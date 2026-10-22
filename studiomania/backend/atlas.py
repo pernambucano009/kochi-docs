@@ -1,9 +1,9 @@
 """عميل Atlas Cloud لتوليد الفيديو بـ Seedance.
 
 الطريقة مأخوذة من المستودع الرسمي AtlasCloudAI/atlas-cloud-skills:
-- رفع الملفات: POST /api/v1/model/uploadMedia (multipart) ويرجّع download_url
+- رفع الملفات: POST /api/v1/model/uploadMedia (multipart) ويعود download_url
 - إرسال طلب التوليد: POST /api/v1/model/generateVideo
-- متابعة الطلب: GET /api/v1/model/prediction/{id} لحد ما الحالة تبقى completed أو failed
+- متابعة الطلب: GET /api/v1/model/prediction/{id} حتى ما الحالة تصبح completed أو failed
 """
 
 import mimetypes
@@ -38,7 +38,7 @@ def api_key() -> str | None:
 
 
 def mock_mode() -> bool:
-    """ATLAS_MOCK=1 بيشغّل البرنامج من غير ما يكلّم Atlas، للتجربة بس."""
+    """ATLAS_MOCK=1 يشغّل البرنامج بدون ما يكلّم Atlas، للتجربة فقط."""
     return os.environ.get("ATLAS_MOCK") == "1"
 
 
@@ -51,7 +51,7 @@ def _unwrap(payload):
 def _headers() -> dict:
     key = api_key()
     if not key:
-        raise AtlasError("مفتاح Atlas مش متسجل. حطه من ⚙️ الإعدادات")
+        raise AtlasError("مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
     return {"Authorization": f"Bearer {key}"}
 
 
@@ -81,7 +81,7 @@ def upload_media(path: Path) -> str:
     data = _check(resp, "رفع الملف")
     url = (data or {}).get("download_url") or (data or {}).get("url")
     if not url:
-        raise AtlasError(f"رفع الملف: الرد مفيهوش لينك: {str(data)[:200]}")
+        raise AtlasError(f"رفع الملف: الرد لا يحتوي رابط: {str(data)[:200]}")
     return url
 
 
@@ -126,7 +126,7 @@ def with_rules(prompt: str) -> str:
 
 
 def _adapt_video(body: dict) -> dict:
-    """كل موديل فيديو بأسماء خاناته (vmodels.py)؛ لو حصل أي حاجة الطلب بيروح زي ما هو."""
+    """كل نموذج فيديو بأسماء خاناته (vmodels.py)؛ إذا حصل أي شيء الطلب يروح كما هو."""
     try:
         import vmodels  # noqa: PLC0415 (بيستورد atlas، فالاستيراد هنا)
         return vmodels.adapt(body)
@@ -143,7 +143,7 @@ def submit_video(body: dict) -> str:
     data = _check(resp, "طلب التوليد")
     prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
     if not prediction_id:
-        raise AtlasError(f"طلب التوليد: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+        raise AtlasError(f"طلب التوليد: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
     return prediction_id
 
 
@@ -154,7 +154,7 @@ def get_prediction(prediction_id: str) -> dict:
 
 
 def wait_for(prediction_id: str, on_status, max_seconds: int = 1800, interval: float = 4) -> str:
-    """يستنى لحد ما الطلب يخلص ويرجّع لينك الفيديو."""
+    """ينتظر حتى ما الطلب ينتهي ويعود رابط الفيديو."""
     deadline = time.monotonic() + max_seconds
     while time.monotonic() < deadline:
         try:
@@ -170,13 +170,13 @@ def wait_for(prediction_id: str, on_status, max_seconds: int = 1800, interval: f
         if status in TERMINAL_OK:
             outputs = pred.get("outputs") or []
             if not outputs:
-                raise AtlasError("الطلب خلص بس مرجّعش فيديو")
+                raise AtlasError("الطلب خلص فقط مرجّعش فيديو")
             return outputs[0]
         if status in TERMINAL_FAIL:
             detail = pred.get("error") or pred.get("meta_info") or status
             raise AtlasError(f"Seedance رفض الطلب: {str(detail)[:300]}")
         time.sleep(interval)
-    raise AtlasError("الطلب أخد وقت أطول من المتوقع. دوس إعادة المحاولة عشان نكمّل متابعته")
+    raise AtlasError("الطلب أخد وقت أطول من المتوقع. اضغط إعادة المحاولة لكي نكمّل متابعته")
 
 
 def download(url: str, dest: Path) -> None:
@@ -206,7 +206,7 @@ def submit_audio(body: dict) -> str:
     data = _check(resp, "طلب تحويل الصوت")
     prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
     if not prediction_id:
-        raise AtlasError(f"طلب تحويل الصوت: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+        raise AtlasError(f"طلب تحويل الصوت: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
     return prediction_id
 
 
@@ -224,11 +224,11 @@ def wait_prediction(prediction_id: str, max_seconds: int = 600, interval: float 
         if status in TERMINAL_FAIL:
             raise AtlasError(f"{what} فشل: {str(pred.get('error') or status)[:300]}")
         time.sleep(interval)
-    raise AtlasError(f"{what} أخد وقت طويل. جرّب تاني")
+    raise AtlasError(f"{what} أخد وقت طويل. جرّب مرة أخرى")
 
 
 def _find_words(obj) -> list[dict] | None:
-    """بيدوّر في الرد على قايمة كلمات فيها أوقات، أيًا كان شكل الرد بالظبط."""
+    """يبحث في الرد على قائمة كلمات فيها أوقات، أيًا كان شكل الرد بالضبط."""
     if isinstance(obj, list) and obj and all(isinstance(x, dict) for x in obj):
         sample = obj[0]
         text_key = next((k for k in ("word", "text", "w", "token") if k in sample), None)
@@ -291,7 +291,7 @@ def _find_text(obj) -> str:
 
 
 def transcribe(audio_path: Path, duration: float) -> list[dict]:
-    """يحوّل التعليق الصوتي لكلام، ويرجّع كل كلمة بوقت بدايتها ونهايتها."""
+    """يحوّل التعليق الصوتي لكلام، ويعود كل كلمة بوقت بدايتها ونهايتها."""
     import json
 
     if mock_mode():
@@ -327,7 +327,7 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
 
     text = _find_text(payload)
     if not text.strip():
-        raise AtlasError("الخدمة مرجّعتش أي كلام. اتأكد إن التسجيل فيه صوت واضح")
+        raise AtlasError("الخدمة مرجّعتش أي نص. تأكد أن التسجيل فيه صوت واضح")
     return words_from_text(text, 0, duration)
 
 
@@ -352,7 +352,7 @@ DEFAULT_SERIES_MODEL = "openai/gpt-5.6-luna"
 
 
 def model_candidates(preferred: str, hints: tuple[str, ...], fallbacks: list[str]) -> list[str]:
-    """الموديل المختار الأول، وبعده اللي عند Atlas وفيه الكلمات دي، وبعدها الاحتياطي."""
+    """النموذج المختار أولًا، وبعده الذي عند Atlas وفيه هذه الكلمات، وبعدها الاحتياطي."""
     available = list_models()
     seen = {m.lower(): m for m in available}
     found = [m for m in available if any(h in m.lower() for h in hints)]
@@ -365,7 +365,7 @@ def model_candidates(preferred: str, hints: tuple[str, ...], fallbacks: list[str
 
 
 def list_models() -> list[str]:
-    """أسماء موديلات الكلام اللي Atlas بيقدمها (لو الطلب فشل بترجع فاضية)."""
+    """أسماء نماذج النص الذي Atlas يقدمها (إذا الطلب فشل تعود فارغة)."""
     try:
         with httpx.Client(timeout=30) as client:
             resp = client.get(f"{LLM_URL}/models", headers=_headers())
@@ -377,7 +377,7 @@ def list_models() -> list[str]:
 
 
 def vision_candidates(preferred: str) -> list[str]:
-    """الموديل المختار الأول، وبعده موديلات الرؤية اللي Atlas عنده، وبعدها الاحتياطي."""
+    """النموذج المختار أولًا، وبعده نماذج الرؤية التي Atlas لديه، وبعدها الاحتياطي."""
     available = list_models()
     seen = {m.lower(): m for m in available}
     found = [m for m in available if any(h in m.lower() for h in VISION_HINTS) and "embed" not in m.lower()]
@@ -391,7 +391,7 @@ def vision_candidates(preferred: str) -> list[str]:
 
 
 def _missing(resp: httpx.Response) -> bool:
-    """Atlas بيرد 400/404 «not found» لما اسم الموديل مش موجود عنده."""
+    """Atlas يرد 400/404 «not found» عندما اسم النموذج غير موجود لديه."""
     if resp.status_code not in (400, 404):
         return False
     t = resp.text.lower()
@@ -434,11 +434,11 @@ def chat(messages: list[dict], model: str, temperature: float = 0.8, max_tokens:
                 if not _missing(r2):
                     resp, model = r2, alt
                     break
-    data = _check(resp, f"موديل الكلام ({model})")
+    data = _check(resp, f"نموذج النص ({model})")
     try:
         return str(data["choices"][0]["message"]["content"] or "").strip()
     except (KeyError, IndexError, TypeError) as exc:
-        raise AtlasError(f"موديل الكلام رجّع رد غريب: {str(data)[:200]}") from exc
+        raise AtlasError(f"نموذج النص استعد رد غريب: {str(data)[:200]}") from exc
 
 
 # ---------------------------------------------------------------- الصور (GPT Image 2.5)
@@ -466,7 +466,7 @@ def size_ratio(size: str) -> str:
 
 
 def generate_image(family: str, prompt: str, size: str, quality: str, images: list[str] | None = None) -> str:
-    """يرسم صورة ويرجّع لينكها. لو فيه صور مرجعية بيستخدم نسخة الـ edit (لحد 16 صورة)."""
+    """يرسم صورة ويعود لينكها. إذا فيه صور مرجعية يستخدم نسخة الـ edit (حتى 16 صورة)."""
     if family in ASPECT_IMAGE_MODELS:
         t2i, edit, _ = ASPECT_IMAGE_MODELS[family]
         body = {"model": edit if images else t2i, "prompt": with_rules(prompt[:30000]), "aspect_ratio": size_ratio(size),
@@ -481,12 +481,12 @@ def generate_image(family: str, prompt: str, size: str, quality: str, images: li
     data = _check(resp, "طلب الصورة")
     prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
     if not prediction_id:
-        raise AtlasError(f"طلب الصورة: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+        raise AtlasError(f"طلب الصورة: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
     pred = wait_prediction(prediction_id, max_seconds=900, interval=4, what="رسم الصورة")
     outputs = pred.get("outputs") or []
     url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
     if not url:
-        raise AtlasError("الصورة خلصت بس مرجعش لينك")
+        raise AtlasError("الصورة خلصت فقط مرجعش رابط")
     return url
 
 
@@ -494,7 +494,7 @@ _uploads: dict[str, tuple[float, str]] = {}
 
 
 def reference_url(path: Path) -> str:
-    """بيرفع الصورة المرجعية لـ Atlas مرة واحدة ويفتكر اللينك (لمدة ساعة)."""
+    """يرفع الصورة المرجعية لـ Atlas مرة واحدة ويتذكر الرابط (لمدة ساعة)."""
     key = f"{path}:{path.stat().st_mtime}"
     cached = _uploads.get(key)
     if cached and time.monotonic() - cached[0] < 3000:
@@ -505,7 +505,7 @@ def reference_url(path: Path) -> str:
 
 
 def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interval: float = 4) -> str:
-    """أي موديل على Atlas (Video / Audio / Image): يبعت الطلب ويستنى ويرجّع لينك أول ناتج."""
+    """أي نموذج على Atlas (Video / Audio / Image): يرسل الطلب وينتظر ويعود رابط أول ناتج."""
     if kind == "Video":
         body = _adapt_video(body)
     if kind in ("Video", "Image") and isinstance(body.get("prompt"), str):
@@ -515,12 +515,12 @@ def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interva
     data = _check(resp, what)
     pid = (data or {}).get("id") or (data or {}).get("prediction_id")
     if not pid:
-        raise AtlasError(f"{what}: الرد مفيهوش رقم طلب: {str(data)[:200]}")
+        raise AtlasError(f"{what}: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
     pred = wait_prediction(pid, max_seconds=max_seconds, interval=interval, what=what)
     outputs = pred.get("outputs") or pred.get("output") or []
     if isinstance(outputs, str):
         outputs = [outputs]
     url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
     if not url:
-        raise AtlasError(f"{what} خلص بس مرجعش لينك")
+        raise AtlasError(f"{what} خلص فقط مرجعش رابط")
     return url

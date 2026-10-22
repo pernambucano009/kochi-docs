@@ -1,8 +1,8 @@
-"""🔊 الأصوات الرسمية للتايبوجرافي (متاخدة من فيديوهات المرجع، ومتخزنة على السيرفر بس مش في الكود).
+"""🔊 الأصوات الرسمية للتايبوجرافي (متاخدة من فيديوهات المرجع، ومتخزنة على الخادم فقط غير في الكود).
 
 القاعدة:
-- كتابة رسالة (حرف حرف بمؤشر، الحركة type): ضغطات الكيبورد (key_*) وصوت التايبينج (typing_*) بس.
-- أي كلمة أو حرف أو عنصر بيظهر أو بيختفي: الكليكات (click_*)، والبرنامج بيبدّل بينهم عشان الصوت مايتكررش.
+- كتابة رسالة (حرف حرف بمؤشر، الحركة type): ضغطات الكيبورد (key_*) وصوت التايبينج (typing_*) فقط.
+- أي كلمة أو حرف أو عنصر يظهر أو يختفي: الكليكات (click_*)، والبرنامج يبدّل بينهم لكي الصوت لا يتكرر.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def read_wav(data: bytes) -> np.ndarray:
         ch, sw, sr, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
         raw = w.readframes(n)
     if sw != 2:
-        raise ValueError("الملف لازم يكون WAV بـ 16 بت")
+        raise ValueError("الملف يجب يكون WAV بـ 16 بت")
     x = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
     if ch > 1:
         x = x.reshape(-1, ch).mean(1)
@@ -51,7 +51,7 @@ def write_wav(path: Path, x: np.ndarray) -> None:
 
 
 def add_files(folder: Path, name: str, data: bytes) -> list[str]:
-    """بيضيف ملف wav أو zip فيه ملفات. الأسماء لازم تبدأ بـ click_ أو key_ أو typing_."""
+    """يضيف ملف wav أو zip فيه ملفات. الأسماء يجب تبدأ بـ click_ أو key_ أو typing_."""
     folder.mkdir(parents=True, exist_ok=True)
     items = []
     if name.lower().endswith(".zip"):
@@ -83,15 +83,15 @@ def library(folder: Path) -> dict[str, list[Path]]:
 
 
 def _score(t: float, salt: int) -> float:
-    """رقم ثابت من 0 لـ 1 لكل صوت (نفس الصوت دايمًا نفس الرقم): الصوت بيتسمع لو رقمه أقل من العداد.
-    كده لما العداد يعلى أصوات جديدة بتتضاف، واللي كانت موجودة بتفضل زي ما هي."""
+    """رقم ثابت من 0 لـ 1 لكل صوت (نفس الصوت دائمًا نفس الرقم): الصوت يُسمع إذا رقمه أقل من العداد.
+    هكذا عندما العداد يعلى أصوات جديدة تُضاف، واللي كانت موجودة تظل كما هي."""
     return random.Random(f"{t:.3f}|{salt}").random()
 
 
 def events(blocks: list[dict], duration: float, level: int = 100) -> list[tuple[float, str, float]]:
     """(وقت، نوع الصوت، قوة) لكل ظهور/اختفاء في الفيديو، على نفس توقيت المحرّك.
-    level من 0 (مفيش كليكات) لـ 100 (كل كلمة): أول كليك لكل عنصر بيفضل طول ما العداد فوق الصفر،
-    وكليكات الكلمات وضغطات الكيبورد بتزيد مع العداد."""
+    level من 0 (لا يوجد كليكات) لـ 100 (كل كلمة): أول كليك لكل عنصر يظل طول ما العداد أعلى الصفر،
+    وكليكات الكلمات وضغطات الكيبورد تزيد مع العداد."""
     level = max(0, min(100, int(level)))
     if level <= 0:
         return []
@@ -135,7 +135,7 @@ def events(blocks: list[dict], duration: float, level: int = 100) -> list[tuple[
 
 
 def render(folder: Path, blocks: list[dict], duration: float, out: Path, seed: int = 7, level: int = 100) -> bool:
-    """بيكتب تراك المؤثرات. بيرجع False لو المكتبة فاضية أو مفيش أحداث."""
+    """يكتب تراك المؤثرات. يعود False إذا المكتبة فارغة أو لا يوجد أحداث."""
     lib = library(folder)
     cache: dict[Path, np.ndarray] = {}
 

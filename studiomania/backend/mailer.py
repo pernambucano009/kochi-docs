@@ -1,9 +1,9 @@
-"""📧 إرسال الإيميلات (تأكيد الحساب، نسيت الباسورد).
+"""📧 إرسال الإيميلات (تأكيد الحساب، نسيت كلمة المرور).
 
-بيشتغل بأي واحد من دول (من متغيرات السيرفر):
+يشتغل بأي واحد من هؤلاء (من متغيرات الخادم):
 - RESEND_API_KEY (+ MAIL_FROM): خدمة Resend.
-- SMTP_HOST + SMTP_PORT + SMTP_USER + SMTP_PASS (+ MAIL_FROM): أي إيميل بيزنس (Google Workspace / Zoho …).
-لو مفيش ولا واحد: الإيميل بيتكتب في سجل السيرفر بس (للتجربة)، و MAIL_DEV=1 بيخلي صفحة التسجيل تعرض اللينك.
+- SMTP_HOST + SMTP_PORT + SMTP_USER + SMTP_PASS (+ MAIL_FROM): أي بريد إلكتروني بيزنس (Google Workspace / Zoho …).
+إذا لا يوجد أي واحد: البريد الإلكتروني يُكتب في سجل الخادم فقط (للتجربة)، و MAIL_DEV=1 يخلي صفحة التسجيل تعرض الرابط.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def sender() -> str:
 
 
 def send(to: str, subject: str, text: str, html: str | None = None) -> bool:
-    """True لو اتبعت فعلًا."""
+    """True إذا أُرسل فعلًا."""
     if os.environ.get("RESEND_API_KEY"):
         try:
             r = httpx.post("https://api.resend.com/emails", timeout=20,
@@ -71,4 +71,4 @@ def button_html(title: str, body: str, link: str, label: str) -> str:
 <div style="font-weight:700;font-size:18px;margin-bottom:18px">Simsim<span style="color:#E5613E">Kit</span></div>
 <h2 style="margin:0 0 12px">{title}</h2><p style="line-height:1.8;color:#555">{body}</p>
 <p style="margin:24px 0"><a href="{link}" style="background:#E5613E;color:#fff;padding:12px 22px;border-radius:12px;text-decoration:none">{label}</a></p>
-<p style="font-size:12px;color:#999">لو الزرار مش شغال، انسخ اللينك ده: {link}</p></div>"""
+<p style="font-size:12px;color:#999">إذا الزر لا يعمل، انسخ هذا الرابط: {link}</p></div>"""

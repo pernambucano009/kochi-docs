@@ -1,11 +1,11 @@
-"""🪄 المشهد: تغيير الخلفية ورا الشخص، وشيل حاجات من الفيديو.
+"""🪄 المشهد: تغيير الخلفية خلف الشخص، وأزل أشياء من الفيديو.
 
-- camera(): حركة الكاميرا في كل لقطة (من نقط الخلفية بس، الشخص مستبعد) عشان الخلفية الجديدة تتحرك معاها،
+- camera(): حركة الكاميرا في كل لقطة (من نقاط الخلفية فقط، الشخص مستبعد) لكي الخلفية الجديدة تتحرك معها،
   ومكان القطعات بين اللقطات.
-- removal(): بيشيل حاجة من جزء من الفيديو: المكان اللي وراها بيتاخد من الفريمات التانية اللي الحاجة فيها كانت
-  اتحركت أو الكاميرا شافت اللي وراها (median)، واللي عمره ما ظهر بيتملا (تقريبي، أو من صورة الـ AI لو اتطلبت).
-  الناتج فيديو نضيف للجزء ده + فيديو للماسك (فين اتغير).
-- composite(): التصدير: الفيديو الأصلي ← الحاجات اللي اتشالت ← الخلفية الجديدة ورا الشخص."""
+- removal(): يزيل شيء من جزء من الفيديو: المكان الذي وراها يُؤخذ من الفريمات الأخرى التي الشيء فيها كانت
+  اتحركت أو الكاميرا شافت الذي وراها (median)، واللي عمره ما ظهر يُملأ (تقريبي، أو من صورة الـ AI إذا اتطلبت).
+  الناتج فيديو نضيف هذا للجزء + فيديو للماسك (أين تغيّر).
+- composite(): التصدير: الفيديو الأصلي ← الأشياء التي أُزيلت ← الخلفية الجديدة خلف الشخص."""
 from __future__ import annotations
 
 import subprocess
@@ -20,7 +20,7 @@ WORK = 360        # عرض الفريمات لحساب حركة الكاميرا
 
 
 def _alpha(path: Path, w: int, h: int) -> np.ndarray | None:
-    """ماسك الشخص (0..1) بمقاس معين، من صورة m_xxxxx.webp."""
+    """ممسك الشخص (0..1) بمقاس معين، من صورة m_xxxxx.webp."""
     if not path.exists():
         return None
     m = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
@@ -33,7 +33,7 @@ def _alpha(path: Path, w: int, h: int) -> np.ndarray | None:
 
 
 def _read(cap, step: int):
-    """الفريم الجاي بـ 30 في الثانية (لو الفيديو 60 بيتخطى فريم)."""
+    """الفريم القادم بـ 30 في الثانية (إذا الفيديو 60 يتخطى فريم)."""
     ok, fr = cap.read()
     for _ in range(step - 1):
         if not cap.grab():
@@ -52,10 +52,10 @@ def mask_path(person_dir: Path, i: int) -> Path:
 # ---------------------------------------------------------------- 🎥 حركة الكاميرا
 
 def camera(path: str, person_dir: Path | None = None, progress=None) -> dict:
-    """{fps, n, w, h, shots: [[f0, f1]], cam: [[a, b, tx, c, d, ty]]} — cam بيحوّل من أول فريم في اللقطة للفريم ده (بكسل الفيديو)."""
+    """{fps, n, w, h, shots: [[f0, f1]], cam: [[a, b, tx, c, d, ty]]} — cam يحوّل من أول فريم في اللقطة هذا للفريم (بكسل الفيديو)."""
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
-        raise RuntimeError("مش قادر يفتح الفيديو")
+        raise RuntimeError("لا قادر يفتح الفيديو")
     vfps = cap.get(cv2.CAP_PROP_FPS) or FPS
     step = max(1, round(vfps / FPS))   # الفريمات بتتعد بـ 30 في الثانية (زي ماسكات الشخص)
     fps = vfps / step
@@ -121,7 +121,7 @@ def cam_mat(c) -> np.ndarray:
 
 
 def shots_on(shots: list, frames: list) -> list[bool]:
-    """اللقطة فيها شخص (أغلب فريماتها)؟ الخلفية بتتغير فيها بس؛ لقطات الـ B-roll بتفضل زي ما هي."""
+    """اللقطة فيها شخص (أغلب فريماتها)؟ الخلفية تتغير فيها فقط؛ لقطات الـ B-roll تظل كما هي."""
     out = []
     for f0, f1 in shots:
         seg = frames[f0:f1 + 1]
@@ -147,8 +147,8 @@ def _close(proc) -> None:
 
 def removal(ffmpeg: str, path: str, out_clean: Path, out_mask: Path, f0: int, f1: int, fref: int, mask_fn, cams: list,
             ai_plate: np.ndarray | None = None, progress=None) -> dict:
-    """mask_fn(i) → ماسك uint8 (255 = الحاجة) بمقاس الفيديو للفريم i. cams: مصفوفة الكاميرا لكل فريم (من camera()).
-    بيرجّع {holes: نسبة المكان اللي عمره ما ظهر، bbox}."""
+    """mask_fn(i) → ممسك uint8 (255 = الشيء) بمقاس الفيديو للفريم i. cams: مصفوفة الكاميرا لكل فريم (من camera()).
+    يعود {holes: نسبة المكان الذي عمره ما ظهر، bbox}."""
     cap = cv2.VideoCapture(path)
     vfps = cap.get(cv2.CAP_PROP_FPS) or FPS
     step = max(1, round(vfps / FPS))
@@ -162,7 +162,7 @@ def removal(ffmpeg: str, path: str, out_clean: Path, out_mask: Path, f0: int, f1
         if m is not None and m.any():
             union |= cv2.warpAffine(m, np.linalg.inv(C[i])[:2], (W, H), flags=cv2.INTER_NEAREST)
     if not union.any():
-        raise RuntimeError("مش لاقي الحاجة في الفريمات دي")
+        raise RuntimeError("غير لاقي الشيء في هذه الفريمات")
     x, y, bw, bh = cv2.boundingRect(union)
     pad = max(16, int(0.02 * W))
     x0, y0, x1, y1 = max(0, x - pad), max(0, y - pad), min(W, x + bw + pad), min(H, y + bh + pad)
@@ -242,7 +242,7 @@ def removal(ffmpeg: str, path: str, out_clean: Path, out_mask: Path, f0: int, f1
 
 
 def poly_masks(polys: dict, W: int, H: int, grow: float = 0.012):
-    """ماسك من حدود (بكسور) لكل فريم، بهامش صغير (الحواف والضل اللي حوالين الحاجة)."""
+    """ممسك من حدود (بكسور) لكل فريم، بهامش صغير (الحواف والضل الذي حوالين الشيء)."""
     g = max(3, int(grow * W)) | 1
     ker = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (g, g))
 
@@ -269,7 +269,7 @@ def person_masks(person_dir: Path, W: int, H: int, grow: float = 0.012):
 # ---------------------------------------------------------------- 🎬 التصدير
 
 def _cover(img: np.ndarray, W: int, H: int, zoom: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
-    """الصورة على قد الكادر (cover) ومصفوفة مكانها: من بكسل الصورة لبكسل الكادر."""
+    """الصورة على قدر الكادر (cover) ومصفوفة مكانها: من بكسل الصورة لبكسل الكادر."""
     ih, iw = img.shape[:2]
     k = max(W / iw, H / ih) * zoom
     P = np.array([[k, 0, (W - iw * k) / 2], [0, k, (H - ih * k) / 2], [0, 0, 1]], np.float64)
@@ -277,7 +277,7 @@ def _cover(img: np.ndarray, W: int, H: int, zoom: float = 1.0) -> tuple[np.ndarr
 
 
 class _Loop:
-    """فيديو الخلفية: فريم ورا فريم، ولما يخلص بيبدأ من الأول."""
+    """فيديو الخلفية: فريم خلف فريم، وعندما ينتهي يبدأ من أولًا."""
     def __init__(self, path: str):
         self.path = path
         self.cap = cv2.VideoCapture(path)
@@ -384,7 +384,7 @@ def composite(ffmpeg: str, in_args: list[str], out: Path, W: int, H: int, fps: i
 
 
 def polys_from_track(tr: dict, poly: list, fref: int, f0: int, f1: int) -> dict:
-    """حدود الحاجة (بكسور) في كل فريم: الحدود اللي اتحددت في fref بتتحرك زي أركان التراك."""
+    """حدود الشيء (بكسور) في كل فريم: الحدود الذي اتحددت في fref تتحرك مثل أركان التراك."""
     i0 = int(round(tr["t0"] * FPS))
     qs = tr["q"]
     q4 = lambda q: np.array(q, np.float32).reshape(4, 2)  # noqa: E731

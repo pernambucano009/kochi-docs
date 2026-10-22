@@ -1,7 +1,7 @@
-"""🎨 «+ إضافة ستايل» (جوه «الستايل» في عقل البراند): ستايل خاص بالبراند بيستنبطه المخ.
+"""🎨 «+ إضافة أسلوب» (داخل «الأسلوب» في عقل العلامة): أسلوب خاص بالعلامة يستنبطه العقل.
 
-بتدّيله لينك صفحة (موقع أو بوست) أو صور وفيديوهات ستوك وألوان، وهو بيطلّع منها ستايل الرسم (مش موضوعها):
-اسم، ووصف بالإنجليزي بيتحط في برومبتات الصور والفيديو، وألوان. الصورة الأولى (أو سكرين شوت الصفحة) بتبقى الكفر.
+تدّيله رابط صفحة (موقع أو منشور) أو صور وفيديوهات ستوك وألوان، وهو يُخرج منها أسلوب الرسم (غير موضوعها):
+اسم، ووصف بالإنجليزية يوضع في أوصاف الصور والفيديو، وألوان. الصورة الأولى (أو سكرين شوت الصفحة) تصبح الكفر.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ ICONS = ["🎨", "🖌️", "✨", "🌈", "🖼️", "🧩", "🎞️", "💫"]
 
 
 def page_assets(html: str, base: str) -> tuple[list[str], list[str]]:
-    """من HTML الصفحة: صور المشاركة والصور الكبيرة، والألوان اللي متكررة في الـCSS."""
+    """من HTML الصفحة: صور المشاركة والصور الكبيرة، والألوان الذي متكررة في الـCSS."""
     from urllib.parse import urljoin
     imgs = re.findall(r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)', html, re.I)
     imgs += re.findall(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image)', html, re.I)
@@ -58,17 +58,17 @@ def clean(raw: dict, colors: list[str]) -> dict:
     pal = [str(x).lower() for x in raw.get("palette") or [] if HEX.fullmatch(str(x).strip())][:6]
     prompt = str(raw.get("prompt") or "").strip()[:600]
     if not prompt:
-        raise ValueError("المخ ما عرفش يطلّع ستايل من المراجع دي، جرّب صور أوضح")
+        raise ValueError("العقل ما عرفش يُخرج أسلوب من هذه المراجع، جرّب صور أوضح")
     return {"ar": str(raw.get("ar") or "ستايلي").strip()[:40], "en": str(raw.get("en") or "My style").strip()[:40],
             "prompt": prompt, "look": str(raw.get("look") or "").strip()[:300], "palette": pal or colors[:6]}
 
 
 def mock(colors: list[str], note: str) -> dict:
-    return {"ar": "ستايل البراند", "en": "Brand style", "look": "رسم فلات بخطوط ناعمة وألوان دافية وإضاءة هادية",
+    return {"ar": "أسلوب العلامة", "en": "Brand style", "look": "رسم فلات بخطوط ناعمة وألوان دافية وإضاءة هادية",
             "prompt": "flat illustrated look, soft rounded shapes, warm muted palette, gentle grain texture, soft diffuse light"
                       + (f", {note}" if note else ""), "palette": colors[:6] or ["#f2a65a", "#2d3047", "#f7f4ea"]}
 
 
 def new_item(name: str = "") -> dict:
-    return {"id": "my-" + uuid.uuid4().hex[:8], "ar": name.strip()[:40] or "ستايل جديد", "en": "", "prompt": "", "look": "",
+    return {"id": "my-" + uuid.uuid4().hex[:8], "ar": name.strip()[:40] or "أسلوب جديد", "en": "", "prompt": "", "look": "",
             "palette": [], "cover": "", "status": "working", "error": None, "icon": ICONS[uuid.uuid4().int % len(ICONS)]}

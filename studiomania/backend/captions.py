@@ -1,6 +1,6 @@
-"""الكابشن: تحويل كلام التعليق الصوتي لملف ASS بيتكتب على الفيديو بـ FFmpeg (libass).
+"""التعليق النصي: تحويل نص التعليق الصوتي لملف ASS يُكتب على الفيديو بـ FFmpeg (libass).
 
-الخطوط العربي في فولدر fonts متجهزة بـ tools/prepare_fonts.py عشان تتكتب صح من غير مربعات.
+الخطوط العربية في مجلد fonts متجهزة بـ tools/prepare_fonts.py لكي تُكتب صحيح بدون مربعات.
 """
 
 import re
@@ -45,7 +45,7 @@ DEFAULT_TEMPLATE = "kochi"
 
 
 def style_for(settings: dict) -> dict:
-    """يدمج التيمبليت مع التعديلات اللي المستخدم عملها."""
+    """يدمج التيمبليت مع التعديلات التي المستخدم عملها."""
     base = dict(TEMPLATES.get(settings.get("template") or DEFAULT_TEMPLATE, TEMPLATES[DEFAULT_TEMPLATE]))
     for k in ("font", "size", "y", "words", "color", "highlight", "highlight_on", "box", "box_color", "pop"):
         if settings.get(k) is not None:
@@ -81,7 +81,7 @@ def clean(word: str) -> str:
 
 
 def chunk_words(words: list[dict], per_chunk: int) -> list[list[dict]]:
-    """يقسم الكلام لمجموعات، ويبدأ مجموعة جديدة لو فيه سكتة طويلة أو نهاية جملة."""
+    """يقسم النص لمجموعات، ويبدأ مجموعة جديدة إذا فيه سكتة طويلة أو نهاية جملة."""
     chunks, cur = [], []
     for i, w in enumerate(words):
         if cur and (len(cur) >= per_chunk or w["s"] - cur[-1]["e"] > 0.7):
@@ -156,13 +156,13 @@ def build_ass(words: list[dict], settings: dict, total: float, size: tuple[int, 
 
 
 def filter_path(path: Path) -> str:
-    """يحضّر مسار الملف عشان يتكتب جوه فلتر FFmpeg (ويندوز فيه : و \\)."""
+    """يحضّر مسار الملف لكي يُكتب داخل فلتر FFmpeg (ويندوز فيه : و \\)."""
     p = str(path).replace("\\", "/")
     return p.replace(":", "\\:").replace("'", "\\'").replace(",", "\\,")
 
 
 def words_from_text(text: str, start: float, end: float) -> list[dict]:
-    """لو الخدمة رجّعت كلام من غير أوقات، نوزّعه بالتساوي على الوقت."""
+    """إذا الخدمة رجّعت نص بدون أوقات، نوزّعه بالتساوي على الوقت."""
     ws = [w for w in text.split() if w.strip()]
     if not ws:
         return []

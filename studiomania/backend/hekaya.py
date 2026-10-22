@@ -1,11 +1,11 @@
-"""📖 «حكاية»: قصة قصيرة بصوت راوي، كل مشهد مرسوم بالكود ومتظبط على توقيت الكلام.
+"""📖 «حكاية»: قصة قصيرة بصوت راوي، كل مشهد مرسوم بالكود ومتظبط على توقيت النص.
 
-الترتيب (الصوت الأول وبعدين الصورة على مقاسه):
-الفكرة ← القصة والمشاهد (تتعدّل) ← صوت الراوي (مولّد أو بصوتك) ← توقيت كل كلمة ← المشاهد بالكود ← الفيديو.
-الكلام بيظهر على الشاشة كلمة كلمة لحظة ما بتتقال.
+الترتيب (الصوت أولًا ثم الصورة على مقاسه):
+الفكرة ← القصة والمشاهد (تُعدّل) ← صوت الراوي (مولّد أو بصوتك) ← توقيت كل كلمة ← المشاهد بالكود ← الفيديو.
+النص يظهر على الشاشة كلمة كلمة لحظة ما تُقال.
 
-الستايل منفصل عن الرسم: المشاهد بتترسم بأدوات عامة (P للأشكال، M للخامة)، وكل ستايل (لبّاد، ورق، شمع، ألوان مية…)
-بيدّي نفس الأدوات شكل تاني. فتغيير الستايل بعد ما المشاهد تخلص مش محتاج يكتب كود تاني.
+الأسلوب منفصل عن الرسم: المشاهد تُرسم بأدوات عامة (P للأشكال، M للخامة)، وكل أسلوب (لبّاد، ورق، شمع، ألوان مية…)
+يعطي نفس الأدوات شكل آخر. فتغيير الأسلوب بعد ما المشاهد تنتهي لا يحتاج يكتب كود آخر.
 """
 from __future__ import annotations
 
@@ -22,9 +22,9 @@ OUT_FPS = 24
 LEAD = .4         # الصوت بيبدأ بعد البداية بشوية
 TAIL = 1.2        # نفَس بعد آخر كلمة
 TD = .5           # مدة الانتقال بين المشاهد
-AUDIENCES = {"kids": "حكاية أطفال", "brand": "حكاية للبراند", "general": "حكاية لأي حد"}
+AUDIENCES = {"kids": "حكاية أطفال", "brand": "حكاية للعلامة", "general": "حكاية لأي حد"}
 MOODS = {"playful": "مرحة", "warm": "دافية", "calm": "هادية", "epic": "حماسية", "tense": "تشويق"}
-ENDINGS = {"none": "من غير نهاية خاصة", "brand": "اسم البراند والدعوة (CTA)", "custom": "كلمة في الكومنت + جملة"}
+ENDINGS = {"none": "بدون نهاية خاصة", "brand": "اسم العلامة والدعوة (CTA)", "custom": "كلمة في التعليق + جملة"}
 TRANS = ("scallop", "iris", "slide", "dissolve", "page")
 ROLES = ("sky", "sky2", "sun", "coral", "teal", "grass", "navy", "cream", "ink", "card", "pink", "purple", "orange", "brown", "white", "skin")
 
@@ -113,7 +113,7 @@ def styles_list() -> list[dict]:
 # ---------------------------------------------------------------- محرّك الرسم (JS)
 # الأدوات العامة: P (أشكال) و M (خامة)، والخامة بتختلف حسب الستايل. فوقها: الكاميرا، الهزّة، الانتقالات، والكلام اللي بيظهر كلمة كلمة.
 KIT = r"""
-// الموديل ساعات بيكتب min() و sin() و PI من غير Math.: بنعرّفهم عامّين (كخصائص، فلو كود الشخصيات عرّف واحد بنفس الاسم مايحصلش تعارض)
+// النموذج ساعات يكتب min() و sin() و PI بدون Math.: نعرّفهم عامّين (كخصائص، فلو كود الشخصيات عرّف واحد بنفس الاسم مايحصلش تعارض)
 for(const k of ['min','max','abs','floor','ceil','round','trunc','sin','cos','tan','asin','acos','atan','atan2','sqrt','cbrt','hypot','pow','sign','exp','log','log2','log10'])if(!(k in globalThis))globalThis[k]=Math[k];
 if(!('PI' in globalThis))globalThis.PI=Math.PI;if(!('TAU' in globalThis))globalThis.TAU=Math.PI*2;
 const u=Math.min(W,H)/1080;let T=0;
@@ -160,7 +160,7 @@ function inset(ctx,path,d,fn){const b=path.bb;if(!b||b.w<d*4||b.h<d*4)return;con
 function drop(ctx,p,dx,dy,a,soft){ctx.save();ctx.fillStyle=`rgba(35,18,8,${a*.55})`;ctx.translate(dx*.6,dy*.6);ctx.fill(p);ctx.fillStyle=`rgba(35,18,8,${a*.45})`;
   ctx.translate(dx*.6,dy*.6);ctx.fill(p);if(soft){ctx.fillStyle=`rgba(35,18,8,${a*.2})`;ctx.translate(dx*.5,dy*.5);ctx.fill(p)}ctx.restore()}
 function strokePts(ctx,pts){ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y))}
-// الخامة الأساسية (فلات)، وكل ستايل بيغيّر اللي محتاجه
+// الخامة الأساسية (فلات)، وكل أسلوب يغيّر ما تحتاجه
 const M={
  c(k){return (ST.pal&&ST.pal[k])||k},
  bg(ctx,top='sky',bottom='sky2'){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,M.c(top));g.addColorStop(1,M.c(bottom||top));ctx.fillStyle=g;ctx.fillRect(-W,-H,W*3,H*3)},
@@ -285,7 +285,7 @@ IMPL = {
 
 # المشهد الكامل: الكاميرا، الهزّة، الانتقال، الكلام كلمة كلمة، والنهاية الجاهزة
 RUNTIME = r"""
-// الخلفية بتترسم مرة واحدة لكل لونين وتتخزن (أسرع بكتير من رسمها كل فريم)
+// الخلفية تُرسم مرة واحدة لكل لونين وتتخزن (أسرع بكتير من رسمها كل فريم)
 const _bgImpl=M.bg,_BG={};
 M.bg=function(ctx,top='sky',bottom='sky2'){const k=top+'|'+bottom;if(!_BG[k]){const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
   _bgImpl.call(M,g,top,bottom);_BG[k]=c}ctx.drawImage(_BG[k],-W*.03,-H*.03,W*1.06,H*1.06)};
@@ -360,7 +360,7 @@ function scene(ctx,t){T=t;const i=sceneAt(t),sc=SCN[i],into=t-sc.s;
 
 
 def runtime_code(style: str, scn: list[dict], end: dict, cast_code: str, bodies: dict[int, str]) -> str:
-    """الكود الكامل اللي بيترسم: الستايل + الأدوات + الشخصيات + المشاهد + المحرّك."""
+    """الكود الكامل الذي يُرسم: الأسلوب + الأدوات + الشخصيات + المشاهد + المحرّك."""
     st = STYLES.get(style) or STYLES[DEFAULT_STYLE]
     cfg = {"key": style, "pal": st["pal"], "cap": st["cap"], "trans": st["trans"], "post": st["post"]}
     scenes = "\n".join(f"SC[{i}]=function(ctx,t,d,W,H,w){{\n{bodies[i]}\n}};" for i in sorted(bodies))
@@ -431,14 +431,14 @@ Return JSON:
 
 def mock_story(i: dict) -> dict:
     ar = not re.search(r"english|انجليز|إنجليز", i.get("lang") or "", re.I)
-    lines = (["كان يا ما كان", "ثعلب صغير اسمه بيبو", "بيحلم يلمس القمر", "فبنى صاروخ من الكراتين", "ولزقه ولوّنه بالألوان", "تلاتة اتنين واحد", "انطلق!",
-              "عدّى السحاب والطيور", "وطلع فوق قوس قزح", "ووصل للنجوم", "وهبط على القمر", "الأحلام معمولة علشان تطير"] if ar else
+    lines = (["كان يا ما كان", "ثعلب صغير اسمه يبو", "يحلم يلمس القمر", "فبنى صاروخ من الكراتين", "ولزقه ولوّنه بالألوان", "ثلاثة اثنان واحد", "انطلق!",
+              "عدّى السحاب والطيور", "وطلع أعلى قوس قزح", "ووصل للنجوم", "وهبط على القمر", "الأحلام معمولة لكي تطير"] if ar else
              ["Once upon a time", "a little fox named Pip", "dreamed of the moon", "so Pip built a rocket", "from boxes and paint", "three two one", "blast off!",
               "past the clouds and birds", "over the rainbow", "into the stars", "and landed on the moon", "dreams are made to fly"])
     sc = [{"text": t, "visual": "fox scene", "motion": "bounce", "big": k == 6, "keys": [t.split()[-1]], "trans": None, "end": None} for k, t in enumerate(lines)]
     if i["ending"] != "none":
-        sc += [{"text": "كل اللي شفته ده اتعمل بالكود" if ar else "Everything you saw was made in code", "visual": "", "motion": "", "big": False, "keys": [], "end": "card"},
-               {"text": f"اكتب {i.get('keyword') or 'حكاية'} في الكومنت" if ar else f"Comment {i.get('keyword') or 'story'}", "visual": "", "motion": "", "big": False,
+        sc += [{"text": "كل ما شفته هذا أُنشئ بالكود" if ar else "Everything you saw was made in code", "visual": "", "motion": "", "big": False, "keys": [], "end": "card"},
+               {"text": f"اكتب {i.get('keyword') or 'حكاية'} في التعليق" if ar else f"Comment {i.get('keyword') or 'story'}", "visual": "", "motion": "", "big": False,
                 "keys": [], "end": "cta"}]
     return {"title": "الصاروخ الورق" if ar else "The Paper Rocket", "cast": [{"name": "fox", "label": "يبو", "look": "orange blob body, cream belly, triangle ears, bushy tail"}],
             "scenes": sc, "music": {"mood": "playful", "bpm": 118}}
@@ -456,7 +456,7 @@ def clean_story(raw: dict, i: dict) -> dict:
                        "big": bool(s.get("big")), "keys": [str(k)[:30] for k in s.get("keys") or [] if str(k).strip()][:3],
                        "trans": s.get("trans") if s.get("trans") in TRANS else None, "end": end})
     if len(scenes) < 2:
-        raise ValueError("القصة رجعت من غير مشاهد كفاية")
+        raise ValueError("القصة رجعت بدون مشاهد كفاية")
     cast = [{"name": re.sub(r"[^A-Za-z0-9_]", "", str(c.get("name") or f"c{k}"))[:24] or f"c{k}", "label": str(c.get("label") or c.get("name") or "")[:40],
              "look": str(c.get("look") or "")[:400]} for k, c in enumerate(raw.get("cast") or []) if isinstance(c, dict)][:4]
     m = raw.get("music") if isinstance(raw.get("music"), dict) else {}
@@ -469,7 +469,7 @@ def clean_story(raw: dict, i: dict) -> dict:
 
 
 def clean_spoken(s: str) -> str:
-    """الكلام اللي بيتقال بس: من غير توجيهات بين أقواس."""
+    """النص الذي يُقال فقط: بدون توجيهات بين أقواس."""
     return re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", s)).strip()
 
 
@@ -492,7 +492,7 @@ def split_words(s: str) -> list[str]:
 
 
 def align(script: list[str], heard: list[dict], dur: float) -> list[float]:
-    """بداية كل كلمة في القصة: من كلام الراوي اللي اتسمع، واللي ماتسمعش بيتحسب من اللي حواليه."""
+    """بداية كل كلمة في القصة: من نص الراوي الذي اتسمع، واللي ماتسمعش يُحسب مما حواليه."""
     n = len(script)
     if not n:
         return []
@@ -530,7 +530,7 @@ def align(script: list[str], heard: list[dict], dur: float) -> list[float]:
 
 
 def timeline(story: dict, word_times: list[float], voice_dur: float) -> tuple[list[dict], float]:
-    """المشاهد على الصوت: كل مشهد بيبدأ قبل أول كلمة فيه بـ 0.15 ثانية."""
+    """المشاهد على الصوت: كل مشهد يبدأ قبل أول كلمة فيه بـ 0.15 ثانية."""
     scn, k = [], 0
     for idx, s in enumerate(story["scenes"]):
         ws = split_words(s["text"])

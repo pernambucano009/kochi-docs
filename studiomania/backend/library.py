@@ -1,7 +1,7 @@
-"""📁 مكتبة العقل: صور وفيديوهات وأصوات العميل في فولدرات جوه فولدرات، وكل ملف المخ بيكتب عليه هو إيه (وصف وتاجات).
+"""📁 مكتبة العقل: صور وفيديوهات وأصوات العميل في مجلدات داخل مجلدات، وكل ملف العقل يكتب عليه هو ماذا (وصف وتاجات).
 
-الأساس اللي «الموديل المخصص» (الكانفاس) هيشتغل عليه: «اسحب صورة من @صور/أسنان/قبل»، أو ملف بعينه، أو «صورة فيها ابتسامة».
-الملفات نفسها في فولدر واحد على السيرفر، والفولدرات مجرد شجرة في library.json (النقل والتسمية مابيلمسوش الملفات).
+الأساس الذي «النموذج المخصص» (الكانفاس) سيشتغل عليه: «اسحب صورة من @صور/أسنان/قبل»، أو ملف بعينه، أو «صورة فيها ابتسامة».
+الملفات نفسها في مجلد واحد على الخادم، والمجلدات مجرد شجرة في library.json (النقل والتسمية مابيلمسوش الملفات).
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def fid() -> str:
     return uuid.uuid4().hex[:10]
 
 
-def clean_name(s: str, fallback: str = "من غير اسم") -> str:
+def clean_name(s: str, fallback: str = "بدون اسم") -> str:
     s = re.sub(r"[\\/\x00-\x1f]", " ", str(s or "")).strip()
     return re.sub(r"\s+", " ", s)[:80] or fallback
 
@@ -40,7 +40,7 @@ def children(lib: dict, parent: str | None) -> list[dict]:
 
 
 def path_of(lib: dict, folder: str | None) -> list[dict]:
-    """الفولدر وآباؤه من فوق لتحت."""
+    """المجلد وآباؤه من أعلى لتحت."""
     by = {f["id"]: f for f in lib["folders"]}
     out, cur, seen = [], by.get(folder or ""), set()
     while cur and cur["id"] not in seen:
@@ -66,7 +66,7 @@ def descendants(lib: dict, folder: str) -> set[str]:
 
 
 def ensure_path(lib: dict, parent: str | None, parts: list[str]) -> str | None:
-    """فولدر مرفوع بفولدراته («أسنان/قبل/صورة.jpg»): الفولدرات بتتعمل لو مش موجودة، وبيرجّع آخر واحد."""
+    """مجلد مرفوع بفولدراته («أسنان/قبل/صورة.jpg»): المجلدات تُنشأ إذا غير موجودة، ويعود آخر واحد."""
     cur = parent
     for name in [clean_name(p) for p in parts if p.strip()][:MAX_DEPTH]:
         hit = next((f for f in children(lib, cur) if norm(f["name"]) == norm(name)), None)
@@ -78,7 +78,7 @@ def ensure_path(lib: dict, parent: str | None, parts: list[str]) -> str | None:
 
 
 def resolve(lib: dict, ref: str) -> tuple[str | None, dict | None]:
-    """منشن: «صور/أسنان/قبل» ← فولدر، أو اسم ملف بعينه ← ملف. بيرجّع (folder_id, file)."""
+    """إشارة: «صور/أسنان/قبل» ← مجلد، أو اسم ملف بعينه ← ملف. يعود (folder_id, file)."""
     parts = [p for p in re.split(r"[/\\›>]+", str(ref or "").lstrip("@")) if p.strip()]
     cur = None
     for i, p in enumerate(parts):
@@ -94,7 +94,7 @@ def resolve(lib: dict, ref: str) -> tuple[str | None, dict | None]:
 
 
 def search(lib: dict, q: str, kind: str = "", folder: str | None = None, deep: bool = True) -> list[dict]:
-    """بحث بالاسم والوصف والتاجات (بعد توحيد الحروف). من غير كلام: كل اللي في الفولدر."""
+    """بحث بالاسم والوصف والتاجات (بعد توحيد الحروف). بدون نص: كل ما في المجلد."""
     words = [w for w in norm(q).split() if len(w) > 1]
     scope = None if folder is None else ({folder} | (descendants(lib, folder) if deep else set()))
     out = []
@@ -116,10 +116,10 @@ def search(lib: dict, q: str, kind: str = "", folder: str | None = None, deep: b
 
 def tag_messages(kind: str, name: str, where: str, extra: str = "") -> list[dict]:
     what = {"image": "الصورة", "video": "الفيديو", "audio": "التسجيل الصوتي"}[kind]
-    return [{"role": "system", "content": "انت بتنظّم مكتبة صور وفيديوهات وأصوات لبراند. اكتب بالعربي الفصيح البسيط. رجّع JSON بس."},
+    return [{"role": "system", "content": "أنت تنظّم مكتبة صور وفيديوهات وأصوات لبراند. اكتب بالعربية الفصيح البسيط. استعد JSON فقط."},
             {"role": "user", "content": (
-                f"وصّف {what} ده في جملة قصيرة (فيه إيه بالظبط: الحاجة، المكان، الناس، الإحساس، قبل/بعد لو باين)، "
-                "وبعدين من 4 لـ 10 تاجات قصيرة بالعربي (وكمان الإنجليزي لو مفيد) تساعد البحث بعدين.\n"
+                f"وصّف {what} هذا في جملة قصيرة (فيه ماذا بالضبط: الشيء، المكان، الأشخاص، الإحساس، قبل/بعد إذا باين)، "
+                "ثم من 4 لـ 10 تاجات قصيرة بالعربية (وأيضًا الإنجليزية إذا مفيد) تساعد البحث لاحقًا.\n"
                 f"اسم الملف: «{name}» · مكانه في المكتبة: «{where or 'الرئيسية'}»\n{extra}"
                 '\nJSON: {"desc": "...", "tags": ["..."]}')}]
 

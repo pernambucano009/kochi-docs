@@ -1,9 +1,9 @@
-"""🎬 كل موديلات الفيديو اللي عند Atlas: القايمة وأسعارها بتيجي من كتالوج Atlas نفسه (مش مكتوبة بإيدينا)،
-وكل موديل بيتظبطله شكل الطلب من الـ schema بتاعه (أسماء الخانات بتختلف من موديل للتاني).
+"""🎬 كل نماذج الفيديو الذي عند Atlas: القائمة وأسعارها تأتي من كتالوج Atlas نفسه (غير مكتوبة بإيدينا)،
+وكل نموذج يتظبطله شكل الطلب من الـ schema الخاص به (أسماء الخانات تختلف من نموذج للتاني).
 
-- العائلة = اسم الموديل من غير آخر جزء (مثلًا kwaivgi/kling-video-o3-std)، وليها:
-  image-to-video (صورة ← فيديو) و reference-to-video (مراجع ← فيديو) و start-end-to-video (بداية ونهاية) لو موجودين.
-- الافتراضي في البرنامج Seedance Mini (VDEF في app.py)، ومفيش موديل عليه علامة "موصى به"."""
+- العائلة = اسم النموذج بدون آخر جزء (مثلًا kwaivgi/kling-video-o3-std)، ولها:
+  image-to-video (صورة ← فيديو) و reference-to-video (مراجع ← فيديو) و start-end-to-video (بداية ونهاية) إذا موجودين.
+- الافتراضي في البرنامج Seedance Mini (VDEF في app.py)، ولا يوجد نموذج عليه علامة "موصى به"."""
 from __future__ import annotations
 
 import json
@@ -104,7 +104,7 @@ def families(refresh: bool = False) -> dict:
 
 
 def listing() -> list[dict]:
-    """للواجهة: الأرخص الأول."""
+    """للواجهة: الأرخص أولًا."""
     fams = families()
     rows = [{"key": k, "label": v["label"], "per_sec": round(v["per_sec"], 4),
              "refs": bool(v.get("r2v")), "org": v.get("org", "")} for k, v in fams.items()]
@@ -129,7 +129,7 @@ ALIASES = {
 
 
 def _schema_for(model_id: str) -> dict | None:
-    """الـ schema بتاع الموديل (من Atlas، متخزن على الجهاز)؛ None لو مقدرناش نوصله."""
+    """الـ schema الخاص بالنموذج (من Atlas، متخزن على الجهاز)؛ None إذا لم نتمكن نوصله."""
     if model_id in _schemas:
         return _schemas[model_id]
     f = _cache_dir() / (model_id.replace("/", "__") + ".json")
@@ -174,7 +174,7 @@ def _props(sch: dict) -> dict:
 
 
 def _fit(value, spec: dict):
-    """القيمة لأقرب اختيار مسموح (enum) أو جوه الحدود (minimum / maximum)."""
+    """القيمة لأقرب اختيار مسموح (enum) أو داخل الحدود (minimum / maximum)."""
     if not isinstance(spec, dict):
         return value
     enum = spec.get("enum")
@@ -207,7 +207,7 @@ def _fit(value, spec: dict):
 
 
 def adapt(body: dict) -> dict:
-    """نفس الطلب، بأسماء خانات الموديل ده وقيم مسموحة عنده. Seedance (اللي البرنامج مبني عليه) بيعدّي زي ما هو."""
+    """نفس الطلب، بأسماء خانات هذا النموذج وقيم مسموحة لديه. Seedance (ما البرنامج مبني عليه) يعدّي كما هو."""
     model = str(body.get("model") or "")
     # بس موديلات الفيديو العادية (صورة / مراجع / بداية ونهاية)؛ الأفاتار والليب سينك وغيرهم طلباتهم مجرّبة وبتروح زي ما هي
     if not model or model.startswith("bytedance/seedance") or not model.endswith(("/image-to-video", "/reference-to-video", "/start-end-to-video", "/text-to-video")):
@@ -258,7 +258,7 @@ def catalog() -> list[dict]:
 
 
 def camera_candidates() -> list[dict]:
-    """الموديلات اللي ممكن تغيّر زاوية الكاميرا: من كتالوج Atlas نفسه (عشان أي موديل جديد يظهر لوحده)."""
+    """النماذج التي يمكن تغيّر زاوية الكاميرا: من كتالوج Atlas نفسه (لكي أي نموذج جديد يظهر تلقائيًا)."""
     out, seen = [], set()
     for e in catalog():
         if e.get("type") != "Video" or e.get("display_console") is False:
@@ -276,8 +276,8 @@ def camera_candidates() -> list[dict]:
 
 
 def camera_body(c: dict, video_url: str, prompt: str, dur: float, ratio: str, images: list[str] | None = None) -> dict:
-    """طلب «صوّر نفس المشهد من زاوية تانية» بأسماء خانات الموديل ده (من الـ schema بتاعه لو موجود).
-    images: صور حقيقية للشخص من كذا اتجاه (من «نسختي»)، عشان الموديل ميخمّنش شكله من الزاوية الجديدة."""
+    """طلب «صوّر نفس المشهد من زاوية أخرى» بأسماء خانات هذا النموذج (من الـ schema الخاص به إذا موجود).
+    images: صور حقيقية للشخص من كذا اتجاه (من «نسختي»)، لكي النموذج لا يخمّن شكله من الزاوية الجديدة."""
     if c["kind"] == "ref":
         body = {"model": c["model"], "prompt": prompt, "reference_videos": [video_url], "duration": max(4, round(dur)),
                 "resolution": "720p", "aspect_ratio": ratio, "generate_audio": False}
@@ -361,7 +361,7 @@ TEXT_FIELDS = ("text", "input", "prompt")
 
 
 def schema_of(model_id: str) -> dict | None:
-    """الـ schema لأي موديل في الكتالوج (مش بس الفيديو)، ومتخزن على الجهاز."""
+    """الـ schema لأي نموذج في الكتالوج (غير فقط الفيديو)، ومتخزن على الجهاز."""
     if model_id in _schemas and _schemas[model_id] is not None:
         return _schemas[model_id]
     sch = _schema_for(model_id)
@@ -385,7 +385,7 @@ def props_of(model_id: str) -> dict:
 
 
 def img_catalog() -> list[dict]:
-    """موديلات الصور: لكل عيلة نسخة «من الكلام» ونسخة «بمراجع» لو موجودة (هي اللي بتقبل صور مرجع)."""
+    """نماذج الصور: لكل عيلة نسخة «من النص» ونسخة «بمراجع» إذا موجودة (هي ما تقبل صور مرجع)."""
     fams: dict[str, dict] = {}
     for e in catalog():
         if e.get("type") != "Image" or e.get("display_console") is False:
@@ -418,7 +418,7 @@ def img_catalog() -> list[dict]:
 
 
 def img_body(m: dict, prompt: str, ratio: str, images: list[str] | None) -> dict:
-    """طلب صورة بأسماء خانات الموديل ده (لو الـ schema متاح)، وإلا الأسامي المشهورة."""
+    """طلب صورة بأسماء خانات هذا النموذج (إذا الـ schema متاح)، وإلا الأسامي المشهورة."""
     model = m["edit"] if images and m.get("edit") else (m.get("t2i") or m["edit"])
     props = props_of(model)
     body = {"model": model, "prompt": prompt}
@@ -441,7 +441,7 @@ def img_body(m: dict, prompt: str, ratio: str, images: list[str] | None) -> dict
 
 
 def voice_catalog() -> list[dict]:
-    """موديلات الصوت على Atlas: كلام (بأصوات جاهزة من الـ schema) وموسيقى. اللي فيه خانة صوت مرجع بيقبل منشن صوت."""
+    """نماذج الصوت على Atlas: نص (بأصوات جاهزة من الـ schema) وموسيقى. ما فيه خانة صوت مرجع يقبل إشارة صوت."""
     out = []
     for e in catalog():
         if e.get("type") != "Audio" or e.get("display_console") is False:

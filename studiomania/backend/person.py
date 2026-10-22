@@ -1,12 +1,12 @@
 """🧍 قراءة الشخص في الفيديو: فصله عن الخلفية في كل فريم + مكان جسمه وراسه.
 
-بيطلّع لكل فريم (على نفس سرعة رسم التايبوجرافي):
-- صورة WebP شفافة للشخص لوحده (عشان الكلام يتحط وراه: الكلام تحت والشخص فوقه)
-- مكانه: الصندوق حوالين الجسم، ونص الراس ونص قطرها (عشان الكلام يتقوّس حوالين الراس أو يتحط جنبه)
+يُخرج لكل فريم (على نفس سرعة رسم التايبوجرافي):
+- صورة WebP شفافة للشخص تلقائيًا (لكي النص يوضع وراه: النص أسفل والشخص فوقه)
+- مكانه: الصندوق حوالين الجسم، ونص الرأس ونص قطرها (لكي النص يتقوّس حوالين الرأس أو يوضع جنبه)
 
-الموديل: RobustVideoMatting (MobileNetV3، ONNX على الـ CPU) لأنه بيفصل الفيديو وهو فاكر الفريمات اللي قبله؛
-ولو مش موجود: MediaPipe selfie multiclass (256×256). بيتحمّلوا أول مرة بس (أو وقت بناء السيرفر)، ومش جوه الكود.
-الرخص: RobustVideoMatting تحت GPL-3.0 (github.com/PeterL1n/RobustVideoMatting)، وMediaPipe تحت Apache-2.0.
+النموذج: RobustVideoMatting (MobileNetV3، ONNX على الـ CPU) لأنه يفصل الفيديو وهو تتذكر الفريمات التي قبله؛
+وإذا غير موجود: MediaPipe selfie multiclass (256×256). يتحمّلون أول مرة فقط (أو وقت بناء الخادم)، ومش داخل الكود.
+الرخص: RobustVideoMatting أسفل GPL-3.0 (github.com/PeterL1n/RobustVideoMatting)، وMediaPipe أسفل Apache-2.0.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ RVM_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0
 
 
 def model_status(models_dir: Path) -> dict:
-    """إيه اللي موجود على السيرفر (للتشخيص): مكتبة موديل الفيديو وملفه، أو موديل الصور."""
+    """ماذا الذي موجود على الخادم (للتشخيص): مكتبة نموذج الفيديو وملفه، أو نموذج الصور."""
     f = models_dir / "rvm_mobilenetv3_fp32.onnx"
     return {"video_lib": _has("onnxruntime"), "video_model": f.exists() and f.stat().st_size > 1_000_000,
             "image_lib": _has("ai_edge_litert.interpreter")}
@@ -44,8 +44,8 @@ def _has(mod: str) -> bool:
 
 
 class Matter:
-    """RobustVideoMatting (MobileNetV3): بيفصل الشخص في الفيديو وهو فاكر الفريمات اللي قبله،
-    فالحافة ثابتة من فريم لفريم ومفيهاش رعشة، وبيمسك الشعر أحسن بكتير من موديل الصور."""
+    """RobustVideoMatting (MobileNetV3): يفصل الشخص في الفيديو وهو تتذكر الفريمات التي قبله،
+    فالحافة ثابتة من فريم لفريم ولا تحتوي رعشة، ويمسك الشعر أحسن بكتير من نموذج الصور."""
 
     def __init__(self, models_dir: Path):
         import onnxruntime as ort
@@ -62,8 +62,8 @@ class Matter:
         self.rec = [np.zeros((1, 1, 1, 1), np.float32)] * 4
 
     def alpha(self, rgb: np.ndarray, work: int = 720) -> np.ndarray:
-        """احتمال إن البكسل شخص (0..1) بنفس مقاس الصورة. الموديل بيشتغل على 720 بالعرض (أسرع)،
-        والنتيجة بتتكبّر ناعمة للمقاس الكامل قبل ما الحافة تتحسم."""
+        """احتمال أن البكسل شخص (0..1) بنفس مقاس الصورة. النموذج يشتغل على 720 بالعرض (أسرع)،
+        والنتيجة تتكبّر ناعمة للمقاس الكامل قبل ما الحافة تتحسم."""
         from PIL import Image
 
         H0, W0 = rgb.shape[:2]
@@ -101,7 +101,7 @@ class Segmenter:
         self.o = self.it.get_output_details()[0]["index"]
 
     def mask(self, rgb: np.ndarray) -> np.ndarray:
-        """صورة RGB (أي مقاس) ← احتمال إن البكسل شخص (256×256، من 0 لـ 1)."""
+        """صورة RGB (أي مقاس) ← احتمال أن البكسل شخص (256×256، من 0 لـ 1)."""
         from PIL import Image
 
         x = np.asarray(Image.fromarray(rgb).resize((256, 256), Image.BILINEAR), dtype=np.float32) / 255.0
@@ -154,7 +154,7 @@ def _part(on: np.ndarray, lab: np.ndarray, num: int, sy: int, sx: int) -> np.nda
 
 
 def fill_holes(alpha: np.ndarray) -> np.ndarray:
-    """الخروم جوه الشخص (شعر غامق، نضارة) بتتملي، عشان الكلام اللي وراه مايبانش من جوه راسه."""
+    """الخروم داخل الشخص (شعر غامق، نضارة) تُملأ، لكي النص الذي وراه مايبانش من داخل راسه."""
     from PIL import Image, ImageFilter
 
     h, w = alpha.shape
@@ -192,7 +192,7 @@ def fill_holes(alpha: np.ndarray) -> np.ndarray:
 
 
 def _solid(alpha: np.ndarray, st: dict) -> float:
-    """قد إيه الراس متقصوصة صح (0..1). الضلمة أو الضهر للكاميرا بيخلّوها ضعيفة، ووقتها الكلام مايتحطش وراها."""
+    """قدر ماذا الرأس متقصوصة صحيح (0..1). الضلمة أو الضهر للكاميرا يخلّونها ضعيفة، ووقتها النص مايتحطش وراها."""
     h, w = alpha.shape
     cx, cy, r = st["head"][0] * w, st["head"][1] * h, st["head"][2] * w
     yy, xx = np.ogrid[:h, :w]
@@ -225,8 +225,8 @@ def _stats_one(on: np.ndarray, cover: float) -> dict:
 
 
 def _stats(alpha: np.ndarray) -> dict | None:
-    """الصندوق ومكان الراس من الماسك (0..1)، بكسور من عرض وطول الفريم.
-    لو فيه أكتر من شخص (أو صورة جوه صورة) بيتحفظوا كلهم في others، والكادر النهائي بيختار اللي باين فيه."""
+    """الصندوق ومكان الرأس من الماسك (0..1)، بكسور من عرض وطول الفريم.
+    إذا فيه أكثر من شخص (أو صورة داخل صورة) يتحفظون كلهم في others، والكادر النهائي يختار ما باين فيه."""
     on = alpha > 0.5
     if on.mean() < 0.01:
         return None
@@ -258,7 +258,7 @@ def _box(x: np.ndarray, r: int) -> np.ndarray:
 
 
 def guided(gray: np.ndarray, p: np.ndarray, r: int, eps: float = 1e-3, s: int = 2) -> np.ndarray:
-    """فلتر موجَّه (He et al., النسخة السريعة): حواف الماسك بتلزق على الحواف الحقيقية في الصورة (الشعر والوش)."""
+    """فلتر موجَّه (He et al., النسخة السريعة): حواف الماسك تلزق على الحواف الحقيقية في الصورة (الشعر والوجه)."""
     from PIL import Image
 
     h, w = gray.shape
@@ -276,8 +276,8 @@ def guided(gray: np.ndarray, p: np.ndarray, r: int, eps: float = 1e-3, s: int = 
 
 def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, duration: float, width: int = 540,
             on_step=None, max_seconds: float = 120, mask_width: int = 1080) -> dict:
-    """بيكتب out_dir/p_00000.webp (الشخص لوحده، 540) وm_00000.webp (شكل الشخص بس بدقة الفيديو، للكلام اللي وراه)
-    ويرجّع {fps, n, sw, sh, mw, frames: [stats|None, ...]}."""
+    """يكتب out_dir/p_00000.webp (الشخص تلقائيًا، 540) وm_00000.webp (شكل الشخص فقط بدقة الفيديو، للكلام الذي وراه)
+    ويعود {fps, n, sw, sh, mw, frames: [stats|None, ...]}."""
     from PIL import Image
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -356,7 +356,7 @@ def analyze(ffmpeg: str, src: Path, out_dir: Path, models_dir: Path, fps: int, d
 
 
 def summary(info: dict | None) -> dict:
-    """ملخص للموديل اللي بيوزّع الكلام: إمتى فيه شخص وفين راسه."""
+    """ملخص للنموذج الذي يوزّع النص: متى فيه شخص وأين راسه."""
     if not info or not info.get("frames"):
         return {"present": False}
     fr = info["frames"]

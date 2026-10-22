@@ -1,10 +1,10 @@
-"""💳 رصيد المنصات اللي البرنامج بياخد منها خدمات (للأدمن بس).
+"""💳 رصيد المنصات التي البرنامج يأخذ منها خدمات (للأدمن فقط).
 
-- Atlas Cloud (الفيديو والصور والصوت والمخ) و ScrapeCreators (تحليل الحسابات): ليهم API بيقول الرصيد، فبنسأله.
-- AudioShake (فصل الصوت في الدبلجة) وفصيح (الأصوات العربي): مالهمش API للرصيد، فبنعرف من أول طلب يفشل بسبب الرصيد،
-  وبنطلّع الرقم لو مكتوب في الرسالة (زي «Client has -1.5 credits»).
-- Zernio (النشر): اشتراك شهري مش رصيد، فبنشيّك إنه شغال بس.
-الحالة في ملف واحد جنب قاعدة بيانات المنصة، علشان كل نسخ العملاء بتكتب فيه، والبوابة بتنبّه الأدمن (جرس + إيميل).
+- Atlas Cloud (الفيديو والصور والصوت والعقل) و ScrapeCreators (تحليل الحسابات): لهم API يقول الرصيد، فنسأله.
+- AudioShake (فصل الصوت في الدبلجة) وفصيح (الأصوات العربية): مالهمش API للرصيد، فنعرف من أول طلب يفشل بسبب الرصيد،
+  ونطلّع الرقم إذا مكتوب في الرسالة (مثل «Client has -1.5 credits»).
+- Zernio (النشر): اشتراك شهري غير رصيد، فنشيّك أنه يعمل فقط.
+الحالة في ملف واحد بجانب قاعدة بيانات المنصة، لكي كل نسخ العملاء تكتب فيه، والبوابة تنبّه الأدمن (جرس + بريد إلكتروني).
 """
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ from pathlib import Path
 import httpx
 
 PROVIDERS = {
-    "atlas": {"name": "Atlas Cloud", "what": "الفيديو والصور والصوت والمخ", "unit": "$", "api": True, "default_min": 10},
+    "atlas": {"name": "Atlas Cloud", "what": "الفيديو والصور والصوت والعقل", "unit": "$", "api": True, "default_min": 10},
     "scrape": {"name": "ScrapeCreators", "what": "تحليل الحسابات والمنافسين", "unit": "رصيد", "api": True, "default_min": 500},
     "audioshake": {"name": "AudioShake", "what": "فصل الصوت عن الموسيقى في الدبلجة", "unit": "رصيد", "api": False, "default_min": 5},
-    "fasih": {"name": "فصيح", "what": "الأصوات العربي", "unit": "", "api": False, "default_min": 0},
+    "fasih": {"name": "فصيح", "what": "الأصوات العربية", "unit": "", "api": False, "default_min": 0},
     "munsit": {"name": "منصت", "what": "الأصوات الخليجي", "unit": "", "api": False, "default_min": 0},
-    "zernio": {"name": "Zernio", "what": "النشر والرسايل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0},
+    "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0},
 }
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|top.?up|رصيد", re.I)
 CHECK_EVERY = 30 * 60
@@ -67,7 +67,7 @@ def _num(v) -> float | None:
 
 
 def fetch(name: str, keys: dict | None = None) -> dict:
-    """بيسأل المنصة عن الرصيد. بيرجّع {"balance", "ok", "error"}."""
+    """يسأل المنصة عن الرصيد. يعود {"balance", "ok", "error"}."""
     try:
         if name == "atlas":
             key = _env(keys, "ATLASCLOUD_API_KEY", "ATLAS_CLOUD_API_KEY")
@@ -126,7 +126,7 @@ def refresh(f: Path, keys: dict | None = None) -> dict:
 
 
 def note_error(provider: str, message: str) -> None:
-    """أي نسخة شافت طلب فشل بسبب الرصيد بتسجّله هنا (والبوابة بتنبّه الأدمن)."""
+    """أي نسخة شافت طلب فشل بسبب الرصيد تسجّله هنا (والبوابة تنبّه الأدمن)."""
     if provider not in PROVIDERS or not LOW_WORDS.search(message or ""):
         return
     f = state_file()
@@ -143,8 +143,8 @@ def note_error(provider: str, message: str) -> None:
 
 
 def friendly(provider: str) -> str:
-    """الرسالة اللي العميل بيشوفها (من غير أسامي مزوّدين ولا أرقام رصيد)."""
-    return "الخدمة دي مش متاحة دلوقتي لسبب عندنا، وفريقنا اتبلّغ وبيصلّحها. جرّب كمان شوية."
+    """الرسالة التي العميل يشوفها (بدون أسامي مزوّدين ولا أرقام رصيد)."""
+    return "هذه الخدمة غير متاحة الآن لسبب لدينا، وفريقنا اتبلّغ ويصلّحها. جرّب أيضًا قليلًا."
 
 
 def summary(d: dict) -> list[dict]:
@@ -162,7 +162,7 @@ def summary(d: dict) -> list[dict]:
 
 
 def alerts(d: dict) -> list[dict]:
-    """اللي محتاج تنبيه دلوقتي (مرة لكل مرة الرصيد يقل)، وبيعلّم عليهم إنهم اتبعتوا."""
+    """ما يحتاج تنبيه الآن (مرة لكل مرة الرصيد يقل)، ويعلّم عليهم أنهم اتبعتوا."""
     out = []
     for row in summary(d):
         key = row["key"]
@@ -180,6 +180,6 @@ def alert_text(row: dict) -> tuple[str, str]:
     if row["state"] == "bad":
         title = f"🔴 رصيد {row['name']} خلص"
     else:
-        title = f"🟠 رصيد {row['name']} قرّب يخلص"
-    body = f"{row['what']}. " + (f"الرصيد دلوقتي: {bal}. " if bal else "") + (f"آخر غلطة: {row['fail']['msg'][:160]}" if row.get("fail") else f"حد التنبيه: {row['min']:g}")
+        title = f"🟠 رصيد {row['name']} قرّب ينتهي"
+    body = f"{row['what']}. " + (f"الرصيد الآن: {bal}. " if bal else "") + (f"آخر غلطة: {row['fail']['msg'][:160]}" if row.get("fail") else f"حد التنبيه: {row['min']:g}")
     return title, body

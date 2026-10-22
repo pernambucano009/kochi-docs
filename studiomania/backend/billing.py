@@ -1,9 +1,9 @@
-"""💳 الأسعار والنقط: الباقات والإضافات وباقات النقط الزيادة، وتحويل أي تكلفة حقيقية لنقط.
+"""💳 الأسعار والنقاط: الباقات والإضافات وباقات النقاط الزيادة، وتحويل أي تكلفة حقيقية لنقط.
 
-- النقطة = سنت واحد في الحساب، وأي عملية بتتخصم بـ (التكلفة الحقيقية × MARKUP) نقطة.
-- النقط الزيادة (لما نقط الباقة تخلص) أغلى من نقط الباقة: بنديك نقط أقل من قيمة فلوسك بالسعر العادي.
-- الحسابات في الباقة محسوبة على أغلى سعر Zernio (ZERNIO_WORST)، فمفيش خسارة حتى في الأول.
-- أي رقم هنا ممكن يتغيّر من غير كود: billing.json في فولدر البيانات بيكتب فوقه (لصفحة الأدمن بعدين).
+- النقطة = سنت واحد في الحساب، وأي عملية تتخصم بـ (التكلفة الحقيقية × MARKUP) نقطة.
+- النقاط الزيادة (عندما نقاط الباقة تنتهي) أغلى من نقاط الباقة: نديك نقاط أقل من قيمة فلوسك بالسعر العادي.
+- الحسابات في الباقة محسوبة على أغلى سعر Zernio (ZERNIO_WORST)، فلا يوجد خسارة حتى في أولًا.
+- أي رقم هنا يمكن يتغيّر بدون كود: billing.json في مجلد البيانات يكتب فوقه (لصفحة الأدمن لاحقًا).
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ DEFAULTS = {
     "plans": [
         {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0,
          "autopilot": False, "once": True,
-         "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة بس (عشان الحساب في Zernio بيتحسب علينا)"},
+         "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة فقط (لكي الحساب في Zernio يُحسب علينا)"},
         {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False},
         {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "popular": True},
         # 🏆 أعلى باقة: النقطة فيها أرخص بحوالي ٧٠٪ من «محترف» (٣٠ ألف نقطة)، وتكفي ٩٠ بوست في الشهر بالأوتوبايلوت
@@ -30,8 +30,8 @@ DEFAULTS = {
         {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True,
          "max_accounts": 25, "topup_bonus": 2,
          "features": ["النقطة أرخص بحوالي ٧٠٪ من «محترف»",
-                      "تكفي ٩٠ بوست في الشهر بالأوتوبايلوت (٣ في اليوم)، فيديوهات أو كاروسيل",
-                      "النقط الزيادة بنص السعر (ضعف النقط في أي شحن)"]},
+                      "تكفي ٩٠ منشور في الشهر بالأوتوبايلوت (٣ في اليوم)، فيديوهات أو كاروسيل",
+                      "النقاط الزيادة بنص السعر (ضعف النقاط في أي شحن)"]},
     ],
     "addons": [
         {"key": "account", "name": "حساب سوشيال زيادة", "name_en": "Extra social account", "price": 10, "unit": "للحساب في الشهر"},
@@ -67,7 +67,7 @@ def config(data_dir: Path) -> dict:
 
 
 def credits_for(usd: float) -> int:
-    """التكلفة الحقيقية بالدولار ← نقط على العميل (بالتقريب لفوق، وأقل حاجة نقطة واحدة)."""
+    """التكلفة الحقيقية بالدولار ← نقاط على العميل (بالتقريب لفوق، وأقل شيء نقطة واحدة)."""
     if usd <= 0:
         return 0
     return max(1, math.ceil(round(usd * MARKUP / CREDIT_USD, 6)))
@@ -78,7 +78,7 @@ def fee(price: float) -> float:
 
 
 def plan_margin(p: dict, zernio_per_acc: float = ZERNIO_WORST) -> dict:
-    """مكسبنا من الباقة لو العميل صرف كل نقطه (أسوأ حالة)."""
+    """مكسبنا من الباقة إذا العميل صرف كل نقطه (أسوأ حالة)."""
     credits_cost = p["credits"] * CREDIT_USD / MARKUP
     accounts_cost = p["accounts"] * zernio_per_acc
     profit = p["price"] - credits_cost - accounts_cost - fee(p["price"])
@@ -101,7 +101,7 @@ def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool 
     """باقة على مقاسك: باقة أساسية + حسابات زيادة + أوتوبايلوت."""
     p = next((x for x in cfg["plans"] if x["key"] == plan and not x.get("once")), None)
     if not p:
-        raise ValueError("الباقة دي مش موجودة")
+        raise ValueError("هذه الباقة غير موجودة")
     add = {a["key"]: a for a in cfg["addons"]}
     extra_accounts = max(0, int(extra_accounts))
     if p.get("max_accounts"):

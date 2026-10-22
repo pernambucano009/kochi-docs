@@ -1,5 +1,5 @@
-"""🔠 النصوص الحرة في المونتاج (زي كاب كات): كل نص بخطه ولونه ومكانه وحركة دخوله وخروجه،
-بيتحول لملف ASS وبيترسم بـ libass في التصدير. نفس المعادلات بالظبط في المعاينة (montage-text.js)."""
+"""🔠 النصوص الحرة في المونتاج (مثل كاب كات): كل نص بخطه ولونه ومكانه وحركة دخوله وخروجه،
+يتحول لملف ASS ويُرسم بـ libass في التصدير. نفس المعادلات بالضبط في المعاينة (montage-text.js)."""
 from __future__ import annotations
 
 import re
@@ -43,7 +43,7 @@ def _esc(s: str) -> str:
 
 
 def clean(x: dict) -> dict | None:
-    """بيظبط بيانات نص واحد (اللي جاية من البرنامج) في حدودها."""
+    """يضبط بيانات نص واحد (ما قادمة من البرنامج) في حدودها."""
     text = str(x.get("text") or "").strip()[:400]
     if not text:
         return None
@@ -71,7 +71,7 @@ def clean(x: dict) -> dict | None:
 
 
 def anim_state(typ: str, p: float, entering: bool, w: int, h: int) -> dict:
-    """حالة النص في حركة الدخول/الخروج: p من 0 (برّه) لـ 1 (مكانه). scale و alpha و dx/dy بالبكسل."""
+    """حالة النص في حركة الدخول/الخروج: p من 0 (خارج) لـ 1 (مكانه). scale و alpha و dx/dy بالبكسل."""
     st = {"scale": 1.0, "alpha": 1.0, "dx": 0.0, "dy": 0.0}
     q = 1 - p
     sign = 1 if entering else -1

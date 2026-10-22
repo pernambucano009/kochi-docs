@@ -1,12 +1,12 @@
-"""🎥 «من مرجع لبرومبت»: فيديو مرجعي ← تحليل حقيقي (قياسات + فريمات + قطعات) ← برومبت جاهز لموديل فيديو، بـ 14 جزء ثابت.
+"""🎥 «من مرجع لبرومبت»: فيديو مرجعي ← تحليل حقيقي (قياسات + فريمات + قطعات) ← وصف جاهز لموديل فيديو، بـ 14 جزء ثابت.
 
-القياسات والفريمات بتتعمل هنا بـ FFmpeg (مش تخمين)، والموديل بيشوف الفريمات بتوقيتها ويكتب قايمة اللقطات والبرومبت.
+القياسات والفريمات تُنشأ هنا بـ FFmpeg (غير تخمين)، والنموذج يرى الفريمات بتوقيتها ويكتب قائمة اللقطات والوصف.
 """
 from __future__ import annotations
 
 import re
 
-TARGETS = {"": "أي موديل", "Seedance": "Seedance", "Kling": "Kling", "Veo": "Veo", "Sora": "Sora", "Runway": "Runway", "Omni Flash": "Omni Flash"}
+TARGETS = {"": "أي نموذج", "Seedance": "Seedance", "Kling": "Kling", "Veo": "Veo", "Sora": "Sora", "Runway": "Runway", "Omni Flash": "Omni Flash"}
 SECTIONS = ("SCENE CONTEXT", "LOCATION MAP", "FIRST FRAME / BLOCKING", "FORMAT MODE", "OPTICS", "CAMERA", "ACTION", "PHYSICS",
             "LIGHTING", "COLOR GRADE", "STYLE", "OUTPUT SETTINGS", "AUDIO", "POSITIVE LOCKS")
 
@@ -51,9 +51,9 @@ Return JSON only:
 {{"shots": [{{"t0": 0.0, "t1": 1.0, "size": "CU/MS/WS...", "angle": "", "move": "", "change": "what changes inside the shot"}}],
  "shot_count": 0,
  "prompt": "the full prompt block with the 14 section headers, each header on its own line",
- "notes": {{"struggle": "بالعربي المصري البسيط: إيه اللي الموديل هيتعب يحافظ عليه، وإيه اللي يتصلّح في المونتاج",
-            "split": "بالعربي: يتولّد مرة واحدة ولا يتقسّم مقاطع، ومنين",
-            "variants": ["بالعربي: حاجة تتغيّر تطلع نسخة مختلفة", "...", "..."]}},
+ "notes": {{"struggle": "بالعربية الفصحى البسيطة: ماذا الذي النموذج سيتعب يحافظ عليه، وماذا الذي يتصلّح في المونتاج",
+            "split": "بالعربية: يُولّد مرة واحدة ولا يُقسّم مقاطع، ومنين",
+            "variants": ["بالعربية: شيء تتغيّر تظهر نسخة مختلفة", "...", "..."]}},
  "clips": [{{"t0": 0.0, "t1": 5.0, "prompt": "self-contained prompt for this clip only (same 14 sections, FORMAT MODE covering only this clip, times starting at 0.0s)"}}]}}
 "clips" is an empty list when one generation is enough."""
 
@@ -62,7 +62,7 @@ def variant_text(prompt: str, change: str) -> str:
     return f"""Here is a generation-ready video prompt with fixed sections ({", ".join(SECTIONS)}).
 Rewrite it into a VARIANT: apply this change everywhere it matters and keep everything else (structure, timing, camera language, look, units, locks) the same.
 Change: {change}
-Keep the exact section headers and the same plain, measurable style. Return JSON only: {{"prompt": "...", "summary": "بالعربي في جملة: إيه اللي اتغيّر"}}
+Keep the exact section headers and the same plain, measurable style. Return JSON only: {{"prompt": "...", "summary": "بالعربية في جملة: ماذا الذي تغيّر"}}
 
 PROMPT:
 {prompt}"""
@@ -83,13 +83,13 @@ def mock_result(facts: dict, cuts: list[float]) -> dict:
         "STYLE\n2D motion graphics, light grain.", f"OUTPUT SETTINGS\n{facts['aspect']}, {facts['width']}x{facts['height']}, real time, motion blur at {facts['fps']:g} fps.",
         "AUDIO\nsilent, no audio design.", "POSITIVE LOCKS\nThe same palette in every beat.\nOne subject in frame."])
     return {"shots": shots, "shot_count": len(shots), "prompt": prompt,
-            "notes": {"struggle": "تجربة: مفيش تحليل حقيقي في وضع التجربة", "split": "مرة واحدة", "variants": ["غيّر الموضوع", "غيّر الألوان", "غيّر المكان"]},
+            "notes": {"struggle": "تجربة: لا يوجد تحليل حقيقي في وضع التجربة", "split": "مرة واحدة", "variants": ["غيّر الموضوع", "غيّر الألوان", "غيّر المكان"]},
             "clips": []}
 
 
 def clean_result(raw: dict, dur: float) -> dict:
     if not isinstance(raw, dict) or not str(raw.get("prompt") or "").strip():
-        raise ValueError("التحليل رجع من غير برومبت")
+        raise ValueError("التحليل أعد بدون وصف")
     shots = []
     for s in raw.get("shots") or []:
         try:

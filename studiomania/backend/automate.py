@@ -1,10 +1,10 @@
-"""🤖 القالب المخصص (أوتوميشن على كانفاس): كل عميل بيرتّب خطوات بأفعال، وكل خطوة بتمنشن حاجة من مكتبة العقل.
+"""🤖 القالب المخصص (قالب مخصص على كانفاس): كل عميل يرتّب خطوات بأفعال، وكل خطوة تشير إلى شيء من مكتبة العقل.
 
-الخطوات بالترتيب بتتحول لمشروع مونتاج عادي (بيتفتح في المحرر ويتصدّر): اسحب صور/فيديوهات ← إنترو/أوترو ← تعليق صوتي ←
-موسيقى بتوطى تحت الكلام ← قطّع ← كابشن ← صدّر. كل تشغيل بيختار ملفات لسه متستخدمتش (لحد ما الفولدر يخلص ويبدأ من الأول).
+الخطوات بالترتيب تتحول لمشروع مونتاج عادي (يُفتح في المحرر ويُصدّر): اسحب صور/فيديوهات ← إنترو/أوترو ← تعليق صوتي ←
+موسيقى توطى أسفل النص ← قطّع ← تعليق نصي ← صدّر. كل تشغيل يختار ملفات ما زال متستخدمتش (حتى ما المجلد ينتهي ويبدأ من أولًا).
 
-التقطيع بيفتح مسارات: «قطّع الفيديو» بيقسم فيديو طويل لقطع (كل قطعة أقل من الطول اللي تحدده)، وكل قطعة ليها مسار لوحدها
-تحط فيه خطوات (زي «ولّد» ببرومبت)، وبعدين «جمّع» بيلم المخرجات اللي تختارها بالترتيب اللي تحدده في فيديو واحد.
+التقطيع يفتح مسارات: «قطّع الفيديو» يقسم فيديو طويل لقطع (كل قطعة أقل من الطول الذي تحدده)، وكل قطعة لها مسار تلقائيًا
+تضع فيه خطوات (مثل «ولّد» ببرومبت)، ثم «جمّع» يلم المخرجات التي تختارها بالترتيب الذي تحدده في فيديو واحد.
 """
 from __future__ import annotations
 
@@ -45,17 +45,17 @@ for _k in RULES_VERBS:
     VERBS[_k]["opts"]["rules"] = ""
 # 🌐 الستوك أونلاين: صور وفيديوهات من Pexels، وموسيقى مجانية للاستخدام التجاري
 STOCK_KINDS = ("image", "video", "audio")
-ROLES = {"music": "موسيقى تحت الفيديو", "voice": "تعليق صوتي"}
+ROLES = {"music": "موسيقى أسفل الفيديو", "voice": "تعليق صوتي"}
 FRAME_OUT = {"frames": "صور (فريمات)", "clips": "لقطات فيديو قصيرة"}
 FIXED = ("export", "publish")
 LANE_VERBS = ("gen",)
-REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "export": "فيديو جاهز", "audio": "صوت",
+REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "مجلد", "export": "فيديو جاهز", "audio": "صوت",
              "frame": "أول فريم من القطعة", "piece_audio": "صوت القطعة نفسها"}
 MAX_REFS = 6          # الخطوات اللي بتتحط جوه مسار قطعة
 MAX_LANES = 12   # آخر خطوتين دايمًا: صدّر وبعدها انشر (مابيتشالوش ومابيتحركوش)
-WHEN = {"draft": "يستنى موافقتي", "now": "ينزل على طول"}
-ORDERS = {"fresh": "اللي متستخدمش قبل كده", "random": "عشوائي", "newest": "الأحدث الأول", "oldest": "الأقدم الأول"}
-TRANS = {"": "من غير", "fade": "ذوبان", "whip": "سحبة"}
+WHEN = {"draft": "ينتظر موافقتي", "now": "ينزل مباشرة"}
+ORDERS = {"fresh": "ما لا تستخدم من قبل", "random": "عشوائي", "newest": "الأحدث أولًا", "oldest": "الأقدم أولًا"}
+TRANS = {"": "بدون", "fade": "ذوبان", "whip": "سحبة"}
 RATIOS = ("9:16", "1:1", "4:5", "16:9")
 MAX_STEPS = 24
 
@@ -73,7 +73,7 @@ def new_step(verb: str) -> dict:
 
 
 def starter() -> list[dict]:
-    """الموديل الجديد بيبدأ بمثال يتعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← كابشن ← صدّر ← انشر."""
+    """النموذج الجديد يبدأ بمثال يُعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← تعليق نصي ← صدّر ← انشر."""
     return [new_step(v) for v in ("pull", "voice", "music", "cut", "caption", "export", "publish")]
 
 
@@ -94,7 +94,7 @@ def clean_src(raw) -> dict | None:
 
 
 def clean_ref(raw) -> dict | None:
-    """منشن (@) لشخصية أو نسختي أو خلفية أو ملف أو فولدر من مكتبة المحتويات، أو «أول فريم من القطعة»."""
+    """إشارة (@) لشخصية أو نسختي أو خلفية أو ملف أو مجلد من مكتبة المحتويات، أو «أول فريم من القطعة»."""
     if not isinstance(raw, dict) or raw.get("kind") not in REF_KINDS:
         return None
     if raw["kind"] in ("frame", "piece_audio"):
@@ -185,8 +185,8 @@ def clean_lane(raw) -> list[dict]:
 
 
 def clean_steps(raw: list) -> list[dict]:
-    """الخطوات بالترتيب، و«صدّر» و«انشر» آخر حاجة دايمًا (لو مش موجودين بيتضافوا).
-    «قطّع الفيديو» واحد بس، ومعاه مساراته، و«جمّع» لازم ييجي بعده (لو مش موجود بيتضاف بعده على طول)."""
+    """الخطوات بالترتيب، و«صدّر» و«انشر» آخر شيء دائمًا (إذا غير موجودين يتضافون).
+    «قطّع الفيديو» واحد فقط، ومعه مساراته، و«جمّع» يجب يأتي بعده (إذا غير موجود يُضاف بعده مباشرة)."""
     out, fixed, split, merge = [], {}, None, None
     for s in raw or []:
         if not isinstance(s, dict) or s.get("verb") not in VERBS or s["verb"] in LANE_VERBS:
@@ -216,7 +216,7 @@ def clean_steps(raw: list) -> list[dict]:
 
 
 def walk(steps: list[dict]):
-    """كل الخطوات، واللي جوه مسارات التقطيع كمان."""
+    """كل الخطوات، واللي داخل مسارات التقطيع أيضًا."""
     for s in steps:
         yield s
         for lane in s.get("lanes") or []:
@@ -225,14 +225,14 @@ def walk(steps: list[dict]):
 
 # ---------------------------------------------------------------- التقطيع
 def even_spans(dur: float, mx: float) -> list[tuple[float, float]]:
-    """قطع متساوية، كل واحدة أقل من (أو قد) الطول الأقصى. فيديو ٤٠ ثانية على ١٥ = ٣ قطع."""
+    """قطع متساوية، كل واحدة أقل من (أو قدر) الطول الأقصى. فيديو ٤٠ ثانية على ١٥ = ٣ قطع."""
     n = max(1, math.ceil(dur / max(0.5, mx) - 1e-6))
     step = dur / n
     return [(round(i * step, 2), round(dur if i == n - 1 else (i + 1) * step, 2)) for i in range(n)]
 
 
 def snap_quiet(spans: list[tuple[float, float]], quiet: list[tuple[float, float]], mx: float) -> list[tuple[float, float]]:
-    """مكان القطع بيتزق لأقرب سكوت (علشان مايقطعش في نص كلمة)، من غير ما أي قطعة تعدّي الطول الأقصى."""
+    """مكان القطع يُدفع لأقرب سكوت (لكي لا يقطع في نص كلمة)، بدون ما أي قطعة تعدّي الطول الأقصى."""
     if len(spans) < 2 or not quiet:
         return spans
     cuts = [b for _, b in spans[:-1]]
@@ -279,7 +279,7 @@ def clean_spans(raw: dict, dur: float, mx: float) -> list[tuple[float, float]]:
 
 
 def lane_for(lanes: list[list[dict]], i: int) -> list[dict]:
-    """مسار القطعة رقم i، والقطع الزيادة (اللي الموديل مايعرفش عددها قبل التشغيل) بتمشي زي آخر مسار."""
+    """مسار القطعة رقم i، والقطع الزيادة (ما النموذج مايعرفش عددها قبل التشغيل) تسير مثل آخر مسار."""
     if not lanes:
         return []
     return lanes[i] if i < len(lanes) else lanes[-1]
@@ -304,7 +304,7 @@ Rules:
   Empty items = the last output of every lane in order.
 - "src" can also be online stock: {{"mode": "stock", "q": "<english words>"}} (photos/videos, or music for music/pull audio) when the client asks for stock / Pexels / footage from the internet.
 - genvid ("ولّد فيديو") makes a brand-new AI video on the main line (from text, image or references); "gen" is only inside split lanes.
-- frames ("اختار الفريمات") watches one video from src and keeps only the frames (opts.out "frames") or short clips (opts.out "clips") matching opts.want (a short description), dropping the rest.
+- frames ("اختر الفريمات") watches one video from src and keeps only the frames (opts.out "frames") or short clips (opts.out "clips") matching opts.want (a short description), dropping the rest.
 - opts.rules is free text with the client's own rules for that step (filters what is picked, or is added to the prompt).
 - Give every step a short unique "id" (letters/digits).
 - Keep what the client did not ask to change from the current model: {json.dumps(current, ensure_ascii=False)[:3000]}
@@ -321,7 +321,7 @@ def _num_near(text: str, words: tuple[str, ...]) -> float | None:
 
 
 def mock_describe(text: str, current: list[dict]) -> dict:
-    """تجربة من غير موديل: بيفهم الكلمات المشهورة (تقطيع، ولّد، جمّع، تعليق، موسيقى، كابشن، صور)."""
+    """تجربة بدون نموذج: يفهم الكلمات المشهورة (تقطيع، ولّد، جمّع، تعليق، موسيقى، تعليق نصي، صور)."""
     t = text or ""
     steps: list[dict] = []
     if re.search(r"صور|فيديوهات من", t) and not re.search(r"قط[عّ]", t):
@@ -362,7 +362,7 @@ def mock_describe(text: str, current: list[dict]) -> dict:
 
 
 def pick(files: list[dict], n: int, order: str, used: dict[str, int], rnd: random.Random) -> tuple[list[dict], bool]:
-    """اختيار n ملف: «مايتكررش» بياخد الأقل استخدامًا الأول (ولو الكل اتستخدم بيلف من الأول). بيرجّع (الملفات، لفّ من الأول؟)."""
+    """اختيار n ملف: «لا يتكرر» يأخذ الأقل استخدامًا أولًا (وإذا الكل اتستخدم يدور من أولًا). يعود (الملفات، لفّ من أولًا؟)."""
     if not files:
         return [], False
     if order == "newest":
@@ -382,7 +382,7 @@ def pick(files: list[dict], n: int, order: str, used: dict[str, int], rnd: rando
 
 
 def plan_lengths(kinds_durs: list[tuple[str, float | None]], target: float | None, cap: float | None, image_sec: list[float]) -> list[float]:
-    """طول كل لقطة: الصور بمدتها (أو على قد التعليق الصوتي لو «على قده»)، والفيديوهات بطولها، والكل مايعدّيش «أقصى طول»."""
+    """طول كل لقطة: الصور بمدتها (أو على قدر التعليق الصوتي إذا «على قده»)، والفيديوهات بطولها، والكل مايعدّيش «أقصى طول»."""
     out = []
     for (k, d), s in zip(kinds_durs, image_sec):
         L = s if k == "image" else (d or s)
@@ -398,7 +398,7 @@ def plan_lengths(kinds_durs: list[tuple[str, float | None]], target: float | Non
 
 
 def plan_lines(steps: list[dict]) -> list[str]:
-    """الخطوات بالكلام (قبل ما تتنفّذ): «اسحب صور من @فولدر»، «ولّد فيديو: …»، ومسارات التقطيع تحتها."""
+    """الخطوات بالكلام (قبل ما تتنفّذ): «اسحب صور من @مجلد»، «ولّد فيديو: …»، ومسارات التقطيع تحتها."""
     def one(s: dict) -> str:
         v, o, src = VERBS[s["verb"]], s.get("opts") or {}, s.get("src") or {}
         out = v["t"]

@@ -1,8 +1,8 @@
-"""📚 مكتبة صور وفيديوهات حقيقية (متصوّرة، مش متولّدة) للخلفيات، من Pexels.
+"""📚 مكتبة صور وفيديوهات حقيقية (متصوّرة، غير متولّدة) للخلفيات، من Pexels.
 
 - المفتاح PEXELS_API_KEY (من الإعدادات ← المفاتيح، أو Railway).
-- شرطهم: لينك واضح لـ Pexels جنب النتايج، واسم المصوّر لو ينفع (بنحفظه مع الخلفية).
-- الحد: ٢٠٠ طلب في الساعة، فالنتايج بتتحفظ شوية في الذاكرة.
+- شرطهم: رابط واضح لـ Pexels بجانب النتائج، واسم المصوّر إذا ينفع (نحفظه مع الخلفية).
+- الحد: ٢٠٠ طلب في الساعة، فالنتائج تُحفظ قليلًا في الذاكرة.
 """
 from __future__ import annotations
 
@@ -42,11 +42,11 @@ def _get(path: str, params: dict) -> dict:
     try:
         r = httpx.get(API + path, params=params, headers={"Authorization": key()}, timeout=25)
     except httpx.HTTPError as exc:
-        raise StockError("مكتبة الصور مش بترد دلوقتي، جرّب تاني") from exc
+        raise StockError("مكتبة الصور لا ترد الآن، جرّب مرة أخرى") from exc
     if r.status_code in (401, 403):
-        raise StockError("مفتاح Pexels مش شغال، راجعه في الإعدادات")
+        raise StockError("مفتاح Pexels لا يعمل، راجعه في الإعدادات")
     if r.status_code == 429:
-        raise StockError("وصلنا للحد بتاع مكتبة الصور في الساعة دي، جرّب بعد شوية")
+        raise StockError("وصلنا للحد الخاص بـ مكتبة الصور في هذه الساعة، جرّب بعد قليلًا")
     if r.status_code >= 400:
         raise StockError(f"مكتبة الصور رجّعت خطأ ({r.status_code})")
     data = r.json()
@@ -58,7 +58,7 @@ def _get(path: str, params: dict) -> dict:
 
 
 def _best_file(files: list[dict], vertical: bool) -> dict | None:
-    """أنسب نسخة للفيديو: HD (حوالي ١٠٨٠) مش 4K عشان التنزيل والرندر يبقوا سريعين."""
+    """أنسب نسخة للفيديو: HD (نحو ١٠٨٠) غير 4K لكي التنزيل والرندر يصبحون سريعين."""
     mp4 = [f for f in files if (f.get("file_type") or "").endswith("mp4") and f.get("link")]
     if not mp4:
         return None
@@ -68,7 +68,7 @@ def _best_file(files: list[dict], vertical: bool) -> dict | None:
 
 
 def search(q: str, kind: str = "video", orientation: str = "portrait", page: int = 1) -> dict:
-    """بحث بالإنجليزي. بيرجّع نتايج موحّدة للصور والفيديو."""
+    """بحث بالإنجليزية. يعود نتائج موحّدة للصور والفيديو."""
     q = q.strip()[:100]
     if not q:
         return {"items": [], "next": False}
@@ -101,7 +101,7 @@ def search(q: str, kind: str = "video", orientation: str = "portrait", page: int
 
 
 def allowed_url(u: str) -> bool:
-    """بننزّل بس من سيرفرات Pexels (عشان محدش يبعت لينك تاني ينزّله على السيرفر)."""
+    """ننزّل فقط من سيرفرات Pexels (لكي محدش يرسل رابط آخر ينزّله على الخادم)."""
     p = urlparse(u or "")
     return p.scheme == "https" and p.hostname in ("images.pexels.com", "videos.pexels.com", "player.vimeo.com")
 
@@ -123,9 +123,9 @@ def music_search(q: str) -> list[dict]:
         r = httpx.get(OV_API, params={"q": q, "page_size": 20, "license_type": "commercial", "category": "music", "mature": "false"},
                       headers={"User-Agent": "SimsimKit/1.0"}, timeout=25)
     except httpx.HTTPError as exc:
-        raise StockError("مكتبة الموسيقى مش بترد دلوقتي، جرّب تاني") from exc
+        raise StockError("مكتبة الموسيقى لا ترد الآن، جرّب مرة أخرى") from exc
     if r.status_code == 429:
-        raise StockError("وصلنا للحد بتاع مكتبة الموسيقى دلوقتي، جرّب بعد شوية")
+        raise StockError("وصلنا للحد الخاص بـ مكتبة الموسيقى الآن، جرّب بعد قليلًا")
     if r.status_code >= 400:
         raise StockError(f"مكتبة الموسيقى رجّعت خطأ ({r.status_code})")
     out = []

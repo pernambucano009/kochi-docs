@@ -1,12 +1,12 @@
-"""💳 الدفع: Stripe (كارت) و PayPal. الكلام مع الشركتين بس، والنقط والباقات في gateway.py.
+"""💳 الدفع: Stripe (بطاقة) و PayPal. النص مع الشركتين فقط، والنقاط والباقات في gateway.py.
 
-المتغيرات (على السيرفر):
+المتغيرات (على الخادم):
 - STRIPE_SECRET_KEY و STRIPE_WEBHOOK_SECRET  (من لوحة Stripe ← Developers)
 - PAYPAL_CLIENT_ID و PAYPAL_SECRET و PAYPAL_WEBHOOK_ID و PAYPAL_MODE (sandbox للتجربة، live للحقيقي)
 - PAY_CURRENCY (افتراضي USD)
 
-Stripe: صفحة دفع Stripe (Checkout) للاشتراك أو النقط، وبوابة العميل يغيّر كارته أو يلغي.
-PayPal: الاشتراك بيتعمله «خطة» عند PayPal بنفس السعر أول مرة (وبتتحفظ)، والنقط طلب دفع مرة واحدة.
+Stripe: صفحة دفع Stripe (Checkout) للاشتراك أو النقاط، وبوابة العميل يغيّر كارته أو يلغي.
+PayPal: الاشتراك يُنشأ له «خطة» عند PayPal بنفس السعر أول مرة (وتُحفظ)، والنقاط طلب دفع مرة واحدة.
 """
 from __future__ import annotations
 
@@ -40,15 +40,15 @@ def stripe_on() -> bool:
 def _stripe(method: str, path: str, data: dict | None = None) -> dict:
     key = _clean(os.environ.get("STRIPE_SECRET_KEY"))
     if not key:
-        raise PayError("الدفع بالكارت مش متفعّل لسه")
+        raise PayError("الدفع بالكارت غير متفعّل ما زال")
     if key.startswith("whsec_"):
-        raise PayError("STRIPE_SECRET_KEY فيه مفتاح الـ Webhook (whsec_) بالغلط: لازم يكون الـ Secret key اللي بيبدأ بـ sk_test_ أو sk_live_")
+        raise PayError("STRIPE_SECRET_KEY فيه مفتاح الـ Webhook (whsec_) بالغلط: يجب يكون الـ Secret key ما يبدأ بـ sk_test_ أو sk_live_")
     if key.startswith("pk_"):
-        raise PayError("STRIPE_SECRET_KEY فيه الـ Publishable key (pk_) بالغلط: لازم يكون الـ Secret key اللي بيبدأ بـ sk_test_ أو sk_live_")
+        raise PayError("STRIPE_SECRET_KEY فيه الـ Publishable key (pk_) بالغلط: يجب يكون الـ Secret key ما يبدأ بـ sk_test_ أو sk_live_")
     try:
         r = httpx.request(method, f"https://api.stripe.com/v1/{path}", auth=(key, ""), data=_flat(data or {}), timeout=30)
     except httpx.HTTPError as e:
-        raise PayError(f"Stripe مش بيرد: {e}") from e
+        raise PayError(f"Stripe لا يرد: {e}") from e
     j = r.json() if r.content else {}
     if r.status_code >= 400:
         log.warning("stripe %s %s failed: %s %s", method, path, r.status_code, str(j.get("error") or j)[:400])
@@ -57,7 +57,7 @@ def _stripe(method: str, path: str, data: dict | None = None) -> dict:
 
 
 def _flat(d, prefix: str = "") -> dict:
-    """{"a": {"b": 1}, "l": [{"x": 2}]} ← {"a[b]": 1, "l[0][x]": 2} (شكل الفورم اللي Stripe عايزه)."""
+    """{"a": {"b": 1}, "l": [{"x": 2}]} ← {"a[b]": 1, "l[0][x]": 2} (شكل الفورم الذي Stripe تريده)."""
     out = {}
     items = d.items() if isinstance(d, dict) else enumerate(d)
     for k, v in items:
@@ -71,7 +71,7 @@ def _flat(d, prefix: str = "") -> dict:
 
 def stripe_checkout(*, mode: str, lines: list[tuple[str, float, int]], meta: dict, email: str, customer: str | None,
                     success: str, cancel: str, interval: str = "month") -> str:
-    """lines = [(الاسم، السعر بالدولار، الكمية)]. بيرجّع لينك صفحة الدفع."""
+    """lines = [(الاسم، السعر بالدولار، الكمية)]. يعود رابط صفحة الدفع."""
     items = []
     for name, price, qty in lines:
         if qty <= 0:
@@ -100,7 +100,7 @@ def stripe_cancel(sub_id: str) -> None:
 
 
 def stripe_verify(payload: bytes, header: str, tolerance: int = 300) -> bool:
-    """التوقيع اللي Stripe بيبعته مع كل إشعار (عشان محدش يزوّر إشعار دفع)."""
+    """التوقيع الذي Stripe يرسله مع كل إشعار (لكي محدش يزوّر إشعار دفع)."""
     secret = _clean(os.environ.get("STRIPE_WEBHOOK_SECRET"))
     if not secret or not header:
         return False
@@ -140,7 +140,7 @@ def _pp_token() -> str:
         return _pp_tok["t"]
     cid, sec = _pp_cred()
     if not (cid and sec):
-        raise PayError("الدفع بـ PayPal مش متفعّل لسه")
+        raise PayError("الدفع بـ PayPal غير متفعّل ما زال")
     first = _pp_base()
     # لو المفاتيح من «Sandbox» والوضع «live» (أو العكس) بنجرّب التاني بدل ما نوقف
     for base in (first, SANDBOX if first == LIVE else LIVE):
@@ -148,14 +148,14 @@ def _pp_token() -> str:
             r = httpx.post(f"{base}/v1/oauth2/token", auth=(cid, sec), data={"grant_type": "client_credentials"}, timeout=30)
             j = r.json()
         except (httpx.HTTPError, ValueError) as e:
-            raise PayError(f"PayPal مش بيرد: {e}") from e
+            raise PayError(f"PayPal لا يرد: {e}") from e
         if r.status_code < 400 and "access_token" in j:
             if base != first:
                 log.warning("paypal keys belong to %s, not PAYPAL_MODE", "sandbox" if base == SANDBOX else "live")
             _pp_tok.update(t=j["access_token"], exp=time.time() + int(j.get("expires_in") or 3000), base=base)
             return _pp_tok["t"]
         log.warning("paypal token failed on %s: %s %s", base, r.status_code, str(j)[:200])
-    raise PayError("PayPal رفض المفاتيح: اتأكد إن PAYPAL_CLIENT_ID و PAYPAL_SECRET من نفس الـ App ومنسوخين كاملين")
+    raise PayError("PayPal رفض المفاتيح: تأكد أن PAYPAL_CLIENT_ID و PAYPAL_SECRET من نفس الـ App ومنسوخين كاملين")
 
 
 def _pp(method: str, path: str, body: dict | None = None) -> dict:
@@ -163,7 +163,7 @@ def _pp(method: str, path: str, body: dict | None = None) -> dict:
         r = httpx.request(method, f"{_pp_base()}{path}", json=body, timeout=30,
                           headers={"Authorization": f"Bearer {_pp_token()}", "Prefer": "return=representation"})
     except httpx.HTTPError as e:
-        raise PayError(f"PayPal مش بيرد: {e}") from e
+        raise PayError(f"PayPal لا يرد: {e}") from e
     j = r.json() if r.content else {}
     if r.status_code >= 400:
         raise PayError(j.get("message") or (j.get("details") or [{}])[0].get("description") or f"PayPal HTTP {r.status_code}")
@@ -173,7 +173,7 @@ def _pp(method: str, path: str, body: dict | None = None) -> dict:
 def _approve(j: dict) -> str:
     link = next((x["href"] for x in j.get("links") or [] if x.get("rel") in ("approve", "payer-action")), None)
     if not link:
-        raise PayError("PayPal مارجّعش لينك الدفع")
+        raise PayError("PayPal مارجّعش رابط الدفع")
     return link
 
 
@@ -187,7 +187,7 @@ def paypal_order(amount: float, custom: str, name: str, ret: str, cancel: str) -
 
 
 def paypal_capture(order_id: str) -> dict:
-    """بيرجّع {status, custom, amount}."""
+    """يعود {status, custom, amount}."""
     j = _pp("POST", f"/v2/checkout/orders/{order_id}/capture", {})
     pu = (j.get("purchase_units") or [{}])[0]
     cap = ((pu.get("payments") or {}).get("captures") or [{}])[0]
@@ -196,7 +196,7 @@ def paypal_capture(order_id: str) -> dict:
 
 
 def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = "MONTH") -> str:
-    """خطة اشتراك (شهري أو سنوي) بالسعر ده (بتتعمل مرة واحدة وبتتحفظ). plans_cache = (get, set)."""
+    """خطة اشتراك (شهري أو سنوي) هذا بالسعر (تُنشأ مرة واحدة وتُحفظ). plans_cache = (get, set)."""
     get, put = plans_cache
     _pp_token()   # يحدد sandbox ولا live قبل ما نقرا الكاش
     if (pid := get(f"paypal_plan:{_pp_base()}:{key}")):

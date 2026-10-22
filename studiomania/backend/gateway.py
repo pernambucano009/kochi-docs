@@ -1,11 +1,11 @@
-"""🚪 البوابة: الحسابات والدخول، وكل عميل ليه نسخة برنامج لوحده ببياناته (مفيش عميل يشوف حاجة عميل تاني).
+"""🚪 البوابة: الحسابات والدخول، وكل عميل له نسخة برنامج تلقائيًا ببياناته (لا يوجد عميل يرى شيء عميل آخر).
 
-- البوابة هي اللي بتفتح للناس (PORT). البرنامج نفسه (app.py) بيشتغل نسخة لكل مساحة عمل على 127.0.0.1 بس،
-  وبيقبل الطلبات اللي جاية من البوابة بس (هيدر سري GATEWAY_SECRET).
-- مساحة صاحب البرنامج (owner) = فولدر البيانات القديم زي ما هو (مفيش نقل)، والعملاء في _platform/tenants/<id>.
-- نسخة العميل بتتفتح أول ما يدخل، وبتتقفل لو مفيش استخدام IDLE_MIN دقيقة ومفيش شغل شغال جواها.
-- الحسابات: إيميل وباسورد (مع تأكيد الإيميل) أو جوجل (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).
-- أول دخول: صاحب البرنامج بيعمل حساب الأدمن بإيميله، وبيأكد بالباسورد القديم بتاع البرنامج لو كان متعمل.
+- البوابة هي ما تفتح للناس (PORT). البرنامج نفسه (app.py) يشتغل نسخة لكل مساحة عمل على 127.0.0.1 فقط،
+  ويقبل الطلبات التي قادمة من البوابة فقط (سيدر سري GATEWAY_SECRET).
+- مساحة صاحب البرنامج (owner) = مجلد البيانات القديم كما هو (لا يوجد نقل)، والعملاء في _platform/tenants/<id>.
+- نسخة العميل تُفتح أول ما يدخل، وتُغلق إذا لا يوجد استخدام IDLE_MIN دقيقة ولا يوجد عمل يعمل جواها.
+- الحسابات: بريد إلكتروني وكلمة مرور (مع تأكيد البريد الإلكتروني) أو جوجل (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).
+- أول دخول: صاحب البرنامج يعمل حساب الأدمن بإيميله، ويأكد بالباسورد القديم الخاص بالبرنامج إذا كان متعمل.
 
 التشغيل: uvicorn gateway:app --app-dir backend
 """
@@ -205,7 +205,7 @@ def new_workspace(name: str) -> str:
         c.execute("INSERT INTO workspaces (id, name, plan, created_at) VALUES (?, ?, 'trial', ?)", (wid, name, time.time()))
         c.execute("INSERT INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, ?, 0, ?)",
                   (wid, TRIAL["credits"], time.time()))
-        c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, at) VALUES (?, ?, ?, 'trial', 'نقط التجربة المجانية', ?)",
+        c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, at) VALUES (?, ?, ?, 'trial', 'نقاط التجربة المجانية', ?)",
                   (uuid.uuid4().hex, wid, TRIAL["credits"], time.time()))
     return wid
 
@@ -246,7 +246,7 @@ def free_port() -> int:
 
 
 def owner_keys() -> dict:
-    """مفاتيح الخدمات اللي صاحب البرنامج حفظها من صفحة الإعدادات (في قاعدة بيانات مساحته)، عشان نسخ العملاء تشتغل بيها."""
+    """مفاتيح الخدمات التي صاحب البرنامج حفظها من صفحة الإعدادات (في قاعدة بيانات مساحته)، لكي نسخ العملاء تشتغل بها."""
     out = {}
     try:
         with closing(sqlite3.connect(DATA_DIR / "studiomania.db")) as c:
@@ -360,7 +360,7 @@ def _keep(wid: str) -> bool:
 
 
 def provider_watch() -> None:
-    """💳 رصيد المنصات: كل نص ساعة بنسأل، وكل دقيقة بنشوف لو حد سجّل طلب فشل بسبب الرصيد. التنبيه جرس عند الأدمن + إيميل."""
+    """💳 رصيد المنصات: كل نص ساعة نسأل، وكل دقيقة نرى إذا حد سجّل طلب فشل بسبب الرصيد. التنبيه جرس عند الأدمن + بريد إلكتروني."""
     import providers
     from datetime import datetime, timezone
     f = PLATFORM / "providers.json"   # نفس الملف اللي النسخ بتكتب فيه (جنب PLATFORM_DB)
@@ -371,11 +371,11 @@ def provider_watch() -> None:
     providers.save(f, d)
     for row in rows:
         title, body = providers.alert_text(row)
-        admin_alert(title, body, f"credit:{row['key']}", "اشحن من لوحة المنصة، وبعدها البرنامج هيرجع يشتغل لوحده.")
+        admin_alert(title, body, f"credit:{row['key']}", "اشحن من لوحة المنصة، وبعدها البرنامج سيعود يشتغل تلقائيًا.")
 
 
 def admin_alert(title: str, body: str, ref: str, tail: str = "") -> None:
-    """تنبيه للأدمن: جرس في البرنامج (قاعدة بيانات مساحة صاحب البرنامج) + إيميل."""
+    """تنبيه للأدمن: جرس في البرنامج (قاعدة بيانات مساحة صاحب البرنامج) + بريد إلكتروني."""
     from datetime import datetime, timezone
     try:
         with closing(sqlite3.connect(DATA_DIR / "studiomania.db", timeout=10)) as c, c:
@@ -410,7 +410,7 @@ def backup_state() -> dict:
 def backup_now() -> dict:
     import backup
     if not _backup_busy.acquire(blocking=False):
-        raise backup.BackupError("فيه نسخة بتتعمل دلوقتي")
+        raise backup.BackupError("فيه نسخة تُنشأ الآن")
     try:
         out = backup.run(DATA_DIR, kv_get("drive_refresh") or "", os.environ.get("GOOGLE_CLIENT_ID", ""), os.environ.get("GOOGLE_CLIENT_SECRET", ""),
                          kv_get("drive_folder"))
@@ -435,7 +435,7 @@ def backup_first() -> None:
 
 
 def backup_tick() -> None:
-    """مرة في اليوم (ولو فشلت بنجرّب تاني بعد ٣ ساعات، والتنبيه مرة واحدة لكل غلطة)."""
+    """مرة في اليوم (وإذا فشلت نجرّب مرة أخرى بعد ٣ ساعات، والتنبيه مرة واحدة لكل غلطة)."""
     import backup
     if not kv_get("drive_refresh") or not os.environ.get("GOOGLE_CLIENT_ID"):
         return
@@ -453,14 +453,14 @@ def backup_tick() -> None:
     except backup.BackupError as exc:
         if kv_get("backup_alerted") != str(exc)[:120]:
             kv_set("backup_alerted", str(exc)[:120])
-            admin_alert("🔴 النسخة الاحتياطية مااتعملتش", str(exc)[:300], "backup", "افتح الإعدادات ← النسخة الاحتياطية، ودوس «اعمل نسخة دلوقتي» أو اربط جوجل درايف تاني.")
+            admin_alert("🔴 النسخة الاحتياطية لم تُنشأ", str(exc)[:300], "backup", "افتح الإعدادات ← النسخة الاحتياطية، واضغط «أنشئ نسخة الآن» أو اربط جوجل درايف آخر.")
 
 
 ENV0 = set(os.environ)   # اللي جاي من الاستضافة نفسها ليه الأولوية على اللي اتحفظ من صفحة الإعدادات
 
 
 def sync_owner_keys() -> None:
-    """مفاتيح المنصة اللي الأدمن حفظها من صفحة الإعدادات (الدفع والإيميل والدخول بجوجل) بتوصل للبوابة من غير إعادة تشغيل."""
+    """مفاتيح المنصة التي الأدمن حفظها من صفحة الإعدادات (الدفع والبريد الإلكتروني والدخول بجوجل) توصل للبوابة بدون إعادة تشغيل."""
     for k, v in owner_keys().items():
         if k not in ENV0 and v and os.environ.get(k) != v:
             os.environ[k] = v
@@ -604,7 +604,7 @@ class SetupIn(BaseModel):
 
 @app.post("/api/auth/setup")
 def owner_setup(body: SetupIn, request: Request):
-    """أول مرة: حساب صاحب البرنامج (الأدمن)، ومساحته هي البيانات القديمة زي ما هي."""
+    """أول مرة: حساب صاحب البرنامج (الأدمن)، ومساحته هي البيانات القديمة كما هي."""
     if not needs_owner_setup():
         raise HTTPException(400, "حساب الأدمن متعمل من قبل")
     want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
@@ -625,7 +625,7 @@ def owner_setup(body: SetupIn, request: Request):
 
 
 def _remember_owner_profile() -> None:
-    """بروفايل Zernio بتاع صاحب البرنامج (أول بروفايل موجود) عشان حسابات العملاء متظهرش عنده."""
+    """بروفايل Zernio الخاص بـ صاحب البرنامج (أول بروفايل موجود) لكي حسابات العملاء متظهرش لديه."""
     if kv_get("zernio_owner_profile"):
         return
     try:
@@ -652,18 +652,18 @@ SKIP_VERIFY = os.environ.get("SKIP_EMAIL_VERIFY") == "1"
 if SKIP_VERIFY:   # الحسابات اللي اتعملت قبل ما المتغير يتحط كمان
     with closing(db()) as _c, _c:
         _c.execute("UPDATE users SET verified=1 WHERE verified=0")
-MAIL_FAIL = "الإيميل مقدرش يتبعت دلوقتي. جرّب كمان شوية، ولو فضلت المشكلة كلّمنا"
+MAIL_FAIL = "البريد الإلكتروني لم يستطع يُرسل الآن. جرّب أيضًا قليلًا، وإذا فضلت المشكلة كلّمنا"
 
 
 def send_verify(u: sqlite3.Row, request: Request) -> tuple[bool, str | None]:
-    """(اتبعت؟، لينك وضع التجربة)."""
+    """(أُرسل؟، رابط وضع التجربة)."""
     tok = secrets.token_urlsafe(32)
     with closing(db()) as c, c:
         c.execute("DELETE FROM tokens WHERE user_id=? AND kind='verify'", (u["id"],))
         c.execute("INSERT INTO tokens (token, user_id, kind, expires) VALUES (?, ?, 'verify', ?)", (tok, u["id"], time.time() + 3 * 86400))
     link = f"{base_url(request)}/verify?token={tok}"
-    sent = mailer.send(u["email"], f"أكّد إيميلك · {mailer.BRAND}", f"أهلًا! أكّد إيميلك من اللينك ده:\n{link}",
-                       mailer.button_html("أكّد إيميلك", "دوس على الزرار عشان نتأكد إن الإيميل ده بتاعك ونفتحلك حسابك.", link, "أكّد الإيميل"))
+    sent = mailer.send(u["email"], f"أكّد إيميلك · {mailer.BRAND}", f"أهلًا! أكّد إيميلك من هذا الرابط:\n{link}",
+                       mailer.button_html("أكّد إيميلك", "اضغط على الزر لكي نتأكد أن هذا البريد الإلكتروني الخاص بك ونفتحلك حسابك.", link, "أكّد البريد الإلكتروني"))
     return sent, (link if (not sent and os.environ.get("MAIL_DEV") == "1") else None)
 
 
@@ -757,8 +757,8 @@ def forgot(body: ForgotIn, request: Request):
             c.execute("DELETE FROM tokens WHERE user_id=? AND kind='reset'", (u["id"],))
             c.execute("INSERT INTO tokens (token, user_id, kind, expires) VALUES (?, ?, 'reset', ?)", (tok, u["id"], time.time() + 3600))
         link = f"{base_url(request)}/reset?token={tok}"
-        sent = mailer.send(u["email"], f"غيّر الباسورد · {mailer.BRAND}", f"لو انت اللي طلبت تغيير الباسورد، ادخل على اللينك ده (صالح ساعة):\n{link}",
-                           mailer.button_html("غيّر الباسورد", "لو انت اللي طلبت تغيير الباسورد دوس على الزرار. اللينك صالح ساعة. لو مش انت، تجاهل الإيميل ده.", link, "اعمل باسورد جديد"))
+        sent = mailer.send(u["email"], f"غيّر كلمة المرور · {mailer.BRAND}", f"إذا أنت ما طلبت تغيير كلمة المرور، ادخل على هذا الرابط (صالح ساعة):\n{link}",
+                           mailer.button_html("غيّر كلمة المرور", "إذا أنت ما طلبت تغيير كلمة المرور اضغط على الزر. الرابط صالح ساعة. إذا غير أنت، تجاهل هذا البريد الإلكتروني.", link, "أنشئ كلمة مرور جديد"))
         dev = link if (not sent and os.environ.get("MAIL_DEV") == "1") else None
     # نفس الرد سواء الإيميل موجود ولا لأ (عشان محدش يعرف مين متسجل)
     return {"ok": True, "dev_link": dev}
@@ -866,7 +866,7 @@ def ledger_add(c: sqlite3.Connection, wid: str, delta: int, kind: str, note: str
 
 
 def paid_once(c: sqlite3.Connection, ref: str, wid: str, provider: str, kind: str, amount: float, note: str) -> bool:
-    """True أول مرة بس (كل دفعة بتتسجل مرة واحدة حتى لو الإشعار وصل مرتين)."""
+    """True أول مرة فقط (كل دفعة تتسجل مرة واحدة حتى إذا الإشعار وصل مرتين)."""
     try:
         c.execute("INSERT INTO payments (ref, workspace, provider, kind, amount, note, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                   (ref, wid, provider, kind, amount, note, time.time()))
@@ -900,7 +900,7 @@ def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provide
 
 
 def renew(wid: str, ref: str, amount: float) -> None:
-    """تجديد شهري: نقط الباقة بترجع لعددها (من غير ترحيل)."""
+    """تجديد شهري: نقاط الباقة تعود لعددها (بدون ترحيل)."""
     w = workspace(wid)
     p = plan_of(w["plan"]) if w else None
     if not p:
@@ -919,14 +919,14 @@ MONTH = 30 * 86400
 
 
 def renews_at(w) -> float | None:
-    """إمتى نقط الباقة هترجع تاني (تقريبًا شهر من آخر مرة)."""
+    """متى نقاط الباقة ستعود مرة أخرى (تقريبًا شهر من آخر مرة)."""
     if not w or w["plan"] in ("none", "trial") or not w["refill_at"]:
         return None
     return w["refill_at"] + MONTH
 
 
 def yearly_refill() -> None:
-    """الاشتراك السنوي بيتدفع مرة في السنة، بس نقط الباقة بترجع لعددها كل شهر (من غير ترحيل)."""
+    """الاشتراك السنوي يتدفع مرة في السنة، فقط نقاط الباقة تعود لعددها كل شهر (بدون ترحيل)."""
     now = time.time()
     with closing(db()) as c:
         rows = c.execute("""SELECT id, plan, refill_at FROM workspaces WHERE cycle='year' AND plan NOT IN ('none', 'trial')
@@ -938,11 +938,11 @@ def yearly_refill() -> None:
         with closing(db()) as c, c:
             c.execute("UPDATE workspaces SET refill_at=? WHERE id=?", (r["refill_at"] + MONTH, r["id"]))
             c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], now, r["id"]))
-            ledger_add(c, r["id"], p["credits"], "renewal", f"نقط الشهر · باقة {p['name']} السنوية")
+            ledger_add(c, r["id"], p["credits"], "renewal", f"نقاط الشهر · باقة {p['name']} السنوية")
 
 
 def end_subscription(wid: str, at: float | None = None) -> None:
-    """الاشتراك اتلغى: بيفضل شغال لآخر الفترة المدفوعة، وبعدها نقط الباقة والحسابات والأوتوبايلوت بيروحوا (النقط الزيادة بتفضل)."""
+    """الاشتراك أُلغي: يظل يعمل لآخر الفترة المدفوعة، وبعدها نقاط الباقة والحسابات والأوتوبايلوت يروحون (النقاط الزيادة تظل)."""
     with closing(db()) as c, c:
         if at and at > time.time():
             c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (at, wid))
@@ -953,7 +953,7 @@ def end_subscription(wid: str, at: float | None = None) -> None:
 
 
 def topup_bonus(c, wid: str, cfg: dict) -> int:
-    """باقة «وكالات» النقط الزيادة ليها بالضعف (topup_bonus في الباقة)."""
+    """باقة «وكالات» النقاط الزيادة لها بالضعف (topup_bonus في الباقة)."""
     r = c.execute("SELECT plan FROM workspaces WHERE id=?", (wid,)).fetchone()
     p = next((x for x in cfg["plans"] if r and x["key"] == r["plan"]), None)
     return max(1, int((p or {}).get("topup_bonus") or 1))
@@ -970,7 +970,7 @@ def add_topup(wid: str, key: str, provider: str, ref: str, amount: float) -> boo
         n = t["credits"] * topup_bonus(c, wid, cfg)
         c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
         c.execute("UPDATE wallet SET topup_credits=topup_credits+?, updated_at=? WHERE workspace=?", (n, time.time(), wid))
-        ledger_add(c, wid, n, "topup", f"نقط زيادة {n}", ref)
+        ledger_add(c, wid, n, "topup", f"نقاط زيادة {n}", ref)
     return True
 
 
@@ -997,7 +997,7 @@ def customer_user(request: Request) -> sqlite3.Row:
 
 @app.get("/billing")
 def billing_page(request: Request, ok: str = "", err: str = ""):
-    """الصفحة القديمة اتشالت: «باقتي ونقاطي» بقت جوه البرنامج (أيقونة الكارت في الشريط اللي فوق)."""
+    """الصفحة القديمة أُزيلت: «باقتي ونقاطي» بقت داخل البرنامج (أيقونة البطاقة في الشريط الذي أعلى)."""
     if not current_user(request):
         return RedirectResponse("/login?next=/billing")
     q = "&ok=" + ok if ok in ("plan", "topup") else "&err=paypal" if err == "paypal" else ""
@@ -1100,7 +1100,7 @@ def portal(request: Request):
 
 @app.post("/api/billing/cancel")
 def cancel_sub(request: Request):
-    """إلغاء اشتراك PayPal من جوه البرنامج (Stripe بيتلغي من بوابة العميل)."""
+    """إلغاء اشتراك PayPal من داخل البرنامج (Stripe يتلغي من بوابة العميل)."""
     u = customer_user(request)
     w = workspace(u["workspace"])
     if not w or not w["sub_id"]:
@@ -1222,7 +1222,7 @@ def admin(request: Request) -> sqlite3.Row:
 
 @app.get("/auth/drive")
 def drive_start(request: Request):
-    """ربط جوجل درايف للنسخة الاحتياطية (الأدمن بس)."""
+    """ربط جوجل درايف للنسخة الاحتياطية (الأدمن فقط)."""
     import backup
     admin(request)
     cid = os.environ.get("GOOGLE_CLIENT_ID")
@@ -1306,7 +1306,7 @@ SEC_HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "SAMEORIG
 
 
 class SecurityMiddleware:
-    """هيدرز أمان على كل رد، ورفض الرفع اللي حجمه المعلن أكبر من الحد (ASGI خام عشان الستريم والفيديو يفضلوا زي ما هم)."""
+    """سيدرز أمان على كل رد، ورفض الرفع الذي حجمه المعلن أكبر من الحد (ASGI خام لكي الستريم والفيديو يظلون كما هم)."""
 
     def __init__(self, app_):
         self.app = app_
@@ -1331,7 +1331,7 @@ app.add_middleware(SecurityMiddleware)
 
 
 async def capped(stream):
-    """الرفع من غير حجم معروف: بيقف لو عدّى الحد."""
+    """الرفع بدون حجم معروف: يقف إذا عدّى الحد."""
     n = 0
     async for chunk in stream:
         n += len(chunk)
@@ -1342,7 +1342,7 @@ async def capped(stream):
 
 @app.post("/hooks/zernio")
 async def zernio_hook(request: Request):
-    """الرسايل اللي على الخاص من خدمة النشر: بنتأكد من التوقيع، ونوصّلها لنسخة العميل صاحب الحساب."""
+    """الرسائل الذي على الخاص من خدمة النشر: نتأكد من التوقيع، ونوصّلها لنسخة العميل صاحب الحساب."""
     import dmflow
     raw = await request.body()
     if not dmflow.verify(raw, request.headers.get("x-zernio-signature") or "", hook_secret()):
@@ -1368,7 +1368,7 @@ async def zernio_hook(request: Request):
 async def proxy(path: str, request: Request):
     url_path = "/" + path
     if url_path.startswith(("/api/_hooks/", "/api/_tenant/")):   # داخلي بين البوابة والنسخ بس
-        return JSONResponse({"detail": "مش موجود"}, status_code=404)
+        return JSONResponse({"detail": "غير موجود"}, status_code=404)
     u = current_user(request)
     if not u or not u["verified"]:
         # ملفات الشكل (CSS / JS) لصفحات الدخول بتتقرا من الفولدر على طول
@@ -1380,7 +1380,7 @@ async def proxy(path: str, request: Request):
     u_pub = False
     if not u:
         if url_path.startswith("/api/") and url_path not in PUBLIC_FILES or url_path.startswith("/media/"):
-            return JSONResponse({"detail": "لازم تسجّل دخول"}, status_code=401)
+            return JSONResponse({"detail": "يجب تسجّل دخول"}, status_code=401)
         if url_path in PUBLIC_FILES:
             u_pub = True   # صفحة الأسعار: بتتقرا من نسخة صاحب البرنامج
         else:
@@ -1391,7 +1391,7 @@ async def proxy(path: str, request: Request):
         if url_path in PUBLIC_FILES:
             u_pub = True
         elif url_path.startswith("/api/"):
-            return JSONResponse({"detail": "أكّد إيميلك الأول"}, status_code=403)
+            return JSONResponse({"detail": "أكّد إيميلك أولًا"}, status_code=403)
         else:
             return RedirectResponse("/verify")
     if u and u["verified"] and url_path in ("/pricing", "/pricing.html"):
@@ -1399,7 +1399,7 @@ async def proxy(path: str, request: Request):
     if u and u["role"] != "admin" and ADMIN_ONLY.match(url_path):
         if url_path == "/api/settings" and request.method == "GET":
             return JSONResponse({"keys": {}, "password_from_env": False, "customer": True})
-        return JSONResponse({"detail": "الصفحة دي مش متاحة"}, status_code=403)
+        return JSONResponse({"detail": "هذه الصفحة غير متاحة"}, status_code=403)
     # الملفات العامة (من غير دخول) بتتقرا من نسخة صاحب البرنامج، ومن غير بيانات
     t = await ensure(OWNER if u_pub else u["workspace"])
     t.last = time.time()
@@ -1416,7 +1416,7 @@ async def proxy(path: str, request: Request):
         r = await _http.send(req, stream=True)
     except httpx.HTTPError:
         _tenants.pop(t.wid, None)
-        return JSONResponse({"detail": "البرنامج بيعيد التشغيل، جرّب تاني كمان ثانية"}, status_code=503)
+        return JSONResponse({"detail": "البرنامج يعيد التشغيل، جرّب مرة أخرى أيضًا ثانية"}, status_code=503)
     out_headers = [(k, v) for k, v in r.headers.multi_items() if k.lower() not in HOP and k.lower() != "set-cookie"]
     resp = StreamingResponse(r.aiter_raw(), status_code=r.status_code, background=BackgroundTask(r.aclose))
     resp.raw_headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in out_headers]

@@ -1,10 +1,10 @@
-"""ترتيب مونتاج كوتشي التلقائي: التعليق الصوتي بيتقطع جمل ويتوزع على الفيديو، والموسيقى بتتقطع على الجمل.
+"""ترتيب مونتاج كوتشي التلقائي: التعليق الصوتي يتقطع جمل ويتوزع على الفيديو، والموسيقى تتقطع على الجمل.
 
 القواعد (من صاحب البرنامج):
-- أول جملة (الهوك) في أول الفيديو خالص.
-- آخر جملة («سوي فولو...») بتبدأ مع الأوترو، وصوت الأوترو نفسه مقفول.
-- الجمل اللي في النص بتتوزع على باقي الفيديو بمسافات متساوية بينها.
-- الموسيقى بتبدأ بعد نهاية أول جملة بفريمين، وبتتقطع عند كل جملة: وقت الكلام 20%، وبين الجمل عالية.
+- أول جملة (الخطاف) في أول الفيديو تمامًا.
+- آخر جملة («سوي فوإذا...») تبدأ مع الأوترو، وصوت الأوترو نفسه مغلق.
+- الجمل الذي في النص تتوزع على باقي الفيديو بمسافات متساوية بينها.
+- الموسيقى تبدأ بعد نهاية أول جملة بفريمين، وتتقطع عند كل جملة: وقت النص 20%، وبين الجمل عالية.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ MIN_GAP = 0.15            # أقل مسافة بين جملتين لو الفي�
 
 def speech_segments(ffmpeg: str, path: Path, duration: float, silence_db: float = SILENCE_DB,
                     min_pause: float = MIN_PAUSE) -> list[tuple[float, float]]:
-    """أماكن الكلام في التسجيل [(بداية، نهاية)] بالثواني، من غير ما نبعته لأي خدمة برّه."""
+    """أماكن النص في التسجيل [(بداية، نهاية)] بالثواني، بدون ما نبعته لأي خدمة خارج."""
     r = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(path), "-af",
                         f"silencedetect=noise={silence_db}dB:d={min_pause}", "-f", "null", "-"],
                        capture_output=True, text=True, timeout=300)
@@ -54,7 +54,7 @@ def merge_short(segs: list[tuple[float, float]]) -> list[tuple[float, float]]:
 
 
 def padded(segs: list[tuple[float, float]], duration: float) -> list[tuple[float, float]]:
-    """كل جملة بهامش صغير، من غير ما تدخل في اللي جنبها."""
+    """كل جملة بهامش صغير، بدون ما تدخل في ما جنبها."""
     out = []
     for i, (s, e) in enumerate(segs):
         lo = segs[i - 1][1] if i else 0.0
@@ -64,7 +64,7 @@ def padded(segs: list[tuple[float, float]], duration: float) -> list[tuple[float
 
 
 def place_sentences(lens: list[float], video_end: float, outro_start: float | None) -> list[float]:
-    """إمتى تبدأ كل جملة على التايم لاين."""
+    """متى تبدأ كل جملة على التايم لاين."""
     n = len(lens)
     if n == 0:
         return []
@@ -92,7 +92,7 @@ def place_sentences(lens: list[float], video_end: float, outro_start: float | No
 
 def layout(sentences: list[tuple[float, float]], video_end: float, outro_start: float | None,
            music_len: float | None, total: float, fps: int = 30) -> dict:
-    """بيرجع قطع التعليق وقطع الموسيقى بنفس شكل بيانات المونتاج (parts)."""
+    """يعود قطع التعليق وقطع الموسيقى بنفس شكل بيانات المونتاج (parts)."""
     lens = [e - s for s, e in sentences]
     starts = place_sentences(lens, video_end, outro_start)
     voice = [{"delay": round(t, 3), "offset": round(s, 3), "length": round(e - s, 3), "volume": 1}
@@ -116,7 +116,7 @@ def layout(sentences: list[tuple[float, float]], video_end: float, outro_start: 
 
 
 def auto_cuts(duration: float, scene_cuts: list[float], max_len: float = 14.5, min_len: float = 2.0) -> list[float]:
-    """نقط تقطيع بحيث كل قطعة أقل من max_len: بنقطع عند تغيّر المشهد لو فيه، وإلا بنقسم بالتساوي."""
+    """نقاط تقطيع بحيث كل قطعة أقل من max_len: نقطع عند تغيّر المشهد إذا فيه، وإلا نقسم بالتساوي."""
     cuts, pos = [], 0.0
     scenes = sorted(c for c in scene_cuts if min_len <= c <= duration - min_len)
     while duration - pos > max_len:
@@ -133,7 +133,7 @@ def auto_cuts(duration: float, scene_cuts: list[float], max_len: float = 14.5, m
 
 
 def scene_cuts(ffmpeg: str, src: Path, threshold: float = 0.3) -> list[float]:
-    """أماكن تغيّر المشهد، على نسخة صغيرة من الفيديو (أسرع كتير من الحجم الكامل على السيرفر)."""
+    """أماكن تغيّر المشهد، على نسخة صغيرة من الفيديو (أسرع كثير من الحجم الكامل على الخادم)."""
     r = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(src), "-an", "-sn", "-vf",
                         f"fps=10,scale=160:-2,select='gt(scene,{threshold})',showinfo", "-f", "null", "-"],
                        capture_output=True, text=True, timeout=900)

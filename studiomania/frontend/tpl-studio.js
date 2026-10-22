@@ -52,7 +52,7 @@ function tsHome() {
             : `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""} title="عينة جديدة">↻</button>`}</div></div></article>`;
   };
   const t = D.templates.find((x) => x.id === tsx.pick);
-  const opt = (g) => Object.entries(D.dialects).filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}">${tse(v.label)}</option>`).join("");
+  const opt = (g) => Object.entries(D.dialects).filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}" ${k === D.brand_lang ? "selected" : ""}>${tse(v.label)}</option>`).join("");
   $("tsGallery").innerHTML = `
     <section class="panel"><div class="car-head"><h2>القوالب</h2><small class="muted">اختر أسلوب، اكتب فكرتك، والباقي علينا: نص ← تعليق صوتي ← ستوري بورد ← فيديو متصل ← مونتاج</small></div>
       <div class="ts-grid">${D.templates.map(card).join("")}</div></section>

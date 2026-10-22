@@ -1,7 +1,7 @@
-"""🎯 تراك لحاجة في الفيديو: المستخدم بيحدد مربع عليها في فريم، والبرنامج بيتابع نقط مميزة جواها فريم فريم
-(Lucas-Kanade optical flow)، ومن حركة النقط بيحسب الحاجة اتحركت إزاي:
-  follow  → إزاحة ولفّ وتكبير بس (حاجة بتتحرك: وش، علبة، عربية)
-  surface → كمان الميلان والمنظور (ورقة على مكتب، شاشة، يافطة)
+"""🎯 تراك لحاجة في الفيديو: المستخدم يحدد مربع عليها في فريم، والبرنامج يتابع نقاط مميزة جواها فريم فريم
+(Lucas-Kanade optical flow)، ومن حركة النقاط يحسب الشيء اتحركت كيف:
+  follow  → إزاحة ولفّ وتكبير فقط (شيء تتحرك: وجه، علبة، عربية)
+  surface → أيضًا الميلان والمنظور (ورقة على مكتب، شاشة، يافطة)
 النتيجة: 4 أركان للحاجة في كل فريم، بكسور من مقاس الفيديو."""
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _features(gray, quad, n=300):
 
 
 def _sane(q_old, q_new):
-    """الأركان الجديدة معقولة؟ (مش مقلوبة ولا اتكبرت/صغرت فجأة)"""
+    """الأركان الجديدة معقولة؟ (غير مقلوبة ولا اتكبرت/صغرت فجأة)"""
     if not np.all(np.isfinite(q_new)):
         return False
     a0, a1 = abs(cv2.contourArea(q_old.astype(np.float32))), abs(cv2.contourArea(q_new.astype(np.float32)))
@@ -31,7 +31,7 @@ def _sane(q_old, q_new):
 
 
 def _step(g0, g1, quad, pts, mode):
-    """فريم ← الفريم اللي بعده: النقط بتتحرك، والأركان بتتحرك على قدها."""
+    """فريم ← الفريم الذي بعده: النقاط تتحرك، والأركان تتحرك على قدها."""
     if len(pts) < 30:
         more = _features(g0, quad)
         pts = np.vstack([pts, more]) if len(pts) else more
@@ -59,7 +59,7 @@ def _step(g0, g1, quad, pts, mode):
 
 
 def _smooth(qs, ref, r=2):
-    """تنعيم خفيف عشان الرعشة، والفريم اللي المستخدم حدد فيه بيفضل زي ما هو بالظبط."""
+    """تنعيم خفيف لكي الرعشة، والفريم الذي المستخدم حدد فيه يظل كما هو بالضبط."""
     arr = np.array(qs, np.float64)
     out = arr.copy()
     for i in range(len(arr)):
@@ -71,10 +71,10 @@ def _smooth(qs, ref, r=2):
 
 
 def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: str = "follow", progress=None, quad: list[float] | None = None) -> dict:
-    """box: [x0, y0, x1, y1] أو quad: 8 أرقام (4 أركان) بكسور من مقاس الفيديو في الثانية tref. بيرجّع {t0, fps, q: [[8 أرقام]...]}"""
+    """box: [x0, y0, x1, y1] أو quad: 8 أرقام (4 أركان) بكسور من مقاس الفيديو في الثانية tref. يعود {t0, fps, q: [[8 أرقام]...]}"""
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
-        raise RuntimeError("مش قادر يفتح الفيديو عشان يعمل تراك")
+        raise RuntimeError("لا قادر يفتح الفيديو لكي يعمل تراك")
     vfps = cap.get(cv2.CAP_PROP_FPS) or 30
     vw, vh = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
@@ -99,7 +99,7 @@ def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: 
     cap.release()
     n = len(grays)
     if n < 2:
-        raise RuntimeError("الجزء ده من الفيديو قصير قوي على التراك")
+        raise RuntimeError("هذا الجزء من الفيديو قصير قوي على التراك")
     fps = vfps / step
     ref = int(round(min(max(tref - f0 / vfps, 0), (n - 1) / fps) * fps))
     ref = min(max(ref, 0), n - 1)
@@ -131,7 +131,7 @@ def track(path: str, t0: float, t1: float, tref: float, box: list[float], mode: 
 
 
 def _order(pts):
-    """4 نقط بالترتيب: فوق شمال، فوق يمين، تحت يمين، تحت شمال."""
+    """4 نقاط بالترتيب: أعلى شمال، أعلى يمين، أسفل يمين، أسفل شمال."""
     p = np.array(pts, np.float32).reshape(4, 2)
     c = p.mean(0)
     p = p[np.argsort(np.arctan2(p[:, 1] - c[1], p[:, 0] - c[0]))]   # لفّة مع عقارب الساعة (y لتحت) — مبيكررش نقطة حتى لو المربع مايل 45°
@@ -139,7 +139,7 @@ def _order(pts):
 
 
 def _boxy(q) -> bool:
-    """شكل قريب من مستطيل في المنظور: كل زاوية بين 55° و125° ومفيش ضلع أقصر من ربع اللي قصاده."""
+    """شكل قريب من مستطيل في المنظور: كل زاوية بين 55° و125° ولا يوجد ضلع أقصر من ربع الذي قصاده."""
     q = np.asarray(q, np.float64)
     for i in range(4):
         a, b, c = q[i - 1], q[i], q[(i + 1) % 4]
@@ -152,14 +152,14 @@ def _boxy(q) -> bool:
 
 
 def detect(path: str, t: float, pt: list[float], person_mask: str | None = None) -> tuple[list[float], str]:
-    """🎯 دوسة على حاجة في الفريم ← حدودها (4 أركان بكسور من الفيديو) ونوعها:
-    surface لو ليها حواف مربعة واضحة (ورقة، شاشة، يافطة) فبتتتبع بالمنظور، وfollow لأي حاجة تانية (شخص، وش، علبة)."""
+    """🎯 ضغطة على شيء في الفريم ← حدودها (4 أركان بكسور من الفيديو) ونوعها:
+    surface إذا لها حواف مربعة واضحة (ورقة، شاشة، يافطة) فتتتبع بالمنظور، وfollow لأي شيء أخرى (شخص، وجه، علبة)."""
     cap = cv2.VideoCapture(path)
     cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t) * 1000)
     ok, fr = cap.read()
     cap.release()
     if not ok:
-        raise RuntimeError("مش قادر يقرا الفريم ده من الفيديو")
+        raise RuntimeError("لا قادر يقرأ هذا الفريم من الفيديو")
     H0, W0 = fr.shape[:2]
     k = WORK_W / W0 if W0 > WORK_W else 1.0
     img = cv2.resize(fr, (int(W0 * k), int(H0 * k))) if k != 1.0 else fr
@@ -231,15 +231,15 @@ def detect(path: str, t: float, pt: list[float], person_mask: str | None = None)
 
 
 def regions(path: str, t: float, person_mask: str | None = None, head: list[float] | None = None) -> tuple[list[dict], np.ndarray]:
-    """🖱️ كل الحاجات اللي في الفريم وحدودها (عشان لما الماوس يعدّي على حاجة حدودها تنوّر قبل ما تدوس):
-    الراس، الشخص، الحاجات اللي ليها 4 حواف (ورقة/شاشة)، وأجزاء لونها واحد (إيد، كوباية، تيشيرت، علبة).
-    بيرجّع الحاجات (حدود بكسور من الفيديو) وخريطة صغيرة فيها رقم الحاجة اللي في كل نقطة (-1 = مفيش)."""
+    """🖱️ كل الأشياء التي في الفريم وحدودها (لكي عندما الماوس يعدّي على شيء حدودها تضيء قبل ما تضغط):
+    الرأس، الشخص، الأشياء التي لها 4 حواف (ورقة/شاشة)، وأجزاء لونها واحد (يد، كوب، تيشيرت، علبة).
+    يعود الأشياء (حدود بكسور من الفيديو) وخريطة صغيرة فيها رقم الشيء الذي في كل نقطة (-1 = لا يوجد)."""
     cap = cv2.VideoCapture(path)
     cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t) * 1000)
     ok, fr = cap.read()
     cap.release()
     if not ok:
-        raise RuntimeError("مش قادر يقرا الفريم ده من الفيديو")
+        raise RuntimeError("لا قادر يقرأ هذا الفريم من الفيديو")
     H0, W0 = fr.shape[:2]
     k = 360 / W0 if W0 > 360 else 1.0
     img = cv2.resize(fr, (int(W0 * k), int(H0 * k)), interpolation=cv2.INTER_AREA) if k != 1.0 else fr
@@ -274,7 +274,7 @@ def regions(path: str, t: float, person_mask: str | None = None, head: list[floa
         if pm is not None:
             hm &= pm.astype(np.uint8)
         if hm.sum() > area * 0.002:
-            add(hm, "follow", "الراس")
+            add(hm, "follow", "الرأس")
     # أجزاء لونها واحد (بعد تنعيم يخلي كل حاجة لون واحد تقريبًا)
     sm = cv2.pyrMeanShiftFiltering(img, 8, 22)
     lab = cv2.cvtColor(sm, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(np.float32)
@@ -289,7 +289,7 @@ def regions(path: str, t: float, person_mask: str | None = None, head: list[floa
             a = stats[j, cv2.CC_STAT_AREA]
             if area * 0.006 < a < area * 0.4:
                 comp = cv2.morphologyEx((cc == j).astype(np.uint8), cv2.MORPH_CLOSE, ker)
-                add(comp, "follow", "حاجة")
+                add(comp, "follow", "شيء")
     # حاجات ليها 4 حواف واضحة (ورقة، شاشة، يافطة)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = cv2.dilate(cv2.Canny(cv2.bilateralFilter(gray, 7, 50, 50), 40, 120), np.ones((3, 3), np.uint8))

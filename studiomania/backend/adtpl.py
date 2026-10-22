@@ -1,8 +1,8 @@
-"""🎯 قوالب الإعلانات (UGC، إعلان سينمائي، ...): شخصية ثابتة + صورة المنتج + سكريبت ← برومتات Seedance جاهزة.
+"""🎯 قوالب الإعلانات (UGC، إعلان سينمائي، ...): شخصية ثابتة + صورة المنتج + نص ← برومتات Seedance جاهزة.
 
 الطريقة مستوحاة من skills «ugc» (PYNK AI UGC Studio) و«ad-director / ad-assets» و«image/video-prompter» (Pink Prompt Director):
-- الشخصية بتتعمل مرة واحدة (صورة وش ← صورة جسم كامل بنفس الوش) وبتتبعت مرجع مع كل توليدة، فبتفضل هي هي.
-- صورة المنتج هي المرجع: البرومت عمره ما بيوصف شكل المنتج بالكلام (الوصف بيخلي الموديل يعيد تصميمه).
+- الشخصية تُنشأ مرة واحدة (صورة وجه ← صورة جسم كامل بنفس الوجه) وتُرسل مرجع مع كل توليدة، فتظل هي هي.
+- صورة المنتج هي المرجع: البرومت عمره ما يوصف شكل المنتج بالكلام (الوصف يخلي النموذج يعيد تصميمه).
 - الكلام على الشاشة ممنوع جوه الفيديو؛ اسم البراند والجملة الأخيرة بيتكتبوا بخطوطنا في الآخر.
 """
 from __future__ import annotations
@@ -31,16 +31,16 @@ FLAT_CLOSE = (
 
 
 def hero_messages(desc: str, brief: str, kind: str) -> list[dict]:
-    """وصف الشخصية (اللي كتبه العميل بالعربي) ← مواصفات ثابتة بالإنجليزي للصور."""
+    """وصف الشخصية (ما كتبه العميل بالعربية) ← مواصفات ثابتة بالإنجليزية للصور."""
     sys = (
-        "إنت مسؤول الكاستينج في إعلانات واقعية. هتاخد وصف قصير لشخصية (أو مفيش) وتطلع مواصفات كاملة ثابتة بالإنجليزي لصورة مرجعية.\n"
-        "- من غير سن ولا أسامي: اوصف بالشعر والملامح والجسم والطاقة واللبس.\n"
+        "أنت مسؤول الكاستينج في إعلانات واقعية. ستأخذ وصف قصير لشخصية (أو لا يوجد) وتظهر مواصفات كاملة ثابتة بالإنجليزية لصورة مرجعية.\n"
+        "- بدون سن ولا أسامي: صِف بالشعر والملامح والجسم والطاقة واللبس.\n"
         "- اللبس: لبس عادي من الحياة يناسب الإعلان" + (" (حد بيصوّر نفسه بالموبايل)" if kind == "ugc" else "") + "، فوق وتحت وجزمة، ومحتشم.\n"
         "- handle: وصف قصير مميز للشخصية يتقال في البرومتات (زي: the woman with the soft brown hijab and the denim jacket).\n"
-        'رجّع JSON بس: {"gender": "female|male", "identity": "English: face, skin tone and finish, hair (color, length, texture), eyes, brows, lips, '
+        'استعد JSON فقط: {"gender": "female|male", "identity": "English: face, skin tone and finish, hair (color, length, texture), eyes, brows, lips, '
         'build, default expression - one paragraph", "outfit": "English: top / bottom / shoes / accessories", "handle": "English short descriptor", '
         '"summary_ar": "ملخص الشخصية في سطر بالعامية"}')
-    return [{"role": "system", "content": sys}, {"role": "user", "content": f"وصف الشخصية: {desc or '(اختار إنت شخصية تناسب الإعلان)'}\nالإعلان عن: {brief}"}]
+    return [{"role": "system", "content": sys}, {"role": "user", "content": f"وصف الشخصية: {desc or '(اختر أنت شخصية تناسب الإعلان)'}\nالإعلان عن: {brief}"}]
 
 
 def head_prompt(hero: dict) -> str:
@@ -61,9 +61,9 @@ def body_prompt(hero: dict) -> str:
 
 # ---------------------------------------------------------------- 📱 UGC (skill «ugc»): ١٥ ثانية، ٤ نبضات، الكاميرا الأمامية والخلفية
 UGC_PLACES = {
-    "bathroom": "حمام، الصبح (سكين كير وتجهيز)", "car": "عربية راكنة، كرسي السواق (كلام على السريع)",
-    "kitchen": "مطبخ، نور النهار (روتين ونصيحة صادقة)", "bedroom": "أوضة نوم، بالليل (دافي وصادق)",
-    "desk": "مكتب في البيت (شغل وإنتاجية)", "street": "شارع أو كافيه برّه (حركة وطاقة)",
+    "bathroom": "حمام، الصبح (سكين كير وتجهيز)", "car": "عربية راكنة، كرسي السواق (نص على السريع)",
+    "kitchen": "مطبخ، ضوء النهار (روتين ونصيحة صادقة)", "bedroom": "أوضة نوم، بالليل (دافي وصادق)",
+    "desk": "مكتب في البيت (عمل وإنتاجية)", "street": "شارع أو كافيه خارج (حركة وطاقة)",
 }
 UGC_BEATS = [("0-3s", "Opener"), ("3-7s", "Use"), ("7-11s", "Result"), ("11-15s", "Verdict")]
 
@@ -72,27 +72,27 @@ def ugc_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[dic
     a = d["ad"]
     own = (a.get("script") or "").strip()
     sys = (
-        "إنت كاتب ومخرج إعلانات UGC: حد حقيقي ماسك موبايله وبيتكلم عن منتج بيحبه فعلًا، مش إعلان متصوّر.\n"
-        f"الفيديو ١٥ ثانية بالظبط، ٤ نبضات، والكلام بلغة: {lang_txt}. {guide}\n"
-        "- السكريبت كله حوالي ٣٢-٣٨ كلمة (كلام طبيعي مريح في ١٥ ثانية): ١ افتتاحية/رد فعل قبل أي كلام عن المنتج (٤-٧ كلمات) · ٢ وهي بتستخدمه "
-        "(إحساسه، طعمه، ريحته، شكله) (٦-٩ كلمات) · ٣ النتيجة اللي عمله لها، وده أهم جزء (٩-١٤ كلمة) · ٤ حكمها في الآخر قصير (٣-٦ كلمات).\n"
-        "- كلام متقطع وعفوي زي ما بتكلم صاحبتها، مش لغة إعلانات. اسم المنتج مرة واحدة بالكتير. من غير «اللينك في البايو» ومن غير هاشتاجات.\n"
+        "أنت كاتب ومخرج إعلانات UGC: حد حقيقي ممسك موبايله ويتكلم عن منتج يحبه فعلًا، غير إعلان متصوّر.\n"
+        f"الفيديو ١٥ ثانية بالضبط، ٤ نبضات، والنص بلغة: {lang_txt}. {guide}\n"
+        "- النص كله نحو ٣٢-٣٨ كلمة (نص طبيعي مريح في ١٥ ثانية): ١ افتتاحية/رد فعل قبل أي نص عن المنتج (٤-٧ كلمات) · ٢ وهي تستخدمه "
+        "(إحساسه، طعمه، ريحته، شكله) (٦-٩ كلمات) · ٣ النتيجة التي عمله لها، وده أهم جزء (٩-١٤ كلمة) · ٤ حكمها في الآخر قصير (٣-٦ كلمات).\n"
+        "- نص متقطع وعفوي كما تكلم صاحبتها، غير لغة إعلانات. اسم المنتج مرة واحدة بالكتير. بدون «الرابط في السيرة» ومن غير هاشتاجات.\n"
         "- ممنوع تخترع أرقام أو ادعاءات: استخدم بس اللي في الفكرة أو ملف العميل.\n"
-        "- world (English, 35-40 words): المكان بقى مكان حقيقي محدد: الأسطح، مصدر النور واتجاهه، والإحساس.\n"
-        "- lighting (English, short): النور اللي يناسب المكان (natural window light / warm lamp light / daylight through the windshield...).\n"
-        "- action (English) لكل نبضة: زاوية كاميرا جديدة أو تبديل بين الكاميرا الأمامية والخلفية مكتوب كحركة هي بتعملها، ولحظة واحدة للمنتج "
-        "(@Image3): تميله في النور، تقرّبه من العدسة، تملا بيه الكادر، أو تمسكه جنب وشها.\n"
+        "- world (English, 35-40 words): المكان بقى مكان حقيقي محدد: الأسطح، مصدر الضوء واتجاهه، والإحساس.\n"
+        "- lighting (English, short): الضوء الذي يناسب المكان (natural window light / warm lamp light / daylight through the windshield...).\n"
+        "- action (English) لكل نبضة: زاوية كاميرا جديدة أو تبديل بين الكاميرا الأمامية والخلفية مكتوب كحركة هي تعملها، ولحظة واحدة للمنتج "
+        "(@Image3): تميله في الضوء، تقرّبه من العدسة، تملأ به الكادر، أو تمسكه بجانب وشها.\n"
         'استعد JSON فقط: {"title": "اسم قصير", "world": "...", "lighting": "...", '
-        '"beats": [{"line": "الجملة بالظبط", "action": "English camera + action"}]} أربع نبضات بالظبط.')
-    task = (f"العميل كتب السكريبت ده: «{own}». قسّمه على الأربع نبضات بكلامه هو، وقصّر بس لو أطول من الوقت. لو جزء ناقص اكتبه إنت."
+        '"beats": [{"line": "الجملة بالضبط", "action": "English camera + action"}]} أربع نبضات بالضبط.')
+    task = (f"العميل كتب هذا النص: «{own}». قسّمه على الأربع نبضات بكلامه هو، وقصّر فقط إذا أطول من الوقت. إذا جزء ناقص اكتبه أنت."
             if own else f"الفكرة: {d.get('brief') or ''}")
     p = a.get("product") or {}
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
-            f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n{task}"}]
+            f"ملف العميل:\n{brain_txt or '(لا يوجد)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n{task}"}]
 
 
 def ugc_prompt(d: dict) -> str:
-    """البرومت الكبير (Master prompt) بنفس ترتيب skill «ugc» بالظبط."""
+    """البرومت الكبير (Master prompt) بنفس ترتيب skill «ugc» بالضبط."""
     a, plan = d["ad"], d["ad"]["plan"]
     name = (a.get("product") or {}).get("name") or "the product"
     she = "she" if (a.get("hero") or {}).get("gender") != "male" else "he"
@@ -111,7 +111,7 @@ def ugc_prompt(d: dict) -> str:
 
 # ---------------------------------------------------------------- 🎬 إعلان سينمائي (skills «ad-director» + «video-prompter»)
 CINEMA_LOOKS = {   # الشكل ← (اسم عربي، سطر الكاميرا والجريد)
-    "narrative": ("حياة حقيقية: شوارع وبيوت وعربيات", "wide-latitude cinema capture, vintage 2x anamorphic character at a wide aperture - oval bokeh, "
+    "narrative": ("حياة حقيقية: شوارع ويوت وعربيات", "wide-latitude cinema capture, vintage 2x anamorphic character at a wide aperture - oval bokeh, "
                   "soft frame-edge falloff - light diffusion bloom softening highlights, handheld with natural operator breath, color-negative daylight "
                   "film rendition with fine 35mm grain, teal-amber grade, shallow depth of field, 24fps 180-degree shutter"),
     "studio": ("استوديو وموضة: نضيف ومتصمّم", "wide-latitude cinema capture, clean spherical lens character at a wide aperture - natural round bokeh, "
@@ -124,7 +124,7 @@ CINEMA_LOOKS = {   # الشكل ← (اسم عربي، سطر الكاميرا �
              "falloff - light diffusion bloom, locked-off or extremely slow push-in only, color-negative film rendition with fine grain, atmospheric "
              "haze, weathered material detail, 24fps 180-degree shutter"),
 }
-CINEMA_BEATS = {"HOOK": "تشد العين", "SETUP": "تعريف", "PROBLEM": "المشكلة", "REVEAL": "ظهور المنتج", "DEMO": "المنتج شغال",
+CINEMA_BEATS = {"HOOK": "تشد العين", "SETUP": "تعريف", "PROBLEM": "المشكلة", "REVEAL": "ظهور المنتج", "DEMO": "المنتج يعمل",
                 "REACTION": "رد الفعل", "PAYOFF": "النتيجة", "HERO": "لقطة المنتج"}
 CAPTURE = (
     "Capture Realism: the subject sits inside real depth - {air} atmosphere suspended in the air between camera, subject and the far background, "
@@ -147,31 +147,31 @@ def cinema_messages(d: dict, lang_txt: str, guide: str, brain_txt: str, total: i
     shots = {6: "2-3", 10: "3-4", 15: "4-6", 20: "5-7", 30: "7-10"}.get(total, "4-6")
     look = CINEMA_LOOKS.get(a.get("look") or "narrative", CINEMA_LOOKS["narrative"])[0]
     sys = (
-        "إنت مخرج إعلانات سينمائية. بتقسّم الإعلان للقطات بتوقيتها، كل لقطة زاوية واحدة متصلة (توليدة واحدة).\n"
-        f"طول الإعلان {total} ثانية من غير الكارت الأخير، {shots} لقطات، كل لقطة بين ٢ و٤ ثواني. ستايل الصورة: {look}.\n"
-        "- beat لكل لقطة واحد من: HOOK (أول فريم بيشد، حاجة بتحصل فعلًا) · SETUP (بس لو الإعلان أطول من ١٠ ثواني) · PROBLEM (المشكلة اللي المنتج "
-        "بيحلها، باينة جسديًا) · REVEAL (أول مرة المنتج يبان واضح والليبل قدام الكاميرا) · DEMO (المنتج شغال في الإيد) · REACTION (الوش، النفس) · "
-        "PAYOFF (النتيجة اللي المنتج عملها) · HERO (المنتج لوحده متصوّر حلو).\n"
-        "- visual (English): اللي الكاميرا شايفاه بس: مين/إيه فين في الكادر (قدام/وسط/ورا)، الوضع، الحركة اللي بتحصل بالثواني، الإيد ماسكة المنتج إزاي، "
+        "أنت مخرج إعلانات سينمائية. تقسّم الإعلان للقطات بتوقيتها، كل لقطة زاوية واحدة متصلة (توليدة واحدة).\n"
+        f"طول الإعلان {total} ثانية بدون البطاقة الأخير، {shots} لقطات، كل لقطة بين ٢ و٤ ثواني. أسلوب الصورة: {look}.\n"
+        "- beat لكل لقطة واحد من: HOOK (أول فريم يشد، شيء تحدث فعلًا) · SETUP (فقط إذا الإعلان أطول من ١٠ ثواني) · PROBLEM (المشكلة التي المنتج "
+        "يحلها، باينة جسديًا) · REVEAL (أول مرة المنتج يظهر واضح والليبل أمام الكاميرا) · DEMO (المنتج يعمل في اليد) · REACTION (الوجه، النفس) · "
+        "PAYOFF (النتيجة التي المنتج عملها) · HERO (المنتج تلقائيًا متصوّر جميل).\n"
+        "- visual (English): ما الكاميرا شايفاه فقط: من/ماذا أين في الكادر (أمام/وسط/خلف)، الوضع، الحركة التي تحدث بالثواني، اليد ماسكة المنتج كيف، "
         "والنور جاي منين. ممنوع توصف شكل المنتج أو الشخصية (الصور المرجعية بتكفي).\n"
         "- camera (English): العدسة (مثلًا 35mm wide / 50mm medium / 85mm close-up) وحركة كاميرا واحدة.\n"
-        "- audio (English): ٢-٤ أصوات حقيقية في المكان من غير موسيقى ولا كلام.\n"
-        "- with: المراجع اللي في اللقطة من: hero (الشخصية)" + ("" if has_hero else " - مفيش شخصية، فاللقطات إيدين أو منتج بس") + "، product، place.\n"
-        f"- line: جملة فويس أوفر قصيرة للقطة دي (اختياري، فاضية لو اللقطة صامتة) بلغة: {lang_txt}. {guide} "
-        "كل ثانية حوالي كلمتين بالكتير، والفويس أوفر كله بيحكي فكرة واحدة.\n"
-        "- end: الكارت الأخير (اسم البراند زي ما بيتكتب + جملة قصيرة ٢-٥ كلمات بنفس اللغة).\n"
-        "- world (English): سطر واحد ثابت لكل اللقطات: المكان والوقت والنور والألوان، عشان كلهم يتقطعوا على بعض.\n"
+        "- audio (English): ٢-٤ أصوات حقيقية في المكان بدون موسيقى ولا نص.\n"
+        "- with: المراجع الذي في اللقطة من: hero (الشخصية)" + ("" if has_hero else " - لا يوجد شخصية، فاللقطات إيدين أو منتج فقط") + "، product، place.\n"
+        f"- line: جملة تعليق صوتي قصيرة هذه للقطة (اختياري، فارغة إذا اللقطة صامتة) بلغة: {lang_txt}. {guide} "
+        "كل ثانية نحو كلمتين بالكتير، والفويس أوفر كله يحكي فكرة واحدة.\n"
+        "- end: البطاقة الأخير (اسم العلامة كما يُكتب + جملة قصيرة ٢-٥ كلمات بنفس اللغة).\n"
+        "- world (English): سطر واحد ثابت لكل اللقطات: المكان والوقت والضوء والألوان، لكي كلهم يتقطعون على بعض.\n"
         "- ممنوع تخترع أرقام أو ادعاءات، وممنوع أسامي أو وشوش ناس حقيقيين أو شعارات تانية.\n"
         'استعد JSON فقط: {"title": "اسم قصير", "world": "...", "end": {"brand": "...", "slogan": "..."}, '
         '"shots": [{"beat": "HOOK", "dur": 2.5, "what": "وصف قصير بالعامية", "visual": "...", "camera": "...", "audio": "...", "with": ["hero", "product"], "line": ""}]}')
     p = a.get("product") or {}
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
-            f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n"
+            f"ملف العميل:\n{brain_txt or '(لا يوجد)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالمكان: {a.get('place') or '-'}\n"
             f"الإعلان: {(a.get('script') or '').strip() or d.get('brief') or ''}"}]
 
 
 def plate_messages(place: str, brief: str) -> list[dict]:
-    """صورة المكان من غير ناس (Mode 3: خمس فقرات بلغة السينما)."""
+    """صورة المكان بدون أشخاص (Mode 3: خمس فقرات بلغة السينما)."""
     sys = ("You write one photoreal environment-plate image prompt (no people in it) in cinema prose: five short paragraphs - (1) the place, time "
            "of day and weather, (2) foreground, midground and far background planes with real materials, (3) the light sources and where they fall, "
            "(4) colour and atmosphere with visible haze between the planes, (5) the camera: a vintage 2x anamorphic lens, eye level, a frame that "
@@ -185,7 +185,7 @@ PLATE_CLOSE = (" Captured with a wide-latitude cinema look, vintage 2x anamorphi
 
 
 def cinema_shot_prompt(d: dict, i: int, refs: list[str]) -> str:
-    """لقطة واحدة على العمود الفقري بتاع «ad-director» (مختصر): الهيدر ← الستايل ← بلا كلام ← المراجع ← الكادر ← الكاميرا ← الواقعية ← الصوت ← الأقفال."""
+    """لقطة واحدة على العمود الفقري الخاص بـ «ad-director» (مختصر): الهيدر ← الأسلوب ← بلا نص ← المراجع ← الكادر ← الكاميرا ← الواقعية ← الصوت ← الأقفال."""
     a, plan = d["ad"], d["ad"]["plan"]
     s = plan["shots"][i]
     look = CINEMA_LOOKS.get(a.get("look") or "narrative", CINEMA_LOOKS["narrative"])[1]
@@ -264,12 +264,12 @@ LOOKS = {
                  "internal organs (heart, lungs, intestines) glowing red and orange through a blue-tinted translucent skin outline, with large "
                  "expressive cartoon eyes.",
                  "clean sci-fi medical 3D render, cool blue translucent body with warm organ glow, {theme} setting with x-ray glow, soft rim light"),
-        "cute": ("كيوت: هيكل صغير شكل اللعبة (للبراندات الهزارية بس)", "A cute chibi cartoon skeleton with an oversized round skull, big adorable eyes, a "
+        "cute": ("كيوت: هيكل صغير شكل اللعبة (للبراندات الهزارية فقط)", "A cute chibi cartoon skeleton with an oversized round skull, big adorable eyes, a "
                  "small rounded body, and smooth toy-like bones; bright, friendly, non-scary.",
                  "playful 3D animated feature-film render, simple clean {palette} background, soft even studio lighting"),
     },
     "talking": {
-        "pixar": ("3D كرتون (زي أفلام الأنيميشن)", "", "Pixar-style 3D animated render, soft cinematic lighting, rich saturated colors"),
+        "pixar": ("3D كرتون (مثل أفلام الأنيميشن)", "", "Pixar-style 3D animated render, soft cinematic lighting, rich saturated colors"),
         "clay": ("صلصال ستوب موشن", "", "handmade stop-motion claymation, matte plasticine with visible fingerprints and tool marks, real miniature-set lighting"),
         "watercolor": ("ألوان مية", "", "hand-painted watercolor animation, soft paper texture, gentle washes and ink outlines"),
         "paper": ("ورق مقصوص", "", "layered papercraft animation, stacked cardstock with visible paper thickness and soft cast shadows"),
@@ -280,7 +280,7 @@ LOOKS["song"] = LOOKS["talking"]
 
 
 def plate_messages(kind: str, look: str, desc: str, brief: str, product: str) -> list[dict]:
-    """وصف الشخصية الرئيسية (اللي بتتعمل plate) بالإنجليزي."""
+    """وصف الشخصية الرئيسية (ما تُنشأ plate) بالإنجليزية."""
     if kind == "skeleton":
         task = ("The hero is the skeleton (its design is locked). Choose the ad's world: theme (a recurring setting that dramatizes the angle, e.g. "
                 "1940s small town / modern office / the product's industry), palette (a warm color grade in a few words) and wardrobe (only used by "
@@ -297,7 +297,7 @@ def plate_messages(kind: str, look: str, desc: str, brief: str, product: str) ->
 
 
 def look_style(kind: str, look: str, hero: dict) -> tuple[str, str]:
-    """(وصف الشخصية، سطر الستايل) بعد ما الموضوع والألوان اتملوا."""
+    """(وصف الشخصية، سطر الأسلوب) بعد ما الموضوع والألوان اتملوا."""
     L = LOOKS[kind].get(look) or next(iter(LOOKS[kind].values()))
     fill = {"theme": hero.get("theme") or "warm cinematic", "palette": hero.get("palette") or "amber", "wardrobe": hero.get("wardrobe") or "a themed outfit"}
     char = (L[1].format(**fill) if L[1] else hero.get("character") or "")
@@ -322,32 +322,32 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
               "- camera (English): one camera move.\n- with: which references appear in the beat: hero, product.\n"
               "- ممنوع تخترع أرقام أو إثباتات مش في ملف العميل، وممنوع أسامي ناس حقيقيين أو شعارات تانية.\n")
     if kind == "skeleton":
-        sys = ("إنت كاتب إعلانات Direct Response بفورمات «إيه اللي يحصل لو...؟»: هيكل عظمي كرتون ثابت بيعيش رحلة بتتصاعد (يوم ١ ← يوم ٣٠ ← يوم ٣٦٥) "
-               "وصوت راوي واحد بيحكي.\n"
-               "- اختار الزاوية: تحوّل بالاستخدام اليومي / تمن إنك ماتعملش حاجة / الطريقة القديمة لحد ما تبوظ / المنتج في عالم غريب. والسلم: وقت أو كمية أو مراحل.\n"
-               f"- السكريبت بلغة: {lang_txt}. {guide} سؤال فضول في الأول ← ٥-٧ نبضات بتتصاعد (جملة واحدة لكل نبضة ولكل درجة في السلم) ← النتيجة "
-               "(انتصار أو كارثة) + دعوة خفيفة. المجموع حوالي ٧٠-١١٠ كلمة. المنتج بيدخل في نبضة واحدة واضحة (اللفة).\n"
-               "- line: جملة الراوي للنبضة دي.\n" + common +
+        sys = ("أنت كاتب إعلانات Direct Response بفورمات «ماذا الذي يحدث إذا...؟»: هيكل عظمي كرتون ثابت يعيش رحلة تتصاعد (يوم ١ ← يوم ٣٠ ← يوم ٣٦٥) "
+               "وصوت راوي واحد يحكي.\n"
+               "- اختر الزاوية: تحوّل بالاستخدام اليومي / ثمن أنك ماتعملش شيء / الطريقة القديمة حتى ما تبوظ / المنتج في عالم غريب. والسلم: وقت أو كمية أو مراحل.\n"
+               f"- النص بلغة: {lang_txt}. {guide} سؤال فضول في أولًا ← ٥-٧ نبضات تتصاعد (جملة واحدة لكل نبضة ولكل درجة في السلم) ← النتيجة "
+               "(انتصار أو كارثة) + دعوة خفيفة. المجموع نحو ٧٠-١١٠ كلمة. المنتج يدخل في نبضة واحدة واضحة (اللفة).\n"
+               "- line: جملة الراوي هذه للنبضة.\n" + common +
                'استعد JSON فقط: {"title": "...", "angle": "الزاوية والسلم في سطر", "shots": [{"line": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
     elif kind == "talking":
-        sys = ("إنت كاتب ومخرج إعلانات «الشخصية اللي بتتكلم»: شخصية أنيميشن بتكلم الكاميرا وتقول السكريبت، والصورة هي دليل الجملة.\n"
-               "- الشكل: «أنا X. بعمل Y. فـ Z بيحصلك». اختار: تعريف مباشر / مشكلة بعدين حل / شرير بعدين بطل، واختار نبرة واحدة وثبّتها.\n"
-               f"- الكلام بلغة: {lang_txt}. {guide} ٤-٧ نبضات، كل نبضة جملة قصيرة سهلة النطق (٥-١٢ كلمة)، والمجموع يتقال في ٢٠-٣٥ ثانية. "
-               "أول فريم لازم يشد من غير صوت، وأول جملة بتنادي على مشكلة المشاهد بالظبط.\n"
-               "- line: الجملة اللي الشخصية بتقولها. emotion (English): نبرة الصوت (warm, reassuring / frustrated / proud...).\n"
-               "- كل نبضة فيها حركتين على الأقل من: الكاميرا بتتحرك، الشخصية بتتحرك وبتعمل اللي بتقوله، المكان بيتفاعل.\n" + common +
+        sys = ("أنت كاتب ومخرج إعلانات «الشخصية التي تتكلم»: شخصية أنيميشن تكلم الكاميرا وتقول النص، والصورة هي دليل الجملة.\n"
+               "- الشكل: «أنا X. بعمل Y. فـ Z يحصلك». اختر: تعريف مباشر / مشكلة لاحقًا حل / شرير لاحقًا بطل، واختر نبرة واحدة وثبّتها.\n"
+               f"- النص بلغة: {lang_txt}. {guide} ٤-٧ نبضات، كل نبضة جملة قصيرة سهلة النطق (٥-١٢ كلمة)، والمجموع يُقال في ٢٠-٣٥ ثانية. "
+               "أول فريم يجب يشد بدون صوت، وأول جملة تنادي على مشكلة المشاهد بالضبط.\n"
+               "- line: الجملة التي الشخصية تقولها. emotion (English): نبرة الصوت (warm, reassuring / frustrated / proud...).\n"
+               "- كل نبضة فيها حركتين على الأقل من: الكاميرا تتحرك، الشخصية تتحرك وتعمل الذي تقوله، المكان يتفاعل.\n" + common +
                'استعد JSON فقط: {"title": "...", "angle": "الشكل والنبرة في سطر", "shots": [{"line": "...", "emotion": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
     else:
-        sys = ("إنت كاتب أغاني إعلانات: أغنية حقيقية (مش جينجل) بتحكي نتيجة العميل، فوق فيديو أنيميشن والبطل بيغني في لقطة أو اتنين.\n"
-               f"- الكلمات بلغة: {lang_txt}. {guide} الهوك في أول ٥ ثواني، والكلمات عن النتيجة اللي العميل بيوصلها مش اسم البراند. "
+        sys = ("أنت كاتب أغاني إعلانات: أغنية حقيقية (غير جينجل) تحكي نتيجة العميل، أعلى فيديو أنيميشن والبطل يغني في لقطة أو اثنان.\n"
+               f"- الكلمات بلغة: {lang_txt}. {guide} الخطاف في أول ٥ ثواني، والكلمات عن النتيجة التي العميل يوصلها غير اسم العلامة. "
                "سطور قصيرة تتغني (٤-٨ مقاطع). ٣٠ ثانية = كوبليه، كورس، كوبليه، كورس. استخدم [Verse] و[Chorus] في الكلمات.\n"
                "- style (English, under 25 words): genre, vocal, tempo/BPM, mood, production. Genre from the audience. No artist names.\n"
-               "- shots: لقطة لكل سطر أو سطرين بالترتيب: lyric = السطور اللي بتتغنى في اللقطة دي بالظبط، sing = true للقطات اللي البطل بيغني فيها "
-               "قدام الكاميرا (الهوك والكورس الأخير غالبًا)، والباقي صورة بتوضح الكلام.\n" + common +
+               "- shots: لقطة لكل سطر أو سطرين بالترتيب: lyric = السطور الذي تتغنى في هذه اللقطة بالضبط، sing = true للقطات التي البطل يغني فيها "
+               "أمام الكاميرا (الخطاف والكورس الأخير غالبًا)، والباقي صورة توضح النص.\n" + common +
                'استعد JSON فقط: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
                '"shots": [{"lyric": "...", "sing": false, "visual": "...", "camera": "...", "with": ["hero"]}]}')
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
-            f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالشخصية: {hero.get('handle') or '-'}\n"
+            f"ملف العميل:\n{brain_txt or '(لا يوجد)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالشخصية: {hero.get('handle') or '-'}\n"
             f"الإعلان: {(a.get('script') or '').strip() or d.get('brief') or ''}"}]
 
 
@@ -364,7 +364,7 @@ def clean_beats(kind: str, res: dict) -> list[dict]:
 
 
 def group_beats(shots: list[dict], cap: float = 15.0) -> list[list[int]]:
-    """لقطات ورا بعض في توليدة واحدة لحد ١٥ ثانية."""
+    """لقطات خلف بعض في توليدة واحدة حتى ١٥ ثانية."""
     groups, cur, t = [], [], 0.0
     for i, s in enumerate(shots):
         if cur and t + s["dur"] > cap:

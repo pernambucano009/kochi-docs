@@ -1,5 +1,5 @@
-"""🔉 مكتبة مؤثرات صوتية للمونتاج (زي كاب كات): كلها متولّدة بالحساب، فمفيش ملفات صوت ليها حقوق في الكود.
-بتتعمل مرة واحدة على السيرفر أول ما حد يطلبها."""
+"""🔉 مكتبة مؤثرات صوتية للمونتاج (مثل كاب كات): كلها متولّدة بالحساب، فلا يوجد ملفات صوت لها حقوق في الكود.
+تُنشأ مرة واحدة على الخادم أول ما حد يطلبها."""
 from __future__ import annotations
 
 import wave
@@ -26,7 +26,7 @@ def _noise(sec: float, seed: int) -> np.ndarray:
 
 
 def _bandpass(x: np.ndarray, lo: np.ndarray | float, hi: np.ndarray | float) -> np.ndarray:
-    """فلتر تقريبي في الترددات (كفاية للمؤثرات)، والحدود ممكن تتغير مع الوقت (بنقسّم على قطع)."""
+    """فلتر تقريبي في الترددات (كفاية للمؤثرات)، والحدود يمكن تتغير مع الوقت (نقسّم على قطع)."""
     out = np.zeros_like(x)
     n, step = len(x), 2048
     lo_a = np.broadcast_to(np.asarray(lo, float), (n,)) if np.ndim(lo) else np.full(n, float(lo))
@@ -206,7 +206,7 @@ SOUNDS = {
 
 
 def ensure(folder: Path, name: str) -> Path:
-    """بيرجّع مسار ملف المؤثر، وبيعمله لو مش موجود."""
+    """يعود مسار ملف المؤثر، ويعمله إذا غير موجود."""
     if name not in SOUNDS:
         raise KeyError(name)
     folder.mkdir(parents=True, exist_ok=True)

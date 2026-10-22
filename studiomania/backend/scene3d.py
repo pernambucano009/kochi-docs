@@ -1,8 +1,8 @@
 """🧊 استوديو المشهد: مسودة 3D بأشكال بسيطة (البيت على المحارة) ← فيديو حقيقي.
 
-المشهد JSON صغير: أشكال (صندوق، كورة، أسطوانة، كارت بصورة…) بمكان ولون وحركة، وكاميرا بنقط على الوقت.
-المتصفح بيرسمه (three.js) ويطلّع منه فيديو رمادي، والفيديو ده بيتبعت لموديل فيديو بياخد فيديو مرجع
-ومعاه صور العناصر والبرومبت، فالموديل بيلوّن المشهد من غير ما يخمّن الحركة ولا زاوية الكاميرا.
+المشهد JSON صغير: أشكال (صندوق، كورة، أسطوانة، بطاقة بصورة…) بمكان ولون وحركة، وكاميرا بنقط على الوقت.
+المتصفح يرسمه (three.js) ويُخرج منه فيديو رمادي، هذا والفيديو يُرسل لموديل فيديو يأخذ فيديو مرجع
+ومعه صور العناصر والوصف، فالنموذج يلوّن المشهد بدون ما يخمّن الحركة ولا زاوية الكاميرا.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import re
 import uuid
 
 SHAPES = {"box": "صندوق", "sphere": "كورة", "cylinder": "أسطوانة", "cone": "مخروط", "torus": "حلقة", "capsule": "كبسولة",
-          "plane": "أرضية/حيطة", "card": "كارت بصورة"}
+          "plane": "أرضية/حيطة", "card": "بطاقة بصورة"}
 LIGHTS = {"studio": "استوديو", "sunset": "غروب", "night": "ليل", "soft": "ناعم"}
 RATIOS = ("9:16", "16:9", "1:1", "4:5")
 MAX_OBJECTS = 24
@@ -42,7 +42,7 @@ def _color(v, d: str = "#9a9a9a") -> str:
 
 
 def clean_ref(r) -> dict | None:
-    """صورة على شكل (من المكتبة أو شخصية أو خلفية): اللينك علشان المتصفح يرسمها، والمنشن علشان تتبعت للموديل."""
+    """صورة على شكل (من المكتبة أو شخصية أو خلفية): الرابط لكي المتصفح يرسمها، والإشارة لكي تُرسل للنموذج."""
     if not isinstance(r, dict) or not r.get("id") or not r.get("kind"):
         return None
     return {"kind": str(r["kind"])[:20], "id": str(r["id"])[:120], "label": str(r.get("label") or "")[:80], "thumb": str(r.get("thumb") or "")[:400]}
@@ -82,7 +82,7 @@ def clean(raw: dict) -> dict:
 
 
 def default() -> dict:
-    """مشهد البداية: قاعدة ومنتج عليها بيلف، والكاميرا بتقرّب."""
+    """مشهد البداية: قاعدة ومنتج عليها يدور، والكاميرا تقرّب."""
     return clean({"duration": 5, "objects": [
         {"name": "القاعدة", "shape": "cylinder", "color": "#d8d4cc", "pos": [0, 0.15, 0], "scale": [1.6, 0.3, 1.6]},
         {"name": "المنتج", "shape": "box", "color": "#e5613e", "pos": [0, 0.75, 0], "scale": [0.9, 0.9, 0.9], "anim": {"spin": 45}}],
@@ -110,12 +110,12 @@ Return JSON only: {{"scene": {{"duration","ratio","bg","floor","light","objects"
 
 
 def mock_plan(text: str) -> dict:
-    """تجربة من غير موديل: بيفهم كلمات بسيطة (بيلف، بيقرّب، فوق، جزمة/زجاجة/علبة)."""
+    """تجربة بدون نموذج: يفهم كلمات بسيطة (يدور، يقرّب، أعلى، حذاء/زجاجة/علبة)."""
     t = text or ""
     s = default()
     prod = s["objects"][1]
     if re.search(r"جزم|حذاء|كوتشي|shoe", t):
-        prod.update(name="الجزمة", shape="capsule", scale=[0.5, 0.45, 1.2], rot=[90, 0, 0], what="a modern running sneaker")
+        prod.update(name="الحذاء", shape="capsule", scale=[0.5, 0.45, 1.2], rot=[90, 0, 0], what="a modern running sneaker")
     elif re.search(r"زجاج|برفان|عطر|bottle", t):
         prod.update(name="الزجاجة", shape="cylinder", scale=[0.45, 1.1, 0.45], pos=[0, 0.85, 0], what="a premium glass perfume bottle")
     if re.search(r"فوق|تطلع|up", t):
@@ -124,11 +124,11 @@ def mock_plan(text: str) -> dict:
     if re.search(r"ثابت|مش بيلف", t):
         prod["anim"]["spin"] = 0
     return {"scene": clean(s), "prompt": "Premium product commercial, soft studio light, clean reflections. Keep the exact camera move, layout and object motion of the reference video; replace the grey placeholders with the real objects.",
-            "say": "عملت مسودة: قاعدة والمنتج عليها يدور، والكاميرا تقرّب. عدّل الذي تريده وطلّع المسودة."}
+            "say": "عملت مسودة: قاعدة والمنتج عليها يبحث، والكاميرا تقرّب. عدّل الذي تريده وطلّع المسودة."}
 
 
 def gen_prompt(sc: dict, prompt: str, refs: list[dict]) -> str:
-    """برومبت التوليد: البرومبت بتاع العميل + وصف كل شكل هو إيه في الحقيقة + أوامر إن الموديل يمشي على الحركة بالحرف."""
+    """وصف التوليد: الوصف الخاص بالعميل + وصف كل شكل هو ماذا في الحقيقة + أوامر أن النموذج يسير على الحركة بالحرف."""
     parts = [prompt.strip()] if prompt.strip() else []
     things = [f"the {o['color']} {o['shape']} named «{o['name']}» is {o['what']}" + (f" (see reference «{o['img']['label']}»)" if o.get("img") else "")
               for o in sc.get("objects") or [] if o.get("what") or o.get("img")]

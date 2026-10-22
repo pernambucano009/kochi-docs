@@ -1,6 +1,6 @@
 """الخطوة 6: المونتاج النهائي بـ FFmpeg.
 
-بيركّب الفيديوهات المولَّدة ورا بعض (مع القص والزووم والتحريك والصوت لكل واحد)،
+يركّب الفيديوهات المولَّدة خلف بعض (مع القص والزووم والتحريك والصوت لكل واحد)،
 وبعدها أوترو المدرب، وفوقهم التعليق الصوتي والموسيقى.
 """
 
@@ -17,7 +17,7 @@ _canvas = threading.local()
 
 
 def canvas_size() -> tuple[int, int]:
-    """مقاس الكادر للتصدير الحالي (9:16 افتراضي، أو اللي اتحدد بـ with canvas(w, h))."""
+    """مقاس الكادر للتصدير الحالي (9:16 افتراضي، أو ما اتحدد بـ with canvas(w, h))."""
     return (getattr(_canvas, "size", None) or (WIDTH, HEIGHT, FPS, 20))[:2]
 
 
@@ -138,7 +138,7 @@ class AudioTrack:
 
 @dataclass
 class Overlay:
-    """🖼️ فيديو أو صورة فوق الفيديو الأساسي (صورة جوه صورة)."""
+    """🖼️ فيديو أو صورة أعلى الفيديو الأساسي (صورة داخل صورة)."""
     path: Path
     is_image: bool = False
     start: float = 0.0          # من ثانية كام في الملف
@@ -173,7 +173,7 @@ MASKS = {
 
 
 def overlay_anim_exprs(o: Overlay, W: int, H: int) -> tuple[str, str, str]:
-    """حركة دخول وخروج الطبقة: (مضاعف الحجم، إزاحة x، إزاحة y) بدلالة t — خطي زي المعاينة."""
+    """حركة دخول وخروج الطبقة: (مضاعف الحجم، إزاحة x، إزاحة y) بدلالة t — خطي مثل المعاينة."""
     z, dx, dy = ["1"], ["0"], ["0"]
     for kind, (typ, d) in (("in", o.anim_in), ("out", o.anim_out)):
         if not typ or d <= 0.01:
@@ -199,7 +199,7 @@ def overlay_anim_exprs(o: Overlay, W: int, H: int) -> tuple[str, str, str]:
 
 def overlay_filters(ffmpeg: str, overlays: list[Overlay], video_label: str, first_input: int, work_dir: Path,
                     W: int, H: int, fps: int) -> tuple[list[str], list[str], str]:
-    """بيرجّع (مدخلات زيادة، فلاتر، اسم آخر صورة). كل طبقة بتتظبط لوحدها وبعدين بتتركّب في مكانها ووقتها."""
+    """يعود (مدخلات زيادة، فلاتر، اسم آخر صورة). كل طبقة تُضبط تلقائيًا ثم تتركّب في مكانها ووقتها."""
     args, filters = [], []
     idx = first_input
     for n, o in enumerate(overlays):
@@ -301,7 +301,7 @@ LOOKS = {
 
 
 def atempo_chain(speed: float) -> str:
-    """atempo بيقبل من 0.5 لـ 2 بس، فالسرعات التانية بنعملها كذا مرة ورا بعض."""
+    """atempo يقبل من 0.5 لـ 2 فقط، فالسرعات الأخرى نعملها كذا مرة خلف بعض."""
     parts, s = [], speed
     while s > 2.0:
         parts.append("atempo=2.0"); s /= 2.0
@@ -312,7 +312,7 @@ def atempo_chain(speed: float) -> str:
 
 
 def color_filters(seg: "Segment") -> str:
-    """الألوان والفلتر الجاهز والفينييت: سلسلة فلاتر بتتحط بعد ما الصورة تبقى على مقاس الكادر."""
+    """الألوان والفلتر الجاهز والفينييت: سلسلة فلاتر توضع بعد ما الصورة تصبح على مقاس الكادر."""
     a = seg.adj or {}
     f = []
     b, c, s = float(a.get("bright") or 0) / 100, float(a.get("contrast") or 0) / 100, float(a.get("sat") or 0) / 100
@@ -345,7 +345,7 @@ def _f(v: float) -> str:
 
 
 def kf_expr(kf: list, key: str, default: float, tl: str) -> str:
-    """قيمة خاصية في وقت tl من الكي فريمز: بين كل اتنين انتقال ناعم (smoothstep)، وقبل الأول وبعد الآخر ثابتة."""
+    """قيمة خاصية في وقت tl من الكي فريمز: بين كل اثنان انتقال ناعم (smoothstep)، وقبل أولًا وبعد الآخر ثابتة."""
     pts = sorted((float(k["t"]), float(k.get(key, default))) for k in kf or [] if k.get(key) is not None)
     if not pts:
         return _f(default)
@@ -418,7 +418,7 @@ def motion_exprs(seg: "Segment", tl: str, fx_tl: str | None = None) -> dict:
 
 
 def needs_motion(seg: "Segment") -> bool:
-    """القطعة محتاجة طريقة التركيب الكاملة (أبطأ شوية) بدل القص السريع."""
+    """القطعة تحتاج طريقة التركيب الكاملة (أبطأ قليلًا) بدل القص السريع."""
     return bool(
         seg.kf or abs(seg.angle) > 0.01 or seg.zoom < 0.999
         or (seg.anim_in[0] in ANIMS and seg.anim_in[1] > 0.01) or (seg.anim_out[0] in ANIMS and seg.anim_out[1] > 0.01)
@@ -427,7 +427,7 @@ def needs_motion(seg: "Segment") -> bool:
 
 
 def post_fx(seg: "Segment", tl: str) -> str:
-    """التأثيرات اللي بتتحط على الكادر بعد التركيب (فلاش، ألوان مفصولة، بلور، حبيبات، وألوان الجليتش)."""
+    """التأثيرات التي توضع على الكادر بعد التركيب (فلاش، ألوان مفصولة، بلور، حبيبات، وألوان الجليتش)."""
     f = []
     for typ, amt in seg.fx or []:
         if typ == "flash":
@@ -454,9 +454,9 @@ def encoder_args(preset: str, crf: int, low_memory: bool) -> list[str]:
 
 
 def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = False, pre: float = 0.0, post: float = 0.0) -> list[str]:
-    """المرحلة الأولى: قطعة واحدة بس، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد، وعليها تأثيراتها
+    """المرحلة الأولى: قطعة واحدة فقط، مقصوصة ومتظبطة على 1080×1920 وصوتها موحّد، وعليها تأثيراتها
     (سرعة، عكس، قلب، لف، ألوان، فلتر، ظهور/اختفاء، ملء الكادر أو كاملة بخلفية).
-    pre/post: ثواني زيادة (بوقت الفيديو النهائي) قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي مش موجود بيثبت على أول/آخر فريم)."""
+    pre/post: ثواني زيادة (بوقت الفيديو النهائي) قبلها وبعدها للترانزيشن (من الفيديو الأصلي، واللي غير موجود يثبت على أول/آخر فريم)."""
     WIDTH, HEIGHT = canvas_size()
     FPS = canvas_fps()
     if seg.blank:
@@ -620,8 +620,8 @@ def segment_command(ffmpeg: str, seg: Segment, output: Path, low_memory: bool = 
 
 def audio_mix_command(base_args: list[str], concat_in: list[str], total: float, voice, music, sounds, audio_fx: dict | None, out: Path) -> list[str]:
     """أمر الصوت: صوت الفيديوهات (من concat_in) + قطع التعليق والموسيقى والأصوات الزيادة، مع التنضيف والتوطية وتوحيد العلو.
-    كل ملف صوت بيتفتح مرة واحدة بس، وبنقسمه جوه لقطعه — FFmpeg 7.0 ممكن يعلّق لما
-    يبقى فيه مدخلات كتير ماشية بسرعات مختلفة في نفس الأمر"""
+    كل ملف صوت يُفتح مرة واحدة فقط، ونقسمه داخل لقطعه — FFmpeg 7.0 يمكن يعلّق عندما
+    يصبح فيه مدخلات كثير ماشية بسرعات مختلفة في نفس الأمر"""
     def as_list(t):
         return [x for x in t if x] if isinstance(t, list) else ([t] if t else [])
 
@@ -713,14 +713,14 @@ def build_commands(
 ) -> tuple[list[list[str]], float]:
     """يبني أوامر FFmpeg بالترتيب ويرجّعها مع الطول النهائي للفيديو.
 
-    كل قطعة بتتجهّز لوحدها الأول، وبعدين أمر أخير بيلزقهم ويحط اللوجو والكابشن
-    والصوت. كده الذاكرة ثابتة مهما كان عدد القطع (لو كله في أمر واحد، كل قطعة
-    بتفتح فيديو في نفس الوقت والذاكرة بتخلص على السيرفر).
+    كل قطعة تتجهّز تلقائيًا أولًا، ثم أمر أخير يلزقهم ويضع الشعار والتعليق النصي
+    والصوت. هكذا الذاكرة ثابتة مهما كان عدد القطع (إذا كله في أمر واحد، كل قطعة
+    تفتح فيديو في الوقت نفسه والذاكرة تنتهي على الخادم).
     """
     WIDTH, HEIGHT = canvas_size()
     FPS = canvas_fps()
     if not segments:
-        raise ValueError("مفيش فيديوهات في المونتاج")
+        raise ValueError("لا يوجد فيديوهات في المونتاج")
     total = sum(s.duration for s in segments)
     work_dir.mkdir(parents=True, exist_ok=True)
     commands, parts = [], []
@@ -834,9 +834,9 @@ def build_commands(
 
 def build_audio_commands(ffmpeg: str, segments: list[Segment], output: Path, work_dir: Path, voice=None, music=None,
                          sounds=None, audio_fx: dict | None = None) -> tuple[list[list[str]], float]:
-    """🎧 تصدير الصوت بس (MP3): صوت كل قطعة لوحده (من غير صورة، فهو سريع) + التعليق والموسيقى والأصوات."""
+    """🎧 تصدير الصوت فقط (MP3): صوت كل قطعة تلقائيًا (بدون صورة، فهو سريع) + التعليق والموسيقى والأصوات."""
     if not segments:
-        raise ValueError("مفيش فيديوهات في المونتاج")
+        raise ValueError("لا يوجد فيديوهات في المونتاج")
     total = sum(s.duration for s in segments)
     work_dir.mkdir(parents=True, exist_ok=True)
     commands, parts = [], []

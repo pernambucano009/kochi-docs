@@ -1,7 +1,7 @@
-"""📱 حساب سوشيال ← العقل: البايو والمعلومات، الصور والفيديوهات (كل واحدة في مكانها)، النيتش، وتحليل البوستات والمشاهدات،
-وتحليل أحسن وأضعف الفيديوهات (الأخطاء واللي ناقص) كـ «نقاط لازم تتشتغل».
+"""📱 حساب سوشيال ← العقل: السيرة والمعلومات، الصور والفيديوهات (كل واحدة في مكانها)، النيتش، وتحليل المنشورات والمشاهدات،
+وتحليل أحسن وأضعف الفيديوهات (الأخطاء واللي ناقص) كـ «نقاط يجب تتشتغل».
 
-الداتا من ScrapeCreators (نفس مفتاح «نبض المجال»). من غير المفتاح أو في وضع التجربة بيشتغل بداتا تجريبية.
+الداتا من ScrapeCreators (نفس مفتاح «نبض المجال»). بدون المفتاح أو في وضع التجربة يشتغل بداتا تجريبية.
 """
 from __future__ import annotations
 
@@ -14,11 +14,11 @@ import uuid
 import brainsrc
 import rivals
 
-KINDS = {"logos": "اللوجو"}   # صور البراند اتشالت من العقل (الشخصيات في «الشخصيات والأفاتار»، والخلفيات ليها مكان جديد بعدين)
+KINDS = {"logos": "الشعار"}   # صور البراند اتشالت من العقل (الشخصيات في «الشخصيات والأفاتار»، والخلفيات ليها مكان جديد بعدين)
 
 
 def parse(s: str) -> tuple[str, str]:
-    """لينك أو @يوزر ← (المنصة، اليوزر)."""
+    """رابط أو @يوزر ← (المنصة، اليوزر)."""
     s = str(s or "").strip()
     plat = "tiktok" if "tiktok.com" in s else "instagram"
     if re.match(r"^tiktok\s*[:@]", s, re.I) or s.lower().startswith("tt:"):
@@ -45,7 +45,7 @@ def _url(x) -> str:
 
 
 def profile(plat: str, handle: str) -> dict:
-    """بيانات الحساب نفسه: الاسم والبايو والمتابعين والصورة واللينك."""
+    """بيانات الحساب نفسه: الاسم والسيرة والمتابعين والصورة والرابط."""
     if plat == "tiktok":
         d = rivals._get("/v1/tiktok/profile", {"handle": handle})
         u = (d.get("userInfo") or {}).get("user") or d.get("user") or {}
@@ -64,7 +64,7 @@ def profile(plat: str, handle: str) -> dict:
 
 
 def _media(plat: str, raw: dict) -> tuple[str, str]:
-    """(صورة الغلاف، لينك الفيديو) من البوست الخام."""
+    """(صورة الغلاف، رابط الفيديو) من المنشور الخام."""
     if plat == "tiktok":
         v = raw.get("video") or {}
         return _url(_first(v.get("cover"), v.get("origin_cover"), v.get("dynamic_cover"))), _url(_first(v.get("play_addr"), v.get("download_addr")))
@@ -74,7 +74,7 @@ def _media(plat: str, raw: dict) -> tuple[str, str]:
 
 
 def posts(plat: str, handle: str) -> list[dict]:
-    """آخر البوستات بأرقامها وصورة الغلاف ولينك الفيديو."""
+    """آخر المنشورات بأرقامها وصورة الغلاف ورابط الفيديو."""
     if plat == "tiktok":
         d = rivals._get("/v3/tiktok/profile/videos", {"handle": handle, "sort_by": "latest"})
         raws, norm = d.get("aweme_list") or d.get("data") or [], rivals.norm_tt
@@ -91,7 +91,7 @@ def posts(plat: str, handle: str) -> list[dict]:
 
 
 def stats(items: list[dict]) -> dict:
-    """أرقام الحساب: متوسط ووسيط المشاهدات، التفاعل، وكل قد إيه بينزل، وأحسن وأضعف بوستات."""
+    """أرقام الحساب: متوسط ووسيط المشاهدات، التفاعل، وكل قدر ماذا ينزل، وأحسن وأضعف منشورات."""
     if not items:
         return {"n": 0}
     views = [p["views"] for p in items if p.get("views")]
@@ -108,21 +108,21 @@ def analyze_prompt(prof: dict, st: dict, items: list[dict], videos: list[dict], 
     rows = [{"id": p["id"], "views": p["views"], "likes": p["likes"], "comments": p["comments"], "caption": p["caption"][:300],
              "days_ago": round((time.time() - p["ts"]) / 86400) if p.get("ts") else None} for p in items[:25]]
     return (
-        "انت محلل محتوى سوشيال وبتبني «عقل» لبراند (ذاكرة بتتقري في كل سكريبت وفيديو بيتعمل له). عندك حساب البراند نفسه:\n"
+        "أنت محلل محتوى سوشيال وتبني «عقل» لبراند (ذاكرة تتقري في كل نص وفيديو يُنشأ له). لديك حساب العلامة نفسه:\n"
         f"الحساب: {json.dumps({k: prof[k] for k in ('platform', 'handle', 'name', 'bio', 'followers', 'posts', 'link', 'category')}, ensure_ascii=False)}\n"
         f"الأرقام: {json.dumps(st, ensure_ascii=False)}\n"
-        f"آخر البوستات: {json.dumps(rows, ensure_ascii=False)}\n"
-        f"فيديوهات اتفرّغ كلامها (ومعاها لقطات منها بالترتيب في الصور): {json.dumps(videos, ensure_ascii=False)}\n"
-        f"وفيه {n_imgs} صورة بالترتيب: الأول لقطات الفيديوهات، وبعدين صور أغلفة البوستات وصورة البروفايل (images_from).\n\n"
-        "اللي في العقل دلوقتي:\n" + (brain_txt or "(لسه فاضي)") + "\n\n"
+        f"آخر المنشورات: {json.dumps(rows, ensure_ascii=False)}\n"
+        f"فيديوهات اتفرّغ كلامها (ومعها لقطات منها بالترتيب في الصور): {json.dumps(videos, ensure_ascii=False)}\n"
+        f"وفيه {n_imgs} صورة بالترتيب: أولًا لقطات الفيديوهات، ثم صور أغلفة المنشورات وصورة البروفايل (images_from).\n\n"
+        "ما في العقل الآن:\n" + (brain_txt or "(ما زال فارغ)") + "\n\n"
         "المطلوب JSON:\n"
-        "1) fields: قيم للخانات دي لو الحساب بيقولها بوضوح: " + brainsrc.fields_desc() + ". " + brainsrc.FIELD_RULES +
-        "2) niche: النيتش بالظبط في جملة (المجال + الجمهور + الزاوية).\n"
-        "3) notes: معرفة مهمة عن الشخص أو البراند (اللي بيقدمه، أسلوبه، المواضيع اللي بيتكلم فيها، أكتر حاجة بتنجح عنده وليه). كل note موضوع واحد.\n"
-        "4) todos: «نقاط لازم تتشتغل»: أخطاء حقيقية شفتها ولقطات ناقصة (الهوك، أول ٣ ثواني، الإضاءة والصوت، الكلام على الشاشة، طول الفيديو، "
-        "الدعوة للفعل، انتظام النشر، البايو، الفرق بين أحسن وأضعف بوستات). كل نقطة: title قصير، why (الدليل من الأرقام أو الفيديو)، how (تتصلّح إزاي بالظبط). من ٣ لـ ٨ نقاط.\n"
+        "1) fields: قيم هذه للخانات إذا الحساب يقولها بوضوح: " + brainsrc.fields_desc() + ". " + brainsrc.FIELD_RULES +
+        "2) niche: النيتش بالضبط في جملة (المجال + الجمهور + الزاوية).\n"
+        "3) notes: معرفة مهمة عن الشخص أو العلامة (ما يقدمه، أسلوبه، المواضيع الذي يتكلم فيها، أكثر شيء تنجح لديه وليه). كل note موضوع واحد.\n"
+        "4) todos: «نقاط يجب تتشتغل»: أخطاء حقيقية شفتها ولقطات ناقصة (الخطاف، أول ٣ ثواني، الإضاءة والصوت، النص على الشاشة، طول الفيديو، "
+        "الدعوة للفعل، انتظام النشر، السيرة، الفرق بين أحسن وأضعف منشورات). كل نقطة: title قصير، why (الدليل من الأرقام أو الفيديو)، how (تتصلّح كيف بالضبط). من ٣ لـ ٨ نقاط.\n"
         "5) images: لكل صورة من صور الأغلفة والبروفايل (بالرقم i من 0 في images_from) حدد kind من: " + "، ".join(f"{k} ({v})" for k, v in KINDS.items())
-        + " أو skip لو مش مفيدة للعقل، ووصف قصير description.\n"
+        + " أو skip إذا غير مفيدة للعقل، ووصف قصير description.\n"
         "ممنوع تخترع معلومة مش موجودة في الحساب. اكتب بالعربي.\n"
         "ممنوع تكتب id البوستات (زي DbYA-54K5ct) في الكلام: لو بتتكلم عن فيديو اذكر موضوعه من الكابشن، والعميل لازم يفهم من غير ما يشوف أي كود.\n"
         'الشكل: {"fields":{"<خانة>":{"value":"","why":""}},"niche":"","notes":[{"section":"identity|voice|products|offers|audience|campaigns|other","title":"","summary":"","body":""}],'
@@ -135,13 +135,13 @@ def mock_posts(plat: str, handle: str) -> tuple[dict, list[dict]]:
     prof = {"platform": plat, "handle": handle, "name": handle, "bio": "حساب تجريبي · نقدم خدمات للعملاء", "followers": 12400, "posts": 210,
             "avatar": "", "link": "https://example.com", "category": "Business"}
     items = [{"platform": plat, "id": f"p{i}", "handle": handle, "name": handle, "followers": 12400, "url": f"https://example.com/p{i}",
-              "caption": f"بوست تجريبي رقم {i + 1}", "views": [52000, 3100, 8800, 1500, 26000, 4100, 2300, 9900][i % 8], "likes": 300 + i * 40,
+              "caption": f"منشور تجريبي رقم {i + 1}", "views": [52000, 3100, 8800, 1500, 26000, 4100, 2300, 9900][i % 8], "likes": 300 + i * 40,
               "comments": 12 + i, "shares": 3, "ts": int(now - i * 3 * 86400), "cover": "", "video": ""} for i in range(10)]
     return prof, items
 
 
 def mock_out() -> dict:
-    return {"fields": {"about": "حساب تجريبي بيقدم خدمات للعملاء"}, "niche": "خدمات للعملاء في السوق المحلي",
+    return {"fields": {"about": "حساب تجريبي يقدم خدمات للعملاء"}, "niche": "خدمات للعملاء في السوق المحلي",
             "notes": [{"section": "campaigns", "title": "أكثر شيء تنجح لديه", "summary": "المنشورات التي فيها قبل وبعد تجلب ٥ أضعاف المشاهدات", "body": ""}],
             "todos": [{"title": "الخطاف ضعيف في أول ثانيتين", "why": "أضعف ٣ فيديوهات يبدأون بمقدمة وتحية", "how": "ابدأ بالنتيجة أو بسؤال، والتحية في الآخر"},
                       {"title": "النشر غير منتظم", "why": "بين المنشورات من يوم لـ ١٢ يوم", "how": "٣ منشورات في الأسبوع في نفس المواعيد"}],
@@ -158,7 +158,7 @@ def clean_todos(raw: list, source: str) -> list[dict]:
 
 
 def deid(out: dict, items: list[dict]) -> dict:
-    """لو الموديل كتب id بوست برضه: بيتبدّل بأول كلام الكابشن عشان العميل يفهم قصده أنهي فيديو."""
+    """إذا النموذج كتب id منشور أيضًا: يُستبدل بأول نص التعليق النصي لكي العميل يفهم قصده أي فيديو."""
     names = {}
     for p in items:
         cap = re.sub(r"\s+", " ", str(p.get("caption") or "")).strip()

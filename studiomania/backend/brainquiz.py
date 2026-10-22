@@ -1,8 +1,8 @@
-"""🧩 «ضيف للعقل بكويز»: أسئلة قصيرة، كل إجابة بتروح لخانتها في العقل على طول.
+"""🧩 «أضف للعقل بكويز»: أسئلة قصيرة، كل إجابة تروح لخانتها في العقل مباشرة.
 
 - العربي فصحى بسيطة (مش لهجة) عشان ينفع لأي بلد، ومعاه نسخة إنجليزي.
-- الأمثلة عامة لأي نشاط (مش لبراند معيّن).
-- to: field = خانة في العقل · note = معلومة في «المعرفة» تحت قسم · rules = قاعدة لكل سطر · pick = اختيار من قايمة.
+- الأمثلة عامة لأي نشاط (غير لبراند معيّن).
+- to: field = خانة في العقل · note = معلومة في «المعرفة» أسفل قسم · rules = قاعدة لكل سطر · pick = اختيار من قائمة.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ Q = [
      "opts": [["service", "خدمة", "A service"], ["physical", "منتج ملموس", "A physical product"], ["app", "تطبيق أو موقع", "An app or website"]]},
     {"id": "about", "to": {"field": "about"},
      "ar": "صِف مشروعك في جملتين: ماذا تقدم، وما الذي يميزك عن غيرك؟", "en": "Describe your business in two sentences: what you offer and what sets you apart.",
-     "ph_ar": "مثلًا: نقدم وجبات صحية جاهزة بتوصيل في نفس اليوم، وكل وجبة محسوبة السعرات", "ph_en": "e.g. We deliver ready healthy meals the same day, each with counted calories"},
+     "ph_ar": "مثلًا: نقدم وجبات صحية جاهزة توصيل في نفس اليوم، وكل وجبة محسوبة السعرات", "ph_en": "e.g. We deliver ready healthy meals the same day, each with counted calories"},
     {"id": "audience", "to": {"field": "audience"},
      "ar": "من هو عميلك المثالي؟", "en": "Who is your ideal customer?",
      "ph_ar": "العمر، الاهتمامات، وما الذي يبحث عنه", "ph_en": "Age, interests, and what they are looking for"},
@@ -29,12 +29,12 @@ Q = [
     {"id": "language", "to": {"field": "language"},
      "ar": "بأي لغة أو لهجة تحب أن نخاطب جمهورك؟", "en": "Which language or dialect should we speak to your audience in?",
      "ph_ar": "مثلًا: لهجة البلد، أو فصحى بسيطة، أو إنجليزي", "ph_en": "e.g. the local dialect, simple formal Arabic, or English"},
-    {"id": "voice", "to": {"note": "voice", "title_ar": "نبرة البراند", "title_en": "Brand voice"},
-     "ar": "كيف تحب أن يبدو صوت البراند؟", "en": "How should your brand sound?",
+    {"id": "voice", "to": {"note": "voice", "title_ar": "نبرة العلامة", "title_en": "Brand voice"},
+     "ar": "كيف تحب أن يبدو صوت العلامة؟", "en": "How should your brand sound?",
      "ph_ar": "مثلًا: ودود ومرح، أو جاد وموثوق، أو فاخر وهادئ", "ph_en": "e.g. friendly and fun, serious and trusted, or calm and premium"},
     {"id": "products", "to": {"note": "products", "title_ar": "أهم المنتجات والخدمات", "title_en": "Main products and services"},
      "ar": "ما أهم منتجاتك أو خدماتك، وبكم تقريبًا؟", "en": "What are your main products or services, and roughly how much do they cost?",
-     "ph_ar": "اكتب كل واحد في سطر مع سعره إن أمكن", "ph_en": "One per line, with price if possible", "multi": True},
+     "ph_ar": "اكتب كل واحد في سطر مع سعره أن أمكن", "ph_en": "One per line, with price if possible", "multi": True},
     {"id": "offer", "to": {"note": "offers", "title_ar": "العرض الحالي", "title_en": "Current offer"},
      "ar": "هل لديك عرض حالي أو ميزة تجذب العملاء؟", "en": "Do you have a current offer or a hook that attracts customers?",
      "ph_ar": "مثلًا: خصم لأول طلب، أو توصيل مجاني، أو ضمان استرجاع", "ph_en": "e.g. first-order discount, free delivery, or a money-back guarantee"},
@@ -62,7 +62,7 @@ BY_ID = {q["id"]: q for q in Q}
 
 
 def public(lang: str) -> list[dict]:
-    """الأسئلة باللغة المطلوبة (من غير تفاصيل الحفظ)."""
+    """الأسئلة باللغة المطلوبة (بدون تفاصيل الحفظ)."""
     en = lang == "en"
     out = []
     for q in Q:
@@ -74,7 +74,7 @@ def public(lang: str) -> list[dict]:
 
 
 def current(q: dict, brain: dict) -> str:
-    """الإجابة اللي في العقل دلوقتي (عشان تظهر لو رجعت للسؤال)."""
+    """الإجابة التي في العقل الآن (لكي تظهر إذا رجعت للسؤال)."""
     to = q["to"]
     if "field" in to:
         return str(brain.get(to["field"]) or "")
@@ -95,20 +95,20 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
     app = b.get("type") == "app"
     tw = ctx.get("twin") or {}
     items = [
-        ("logo", "ارفع اللوجو", "اللوجو بيتحط على الفيديوهات والصور", has("logos"), {"leaf": "look:logos:"}),
-        ("palette", "حط ألوان البراند", "الألوان بتمشي على كل التصميمات", bool(hexes), {"leaf": "look:palette:"}),
-        ("typography", "اختار خطوط البراند", "خط العناوين وخط الكلام", bool(str(b.get("typography") or "").strip()), {"leaf": "look:typography:"}),
-        ("intro", "ارفع إنترو البراند", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
-        ("outro", "ارفع أوترو البراند", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
-        ("caption", "اكتب الكابشن الافتراضي", "الشكل اللي الكابشن بينزل بيه مع كل بوست", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
-        ("social", "حلّل حساب السوشيال بتاعك", "المخ بيتعلم من بوستاتك ومشاهداتك", bool(b.get("todos") or b.get("niche")), {"leaf": "improve:social:"}),
-        ("rivals", "وافق على منافسينك", "البرنامج بيقترح، وانت بتختار اللي عايز تبقى زيهم", bool(rivals.approved(b.get("competitors") or {})), {"page": "rivals"}),
-        ("twin_photos", "ارفع صورك علشان الأفاتار", "صور وشّك من كذا زاوية في «نسختي»", bool(tw.get("photo")), {"page": "twin"}),
-        ("twin_video", "ارفع فيديو ليك وانت بتتكلم", "علشان الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
-        ("twin_voice", "سجّل صوتك", "علشان الأفاتار يتكلم بصوتك", bool(tw.get("voice")), {"page": "twin"}),
-        ("characters", "اعمل شخصية للبراند", "شخصية ثابتة تظهر في الفيديوهات", ctx.get("coaches", 0) > 0, {"page": "coaches"}),
-        ("voice", "ضيف تعليق صوتي", "تسجيلات صوت تتحط على الفيديوهات", ctx.get("voices", 0) > 0, {"page": "brainlib", "tab": "voice"}),
-        ("music", "ضيف موسيقى", "موسيقى البراند للفيديوهات", ctx.get("music", 0) > 0, {"page": "brainlib", "tab": "music"}),
-        ("lib_media", "ارفع صور وفيديوهات في مكتبة العقل", "المكتبة اللي الموديل المخصص بيسحب منها", ctx.get("lib_media", 0) > 0, {"page": "brainlib"}),
+        ("logo", "ارفع الشعار", "الشعار يوضع على الفيديوهات والصور", has("logos"), {"leaf": "look:logos:"}),
+        ("palette", "ضع ألوان العلامة", "الألوان تسير على كل التصميمات", bool(hexes), {"leaf": "look:palette:"}),
+        ("typography", "اختر خطوط العلامة", "خط العناوين وخط النص", bool(str(b.get("typography") or "").strip()), {"leaf": "look:typography:"}),
+        ("intro", "ارفع إنترو العلامة", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
+        ("outro", "ارفع أوترو العلامة", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
+        ("caption", "اكتب التعليق النصي الافتراضي", "الشكل الذي التعليق النصي ينزل به مع كل منشور", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
+        ("social", "حلّل حساب السوشيال الخاص بك", "العقل يتعلم من بوستاتك ومشاهداتك", bool(b.get("todos") or b.get("niche")), {"leaf": "improve:social:"}),
+        ("rivals", "وافق على منافسوك", "البرنامج يقترح، وأنت تختار ما تريد تصبح زيهم", bool(rivals.approved(b.get("competitors") or {})), {"page": "rivals"}),
+        ("twin_photos", "ارفع صورك لكي الأفاتار", "صور وشّك من كذا زاوية في «نسختي»", bool(tw.get("photo")), {"page": "twin"}),
+        ("twin_video", "ارفع فيديو لك وأنت تتكلم", "لكي الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
+        ("twin_voice", "سجّل صوتك", "لكي الأفاتار يتكلم بصوتك", bool(tw.get("voice")), {"page": "twin"}),
+        ("characters", "أنشئ شخصية للعلامة", "شخصية ثابتة تظهر في الفيديوهات", ctx.get("coaches", 0) > 0, {"page": "coaches"}),
+        ("voice", "أضف تعليق صوتي", "تسجيلات صوت توضع على الفيديوهات", ctx.get("voices", 0) > 0, {"page": "brainlib", "tab": "voice"}),
+        ("music", "أضف موسيقى", "موسيقى العلامة للفيديوهات", ctx.get("music", 0) > 0, {"page": "brainlib", "tab": "music"}),
+        ("lib_media", "ارفع صور وفيديوهات في مكتبة العقل", "المكتبة التي النموذج المخصص يسحب منها", ctx.get("lib_media", 0) > 0, {"page": "brainlib"}),
     ]
     return [{"id": i, "t": t, "why": w, "done": bool(d), "go": g} for i, t, w, d, g in items]

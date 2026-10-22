@@ -1,9 +1,9 @@
-"""📣 إعلاناتك (مدير الإعلانات): ترويج بوست اتنشر، أو إعلان جديد من الصفر، وجماهير مخصصة وشبيهة، كله من جوه البرنامج.
+"""📣 إعلاناتك (مدير الإعلانات): ترويج منشور نُشر، أو إعلان جديد من الصفر، وجماهير مخصصة وشبيهة، كله من داخل البرنامج.
 
-الإعلانات بتتعمل على حساب الإعلانات بتاع العميل نفسه (فلوس الإعلان بتتدفع للمنصة من كارته هو)،
-والاستهداف بييجي من «🎯 وصفة الاستهداف» (اهتمامات وكلمات بحث وسن وبلاد)، مش من قايمة ناس.
-بنستخدم نفس خدمة النشر (ومحتاجة إضافة الإعلانات تكون متفعّلة في الاشتراك).
-PUBLISH_MOCK=1: حسابات وإعلانات تجريبية بأرقام وهمية علشان التجربة.
+الإعلانات تُنشأ على حساب الإعلانات الخاص بالعميل نفسه (مال الإعلان تتدفع للمنصة من كارته هو)،
+والاستهداف يأتي من «🎯 وصفة الاستهداف» (اهتمامات وكلمات بحث وسن وبلاد)، غير من قائمة أشخاص.
+نستخدم نفس خدمة النشر (وتحتاج إضافة الإعلانات تكون متفعّلة في الاشتراك).
+PUBLISH_MOCK=1: حسابات وإعلانات تجريبية بأرقام وهمية لكي التجربة.
 """
 from __future__ import annotations
 
@@ -26,9 +26,9 @@ GOALS = {"engagement": "تفاعل", "traffic": "زيارات للينك", "awar
 GOALS_BY = {"x": {"engagement", "traffic", "awareness", "video_views"}, "pinterest": {"engagement", "traffic", "awareness", "video_views"},
             "google": {"engagement", "traffic", "awareness", "video_views"}}
 MIN_BUDGET = {"tiktok": 20, "pinterest": 5}   # بالدولار، والباقي ١
-CTAS = {"LEARN_MORE": "اعرف أكتر", "SHOP_NOW": "اشتري دلوقتي", "SIGN_UP": "سجّل", "CONTACT_US": "كلّمنا", "GET_OFFER": "خد العرض",
-        "GET_QUOTE": "اطلب عرض سعر", "SUBSCRIBE": "اشترك", "WATCH_MORE": "اتفرج أكتر", "DOWNLOAD": "نزّل", "BOOK_TRAVEL": "احجز"}
-ADDON_MSG = "الإعلانات لسه مش متفعّلة في اشتراكك. كلّم الدعم يفعّلها، وبعدها كل حاجة هتشتغل من هنا."
+CTAS = {"LEARN_MORE": "اعرف أكثر", "SHOP_NOW": "اشتري الآن", "SIGN_UP": "سجّل", "CONTACT_US": "كلّمنا", "GET_OFFER": "خذ العرض",
+        "GET_QUOTE": "اطلب عرض سعر", "SUBSCRIBE": "اشترك", "WATCH_MORE": "شاهد أكثر", "DOWNLOAD": "نزّل", "BOOK_TRAVEL": "احجز"}
+ADDON_MSG = "الإعلانات ما زال غير متفعّلة في اشتراكك. كلّم الدعم يفعّلها، وبعدها كل شيء ستشتغل من هنا."
 # أسامي البلاد زي ما الوصفة بتكتبها ← الكود اللي المنصات بتفهمه
 COUNTRIES = {"السعودية": "SA", "المملكة": "SA", "مصر": "EG", "الإمارات": "AE", "الامارات": "AE", "الكويت": "KW", "قطر": "QA", "البحرين": "BH",
              "عمان": "OM", "عُمان": "OM", "الأردن": "JO", "الاردن": "JO", "لبنان": "LB", "العراق": "IQ", "المغرب": "MA", "الجزائر": "DZ",
@@ -47,14 +47,14 @@ def mock() -> bool:
 
 def ready() -> None:
     if publisher.service_name() not in ("zernio", "mock"):
-        raise AdsError("خدمة النشر والإعلانات مش متوصّلة لسه. كلّم الدعم")
+        raise AdsError("خدمة النشر والإعلانات غير متصلة ما زال. كلّم الدعم")
 
 
 def _check(resp: httpx.Response, what: str):
     if resp.status_code == 403 and "add-on" in resp.text.lower():
         raise AdsError(ADDON_MSG)
     if resp.status_code == 422 and "ads connection" in resp.text.lower():
-        raise AdsError("لازم تربط حساب الإعلانات للمنصة دي الأول (من «اربط حساب إعلانات»)")
+        raise AdsError("يجب تربط حساب الإعلانات هذه للمنصة أولًا (من «اربط حساب إعلانات»)")
     try:
         return publisher._check(resp, what)
     except publisher.PublishError as exc:
@@ -129,7 +129,7 @@ def _norm_account(a: dict) -> dict | None:
 
 
 def ad_accounts() -> list[dict]:
-    """حسابات الإعلانات المربوطة (مثلًا حساب ميتا act_123) ومعاها حساب النشر اللي بتتعمل منه."""
+    """حسابات الإعلانات المربوطة (مثلًا حساب ميتا act_123) ومعها حساب النشر الذي تُنشأ منه."""
     if mock():
         return _M["accounts"]
     prof = publisher.tenant_profile()
@@ -139,9 +139,9 @@ def ad_accounts() -> list[dict]:
 
 
 def connect(platform: str, account_id: str, redirect_url: str) -> dict:
-    """ربط الإعلانات: ميتا ولينكدإن وبنترست بياخدوا ربط النشر على طول، وتيك توك وX وجوجل بتسجيل دخول على المنصة نفسها."""
+    """ربط الإعلانات: ميتا ولينكدإن ونترست يأخذون ربط النشر مباشرة، وتيك توك وX وجوجل بتسجيل دخول على المنصة نفسها."""
     if platform not in PLATFORMS:
-        raise AdsError("منصة مش معروفة")
+        raise AdsError("منصة غير معروفة")
     if mock():
         name = {"facebook": "حساب إعلانات ميتا التجريبي", "instagram": "حساب إعلانات ميتا التجريبي"}.get(platform, f"إعلانات {PLATFORMS[platform][1]} التجريبي")
         if not any(a["platform"] == platform for a in _M["accounts"]):
@@ -150,7 +150,7 @@ def connect(platform: str, account_id: str, redirect_url: str) -> dict:
         return {"done": True}
     remote = "googleads" if platform == "google" else PLATFORMS[platform][0]
     if platform not in SAME_TOKEN and platform != "google" and not account_id:
-        raise AdsError(f"اربط حساب {PLATFORMS[platform][1]} للنشر الأول، وبعدين اربط إعلاناته")
+        raise AdsError(f"اربط حساب {PLATFORMS[platform][1]} للنشر أولًا، ثم اربط إعلاناته")
     data = _get(f"/connect/{remote}/ads", {"profileId": publisher.default_profile(), "accountId": account_id or None,
                                           "redirect_url": redirect_url, "headless": "true"}, "ربط الإعلانات")
     if isinstance(data, dict) and data.get("alreadyConnected"):
@@ -174,7 +174,7 @@ def interests(q: str, account_id: str) -> list[dict]:
 
 
 def map_interests(names: list[str], account_id: str, n: int = 12) -> list[dict]:
-    """أسامي الاهتمامات اللي في الوصفة ← الاهتمام الحقيقي عند المنصة (أقرب نتيجة لكل اسم)."""
+    """أسامي الاهتمامات التي في الوصفة ← الاهتمام الحقيقي عند المنصة (أقرب نتيجة لكل اسم)."""
     out, seen = [], set()
     for name in (names or [])[:n]:
         try:
@@ -189,7 +189,7 @@ def map_interests(names: list[str], account_id: str, n: int = 12) -> list[dict]:
 
 
 def targeting(t: dict) -> dict:
-    """الاستهداف اللي بيتبعت: سن وبلاد واهتمامات (ده اللي الخدمة بتقبله في الترويج والإعلان الجديد)."""
+    """الاستهداف الذي يُرسل: سن وبلاد واهتمامات (هذا ما الخدمة تقبله في الترويج والإعلان الجديد)."""
     out = {"ageMin": max(13, min(65, int(t.get("age_min") or 18))), "ageMax": max(13, min(65, int(t.get("age_max") or 45)))}
     if t.get("countries"):
         out["countries"] = [str(c).upper()[:2] for c in t["countries"]][:25]
@@ -207,7 +207,7 @@ def boost(post_id: str, account_id: str, ad_account: str, platform: str, name: s
         body["schedule"] = {"startDate": time.strftime("%Y-%m-%d"), "endDate": time.strftime("%Y-%m-%d", time.gmtime(time.time() + days * 86400))}
     if mock():
         return _mock_ad("boost", platform, name, budget, {"post": post_id, "goal": goal, "targeting": body["targeting"], "days": days})
-    data = _send("POST", "/ads/boost", body, "ترويج البوست")
+    data = _send("POST", "/ads/boost", body, "ترويج المنشور")
     ad = (data.get("ad") or data) if isinstance(data, dict) else {}
     return {"id": str(ad.get("_id") or ad.get("id") or ad.get("adId") or ""), "name": name, "platform": platform}
 
@@ -291,7 +291,7 @@ def analytics(ad_id: str) -> dict:
     if mock():
         a = next((x for x in _M["ads"] if x["id"] == ad_id), None)
         if not a:
-            raise AdsError("الإعلان مش موجود")
+            raise AdsError("الإعلان غير موجود")
         m = _mock_metrics(a)
         return {"summary": m, "daily": [], "breakdowns": {"age": [{"key": "25-34", "spend": round(m["spend"] * .5, 2)}, {"key": "18-24", "spend": round(m["spend"] * .3, 2)}]}}
     data = _get(f"/ads/{ad_id}/analytics", {"breakdowns": "age,gender,country"}, "أرقام الإعلان")
@@ -318,14 +318,14 @@ def create_audience(account_id: str, ad_account: str, name: str, kind: str, sour
     body = {"accountId": account_id, "adAccountId": ad_account, "name": name[:100], "type": kind}
     if kind == "lookalike":
         if not source or not country:
-            raise AdsError("الجمهور الشبيه محتاج جمهور أصلي وبلد")
+            raise AdsError("الجمهور الشبيه يحتاج جمهور أصلي وبلد")
         body.update(sourceAudienceId=source, country=country.upper()[:2], ratio=max(0.01, min(0.2, ratio)))
     elif kind == "website":
         if not pixel:
-            raise AdsError("جمهور زوار الموقع محتاج البيكسل بتاع موقعك")
+            raise AdsError("جمهور زوار الموقع يحتاج البيكسل الخاص بـ موقعك")
         body.update(pixelId=pixel, retentionDays=max(1, min(180, days)))
     elif kind != "customer_list":
-        raise AdsError("نوع جمهور مش معروف")
+        raise AdsError("نوع جمهور غير معروف")
     if mock():
         a = {"id": f"maud-{uuid.uuid4().hex[:6]}", "name": name, "type": kind, "size": None if kind == "customer_list" else 120000, "platform": "facebook", "status": "ready"}
         _M["audiences"].append(a)
@@ -338,7 +338,7 @@ def create_audience(account_id: str, ad_account: str, name: str, kind: str, sour
 def upload_users(audience_id: str, users: list[dict]) -> int:
     users = [u for u in users if u.get("email") or u.get("phone")][:10000]
     if not users:
-        raise AdsError("مفيش إيميلات أو أرقام في الملف")
+        raise AdsError("لا يوجد إيميلات أو أرقام في الملف")
     if mock():
         for a in _M["audiences"]:
             if a["id"] == audience_id:

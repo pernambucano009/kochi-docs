@@ -1,10 +1,10 @@
-"""🗄️ نسخة احتياطية يومية على جوجل درايف (البوابة هي اللي بتعملها، لأنها شايفة بيانات كل الحسابات).
+"""🗄️ نسخة احتياطية يومية على جوجل درايف (البوابة هي ما تعملها، لأنها شايفة بيانات كل الحسابات).
 
-- الربط مرة واحدة من الإعدادات: الأدمن بيسجّل دخول بإيميل جوجل ويوافق. الصلاحية drive.file بس،
-  يعني البرنامج بيشوف الملفات اللي هو عملها بس، ومش بيقدر يفتح أي حاجة تانية في الدرايف.
-- النسخة: كل قواعد البيانات (نسخة متسقة بـ sqlite backup) وملفات الإعدادات الصغيرة، من غير الفيديوهات والصور.
-  بتتضغط في ملف واحد وبتترفع في فولدر «SimsimKit Backups»، والأقدم من آخر KEEP نسخة بيتمسح.
-- محتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET (نفس بتوع الدخول بجوجل).
+- الربط مرة واحدة من الإعدادات: الأدمن يسجّل دخول بإيميل جوجل ويوافق. الصلاحية drive.file فقط،
+  أي البرنامج يرى الملفات التي هو عملها فقط، ولا يستطيع يفتح أي شيء أخرى في الدرايف.
+- النسخة: كل قواعد البيانات (نسخة متسقة بـ sqlite backup) وملفات الإعدادات الصغيرة، بدون الفيديوهات والصور.
+  تتضغط في ملف واحد وتُرفع في مجلد «SimsimKit Backups»، والأقدم من آخر KEEP نسخة يُحذف.
+- يحتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET (نفس الخاصين بالدخول بجوجل).
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def access_token(refresh: str, client_id: str, secret: str) -> str:
 
 # ---------------------------------------------------------------- تجميع الملفات
 def collect(root: Path) -> list[tuple[Path, str]]:
-    """(الملف، اسمه جوه النسخة). قواعد البيانات كلها، والملفات الصغيرة بس من الباقي."""
+    """(الملف، اسمه داخل النسخة). قواعد البيانات كلها، والملفات الصغيرة فقط من الباقي."""
     out = []
     for dirpath, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
@@ -121,12 +121,12 @@ def folder_id(tok: str, known: str | None) -> str:
     r = httpx.post(f"{API}/drive/v3/files", headers=_h(tok), timeout=20,
                    json={"name": FOLDER, "mimeType": "application/vnd.google-apps.folder"})
     if r.status_code >= 400:
-        raise BackupError(f"مقدرتش أعمل فولدر في الدرايف: {r.status_code} {r.text[:150]}")
+        raise BackupError(f"تعذّر إنشاء مجلد في الدرايف: {r.status_code} {r.text[:150]}")
     return r.json()["id"]
 
 
 def upload(tok: str, folder: str, path: Path, name: str) -> str:
-    """رفع على مرحلتين (resumable) علشان الملف لو كبير مايقعش في النص."""
+    """رفع على مرحلتين (resumable) لكي الملف إذا كبير مايقعش في النص."""
     r = httpx.post(f"{API}/upload/drive/v3/files", params={"uploadType": "resumable"}, timeout=30,
                    headers={**_h(tok), "X-Upload-Content-Type": "application/gzip", "X-Upload-Content-Length": str(path.stat().st_size)},
                    json={"name": name, "parents": [folder]})

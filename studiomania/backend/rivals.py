@@ -1,9 +1,9 @@
-"""💓 «نبض المجال» (فرع في عقل البراند): المنافسين والترند. أعلى 5 حسابات مشاهدات في مجال البراند وسوقه (تيك توك وإنستجرام).
+"""💓 «نبض المجال» (فرع في عقل العلامة): المنافسين والترند. أعلى 5 حسابات مشاهدات في مجال العلامة وسوقه (تيك توك وإنستجرام).
 
 البرنامج بيدوّر بكلمات المجال بلهجة السوق، يجمّع الحسابات اللي بتطلع، يختار الأقرب للبراند،
-وبعدين يجيب آخر بوستات كل حساب ويحسب كل بوست عدّى متوسط صاحبه بكام مرة.
-اللي بينجح عندهم (الهوكات والفكرة والهيكل) بيدخل في كتابة الأفكار والسكريبتات.
-الداتا من ScrapeCreators (SCRAPECREATORS_API_KEY)، ومن غيره بيشتغل بداتا تجريبية.
+ثم يجلب آخر منشورات كل حساب ويحسب كل منشور عدّى متوسط صاحبه بكام مرة.
+ما ينجح لديهم (الخطافات والفكرة والهيكل) يدخل في كتابة الأفكار والنصوص.
+الداتا من ScrapeCreators (SCRAPECREATORS_API_KEY)، ومن غيره يشتغل بداتا تجريبية.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def _norm(name: str) -> str:
 
 
 def key_names() -> list[str]:
-    """أسماء المتغيرات اللي شكلها مفتاح ScrapeCreators (الأسماء بس، من غير القيم)."""
+    """أسماء المتغيرات التي شكلها مفتاح ScrapeCreators (الأسماء فقط، بدون القيم)."""
     return sorted(k for k in os.environ if "SCRAPECREATOR" in _norm(k))
 
 
@@ -45,11 +45,11 @@ def key() -> str:
 
 
 def missing_msg() -> str:
-    """رسالة لصاحب البرنامج لما المفتاح مش واصل للبرنامج: بتقول لقينا أنهي أسماء (من غير القيم)."""
+    """رسالة لصاحب البرنامج عندما المفتاح غير واصل للبرنامج: تقول لقينا أي أسماء (بدون القيم)."""
     names = key_names()
     if names:
-        return f"لقيت متغير باسم {', '.join(names)} بس قيمته فاضية. حط المفتاح فيه في Railway"
-    return "مفتاح ScrapeCreators مش واصل للبرنامج. حطه من الإعدادات ← المفاتيح والرصيد ← مفتاح ScrapeCreators"
+        return f"لقيت متغير باسم {', '.join(names)} فقط قيمته فارغة. ضع المفتاح فيه في Railway"
+    return "مفتاح ScrapeCreators غير واصل للبرنامج. ضعه من الإعدادات ← المفاتيح والرصيد ← مفتاح ScrapeCreators"
 
 
 def live() -> bool:
@@ -66,7 +66,7 @@ def _get(path: str, params: dict, timeout: float = 40) -> dict:
         try:
             r = httpx.get(API + path, params=params, headers={"x-api-key": key()}, timeout=timeout)
             if r.status_code in (401, 403):
-                raise RivalsError("مفتاح ScrapeCreators مش شغال، راجعه في Railway")
+                raise RivalsError("مفتاح ScrapeCreators لا يعمل، راجعه في Railway")
             if r.status_code == 402:
                 import providers
                 providers.note_error("scrape", "402 payment required: credits")
@@ -190,7 +190,7 @@ def sig(items: list[dict]) -> str:
 
 # ---------- الحساب
 def candidates(posts: list[dict], exclude: set[str]) -> list[dict]:
-    """الحسابات اللي طلعت في البحث، مترتبة بأعلى مشاهدات."""
+    """الحسابات التي طلعت في البحث، مترتبة بأعلى مشاهدات."""
     acc: dict[str, dict] = {}
     for p in posts:
         k = f"{p['platform']}:{p['handle'].lower()}"
@@ -212,7 +212,7 @@ def candidates(posts: list[dict], exclude: set[str]) -> list[dict]:
 
 
 def summarize(platform: str, handle: str, posts: list[dict], now: float | None = None) -> dict:
-    """متوسط الحساب (الوسيط، علشان بوست واحد مضروب مايبوّظش الحساب) وكل بوست عدّاه بكام."""
+    """متوسط الحساب (الوسيط، لكي منشور واحد مضروب مايبوّظش الحساب) وكل منشور عدّاه بكام."""
     now = now or time.time()
     posts = [p for p in posts if p["handle"].lower() == handle.lower()] or posts
     views = [p["views"] for p in posts if p["views"]]
@@ -229,7 +229,7 @@ def summarize(platform: str, handle: str, posts: list[dict], now: float | None =
 
 
 def trending(posts: list[dict], now: float | None = None, n: int = 15) -> list[dict]:
-    """نبض المجال: أعلى البوستات مشاهدات في آخر ٣٠ يوم (من أي حساب)."""
+    """نبض المجال: أعلى المنشورات مشاهدات في آخر ٣٠ يوم (من أي حساب)."""
     now = now or time.time()
     seen, out = set(), []
     for p in sorted(posts, key=lambda p: -p["views"]):
@@ -273,7 +273,7 @@ These accounts came up when searching the niche. Pick the {n} that are the close
 preferring the highest views. Skip news pages, meme pages, unrelated viral accounts, and accounts from a clearly different country or language.
 {lines}
 
-Return JSON: {{"picks": [{{"i": 0, "why": "بالعربي المصري في جملة قصيرة: ليه ده منافس"}}]}} ordered best first, at most {n}."""}]
+Return JSON: {{"picks": [{{"i": 0, "why": "بالعربية الفصحى في جملة قصيرة: له هذا منافس"}}]}} ordered best first, at most {n}."""}]
 
 
 def digest_messages(brain: dict, items: list[dict]) -> list[dict]:
@@ -290,12 +290,12 @@ A high multiple means the IDEA worked, not the account. Find what repeats in the
 {chr(10).join(blocks)}
 
 Write everything in simple Egyptian Arabic. Return JSON:
-{{"hooks": ["نوع هوك بيكسب عندهم + مثال قصير منهم", "..."],
-  "concepts": ["فكرة/زاوية محتوى بتجيب مشاهدات عالية عندهم", "..."],
-  "formats": ["شكل/هيكل الفيديو (مثلًا: قبل وبعد، قايمة ٣ حاجات، رد على كومنت)", "..."],
-  "angles": ["زاوية ممكن البراند ياخدها ومحدش منهم عاملها كويس", "..."],
-  "avoid": ["حاجة بتجيب مشاهدات قليلة عندهم", "..."],
-  "summary": "جملتين: إيه اللي بينجح في المجال ده دلوقتي"}}
+{{"hooks": ["نوع خطاف يكسب لديهم + مثال قصير منهم", "..."],
+  "concepts": ["فكرة/زاوية محتوى تجلب مشاهدات عالية لديهم", "..."],
+  "formats": ["شكل/هيكل الفيديو (مثلًا: قبل وبعد، قائمة ٣ أشياء، رد على تعليق)", "..."],
+  "angles": ["زاوية يمكن العلامة ياخدها ومحدش منهم عاملها كويس", "..."],
+  "avoid": ["شيء تجلب مشاهدات قليلة لديهم", "..."],
+  "summary": "جملتين: ماذا الذي ينجح في هذا المجال الآن"}}
 3 to 5 items in each list."""}]
 
 
@@ -307,25 +307,25 @@ def clean_digest(raw: dict) -> dict:
 
 
 def insight_text(brain: dict | None) -> str:
-    """اللي بيدخل في برومبت الأفكار والسكريبتات."""
+    """ما يدخل في وصف الأفكار والنصوص."""
     c = (brain or {}).get("competitors") or {}
     items = approved(c)
     if not items and not c.get("trending"):
         return ""
-    lines = ["منافسين البراند في نفس المجال والسوق (أعلى مشاهدات). اتعلّم من الفكرة والهوك والهيكل اللي نجح عندهم، وماتنسخش كلامهم:"]
+    lines = ["منافسين العلامة في نفس المجال والسوق (أعلى مشاهدات). تعلّم من الفكرة والخطاف والهيكل الذي نجح لديهم، وماتنسخش كلامهم:"]
     for i in items[:TOP]:
         lines.append(f"- @{i['handle']} ({PLATFORMS.get(i['platform'], i['platform'])}، متوسطه {fmt(i.get('median_views'))}):")
         for p in i["posts"][:3]:
             hook = (p.get("spoken") or p.get("caption") or "").split("\n")[0][:140]
             lines.append(f"  ×{p.get('multiple')} ({fmt(p.get('views'))}): {hook}")
     if tr := c.get("trending") or []:
-        lines.append("أعلى بوستات في المجال آخر ٣٠ يوم (الترند دلوقتي):")
+        lines.append("أعلى منشورات في المجال آخر ٣٠ يوم (الترند الآن):")
         lines += [f"  {fmt(p.get('views'))} @{p.get('handle')}: {(p.get('caption') or '').split(chr(10))[0][:120]}" for p in tr[:5]]
     d = c.get("digest") or {}
     for k, t in (("hooks", "هوكات بتكسب عندهم"), ("concepts", "أفكار بتجيب مشاهدات"), ("formats", "أشكال ناجحة"), ("angles", "زوايا فاضية ينفع ناخدها"), ("avoid", "بيجيب مشاهدات قليلة")):
         if d.get(k):
             lines.append(f"{t}: " + " · ".join(d[k][:5]))
-    lines.append("لما تختار الهوك والفكرة: خليها على نفس نمط البوستات اللي عدّت متوسطها بكتير، بس بزاوية البراند وصوته.")
+    lines.append("عندما تختار الخطاف والفكرة: اجعلها على نفس نمط المنشورات التي عدّت متوسطها بكتير، فقط بزاوية العلامة وصوته.")
     return "\n".join(lines)[:2500]
 
 
@@ -377,16 +377,16 @@ Build a TARGETING RECIPE so the brand's ads reach people likely to buy or follow
 (interests, behaviors, keywords, topics, lookalikes). Never suggest lists of specific people. Be concrete and specific to this market and dialect.
 Interest names must be real options that exist in Meta / TikTok ads (English names as they appear in Ads Manager). Google keywords in the language people actually search with.
 Write explanations in simple Egyptian Arabic. Return JSON:
-{{"summary": "جملتين: مين اللي هيشتري وإزاي نوصله",
-  "personas": [{{"name": "اسم قصير للشريحة", "who": "مين هم بالظبط", "age": [25, 40], "gender": "all|female|male", "pains": ["..."], "desires": ["..."], "hook": "هوك إعلان ليهم بلهجتهم"}}],
+{{"summary": "جملتين: من الذين سيشتري وكيف نوصله",
+  "personas": [{{"name": "اسم قصير للشريحة", "who": "من هم بالضبط", "age": [25, 40], "gender": "all|female|male", "pains": ["..."], "desires": ["..."], "hook": "خطاف إعلان لهم بلهجتهم"}}],
   "meta": {{"age": [22, 45], "gender": "all|female|male", "locations": ["الدولة/المدن"], "interests": ["English interest names"], "behaviors": ["..."], "exclusions": ["..."], "placements": "اقتراح الأماكن (ريلز، ستوريز…) وليه"}},
-  "google": {{"keywords": ["كلمات بحث بنية شراء"], "negative": ["كلمات نستبعدها"], "competitor_terms": ["أسماء أو مواقع منافسين يستهدف اللي بيدوروا عليهم (Custom segment)"], "youtube_topics": ["..."]}},
+  "google": {{"keywords": ["كلمات بحث بنية شراء"], "negative": ["كلمات نستبعدها"], "competitor_terms": ["أسماء أو مواقع منافسين يستهدف الذي يدورون عليهم (Custom segment)"], "youtube_topics": ["..."]}},
   "tiktok": {{"tt_interests": ["..."], "tt_hashtags": ["..."]}},
   "hashtags": ["للمحتوى العادي"],
   "angles": [{{"persona": "اسم الشريحة", "angle": "زاوية الإعلان", "text": "نص إعلان قصير بلهجة السوق", "cta": "زرار/دعوة"}}],
-  "questions": ["أكتر أسئلة الجمهور في الكومنتات (تنفع أفكار محتوى وإعلانات)"],
-  "objections": ["اعتراضات/مخاوف بتمنعهم يشتروا، ونرد عليها في الإعلان"],
-  "budget": "اقتراح بداية: ميزانية وتقسيم اختبار بسيط بالعربي المصري"}}
+  "questions": ["أكثر أسئلة الجمهور في التعليقات (تنفع أفكار محتوى وإعلانات)"],
+  "objections": ["اعتراضات/مخاوف تمنعهم يشترون، ونرد عليها في الإعلان"],
+  "budget": "اقتراح بداية: ميزانية وتقسيم اختبار بسيط بالعربية الفصحى"}}
 2 to 4 personas, 8 to 15 interests, 10 to 20 keywords, 3 to 6 angles."""}]
 
 
@@ -425,20 +425,20 @@ def clean_audience(raw: dict) -> dict:
 
 def mock_audience() -> dict:
     return clean_audience({
-        "summary": "اللي هيشتري: ناس مهتمين بالموضة والرياضة في السعودية، بيقارنوا الأسعار وبيستنوا العروض. نوصلهم بإعلانات ريلز قصيرة فيها قبل وبعد وعرض واضح.",
-        "personas": [{"name": "الشاب الرياضي", "who": "شباب ٢٠-٣٢ بيروحوا الجيم ومهتمين بالشكل", "age": [20, 32], "gender": "male", "pains": ["المقاسات مش مضبوطة أونلاين"],
-                      "desires": ["لبس مريح وشكله حلو"], "hook": "لو بتتعب من المقاسات اللي مابتظبطش، شوف دي"},
-                     {"name": "الأم اللي بتشتري للبيت", "who": "ستات ٢٨-٤٥ بيشتروا لعيلتهم", "age": [28, 45], "gender": "female", "pains": ["الأسعار"], "desires": ["جودة بسعر معقول"],
+        "summary": "ما سيشتري: أشخاص مهتمين بالموضة والرياضة في السعودية، يقارنون الأسعار وينتظرون العروض. نوصلهم بإعلانات ريلز قصيرة فيها قبل وبعد وعرض واضح.",
+        "personas": [{"name": "الشاب الرياضي", "who": "شباب ٢٠-٣٢ يروحون الجيم ومهتمين بالشكل", "age": [20, 32], "gender": "male", "pains": ["المقاسات غير مضبوطة أونلاين"],
+                      "desires": ["لبس مريح وشكله جميل"], "hook": "إذا تتعب من المقاسات التي مابتظبطش، انظر هذه"},
+                     {"name": "الأم الذي تشتري للبيت", "who": "نساء ٢٨-٤٥ يشترون لعيلتهم", "age": [28, 45], "gender": "female", "pains": ["الأسعار"], "desires": ["جودة بسعر معقول"],
                       "hook": "جودة المحلات الكبيرة بنص السعر"}],
         "meta": {"age": [20, 45], "gender": "all", "locations": ["السعودية: الرياض، جدة، الدمام"], "interests": ["Online shopping", "Fashion", "Sportswear", "Physical fitness", "Shoes"],
-                 "behaviors": ["Engaged Shoppers"], "exclusions": ["الموظفين في مجال الموضة"], "placements": "ريلز إنستجرام وستوريز: الجمهور بيتفرج فيديو قصير"},
+                 "behaviors": ["Engaged Shoppers"], "exclusions": ["الموظفين في مجال الموضة"], "placements": "ريلز إنستجرام وستوريز: الجمهور يشاهد فيديو قصير"},
         "google": {"keywords": ["محل ملابس رياضية الرياض", "شراء ملابس أونلاين السعودية", "عروض ملابس"], "negative": ["مجاني", "وظائف"],
                    "competitor_terms": ["متاجر ملابس رياضية مشهورة في السعودية"], "youtube_topics": ["Fitness", "Fashion"]},
         "tiktok": {"tt_interests": ["Apparel & Accessories", "Sports & Outdoor"], "tt_hashtags": ["ملابس_رياضية", "الرياض"]},
         "hashtags": ["موضة", "ملابس_رياضية", "الرياض"],
-        "angles": [{"persona": "الشاب الرياضي", "angle": "قبل وبعد في الجيم", "text": "نفس التمرين، بس بلبس مريح فرق معاك. اطلب النهارده والتوصيل لحد عندك.", "cta": "اطلب دلوقتي"}],
-        "questions": ["فيه مقاسات كبيرة؟", "التوصيل بياخد قد إيه؟"], "objections": ["خايفين المقاس مايظبطش"],
-        "budget": "ابدأ بـ ٥٠ ريال في اليوم لكل شريحة لمدة ٥ أيام، وشيل الأضعف وحط فلوسه على الأحسن."})
+        "angles": [{"persona": "الشاب الرياضي", "angle": "قبل وبعد في الجيم", "text": "نفس التمرين، فقط بلبس مريح فرق معك. اطلب اليوم والتوصيل حتى لديك.", "cta": "اطلب الآن"}],
+        "questions": ["فيه مقاسات كبيرة؟", "التوصيل يأخذ قدر ماذا؟"], "objections": ["خايفين المقاس مايظبطش"],
+        "budget": "ابدأ بـ ٥٠ ريال في اليوم لكل شريحة لمدة ٥ أيام، وأزل الأضعف وحط فلوسه على الأحسن."})
 
 
 # ---------- داتا تجريبية (من غير مفتاح)
@@ -446,8 +446,8 @@ def _h(s: str) -> int:
     return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
 
 
-MOCK_HOOKS = ["أكتر غلطة بتعملها كل يوم ومش واخد بالك", "جربت ده ٣٠ يوم وده اللي حصل", "محدش هيقولك السر ده", "٣ حاجات لو عرفتها من بدري",
-              "رد على كومنت: هو ده بجد بيفرق؟", "قبل وبعد في أسبوع واحد", "ده اللي بيحصل لما تعمل كده", "متشتريش قبل ما تشوف ده"]
+MOCK_HOOKS = ["أكثر غلطة تعملها كل يوم ومش آخذ بالك", "جربت هذا ٣٠ يوم وده الذي حصل", "محدش سيقولك هذا السر", "٣ أشياء إذا عرفتها من بدري",
+              "رد على تعليق: هو هذا بجد يفرق؟", "قبل وبعد في أسبوع واحد", "هذا ما يحدث عندما تعمل هكذا", "متشتريش قبل ما ترى هذا"]
 
 
 def mock_posts(platform: str, handle: str, now: float | None = None) -> list[dict]:
@@ -473,7 +473,7 @@ def mock_search(brain: dict) -> list[dict]:
 
 
 def mock_digest() -> dict:
-    return {"hooks": ["«أكتر غلطة…»: بيبدأ بالغلطة اللي الجمهور بيعملها", "«جربت ٣٠ يوم»: تجربة شخصية بنتيجة"],
-            "concepts": ["قبل وبعد في وقت قصير", "رد على كومنت فيه شك"], "formats": ["قايمة ٣ حاجات بسرعة", "قبل/بعد في نفس الكادر"],
-            "angles": ["محدش بيشرح السعر بصراحة"], "avoid": ["الفيديوهات الإعلانية المباشرة من غير قصة"],
-            "summary": "تجربة: البوستات اللي بتبدأ بغلطة أو تجربة شخصية بتعدّي متوسطها بكتير."}
+    return {"hooks": ["«أكثر غلطة…»: يبدأ بالغلطة التي الجمهور يعملها", "«جربت ٣٠ يوم»: تجربة شخصية نتيجة"],
+            "concepts": ["قبل وبعد في وقت قصير", "رد على تعليق فيه شك"], "formats": ["قائمة ٣ أشياء بسرعة", "قبل/بعد في نفس الكادر"],
+            "angles": ["محدش يشرح السعر بصراحة"], "avoid": ["الفيديوهات الإعلانية المباشرة بدون قصة"],
+            "summary": "تجربة: المنشورات التي تبدأ بغلطة أو تجربة شخصية تعدّي متوسطها بكتير."}

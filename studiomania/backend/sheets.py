@@ -1,4 +1,4 @@
-"""قراءة ملفات Excel (xlsx) و CSV من غير مكتبات زيادة، ولينكات حسابات السوشيال."""
+"""قراءة ملفات Excel (xlsx) و CSV بدون مكتبات زيادة، وروابط حسابات السوشيال."""
 
 import csv
 import io
@@ -18,7 +18,7 @@ def _col_index(ref: str) -> int:
 
 
 def read_xlsx(data: bytes) -> list[list[str]]:
-    """أول شيت في الملف كصفوف من النصوص."""
+    """أول ورقة في الملف كصفوف من النصوص."""
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         shared: list[str] = []
         if "xl/sharedStrings.xml" in z.namelist():
@@ -68,7 +68,7 @@ HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 
 
 def clean_handle(value: str | None, site: str) -> str | None:
-    """اسم الحساب من أي شكل: لينك كامل أو @اسم أو اسم بس. لو مش اسم صالح بيرجّع None."""
+    """اسم الحساب من أي شكل: رابط كامل أو @اسم أو اسم فقط. إذا غير اسم صالح يعود None."""
     v = (value or "").strip()
     if not v:
         return None
@@ -83,7 +83,7 @@ def clean_handle(value: str | None, site: str) -> str | None:
 
 
 def norm_name(s: str) -> str:
-    """الاسم بشكل واحد عشان نقارن: من غير تشكيل ومسافات زيادة، والهمزات والتاء المربوطة واحد."""
+    """الاسم بشكل واحد لكي نقارن: بدون تشكيل ومسافات زيادة، والهمزات والتاء المربوطة واحد."""
     s = re.sub(r"[ً-ْـ]", "", (s or "").strip().lower())
     s = re.sub("[إأآا]", "ا", s).replace("ة", "ه").replace("ى", "ي")
     s = re.sub(r"^(الكوتش|كوتش|الكابتن|كابتن|coach|captain)\s+", "", s)

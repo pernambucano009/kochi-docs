@@ -1,7 +1,7 @@
-"""🎞️ «فريم فريم»: استوديو أنيميشن مرسوم بالكود، على مراحل والعميل متحكم في كل مرحلة قبل اللي بعدها.
+"""🎞️ «فريم فريم»: استوديو أنيميشن مرسوم بالكود، على مراحل والعميل متحكم في كل مرحلة قبل ما بعدها.
 
-المراحل: المدخلات ← دليل الستايل (من المراجع) ← الفكرة والمشاهد ← صور ثابتة للمراجعة ← الفيديو.
-الرسم والصوت والمتصفح المقفول من stylecl؛ هنا البرومبتات والقيم الافتراضية والتجهيز.
+المراحل: المدخلات ← دليل الأسلوب (من المراجع) ← الفكرة والمشاهد ← صور ثابتة للمراجعة ← الفيديو.
+الرسم والصوت والمتصفح المقفول من stylecl؛ هنا الأوصاف والقيم الافتراضية والتجهيز.
 """
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import json
 import stylecl
 
 FORMATS = {"auto": "البرنامج يختار", "single-world story": "حكاية في عالم واحد", "transformation journey": "رحلة تحوّل",
-           "showcase montage": "مونتاج عوالم", "explainer": "شرح بالرسم", "seamless loop": "لوب من غير نهاية",
-           "kinetic type": "كلام متحرك"}
-ENERGY = {"calm": "هادي", "building": "بيتصاعد", "intense": "حماسي"}
-SOUND = {"on": "موسيقى ومؤثرات", "sfx": "مؤثرات بس", "off": "من غير صوت"}
+           "showcase montage": "مونتاج عوالم", "explainer": "شرح بالرسم", "seamless loop": "لوب بدون نهاية",
+           "kinetic type": "نص متحرك"}
+ENERGY = {"calm": "هادي", "building": "يتصاعد", "intense": "حماسي"}
+SOUND = {"on": "موسيقى ومؤثرات", "sfx": "مؤثرات فقط", "off": "بدون صوت"}
 
 ENGINES = {"canvas": "أشكال وخطوط بالكود", "brush": "فُرش حقيقية (رصاص، فحم، حبر، ألوان مية)"}
 DEFAULT_INPUTS = {"idea": "", "duration": 15, "ratio": "9:16", "energy": "building", "format": "auto", "fps": 30, "engine": "canvas",
@@ -85,13 +85,13 @@ Return JSON only:
 def mock_bible(i: dict) -> dict:
     p = stylecl.mock_plan(i["idea"], i["duration"])["style"]
     return {**p, "palette": [*p["palette"], "#1b1b1b", "#efe6d2"], "palette_roles": {"#efe6d2": "ground", "#1b1b1b": "ink"},
-            "ground": "paper", "shapes": "دواير وأشكال ناعمة", "light": "مسطّح", "depth": "طبقتين", "composition": "الموضوع في النص",
-            "type": "Cairo", "sound_cues": "بوب وكليكات", "do_not_copy": ["الأشكال اللي في المرجع"]}
+            "ground": "paper", "shapes": "دوائر وأشكال ناعمة", "light": "مسطّح", "depth": "طبقتين", "composition": "الموضوع في النص",
+            "type": "Cairo", "sound_cues": "بوب وكليكات", "do_not_copy": ["الأشكال الذي في المرجع"]}
 
 
 def clean_bible(raw: dict) -> dict:
     if not isinstance(raw, dict) or not raw.get("palette"):
-        raise ValueError("دليل الستايل رجع ناقص")
+        raise ValueError("دليل الأسلوب أعد ناقص")
     pal = [str(c)[:9] for c in raw.get("palette") or [] if isinstance(c, str) and c.startswith("#")][:12]
     raw["palette"] = pal or ["#efe6d2", "#1b1b1b"]
     raw["do_not_copy"] = [str(x)[:200] for x in raw.get("do_not_copy") or []][:20]
@@ -135,16 +135,16 @@ Return JSON only:
 def mock_concept(i: dict) -> dict:
     p = stylecl.mock_plan(i["idea"], i["duration"])
     d = i["duration"]
-    beats = [{"t0": 0, "t1": 1, "what": "نقطة صغيرة بتنور في النص", "text": "", "transition": "النقطة بتكبر", "camera": "ثابتة", "sound": "pop"},
-             {"t0": 1, "t1": d * .55, "what": "دواير بتفتح طبقة ورا طبقة", "text": i["title"], "transition": "قزحية", "camera": "ثابتة", "sound": "whoosh"},
-             {"t0": d * .55, "t1": d - 1.5, "what": "الكلام بيتكتب", "text": i["idea"][:30], "transition": "فريز", "camera": "ثابتة", "sound": "click"}]
+    beats = [{"t0": 0, "t1": 1, "what": "نقطة صغيرة تنور في النص", "text": "", "transition": "النقطة تكبر", "camera": "ثابتة", "sound": "pop"},
+             {"t0": 1, "t1": d * .55, "what": "دوائر تفتح طبقة خلف طبقة", "text": i["title"], "transition": "قزحية", "camera": "ثابتة", "sound": "whoosh"},
+             {"t0": d * .55, "t1": d - 1.5, "what": "النص يُكتب", "text": i["idea"][:30], "transition": "فريز", "camera": "ثابتة", "sound": "click"}]
     return {"title": p["title"], "format": "kinetic type", "logline": i["idea"][:80], "why": "", "payoff": "النص الأخير", "device": "النقطة",
             "beats": beats, "end_card": {"text": i["closing"] or "SimsimKit", "t0": d - 1.5}, "sfx": p["sfx"], "music": p["music"]}
 
 
 def clean_concept(raw: dict, dur: int) -> dict:
     if not isinstance(raw, dict) or not raw.get("beats"):
-        raise ValueError("لازم يكون فيه مشهد واحد على الأقل")
+        raise ValueError("يجب يكون فيه مشهد واحد على الأقل")
     beats = []
     for b in raw.get("beats") or []:
         if not isinstance(b, dict):
@@ -156,7 +156,7 @@ def clean_concept(raw: dict, dur: int) -> dict:
         if t1 > t0:
             beats.append({"t0": round(t0, 2), "t1": round(t1, 2), **{k: str(b.get(k) or "")[:400] for k in ("what", "text", "transition", "camera", "sound")}})
     if not beats:
-        raise ValueError("المشاهد مالهاش توقيت صحيح")
+        raise ValueError("المشاهد ليس لها توقيت صحيح")
     raw["beats"] = sorted(beats, key=lambda b: b["t0"])[:24]
     ec = raw.get("end_card") if isinstance(raw.get("end_card"), dict) else {}
     try:
@@ -189,14 +189,14 @@ def clean_sound(raw: dict | None, dur: int) -> dict:
 # ---------------------------------------------------------------- المرحلة 4 و5: الكود والصور الثابتة
 
 def plan_for_code(d: dict) -> dict:
-    """الخطة اللي بتروح لموديل الكود والمراجعة: الفكرة + دليل الستايل + الصوت."""
+    """الخطة التي تروح لموديل الكود والمراجعة: الفكرة + دليل الأسلوب + الصوت."""
     i, c = d["inputs"], d.get("concept") or {}
     return {**{k: v for k, v in c.items() if k not in ("sfx", "music")}, "style": d.get("bible") or {}, "fps": i["fps"], "engine": i.get("engine", "canvas"),
             "energy": i["energy"], "must_include": i["include"], "must_avoid": i["avoid"], "duration": i["duration"]}
 
 
 def still_times(d: dict) -> list[float]:
-    """صورة من كل مشهد (قرب آخره، بعد ما الحركة تستقر) + كارت النهاية، لحد 8."""
+    """صورة من كل مشهد (قرب آخره، بعد ما الحركة تستقر) + بطاقة النهاية، حتى 8."""
     dur = float(d["inputs"]["duration"])
     c = d.get("concept") or {}
     ts = [round(b["t0"] + (b["t1"] - b["t0"]) * .7, 2) for b in c.get("beats") or []]
@@ -211,7 +211,7 @@ def still_times(d: dict) -> list[float]:
 
 
 def sound_plan(d: dict) -> dict:
-    """الصوت حسب اختيار العميل: كامل، مؤثرات بس، أو ساكت."""
+    """الصوت حسب اختيار العميل: كامل، مؤثرات فقط، أو ساكت."""
     s = d.get("sound") or {}
     mode = d["inputs"]["sound"]
     if mode == "off":

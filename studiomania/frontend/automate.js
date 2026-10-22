@@ -97,7 +97,7 @@ const AutoPage = (() => {
     const L = [{ f: "model", t: "النموذج", val: `${m.label}${m.ref ? " · يقبل صوت مرجع" : ""}` },
       { f: "text", t: music ? "وصف الموسيقى" : "النص", val: (o.text || "").slice(0, 40), miss: !(o.text || "").trim() }];
     if (m.mode === "std") {
-      const lang = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo", vs = M.dialects?.[lang]?.voices || [];
+      const lang = M.dialects?.[o.lang] ? o.lang : (M.brand_lang || "ar-msa"), vs = M.dialects?.[lang]?.voices || [];
       L.push({ f: "lang", t: "اللهجة / اللغة", val: M.dialects?.[lang]?.label || "" }, { f: "voice", t: "الصوت", val: M.voices?.[vs.includes(o.voice) ? o.voice : vs[0]] || "" });
     } else if ((m.voices || []).length) L.push({ f: "voice", t: "الصوت", val: (m.voices.includes(o.voice) ? o.voice : m.voices[0]) || "" });
     if (m.ref) L.push({ f: "ref", t: "صوت مرجع (اختياري)", val: o.ref?.label || "" });
@@ -526,12 +526,12 @@ const AutoPage = (() => {
         + `<p class="bm-note">${l.f === "lyrics" ? "إذا فارغة تظهر موسيقى بدون نص." : music ? "الموسيقى توضع أسفل الفيديو، وتُحفظ في «الموسيقى» في المكتبة." : "التعليق يوضع على الفيديو، ويُحفظ في «التعليقات الصوتية» في المكتبة."} يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
     }
     if (l.f === "lang" && s.verb === "genvoice") {
-      const D = Object.entries(M.dialects || {}), cur = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo";
+      const D = Object.entries(M.dialects || {}), cur = M.dialects?.[o.lang] ? o.lang : (M.brand_lang || "ar-msa");
       return head + `<p class="am-gh">عربي</p>` + pills("lang", D.filter(([, v]) => v.group === "ar").map(([k, v]) => [k, v.label]), cur) + `<p class="am-gh">لغات أخرى</p>` + pills("lang", D.filter(([, v]) => v.group !== "ar").map(([k, v]) => [k, v.label]), cur);
     }
     if (l.f === "voice" && s.verb === "genvoice") {
       const m = voModel(o);
-      if (m.mode === "std") { const lang = M.dialects?.[o.lang] ? o.lang : "ar-eg-cairo", vs = M.dialects?.[lang]?.voices || []; return head + pills("voice", vs.map((v) => [v, M.voices?.[v] || v]), vs.includes(o.voice) ? o.voice : vs[0]); }
+      if (m.mode === "std") { const lang = M.dialects?.[o.lang] ? o.lang : (M.brand_lang || "ar-msa"), vs = M.dialects?.[lang]?.voices || []; return head + pills("voice", vs.map((v) => [v, M.voices?.[v] || v]), vs.includes(o.voice) ? o.voice : vs[0]); }
       return head + pills("voice", (m.voices || []).map((v) => [v, v]), (m.voices || []).includes(o.voice) ? o.voice : (m.voices || [])[0]);
     }
     if (l.f === "model" && s.verb === "genimg") {

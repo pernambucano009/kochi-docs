@@ -1,7 +1,7 @@
-"""🎚️ AudioShake: فصل صوت الفيديو لـ ٣ تراكات (كلام / موسيقى / مؤثرات).
+"""🎚️ AudioShake: فصل صوت الفيديو لـ ٣ تراكات (نص / موسيقى / مؤثرات).
 
-POST https://api.audioshake.ai/tasks  (هيدر x-api-key) بلينك الملف والـ targets، وبعدين GET /tasks/{id} لحد ما كل
-target يخلص. لينكات النتايج بتنتهي بعد ساعة، فبنحمّلها على طول.
+POST https://api.audioshake.ai/tasks  (سيدر x-api-key) بلينك الملف والـ targets، ثم GET /tasks/{id} حتى ما كل
+target ينتهي. روابط النتائج تنتهي بعد ساعة، فنحمّلها مباشرة.
 المفتاح في متغير البيئة AUDIOSHAKE_API_KEY (على Railway).
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ STEMS = ("dialogue", "music", "effects")
 EFFECTS_NAMES = ("effects", "sfx", "sound_effects", "fx")
 MUSIC_NAMES = ("music",)
 _valid: list[str] | None = None   # الأسماء اللي AudioShake قال إنها مسموحة (من رسالة الخطأ)
-LABELS = {"dialogue": "🗣️ الكلام", "music": "🎵 الموسيقى", "effects": "🔊 المؤثرات"}
+LABELS = {"dialogue": "🗣️ النص", "music": "🎵 الموسيقى", "effects": "🔊 المؤثرات"}
 
 
 class AudioShakeError(RuntimeError):
@@ -41,15 +41,15 @@ def api_key() -> str | None:
 
 
 def missing_hint() -> str:
-    """لو المفتاح مش لاقيه: أسماء المتغيرات الشبه (من غير قيمها) عشان نعرف الغلطة فين."""
+    """إذا المفتاح غير لاقيه: أسماء المتغيرات الشبه (بدون قيمها) لكي نعرف الغلطة أين."""
     near = sorted(k for k in os.environ if "SHAKE" in k.upper() or "AUDIO" in k.upper())
-    return f" (لقيت متغيرات بأسماء: {', '.join(near)})" if near else " (السيرفر مش شايف أي متغير اسمه فيه AUDIOSHAKE: غالبًا التغيير لسه ما اتعملّوش Deploy على Railway، أو اتحط في خدمة تانية)"
+    return f" (لقيت متغيرات بأسماء: {', '.join(near)})" if near else " (الخادم لا ترى أي متغير اسمه فيه AUDIOSHAKE: غالبًا التغيير ما زال ما اتعملّوش Deploy على Railway، أو وُضع في خدمة أخرى)"
 
 
 def _headers() -> dict:
     key = api_key()
     if not key:
-        raise AudioShakeError("مفتاح AudioShake مش متسجل. حطه على Railway في المتغير AUDIOSHAKE_API_KEY")
+        raise AudioShakeError("مفتاح AudioShake غير مسجل. ضعه على Railway في المتغير AUDIOSHAKE_API_KEY")
     return {"x-api-key": key, "Content-Type": "application/json"}
 
 
@@ -63,11 +63,11 @@ def _json(resp: httpx.Response, what: str) -> dict:
     try:
         return resp.json()
     except ValueError as exc:
-        raise AudioShakeError(f"AudioShake ({what}): رد مش مفهوم {resp.text[:200]}") from exc
+        raise AudioShakeError(f"AudioShake ({what}): رد غير مفهوم {resp.text[:200]}") from exc
 
 
 def plan(valid: list[str] | None) -> dict:
-    """لكل تراك عايزينه: يا إما target بنطلبه، يا إما طرح تراكين. valid = None يعني لسه منعرفش القايمة."""
+    """لكل تراك عايزينه: يا إما target نطلبه، يا إما طرح تراكين. valid = None أي ما زال منعرفش القائمة."""
     v = set(valid or [])
     fx = next((n for n in EFFECTS_NAMES if n in v), None) if valid is not None else "effects"
     mu = next((n for n in MUSIC_NAMES if n in v), None) if valid is not None else "music"
@@ -78,7 +78,7 @@ def plan(valid: list[str] | None) -> dict:
 
 
 def plan_targets(p: dict) -> list[str]:
-    """الأسماء اللي هتتطلب: التراكات المباشرة + أي تراك خام داخل في طرح (التراكات بتاعتنا زي dialogue بتتحسب لوحدها)."""
+    """الأسماء الذي ستتطلب: التراكات المباشرة + أي تراك خام داخل في طرح (التراكات تاعتنا مثل dialogue تُحسب تلقائيًا)."""
     names = []
     for how in p.values():
         for n in ([how[1]] if how[0] == "target" else [x for x in how[1:] if x not in STEMS]):
@@ -96,7 +96,7 @@ def _parse_valid(msg: str) -> list[str] | None:
 
 
 def create_task(url: str, fmt: str = "wav") -> tuple[str, dict]:
-    """بيرجع (رقم المهمة، الخطة). لو AudioShake رفض اسم، بنقرا القايمة المسموحة من الرسالة ونعيد مرة واحدة."""
+    """يعود (رقم المهمة، الخطة). إذا AudioShake رفض اسم، نقرا القائمة المسموحة من الرسالة ونعيد مرة واحدة."""
     global _valid
     p = plan(_valid)
     try:
@@ -116,7 +116,7 @@ def _create(url: str, stems, fmt: str) -> str:
         data = _json(client.post(f"{BASE}/tasks", headers=_headers(), json=body), "إنشاء المهمة")
     tid = data.get("id") or (data.get("task") or {}).get("id")
     if not tid:
-        raise AudioShakeError(f"AudioShake: الرد مفيهوش رقم المهمة: {str(data)[:200]}")
+        raise AudioShakeError(f"AudioShake: الرد لا يحتوي رقم المهمة: {str(data)[:200]}")
     return str(tid)
 
 
@@ -141,5 +141,5 @@ def wait(tid: str, on_status=None, max_seconds: int = 1800, interval: float = 6)
         if out and all(v["status"] in ("completed", "complete", "done", "succeeded", "error", "failed") for v in out.values()):
             return out
         if time.time() - t0 > max_seconds:
-            raise AudioShakeError("AudioShake خد وقت أطول من اللازم")
+            raise AudioShakeError("AudioShake خذ وقت أطول من اللازم")
         time.sleep(interval)

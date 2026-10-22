@@ -1,5 +1,5 @@
-"""🧠 مصادر عقل البراند: قراية ملف أو لينك أو كلام مكتوب، وتحويله لاقتراحات بتستنى موافقتك.
-الاقتراحات أنواع: قيمة لخانة موجودة (الجمهور مثلًا)، قاعدة، معلومة (معرفة)، أو سؤال عن حاجة ناقصة."""
+"""🧠 مصادر عقل العلامة: قراية ملف أو رابط أو نص مكتوب، وتحويله لاقتراحات تنتظر موافقتك.
+الاقتراحات أنواع: قيمة لخانة موجودة (الجمهور مثلًا)، قاعدة، معلومة (معرفة)، أو سؤال عن شيء ناقصة."""
 from __future__ import annotations
 
 import html
@@ -24,21 +24,21 @@ SOURCE_EXT = TEXT_EXT | DOC_EXT | IMG_EXT | AUDIO_EXT | VIDEO_EXT
 MAX_TEXT = 60000
 # الخانات اللي الموديل يقدر يقترح لها قيمة (نفس خانات الخريطة)
 FIELDS = {"about": "عن البراند", "audience": "الجمهور", "market": "السوق", "language": "اللغة واللهجة", "domain": "المجال",
-          "typography": "الخطوط", "palette": "الألوان", "cta": "الدعوة (CTA)", "link": "اللينك", "caption": "الكابشن الافتراضي"}
+          "typography": "الخطوط", "palette": "الألوان", "cta": "الدعوة (CTA)", "link": "الرابط", "caption": "التعليق النصي الافتراضي"}
 # كل خانة بتاخد إيه بالظبط (عشان الموديل ميحطش المجال في خانة السوق مثلًا)
 FIELD_SCOPE = {
-    "about": "جملتين: البراند بيقدم إيه وإيه اللي بيميزه",
-    "audience": "مين العميل: السن والاهتمامات واللي بيدوّر عليه",
-    "market": "المكان الجغرافي بس (دولة / مدينة / منطقة). من غير المجال أو الخدمة",
+    "about": "جملتين: العلامة يقدم ماذا وماذا الذي يميزه",
+    "audience": "من العميل: السن والاهتمامات واللي يبحث عليه",
+    "market": "المكان الجغرافي فقط (دولة / مدينة / منطقة). بدون المجال أو الخدمة",
     "language": "لغة أو لهجة الكلام مع الجمهور بس",
-    "domain": "المجال أو نوع النشاط بس، في كلمات قليلة",
-    "typography": "أسماء الخطوط بس", "palette": "الألوان بأكوادها (#RRGGBB) بس",
-    "cta": "جملة الدعوة للفعل بس", "link": "لينك أو رقم تواصل بس", "caption": "كابشن افتراضي قصير",
+    "domain": "المجال أو نوع النشاط فقط، في كلمات قليلة",
+    "typography": "أسماء الخطوط فقط", "palette": "الألوان بأكوادها (#RRGGBB) فقط",
+    "cta": "جملة الدعوة للفعل فقط", "link": "رابط أو رقم تواصل فقط", "caption": "تعليق نصي افتراضي قصير",
 }
 FIELD_RULES = (
     "كل خانة تاخد اللي في وصفها بس، وممنوع تخلط خانة في خانة (مثلًا المجال ميتحطش في السوق). "
-    "اقترح قيمة لخانة بس لو هي معلومة جديدة أو بتصحّح غلط في اللي موجود؛ لو اللي في العقل صح بنفس المعنى (حتى لو بكلام تاني) متقترحش. "
-    "ولكل اقتراح خانة اكتب ليه في why بجملة قصيرة. الشكل: \"fields\": {\"market\": {\"value\": \"…\", \"why\": \"…\"}}.\n"
+    "اقترح قيمة لخانة فقط إذا هي معلومة جديدة أو تصحّح خطأ في ما موجود؛ إذا ما في العقل صحيح بنفس المعنى (حتى إذا بكلام آخر) متقترحش. "
+    "ولكل اقتراح خانة اكتب له في why بجملة قصيرة. الشكل: \"fields\": {\"market\": {\"value\": \"…\", \"why\": \"…\"}}.\n"
 )
 
 
@@ -47,12 +47,12 @@ def fields_desc() -> str:
 
 
 SECTIONS = {"identity": "الهوية", "voice": "النبرة", "products": "المنتجات", "offers": "العروض", "audience": "الجمهور",
-            "seasonal": "المواسم", "claims": "الادعاءات المسموحة", "campaigns": "حملات ودروس", "visual": "الشكل", "other": "تانية"}
+            "seasonal": "المواسم", "claims": "الادعاءات المسموحة", "campaigns": "حملات ودروس", "visual": "الشكل", "other": "أخرى"}
 
 
 # ---------- القراية ----------
 def read_pdf(path: Path, img_dir: Path) -> tuple[str, list[Path]]:
-    """نص كل صفحة، وصورة للصفحات اللي معظمها تصميم (الـ brand books غالبًا كده)."""
+    """نص كل صفحة، وصورة للصفحات التي معظمها تصميم (الـ brand books غالبًا هكذا)."""
     import pymupdf  # noqa: PLC0415
     doc = pymupdf.open(path)
     texts, imgs = [], []
@@ -111,25 +111,25 @@ def html_text(raw: str) -> tuple[str, list[str], dict]:
 
 
 def safe_url(url: str) -> str:
-    """http/https بس، ومش عنوان داخلي (عشان محدش يخلي السيرفر يفتح حاجات جوّه الشبكة)."""
+    """http/https فقط، ومش عنوان داخلي (لكي محدش يخلي الخادم يفتح أشياء داخل الشبكة)."""
     url = url.strip()
     if not re.match(r"^https?://", url, re.I):
         url = "https://" + url
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
-        raise ValueError("اللينك ده مش مظبوط")
+        raise ValueError("هذا الرابط غير مظبوط")
     try:
         for info in socket.getaddrinfo(u.hostname, None):
             ip = ipaddress.ip_address(info[4][0])
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                raise ValueError("اللينك ده لعنوان داخلي")
+                raise ValueError("هذا الرابط لعنوان داخلي")
     except socket.gaierror:
         pass   # من غير DNS مباشر (ورا proxy): الطلب نفسه هيتأكد إن الموقع موجود
     return url
 
 
 def read_site(url: str, pages: int = 6) -> str:
-    """الصفحة الرئيسية + كام صفحة داخلية من نفس الموقع (عن البراند، المنتجات…)."""
+    """الصفحة الرئيسية + كم صفحة داخلية من نفس الموقع (عن العلامة، المنتجات…)."""
     url = safe_url(url)
     host = urlparse(url).hostname
     seen, queue, parts = set(), [url], []
@@ -156,40 +156,40 @@ def read_site(url: str, pages: int = 6) -> str:
                 if urlparse(nu).hostname == host and nu not in seen and nu not in queue and not re.search(r"\.(jpg|png|pdf|zip|mp4|webp|svg)$", nu, re.I):
                     queue.append(nu)
     if not parts:
-        raise ValueError("مقدرتش أقرا حاجة من الموقع ده")
+        raise ValueError("تعذّرت قراءة شيء من هذا الموقع")
     return "\n\n".join(parts)
 
 
 # ---------- الموديل ----------
 FORMAT = """{
-  "fields": {"<خانة>": {"value": "...", "why": "ليه الاقتراح ده"}},
-  "rules": ["قاعدة صريحة لازم تتراعى", "..."],
+  "fields": {"<خانة>": {"value": "...", "why": "له هذا الاقتراح"}},
+  "rules": ["قاعدة صريحة يجب تتراعى", "..."],
   "notes": [{"section": "voice|products|offers|audience|seasonal|claims|campaigns|identity|visual|other", "title": "عنوان قصير", "summary": "سطر واحد يقول هذه الصفحة فيها ماذا", "body": "التفاصيل"}],
-  "questions": ["سؤال عن حاجة مهمة ناقصة ومش موجودة في المصدر"]
+  "questions": ["سؤال عن شيء مهمة ناقصة ومش موجودة في المصدر"]
 }"""
 
 
 def extract_prompt(brain_txt: str, name: str, note: str, text: str, n_images: int) -> str:
     return (
-        "انت بتبني «عقل» لبراند: ذاكرة منظمة بتتقري تلقائي في كل سكريبت وصورة وفيديو بيتعمل للبراند.\n"
+        "أنت تبني «عقل» لبراند: ذاكرة منظمة تتقري تلقائي في كل نص وصورة وفيديو يُنشأ للعلامة.\n"
         f"المصدر: «{name}»" + (f" — المستخدم قال عنه: {note}" if note else "") + "\n"
         + (f"وفيه {n_images} صورة (صفحات أو صور) مع الرسالة.\n" if n_images else "")
-        + "\nاللي في العقل دلوقتي:\n" + (brain_txt or "(لسه فاضي)") + "\n\n"
-        "المطلوب: اقرا المصدر وطلّع منه اللي يفيد العقل بس:\n"
-        "1) fields: قيمة لخانة من الخانات دي لو المصدر بيقولها بوضوح: " + fields_desc() + ". متكتبش خانة مش موجودة في المصدر. " + FIELD_RULES +
+        + "\nما في العقل الآن:\n" + (brain_txt or "(ما زال فارغ)") + "\n\n"
+        "المطلوب: اقرا المصدر وطلّع منه الذي يفيد العقل فقط:\n"
+        "1) fields: قيمة لخانة من هذه الخانات إذا المصدر يقولها بوضوح: " + fields_desc() + ". لم يُكتب خانة غير موجودة في المصدر. " + FIELD_RULES +
         "2) rules: القواعد الصارمة (ممنوعات، لازم، ادعاءات ممنوعة، disclaimers) بنصها الحرفي لو مكتوبة. كل قاعدة سطر واحد قابل للتنفيذ.\n"
-        "3) notes: أي معرفة تانية مهمة (منتجات وأسعار، عروض، أمثلة حقيقية لكلام البراند بين علامات تنصيص، مواسم، حملات ناجحة وليه نجحت…). "
-        "كل note موضوع واحد بس، وsummary سطر واحد.\n"
+        "3) notes: أي معرفة أخرى مهمة (منتجات وأسعار، عروض، أمثلة حقيقية لكلام العلامة بين علامات تنصيص، مواسم، حملات ناجحة وليه نجحت…). "
+        "كل note موضوع واحد فقط، وsummary سطر واحد.\n"
         "4) questions: لو حاجة أساسية ناقصة (الجمهور، النبرة، الممنوعات…) اسأل عنها سؤال قصير. 3 أسئلة بالكتير. "
-        "ماتسألش عن المواسم أو المناسبات أو الأعياد: البرنامج بيجيبها لوحده من السوق والجمهور.\n"
+        "ماتسألش عن المواسم أو المناسبات أو الأعياد: البرنامج يجيبها تلقائيًا من السوق والجمهور.\n"
         "قواعد مهمة: ممنوع تخترع أي معلومة مش موجودة في المصدر. اكتب بالعربي (المصطلحات والأسماء زي ما هي). "
-        "متكررش حاجة موجودة في العقل بالفعل. لو المصدر مفيهوش حاجة مفيدة رجّع قوايم فاضية.\n"
-        f"رجّع JSON بس بالشكل ده:\n{FORMAT}\n\n---\nالمصدر:\n{text[:MAX_TEXT]}"
+        "متكررش شيء موجودة في العقل بالفعل. إذا المصدر لا يحتوي شيء مفيدة استعد قوائم فارغة.\n"
+        f"استعد JSON فقط هذا بالشكل:\n{FORMAT}\n\n---\nالمصدر:\n{text[:MAX_TEXT]}"
     )
 
 
 def to_pending(out: dict, brain: dict, sid: str) -> list[dict]:
-    """رد الموديل ← اقتراحات (من غير تكرار للي موجود)."""
+    """رد النموذج ← اقتراحات (بدون تكرار للي موجود)."""
     items = []
     rules_now = {r.strip() for r in str(brain.get("rules") or "").split("\n") if r.strip()}
     for k, v in (out.get("fields") or {}).items():
@@ -217,18 +217,18 @@ def to_pending(out: dict, brain: dict, sid: str) -> list[dict]:
 
 
 def mock_out(name: str) -> dict:
-    return {"fields": {"audience": f"جمهور تجريبي من «{name}»"}, "rules": ["من غير وعود مبالغ فيها"],
+    return {"fields": {"audience": f"جمهور تجريبي من «{name}»"}, "rules": ["بدون وعود مبالغ فيها"],
             "notes": [{"section": "products", "title": "الباقة الشهرية", "summary": "اشتراك شهري بمدرب", "body": "تفاصيل تجريبية"}],
-            "questions": ["مين الجمهور الأساسي بالظبط؟"]}
+            "questions": ["من الجمهور الأساسي بالضبط؟"]}
 
 
 # ---------- الاختيار وقت التوليد ----------
 _AR = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي", "ـ": ""})
-_STOP = {"في", "من", "علي", "على", "عن", "الي", "إلى", "مع", "دي", "ده", "اللي", "the", "and", "for", "with", "that", "this", "هو", "هي", "كل", "لو", "او", "أو", "بس"}
+_STOP = {"في", "من", "علي", "على", "عن", "الي", "إلى", "مع", "هذه", "هذا", "ما", "the", "and", "for", "with", "that", "this", "هو", "هي", "كل", "إذا", "او", "أو", "فقط"}
 
 
 def tokens(text: str) -> set[str]:
-    """كلمات للمقارنة: من غير تشكيل، والألف والياء والتاء المربوطة موحّدين، ومن غير «ال» في الأول."""
+    """كلمات للمقارنة: بدون تشكيل، والألف والياء والتاء المربوطة موحّدين، ومن غير «ال» في أولًا."""
     t = re.sub(r"[\u064B-\u0652\u0670]", "", str(text or "").lower()).translate(_AR)
     out = set()
     for w in re.findall(r"[\w]+", t):
@@ -243,7 +243,7 @@ CORE = {"voice", "claims"}   # النبرة والادعاءات المسموح�
 
 
 def pick_notes(notes: list[dict], query: str = "", k: int = 8) -> list[dict]:
-    """من المعرفة كلها: الأساسيات دايمًا، وبعدين الأقرب للطلب (بالكلام المشترك)، ولو مفيش طلب الأحدث."""
+    """من المعرفة كلها: الأساسيات دائمًا، ثم الأقرب للطلب (بالكلام المشترك)، وإذا لا يوجد طلب الأحدث."""
     core = [n for n in notes if n.get("section") in CORE][:6]
     rest = [n for n in notes if n not in core]
     q = tokens(query)
@@ -261,7 +261,7 @@ def pick_notes(notes: list[dict], query: str = "", k: int = 8) -> list[dict]:
 
 
 def notes_text(brain: dict, query: str = "") -> str:
-    """المعرفة اللي اتوافق عليها: الأنسب للطلب بس (مش كلها)، بحد أقصى للطول."""
+    """المعرفة التي اعتُمد عليها: الأنسب للطلب فقط (غير كلها)، بحد أقصى للطول."""
     notes = brain.get("notes") or []
     if not notes:
         return ""
@@ -273,12 +273,12 @@ def notes_text(brain: dict, query: str = "") -> str:
             break
         lines.append(line)
         size += len(line)
-    return "معرفة عن البراند (اتوافق عليها، الأنسب للطلب ده):\n" + "\n".join(lines)
+    return "معرفة عن العلامة (اعتُمد عليها، الأنسب هذا للطلب):\n" + "\n".join(lines)
 
 
 # ---------- التعلّم من التقييم ----------
 def similar(a: str, b: str) -> bool:
-    """ملاحظتين بيقولوا نفس الحاجة تقريبًا (كلمات مشتركة كفاية)."""
+    """ملاحظتين يقولون نفس الشيء تقريبًا (كلمات مشتركة كفاية)."""
     ta, tb = tokens(a), tokens(b)
     if not ta or not tb:
         return False
@@ -287,8 +287,8 @@ def similar(a: str, b: str) -> bool:
 
 
 def learn(d: dict, fb: dict, repeat: int = 3) -> list[dict]:
-    """تقييم جديد ← اقتراحات (بتستنى موافقتك زي أي اقتراح):
-    ممتاز ← مثال حقيقي يتضاف للمعرفة (النبرة) · ملاحظة اتكررت 3 مرات ← قاعدة مقترحة."""
+    """تقييم جديد ← اقتراحات (تنتظر موافقتك مثل أي اقتراح):
+    ممتاز ← مثال حقيقي يُضاف للمعرفة (النبرة) · ملاحظة اتكررت 3 مرات ← قاعدة مقترحة."""
     out = []
     if fb["rating"] == "great" and (fb.get("text") or fb.get("note")):
         out.append({"kind": "note", "section": "voice", "title": f"مثال ممتاز: {fb.get('what') or 'نتيجة'}"[:120],
@@ -298,7 +298,7 @@ def learn(d: dict, fb: dict, repeat: int = 3) -> list[dict]:
         same = [x for x in d.get("feedback") or [] if x.get("rating") == "bad" and x.get("note") and similar(x["note"], fb["note"])]
         already = any(p.get("kind") == "rule" and p.get("source") == "feedback" and similar(p.get("value", ""), fb["note"]) for p in d.get("pending") or [])
         if len(same) + 1 >= repeat and not already:   # + التقييم الجديد نفسه
-            out.append({"kind": "rule", "value": f"تجنّب: {fb['note']}"[:600], "why": f"الملاحظة دي اتكررت {len(same) + 1} مرات في تقييماتك"})
+            out.append({"kind": "rule", "value": f"تجنّب: {fb['note']}"[:600], "why": f"هذه الملاحظة اتكررت {len(same) + 1} مرات في تقييماتك"})
     for it in out:
         it.update(id=uuid.uuid4().hex[:10], source="feedback")
     return out

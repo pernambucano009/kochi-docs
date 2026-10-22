@@ -1,12 +1,12 @@
 """الخطوة 7: النشر على السوشيال ميديا عن طريق Zernio (اسمها القديم Late).
 
-أول ما تجدول بوست، البرنامج بيرفع الفيديو لـ Zernio ويسلّمها البوست بميعاده،
-وZernio هي اللي بتنشر في الميعاد، فالجهاز مش لازم يكون مفتوح وقتها.
+أول ما تجدول منشور، البرنامج يرفع الفيديو لـ Zernio ويسلّمها المنشور بميعاده،
+وZernio هي ما تنشر في الموعد، فالجهاز ليس ضروريًا يكون مفتوح وقتها.
 الطريقة مأخوذة من المستودع الرسمي getlate-dev/late-api.
 
 - ZERNIO_API_KEY في .env: النشر الحقيقي.
-- PUBLISH_MOCK=1: البرنامج بيعتبر البوست اتنشر في ميعاده (للتجربة).
-- ولا ده ولا ده: البوستات بتتجدول جوه البرنامج، وتتبعت لـ Zernio أول ما المفتاح يتضاف.
+- PUBLISH_MOCK=1: البرنامج يعتبر المنشور نُشر في موعده (للتجربة).
+- ولا هذا ولا هذا: المنشورات تتجدول داخل البرنامج، وتُرسل لـ Zernio أول ما المفتاح يُضاف.
 """
 
 import mimetypes
@@ -41,7 +41,7 @@ PLATFORMS = {
 # كل الربط بيحصل من جوه البرنامج: تسجيل الدخول على المنصة نفسها، وبعدها اختيار الصفحة/البورد/المكان عندنا (headless).
 # دول بيتربطوا من غير تسجيل دخول: بلوسكاي (باسورد تطبيق)، تيليجرام (كود للبوت)، واتساب بيزنس (بيانات Meta)
 CREDENTIALS = {"bluesky", "telegram", "whatsapp"}
-SOON = {"snapchat": "سناب شات لسه في تجربة مقفولة عند المنصة، هيتفتح قريب"}
+SOON = {"snapchat": "سناب شات ما زال في تجربة مغلقة عند المنصة، سيُفتح قريب"}
 NOT_FOR_POSTS = {"whatsapp"}   # واتساب للرسايل والرد على العملاء (الإنبوكس والبرودكاست)، مش لنشر الفيديوهات
 # اختيار بعد تسجيل الدخول: الخطوة ← (المنصة، مسار القايمة، مسار الاختيار، اسم القايمة في الرد)
 SELECT_STEPS = {
@@ -54,7 +54,7 @@ SELECT_STEPS = {
 
 
 def split_target(t: str) -> tuple[str, str | None]:
-    """«tiktok» = أول حساب تيك توك مربوط · «tiktok@<id>» = حساب معيّن (لو عندك أكتر من حساب على نفس المنصة)."""
+    """«tiktok» = أول حساب تيك توك مربوط · «tiktok@<id>» = حساب معيّن (إذا لديك أكثر من حساب على نفس المنصة)."""
     p, _, acc = str(t).partition("@")
     return p, (acc or None)
 
@@ -133,7 +133,7 @@ def _pid(x) -> str | None:
 
 
 def mine(account_id: str | None) -> bool:
-    """الحساب ده بتاع العميل ده؟ (لو مفيش بروفايلات، كل الحسابات بتاعتك)."""
+    """هذا الحساب الخاص بـ هذا العميل؟ (إذا لا يوجد بروفايلات، كل الحسابات الخاصة بك)."""
     if not scoped():
         return True
     return bool(account_id) and any(a["id"] == account_id for a in account_list())
@@ -141,7 +141,7 @@ def mine(account_id: str | None) -> bool:
 
 def require_mine(account_id: str | None) -> None:
     if not mine(account_id):
-        raise PublishError("الحساب ده مش مربوط عندك")
+        raise PublishError("هذا الحساب غير مربوط لديك")
 
 
 # ---------------------------------------------------------------- الحسابات المربوطة
@@ -150,7 +150,7 @@ _accounts_cache: tuple[float, list] | None = None
 
 
 def account_list(refresh: bool = False) -> list[dict]:
-    """كل الحسابات المربوطة في Zernio (ممكن أكتر من حساب على نفس المنصة)."""
+    """كل الحسابات المربوطة في Zernio (يمكن أكثر من حساب على نفس المنصة)."""
     global _accounts_cache
     if not refresh and _accounts_cache and time.monotonic() - _accounts_cache[0] < 300:
         return _accounts_cache[1]
@@ -183,7 +183,7 @@ def account_list(refresh: bool = False) -> list[dict]:
 
 
 def accounts(refresh: bool = False) -> dict:
-    """أول حساب مربوط لكل منصة: {منصة عندنا: {"id", "name"}} (للكود القديم والنشر من غير اختيار حساب)."""
+    """أول حساب مربوط لكل منصة: {منصة لدينا: {"id", "name"}} (للكود القديم والنشر بدون اختيار حساب)."""
     found: dict = {}
     for a in account_list(refresh):
         found.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
@@ -191,7 +191,7 @@ def accounts(refresh: bool = False) -> dict:
 
 
 def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
-    """كل هدف ← (منصة، رقم الحساب). لو الحساب المختار اتفصل أو المنصة مش مربوطة بيقول بالظبط إيه الناقص."""
+    """كل هدف ← (منصة، رقم الحساب). إذا الحساب المختار اتفصل أو المنصة غير مربوطة يقول بالضبط ماذا الناقص."""
     lst = account_list(refresh=True)
     ids = {a["id"]: a for a in lst}
     out, missing = [], []
@@ -201,7 +201,7 @@ def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
             if acc in ids and ids[acc]["platform"] == p:
                 out.append((p, acc))
             else:
-                missing.append(f"{PLATFORMS.get(p, (p, p))[1]} (الحساب اللي اخترته اتفصل)")
+                missing.append(f"{PLATFORMS.get(p, (p, p))[1]} (الحساب الذي اخترته اتفصل)")
         else:
             first = next((a for a in lst if a["platform"] == p), None)
             if first:
@@ -209,14 +209,14 @@ def resolve_targets(targets: list[str]) -> list[tuple[str, str]]:
             else:
                 missing.append(PLATFORMS.get(p, (p, p))[1])
     if missing:
-        raise PublishError(f"الحسابات دي مش مربوطة: {'، '.join(missing)}. اربطها من صفحة النشر")
+        raise PublishError(f"هذه الحسابات غير مربوطة: {'، '.join(missing)}. اربطها من صفحة النشر")
     return list(dict.fromkeys(out))
 
 
 # ---------------------------------------------------------------- ربط وفصل الحسابات من جوه البرنامج
 
 def default_profile() -> str:
-    """البروفايل (فولدر الحسابات) عند Zernio: بتاع العميل لو فيه بوابة، وإلا الأول، ولو مفيش بنعمل واحد."""
+    """البروفايل (مجلد الحسابات) عند Zernio: الخاص بالعميل إذا فيه بوابة، وإلا أولًا، وإذا لا يوجد نعمل واحد."""
     if (prof := tenant_profile()):
         return prof
     with _client(30) as c:
@@ -230,10 +230,10 @@ def default_profile() -> str:
 
 
 def connect_url(platform: str, redirect_url: str) -> str:
-    """لينك تسجيل الدخول على المنصة نفسها. بعد الموافقة بيرجع للبرنامج على طول (headless)،
-    ولو المنصة محتاجة تختار صفحة أو بورد أو مكان، الاختيار بيحصل عندنا (pending_options / pending_select)."""
+    """رابط تسجيل الدخول على المنصة نفسها. بعد الموافقة يعود للبرنامج مباشرة (headless)،
+    وإذا المنصة تحتاج تختار صفحة أو بورد أو مكان، الاختيار يحدث لدينا (pending_options / pending_select)."""
     if platform not in PLATFORMS or platform in CREDENTIALS:
-        raise PublishError("منصة مش معروفة")
+        raise PublishError("منصة غير معروفة")
     if platform in SOON:
         raise PublishError(SOON[platform])
     with _client(30) as c:
@@ -268,7 +268,7 @@ def _pick(data, key: str) -> list:
 
 
 def _profile_json(raw: str | None):
-    """userProfile بييجي متشفّر مرتين في اللينك: بنفكّه مرة كمان ونقراه JSON."""
+    """userProfile يأتي متشفّر مرتين في الرابط: نفكّه مرة أيضًا ونقراه JSON."""
     from urllib.parse import unquote
     if not raw:
         return None
@@ -287,11 +287,11 @@ def _profile_json(raw: str | None):
 
 
 def pending_options(params: dict) -> dict:
-    """رجع من تسجيل الدخول ومحتاج يختار: بنجيب الصفحات/المنظمات/الأماكن/البوردات ونحفظ بيانات الربط عندنا (مش في المتصفح)."""
+    """أعد من تسجيل الدخول ويحتاج يختار: نجلب الصفحات/المنظمات/الأماكن/البوردات ونحفظ بيانات الربط لدينا (غير في المتصفح)."""
     plat = str(params.get("platform") or "")
     mine_plat = next((k for k, v in PLATFORMS.items() if v[0] == plat), plat)
     if plat not in SELECT_STEPS:
-        raise PublishError("مفيش اختيار مطلوب للمنصة دي")
+        raise PublishError("لا يوجد اختيار مطلوب هذه للمنصة")
     list_path, _, key = SELECT_STEPS[plat]
     profile = params.get("profileId") or default_profile()
     temp, ctoken, pend = params.get("tempToken"), params.get("connect_token"), params.get("pendingDataToken")
@@ -308,7 +308,7 @@ def pending_options(params: dict) -> dict:
             ids = ",".join(str(o.get("id")) for o in orgs if isinstance(o, dict) and o.get("id")) if isinstance(orgs, list) else None
         q = {"tempToken": temp, **({"orgIds": ids} if ids else {})}
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/connect/{plat}/{list_path}", params=q, headers=headers), "قايمة الاختيار")
+        data = _check(c.get(f"{BASE_URL}/connect/{plat}/{list_path}", params=q, headers=headers), "قائمة الاختيار")
     items = _pick(data, key)
     opts = []
     for x in items:
@@ -335,13 +335,13 @@ def pending_options(params: dict) -> dict:
 
 
 def pending_select(sid: str, choice: str, redirect_url: str) -> None:
-    """العميل اختار من القايمة اللي عندنا: بنكمّل الربط."""
+    """العميل اختر من القائمة التي لدينا: نكمّل الربط."""
     p = _PENDING.pop(sid, None)
     if not p or time.time() - p["at"] > 900:
-        raise PublishError("الربط خد وقت طويل وخلص. ابدأه تاني")
+        raise PublishError("الربط خذ وقت طويل وخلص. ابدأه مرة أخرى")
     plat, o = p["platform"], p["opts"].get(choice)
     if not o and not (plat == "linkedin" and choice == "personal"):
-        raise PublishError("الاختيار ده مش في القايمة")
+        raise PublishError("هذا الاختيار غير في القائمة")
     base = {"profileId": p["profile"], "redirect_url": redirect_url}
     if plat == "facebook":
         body = {**base, "pageId": choice, "tempToken": p["temp"], "userProfile": p["user"]}
@@ -370,7 +370,7 @@ def connect_bluesky(identifier: str, app_password: str) -> None:
         users = _check(c.get(f"{BASE_URL}/users"), "قراءة الحساب")
         uid = (users or {}).get("currentUserId") if isinstance(users, dict) else None
         if not uid:
-            raise PublishError("مقدرتش أعرف رقم الحساب عند خدمة النشر")
+            raise PublishError("تعذّر ذلك أعرف رقم الحساب عند خدمة النشر")
         _check(c.post(f"{BASE_URL}/connect/bluesky/credentials", json={"identifier": identifier.strip(), "appPassword": app_password.strip(),
                                                                        "state": f"{uid}-{profile}"}), "ربط بلوسكاي")
     _drop_cache()
@@ -414,7 +414,7 @@ def disconnect(account_id: str) -> None:
 
 
 def presign_urls(data) -> tuple[str | None, str | None]:
-    """لينك الرفع ولينك الفيديو بعد الرفع. Zernio بيسمّي التاني publicUrl (وقبل كده fileUrl)."""
+    """رابط الرفع ورابط الفيديو بعد الرفع. Zernio يسمّي الآخر publicUrl (ومن قبل fileUrl)."""
     if isinstance(data, dict) and isinstance(data.get("data"), dict):
         data = data["data"]
     if not isinstance(data, dict):
@@ -438,7 +438,7 @@ def upload_video(path: Path) -> str:
 
 
 def upload_file(path: Path) -> str:
-    """بيرفع ملف (فيديو أو صورة) لـ Zernio ويرجّع اللينك بتاعه."""
+    """يرفع ملف (فيديو أو صورة) لـ Zernio ويعود الرابط الخاص به."""
     content_type = mimetypes.guess_type(path.name)[0] or "video/mp4"
     with _client() as c:
         data = _check(
@@ -459,7 +459,7 @@ def schedule(
     video: Path, caption: str, platforms: list[str], when_utc: str, title: str, ai_made: bool, publish_now: bool,
     options: dict | None = None,
 ) -> str:
-    """يرفع الفيديو ويسلّم البوست لـ Zernio، ويرجّع رقم البوست عندهم."""
+    """يرفع الفيديو ويسلّم المنشور لـ Zernio، ويعود رقم المنشور لديهم."""
     targets = resolve_targets(platforms)
     opts = options or {}
     url = upload_video(video)
@@ -511,21 +511,21 @@ def schedule(
     else:
         body["scheduledFor"] = when_utc
     with _client() as c:
-        data = _check(c.post(f"{BASE_URL}/posts", json=body), "تسليم البوست")
+        data = _check(c.post(f"{BASE_URL}/posts", json=body), "تسليم المنشور")
     post = data.get("post", data) if isinstance(data, dict) else {}
     remote_id = post.get("_id") or post.get("id")
     if not remote_id:
-        raise PublishError(f"تسليم البوست: الرد مفيهوش رقم البوست: {str(data)[:200]}")
+        raise PublishError(f"تسليم المنشور: الرد لا يحتوي رقم المنشور: {str(data)[:200]}")
     return remote_id
 
 
 def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_now: bool, options: dict | None = None,
                       targets: list[str] | None = None) -> str:
-    """كاروسيل صور على إنستجرام (لحد 10 صور). إنستجرام مش بيقبل موسيقى على الكاروسيل من الـ API."""
+    """كاروسيل صور على إنستجرام (حتى 10 صور). إنستجرام لا يقبل موسيقى على الكاروسيل من الـ API."""
     ig = [t for t in (targets or []) if split_target(t)[0] == "instagram"] or ["instagram"]
     ig_targets = resolve_targets(ig)
     if not 2 <= len(images) <= 10:
-        raise PublishError("الكاروسيل لازم يكون من 2 لـ 10 صور")
+        raise PublishError("الكاروسيل يجب يكون من 2 لـ 10 صور")
     opts = options or {}
     urls = [upload_file(p) for p in images]
     data = {}
@@ -552,7 +552,7 @@ def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_n
     post = data.get("post", data) if isinstance(data, dict) else {}
     remote_id = post.get("_id") or post.get("id")
     if not remote_id:
-        raise PublishError(f"تسليم الكاروسيل: الرد مفيهوش رقم البوست: {str(data)[:200]}")
+        raise PublishError(f"تسليم الكاروسيل: الرد لا يحتوي رقم المنشور: {str(data)[:200]}")
     return remote_id
 
 
@@ -560,18 +560,18 @@ def cancel(remote_id: str) -> None:
     with _client(30) as c:
         resp = c.delete(f"{BASE_URL}/posts/{remote_id}")
     if resp.status_code != 404:
-        _check(resp, "إلغاء البوست")
+        _check(resp, "إلغاء المنشور")
 
 
 def list_posts(status: str, limit: int = 100) -> list[dict]:
-    """بوستات Zernio بحالة معيّنة، بشكل موحّد:
+    """منشورات Zernio بحالة معيّنة، بشكل موحّد:
     [{"id", "status", "content", "scheduled_for", "published_at", "media_url",
-      "platforms": [{"key" (عندنا), "status", "url", "error", "published_at"}]}]"""
+      "platforms": [{"key" (لدينا), "status", "url", "error", "published_at"}]}]"""
     params = {"status": status, "limit": limit}
     if (prof := tenant_profile()):
         params["profileId"] = prof
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/posts", params=params), "قراءة البوستات ")
+        data = _check(c.get(f"{BASE_URL}/posts", params=params), "قراءة المنشورات ")
     items = data.get("posts", data.get("data", [])) if isinstance(data, dict) else data
     if scoped():   # بس البوستات اللي على حسابات العميل ده
         ids = {a["id"] for a in account_list()}
@@ -611,7 +611,7 @@ def list_posts(status: str, limit: int = 100) -> list[dict]:
 
 
 def list_scheduled() -> list[dict]:
-    """البوستات المتجدولة عند Zernio (الشكل القديم اللي بتستخدمه مقارنة القايمة)."""
+    """المنشورات المتجدولة عند Zernio (الشكل القديم الذي تستخدمه مقارنة القائمة)."""
     return [
         {"id": p["id"], "content": p["content"], "scheduled_for": p["scheduled_for"],
          "platforms": list(dict.fromkeys(x["key"] for x in p["platforms"])), "media_url": p["media_url"]}
@@ -625,9 +625,9 @@ def retry(remote_id: str) -> None:
 
 
 def remote_status(remote_id: str) -> tuple[str, str | None]:
-    """يرجّع (published | failed | pending, رسالة الخطأ لو فيه)."""
+    """يعود (published | failed | pending, رسالة الخطأ إذا فيه)."""
     with _client(30) as c:
-        data = _check(c.get(f"{BASE_URL}/posts/{remote_id}"), "متابعة البوست")
+        data = _check(c.get(f"{BASE_URL}/posts/{remote_id}"), "متابعة المنشور")
     post = data.get("post", data) if isinstance(data, dict) else {}
     status = str(post.get("status", "")).lower()
     errors = []
@@ -646,7 +646,7 @@ def remote_status(remote_id: str) -> tuple[str, str | None]:
 # محتاج إضافة «Inbox» في اشتراك Zernio. الرسايل (DM): إنستجرام، فيسبوك، X وغيرهم، مش تيك توك.
 # قايمة البوستات اللي عليها كومنتات Zernio بيحدّثها كل 10 دقايق بالكتير.
 
-INBOX_ADDON_MSG = "صندوق الردود لسه مش متفعّل في الاشتراك. كلّم الدعم يفعّله"
+INBOX_ADDON_MSG = "صندوق الردود ما زال غير متفعّل في الاشتراك. كلّم الدعم يفعّله"
 
 
 def _inbox_check(resp: httpx.Response, what: str):
@@ -656,7 +656,7 @@ def _inbox_check(resp: httpx.Response, what: str):
 
 
 def _failed(meta: dict | None) -> list[str]:
-    """الحسابات اللي Zernio مقدرش يقرا منها (حد أقصى للطلبات أو الربط باظ)."""
+    """الحسابات التي Zernio لم يستطع يقرأ منها (حد أقصى للطلبات أو الربط باظ)."""
     out = []
     for f in (meta or {}).get("failedAccounts") or []:
         out.append(f"{f.get('platform') or ''} {('@' + f['accountUsername']) if f.get('accountUsername') else ''}: {f.get('error') or ''}".strip())
@@ -664,12 +664,12 @@ def _failed(meta: dict | None) -> list[str]:
 
 
 def inbox_posts(limit: int = 50, cursor: str | None = None) -> dict:
-    """البوستات اللي عليها كومنتات (من كل الحسابات)، الأحدث الأول."""
+    """المنشورات التي عليها تعليقات (من كل الحسابات)، الأحدث أولًا."""
     params = {"limit": limit, "minComments": 1, "sortBy": "date", "sortOrder": "desc"}
     if cursor:
         params["cursor"] = cursor
     with _client() as c:
-        data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments", params=params), "قراءة البوستات اللي عليها كومنتات")
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments", params=params), "قراءة المنشورات التي عليها تعليقات")
     rows = [p for p in data.get("data") or [] if mine(p.get("accountId"))]
     posts = [{
         "id": p.get("id"), "platform": p.get("platform"), "account_id": p.get("accountId"),
@@ -696,7 +696,7 @@ def inbox_comments(post_id: str, account_id: str) -> list[dict]:
     require_mine(account_id)
     with _client() as c:
         data = _inbox_check(c.get(f"{BASE_URL}/inbox/comments/{post_id}", params={"accountId": account_id, "limit": 100}),
-                            "قراءة الكومنتات")
+                            "قراءة التعليقات")
     return [_comment(x) for x in data.get("comments") or []]
 
 
@@ -717,7 +717,7 @@ def inbox_conversations(limit: int = 50, cursor: str | None = None) -> dict:
     if cursor:
         params["cursor"] = cursor
     with _client() as c:
-        data = _inbox_check(c.get(f"{BASE_URL}/inbox/conversations", params=params), "قراءة الرسايل")
+        data = _inbox_check(c.get(f"{BASE_URL}/inbox/conversations", params=params), "قراءة الرسائل")
     convs = [{
         "id": x.get("id"), "platform": x.get("platform"), "account_id": x.get("accountId"), "account": x.get("accountUsername"),
         "name": x.get("participantName") or "", "picture": x.get("participantPicture"), "last": x.get("lastMessage") or "",

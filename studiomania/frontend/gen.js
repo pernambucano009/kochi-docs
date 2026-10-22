@@ -31,7 +31,7 @@ const Gen = (() => {
     try {
       [S.info, S.list] = await Promise.all([S.info || api("/api/gens/info"), api("/api/gens")]);
       S.d.vmodel ||= S.info.video_models?.[0]?.key || "";
-      S.d.lang ||= Object.keys(S.info.dialects || {})[0] || "";
+      S.d.lang ||= (S.info.dialects?.[S.info.brand_lang] ? S.info.brand_lang : Object.keys(S.info.dialects || {})[0] || "");
     } catch (err) { toast(err.message, true); return close(); }
     render(); poll();
   }

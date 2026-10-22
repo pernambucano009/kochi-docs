@@ -1,7 +1,7 @@
-"""تفريغ الكلام على السيرفر نفسه (Whisper مفتوح المصدر) من غير أي خدمة برّه.
+"""تفريغ النص على الخادم نفسه (Whisper مفتوح المصدر) بدون أي خدمة خارج.
 
-بيشتغل لو STT_LOCAL=1 ومكتبة faster-whisper متثبتة (الـ Dockerfile بيثبتها لو LOCAL_STT=1 وقت البناء).
-الموديل بيتحمّل أول مرة بس (STT_LOCAL_MODEL، الافتراضي small: كويس في العربي وبيمشي على CPU).
+يشتغل إذا STT_LOCAL=1 ومكتبة faster-whisper متثبتة (الـ Dockerfile يثبتها إذا LOCAL_STT=1 وقت البناء).
+النموذج يُحمّل أول مرة فقط (STT_LOCAL_MODEL، الافتراضي small: كويس في العربية ويسير على CPU).
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _get():
 
 
 def transcribe(audio_path: Path) -> list[dict]:
-    """صوت ← كلام بتوقيت كل كلمة: [{"w", "s", "e"}] (نفس شكل atlas.transcribe)."""
+    """صوت ← نص بتوقيت كل كلمة: [{"w", "s", "e"}] (نفس شكل atlas.transcribe)."""
     segments, _info = _get().transcribe(str(audio_path), word_timestamps=True, vad_filter=True, beam_size=5)
     out = []
     for seg in segments:

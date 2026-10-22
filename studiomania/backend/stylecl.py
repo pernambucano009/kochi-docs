@@ -1,9 +1,9 @@
-"""🎨 استنساخ الستايل: مراجع (صور/فيديو) + فكرة ← أنيميشن مرسوم بالكود فريم فريم.
+"""🎨 استنساخ الأسلوب: مراجع (صور/فيديو) + فكرة ← أنيميشن مرسوم بالكود فريم فريم.
 
-مفيش موديل فيديو: الموديل بيكتب دالة JavaScript بترسم أي لحظة على Canvas، والمتصفح (من غير نت ولا كوكيز)
-بيرسم كل فريم، والموسيقى والمؤثرات بتتعمل هنا بالحساب، وFFmpeg بيجمّعهم في MP4.
+لا يوجد نموذج فيديو: النموذج يكتب دالة JavaScript ترسم أي لحظة على Canvas، والمتصفح (بدون نت ولا كوكيز)
+يرسم كل فريم، والموسيقى والمؤثرات تُنشأ هنا بالحساب، وFFmpeg يجمّعهم في MP4.
 
-هنا: البرومبتات، والصفحة اللي بترسم، والكود التجريبي (وضع التجربة)، والصوت.
+هنا: الأوصاف، والصفحة التي ترسم، والكود التجريبي (وضع التجربة)، والصوت.
 """
 from __future__ import annotations
 
@@ -82,21 +82,21 @@ function text(ctx,str,x,y,{size=80,font='Cairo',weight=800,color='#fff',align='c
   ctx.direction=(rtl??/[؀-ۿ]/.test(str))?'rtl':'ltr';ctx.fillText(str,x,y);ctx.restore()}
 """
 
-HELPERS_DOC = """متاح لك جاهز (متعرّفش تاني):
+HELPERS_DOC = """متاح لك جاهز (متعرّفش آخر):
 - W, H, DUR (المقاس والمدة بالثواني)
 - clamp(x,a=0,b=1) · lerp(a,b,k) · prog(t,a,b) = تقدّم من 0 لـ 1 بين الوقتين a و b
-- E.lin / E.inOut / E.out / E.in / E.outBack / E.outElastic / E.bounce : دوال تنعيم بتاخد 0..1
+- E.lin / E.inOut / E.out / E.in / E.outBack / E.outElastic / E.bounce : دوال تنعيم تأخذ 0..1
 - rng(seed) : مولّد أرقام عشوائية ثابت (استخدمه بدل Math.random)
 - noise2(x,y) : ضوضاء ناعمة من -0.5 لـ 0.5
-- grain(ctx, amount=.08, t, scale=2) : حبيبات ورق/طباعة فوق الكادر
+- grain(ctx, amount=.08, t, scale=2) : حبيبات ورق/طباعة أعلى الكادر
 - wobbly(ctx, [[x,y],...], amt=3, t, close=true) : مسار بخط مهزوز كأنه مرسوم باليد (بعده ctx.fill() أو ctx.stroke())
-- text(ctx, str, x, y, {size, font, weight, color, align, rtl, alpha}) : كلام عربي أو إنجليزي (الاتجاه بيتظبط لوحده)
-- paper(ctx, color='#efe6d2', seed) : أرضية ورق كاملة (بقع وألياف ونقط) متجهّزة مرة واحدة
-- inkLine(ctx, [[x,y],...], {w, color, p, t, taper, boil, nib}) : خط حبر عرضه بيتغيّر وأطرافه رفيعة وبيرتعش كل فريمين؛ p من 0 لـ 1 = الرسم وهو بيتكتب
-- halftone(ctx, c=>{ /* path */ }, color, {cell, angle, dx, dy, shade:(x,y)=>0..1, blend}) : نقط طباعة جوه شكل؛ لون تاني بزاوية تانية وإزاحة 1-3px = ريزوجراف
-- iris(ctx, x, y, r, c=>{...}) : انتقال قزحية (دايرة بتفتح على عالم تاني)
+- text(ctx, str, x, y, {size, font, weight, color, align, rtl, alpha}) : نص عربي أو إنجليزي (الاتجاه يُضبط تلقائيًا)
+- paper(ctx, color='#efe6d2', seed) : أرضية ورق كاملة (بقع وألياف ونقاط) متجهّزة مرة واحدة
+- inkLine(ctx, [[x,y],...], {w, color, p, t, taper, boil, nib}) : خط حبر عرضه يتغيّر وأطرافه رفيعة ويرتجف كل فريمين؛ p من 0 لـ 1 = الرسم وهو يُكتب
+- halftone(ctx, c=>{ /* path */ }, color, {cell, angle, dx, dy, shade:(x,y)=>0..1, blend}) : نقاط طباعة داخل شكل؛ لون آخر بزاوية أخرى وإزاحة 1-3px = ريزوجراف
+- iris(ctx, x, y, r, c=>{...}) : انتقال قزحية (دائرة تفتح على عالم آخر)
 - tau(t, [[t0, rate], ...]) : الوقت بسرعات (1 عادي، 0.1 بطيء، 0 فريز) للموضوع وجزيئاته
-- typed(str, p) : جزء من الكلام لحد p (كتابة على الآلة الكاتبة)
+- typed(str, p) : جزء من النص حتى p (كتابة على الآلة الكاتبة)
 الخطوط المتاحة: """ + "، ".join(FONTS)
 
 
@@ -136,8 +136,8 @@ def uses_brush(code: str) -> bool:
 
 
 def harness(code: str, w: int, h: int, dur: float) -> str:
-    """الصفحة اللي بترسم: الكود جوه، ومفيش نت (غير الخطوط ومكتبة الفُرش من السيرفر نفسه).
-    الكود اللي بيستخدم brush بيترسم على 3 طبقات: ctx (ورق/خلفية) ← فُرش حقيقية (WebGL) ← top (كلام وحبيبات)."""
+    """الصفحة التي ترسم: الكود داخل، ولا يوجد نت (غير الخطوط ومكتبة الفُرش من الخادم نفسه).
+    الكود الذي يستخدم brush يُرسم على 3 طبقات: ctx (ورق/خلفية) ← فُرش حقيقية (WebGL) ← top (نص وحبيبات)."""
     faces = "".join(f'@font-face{{font-family:"{fam}";src:url("https://fonts.local/{f}")}}' for fam, f in FONTS.items())
     loads = ",".join(f'document.fonts.load(\'800 40px "{fam}"\')' for fam in FONTS)
     safe = code.replace("</script", "<\\/script")
@@ -273,8 +273,8 @@ def extract_code(text: str) -> str:
 def mock_plan(idea: str, dur: int) -> dict:
     return {"title": (idea or "تجربة")[:40],
             "style": {"name": "فلات بحبيبات", "look": "أشكال بسيطة وألوان دافية", "palette": ["#f4a259", "#5b8e7d", "#bc4b51", "#f4e285"],
-                      "background": "#1d1a2f", "line": "من غير حدود", "texture": "حبيبات خفيفة", "motion": "ناعمة بارتداد", "type": "عريض"},
-            "beats": [{"t0": 0, "t1": dur * .3, "what": "دواير بتفتح", "text": ""}, {"t0": dur * .3, "t1": dur, "what": "الكلام", "text": idea[:30]}],
+                      "background": "#1d1a2f", "line": "بدون حدود", "texture": "حبيبات خفيفة", "motion": "ناعمة بارتداد", "type": "عريض"},
+            "beats": [{"t0": 0, "t1": dur * .3, "what": "دوائر تفتح", "text": ""}, {"t0": dur * .3, "t1": dur, "what": "النص", "text": idea[:30]}],
             "sfx": [{"t": 0.1, "kind": "pop"}, {"t": dur * .3, "kind": "whoosh"}, {"t": dur * .6, "kind": "hit"}],
             "music": {"bpm": 104, "mood": "playful", "key": "D"}}
 
@@ -382,7 +382,7 @@ def _sfx(kind: str, rnd: np.random.Generator) -> np.ndarray:
 
 
 def _reverb(x: np.ndarray, wet: float = .16, decay: float = .7, seed: int = 5) -> np.ndarray:
-    """صدى بسيط (IR من ضوضاء بتخفت) بالـ FFT."""
+    """صدى بسيط (IR من ضوضاء تخفت) بالـ FFT."""
     rnd = np.random.default_rng(seed)
     n = int(SR * 1.6)
     ir = rnd.standard_normal(n) * np.exp(-np.arange(n) / (SR * decay / 3))
@@ -488,7 +488,7 @@ def wrap_check(code: str) -> str | None:
         if bad in code:
             return f"الكود فيه {why} وده ممنوع"
     if "function scene" not in code and "scene=" not in code.replace(" ", ""):
-        return "مفيش دالة scene"
+        return "لا يوجد دالة scene"
     return None
 
 

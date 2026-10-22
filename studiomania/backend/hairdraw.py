@@ -1,7 +1,7 @@
-"""✏️ رسومات Hairline: أنهي رسمة جاهزة (من الـ 33) على قد الجملة، ولو مفيش، المخ بيرسم رسمة جديدة بنفس الستايل.
+"""✏️ رسومات Hairline: أي رسمة جاهزة (من الـ 33) على قدر الجملة، وإذا لا يوجد، العقل يرسم رسمة جديدة بنفس الأسلوب.
 
-الرسمة الجديدة خطوط بس (path) في مساحة 400×320 زي رسومات Hairline، وبتتحفظ في مكتبة باسم الكلمة،
-فنفس الكلمة بعد كده بتيجي من المكتبة على طول من غير ما تتحسب تاني.
+الرسمة الجديدة خطوط فقط (path) في مساحة 400×320 مثل رسومات Hairline، وتُحفظ في مكتبة باسم الكلمة،
+فنفس الكلمة بعد ذلك تأتي من المكتبة مباشرة بدون ما تُحسب مرة أخرى.
 """
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ FIGS = ["laptop", "phone", "keyboard", "terminal", "padlock", "vault", "plot", "
 
 # الكلمة ← الرسمة الجاهزة (نفس اللي في typo-studio.js، بعد توحيد الحروف العربي)
 WORDS = [
-    (r"لابتوب|كمبيوتر|جهاز|مكتب|laptop|computer|desk|work", "laptop"), (r"موبايل|تليفون|تطبيق|ابلكيشن|app|phone|mobile", "phone"),
-    (r"كتابه|اكتب|كيبورد|typing|keyboard|write", "keyboard"), (r"كود|برمجه|سيرفر|terminal|code|coding|command|developer", "terminal"),
-    (r"امان|حمايه|قفل|باسورد|secure|security|lock|password|safe", "padlock"), (r"فلوس|ادخار|توفير|بنك|خزنه|money|saving|bank|vault|cash", "vault"),
-    (r"ارقام|نمو|مبيعات|نتايج|نتائج|احصاي|chart|growth|sales|numbers|data|stats", "plot"), (r"سوال|ليه|ازاي|question|why|how", "query"),
+    (r"لابتوب|كمبيوتر|جهاز|مكتب|laptop|computer|desk|work", "laptop"), (r"جوال|تليفون|تطبيق|ابلكيشن|app|phone|mobile", "phone"),
+    (r"كتابه|اكتب|كيبورد|typing|keyboard|write", "keyboard"), (r"كود|برمجه|خادم|terminal|code|coding|command|developer", "terminal"),
+    (r"امان|حمايه|قفل|كلمة مرور|secure|security|lock|password|safe", "padlock"), (r"مال|ادخار|توفير|بنك|خزنه|money|saving|bank|vault|cash", "vault"),
+    (r"ارقام|نمو|مبيعات|نتائج|نتائج|احصاي|chart|growth|sales|numbers|data|stats", "plot"), (r"سوال|له|كيف|question|why|how", "query"),
     (r"ملفات|ارشيف|ورق|file|files|archive|documents", "drawer"), (r"تسوق|شراء|سله|متجر|shop|store|buy|cart", "basket"),
     (r"طاقه|كهربا|شحن|power|energy|charge|plug", "plug"), (r"انترنت|واي ?فاي|شبكه|internet|wifi|network", "router"),
-    (r"فريق|ناس|تواصل|team|people|connect|community", "hub"), (r"خطوات|مراحل|steps|levels|stages", "elevator"),
+    (r"فريق|أشخاص|تواصل|team|people|connect|community", "hub"), (r"خطوات|مراحل|steps|levels|stages", "elevator"),
     (r"تنظيم|ترتيب|منظم|organi[sz]e|tidy|order", "settle"), (r"بحث|تفاصيل|دقه|search|detail|zoom", "loupe"),
     (r"اشاره|بث|اعلان|signal|broadcast|reach|ads?", "dish"), (r"وقت|ببطء|بطء|time|slow|patience", "slow"),
     (r"تصميم|طبقات|design|layers", "exploded"), (r"لبس|هدوم|موضه|fashion|clothes|outfit", "rail"), (r"فلتر|تصفيه|filter|sift", "sieve"),
@@ -29,8 +29,8 @@ WORDS = [
 _WORDS = [(re.compile(rf"(?:^|\s)(?:ال)?(?:{p})", re.I), f) for p, f in WORDS]
 
 # كلام مالوش رسمة (حروف وضماير وأفعال عامة): مايتعملوش رسمة جديدة
-_WEAK = set(norm("""انا انت انتي احنا هو هي هم ده دي دول اللي في من على الى عن مع كل بس كمان يعني لو لما عشان علشان ان انه
-مش مفيش فيه كان كانت يكون هيكون بقى بقت عايز عاوز ممكن لازم جدا اوي خالص النهارده بكره امبارح حاجه حاجات واحد اول اخر
+_WEAK = set(norm("""انا أنت أنتِ نحن هو هي هم هذا هذه هؤلاء الذي في من على الى عن مع كل فقط أيضًا أي إذا عندما لكي لكي ان أنه
+غير لا يوجد فيه كان كانت يكون سيكون بقى بقت تريد تريد يمكن يجب جدا جدًا تمامًا اليوم غدًا أمس شيء أشياء واحد اول اخر
 the a an and or but is are was were be to of in on for with you your we our i my me it this that these those so very just really
 do does did have has had can will would should could not no yes all any some more most love like want need make get go new good great best"""
                  + " حب بحب عايزه نفسي جديد حلو جميل جميله احسن قبل بعد شكل حقيقي حقيقيه طريقه حاجه فعلا كده زي مره كتير شويه").split())
@@ -50,7 +50,7 @@ def _weak(w: str) -> bool:
 
 
 def concept(words: list[str], focus: int = -1) -> str:
-    """أهم كلمة في الجملة تترسم: الكلمة المهمة لو محددة، وإلا آخر كلمة مش ضعيفة."""
+    """أهم كلمة في الجملة تُرسم: الكلمة المهمة إذا محددة، وإلا آخر كلمة غير ضعيفة."""
     clean = [w for w in (re.sub(r"[^\w]", "", x) for x in words) if w]
     if 0 <= focus < len(words):
         f = re.sub(r"[^\w]", "", words[focus])
@@ -93,7 +93,7 @@ def clean_drawing(raw: dict) -> dict | None:
 
 
 def mock_drawing(word: str) -> dict:
-    """تجربة من غير موديل: صندوق أيزومتريك على قاعدة."""
+    """تجربة بدون نموذج: صندوق أيزومتريك على قاعدة."""
     return {"name": f"mock {word}", "paths": [
         {"d": "M90 230 L200 285 L310 230 L200 175 Z", "c": "lo"},
         {"d": "M140 200 L200 230 L260 200 L200 170 Z", "c": "edge"},

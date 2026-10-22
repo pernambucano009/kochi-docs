@@ -1,7 +1,7 @@
 """🎭 مكتبة الكوميكس: كوميكس موجودة (GIF وصور وفيديوهات قصيرة) من مصادر كبيرة، وكل واحد مكتوب له سياقه
 (الإحساس، الموقف، بيتقال إمتى، الجملة اللي فيه، اللهجة)، علشان أي أداة تستحضر الكوميك المناسب للكلام.
 
-المصادر: KLIPY (KLIPY_API_KEY) و GIPHY (GIPHY_API_KEY) و Imgflip (قوالب الميمز، من غير مفتاح).
+المصادر: KLIPY (KLIPY_API_KEY) و GIPHY (GIPHY_API_KEY) و Imgflip (قوالب الميمز، بدون مفتاح).
 التجميع بيدوّر بكلمات كتير (عربي مصري وخليجي + إنجليزي) والمخ بيتفرج على كل واحد ويكتب سياقه.
 """
 from __future__ import annotations
@@ -19,16 +19,16 @@ EMOTIONS = ("صدمة", "ضحك", "فرحة", "احتفال", "حزن", "إحب�
             "رفض", "موافقة", "انتظار", "تعب", "حب", "ترحيب", "وداع", "نصر", "فشل", "توتر", "ارتياح", "فخر", "غيرة", "حيرة", "هدوء")
 
 # كلمات التجميع: ردود فعل ومواقف يومية بالمصري والخليجي والفصحى والإنجليزي
-SEEDS_AR = """يا نهار ابيض|ايه ده|مش قادر|طب والله|يا سلام|ماشي يا عم|انا مالي|اهدى|عيب كده|يا خبر|حلو اوي|برافو|تحفة|حرام عليك|الله يسامحك|
-مش فاهم|ازاي يعني|بجد|لا يا شيخ|خلاص|كفاية|يلا بينا|فين|استنى|هموت من الضحك|ضحك|صدمة|مصدوم|زعلان|فرحان|غضبان|متعصب|مكسوف|خايف|مرعوب|زهقان|
-تعبان|نايم|جعان|اكل|فلوس|مفلس|غني|شغل|مدير|موظف|امتحان|مذاكرة|نتيجة|نجحت|سقطت|مدرسة|جامعة|عيد|رمضان|فطار|سحور|عزومة|ماما|بابا|الحماة|الجواز|
+SEEDS_AR = """يا نهار ابيض|ماذا هذا|لا قادر|حسنًا والله|يا سلام|حسنًا يا عم|انا مالي|اهدى|عيب هكذا|يا خبر|جميل جدًا|برافو|تحفة|حرام عليك|الله يسامحك|
+غير فاهم|كيف أي|بجد|لا يا شيخ|انتهى|كفاية|هيا ينا|أين|انتظر|هموت من الضحك|ضحك|صدمة|مصدوم|زعلان|فرحان|غضبان|متعصب|مكسوف|خايف|مرعوب|زهقان|
+تعبان|نايم|جعان|اكل|مال|مفلس|غني|عمل|مدير|موظف|امتحان|مذاكرة|نتيجة|نجحت|سقطت|مدرسة|جامعة|عيد|رمضان|فطار|سحور|عزومة|ماما|بابا|الحماة|الجواز|
 عريس|عروسة|خطوبة|حب|قلب|غيرة|خيانة|صحاب|اخويا|جيران|زحمة|مواصلات|تاكسي|عربية|مرور|شتا|صيف|حر|برد|كورة|جون|ماتش|ملعب|رقص|غنا|
-فرح|حفلة|مفاجأة|هدية|عيد ميلاد|سفر|اجازة|بحر|مصيف|دكتور|مستشفى|دوا|رجيم|جيم|تمرين|اكل صحي|كرش|نوم|صحيان|منبه|موبايل|نت|واي فاي|
-لايك|كومنت|اشتري|تسوق|خصم|غالي|رخيص|بلاش|تمام|اوكي|لا|اه|اكيد|مستحيل|يمكن|مش عارف|فكرة|عبقري|غبي|هبل|جنان|مجنون|تفكير|حيرة|انتظار|بسرعة|
+فرح|حفلة|مفاجأة|هدية|عيد ميلاد|سفر|اجازة|بحر|مصيف|دكتور|مستشفى|دوا|رجيم|جيم|تمرين|اكل صحي|كرش|نوم|صحيان|منبه|جوال|نت|واي فاي|
+لايك|تعليق|اشتري|تسوق|خصم|غالي|رخيص|لا داعي|حسنًا|اوكي|لا|اه|اكيد|مستحيل|يمكن|لا تعرف|فكرة|عبقري|غبي|هبل|جنان|مجنون|تفكير|حيرة|انتظار|بسرعة|
 ببطء|متأخر|معاد|وعد|كدب|صراحة|سر|فضيحة|مشكلة|حل|نجاح|فشل|تحدي|حماس|يأس|امل|دعاء|الحمد لله|ما شاء الله|ان شاء الله|سبحان الله|يا رب|
 والله العظيم|يا جماعة|يا ولاد|يا بني|يا حبيبي|يا باشا|يا معلم|يا كبير|اسطورة|ملك|بطل|وحش|اسد|قطة|كلب|مصري|مصريين|خليجي|سعودي|ههههه|
-لا تعليق|بدون تعليق|اتصدمت|انصدمت|عادي|مش مهم|شكرا|اسف|سامحني|زعلت|صالحني|مبروك|الف مبروك|حظ|حظ سعيد|نحس|ابتسامة|دموع|بكا|عياط|صريخ|
-هيستيريا|سكوت|كلام|رغي|نميمة|حماتي|مراتي|جوزي|عيال|اطفال|مدرسين|استاذ|طالب|اخر الشهر|المرتب|البنك|الدين|سلف|كوميكس|ميمز|افيهات|افيه|
+لا تعليق|بدون تعليق|اتصدمت|انصدمت|عادي|غير مهم|شكرا|اسف|سامحني|زعلت|صالحني|مبروك|الف مبروك|حظ|حظ سعيد|نحس|ابتسامة|دموع|بكا|عياط|صريخ|
+سيستيريا|سكوت|نص|رغي|نميمة|حماتي|مراتي|جوزي|عيال|اطفال|مدرسين|استاذ|طالب|اخر الشهر|المرتب|البنك|الدين|سلف|كوميكس|ميمز|افيهات|افيه|
 مشهد|فيلم|مسرحية|مسلسل|كرتون|الشيخ|حرامي|بوليس|ظابط|محامي|قاضي|سجن|براءة|""".replace("\n", "")
 
 SEEDS_EN = """omg|wow|shocked|surprised|mind blown|facepalm|eye roll|laughing|lol|crying|sad|happy dance|celebrate|party|yes|no|nope|thumbs up|
@@ -50,11 +50,11 @@ def seeds() -> list[str]:
 REACTIONS = {"surprise": "استغراب", "anger": "غضب", "shock": "دهشة", "bored": "ملل", "confused": "حيرة"}
 REACTION_KINDS = ("gif", "clip")
 REACTION_SEEDS = {
-    "surprise": "ايه ده|بجد|ازاي يعني|لا يا شيخ|نعم|يعني ايه|surprised face|raised eyebrow|wait what|side eye|suspicious look|double take|what reaction",
-    "anger": "متعصب|غضبان|اتنرفز|هتجنن|angry face|rage reaction|furious|annoyed face|frustrated reaction|angry stare|losing it|mad face",
+    "surprise": "ماذا هذا|بجد|كيف أي|لا يا شيخ|نعم|أي ماذا|surprised face|raised eyebrow|wait what|side eye|suspicious look|double take|what reaction",
+    "anger": "متعصب|غضبان|اتنرفز|ستجنن|angry face|rage reaction|furious|annoyed face|frustrated reaction|angry stare|losing it|mad face",
     "shock": "مصدوم|يا نهار ابيض|يا خبر|اتصدمت|shocked face|jaw drop|mind blown|speechless|gasp|stunned|omg reaction|in disbelief",
-    "bored": "زهقان|ملل|مش فارقة|نايم|bored face|yawn|unimpressed|eye roll|not interested|waiting bored|so bored|blank stare",
-    "confused": "مش فاهم|حيرة|محتار|confused face|confused math|thinking hard|huh|puzzled|what is happening|lost|scratching head|confused look",
+    "bored": "زهقان|ملل|غير فارقة|نايم|bored face|yawn|unimpressed|eye roll|not interested|waiting bored|so bored|blank stare",
+    "confused": "غير فاهم|حيرة|محتار|confused face|confused math|thinking hard|huh|puzzled|what is happening|lost|scratching head|confused look",
 }
 
 
@@ -63,11 +63,11 @@ def reaction_seeds() -> list[str]:
 
 
 def reaction_reject(ctx: dict) -> str | None:
-    """ليه الكوميك ده مايدخلش مكتبة «ردود الفعل»: عليه كلام مكتوب، أو مش رد فعل من الخمسة. None = ينفع."""
+    """له هذا الكوميك مايدخلش مكتبة «ردود الفعل»: عليه نص مكتوب، أو غير رد فعل من الخمسة. None = ينفع."""
     if ctx.get("text_on_screen"):
-        return "عليه كلام مكتوب"
+        return "عليه نص مكتوب"
     if ctx.get("reaction") not in REACTIONS:
-        return "مش رد فعل"
+        return "غير رد فعل"
     return None
 
 
@@ -96,19 +96,19 @@ def _get(url: str, params: dict) -> dict:
     except httpx.HTTPError as exc:
         raise SourceError(f"المصدر مردش: {str(exc)[:100]}") from exc
     if r.status_code in (401, 403):
-        raise SourceError("مفتاح المصدر مش شغال")
+        raise SourceError("مفتاح المصدر لا يعمل")
     if r.status_code == 429:
-        raise SourceError("المصدر بيقول استنى شوية (كتير طلبات)")
+        raise SourceError("المصدر يقول انتظر قليلًا (كثير طلبات)")
     if r.status_code >= 400:
-        raise SourceError(f"المصدر رجّع {r.status_code}")
+        raise SourceError(f"المصدر استعد {r.status_code}")
     try:
         return r.json()
     except ValueError as exc:
-        raise SourceError("المصدر رجّع رد مش مفهوم") from exc
+        raise SourceError("المصدر استعد رد غير مفهوم") from exc
 
 
 def _urls(obj, out: list) -> None:
-    """بيلم كل لينكات الميديا من أي شكل رد (الأسماء بتختلف من مصدر للتاني)."""
+    """يلم كل روابط الميديا من أي شكل رد (الأسماء تختلف من مصدر للتاني)."""
     if isinstance(obj, dict):
         for k, v in obj.items():
             if isinstance(v, str) and v.startswith("http") and re.search(r"\.(mp4|gif|webp|jpe?g|png)(\?|$)", v, re.I):
@@ -196,8 +196,8 @@ For each image below (same order as the list; for videos/GIFs you see one frame)
 
 Return JSON only: {{"items": [{{"i": 0,
  "emotion": "one or two of: {'، '.join(EMOTIONS)}",
- "situation": "بالعربي المصري: الموقف اللي الكوميك ده بيتحط فيه (جملة)",
- "use_when": "بالعربي المصري: الكلام اللي لو اتقال في الفيديو يبقى الكوميك ده مناسب (أمثلة قصيرة)",
+ "situation": "بالعربية الفصحى: الموقف الذي هذا الكوميك يوضع فيه (جملة)",
+ "use_when": "بالعربية الفصحى: النص الذي إذا قيل في الفيديو يصبح هذا الكوميك مناسب (أمثلة قصيرة)",
  "phrase": "the exact text/catchphrase written or famously said in it, or empty",
  "text_on_screen": true if ANY words/letters/captions/subtitles are written on the image (watermark logos alone don't count), else false,
  "reaction": "the face/body reaction it shows: {' | '.join(REACTIONS)} | other  (surprise = puzzled/raised eyebrow, anger, shock = astonished/jaw drop, bored, confused)",
@@ -231,7 +231,7 @@ _AR = re.compile(r"[\u0600-\u06FF]")
 
 
 def lang_group(ctx: dict, title: str = "", query: str = "") -> str:
-    """من وصف المخ لو موجود، ولو لسه مااتوصفش: من لغة الكلمة اللي اتلاقى بيها."""
+    """من وصف العقل إذا موجود، وإذا ما زال مااتوصفش: من لغة الكلمة التي اتلاقى بها."""
     ctx = ctx or {}
     if ctx.get("audience") in LANGS:
         return ctx["audience"]
@@ -249,7 +249,7 @@ def text_lang(text: str) -> str:
 
 
 def ctx_text(title: str, query: str, ctx: dict) -> str:
-    """النص اللي البحث بيدوّر فيه."""
+    """النص الذي البحث يبحث فيه."""
     return " ".join([title or "", query or "", ctx.get("emotion", ""), ctx.get("situation", ""), ctx.get("use_when", ""), ctx.get("phrase", ""),
                      ctx.get("who", ""), " ".join(ctx.get("tags") or [])]).strip()
 
@@ -272,7 +272,7 @@ Pick for about {n} scenes only (the ones where a reaction really lands: a surpri
 Only choose from the candidates listed under each scene (by id). The comic must match the meaning and emotion of THAT scene's words.
 {chr(10).join(blocks)}
 
-Return JSON: {{"picks": [{{"scene": 1, "id": "comic id", "why": "بالعربي في جملة"}}]}}"""}]
+Return JSON: {{"picks": [{{"scene": 1, "id": "comic id", "why": "بالعربية في جملة"}}]}}"""}]
 
 
 def mock_items(q: str, kind: str, n: int = 4) -> list[dict]:
@@ -281,7 +281,7 @@ def mock_items(q: str, kind: str, n: int = 4) -> list[dict]:
 
 
 def mock_ctx(it: dict, k: int) -> dict:
-    return clean_ctx({"emotion": EMOTIONS[k % len(EMOTIONS)], "situation": f"لما حد يقول «{it.get('query') or it.get('title')}»",
+    return clean_ctx({"emotion": EMOTIONS[k % len(EMOTIONS)], "situation": f"عندما حد يقول «{it.get('query') or it.get('title')}»",
                       "use_when": it.get("query") or it.get("title"), "phrase": "", "tags": [it.get("query") or ""], "quality": 4,
                       "text_on_screen": k % 3 == 2, "reaction": list(REACTIONS)[k % len(REACTIONS)],
                       "lang": "ar-eg" if _AR.search(it.get("query") or "") else ("en" if k % 2 else "none")})

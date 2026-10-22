@@ -1,12 +1,12 @@
-"""صناعة الكاروسيل: البرومبتات، والهوية البصرية بتاعة العميل المختار.
+"""صناعة الكاروسيل: الأوصاف، والهوية البصرية الخاصة بالعميل المختار.
 
 الخطوات:
-1. نقاش مع موديل الكلام لحد ما نوصل لفكرة.
-2. الموديل يكتب خطة الكاروسيل (نص كل سلايد ووصف الرسمة) بلغة العميل ولهجته، كـ JSON.
+1. نقاش مع نموذج النص حتى ما نوصل لفكرة.
+2. النموذج يكتب خطة الكاروسيل (نص كل سلايد ووصف الرسمة) بلغة العميل ولهجته، كـ JSON.
 3. تنقيح: نفس الموديل يراجع الإملاء واللهجة (بعد أي تعديل بإيدك).
-4. GPT Image يرسم الكاروسيل كله في صورة واحدة (عشان يطلع متسق).
+4. GPT Image يرسم الكاروسيل كله في صورة واحدة (لكي يظهر متسق).
 5. بعد الموافقة، يرسم السلايدات واحدة واحدة بالمقاس النهائي،
-   ومعاه الصورة الكاملة والسلايد اللي قبلها كمرجع.
+   ومعه الصورة الكاملة والسلايد الذي قبلها كمرجع.
 """
 
 import json
@@ -24,10 +24,10 @@ DEFAULT_BRAND = {
     "about": "",
     "audience": "",
     "colors": "",
-    "font": "خط عربي عريض وواضح (زي Tajawal أو Cairo)، العناوين Bold والكلام العادي Regular",
+    "font": "خط عربي عريض وواضح (مثل Tajawal أو Cairo)، العناوين Bold والنص العادي Regular",
     "style": ("2D flat vector illustration, clean shapes, solid fills, no 3D, no photorealism, consistent characters "
               "across slides, generous white space, modern social-media carousel layout"),
-    "logo_rule": "اللوجو صغير في نفس الركن في كل السلايدات",
+    "logo_rule": "الشعار صغير في نفس الركن في كل السلايدات",
     "market": "",
     "language": "عربي بسيط",
     "modest": "",
@@ -36,21 +36,21 @@ DEFAULT_BRAND = {
 # هوية كوتشي القديمة: بتتنقل مرة واحدة لملف عميل كوتشي (البرنامج كان معمول ليها قبل ما يبقى لأي عميل)
 LEGACY_BRAND = {
     "name": "KOCHI",
-    "about": "كوتشي منصة تدريب رياضي وتغذية أونلاين بتوصّل المتدربين في السعودية والخليج بمدربين معتمدين.",
-    "audience": "شباب وبنات في السعودية والخليج مهتمين باللياقة والتغذية والجسم الصحي",
+    "about": "كوتشي منصة تدريب رياضي وتغذية أونلاين توصّل المتدربين في السعودية والخليج بمدربين معتمدين.",
+    "audience": "شباب ونات في السعودية والخليج مهتمين باللياقة والتغذية والجسم الصحي",
     # من KOCHI Production Brief (الهوية الرسمية: KOCHI Sketchy Fitness)
     "colors": "#57B8AF teal (main accent), #EEECDA cream (backgrounds), #1F2933 charcoal (text and lines)",
-    "font": "خط عربي عريض وواضح (زي Tajawal أو Cairo)، العناوين Bold والكلام العادي Regular",
+    "font": "خط عربي عريض وواضح (مثل Tajawal أو Cairo)، العناوين Bold والنص العادي Regular",
     "style": (
         "KOCHI Sketchy Fitness: hand-drawn illustration, loose pencil-like line work with slight imperfections, "
         "misty watercolor-wash fills, warm muted palette (teal, cream, charcoal), bold clean outlines, minimal cell "
         "shading, no 3D, no photorealism, no gradient fills. Athletic but approachable, like a fitness sketchbook."
     ),
-    "logo_rule": "اللوجو صغير في نفس الركن في كل السلايدات",
+    "logo_rule": "الشعار صغير في نفس الركن في كل السلايدات",
     "market": "السعودية والخليج",
     "language": "اللهجة السعودية البيضاء",
     "modest": "1",
-    "rules": "من غير وعود صحية مبالغ فيها.",
+    "rules": "بدون وعود صحية مبالغ فيها.",
 }
 
 # الستايل القديم (قبل الهوية الرسمية): لو متسجل في الإعدادات نتجاهله
@@ -97,7 +97,7 @@ def full_brand(brand: dict | None) -> dict:
 
 
 def style_text(style: dict | None) -> str | None:
-    """ستايل الرسم المختار من المكتبة: بيحل محل ستايل البراند في الرسم بس، والألوان تفضل ألوان البراند."""
+    """أسلوب الرسم المختار من المكتبة: يحل محل أسلوب العلامة في الرسم فقط، والألوان تظل ألوان العلامة."""
     if not style:
         return None
     return (f"the \"{style['name']}\" art style shown in the style reference images"
@@ -120,7 +120,7 @@ def brand_block(brand: dict, kind: str = "characters", style: dict | None = None
 
 
 def cta_text(cta: dict | None, ctas: list[dict], coach_name: str | None) -> str | None:
-    """نص الـ CTA بعد ما نحط الكلمة والجايزة واسم المدرب. None = الموديل يختار."""
+    """نص الـ CTA بعد ما نحط الكلمة والجايزة واسم المدرب. None = النموذج يختار."""
     if not cta or cta.get("type") in (None, "", "auto"):
         return None
     if cta.get("type") == "custom":
@@ -144,23 +144,23 @@ def cta_text(cta: dict | None, ctas: list[dict], coach_name: str | None) -> str 
 def dialect_rules(brand: dict | None) -> str:
     b = full_brand(brand)
     return f"""قواعد الكتابة على السلايدات:
-- اللغة: {b['language']}، طبيعية زي ما الجمهور بيتكلم على السوشيال{f" ({b['market']})" if b.get("market") else ""}.
+- اللغة: {b['language']}، طبيعية كما الجمهور يتكلم على السوشيال{f" ({b['market']})" if b.get("market") else ""}.
 - إملاء صحيح 100%: الهمزات والتاء المربوطة والألف المقصورة في مكانها.
-- من غير تشكيل، ومن غير إيموجي جوه نص السلايد.
-- جمل قصيرة جدًا: العنوان من 2 لـ 6 كلمات، والكلام تحته 20 كلمة بالكتير.
+- بدون تشكيل، ومن غير إيموجي داخل نص السلايد.
+- جمل قصيرة جدًا: العنوان من 2 لـ 6 كلمات، والنص تحته 20 كلمة بالكتير.
 - معلومات صحيحة ومفيدة، ومن غير وعود مبالغ فيها.
-- أول سلايد هوك يوقّف السكرول.""" + (f"\n- قواعد العميل: {b['rules']}" if b.get("rules") else "")
+- أول سلايد خطاف يوقّف السكرول.""" + (f"\n- قواعد العميل: {b['rules']}" if b.get("rules") else "")
 
 
 def chat_system(brand: dict) -> str:
     b = full_brand(brand)
-    return f"""انت كاتب محتوى ومخطط كاروسيلات لإنستجرام وتيك توك لبراند {b['name'] or 'العميل'}.
+    return f"""أنت كاتب محتوى ومخطط كاروسيلات لإنستجرام وتيك توك لبراند {b['name'] or 'العميل'}.
 {b['about']}
 الجمهور: {b['audience'] or b.get('market') or '—'}.
 
-شغلك في النقاش: تقترح أفكار كاروسيل قوية (هوك واضح، قيمة حقيقية، تسلسل منطقي)، وتطوّر الفكرة مع المستخدم.
-لما تقترح أفكار: رقّمها، ولكل فكرة عنوان/هوك وسطر يشرح الزاوية وعدد السلايدات المقترح.
-اتكلم مع المستخدم بالعربي البسيط، وأي نص مقترح للسلايدات يكون بـ{b['language']}.
+شغلك في النقاش: تقترح أفكار كاروسيل قوية (خطاف واضح، قيمة حقيقية، تسلسل منطقي)، وتطوّر الفكرة مع المستخدم.
+عندما تقترح أفكار: رقّمها، ولكل فكرة عنوان/خطاف وسطر يشرح الزاوية وعدد السلايدات المقترح.
+اتكلم مع المستخدم بالعربية البسيط، وأي نص مقترح للسلايدات يكون بـ{b['language']}.
 {dialect_rules(b)}
 {growth.psych_rule()}
 {algo.for_use("carousel")}"""
@@ -168,48 +168,48 @@ def chat_system(brand: dict) -> str:
 
 PLAN_SCHEMA = """{
   "title": "اسم قصير للكاروسيل",
-  "caption": "كابشن البوست بنفس لغة السلايدات",
+  "caption": "تعليق نصي المنشور بنفس لغة السلايدات",
   "hashtags": ["#هاشتاق", "..."],
   "slides": [
-    {"headline": "عنوان السلايد", "body": "الكلام تحت العنوان (ممكن يبقى فاضي)", "visual": "وصف الرسمة بالإنجليزي"}
+    {"headline": "عنوان السلايد", "body": "النص أسفل العنوان (يمكن يصبح فارغ)", "visual": "وصف الرسمة بالإنجليزية"}
   ]
 }"""
 
 
 def kind_writing_rules(ctx: dict) -> str:
-    """قواعد الكتابة على حسب الاختيارات (تيمبليت + ستايل + شخصيات + مدرب مع بعض)."""
+    """قواعد الكتابة على حسب الاختيارات (تيمبليت + أسلوب + شخصيات + مدرب مع بعض)."""
     rules = []
     c = ctx.get("coach")
     if c:
         handle = f" (@{c['instagram']})" if c.get("instagram") else ""
-        rules.append(f"- الكاروسيل ده معلومات ونصايح من المدرب {c['name']}{handle}: الكلام على لسانه أو منسوب له، "
+        rules.append(f"- هذا الكاروسيل معلومات ونصايح من المدرب {c['name']}{handle}: النص على لسانه أو منسوب له، "
                      f"وأول سلايد يقدّمه (مثلًا: نصيحة من كوتش {c['name']}).")
     names = "، ".join(ch["name"] for ch in ctx.get("characters") or [])
     who = "، ".join(x for x in [f"المدرب {c['name']}" if c else "", names] if x)
     if ctx.get("template") and not who:
-        rules.append("- حقل visual بالإنجليزي ويوصف المحتوى المرسوم بس (أيقونات وعناصر وشخصيات لو محتاج)، "
+        rules.append("- حقل visual بالإنجليزية ويوصف المحتوى المرسوم فقط (أيقونات وعناصر وشخصيات إذا يحتاج)، "
                      "لأن التصميم نفسه ثابت من التيمبليت.")
     else:
-        rules.append(f"- حقل visual بالإنجليزي ويوصف {who or 'شخصيات البراند'} بتعمل إيه في كل سلايد "
-                     "(وضعية، تمرين، تعبير) وأي أيقونات بسيطة، بنفس الشكل في كل السلايدات.")
+        rules.append(f"- حقل visual بالإنجليزية ويوصف {who or 'شخصيات العلامة'} تعمل ماذا في كل سلايد "
+                     "(وضعية، تمرين، تعبير) وأي أيقونات بسيطة، بالشكل نفسه في كل السلايدات.")
     return "\n".join(rules)
 
 
 def cta_rule(ctx: dict, brand: dict | None = None) -> str:
     text = ctx.get("cta_text")
     if text:
-        return f"- آخر سلايد هو الدعوة (CTA) ونصها لازم يكون بالمعنى ده بالظبط، ولو فيه كلمة بين « » تفضل زي ما هي: {text}\n- الكابشن يكرر نفس الدعوة."
+        return f"- آخر سلايد هو الدعوة (CTA) ونصها يجب يكون هذا بالمعنى بالضبط، وإذا فيه كلمة بين « » تظل كما هي: {text}\n- التعليق النصي يكرر نفس الدعوة."
     name = full_brand(brand)["name"]
-    return ("- آخر سلايد دعوة (CTA): اختار الأنسب للمحتوى من دول: اكتب كلمة في الكومنت ونرسلك حاجة، "
-            f"أو تابعنا عشان تشوف أكتر،{f' أو جملة قصيرة عن {name}،' if name else ''} أو احفظ البوست وشاركه.")
+    return ("- آخر سلايد دعوة (CTA): اختر الأنسب للمحتوى من هؤلاء: اكتب كلمة في التعليق ونرسلك شيء، "
+            f"أو تابعنا لكي ترى أكثر،{f' أو جملة قصيرة عن {name}،' if name else ''} أو احفظ المنشور وشاركه.")
 
 
 def plan_messages(brand: dict, chat: list[dict], slides: int, ctx: dict) -> list[dict]:
-    ask = f"""اكتب الكاروسيل النهائي من النقاش اللي فات، في {slides} سلايدات بالظبط.
+    ask = f"""اكتب الكاروسيل النهائي من النقاش الذي فات، في {slides} سلايدات بالضبط.
 {dialect_rules(brand)}
 {kind_writing_rules(ctx)}
 {cta_rule(ctx, brand)}
-رجّع JSON بس، من غير أي كلام قبله أو بعده، بالشكل ده:
+استعد JSON فقط، بدون أي نص قبله أو بعده، هذا بالشكل:
 {PLAN_SCHEMA}"""
     return [{"role": "system", "content": chat_system(brand)}, *chat[-20:], {"role": "user", "content": ask}]
 
@@ -217,24 +217,24 @@ def plan_messages(brand: dict, chat: list[dict], slides: int, ctx: dict) -> list
 def polish_messages(brand: dict, plan: dict, ctx: dict | None = None) -> list[dict]:
     keep = ""
     if ctx and ctx.get("cta_text"):
-        keep = f"\n- سيب معنى الدعوة في آخر سلايد زي ما هو، وأي كلمة بين « » متتغيرش: {ctx['cta_text']}"
-    ask = f"""راجع نص الكاروسيل ده ونقّحه:
-- خلّي كل الكلام بـ{full_brand(brand)['language']}، وحوّل أي كلمة خارجة عنها.
+        keep = f"\n- اترك معنى الدعوة في آخر سلايد كما هو، وأي كلمة بين « » متتغيرش: {ctx['cta_text']}"
+    ask = f"""راجع نص هذا الكاروسيل ونقّحه:
+- اجعل كل النص بـ{full_brand(brand)['language']}، وحوّل أي كلمة خارجة عنها.
 - صحّح أي غلطة إملائية أو همزة أو تاء مربوطة.
-- قصّر أي جملة طويلة من غير ما المعنى يضيع.
+- قصّر أي جملة طويلة بدون ما المعنى يضيع.
 - متغيّرش عدد السلايدات ولا حقل visual.{keep}
 {dialect_rules(brand)}
-رجّع نفس الـ JSON بالظبط بعد التنقيح، من غير أي كلام تاني:
+استعد نفس الـ JSON بالضبط بعد التنقيح، بدون أي نص آخر:
 {json.dumps(plan, ensure_ascii=False, indent=1)}"""
     return [{"role": "system", "content": chat_system(brand)}, {"role": "user", "content": ask}]
 
 
 def parse_plan(text: str, slides: int | None = None) -> dict:
-    """بيطلّع الـ JSON من رد الموديل حتى لو كتب حاجة قبله أو بعده أو حطه في ```."""
+    """يُخرج الـ JSON من رد النموذج حتى إذا كتب شيء قبله أو بعده أو ضعه في ```."""
     t = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
     start, end = t.find("{"), t.rfind("}")
     if start < 0 or end <= start:
-        raise ValueError("الموديل مرجّعش خطة. جرّب تاني")
+        raise ValueError("النموذج مرجّعش خطة. جرّب مرة أخرى")
     data = json.loads(t[start : end + 1])
     out_slides = []
     for s in data.get("slides") or []:
@@ -246,7 +246,7 @@ def parse_plan(text: str, slides: int | None = None) -> dict:
             "visual": str(s.get("visual") or s.get("image") or "").strip(),
         })
     if not out_slides:
-        raise ValueError("الخطة طلعت من غير سلايدات. جرّب تاني")
+        raise ValueError("الخطة طلعت بدون سلايدات. جرّب مرة أخرى")
     tags = data.get("hashtags") or []
     return {
         "title": str(data.get("title") or "").strip(),
@@ -266,7 +266,7 @@ TEXT_RULES = (
 
 
 def overview_grid(n: int) -> tuple[int, int]:
-    """الكاروسيل كله في صورة واحدة: كام عمود وكام صف."""
+    """الكاروسيل كله في صورة واحدة: كم عمود وكم صف."""
     cols = n if n <= 4 else math.ceil(n / 2)
     return cols, math.ceil(n / cols)
 
@@ -293,7 +293,7 @@ def slide_text(s: dict) -> str:
 
 def kind_design_rules(ctx: dict, brand: dict | None = None) -> str:
     b = full_brand(brand)
-    """قواعد الرسم من الاختيارات مع بعض: التيمبليت للتقسيم، والمدرب والشخصيات للناس، والستايل لطريقة الرسم."""
+    """قواعد الرسم من الاختيارات مع بعض: التيمبليت للتقسيم، والمدرب والشخصيات للناس، والأسلوب لطريقة الرسم."""
     parts = []
     t = ctx.get("template")
     if t:
@@ -408,7 +408,7 @@ DESCRIBE_FOCUS = {
 
 
 def describe_messages(kind: str, image_urls: list[str]) -> list[dict]:
-    """رسالة لموديل الرؤية: يكتب اسم عربي قصير وملاحظات تصميم بالإنجليزي (JSON)."""
+    """رسالة لموديل الرؤية: يكتب اسم عربي قصير وملاحظات تصميم بالإنجليزية (JSON)."""
     content: list[dict] = [{"type": "text", "text": (
         f"The images show {DESCRIBE_FOCUS.get(kind, DESCRIBE_FOCUS['template'])}\n"
         "Reply with JSON only: {\"name\": \"a short catchy Arabic name of 2-4 words that describes the look "
@@ -422,17 +422,17 @@ def describe_messages(kind: str, image_urls: list[str]) -> list[dict]:
 def parse_description(text: str) -> dict:
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
-        raise ValueError("الموديل ما رجعش وصف")
+        raise ValueError("النموذج ما رجعش وصف")
     data = json.loads(m.group(0), strict=False)  # بعض الموديلات بتحط سطر جديد جوه النص
     name = str(data.get("name") or "").strip().strip('"«»')[:60]
     notes = re.sub(r"\s+", " ", str(data.get("notes") or "")).strip()[:1500]
     if not notes:
-        raise ValueError("الموديل ما رجعش وصف")
+        raise ValueError("النموذج ما رجعش وصف")
     return {"name": name, "notes": notes}
 
 
 def mock_description(kind: str) -> dict:
-    return {"name": {"template": "تصميم تجريبي جريء", "style": "ستايل تجريبي ناعم"}.get(kind, "شخصية تجريبية"),
+    return {"name": {"template": "تصميم تجريبي جريء", "style": "أسلوب تجريبي ناعم"}.get(kind, "شخصية تجريبية"),
             "notes": "Mock description: bold sans headline top-start, big slide number, charcoal and cream panels, "
                      "teal accent, thin arrow connecting slides."}
 
@@ -442,9 +442,9 @@ def mock_description(kind: str) -> dict:
 def mock_reply(chat: list[dict]) -> str:
     last = chat[-1]["content"] if chat else ""
     return (
-        f"تمام، عن «{last[:40]}» عندي ٣ أفكار:\n"
-        "1. «تمرّن كل يوم ولا تشوف نتيجة؟» ليه الراحة جزء من التمرين (6 سلايدات)\n"
-        "2. «البروتين مو بس للمتضخمين» كم تحتاج فعلًا (5 سلايدات)\n"
+        f"حسنًا، عن «{last[:40]}» عندي ٣ أفكار:\n"
+        "1. «تمرّن كل يوم ولا ترى نتيجة؟» له الراحة جزء من التمرين (6 سلايدات)\n"
+        "2. «البروتين مو فقط للمتضخمين» كم تحتاج فعلًا (5 سلايدات)\n"
         "3. «٣ أغلاط تخرّب الدايت» (5 سلايدات)\n"
         "أي وحدة تبي نكمل عليها؟"
     )
@@ -452,15 +452,15 @@ def mock_reply(chat: list[dict]) -> str:
 
 def mock_plan(slides: int, cta: str | None = None) -> str:
     items = [
-        {"headline": "تمرّن كل يوم وما تشوف نتيجة؟", "body": "", "visual": "tired character looking at a mirror"},
-        {"headline": "العضلة تكبر وانت ترتاح", "body": "التمرين يكسّر الألياف، والنوم يبنيها من جديد", "visual": "character sleeping, muscle icon glowing"},
+        {"headline": "تمرّن كل يوم وما ترى نتيجة؟", "body": "", "visual": "tired character looking at a mirror"},
+        {"headline": "العضلة تكبر وأنت ترتاح", "body": "التمرين يكسّر الألياف، والنوم يبنيها من جديد", "visual": "character sleeping, muscle icon glowing"},
         {"headline": "نام ٧ ساعات على الأقل", "body": "قلة النوم ترفع الكورتيزول وتوقف التقدم", "visual": "moon and clock icons"},
         {"headline": "يوم راحة مو كسل", "body": "خذ يومين راحة بالأسبوع وخلك نشيط بمشي خفيف", "visual": "character walking in a park"},
-        {"headline": "كل بروتين كافي", "body": "حوالي ١.٦ جرام لكل كيلو من وزنك يوميًا", "visual": "plate with chicken, eggs and yogurt"},
-        {"headline": "ابدأ مع مدربك النهارده", "body": "خطة تمرين وتغذية تناسبك", "visual": "coach character giving thumbs up with phone showing app"},
+        {"headline": "كل بروتين كافي", "body": "نحو ١.٦ جرام لكل كيلو من وزنك يوميًا", "visual": "plate with chicken, eggs and yogurt"},
+        {"headline": "ابدأ مع مدربك اليوم", "body": "خطة تمرين وتغذية تناسبك", "visual": "coach character giving thumbs up with phone showing app"},
     ]
     while len(items) < slides:
-        items.insert(-1, {"headline": f"نصيحة رقم {len(items)}", "body": "كلام تجريبي للسلايد", "visual": "flat icon"})
+        items.insert(-1, {"headline": f"نصيحة رقم {len(items)}", "body": "نص تجريبي للسلايد", "visual": "flat icon"})
     return json.dumps({"title": "الراحة جزء من التمرين", "caption": "الراحة مو رفاهية 💪", "hashtags": ["#لياقة"],
                        "slides": items[: slides - 1] + [{"headline": cta, "body": "", "visual": "call to action"} if cta else items[-1]]},
                       ensure_ascii=False)
