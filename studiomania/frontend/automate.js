@@ -24,6 +24,7 @@ const AutoPage = (() => {
     genvid: "M3.5 6.5h12v11h-12z M15.5 10l5-3v10l-5-3 M19 2.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z",
     frames: "M3.5 5h7v6h-7z M13.5 5h7v6h-7z M3.5 13h7v6h-7z M13.5 13h7v6h-7z M15 16l1.5 1.5 3-3",
     piece: "M5 4.5h14v15H5z M5 9h14 M5 15h14 M8 4.5v4.5 M16 15v4.5",
+    montage: "M4 5.5h16v13H4z M4 9h16 M7 5.5 9 9 M12 5.5 14 9 M17 5.5 19 9 M10 12.5l4 2.25-4 2.25z",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const KIND_T = { image: "صور", video: "فيديوهات", any: "صور وفيديوهات", audio: "صوت" };
@@ -45,6 +46,11 @@ const AutoPage = (() => {
       music: [srcLeaf, { f: "volume", t: "علو الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت النص", val: o.duck ? "نعم" : "لا" }, { f: "order", t: "أي موسيقى", val: M.orders[o.order] }],
       cut: [{ f: "max", t: "أقصى طول للقطة", val: `${AR_N(o.max)} ث` }, { f: "trans", t: "الانتقال", val: M.trans[o.trans] }],
       caption: [{ f: "on", t: "التعليق النصي", val: o.on ? "يعمل" : "مغلق" }],
+      montage: [{ f: "silence", t: "إزالة السكتات", val: M.silence?.[o.silence] || "" }, { f: "logo", t: "مكان اللوجو", val: M.logo_pos?.[o.logo]?.[0] || "" },
+        ...(o.logo === "off" ? [] : [{ f: "logo_size", t: "حجم اللوجو", val: `${AR_N(o.logo_size)}٪` }]),
+        { f: "duck_pct", t: "توطية الموسيقى وقت الراوي", val: o.duck_pct ? `${AR_N(o.duck_pct)}٪` : "لا" }, { f: "cap_style", t: "شكل الكابشن", val: M.cap_styles?.[o.cap_style] || "" },
+        { f: "b_intro", t: "إنترو البراند", val: o.b_intro ? "نعم" : "لا" }, { f: "b_outro", t: "أوترو البراند", val: o.b_outro ? "نعم" : "لا" },
+        { f: "denoise", t: "تنقية صوت الكلام", val: o.denoise ? "نعم" : "لا" }],
       export: [{ f: "ratio", t: "المقاس", val: o.ratio }],
       split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
         { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
@@ -561,12 +567,32 @@ const AutoPage = (() => {
     if (s.verb === "genvid" && l.f === "sec") return head + pills("sec", [[4, "٤ ث"], [5, "٥ ث"], [6, "٦ ث"], [8, "٨ ث"], [10, "١٠ ث"]], o.sec) + `<p class="bm-note">التكلفة على قدر الثواني.</p>`;
     if (s.verb === "genvid" && l.f === "count") return head + pills("count", [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"]], o.count);
     if (s.verb === "pull" && l.f === "volume") return head + pills("volume", [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]], o.volume);
+    if (s.verb === "montage") return head + montCard(l.f, o);
     if (["fit", "duck", "on", "use_piece"].includes(l.f)) return head + pills(l.f, [[true, "نعم"], [false, "لا"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
     if (s.verb === "split" && l.f === "max") return head + pills("max", [[5, "٥ ث"], [8, "٨ ث"], [10, "١٠ ث"], [12, "١٢ ث"], [15, "١٥ ث"], [20, "٢٠ ث"], [30, "٣٠ ث"], [60, "٦٠ ث"]], o.max)
       + `<p class="bm-note">كل قطعة ستظهر أقل من (أو قدر) هذا الطول. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
+  }
+  // 🎬 «مونتاج»: كل اختيار أزرار، ومعاينة صغيرة (مكان اللوجو وشكل الكابشن) بتتغير مع الاختيار
+  function montPrev(o) {
+    const M = S.meta, pos = M.logo_pos?.[o.logo], look = M.cap_looks?.[o.cap_style];
+    const logo = pos && o.logo !== "off" ? `<span class="mp-logo" style="width:${o.logo_size}%;left:calc((100% - ${o.logo_size}%) * ${pos[1] / 100});top:calc((100% - ${(o.logo_size * 0.5625).toFixed(2)}%) * ${pos[2] / 100})">${M.brand_logo ? `<img src="${esc(M.brand_logo)}" alt="">` : "LOGO"}</span>` : "";
+    const words = ["جرّب", "الطعم", "الجديد"].slice(0, Math.min(3, look?.words || 3));
+    const cap = look ? `<span class="mp-cap${look.box ? " box" : ""}${look.pop ? " pop" : ""}" style="color:${esc(look.color)};${look.box ? `background:${esc(look.box_color)}` : ""}">${words.map((w, i) => `<i style="${look.highlight_on && i === 1 ? `color:${esc(look.highlight)}` : ""}">${w}</i>`).join(" ")}</span>` : "";
+    return `<div class="mp-box" aria-hidden="true"><div class="mp-scene"></div>${logo}${cap}<div class="mp-bar"><i></i></div></div>`;
+  }
+  function montCard(f, o) {
+    const M = S.meta, yes = [[true, "نعم"], [false, "لا"]];
+    let body = "";
+    if (f === "silence") body = pills("silence", Object.entries(M.silence || {}), o.silence) + `<p class="bm-note">«خفيف»: الوقفات الطويلة بس. «متوسط»: أي وقفة أطول من نص ثانية. «قوي»: إيقاع سريع. بيشتغل على الفيديوهات اللي فيها كلام.</p>`;
+    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">اللوجو من «عقل البراند». الخانة اللي في النص = بدون لوجو.</p>`;
+    else if (f === "logo_size") body = pills("logo_size", [[10, "صغير"], [14, "وسط"], [18, "عادي"], [24, "كبير"]], o.logo_size);
+    else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">الموسيقى بتوطى لوحدها وقت كلام الراوي، وترجع بعده.</p>`;
+    else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">الكابشن بيتكتب من التعليق الصوتي بتوقيته.</p>`;
+    else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل البراند ← الإنترو والأوترو».</p>` : "");
+    return body + (["logo", "logo_size", "cap_style"].includes(f) ? montPrev(o) : "");
   }
   const RULES_PH = { gen: "مثلًا: بدون نصوص على الشاشة، ألوان العلامة، الشخصية دائمًا لابسة أبيض", genvid: "مثلًا: بدون نصوص على الشاشة، إضاءة دافية، حركة كاميرا هادية", genimg: "مثلًا: خلفية فاتحة، بدون أشخاص، أسلوب مينيمال",
     pull: "مثلًا: قبل وبعد فقط، بدون صور فيها وشوش", music: "مثلًا: هادية، بدون نص", voice: "مثلًا: صوت سارة فقط" };

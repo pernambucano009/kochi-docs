@@ -3167,7 +3167,7 @@ $("mtPreviewTop")?.addEventListener("click", () => $("tpFull")?.click());
 let ALGO_ON = null;
 const silAll = () => mt.project?.data.algo?.marks || [];
 const silPending = () => silAll().filter((m) => !m.done);
-async function algoPrep(force = false) {
+async function algoPrep(force = false, minSec = 0) {
   const p = mt.project;
   if (!p) return;
   if (ALGO_ON === null) { try { ALGO_ON = (await api("/api/algo/mode")).on; } catch { ALGO_ON = false; } }
@@ -3177,7 +3177,7 @@ async function algoPrep(force = false) {
   if (!force && d.algo?.sig === sig && d.algo?.caps !== "working") return renderSilReview();
   await saveProject();
   let r;
-  try { r = await api(`/api/projects/${p.id}/algo-prep`, { method: "POST" }); } catch (err) { if (force) toast(err.message, true); return; }
+  try { r = await api(`/api/projects/${p.id}/algo-prep${minSec ? `?min_sec=${minSec}` : ""}`, { method: "POST" }); } catch (err) { if (force) toast(err.message, true); return; }
   if (mt.project?.id !== p.id) return;
   const old = new Map(silAll().map((m) => [m.id, m]));
   d.algo = { ...(d.algo || {}), sig, caps: r.caps, marks: r.marks.map((m) => ({ ...m, del: old.get(m.id)?.del ?? true, done: old.get(m.id)?.done || false })) };
@@ -3329,11 +3329,36 @@ $("tlBeat").onclick = async () => {
   } catch (err) { toast(err.message, true); }
   b.disabled = false;
 };
-$("tlSilence").onclick = async () => {
-  if (!mt.project?.data.clips.length) return toast("أضف فيديو أولًا", true);
+// ✂️ إزالة السكتات بضغطة: تختار المستوى فتتشال على طول (Ctrl+Z يرجّعها)، أو «علّمها بس» للمراجعة واحدة واحدة
+const SIL_LEVELS = [["light", "خفيف", "السكتات الطويلة بس (أطول من ٠٫٨ ث)", 0.8], ["mid", "متوسط", "أي وقفة أطول من نص ثانية", 0.45],
+  ["strong", "قوي", "إيقاع سريع: أي وقفة أطول من ٠٫٣ ث", 0.3]];
+function silMenuClose() { document.querySelector(".sil-menu")?.remove(); }
+async function silRun(minSec, review) {
   const b = $("tlSilence");
   b.disabled = true;
-  await algoPrep(true);
+  await algoPrep(true, minSec);
   b.disabled = false;
-  if (!silPending().length) toast("لا يوجد سكتات واضحة في الفيديوهات التي بصوت 👌");
+  if (!silPending().length) return toast("لا يوجد سكتات واضحة في الفيديوهات التي بصوت 👌");
+  if (!review) { silPending().forEach((m) => (m.del = m.kind !== "filler" && m.kind !== "repeat" ? true : m.del)); silApply(); }
+}
+$("tlSilence").onclick = (e) => {
+  e.stopPropagation();
+  if (document.querySelector(".sil-menu")) return silMenuClose();
+  if (!mt.project?.data.clips.length) return toast("أضف فيديو أولًا", true);
+  const r = $("tlSilence").getBoundingClientRect(), m = document.createElement("div");
+  m.className = "sil-menu";
+  m.setAttribute("role", "menu");
+  m.innerHTML = `<b>إزالة السكتات</b>${SIL_LEVELS.map(([k, t, sub, v]) => `<button type="button" role="menuitem" data-sl="${v}"><span>${t}</span><small>${sub}</small></button>`).join("")}
+    <button type="button" role="menuitem" class="rv" data-sl="0.45" data-rv="1"><span>علّمها بس</span><small>أراجعها واحدة واحدة قبل الحذف</small></button>`;
+  document.body.appendChild(m);
+  m.style.top = `${Math.max(8, r.top - m.offsetHeight - 6)}px`;
+  m.style.left = `${Math.min(innerWidth - m.offsetWidth - 8, Math.max(8, r.left))}px`;
+  m.addEventListener("click", (ev) => {
+    const x = ev.target.closest("[data-sl]");
+    if (!x) return;
+    silMenuClose();
+    silRun(+x.dataset.sl, !!x.dataset.rv);
+  });
 };
+document.addEventListener("click", (e) => { if (!e.target.closest(".sil-menu")) silMenuClose(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") silMenuClose(); });

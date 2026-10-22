@@ -3073,3 +3073,31 @@ html[data-role="customer"] .admin-only { display: none !important; }
 :root:root .project-bar .mtu-menu .new-project { display: flex; flex-direction: column; gap: 8px; order: 0; }
 :root:root .project-bar .mtu-menu select { width: 100%; }
 :root:root .project-bar .mtu-menu .btn { width: 100%; justify-content: flex-start; text-align: start; }
+
+/* ✂️ قائمة إزالة السكتات (مستويات) */
+.sil-menu{position:fixed;z-index:400;min-width:230px;padding:8px;border-radius:14px;background:var(--card,#fff);color:var(--text,#1d1b18);border:1px solid var(--line,#ddd8cf);box-shadow:0 14px 40px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:2px;direction:rtl}
+.sil-menu>b{font-size:12px;padding:4px 8px 6px;opacity:.7}
+.sil-menu button{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:10px}
+.sil-menu button:hover,.sil-menu button:focus-visible{background:var(--surface-2,rgba(0,0,0,.06))}
+.sil-menu button span{font-size:13px;font-weight:600}
+.sil-menu button small{font-size:11px;opacity:.65}
+.sil-menu button.rv{border-top:1px solid var(--line,#ddd8cf);border-radius:0 0 10px 10px;margin-top:4px}
+
+/* 🎬 نود المونتاج: شبكة مكان اللوجو + معاينة صغيرة */
+.mp-grid{display:grid;grid-template-columns:repeat(3,44px);gap:6px;direction:ltr;margin:4px 0}
+.mp-cell{all:unset;cursor:pointer;width:44px;height:30px;border-radius:7px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
+.mp-cell:hover{border-color:var(--accent)}
+.mp-cell.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.mp-box{position:relative;width:150px;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:linear-gradient(#3a352e,#1d1b18);margin:10px auto 2px}
+.mp-scene{position:absolute;inset:28% 24% auto;height:34%;border-radius:50% 50% 40% 40%;background:#4b453c}
+.mp-logo{position:absolute;aspect-ratio:1;border-radius:22%;background:var(--accent);color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mp-logo img{width:100%;height:100%;object-fit:contain;background:#fff}
+.mp-cap{position:absolute;left:6%;right:6%;bottom:24%;text-align:center;font-weight:800;font-size:13px;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.6);direction:rtl}
+.mp-cap.box{left:12%;right:12%;padding:3px 4px;border-radius:5px;text-shadow:none}
+.mp-cap.pop i{display:inline-block;animation:mpPop 1.6s ease infinite}
+.mp-cap.pop i:nth-child(2){animation-delay:.25s}.mp-cap.pop i:nth-child(3){animation-delay:.5s}
+.mp-cap i{font-style:normal}
+@keyframes mpPop{0%,100%{transform:scale(1)}12%{transform:scale(1.18)}24%{transform:scale(1)}}
+.mp-bar{position:absolute;left:8%;right:8%;bottom:5%;height:3px;border-radius:2px;background:rgba(255,255,255,.25)}
+.mp-bar i{position:absolute;inset:0 60% 0 0;background:#fff;border-radius:2px}
+@media (prefers-reduced-motion:reduce){.mp-cap.pop i{animation:none}}

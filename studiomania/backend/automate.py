@@ -34,6 +34,9 @@ VERBS = {
     "frames": {"t": "اختر الفريمات", "desc": "الذكاء الاصطناعي يشاهد على فيديو، ويُخرج الفريمات (أو اللقطات) ما توصفها بالكلام فقط، والباقي يُزال",
                "accept": ("video",), "opts": {"want": "", "out": "frames", "count": 6, "sec": 2.5, "order": "fresh"}},
     "merge": {"t": "جمّع", "desc": "يجمع المخرجات التي تختارها في فيديو واحد بالترتيب الذي تحدده", "accept": (), "opts": {"items": []}},
+    "montage": {"t": "مونتاج", "desc": "اختيارات المونتاج: إزالة السكتات، مكان اللوجو، توطية الموسيقى وقت الراوي، شكل الكابشن، وإنترو وأوترو البراند",
+                "accept": (), "opts": {"silence": "mid", "logo": "tr", "logo_size": 18, "duck_pct": 75, "cap_style": "tiktok",
+                                       "b_intro": True, "b_outro": True, "denoise": True}},
     "cut": {"t": "طول اللقطات", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "ضع تعليق نصي", "desc": "النص مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
     "export": {"t": "صدّر", "desc": "الفيديو يُصدّر هذا بالمقاس", "accept": (), "opts": {"ratio": "9:16"}},
@@ -57,6 +60,10 @@ WHEN = {"draft": "ينتظر موافقتي", "now": "ينزل مباشرة"}
 ORDERS = {"fresh": "ما لا تستخدم من قبل", "random": "عشوائي", "newest": "الأحدث أولًا", "oldest": "الأقدم أولًا"}
 TRANS = {"": "بدون", "fade": "ذوبان", "whip": "سحبة"}
 RATIOS = ("9:16", "1:1", "4:5", "16:9")
+# 🎬 «مونتاج»: مستويات إزالة السكتات (أقل طول للسكتة بالثواني)، وأماكن اللوجو (x, y من 0 لـ 100)
+SILENCE = {"off": ("بدون", 0.0), "light": ("خفيف", 0.8), "mid": ("متوسط", 0.45), "strong": ("قوي", 0.3)}
+LOGO_POS = {"tr": ("أعلى يمين", 96, 4), "tc": ("أعلى وسط", 50, 4), "tl": ("أعلى يسار", 4, 4), "mr": ("وسط يمين", 96, 50), "ml": ("وسط يسار", 4, 50),
+            "br": ("أسفل يمين", 96, 92), "bc": ("أسفل وسط", 50, 92), "bl": ("أسفل يسار", 4, 92), "off": ("بدون لوجو", 0, 0)}
 MAX_STEPS = 24
 
 
@@ -73,8 +80,8 @@ def new_step(verb: str) -> dict:
 
 
 def starter() -> list[dict]:
-    """النموذج الجديد يبدأ بمثال يُعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← تعليق نصي ← صدّر ← انشر."""
-    return [new_step(v) for v in ("pull", "voice", "music", "cut", "caption", "export", "publish")]
+    """النموذج الجديد يبدأ بمثال يُعدّل: اسحب ← تعليق ← موسيقى ← قطّع ← مونتاج ← صدّر ← انشر."""
+    return [new_step(v) for v in ("pull", "voice", "music", "cut", "montage", "export", "publish")]
 
 
 def clean_src(raw) -> dict | None:
@@ -129,6 +136,18 @@ def clean_opts(verb: str, raw: dict) -> dict:
             base[k] = raw[k]
         elif k == "ratio" and raw[k] in RATIOS:
             base[k] = raw[k]
+        elif k == "silence" and raw[k] in SILENCE:
+            base[k] = raw[k]
+        elif k == "logo" and raw[k] in LOGO_POS:
+            base[k] = raw[k]
+        elif k == "cap_style":
+            base[k] = str(raw[k] or "off")[:20]
+        elif k == "logo_size":
+            base[k] = int(num(k, 6, 40))
+        elif k == "duck_pct":
+            base[k] = int(num(k, 0, 95))
+        elif k in ("b_intro", "b_outro", "denoise"):
+            base[k] = bool(raw[k])
         elif k == "when" and raw[k] in WHEN:
             base[k] = raw[k]
         elif k == "platforms" and isinstance(raw[k], list):

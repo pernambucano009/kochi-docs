@@ -605,12 +605,12 @@ SILENCE_PAD = 0.12    # بنسيب نَفَس صغير قبل وبعد الكل�
 FILLERS = {"امم", "اممم", "ممم", "مم", "إمم", "ااه", "آآ", "اا", "ااا", "إيييه", "um", "umm", "uh", "uhh", "hmm", "erm", "ah"}
 
 
-def silence_marks(quiet: list[tuple[float, float]], a: float, b: float, first: bool, last: bool) -> list[dict]:
+def silence_marks(quiet: list[tuple[float, float]], a: float, b: float, first: bool, last: bool, min_len: float = SILENCE_MIN) -> list[dict]:
     """السكتات داخل قطعة [a, b] من الفيديو الأصلي. السكوت في أول أول قطعة وآخر آخر قطعة يُزال كله (القفل بعد النتيجة)."""
     out = []
     for s, e in quiet:
         s, e = max(s, a), min(e, b)
-        if e - s < SILENCE_MIN:
+        if e - s < min_len:
             continue
         head, tail = s <= a + 0.05, e >= b - 0.05
         cs = s if (head and first) else s + SILENCE_PAD

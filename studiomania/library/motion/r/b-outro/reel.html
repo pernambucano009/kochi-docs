@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// 🎬 أوترو البراند (من «عقل البراند ← الأوترو»): آخر ٤ ثواني بدعوة واضحة. الكلام والحسابات بتيجي من العقل.
+const PR = M.params({
+  style: { label: "الشكل", kind: "select", def: "cta", options: [["cta", "دعوة لفعل"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
+  bgk: { label: "الخلفية", kind: "select", def: "dark", options: [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]] },
+  ratio: { label: "المقاس", kind: "select", def: "9:16", options: [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]] },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "براند", max: 18 },
+  tag: { label: "الشعار", kind: "text", role: "tagline", def: "", max: 40 },
+  cta: { label: "الدعوة", kind: "text", role: "cta", def: "اطلب الآن", max: 24 },
+  handle: { label: "الحساب", kind: "text", role: "handle", def: "", max: 30 },
+  link: { label: "الموقع أو الرقم", kind: "text", def: "", max: 40 },
+  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e8a54b" },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#c9862f" },
+  fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
+  fBody: { label: "خط الكلام", kind: "font", def: "tajawal" },
+});
+M.meta({ story: "أوترو قصير للبراند بدعوة واضحة.", scenes: [{ name: "الأوترو", t0: 0, t1: 4, about: "اللوجو والدعوة" }] });
+const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
+const W = SZ[0], H = SZ[1], DUR = 4, S = Math.min(W, H) / 1080;
+const BG = PR.style === "tagline" ? PR.c1 : PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";
+const LIGHT = BG === "#f6f4ef", INK = LIGHT ? "#1d1b18" : "#ffffff", SUB = LIGHT ? "#4a463f" : "rgba(255,255,255,.8)";
+const CX = W / 2, LS = 230 * S;
+
+M.reel({
+  W, H, DUR, bg: BG,
+  async init(M) {
+    await Promise.all([M.font("LZ", PR.fHead), M.font("TJ", PR.fBody)]);
+    const lg = await M.img(PR.logo), c = M.canvas(W, H);
+    const L = document.createElement("canvas"); L.width = L.height = Math.ceil(LS); const lx = L.getContext("2d");
+    if (lg) {
+      if (!LIGHT) { lx.fillStyle = "#fff"; rr(lx, 0, 0, LS, LS, LS * .22); lx.fill(); }
+      const pad = LIGHT ? 0 : LS * .14, k = Math.min((LS - pad * 2) / lg.width, (LS - pad * 2) / lg.height);
+      lx.drawImage(lg, (LS - lg.width * k) / 2, (LS - lg.height * k) / 2, lg.width * k, lg.height * k);
+    } else {
+      lx.fillStyle = BG === PR.c1 ? "#fff" : PR.c1; rr(lx, 0, 0, LS, LS, LS * .24); lx.fill();
+      lx.fillStyle = BG === PR.c1 ? PR.c1 : "#fff"; lx.textAlign = "center"; lx.textBaseline = "middle"; lx.font = `${LS * .5}px LZ`;
+      lx.fillText([...String(PR.brand || "S").trim()][0] || "S", LS / 2, LS * .54);
+    }
+    return { x: c.getContext("2d"), L };
+  },
+  seek(t, C, M) {
+    const { x, L } = C, { seg, cubicIO, clamp, springO } = M, io = (k) => cubicIO(clamp(k));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.fillStyle = BG; x.fillRect(0, 0, W, H);
+    const up = (a, b) => io(seg(t, a, b));   // يطلع لفوق بنعومة
+    const text = (s, y, font, size, color, k, minS = 22 * S) => { if (!s || k <= 0) return; x.save(); x.globalAlpha = k; x.fillStyle = color;
+      x.font = `${M.fit(s, font, W * .84, size, minS)}px ${font}`; x.textAlign = "center"; x.direction = M.isAr(s) ? "rtl" : "ltr"; x.fillText(s, CX, y + (1 - k) * 36 * S); x.restore(); };
+    const logo = (y, k, sc = 1) => { if (k <= 0) return; const e = springO(k, 10, .6) * sc; x.save(); x.globalAlpha = clamp(k * 2); x.translate(CX, y); x.scale(e, e); x.drawImage(L, -LS / 2, -LS / 2, LS, LS); x.restore(); };
+    const st = PR.style, mid = H / 2;
+    if (st === "cta") {
+      logo(mid - 250 * S, seg(t, 0, .7));
+      text(PR.brand, mid - 30 * S, "LZ", 120 * S, INK, up(.3, .8));
+      const k = up(.7, 1.2), beat = 1 + .05 * Math.max(0, Math.sin((t - 1.4) * Math.PI * 2.2)) * (t > 1.4 ? 1 : 0);
+      if (k > 0 && PR.cta) { const fs = M.fit(PR.cta, "TJ", W * .6, 60 * S, 28 * S, "700"), w = M.measure(PR.cta, `700 ${fs}px TJ`) + 110 * S, h = fs + 64 * S;
+        x.save(); x.globalAlpha = k; x.translate(CX, mid + 150 * S + (1 - k) * 30 * S); x.scale(beat, beat); x.fillStyle = BG === PR.c1 ? "#fff" : PR.c1; rr(x, -w / 2, -h / 2, w, h, h / 2); x.fill();
+        x.fillStyle = BG === PR.c1 ? PR.c1 : "#141311"; x.font = `700 ${fs}px TJ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = M.isAr(PR.cta) ? "rtl" : "ltr"; x.fillText(PR.cta, 0, 4 * S); x.restore(); }
+      text(PR.link, mid + 300 * S, "TJ", 44 * S, SUB, up(1.1, 1.6));
+    } else if (st === "handles") {
+      logo(mid - 320 * S, seg(t, 0, .7), .85);
+      text(PR.brand, mid - 120 * S, "LZ", 110 * S, INK, up(.3, .8));
+      const rows = [[PR.handle, "@"], [PR.link, "↗"]].filter((r) => r[0]);
+      rows.forEach(([s, ic], i) => { const k = up(.7 + i * .25, 1.2 + i * .25); if (k <= 0) return; const y = mid + 40 * S + i * 120 * S;
+        x.save(); x.globalAlpha = k; x.fillStyle = LIGHT ? "rgba(0,0,0,.06)" : "rgba(255,255,255,.1)"; rr(x, W * .14, y - 50 * S, W * .72, 92 * S, 46 * S); x.fill();
+        x.fillStyle = PR.c1; x.beginPath(); x.arc(W * .14 + 46 * S, y - 4 * S, 30 * S, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.font = `700 ${32 * S}px TJ`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(ic, W * .14 + 46 * S, y - 2 * S);
+        x.fillStyle = INK; x.font = `${M.fit(s, "TJ", W * .52, 44 * S, 22 * S)}px TJ`; x.direction = "ltr"; x.fillText(s, CX + 20 * S, y - 2 * S); x.restore(); });
+      if (!rows.length) text(PR.cta, mid + 60 * S, "TJ", 56 * S, SUB, up(.7, 1.2));
+    } else if (st === "follow") {
+      const k = seg(t, 0, .7); logo(mid - 200 * S, k);
+      // جرس صغير بيرن جنب اللوجو
+      const b = up(.6, .9), ring = Math.sin(t * 18) * Math.exp(-Math.max(0, t - .9) * 3) * .35;
+      if (b > 0) { x.save(); x.globalAlpha = b; x.translate(CX + LS * .62, mid - 200 * S - LS * .42); x.rotate(ring); x.fillStyle = PR.c1; x.beginPath(); x.arc(0, 0, 38 * S, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = "#fff"; x.lineWidth = 5 * S; x.beginPath(); x.moveTo(-13 * S, 10 * S); x.quadraticCurveTo(-13 * S, -16 * S, 0, -16 * S); x.quadraticCurveTo(13 * S, -16 * S, 13 * S, 10 * S); x.closePath(); x.stroke(); x.restore(); }
+      text(M.isAr(PR.brand) || M.isAr(PR.cta) ? "تابعنا للمزيد" : "Follow for more", mid + 20 * S, "LZ", 104 * S, INK, up(.35, .85));
+      text(PR.handle || PR.brand, mid + 130 * S, "TJ", 54 * S, PR.c1 === BG ? "#fff" : PR.c1, up(.75, 1.25));
+    } else {   // tagline
+      logo(mid - 230 * S, seg(t, 0, .7), .8);
+      text(PR.tag || PR.brand, mid, "LZ", 96 * S, "#fff", up(.35, .9));
+      const lk = up(.9, 1.4); if (lk > 0) { x.fillStyle = "rgba(255,255,255,.8)"; x.fillRect(CX - 60 * S * lk, mid + 60 * S, 120 * S * lk, 5 * S); }
+      text(PR.link || PR.handle, mid + 150 * S, "TJ", 44 * S, "rgba(255,255,255,.9)", up(1.1, 1.6));
+    }
+  },
+  sound(A) {
+    const N = A.midi;
+    A.whoosh(0, .5, .06); A.kick(.35, .7); A.pluck(.35, N(72), .1, 1.4);
+    A.pad(.35, [N(48), N(55), N(60), N(64)], 3.6, .03);
+    if (PR.style === "follow") { for (let i = 0; i < 4; i++) A.tone(.9 + i * .09, N(96 - i % 2 * 4), .25, "sine", .05); }
+    else { A.pluck(.8, N(76), .08, 1.4); A.pluck(1.2, N(79), .08, 1.6); }
+  },
+});
+function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+</script>
+</body></html>

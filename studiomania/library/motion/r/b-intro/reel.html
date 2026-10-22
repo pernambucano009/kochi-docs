@@ -1,0 +1,116 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// 🎬 إنترو البراند (من «عقل البراند ← الإنترو»): لوجو العميل واسمه وألوانه في ٣ ثواني، بأكتر من حركة يختار منها.
+// لو مفيش لوجو: مربع بلون البراند وأول حرف من الاسم. المقاس على حسب الاختيار (٩:١٦ / ١:١ / ١٦:٩).
+const PR = M.params({
+  style: { label: "الحركة", kind: "select", def: "assemble", options: [["assemble", "تجميع اللوجو"], ["shine", "لمعة فاخرة"], ["letters", "الاسم يتكتب"],
+    ["wipe", "ستارة لونية"], ["pulse", "نبضة على الإيقاع"], ["glitch", "تشويش رقمي"], ["flip", "قلبة ثلاثية الأبعاد"]] },
+  bgk: { label: "الخلفية", kind: "select", def: "dark", options: [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]] },
+  ratio: { label: "المقاس", kind: "select", def: "9:16", options: [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]] },
+  textk: { label: "النص", kind: "select", def: "name", options: [["name", "الاسم"], ["tag", "الاسم والشعار"], ["none", "بدون"]] },
+  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
+  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "براند", max: 18 },
+  tag: { label: "الشعار", kind: "text", role: "tagline", def: "", max: 40 },
+  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e8a54b" },
+  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#c9862f" },
+  fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
+  fBody: { label: "خط الشعار", kind: "font", def: "tajawal" },
+});
+M.meta({ story: "إنترو قصير للبراند: اللوجو والاسم بحركة واحدة.", scenes: [{ name: "الإنترو", t0: 0, t1: 3, about: "اللوجو والاسم" }] });
+const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
+const W = SZ[0], H = SZ[1], DUR = 3, S = Math.min(W, H) / 1080;
+const BG = PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";
+const INK = PR.bgk === "light" ? "#1d1b18" : "#ffffff";
+const TXT = PR.textk === "none" ? "" : PR.brand, TAG = PR.textk === "tag" ? PR.tag : "";
+const CX = W / 2, CY = H / 2 - (TXT ? 90 * S : 0), LS = 300 * S;   // مكان وحجم اللوجو
+
+M.reel({
+  W, H, DUR, bg: BG,
+  async init(M) {
+    await Promise.all([M.font("LZ", PR.fHead), M.font("TJ", PR.fBody)]);
+    const lg = await M.img(PR.logo), c = M.canvas(W, H);
+    // اللوجو مرسوم مرة واحدة في كانفاس لوحده (مربع LS×LS)، علشان الحركات تقطّعه وتلمّعه
+    const L = document.createElement("canvas"); L.width = L.height = Math.ceil(LS); const lx = L.getContext("2d");
+    if (lg) {
+      if (PR.bgk !== "light") { lx.fillStyle = "#fff"; rr(lx, 0, 0, LS, LS, LS * .22); lx.fill(); }
+      const pad = PR.bgk !== "light" ? LS * .14 : 0, k = Math.min((LS - pad * 2) / lg.width, (LS - pad * 2) / lg.height);
+      lx.drawImage(lg, (LS - lg.width * k) / 2, (LS - lg.height * k) / 2, lg.width * k, lg.height * k);
+    } else {
+      lx.fillStyle = PR.bgk === "brand" ? "#fff" : PR.c1; rr(lx, 0, 0, LS, LS, LS * .24); lx.fill();
+      lx.fillStyle = PR.bgk === "brand" ? PR.c1 : "#fff"; lx.textAlign = "center"; lx.textBaseline = "middle"; lx.font = `${LS * .5}px LZ`;
+      lx.fillText([...String(PR.brand || "S").trim()][0] || "S", LS / 2, LS * .54);
+    }
+    return { x: c.getContext("2d"), L };
+  },
+  seek(t, C, M) {
+    const { x, L } = C, { seg, cubicIO, clamp, springO, expo } = M, io = (k) => cubicIO(clamp(k));
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.fillStyle = BG; x.fillRect(0, 0, W, H);
+    const out = 1 - io(seg(t, 2.65, 3));   // آخر ثلث ثانية: كله يخفت شوية علشان يدخل الفيديو
+    x.globalAlpha = .25 + .75 * out;
+    const logo = (a = 1, sc = 1, rot = 0, dx = 0) => { if (a <= 0) return; x.save(); x.globalAlpha *= a; x.translate(CX + dx, CY); x.rotate(rot); x.scale(sc, sc); x.drawImage(L, -LS / 2, -LS / 2, LS, LS); x.restore(); };
+    const st = PR.style;
+    if (st === "assemble") {
+      // ٣ حتت من اللوجو جايين من بعيد بزوايا مختلفة، ويتركبوا
+      const P = [[-1, -1, -.7, 0, 0, LS / 2, LS / 2], [1, -.6, .5, LS / 2, 0, LS / 2, LS / 2], [0, 1.2, 0, 0, LS / 2, LS, LS / 2]];
+      P.forEach(([ox, oy, r, sx, sy, sw, sh], i) => {
+        const k = springO(clamp((t - .05 - i * .14) / .75), 9, .62), f = 1 - k;
+        x.save(); x.globalAlpha *= clamp(k * 3); x.translate(CX - LS / 2 + sx + sw / 2 + ox * 520 * S * f, CY - LS / 2 + sy + sh / 2 + oy * 620 * S * f); x.rotate(r * f * 2);
+        x.drawImage(L, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); x.restore();
+      });
+      logo(io(seg(t, 1.1, 1.3)));   // بعد ما يتركبوا: اللوجو كامل فوقهم (من غير خطوط بين الحتت)
+    } else if (st === "shine") {
+      const k = io(seg(t, 0, .7)); logo(k, .86 + .14 * k);
+      const s = seg(t, .75, 1.65);
+      if (s > 0 && s < 1) { x.save(); x.beginPath(); x.rect(CX - LS / 2, CY - LS / 2, LS, LS); x.clip(); x.translate(CX - LS + s * LS * 2.2, CY); x.rotate(.35);
+        const g = x.createLinearGradient(-LS * .25, 0, LS * .25, 0); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(.5, "rgba(255,255,255,.75)"); g.addColorStop(1, "rgba(255,255,255,0)");
+        x.fillStyle = g; x.fillRect(-LS * .25, -LS, LS * .5, LS * 2); x.restore(); }
+    } else if (st === "letters") {
+      logo(springO(clamp(t / .6), 10, .55), springO(clamp(t / .6), 10, .55) * .7);
+    } else if (st === "wipe") {
+      const a = io(seg(t, 0, .55)), b = io(seg(t, .55, 1.1));
+      logo(b > 0 ? 1 : 0, .9 + .1 * b);
+      x.fillStyle = PR.bgk === "brand" ? "#fff" : PR.c1; x.fillRect(W * (1 - a) - W * b, 0, W * (a > 0 ? 1 : 0), H);
+      x.fillStyle = PR.c2; x.fillRect(W * (1 - a) - W * b + W * .92, 0, W * .08 * a, H);
+    } else if (st === "pulse") {
+      [0, .55, 1.1].forEach((d) => { const r = seg(t, .2 + d, 1.3 + d); if (r > 0 && r < 1) { x.save(); x.globalAlpha *= 1 - r; x.strokeStyle = PR.c1; x.lineWidth = 10 * S; x.beginPath(); x.arc(CX, CY, LS * (.55 + 1.6 * expo(r)), 0, Math.PI * 2); x.stroke(); x.restore(); } });
+      const beat = [0.2, .75, 1.3].reduce((m, b) => Math.max(m, Math.exp(-Math.max(0, t - b) * 9) * (t >= b ? 1 : 0)), 0);
+      logo(io(seg(t, 0, .25)), 1 + .12 * beat);
+    } else if (st === "glitch") {
+      const g = t < 1.2 ? 1 - io(seg(t, .7, 1.2)) : 0, n = Math.floor(t * 24);
+      if (g <= 0) logo(1);
+      else for (let i = 0; i < 8; i++) {
+        const h = LS / 8, off = (((n * 7 + i * 13) % 11) - 5) * 14 * S * g;
+        x.save(); x.globalAlpha *= clamp(t * 6); x.drawImage(L, 0, i * h, LS, h, CX - LS / 2 + off, CY - LS / 2 + i * h, LS, h);
+        x.globalCompositeOperation = "lighter"; x.globalAlpha *= .35 * g; x.drawImage(L, 0, i * h, LS, h, CX - LS / 2 + off + 10 * S, CY - LS / 2 + i * h, LS, h); x.restore();
+      }
+    } else {   // flip
+      const k = io(seg(t, 0, 1.1)), c = Math.cos(Math.PI * (1 - k));
+      x.save(); x.globalAlpha *= clamp(k * 2.5); x.translate(CX, CY); x.scale(Math.abs(c) * (.6 + .4 * k), .6 + .4 * k); x.drawImage(L, -LS / 2, -LS / 2, LS, LS); x.restore();
+    }
+    // الاسم والشعار تحت اللوجو
+    if (TXT) {
+      const y = CY + LS / 2 + 150 * S, fs = M.fit(TXT, "LZ", W * .82, 150 * S, 50 * S);
+      x.save(); x.fillStyle = INK; x.font = `${fs}px LZ`; x.textAlign = "center"; x.direction = M.isAr(TXT) ? "rtl" : "ltr";
+      if (st === "letters") {   // بيتكتب من أول الكلمة لآخرها (قناع بيتحرك، علشان الحروف العربي متتقطعش)
+        const k = io(seg(t, .45, 1.5)), w = M.measure(TXT, `${fs}px LZ`) + 40 * S, rtl = M.isAr(TXT);
+        x.beginPath(); x.rect(rtl ? CX + w / 2 - w * k : CX - w / 2, y - fs, w * k, fs * 1.5); x.clip(); x.fillText(TXT, CX, y);
+      } else { const k = io(seg(t, st === "wipe" ? .9 : .7, st === "wipe" ? 1.4 : 1.25)); x.globalAlpha *= k; x.fillText(TXT, CX, y + (1 - k) * 40 * S); }
+      x.restore();
+      if (TAG) { const k = io(seg(t, 1.3, 1.8)); x.save(); x.globalAlpha *= k; x.fillStyle = PR.bgk === "light" ? "#4a463f" : "rgba(255,255,255,.82)";
+        x.font = `${M.fit(TAG, "TJ", W * .8, 52 * S, 24 * S)}px TJ`; x.textAlign = "center"; x.direction = M.isAr(TAG) ? "rtl" : "ltr"; x.fillText(TAG, CX, y + 95 * S); x.restore(); }
+    }
+  },
+  sound(A) {
+    const N = A.midi, st = PR.style;
+    if (st === "assemble") { A.whoosh(0, .5, .06); A.hit(.55, .5); A.hit(.7, .35); A.kick(.85, .8); A.pluck(.85, N(76), .1, 1.4); A.pad(.85, [N(52), N(59), N(64), N(67)], 2, .03); }
+    else if (st === "shine") { A.riser(0, .7, .04); A.tone(.75, N(88), 1.2, "sine", .07); A.tone(.95, N(95), 1, "sine", .05); A.pad(.2, [N(57), N(64), N(69)], 2.6, .03); }
+    else if (st === "letters") { A.kick(.05, .6); for (let i = 0; i < 6; i++) A.click(.5 + i * .16, .25); A.pluck(1.55, N(79), .09, 1.4); }
+    else if (st === "wipe") { A.whoosh(0, .55, .08); A.whoosh(.55, .5, .06); A.kick(1.1, .7); A.pluck(1.1, N(74), .1, 1.4); }
+    else if (st === "pulse") { [0.2, .75, 1.3].forEach((b, i) => { A.kick(b, .9); A.tone(b, N(48 + i * 7), .5, "sine", .12); }); A.pad(1.3, [N(55), N(62), N(67)], 1.6, .03); }
+    else if (st === "glitch") { for (let i = 0; i < 9; i++) A.nz(i * .12, .05, "highpass", 3000, .06); A.hit(1.2, .6); A.kick(1.2, .7); A.bass(1.2, N(36), .9, .2); }
+    else { A.whoosh(0, 1, .06); A.kick(1.1, .7); A.pluck(1.1, N(81), .09, 1.6); }
+  },
+});
+function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+</script>
+</body></html>

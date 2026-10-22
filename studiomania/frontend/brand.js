@@ -705,7 +705,8 @@ const BrandPage = (() => {
         const url = b?.[`${l.f}_url`];
         return head + (url ? `<video src="${esc(url)}" controls preload="metadata" playsinline></video>
           <div class="bm-pills"><button class="bm-pill${b[`${l.f}_on`] ? " on" : ""}" data-von="${l.f}" data-v="1">يعمل</button><button class="bm-pill${b[`${l.f}_on`] ? "" : " on"}" data-von="${l.f}" data-v="">مغلق</button></div>
-          <button class="bm-link bad" data-vdel="${l.f}">أزل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
+          <button class="bm-link bad" data-vdel="${l.f}">أزل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`)
+          + makerHTML(b, l.f);
       }
       case "multi": return head + `<p class="bm-note">يُكتب تلقائيًا من الشعار والصور، ويمكنك تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
       case "todo": {
@@ -754,6 +755,66 @@ const BrandPage = (() => {
     }
     return head;
   }
+  // 🎬 صانع الإنترو والأوترو: حركة بالكود بلوجو العلامة وألوانها واسمها، بمعاينة حية، وزرار يرسمها فيديو ويحطها هنا (من غير نقط)
+  const MK_OPTS = {
+    intro: { style: [["assemble", "تجميع اللوجو"], ["shine", "لمعة فاخرة"], ["letters", "الاسم يتكتب"], ["wipe", "ستارة لونية"], ["pulse", "نبضة على الإيقاع"], ["glitch", "تشويش رقمي"], ["flip", "قلبة ثلاثية الأبعاد"]],
+      textk: [["name", "الاسم"], ["tag", "الاسم والشعار"], ["none", "بدون نص"]] },
+    outro: { style: [["cta", "دعوة لفعل"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
+  };
+  const MK_BG = [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]], MK_RATIO = [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]];
+  const MK_TXT = { intro: [["tag", "الشعار"]], outro: [["cta", "الدعوة"], ["handle", "الحساب"], ["link", "الموقع أو الرقم"], ["tag", "الشعار"]] };
+  S.mk = S.mk || {};
+  function mkState(b, kind) {
+    const key = `${b.id}:${kind}`;
+    if (!S.mk[key]) {
+      S.mk[key] = { loading: true, opts: { kind, style: MK_OPTS[kind].style[0][0], bgk: "dark", ratio: "9:16", textk: "name" }, info: null };
+      api(`/api/brand-reel-params/${b.id}?kind=${kind}`).then((r) => { const m = S.mk[key]; m.info = r; m.loading = false; Object.assign(m.opts, r.made || {}, { kind }); refreshCard(); if (r.job?.status === "working") mkPoll(b.id, kind); })
+        .catch(() => { S.mk[key].loading = false; });
+    }
+    return S.mk[key];
+  }
+  function makerHTML(b, kind) {
+    if (!b?.id || !MK_OPTS[kind]) return "";
+    const m = mkState(b, kind), o = m.opts, T = kind === "intro" ? "الإنترو" : "الأوترو";
+    const row = (k, xs) => `<div class="bm-pills">${xs.map(([v, t]) => `<button class="bm-pill${String(o[k]) === v ? " on" : ""}" data-mk="${kind}" data-mkk="${k}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>`;
+    if (m.loading || !m.info) return `<div class="bm-mk"><p class="bm-note">يجهّز صانع ${T}…</p></div>`;
+    const P = { ...m.info.params, ...Object.fromEntries(Object.entries(o).filter(([k, v]) => k !== "kind" && v !== "")) };
+    const [W, H] = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[o.ratio] || [1080, 1920], bw = o.ratio === "16:9" ? 260 : o.ratio === "1:1" ? 210 : 170, sc = bw / W;
+    const job = m.info.job, busy = job?.status === "working";
+    const txt = (MK_TXT[kind] || []).map(([k, t]) => `<label class="bm-mkf"><small>${t}</small><input type="text" data-mkt="${kind}" data-mkk="${k}" value="${esc(o[k] ?? m.info.params[k] ?? "")}" placeholder="${esc(m.info.params[k] || "")}"></label>`).join("");
+    return `<div class="bm-mk"><p class="bm-mkh">🎬 أو اصنع ${T} هنا بلوجو العلامة وألوانها</p>
+      <div class="bm-mkrow"><div class="bm-mkprev" style="width:${bw}px;height:${Math.round(H * sc)}px"><iframe title="معاينة ${T}" data-mkprev="${esc(b.id)}:${kind}" src="${esc(m.info.reel)}#p=${encodeURIComponent(JSON.stringify(P))}" style="width:${W}px;height:${H}px;transform:scale(${sc})" tabindex="-1"></iframe></div>
+      <div class="bm-mkopts"><small>الحركة</small>${row("style", MK_OPTS[kind].style)}<small>الخلفية</small>${row("bgk", MK_BG)}${MK_OPTS[kind].textk ? `<small>النص</small>${row("textk", MK_OPTS[kind].textk)}` : ""}<small>المقاس</small>${row("ratio", MK_RATIO)}${txt}</div></div>
+      ${busy ? `<p class="bm-note">⏳ يرسم الفيديو… ${Math.round((job.progress || 0) * 100)}٪</p>` : job?.status === "error" ? `<p class="bm-note bad">ماكملش: ${esc(job.error || "")}</p>` : ""}
+      <button class="bm-go" data-mkgo="${kind}" ${busy ? "disabled" : ""}>🎬 اعمل ${T} وحطه هنا</button>
+      <p class="bm-note">بيترسم بالكود من غير ذكاء صناعي، فمفيش نقط. الاسم والألوان واللوجو من العقل${kind === "outro" ? "، والدعوة والحساب من «التسليم»" : ""}. ${b[`${kind}_url`] ? "الفيديو الجديد هيحل مكان الحالي." : ""}</p></div>`;
+  }
+  function mkPoll(bid, kind) {
+    const key = `${bid}:${kind}`, m = S.mk[key];
+    if (!m || m.polling) return;
+    m.polling = true;
+    const tick = async () => {
+      try {
+        const r = await api(`/api/brand-reel-params/${bid}?kind=${kind}`);
+        m.info.job = r.job;
+        if (r.job?.status === "working") { refreshCard(); return setTimeout(tick, 1500); }
+        m.polling = false;
+        if (r.job?.status === "error") { refreshCard(); return toast(r.job.error || "ماكملش", true); }
+        toast(`✓ ${kind === "intro" ? "الإنترو" : "الأوترو"} اتعمل واتحط في العقل`);
+        if (S.id === bid) save(() => bAPI(""));
+      } catch (err) { m.polling = false; toast(err.message, true); }
+    };
+    setTimeout(tick, 1200);
+  }
+  // المعاينة: الصفحة نفسها بتترسم بالوقت (seek) في لوب
+  (function mkLoop() {
+    const t0 = performance.now();
+    const step = () => {
+      document.querySelectorAll("iframe[data-mkprev]").forEach((f) => { try { const w = f.contentWindow; if (w?.seek && w.DUR) w.seek(((performance.now() - t0) / 1000) % (w.DUR + .6)); } catch { /* لسه بيحمّل */ } });
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  })();
   // 💡 الاقتراح جوه كارت الخانة: «استخدم الاقتراح» أو «تجاهل»، و«✨ اقترح» للخانات اللي المخ يقدر يقترحها (الخطوط)
   const SUGGEST = { typography: "✨ اقترح خطوط" };
   function suggBox(b, l) {
@@ -1129,6 +1190,17 @@ const BrandPage = (() => {
       if (ndel) { if ((await uiConfirm("تحذف هذه المعلومة؟ العقل لن يعرفها مرة أخرى ولن يستخدمها في أي كتابة جديدة. (ما أُنشئ من قبل لن يتغير)"))) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
+      const mk = t.closest("[data-mk]");
+      if (mk) { const m = S.mk[`${cur()?.id}:${mk.dataset.mk}`]; if (m) { m.opts[mk.dataset.mkk] = mk.dataset.v; refreshCard(); } return; }
+      const mkgo = t.closest("[data-mkgo]");
+      if (mkgo) {
+        const b = cur(), kind = mkgo.dataset.mkgo, m = S.mk[`${b?.id}:${kind}`];
+        if (!m) return;
+        S.el.querySelectorAll(`[data-mkt="${kind}"]`).forEach((x) => { m.opts[x.dataset.mkk] = x.value.trim(); });
+        try { const r = await api(`/api/ad-brains/${b.id}/brand-video/make`, { method: "POST", ...jsonBody(m.opts) }); m.info.job = r.job; refreshCard(); mkPoll(b.id, kind); }
+        catch (err) { toast(err.message, true); }
+        return;
+      }
       const von = t.closest("[data-von]");
       if (von) return patch({ [`${von.dataset.von}_on`]: von.dataset.v });
       const vdel = t.closest("[data-vdel]");
@@ -1199,6 +1271,7 @@ const BrandPage = (() => {
         const b = cur(), p = String(b?.palette || "").trim();
         return patch({ palette: p ? `${p}, ${el.value.toUpperCase()}` : el.value.toUpperCase() });
       }
+      if (el.dataset.mkt) { const m = S.mk[`${cur()?.id}:${el.dataset.mkt}`]; if (m) { m.opts[el.dataset.mkk] = el.value.trim(); refreshCard(); } return; }
       if (el.dataset.vup) {
         const f = el.files[0];
         el.value = "";

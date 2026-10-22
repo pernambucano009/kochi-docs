@@ -6674,30 +6674,67 @@ def project_voice_words(conn: sqlite3.Connection, data: dict) -> tuple[str, list
     return tr.get("status") or "none", tr.get("words") or []
 
 
+def project_silence_marks(conn: sqlite3.Connection, data: dict, min_len: float = algo.SILENCE_MIN) -> list[dict]:
+    """السكتات في القطع التي بصوت: [{id, i (رقم القطعة), a, b, kind}] بأوقات الفيديو الأصلي."""
+    clips = data.get("clips") or []
+    n = len(clips)
+    marks = []
+    cache: dict[str, list] = {}
+    for i, c in enumerate(clips):
+        if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf"):
+            continue
+        path = clip_source(conn, c["gen_id"])
+        if not path or not media_info(path).has_audio:
+            continue
+        info = media_info(path)
+        if str(path) not in cache:
+            try:
+                cache[str(path)] = silences(path, min(min_len, algo.SILENCE_MIN))
+            except (subprocess.SubprocessError, OSError):
+                cache[str(path)] = []
+        a, b = float(c.get("start") or 0), float(c["end"] if c.get("end") is not None else info.duration)
+        for m in algo.silence_marks(cache[str(path)], a, b, i == 0, i == n - 1, min_len):
+            marks.append({"id": f"{i}-{m['a']}", "i": i, **m})
+    return marks
+
+
+def cut_silences(conn: sqlite3.Connection, data: dict, min_len: float) -> tuple[int, float]:
+    """يشيل السكتات من القطع (كل قطعة تتقسم لحتت من غير السكوت، زي «احذف الأحمر» في المونتاج). يعود (عددها، ثوانيها)."""
+    marks = project_silence_marks(conn, data, min_len)
+    if not marks:
+        return 0, 0.0
+    out = []
+    for i, c in enumerate(data.get("clips") or []):
+        ms = sorted((m for m in marks if m["i"] == i), key=lambda m: m["a"])
+        if not ms:
+            out.append(c)
+            continue
+        path = clip_source(conn, c["gen_id"])
+        end = float(c["end"]) if c.get("end") is not None else media_info(path).duration
+        a, pieces = float(c.get("start") or 0), []
+        for m in ms:
+            if m["a"] - a > 0.05:
+                pieces.append((a, m["a"]))
+            a = max(a, m["b"])
+        if end - a > 0.05:
+            pieces.append((a, end))
+        for k, (x, y) in enumerate(pieces):
+            p = {**json.loads(json.dumps(c)), "start": round(x, 3), "end": round(y, 3)}
+            if k:
+                p.pop("trans", None)
+            out.append(p)
+    data["clips"] = out
+    return len(marks), round(sum(m["b"] - m["a"] for m in marks), 1)
+
+
 @app.post("/api/projects/{project_id}/algo-prep")
-def project_algo_prep(project_id: str):
-    """السكتات في الفيديوهات التي بصوت (بالأحمر للمراجعة)، وخطاف الشاشة، وحالة التعليق النصي."""
+def project_algo_prep(project_id: str, min_sec: float = 0.0):
+    """السكتات في الفيديوهات التي بصوت (بالأحمر للمراجعة)، وخطاف الشاشة، وحالة التعليق النصي.
+    min_sec: أقل طول للسكتة (مستوى الإزالة: خفيف/متوسط/قوي)، والافتراضي algo.SILENCE_MIN."""
+    min_len = min(2.0, max(0.25, min_sec)) if min_sec else algo.SILENCE_MIN
     with closing(db()) as conn:
         data = json.loads(get_project(conn, project_id)["data"])
-        clips = data.get("clips") or []
-        n = len(clips)
-        marks = []
-        cache: dict[str, list] = {}
-        for i, c in enumerate(clips):
-            if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf"):
-                continue
-            path = clip_source(conn, c["gen_id"])
-            if not path or not media_info(path).has_audio:
-                continue
-            info = media_info(path)
-            if str(path) not in cache:
-                try:
-                    cache[str(path)] = silences(path, algo.SILENCE_MIN)
-                except (subprocess.SubprocessError, OSError):
-                    cache[str(path)] = []
-            a, b = float(c.get("start") or 0), float(c["end"] if c.get("end") is not None else info.duration)
-            for m in algo.silence_marks(cache[str(path)], a, b, i == 0, i == n - 1):
-                marks.append({"id": f"{i}-{m['a']}", "i": i, **m})
+        marks = project_silence_marks(conn, data, min_len)
         status, words = project_voice_words(conn, data)
     if data.get("voice") and status == "none":   # الكابشن محتاج الكلام مكتوب: بيبدأ يتكتب لوحده
         with closing(db()) as conn, conn:
@@ -10735,6 +10772,87 @@ def delete_brand_video(bid: str, kind: str):
         d[f"{kind}_on"] = ""
     update_brain(bid, fn)
     return brain_to_dict(brain_row(bid))
+
+
+# 🎬 صانع الإنترو والأوترو: قالب بالكود (library/motion/r/b-intro و b-outro) بلوجو العميل وألوانه واسمه، بيترسم فيديو
+# وبيتحط مكان إنترو/أوترو العلامة على طول (ومتفعّل). مفيش توليد، فمفيش نقط.
+BRAND_REEL = {"intro": "b-intro", "outro": "b-outro"}
+BRAND_JOBS: dict[str, dict] = {}   # "<bid>:<kind>" → {status, progress, error}
+
+
+class BrandMakeIn(BaseModel):
+    kind: str = "intro"
+    style: str = ""
+    bgk: str = "dark"
+    ratio: str = "9:16"
+    textk: str = "name"
+    cta: str = ""
+    tag: str = ""
+    handle: str = ""
+    link: str = ""
+
+
+def brand_reel_params(b: dict, body: BrandMakeIn) -> dict:
+    """القيم من العقل (الاسم، الشعار، الألوان، الدعوة، الحساب)، وما كتبه العميل في الصانع فوقها."""
+    d = brain_to_dict(b)
+    hexes = re.findall(r"#[0-9a-fA-F]{6}\b", str(d.get("palette") or ""))
+    handle = re.search(r"instagram\.com/([A-Za-z0-9_.]+)", str(d.get("link") or ""))
+    about = re.split(r"[.\n،,]", str(d.get("about") or ""))[0].strip()[:40]
+    out = {"brand": str(d.get("name") or "")[:18], "logo": ((d.get("logos") or [{}])[0]).get("url") or "",
+           "c1": hexes[0] if hexes else "", "c2": hexes[1] if len(hexes) > 1 else (hexes[0] if hexes else ""),
+           "tag": body.tag.strip()[:40] or about, "cta": body.cta.strip()[:24] or str(d.get("cta") or "")[:24],
+           "handle": body.handle.strip()[:30] or (f"@{handle.group(1)}" if handle else ""),
+           "link": body.link.strip()[:40] or re.sub(r"^https?://(www\.)?", "", str(d.get("link") or ""))[:40],
+           "style": body.style, "bgk": body.bgk, "ratio": body.ratio, "textk": body.textk}
+    return {k: v for k, v in out.items() if v}
+
+
+def run_brand_make(bid: str, body: BrandMakeIn, params: dict) -> None:
+    key = f"{bid}:{body.kind}"
+    job = BRAND_JOBS[key]
+    tmp = brain_dir(bid) / f"make-{uuid.uuid4().hex[:6]}"
+    try:
+        tmp.mkdir(parents=True, exist_ok=True)
+        name = f"brand-{body.kind}-{uuid.uuid4().hex[:6]}.mp4"
+        motion_to_mp4(BRAND_REEL[body.kind], params, tmp, brain_dir(bid) / name, lambda k: job.update(progress=k))
+        def fn(d):
+            old = d.get(f"{body.kind}_file")
+            if old:
+                (brain_dir(bid) / old).unlink(missing_ok=True)
+            d[f"{body.kind}_file"] = name
+            d[f"{body.kind}_on"] = "1"
+            d[f"{body.kind}_made"] = {k: v for k, v in body.model_dump().items() if k != "kind"}
+        update_brain(bid, fn)
+        BRAND_JOBS.pop(key, None)
+    except Exception as e:  # noqa: BLE001
+        job.update(status="error", error=str(e)[:300])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@app.get("/api/brand-reel-params/{bid}")
+def brand_reel_preview_params(bid: str, kind: str = "intro"):
+    """القيم للمعاينة الحية في الصانع (نفس اللي هيترسم)، وحالة الرسم لو شغال."""
+    b = brain_row(bid)
+    if b is None or kind not in BRAND_REEL:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    return {"reel": f"/media/motion/r/{BRAND_REEL[kind]}/reel.html", "params": brand_reel_params(b, BrandMakeIn(kind=kind)),
+            "made": b.get(f"{kind}_made") or {}, "job": BRAND_JOBS.get(f"{bid}:{kind}")}
+
+
+@app.post("/api/ad-brains/{bid}/brand-video/make")
+def make_brand_video(bid: str, body: BrandMakeIn):
+    b = brain_row(bid)
+    if b is None:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    if body.kind not in BRAND_REEL:
+        raise HTTPException(400, "النوع يجب intro أو outro")
+    key = f"{bid}:{body.kind}"
+    if (BRAND_JOBS.get(key) or {}).get("status") == "working":
+        raise HTTPException(400, "يُرسم الآن، انتظر حتى ينتهي")
+    BRAND_JOBS[key] = {"status": "working", "progress": 0.0, "error": ""}
+    threading.Thread(target=run_brand_make, args=(bid, body, brand_reel_params(b, body)), daemon=True).start()
+    return {"ok": True, "job": BRAND_JOBS[key]}
 
 
 def coach_intro(data: dict) -> Path | None:
@@ -15058,45 +15176,52 @@ def motion_params(params: dict) -> dict:
     return out
 
 
+def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progress=lambda k: None, timing: list | None = None, vo: Path | None = None) -> float:
+    """يفتح قالب الموشن في المتصفح، يرسم كل فريم من الوقت (seek) ويأخذ الصوت المكتوب بالكود، ويعمل منهم فيديو. يعود الطول."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = typo_browser(p)
+        try:
+            page = browser.new_page(viewport={"width": 1920, "height": 1080})
+            page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";"
+                                 + (f"window.TIMING = {json.dumps([float(x) for x in timing])};" if timing else ""))
+            page.goto((MOTION_DIR / "r" / Path(mid).name / "reel.html").as_uri())
+            page.evaluate("() => window.ready")
+            W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
+            page.set_viewport_size({"width": W, "height": H})
+            (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
+            if vo:   # الفويس أوفر فوق المزيكا: المزيكا بتوطى، والصوت بطول الفيديو بالظبط
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / "track.wav"), "-i", str(vo), "-filter_complex",
+                                "[0]volume=0.32[m];[1]aformat=channel_layouts=stereo,volume=1.15[v];[m][v]amix=inputs=2:duration=first:normalize=0[o]",
+                                "-map", "[o]", "-ar", "48000", str(folder / "mix.wav")], check=True, capture_output=True, timeout=180)
+                (folder / "mix.wav").replace(folder / "track.wav")
+            n = int(math.ceil(dur * MOTION_FPS))
+            cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(MOTION_FPS), "-c:v", "mjpeg", "-i", "-",
+                   "-i", str(folder / "track.wav"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+                   "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(out)]
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+            for i in range(n):
+                page.evaluate(f"() => seek({i / MOTION_FPS})")
+                proc.stdin.write(page.screenshot(type="jpeg", quality=90))
+                progress(round((i + 1) / n, 3))
+            proc.stdin.close()
+            if proc.wait(timeout=600) != 0:
+                raise RuntimeError((proc.stderr.read() or b"").decode(errors="ignore")[-300:] or "ffmpeg فشل")
+        finally:
+            browser.close()
+    (folder / "track.wav").unlink(missing_ok=True)
+    return dur
+
+
 def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None) -> None:
     """يفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، ويأخذ الصوت الذي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
     aid = uuid.uuid4().hex[:12]
     folder = clip_dir(aid)
     job = MOTION_JOBS[mid]
     try:
-        from playwright.sync_api import sync_playwright
-
         (folder / "variants").mkdir(parents=True, exist_ok=True)
-        with sync_playwright() as p:
-            browser = typo_browser(p)
-            try:
-                page = browser.new_page(viewport={"width": 1920, "height": 1080})
-                page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";"
-                                     + (f"window.TIMING = {json.dumps([float(x) for x in timing])};" if timing else ""))
-                page.goto((MOTION_DIR / "r" / mid / "reel.html").as_uri())
-                page.evaluate("() => window.ready")
-                W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
-                page.set_viewport_size({"width": W, "height": H})
-                (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
-                if vo:   # الفويس أوفر فوق المزيكا: المزيكا بتوطى، والصوت بطول الفيديو بالظبط
-                    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / "track.wav"), "-i", str(vo), "-filter_complex",
-                                    "[0]volume=0.32[m];[1]aformat=channel_layouts=stereo,volume=1.15[v];[m][v]amix=inputs=2:duration=first:normalize=0[o]",
-                                    "-map", "[o]", "-ar", "48000", str(folder / "mix.wav")], check=True, capture_output=True, timeout=180)
-                    (folder / "mix.wav").replace(folder / "track.wav")
-                n = int(math.ceil(dur * MOTION_FPS))
-                cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", str(MOTION_FPS), "-c:v", "mjpeg", "-i", "-",
-                       "-i", str(folder / "track.wav"), "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
-                       "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(folder / "clip.mp4")]
-                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-                for i in range(n):
-                    page.evaluate(f"() => seek({i / MOTION_FPS})")
-                    proc.stdin.write(page.screenshot(type="jpeg", quality=90))
-                    job["progress"] = round((i + 1) / n, 3)
-                proc.stdin.close()
-                if proc.wait(timeout=600) != 0:
-                    raise RuntimeError((proc.stderr.read() or b"").decode(errors="ignore")[-300:] or "ffmpeg فشل")
-            finally:
-                browser.close()
+        dur = motion_to_mp4(mid, params, folder, folder / "clip.mp4", lambda k: job.update(progress=k), timing, vo)
         (folder / "track.wav").unlink(missing_ok=True)
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
                         "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
@@ -28517,6 +28642,10 @@ def automations_meta():
             "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
             "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES, "roles": automate.ROLES, "rules_verbs": automate.RULES_VERBS,
             "frame_out": automate.FRAME_OUT, "vid_modes": AUTO_VID_MODES,
+            "silence": {k: v[0] for k, v in automate.SILENCE.items()}, "logo_pos": {k: list(v) for k, v in automate.LOGO_POS.items()},
+            "cap_styles": {**{k: v["label"] for k, v in captions.TEMPLATES.items()}, "off": "بدون كابشن"},
+            "cap_looks": {k: {x: v[x] for x in ("color", "highlight", "highlight_on", "box", "box_color", "pop", "words")} for k, v in captions.TEMPLATES.items()},
+            "brand_logo": ((active_client() or {}).get("logos") or [{}])[0].get("file") and f"/media/ads/brains/{active_client_id()}/{(active_client() or {}).get('logos')[0]['file']}",
             "stock_pexels": stock.live() or atlas.mock_mode(),
             "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind", "mode", "video_in")} for m in auto_gen_models()],
             "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS,
@@ -29264,12 +29393,27 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
         if outro:
             clips.append({**vclip(outro, None), **({"trans": {"type": trans, "dur": 0.3}} if trans else {})})
         cache_f.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-        caps = (opt("caption") or {}).get("on") and voice_id
-        data = {"name": f"🤖 {d.get('name') or 'قالب'}"[:100], "section": "free", "clips": clips, "outro": False, "brand_intro": False, "brand_outro": False,
-                "char_intro": False, "canvas": {"ratio": ratio, "bg": "#000000"}, "captions": {"enabled": True} if caps else {},
+        mo = opt("montage")   # 🎬 «مونتاج»: الاختيارات فوق «تعليق نصي» والتوطية لو موجودة
+        cap_style = (mo or {}).get("cap_style") or "off"
+        caps = voice_id and ((cap_style != "off") if mo else (opt("caption") or {}).get("on"))
+        duck = ((mo or {}).get("duck_pct", 75) / 100 if mo else 0.75) if voice_id and (mo or (music or {}).get("duck")) else 0
+        data = {"name": f"🤖 {d.get('name') or 'قالب'}"[:100], "section": "free", "clips": clips, "outro": False,
+                "brand_intro": bool((mo or {}).get("b_intro")), "brand_outro": bool((mo or {}).get("b_outro")),
+                "char_intro": False, "canvas": {"ratio": ratio, "bg": "#000000"},
+                "captions": ({"enabled": True, **({"template": cap_style} if cap_style in captions.TEMPLATES else {})}) if caps else {},
                 "voice": {"id": voice_id} if voice_id else None,
                 "music": {"id": music_id, "volume": round((music or {}).get("volume", 35) / 100, 2)} if music_id else None,
-                "mix": {"duck": 0.75 if (music or {}).get("duck") and voice_id else 0, "normalize": True, "enhance": bool(voice_id)}}
+                "mix": {"duck": round(duck, 2), "normalize": True, "enhance": bool(voice_id) and (mo or {}).get("denoise", True)}}
+        if mo:
+            pos = automate.LOGO_POS.get(mo.get("logo") or "tr", automate.LOGO_POS["tr"])
+            data["logo"] = {**LOGO_DEFAULTS, "enabled": mo.get("logo") != "off", "x": pos[1], "y": pos[2], "size": int(mo.get("logo_size") or 18)}
+            lvl = automate.SILENCE.get(mo.get("silence") or "off", automate.SILENCE["off"])
+            if lvl[1]:
+                setr(step="✂️ يشيل السكتات")
+                with closing(db()) as conn:
+                    n_sil, sec_sil = cut_silences(conn, data, lvl[1])
+                if n_sil:
+                    report.append(f"✂️ اتشال {n_sil} سكتة ({sec_sil} ثانية، مستوى {lvl[0]})")
         pj = create_project(ProjectIn(**data))
         if caps:   # الكابشن محتاج الكلام مكتوب بتوقيته
             setr(step="✍️ يكتب النص لكي التعليق النصي", project_id=pj["id"])
