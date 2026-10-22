@@ -2557,3 +2557,5 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .flw-btn { padding: 10px 18px; } #nh .flw-btn.big { padding: 14px 28px; }
 #nh .flw-link { padding: 6px 4px; } #nh .flw-chip { padding: 8px 14px; }
 #nh .nh-gal-go { padding: 13px 24px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+#nhBar .nh-acct { width: 44px; padding: 0; justify-content: center; }
+#nhBar .nh-acct svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }

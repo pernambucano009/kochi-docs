@@ -184,6 +184,7 @@ const NH = (() => {
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
       <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
       <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
+      <button class="nh-chip nh-acct" id="nhAcct" title="حسابك" aria-label="حسابك"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></button>
       <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
     </div>`;
   document.body.appendChild(bar);
@@ -343,6 +344,14 @@ const NH = (() => {
   document.getElementById("nhClient").onclick = () => document.getElementById("clientBtn").click();
   document.getElementById("nhLang").textContent = I18N.lang === "en" ? "ع" : "EN";
   document.getElementById("nhLang").onclick = () => document.getElementById("langToggle").click();
+  // 👤 الحساب: بيوري الإيميل، ومنه تسجيل الخروج
+  document.getElementById("nhAcct").onclick = async () => {
+    let who = "";
+    try { const r = await fetch("/api/me"); if (r.ok) { const m = await r.json(); who = m.email || ""; } } catch { /* من غير بوابة الحسابات */ }
+    if (!(await uiConfirm(who ? `مسجّل الدخول بـ ${who}\nتسجيل الخروج؟` : "تسجيل الخروج؟", { ok: "تسجيل الخروج" }))) return;
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
+    location.href = "/login";
+  };
 
   // ---------- الزوم: المربع بيكبر بنعومة لحد ما يبقى الشاشة، واسمه وأيقونته بيتنقلوا لركن الصفحة زي ما هم ----------
   // الاسم بيتحرك بالـ transform بس (من غير تكبير ولا تغيير في الخط)، فعنوان الصفحة لازم يبقى بنفس مقاس اسم المربع
