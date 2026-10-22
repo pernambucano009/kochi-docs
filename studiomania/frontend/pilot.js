@@ -190,7 +190,7 @@ const PilotPage = (() => {
     const names = d.settings.names || {};
     return [
       { id: "phone", n: "تصوير بالموبايل", k: "قالب", tag: ["cam", "📱 محتاج تصوّر بنفسك"] },
-      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بنسخة ${twin.name}` : "قالب", tag: twin ? null : ["", "محتاج نسخة في «نسختي»"], off: !twin },
+      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "محتاج أفاتار جاهز"], off: !twin },
       ...d.custom.map((c) => ({ id: c.id, n: c.name, k: "قالب مخصص" })),
       { id: "carousel", n: "كاروسيل", k: "قالب", tag: ["", "🖼️ صور على إنستجرام"] },
       ...d.settings.templates.filter((t) => t.startsWith("t-")).map((t) => ({ id: t, n: names[t] || codeTpls().find((x) => x.id === t)?.name || t, k: "قالب" })),
@@ -311,7 +311,7 @@ const PilotPage = (() => {
       if (d.cnt) { const n = Math.max(1, Math.min(6, s.times.length + +d.cnt)); s.times = autoTimes(n); drawDay(); return saveTimes(); }
       if (d.tpl) {
         const m = tplList().find((x) => x.id === d.tpl);
-        if (m?.off) return toast("اعمل نسختك الأول من «نسختي» (فيديو قراية أو صورة قدامية)");
+        if (m?.off) return toast("اعمل أفاتار الأول من «الأفاتار» (فيديو قراية أو صورة قدامية)");
         const set = new Set(s.templates); set.has(d.tpl) ? set.delete(d.tpl) : set.add(d.tpl);
         return save({ templates: [...set] });
       }

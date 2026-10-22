@@ -1,4 +1,4 @@
-// 🪞 «نسختي»: نسخة من الشخص نفسه من تسجيلات حقيقية ليه.
+// 🪞 «الأفاتار»: نسخة من أي شخص (انت أو حد معاك إذنه) من تسجيلات حقيقية ليه.
 // ١) فيديو وهو بيقرا سكريبت إحنا مدينهوله (بنركّب عليه أي كلام جديد بعدين) ٢) صور من كذا اتجاه ٣) صوته لوحده ٤) فيديوهات جديدة بيه.
 const tw = { list: [], cur: null, kit: null, timer: null, rec: null };
 const twe = (v) => escapeHtml(v == null ? "" : String(v));
@@ -20,14 +20,14 @@ async function twInit() {
 function twRender() {
   const el = $("twMain");
   if (!el) return;
-  const side = `<aside class="panel tw-side"><div class="panel-head"><h2>🪞 نسختي</h2></div>
-    <p class="hint">نسخة منك انت (أو من الشخص صاحب الصفحة) معمولة من تسجيلات حقيقية: وشّه وحركته ولبسه وصوته، عشان تعمل بيها فيديوهات بكلام جديد.</p>
+  const side = `<aside class="panel tw-side"><div class="panel-head"><h2>🪞 الأفاتار</h2></div>
+    <p class="hint">أفاتار لأي شخص: انت، أو حد تاني معاك إذنه. بيتعمل من تسجيلات حقيقية ليه (وشّه وحركته ولبسه وصوته)، عشان تعمل بيه فيديوهات بكلام جديد. تقدر تعمل أكتر من أفاتار.</p>
     <ul class="ad-list">${tw.list.map((t) => `<li class="${tw.cur?.id === t.id ? "on" : ""}" data-twopen="${t.id}"><b data-no-i18n>${twe(t.name)}</b>
       <small class="muted">${t.ready.video ? "🎬" : "○"} ${t.ready.photos}/${t.ready.angles} 📷 ${t.ready.voice ? "🎙️" : "○"}</small></li>`).join("") || `<li class="muted">لسه مفيش</li>`}</ul>
     <form class="tw-new" data-twnew><input name="name" placeholder="اسم الشخص" required maxlength="80">
       <label class="tw-consent"><input type="checkbox" name="consent" required> ده أنا، أو معايا إذن صريح من الشخص إننا نعمل نسخة منه</label>
-      <button class="btn primary sm">＋ نسخة جديدة</button></form></aside>`;
-  setHTML(el, `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">اعمل نسخة جديدة من الشمال، وهنمشي معاك خطوة خطوة.</p></div>`}</section></div>`);
+      <button class="btn primary sm">＋ أفاتار جديد</button></form></aside>`;
+  setHTML(el, `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">اعمل أفاتار جديد من الشمال، وهنمشي معاك خطوة خطوة.</p></div>`}</section></div>`);
 }
 
 function twTips(k) { return `<ul class="tw-tips">${(tw.kit?.tips?.[k] || []).map((x) => `<li>${twe(x)}</li>`).join("")}</ul>`; }
@@ -61,7 +61,7 @@ function twBody(t) {
     <div class="row wrap"><input class="input" data-twbgname placeholder="اسم المكان (المكتب، المطبخ…)" maxlength="60">
       <label class="btn primary">📸 صوّر أو ارفع صورة المكان<input type="file" accept="image/*" capture="environment" data-twup="background" hidden></label></div>`);
   const c = t.cost || {}, sec = (key) => `≈ ${Math.max(1, Math.round((c[key] || 0) * 3 / 0.01))} نقطة/ث`;
-  const make = `<div class="panel tw-step tw-make"><div class="tw-mh"><i class="num">5</i><b>🎥 اعمل فيديو بنسختك</b></div>
+  const make = `<div class="panel tw-step tw-make"><div class="tw-mh"><i class="num">5</i><b>🎥 اعمل فيديو بالأفاتار</b></div>
     <p class="hint">قول الكلام الجديد بصوتك (سجّله هنا أو ارفعه)، والبرنامج يركّبه على شفايفك في فيديو القراية، أو يخلّي صورتك تتكلم.
       استنساخ الصوت (تكتب الكلام وهو يتقال بصوتك) هيتضاف لما نوصّل خدمة الاستنساخ.</p>
     <form class="tw-form" data-twmake>

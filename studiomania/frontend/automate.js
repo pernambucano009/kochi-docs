@@ -92,7 +92,7 @@ const AutoPage = (() => {
     else L.push({ f: "fit", t: "الفيديو على قد الصوت", val: o.fit ? "أيوه" : "لأ" });
     return L;
   }
-  // اللي ينفع يتمنشن: الشخصيات، نسختي، الخلفيات، والفولدرات والملفات من مكتبة المحتويات
+  // اللي ينفع يتمنشن: الشخصيات، الأفاتار، الخلفيات، والفولدرات والملفات من مكتبة المحتويات
   function loadRefs() {
     if (S.refsLoading) return;
     S.refsLoading = true;
@@ -106,7 +106,7 @@ const AutoPage = (() => {
     const nq = String(q || "").trim().toLowerCase(), on = new Set(chosen.map(refKey));
     const list = S.refs.filter((r) => !nq || `${r.label} ${r.sub}`.toLowerCase().includes(nq)).slice(0, 40);
     const groups = f === "audio" || f === "ref" ? [["audio", "🎙️ الأصوات (الشخصيات، صوتك، التعليقات والموسيقى)"]]
-      : [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 نسختي"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"], ["export", "📤 فيديوهات جاهزة"]];
+      : [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 الأفاتار"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 فولدرات"], ["file", "🖼️ صور وفيديوهات"], ["export", "📤 فيديوهات جاهزة"]];
     return groups.map(([k, t]) => { const xs = list.filter((r) => r.kind === k); return xs.length ? `<p class="am-gh">${t}</p><div class="am-files">${xs.map((r) =>
       `<button class="am-file${on.has(refKey(r)) ? " on" : ""}" data-refpick="${esc(f)}" data-ref="${esc(refKey(r))}" title="${esc(r.sub)}">${refThumb(r)}<small>${esc(r.label)}</small></button>`).join("")}</div>` : ""; }).join("")
       || `<p class="bm-note">مفيش حاجة بالاسم ده. ضيف شخصيات من «الشخصيات والأفاتار» وخلفيات وملفات من «مكتبة محتويات البراند».</p>`;
@@ -114,10 +114,10 @@ const AutoPage = (() => {
   function refsCard(s, f) {
     const o = s.opts, mode = genMode(o), one = f !== "refs", chosen = one ? (o[f] ? [o[f]] : []) : (o.refs || []);
     const note = s.verb === "genimg" ? { refs: `الصور دي بتتبعت للموديل كمرجع (لحد ${AR_N(imgModel(o)?.max_refs || 4)}): شخصية علشان شكلها يفضل ثابت، أو خلفية، أو أي صورة من المكتبة. أو اكتب @ في الوصف.` }[f]
-      : s.verb === "genvoice" ? { ref: "الموديل بيقلّد الصوت ده: صوت شخصية، صوتك من «نسختي»، أو تعليق من المكتبة." }[f] : { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
-      start: mode === "avatar" ? "صورة الشخص اللي هيتكلم (شخصية، نسختك، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.",
+      : s.verb === "genvoice" ? { ref: "الموديل بيقلّد الصوت ده: صوت شخصية، صوت أفاتار، أو تعليق من المكتبة." }[f] : { refs: mode === "refs" ? `الموديل بيعمل الفيديو من المراجع دي (لحد ${AR_N(S.meta.max_refs || 6)}). اختار شخصية أو خلفية أو صورة، أو اكتب @ في البرومبت.` : "لو الموديل بيقبل صور مرجع، بتتبعت معاه القطعة (مثلًا الشخصية علشان شكلها يفضل ثابت).",
+      start: mode === "avatar" ? "صورة الشخص اللي هيتكلم (شخصية، أفاتار، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.",
       end: "الصورة اللي الفيديو هيخلص عليها.",
-      audio: mode === "avatar" ? "الصوت اللي الشخص هيقوله (صوت شخصية، صوتك من «نسختي»، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو بيطلع على قد الصوت." : "الصوت اللي الشفايف هتتظبط عليه." }[f];
+      audio: mode === "avatar" ? "الصوت اللي الشخص هيقوله (صوت شخصية، صوت أفاتار، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو بيطلع على قد الصوت." : "الصوت اللي الشفايف هتتظبط عليه." }[f];
     if (s.verb !== "gen") return `<p class="bm-note">${note || ""}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>

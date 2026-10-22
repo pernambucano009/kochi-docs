@@ -272,7 +272,7 @@ const SceneStudio = (() => {
     if (!S.refs) { try { S.refs = await api("/api/automations-refs"); } catch (err) { return toast(err.message, true); } }
     const imgs = S.refs.filter((r) => ["char", "twin", "bg"].includes(r.kind) || (r.kind === "file" && /صورة/.test(r.sub)));
     box.hidden = false;
-    box.innerHTML = `<div class="sc-pick-in"><b>اختار صورة (شخصية، نسختك، خلفية، أو صورة من المكتبة)</b>
+    box.innerHTML = `<div class="sc-pick-in"><b>اختار صورة (شخصية، أفاتار، خلفية، أو صورة من المكتبة)</b>
       <div class="sc-grid">${imgs.map((r, i) => `<button type="button" data-scpk="${i}">${r.thumb ? `<img src="${esc(r.thumb)}" alt="">` : "🖼️"}<small>${esc(r.label)}</small></button>`).join("") || `<p class="sc-note">مفيش صور. ارفع صور في «مكتبة محتويات البراند».</p>`}</div>
       <div class="sc-acts"><button type="button" class="sc-btn" data-scpkx>إلغاء</button></div></div>`;
     box.onclick = (e) => {

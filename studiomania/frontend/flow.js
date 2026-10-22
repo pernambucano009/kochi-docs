@@ -567,12 +567,12 @@ const Flow = (() => {
     }
     const tw = twins.find((t) => t.id === cast?.twin);
     const bgs = tw?.backgrounds || [];
-    const auto = `<p class="muted">🪄 الـ B-roll أوتوماتيك: اللقطات اللي لازم تظهر فيها بتتعمل بنسختك${tw ? " في نفس المكان" : ""}، واللي مش لازم بتيجي من فيديوهات ستوك حقيقية. وفي المونتاج تقدر تشيل أي لقطة أو تبدّلها بفيديو من عندك.</p>`;
-    if (S.twins === null) return `<section><h3>🪞 مين في الفيديو؟</h3>${working("بيجيب نسخك…")}</section>`;
-    if (!twins.length) return `<section><h3>🪞 مين في الفيديو؟</h3><p class="muted">لو عملت «🪞 نسختي» (فيديو وصور من كذا اتجاه)، البرنامج يقدر يعمل لقطات B-roll بيك انت. من غيرها هيستخدم فيديوهات ستوك بس.</p>
-      <button type="button" class="flw-link" data-gotwin>🪞 اعمل نسختك</button>${auto}</section>`;
+    const auto = `<p class="muted">🪄 الـ B-roll أوتوماتيك: اللقطات اللي لازم تظهر فيها بتتعمل بالأفاتار${tw ? " في نفس المكان" : ""}، واللي مش لازم بتيجي من فيديوهات ستوك حقيقية. وفي المونتاج تقدر تشيل أي لقطة أو تبدّلها بفيديو من عندك.</p>`;
+    if (S.twins === null) return `<section><h3>🪞 مين في الفيديو؟</h3>${working("بيجيب الأفاتار…")}</section>`;
+    if (!twins.length) return `<section><h3>🪞 مين في الفيديو؟</h3><p class="muted">لو عملت أفاتار في «🪞 الأفاتار» (فيديو وصور من كذا اتجاه)، البرنامج يقدر يعمل لقطات B-roll بيه. من غيرها هيستخدم فيديوهات ستوك بس.</p>
+      <button type="button" class="flw-link" data-gotwin>🪞 اعمل أفاتار</button>${auto}</section>`;
     return `<section><h3>🪞 مين في الفيديو؟</h3>
-      <label class="flw-csel"><select data-casttwin><option value="">محدش من نسختي (ستوك بس)</option>
+      <label class="flw-csel"><select data-casttwin><option value="">من غير أفاتار (ستوك بس)</option>
         ${twins.map((t) => `<option value="${esc(t.id)}" ${cast?.twin === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
       ${tw ? `<h4>🏠 صوّرت فين؟</h4><div class="flw-bgs">
         <button type="button" class="flw-bgit ${!cast.bg ? "on" : ""}" data-castbg=""><span>🎬</span><small>زي الفيديو نفسه</small></button>
@@ -596,14 +596,14 @@ const Flow = (() => {
   }
   function stMontage(d) {
     const mo = d.montage, ms = S.mstate || {};
-    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("بيقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويظبط الألوان، ويختار ويعمل لقطات الـ B-roll، ويحط التايبوجرافي… (لقطات نسختك ممكن تاخد كام دقيقة)") : failed("montage")}`;
+    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("بيقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويظبط الألوان، ويختار ويعمل لقطات الـ B-roll، ويحط التايبوجرافي… (لقطات الأفاتار ممكن تاخد كام دقيقة)") : failed("montage")}`;
     const rp = mo.report || {}, pj = ms.project || {}, ty = ms.typo;
     const rendering = pj.render_status === "rendering", done = pj.export_url && !rendering;
     const tyBusy = ty?.busy;
     return `<h2>${mo.plain ? "الفيديو من غير مونتاج" : "المونتاج الأوتوماتيك جاهز"}</h2>
       ${mo.plain ? `<p class="flw-sub">الفيديو زي ما هو، بس على مقاس الريلز.</p>` : `<ul class="flw-mrep">
         <li>✂️ اتشال <b class="num">${rp.cut || 0}</b> ثانية سكوت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، من الجنب…)</li>
-        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بنسختك (في نفس المكان)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية فوق الكلام</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 ملقتش كوميكس في المكتبة تناسب الكلام ده</li>` : ""}
+        <li>🎨 الألوان اتظبطت أوتوماتيك</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بالأفاتار (في نفس المكان)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية فوق الكلام</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق الكلام</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 ملقتش كوميكس في المكتبة تناسب الكلام ده</li>` : ""}
         <li>🔤 التايبوجرافي: ${!rp.typo ? "مفيش كلام مسموع" : tyBusy ? `⏳ ${esc(ty.step || "بيتعمل")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
       ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
       ${rendering ? working(`بيصدّر الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
@@ -632,7 +632,7 @@ const Flow = (() => {
         <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
         <label title="صور الشخص من كذا اتجاه بتخلّي الموديل ميخمّنش شكله من الزاوية الجديدة">📷 صور الشخص <select data-camtwin><option value="">من غير صور</option>
           ${(S.camTwins || []).filter((t) => t.ready?.photos).map((t) => `<option value="${esc(t.id)}" ${S.camTwin === t.id || (!S.camTwin && S.camTwin !== "" && t === S.camTwins.find((x) => x.ready?.photos)) ? "selected" : ""}>${esc(t.name)} (${t.ready.photos} صورة)</option>`).join("")}</select></label></div>
-      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 لو عملت «🪞 نسختي» وصوّرت صورك من كذا اتجاه، تقدر تبعتها مع اللقطة والوش من الزاوية الجديدة هيطلع أدق.</p>`}
+      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 لو عملت أفاتار في «🪞 الأفاتار» وصوّرت صورك من كذا اتجاه، تقدر تبعتها مع اللقطة والوش من الزاوية الجديدة هيطلع أدق.</p>`}
       <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
         ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر مش معروف"}</small></label>`).join("")}</div>
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على الموديلات المختارة</button>

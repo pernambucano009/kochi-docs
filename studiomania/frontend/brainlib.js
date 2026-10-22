@@ -166,7 +166,7 @@ const BrainLibPage = (() => {
       } catch (err) { toast(err.message, true); }
     });
   }
-  // 📦 اللي في حساب البراند: الشخصيات ونسختي والفيديوهات الجاهزة (بتظهر هنا لوحدها، وتقدر تمنشنها في الأوتوميشن)
+  // 📦 اللي في حساب البراند: الشخصيات والأفاتار والفيديوهات الجاهزة (بتظهر هنا لوحدها، وتقدر تمنشنها في الأوتوميشن)
   async function renderAccount(tab) {
     S.body.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
     const A = await api("/api/content/account");
@@ -175,14 +175,14 @@ const BrainLibPage = (() => {
     if (tab === "chars") {
       const ch = A.characters.map((c) => `<figure class="bl-item bl-acc"><img src="${esc(c.image_url)}" alt="" loading="lazy"><figcaption><b>${esc(c.name)}</b>
           <small class="muted">🧑‍🎤 شخصية${(c.sheet || []).length ? ` · ${(c.sheet || []).length} صورة` : ""}</small>${au(c.voice_url)}</figcaption></figure>`).join("");
-      const tw = A.twins.map((t) => `${(t.photos || []).map((p) => `<figure class="bl-item bl-acc"><img src="${esc(p.url)}" alt="" loading="lazy"><figcaption><b>${esc(t.name)}</b><small class="muted">🪞 نسختي</small></figcaption></figure>`).join("")}
+      const tw = A.twins.map((t) => `${(t.photos || []).map((p) => `<figure class="bl-item bl-acc"><img src="${esc(p.url)}" alt="" loading="lazy"><figcaption><b>${esc(t.name)}</b><small class="muted">🪞 أفاتار</small></figcaption></figure>`).join("")}
           ${t.voice_url ? `<figure class="bl-item bl-acc"><span class="bl-ph">🎙️</span><figcaption><b>صوت ${esc(t.name)}</b>${au(t.voice_url)}</figcaption></figure>` : ""}
-          ${(t.backgrounds || []).map((b) => `<figure class="bl-item bl-acc"><img src="${esc(b.url)}" alt="" loading="lazy"><figcaption><b>${esc(b.name || "مكان تصوير")}</b><small class="muted">🏠 مكان من «نسختي»</small></figcaption></figure>`).join("")}`).join("");
+          ${(t.backgrounds || []).map((b) => `<figure class="bl-item bl-acc"><img src="${esc(b.url)}" alt="" loading="lazy"><figcaption><b>${esc(b.name || "مكان تصوير")}</b><small class="muted">🏠 مكان من «الأفاتار»</small></figcaption></figure>`).join("")}`).join("");
       S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الشخصيات والأفاتار</b><span class="latin">CHARACTERS</span></div>
-          <p>كل الشخصيات اللي عملتها، ونسختك (صورك وصوتك وأماكن التصوير). بيتضافوا هنا لوحدهم، وتقدر تمنشن أي واحد («@») في الأوتوميشن كصورة مرجع أو كصوت.</p>
-          <div class="nb-bar"><button type="button" class="nb-btn" data-blnav="coaches">🧑‍🎤 افتح الشخصيات</button><button type="button" class="nb-btn" data-blnav="twin">🪞 افتح نسختي</button></div></section>
+          <p>كل الشخصيات اللي عملتها، والأفاتار (الصور والصوت وأماكن التصوير). بيتضافوا هنا لوحدهم، وتقدر تمنشن أي واحد («@») في الأوتوميشن كصورة مرجع أو كصوت.</p>
+          <div class="nb-bar"><button type="button" class="nb-btn" data-blnav="coaches">🧑‍🎤 افتح الشخصيات</button><button type="button" class="nb-btn" data-blnav="twin">🪞 افتح الأفاتار</button></div></section>
         <h4 class="bl-h">🧑‍🎤 الشخصيات</h4><div class="bl-grid">${ch || `<div class="nh-empty">لسه مفيش شخصيات.</div>`}</div>
-        <h4 class="bl-h">🪞 نسختي</h4><div class="bl-grid">${tw || `<div class="nh-empty">لسه ماعملتش نسختك.</div>`}</div>`;
+        <h4 class="bl-h">🪞 الأفاتار</h4><div class="bl-grid">${tw || `<div class="nh-empty">لسه ماعملتش أفاتار.</div>`}</div>`;
       return;
     }
     S.body.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الفيديوهات الجاهزة</b><span class="latin">EXPORTS</span></div>

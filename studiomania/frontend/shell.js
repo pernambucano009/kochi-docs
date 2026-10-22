@@ -22,7 +22,7 @@ const STEP_INFO = {
   13: { num: "", title: "الدبلجة باللهجات", en: "Dubbing" },
   14: { num: "", title: "القوالب", en: "Templates" },
   15: { num: "", title: "الكومنتات والرسايل", en: "Inbox" },
-  16: { num: "", title: "نسختي", en: "My twin" },
+  16: { num: "", title: "الأفاتار", en: "Avatar" },
   "6s": { num: "", title: "مونتاج المسلسلات", en: "Series montage" },
   "6a": { num: "", title: "مونتاج الإعلانات", en: "Ad montage" },
   "6f": { num: "", title: "المونتاج", en: "Montage" },

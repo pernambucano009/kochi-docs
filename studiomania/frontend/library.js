@@ -62,7 +62,7 @@ const CharactersPage = (() => {
     const secs = Math.max(3, Math.round((d.text || "").length / 14));
     const opt = (g) => langs.filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}" ${k === lang ? "selected" : ""}>${libEsc(v.label)}</option>`).join("");
     const ST = { queued: "في الطابور", working: "شغّال", done: "جاهز", failed: "وقف" };
-    return `<div class="ch-sec ch-talk"><div class="nb-kh"><b>🗣️ الأفاتار: خلّيها تتكلم</b><span class="num">${c.talks.length}</span></div>
+    return `<div class="ch-sec ch-talk"><div class="nb-kh"><b>🗣️ خلّيها تتكلم</b><span class="num">${c.talks.length}</span></div>
       <p class="nb-hint">اكتب اللي الشخصية هتقوله، واختار اللهجة والصوت. البرنامج بيعمل الصوت الأول، وبعدين بيعمل فيديو والشخصية بتقوله: البُق والوش والإيد ماشيين مع الصوت، والصورة زي ما هي. أو ارفع صوتك انت.</p>
       <textarea rows="3" data-tk="text" placeholder="مثلًا: أهلًا! أنا ${libEsc(c.name)}، والنهارده هقولك على ٣ حاجات…">${libEsc(d.text || "")}</textarea>
       <div class="nb-row">
@@ -96,7 +96,7 @@ const CharactersPage = (() => {
             <label class="nb-f"><span>الشكل</span><select id="chAiStyle">${Object.entries(S.av?.styles || { real: "صورة حقيقية" }).map(([k, v]) => `<option value="${k}">${libEsc(v)}</option>`).join("")}</select></label></div>
           <label class="nb-f"><span>اوصفها (السن، الشكل، اللبس، المكان، الإحساس)</span><textarea rows="3" id="chAiDesc" placeholder="مثلًا: مدربة سعودية في التلاتينات، محجبة، لابسة تيشيرت رياضي أسود، في جيم منوّر، ابتسامة واثقة"></textarea></label>
           <div class="nb-row"><button class="nb-btn" data-caigo ${S.aiBusy ? "disabled" : ""}>${S.aiBusy ? "⏳ بترسمها…" : "✨ ارسمها"}</button><button class="nb-btn danger" data-caix>إلغاء</button></div>
-          <p class="nb-hint">صورة نص جسم قدام الكاميرا، جاهزة تتكلم في الأفاتار. لو مش عاجباك ارسمها تاني من صفحتها.</p></section>` : ""}
+          <p class="nb-hint">صورة نص جسم قدام الكاميرا، جاهزة تتكلم في «خلّيها تتكلم». لو مش عاجباك ارسمها تاني من صفحتها.</p></section>` : ""}
       ${c ? detail(c) : `
       <div class="as-sh"><h2>الشخصيات <span>(${S.list.length})</span></h2></div>
       <div class="ch-grid as-grid">${S.list.map((x, i) => `<div class="ch-card as-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">

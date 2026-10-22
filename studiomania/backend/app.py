@@ -26340,7 +26340,7 @@ def run_twin_clip(tid: str, cid: str) -> None:
             raise RuntimeError("الصوت أطول من دقيقتين. قسّمه على أكتر من فيديو")
         key = f"{c['method']}:{c['quality']}"
         cost = wallet.credits(TWIN_COST[key] * dur)
-        wallet.need(cost, "فيديو بنسختك")
+        wallet.need(cost, "فيديو بالأفاتار")
         dest = folder / f"clip_{cid}.mp4"
         if c["method"] == "video":
             twin_clip_set(tid, cid, status="working", step="بيجهّز فيديو القراية على قد الكلام")
@@ -26370,7 +26370,7 @@ def run_twin_clip(tid: str, cid: str) -> None:
                         "prompt": "The person speaks naturally to the camera, lips perfectly synced to the audio, natural blinking, subtle head movement. "
                                   "Keep the face, hair, outfit and background exactly as in the photo."}
                 atlas.download(atlas.run_model("Video", body, "الأفاتار", max_seconds=2400, interval=6), dest)
-        spent = 0 if atlas.mock_mode() else wallet.charge(cost, f"نسختي: فيديو {round(dur)} ثانية", cid)
+        spent = 0 if atlas.mock_mode() else wallet.charge(cost, f"الأفاتار: فيديو {round(dur)} ثانية", cid)
         twin_clip_set(tid, cid, status="done", step=None, file=dest.name, duration=round(probe_duration(dest), 2), credits=spent, error=None)
     except wallet.NoCredits as exc:
         twin_clip_set(tid, cid, status="failed", step=None, error=str(exc))
@@ -26758,7 +26758,7 @@ def phone_broll_avatar(b: dict, people: list[Path], bg: Path | None, vertical: b
               + ". Photorealistic, natural phone-camera look, no talking to the camera, no text, no logos, no subtitles.")
     body = {"model": BROLL_MODEL, "prompt": prompt, "reference_images": refs, "duration": BROLL_AI_SEC, "resolution": "720p",
             "ratio": "9:16" if vertical else "16:9", "generate_audio": False, "watermark": False}
-    atlas.download(atlas.run_model("Video", body, "لقطة B-roll بنسختك", max_seconds=1500, interval=6), out)
+    atlas.download(atlas.run_model("Video", body, "لقطة B-roll بالأفاتار", max_seconds=1500, interval=6), out)
     return out
 
 
@@ -26785,9 +26785,9 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
     n_ai = sum(b["kind"] == "avatar" for b in plan)
     if n_ai and not atlas.mock_mode():
         try:
-            wallet.need(per_ai * n_ai, "لقطات B-roll بنسختك")
+            wallet.need(per_ai * n_ai, "لقطات B-roll بالأفاتار")
         except wallet.NoCredits:
-            rep["broll_note"] = "الرصيد مايكفيش لقطات بنسختك، فحطّينا ستوك بدالها"
+            rep["broll_note"] = "الرصيد مايكفيش لقطات بالأفاتار، فحطّينا ستوك بدالها"
             for b in plan:
                 b["kind"] = "stock"
     used: set = set()
@@ -26798,7 +26798,7 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
                 f = phone_broll_avatar(b, people, bg, vertical)
                 if f:
                     if not atlas.mock_mode():
-                        wallet.charge(per_ai, "تصوير بالموبايل: لقطة B-roll بنسختك", d.get("id") or "")
+                        wallet.charge(per_ai, "تصوير بالموبايل: لقطة B-roll بالأفاتار", d.get("id") or "")
                     return b, f, "avatar"
         except Exception:  # noqa: BLE001  # الموديل وقع ← ستوك بداله
             pass
@@ -26818,7 +26818,7 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
         if ln < 1.5:
             continue
         info = media_info(f)
-        gid = phone_gen(f, ("🪄 " if kind == "avatar" else "🎞️ ") + (b["query"] if kind == "stock" else "B-roll بنسختك"))
+        gid = phone_gen(f, ("🪄 " if kind == "avatar" else "🎞️ ") + (b["query"] if kind == "stock" else "B-roll بالأفاتار"))
         cover = max(1.0, (info.width / max(1, info.height)) / ((9 / 16) if vertical else (16 / 9)))
         overlays.append({"id": uuid.uuid4().hex[:8], "src": gid, "t0": round(t0 + 0.2, 2), "dur": round(min(3.0, ln - 0.3, info.duration or 3), 2),
                          "start": 0, "x": 0.5, "y": 0.5, "w": round(cover, 3), "volume": 0, "broll": kind,
@@ -27928,9 +27928,9 @@ def auto_refs(q: str = "") -> list[dict]:
     for t in twins_list():
         ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
         if ph:
-            out.append({"kind": "twin", "id": t["id"], "label": t.get("name") or "نسختي", "thumb": ph["url"], "sub": "🪞 نسختي"})
+            out.append({"kind": "twin", "id": t["id"], "label": t.get("name") or "أفاتار", "thumb": ph["url"], "sub": "🪞 أفاتار"})
         if t.get("voice_url"):
-            out.append({"kind": "audio", "id": f"tv:{t['id']}", "label": f"صوت {t.get('name') or 'نسختي'}", "thumb": ph["url"] if ph else "", "sub": "🎙️ صوتك (نسختي)"})
+            out.append({"kind": "audio", "id": f"tv:{t['id']}", "label": f"صوت {t.get('name') or 'الأفاتار'}", "thumb": ph["url"] if ph else "", "sub": "🎙️ صوتك (نسختي)"})
     for e in exports:
         out.append({"kind": "export", "id": e["id"], "label": e["name"], "thumb": "", "sub": "📤 فيديو جاهز"})
     bg = content_backgrounds()
@@ -29286,7 +29286,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             threading.Thread(target=run_automation, args=(rid, run["id"], bid, port), daemon=True).start()
             return put(phase="custom", run_id=run["id"], note="القالب المخصص شغّال")
         if kind == "avatar" and not pilot_twin(s):
-            raise HTTPException(400, "مفيش نسخة جاهزة في «نسختي». سجّل فيديو القراية أو صورة قدامية الأول")
+            raise HTTPException(400, "مفيش أفاتار جاهز في «الأفاتار». سجّل فيديو القراية أو صورة قدامية الأول")
         pre = j.get("preset") or {}
         f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea"))))
         flow_update(f["id"], lambda x: x.update(pilot=jid))
@@ -29464,7 +29464,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     if ph == "say":
         tid = pilot_twin(s)
         if not tid:
-            raise HTTPException(400, "مفيش نسخة جاهزة في «نسختي»")
+            raise HTTPException(400, "مفيش أفاتار جاهز في «الأفاتار»")
         text = pilot_say(d.get("scenario") or {})
         if not text:
             raise HTTPException(400, "السكريبت مفيهوش كلام يتقال")
@@ -29482,7 +29482,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
                 "status": "queued", "step": "في الطابور", "file": None, "error": None, "created_at": now(), "pilot": jid}
         twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
         threading.Thread(target=run_twin_clip, args=(tid, cid), daemon=True).start()
-        return put(phase="twin", twin=tid, clip=cid, note="نسختك بتتكلم (بياخد كام دقيقة)")
+        return put(phase="twin", twin=tid, clip=cid, note="الأفاتار بيتكلم (بياخد كام دقيقة)")
     if ph == "twin":
         c = next((x for x in twin_load(j["twin"]).get("clips") or [] if x["id"] == j.get("clip")), None)
         if not c:
