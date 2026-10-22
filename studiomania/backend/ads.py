@@ -674,6 +674,11 @@ def brain_text(brain: dict | None, query: str = "") -> str:
                      ("theme", "الثيم"), ("typography", "الخطوط"), ("ui_style", "شكل الواجهة")):
         if brain.get(k):
             lines.append(f"{label}: {brain[k]}")
+    auds = [a for a in brain.get("audiences") or [] if isinstance(a, dict) and a.get("name")]
+    if auds:   # 👥 أكتر من جمهور: كل فكرة أو إعلان بيتوجّه لواحد منهم بالاسم
+        lines.append("الجماهير المستهدفة (وجّه كل فكرة أو إعلان لواحد منهم بالاسم، ووزّع بينهم على قد نسبة كل واحد):\n" + "\n".join(
+            f"- {a['name']}" + (f" ({a['share']}٪)" if a.get("share") else "") + (f": {a['who']}" if a.get("who") else "")
+            + (f" · يزعجه: {a['pain']}" if a.get("pain") else "") + (f" · يريد: {a['want']}" if a.get("want") else "") for a in auds[:6]))
     for kind, label in (("screens", "شاشات التطبيق الحقيقية المتاحة"), ("logos", "اللوجوهات المتاحة"), ("products", "صور المنتج المتاحة"),
                         ("characters", "شخصيات البراند الثابتة (لو مناسبة استخدمها بنفس اسمها)"), ("sets", "أماكن البراند الثابتة"),
                         ("props", "أدوات البراند الثابتة")):

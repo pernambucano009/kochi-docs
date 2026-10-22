@@ -136,7 +136,7 @@ const RivalsPage = (() => {
           <div class="nb-row"><button class="nb-btn sm fs-go" data-mosave>حفظ</button><button class="nb-btn sm" data-mox>إلغاء</button><button class="nb-btn sm danger" data-model>✕ شيل البوست</button></div></div>`;
       return `<div class="mo-post${done ? " done" : ""}" data-moid="${esc(x.id)}" ${done ? "" : "data-moedit"} title="${esc(x.why || "")}">
           <span class="mo-meta"><span class="num">${esc(x.time)}</span><span class="mo-kind">${KIND_IC[x.kind] || "🎬"} ${esc(x.tpl_name || d.kinds[x.kind] || "")}</span>${done ? `<span class="mo-job">✓ في الأوتوبايلوت</span>` : ""}</span>
-          <b>${esc(x.title)}</b>${x.hook ? `<i>«${esc(x.hook)}»</i>` : ""}<small>${esc(x.idea)}</small></div>`;
+          <b>${esc(x.title)}</b>${x.hook ? `<i>«${esc(x.hook)}»</i>` : ""}<small>${esc(x.idea)}</small>${x.aud ? `<small class="mo-aud">👥 ${esc(x.aud)}</small>` : ""}</div>`;
     };
     const days = Object.keys(byDay).sort().map((day) => {
       const dt = new Date(day + "T12:00:00");

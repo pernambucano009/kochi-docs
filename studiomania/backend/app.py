@@ -4776,7 +4776,8 @@ def month_messages(b: dict, fmts: list[dict], start, days: int, per_day: int, ti
 وكل بوست فكرته محددة جدًا (مش عامة) وهوكه جملة قصيرة بتشد. الكاروسيل للمعلومات والقوايم والخطوات، والموبايل للآراء والقصص والإجابات.
 رجّع JSON بالشكل ده بس:
 {{"posts": [{{"date": "YYYY-MM-DD", "time": "HH:MM", "format": "id من الأشكال", "bucket": "مجموعة المواضيع", "title": "عنوان قصير",
-  "idea": "الفكرة في جملة واحدة قصيرة (مش سكريبت)", "hook": "الهوك", "cta": "الدعوة", "why": "ليه البوست ده في اليوم ده (جملة)"}}]}}"""}]
+  "idea": "الفكرة في جملة واحدة قصيرة (مش سكريبت)", "hook": "الهوك", "cta": "الدعوة", "why": "ليه البوست ده في اليوم ده (جملة)",
+  "aud": "اسم الجمهور المقصود بالظبط من «الجماهير المستهدفة» لو موجودة، وإلا فاضي"}}]}}"""}]
 
 
 def month_clean(raw: dict, fmts: list[dict], dates: set[str], times: list[str]) -> list[dict]:
@@ -4789,7 +4790,7 @@ def month_clean(raw: dict, fmts: list[dict], dates: set[str], times: list[str]) 
         t = str(p.get("time") or "")
         out.append({"id": uuid.uuid4().hex[:8], "date": str(p["date"]), "time": t if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t) else times[0],
                     "tpl": f["id"], "kind": f["kind"], "tpl_name": f["name"].split(":")[0].split(" (")[0],
-                    **{k: str(p.get(k) or "").strip()[:400] for k in ("bucket", "title", "idea", "hook", "cta", "why")}})
+                    **{k: str(p.get(k) or "").strip()[:400] for k in ("bucket", "title", "idea", "hook", "cta", "why", "aud")}})
     return out
 
 
@@ -10419,7 +10420,92 @@ def brain_to_dict(b: dict) -> dict:
     out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in rivals.approved(b.get("competitors") or {})]
     out["rivals_pending"] = sum(1 for i in (b.get("competitors") or {}).get("items") or [] if not rivals.is_ok(i))
     out["custom_styles"] = [{**c, "cover_url": f"{base}/{c['cover']}" if c.get("cover") else None} for c in b.get("custom_styles") or []]
+    out["audiences"] = b.get("audiences") or []
+    out["audiences_busy"] = AUD_BUSY.get(b["id"]) is not None
     return out
+
+
+# ---------- 👥 أكتر من جمهور: العقل بيستخلص الجماهير لوحده من وصف البراند، وتقدر تعدّلها
+AUD_BUSY: dict[str, float] = {}
+AUD_KEYS = ("name", "who", "pain", "want")
+
+
+def audiences_clean(raw) -> list[dict]:
+    out = []
+    for a in (raw if isinstance(raw, list) else [])[:6]:
+        if not isinstance(a, dict) or not str(a.get("name") or "").strip():
+            continue
+        x = {k: re.sub(r"\s+", " ", str(a.get(k) or "")).strip()[:300] for k in AUD_KEYS}
+        x["name"] = x["name"][:60]
+        try:
+            x["share"] = max(0, min(100, int(float(a.get("share") or 0))))
+        except (TypeError, ValueError):
+            x["share"] = 0
+        x["id"] = str(a.get("id") or uuid.uuid4().hex[:8])[:12]
+        out.append(x)
+    return out
+
+
+def audiences_messages(b: dict) -> list[dict]:
+    info = "\n".join(f"{t}: {b[k]}" for k, t in (("name", "الاسم"), ("domain", "المجال"), ("about", "عن البراند"), ("audience", "الجمهور كما كتبه العميل"),
+                                                 ("market", "السوق"), ("niche", "النيتش")) if b.get(k))
+    return [{"role": "system", "content": "أنت خبير تسويق. استخرج الجماهير المستهدفة لعلامة تجارية من وصفها. اكتب بالعربية الفصحى البسيطة. Return JSON only."},
+            {"role": "user", "content": info + '\n\nاستخرج من ١ إلى ٤ جماهير مختلفة فعلًا تستهدفها هذه العلامة (لو الوصف يذكر جمهورًا واحدًا فقط فاكتفِ به). '
+             'لكل جمهور: اسم قصير مميز، ومن هو (عمر واهتمام في جملة)، وما يزعجه، وما يريده، ونسبته التقريبية من الجمهور (المجموع ١٠٠).\n'
+             'JSON: {"audiences": [{"name": "...", "who": "...", "pain": "...", "want": "...", "share": 50}]}'}]
+
+
+def audiences_mock(b: dict) -> list[dict]:
+    parts = [p.strip() for p in re.split(r"[،,\n]|\sو(?=[^\s])", b.get("audience") or "") if len(p.strip()) > 3][:3] or ["الجمهور الأساسي"]
+    return audiences_clean([{"name": p[:40], "who": p, "pain": "", "want": "", "share": round(100 / len(parts))} for p in parts])
+
+
+def audiences_extract(bid: str) -> list[dict]:
+    b = brain_row(bid) or {}
+    if atlas.mock_mode() or not atlas.api_key():
+        items = audiences_mock(b)
+    else:
+        items = audiences_clean(flow_llm(audiences_messages(b), "استخلاص الجماهير").get("audiences"))   # flow_llm بيخصم من الرصيد
+    if not items:
+        raise HTTPException(400, "مقدرتش أستخلص جمهور من الوصف. اكتب عن البراند وجمهوره في العقل الأول")
+    update_brain(bid, lambda d: d.update(audiences=items, audiences_auto=True))
+    return items
+
+
+def audiences_auto(bid: str, old: dict, new: dict) -> None:
+    """لما وصف البراند أو الجمهور يتغيّر: الجماهير بتتستخلص تاني في الخلفية، إلا لو العميل عدّلها بإيده."""
+    keys = ("domain", "about", "audience", "market")
+    if new.get("audiences_edited") or all(old.get(k) == new.get(k) for k in keys) or AUD_BUSY.get(bid):
+        return
+    if len(" ".join(str(new.get(k) or "") for k in keys)) < 40:
+        return
+    AUD_BUSY[bid] = time.time()
+    def run():
+        try:
+            audiences_extract(bid)
+        except Exception:  # noqa: BLE001 — المرة الجاية لما الوصف يتغيّر
+            pass
+        finally:
+            AUD_BUSY.pop(bid, None)
+    threading.Thread(target=run, daemon=True).start()
+
+
+@app.post("/api/ad-brains/{bid}/audiences/extract")
+def brain_audiences_extract(bid: str):
+    update_brain(bid, lambda d: d.pop("audiences_edited", None))
+    audiences_extract(bid)
+    return brain_to_dict(brain_row(bid))
+
+
+class AudiencesIn(BaseModel):
+    items: list = []
+
+
+@app.put("/api/ad-brains/{bid}/audiences")
+def brain_audiences_set(bid: str, body: AudiencesIn):
+    items = audiences_clean(body.items)
+    update_brain(bid, lambda d: d.update(audiences=items, audiences_edited=True))
+    return brain_to_dict(brain_row(bid))
 
 
 def seed_brain() -> None:
@@ -10941,6 +11027,7 @@ def patch_brain(bid: str, body: BrainIn):
     update_brain(bid, fn)
     new = brain_row(bid) or {}
     seasons_if_changed(bid, old, new)   # 🗓️ المواسم بتتجاب من جديد لوحدها
+    audiences_auto(bid, old, new)       # 👥 والجماهير بتتستخلص من الوصف الجديد
     return brain_to_dict(new)
 
 
@@ -22728,7 +22815,7 @@ def flow_parse_ideas(raw: dict) -> list[dict]:
     for i in (raw.get("ideas") or [])[:6]:
         if not isinstance(i, dict):
             continue
-        it = {"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why")}}
+        it = {"id": uuid.uuid4().hex[:8], **{x: str(i.get(x) or "")[:600] for x in ("title", "hook", "idea", "fit", "why", "aud")}}
         if i.get("heat") is not None:
             it["heat"] = algo.heat_of(i.get("heat"))
         if str(i.get("ring") or "").isdigit():

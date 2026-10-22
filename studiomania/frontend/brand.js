@@ -45,6 +45,7 @@ const BrandPage = (() => {
         { f: "niche", t: "النيتش", type: "text", ph: "المجال + الجمهور + الزاوية بالظبط", hint: "بيتكتب لوحده لما تحلّل حساب السوشيال، وتقدر تعدّله." },
         { f: "about", t: "عن البراند", type: "text", ph: "البراند بيعمل إيه، وبيفرق في إيه عن غيره" },
         { f: "audience", t: "الجمهور", type: "text", ph: "مين اللي بنكلمه؟ سنه، اهتماماته، بيدوّر على إيه" },
+        { f: "audiences", t: "الجماهير المستهدفة", type: "auds" },
         { f: "market", t: "السوق", type: "text", ph: "مثلًا: السعودية والخليج" },
         { f: "language", t: "اللغة واللهجة", type: "text", ph: "مثلًا: اللهجة السعودية البيضاء" },
       ] },
@@ -129,6 +130,7 @@ const BrandPage = (() => {
       case "palette": return hexes(b.palette).length > 0;
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
+      case "auds": return (b.audiences || []).length > 0;
       case "rule": case "note": case "algo": return true;
       case "page": return false;   // لينك لصفحة، مش خانة تتملي
       case "todo": return !!l.todo.done;
@@ -142,6 +144,7 @@ const BrandPage = (() => {
     if (l.type === "palette") return hexes(b?.palette).join(" ");
     if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "شغّال" : "موجود ومقفول") : "";
     if (l.type === "todo") return l.todo.done ? "اتعملت ✓" : l.todo.why;
+    if (l.type === "auds") return (b?.audiences || []).map((a) => a.name).join("، ");
     return "";
   };
 
@@ -673,6 +676,18 @@ const BrandPage = (() => {
     switch (l.type) {
       case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "") + suggBox(b, l);
       case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">شيل القاعدة دي</button>`;
+      case "auds": {   // 👥 أكتر من جمهور: العقل بيستخلصهم من الوصف، وكل فكرة وإعلان بيتوجّه لواحد منهم
+        const A = b?.audiences || [];
+        return head + `<p class="bm-note">${b?.audiences_busy ? "⏳ العقل بيستخلص الجماهير من وصف البراند…" : "العقل بيستخلصهم لوحده من «عن البراند» و«الجمهور»، وكل فكرة وإعلان بيتوجّه لواحد منهم."}</p>
+          <div class="bm-auds">${A.map((a, i) => `<div class="bm-aud" data-audi="${i}">
+            <input class="bm-in" data-audk="name" value="${esc(a.name)}" placeholder="اسم الجمهور" aria-label="اسم الجمهور">
+            <input class="bm-in sm" data-audk="share" value="${esc(a.share || "")}" placeholder="٪" aria-label="النسبة" inputmode="numeric">
+            <input class="bm-in wide" data-audk="who" value="${esc(a.who)}" placeholder="مين هو" aria-label="مين هو">
+            <input class="bm-in wide" data-audk="pain" value="${esc(a.pain)}" placeholder="إيه اللي مضايقه" aria-label="إيه اللي مضايقه">
+            <input class="bm-in wide" data-audk="want" value="${esc(a.want)}" placeholder="عايز إيه" aria-label="عايز إيه">
+            <button class="bm-x2" data-auddel="${i}" title="شيل الجمهور ده">✕</button></div>`).join("")}</div>
+          <div class="bm-acts"><button class="bm-pill" data-audadd>＋ جمهور</button>${A.length ? `<button class="bm-go" data-audsave>احفظ</button>` : ""}<button class="bm-pill" data-audx ${b?.audiences_busy ? "disabled" : ""}>✨ استخلصهم من الوصف</button></div>`;
+      }
       case "rule-new": return head + `<p class="bm-note">أي حاجة لازم تتراعى في كل شغل للبراند: السكريبت والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: من غير مزيكا · واضغط Enter");
       case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${String(b?.[l.f] || "") === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
@@ -1118,6 +1133,12 @@ const BrandPage = (() => {
       if (von) return patch({ [`${von.dataset.von}_on`]: von.dataset.v });
       const vdel = t.closest("[data-vdel]");
       if (vdel) { if ((await uiConfirm("تشيل الفيديو ده؟"))) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
+      const audRows = () => [...S.el.querySelectorAll(".bm-aud")].map((r) => Object.fromEntries([...r.querySelectorAll("[data-audk]")].map((x) => [x.dataset.audk, x.value.trim()])));
+      if (t.closest("[data-audx]")) { toast("⏳ العقل بيستخلص الجماهير…"); return save(() => bAPI("/audiences/extract", { method: "POST" })); }
+      if (t.closest("[data-audsave]")) return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: audRows().filter((a) => a.name) }) })).then((ok) => ok && toast("✓ اتحفظت الجماهير"));
+      if (t.closest("[data-audadd]")) { const rows = audRows(); rows.push({ name: "جمهور جديد", who: "", pain: "", want: "", share: "" }); return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: rows }) })); }
+      const audd = t.closest("[data-auddel]");
+      if (audd) { const rows = audRows(); rows.splice(+audd.dataset.auddel, 1); return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: rows }) })); }
       const rdel = t.closest("[data-rdel]");
       if (rdel) { const rs = rulesOf(cur()); rs.splice(+rdel.dataset.rdel, 1); openCard(null); return patch({ rules: rs.join("\n") }); }
       const hdel = t.closest("[data-hdel]");
