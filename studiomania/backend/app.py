@@ -23917,7 +23917,8 @@ def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
             vs = [v for v in dub.VOICES if dub.VOICES[v].get("provider") == p and dub.VOICES[v].get("dialect") == dialect] or [v for v in dv if dub.VOICES[v]["provider"] == p]
             pick = [next((v for v in vs if dub.VOICES[v].get("gender") == g), None) for g in ("male", "female")]
             pick = [v for v in pick if v] or vs[:2]
-            out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in pick]
+            out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in pick] or [
+                {"provider": p, "voice": "", "label": "—", "skip": f"{VLAB_PROV[p]} مالوش أصوات في اللهجة دي"}]
         elif p == "eleven_atlas":
             out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in list(dub.ELEVEN)[:2]]
         elif p == "eleven" and voicelab.eleven_key():
@@ -23984,6 +23985,8 @@ def run_vlab(rid: str) -> None:
 
     def one(i: int, c: dict) -> None:
         t0 = time.time()
+        if c.get("skip"):
+            return vlab_save(rid, lambda x: x["clips"][i].update(status="failed", error=c["skip"]))
         try:
             if d["kind"] == "clone":
                 sample = folder / d["sample"]
