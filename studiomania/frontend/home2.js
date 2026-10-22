@@ -588,7 +588,14 @@ const NH = (() => {
     pTitle.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce.matches ? 1 : 450, easing: EASE });
     if (!MODS[key]) pGrid.querySelectorAll(":scope > .nh-tile").forEach((p, i) => setTimeout(() => { p.classList.add("nh-sweep"); setTimeout(() => p.classList.add("done"), 1100); }, i * 70));
   }
-  window.NHNav = (key) => { if (T[key] && zoom?.page) swapPage(key); };
+  // صفحة واحدة لكل مدخل: لو الصفحة دي موجودة قبل كده في التسلسل بنرجع لها بدل ما التسلسل يطول (أ ← ب ← أ ← ب…)
+  window.NHNav = (key) => {
+    if (!T[key] || !zoom?.page) return;
+    if (pGrid.dataset.key === key && pTitle.dataset.key === key) return;
+    const i = pStack.findIndex((s) => s.key === key && s.tkey === key);
+    if (i >= 0) { pStack.length = i + 1; swapPage(key, true); return renderBar(); }
+    swapPage(key);
+  };
   function openPage(tile, key) {
     if (busy || zoom) return;
     busy = true;
