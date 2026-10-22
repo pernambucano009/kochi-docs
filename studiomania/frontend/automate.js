@@ -275,7 +275,7 @@ const AutoPage = (() => {
       <div class="bm-card" hidden role="dialog"></div>
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ اوصف القالب بكلامك (كتابة أو صوت)</button>
         <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو اللي في فولدر «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وكابشن، واستنى موافقتي قبل النشر"></div>
-          <div class="bm-acts"><button class="bm-pill" data-rec>🎙️ سجّل صوتك</button><span class="am-recst"></span>
+          <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ افهم اللي قلته</button><button class="bm-pill" data-undo hidden>↩ رجّع زي ما كان</button></div>
           <div class="am-clip" hidden></div>
           <div class="am-plan" hidden></div>
@@ -900,18 +900,20 @@ const AutoPage = (() => {
       an.fftSize = 256; ac.createMediaStreamSource(stream).connect(an);
       const buf = new Uint8Array(an.fftSize);
       st.innerHTML = `<span class="am-live"><i class="dot"></i><span class="am-bars">${"<i></i>".repeat(12)}</span><b class="num">٠:٠٠</b><small></small></span>`;
-      const bars = [...st.querySelectorAll(".am-bars i")], clock = st.querySelector("b"), hint = st.querySelector("small");
-      let heardAt = 0;
+      const bars = [...st.querySelectorAll(".am-bars i")], clock = st.querySelector("b"), hint = st.querySelector("small"), lv = bars.map(() => 3);
+      let heardAt = 0, lastSec = -1, lastHint = "";
       const draw = () => {
         if (mr.state !== "recording") return;
         an.getByteTimeDomainData(buf);
         let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v - 128) / 128);
         if (pk > .06) heardAt = Date.now();
-        bars.push(bars.shift()); bars.forEach((b, i) => { if (i === bars.length - 1) b.style.height = `${Math.round(3 + Math.min(1, pk * 2.2) * 19)}px`; st.querySelector(".am-bars").appendChild(b); });
-        const sec = Math.round((Date.now() - t0) / 1000);
-        clock.textContent = `${AR_N(Math.floor(sec / 60))}:${AR_N(String(sec % 60).padStart(2, "0"))}`;
-        hint.textContent = Date.now() - t0 > 2500 && Date.now() - heardAt > 2500 ? "مش سامع صوت… قرّب من المايك" : "لاقط صوتك ✓";
-        hint.classList.toggle("bad", Date.now() - t0 > 2500 && Date.now() - heardAt > 2500);
+        // الموجة: الأعمدة ثابتة مكانها وبس الطول بيتغيّر (من غير ما العناصر تتحرك في الصفحة)
+        lv.shift(); lv.push(Math.round(3 + Math.min(1, pk * 2.2) * 19));
+        bars.forEach((b, i) => { b.style.transform = `scaleY(${(lv[i] / 22).toFixed(3)})`; });
+        const sec = Math.floor((Date.now() - t0) / 1000);
+        if (sec !== lastSec) { lastSec = sec; clock.textContent = `${AR_N(Math.floor(sec / 60))}:${AR_N(String(sec % 60).padStart(2, "0"))}`; }
+        const bad = Date.now() - t0 > 2500 && Date.now() - heardAt > 2500, h = bad ? "مش سامع صوت… قرّب من المايك" : "لاقط صوتك ✓";
+        if (h !== lastHint) { lastHint = h; hint.textContent = h; hint.classList.toggle("bad", bad); }
         requestAnimationFrame(draw);
       };
       mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);

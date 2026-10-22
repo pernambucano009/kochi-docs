@@ -96,7 +96,7 @@ const Gallery = (() => {
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الصناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
-    S.items = EXTRA.filter((x) => x.id !== "custom");   // القالب المخصص بقى تاب لوحده جوه «القوالب»
+    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
   }
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
   // 🎡 العجلة: مالية الصفحة. أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
@@ -112,7 +112,7 @@ const Gallery = (() => {
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
   // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
-  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك انت"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك انت"], ["editor", "فيديو إديتور", "مونتاج حر من غير قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 2 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
@@ -144,8 +144,16 @@ const Gallery = (() => {
     panel.animate?.([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" });
     if (key === "dub") return dubIn(panel);
     if (key === "custom") return customIn(panel);
+    if (key === "editor") return editorIn(panel);
     if (key === "scene") return SceneStudio.open(panel);
     Gen.open(key, panel);
+  }
+  // 🎞️ فيديو إديتور: غلاف صغير وزرار واحد بيفتح مشروع مونتاج فاضي
+  function editorIn(panel) {
+    const x = EXTRA.find((e) => e.id === "editor");
+    panel.innerHTML = `<div class="nh-ed"><img src="${x.cover_url}" alt=""><div><h3 class="nh-ct-h">فيديو إديتور</h3><p class="nh-ct-hint">${esc(x.desc)}</p>
+      <button type="button" class="nh-gal-go" data-edopen>🎞️ افتح الإديتور</button></div></div>`;
+    panel.querySelector("[data-edopen]").addEventListener("click", () => openEditor());
   }
   // 🧩 القوالب المخصصة: كروت بالقوالب اللي العميل عملها بخطواته، وكارت يعمل واحد جديد
   async function customIn(panel) {
