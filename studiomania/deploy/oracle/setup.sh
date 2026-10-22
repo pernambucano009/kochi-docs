@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # 🛫 تركيب SimsimKit على سيرفر Oracle (Ubuntu 22.04/24.04، بيشتغل على AMD أو ARM).
-# الاستخدام (على السيرفر):  curl -fsSL https://raw.githubusercontent.com/pernambucano009/kochi-docs/claude/new-program-gvemu5/studiomania/deploy/oracle/setup.sh | sudo bash -s -- app.example.com
+# الاستخدام (على السيرفر):  curl -fsSL https://raw.githubusercontent.com/pernambucano009/kochi-docs/claude/new-program-gvemu5/studiomania/deploy/oracle/setup.sh | sudo bash
+#   من غير دومين: البرنامج بيشتغل على عنوان مؤقت ببلاش من الـ IP (<ip>.sslip.io) بشهادة HTTPS حقيقية.
+#   الدومين بعدين بأمر واحد: sudo /srv/simsimkit/domain.sh app.example.com
 #
 # بيعمل: Docker ← نسخة من الكود ← يبني البرنامج ← يشغّله على 127.0.0.1:8000 ← Caddy قدامه بشهادة HTTPS لوحدها.
 # البيانات في /srv/simsimkit/data (برّه الحاوية، مابتضيعش مع التحديث).
@@ -12,8 +14,13 @@ DOMAIN="${1:-}"
 BRANCH="${BRANCH:-claude/new-program-gvemu5}"
 REPO="${REPO:-https://github.com/pernambucano009/kochi-docs.git}"
 ROOT=/srv/simsimkit
-[ -n "$DOMAIN" ] || { echo "اكتب الدومين: setup.sh app.example.com"; exit 1; }
 [ "$(id -u)" = 0 ] || { echo "شغّله بـ sudo"; exit 1; }
+if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "auto" ]; then   # عنوان مؤقت من الـ IP العام لحد ما الدومين يتنقل
+  IP="$(curl -fs --max-time 10 https://api.ipify.org || curl -fs --max-time 10 https://ifconfig.me)"
+  [ -n "$IP" ] || { echo "مقدرتش أعرف الـ IP العام"; exit 1; }
+  DOMAIN="${IP//./-}.sslip.io"
+fi
+echo "العنوان: https://$DOMAIN"
 
 echo "== 1) Docker"
 if ! command -v docker >/dev/null; then
@@ -79,10 +86,23 @@ echo "⚠️ البرنامج مقامش، شوف: docker logs --tail 100 simsim
 EOF
 chmod 700 "$ROOT/update.sh"
 
+cat > "$ROOT/domain.sh" <<'EOF'
+#!/usr/bin/env bash
+# تغيير عنوان الموقع: sudo /srv/simsimkit/domain.sh app.example.com (بعد ما الدومين يشاور على IP السيرفر)
+set -euo pipefail
+ROOT=/srv/simsimkit
+D="${1:?اكتب الدومين}"
+sed -i "1s/.*/$D {/" "$ROOT/caddy/Caddyfile"
+sed -i "s#^PUBLIC_URL=.*#PUBLIC_URL=https://$D#" "$ROOT/app.env"
+"$ROOT/update.sh"
+echo "✓ العنوان بقى https://$D"
+EOF
+chmod 700 "$ROOT/domain.sh"
+
 echo "== 6) بناء وتشغيل (أول مرة بتاخد حوالي ١٠ دقايق)"
 "$ROOT/update.sh"
 echo
 echo "خلصنا. الخطوات الجاية:"
 echo "  1) sudo nano $ROOT/app.env   ← حط المفاتيح الجديدة، وبعدين: sudo $ROOT/update.sh"
-echo "  2) خلّي الدومين $DOMAIN يشاور على IP السيرفر ده (A record)"
+echo "  2) العنوان دلوقتي: https://$DOMAIN — ولما الدومين يشاور على IP السيرفر: sudo $ROOT/domain.sh <الدومين>"
 echo "  3) البيانات القديمة تتحط في $ROOT/data (وبعدين update.sh)"
