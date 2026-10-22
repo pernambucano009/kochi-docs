@@ -18,13 +18,16 @@ const PilotPage = (() => {
 #nh .ap-tg.on { background: var(--nh-accent); }
 #nh .ap-tg.on::after { inset-inline-start: 23px; }
 #nh .ap-st { font-size: 13px; color: var(--ap-sub); }
-#nh .ap-main { display: grid; align-content: center; justify-items: center; gap: 30px; min-height: 0; padding: 12px 0 90px; }
-#nh .ap-sec { display: grid; justify-items: center; gap: 12px; width: min(980px, 100%); }
+#nh .ap-main { display: grid; align-content: center; justify-items: center; gap: 22px; min-height: 0; padding: 4px 0 70px; }
+#nh .ap-row { display: flex; align-items: center; justify-content: center; gap: 40px; width: min(1100px, 100%); }
+#nh .ap-row > .ap-sec { width: auto; }
+#nh .ap-row > .ap-sec:last-child { flex: 1; max-width: 760px; }
+#nh .ap-sec { display: grid; justify-items: center; gap: 12px; width: min(1180px, 100%); }
 #nh .ap-sec > small { font-size: 12.5px; color: var(--ap-sub); }
-#nh .ap-cnt { display: flex; align-items: center; gap: 22px; }
+#nh .ap-cnt { display: flex; align-items: center; gap: 16px; }
 #nh .ap-cnt button { width: 40px; height: 40px; border-radius: 50%; background: var(--ap-card); box-shadow: var(--ap-chip); font-size: 18px; color: var(--ap-sub); transition: scale .3s var(--ap-pop); }
 #nh .ap-cnt button:hover { scale: 1.08; }
-#nh .ap-cnt .n { font-size: 44px; line-height: 1; min-width: 60px; text-align: center; }
+#nh .ap-cnt .n { font-size: 38px; line-height: 1; min-width: 52px; text-align: center; }
 #nh .ap-day { position: relative; width: min(760px, 100%); height: 46px; direction: ltr; cursor: copy; touch-action: none; }
 #nh .ap-day::before { content: ""; position: absolute; left: 0; right: 0; top: 22px; height: 2px; border-radius: 2px; background: var(--ap-line); }
 #nh .ap-day .pk { position: absolute; top: 18px; height: 10px; border-radius: 10px; background: var(--ap-soft); }
@@ -36,7 +39,7 @@ const PilotPage = (() => {
 #nh .ap-leg i { display: inline-block; width: 18px; height: 8px; border-radius: 8px; background: var(--ap-soft); margin-inline-end: 6px; vertical-align: middle; }
 #nh .ap-leg em { font-style: normal; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--nh-accent); margin-inline-end: 6px; vertical-align: middle; }
 #nh .ap-tpls { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-#nh .ap-md { position: relative; display: grid; gap: 2px; justify-items: start; align-content: start; min-width: 150px; max-width: 220px; padding: 12px 16px; border-radius: 18px; background: var(--ap-card); box-shadow: var(--ap-sh); text-align: start; transition: scale .3s var(--ap-pop), box-shadow .3s; }
+#nh .ap-md { position: relative; display: grid; gap: 2px; justify-items: start; align-content: start; min-width: 140px; max-width: 210px; padding: 10px 14px; border-radius: 18px; background: var(--ap-card); box-shadow: var(--ap-sh); text-align: start; transition: scale .3s var(--ap-pop), box-shadow .3s; }
 #nh .ap-md:hover { scale: 1.03; }
 #nh .ap-md b { font-size: 13.5px; font-weight: 500; }
 #nh .ap-md small { font-size: 11px; color: var(--nh-muted); }
@@ -59,6 +62,7 @@ const PilotPage = (() => {
 #nh .ap-seg button { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 12.5px; color: var(--ap-sub); transition: background .25s, color .25s; }
 #nh .ap-seg button.on { background: var(--ap-card); color: var(--nh-ink); box-shadow: 0 2px 8px rgba(24, 23, 24, .08); }
 #nh .ap-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+#nh .ap-sec.ap-modes { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; }
 #nh .ap-steps button { height: 30px; padding: 0 12px; border-radius: 999px; background: var(--ap-field); font-size: 12px; color: var(--ap-sub); }
 #nh .ap-steps button.on { background: var(--ap-soft); color: var(--nh-accent); }
 #nh .ap-steps i { font-style: normal; color: var(--ap-track); align-self: center; }
@@ -91,8 +95,25 @@ const PilotPage = (() => {
 #nh .ap-qi video { width: 100%; max-height: 260px; border-radius: 12px; background: #000; }
 #nh .ap-err { font-size: 11.5px; color: #C2482E; }
 #nh .ap-none { padding: 16px; text-align: center; font-size: 12.5px; color: var(--nh-muted); }
+/* شاشات قصيرة: كل حاجة بتتلم في الشاشة من غير سكرول */
+@media (min-width: 821px) and (max-height: 860px) {
+  #nh .ap-main { gap: 14px; padding: 0 0 56px; }
+  #nh .ap-sec { gap: 8px; }
+  #nh .ap-cnt button { width: 34px; height: 34px; font-size: 16px; }
+  #nh .ap-cnt .n { font-size: 32px; }
+  #nh .ap-md { min-width: 124px; padding: 8px 12px; border-radius: 16px; }
+  #nh .ap-md .tag { margin-top: 2px; }
+  #nh .ap-leg span:last-child { display: none; }
+  #nh .ap-seg button, #nh .ap-steps button { height: 28px; }
+}
+@media (min-width: 821px) and (max-height: 700px) {
+  #nh .ap .lat { display: none; }
+  #nh .ap-main { gap: 10px; }
+}
 @media (max-width: 820px) {
   #nh .ap-main { align-content: start; gap: 24px; }
+  #nh .ap-row { flex-direction: column; gap: 24px; }
+  #nh .ap-row > .ap-sec:last-child { width: 100%; }
   #nh .ap-cnt .n { font-size: 36px; }
   #nh .ap-md { flex: 1 1 calc(50% - 5px); min-width: 0; max-width: none; }
   #nh .ap-dock { inset-inline-end: 16px; bottom: 16px; }
@@ -130,17 +151,17 @@ const PilotPage = (() => {
   const shell = () => `
     <header class="ap-top"><span class="lat">Autopilot</span><button type="button" class="ap-tg" data-on aria-label="الأوتوبايلوت"></button><span class="ap-st" data-st></span></header>
     <main class="ap-main">
-      <section class="ap-sec"><span class="lat">Posts per day</span>
+      <div class="ap-row"><section class="ap-sec"><span class="lat">Posts per day</span>
         <div class="ap-cnt"><button type="button" data-cnt="-1" aria-label="أقل">−</button><span class="n num" data-n></span><button type="button" data-cnt="1" aria-label="أكتر">+</button></div>
-        <small>بوست في اليوم</small></section>
+        <small>بوست في اليوم <span data-fee></span></small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
-        <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>دوس على الخط تزوّد ميعاد · اسحب النقطة تغيّره · دوس عليها تشيلها</span></div></section>
+        <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>دوس على الخط تزوّد ميعاد · اسحب النقطة تغيّره · دوس عليها تشيلها</span></div></section></div>
       <section class="ap-sec"><span class="lat">Templates</span>
         <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالدور من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
         <div class="ap-plan" data-plan></div>
         <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
         <small data-tplsub>بيختار منهم بالتبادل عشان المحتوى مايتكررش</small></section>
-      <section class="ap-sec"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل حاجة لوحده</button><button type="button" data-mode="approve">أوافق على كل خطوة</button></div>
+      <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل حاجة لوحده</button><button type="button" data-mode="approve">أوافق على الخطوات دي</button></div>
         <div class="ap-steps" data-steps></div></section>
     </main>
     <div class="ap-dock" data-dock><div class="ap-q" data-q></div>
@@ -184,6 +205,7 @@ const PilotPage = (() => {
       + [0, 6, 12, 18].map((h) => `<span class="hr" style="left:${pct(h)}%">${String(h).padStart(2, "0")}</span>`).join("")
       + s.times.map((t, i) => `<span class="pt ${t.mine ? "mine" : ""}" data-pt="${i}" style="left:${pct(hOf(t.t))}%"><b>${fmtH(hOf(t.t))}</b></span>`).join("");
     q("[data-n]").textContent = s.times.length;
+    q("[data-fee]").textContent = S.d.fee ? `· كل بوست ${S.d.fee} نقطة للأوتوبايلوت + تكلفة التوليد` : "";
   }
   function tplList() {
     const d = S.d, twin = d.twins.find((t) => t.ready);

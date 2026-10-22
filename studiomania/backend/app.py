@@ -29373,6 +29373,14 @@ def pilot_say(sc: dict) -> str:
     return " ".join(str(b.get("say") or "").strip() for b in sc.get("beats") or [] if str(b.get("say") or "").strip())
 
 
+# 💰 رسم الأوتوبايلوت: نقط ثابتة على كل بوست بيتجهّز ويتجدول لوحده (فوق تكلفة التوليد نفسها)، حتى لو الخطوات مافيهاش ذكاء صناعي
+PILOT_FEE_USD = float(os.environ.get("PILOT_FEE_USD") or 0.15)
+
+
+def pilot_fee() -> int:
+    return wallet.credits(PILOT_FEE_USD)
+
+
 def pilot_step(j: dict, s: dict, port: int) -> None:
     """خطوة واحدة للمهمة (من غير ما نستنى شغل تقيل: الشغل التقيل بيتعمل في الخلفية ونرجعله اللفة الجاية)."""
     jid, kind, ph = j["id"], j["kind"], j["phase"]
@@ -29380,7 +29388,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     gate = lambda step, note: put(status="wait", gate=step, note=note) or True if pilot_gate(j, s, step) else False  # noqa: E731
 
     if ph == "start":
-        wallet.need(wallet.credits(0.05), "الأوتوبايلوت")
+        wallet.need(pilot_fee() + wallet.credits(0.05), "بوست من الأوتوبايلوت")
         if kind == "custom":
             rid, bid = j["tpl"][5:], active_client_id()
             auto_load(rid, bid)
@@ -29415,6 +29423,10 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     if ph in ("final", "schedule"):
         if gate("video", "الفيديو جاهز: شوفه ووافق عشان يتجدول"):
             return
+        if not j.get("fee_paid"):   # الرسم مرة واحدة على البوست، قبل ما يتجدول
+            wallet.need(pilot_fee(), "رسم الأوتوبايلوت")
+            wallet.charge(pilot_fee(), f"الأوتوبايلوت: تجهيز وجدولة «{j['name']}»", jid)
+            put(fee_paid=True)
         when = max(datetime.fromisoformat(j["at"]), datetime.now(timezone.utc) + timedelta(minutes=3))
         plats = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
         caption = j.get("caption") or (pilot_caption(flow_load(j["fid"])) if j.get("fid") else j["name"])
@@ -29666,7 +29678,7 @@ def pilot_state() -> dict:
     twins = [{"id": t["id"], "name": t.get("name") or "", "ready": bool(t["ready"]["video"] or t["ready"]["photo"])} for t in twins_list()]
     upcoming = [a.isoformat(timespec="minutes") for a in pilot_slots(s, datetime.now(timezone.utc), 48)][:12]
     return {"settings": s, "jobs": jobs, "custom": custom, "twins": twins, "best": PILOT_BEST, "upcoming": upcoming,
-            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam"))}
+            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam")), "fee": pilot_fee()}
 
 
 class PilotIn(BaseModel):
