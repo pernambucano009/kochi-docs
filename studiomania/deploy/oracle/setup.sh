@@ -60,9 +60,14 @@ echo "== 5) Caddy (HTTPS)"
 cat > "$ROOT/caddy/Caddyfile" <<EOF
 $DOMAIN {
   encode gzip
-  request_body { max_size 2GB }
+  request_body {
+    max_size 2GB
+  }
   reverse_proxy 127.0.0.1:8000 {
-    transport http { read_timeout 30m write_timeout 30m }
+    transport http {
+      read_timeout 30m
+      write_timeout 30m
+    }
   }
 }
 EOF
