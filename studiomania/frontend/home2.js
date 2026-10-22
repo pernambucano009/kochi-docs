@@ -424,6 +424,8 @@ const NH = (() => {
     stageLock = true;
     zoom = { anims, frame, flies, real, cleanup: [], key, glEl };
     return anims[0].finished.then(() => {
+      // حركة التحويل المتبقية على المحتوى تجعل الأدراج الثابتة محبوسة داخله، فنكتفي بالشفافية بعد الوصول
+      anims.slice(2, 2 + content.filter(Boolean).length).forEach((x) => x.effect?.setKeyframes?.([{ opacity: 0 }, { opacity: 0, offset: .55 }, { opacity: 1 }]));
       home.style.visibility = "hidden";
       flies.forEach((f) => (f.style.opacity = 0));
       real.forEach((e) => (e.style.opacity = ""));

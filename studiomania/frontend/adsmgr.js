@@ -3,145 +3,150 @@
 const AdsMgrPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const BACK = location.hash === "#adsmgr";   // راجع من تسجيل الدخول على منصة الإعلانات
-  const S = { el: null, d: null, tab: "boost", busy: "", t: { age_min: 18, age_max: 45, countries: [], interests: [] }, f: {}, hits: [], aud: null, audAcc: "", open: null };
-  const TABS = [["boost", "🚀 روّج بوست"], ["create", "✨ إعلان جديد"], ["list", "📊 إعلاناتك"], ["aud", "👥 الجماهير"]];
+  const S = { el: null, d: null, tab: "boost", dw: null, menu: null, busy: "", t: { age_min: 18, age_max: 45, countries: [], interests: [] }, f: {}, hits: [], aud: null, audAcc: "", open: null };
   const META = ["facebook", "instagram"];
-  const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="amWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+  const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="amWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(Math.round(n * 100) / 100); };
-  const ST = { active: ["شغال", "ok"], paused: ["متوقف", "wait"], pending: ["بيتراجع", "wait"], in_review: ["بيتراجع", "wait"], rejected: ["اترفض", "bad"], completed: ["خلص", ""], cancelled: ["اتلغى", ""], unknown: ["…", ""] };
+  const ST = { active: ["يعمل", "ok"], paused: ["متوقف", "wait"], pending: ["قيد المراجعة", "wait"], in_review: ["قيد المراجعة", "wait"], rejected: ["مرفوض", "bad"], completed: ["انتهى", ""], cancelled: ["ملغى", ""], unknown: ["…", ""] };
   const accsFor = (p) => (S.d.ad_accounts || []).filter((a) => a.platform === p || (META.includes(p) && META.includes(a.platform)));
   const platName = (p) => S.d.platforms[p] || p;
   const opts = (o, cur) => Object.entries(o).map(([k, t]) => `<option value="${esc(k)}" ${k === cur ? "selected" : ""}>${esc(t)}</option>`).join("");
   const val = (k, d = "") => S.f[k] ?? d;
 
-  function hero() {
-    const d = S.d;
-    return `<section class="fs-hero"><div class="fs-hero-t"><b>إعلاناتك</b><span class="latin">YOUR ADS</span></div>
-      <p>روّج بوست نزل، أو اعمل إعلان جديد، وتابع أرقامه، واعمل جماهير مخصصة وشبيهة. كله من هنا، والاستهداف بيتملي من «🎯 وصفة الاستهداف» اللي اتعملت من منافسينك المعتمدين.</p>
-      <p class="nb-hint">💳 فلوس الإعلان نفسها بتتدفع للمنصة من حساب الإعلانات بتاعك (الكارت اللي عليه). البرنامج بياخد ${d.fee} نقطة بس على كل إعلان بيتعمل.</p>
-      ${d.mock ? `<p class="nb-hint">⚠️ وضع تجربة: حسابات وإعلانات وأرقام تجريبية.</p>` : ""}
-      ${!d.ready ? `<div class="fs-err">⚠️ خدمة الإعلانات مش متوصّلة لسه. كلّم الدعم.</div>` : d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}
-      ${d.recipe?.summary ? `<p class="nb-hint">🎯 ${esc(d.recipe.summary)}</p>` : `<p class="nb-hint">🎯 مفيش وصفة استهداف لسه: يجب الموافقة على المنافسين في صفحة المنافسين علشان تتعمل لوحدها.</p>`}</section>`;
-  }
-  // حسابات الإعلانات: ميتا ولينكدإن وبنترست بياخدوا ربط النشر، وتيك توك وX بيسجّلوا دخول، وجوجل لوحده
+  // 📣 من البروتوتايب: الأرقام والإعلانات بس، والترويج والإعلان الجديد والجماهير والحسابات في درج على الجنب
+  const DW = { boost: "روّج منشورًا", create: "إعلان جديد", aud: "الجماهير المخصصة", acc: "حسابات الإعلانات" };
+  // حسابات الإعلانات: ميتا ولينكدإن وبنترست تستخدم ربط النشر، وتيك توك وX تسجّل الدخول، وجوجل وحده
   function accounts() {
     const d = S.d, social = new Set((d.social || []).map((a) => a.platform));
     const btn = (p, label) => {
       const has = accsFor(p).length, needSocial = p !== "google" && !social.has(p) && !(META.includes(p) && META.some((m) => social.has(m)));
-      return has ? `<span class="pl-chip">✓ ${esc(label)}</span>`
-        : `<button class="nb-btn sm" data-amcon="${p}" ${needSocial ? `disabled title="اربط حساب ${esc(label)} للنشر الأول من صفحة النشر"` : ""}>＋ ${esc(label)}</button>`;
+      return `<label class="pk-tg${needSocial && !has ? " dim" : ""}">${esc(label)}${has ? `<span class="pk-ok">✓ مربوط</span>`
+        : `<button class="pk-chip" data-amcon="${p}" ${needSocial ? `disabled title="اربط حساب ${esc(label)} للنشر أولًا من صفحة النشر"` : ""}>اربط</button>`}</label>`;
     };
-    return `<section class="fs-card"><h3>🔗 حسابات الإعلانات</h3>
-      ${(d.ad_accounts || []).length ? `<div class="am-accs">${d.ad_accounts.map((a) => `<span class="am-acc"><b>${esc(platName(a.platform))}</b> ${esc(a.name)} <small dir="ltr">${esc(a.ad_account)} · ${esc(a.currency)}</small></span>`).join("")}</div>` : `<p class="nb-hint">لسه مفيش حساب إعلانات مربوط.</p>`}
-      <div class="nb-bar">${btn("facebook", "ميتا (فيسبوك وإنستجرام)")}${btn("tiktok", "تيك توك")}${btn("google", "جوجل ويوتيوب")}${btn("linkedin", "لينكدإن")}${btn("pinterest", "بنترست")}${btn("x", "X")}</div>
-      <p class="nb-hint">ميتا ولينكدإن وبنترست بيستخدموا نفس ربط النشر. تيك توك وX وجوجل بيطلبوا تسجيل دخول على المنصة نفسها وبعدها بترجع هنا.</p></section>`;
+    return `${(d.ad_accounts || []).map((a) => `<div class="pk-li"><b>${esc(platName(a.platform))}</b><small>${esc(a.name)} · <span dir="ltr">${esc(a.ad_account)} · ${esc(a.currency)}</span></small></div>`).join("")}
+      ${btn("facebook", "ميتا (فيسبوك وإنستجرام)")}${btn("tiktok", "تيك توك")}${btn("google", "جوجل ويوتيوب")}${btn("linkedin", "لينكدإن")}${btn("pinterest", "بنترست")}${btn("x", "X")}
+      <p class="pk-note">ميتا ولينكدإن وبنترست تستخدم ربط النشر نفسه. تيك توك وX وجوجل تطلب تسجيل الدخول على المنصة ثم تعود إلى هنا.</p>`;
   }
-  // 🎯 الاستهداف: نفس البلوك في الترويج والإعلان الجديد
+  // 🎯 الاستهداف: البلوك نفسه في الترويج والإعلان الجديد
   function target(p) {
     const t = S.t, r = S.d.recipe || {};
-    return `<div class="am-tg"><div class="am-tgh"><b>🎯 الاستهداف</b>
-        <button class="nb-btn sm fs-go" data-amfill ${!r.summary || S.busy ? "disabled" : ""}>${S.busy === "fill" ? "⏳ بيدوّر على الاهتمامات…" : "🎯 املاه من الوصفة"}</button></div>
-      <div class="am-row"><label>السن <input type="number" min="13" max="65" data-amt="age_min" value="${t.age_min}"> لـ <input type="number" min="13" max="65" data-amt="age_max" value="${t.age_max}"></label></div>
-      ${p === "google" ? "" : `<div class="am-row"><b>البلاد</b><span>${t.countries.map((c) => `<span class="pl-chip" dir="ltr">${esc(c)} <i data-amrmc="${esc(c)}">✕</i></span>`).join("")}</span>
-        <input type="text" maxlength="2" placeholder="SA" dir="ltr" data-amcin class="am-sm"><button class="nb-btn sm" data-amcadd>＋</button></div>
-      <div class="am-row"><b>الاهتمامات</b><span>${t.interests.map((i) => `<span class="pl-chip">${esc(i.name)} <i data-amrmi="${esc(i.id)}">✕</i></span>`).join("") || `<small class="nb-hint">من غير اهتمامات = جمهور واسع في البلاد والسن دول</small>`}</span></div>
-      <div class="am-row"><input type="text" placeholder="دوّر على اهتمام (بالإنجليزي أحسن): Fitness" dir="auto" data-amq><button class="nb-btn sm" data-amsearch>🔍</button></div>
-      ${S.hits.length ? `<div class="am-row">${S.hits.map((h) => `<button class="pl-chip am-hit" data-amhit="${esc(h.id)}">＋ ${esc(h.name)}</button>`).join("")}</div>` : ""}`}
-      ${r.locations?.length ? `<p class="nb-hint">الوصفة بتقول: ${esc(r.locations.join("، "))}</p>` : ""}</div>`;
+    return `<div class="pk-dh"><b class="pk-h3">الاستهداف</b>
+        <button class="pk-chip" data-amfill ${!r.summary || S.busy ? "disabled" : ""} ${r.summary ? "" : `title="وافق على المنافسين أولًا لتُصنع وصفة الاستهداف"`}>${S.busy === "fill" ? "جارٍ البحث…" : "املأه من الوصفة"}</button></div>
+      <div class="pk-row2"><label class="pk-f">من سن<input type="number" min="13" max="65" data-amt="age_min" value="${t.age_min}"></label><label class="pk-f">إلى<input type="number" min="13" max="65" data-amt="age_max" value="${t.age_max}"></label></div>
+      ${p === "google" ? "" : `<div class="pk-f">الدول<div class="pk-pills">${t.countries.map((c) => `<span class="pk-pill" dir="ltr">${esc(c)}<i data-amrmc="${esc(c)}">✕</i></span>`).join("")}
+          <input type="text" maxlength="2" placeholder="SA" dir="ltr" data-amcin class="pk-in2">${pkIb("plus", "أضف الدولة", "data-amcadd", "sm")}</div></div>
+      <div class="pk-f">الاهتمامات<div class="pk-pills">${t.interests.map((i) => `<span class="pk-pill">${esc(i.name)}<i data-amrmi="${esc(i.id)}">✕</i></span>`).join("") || `<small>بدون اهتمامات = جمهور واسع في هذه الدول والأعمار</small>`}</div></div>
+      <div class="pk-row2"><input type="text" class="pk-q" placeholder="ابحث عن اهتمام (بالإنجليزية أفضل): Fitness" dir="auto" data-amq>${pkIb("search", "ابحث", "data-amsearch", "sm")}</div>
+      ${S.hits.length ? `<div class="pk-pills">${S.hits.map((h) => `<button class="pk-pill add" data-amhit="${esc(h.id)}">＋ ${esc(h.name)}</button>`).join("")}</div>` : ""}`}
+      ${r.locations?.length ? `<p class="pk-note">الوصفة تقترح: ${esc(r.locations.join("، "))}</p>` : ""}`;
   }
   function common(p, accs) {
     const goals = S.d.goals[p] || {}, min = S.d.min_budget[p] || 1, b = +val("budget", Math.max(5, min)), days = +val("days", 7);
     if (!goals[S.f.goal]) S.f.goal = Object.keys(goals)[0];
-    return `<div class="am-row"><label>حساب الإعلانات <select data-amf="ad_account">${accs.map((a) => `<option value="${esc(a.ad_account)}" ${a.ad_account === val("ad_account") ? "selected" : ""}>${esc(a.name)} (${esc(a.currency)})</option>`).join("")}</select></label>
-        <label>الهدف <select data-amf="goal">${opts(goals, val("goal", Object.keys(goals)[0]))}</select></label></div>
-      <div class="am-row"><label>ميزانية يومية <input type="number" min="${min}" step="1" data-amf="budget" value="${b}"> <span data-amcur>${esc(accs.find((a) => a.ad_account === val("ad_account"))?.currency || accs[0]?.currency || "USD")}</span></label>
-        <label>لمدة <input type="number" min="1" max="90" data-amf="days" value="${days}"> يوم</label>
-        <span class="nb-hint">الإجمالي حوالي <b class="num">${fmt(b * days)}</b> · أقل يومية هنا ${min}</span></div>
-      <div class="am-row"><label>اسم الإعلان (ليك انت) <input type="text" data-amf="name" value="${esc(val("name"))}" placeholder="مثلًا: عرض الشتا"></label></div>`;
+    const cur = accs.find((a) => a.ad_account === val("ad_account"))?.currency || accs[0]?.currency || "USD";
+    return `<label class="pk-f">حساب الإعلانات<select data-amf="ad_account">${accs.map((a) => `<option value="${esc(a.ad_account)}" ${a.ad_account === val("ad_account") ? "selected" : ""}>${esc(a.name)} (${esc(a.currency)})</option>`).join("")}</select></label>
+      <label class="pk-f">الهدف<select data-amf="goal">${opts(goals, val("goal", Object.keys(goals)[0]))}</select></label>
+      <div class="pk-row2"><label class="pk-f">الميزانية اليومية (${esc(cur)})<input type="number" min="${min}" step="1" data-amf="budget" value="${b}"></label>
+        <label class="pk-f">المدة بالأيام<input type="number" min="1" max="90" data-amf="days" value="${days}"></label></div>
+      <p class="pk-note">الإجمالي نحو <b class="num">${fmt(b * days)}</b> ${esc(cur)} · أقل ميزانية يومية ${min}</p>
+      <label class="pk-f">اسم الإعلان (لك فقط)<input type="text" data-amf="name" value="${esc(val("name"))}" placeholder="مثلًا: عرض الشتاء"></label>`;
   }
-  function noAcc(p) {
-    return `<div class="fs-err">⚠️ اربط حساب إعلانات ${esc(platName(p))} الأول من «🔗 حسابات الإعلانات» فوق.</div>`;
-  }
+  const noAcc = (p) => `<p class="pk-err">اربط حساب إعلانات ${esc(platName(p))} أولًا.</p><button class="pk-chip" data-amdw="acc">حسابات الإعلانات</button>`;
+  const goBtn = (attr, t) => `<div class="pk-dacts"><button class="nb-btn fs-go" ${attr} ${S.busy ? "disabled" : ""}>${S.busy === "go" ? "جارٍ إنشاء الإعلان…" : t}</button></div>`;
   function boostTab() {
     const posts = S.d.posts || [];
-    if (!posts.length) return `<section class="fs-card"><h3>🚀 روّج بوست</h3><p class="nb-hint">لسه مفيش بوستات اتنشرت من البرنامج على فيسبوك أو إنستجرام أو تيك توك أو لينكدإن أو بنترست أو X. انشر بوست الأول وبعدين روّجه من هنا.</p></section>`;
+    if (!posts.length) return `<p class="pk-note">لا توجد منشورات نُشرت من البرنامج بعد. انشر منشورًا أولًا ثم روّجه من هنا.</p>`;
     const post = posts.find((x) => x.id === val("post")) || posts[0], p = post.platforms.includes(val("platform")) ? val("platform") : post.platforms[0], accs = accsFor(p);
     S.f.post = post.id; S.f.platform = p;
     if (!accs.some((a) => a.ad_account === val("ad_account"))) S.f.ad_account = accs[0]?.ad_account;
-    return `<section class="fs-card"><h3>🚀 روّج بوست <small>البوست نفسه بيوصل لناس أكتر بالاستهداف اللي تختاره</small></h3>
-      <div class="am-row"><label>البوست <select data-amf="post">${posts.map((x) => `<option value="${esc(x.id)}" ${x.id === post.id ? "selected" : ""}>${esc((x.name ? x.name + " · " : "") + (x.caption || "").slice(0, 60))}</option>`).join("")}</select></label>
-        <label>على <select data-amf="platform">${post.platforms.map((k) => `<option value="${k}" ${k === p ? "selected" : ""}>${esc(platName(k))}</option>`).join("")}</select></label></div>
-      ${accs.length ? common(p, accs) + target(p) + `<div class="nb-bar"><button class="nb-btn fs-go" data-amboost ${S.busy ? "disabled" : ""}>${S.busy === "go" ? "⏳ بيعمل الإعلان…" : "🚀 روّج البوست"}</button></div>` : noAcc(p)}</section>`;
+    return `<label class="pk-f">المنشور<select data-amf="post">${posts.map((x) => `<option value="${esc(x.id)}" ${x.id === post.id ? "selected" : ""}>${esc((x.name ? x.name + " · " : "") + (x.caption || "").slice(0, 60))}</option>`).join("")}</select></label>
+      <label class="pk-f">على<select data-amf="platform">${post.platforms.map((k) => `<option value="${k}" ${k === p ? "selected" : ""}>${esc(platName(k))}</option>`).join("")}</select></label>
+      ${accs.length ? common(p, accs) + target(p) + goBtn("data-amboost", "روّج المنشور") : noAcc(p)}`;
   }
   function createTab() {
     const plats = Object.keys(S.d.platforms), p = plats.includes(val("cplatform")) ? val("cplatform") : "facebook", accs = accsFor(p), ex = S.d.exports || [];
     S.f.cplatform = p;
     if (!accs.some((a) => a.ad_account === val("ad_account"))) S.f.ad_account = accs[0]?.ad_account;
     const g = p === "google", lim = g ? [30, 90] : [255, 500];
-    return `<section class="fs-card"><h3>✨ إعلان جديد <small>${g ? "إعلان بحث: بيظهر للناس اللي بيدوروا على الكلمات دي" : "صورة أو فيديو بعنوان ونص ودعوة"}</small></h3>
-      <div class="am-row"><label>المنصة <select data-amf="cplatform">${opts(S.d.platforms, p)}</select></label></div>
+    return `<label class="pk-f">المنصة<select data-amf="cplatform">${opts(S.d.platforms, p)}</select></label>
+      <p class="pk-note">${g ? "إعلان بحث: يظهر لمن يبحث عن هذه الكلمات" : "صورة أو فيديو مع عنوان ونص ودعوة"}</p>
       ${!accs.length ? noAcc(p) : `${common(p, accs)}
-      <div class="am-copy"><div class="am-row"><label class="am-grow">بتروّج لإيه؟ <input type="text" data-amf="offer" value="${esc(val("offer"))}" placeholder="مثلًا: خصم ٢٠٪ على التشكيلة الجديدة"></label>
-          <button class="nb-btn sm" data-amcopy ${S.busy ? "disabled" : ""}>${S.busy === "copy" ? "⏳ بيكتب…" : "✍️ اكتبهولي من الوصفة"}</button></div>
-        <label>العنوان <small class="num">(${lim[0]} حرف)</small><input type="text" maxlength="${lim[0]}" data-amf="headline" value="${esc(val("headline"))}"></label>
-        <label>النص <small class="num">(${lim[1]} حرف)</small><textarea rows="3" maxlength="${lim[1]}" data-amf="body">${esc(val("body"))}</textarea></label>
-        ${(val("more_headlines", []) || []).length ? `<p class="nb-hint">عناوين بديلة: ${val("more_headlines").map((h) => `<button class="pl-chip" data-amalt="${esc(h)}">${esc(h)}</button>`).join("")}</p>` : ""}
-        <div class="am-row"><label class="am-grow">اللينك <input type="url" dir="ltr" data-amf="link" value="${esc(val("link"))}" placeholder="https://"></label>
-          ${META.includes(p) ? `<label>الزرار <select data-amf="cta">${opts(S.d.ctas, val("cta", "LEARN_MORE"))}</select></label>` : ""}</div>
-        ${g ? `<label>كلمات البحث (كل كلمة في سطر)<textarea rows="4" data-amf="keywords">${esc(val("keywords", (S.d.recipe?.keywords || []).join("\n")))}</textarea></label>`
-          : `<label>الصورة/الفيديو <select data-amf="export_id"><option value="">اختار من الفيديوهات الجاهزة</option>${ex.map((e) => `<option value="${esc(e.id)}" ${e.id === val("export_id") ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></label>`}</div>
-      ${target(p)}
-      <div class="nb-bar"><button class="nb-btn fs-go" data-amcreate ${S.busy ? "disabled" : ""}>${S.busy === "go" ? "⏳ بيعمل الإعلان…" : "✨ اعمل الإعلان"}</button></div>`}</section>`;
+      <div class="pk-row2"><label class="pk-f pk-grow">ما الذي تروّج له؟<input type="text" data-amf="offer" value="${esc(val("offer"))}" placeholder="مثلًا: خصم ٢٠٪ على التشكيلة الجديدة"></label>
+        ${pkIb("spark", S.busy === "copy" ? "جارٍ الكتابة…" : "اكتبه لي من الوصفة", `data-amcopy ${S.busy ? "disabled" : ""}`, "sm")}</div>
+      <label class="pk-f">العنوان (${lim[0]} حرفًا)<input type="text" maxlength="${lim[0]}" data-amf="headline" value="${esc(val("headline"))}"></label>
+      <label class="pk-f">النص (${lim[1]} حرف)<textarea rows="3" maxlength="${lim[1]}" data-amf="body">${esc(val("body"))}</textarea></label>
+      ${(val("more_headlines", []) || []).length ? `<div class="pk-pills">${val("more_headlines").map((h) => `<button class="pk-pill add" data-amalt="${esc(h)}">${esc(h)}</button>`).join("")}</div>` : ""}
+      <label class="pk-f">الرابط<input type="url" dir="ltr" data-amf="link" value="${esc(val("link"))}" placeholder="https://"></label>
+      ${META.includes(p) ? `<label class="pk-f">الزر<select data-amf="cta">${opts(S.d.ctas, val("cta", "LEARN_MORE"))}</select></label>` : ""}
+      ${g ? `<label class="pk-f">كلمات البحث (كلمة في كل سطر)<textarea rows="4" data-amf="keywords">${esc(val("keywords", (S.d.recipe?.keywords || []).join("\n")))}</textarea></label>`
+        : `<label class="pk-f">الصورة أو الفيديو<select data-amf="export_id"><option value="">اختر من الفيديوهات الجاهزة</option>${ex.map((e) => `<option value="${esc(e.id)}" ${e.id === val("export_id") ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</select></label>`}
+      ${target(p)}${goBtn("data-amcreate", "أنشئ الإعلان")}`}`;
   }
-  function listTab() {
+  // صف الإعلان: الاسم والحالة والإنفاق والنتائج، والأوامر في قائمة ⋯
+  function row(a) {
+    const st = ST[a.status] || [a.status, ""], m = a.metrics || {}, on = S.open === a.id, menu = S.menu === a.id, live = ["active", "paused"].includes(a.status);
+    return `<div class="am-r" data-adid="${esc(a.id)}"><span class="am-th" title="${esc(platName(a.platform))}">${pkIc(a.kind === "boost" ? "trend" : "megaphone", 18)}</span>
+        <div class="am-n"><b>${esc(a.name)}</b><small>${a.kind === "boost" ? "ترويج منشور" : "إعلان جديد"} · ${esc(S.d.goals[a.platform]?.[a.goal] || a.goal || "")}</small></div>
+        <span class="am-st ${st[1]}">${esc(st[0])}</span><span class="num" dir="ltr">${fmt(m.spend)}</span><span class="num">${fmt(m.clicks)} <small>نقرة</small></span>
+        <span class="pk-wrapm">${pkIb("more", "خيارات", "data-ammenu", "sm")}${menu ? `<div class="pk-menu" role="menu">
+          ${a.status === "active" ? `<button data-ampause>أوقف</button>` : a.status === "paused" ? `<button data-amresume>شغّل</button>` : ""}
+          ${live ? `<button data-ambudget>عدّل الميزانية</button>` : ""}<button data-amstats>${on ? "أخفِ التفاصيل" : "التفاصيل"}</button>
+          ${live ? `<button class="bad" data-amcancel>ألغِ الإعلان</button>` : ""}</div>` : ""}</span>
+        ${a.error ? `<p class="pk-err am-full">⚠️ ${esc(a.error)}</p>` : ""}
+        ${on ? `<div class="am-full pk-sub"><span>الظهور <b class="num">${fmt(m.impressions)}</b></span><span>الوصول <b class="num">${fmt(m.reach)}</b></span><span>CTR <b class="num">${m.ctr ?? "—"}%</b></span><span>تكلفة النقرة <b class="num">${m.cpc ?? "—"}</b></span>${a.budget?.amount ? `<span>يوميًا <b class="num">${a.budget.amount}</b></span>` : ""}</div><div class="am-full pk-note" data-amstatbox>جارٍ التحميل…</div>` : ""}</div>`;
+  }
+  function listView() {
     const L = S.d.ads || [];
-    if (!L.length) return `<section class="fs-card"><p class="nb-hint">لسه مفيش إعلانات اتعملت من البرنامج للبراند ده.</p></section>`;
-    return L.map((a) => {
-      const st = ST[a.status] || [a.status, ""], m = a.metrics || {}, on = S.open === a.id;
-      return `<article class="fs-card am-ad" data-adid="${esc(a.id)}"><div class="rv-head"><span class="rv-pl">${esc(platName(a.platform))}</span><b>${esc(a.name)}</b>
-          <span class="am-st ${st[1]}">${esc(st[0])}</span><small>${a.kind === "boost" ? "ترويج بوست" : "إعلان جديد"} · ${esc(S.d.goals[a.platform]?.[a.goal] || a.goal || "")}</small>
-          <span class="rv-acts">${a.status === "active" ? `<button class="nb-btn sm" data-ampause>⏸ وقّف</button>` : a.status === "paused" ? `<button class="nb-btn sm" data-amresume>▶ شغّل</button>` : ""}
-            ${["active", "paused"].includes(a.status) ? `<button class="nb-btn sm" data-ambudget>💰 الميزانية</button><button class="nb-btn sm danger" data-amcancel>✕ الغي</button>` : ""}
-            <button class="nb-btn sm" data-amstats>${on ? "اقفل" : "📈 التفاصيل"}</button></span></div>
-        <div class="rv-stats"><span>صرف <b class="num">${fmt(m.spend)}</b></span><span>ظهر <b class="num">${fmt(m.impressions)}</b></span><span>وصل لـ <b class="num">${fmt(m.reach)}</b></span>
-          <span>ضغطات <b class="num">${fmt(m.clicks)}</b></span><span>CTR <b class="num">${m.ctr ?? "—"}%</b></span><span>تمن الضغطة <b class="num">${m.cpc ?? "—"}</b></span>
-          ${a.budget?.amount ? `<span>يومي <b class="num">${a.budget.amount}</b></span>` : ""}</div>
-        ${a.error ? `<div class="fs-err">⚠️ ${esc(a.error)}</div>` : ""}${on ? `<div class="am-stats" data-amstatbox>بيحمّل…</div>` : ""}</article>`;
-    }).join("");
+    if (!(S.d.ad_accounts || []).length) return `<div class="pk-hero"><span class="pk-big">${pkIc("megaphone", 40)}</span><h2>اربط حساب الإعلانات</h2>
+      <p>تُدفع تكلفة الإعلان للمنصة مباشرة من حسابك، ويأخذ البرنامج ${S.d.fee} نقطة فقط عن كل إعلان.</p><button class="nb-btn fs-go" data-amdw="acc">اربط حسابًا</button></div>`;
+    const sum = (k) => L.reduce((n, a) => n + (+a.metrics?.[k] || 0), 0), spend = sum("spend"), clicks = sum("clicks");
+    return `<div class="pk-kpis"><div><b class="num" dir="ltr">${fmt(spend)}</b><span>الإنفاق</span></div><div><b class="num">${fmt(clicks)}</b><span>نقرة</span></div>
+        <div><b class="num" dir="ltr">${clicks ? fmt(spend / clicks) : "—"}</b><span>تكلفة النقرة</span></div><div><b class="num">${L.filter((a) => a.status === "active").length}</b><span>إعلانات تعمل</span></div></div>
+      ${L.length ? `<div class="am-rows"><div class="am-r am-hd"><span></span><span>الإعلان</span><span>الحالة</span><span>الإنفاق</span><span>النتائج</span><span></span></div>${L.map(row).join("")}</div>`
+        : `<div class="pk-empty">لا توجد إعلانات بعد. اضغط «＋» لإنشاء إعلان، أو روّج منشورًا نُشر.</div>`}`;
+  }
+  function drawer() {
+    if (!S.dw) return "";
+    if (S.dw === "aud") { const b = audTab(); return `<aside class="pk-drawer" aria-label="${DW.aud}"><div class="pk-dh"><h2>${DW.aud}</h2>${pkIb("close", "إغلاق", "data-amdx", "sm")}</div>${b}</aside>`; }
+    const body = { boost: boostTab, create: createTab, acc: accounts }[S.dw]();
+    return `<aside class="pk-drawer" aria-label="${DW[S.dw]}"><div class="pk-dh"><h2>${DW[S.dw]}</h2>${pkIb("close", "إغلاق", "data-amdx", "sm")}</div>${body}</aside>`;
   }
   function audTab() {
     const meta = (S.d.ad_accounts || []).filter((a) => META.includes(a.platform));
-    if (!meta.length) return `<section class="fs-card"><h3>👥 الجماهير</h3>${noAcc("facebook")}</section>`;
+    if (!meta.length) return noAcc("facebook");
     const acc = meta.find((a) => a.ad_account === S.audAcc) || meta[0], A = S.aud;
     S.audAcc = acc.ad_account;
-    if (!A || A.acc !== acc.ad_account) { loadAud(acc); return `<section class="fs-card"><div class="nh-empty">بيحمّل…</div></section>`; }
+    if (!A || A.acc !== acc.ad_account) { loadAud(acc); return `<div class="pk-empty">جارٍ التحميل…</div>`; }
     const kind = val("akind", "website"), list = A.audiences || [];
-    return `<section class="fs-card"><h3>👥 الجماهير <small>أقوى من الاهتمامات: ناس عرفوك قبل كده، ومنهم جمهور شبيه</small></h3>
-      <div class="am-row"><label>حساب ميتا <select data-amaudacc>${meta.map((a) => `<option value="${esc(a.ad_account)}" ${a === acc ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label></div>
-      ${list.length ? `<div class="pl-grid">${list.map((x) => `<div class="pl-card"><b>${esc(x.name)}</b><small>${esc({ website: "زوار الموقع", customer_list: "قايمة عملاء", lookalike: "جمهور شبيه" }[x.type] || x.type)}${x.size ? ` · حوالي ${fmt(x.size)}` : ""}</small>
-          ${x.type === "customer_list" ? `<button class="nb-btn sm" data-amup="${esc(x.id)}">⬆️ ارفع عملاء (CSV)</button>` : ""}<button class="nb-btn sm danger" data-amaudel="${esc(x.id)}">✕ امسح</button></div>`).join("")}</div>` : `<p class="nb-hint">لسه مفيش جماهير.</p>`}</section>
-      <section class="fs-card"><h3>＋ جمهور جديد</h3>
-        <div class="am-row"><label>النوع <select data-amf="akind">${opts({ website: "🌐 زوار موقعك (بالبيكسل)", customer_list: "📇 قايمة عملائك", lookalike: "👯 جمهور شبيه" }, kind)}</select></label>
-          <label class="am-grow">الاسم <input type="text" data-amf="aname" value="${esc(val("aname"))}" placeholder="مثلًا: زوار آخر ٣٠ يوم"></label></div>
-        ${kind === "website" ? `<div class="am-row"><label>البيكسل <select data-amf="pixel">${(A.pixels || []).map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") || `<option value="">مفيش بيكسل على الحساب</option>`}</select></label>
-            <label>آخر <input type="number" min="1" max="180" data-amf="adays" value="${val("adays", 30)}"> يوم</label></div>` : ""}
-        ${kind === "lookalike" ? `<div class="am-row"><label>من جمهور <select data-amf="source">${list.filter((x) => x.type !== "lookalike").map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("") || `<option value="">اعمل جمهور زوار أو عملاء الأول</option>`}</select></label>
-            <label>البلد <input type="text" maxlength="2" dir="ltr" class="am-sm" data-amf="country" value="${esc(val("country", S.d.recipe?.countries?.[0] || "SA"))}"></label>
-            <label>الحجم <select data-amf="ratio">${[1, 2, 3, 5, 10].map((r) => `<option value="${r / 100}" ${+val("ratio", 0.01) === r / 100 ? "selected" : ""}>${r}٪ ${r === 1 ? "(الأقرب ليهم)" : ""}</option>`).join("")}</select></label></div>` : ""}
-        ${kind === "customer_list" ? `<p class="nb-hint">بعد ما يتعمل، ارفع ملف CSV فيه إيميل أو رقم كل عميل (الرقم بكود الدولة، مثلًا +966…). لازم يكونوا عملاءك فعلًا ووافقوا إنك تتواصل معاهم، والبيانات بتتشفّر قبل ما توصل لميتا.</p>` : ""}
-        <div class="nb-bar"><button class="nb-btn fs-go" data-amaudnew ${S.busy ? "disabled" : ""}>＋ اعمل الجمهور</button></div></section>
+    return `<p class="pk-note">أقوى من الاهتمامات: أشخاص عرفوك من قبل، ومنهم جمهور مشابه.</p>
+      ${meta.length > 1 ? `<label class="pk-f">حساب ميتا<select data-amaudacc>${meta.map((a) => `<option value="${esc(a.ad_account)}" ${a === acc ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>` : ""}
+      ${list.map((x) => `<div class="pk-li"><b>${esc(x.name)}</b><small>${esc({ website: "زوار الموقع", customer_list: "قائمة عملاء", lookalike: "جمهور مشابه" }[x.type] || x.type)}${x.size ? ` · نحو ${fmt(x.size)}` : ""}</small>
+          <span class="pk-acts">${x.type === "customer_list" ? pkIb("upload", "ارفع العملاء (CSV)", `data-amup="${esc(x.id)}"`, "sm") : ""}${pkIb("trash", "احذف", `data-amaudel="${esc(x.id)}"`, "sm")}</span></div>`).join("") || `<p class="pk-note">لا توجد جماهير بعد.</p>`}
+      <b class="pk-h3">جمهور جديد</b>
+      <label class="pk-f">النوع<select data-amf="akind">${opts({ website: "زوار موقعك (بالبكسل)", customer_list: "قائمة عملائك", lookalike: "جمهور مشابه" }, kind)}</select></label>
+      <label class="pk-f">الاسم<input type="text" data-amf="aname" value="${esc(val("aname"))}" placeholder="مثلًا: زوار آخر ٣٠ يومًا"></label>
+      ${kind === "website" ? `<div class="pk-row2"><label class="pk-f">البكسل<select data-amf="pixel">${(A.pixels || []).map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") || `<option value="">لا يوجد بكسل على الحساب</option>`}</select></label>
+          <label class="pk-f">آخر (يوم)<input type="number" min="1" max="180" data-amf="adays" value="${val("adays", 30)}"></label></div>` : ""}
+      ${kind === "lookalike" ? `<label class="pk-f">من جمهور<select data-amf="source">${list.filter((x) => x.type !== "lookalike").map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("") || `<option value="">أنشئ جمهور زوار أو عملاء أولًا</option>`}</select></label>
+          <div class="pk-row2"><label class="pk-f">الدولة<input type="text" maxlength="2" dir="ltr" data-amf="country" value="${esc(val("country", S.d.recipe?.countries?.[0] || "SA"))}"></label>
+          <label class="pk-f">الحجم<select data-amf="ratio">${[1, 2, 3, 5, 10].map((r) => `<option value="${r / 100}" ${+val("ratio", 0.01) === r / 100 ? "selected" : ""}>${r}٪ ${r === 1 ? "(الأقرب)" : ""}</option>`).join("")}</select></label></div>` : ""}
+      ${kind === "customer_list" ? `<p class="pk-note">بعد إنشائه، ارفع ملف CSV فيه بريد أو رقم كل عميل (بمفتاح الدولة، مثل +966…). يجب أن يكونوا عملاءك فعلًا وقد وافقوا على التواصل، وتُشفَّر البيانات قبل وصولها إلى ميتا.</p>` : ""}
+      <div class="pk-dacts"><button class="nb-btn fs-go" data-amaudnew ${S.busy ? "disabled" : ""}>أنشئ الجمهور</button></div>
       <input type="file" accept=".csv,text/csv" hidden data-amfile>`;
   }
   async function loadAud(acc) {
     try { const r = await api(`/api/ads-audiences?account_id=${encodeURIComponent(acc.account || "")}`); S.aud = { ...r, acc: acc.ad_account }; }
     catch (err) { S.aud = { audiences: [], pixels: [], acc: acc.ad_account }; toast(err.message, true); }
-    if (S.tab === "aud") render();
+    if (S.dw === "aud") render();
   }
   function render() {
     const w = S.el;
     if (!w || !S.d) return;
-    const body = { boost: boostTab, create: createTab, list: listTab, aud: audTab }[S.tab]();
-    w.innerHTML = hero() + (S.d.ready ? accounts() + `<nav class="rv-tabs" role="tablist">${TABS.map(([k, t]) => `<button role="tab" data-amtab="${k}" aria-selected="${k === S.tab}" class="${k === S.tab ? "on" : ""}">${t}${k === "list" && S.d.ads?.length ? ` (${S.d.ads.length})` : ""}</button>`).join("")}</nav>` + body : "");
+    const d = S.d, ok = d.ready && (d.ad_accounts || []).length;
+    w.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub">${d.mock ? `<span>وضع تجربة: أرقام تجريبية</span>` : ""}${d.recipe?.summary ? `<span data-tip="${esc(d.recipe.summary.slice(0, 90))}">الاستهداف من وصفة الاستهداف</span>` : ""}</div>
+        <div class="pk-acts">${d.ready ? pkIb("link", "حسابات الإعلانات", 'data-amdw="acc"') : ""}${ok ? pkIb("users", "الجماهير المخصصة", 'data-amdw="aud"') + pkIb("trend", "روّج منشورًا", 'data-amdw="boost"') + pkIb("plus", "إعلان جديد بوصفة الاستهداف", 'data-amdw="create"', "blk") : ""}</div></div>
+      ${!d.ready ? `<p class="pk-err">خدمة الإعلانات غير متصلة بعد. تواصل مع الدعم.</p>` : d.error ? `<p class="pk-err">⚠️ ${esc(d.error)}</p>` : ""}
+      ${d.ready ? listView() : ""}${drawer()}</div>`;
     if (S.open) loadStats(S.open);
   }
   async function loadStats(id) {
@@ -149,7 +154,7 @@ const AdsMgrPage = (() => {
       const r = await api(`/api/ads/${encodeURIComponent(id)}/analytics`), box = S.el.querySelector(`[data-adid="${CSS.escape(id)}"] [data-amstatbox]`);
       if (!box) return;
       const bd = r.breakdowns || {};
-      box.innerHTML = Object.keys(bd).length ? Object.entries(bd).map(([k, rows]) => `<p><b>${esc({ age: "السن", gender: "النوع", country: "البلد" }[k] || k)}:</b> ${(rows || []).slice(0, 6).map((x) => `${esc(x.key || x.value || x.age || x.gender || x.country || "")} <span class="num">${fmt(x.spend ?? x.impressions)}</span>`).join(" · ")}</p>`).join("") : `<p class="nb-hint">لسه مفيش تفاصيل.</p>`;
+      box.innerHTML = Object.keys(bd).length ? Object.entries(bd).map(([k, rows]) => `<p><b>${esc({ age: "السن", gender: "النوع", country: "البلد" }[k] || k)}:</b> ${(rows || []).slice(0, 6).map((x) => `${esc(x.key || x.value || x.age || x.gender || x.country || "")} <span class="num">${fmt(x.spend ?? x.impressions)}</span>`).join(" · ")}</p>`).join("") : "لا توجد تفاصيل بعد.";
     } catch (err) { toast(err.message, true); }
   }
   const tgBody = () => ({ age_min: +S.t.age_min, age_max: +S.t.age_max, countries: S.t.countries, interests: S.t.interests });
@@ -173,21 +178,24 @@ const AdsMgrPage = (() => {
     w.addEventListener("input", (e) => { const f = e.target.dataset.amf; if (f && !["budget", "days"].includes(f)) S.f[f] = e.target.value; });
     w.addEventListener("click", async (e) => {
       const q = (s) => e.target.closest(s);
-      const tb = q("[data-amtab]");
-      if (tb) { S.tab = tb.dataset.amtab; S.hits = []; return render(); }
+      const dw = q("[data-amdw]");
+      if (dw) { S.dw = dw.dataset.amdw; S.tab = S.dw; S.hits = []; S.menu = null; return render(); }
+      if (q("[data-amdx]")) { S.dw = null; return render(); }
+      if (q("[data-ammenu]")) { const id = q("[data-adid]").dataset.adid; S.menu = S.menu === id ? null : id; return render(); }
+      if (S.menu && !q(".pk-menu")) { S.menu = null; render(); }
       if (q("[data-amcon]")) {
         const p = q("[data-amcon]").dataset.amcon;
-        try { const r = await api("/api/ads/connect", { method: "POST", ...jsonBody({ platform: p }) }); if (r.url) { location.href = r.url; return; } S.d = r; render(); toast("✅ حساب الإعلانات اتربط"); }
+        try { const r = await api("/api/ads/connect", { method: "POST", ...jsonBody({ platform: p }) }); if (r.url) { location.href = r.url; return; } S.d = r; render(); toast("✓ رُبط حساب الإعلانات"); }
         catch (err) { toast(err.message, true); }
         return;
       }
       if (q("[data-amfill]")) {
-        const p = S.tab === "boost" ? S.f.platform : S.f.cplatform, acc = accOf(S.f.ad_account);
+        const p = S.dw === "boost" ? S.f.platform : S.f.cplatform, acc = accOf(S.f.ad_account);
         return run("fill", async () => {
           const r = await api("/api/ads/targeting", { method: "POST", ...jsonBody({ account_id: acc?.account || "", platform: p }) });
           S.t = { age_min: r.age_min, age_max: r.age_max, countries: r.countries.length ? r.countries : S.t.countries, interests: r.interests };
           if (p === "google" && r.keywords?.length) S.f.keywords = r.keywords.join("\n");
-          toast(`🎯 اتملى: ${r.interests.length} اهتمام من ${r.asked.length} في الوصفة${r.countries.length ? "" : " · اختار البلد بنفسك"}`);
+          toast(`✓ أُضيف ${r.interests.length} اهتمامًا من ${r.asked.length} في الوصفة${r.countries.length ? "" : " · اختر الدولة بنفسك"}`);
         });
       }
       if (q("[data-amcadd]")) { const v = w.querySelector("[data-amcin]").value.trim().toUpperCase(); if (/^[A-Z]{2}$/.test(v) && !S.t.countries.includes(v)) S.t.countries.push(v); return render(); }
@@ -196,7 +204,7 @@ const AdsMgrPage = (() => {
       if (q("[data-amsearch]")) {
         const v = w.querySelector("[data-amq]").value.trim(), acc = accOf(S.f.ad_account);
         if (!v) return;
-        try { S.hits = await api(`/api/ads/interests?q=${encodeURIComponent(v)}&account_id=${encodeURIComponent(acc?.account || "")}`); if (!S.hits.length) toast("مالقيتش اهتمام بالاسم ده", true); render(); }
+        try { S.hits = await api(`/api/ads/interests?q=${encodeURIComponent(v)}&account_id=${encodeURIComponent(acc?.account || "")}`); if (!S.hits.length) toast("لم أجد اهتمامًا بهذا الاسم", true); render(); }
         catch (err) { toast(err.message, true); }
         return;
       }
@@ -208,12 +216,12 @@ const AdsMgrPage = (() => {
           Object.assign(S.f, { headline: r.headline, body: r.body, more_headlines: r.more_headlines, more_bodies: r.more_bodies, cta: r.cta });
         });
       }
-      const common = () => { const acc = accOf(S.f.ad_account); return { ad_account: S.f.ad_account, account_id: META.includes(acc?.platform) ? "" : acc?.account || "", name: S.f.name || "", goal: S.f.goal || Object.keys(S.d.goals[S.tab === "boost" ? S.f.platform : S.f.cplatform] || {})[0], budget: +(S.f.budget || 5), days: +(S.f.days || 7), currency: acc?.currency || "USD", targeting: tgBody() }; };
-      const confirmSpend = (c) => uiConfirm(`هيتعمل إعلان بميزانية ${c.budget} ${c.currency} في اليوم لمدة ${c.days} يوم (حوالي ${fmt(c.budget * c.days)} ${c.currency})، والفلوس دي بتتدفع للمنصة من حساب إعلاناتك. + ${S.d.fee} نقطة للبرنامج. تكمّل؟`);
+      const common = () => { const acc = accOf(S.f.ad_account); return { ad_account: S.f.ad_account, account_id: META.includes(acc?.platform) ? "" : acc?.account || "", name: S.f.name || "", goal: S.f.goal || Object.keys(S.d.goals[S.dw === "boost" ? S.f.platform : S.f.cplatform] || {})[0], budget: +(S.f.budget || 5), days: +(S.f.days || 7), currency: acc?.currency || "USD", targeting: tgBody() }; };
+      const confirmSpend = (c) => uiConfirm(`سيُنشأ إعلان بميزانية ${c.budget} ${c.currency} يوميًا لمدة ${c.days} يومًا (نحو ${fmt(c.budget * c.days)} ${c.currency})، ويُدفع هذا المبلغ للمنصة من حساب إعلاناتك، إضافة إلى ${S.d.fee} نقطة للبرنامج. هل تتابع؟`);
       if (q("[data-amboost]")) {
         const c = common();
         if (!(await confirmSpend(c))) return;
-        return run("go", async () => { S.d = await api("/api/ads/boost", { method: "POST", ...jsonBody({ ...c, platform: S.f.platform, post_id: S.f.post }) }); S.tab = "list"; toast("🚀 الإعلان اتعمل، بيتراجع من المنصة وبعدها بيشتغل"); });
+        return run("go", async () => { S.d = await api("/api/ads/boost", { method: "POST", ...jsonBody({ ...c, platform: S.f.platform, post_id: S.f.post }) }); S.dw = null; toast("✓ أُنشئ الإعلان، وستراجعه المنصة ثم يبدأ"); });
       }
       if (q("[data-amcreate]")) {
         const c = common();
@@ -221,7 +229,7 @@ const AdsMgrPage = (() => {
         return run("go", async () => {
           S.d = await api("/api/ads/create", { method: "POST", ...jsonBody({ ...c, platform: S.f.cplatform, headline: S.f.headline || "", body: S.f.body || "", link: S.f.link || "", export_id: S.f.export_id || "",
             cta: S.f.cta || "LEARN_MORE", keywords: String(S.f.keywords ?? (S.d.recipe?.keywords || []).join("\n")).split("\n").map((x) => x.trim()).filter(Boolean), more_headlines: S.f.more_headlines || [], more_bodies: S.f.more_bodies || [] }) });
-          S.tab = "list"; toast("✨ الإعلان اتعمل، بيتراجع من المنصة وبعدها بيشتغل");
+          S.dw = null; toast("✓ أُنشئ الإعلان، وستراجعه المنصة ثم يبدأ");
         });
       }
       const id = q("[data-adid]")?.dataset.adid;
@@ -230,8 +238,8 @@ const AdsMgrPage = (() => {
         if (q("[data-ampause]")) return patch({ status: "paused" });
         if (q("[data-amresume]")) return patch({ status: "active" });
         if (q("[data-ambudget]")) { const v = await uiPrompt("الميزانية اليومية الجديدة:"); if (v && +v > 0) patch({ budget: +v }); return; }
-        if (q("[data-amcancel]")) { if (await uiConfirm("تلغي الإعلان ده؟ مش هيرجع تاني.")) run("x", async () => { S.d = await api(`/api/ads/${encodeURIComponent(id)}`, { method: "DELETE" }); }); return; }
-        if (q("[data-amstats]")) { S.open = S.open === id ? null : id; return render(); }
+        if (q("[data-amcancel]")) { if (await uiConfirm("هل تلغي هذا الإعلان؟ لا يمكن التراجع.")) run("x", async () => { S.d = await api(`/api/ads/${encodeURIComponent(id)}`, { method: "DELETE" }); }); return; }
+        if (q("[data-amstats]")) { S.menu = null; S.open = S.open === id ? null : id; return render(); }
       }
       const acc = (S.d.ad_accounts || []).find((a) => a.ad_account === S.audAcc);
       if (q("[data-amaudnew]")) {
@@ -239,11 +247,11 @@ const AdsMgrPage = (() => {
         return run("aud", async () => {
           const r = await api("/api/ads-audiences", { method: "POST", ...jsonBody({ account_id: acc?.account || "", ad_account: S.audAcc, name: S.f.aname || "", kind: k, source: S.f.source || w.querySelector('[data-amf="source"]')?.value || "",
             country: S.f.country || w.querySelector('[data-amf="country"]')?.value || "", ratio: +(S.f.ratio || 0.01), pixel: S.f.pixel || w.querySelector('[data-amf="pixel"]')?.value || "", days: +(S.f.adays || 30) }) });
-          S.aud = { ...r, acc: S.audAcc }; S.f.aname = ""; toast("✅ الجمهور اتعمل" + (k === "customer_list" ? "، ارفع العملاء دلوقتي" : ""));
+          S.aud = { ...r, acc: S.audAcc }; S.f.aname = ""; toast("✓ أُنشئ الجمهور" + (k === "customer_list" ? "، ارفع العملاء الآن" : ""));
         });
       }
       if (q("[data-amaudel]")) {
-        if (!(await uiConfirm("تمسح الجمهور ده من المنصة؟"))) return;
+        if (!(await uiConfirm("هل تحذف هذا الجمهور من المنصة؟"))) return;
         return run("aud", async () => { const r = await api(`/api/ads-audiences/${encodeURIComponent(q("[data-amaudel]").dataset.amaudel)}?account_id=${encodeURIComponent(acc?.account || "")}`, { method: "DELETE" }); S.aud = { ...r, acc: S.audAcc }; });
       }
       if (q("[data-amup]")) { const f = w.querySelector("[data-amfile]"); f.dataset.aid = q("[data-amup]").dataset.amup; f.value = ""; f.click(); }
@@ -252,10 +260,10 @@ const AdsMgrPage = (() => {
   async function upload(input) {
     const f = input.files?.[0];
     if (!f) return;
-    if (!(await uiConfirm("العملاء اللي في الملف ده عملاءك فعلًا ووافقوا إنك تتواصل معاهم؟"))) return;
+    if (!(await uiConfirm("هل العملاء في هذا الملف عملاؤك فعلًا ووافقوا على التواصل معهم؟"))) return;
     const fd = new FormData();
     fd.append("file", f); fd.append("consent", "yes");
-    try { const r = await api(`/api/ads-audiences/${encodeURIComponent(input.dataset.aid)}/users`, { method: "POST", body: fd }); toast(`✅ اترفع ${r.uploaded} عميل`); S.aud = null; render(); }
+    try { const r = await api(`/api/ads-audiences/${encodeURIComponent(input.dataset.aid)}/users`, { method: "POST", body: fd }); toast(`✓ رُفع ${r.uploaded} عميلًا`); S.aud = null; render(); }
     catch (err) { toast(err.message, true); }
   }
   async function mount(root) {
