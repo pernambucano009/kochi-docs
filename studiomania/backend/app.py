@@ -4477,6 +4477,7 @@ def inbox_suggest(body: InboxSuggestIn):
 import growth  # noqa: E402
 import algo  # noqa: E402
 import dialect  # noqa: E402
+import niches  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
@@ -17081,6 +17082,12 @@ def lab_ratio(d: dict, lid: str | None = None) -> str:
         except Exception:  # noqa: BLE001
             pass
     return nearest_ratio(int(w), int(h)) if nearest_ratio(int(w), int(h)) in az.ASPECTS else ("9:16" if h >= w else "16:9")
+
+
+@app.get("/api/tpl-niche")
+def tpl_niche():
+    """مجال العميل المختار: المعرض يعرض القوالب المناسبة له أولًا."""
+    return niches.detect(active_client())
 
 
 @app.get("/api/templates")

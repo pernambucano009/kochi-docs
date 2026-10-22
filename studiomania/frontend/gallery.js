@@ -2,7 +2,7 @@
 // الفيديو بيشتغل للكارت اللي في النص، والدوسة عليه بتفتحه كبير. مولّدات الصوت والصور والفيديو زراير جوه كورة العجلة.
 const Gallery = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { items: [], cats: [], root: null };
+  const S = { items: [], cats: [], root: null, niche: { key: "", name: "" } };
   // التايبوجرافي قالب زي الباقي: فيديو العرض بتاعه مترسوم بمحرك الكلام المتحرك نفسه
   // 📱 الخط الأساسي: تصوير بالموبايل (أول قالب): الفكرة والسكريبت اختياريين ← الفيديو ← ملاحظات ← مونتاج أوتوماتيك
   const EXTRA = [{ id: "phone", name: "تصوير بالجوال", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
@@ -87,12 +87,86 @@ const Gallery = (() => {
       ["t-brandreveal", "كشف هوية العلامة", "social", "على الإيقاع: العلامة والاسم، كاروسيل منشورات ثري هذه، الحرف يتحوّل، صفحات دليل العلامة، ومطر رمز العلامة."],
       ["t-flipcards", "ستيكرات تتقلب مثل البطاقات", "social", "٣ رسائل كل واحدة بطاقة: عنوان بشخبطة، صورة أبيض وأسود أمام دائرة، وستيكرات حواليها، والبطاقة يتقلب للي بعده."]]
       .map(([id, name, cat, desc]) => ({ id, name, cat, desc, sample_url: `/gallery/${id}.mp4`, cover_url: `/gallery/${id}.jpg` }))];
+  // 🏷️ القوالب المناسبة لكل مجال (* = تنفع لأي مجال). قوالب الكود رسوماتها ثابتة (مثلًا «طباعة خشب» بترسم فرن ورغيف)،
+  // فاللي رسمته بعيدة عن مجال العميل بيظهر بعد المناسب. مجال العميل بيتعرف من العقل (/api/tpl-niche).
+  const FIT = {
+    "phone": "*",
+    "avatar": "*",
+    "carousel": "*",
+    "typo": "*",
+    "hairline": "*",
+    "t-captions": "*",
+    "t-review": "*",
+    "t-beat": "*",
+    "t-count": "*",
+    "t-logo": "*",
+    "t-brandreveal": "*",
+    "t-title3d": "*",
+    "t-lower": "*",
+    "t-milestone": "*",
+    "t-wrapped": "*",
+    "t-versus": "*",
+    "t-lantern": "*",
+    "t-signature": "*",
+    "t-particles": "*",
+    "t-audiogram": "*",
+    "t-price": "realestate food beauty fitness edu travel retail",
+    "t-chart": "realestate tech services edu fitness",
+    "t-ytintro": "creator edu tech",
+    "t-flow": "services tech edu realestate beauty",
+    "t-show": "edu food retail creator fitness",
+    "t-watercolor": "food travel beauty edu",
+    "t-riso": "creator food retail",
+    "t-hose": "creator food",
+    "t-board": "edu services tech fitness",
+    "t-chat": "retail food realestate services beauty travel",
+    "t-pixel": "tech creator retail",
+    "t-blueprint": "realestate tech services",
+    "t-swiss": "services realestate tech creator",
+    "t-ink": "travel food beauty",
+    "t-silent": "creator food",
+    "t-anime": "tech creator",
+    "t-map": "realestate food retail travel services beauty",
+    "t-launch": "tech services",
+    "t-ukiyo": "travel food",
+    "t-glass": "travel beauty",
+    "t-screen": "creator retail food",
+    "t-deco": "realestate beauty food",
+    "t-crayon": "edu",
+    "t-spy": "creator tech",
+    "t-holo": "tech retail",
+    "t-tilt": "realestate food retail travel",
+    "t-toon": "retail food services",
+    "t-brick": "realestate retail edu",
+    "t-impasto": "food beauty creator",
+    "t-oneline": "food beauty",
+    "t-shadow": "creator edu travel",
+    "t-keynote": "tech",
+    "t-ascii": "tech",
+    "t-math": "edu tech",
+    "t-iso": "retail tech services food",
+    "t-loop": "creator tech",
+    "t-dossier": "creator services",
+    "t-woodcut": "food",
+    "t-sketch": "food retail travel realestate",
+    "t-redcut": "beauty food creator",
+    "t-pictogram": "fitness edu services",
+    "t-microgame": "tech creator retail",
+    "t-screencast": "tech edu",
+    "t-newsletter": "creator edu services",
+    "t-notch": "tech retail",
+    "t-onehero": "retail tech services",
+    "t-shopfloat": "retail food",
+    "t-flipcards": "creator retail beauty fitness",
+  };
+  const fits = (x) => !S.niche.key || FIT[x.id] === "*" || (FIT[x.id] || "").split(" ").includes(S.niche.key);
   // تصنيفات القوالب اللي مش جاية من السيرفر
   const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات سوشيال" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "other", ar: "قوالبي" }];
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
-    const cats = await api("/api/style-cats").catch(() => []);
+    const [cats, niche] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null)]);
+    S.niche = niche?.key ? niche : { key: "", name: "" };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الصناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
@@ -184,7 +258,8 @@ const Gallery = (() => {
   function render() {
     const list = S.items.map((x, i) => [x, i]);
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
-    list.sort((a, b) => ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
+    // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
+    list.sort((a, b) => ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
     if (!list.length) { box.innerHTML = `<div class="nh-empty">لا يوجد قوالب ما زال.</div>`; return; }
@@ -355,7 +430,7 @@ const Gallery = (() => {
       const ti = el.querySelector(".nh-wh-title"); ti.innerHTML = ""; const s = document.createElement("span"); s.textContent = x.name; ti.appendChild(s);
       s.animate?.([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
       el.querySelector(".nh-wh-desc").textContent = x.desc || x.description || "";
-      el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat);
+      el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat) + (S.niche.key ? (fits(x) ? ` · مناسب لمجال ${S.niche.name}` : ` · بعيد عن مجال ${S.niche.name}`) : "");
     }, 60);
     clearTimeout(W.playT);
     W.playT = setTimeout(() => W.G.cards.forEach((c, j) => play(c, j === W.shown)), 380);   // الفيديو يشتغل للقالب الذي وقفت عليه فقط
