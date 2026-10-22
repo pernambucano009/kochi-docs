@@ -232,4 +232,21 @@
     renderTimeline = function (...a) { const r = _rt.apply(this, a); groups(); return r; };
   }
   groups();
+
+  // ---------- خيارات المشروع (من البروتوتايب): «مشروع جديد» و«حذف» في قائمة ⋯ بدل أزرار ظاهرة ----------
+  const pbar = document.querySelector('[data-view="6"] .project-bar'), prev = $id("mtPreviewTop");
+  if (pbar && prev && !$id("mtuMore")) {
+    const wrap = document.createElement("span");
+    wrap.className = "mtu-more";
+    wrap.innerHTML = `<button type="button" class="mtu-ib" id="mtuMore" data-tip="مشروع جديد · حذف" aria-label="خيارات المشروع" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5.5 12h.01 M12 12h.01 M18.5 12h.01"/></svg></button><div class="mtu-menu" hidden></div>`;
+    pbar.insertBefore(wrap, prev);
+    const menu = wrap.querySelector(".mtu-menu"), np = pbar.querySelector(".new-project"), del = $id("deleteProject");
+    if (np) menu.append(np);
+    if (del) menu.append(del);
+    const btn = wrap.querySelector("#mtuMore");
+    const set = (on) => { menu.hidden = !on; btn.setAttribute("aria-expanded", String(on)); };
+    btn.addEventListener("click", (e) => { e.stopPropagation(); set(menu.hidden); });
+    document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest(".mtu-more")) set(false); });
+    menu.addEventListener("click", (e) => { if (e.target.closest("#newProject, #deleteProject")) setTimeout(() => set(false), 0); });
+  }
 })();
