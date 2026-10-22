@@ -4636,13 +4636,20 @@ def plan_out(bid: str) -> dict:
     return {"count": len(inputs), "built_from": int(st.get("built_from") or 0) if st else 0, "made_at": st.get("made_at"), "has": bool(st),
             "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle", "error": job[6:] if job.startswith("error") else None,
             "by": [{"k": k, "t": algo.PLAN_KINDS.get(k, k), "n": n} for k, n in by.items()], "min": algo.PLAN_MIN,
-            "ready": bool(b.get("domain") or b.get("about"))}
+            "ready": bool(b.get("domain") or b.get("about")), "score": brain_score(b), "need": PLAN_SCORE}
+
+
+PLAN_SCORE = 55   # 🧠 الخطة مابتتعملش غير لما العقل يفهم العميل للدرجة دي («المخ يعرفك قد إيه»)
+
+
+def brain_score(b: dict | None) -> int:
+    return int(fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)["score"])
 
 
 def plan_maybe(bid: str) -> None:
     """الخطة بتتعمل من جديد لوحدها لما يتجمع معلومات جديدة كفاية أو حاجة أساسية تتغير."""
     b = brain_row(bid) or {}
-    if PLAN_BUSY.get(bid) == "working" or not algo.plan_should(b, len(algo.plan_inputs(b))):
+    if PLAN_BUSY.get(bid) == "working" or brain_score(b) < PLAN_SCORE or not algo.plan_should(b, len(algo.plan_inputs(b))):
         return
     if str(PLAN_BUSY.get(bid) or "").startswith("error") and not (atlas.api_key() or atlas.mock_mode()):
         return
@@ -4674,6 +4681,207 @@ def strategy_clear():
         d.pop("strategy", None)
     update_brain(rivals_client(), fn)
     return {"strategy": None, "games": algo.GAMES, "axes": algo.AXES}
+
+
+# ---------- 🗓️ خطة الشهر: الخطة بقت جدول. كل يوم كام بوست، وكل بوست بنوعه وقالبه وموضوعه وفكرته وهوكه.
+# بتتعمل لما العقل يفهم العميل (PLAN_SCORE) وتكون فيه خطة محتوى، وبعد ما العميل يوافق بتنزل على الأوتوبايلوت:
+# كل بوست بيتعمل في ميعاده بالفكرة دي (من غير ما المخ يقترح أفكار تانية)، والموافقة على الخطوات زي ما هي في الأوتوبايلوت.
+MONTH_DAYS = 30
+MONTH_KINDS = {"reel": "ريل بقالب", "carousel": "كاروسيل", "phone": "تصوير بالموبايل", "avatar": "فيديو بالأفاتار", "custom": "قالب مخصص"}
+MONTH_BUSY: dict[str, str] = {}
+
+
+def month_formats(bid: str, code_tpls: list[dict]) -> list[dict]:
+    """الأشكال اللي الخطة تقدر تختار منها (اللي الأوتوبايلوت يعرف يعملها فعلًا)."""
+    out = [{"id": "phone", "kind": "phone", "name": "تصوير بالموبايل (العميل بيصوّر نفسه بالسكريبت)"},
+           {"id": "carousel", "kind": "carousel", "name": "كاروسيل صور على إنستجرام"}]
+    if any(t["ready"]["video"] or t["ready"]["photo"] for t in twins_list()):
+        out.append({"id": "avatar", "kind": "avatar", "name": "فيديو بنسخة العميل (أفاتار) بيقول السكريبت"})
+    out += [{"id": f"auto:{a['id']}", "kind": "custom", "name": f"قالب مخصص: {a['name']}"} for a in automations_list() if a.get("saved")]
+    out += [{"id": t["id"], "kind": "reel", "name": f"ريل بقالب «{t['name']}»: {t.get('desc', '')[:90]}"} for t in code_tpls[:40]
+            if re.fullmatch(r"t-[\w-]+", str(t.get("id") or "")) and (MOTION_DIR / "r" / t["id"] / "reel.html").exists()]
+    return out
+
+
+def month_messages(b: dict, fmts: list[dict], start, days: int, per_day: int, times: list[str], extra: str) -> list[dict]:
+    dates = [(start + timedelta(days=i)).isoformat() for i in range(days)]
+    return [{"role": "system", "content": "إنت مخطط محتوى سوشيال محترف بتعمل جدول نشر شهري حقيقي لبراند واحد، بالعربي المصري. Return JSON only."},
+            {"role": "user", "content": f"""البراند:
+{az.brain_text(b)[:4000]}
+
+{algo.strategy_text(b)}
+{extra}
+
+الأشكال المتاحة (اختار id منهم بالظبط، ونوّع بينهم على قد ما يناسب البراند):
+{chr(10).join(f"- {f['id']}: {f['name']}" for f in fmts)}
+
+اعمل جدول نشر للأيام دي: {", ".join(dates)}
+كل يوم {per_day} بوست في المواعيد دي: {", ".join(times)}.
+القواعد: امشي على مجموعات المواضيع ودواير الجمهور وخلطة ٣-٢-١ اللي في الخطة، واربط بالمواسم والترندات لو في معادها، وماتكررش فكرة،
+وكل بوست فكرته محددة جدًا (مش عامة) وهوكه جملة قصيرة بتشد. الكاروسيل للمعلومات والقوايم والخطوات، والموبايل للآراء والقصص والإجابات.
+رجّع JSON بالشكل ده بس:
+{{"posts": [{{"date": "YYYY-MM-DD", "time": "HH:MM", "format": "id من الأشكال", "bucket": "مجموعة المواضيع", "title": "عنوان قصير",
+  "idea": "الفكرة في جملتين", "hook": "الهوك", "cta": "الدعوة", "why": "ليه البوست ده في اليوم ده (جملة)"}}]}}"""}]
+
+
+def month_clean(raw: dict, fmts: list[dict], dates: set[str], times: list[str]) -> list[dict]:
+    by = {f["id"]: f for f in fmts}
+    out = []
+    for p in (raw.get("posts") or []) if isinstance(raw, dict) else []:
+        if not isinstance(p, dict) or str(p.get("date")) not in dates:
+            continue
+        f = by.get(str(p.get("format") or "")) or by.get("phone")
+        t = str(p.get("time") or "")
+        out.append({"id": uuid.uuid4().hex[:8], "date": str(p["date"]), "time": t if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t) else times[0],
+                    "tpl": f["id"], "kind": f["kind"], "tpl_name": f["name"].split(":")[0].split(" (")[0],
+                    **{k: str(p.get(k) or "").strip()[:400] for k in ("bucket", "title", "idea", "hook", "cta", "why")}})
+    return out
+
+
+def month_mock(fmts: list[dict], start, days: int, per_day: int, times: list[str]) -> list[dict]:
+    raw = {"posts": [{"date": (start + timedelta(days=i)).isoformat(), "time": times[k % len(times)], "format": fmts[(i * per_day + k) % len(fmts)]["id"],
+                      "bucket": "مجموعة تجريبية", "title": f"فكرة اليوم {i + 1} رقم {k + 1}", "idea": "فكرة تجريبية للجدول", "hook": "هوك تجريبي",
+                      "cta": "علّق بكلمة", "why": "تجربة"} for i in range(days) for k in range(per_day)]}
+    return month_clean(raw, fmts, {(start + timedelta(days=i)).isoformat() for i in range(days)}, times)
+
+
+def run_month(bid: str, per_day: int, times: list[str], code_tpls: list[dict]) -> None:
+    try:
+        b = brain_row(bid) or {}
+        fmts = month_formats(bid, code_tpls)
+        start = (datetime.now(timezone.utc) + timedelta(days=1)).date()
+        if atlas.mock_mode():
+            items = month_mock(fmts, start, MONTH_DAYS, per_day, times)
+        else:
+            usd = wallet.est(chars=60000)
+            wallet.need(wallet.credits(usd), "خطة الشهر")
+            seasons = "\n".join(f"- {i['name']} ({i['date']})" for i in ((b.get("seasons") or {}).get("items") or [])[:20])
+            trends = "\n".join(f"- {t.get('title')}" for t in ((b.get("trends") or {}).get("items") or [])[:12] if t.get("title"))
+            extra = "\n\n".join(x for x in (algo.batch_text(b), rivals.insight_text(b), f"المواسم:\n{seasons}" if seasons else "",
+                                             f"الترندات في المجال دلوقتي:\n{trends}" if trends else "") if x)[:4000]
+            items = []
+            for half in range(0, MONTH_DAYS, 10):   # ١٠ أيام في كل طلب: الرد أقصر وأضمن
+                n = min(10, MONTH_DAYS - half)
+                s0 = start + timedelta(days=half)
+                msgs = month_messages(b, fmts, s0, n, per_day, times, extra + ("\n\nأفكار اتحطت قبل كده (ماتكررهاش): " + " · ".join(x["title"] for x in items[-40:]) if items else ""))
+                raw = az.parse_json(atlas.chat(msgs, carousel_settings()["text_model"], temperature=0.7, max_tokens=12000, json_mode=True, timeout=300), "خطة الشهر")
+                items += month_clean(raw, fmts, {(s0 + timedelta(days=i)).isoformat() for i in range(n)}, times)
+            wallet.charge(wallet.credits(usd), "عقل البراند: خطة الشهر", bid)
+        if not items:
+            raise HTTPException(400, "المخ مرجعش جدول، جرّب تاني")
+        month = {"status": "draft", "start": start.isoformat(), "days": MONTH_DAYS, "per_day": per_day, "times": times, "items": items, "made_at": now()}
+        update_brain(bid, lambda d: d.update(month=month))
+        MONTH_BUSY.pop(bid, None)
+        notify("plan", "ok", "🗓️ خطة الشهر جاهزة", f"{len(items)} بوست · راجعها ووافق عشان تنزل على الأوتوبايلوت", "plan", bid)
+    except Exception as exc:  # noqa: BLE001
+        MONTH_BUSY[bid] = f"error:{str(getattr(exc, 'detail', None) or exc)[:200]}"
+
+
+def month_out(bid: str) -> dict:
+    b = brain_row(bid) or {}
+    m = b.get("month") or None
+    job = MONTH_BUSY.get(bid) or ""
+    score = brain_score(b)
+    return {"month": m, "kinds": MONTH_KINDS, "score": score, "need": PLAN_SCORE, "has_strategy": bool(b.get("strategy")),
+            "ready": score >= PLAN_SCORE and bool(b.get("strategy")),
+            "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle", "error": job[6:] if job.startswith("error") else None}
+
+
+@app.get("/api/plan/month")
+def month_get():
+    return month_out(rivals_client())
+
+
+class MonthIn(BaseModel):
+    per_day: int = 0          # 0 = من الأوتوبايلوت (أو ٢)
+    times: list[str] = []
+    templates: list[dict] = []   # قوالب الكود من المعرض (id، الاسم، الوصف): الخطة بتختار منها
+
+
+@app.post("/api/plan/month")
+def month_make(body: MonthIn):
+    bid = rivals_client()
+    st = month_out(bid)
+    if not st["ready"]:
+        raise HTTPException(400, f"العقل لسه فاهمك {st['score']}٪، والخطة بتتعمل من {PLAN_SCORE}٪ (ومعاها خطة المحتوى). كمّل العقل الأول")
+    if st["status"] == "working":
+        raise HTTPException(400, "الخطة بتتعمل دلوقتي")
+    ps = pilot_load()["settings"]
+    times = [t for t in body.times if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t)] or [x["t"] for x in ps["times"]] or PILOT_BEST[2]
+    per_day = max(1, min(6, body.per_day or len(times)))
+    times = (times + PILOT_BEST[per_day])[:per_day] if len(times) < per_day else times[:per_day]
+    MONTH_BUSY[bid] = "working"
+    threading.Thread(target=run_month, args=(bid, per_day, sorted(times), body.templates[:60]), daemon=True).start()
+    return month_out(bid)
+
+
+class MonthItemIn(BaseModel):
+    title: str | None = None
+    idea: str | None = None
+    hook: str | None = None
+    cta: str | None = None
+    time: str | None = None
+    date: str | None = None
+    tpl: str | None = None
+
+
+@app.patch("/api/plan/month/items/{iid}")
+def month_item_edit(iid: str, body: MonthItemIn):
+    bid = rivals_client()
+
+    def fn(d):
+        m = d.get("month") or {}
+        it = next((x for x in m.get("items") or [] if x["id"] == iid), None)
+        if not it:
+            raise HTTPException(404, "البوست ده مش في الخطة")
+        if it.get("job"):
+            raise HTTPException(400, "البوست ده بدأ يتعمل في الأوتوبايلوت، عدّله من الطابور")
+        for k in ("title", "idea", "hook", "cta"):
+            if getattr(body, k) is not None:
+                it[k] = getattr(body, k).strip()[:400]
+        if body.time and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", body.time):
+            it["time"] = body.time
+        if body.date and re.fullmatch(r"\d{4}-\d{2}-\d{2}", body.date):
+            it["date"] = body.date
+        if body.tpl:
+            kind = "carousel" if body.tpl == "carousel" else pilot_kind(body.tpl) if body.tpl in ("phone", "avatar") or body.tpl.startswith("auto:") else "reel"
+            it.update(tpl=body.tpl[:60], kind=kind, tpl_name=MONTH_KINDS.get(kind, ""))
+    update_brain(bid, fn)
+    return month_out(bid)
+
+
+@app.delete("/api/plan/month/items/{iid}")
+def month_item_delete(iid: str):
+    bid = rivals_client()
+    update_brain(bid, lambda d: (d.get("month") or {}).update(items=[x for x in (d.get("month") or {}).get("items") or [] if x["id"] != iid or x.get("job")]))
+    return month_out(bid)
+
+
+class MonthApplyIn(BaseModel):
+    on: bool = True
+
+
+@app.post("/api/plan/month/apply")
+def month_apply(body: MonthApplyIn):
+    """✅ موافق على الخطة: الأوتوبايلوت بيمشي عليها (كل بوست في ميعاده بفكرته)، أو ↩ يرجع يختار بالدور من القوالب."""
+    bid = rivals_client()
+    m = (brain_row(bid) or {}).get("month")
+    if body.on and not (m and m.get("items")):
+        raise HTTPException(400, "اعمل خطة الشهر الأول")
+    if body.on:
+        update_brain(bid, lambda d: d["month"].update(status="applied", applied_at=now()))
+
+    def fn(d):
+        s = d["settings"]
+        s["source"] = "plan" if body.on else "rotate"
+        s["plan_bid"] = bid if body.on else ""
+        if body.on:
+            s["on"] = True
+            s["times"] = [{"t": t, "mine": True} for t in m.get("times") or []] or s["times"]
+            # المواعيد اللي اتعملت مهمتها بالدور ومابدأتش بتتشال، عشان الخطة تاخد مكانها
+            d["jobs"] = [j for j in d["jobs"] if not (j.get("status") == "run" and j.get("phase") == "start" and not j.get("plan_item"))]
+    pilot_update(fn)
+    return {**month_out(bid), "pilot": pilot_state()}
 
 
 # ---------- 📊 تحليل الدفعة: آخر ١٠ فيديوهات للبراند نفسه، وقاعدة ٥× و١٠× (playbook: batch)
@@ -22526,6 +22734,7 @@ class FlowNewIn(BaseModel):
     cat: str = ""
     desc: str = ""
     season: str = ""
+    skip_ideas: bool = False   # الفكرة جاهزة (من خطة الشهر): من غير ما المخ يقترح أفكار
 
 
 @app.post("/api/flows")
@@ -22541,7 +22750,8 @@ def flow_new(body: FlowNewIn):
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
     with FLOW_LOCK:
         flow_save(fid, d)
-    flow_job(fid, "ideas", lambda: flow_gen_ideas(fid))
+    if not body.skip_ideas:
+        flow_job(fid, "ideas", lambda: flow_gen_ideas(fid))
     return flow_to_dict(fid, flow_load(fid))
 
 
@@ -28963,6 +29173,8 @@ def pilot_plan() -> None:
     """مهمة جديدة لكل ميعاد جاي في الـ ٢٤ ساعة مالوش مهمة، والقالب بيتلف على القوالب المختارة بالدور."""
     def fn(d):
         s = d["settings"]
+        if s.get("on") and s.get("source") == "plan":
+            return pilot_plan_month(d)
         pool = [t for t in s.get("templates") or [] if isinstance(t, str)]
         if not s.get("on") or not pool:
             return
@@ -28979,6 +29191,46 @@ def pilot_plan() -> None:
             have.add(key[:16])
         d["jobs"] = d["jobs"][:60]
     pilot_update(fn)
+
+
+def pilot_plan_month(d: dict) -> None:
+    """🗓️ الأوتوبايلوت ماشي على خطة الشهر: كل بوست ميعاده جاي في الـ ٢٤ ساعة بيبقى مهمة بفكرته الجاهزة."""
+    s = d["settings"]
+    bid = s.get("plan_bid") or ""
+    m = (brain_row(bid) or {}).get("month") or {}
+    if m.get("status") != "applied":
+        return
+    tz = timezone(timedelta(minutes=int(s.get("tz") or 0)))
+    t0 = datetime.now(timezone.utc)
+    made = {}
+    for it in m.get("items") or []:
+        if it.get("job"):
+            continue
+        try:
+            at = datetime.fromisoformat(f"{it['date']}T{it['time']}").replace(tzinfo=tz).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        if not t0 < at <= t0 + timedelta(hours=24):
+            continue
+        jid = uuid.uuid4().hex[:8]
+        d["jobs"].insert(0, {"id": jid, "at": at.isoformat(timespec="minutes"), "tpl": it["tpl"], "kind": pilot_kind(it["tpl"]),
+                             "name": (lambda nm: (it.get("tpl_name") or nm) if nm == it["tpl"] else nm)(pilot_tpl_name(it["tpl"], s.get("names") or {})),
+                             "status": "run", "phase": "start", "gate": None, "passed": ["idea"], "note": "من خطة الشهر", "error": None,
+                             "fid": None, "project_id": None, "export_id": None, "post_id": None, "tries": 0, "created_at": now(),
+                             "plan_item": it["id"], "preset": {k: it.get(k) or "" for k in ("title", "idea", "hook")}, "caption": None})
+        made[it["id"]] = jid
+    d["jobs"] = d["jobs"][:80]
+    if made:
+        def mark(x):
+            for it in (x.get("month") or {}).get("items") or []:
+                if it["id"] in made:
+                    it["job"] = made[it["id"]]
+        update_brain(bid, mark)
+    # قرّبت تخلص: إشعار مرة واحدة إن خطة الشهر الجاي محتاجة تتعمل
+    last = max((it["date"] for it in m.get("items") or []), default="")
+    if last and s.get("plan_warned") != m.get("start") and (datetime.fromisoformat(last).date() - t0.date()).days <= 5:
+        s["plan_warned"] = m.get("start")
+        notify("plan", "info", "🗓️ خطة الشهر قرّبت تخلص", "اعمل خطة الشهر الجاي من خطة المحتوى ووافق عليها", "plan", bid)
 
 
 def pilot_gate(j: dict, s: dict, step: str) -> bool:
@@ -29034,8 +29286,12 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             return put(phase="custom", run_id=run["id"], note="القالب المخصص شغّال")
         if kind == "avatar" and not pilot_twin(s):
             raise HTTPException(400, "مفيش نسخة جاهزة في «نسختي». سجّل فيديو القراية أو صورة قدامية الأول")
-        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else ""))
+        pre = j.get("preset") or {}
+        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea"))))
         flow_update(f["id"], lambda x: x.update(pilot=jid))
+        if pre.get("title") or pre.get("idea"):   # 🗓️ الفكرة من خطة الشهر: على السكريبت على طول
+            flow_pick_idea(f["id"], FlowPickIn(item={"title": pre.get("title"), "idea": pre.get("idea"), "hook": pre.get("hook")}))
+            return put(phase="script", fid=f["id"], note="بيكتب السكريبت")
         return put(phase="idea", fid=f["id"], note="بيفكّر في أفكار")
 
     if kind == "custom" and ph == "custom":
