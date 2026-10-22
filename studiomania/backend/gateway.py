@@ -952,16 +952,25 @@ def end_subscription(wid: str, at: float | None = None) -> None:
         ledger_add(c, wid, 0, "cancel", "الاشتراك خلص")
 
 
+def topup_bonus(c, wid: str, cfg: dict) -> int:
+    """باقة «وكالات» النقط الزيادة ليها بالضعف (topup_bonus في الباقة)."""
+    r = c.execute("SELECT plan FROM workspaces WHERE id=?", (wid,)).fetchone()
+    p = next((x for x in cfg["plans"] if r and x["key"] == r["plan"]), None)
+    return max(1, int((p or {}).get("topup_bonus") or 1))
+
+
 def add_topup(wid: str, key: str, provider: str, ref: str, amount: float) -> bool:
-    t = next((x for x in billing.config(DATA_DIR)["topups"] if x["key"] == key), None)
+    cfg = billing.config(DATA_DIR)
+    t = next((x for x in cfg["topups"] if x["key"] == key), None)
     if not t or amount + 0.01 < t["price"]:
         return False
     with closing(db()) as c, c:
         if not paid_once(c, ref, wid, provider, "topup", amount, key):
             return True
+        n = t["credits"] * topup_bonus(c, wid, cfg)
         c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
-        c.execute("UPDATE wallet SET topup_credits=topup_credits+?, updated_at=? WHERE workspace=?", (t["credits"], time.time(), wid))
-        ledger_add(c, wid, t["credits"], "topup", f"نقط زيادة {t['credits']}", ref)
+        c.execute("UPDATE wallet SET topup_credits=topup_credits+?, updated_at=? WHERE workspace=?", (n, time.time(), wid))
+        ledger_add(c, wid, n, "topup", f"نقط زيادة {n}", ref)
     return True
 
 

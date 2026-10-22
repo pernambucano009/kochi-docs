@@ -7886,6 +7886,14 @@ def draw(prompt: str, size: str, files: list[Path], dest: Path, mock_label: str,
     part.replace(dest)
 
 
+# 🖼️ كل صورة كاروسيل بتترسم (الشكل العام وكل سلايد) بتتخصم بتكلفتها الحقيقية (GPT Image أغلى من Flare)
+CAROUSEL_IMG_USD = {"sunburst": 0.10, "flare": 0.06}
+
+
+def carousel_img_credits() -> int:
+    return wallet.credits(CAROUSEL_IMG_USD.get(carousel_settings()["image_family"], 0.10))
+
+
 def run_overview(cid: str) -> None:
     try:
         with closing(db()) as conn:
@@ -7898,6 +7906,8 @@ def run_overview(cid: str) -> None:
         name = f"overview-{uuid.uuid4().hex[:6]}.png"
         prompt = cz.overview_prompt(brand_settings(), plan, ratio, refs, ctx)
         draw(prompt, cz.overview_size(len(plan["slides"]), ratio), files, folder / name, "overview", 0)
+        if not atlas.mock_mode():
+            wallet.charge(carousel_img_credits(), "كاروسيل: الشكل العام", cid)
         def done(d):
             # القديم بيفضل محفوظ في النسخ، وتقدر ترجعله
             add_version(d, "overview", name)
@@ -7940,6 +7950,8 @@ def run_slides(cid: str, only: int | None, redo_all: bool = False) -> None:
                 msg = str(exc)[:400]
                 update_carousel(cid, lambda d, k=k: d["slides"][k - 1].update(status="failed", error=msg))
                 break  # اللي بعدها محتاجة دي كمرجع
+            if not atlas.mock_mode():
+                wallet.charge(carousel_img_credits(), f"كاروسيل: سلايد {k}", cid)
             def done(d, k=k, name=name):
                 add_version(d, str(k), name)
                 d["slides"][k - 1] = {"status": "done", "file": name, "error": None}
@@ -7972,6 +7984,7 @@ def carousel_overview(cid: str):
     check_kind_ready(data)
     if cid in CAROUSEL_JOBS:
         raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    wallet.need(carousel_img_credits(), "رسم الشكل العام للكاروسيل")
     update_carousel(cid, lambda d: d["overview"].update(status="working", error=None))
     start_job(cid, run_overview)
     return get_carousel(cid)
@@ -8001,6 +8014,8 @@ def carousel_slides(cid: str, only: int | None = None, redo_all: bool = False):
         raise HTTPException(400, "رقم السلايد غلط")
     if cid in CAROUSEL_JOBS:
         raise HTTPException(400, "فيه رسم شغال للكاروسيل ده. استنى يخلص")
+    todo = 1 if only else sum(1 for x in data["slides"] if redo_all or x["status"] != "done")
+    wallet.need(carousel_img_credits() * max(1, todo), f"رسم {todo} سلايد")
     def mark(d):
         for k in ([only] if only else range(1, n + 1)):
             if only or redo_all or d["slides"][k - 1]["status"] != "done":
@@ -20682,6 +20697,14 @@ def tpl_sample_cost(d: dict) -> float:
     return round(TV_IMAGE_MODELS["sunburst"][0] + 3 * 10 * TRIAL_MODELS["seedance-mini"]["per_sec"], 2)
 
 
+def voice_usd(voice: str, text: str) -> float:
+    """تكلفة التعليق الصوتي الحقيقية: منصت كل ١٠٠٠ كريدت ≈ ٥٠٠ حرف، وفصيح بالدقيقة، وElevenLabs بالألف حرف."""
+    v = dub.VOICES.get(voice) or {}
+    n = len(text or "")
+    per_1k = v.get("per_1k", 0.1) * (2 if v.get("provider") == "munsit" else 1)
+    return n / 1000 * per_1k + (n / dub.CHARS_PER_SEC) / 60 * v.get("per_min", 0)
+
+
 def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     """جملة فويس أوفر (wav 48k): فصيح للهجات العربية، وElevenLabs للأجنبي."""
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
@@ -20697,6 +20720,7 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
         atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "الفويس أوفر", max_seconds=300, interval=2), raw)
     subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
     raw.unlink(missing_ok=True)
+    wallet.charge(wallet.credits(voice_usd(voice, text)), "تعليق صوتي", out.stem[:60])
     return out
 
 
@@ -22558,7 +22582,10 @@ def flow_llm(messages: list[dict], what: str) -> dict:
     for model in dict.fromkeys([series_settings()["text_model"], *FLOW_FALLBACK]):
         try:
             reply = atlas.chat(messages, model, temperature=0.7, max_tokens=8000, json_mode=True, timeout=60)
-            return az.parse_json(reply, what)
+            out = az.parse_json(reply, what)
+            if not atlas.mock_mode():   # كتابة المخ (أفكار، سيناريوهات، سكريبتات) على حساب العميل بحجم الكلام داخل وخارج
+                wallet.charge(wallet.credits(wallet.est(chars=sum(len(str(m.get("content") or "")) for m in messages) + len(reply))), f"المخ: {what}", "flow")
+            return out
         except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
             errors.append(f"{model.split('/')[-1]}: {str(exc)[:90]}")
     raise HTTPException(400, "المخ مقدرش يرد دلوقتي، جرّب تاني. (" + " | ".join(errors) + ")")
@@ -27981,7 +28008,8 @@ def auto_gen_voice(bid: str, s: dict, run_id: str, report: list[str]) -> tuple[d
             if not atlas.mock_mode():
                 wallet.need(cost, "توليد صوت")
             wav = tmp / "say.wav"
-            vo_say(text, voice, lang, wav)
+            vo_say(text, voice, lang, wav)   # بيتخصم جوّه vo_say
+            cost = 0
             label = dub.VOICES[voice]["label"]
         else:
             ref = auto_ref_audio(o.get("ref"), None, tmp) if o.get("ref") else None
@@ -29477,7 +29505,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         sc = d.get("scenario") or {}
         n = max(2, min(10, len(sc.get("slides") or []) or 6))
         if not atlas.mock_mode():
-            wallet.need(wallet.credits(wallet.est(chars=12000, images=n + 1)), "كاروسيل")
+            wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + 1), "كاروسيل")
         car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
         cid = car["id"]
         patch_carousel(cid, CarouselPatch(settings={"slides": n}))
@@ -29516,7 +29544,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if any(s.get("status") != "done" for s in c["slides"]):
             return put(note=f"بيرسم السلايدات {sum(s.get('status') == 'done' for s in c['slides'])}/{len(c['slides'])}")
         if not atlas.mock_mode():   # الرسم والكتابة على حساب العميل
-            wallet.charge(wallet.credits(wallet.est(chars=12000, images=len(c["slides"]) + 1)), "الأوتوبايلوت: كاروسيل", jid)
+            wallet.charge(wallet.credits(wallet.est(chars=12000)), "الأوتوبايلوت: كتابة الكاروسيل", jid)   # الصور بتتخصم وهي بتترسم
         return put(phase="final", note="الكاروسيل جاهز")
 
     # 🎨 قالب كود: فويس أوفر ← رسم الفيديو
@@ -29588,9 +29616,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         cost = wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01)
         wallet.need(cost, "صوت الأفاتار")
         cid = uuid.uuid4().hex[:8]
-        wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
-        if not atlas.mock_mode():
-            wallet.charge(cost, "الأوتوبايلوت: صوت الأفاتار", jid)
+        wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")   # الصوت بيتخصم جوّه vo_say
         t = twin_load(tid)
         method = "video" if twin.ready(t)["video"] else "photo"
         item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,

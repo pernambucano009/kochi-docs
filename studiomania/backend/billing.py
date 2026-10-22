@@ -24,8 +24,14 @@ DEFAULTS = {
          "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة بس (عشان الحساب في Zernio بيتحسب علينا)"},
         {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False},
         {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "popular": True},
-        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 10000, "accounts": 10, "autopilot": True,
-         "max_accounts": 25},
+        # 🏆 أعلى باقة: النقطة فيها أرخص بحوالي ٧٠٪ من «محترف» (٣٠ ألف نقطة)، وتكفي ٩٠ بوست في الشهر بالأوتوبايلوت
+        # (٣ في اليوم، فيديوهات أو كاروسيل) من غير ما العميل يحتاج يشحن. والنقط الزيادة ليها بالضعف (نص السعر).
+        # أسوأ حالة (كل النقط اتصرفت على توليد + ١٠ حسابات بأغلى سعر Zernio) لسه مكسب: plan_margin.
+        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True,
+         "max_accounts": 25, "topup_bonus": 2,
+         "features": ["النقطة أرخص بحوالي ٧٠٪ من «محترف»",
+                      "تكفي ٩٠ بوست في الشهر بالأوتوبايلوت (٣ في اليوم)، فيديوهات أو كاروسيل",
+                      "النقط الزيادة بنص السعر (ضعف النقط في أي شحن)"]},
     ],
     "addons": [
         {"key": "account", "name": "حساب سوشيال زيادة", "name_en": "Extra social account", "price": 10, "unit": "للحساب في الشهر"},
