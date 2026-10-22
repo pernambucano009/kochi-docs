@@ -1151,6 +1151,10 @@ body:has(#nhPage.nh-full:not([hidden])) #nhCorner { display: none; }   /* الع
 .flw-ch { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .flw-ch b { font-size: 17px; font-weight: 500; line-height: 1.5; }
 .flw-hook { color: var(--acc); font-weight: 500; }
+.flw-idea { font-size: 14.5px; line-height: 1.7; }
+.flw-more { font-size: 12.5px; }
+.flw-more summary { cursor: pointer; color: var(--muted, #8a8986); padding: 2px 0; }
+.flw-more[open] summary { margin-bottom: 6px; }
 .flw-rate { display: inline-flex; gap: 2px; flex: none; }
 .flw-rate button { width: 32px; height: 32px; border-radius: 50%; font-size: 15px; filter: grayscale(1); opacity: .55; transition: all .2s; }
 .flw-rate button:hover { opacity: 1; background: var(--soft); }

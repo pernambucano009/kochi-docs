@@ -166,7 +166,8 @@ const Flow = (() => {
   function ideaCard(it) {
     if (S.edit === it.id) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
-      ${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}<p>${esc(it.idea)}</p>${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}
+      <p class="flw-idea">${esc(it.idea)}</p>${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}
+      ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (هوكات تانية، وإزاي ماشية على القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختار الفكرة دي</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div></article>`;
   }

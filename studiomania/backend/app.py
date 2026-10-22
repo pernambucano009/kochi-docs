@@ -4725,7 +4725,7 @@ def month_messages(b: dict, fmts: list[dict], start, days: int, per_day: int, ti
 وكل بوست فكرته محددة جدًا (مش عامة) وهوكه جملة قصيرة بتشد. الكاروسيل للمعلومات والقوايم والخطوات، والموبايل للآراء والقصص والإجابات.
 رجّع JSON بالشكل ده بس:
 {{"posts": [{{"date": "YYYY-MM-DD", "time": "HH:MM", "format": "id من الأشكال", "bucket": "مجموعة المواضيع", "title": "عنوان قصير",
-  "idea": "الفكرة في جملتين", "hook": "الهوك", "cta": "الدعوة", "why": "ليه البوست ده في اليوم ده (جملة)"}}]}}"""}]
+  "idea": "الفكرة في جملة واحدة قصيرة (مش سكريبت)", "hook": "الهوك", "cta": "الدعوة", "why": "ليه البوست ده في اليوم ده (جملة)"}}]}}"""}]
 
 
 def month_clean(raw: dict, fmts: list[dict], dates: set[str], times: list[str]) -> list[dict]:
@@ -23254,8 +23254,8 @@ def my_ideas_polish(iid: str):
                                               "well-organized video idea, in the same language and dialect the user wrote in. Keep every point they made; "
                                               "do not invent facts, products, prices or names. Return JSON only."},
                 {"role": "user", "content": f"Brand context:\n{growth_brand()[:3000]}\n\nRaw idea notes:\n{src[:4000]}\n\n"
-                                            'Return JSON: {"title": "short title (max 8 words)", "idea": "the idea organized in 2-5 short sentences '
-                                            '(what the video shows, the angle, and the ending/CTA if mentioned)", "hook": "one opening line for the first 2 seconds"}'}]
+                                            'Return JSON: {"title": "short title (max 8 words)", "idea": "the idea in 1-2 short sentences: the angle and topic only, not a script '
+                                            '(keep the ending/CTA if mentioned)", "hook": "one opening line for the first 2 seconds"}'}]
         out = az.parse_json(series_chat(msgs), "تنقيح الفكرة")
         wallet.charge(wallet.credits(wallet.est(chars=len(src) + 5000)), "فولدر الأفكار: تنقيح فكرة", iid)
     clean = {k: str(out.get(k) or "").strip()[:1500] for k in ("title", "idea", "hook")}
