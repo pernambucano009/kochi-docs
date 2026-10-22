@@ -52,6 +52,9 @@ const PilotPage = (() => {
 #nh .ap-more.on { display: flex; }
 #nh .ap-more button { height: 30px; padding: 0 12px; border-radius: 999px; background: var(--ap-field); font-size: 12px; color: var(--ap-sub); }
 #nh .ap-more button.on { background: var(--ap-soft); color: var(--nh-accent); }
+#nh .ap-plan { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; font-size: 12.5px; color: var(--ap-sub); text-align: center; max-width: 560px; line-height: 1.7; }
+#nh .ap-plan button { height: 30px; padding: 0 14px; border-radius: 999px; background: var(--ap-field); font-size: 12px; color: var(--nh-ink); }
+#nh .ap-tpls.dim, #nh .ap-more.dim { opacity: .35; pointer-events: none; }
 #nh .ap-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--ap-field); }
 #nh .ap-seg button { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 12.5px; color: var(--ap-sub); transition: background .25s, color .25s; }
 #nh .ap-seg button.on { background: var(--ap-card); color: var(--nh-ink); box-shadow: 0 2px 8px rgba(24, 23, 24, .08); }
@@ -112,6 +115,7 @@ const PilotPage = (() => {
     S.root = root.querySelector("#apRoot");
     if (!S.root) return;
     try { S.d = await api("/api/pilot"); } catch (err) { S.root.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
+    S.mo = await api("/api/plan/month").catch(() => null);
     S.root.innerHTML = shell();
     bind();
     draw();
@@ -131,19 +135,48 @@ const PilotPage = (() => {
         <small>بوست في اليوم</small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
         <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>دوس على الخط تزوّد ميعاد · اسحب النقطة تغيّره · دوس عليها تشيلها</span></div></section>
-      <section class="ap-sec"><span class="lat">Templates</span><div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
-        <small>بيختار منهم بالتبادل عشان المحتوى مايتكررش</small></section>
+      <section class="ap-sec"><span class="lat">Templates</span>
+        <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالدور من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
+        <div class="ap-plan" data-plan></div>
+        <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
+        <small data-tplsub>بيختار منهم بالتبادل عشان المحتوى مايتكررش</small></section>
       <section class="ap-sec"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل حاجة لوحده</button><button type="button" data-mode="approve">أوافق على كل خطوة</button></div>
         <div class="ap-steps" data-steps></div></section>
     </main>
     <div class="ap-dock" data-dock><div class="ap-q" data-q></div>
       <button type="button" class="ap-cap" data-cap><span>الطابور</span><span class="n" data-qn hidden></span><small data-qsub></small></button></div>`;
   const q = (s) => S.root.querySelector(s);
-  function draw() { drawHead(); drawDay(); drawTpls(); drawMode(); drawQ(); }
+  function draw() { drawHead(); drawDay(); drawSrc(); drawTpls(); drawMode(); drawQ(); }
+  // 🗓️ المصدر: بالدور من القوالب، أو خطة الشهر (كل بوست في ميعاده بفكرته وقالبه، من صفحة «خطة المحتوى»)
+  const fromPlan = () => S.d.settings.source === "plan";
+  function drawSrc() {
+    const plan = fromPlan(), m = S.mo?.month, left = (m?.items || []).filter((x) => !x.job).length;
+    q("[data-srcs]").querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("on", b.dataset.src === (plan ? "plan" : "rotate")));
+    q("[data-plan]").innerHTML = plan
+      ? `<span>ماشي على خطة الشهر: <b class="num">${left}</b> بوست فاضل، كل واحد في ميعاده بفكرته وقالبه.</span><button type="button" data-openplan>افتح الخطة</button>`
+      : m?.items?.length ? `<span>عندك خطة شهر فيها <b class="num">${m.items.length}</b> بوست${m.status === "applied" ? "" : " مستنية موافقتك"}.</span><button type="button" data-openplan>راجعها</button>`
+      : S.mo && !S.mo.ready ? `<span>خطة الشهر بتتعمل لما العقل يفهمك ${S.mo.need}٪ (دلوقتي ${S.mo.score}٪).</span>` : "";
+    q("[data-tpls]").classList.toggle("dim", plan);
+    q("[data-more]").classList.toggle("dim", plan);
+    q("[data-tplsub]").textContent = plan ? "القوالب بتيجي من الخطة، والموافقات تحت زي ما هي" : "بيختار منهم بالتبادل عشان المحتوى مايتكررش";
+  }
+  async function setSrc(src) {
+    if ((src === "plan") === fromPlan()) return;
+    if (src === "plan" && !S.mo?.month?.items?.length) {
+      toast(S.mo?.ready ? "اعمل خطة الشهر الأول من صفحة خطة المحتوى" : `خطة الشهر بتتعمل لما العقل يفهمك ${S.mo?.need ?? 55}٪`, true);
+      return openPlan();
+    }
+    try {
+      const r = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: src === "plan" }) });
+      S.d = r.pilot; S.mo = r; draw();
+      toast(src === "plan" ? "✅ الأوتوبايلوت ماشي على خطة الشهر" : "الأوتوبايلوت رجع يختار من القوالب بالدور");
+    } catch (err) { toast(err.message, true); }
+  }
+  function openPlan() { window.RV_FOCUS = "plan-only"; window.NHNav?.("plan"); }
   function drawHead() {
     const s = S.d.settings, nx = S.d.upcoming?.[0];
     q("[data-on]").classList.toggle("on", !!s.on);
-    q("[data-st]").textContent = !s.on ? "مقفول" : !s.templates.length ? "شغّال · اختار قالب واحد على الأقل" : `شغّال${nx ? ` · الجاي ${when(nx)}` : ""}`;
+    q("[data-st]").textContent = !s.on ? "مقفول" : !s.templates.length && s.source !== "plan" ? "شغّال · اختار قالب واحد على الأقل" : `شغّال${nx ? ` · الجاي ${when(nx)}` : ""}`;
   }
   function drawDay() {
     const pct = (h) => (h / 24) * 100, s = S.d.settings;
@@ -290,6 +323,8 @@ const PilotPage = (() => {
       }
       if ("newauto" in d) return window.NHNav?.("auto");
       if (d.mode) return save({ mode: d.mode });
+      if (d.src) return setSrc(d.src);
+      if ("openplan" in d) return openPlan();
       if (d.step) { const st = new Set(s.steps); st.has(d.step) ? st.delete(d.step) : st.add(d.step); return save({ steps: STEP_N.map(([k]) => k).filter((k) => st.has(k)) }); }
       if ("cap" in d) { S.open = !S.open; return drawQ(); }
       if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اتوافق، وبيكمّل الخطوة الجاية");

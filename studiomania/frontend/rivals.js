@@ -3,7 +3,7 @@
 // الترند بقى دراع لوحده في العقل، والفحص قبل النشر بقى أوتوماتيك في صفحة النشر، وقواعد الخوارزميات دراع لوحدها.
 const RivalsPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, bt: { d: null, busy: "", handle: "", platform: "" } };
+  const S = { el: null, d: null, timer: null, swap: null, focus: null, tab: "rivals", pl: { d: null, busy: false, notes: "" }, mo: { d: null, busy: "", per: 0, edit: null }, bt: { d: null, busy: "", handle: "", platform: "" } };
   const TABS = [["rivals", "🏆 المنافسين"], ["works", "🧠 اللي بينجح عندهم"], ["batch", "📊 حلّل آخر ١٠ فيديوهات ليك"], ["audience", "🎯 وصفة الاستهداف"]];
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="rvWrap"><div class="nh-empty">بيحمّل…</div></div>`;
   const fmt = (n) => { n = +n || 0; return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n); };
@@ -73,7 +73,7 @@ const RivalsPage = (() => {
         ${st && pl.status !== "working" ? `<button class="nb-btn sm" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "⏳…" : "🔄 حدّثها دلوقتي"}</button>` : ""}</p>${pl.error ? `<div class="fs-err">⚠️ ${esc(pl.error)}</div>` : ""}` : "";
     if (!st) return `<section class="fs-card"><h3>🧭 خطة المحتوى <small>المخ بيطبّق فريمويركس الاستراتيجية على براندك انت</small></h3>
         <p class="nb-hint">بتحدد لعبتك (شهرة ولا بيع)، وجملة التموضع، والشخص اللي بتكلمه، ودواير الجمهور، ومجموعات المواضيع والأشكال، وجدول أسبوع بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ اللي المنافسين سايبينه، والدعوة والهدية. وكل الأفكار والسكريبتات والهوكات في البرنامج بتمشي عليها.</p>
-        ${form}${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="nb-hint">⏳ هتتبني لوحدها أول ما العقل يعرف ${pl.min} معلومات على الأقل (ومنهم «المجال» أو «عن البراند»). كمّل العقل من الكويز أو ضيف للعقل.</p>` : ""}</section>`;
+        ${form}${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="nb-hint">⏳ هتتبني لوحدها أول ما العقل يعرف ${pl.min} معلومات على الأقل (ومنهم «المجال» أو «عن البراند»). كمّل العقل من الكويز أو ضيف للعقل.</p>` : ""}</section>` + monthSec();
     const li = (a) => a.map((x) => `<li>${esc(x)}</li>`).join("");
     const sec = (t, h) => `<section class="fs-card pl-sec"><h3>${t}</h3>${h}</section>`;
     return `<section class="fs-card pl-hero">
@@ -82,6 +82,7 @@ const RivalsPage = (() => {
         <p class="nb-hint">${esc(st.game.why)}</p>
         ${st.avatar ? `<p><b>الشخص اللي بنكلمه:</b> ${esc(st.avatar)}</p>` : ""}
         ${form}</section>
+      ${monthSec()}
       ${st.rings.length ? sec("🎯 دواير الجمهور <small>من الأضيق للأعرض · ماتنزلش في أوسع دايرة</small>", `<ol class="pl-rings">${st.rings.map((r, i) => `<li style="--r:${i}"><span class="num">${i + 1}</span>${esc(r)}</li>`).join("")}</ol>`) : ""}
       ${st.buckets.length ? sec("🗂 مجموعات المواضيع", `<div class="pl-grid">${st.buckets.map((b) => `<div class="pl-card"><b>${esc(b.name)}</b><small>دايرة ${b.ring} · ${esc(b.why)}</small><ul>${li(b.topics)}</ul></div>`).join("")}</div>`) : ""}
       ${st.formats.length || st.formulas.length ? sec("🧱 الأشكال والتركيبات <small>موضوع + شكل + عرض بصري</small>", `<div class="pl-grid">${st.formats.map((f) => `<div class="pl-card"><b>${esc(f.name)}</b><small>${esc(f.why)}</small></div>`).join("")}</div>
@@ -96,6 +97,62 @@ const RivalsPage = (() => {
       ${sec("⏱ الإيقاع والمنصة والبروفايل", `${st.cadence ? `<p><b>الإيقاع:</b> ${esc(st.cadence)}</p>` : ""}${st.platform ? `<p><b>منصة البيت:</b> ${esc(st.platform)}</p>` : ""}
           ${st.profile.bio ? `<p><b>البايو:</b> ${esc(st.profile.bio)}</p>` : ""}${st.profile.pinned ? `<p><b>الفيديو المثبّت:</b> ${esc(st.profile.pinned)}</p>` : ""}
           ${st.avoid.length ? `<p><b>نبعد عن:</b></p><ul class="pl-list">${li(st.avoid)}</ul>` : ""}`)}`;
+  }
+  // 🗓️ خطة الشهر: جدول ٣٠ يوم (كل يوم كام بوست، وكل بوست بشكله وقالبه وفكرته وهوكه). مابتتعملش غير لما العقل يفهم العميل،
+  // ولما توافق عليها بتنزل على الأوتوبايلوت: كل بوست بيتعمل في ميعاده بفكرته.
+  const DAYN = ["الأحد", "الاتنين", "التلات", "الأربع", "الخميس", "الجمعة", "السبت"];
+  const KIND_IC = { reel: "🎬", carousel: "🖼️", phone: "📱", avatar: "🪞", custom: "🧩" };
+  const codeTpls = () => (typeof Gallery !== "undefined" && Gallery.list ? Gallery.list() : []).filter((x) => String(x.id).startsWith("t-")).map((x) => ({ id: x.id, name: x.name, desc: x.desc || "" }));
+  const moFmts = (x) => {
+    const a = [{ id: "phone", name: "📱 تصوير بالموبايل" }, { id: "carousel", name: "🖼️ كاروسيل" }, { id: "avatar", name: "🪞 فيديو بالأفاتار" }, ...codeTpls().map((t) => ({ id: t.id, name: `🎬 ${t.name}` }))];
+    return a.some((f) => f.id === x.tpl) ? a : [{ id: x.tpl, name: `${KIND_IC[x.kind] || ""} ${x.tpl_name || x.tpl}` }, ...a];
+  };
+  function monthSec() {
+    const M = S.mo, d = M.d;
+    if (!d) return "";
+    const m = d.month, busy = d.status === "working" || M.busy === "make", applied = m?.status === "applied";
+    const meter = `<div class="mo-meter"><div><b>العقل فاهمك <span class="num">${d.score}٪</span></b><small>الخطة بتتعمل من ${d.need}٪${d.has_strategy ? "" : " ومعاها خطة المحتوى"}</small></div>
+        <span class="mo-bar"><i style="width:${Math.min(100, d.score)}%"></i><em style="inset-inline-start:${d.need}%"></em></span></div>`;
+    const per = M.per || m?.per_day || 2;
+    const make = `<div class="nb-bar mo-make"><span class="mo-step">بوستات في اليوم <button class="nb-btn sm" data-moper="-1">−</button><b class="num">${per}</b><button class="nb-btn sm" data-moper="1">+</button></span>
+        <button class="nb-btn ${m ? "" : "fs-go"}" data-momake ${busy || !d.ready ? "disabled" : ""}>${busy ? "⏳ بتتعمل… (دقيقة أو اتنين)" : m ? "🔄 اعمل خطة جديدة" : "🗓️ اعمل خطة الشهر"}</button></div>`;
+    const head = `<section class="fs-card mo-card"><h3>🗓️ خطة الشهر <small>كل يوم كام بوست، وكل بوست بشكله وقالبه وفكرته وهوكه</small></h3>
+        ${meter}${d.ready ? "" : `<p class="nb-hint">الخطة مابتتعملش غير لما العقل يفهمك كويس. كمّل العقل من الكويز أو ضيف معلومات عنك، والعدّاد هيزيد.</p>`}
+        ${make}${d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}`;
+    if (!m?.items?.length) return head + `</section>`;
+    const items = m.items.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), byDay = {};
+    items.forEach((x) => (byDay[x.date] = byDay[x.date] || []).push(x));
+    const kinds = {};
+    items.forEach((x) => (kinds[x.kind] = (kinds[x.kind] || 0) + 1));
+    const post = (x) => {
+      const ed = M.edit === x.id, done = !!x.job;
+      if (ed) return `<div class="mo-post on" data-moid="${esc(x.id)}">
+          <input data-mof="title" value="${esc(x.title)}" placeholder="العنوان">
+          <textarea data-mof="idea" rows="2" placeholder="الفكرة">${esc(x.idea)}</textarea>
+          <input data-mof="hook" value="${esc(x.hook)}" placeholder="الهوك">
+          <input data-mof="cta" value="${esc(x.cta)}" placeholder="الدعوة">
+          <div class="nb-row"><input type="time" data-mof="time" value="${esc(x.time)}">
+            <select data-mof="tpl">${moFmts(x).map((f) => `<option value="${esc(f.id)}" ${f.id === x.tpl ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div>
+          <div class="nb-row"><button class="nb-btn sm fs-go" data-mosave>حفظ</button><button class="nb-btn sm" data-mox>إلغاء</button><button class="nb-btn sm danger" data-model>✕ شيل البوست</button></div></div>`;
+      return `<div class="mo-post${done ? " done" : ""}" data-moid="${esc(x.id)}" ${done ? "" : "data-moedit"} title="${esc(x.why || "")}">
+          <span class="mo-meta"><span class="num">${esc(x.time)}</span><span class="mo-kind">${KIND_IC[x.kind] || "🎬"} ${esc(x.tpl_name || d.kinds[x.kind] || "")}</span>${done ? `<span class="mo-job">✓ في الأوتوبايلوت</span>` : ""}</span>
+          <b>${esc(x.title)}</b>${x.hook ? `<i>«${esc(x.hook)}»</i>` : ""}<small>${esc(x.idea)}</small></div>`;
+    };
+    const days = Object.keys(byDay).sort().map((day) => {
+      const dt = new Date(day + "T12:00:00");
+      return `<div class="mo-day"><span class="mo-date">${DAYN[dt.getDay()]}<b class="num">${dt.getDate()}/${dt.getMonth() + 1}</b></span><div class="mo-posts">${byDay[day].map(post).join("")}</div></div>`;
+    }).join("");
+    return head + `<div class="mo-sum"><span><b class="num">${items.length}</b> بوست</span>${Object.entries(kinds).map(([k, n]) => `<span>${KIND_IC[k] || ""} ${esc(d.kinds[k] || k)} <b class="num">${n}</b></span>`).join("")}</div>
+        <div class="mo-apply ${applied ? "on" : ""}">${applied
+          ? `<span>✅ الخطة شغالة على الأوتوبايلوت: كل بوست بيتعمل في ميعاده بفكرته، والموافقات زي ما هي في صفحة الأوتوبايلوت.</span><button class="nb-btn sm" data-moapply="0">↩ وقّفها</button><button class="nb-btn sm" data-mopilot>✈️ افتح الأوتوبايلوت</button>`
+          : `<span>راجع البوستات (دوس على أي بوست تعدّله)، ولما تبقى تمام وافق عليها تنزل على الأوتوبايلوت.</span><button class="nb-btn fs-go" data-moapply="1">✅ طبّق على الأوتوبايلوت</button>`}</div>
+        <div class="mo-cal">${days}</div></section>`;
+  }
+  async function moLoad() {
+    try { S.mo.d = await api("/api/plan/month"); } catch (err) { return toast(err.message, true); }
+    if (S.tab === "plan") render();
+    clearTimeout(S.moT);
+    if (S.mo.d.status === "working") S.moT = setTimeout(moLoad, 4000);
   }
   // 📊 تحليل الدفعة: آخر ١٠ فيديوهات للبراند، كل واحد بكام ضعف وسيط الدفعة، والمخ يقارن الفايزين بالخاسرين ويخطط العشرة الجايين
   const TIER = { gold: "🥇", win: "🏆", ok: "", low: "" };
@@ -219,6 +276,7 @@ const RivalsPage = (() => {
     bd.innerHTML = body();
     if (S.tab === "batch" && !S.bt.d) api("/api/batch").then((x) => { S.bt.d = x; if (S.tab === "batch") render(); }).catch((err) => toast(err.message, true));
     if (S.tab === "plan" && !S.pl.d) api("/api/strategy").then((x) => { S.pl.d = x; if (S.tab === "plan") render(); planPoll(); }).catch((err) => toast(err.message, true));
+    if (S.tab === "plan" && !S.mo.d && !S.mo.loading) { S.mo.loading = true; moLoad().finally(() => (S.mo.loading = false)); }
     if (S.focus) { w.querySelector(`[data-rid="${CSS.escape(S.focus)}"]`)?.scrollIntoView({ block: "center" }); S.focus = null; }
   }
   // الخطة وهي بتتبني لوحدها: بنشوف كل شوية لحد ما تخلص
@@ -276,6 +334,36 @@ const RivalsPage = (() => {
         catch (err) { toast(err.message, true); }
         S.pl.busy = false; return render();
       }
+      const per = e.target.closest("[data-moper]");
+      if (per) { S.mo.per = Math.max(1, Math.min(6, (S.mo.per || S.mo.d?.month?.per_day || 2) + +per.dataset.moper)); return render(); }
+      if (e.target.closest("[data-momake]")) {
+        if (S.mo.d?.month && !(await uiConfirm("تعمل خطة جديدة؟ الخطة الحالية هتتشال (البوستات اللي بدأت في الأوتوبايلوت بتكمّل)."))) return;
+        S.mo.busy = "make"; render();
+        try { S.mo.d = await api("/api/plan/month", { method: "POST", ...jsonBody({ per_day: S.mo.per || S.mo.d?.month?.per_day || 2, templates: codeTpls() }) }); }
+        catch (err) { toast(err.message, true); }
+        S.mo.busy = ""; render(); return moLoad();
+      }
+      if (e.target.closest("[data-mopilot]")) return window.NHNav?.("pilot");
+      const ap = e.target.closest("[data-moapply]");
+      if (ap) {
+        try { S.mo.d = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: ap.dataset.moapply === "1" }) }); toast(ap.dataset.moapply === "1" ? "✅ الخطة نزلت على الأوتوبايلوت" : "الأوتوبايلوت رجع يختار من القوالب بالدور"); }
+        catch (err) { toast(err.message, true); }
+        return render();
+      }
+      const mid = e.target.closest("[data-moid]")?.dataset.moid;
+      if (mid && e.target.closest("[data-mox]")) { S.mo.edit = null; return render(); }
+      if (mid && e.target.closest("[data-model]")) {
+        if (!(await uiConfirm("تشيل البوست ده من الخطة؟"))) return;
+        try { S.mo.d = await api(`/api/plan/month/items/${encodeURIComponent(mid)}`, { method: "DELETE" }); S.mo.edit = null; } catch (err) { toast(err.message, true); }
+        return render();
+      }
+      if (mid && e.target.closest("[data-mosave]")) {
+        const box = e.target.closest("[data-moid]"), v = (k) => box.querySelector(`[data-mof="${k}"]`)?.value;
+        try { S.mo.d = await api(`/api/plan/month/items/${encodeURIComponent(mid)}`, { method: "PATCH", ...jsonBody({ title: v("title"), idea: v("idea"), hook: v("hook"), cta: v("cta"), time: v("time"), tpl: v("tpl") }) }); S.mo.edit = null; toast("✅ اتحفظ"); }
+        catch (err) { toast(err.message, true); }
+        return render();
+      }
+      if (mid && e.target.closest("[data-moedit]") && S.mo.edit !== mid) { S.mo.edit = mid; return render(); }
       const tb = e.target.closest("[data-rvtab]");
       if (tb) { S.tab = tb.dataset.rvtab; return render(); }
       if (e.target.closest(".vr-wrap")) return;
@@ -318,10 +406,11 @@ const RivalsPage = (() => {
     S.only = f === "plan-only";   // 🧭 من نقطة «خطة المحتوى» في العقل: صفحة الخطة لوحدها
     S.tab = S.only ? "plan" : TABS.some(([k]) => `rv:${k}` === f) ? f.slice(3) : "rivals";
     S.pl.d = null;   // عدّاد الخطة بيتجاب من جديد كل مرة
+    S.mo = { d: null, busy: "", per: 0, edit: null };
     S.focus = /^rv[^:]/.test(f) ? f.slice(2) : null;
     bind(w);
     try { S.d = await api("/api/rivals"); render(); poll(); }
     catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { html, mount, close: () => clearTimeout(S.timer) };
+  return { html, mount, close: () => { clearTimeout(S.timer); clearTimeout(S.moT); clearTimeout(S.plT); } };
 })();
