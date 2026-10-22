@@ -15,8 +15,8 @@ import re
 import uuid
 
 VERBS = {
-    "pull": {"t": "اسحب", "desc": "صور أو فيديوهات من المكتبة (فولدر، ملف بعينه، أو بحث بالمعنى)", "accept": ("image", "video"),
-             "opts": {"type": "image", "count": 4, "order": "fresh", "sec": 2.5}},
+    "pull": {"t": "اسحب", "desc": "صور أو فيديوهات أو أصوات من المكتبة (فولدر، ملف بعينه، أو بحث بالمعنى)، أو من الستوك أونلاين", "accept": ("image", "video", "audio"),
+             "opts": {"type": "image", "count": 4, "order": "fresh", "sec": 2.5, "role": "music", "volume": 35, "duck": True}},
     "intro": {"t": "حط إنترو", "desc": "فيديو في أول الفيديو", "accept": ("video",), "opts": {}},
     "outro": {"t": "حط أوترو", "desc": "فيديو في آخر الفيديو", "accept": ("video",), "opts": {}},
     "voice": {"t": "حط تعليق صوتي", "desc": "تسجيل صوت من المكتبة، والفيديو على قده", "accept": ("audio",), "opts": {"fit": True, "order": "fresh"}},
@@ -35,6 +35,13 @@ VERBS = {
     "export": {"t": "صدّر", "desc": "الفيديو بيتصدّر بالمقاس ده", "accept": (), "opts": {"ratio": "9:16"}},
     "publish": {"t": "انشر", "desc": "على حساباتك المربوطة في صفحة النشر، أو يستنى موافقتك", "accept": (), "opts": {"when": "draft", "platforms": [], "caption": ""}},
 }
+# «قواعدي»: كلام حر في الخطوات اللي بتختار أو بتولّد (بيفلتر الملفات بالمعنى، أو بيتضاف لكلمة بحث الستوك، أو للبرومبت)
+RULES_VERBS = ("pull", "intro", "outro", "voice", "music", "split", "gen", "genimg")
+for _k in RULES_VERBS:
+    VERBS[_k]["opts"]["rules"] = ""
+# 🌐 الستوك أونلاين: صور وفيديوهات من Pexels، وموسيقى مجانية للاستخدام التجاري
+STOCK_KINDS = ("image", "video", "audio")
+ROLES = {"music": "موسيقى تحت الفيديو", "voice": "تعليق صوتي"}
 FIXED = ("export", "publish")
 LANE_VERBS = ("gen",)
 REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "export": "فيديو جاهز", "audio": "صوت",
@@ -73,6 +80,9 @@ def clean_src(raw) -> dict | None:
         return {"mode": "folder", "id": str(raw.get("id") or "")[:20] or None, "label": str(raw.get("label") or "")[:200]}
     if mode == "file" and raw.get("id"):
         return {"mode": "file", "id": str(raw["id"])[:20], "label": str(raw.get("label") or "")[:200]}
+    if mode == "stock" and str(raw.get("q") or "").strip():
+        q = str(raw["q"]).strip()[:120]
+        return {"mode": "stock", "q": q, "label": f"🌐 ستوك: {q}"}
     if mode == "search" and str(raw.get("q") or "").strip():
         return {"mode": "search", "q": str(raw["q"]).strip()[:120], "label": str(raw["q"]).strip()[:120]}
     return None
@@ -96,8 +106,12 @@ def clean_opts(verb: str, raw: dict) -> dict:
     for k in base:
         if k not in raw:
             continue
-        if k == "type" and raw[k] in ("image", "video", "any"):
+        if k == "type" and raw[k] in ("image", "video", "any", "audio"):
             base[k] = raw[k]
+        elif k == "role" and raw[k] in ROLES:
+            base[k] = raw[k]
+        elif k == "rules":
+            base[k] = str(raw[k] or "")[:1000]
         elif k == "order" and raw[k] in ORDERS:
             base[k] = raw[k]
         elif k == "trans" and raw[k] in TRANS:

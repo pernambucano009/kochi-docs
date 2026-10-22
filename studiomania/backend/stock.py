@@ -104,3 +104,39 @@ def allowed_url(u: str) -> bool:
     """بننزّل بس من سيرفرات Pexels (عشان محدش يبعت لينك تاني ينزّله على السيرفر)."""
     p = urlparse(u or "")
     return p.scheme == "https" and p.hostname in ("images.pexels.com", "videos.pexels.com", "player.vimeo.com")
+
+
+# 🎵 موسيقى من Openverse (من غير مفتاح): بس اللي رخصته تسمح بالاستخدام التجاري، ومعاها اسم صاحبها ورخصتها
+OV_API = "https://api.openverse.org/v1/audio/"
+AUDIO_EXT = ("mp3", "wav", "ogg", "flac", "m4a")
+
+
+def music_search(q: str) -> list[dict]:
+    q = " ".join((q or "").split())[:100]
+    if not q:
+        return []
+    ck = ("ov", q)
+    hit = _CACHE.get(ck)
+    if hit and time.time() - hit[0] < TTL:
+        return hit[1]["items"]
+    try:
+        r = httpx.get(OV_API, params={"q": q, "page_size": 20, "license_type": "commercial", "category": "music", "mature": "false"},
+                      headers={"User-Agent": "SimsimKit/1.0"}, timeout=25)
+    except httpx.HTTPError as exc:
+        raise StockError("مكتبة الموسيقى مش بترد دلوقتي، جرّب تاني") from exc
+    if r.status_code == 429:
+        raise StockError("وصلنا للحد بتاع مكتبة الموسيقى دلوقتي، جرّب بعد شوية")
+    if r.status_code >= 400:
+        raise StockError(f"مكتبة الموسيقى رجّعت خطأ ({r.status_code})")
+    out = []
+    for a in r.json().get("results") or []:
+        u = a.get("url") or ""
+        dur = (a.get("duration") or 0) / 1000
+        if not u.startswith("https://") or (dur and dur < 15):
+            continue
+        ext = (a.get("filetype") or "mp3").lower()
+        out.append({"id": f"a{a.get('id')}", "kind": "audio", "file": u, "title": a.get("title") or "", "author": a.get("creator") or "",
+                    "author_url": a.get("creator_url") or "", "page": a.get("foreign_landing_url") or "", "dur": dur or None,
+                    "license": f"{a.get('license') or ''} {a.get('license_version') or ''}".strip(), "ext": ext if ext in AUDIO_EXT else "mp3"})
+    _CACHE[ck] = (time.time(), {"items": out})
+    return out

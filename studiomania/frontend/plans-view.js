@@ -1,5 +1,5 @@
 // 💳 شكل الباقات (واحد لـ«باقتي ونقاطي» جوه البرنامج ولصفحة الأسعار العامة).
-// هادي وفاضي: صف صغير فيه اسم كل باقة وسعرها، ولما تقف على «MY PLAN» بيعمل زووم لجوه في نفس الصفحة والكروت بتطلع بالتفاصيل.
+// هادي وفاضي: صف صغير فيه اسم كل باقة وسعرها، وفوقه زرار «تفاصيل الباقات» بيعمل زووم لجوه في نفس الصفحة والكروت بتطلع بالتفاصيل.
 // كل باقة أعلى مكتوب فيها «كل اللي في … وكمان:» والزيادة بس. وتحت كبسولة النقاط والنقاط الزيادة.
 // PlansView.mount(el, data, { pay(kind, key, provider, cycle), signup(plan), toast(msg, bad) })
 const PlansView = (() => {
@@ -18,12 +18,11 @@ const PlansView = (() => {
 :is(#nh, body) .pv .num { font-family: var(--nh-latin, "Unbounded", sans-serif); font-weight: 300; letter-spacing: .03em; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
 :is(#nh, body) .pv .lat { font-family: var(--nh-latin, "Unbounded", sans-serif); text-transform: uppercase; direction: ltr; unicode-bidi: isolate; }
 :is(#nh, body) .pv-mid { display: grid; place-content: center; justify-items: center; gap: 40px; padding: 24px 0; }
-:is(#nh, body) .pv-cap { cursor: pointer; display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 99px; transition: background .2s; }
-:is(#nh, body) .pv-cap:hover, :is(#nh, body) .pv.open .pv-cap { background: var(--pv-fill); }
-:is(#nh, body) .pv-cap .lat { font-size: 11px; letter-spacing: .3em; color: var(--pv-muted); transition: letter-spacing .4s var(--pv-ease), color .3s; }
-:is(#nh, body) .pv-cap:hover .lat, :is(#nh, body) .pv.open .pv-cap .lat { letter-spacing: .5em; color: var(--pv-ink); }
-:is(#nh, body) .pv-cap i { width: 7px; height: 7px; border-inline-end: 1.5px solid var(--pv-muted); border-bottom: 1.5px solid var(--pv-muted); rotate: 45deg; margin-top: -3px; transition: rotate .35s var(--pv-ease); }
-:is(#nh, body) .pv.open .pv-cap i { rotate: 225deg; margin-top: 4px; }
+:is(#nh, body) .pv-cap { cursor: pointer; display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 18px; border-radius: 99px; background: var(--pv-card); box-shadow: var(--pv-cont);
+  font-size: 12.5px; color: var(--pv-ink); transition: scale .32s var(--pv-pop), box-shadow .3s; }
+:is(#nh, body) .pv-cap:hover { scale: 1.04; box-shadow: var(--pv-sh-hi); }
+:is(#nh, body) .pv-cap i { width: 6px; height: 6px; border-right: 1.5px solid var(--pv-muted); border-bottom: 1.5px solid var(--pv-muted); rotate: 45deg; margin-top: -3px; transition: rotate .35s var(--pv-ease); }
+:is(#nh, body) .pv.open .pv-cap i { rotate: 225deg; margin-top: 3px; }
 :is(#nh, body) .pv-stack { display: grid; justify-items: center; align-items: center; }
 :is(#nh, body) .pv-stack > * { grid-area: 1 / 1; }
 :is(#nh, body) .pv-row { display: flex; align-items: flex-start; justify-content: center; gap: clamp(32px, 7vw, 120px); transition: transform .6s var(--pv-ease), opacity .45s var(--pv-ease), filter .45s; transform-origin: 50% 30%; }
@@ -209,7 +208,7 @@ const PlansView = (() => {
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
         <div class="pv-mid">
-          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span class="lat">${guest ? "Pricing" : "My Plan"}</span><i aria-hidden="true"></i></button>
+          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "اقفل التفاصيل" : "تفاصيل الباقات"}</span><i aria-hidden="true"></i></button>
           <div class="pv-stack">
             <div class="pv-row">${plans.map(small).join("")}</div>
             <div class="pv-wrap" aria-hidden="${!S.open}">
@@ -221,15 +220,10 @@ const PlansView = (() => {
         <div class="pv-low">${bottom()}</div></div>`;
     }
     const pv = () => el.querySelector(".pv");
-    let shut, hoverAt = 0;
+    let shut;
     const zoom = (on) => { clearTimeout(shut); S.open = on; if (!on) S.pick = null; pv().classList.toggle("open", on); el.querySelector("[data-pvcap]").setAttribute("aria-expanded", on);
+      el.querySelector("[data-pvcapt]").textContent = on ? "اقفل التفاصيل" : "تفاصيل الباقات";
       el.querySelector(".pv-wrap").setAttribute("aria-hidden", !on); };
-    const hover = () => matchMedia("(hover: hover)").matches;
-    el.addEventListener("mouseover", (e) => { if (hover() && e.target.closest("[data-pvcap]") && !S.open) { hoverAt = Date.now(); zoom(true); } if (e.target.closest(".pv-mid")) clearTimeout(shut); });
-    el.addEventListener("mouseout", (e) => {
-      if (!hover() || !S.open || !e.target.closest(".pv-mid") || e.relatedTarget?.closest?.(".pv-mid")) return;
-      shut = setTimeout(() => zoom(false), 350);
-    });
     const pay = async (kind, key, prov) => {
       if (!o.pay) return;
       S.busy = true; render();
@@ -237,7 +231,7 @@ const PlansView = (() => {
     };
     el.addEventListener("click", (e) => {
       const q = (s) => e.target.closest(s);
-      if (q("[data-pvcap]")) return S.open && Date.now() - hoverAt < 900 ? null : zoom(!S.open);
+      if (q("[data-pvcap]")) return zoom(!S.open);
       if (q("[data-pvopen]")) return zoom(true);
       if (q("[data-pvcyc]")) { S.cyc = q("[data-pvcyc]").dataset.pvcyc; S.pick = null; render(); return pv().classList.add("open"); }
       if (q("[data-pvbuy]")) return o.signup?.(q("[data-pvbuy]").dataset.pvbuy, S.cyc);

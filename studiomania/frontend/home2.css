@@ -2528,3 +2528,10 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok), #nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok) { animation: none; }
 }
+
+/* 🤖 القالب المخصص: كارت الخطوة فيه كل تفاصيلها، كل تفصيلة في سيكشن */
+#nh .am .bm-card .am-sec { display: grid; gap: 8px; padding: 12px 0 2px; border-top: 1px solid var(--nh-line, rgba(24, 23, 24, .08)); border-radius: 0; transition: background .4s; }
+#nh .am .bm-card .am-sec.flash { background: color-mix(in srgb, var(--nh-accent) 8%, transparent); border-radius: 12px; }
+#nh .am .bm-card .am-st { margin: 0; padding: 0; background: none; display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+#nh .am .bm-card .am-st b { font-weight: 600; }
+#nh .am .bm-card .am-st small { font-size: 11px; color: var(--nh-accent); }

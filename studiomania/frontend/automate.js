@@ -24,16 +24,20 @@ const AutoPage = (() => {
     piece: "M5 4.5h14v15H5z M5 9h14 M5 15h14 M8 4.5v4.5 M16 15v4.5",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const KIND_T = { image: "صور", video: "فيديوهات", any: "صور وفيديوهات" };
+  const KIND_T = { image: "صور", video: "فيديوهات", any: "صور وفيديوهات", audio: "صوت" };
   const aAPI = (path = "", opts) => api(`/api/automations/${S.id}${path}`, opts);
 
   // ---------- الخطوات ← فروع ونقط ----------
   function leavesOf(s) {
-    const o = s.opts, M = S.meta, src = s.src ? `@${s.src.label || (s.src.mode === "folder" ? "المكتبة" : "")}` : "";
-    const srcLeaf = { f: "src", t: "منين", val: src ? `${src}${s.found != null ? ` · ${AR_N(s.found)} ملف` : ""}` : "", miss: !s.src || !s.found };
+    const o = s.opts, M = S.meta, stk = s.src?.mode === "stock", src = s.src ? (stk ? s.src.label : `@${s.src.label || (s.src.mode === "folder" ? "المكتبة" : "")}`) : "";
+    const srcLeaf = { f: "src", t: "منين", val: src ? `${src}${s.found != null ? ` · ${AR_N(s.found)} ملف` : ""}` : "", miss: !s.src || (!stk && !s.found) };
     const L = {
-      pull: [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "count", t: "العدد", val: AR_N(o.count) }, { f: "order", t: "الترتيب", val: M.orders[o.order] },
-        { f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }],
+      pull: o.type === "audio"
+        ? [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "role", t: "يتحط إزاي", val: M.roles?.[o.role] || "" },
+          ...(o.role === "voice" ? [] : [{ f: "volume", t: "علو الصوت", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت الكلام", val: o.duck ? "أيوه" : "لأ" }]),
+          { f: "order", t: "أنهي ملف", val: M.orders[o.order] }]
+        : [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "count", t: "العدد", val: AR_N(o.count) }, { f: "order", t: "الترتيب", val: M.orders[o.order] },
+          { f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }],
       intro: [srcLeaf], outro: [srcLeaf],
       voice: [srcLeaf, { f: "fit", t: "الفيديو على قد التعليق", val: o.fit ? "أيوه" : "لأ" }, { f: "order", t: "أنهي تسجيل", val: M.orders[o.order] }],
       music: [srcLeaf, { f: "volume", t: "علو الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت الكلام", val: o.duck ? "أيوه" : "لأ" }, { f: "order", t: "أنهي موسيقى", val: M.orders[o.order] }],
@@ -48,6 +52,7 @@ const AutoPage = (() => {
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
     }[s.verb] || [];
+    if ((M.rules_verbs || []).includes(s.verb)) L.push({ f: "rules", t: "قواعدي", val: (o.rules || "").slice(0, 40) });
     return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
   }
   // ✨ «ولّد»: النقط بتتغيّر على حسب نوع الموديل (من القطعة / مراجع / صورة / بداية ونهاية / الكلام بس)
@@ -310,8 +315,8 @@ const AutoPage = (() => {
       let tx = n.x + (p ? (p.px - p.x) * f : 0), ty = n.y + (p ? (p.py - p.y) * f : 0);
       if (S.mw && !S.drag && (n.kind === "leaf" || n.kind === "branch")) {
         const mx = S.mw[0] - n.x, my = S.mw[1] - n.y, md = Math.hypot(mx, my) || 1;
-        if (S.hovNode === n) { const pull = Math.min(n.kind === "leaf" ? 16 : 12, md * .4); tx += mx / md * pull; ty += my / md * pull; }
-        else if (md < 110) { const push = (1 - md / 110) * 14; tx -= mx / md * push; ty -= my / md * push; }
+        // النقطة اللي الماوس عليها بتقرّب منه سنة صغيرة، والباقي ثابت (مابيهربش من الماوس)
+        if (S.hovNode === n) { const pull = Math.min(n.kind === "leaf" ? 6 : 5, md * .25); tx += mx / md * pull; ty += my / md * pull; }
       }
       n.vx += (k * (tx - n.px) - c * n.vx) * dt;
       n.vy += (k * (ty - n.py) - c * n.vy) * dt;
@@ -412,10 +417,17 @@ const AutoPage = (() => {
     const v = S.meta.verbs[s.verb], L = S.lib;
     if (!L) { loadLib(); return `<p class="bm-note">بيجيب المكتبة…</p>`; }
     const want = s.verb === "pull" ? (s.opts.type === "any" ? ["image", "video"] : [s.opts.type]) : v.accept;
+    const music = want.includes("audio") && (s.verb === "music" || (s.verb === "pull" && s.opts.role !== "voice"));
+    const stockOk = want.includes("audio") ? music : S.meta.stock_pexels;
+    const stockBox = !(want.includes("audio") && !music) ? `<p class="am-gh">🌐 من الستوك أونلاين</p>
+      <p class="bm-note">${want.includes("audio") ? "موسيقى مسموح استخدامها في الإعلانات والبوستات، باسم صاحبها." : "صور وفيديوهات حقيقية من Pexels، ببلاش."} اكتب اللي عايزه (عربي أو إنجليزي)، وكل تشغيل بيجيب حاجة جديدة ويحفظها في المكتبة في «🌐 من الستوك».</p>
+      ${stockOk ? `<div class="bm-write" contenteditable="plaintext-only" data-k="stockq" data-ph="مثلًا: قهوة الصبح، ناس بتضحك في مكتب، lofi chill…">${esc(S.stockQ ?? (s.src?.mode === "stock" ? s.src.q : ""))}</div>
+      <div class="bm-acts"><button class="bm-go" data-src="stock">${s.src?.mode === "stock" ? "✓ " : ""}هات من الستوك</button></div>` : `<p class="bm-note">الستوك مش متاح دلوقتي.</p>`}
+      <p class="am-gh">📁 من المكتبة</p>` : "";
     const kids = (pid, depth = 0) => L.folders.filter((f) => (f.parent || null) === (pid || null)).map((f) =>
       `<button class="bm-pill${s.src?.mode === "folder" && s.src.id === f.id ? " on" : ""}" data-src="folder" data-id="${f.id}" data-label="${esc(f.path)}" style="margin-inline-start:${depth * 14}px">📁 ${esc(f.name)} <small class="num">${f.count}</small></button>${kids(f.id, depth + 1)}`).join("");
     const q = S.srcQ || "", files = L.files.filter((f) => want.includes(f.kind) && (!q || `${f.name} ${f.desc} ${(f.tags || []).join(" ")} ${f.path}`.includes(q))).slice(0, 30);
-    return `<p class="bm-note">${esc(v.desc)}. اختار فولدر (هياخد من اللي جواه كمان)، أو ملف بعينه، أو اكتب كلمة يدوّر بيها بالمعنى.</p>
+    return `${stockBox}<p class="bm-note">اختار فولدر (هياخد من اللي جواه كمان)، أو ملف بعينه، أو اكتب كلمة يدوّر بيها بالمعنى.</p>
       <div class="bm-pills am-tree"><button class="bm-pill${s.src?.mode === "folder" && !s.src.id ? " on" : ""}" data-src="folder" data-id="" data-label="المكتبة كلها">📁 المكتبة كلها</button>${kids(null)}</div>
       <div class="bm-write" contenteditable="plaintext-only" data-k="srcq" data-ph="🔎 دوّر بالمعنى: قبل التبييض، ابتسامة، العيادة…">${esc(q)}</div>
       <div class="bm-acts"><button class="bm-go" data-src="search">استخدم البحث ده كمنشن</button></div>
@@ -457,15 +469,23 @@ const AutoPage = (() => {
           ${x.step ? `<small>${esc(x.step)}</small>` : ""}${(x.report || []).map((t) => `<small>${esc(t)}</small>`).join("")}${x.error ? `<small class="bad">${esc(x.error)}</small>` : ""}
           <span class="bm-acts">${x.export_url ? `<a class="bm-pill" href="${esc(x.export_url)}" target="_blank" rel="noopener">⬇ الفيديو</a>` : ""}${x.project_id ? `<button class="bm-pill" data-openpj="${x.project_id}">🎞️ افتح في المونتاج</button>` : ""}</span></div>`).join("")}`;
     }
+    // الخطوة نفسها: كل تفاصيلها في كارت واحد (تسحب إيه ومنين، المنشن، قواعدك…)، والنقط اللي فوقها بتوديك لنفس الكارت
     if (n.kind === "branch") {
-      const v = M.verbs[n.s.verb];
-      return `<div class="bm-ch"><span class="latin">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}. دوس على أي نقطة فوقها تغيّرها.</p>${M.fixed.includes(n.s.verb) ? `<p class="bm-note">دي من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» بييجي مع «قطّع الفيديو»، ولو شلت التقطيع بيتشال معاه.</p>` : moveActs(n.s)}`;
+      const v = M.verbs[n.s.verb], ls = leavesOf(n.s).filter((l) => l.type !== "action");
+      return `<div class="bm-ch"><span class="latin">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}.</p>
+        ${ls.map((l) => `<section class="am-sec${l.miss ? " miss" : ""}" data-sec="${esc(l.f)}"><p class="am-st"><b>${esc(l.t)}</b>${l.miss ? `<small>لسه ناقصة</small>` : ""}</p>${leafBody(n.s, l)}</section>`).join("")}
+        ${M.fixed.includes(n.s.verb) ? `<p class="bm-note">دي من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» بييجي مع «قطّع الفيديو»، ولو شلت التقطيع بيتشال معاه.</p>` : `<section class="am-sec"><p class="am-st"><b>رتّبها أو شيلها</b></p>${moveActs(n.s)}</section>`}`;
     }
-    const s = n.s, l = n.l, o = s.opts;
-    const head = `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>`;
-    if (l.f === "move") return head + moveActs(s);
+    const s = n.s, l = n.l;
+    if (l.f === "move") return `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>` + moveActs(s);
+    return `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>` + leafBody(s, l);
+  }
+  function leafBody(s, l) {
+    const M = S.meta, o = s.opts, head = "";
+    if (l.f === "rules") return editable("opt:rules", o.rules || "", RULES_PH[s.verb] || "اكتب قواعدك") + `<p class="bm-note">${RULES_NOTE[s.verb] || ""} بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    if (l.f === "role") return pills("role", Object.entries(M.roles || {}), o.role) + `<p class="bm-note">«تعليق صوتي»: الفيديو بيطلع على قد الصوت. «موسيقى»: بتتحط تحت الفيديو.</p>`;
     if (l.f === "src") return head + srcCard(s);
-    if (l.f === "type") return head + pills("type", [["image", "صور"], ["video", "فيديوهات"], ["any", "الاتنين"]], o.type);
+    if (l.f === "type") return head + pills("type", [["image", "صور"], ["video", "فيديوهات"], ["any", "صور وفيديوهات"], ["audio", "صوت"]], o.type);
     if (l.f === "order") return head + pills("order", Object.entries(M.orders), o.order) + `<p class="bm-note">«اللي متستخدمش» بياخد الملفات اللي لسه ماطلعتش في فيديو قبل كده، ولما الفولدر يخلص بيبدأ من الأول.</p>`;
     if (l.f === "trans") return head + pills("trans", Object.entries(M.trans), o.trans);
     if (l.f === "ratio") return head + pills("ratio", M.ratios.map((x) => [x, x]), o.ratio);
@@ -524,6 +544,7 @@ const AutoPage = (() => {
       }).join("");
     }
     if (l.f === "items") return head + mergeCard(s);
+    if (s.verb === "pull" && l.f === "volume") return head + pills("volume", [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]], o.volume);
     if (["fit", "duck", "on", "use_piece"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
@@ -531,6 +552,11 @@ const AutoPage = (() => {
       + `<p class="bm-note">كل قطعة هتطلع أقل من (أو قد) الطول ده. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
   }
+  const RULES_PH = { gen: "مثلًا: من غير نصوص على الشاشة، ألوان البراند، الشخصية دايمًا لابسة أبيض", genimg: "مثلًا: خلفية فاتحة، من غير ناس، ستايل مينيمال",
+    pull: "مثلًا: قبل وبعد بس، من غير صور فيها وشوش", music: "مثلًا: هادية، من غير كلام", voice: "مثلًا: صوت سارة بس" };
+  const RULES_NOTE = { gen: "بتتضاف للبرومبت كل مرة.", genimg: "بتتضاف للوصف كل مرة.", split: "بيختار الفيديو اللي يطابقها من المنشن.",
+    pull: "بيختار من المنشن الملفات اللي تطابقها بالمعنى. ولو من الستوك: بتتضاف لكلمة البحث.", music: "بيختار من المنشن اللي يطابقها. ولو من الستوك: بتتضاف لكلمة البحث.",
+    voice: "بيختار من المنشن التسجيل اللي يطابقها.", intro: "بيختار الفيديو اللي يطابقها.", outro: "بيختار الفيديو اللي يطابقها." };
   // «جمّع»: كل مخرج ممكن (القطعة الأصلية أو بعد «ولّد») زرار، واللي بتختاره بيتحط في الترتيب
   function mergeCard(s) {
     const sp = S.rec.steps.find((x) => x.verb === "split");
@@ -555,13 +581,18 @@ const AutoPage = (() => {
   const moveActs = (s) => { const lc = laneOf(s.id), user = lc ? lc.ln : S.rec.steps.filter((x) => !S.meta.fixed.includes(x.verb) && x.verb !== "merge"), i = user.findIndex((x) => x.id === s.id), n = user.length;
     return `<div class="bm-acts"><button class="bm-pill" data-mv="-1" ${i <= 0 ? "disabled" : ""}>← خليها قبل</button><button class="bm-pill" data-mv="1" ${i >= n - 1 ? "disabled" : ""}>خليها بعد →</button>
       <button class="bm-pill" data-rmstep>🗑 شيل الخطوة</button></div>`; };
-  function openCard(n) {
+  function openCard(n, sec) {
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
-    if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; S.srcQ = ""; S.refQ = ""; }
+    if (n.kind === "leaf" && n.l.type !== "action") { const b = S.byId[n.s.id]; if (b) return openCard(b, n.l.f); }
+    const same = S.open?.id === n.id, top = same ? card.scrollTop : 0;
+    if (!same) { S.cardSide = null; S.cardAt = null; S.srcQ = ""; S.refQ = ""; S.stockQ = null; }
     S.open = { id: n.id, br: n.kind === "leaf" ? n.s.id : n.kind === "branch" ? n.id : null, n };
     card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>${cardHTML(n)}`;
+    card.classList.toggle("wide", n.kind === "branch");
     card.hidden = false;
+    card.scrollTop = top;
+    if (sec) requestAnimationFrame(() => { const el = card.querySelector(`[data-sec="${CSS.escape(sec)}"]`); if (el) { card.scrollTop = el.offsetTop - 12; el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 900); } });
     S.el.classList.add("has-card");
     markOpen();
     placeCard(toScreen([n.px, n.py]));
@@ -633,7 +664,7 @@ const AutoPage = (() => {
       if (z.dataset.zoom === "0") return fit(true);
       zoomAt(z.dataset.zoom === "1" ? 1.25 : .8, w.clientWidth / 2, w.clientHeight / 2);
     });
-    const HOT_R = { leaf: 20, branch: 46 };
+    const HOT_R = { leaf: 26, branch: 46 };
     const setHot = (n) => { if (S.hovNode === n) return; S.hovNode?.el?.classList.remove("hot"); S.hovNode = n; n?.el?.classList.add("hot"); S.el.classList.toggle("hotting", !!n); };
     w.addEventListener("pointermove", (e) => {
       const r = w.getBoundingClientRect();
@@ -677,6 +708,7 @@ const AutoPage = (() => {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
         if (S.open?.id === n.id) return openCard(null);
+        if (n.kind === "leaf" && S.open?.id === n.s.id) return openCard(S.byId[n.s.id], n.l.f);
         return openCard(n);
       }
       if (t.closest("[data-close]")) return openCard(null);
@@ -793,8 +825,9 @@ const AutoPage = (() => {
         }
         if ((b = t.closest("[data-src]"))) {
           const mode = b.dataset.src;
-          const src = mode === "search" ? (S.srcQ?.trim() ? { mode, q: S.srcQ.trim() } : null) : { mode, id: b.dataset.id || null, label: b.dataset.label };
-          if (!src) return toast("اكتب الكلمة اللي هيدوّر بيها الأول", true);
+          const sq = mode === "stock" ? (S.stockQ ?? S.el.querySelector('[data-k="stockq"]')?.innerText ?? "").trim() : "";
+          const src = mode === "search" ? (S.srcQ?.trim() ? { mode, q: S.srcQ.trim() } : null) : mode === "stock" ? (sq ? { mode, q: sq } : null) : { mode, id: b.dataset.id || null, label: b.dataset.label };
+          if (!src) return toast(mode === "stock" ? "اكتب عايز إيه من الستوك الأول" : "اكتب الكلمة اللي هيدوّر بيها الأول", true);
           return saveSteps(mapStep(s.id, (x) => ({ ...x, src })));
         }
       } catch (err) { toast(err.message, true); }
@@ -805,9 +838,10 @@ const AutoPage = (() => {
       const el = e.target.closest?.(".bm-write");
       if (!el) return;
       clearTimeout(typeT);
+      if (el.dataset.k === "stockq") { S.stockQ = el.innerText.trim(); return; }
       if (el.dataset.k === "srcq") { S.srcQ = el.innerText.trim(); typeT = setTimeout(() => { const keep = S.srcQ; refreshCard(); const ed = S.el.querySelector('[data-k="srcq"]'); if (ed) { ed.focus(); const rg = document.createRange(); rg.selectNodeContents(ed); rg.collapse(false); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg); } S.srcQ = keep; }, 450); return; }
       if (el.dataset.k === "pubcap") { const sid = S.open?.n?.s?.id; typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, caption: v } })), { card: false }); }, 800); return; }
-      if (el.dataset.k === "refq") { S.refQ = el.innerText.trim(); const box = S.el.querySelector("[data-reflist]"), f = S.open?.n?.l?.f, s = S.open?.n?.s; if (box && s) box.innerHTML = refList(S.refQ, f === "refs" ? s.opts.refs || [] : s.opts[f] ? [s.opts[f]] : [], f); return; }
+      if (el.dataset.k === "refq") { S.refQ = el.innerText.trim(); const sec = el.closest("[data-sec]"), box = (sec || S.el).querySelector("[data-reflist]"), f = sec?.dataset.sec || S.open?.n?.l?.f, s = S.open?.n?.s; if (box && s) box.innerHTML = refList(S.refQ, f === "refs" ? s.opts.refs || [] : s.opts[f] ? [s.opts[f]] : [], f); return; }
       if (el.dataset.k === "opt:prompt") showMentions(el);
       if (el.dataset.k?.startsWith("opt:")) { const sid = S.open?.n?.s?.id, key = el.dataset.k.slice(4); typeT = setTimeout(() => { const v = el.innerText.trim(); saveSteps(mapStep(sid, (x) => ({ ...x, opts: { ...x.opts, [key]: v } })), { card: false }); }, 800); return; }
       if (el.dataset.k === "desc") return;

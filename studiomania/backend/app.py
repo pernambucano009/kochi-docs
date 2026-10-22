@@ -27891,6 +27891,96 @@ def auto_files(lib: dict, src: dict | None, kinds: tuple[str, ...]) -> list[dict
     return [f for f in lib_.search(lib, "", "", src.get("id")) if f["kind"] in kinds]
 
 
+def auto_kinds(s: dict) -> tuple[str, ...]:
+    if s["verb"] != "pull":
+        return automate.VERBS[s["verb"]]["accept"]
+    t = s["opts"].get("type") or "image"
+    return ("image", "video") if t == "any" else (t,)
+
+
+def auto_src_files(lib: dict, s: dict, kinds: tuple[str, ...]) -> list[dict]:
+    """ملفات المنشن، ولو فيه «قواعدي» بتتفلتر بالمعنى (لو مفيش ولا ملف طابق بيرجع لكل الملفات، والتشغيل بيقول كده)."""
+    files = auto_files(lib, s.get("src"), kinds)
+    rules = (s["opts"].get("rules") or "").strip()
+    if rules and files:
+        ids = {f["id"] for f in lib_.search(lib, rules)}
+        hit = [f for f in files if f["id"] in ids]
+        if hit:
+            return hit
+    return files
+
+
+AUTO_STOCK_SUB = "🌐 من الستوك"
+AUTO_STOCK_ROOT = {"image": "images", "video": "videos", "audio": "music"}
+
+
+def auto_stock(bid: str, s: dict, kind: str, n: int, ratio: str, run_id: str, report: list[str]) -> list[dict]:
+    """🌐 «ستوك»: صور وفيديوهات من Pexels، أو موسيقى مسموح استخدامها تجاريًا (Openverse). بتتنزّل وتدخل المكتبة في «🌐 من الستوك»
+    ومعاها اسم صاحبها. اللي اتاخد قبل كده بيتاخد من المكتبة على طول بدل ما يتنزّل تاني. كلمة البحث + «قواعدي» بيتترجموا للإنجليزي."""
+    o, n = s["opts"], max(1, min(12, int(n)))
+    q = " ".join(x for x in ((s.get("src") or {}).get("q", ""), o.get("rules") or "") if x).strip()
+    what = {"image": "صور", "video": "فيديوهات", "audio": "موسيقى"}[kind]
+    lib = lib_merged(bid, ready=False)
+    have = {f.get("stock_id"): f for f in lib["files"] if f.get("stock_id")}
+    tmp = GENERATED_DIR / f"autostock_{run_id}_{s['id']}_{kind}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        if atlas.mock_mode() and (kind == "audio" or not stock.live()):
+            en, items = q, [{"id": f"mock{uuid.uuid4().hex[:6]}", "kind": kind, "file": "", "title": q, "author": "", "dur": 10 if kind == "audio" else 4} for _ in range(n)]
+        else:
+            if kind != "audio" and not stock.live():
+                report.append("⚠️ مكتبة الصور والفيديوهات (Pexels) مش متاحة دلوقتي، فـ«ستوك» اتخطّى")
+                return []
+            en = stock_query_en(q)
+            orient = "portrait" if ratio in ("9:16", "4:5") else "landscape" if ratio == "16:9" else "square"
+            items = stock.music_search(en) if kind == "audio" else [it for it in stock.search(en, "photo" if kind == "image" else "video", orient)["items"]
+                                                                   if stock.allowed_url(it["file"]) and (kind == "image" or (it.get("dur") or 0) >= 2)]
+        rnd = random.Random()
+        rnd.shuffle(items)
+        items.sort(key=lambda it: it["id"] in have)   # الجديد الأول، وبعدين اللي اتنزّل قبل كده
+        out, made = [], []
+        for it in items:
+            if len(out) + len(made) >= n:
+                break
+            if it["id"] in have:
+                out.append(have[it["id"]])
+                continue
+            ext = {"image": ".jpg", "video": ".mp4"}.get(kind) or f".{it.get('ext') or 'mp3'}"
+            name = f"stock_{uuid.uuid4().hex[:10]}{ext}"
+            dest = tmp / name
+            if atlas.mock_mode() and not it["file"]:
+                src = {"image": ["-f", "lavfi", "-i", f"color=c=0x{uuid.uuid4().hex[:6]}:s=720x1280", "-frames:v", "1"],
+                       "video": ["-f", "lavfi", "-i", "testsrc2=size=720x1280:rate=30:duration=4", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast"],
+                       "audio": ["-f", "lavfi", "-i", "sine=frequency=330:duration=10"]}[kind]
+                ok = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *src, str(dest)], capture_output=True, timeout=120).returncode == 0
+            else:
+                ok = brain_fetch(it["file"], dest, 200 * 1024 * 1024)
+            if not ok or not dest.exists():
+                dest.unlink(missing_ok=True)
+                continue
+            f = {"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"🌐 {(it.get('title') or it.get('alt') or q)[:50]}"), "kind": kind, "size": dest.stat().st_size,
+                 "desc": (it.get("alt") or it.get("title") or q)[:300], "tags": ["ستوك", en[:40]], "status": "ready", "at": now(), "origin": bid, "stock_id": it["id"],
+                 "credit": {"by": (it.get("author") or "")[:120], "by_url": (it.get("author_url") or "")[:300], "page": (it.get("page") or "")[:300],
+                            "src": "Openverse" if kind == "audio" else "Pexels", "license": (it.get("license") or "")[:60]}}
+            for k in ("w", "h"):
+                if it.get(k):
+                    f[k] = it[k]
+            dur = it.get("dur") or (probe_duration(dest) if kind != "image" else None)
+            if dur:
+                f["dur"] = float(dur)
+            made.append(f)
+        if made:
+            out += auto_lib_add(bid, AUTO_STOCK_ROOT[kind], made, tmp, AUTO_STOCK_SUB)
+        report.append(f"✓ ستوك «{q}»: {len(out)} {what}" + (f" ({len(made)} جديد اتحفظ في «{AUTO_STOCK_SUB}»)" if made else "") if out
+                      else f"⚠️ ستوك «{q}» مالقاش {what}. جرّب كلمة تانية")
+        return out
+    except (stock.StockError, wallet.NoCredits) as exc:
+        report.append(f"⚠️ ستوك «{q}»: {exc}")
+        return []
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 GEN_MOCK = [{"model": "mock/kling-o1/video-edit", "label": "Kling O1 Edit (تجريبي)", "per_sec": 0.17, "mode": "video", "kind": "edit", "video_in": True},
             {"model": "mock/seedance-2.5/reference-to-video", "label": "Seedance 2.5 مراجع (تجريبي)", "per_sec": 0.138, "mode": "refs", "kind": "ref", "video_in": True},
             {"model": "mock/kling-o3/reference-to-video", "label": "Kling O3 مراجع (تجريبي)", "per_sec": 0.09, "mode": "refs", "kind": "ref", "video_in": False},
@@ -27957,14 +28047,14 @@ def auto_voice_model(o: dict) -> dict:
     return next((m for m in auto_voice_models() if m["model"] == o.get("model")), None) or AUTO_VOICE_STD
 
 
-def auto_lib_add(bid: str, root: str, files: list[dict], src_dir: Path) -> list[dict]:
-    """الحاجات اللي اتولّدت بتدخل المكتبة في فولدر «✨ اتولّد بالموديل المخصص» (المشتركة لو الفولدر متشارك)."""
+def auto_lib_add(bid: str, root: str, files: list[dict], src_dir: Path, sub: str = "✨ اتولّد بالموديل المخصص") -> list[dict]:
+    """الحاجات اللي اتولّدت (أو اتنزّلت من الستوك) بتدخل المكتبة في فولدر «✨ اتولّد بالموديل المخصص» أو «🌐 من الستوك» (المشتركة لو الفولدر متشارك)."""
     store = SHARED_LIB if root in share_keys() else bid
     for f in files:
         shutil.move(str(src_dir / f["file"]), str(lib_dir(store) / f["file"]))
     def fn(d):
         roots = lib_prepare(d)
-        folder = lib_.ensure_path(d, roots[root], ["✨ اتولّد بالموديل المخصص"]) or roots[root]
+        folder = lib_.ensure_path(d, roots[root], [sub]) or roots[root]
         for f in files:
             f["folder"] = folder
             d["files"].append(f)
@@ -27997,6 +28087,8 @@ def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str
             if r.get("label"):
                 prompt = prompt.replace(f"@{r['label']}", f"{r['label']} (reference image {i + 1})")
         prompt = re.sub(r"@(?=\S)", "", prompt)
+        if (o.get("rules") or "").strip():   # «قواعدي» بتتضاف للوصف
+            prompt += "\nRules: " + o["rules"].strip()
         n = max(1, min(8, int(o.get("count") or 1)))
         each = wallet.credits(m["price"])
         if not atlas.mock_mode():
@@ -28211,8 +28303,8 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
                 gen_sec += L * sum(1 for x in ln if x["verb"] == "gen")
             steps.append({**s, "lanes": lanes, "found": plan["found"], "pieces": plan["pieces"], "spans": plan["spans"], "video": plan["video"]})
             continue
-        kinds = v["accept"] if s["verb"] != "pull" else (("image", "video") if s["opts"].get("type") == "any" else (s["opts"].get("type") or "image",))
-        n = len(auto_files(lib, s.get("src"), kinds)) if v["accept"] else None
+        stk = (s.get("src") or {}).get("mode") == "stock"
+        n = len(auto_src_files(lib, s, auto_kinds(s))) if v["accept"] and not stk else None
         steps.append({**s, "found": n})
     voice_sec = 0.0
     for s in d.get("steps") or []:
@@ -28237,7 +28329,8 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
 def automations_meta():
     return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
             "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
-            "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES,
+            "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES, "roles": automate.ROLES, "rules_verbs": automate.RULES_VERBS,
+            "stock_pexels": stock.live() or atlas.mock_mode(),
             "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind", "mode", "video_in")} for m in auto_gen_models()],
             "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS,
             "img_models": [{k: m.get(k) for k in ("key", "label", "price", "refs", "max_refs")} for m in auto_img_models()],
@@ -28563,6 +28656,8 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
                 if r.get("label"):
                     prompt = prompt.replace(f"@{r['label']}", f"{r['label']} (reference image {i + 1})")
         prompt = re.sub(r"@(?=\S)", "", prompt)   # أي منشن تاني بيفضل اسم عادي
+        if (o.get("rules") or "").strip():   # «قواعدي» بتتضاف للبرومبت
+            prompt = (prompt + "\nRules: " + o["rules"].strip()).strip()
         pick = lambda key, fallback: (auto_ref_image(o[key], src, tmp) if o.get(key) else None) or fallback  # noqa: E731
         start = pick("start", refs[0][1] if refs else auto_ref_image({"kind": "frame"}, src, tmp)) if mode in ("image", "startend", "avatar") else None
         voice = auto_ref_audio(o.get("audio") or ({"kind": "piece_audio"} if mode == "avatar" else None), src, tmp) if mode in ("avatar", "lipsync") else None
@@ -28708,10 +28803,24 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
         intro = outro = None
         split_f = None
         setr(step="📁 بيختار من المكتبة")
+        def take(s: dict, kinds: tuple[str, ...], n: int, order: str) -> tuple[list[dict], bool]:
+            """من الستوك أونلاين (بيتنزّل ويتحفظ في المكتبة) أو من ملفات المنشن في المكتبة."""
+            if (s.get("src") or {}).get("mode") == "stock":
+                setr(step="🌐 بيجيب من الستوك")
+                if "audio" in kinds:
+                    return auto_stock(bid, s, "audio", 1, ratio, run_id, report), False
+                parts = [("image", (n + 1) // 2), ("video", n // 2)] if len(kinds) == 2 else [(kinds[0], n)]
+                return [f for k, c in parts if c for f in auto_stock(bid, s, k, c, ratio, run_id, report)], False
+            if (s["opts"].get("rules") or "").strip():
+                files = auto_files(lib, s.get("src"), kinds)
+                ids = {f["id"] for f in lib_.search(lib, s["opts"]["rules"])}
+                if files and not any(f["id"] in ids for f in files):
+                    report.append(f"⚠️ «{automate.VERBS[s['verb']]['t']}»: مفيش ملف طابق قواعدك «{s['opts']['rules'][:40]}»، فاختار من الكل")
+            return automate.pick(auto_src_files(lib, s, kinds), n, order, used, rnd)
         for s in steps:
             v, o = s["verb"], s["opts"]
             if v == "split":
-                got, _ = automate.pick(auto_files(lib, s.get("src"), ("video",)), 1, o.get("order") or "fresh", used, rnd)
+                got, _ = take(s, ("video",), 1, o.get("order") or "fresh")
                 if not got:
                     report.append(f"⚠️ «قطّع الفيديو» مالقاش فيديو في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
                     continue
@@ -28721,9 +28830,15 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                 if split_f:
                     picked.append({"split": s, "merge": next((x for x in steps if x["verb"] == "merge"), None), "f": split_f})
             elif v == "pull":
-                kinds = ("image", "video") if o.get("type") == "any" else (o.get("type") or "image",)
-                files = auto_files(lib, s.get("src"), kinds)
-                got, wrapped = automate.pick(files, int(o.get("count") or 1), o.get("order") or "fresh", used, rnd)
+                kinds = auto_kinds(s)
+                got, wrapped = take(s, kinds, 1 if kinds == ("audio",) else int(o.get("count") or 1), o.get("order") or "fresh")
+                if got and kinds == ("audio",):   # اسحب صوت: يا تعليق صوتي (الفيديو على قده) يا موسيقى تحت الفيديو
+                    if o.get("role") == "voice":
+                        voice = {"f": got[0], "fit": True}
+                    else:
+                        music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck", True))}
+                    report.append(f"✓ {'التعليق' if o.get('role') == 'voice' else 'الموسيقى'}: {got[0]['name']}")
+                    continue
                 if not got:
                     report.append(f"⚠️ «اسحب» مالقاش {lib_.KINDS.get(kinds[0], 'ملفات')} في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
                     continue
@@ -28732,7 +28847,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                 picked += [{"f": f, "sec": float(o.get("sec") or 2.5)} for f in got]
                 report.append(f"✓ سحب {len(got)} من «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
             elif v in ("intro", "outro"):
-                got, _ = automate.pick(auto_files(lib, s.get("src"), ("video",)), 1, "random", {}, rnd)
+                got, _ = take(s, ("video",), 1, "random") if (s.get("src") or {}).get("mode") == "stock" else automate.pick(auto_src_files(lib, s, ("video",)), 1, "random", {}, rnd)
                 if got:
                     if v == "intro":
                         intro = got[0]
@@ -28750,7 +28865,10 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                 elif got:
                     music = {"f": got[0], "volume": int(o.get("volume") or 35), "duck": bool(o.get("duck", True))}
             elif v in ("voice", "music"):
-                got, _ = automate.pick(auto_files(lib, s.get("src"), ("audio",)), 1, o.get("order") or "fresh", used, rnd)
+                if v == "voice" and (s.get("src") or {}).get("mode") == "stock":
+                    report.append("⚠️ الستوك فيه موسيقى بس، مفيش تعليقات صوتية. اختار تعليق من المكتبة أو استخدم «ولّد صوت»")
+                    continue
+                got, _ = take(s, ("audio",), 1, o.get("order") or "fresh")
                 if not got:
                     report.append(f"⚠️ مالقاش {'تعليق صوتي' if v == 'voice' else 'موسيقى'} في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
                     continue
