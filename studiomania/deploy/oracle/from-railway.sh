@@ -29,7 +29,25 @@ railway status >/dev/null 2>&1 || railway link
 [ -f "$HOME/.ssh/id_ed25519" ] || { mkdir -p "$HOME/.ssh"; ssh-keygen -q -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519" -C "simsimkit-oracle"; }
 railway ssh keys add 2>/dev/null || true
 
-echo "== 4) بيسحب البيانات (ممكن ياخد وقت على حسب حجم الفيديوهات)"
+echo "== 4) المتغيرات: الإعدادات العادية بتتنقل، والمفاتيح لأ (اتكشفت في اختراق Railway ولازم تتغير)"
+NEW="$WORK/vars.env"
+railway variables --kv 2>/dev/null | tr -d '\r' > "$WORK/railway.env" || true
+chmod 600 "$WORK/railway.env"
+: > "$NEW"; SKIPPED=""
+while IFS= read -r line; do
+  k="${line%%=*}"
+  case "$k" in ''|RAILWAY_*|PORT|STUDIOMANIA_DATA|PUBLIC_URL|GATEWAY_SECRET) continue ;; esac
+  if printf '%s' "$k" | grep -Eq 'KEY|SECRET|TOKEN|PASS|PASSWORD|WEBHOOK'; then SKIPPED="$SKIPPED $k"; continue; fi
+  grep -q "^$k=" "$ROOT/app.env" || echo "$line" >> "$NEW"
+done < "$WORK/railway.env"
+cat "$NEW" >> "$ROOT/app.env"
+shred -u "$WORK/railway.env" 2>/dev/null || rm -f "$WORK/railway.env"
+echo "✓ اتنقلت الإعدادات: $(cut -d= -f1 "$NEW" | tr '\n' ' ')"
+echo "⚠️ المفاتيح دي ماتنقلتش، حط الجديدة بتاعتها من الإعدادات ← المفاتيح والرصيد:$SKIPPED"
+[ -s "$NEW" ] && "$ROOT/update.sh" >/dev/null
+rm -f "$NEW"
+
+echo "== 5) بيسحب البيانات (ممكن ياخد وقت على حسب حجم الفيديوهات)"
 # سكريبت صغير بيشتغل جوه Railway: نسخة سليمة من كل قاعدة بيانات + كل الملفات ← tar.gz ← base64 بين علامتين
 PY=$(cat <<'EOF'
 import base64, io, os, sqlite3, sys, tarfile, tempfile
@@ -100,24 +118,7 @@ gzip -t data.tgz && tar tzf data.tgz >/dev/null
 echo "✓ اتسحب $(du -h data.tgz | cut -f1)"
 rm -f raw.txt
 
-echo "== 4ب) المتغيرات: الإعدادات العادية بتتنقل، والمفاتيح لأ (اتكشفت في اختراق Railway ولازم تتغير)"
-NEW="$WORK/vars.env"
-railway variables --kv 2>/dev/null | tr -d '\r' > "$WORK/railway.env" || true
-chmod 600 "$WORK/railway.env"
-: > "$NEW"; SKIPPED=""
-while IFS= read -r line; do
-  k="${line%%=*}"
-  case "$k" in ''|RAILWAY_*|PORT|STUDIOMANIA_DATA|PUBLIC_URL|GATEWAY_SECRET) continue ;; esac
-  if printf '%s' "$k" | grep -Eq 'KEY|SECRET|TOKEN|PASS|PASSWORD|WEBHOOK'; then SKIPPED="$SKIPPED $k"; continue; fi
-  grep -q "^$k=" "$ROOT/app.env" || echo "$line" >> "$NEW"
-done < "$WORK/railway.env"
-cat "$NEW" >> "$ROOT/app.env"
-shred -u "$WORK/railway.env" 2>/dev/null || rm -f "$WORK/railway.env"
-echo "✓ اتنقلت الإعدادات: $(cut -d= -f1 "$NEW" | tr '\n' ' ')"
-echo "⚠️ المفاتيح دي ماتنقلتش، حط الجديدة بتاعتها من الإعدادات ← المفاتيح والرصيد:$SKIPPED"
-rm -f "$NEW"
-
-echo "== 5) بيحط البيانات مكانها"
+echo "== 6) بيحط البيانات مكانها"
 docker stop simsimkit >/dev/null 2>&1 || true
 STAMP=$(date +%Y%m%d-%H%M%S)
 [ -d "$ROOT/data" ] && mv "$ROOT/data" "$ROOT/data.before-$STAMP"

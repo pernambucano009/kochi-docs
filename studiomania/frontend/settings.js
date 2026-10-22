@@ -2,7 +2,7 @@
 
 // باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
 const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربي"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
-  ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"],
+  ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"], ["smtp_pass", "باسورد الإيميل (SMTP_PASS)", "إيميلات تأكيد الحساب"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["stripe", "Stripe Secret key", "الدفع"], ["stripe_hook", "Stripe Webhook secret", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"]];
