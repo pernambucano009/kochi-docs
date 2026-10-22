@@ -2905,3 +2905,22 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .sc2 .sc-take figcaption { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; }
 #nh .sc2 .sc-take .sc-ib { width: 28px; height: 28px; font-size: 12px; }
 @media (max-width: 980px) { #nh .sc2 { flex-direction: column; gap: 24px; } #nh .sc2-r { width: 100%; } #nh .sc2 .sc-view { min-height: 420px; } }
+/* 🔥 الرائج في مجالك */
+#nh .vr2-niche { flex: 1; max-width: 520px; font: inherit; font-size: 18px; border: 0 !important; border-bottom: 1.5px solid var(--nh-line, #E3E2DE) !important; border-radius: 0 !important; background: none !important; padding: 6px 2px 10px; color: var(--nh-ink); outline: none; }
+#nh .vr2-rows { display: flex; flex-direction: column; }
+#nh .vr2-row { display: grid; grid-template-columns: 1fr 2fr 110px 110px 1fr 32px; gap: 14px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--nh-line, rgba(24, 23, 24, .08)); }
+#nh .vr2-row input { font: inherit; font-size: 14px; border: 0 !important; background: none !important; border-radius: 0 !important; padding: 8px 2px; color: var(--nh-ink); outline: none; min-width: 0; }
+#nh .vr2-row input:focus { box-shadow: inset 0 -1.5px 0 var(--nh-ink); }
+#nh .vr2-res { display: grid; gap: 8px; }
+#nh .vr2-tr { display: flex; gap: 18px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--nh-line, rgba(24, 23, 24, .08)); }
+#nh .vr2-tr > div { display: grid; gap: 3px; min-width: 0; }
+#nh .vr2-x { font-family: var(--nh-latin); font-weight: 300; font-size: 24px; min-width: 70px; }
+#nh .vr2-tr.top .vr2-x { color: var(--nh-accent); }
+#nh .vr2-hk { font-size: 14.5px; }
+#nh .vr2-tr small { font-size: 12px; color: var(--nh-muted); }
+#nh .vr2-ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+#nh .vr2-idea { position: relative; background: var(--card, #fff); border-radius: 20px; padding: 18px 18px 14px; display: grid; gap: 8px; box-shadow: 0 2px 10px rgba(24, 23, 24, .05); }
+#nh .vr2-idea b { font-weight: 500; font-size: 14.5px; } #nh .vr2-idea i { font-size: 13px; color: var(--nh-muted); } #nh .vr2-idea p { margin: 0; font-size: 13px; line-height: 1.7; }
+#nh .vr2-idea .pk-ib { justify-self: end; }
+@media (max-width: 820px) { #nh .vr2-row { grid-template-columns: 1fr 1fr 32px; } #nh .vr2-row input[data-k="url"], #nh .vr2-row input[data-k="avg"] { display: none; } }
+#nh .pk-acts .nb-btn, #nh .pk-dacts .nb-btn, #nh .pk-hero .nb-btn { padding: 11px 24px; white-space: nowrap; flex: none; }

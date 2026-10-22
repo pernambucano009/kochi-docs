@@ -353,42 +353,34 @@ const ViralPage = (() => {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ niche: S.niche, rows: S.rows })); } catch {} };
   const html = () => `<div class="nb-wrap vr-wrap" id="vrWrap"></div>`;
   const num = (n) => (n ? Number(n).toLocaleString("en") : "—");
-  const row = (r, i) => `<div class="vr-row" data-i="${i}">
-      <input type="text" data-k="account" placeholder="الحساب" value="${libEsc(r.account)}">
-      <input type="text" data-k="hook" placeholder="أول جملة / الهوك" value="${libEsc(r.hook)}">
-      <input type="text" data-k="views" placeholder="مشاهداته" inputmode="numeric" value="${libEsc(r.views)}">
-      <input type="text" data-k="avg" placeholder="متوسط الحساب" inputmode="numeric" value="${libEsc(r.avg)}">
-      <input type="text" data-k="url" placeholder="اللينك (اختياري)" dir="ltr" value="${libEsc(r.url)}">
-      <button class="nb-btn sm danger" data-del title="شيل">✕</button></div>`;
+  // من البروتوتايب: صفوف بخط تحت بس من غير براويز، والنتيجة ترتيب بالمضاعف وأفكار بنفس الهيكل
+  const row = (r, i) => `<div class="vr2-row" data-i="${i}">
+      <input type="text" data-k="account" placeholder="الحساب" aria-label="الحساب" value="${libEsc(r.account)}">
+      <input type="text" data-k="hook" placeholder="أول جملة (الخطاف)" aria-label="الخطاف" value="${libEsc(r.hook)}">
+      <input type="text" data-k="views" placeholder="مشاهداته" aria-label="مشاهداته" inputmode="numeric" value="${libEsc(r.views)}">
+      <input type="text" data-k="avg" placeholder="متوسط الحساب" aria-label="متوسط الحساب" inputmode="numeric" value="${libEsc(r.avg)}">
+      <input type="text" data-k="url" placeholder="الرابط (اختياري)" aria-label="الرابط" dir="ltr" value="${libEsc(r.url)}">
+      ${pkIb("close", "احذف الصف", "data-del", "sm")}</div>`;
   function results() {
     const R = S.res;
     if (!R) return "";
     const why = Object.fromEntries((R.top || []).map((t) => [String(t.n), t]));
-    return `<div class="vr-res">
-      <h4>الترتيب: قد إيه كل بوست عدّى العادي بتاع صاحبه</h4>
-      <div class="vr-table">${R.rows.map((r) => `<div class="vr-tr${why[r.n] ? " top" : ""}">
-          <b class="vr-x">${r.multiple ? "×" + r.multiple : "—"}</b>
-          <span>${libEsc(r.account || "—")} · ${num(r.views)} / ${num(r.avg)}</span>
-          <span class="vr-hk">${libEsc(r.hook || "")}</span>
-          ${why[r.n] ? `<small>💡 ${libEsc(why[r.n].why || "")}${why[r.n].formula ? ` · <i>${libEsc(why[r.n].formula)}</i>` : ""}${why[r.n].principle ? ` · 🧠 ${libEsc(why[r.n].principle)}` : ""}${why[r.n].structure ? `<br>🧩 ${libEsc(why[r.n].structure)}` : ""}</small>` : ""}
-        </div>`).join("")}</div>
-      ${R.pattern ? `<p class="vr-pat">🔁 النمط: ${libEsc(R.pattern)}</p>` : ""}
-      ${(R.ideas || []).length ? `<h4>أفكار لبراندك بنفس الهيكل (مش نسخ)</h4>
-        <div class="vr-ideas">${R.ideas.map((d) => `<div class="vr-idea"><b>${libEsc(d.title || "")}</b>
-          <p>🎣 ${libEsc(d.hook || "")}</p><p>${libEsc(d.idea || "")}</p>${d.principle ? `<p>🧠 ${libEsc(d.principle)}</p>` : ""}
-          <button class="nb-btn sm" data-cp="${libEsc((d.hook || "") + "\n" + (d.idea || ""))}">📋 انسخ</button></div>`).join("")}</div>` : ""}
-    </div>`;
+    return `<div class="vr2-res"><span class="pk-lbl">الترتيب: كم ضعفًا تجاوز كل منشور المعتاد لصاحبه</span>
+      ${R.rows.map((r) => `<div class="vr2-tr${why[r.n] ? " top" : ""}"><b class="vr2-x num">${r.multiple ? "×" + r.multiple : "—"}</b>
+          <div><span class="vr2-hk">${libEsc(r.hook || "—")}</span><small>${libEsc(r.account || "—")} · ${num(r.views)} / ${num(r.avg)}</small>
+          ${why[r.n] ? `<small class="vr2-why">${libEsc(why[r.n].why || "")}${why[r.n].formula ? ` · ${libEsc(why[r.n].formula)}` : ""}${why[r.n].principle ? ` · ${libEsc(why[r.n].principle)}` : ""}</small>` : ""}</div></div>`).join("")}
+      ${R.pattern ? `<p class="pk-note"><b>النمط:</b> ${libEsc(R.pattern)}</p>` : ""}
+      ${(R.ideas || []).length ? `<span class="pk-lbl">أفكار لعلامتك بالهيكل نفسه (لا نسخ)</span>
+        <div class="vr2-ideas">${R.ideas.map((d) => `<div class="vr2-idea"><b>${libEsc(d.title || "")}</b><i>«${libEsc(d.hook || "")}»</i><p>${libEsc(d.idea || "")}</p>
+          ${pkIb("copy", "انسخ", `data-cp="${libEsc((d.hook || "") + "\n" + (d.idea || ""))}"`, "sm")}</div>`).join("")}</div>` : ""}</div>`;
   }
   function render() {
     const w = S.el;
     if (!w) return;
-    w.innerHTML = `
-      <p class="nb-hint">حط بوستات من مجالك (منافسين أو حسابات بتتابعها): مشاهدات البوست ومتوسط مشاهدات الحساب ده. البوست اللي عدّى متوسطه بكتير يبقى الفكرة هي اللي نجحت مش الحساب، وده اللي نتعلم منه.</p>
-      <div class="nb-row"><label class="nb-f"><span>المجال</span><input type="text" data-niche placeholder="مثلًا: لياقة للستات في الخليج" value="${libEsc(S.niche)}"></label></div>
-      <div class="vr-rows">${S.rows.map(row).join("")}</div>
-      <div class="nb-bar"><button class="nb-btn" data-add>＋ بوست</button>
-        <button class="nb-btn" data-run ${S.busy ? "disabled" : ""}>${S.busy ? "⏳ بيحلّل…" : "🔥 حلّل"}</button></div>
-      ${results()}`;
+    w.innerHTML = `<div class="pk"><div class="pk-top"><input type="text" class="vr2-niche" data-niche aria-label="المجال" placeholder="المجال، مثلًا: لياقة للنساء في الخليج" value="${libEsc(S.niche)}">
+        <div class="pk-acts">${pkIb("plus", "أضف منشورًا", "data-add")}<button class="nb-btn fs-go" data-run ${S.busy ? "disabled" : ""}>${S.busy ? "جارٍ التحليل…" : "حلّل"}</button></div></div>
+      <p class="pk-note">أضف منشورات من مجالك مع مشاهداتها ومتوسط مشاهدات الحساب. المنشور الذي تجاوز متوسطه بكثير نجحت فكرته لا الحساب، وهذا ما نتعلّم منه.</p>
+      <div class="vr2-rows">${S.rows.map(row).join("")}</div>${results()}</div>`;
   }
   function bind(w) {
     w.addEventListener("input", (e) => {
@@ -402,10 +394,10 @@ const ViralPage = (() => {
       const del = e.target.closest("[data-del]");
       if (del) { S.rows.splice(+del.closest("[data-i]").dataset.i, 1); if (!S.rows.length) S.rows.push(blank()); save(); return render(); }
       const cp = e.target.closest("[data-cp]");
-      if (cp) { navigator.clipboard?.writeText(cp.dataset.cp).then(() => toast("✅ اتنسخ"), () => toast("مقدرتش أنسخ", true)); return; }
+      if (cp) { navigator.clipboard?.writeText(cp.dataset.cp).then(() => toast("✓ نُسخ"), () => toast("تعذّر النسخ", true)); return; }
       if (e.target.closest("[data-run]") && !S.busy) {
         const items = S.rows.filter((r) => r.hook || r.views || r.account);
-        if (!items.length) return toast("ضيف بوست واحد على الأقل", true);
+        if (!items.length) return toast("أضف منشورًا واحدًا على الأقل", true);
         S.busy = true; render();
         try { S.res = await api("/api/viral", { method: "POST", ...jsonBody({ niche: S.niche, items }) }); }
         catch (err) { toast(err.message, true); }
