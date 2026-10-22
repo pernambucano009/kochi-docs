@@ -195,9 +195,9 @@ const NH = (() => {
   corner.id = "nhCorner";
   corner.className = "nh-corner";
   corner.hidden = true;
-  corner.innerHTML = `<span class="nh-c-ic"></span><div class="nh-c-name"><span class="latin"></span><b></b></div>`;
+  corner.innerHTML = `<span class="nh-c-ic"></span><div class="nh-c-name"><span class="latin"></span><b></b><span class="nh-c-ask"></span></div>`;
   document.body.appendChild(corner);
-  const cIc = corner.querySelector(".nh-c-ic"), cLatin = corner.querySelector(".latin"), cName = corner.querySelector("b");
+  const cIc = corner.querySelector(".nh-c-ic"), cLatin = corner.querySelector(".latin"), cName = corner.querySelector("b"), cAsk = corner.querySelector(".nh-c-ask");
   let cornerPage = "tr", cornerStage = "tr";
   // الركن من مكان المربع على الشاشة؛ اللي في النص (ابدأ مشروع جديد / كمّل) بيروح فوق يمين
   function cornerOf(tile) {
@@ -222,6 +222,9 @@ const NH = (() => {
       cName.textContent = pTitle.querySelector(".nh-name b")?.textContent || "";
       cIc.innerHTML = pTitle.querySelector(".nh-glt")?.innerHTML || "";
     }
+    // 💬 «اشرح لي «الصفحة»» تحت اسمها، بيفتح المساعد ويسأل على طول
+    const pk = mode === "page" ? pTitle.dataset.key : "";
+    cAsk.innerHTML = pk && pk !== "create" && typeof Help !== "undefined" ? Help.askBtn(pk, cName.textContent) : "";
     cIc.hidden = !cIc.innerHTML;
   }
   const cornerDest = () => ({ latin: cLatin, name: cName, icon: cIc.hidden ? null : cIc });

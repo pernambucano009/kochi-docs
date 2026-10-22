@@ -10425,6 +10425,81 @@ def brain_to_dict(b: dict) -> dict:
     return out
 
 
+# ---------- 💬 مساعد الدعم (تحت على اليمين): بيشرح الصفحة اللي العميل فيها وبيرد على أسئلة البرنامج
+import help as helpdesk  # noqa: E402
+
+HELP_MODELS = ["google/gemini-2.5-flash-lite", "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash"]
+HELP_DAY: dict[str, int] = {}
+HELP_LIMIT = 120   # رسالة في اليوم لكل حساب (ببلاش للعميل، وعلى حسابنا)
+HELP_TICKETS = DATA_DIR / "help_tickets.json"
+
+
+class HelpIn(BaseModel):
+    page: str = "home"
+    q: str
+    history: list = []
+
+
+@app.get("/api/help/pages")
+def help_pages():
+    return {k: {"name": v["name"]} for k, v in helpdesk.PAGES.items()}
+
+
+@app.post("/api/help/chat")
+def help_chat(body: HelpIn):
+    q = body.q.strip()
+    if not q:
+        raise HTTPException(400, "اكتب سؤالك")
+    day = datetime.now(timezone.utc).date().isoformat()
+    if HELP_DAY.get(day, 0) >= HELP_LIMIT:
+        raise HTTPException(429, "وصلت لحد أسئلة اليوم. جرّب بكرة، أو ابعت المشكلة للدعم")
+    if day not in HELP_DAY:   # يوم جديد: العدّاد بيبدأ من الأول
+        HELP_DAY.clear()
+    HELP_DAY[day] = HELP_DAY.get(day, 0) + 1
+    key = body.page if body.page in helpdesk.PAGES else "home"
+    if atlas.mock_mode() or not atlas.api_key():
+        return {"text": helpdesk.mock_reply(key, q), "page": key}
+    b = brain_row(active_client_id()) or {}
+    msgs = helpdesk.messages(key, body.history, q, " · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k)))
+    for model in HELP_MODELS:
+        try:
+            return {"text": atlas.chat(msgs, model, temperature=0.3, max_tokens=700, timeout=45).strip(), "page": key}
+        except (atlas.AtlasError, httpx.HTTPError):
+            continue
+    raise HTTPException(502, "المساعد مش متاح دلوقتي. جرّب بعد شوية، أو ابعت المشكلة للدعم")
+
+
+class TicketIn(BaseModel):
+    page: str = ""
+    text: str
+    history: list = []
+
+
+@app.post("/api/help/ticket")
+def help_ticket(body: TicketIn):
+    """«ابعتها للدعم»: المشكلة بتتحفظ ومعاها آخر كلام الشات والصفحة، وبيوصل إشعار."""
+    text = body.text.strip()[:2000]
+    if not text:
+        raise HTTPException(400, "اكتب المشكلة")
+    try:
+        items = json.loads(HELP_TICKETS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        items = []
+    t = {"id": uuid.uuid4().hex[:8], "at": now(), "page": body.page[:40], "text": text, "status": "open",
+         "history": [{"role": str(h.get("role"))[:10], "text": str(h.get("text") or "")[:800]} for h in body.history[-10:] if isinstance(h, dict)]}
+    HELP_TICKETS.write_text(json.dumps([t, *items][:500], ensure_ascii=False), encoding="utf-8")
+    notify("help", "info", "🛟 تذكرة دعم جديدة", text[:200], "settings", t["id"])
+    return {"ok": True, "id": t["id"]}
+
+
+@app.get("/api/help/tickets")
+def help_tickets():
+    try:
+        return json.loads(HELP_TICKETS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
 # ---------- 👥 أكتر من جمهور: العقل بيستخلص الجماهير لوحده من وصف البراند، وتقدر تعدّلها
 AUD_BUSY: dict[str, float] = {}
 AUD_KEYS = ("name", "who", "pain", "want")
