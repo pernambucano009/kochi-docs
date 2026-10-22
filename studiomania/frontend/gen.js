@@ -3,7 +3,7 @@
 const Gen = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, tab: "video", info: null, list: [], timer: null, d: { lang: "", voice: "", imodel: "nano2", ratio: "9:16", count: 1, vmodel: "", secs: 5, res: "480p", audio: true } };
-  const TABS = { voice: ["🎙️", "مولد صوت"], image: ["🖼️", "مولد صور"], video: ["🎬", "مولد فيديو"] };
+  const TABS = { video: ["🎬", "مولّد الفيديو"], image: ["🖼️", "مولّد الصور"], voice: ["🎙️", "مولّد الصوت"] };
 
   // host: لو اتبعت، المولّد بيترسم جوه العنصر ده (صفحة «ابدأ مشروع جديد») بدل ما يفتح فوق الشاشة
   let escOn = false;
@@ -37,38 +37,50 @@ const Gen = (() => {
   }
   function close() { clearTimeout(S.timer); if (S.el) { S.el.querySelectorAll("video, audio").forEach((m) => m.pause()); S.el.hidden = true; S.el.innerHTML = ""; } }
 
-  // ---------------------------------------------------------------- الفورم
-  function voiceForm() {
-    const A = S.info, d = S.d, langs = Object.entries(A.dialects || {});
-    const voices = A.dialects?.[d.lang]?.voices || [];
+  // ---------------------------------------------------------------- الفورم (من البروتوتايب: وصف كبير + اختيارات صغيرة بأيقونات + معاينة على الجنب)
+  const GI = {
+    model: "M12 3.5l7.5 4.2v8.6L12 20.5l-7.5-4.2V7.7z M12 12l7.5-4.3 M12 12v8.5 M12 12L4.5 7.7",
+    secs: "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z M12 8v4l3 2",
+    ratio: "M7 3.5h10v17H7z",
+    res: "M4 6h16v12H4z M8 10v4 M8 12h2.5 M10.5 10v4 M14 10h1.5a2 2 0 0 1 0 4H14z",
+    audio: "M5 10v4h3l4 4V6l-4 4z M15.5 9a4 4 0 0 1 0 6",
+    image: "M4.5 5h15v14h-15z M3.5 15.5l4.5-4.5 4 4 3-3 5 5",
+    count: "M7 7h12v12H7z M4 4h12",
+    lang: "M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z M3.5 12h17 M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z",
+    voice: "M12 3.5a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0v-5a3 3 0 0 1 3-3z M6 11a6 6 0 0 0 12 0 M12 17v3.5",
+    name: "M4 20h4L19 9l-4-4L4 16z",
+    hist: "M4 12a8 8 0 1 0 2.3-5.6 M4 4v4h4 M12 8v4l3 2",
+  };
+  const gi = (k, s = 16) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${GI[k]}"/></svg>`;
+  const short = (t) => String(t || "").replace(/\s*\(.*?\)\s*/g, " ").trim();
+  function options() {
+    const A = S.info, d = S.d;
+    if (S.tab === "video") {
+      const vr = A.video_ratios || ["9:16", "16:9", "1:1"];
+      if (!vr.includes(d.ratio)) d.ratio = "9:16";
+      const m = (A.video_models || []).find((x) => x.key === d.vmodel);
+      return [{ k: "vmodel", ic: "model", label: "النموذج", v: short(m?.label), ch: (A.video_models || []).map((x) => [x.key, `${short(x.label)} · ~$${vmCost(x, Number(d.secs), d.res)}`]) },
+        { k: "secs", ic: "secs", label: "المدة", v: `${d.secs} ثوانٍ`, ch: [3, 5, 8, 10, 12, 15].map((n) => [String(n), `${n} ثوانٍ`]) },
+        { k: "ratio", ic: "ratio", label: "المقاس", v: d.ratio, ch: vr.map((r) => [r, r]) },
+        { k: "res", ic: "res", label: "الجودة", v: d.res, ch: [["480p", "480p"], ["720p", "720p (الضعف)"]] },
+        { k: "audio", ic: "audio", label: "الصوت", v: d.audio ? "بصوت" : "بدون صوت", ch: [["1", "بصوت"], ["", "بدون صوت"]] },
+        { k: "image", ic: "image", label: "صورة البداية (اختيارية)", v: S.files?.image?.length ? S.files.image[0].name.slice(0, 18) : "صورة البداية", file: "image/*" }];
+    }
+    if (S.tab === "image") {
+      return [{ k: "imodel", ic: "model", label: "النموذج", v: short(A.image_models[d.imodel]?.label), ch: Object.entries(A.image_models).map(([k, m]) => [k, `${short(m.label)} · $${m.price}`]) },
+        { k: "ratio", ic: "ratio", label: "المقاس", v: d.ratio, ch: A.ratios.map((r) => [r, r]) },
+        { k: "count", ic: "count", label: "العدد", v: `${d.count} ${+d.count === 1 ? "صورة" : "صور"}`, ch: [1, 2, 3, 4].map((n) => [String(n), String(n)]) },
+        { k: "refs", ic: "image", label: "صور مرجعية (حتى ٤): منتجك أو شخصية أو أسلوب", v: S.files?.refs?.length ? `${S.files.refs.length} صور مرجعية` : "صور مرجعية", file: "image/*", multi: true }];
+    }
+    const langs = Object.entries(A.dialects || {}), voices = A.dialects?.[d.lang]?.voices || [];
     if (!voices.includes(d.voice)) d.voice = voices[0] || "";
-    const opt = (g) => langs.filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}" ${k === d.lang ? "selected" : ""}>${esc(v.label)}</option>`).join("");
-    return `<label class="gen-f"><b>الكلام</b><textarea data-g="text" rows="5" dir="auto" placeholder="اكتب الكلام اللي عايزه يتقال">${esc(d.text || "")}</textarea></label>
-      <div class="gen-row"><label class="gen-f"><b>اللهجة / اللغة</b><select data-g="lang"><optgroup label="عربي">${opt("ar")}</optgroup><optgroup label="لغات تانية">${opt("foreign")}</optgroup></select></label>
-        <label class="gen-f"><b>الصوت</b><select data-g="voice">${voices.map((v) => `<option value="${v}" ${v === d.voice ? "selected" : ""}>${esc(A.voices?.[v] || v)}</option>`).join("")}</select></label>
-        <label class="gen-f"><b>الاسم (اختياري)</b><input data-g="name" value="${esc(d.name || "")}" placeholder="بيتحفظ بيه في مكتبة التعليق"></label></div>
-      ${!A.fasih ? `<small class="muted">اللهجات العربية مش متاحة دلوقتي.</small>` : ""}`;
+    return [{ k: "lang", ic: "lang", label: "اللهجة أو اللغة", v: A.dialects?.[d.lang]?.label || "", ch: langs.map(([k, v]) => [k, v.label]) },
+      { k: "voice", ic: "voice", label: "الصوت", v: A.voices?.[d.voice] || d.voice, ch: voices.map((v) => [v, A.voices?.[v] || v]) },
+      { k: "name", ic: "name", label: "الاسم في مكتبة التعليق (اختياري)", v: d.name || "الاسم", ask: true }];
   }
-  function imageForm() {
-    const A = S.info, d = S.d;
-    return `<label class="gen-f"><b>اوصف الصورة</b><textarea data-g="iprompt" rows="4" dir="auto" placeholder="مثلًا: كوباية قهوة على ترابيزة خشب جنب شباك، نور الصبح، تصوير منتج">${esc(d.iprompt || "")}</textarea></label>
-      <div class="gen-row"><label class="gen-f"><b>الموديل</b><select data-g="imodel">${Object.entries(A.image_models).map(([k, m]) => `<option value="${k}" ${k === d.imodel ? "selected" : ""}>${esc(m.label)} · $${m.price}</option>`).join("")}</select></label>
-        <label class="gen-f"><b>المقاس</b><select data-g="ratio">${A.ratios.map((r) => `<option ${r === d.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
-        <label class="gen-f"><b>العدد</b><select data-g="count">${[1, 2, 3, 4].map((n) => `<option ${String(n) === String(d.count) ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
-      <label class="gen-drop"><input type="file" accept="image/*" multiple data-gfile="refs" hidden>🖼️ صور مرجعية (اختياري، لحد ٤): منتجك أو شخصية أو ستايل <small class="muted" data-gnames="refs"></small></label>`;
-  }
-  function videoForm() {
-    const A = S.info, d = S.d;
-    const vratios = A.video_ratios || ["9:16", "16:9", "1:1"];
-    if (!vratios.includes(d.ratio)) d.ratio = "9:16";
-    return `<label class="gen-f"><b>اوصف الفيديو</b><textarea data-g="vprompt" rows="4" dir="auto" placeholder="مثلًا: كاميرا بتقرّب ببطء من كوباية قهوة والبخار طالع منها، والنور بيتحرك على الترابيزة">${esc(d.vprompt || "")}</textarea></label>
-      <div class="gen-row"><label class="gen-f wide"><b>الموديل</b><select data-g="vmodel">${vmOptions(A.video_models, d.vmodel, Number(d.secs), d.res, `لـ ${d.secs} ث`)}</select></label></div>
-      <div class="gen-row"><label class="gen-f"><b>المدة</b><select data-g="secs">${[3, 5, 8, 10, 12, 15].map((n) => `<option value="${n}" ${String(n) === String(d.secs) ? "selected" : ""}>${n} ثواني</option>`).join("")}</select></label>
-        <label class="gen-f"><b>المقاس</b><select data-g="ratio">${vratios.map((r) => `<option ${r === d.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
-        <label class="gen-f"><b>الجودة</b><select data-g="res"><option value="480p" ${d.res === "480p" ? "selected" : ""}>480p</option><option value="720p" ${d.res === "720p" ? "selected" : ""}>720p (الضعف)</option></select></label>
-        <label class="gen-f chk"><input type="checkbox" data-g="audio" ${d.audio ? "checked" : ""}> بصوت</label></div>
-      <label class="gen-drop"><input type="file" accept="image/*" data-gfile="image" hidden>🖼️ صورة البداية (اختياري) <small class="muted" data-gnames="image">من غيرها البرنامج بيرسم أول فريم من الوصف</small></label>`;
-  }
+  const HEAD = { video: ["GENERATE VIDEO", "صِف الفيديو الذي تريده", "vprompt", "مثلًا: الكاميرا تقترب ببطء من فنجان قهوة يتصاعد منه البخار، والضوء يتحرك على الطاولة"],
+    image: ["GENERATE IMAGE", "صِف الصورة التي تريدها", "iprompt", "مثلًا: فنجان قهوة على طاولة خشبية بجانب نافذة، ضوء الصباح، تصوير منتج"],
+    voice: ["GENERATE VOICE", "اكتب الكلام الذي تريد أن يُقال", "text", "اكتب النص هنا"] };
   function cost() {
     const A = S.info, d = S.d;
     if (S.tab === "image") return (A.image_models[d.imodel]?.price || 0) * Number(d.count || 1);
@@ -83,71 +95,70 @@ const Gen = (() => {
     const el = S.el?.querySelector("[data-gcost]");
     if (!el) return;
     const c = cost();
-    el.textContent = c == null ? (S.d.text ? `حوالي ${Math.max(1, Math.round(S.d.text.length / 14))} ثانية` : "") : `التكلفة حوالي $${c < 0.1 ? c.toFixed(3) : c.toFixed(2)}`;
+    el.innerHTML = c == null ? (S.d.text ? `المدة نحو <b class="num">${Math.max(1, Math.round(S.d.text.length / 14))}</b> ثانية` : "") : `التكلفة نحو <b class="num">$${c < 0.1 ? c.toFixed(3) : c.toFixed(2)}</b>`;
   }
 
-  // ---------------------------------------------------------------- التاريخ
+  // ---------------------------------------------------------------- المعاينة والسجل
   const sig = (g) => [g.status, g.url, g.step, g.error, g.cost].join("|");
-  function card(g) {
-    const media = g.status !== "done" ? `<div class="gen-ph">${g.status === "failed" ? "⚠️" : `<span class="flw-spin"></span>`}<small>${esc(g.step || (g.status === "failed" ? "وقف" : ""))}</small></div>`
-      : g.kind === "image" ? `<a href="${esc(g.url)}" target="_blank" rel="noopener"><img src="${esc(g.url)}" alt="" loading="lazy"></a>`
-      : g.kind === "video" ? `<video src="${esc(g.url)}" controls playsinline preload="metadata"></video>`
-      : `<div class="gen-ph au"><audio src="${esc(g.url)}" controls preload="none"></audio></div>`;
-    return `<figure class="gen-card ${g.kind} ${g.status}" data-gid="${esc(g.id)}" data-gsig="${esc(sig(g))}">${media}
-      <figcaption><span dir="auto">${esc(g.prompt)}</span>${g.error ? `<small class="err">${esc(g.error)}</small>` : ""}
-        <small class="muted">${g.kind === "video" ? `${esc((g.model_label || "").split(" · ")[0])} · ${g.duration || ""} ث` : g.kind === "voice" ? "اتحفظ في مكتبة التعليق" : esc(g.ratio || "")}${g.cost ? ` · $${g.cost}` : ""}</small>
-        <span class="gen-acts">${g.url ? `<a class="flw-link" href="${esc(g.url)}" download>⬇️ نزّل</a>` : ""}<button type="button" class="flw-link" data-gdel="${esc(g.id)}">✕ امسح</button></span></figcaption></figure>`;
+  const mine = () => S.list.filter((g) => g.kind === S.tab);
+  function media(g, big) {
+    if (!g) return `<div class="gn-ph">${S.tab === "voice" ? "سيظهر التسجيل هنا" : S.tab === "image" ? "ستظهر الصورة هنا" : "سيظهر الفيديو هنا"}</div>`;
+    if (g.status !== "done") return `<div class="gn-ph">${g.status === "failed" ? `⚠️ ${esc(g.error || "توقف")}` : `<span class="flw-spin"></span><small>${esc(g.step || "جارٍ التوليد…")}</small>`}</div>`;
+    if (g.kind === "image") return `<img src="${esc(g.url)}" alt="" ${big ? "" : 'loading="lazy"'}>`;
+    if (g.kind === "video") return big ? `<video src="${esc(g.url)}" controls playsinline preload="metadata"></video>` : `<video src="${esc(g.url)}#t=0.5" muted playsinline preload="metadata"></video>`;
+    return big ? `<div class="gn-ph au"><audio src="${esc(g.url)}" controls preload="none"></audio><small dir="auto">${esc(g.prompt.slice(0, 120))}</small></div>` : `<div class="gn-ph">${gi("voice", 18)}</div>`;
+  }
+  function side() {
+    const L = mine(), cur = L.find((g) => g.id === S.view) || L[0];
+    const ratio = S.tab === "voice" ? "auto" : (cur?.ratio || S.d.ratio || "9:16").replace(":", " / ");
+    return `<div class="gn-prev" style="aspect-ratio:${ratio}">${media(cur, true)}</div>
+      ${cur ? `<div class="gn-cap"><span>${cur.kind === "video" ? `${esc(short((cur.model_label || "").split(" · ")[0]))} · ${cur.duration || ""} ث` : cur.kind === "voice" ? "حُفظ في مكتبة التعليق" : esc(cur.ratio || "")}${cur.cost ? ` · $${cur.cost}` : ""}</span>
+        ${cur.url ? `<a class="gn-ib" href="${esc(cur.url)}" download data-tip="نزّل" aria-label="نزّل">${gi("count", 14)}</a>` : ""}<button type="button" class="gn-ib" data-gdel="${esc(cur.id)}" data-tip="احذف" aria-label="احذف">✕</button></div>` : ""}
+      ${L.length > 1 ? `<div class="gn-thumbs">${L.slice(0, 5).map((g) => `<button type="button" class="gn-th${g === cur ? " on" : ""}" data-gview="${esc(g.id)}" aria-label="${esc(g.prompt.slice(0, 40))}">${media(g)}</button>`).join("")}</div>` : ""}`;
+  }
+  function drawer() {
+    if (!S.hist) return "";
+    const L = mine();
+    return `<aside class="gn-dw" aria-label="كل ما ولّدته"><div class="gn-dh"><b>كل ما ولّدته</b><span class="num">${L.length}</span><button type="button" class="gn-ib" data-ghist aria-label="إغلاق">✕</button></div>
+      <div class="gn-hl">${L.map((g) => `<button type="button" class="gn-hi" data-gview="${esc(g.id)}"><span class="gn-th">${media(g)}</span><span dir="auto">${esc(g.prompt.slice(0, 90))}</span></button>`).join("") || `<p class="gn-note">ما تولّده يظهر هنا ويبقى محفوظًا.</p>`}</div></aside>`;
   }
   function render() {
     if (!S.el || !S.info) return;
-    const form = { voice: voiceForm, image: imageForm, video: videoForm }[S.tab]();
-    const list = S.list.filter((g) => g.kind === S.tab);
-    const scroll = S.el.querySelector(".flw-main")?.scrollTop || 0;
-    S.el.innerHTML = `<div class="flw-box" data-built>
-      <header class="flw-head"><div class="flw-tpl"><small class="latin">Generate</small><b>${S.el.classList.contains("inline") ? `${TABS[S.tab][0]} ${TABS[S.tab][1]} بالذكاء الصناعي` : "مولّدات من غير قوالب"}</b></div>
-        <nav class="gen-tabs">${Object.entries(TABS).map(([k, [ic, t]]) => `<button type="button" class="${k === S.tab ? "on" : ""}" data-gtab="${k}">${ic} ${t}</button>`).join("")}</nav>
-        <div class="flw-hr"><button type="button" class="flw-x big" data-gclose aria-label="اقفل">✕</button></div></header>
-      <main class="flw-main"><div class="gen-form">${form}
-        <div class="flw-acts end"><small class="muted" data-gcost></small><button type="button" class="flw-btn pri big" data-ggo>${TABS[S.tab][0]} ولّد</button></div></div>
-        <h3 class="gen-h">اللي اتولّد <small class="muted">${list.length}</small></h3>
-        <div class="gen-grid">${list.map(card).join("") || `<div class="flw-empty">لسه مفيش. اللي هتولّده هيظهر هنا ويفضل محفوظ.</div>`}</div></main></div>`;
-    S.el.querySelector(".flw-main").scrollTop = scroll;
-    if (S.files) Object.entries(S.files).forEach(([k, fs]) => { const n = S.el.querySelector(`[data-gnames="${k}"]`); if (n && fs.length) n.textContent = [...fs].map((f) => f.name).join("، "); });
+    const d = S.d, H = HEAD[S.tab], O = options(), pop = O.find((o) => o.k === S.pop && o.ch);
+    const inline = S.el.classList.contains("inline");
+    S.el.innerHTML = `<div class="flw-box gn" data-built>
+      ${inline ? "" : `<header class="gn-top"><nav class="gn-tabs">${Object.entries(TABS).map(([k, [, t]]) => `<button type="button" class="${k === S.tab ? "on" : ""}" data-gtab="${k}">${t}</button>`).join("")}</nav><button type="button" class="gn-ib" data-gclose aria-label="أغلق">✕</button></header>`}
+      <div class="gn-main"><div class="gn-form">
+        <div class="gn-h"><span class="latin">${H[0]}</span><h2>${H[1]}</h2></div>
+        <textarea class="gn-pr" data-g="${H[2]}" rows="3" dir="auto" aria-label="${H[1]}" placeholder="${H[3]}">${esc(d[H[2]] || "")}</textarea>
+        <div class="gn-opts">${O.map((o) => o.file ? `<label class="gn-opt${S.files?.[o.k]?.length ? " set" : ""}" data-tip="${esc(o.label)}">${gi(o.ic)}<span>${esc(o.v)}</span><input type="file" accept="${o.file}" ${o.multi ? "multiple" : ""} data-gfile="${o.k}" hidden></label>`
+          : `<button type="button" class="gn-opt${S.pop === o.k ? " on" : ""}" data-gopt="${o.k}" ${o.ask ? "data-gask" : ""} data-tip="${esc(o.label)}">${gi(o.ic)}<span>${esc(o.v)}</span></button>`).join("")}</div>
+        ${pop ? `<div class="gn-pop">${pop.ch.map(([v, t]) => `<button type="button" class="${String(d[pop.k] === true ? "1" : d[pop.k] === false ? "" : d[pop.k]) === v ? "on" : ""}" data-gpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>` : ""}
+        ${S.tab === "voice" && !S.info.fasih ? `<p class="gn-note">اللهجات العربية غير متاحة الآن.</p>` : ""}
+        <div class="gn-go"><button type="button" class="gn-gobtn" data-ggo>ولّد</button><span class="gn-note" data-gcost></span>
+          ${mine().length ? `<button type="button" class="gn-ib" data-ghist data-tip="كل ما ولّدته" aria-label="كل ما ولّدته">${gi("hist")}</button>` : ""}</div></div>
+        <div class="gn-side">${side()}</div></div>${drawer()}</div>`;
     costLine();
   }
-  // وهو بيستنى التوليد: بنغيّر الكارت اللي اتغيّر بس، فالفيديوهات الجاهزة والخانات مابتترسمش تاني ولا بترمش
+  // وهو بيستنى التوليد: بنحدّث المعاينة بس، فالكلام اللي بتكتبه مابيتمسحش
   function patchGrid() {
-    const grid = S.el?.querySelector(".gen-grid");
-    if (!grid) return render();
-    const list = S.list.filter((g) => g.kind === S.tab), ids = new Set(list.map((g) => g.id));
-    grid.querySelectorAll("[data-gid]").forEach((el) => { if (!ids.has(el.dataset.gid)) el.remove(); });
-    let prev = null;
-    for (const g of list) {
-      let el = grid.querySelector(`[data-gid="${CSS.escape(g.id)}"]`);
-      if (!el || el.dataset.gsig !== sig(g)) {
-        const t = document.createElement("template"); t.innerHTML = card(g).trim();
-        const fresh = t.content.firstElementChild;
-        if (el) el.replaceWith(fresh); else grid.insertBefore(fresh, prev ? prev.nextSibling : grid.firstChild);
-        el = fresh;
-      }
-      prev = el;
-    }
-    grid.querySelector(".flw-empty")?.toggleAttribute("hidden", list.length > 0);
-    const n = S.el.querySelector(".gen-h small"); if (n) n.textContent = list.length;
+    const s = S.el?.querySelector(".gn-side");
+    if (!s) return render();
+    const L = mine(), cur = L.find((g) => g.id === S.view) || L[0], key = L.map(sig).join(",");
+    if (s.dataset.k === key) return;
+    s.dataset.k = key; s.innerHTML = side();
+    if (S.hist) { const dw = S.el.querySelector(".gn-dw"); if (dw) dw.outerHTML = drawer(); }
+    void cur;
   }
   function poll() {
     clearTimeout(S.timer);
     if (!S.list.some((g) => g.status === "working")) return;
     S.timer = setTimeout(async () => {
       if (!S.el || S.el.hidden) return;
-      try {
-        S.list = await api("/api/gens");
-        patchGrid();
-      } catch { /* بيعيد المحاولة */ }
+      try { S.list = await api("/api/gens"); patchGrid(); } catch { /* بيعيد المحاولة */ }
       poll();
     }, 3000);
   }
-
   // ---------------------------------------------------------------- الأحداث
   async function go() {
     const d = S.d;
@@ -159,12 +170,12 @@ const Gen = (() => {
       } else {
         const fd = new FormData();
         if (S.tab === "image") {
-          if (!(d.iprompt || "").trim()) return toast("اوصف الصورة", true);
+          if (!(d.iprompt || "").trim()) return toast("صِف الصورة", true);
           fd.append("prompt", d.iprompt); fd.append("model", d.imodel); fd.append("ratio", d.ratio); fd.append("count", d.count);
           [...(S.files?.refs || [])].forEach((f) => fd.append("refs", f));
           res = await api("/api/gens/image", { method: "POST", body: fd });
         } else {
-          if (!(d.vprompt || "").trim()) return toast("اوصف الفيديو", true);
+          if (!(d.vprompt || "").trim()) return toast("صِف الفيديو", true);
           fd.append("prompt", d.vprompt); fd.append("model", d.vmodel); fd.append("duration", d.secs); fd.append("ratio", d.ratio);
           fd.append("resolution", d.res); fd.append("audio", d.audio ? "true" : "false");
           if (S.files?.image?.[0]) fd.append("image", S.files.image[0]);
@@ -174,18 +185,24 @@ const Gen = (() => {
     } catch (err) { return toast(err.message, true); }
     S.list = [...(Array.isArray(res) ? res : [res]), ...S.list];
     S.files = {};
-    toast("✨ بدأ، هتلاقيه تحت لما يخلص");
-    render(); poll();
+    toast("✓ بدأ التوليد، وسيظهر بجانبك عند انتهائه");
+    S.view = null; render(); poll();
   }
   async function onClick(e) {
     const t = e.target, q = (s) => t.closest(s);
     let b;
     if (q("[data-gclose]")) return close();
-    if ((b = q("[data-gtab]"))) { S.tab = b.dataset.gtab; S.files = {}; return render(); }
+    if ((b = q("[data-gtab]"))) { S.tab = b.dataset.gtab; S.files = {}; S.pop = null; S.view = null; S.hist = false; return render(); }
+    if (q("[data-ghist]")) { S.hist = !S.hist; return render(); }
+    if ((b = q("[data-gview]"))) { S.view = b.dataset.gview; return render(); }
+    if ((b = q("[data-gask]"))) { const v = await uiPrompt("الاسم الذي يُحفظ به في مكتبة التعليق:", S.d.name || ""); if (v != null) S.d.name = v.trim(); return render(); }
+    if ((b = q("[data-gopt]"))) { S.pop = S.pop === b.dataset.gopt ? null : b.dataset.gopt; return render(); }
+    if ((b = q("[data-gpick]"))) { const k = S.pop, v = b.dataset.gpick; S.d[k] = k === "audio" ? v === "1" : v; if (k === "lang") S.d.voice = ""; S.pop = null; return render(); }
+    if (S.pop && !q(".gn-pop")) { S.pop = null; render(); }
     if (q("[data-ggo]")) return go();
     if ((b = q("[data-gdel]"))) {
-      if (!(await uiConfirm("تمسحه؟"))) return;
-      try { await api(`/api/gens/${b.dataset.gdel}`, { method: "DELETE" }); S.list = S.list.filter((g) => g.id !== b.dataset.gdel); render(); } catch (err) { toast(err.message, true); }
+      if (!(await uiConfirm("هل تحذفه؟"))) return;
+      try { await api(`/api/gens/${b.dataset.gdel}`, { method: "DELETE" }); S.list = S.list.filter((g) => g.id !== b.dataset.gdel); S.view = null; render(); } catch (err) { toast(err.message, true); }
     }
   }
   function onChange(e) {
