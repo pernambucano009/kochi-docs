@@ -10429,7 +10429,7 @@ def brain_to_dict(b: dict) -> dict:
 # ---------- 💬 مساعد الدعم (تحت على اليمين): بيشرح الصفحة اللي العميل فيها وبيرد على أسئلة البرنامج
 import help as helpdesk  # noqa: E402
 
-HELP_MODELS = ["google/gemini-2.5-flash-lite", "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash"]
+HELP_MODELS = ["google/gemini-2.5-flash", "openai/gpt-5.4-mini", "google/gemini-2.5-flash-lite", "deepseek-ai/deepseek-v4-flash"]   # الأول الأذكى، والباقي احتياطي
 HELP_DAY: dict[str, int] = {}
 HELP_LIMIT = 120   # رسالة في اليوم لكل حساب (ببلاش للعميل، وعلى حسابنا)
 HELP_TICKETS = DATA_DIR / "help_tickets.json"
@@ -10458,14 +10458,17 @@ def help_chat(body: HelpIn):
         HELP_DAY.clear()
     HELP_DAY[day] = HELP_DAY.get(day, 0) + 1
     key = body.page if body.page in helpdesk.PAGES else "home"
-    if atlas.mock_mode() or not atlas.api_key():
+    if atlas.mock_mode():
         return {"text": helpdesk.mock_reply(key, q), "page": key}
+    if not atlas.api_key():   # من غير مفتاح الموديلات المساعد بيبقى شرح ثابت بس، فبنقول ده صراحة بدل ما يبان إنه رد ذكي
+        return {"text": helpdesk.mock_reply(key, q) + "\n\n(المساعد الذكي غير مفعّل الآن، وهذا شرح ثابت للصفحة.)", "page": key}
     b = brain_row(active_client_id()) or {}
     msgs = helpdesk.messages(key, body.history, q, " · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k)))
     for model in HELP_MODELS:
         try:
             return {"text": atlas.chat(msgs, model, temperature=0.3, max_tokens=700, timeout=45).strip(), "page": key}
-        except (atlas.AtlasError, httpx.HTTPError):
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            print(f"[help] {model}: {str(exc)[:160]}", flush=True)
             continue
     raise HTTPException(502, "المساعد غير متاح الآن. جرّب بعد قليلًا، أو أرسل المشكلة للدعم")
 

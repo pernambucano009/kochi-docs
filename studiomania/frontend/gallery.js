@@ -427,6 +427,7 @@ const Gallery = (() => {
     C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
     if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
     const ci = Math.round(C.pos), rowH = Math.max(66, G.rs * .31), boxes = [];
+    if (C.cell !== ci) { if (C.cell != null) tickDeep(Math.abs(C.vel)); C.cell = ci; }   // 🔊 العجلة الداخلية: تكّة أتخن وأوطى من الخارجية
     G.cats.forEach((b, i) => {
       const t = i - C.pos, d = Math.abs(t), dy = t * rowH, sc = 1 - Math.min(.22, d * .1), op = Math.max(0, 1 - d * .28);
       const chord = Math.sqrt(Math.max(0, G.rs * G.rs - dy * dy)), w = (b._w || 0) * sc, h = (b._h || 0) * sc;
@@ -476,6 +477,22 @@ const Gallery = (() => {
     n.connect(bp).connect(gn).connect(out); n.start(t, Math.random() * .01, .02);
     [[180, .55, .035], [900, .26, .03], [2200, .1, .014]].forEach(([f, a, d]) => {
       const o = ac.createOscillator(), g = ac.createGain(); o.type = "sine"; o.frequency.value = f * r();
+      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(.0005, t + d); o.connect(g).connect(out); o.start(t); o.stop(t + d + .01);
+    });
+  }
+  // تكّة العجلة الداخلية: خبطة خشب تخينة (تردد واطي + طقّة مكتومة) علشان تتميّز عن تكّة العجلة الخارجية
+  function tickDeep(speed) {
+    if (!sndOn) return;
+    if (!ac || ac.state !== "running") { unlock(); if (!ac || ac.state !== "running") return; }
+    if (!noiseB) { noiseB = ac.createBuffer(1, Math.floor(ac.sampleRate * .03), ac.sampleRate); const d = noiseB.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const t = ac.currentTime + .002, r = () => 1 + (Math.random() - .5) * .08;
+    const out = ac.createGain(); out.gain.value = Math.min(.6, .34 + Math.min(speed, 20) * .012); out.connect(ac.destination);
+    const n = ac.createBufferSource(), lp = ac.createBiquadFilter(), gn = ac.createGain();
+    n.buffer = noiseB; lp.type = "lowpass"; lp.frequency.value = 900 * r(); lp.Q.value = .8;
+    gn.gain.setValueAtTime(.9, t); gn.gain.exponentialRampToValueAtTime(.001, t + .025);
+    n.connect(lp).connect(gn).connect(out); n.start(t, Math.random() * .01, .03);
+    [[85, .9, .09], [140, .5, .06], [420, .14, .03]].forEach(([f, a, d]) => {
+      const o = ac.createOscillator(), g = ac.createGain(); o.type = f < 100 ? "triangle" : "sine"; o.frequency.setValueAtTime(f * 1.25 * r(), t); o.frequency.exponentialRampToValueAtTime(f * r(), t + d);
       g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(.0005, t + d); o.connect(g).connect(out); o.start(t); o.stop(t + d + .01);
     });
   }

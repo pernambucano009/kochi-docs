@@ -6,6 +6,8 @@ const Help = (() => {
   const CSS = `
 .hp-fab{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));right:calc(22px + env(safe-area-inset-right,0px));z-index:80;width:52px;height:52px;border-radius:50%;border:0;background:var(--nh-ink,#181718);color:var(--nh-bg,#fff);display:grid;place-items:center;cursor:pointer;box-shadow:0 14px 30px -10px rgba(24,23,24,.5);transition:transform .2s}
 .hp-fab:hover{box-shadow:0 18px 36px -10px rgba(24,23,24,.6)}
+.hp-fab::before{content:"";position:absolute;inset:-10px;border-radius:50%}
+.hp-fab .fx-snake{color:var(--nh-accent,#E5613E)}
 .hp-tease{position:fixed;bottom:calc(86px + env(safe-area-inset-bottom,0px));right:calc(22px + env(safe-area-inset-right,0px));z-index:80;display:flex;align-items:center;gap:4px;max-width:min(320px,calc(100vw - 40px));background:var(--card,#fff);color:var(--nh-ink,#181718);border-radius:18px 18px 6px 18px;box-shadow:0 14px 34px -14px rgba(24,23,24,.45);padding:4px 4px 4px 6px;direction:rtl;font-family:var(--nh-arabic,"Readex Pro",sans-serif);animation:hpIn .35s cubic-bezier(.2,.8,.2,1)}
 .hp-tease[hidden]{display:none}
 .hp-tease button{border:0;background:none;font:inherit;color:inherit;cursor:pointer}
@@ -84,7 +86,7 @@ const Help = (() => {
     if (document.querySelector(".hp-fab")) return;
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
     const fab = document.createElement("button");
-    fab.type = "button"; fab.className = "hp-fab"; fab.dataset.nofx = ""; fab.setAttribute("aria-label", "المساعد"); fab.title = "المساعد";
+    fab.type = "button"; fab.className = "hp-fab"; fab.setAttribute("aria-label", "المساعد"); fab.title = "المساعد";
     fab.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>`;
     const box = document.createElement("div");
     box.className = "hp-box"; box.hidden = true; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "المساعد");

@@ -465,7 +465,7 @@ const NH = (() => {
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=9" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=9" alt="" loading="lazy">`; }
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=10" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=10" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
