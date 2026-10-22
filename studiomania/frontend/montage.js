@@ -3173,6 +3173,7 @@ async function algoPrep(force = false) {
   if (ALGO_ON === null) { try { ALGO_ON = (await api("/api/algo/mode")).on; } catch { ALGO_ON = false; } }
   if (!ALGO_ON && !force) return;
   const d = p.data, sig = JSON.stringify(d.clips.map((c) => [c.gen_id, c.start, c.end]));
+  if (!force && !d.clips.length) return;   // مشروع فاضي (الفيديو إديتور): مفيش حاجة تتجهز، ومفيش هوك يتحط لوحده
   if (!force && d.algo?.sig === sig && d.algo?.caps !== "working") return renderSilReview();
   await saveProject();
   let r;

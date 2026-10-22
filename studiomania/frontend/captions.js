@@ -190,6 +190,7 @@ $("pvLogo").addEventListener("load", updatePreviewOverlays);
 function liveCaption(c) {
   const blocks = captionBlocks();
   if (!blocks.length) {
+    if (!mt.project?.data.clips?.length) return { words: [], hl: -1 };   // مشروع فاضي: مفيش كابشن مثال
     const words = sampleWords(c.words);
     return { words, hl: c.highlight_on && words.length > 1 ? 1 : -1 };
   }

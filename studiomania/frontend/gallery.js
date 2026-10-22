@@ -12,6 +12,9 @@ const Gallery = (() => {
     desc: "نفس فكرة التصوير بالموبايل، بس من غير ما تصوّر: الأفاتار (من «الأفاتار»: انت أو أي حد معاك إذنه) هو اللي بيقول السكريبت بوشّه وحركته." },
     { id: "carousel", name: "كاروسيل", icon: "🖼️", cat: "social", pin: 4,
     desc: "صور ورا بعض على إنستجرام: سلايد هوك يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل البراند وألوانه." },
+    // 🎞️ فيديو إديتور: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
+    { id: "editor", name: "فيديو إديتور", icon: "🎞️", cat: "other", pin: 5,
+    desc: "محرر فيديو فاضي: ارفع فيديوهاتك من عندك، وقطّع ورتّب وحط كلام وموسيقى وانتقالات بنفسك، من غير قالب ولا توليد." },
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
     desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل بيطلّع فيديو جديد. وبيظهر في الأوتوبايلوت كقالب تختاره." },
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
@@ -449,6 +452,15 @@ const Gallery = (() => {
       showStep("12");
     } catch (err) { toast(err.message, true); }
   }
+  // 🎞️ فيديو إديتور: مشروع مونتاج حر جديد فاضي، ويفتح المحرر عليه على طول
+  async function openEditor() {
+    try {
+      const p = await api("/api/projects", { method: "POST", ...jsonBody({ ...blankProject("مونتاج جديد"), section: "free" }) });
+      storageSet(projectKey("free"), p.id);
+      mt.project = null;
+      showStep("6f");
+    } catch (err) { toast(err.message, true); }
+  }
   // المعاينة فوق الشاشة كلها (برّه الصفحة نفسها)
   function pvEl() {
     if (!S.pv) {
@@ -462,6 +474,7 @@ const Gallery = (() => {
           if (x.id === "avatar") return showStep("16");
           if (x.id === "custom") return window.NHNav?.("auto");
           if (x.id === "carousel") return showStep("8");
+          if (x.id === "editor") return openEditor();
           return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
         }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
@@ -482,9 +495,9 @@ const Gallery = (() => {
       <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
-        <button type="button" class="nh-gal-go" data-gstart>✨ ابدأ بالقالب ده</button>
+        <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ بالقالب ده"}</button>
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}
-        <small class="nh-gal-hint">المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار.</small></div></div>`;
+        <small class="nh-gal-hint">${x.id === "editor" ? "بيفتح مشروع مونتاج جديد فاضي، وتلاقيه بعدين في «شغّال عليه»." : "المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;
     pv.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
@@ -512,5 +525,5 @@ const Gallery = (() => {
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { mount, list: () => EXTRA };
+  return { mount, list: () => EXTRA, openEditor };
 })();
