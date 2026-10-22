@@ -3085,12 +3085,12 @@ html[data-role="customer"] .admin-only { display: none !important; }
 
 /* 🎬 نود المونتاج: شبكة مكان اللوجو + معاينة صغيرة */
 .mp-grid{display:grid;grid-template-columns:repeat(3,44px);gap:6px;direction:ltr;margin:4px 0}
-.mp-cell{all:unset;cursor:pointer;width:44px;height:30px;border-radius:7px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
-.mp-cell:hover{border-color:var(--accent)}
-.mp-cell.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.mp-cell{all:unset;box-sizing:border-box;cursor:pointer;width:44px;height:30px;border-radius:7px;border:1px solid var(--nh-line,var(--line,#ccc));background:var(--nh-fill,var(--surface,#f4f4f4));display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--nh-muted,var(--muted,#888))}
+.mp-cell:hover,.mp-cell:focus-visible{border-color:var(--nh-accent,var(--accent,#e5613e))}
+.mp-cell.on{background:var(--nh-accent,var(--accent,#e5613e));border-color:var(--nh-accent,var(--accent,#e5613e));color:#fff}
 .mp-box{position:relative;width:150px;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:linear-gradient(#3a352e,#1d1b18);margin:10px auto 2px}
 .mp-scene{position:absolute;inset:28% 24% auto;height:34%;border-radius:50% 50% 40% 40%;background:#4b453c}
-.mp-logo{position:absolute;aspect-ratio:1;border-radius:22%;background:var(--accent);color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mp-logo{position:absolute;aspect-ratio:1;border-radius:22%;background:var(--nh-accent,var(--accent,#e5613e));color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .mp-logo img{width:100%;height:100%;object-fit:contain;background:#fff}
 .mp-cap{position:absolute;left:6%;right:6%;bottom:24%;text-align:center;font-weight:800;font-size:13px;line-height:1.3;text-shadow:0 1px 2px rgba(0,0,0,.6);direction:rtl}
 .mp-cap.box{left:12%;right:12%;padding:3px 4px;border-radius:5px;text-shadow:none}
@@ -3101,3 +3101,40 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .mp-bar{position:absolute;left:8%;right:8%;bottom:5%;height:3px;border-radius:2px;background:rgba(255,255,255,.25)}
 .mp-bar i{position:absolute;inset:0 60% 0 0;background:#fff;border-radius:2px}
 @media (prefers-reduced-motion:reduce){.mp-cap.pop i{animation:none}}
+#nh .mp-cell{border:1px solid var(--nh-line,#ccc)!important;background:var(--nh-fill,#f4f4f4)!important;width:44px!important;height:30px!important}
+#nh .mp-cell.on{background:var(--nh-accent,#e5613e)!important;border-color:var(--nh-accent,#e5613e)!important}
+
+/* 🎧 مختبر الأصوات */
+.vl-ov{position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.45);display:flex;align-items:center;justify-content:center;padding:24px}
+.vl-box{width:min(1100px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--card,#fff);color:var(--text,#1d1b18);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.3);direction:rtl}
+.vl-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:16px;padding:16px 22px;background:inherit;border-bottom:1px solid var(--line,#ddd)}
+.vl-top h2{margin:0;font-size:17px}
+.vl-tabs{display:flex;gap:6px;flex:1}
+.vl-tabs button,.vl-pills button{font:inherit;font-size:12px;padding:6px 12px;border-radius:99px;border:1px solid var(--line,#ddd);background:transparent;color:inherit;cursor:pointer}
+.vl-tabs button.on,.vl-pills button.on{background:var(--text,#1d1b18);color:var(--card,#fff);border-color:transparent}
+.vl-pills button.off{opacity:.55}
+.vl-x{all:unset;cursor:pointer;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;font-size:14px;opacity:.7}
+.vl-x:hover,.vl-x:focus-visible{background:var(--surface-2,rgba(0,0,0,.06));opacity:1}
+.vl-body{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.vl-pills{display:flex;flex-wrap:wrap;gap:6px}
+.vl-runs{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.vl-run{border:1px solid var(--line,#ddd);border-radius:14px;padding:12px 14px}
+.vl-run header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.vl-run header small{flex:1;opacity:.7;font-size:12px}
+.vl-run header audio{height:30px}
+.vl-clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.vl-clip{border-radius:12px;background:var(--surface-2,rgba(0,0,0,.04));padding:10px;display:flex;flex-direction:column;gap:6px}
+.vl-clip p{margin:0;display:flex;flex-direction:column;gap:2px}
+.vl-clip p small{font-size:11px;opacity:.65}
+.vl-clip audio{width:100%;height:32px}
+.vl-err{color:var(--danger,#c0392b);font-size:12px}
+.vl-wait{font-size:12px;opacity:.7}
+.vl-stars{display:flex;gap:2px;direction:ltr;justify-content:flex-end}
+.vl-stars button{all:unset;cursor:pointer;font-size:18px;color:#c9c4ba;line-height:1;padding:2px}
+.vl-stars button.on{color:#e8a54b}
+.vl-stars button:focus-visible{outline:2px solid var(--accent,#e5613e);border-radius:4px}
+.vl-table{width:100%;border-collapse:collapse;font-size:13px}
+.vl-table th,.vl-table td{text-align:right;padding:8px;border-bottom:1px solid var(--line,#ddd);vertical-align:top}
+.vl-rank{display:inline-flex;gap:4px;align-items:baseline;margin:0 0 4px 12px;padding:3px 9px;border-radius:99px;background:var(--surface-2,rgba(0,0,0,.05))}
+.vl-rank.best{background:#e8a54b;color:#1d1b18}
+.vl-rank small{opacity:.65}

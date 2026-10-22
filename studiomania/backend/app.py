@@ -4478,6 +4478,7 @@ import growth  # noqa: E402
 import algo  # noqa: E402
 import dialect  # noqa: E402
 import niches  # noqa: E402
+import voicelab  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402
@@ -23882,7 +23883,260 @@ VSAMPLE_TEXT = {"ar-eg-cairo": "أهلًا، أنا الصوت ده. لو عجب
                 "ar-dz": "سلام، هذا هو الصوت تاعي. إذا عجبك، أنا اللي نهدر في الفيديو تاعك.",
                 "ar-tn": "عسلامة، هذا صوتي. كان عجبك، أنا اللي باش نحكي في الفيديو متاعك.",
                 "ar-sd": "سلام، دا صوتي. لو عجبك، أنا البتكلم في الفيديو بتاعك."}
-VSAMPLE_GULF = "هلا والله، هذا صوتي. إذا عجبك، أنا الذي تكلم في الفيديو حقك."
+VSAMPLE_GULF = "هلا والله، هذا صوتي. إذا عجبك، أنا اللي بتكلم في الفيديو حقك."
+
+
+# ---------------------------------------------------------------- 🎧 مختبر الأصوات (لصاحب المنصة بس)
+# نفس الجملة بكل مزوّد وكل لهجة جنب بعض + تقييم بالنجوم، والنتيجة النهائية متوسط كل مزوّد في كل لهجة.
+# وكلون صوت: نفس العينة بـ ElevenLabs و MiniMax. التجارب دي على حساب المنصة (مش بتتخصم من نقط حد).
+VLAB_DIR = DATA_DIR / "voicelab"
+VLAB_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/voicelab", StaticFiles(directory=VLAB_DIR), name="voicelab")
+VLAB_LOCK = threading.Lock()
+VLAB_PROV = {"fasih": "فصيح", "munsit": "منصت", "eleven_atlas": "ElevenLabs (عن طريق Atlas)", "eleven": "ElevenLabs (مباشر)",
+             "minimax": "MiniMax", "silma": "SILMA"}
+
+
+def vlab_owner() -> None:
+    if not wallet.free():
+        raise HTTPException(403, "مختبر الأصوات لصاحب المنصة بس")
+
+
+def vlab_ready() -> dict:
+    mm_atlas = [m for m in auto_voice_models() if "minimax" in m["model"].lower() and m["mode"] == "tts" and m.get("voices")]
+    return {"fasih": bool(fasih.api_key()), "munsit": bool(munsit.api_key()), "eleven_atlas": bool(atlas.api_key()),
+            "eleven": bool(voicelab.eleven_key()), "minimax": bool(voicelab.minimax_key() or mm_atlas), "silma": bool(voicelab.silma_key())}
+
+
+def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
+    """كل صوت هيتجرّب: {provider, voice, label} — صوتين لكل مزوّد (راجل وست لو موجودين)."""
+    out = []
+    dv = dub.DIALECTS[dialect]["voices"]
+    for p in provs:
+        if p in ("fasih", "munsit"):
+            vs = [v for v in dub.VOICES if dub.VOICES[v].get("provider") == p and dub.VOICES[v].get("dialect") == dialect] or [v for v in dv if dub.VOICES[v]["provider"] == p]
+            pick = [next((v for v in vs if dub.VOICES[v].get("gender") == g), None) for g in ("male", "female")]
+            pick = [v for v in pick if v] or vs[:2]
+            out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in pick]
+        elif p == "eleven_atlas":
+            out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in list(dub.ELEVEN)[:2]]
+        elif p == "eleven" and voicelab.eleven_key():
+            vs = [v for v in voicelab.eleven_voices() if v["cat"] == "premade"] or voicelab.eleven_voices()
+            pick = [next((v for v in vs if v["gender"] == g), None) for g in ("male", "female")]
+            out += [{"provider": p, "voice": v["id"], "label": v["name"]} for v in pick if v]
+        elif p == "minimax":
+            if voicelab.minimax_key():
+                out += [{"provider": p, "voice": v["id"], "label": v["name"]} for v in voicelab.minimax_voices()[:2]]
+            else:
+                m = next((m for m in auto_voice_models() if "minimax" in m["model"].lower() and m["mode"] == "tts" and m.get("voices")), None)
+                if m:
+                    vs = sorted(m["voices"], key=lambda v: "arab" not in v.lower())
+                    out += [{"provider": p, "voice": v, "label": v, "atlas": m["model"], "vf": m.get("voice_field"), "tf": m.get("text_field")} for v in vs[:2]]
+        elif p == "silma":
+            model = voicelab.SILMA_MODELS["ksa"] if dialect.startswith("ar-sa") or dialect == "ar-gulf" else voicelab.SILMA_MODELS["msa"]
+            note = "" if dialect.startswith("ar-sa") or dialect in ("ar-msa", "ar-gulf") else " · SILMA عنده فصحى وسعودي بس"
+            out += [{"provider": p, "voice": v, "label": voicelab.SILMA_VOICES[v] + note, "model": model} for v in ("sultan", "sarah")]
+    return out
+
+
+def vlab_say(j: dict, text: str, dialect: str, dest: Path) -> Path:
+    """صوت واحد ← mp3."""
+    raw = dest.with_suffix(".src")
+    p = j["provider"]
+    if atlas.mock_mode():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        f"sine=frequency={300 + 40 * (hash(p) % 8)}:duration={max(1.5, len(text) / dub.CHARS_PER_SEC):.2f}", "-f", "wav", str(raw)],
+                       check=True, capture_output=True, timeout=60)
+    elif p in ("fasih", "munsit", "eleven_atlas"):
+        vo_say(text, j["voice"], dialect, raw.with_suffix(".wav"))
+        raw = raw.with_suffix(".wav")
+    elif p == "eleven":
+        voicelab.eleven_say(text, j["voice"], raw)
+    elif p == "minimax" and j.get("atlas"):
+        body = {"model": j["atlas"], j.get("tf") or "text": text}
+        if j.get("vf"):
+            body[j["vf"]] = j["voice"]
+        atlas.download(atlas.run_model("Audio", body, "مختبر الأصوات", max_seconds=300, interval=2), raw)
+    elif p == "minimax":
+        voicelab.minimax_say(text, j["voice"], raw)
+    elif p == "silma":
+        voicelab.silma_say(text, j["voice"], j["model"], raw)
+    else:
+        raise voicelab.LabError("مزوّد مش معروف")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-c:a", "libmp3lame", "-b:a", "128k", str(dest)],
+                   check=True, capture_output=True, timeout=120)
+    raw.unlink(missing_ok=True)
+    return dest
+
+
+def vlab_save(rid: str, fn) -> dict:
+    with VLAB_LOCK:
+        f = VLAB_DIR / Path(rid).name / "run.json"
+        d = json.loads(f.read_text(encoding="utf-8"))
+        fn(d)
+        f.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return d
+
+
+def run_vlab(rid: str) -> None:
+    d = vlab_save(rid, lambda d: None)
+    folder = VLAB_DIR / rid
+
+    def one(i: int, c: dict) -> None:
+        t0 = time.time()
+        try:
+            if d["kind"] == "clone":
+                sample = folder / d["sample"]
+                if c["provider"] == "eleven":
+                    vid = voicelab.eleven_clone(sample, f"lab-{rid}")
+                    try:
+                        voicelab.eleven_say(d["text"], vid, folder / f"{i}.src")
+                    finally:
+                        voicelab.eleven_delete(vid)
+                else:
+                    vid = voicelab.minimax_clone(sample)
+                    voicelab.minimax_say(d["text"], vid, folder / f"{i}.src")
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / f"{i}.src"), "-c:a", "libmp3lame", "-b:a", "128k",
+                                str(folder / f"{i}.mp3")], check=True, capture_output=True, timeout=120)
+                (folder / f"{i}.src").unlink(missing_ok=True)
+            else:
+                vlab_say(c, d["text"], d["dialect"], folder / f"{i}.mp3")
+            upd = {"file": f"{i}.mp3", "status": "done", "sec": round(time.time() - t0, 1)}
+        except Exception as e:  # noqa: BLE001
+            upd = {"status": "failed", "error": str(getattr(e, "detail", None) or e)[:240]}
+        vlab_save(rid, lambda x: x["clips"][i].update(upd))
+
+    threads = [threading.Thread(target=one, args=(i, c), daemon=True) for i, c in enumerate(d["clips"])]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=600)
+    vlab_save(rid, lambda x: x.update(status="done"))
+
+
+def vlab_out(d: dict) -> dict:
+    return {**d, "clips": [{**c, "url": f"/media/voicelab/{d['id']}/{c['file']}" if c.get("file") else None} for c in d["clips"]]}
+
+
+def vlab_runs() -> list[dict]:
+    out = []
+    for f in VLAB_DIR.glob("*/run.json"):
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")))
+        except ValueError:
+            continue
+    return sorted(out, key=lambda d: d.get("at") or 0, reverse=True)
+
+
+@app.get("/api/voicelab")
+def voicelab_get():
+    vlab_owner()
+    runs = vlab_runs()
+    score: dict = {}   # النتيجة: متوسط نجوم كل مزوّد في كل لهجة (والكلون لوحده)
+    for d in runs:
+        for c in d["clips"]:
+            if c.get("score"):
+                k = (d["dialect"] if d["kind"] == "tts" else "clone", c["provider"])
+                score.setdefault(k, []).append(c["score"])
+    table = [{"dialect": k[0], "provider": k[1], "avg": round(sum(v) / len(v), 2), "n": len(v)} for k, v in score.items()]
+    return {"providers": VLAB_PROV, "ready": vlab_ready(),
+            "dialects": {k: v["label"] for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
+            "samples": {k: VSAMPLE_TEXT.get(k, VSAMPLE_GULF) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
+            "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"]))}
+
+
+class VLabIn(BaseModel):
+    dialect: str = "ar-sa-najdi"
+    text: str = ""
+    providers: list[str] = []
+
+
+@app.post("/api/voicelab/run")
+def voicelab_run(body: VLabIn):
+    vlab_owner()
+    if body.dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة مش موجودة")
+    text = (body.text or "").strip()[:600] or VSAMPLE_TEXT.get(body.dialect, VSAMPLE_GULF)
+    ready = vlab_ready()
+    provs = [p for p in body.providers if p in VLAB_PROV and (ready.get(p) or atlas.mock_mode())] or [p for p, ok in ready.items() if ok]
+    try:
+        jobs = vlab_jobs(body.dialect, provs)
+    except voicelab.LabError as e:
+        raise HTTPException(400, str(e))
+    if not jobs:
+        raise HTTPException(400, "مفيش مزوّد جاهز: حط مفاتيح المزودين في الإعدادات الأول")
+    rid = uuid.uuid4().hex[:10]
+    (VLAB_DIR / rid).mkdir(parents=True, exist_ok=True)
+    d = {"id": rid, "kind": "tts", "dialect": body.dialect, "text": text, "at": time.time(), "status": "working",
+         "clips": [{**j, "provider_label": VLAB_PROV[j["provider"]], "status": "working", "score": 0} for j in jobs]}
+    (VLAB_DIR / rid / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_vlab, args=(rid,), daemon=True).start()
+    return vlab_out(d)
+
+
+@app.post("/api/voicelab/clone")
+def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), file: UploadFile = File(...)):
+    """نفس عينة الصوت ← كلون بـ ElevenLabs و MiniMax ← نفس الجملة بالصوتين."""
+    vlab_owner()
+    provs = [p for p in ("eleven", "minimax") if (voicelab.eleven_key() if p == "eleven" else voicelab.minimax_key()) or atlas.mock_mode()]
+    if not provs:
+        raise HTTPException(400, "الكلون محتاج مفتاح ElevenLabs أو MiniMax المباشر في الإعدادات")
+    rid = uuid.uuid4().hex[:10]
+    folder = VLAB_DIR / rid
+    folder.mkdir(parents=True, exist_ok=True)
+    src = folder / f"sample-src{Path(file.filename or 'a.mp3').suffix.lower()[:6] or '.mp3'}"
+    with src.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:   # mp3 أحادي، أقصى دقيقتين (الاتنين بيقبلوه)
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-t", "120", "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame",
+                        "-b:a", "160k", str(folder / "sample.mp3")], check=True, capture_output=True, timeout=120)
+    except subprocess.SubprocessError:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "الملف ده مش صوت سليم")
+    finally:
+        src.unlink(missing_ok=True)
+    if probe_duration(folder / "sample.mp3") < 8:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "العينة لازم تبقى ١٠ ثواني على الأقل (الأحسن من ٣٠ ثانية لدقيقة كلام واضح)")
+    text = text.strip()[:600] or VSAMPLE_TEXT.get(dialect, VSAMPLE_GULF)
+    d = {"id": rid, "kind": "clone", "dialect": dialect if dialect in dub.DIALECTS else "ar-msa", "text": text, "at": time.time(), "status": "working", "sample": "sample.mp3",
+         "clips": [{"provider": p, "provider_label": VLAB_PROV[p], "voice": "clone", "label": "كلون من العينة", "status": "working", "score": 0} for p in provs]}
+    (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    if atlas.mock_mode():   # تجربة من غير مفاتيح: صوت تجريبي بدل الكلون
+        for i, c in enumerate(d["clips"]):
+            c.update(provider="eleven_atlas" if c["provider"] == "eleven" else c["provider"], voice="eleven_liam")
+        d["kind"] = "tts"
+        (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_vlab, args=(rid,), daemon=True).start()
+    return vlab_out(d)
+
+
+class VLabRateIn(BaseModel):
+    clip: int
+    score: int = 0
+
+
+@app.post("/api/voicelab/runs/{rid}/rate")
+def voicelab_rate(rid: str, body: VLabRateIn):
+    vlab_owner()
+    if not (VLAB_DIR / Path(rid).name / "run.json").exists():
+        raise HTTPException(404, "التجربة دي مش موجودة")
+    return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(score=max(0, min(5, body.score))) if 0 <= body.clip < len(d["clips"]) else None))
+
+
+@app.get("/api/voicelab/runs/{rid}")
+def voicelab_one(rid: str):
+    vlab_owner()
+    if not (VLAB_DIR / Path(rid).name / "run.json").exists():
+        raise HTTPException(404, "التجربة دي مش موجودة")
+    return vlab_out(vlab_save(rid, lambda d: None))
+
+
+@app.delete("/api/voicelab/runs/{rid}")
+def voicelab_del(rid: str):
+    vlab_owner()
+    shutil.rmtree(VLAB_DIR / Path(rid).name, ignore_errors=True)
+    return {"ok": True}
 
 
 class VoiceSampleIn(BaseModel):

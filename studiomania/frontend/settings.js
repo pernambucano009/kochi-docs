@@ -1,7 +1,7 @@
 // StudioMania — الإعدادات والخروج
 
 // باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
-const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
+const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["eleven", "مفتاح ElevenLabs", "الأصوات وكلون الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات وكلون الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات عربي فصحى وسعودي"], ["recraft", "مفتاح Recraft", "اللوجو والرسومات الفيكتور"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
   ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "إيميلات تأكيد الحساب"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["stripe", "Stripe Secret key", "الدفع"], ["stripe_hook", "Stripe Webhook secret", "الدفع"],

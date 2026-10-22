@@ -21,6 +21,7 @@ SETTING_KEYS = {"atlas": "ATLASCLOUD_API_KEY", "zernio": "ZERNIO_API_KEY", "scra
                 # مفاتيح المنصة كلها من صفحة الإعدادات (الأدمن بس): من غير شاشة أوامر ولا متغيرات استضافة
                 "fasih": "FASIH_API_KEY", "munsit": "MUNSIT_API_KEY", "audioshake": "AUDIOSHAKE_API_KEY", "giphy": "GIPHY_API_KEY", "klipy": "KLIPY_API_KEY",
                 "resend": "RESEND_API_KEY", "smtp_pass": "SMTP_PASS", "paypal_id": "PAYPAL_CLIENT_ID", "paypal_secret": "PAYPAL_SECRET", "paypal_hook": "PAYPAL_WEBHOOK_ID",
+                "eleven": "ELEVENLABS_API_KEY", "minimax": "MINIMAX_API_KEY", "silma": "SILMA_API_KEY", "recraft": "RECRAFT_API_KEY",
                 "stripe": "STRIPE_SECRET_KEY", "stripe_hook": "STRIPE_WEBHOOK_SECRET", "google_id": "GOOGLE_CLIENT_ID", "google_secret": "GOOGLE_CLIENT_SECRET"}
 BASIC_KEYS = ("atlas", "zernio", "scrape", "pexels")
 
