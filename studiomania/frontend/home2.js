@@ -93,7 +93,7 @@ const NH = (() => {
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
   function brainPct(b) {
     if (!b) return 0;
-    const keys = ["about", "audience", "rules", "palette", "typography", "styles", "market", "language", "cta"];
+    const keys = ["about", "audience", "rules", "palette", "typography", "market", "language", "cta"];
     const have = keys.filter((k) => String(b[k] || "").trim()).length + ((b.logos || []).length ? 1 : 0);
     return Math.round((have / (keys.length + 1)) * 100);
   }

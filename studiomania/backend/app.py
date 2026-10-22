@@ -7187,7 +7187,8 @@ def legacy_brand() -> dict:
 
 
 # حقول الهوية في ملف العميل ← أسمائها في البرومبتات
-CLIENT_BRAND_MAP = {"about": "about", "audience": "audience", "palette": "colors", "typography": "font", "style": "style",
+# 🎨 «ستايل الرسم» بتاع العقل مابيدخلش البرومبتات: كل قالب ليه ستايله، والاتنين مع بعض بيطلّعوا شكل ملخبط
+CLIENT_BRAND_MAP = {"about": "about", "audience": "audience", "palette": "colors", "typography": "font",
                     "logo_rule": "logo_rule", "market": "market", "language": "language", "modest": "modest", "rules": "rules",
                     "domain": "domain"}
 
