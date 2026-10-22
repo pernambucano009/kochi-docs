@@ -8,7 +8,7 @@ const TEXT_FONTS = [
   ["Anton", "Anton (إنجليزي)", "TY-Anton.ttf"], ["Outfit", "Outfit (إنجليزي)", "TY-Outfit-700.ttf", 700], ["Instrument Serif", "Instrument Serif (إنجليزي)", "TY-InstrumentSerif.ttf"],
 ];
 const TEXT_BOLD = new Set(TEXT_FONTS.filter((f) => f[3]).map((f) => f[0]));
-const TEXT_ANIMS = [["", "بدون"], ["fade", "ظهور"], ["pop", "بوب"], ["zoom", "زووم"], ["slideup", "من تحت"], ["slidedown", "من فوق"],
+const TEXT_ANIMS = [["", "بدون"], ["fade", "ظهور"], ["pop", "بوب"], ["zoom", "زووم"], ["slideup", "من أسفل"], ["slidedown", "من أعلى"],
   ["slideleft", "من اليمين"], ["slideright", "من الشمال"], ["type", "كتابة حرف حرف"]];
 const TEXT_PRESETS = [
   { label: "عنوان أصفر", font: "SM Lalezar", size: 120, color: "#ffd166", stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false } },
@@ -27,7 +27,7 @@ function loadTextFonts() {
   if (textFontsLoaded) return;
   textFontsLoaded = true;
   for (const [fam, , file, w] of TEXT_FONTS) {
-    if (fam.startsWith("SM ")) continue;  // متسجلين مع الكابشن
+    if (fam.startsWith("SM ")) continue;  // متسجلين مع التعليق النصي
     const face = new FontFace(fam, `url(/fonts/${file})`, w ? { weight: String(w) } : {});
     face.load().then((ff) => { document.fonts.add(ff); drawTextLayer(); }).catch(() => {});
   }
@@ -113,7 +113,7 @@ function drawTextLayer() {
       transform:translate(-50%,-50%) rotate(${x.angle || 0}deg) scale(${((x.scale || 1) * st.scale).toFixed(3)});
       opacity:${((x.opacity ?? 1) * st.alpha).toFixed(3)};font-family:'${x.font}','SM Tajawal';font-size:${size.toFixed(2)}px;
       font-weight:${weight};font-style:${x.italic ? "italic" : "normal"};color:${x.color || "#fff"};letter-spacing:${((x.spacing || 0) * k * fs).toFixed(2)}px;
-      ${stroke}${shadow}${box}">${escapeHtml(s.text)}${i === sel && !mt.playing ? `<b class="tx-rot" data-txh="rot" title="اسحب عشان تلف"></b><i class="tx-sz" data-txh="sz" title="اسحب عشان تكبّر أو تصغّر"></i>` : ""}</div>`);
+      ${stroke}${shadow}${box}">${escapeHtml(s.text)}${i === sel && !mt.playing ? `<b class="tx-rot" data-txh="rot" title="اسحب لكي تدور"></b><i class="tx-sz" data-txh="sz" title="اسحب لكي تكبّر أو تصغّر"></i>` : ""}</div>`);
   });
   el.innerHTML = html.join("");
 }
@@ -124,7 +124,7 @@ function textPointerDown(e) {
   e.stopPropagation();
   pause();
   const i = Number(d.dataset.ti), x = texts()[i];
-  if (kindLocked("text")) return toast("تراك النصوص مقفول 🔒", true);
+  if (kindLocked("text")) return toast("تراك النصوص مغلق 🔒", true);
   selectItem({ kind: "text", i });
   pushHistory();
   const fr = $("previewFrame").getBoundingClientRect(), r = (fr.width / PV_W) * (PV_W / OUT_W);
@@ -174,7 +174,7 @@ function renderTextRow() {
   const lanes = Math.max(1, ...items.map((t) => t.lane + 1)) + (items.length ? 1 : 0);
   const h = Math.min(8, lanes) * TEXT_LANE_H + 4;
   row.style.height = head.style.height = `${h}px`;
-  if (!items.length) { row.innerHTML = `<div class="tl-empty-track">نصوص حرة: ضيفها من تاب 🔠 نص</div>`; return; }
+  if (!items.length) { row.innerHTML = `<div class="tl-empty-track">نصوص حرة: أضفها من تبويب 🔠 نص</div>`; return; }
   row.innerHTML = items.map(({ x, i, lane }) => {
     const sel = isSel({ kind: "text", i });
     return `<div class="tl-text ${sel ? "selected" : ""}" data-ti="${i}" style="left:${x.t0 * mt.pps}px;width:${Math.max(4, x.dur * mt.pps)}px;top:${2 + lane * TEXT_LANE_H}px;height:${TEXT_LANE_H - 3}px">
@@ -224,7 +224,7 @@ function textTrackDown(e) {
 }
 function splitText(i, t) {
   const x = texts()[i];
-  if (!x || t <= x.t0 + 0.05 || t >= x.t0 + x.dur - 0.05) return toast("حط المؤشر جوه النص عشان تقسمه", true);
+  if (!x || t <= x.t0 + 0.05 || t >= x.t0 + x.dur - 0.05) return toast("ضع المؤشر داخل النص لكي تقسمه", true);
   pushHistory();
   const b = JSON.parse(JSON.stringify(x));
   b.t0 = snap(t); b.dur = snap(x.t0 + x.dur - t); b.anim_in = null;
@@ -241,7 +241,7 @@ function freeTextLane(t0, dur) {
 }
 function addText(preset) {
   if (!mt.project) return;
-  if (kindLocked("text")) return toast("تراك النصوص مقفول 🔒", true);
+  if (kindLocked("text")) return toast("تراك النصوص مغلق 🔒", true);
   pushHistory();
   const p = preset || TEXT_PRESETS[0];
   const t0 = snap(mt.t), dur = 3;

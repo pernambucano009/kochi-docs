@@ -118,19 +118,19 @@ const PilotPage = (() => {
   #nh .ap-md { flex: 1 1 calc(50% - 5px); min-width: 0; max-width: none; }
   #nh .ap-dock { inset-inline-end: 16px; bottom: 16px; }
 }`;
-  const STEP_N = [["idea", "الفكرة"], ["script", "السكريبت"], ["montage", "المونتاج"], ["video", "الفيديو"]];
-  const PEAKS = [[12, 14], [18.5, 22.5]];   // الأوقات اللي الجمهور بيبقى فيها أنشط عادةً (للإرشاد بس)
+  const STEP_N = [["idea", "الفكرة"], ["script", "النص"], ["montage", "المونتاج"], ["video", "الفيديو"]];
+  const PEAKS = [[12, 14], [18.5, 22.5]];   // الأوقات التي الجمهور يصبح فيها أنشط عادةً (للإرشاد فقط)
   const S = { d: null, root: null, more: false, drag: null, open: false, timer: 0 };
   const hOf = (t) => { const [h, m] = String(t).split(":").map(Number); return h + (m || 0) / 60; };
   const tOf = (h) => `${String(Math.floor(h)).padStart(2, "0")}:${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
   const fmtH = (h) => { const H = Math.floor(h), m = Math.round((h - H) * 60), h12 = ((H + 11) % 12) + 1; return `${h12}:${String(m).padStart(2, "0")} ${H >= 12 ? "م" : "ص"}`; };
   const when = (iso) => {
-    const d = new Date(iso), t = new Date(), day = d.toDateString() === t.toDateString() ? "النهارده" : d.toDateString() === new Date(+t + 864e5).toDateString() ? "بكرة" : d.toLocaleDateString("ar-EG", { weekday: "long" });
+    const d = new Date(iso), t = new Date(), day = d.toDateString() === t.toDateString() ? "اليوم" : d.toDateString() === new Date(+t + 864e5).toDateString() ? "غدًا" : d.toLocaleDateString("ar-EG", { weekday: "long" });
     return `${day} ${fmtH(d.getHours() + d.getMinutes() / 60)}`;
   };
   const codeTpls = () => (typeof Gallery !== "undefined" && Gallery.list ? Gallery.list() : []).filter((x) => String(x.id).startsWith("t-"));
 
-  const html = () => `<div class="ap" id="apRoot"><div class="nh-empty">بيحمّل…</div></div>`;
+  const html = () => `<div class="ap" id="apRoot"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   async function mount(root) {
     if (!document.getElementById("apCss")) document.head.appendChild(Object.assign(document.createElement("style"), { id: "apCss", textContent: CSS }));
     S.root = root.querySelector("#apRoot");
@@ -146,22 +146,22 @@ const PilotPage = (() => {
   async function refresh() {
     if (!S.root?.isConnected) return clearInterval(S.timer);
     if (S.drag || document.hidden) return;
-    try { S.d = await api("/api/pilot"); drawQ(); drawHead(); } catch { /* اللفة الجاية */ }
+    try { S.d = await api("/api/pilot"); drawQ(); drawHead(); } catch { /* اللفة القادمة */ }
   }
   const shell = () => `
     <header class="ap-top"><span class="lat">Autopilot</span><button type="button" class="ap-tg" data-on aria-label="الأوتوبايلوت"></button><span class="ap-st" data-st></span></header>
     <main class="ap-main">
       <div class="ap-row"><section class="ap-sec"><span class="lat">Posts per day</span>
-        <div class="ap-cnt"><button type="button" data-cnt="-1" aria-label="أقل">−</button><span class="n num" data-n></span><button type="button" data-cnt="1" aria-label="أكتر">+</button></div>
-        <small>بوست في اليوم <span data-fee></span></small></section>
+        <div class="ap-cnt"><button type="button" data-cnt="-1" aria-label="أقل">−</button><span class="n num" data-n></span><button type="button" data-cnt="1" aria-label="أكثر">+</button></div>
+        <small>منشور في اليوم <span data-fee></span></small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
-        <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>دوس على الخط تزوّد ميعاد · اسحب النقطة تغيّره · دوس عليها تشيلها</span></div></section></div>
+        <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط تزوّد موعد · اسحب النقطة تغيّره · اضغط عليها تزيلها</span></div></section></div>
       <section class="ap-sec"><span class="lat">Templates</span>
         <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالدور من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
         <div class="ap-plan" data-plan></div>
         <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
-        <small data-tplsub>بيختار منهم بالتبادل عشان المحتوى مايتكررش</small></section>
-      <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل حاجة لوحده</button><button type="button" data-mode="approve">أوافق على الخطوات دي</button></div>
+        <small data-tplsub>يختار منهم بالتبادل لكي المحتوى لا يتكرر</small></section>
+      <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل شيء تلقائيًا</button><button type="button" data-mode="approve">أوافق على هذه الخطوات</button></div>
         <div class="ap-steps" data-steps></div></section>
     </main>
     <div class="ap-dock" data-dock><div class="ap-q" data-q></div>
@@ -174,30 +174,30 @@ const PilotPage = (() => {
     const plan = fromPlan(), m = S.mo?.month, left = (m?.items || []).filter((x) => !x.job).length;
     q("[data-srcs]").querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("on", b.dataset.src === (plan ? "plan" : "rotate")));
     q("[data-plan]").innerHTML = plan
-      ? `<span>ماشي على خطة الشهر: <b class="num">${left}</b> بوست فاضل، كل واحد في ميعاده بفكرته وقالبه.</span><button type="button" data-openplan>افتح الخطة</button>`
-      : m?.items?.length ? `<span>عندك خطة شهر فيها <b class="num">${m.items.length}</b> بوست${m.status === "applied" ? "" : " مستنية موافقتك"}.</span><button type="button" data-openplan>راجعها</button>`
-      : S.mo && !S.mo.ready ? `<span>خطة الشهر بتتعمل لما العقل يفهمك ${S.mo.need}٪ (دلوقتي ${S.mo.score}٪).</span>` : "";
+      ? `<span>حسنًا على خطة الشهر: <b class="num">${left}</b> منشور فاضل، كل واحد في موعده بفكرته وقالبه.</span><button type="button" data-openplan>افتح الخطة</button>`
+      : m?.items?.length ? `<span>لديك خطة شهر فيها <b class="num">${m.items.length}</b> منشور${m.status === "applied" ? "" : " تنتظر موافقتك"}.</span><button type="button" data-openplan>راجعها</button>`
+      : S.mo && !S.mo.ready ? `<span>خطة الشهر تُنشأ عندما العقل يفهمك ${S.mo.need}٪ (الآن ${S.mo.score}٪).</span>` : "";
     q("[data-tpls]").classList.toggle("dim", plan);
     q("[data-more]").classList.toggle("dim", plan);
-    q("[data-tplsub]").textContent = plan ? "القوالب بتيجي من الخطة، والموافقات تحت زي ما هي" : "بيختار منهم بالتبادل عشان المحتوى مايتكررش";
+    q("[data-tplsub]").textContent = plan ? "القوالب تأتي من الخطة، والموافقات أسفل كما هي" : "يختار منهم بالتبادل لكي المحتوى لا يتكرر";
   }
   async function setSrc(src) {
     if ((src === "plan") === fromPlan()) return;
     if (src === "plan" && !S.mo?.month?.items?.length) {
-      toast(S.mo?.ready ? "اعمل خطة الشهر الأول من صفحة خطة المحتوى" : `خطة الشهر بتتعمل لما العقل يفهمك ${S.mo?.need ?? 55}٪`, true);
+      toast(S.mo?.ready ? "أنشئ خطة الشهر أولًا من صفحة خطة المحتوى" : `خطة الشهر تُنشأ عندما العقل يفهمك ${S.mo?.need ?? 55}٪`, true);
       return openPlan();
     }
     try {
       const r = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: src === "plan" }) });
       S.d = r.pilot; S.mo = r; draw();
-      toast(src === "plan" ? "✅ الأوتوبايلوت ماشي على خطة الشهر" : "الأوتوبايلوت رجع يختار من القوالب بالدور");
+      toast(src === "plan" ? "✅ الأوتوبايلوت حسنًا على خطة الشهر" : "الأوتوبايلوت أعد يختار من القوالب بالدور");
     } catch (err) { toast(err.message, true); }
   }
   function openPlan() { window.RV_FOCUS = "plan-only"; window.NHNav?.("plan"); }
   function drawHead() {
     const s = S.d.settings, nx = S.d.upcoming?.[0];
     q("[data-on]").classList.toggle("on", !!s.on);
-    q("[data-st]").textContent = !s.on ? "مقفول" : !s.templates.length && s.source !== "plan" ? "شغّال · اختار قالب واحد على الأقل" : `شغّال${nx ? ` · الجاي ${when(nx)}` : ""}`;
+    q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length && s.source !== "plan" ? "يعمل · اختر قالب واحد على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
   }
   function drawDay() {
     const pct = (h) => (h / 24) * 100, s = S.d.settings;
@@ -205,14 +205,14 @@ const PilotPage = (() => {
       + [0, 6, 12, 18].map((h) => `<span class="hr" style="left:${pct(h)}%">${String(h).padStart(2, "0")}</span>`).join("")
       + s.times.map((t, i) => `<span class="pt ${t.mine ? "mine" : ""}" data-pt="${i}" style="left:${pct(hOf(t.t))}%"><b>${fmtH(hOf(t.t))}</b></span>`).join("");
     q("[data-n]").textContent = s.times.length;
-    q("[data-fee]").textContent = S.d.fee ? `· كل بوست ${S.d.fee} نقطة للأوتوبايلوت + تكلفة التوليد` : "";
+    q("[data-fee]").textContent = S.d.fee ? `· كل منشور ${S.d.fee} نقطة للأوتوبايلوت + تكلفة التوليد` : "";
   }
   function tplList() {
     const d = S.d, twin = d.twins.find((t) => t.ready);
     const names = d.settings.names || {};
     return [
-      { id: "phone", n: "تصوير بالموبايل", k: "قالب", tag: ["cam", "📱 محتاج تصوّر بنفسك"] },
-      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "محتاج أفاتار جاهز"], off: !twin },
+      { id: "phone", n: "تصوير بالجوال", k: "قالب", tag: ["cam", "📱 يحتاج تصوّر بنفسك"] },
+      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "يحتاج أفاتار جاهز"], off: !twin },
       ...d.custom.map((c) => ({ id: c.id, n: c.name, k: "قالب مخصص" })),
       { id: "carousel", n: "كاروسيل", k: "قالب", tag: ["", "🖼️ صور على إنستجرام"] },
       ...d.settings.templates.filter((t) => t.startsWith("t-")).map((t) => ({ id: t, n: names[t] || codeTpls().find((x) => x.id === t)?.name || t, k: "قالب" })),
@@ -222,29 +222,29 @@ const PilotPage = (() => {
     const on = new Set(S.d.settings.templates);
     q("[data-tpls]").innerHTML = tplList().map((m, i) => `<button type="button" class="ap-md ${on.has(m.id) ? "on" : ""} ${m.off ? "off" : ""}" data-tpl="${esc(m.id)}">
         <span class="n">${i + 1}</span><b>${esc(m.n)}</b><small>${esc(m.k)}</small>${m.tag ? `<span class="tag ${m.tag[0]}">${esc(m.tag[1])}</span>` : ""}</button>`).join("")
-      + `<button type="button" class="ap-md new" data-moretpl><b>+ قوالب تانية</b><small>من معرض القوالب</small></button>`
-      + `<button type="button" class="ap-md new" data-newauto><b>+ قالب مخصص</b><small>بخطواتك انت</small></button>`;
+      + `<button type="button" class="ap-md new" data-moretpl><b>+ قوالب أخرى</b><small>من معرض القوالب</small></button>`
+      + `<button type="button" class="ap-md new" data-newauto><b>+ قالب مخصص</b><small>بخطواتك أنت</small></button>`;
     const box = q("[data-more]");
     box.classList.toggle("on", S.more);
-    if (S.more) box.innerHTML = codeTpls().map((x) => `<button type="button" class="${on.has(x.id) ? "on" : ""}" data-code="${esc(x.id)}">${on.has(x.id) ? "✓ " : ""}${esc(x.name)}</button>`).join("") || `<span class="ap-none">مفيش قوالب تانية</span>`;
+    if (S.more) box.innerHTML = codeTpls().map((x) => `<button type="button" class="${on.has(x.id) ? "on" : ""}" data-code="${esc(x.id)}">${on.has(x.id) ? "✓ " : ""}${esc(x.name)}</button>`).join("") || `<span class="ap-none">لا يوجد قوالب أخرى</span>`;
   }
   function drawMode() {
     const s = S.d.settings, cam = s.templates.includes("phone");
     q("[data-modes]").querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === s.mode));
     q("[data-steps]").innerHTML = s.mode === "approve"
       ? STEP_N.map(([k, n], i) => `${i ? "<i>←</i>" : ""}<button type="button" data-step="${k}" class="${s.steps.includes(k) ? "on" : ""}">${s.steps.includes(k) ? "✓ " : ""}${n}</button>`).join("")
-      : `<small style="font-size:12.5px;color:var(--nh-muted)">بيختار الفكرة ويكتب السكريبت ويعمل الفيديو وينشر من غير ما يرجعلك${cam ? " · قالب الموبايل هيستناك تصوّر" : ""}</small>`;
+      : `<small style="font-size:12.5px;color:var(--nh-muted)">يختار الفكرة ويكتب النص ويعمل الفيديو وينشر بدون ما يرجعلك${cam ? " · قالب الجوال سيستناك تصوّر" : ""}</small>`;
   }
   // صور الكاروسيل صف واحد بيتسحب بالعرض
   const imgs = (j) => (j.images || []).length ? `<div class="ap-imgs">${j.images.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div>` : "";
-  const ST = { run: "شغّال", wait: "مستنيك", cam: "مستني تصويرك", done: "اتجدول", failed: "وقف", stopped: "اتوقف" };
+  const ST = { run: "يعمل", wait: "مستنيك", cam: "ينتظر تصويرك", done: "جُدول", failed: "توقف", stopped: "توقف" };
   function jobHTML(j) {
     const head = `<div class="ap-qh"><div class="tx">${esc(j.title || j.name)}<small>${esc(when(j.at))} · ${esc(j.name)}${j.note && j.status === "run" ? ` · ${esc(j.note)}` : ""}</small></div>
       <span class="st ${j.status}">${ST[j.status] || ""}</span></div>`;
     let body = "";
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
-        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختار فكرة" : "اختار سكريبت"}</span><button type="button" data-stop="${esc(j.id)}">شيل الميعاد ده</button></div>`;
+        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نص"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage" && j.kind === "carousel") {
       body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم السلايدات</button></div>`;
     } else if (j.status === "wait" && j.gate === "video" && j.kind === "carousel") {
@@ -256,13 +256,13 @@ const PilotPage = (() => {
         <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
     } else if (j.status === "cam") {
       body = `${(j.script || []).length ? `<p class="ap-say">${j.script.map(esc).join("<br>")}</p>` : ""}
-        <div class="ap-acts"><label class="ok">📱 ارفع الفيديو اللي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">شيل الميعاد ده</button></div>`;
+        <div class="ap-acts"><label class="ok">📱 ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "failed") {
-      body = `<span class="ap-err">${esc(j.error || "")}</span><div class="ap-acts"><button type="button" data-retry="${esc(j.id)}">جرّب تاني</button><button type="button" data-del="${esc(j.id)}">امسحها</button></div>`;
+      body = `<span class="ap-err">${esc(j.error || "")}</span><div class="ap-acts"><button type="button" data-retry="${esc(j.id)}">جرّب مرة أخرى</button><button type="button" data-del="${esc(j.id)}">احذفها</button></div>`;
     } else if (j.status === "done" && (j.images || []).length) {
       body = imgs(j);
     } else if (j.status === "done" && j.video_url) {
-      body = `<div class="ap-acts"><a href="${esc(j.video_url)}" target="_blank" rel="noopener">شوف الفيديو</a></div>`;
+      body = `<div class="ap-acts"><a href="${esc(j.video_url)}" target="_blank" rel="noopener">انظر الفيديو</a></div>`;
     }
     return `<div class="ap-qi">${head}${body}</div>`;
   }
@@ -270,9 +270,9 @@ const PilotPage = (() => {
     const jobs = S.d.jobs, w = S.d.waiting;
     const n = q("[data-qn]");
     n.textContent = w; n.hidden = !w;
-    q("[data-qsub]").textContent = w ? "مستنيين منك حاجة" : jobs.length ? `${jobs.length} بوست` : "";
+    q("[data-qsub]").textContent = w ? "ينتظرون منك شيء" : jobs.length ? `${jobs.length} منشور` : "";
     if (S.root.querySelector(".ap-q input[type=file]:focus")) return;
-    q("[data-q]").innerHTML = jobs.map(jobHTML).join("") || `<div class="ap-none">${S.d.settings.on ? "أول ميعاد جاي هيظهر هنا" : "شغّل الأوتوبايلوت والمواعيد هتظهر هنا"}</div>`;
+    q("[data-q]").innerHTML = jobs.map(jobHTML).join("") || `<div class="ap-none">${S.d.settings.on ? "أول موعد قادم سيظهر هنا" : "شغّل الأوتوبايلوت والمواعيد ستظهر هنا"}</div>`;
     q("[data-dock]").classList.toggle("open", S.open);
   }
 
@@ -294,7 +294,7 @@ const PilotPage = (() => {
     day.addEventListener("pointerdown", (e) => {
       const pt = e.target.closest("[data-pt]"), r = day.getBoundingClientRect(), s = S.d.settings;
       if (pt) { S.drag = { i: +pt.dataset.pt, x: e.clientX, moved: false }; pt.setPointerCapture(e.pointerId); return; }
-      if (s.times.length >= 6) return toast("أقصى 6 بوستات في اليوم");
+      if (s.times.length >= 6) return toast("أقصى 6 منشورات في اليوم");
       const h = Math.max(0, Math.min(23.5, Math.round(((e.clientX - r.left) / r.width) * 48) / 2));
       if (s.times.some((t) => t.t === tOf(h))) return;
       s.times.push({ t: tOf(h), mine: true });
@@ -314,7 +314,7 @@ const PilotPage = (() => {
       const g = S.drag; if (!g) return;
       S.drag = null;
       const s = S.d.settings;
-      if (!g.moved) { if (s.times.length > 1) s.times.splice(g.i, 1); else return toast("لازم ميعاد واحد على الأقل"); }
+      if (!g.moved) { if (s.times.length > 1) s.times.splice(g.i, 1); else return toast("يجب موعد واحد على الأقل"); }
       s.times.sort((a, b) => hOf(a.t) - hOf(b.t));
       drawDay(); saveTimes();
     });
@@ -322,18 +322,18 @@ const PilotPage = (() => {
       const inp = e.target.closest("[data-cam]");
       if (!inp?.files?.[0]) return;
       const fd = new FormData(); fd.append("file", inp.files[0]);
-      toast("بيرفع الفيديو…");
-      await act(`${inp.dataset.cam}/footage`, { method: "POST", body: fd }, "✓ الفيديو وصل، وبيكمّل المراجعة والمونتاج لوحده");
+      toast("يرفع الفيديو…");
+      await act(`${inp.dataset.cam}/footage`, { method: "POST", body: fd }, "✓ الفيديو وصل، ويُكمل المراجعة والمونتاج تلقائيًا");
     });
     S.root.addEventListener("click", (e) => {
       const b = e.target.closest("button, a"); const d = b?.dataset || {};
       if (!b) { if (!e.target.closest("[data-dock]") && S.open) { S.open = false; drawQ(); } return; }
       const s = S.d.settings;
-      if ("on" in d) return save({ on: !s.on }, !s.on ? "الأوتوبايلوت اشتغل" : "الأوتوبايلوت اتقفل، ومفيش حاجة جديدة هتبدأ لوحدها");
+      if ("on" in d) return save({ on: !s.on }, !s.on ? "الأوتوبايلوت اشتغل" : "الأوتوبايلوت أُغلق، ولا يوجد شيء جديدة ستبدأ تلقائيًا");
       if (d.cnt) { const n = Math.max(1, Math.min(6, s.times.length + +d.cnt)); s.times = autoTimes(n); drawDay(); return saveTimes(); }
       if (d.tpl) {
         const m = tplList().find((x) => x.id === d.tpl);
-        if (m?.off) return toast("اعمل أفاتار الأول من «الأفاتار» (فيديو قراية أو صورة قدامية)");
+        if (m?.off) return toast("أنشئ أفاتار أولًا من «الأفاتار» (فيديو قراية أو صورة قدامية)");
         const set = new Set(s.templates); set.has(d.tpl) ? set.delete(d.tpl) : set.add(d.tpl);
         return save({ templates: [...set] });
       }
@@ -349,10 +349,10 @@ const PilotPage = (() => {
       if ("openplan" in d) return openPlan();
       if (d.step) { const st = new Set(s.steps); st.has(d.step) ? st.delete(d.step) : st.add(d.step); return save({ steps: STEP_N.map(([k]) => k).filter((k) => st.has(k)) }); }
       if ("cap" in d) { S.open = !S.open; return drawQ(); }
-      if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اتوافق، وبيكمّل الخطوة الجاية");
-      if (d.ok) return act(`${d.ok}/ok`, { method: "POST", ...jsonBody({}) }, "✓ اتوافق");
-      if (d.stop) return act(`${d.stop}/stop`, null, "الميعاد ده اتشال");
-      if (d.retry) return act(`${d.retry}/retry`, null, "بيحاول تاني");
+      if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اعتُمد، ويُكمل الخطوة القادمة");
+      if (d.ok) return act(`${d.ok}/ok`, { method: "POST", ...jsonBody({}) }, "✓ اعتُمد");
+      if (d.stop) return act(`${d.stop}/stop`, null, "هذا الموعد أُزيل");
+      if (d.retry) return act(`${d.retry}/retry`, null, "يحاول مرة أخرى");
       if (d.del) return act(d.del, { method: "DELETE" });
       if (d.edit) { storageSet(projectKey("free"), d.edit); return showStep("6f"); }
     });

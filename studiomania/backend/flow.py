@@ -134,7 +134,7 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
             + "لكل فكرة اعمل «pack» للهوك الأعلى درجة بطريقة الهوك التلاتي: المكتوب والمعروض والمنطوق بيقولوا نفس المعنى بالظبط، "
               "ويعدّوا اختبار الصوت المقفول، وبعدهم جملتين قفل بطريقة من الـ ٦ (لمّح للدليل، لمّح للتحوّل، تباين سريع، الصندوق السحري، رد على الاعتراض، أكّد الادعاء).\n"
             + (extra + "\n" if extra else "")
-            + 'رجّع JSON بالشكل ده بس: {"ideas": [{"title": "عنوان قصير", '
+            + 'استعد JSON هذا بالشكل فقط: {"ideas": [{"title": "عنوان قصير", '
               '"hooks": [{"text": "الهوك", "formula": "اسم القالب", "score": 8.5, "why": "ليه الدرجة دي", "principle": "المبدأ النفسي"}, {...}, {...}], '
               '"pack": {"screen": "الهوك المكتوب على الشاشة (٣–١٠ كلمات، سطرين بالكتير، من غير علامات ترقيم)", "visual": "اللي بيتشاف في أول ثانيتين (حركة/تباين/حاجة غير متوقعة)", '
               '"spoken": "أول جملة بتتقال", "lockin": "الجملتين اللي بعد الهوك على طول (بيأكدوا الوعد وفيهم دليل أو لمحة)", "lockin_method": "طريقة القفل"}, '
@@ -147,12 +147,12 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
 
 def scenarios_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], idea: str, fmt: str, episodes, cast: list[str], n: int, avoid: list[str], hint: str) -> list[dict]:
     if fmt == "carousel":
-        shape = ('كل سيناريو = سلايدات (من ٥ لـ ٨): {"title": "...", "summary": "سطر", "slides": [{"n": 1, "heading": "عنوان السلايد", "text": "الكلام", "visual": "اللي بيتشاف"}], "caption": "كابشن البوست"}')
+        shape = ('كل سيناريو = سلايدات (من ٥ لـ ٨): {"title": "...", "summary": "سطر", "slides": [{"n": 1, "heading": "عنوان السلايد", "text": "النص", "visual": "ما يُرى"}], "caption": "تعليق نصي المنشور"}')
     elif fmt == "series":
         cnt = f"عدد الحلقات: {episodes} بالظبط" if str(episodes).isdigit() else "إنت اللي تحدد عدد الحلقات المناسب للحكاية (من ٢ لـ ٦)"
-        shape = (f'{cnt}. كل سيناريو = مسلسل: {{"title": "...", "summary": "الحكاية في سطرين", "episodes": [{{"n": 1, "title": "عنوان الحلقة", "beats": ["اللي بيحصل"], "voice": ["جمل الفويس أوفر"]}}], "caption": "..."}}')
+        shape = (f'{cnt}. كل سيناريو = مسلسل: {{"title": "...", "summary": "الحكاية في سطرين", "episodes": [{{"n": 1, "title": "عنوان الحلقة", "beats": ["ما يحدث"], "voice": ["جمل التعليق الصوتي"]}}], "caption": "..."}}')
     else:
-        shape = ('كل سيناريو = ريل ١٠-٣٠ ثانية: {"title": "...", "summary": "سطر", "beats": [{"t": "٠-٣ث", "what": "اللي بيتشاف", "say": "الكلام/الفويس أوفر", "text": "كلام على الشاشة لو فيه"}], "caption": "..."}')
+        shape = ('كل سيناريو = ريل ١٠-٣٠ ثانية: {"title": "...", "summary": "سطر", "beats": [{"t": "٠-٣ث", "what": "ما يُرى", "say": "النص/التعليق الصوتي", "text": "نص على الشاشة إذا فيه"}], "caption": "..."}')
     user = (f"الفكرة اللي العميل اختارها:\n{idea}\n\nنوع البوست: {FORMATS.get(fmt, fmt)}.\n"
             + (f"أبطال البوست: {', '.join(cast)}\n" if cast else "")
             + (f"طلب العميل: {hint}\n" if hint else "")
@@ -290,12 +290,12 @@ def mock_scenarios(fmt: str, n: int, episodes) -> dict:
     out = []
     for i in range(n):
         if fmt == "carousel":
-            out.append({"title": f"كاروسيل {i + 1}", "summary": "تجربة", "slides": [{"n": j + 1, "heading": f"سلايد {j + 1}", "text": "كلام", "visual": "صورة"} for j in range(5)], "caption": "كابشن"})
+            out.append({"title": f"كاروسيل {i + 1}", "summary": "تجربة", "slides": [{"n": j + 1, "heading": f"سلايد {j + 1}", "text": "نص", "visual": "صورة"} for j in range(5)], "caption": "تعليق نصي"})
         elif fmt == "series":
             ne = int(episodes) if str(episodes).isdigit() else 3
-            out.append({"title": f"مسلسل {i + 1}", "summary": "تجربة", "episodes": [{"n": j + 1, "title": f"الحلقة {j + 1}", "beats": ["بداية", "نهاية"], "voice": ["جملة", "جملة"]} for j in range(ne)], "caption": "كابشن"})
+            out.append({"title": f"مسلسل {i + 1}", "summary": "تجربة", "episodes": [{"n": j + 1, "title": f"الحلقة {j + 1}", "beats": ["بداية", "نهاية"], "voice": ["جملة", "جملة"]} for j in range(ne)], "caption": "تعليق نصي"})
         else:
-            out.append({"title": f"ريل {i + 1}", "summary": "تجربة", "beats": [{"t": "٠-٣ث", "what": "لقطة بتشد", "say": "استنى!", "text": "استنى"}, {"t": "٣-١٠ث", "what": "الحل", "say": "جرّب ده", "text": ""}], "caption": "كابشن"})
+            out.append({"title": f"ريل {i + 1}", "summary": "تجربة", "beats": [{"t": "٠-٣ث", "what": "لقطة تشد", "say": "انتظر!", "text": "انتظر"}, {"t": "٣-١٠ث", "what": "الحل", "say": "جرّب هذا", "text": ""}], "caption": "تعليق نصي"})
     return {"scenarios": out}
 
 
@@ -361,7 +361,7 @@ def motion_script_messages(brand: str, prefs: str, tpl: dict, schema: dict, scen
            "وfields = الكلام اللي بيظهر في خانات المشهد (قصير زي المثال، وماتعدّيش max_chars، ولو الخانة قايمة رجّع array بنفس عدد العناصر وشكلها). "
            "الجمل لازم تكمّل بعض كقصة واحدة بالترتيب، وماتكررش الكلام المكتوب على الشاشة حرفيًا في الفويس أوفر (الصوت بيشرح والشاشة بتلخّص). "
            f"لغة الفويس أوفر والكلام: {lang_label}. {guide} الأرقام بالأرقام العربي (٠١٢٣). "
-           'رجّع JSON: {"scripts":[{"title":"","summary":"","caption":"","scenes":[{"scene":"اسم المشهد بالظبط","say":"","fields":{}}]}]}')
+           'استعد JSON: {"scripts":[{"title":"","summary":"","caption":"","scenes":[{"scene":"اسم المشهد بالضبط","say":"","fields":{}}]}]}')
     user = (f"البراند:\n{brand}\n\n{prefs}\n\nالقالب: {tpl.get('name', '')}\n{tpl.get('profile', '')}\n\nالفكرة:\n{idea}\n\n"
             f"المشاهد بالترتيب:\n{json.dumps(rows, ensure_ascii=False)}\n\nاكتب {n} سكريبت مختلفين.")
     if avoid:
@@ -391,8 +391,8 @@ def clean_scripts(raw: dict, schema: dict, scenes: list[dict]) -> list[dict]:
 
 def mock_scripts(schema: dict, scenes: list[dict], n: int) -> dict:
     fields = scene_fields(schema, scenes)
-    return {"scripts": [{"title": f"سكريبت تجريبي {j + 1}", "summary": "سكريبت للتجربة من غير المخ", "caption": "كابشن تجريبي",
-                         "scenes": [{"scene": sc["name"], "say": f"دي جملة المشهد {i + 1} للتجربة.", "fields": {k: schema[k].get("def") for k in fields[sc["name"]]}}
+    return {"scripts": [{"title": f"نص تجريبي {j + 1}", "summary": "نص للتجربة بدون العقل", "caption": "تعليق نصي تجريبي",
+                         "scenes": [{"scene": sc["name"], "say": f"هذه جملة المشهد {i + 1} للتجربة.", "fields": {k: schema[k].get("def") for k in fields[sc["name"]]}}
                                     for i, sc in enumerate(scenes)]} for j in range(n)]}
 
 

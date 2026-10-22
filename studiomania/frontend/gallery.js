@@ -5,87 +5,87 @@ const Gallery = (() => {
   const S = { items: [], cats: [], root: null };
   // التايبوجرافي قالب زي الباقي: فيديو العرض بتاعه مترسوم بمحرك الكلام المتحرك نفسه
   // 📱 الخط الأساسي: تصوير بالموبايل (أول قالب): الفكرة والسكريبت اختياريين ← الفيديو ← ملاحظات ← مونتاج أوتوماتيك
-  const EXTRA = [{ id: "phone", name: "تصوير بالموبايل", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
-    desc: "صوّر نفسك بالموبايل وانت بتتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج أوتوماتيك بزوايا كاميرا وألوان وتايبوجرافي.", pin: 1 },
+  const EXTRA = [{ id: "phone", name: "تصوير بالجوال", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg", cat: "ugc",
+    desc: "صوّر نفسك بالجوال وأنت تتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج تلقائي بزوايا كاميرا وألوان وتايبوجرافي.", pin: 1 },
     // 🪞 رقم ٢: نفس الكلام للكاميرا بس الأفاتار هو اللي بيقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
     { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cover_url: "/gallery/avatar.jpg", cat: "ugc", pin: 2,
-    desc: "نفس فكرة التصوير بالموبايل، بس من غير ما تصوّر: الأفاتار (من «الأفاتار»: انت أو أي حد معاك إذنه) هو اللي بيقول السكريبت بوشّه وحركته." },
+    desc: "نفس فكرة التصوير بالجوال، فقط بدون ما تصوّر: الأفاتار (من «الأفاتار»: أنت أو أي حد معك إذنه) هو ما يقول النص بوشّه وحركته." },
     { id: "carousel", name: "كاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
-    desc: "صور ورا بعض على إنستجرام: سلايد هوك يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل البراند وألوانه." },
+    desc: "صور خلف بعض على إنستجرام: سلايد خطاف يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل العلامة وألوانه." },
     // 🎞️ فيديو إديتور: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
     { id: "editor", name: "فيديو إديتور", icon: "🎞️", cover_url: "/gallery/editor.jpg", cat: "other", pin: 5,
-    desc: "محرر فيديو فاضي: ارفع فيديوهاتك من عندك، وقطّع ورتّب وحط كلام وموسيقى وانتقالات بنفسك، من غير قالب ولا توليد." },
+    desc: "محرر فيديو فارغ: ارفع فيديوهاتك من جهازك، وقطّع ورتّب وحط نص وموسيقى وانتقالات بنفسك، بدون قالب ولا توليد." },
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
-    desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل بيطلّع فيديو جديد. وبيظهر في الأوتوبايلوت كقالب تختاره." },
+    desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل يُخرج فيديو جديد. ويظهر في الأوتوبايلوت كقالب تختاره." },
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
     { id: "hairline", name: "Hairline: خط رفيع على أسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
-    desc: "سجّل صوتك، والبرنامج يكتب كلامك بخط رفيع على أسود، ويرسم جنبه رسومات أيزومتريك على قد الكلام (لابتوب، قفل، فلوس…)، ولو مفيش رسمة جاهزة يرسم واحدة." },
+    desc: "سجّل صوتك، والبرنامج يكتب كلامك بخط رفيع على أسود، ويرسم جنبه رسومات أيزومتريك على قدر النص (لابتوب، قفل، مال…)، وإذا لا يوجد رسمة جاهزة يرسم واحدة." },
     { id: "typo", name: "تايبوجرافي", icon: "🔤", sample_url: "/gallery/typo.mp4", cover_url: "/gallery/typo.jpg", cat: "motion",
-    desc: "كلام بيتحرك على الإيقاع من صوتك أو سكريبتك، بأكتر من 300 حركة جاهزة." },
+    desc: "نص يتحرك على الإيقاع من صوتك أو سكريبتك، بأكتر من 300 حركة جاهزة." },
     // قوالب موشن بالكود (library/motion/r/t-*): بتترسم من غير توليد، والكلام والألوان بيتغيروا
-    ...[["t-watercolor", "ألوان مية", "art", "صفحة كراسة بترسم نفسها بالفرشاة، وملاحظات بخط اليد جنب الرسمة."],
-      ["t-riso", "ريزوجراف", "art", "طباعة بـ٣ أحبار فوق بعض، بنقط وألوان مش راكبة على بعض بالظبط."],
-      ["t-hose", "كرتون قديم", "cartoon2d", "كرتون التلاتينات بالأبيض والأسود: شخصية بترقص على الجاز وكروت عناوين قديمة."],
-      ["t-board", "سبورة", "explain", "شرح بيترسم قدامك على سبورة بيضا بالماركر أو خضرا وسودا بالطباشير، والكاميرا بتمشي من فكرة للتانية."],
-      ["t-chat", "قصة شات", "social", "محادثة بين العميل والمتجر على الموبايل، بتنتهي بتأكيد الطلب."],
-      ["t-price", "كشف السعر", "social", "السعر القديم بيتشطب والجديد بيخبط بكونفيتي، وعد تنازلي وزرار اطلب."],
-      ["t-pixel", "بكسل", "retro", "عالم لعبة قديمة: البطل بيروح للمحل، صندوق كلام، «حصلت على…» وقايمة اختيار."],
-      ["t-blueprint", "مخطط هندسي", "explain", "المنتج بيترسم بخطوط بيضا على ورق أزرق بالمقاسات والملاحظات، وختم «معتمد» في الآخر."],
-      ["t-swiss", "تصميم سويسري", "art", "شبكة صارمة ورقم ضخم وسطور بتطلع على الإيقاع، ودايرة حمرا واحدة خارجة عن الشبكة."],
-      ["t-review", "رأي عميل", "social", "اقتباس بيظهر كلمة كلمة ونجوم بتنور وصاحب الرأي، وفي الآخر متوسط التقييم."],
-      ["t-milestone", "رقم إنجاز", "social", "آلاف النقط زي النجوم بتتجمع في رقمك، وبعدين تتفرق وتكوّن اسم البراند."],
+    ...[["t-watercolor", "ألوان مية", "art", "صفحة كراسة ترسم نفسها بالفرشاة، وملاحظات بخط اليد بجانب الرسمة."],
+      ["t-riso", "ريزوجراف", "art", "طباعة بـ٣ أحبار أعلى بعض، بنقط وألوان غير راكبة على بعض بالضبط."],
+      ["t-hose", "كرتون قديم", "cartoon2d", "كرتون التلاتينات بالأبيض والأسود: شخصية ترقص على الجاز وبطاقات عناوين قديمة."],
+      ["t-board", "سبورة", "explain", "شرح يُرسم قدامك على سبورة بيضاء بالماركر أو خضراء وسوداء بالطباشير، والكاميرا تسير من فكرة للتانية."],
+      ["t-chat", "قصة شات", "social", "محادثة بين العميل والمتجر على الجوال، تنتهي بتأكيد الطلب."],
+      ["t-price", "كشف السعر", "social", "السعر القديم يتشطب والجديد يخبط بكونفيتي، وعد تنازلي وزر اطلب."],
+      ["t-pixel", "بكسل", "retro", "عالم لعبة قديمة: البطل يروح للمحل، صندوق نص، «حصلت على…» وقائمة اختيار."],
+      ["t-blueprint", "مخطط هندسي", "explain", "المنتج يُرسم بخطوط بيضاء على ورق أزرق بالمقاسات والملاحظات، وختم «معتمد» في الآخر."],
+      ["t-swiss", "تصميم سويسري", "art", "شبكة صارمة ورقم ضخم وسطور تظهر على الإيقاع، ودائرة حمراء واحدة خارجة عن الشبكة."],
+      ["t-review", "رأي عميل", "social", "اقتباس يظهر كلمة كلمة ونجوم تنور وصاحب الرأي، وفي الآخر متوسط التقييم."],
+      ["t-milestone", "رقم إنجاز", "social", "آلاف النقاط مثل النجوم تُجمع في رقمك، ثم تتفرق وتكوّن اسم العلامة."],
       ["t-wrapped", "ملخص السنة", "social", "شرايح سريعة بألوان صريحة، كل واحدة رقم أو معلومة عن العميل في السنة."],
-      ["t-ink", "حبر صيني", "art", "لوحة حبر بتترسم على ورق رز: جبال في الضباب وقارب وصنوبر، وختم أحمر واحد."],
-      ["t-silent", "فيلم صامت", "retro", "سينما زمان: فيلم أبيض وأسود بخدوش وكروت كلام وقصة كوميدية على بيانو."],
+      ["t-ink", "حبر صيني", "art", "لوحة حبر تُرسم على ورق رز: جبال في الضباب وقارب وصنوبر، وختم أحمر واحد."],
+      ["t-silent", "فيلم صامت", "retro", "سينما زمان: فيلم أبيض وأسود بخدوش وبطاقات نص وقصة كوميدية على بيانو."],
       ["t-anime", "أنمي التمانينات", "retro", "مدينة نيون بالليل، بطلة على سكوتر بخطوط سرعة، وعنوان منوّر على شريط فيديو قديم."],
-      ["t-count", "عد تنازلي", "social", "رقم بيقلب زي ساعات المطار لحد الصفر، وبعدها العرض بيتكشف بفلاش وكونفيتي."],
-      ["t-map", "خريطة متحركة", "explain", "دبابيس على الأحياء وطريق التوصيل بيترسم للعميل، وبعدين مناطق التغطية بتنوّر."],
-      ["t-launch", "إطلاق منتج", "social", "جملة على المشاهد، شاشة زجاج فيها طلب بيتكتب ونتيجته، علامات صح ورقم والاسم."],
-      ["t-ukiyo", "أوكييو-إي", "art", "طباعة خشب يابانية: كل لون من لوح لوحده، جبل وموج وقارب وشمس حمرا، وخانة عنوان بختم."],
-      ["t-glass", "زجاج معشق", "art", "شباك زجاج ملوّن في حيطة حجر بينوّر لما الشمس تعدّي، ولونه بيقع على الأرض."],
-      ["t-screen", "بوستر طباعة شاشة", "art", "بوستر بيتطبع لون ورا لون بالمسّاحة، بأحبار سادة وشريط بيانات تحت."],
+      ["t-count", "عد تنازلي", "social", "رقم يقلب مثل ساعات المطار حتى الصفر، وبعدها العرض يتكشف بفلاش وكونفيتي."],
+      ["t-map", "خريطة متحركة", "explain", "دبابيس على الأحياء وطريق التوصيل يُرسم للعميل، ثم مناطق التغطية تضيء."],
+      ["t-launch", "إطلاق منتج", "social", "جملة على المشاهد، شاشة زجاج فيها طلب يُكتب ونتيجته، علامات صحيح ورقم والاسم."],
+      ["t-ukiyo", "أوكييو-إي", "art", "طباعة خشب يابانية: كل لون من لوح تلقائيًا، جبل وموج وقارب وشمس حمراء، وخانة عنوان بختم."],
+      ["t-glass", "زجاج معشق", "art", "نافذة زجاج ملوّن في حيطة حجر يضيء عندما الشمس تعدّي، ولونه يقع على الأرض."],
+      ["t-screen", "بوستر طباعة شاشة", "art", "بوستر يتطبع لون خلف لون بالمسّاحة، بأحبار سادة وشريط بيانات أسفل."],
       ["t-deco", "آرت ديكو", "art", "خطوط دهب على أسود: شمس بأشعة وقوس متدرّج وجوهرة في النص وعنوان بلمعة دهب."],
-      ["t-crayon", "ألوان شمع", "cartoon2d", "صفحة كتاب أطفال بتترسم بالشمع: بيت وشمس بوش وشجرة وطفل ببالونة."],
-      ["t-spy", "تترات جاسوسية", "retro", "ورق مقصوص بأربع ألوان وسيلويت بيجري ورا شنطة، والشنطة بتتفتح على العرض السري."],
-      ["t-holo", "هولوجرام", "explain", "المنتج مجسم خطوط نور فوق قاعدة إسقاط: مسح وتفكيك وأرقام بتتثبت بلون التمييز."],
-      ["t-tilt", "تيلت شيفت", "motion", "المدينة من فوق كأنها ماكيت صغير، والناس بيتجمعوا عند الفرع الجديد."],
-      ["t-toon", "كرتون الخمسينات", "cartoon2d", "مذيعة إعلانات زمان بتشرح المنتج في ٣ خطوات بألوان مطبوعة ونجوم أتوميك."],
-      ["t-show", "برنامج مسابقات", "social", "سؤال و٣ إجابات على الإيقاع، جرس و«صح!»، والجايزة في الآخر."],
-      ["t-brick", "مكعبات طوب", "anim3d", "محل بيتبني طوبة طوبة على مكتب خشب، وشخصية من الطوب ماشية للباب."],
-      ["t-chart", "رسم بياني متحرك", "explain", "أعمدة بتطلع وبتتحول لخط، والرقم المهم بيتعلّم، وجملة كبيرة في الآخر."],
-      ["t-impasto", "ألوان زيت سميكة", "art", "لوحة بتتبني ضربة سكينة ورا التانية، والعنوان نفسه معمول من ضربات ألوان."],
-      ["t-oneline", "رسمة بخط واحد", "art", "خط واحد مابيتقطعش بيرسم الكوباية والبخار اللي بيبقى قلب، وبيكتب سطر تحت العنوان."],
+      ["t-crayon", "ألوان شمع", "cartoon2d", "صفحة كتاب أطفال تُرسم بالشمع: بيت وشمس بوش وشجرة وطفل ببالونة."],
+      ["t-spy", "تترات جاسوسية", "retro", "ورق مقصوص بأربع ألوان وسيلويت يجري خلف شنطة، والشنطة تُفتح على العرض السري."],
+      ["t-holo", "هولوجرام", "explain", "المنتج مجسم خطوط ضوء أعلى قاعدة إسقاط: مسح وتفكيك وأرقام تتثبت بلون التمييز."],
+      ["t-tilt", "تيلت شيفت", "motion", "المدينة من أعلى كأنها ماكيت صغير، والأشخاص يتجمعون عند الفرع الجديد."],
+      ["t-toon", "كرتون الخمسينات", "cartoon2d", "مذيعة إعلانات زمان تشرح المنتج في ٣ خطوات بألوان مطبوعة ونجوم أتوميك."],
+      ["t-show", "برنامج مسابقات", "social", "سؤال و٣ إجابات على الإيقاع، جرس و«صحيح!»، والجايزة في الآخر."],
+      ["t-brick", "مكعبات طوب", "anim3d", "محل يُبنى طوبة طوبة على مكتب خشب، وشخصية من الطوب ماشية للباب."],
+      ["t-chart", "رسم بياني متحرك", "explain", "أعمدة تظهر وتتحول لخط، والرقم المهم يتعلّم، وجملة كبيرة في الآخر."],
+      ["t-impasto", "ألوان زيت سميكة", "art", "لوحة تُبنى ضربة سكينة خلف الأخرى، والعنوان نفسه معمول من ضربات ألوان."],
+      ["t-oneline", "رسمة بخط واحد", "art", "خط واحد لا يُقطع يرسم الكوباية والبخار الذي يصبح قلب، ويكتب سطر أسفل العنوان."],
       ["t-shadow", "خيال الظل", "retro", "عرايس جلد ملوّن على قماشة منوّرة: راجل بطربوش وجمل، ويافطة حروفها مخرومة."],
-      ["t-lantern", "صندوق ورق رمضان", "art", "طبقات ورق مقصوص: الهلال والجامع والبيوت والفوانيس، والشبابيك بتنوّر واحد واحد."],
-      ["t-keynote", "كينوت إطلاق تطبيق", "social", "فوضى إشعارات بتتصف في قائمة مترتبة وتتعلّم صح، وبعدين الرقم الكبير واسم التطبيق."],
-      ["t-ascii", "شاشة كمبيوتر قديمة", "retro", "شاشة كهرماني بتكتب أوامر، وفنجان بيتطبع من حروف ورموز، والبخار بيتحرك."],
-      ["t-audiogram", "أوديوجرام بودكاست", "social", "غلاف الحلقة وموجة صوت بتتحرك، والجملة بتظهر كلمة كلمة والكلمة الحالية متعلّمة."],
-      ["t-captions", "كابشن تيك توك", "social", "فيديو منتج وكلام تقيل بيطلع كلمتين كلمتين، والكلمة المهمة ملوّنة، وزراير التفاعل على الجنب."],
-      ["t-particles", "جزيئات بتكتب الاسم", "social", "آلاف النقط المنوّرة بتلف زي مجرة، وتكتب العنوان، وتنفجر، وترجع تكتب اسم البراند."],
-      ["t-math", "شرح رياضي", "explain", "معادلة بتظهر رمز رمز، ومنحنيين بيتسابقوا، والفرق بينهم بيتعلّم بقوس وجملة."],
-      ["t-iso", "رسم أيزومتري", "explain", "رسم تقني أبيض وأسود بيحكي رحلة الطلب: الموبايل، السير، العربية، لحد باب البيت."],
-      ["t-logo", "ظهور لوجو", "social", "نقطة بتتنطط وتتحول لوجو بتلات بيتفتح ويلف، والخلفية بتتقلب للون البراند، والاسم يظهر."],
-      ["t-versus", "مقارنة VS", "social", "الشاشة بتتقسم بلونين وعلامة VS بتخبط، وجولات مقارنة بأعمدة، والفايز بياخد الشاشة كلها."],
-      ["t-lower", "شريط اسم المتكلم", "explain", "تلات ستايلات لشريط الاسم والوظيفة على مشهد مقابلة، مع شارة البرنامج والموضوع."],
-      ["t-loop", "لوب هندسي", "art", "أشكال بتتحول من دايرة لنجمة في شبكة مالهاش آخر، والكاميرا بتبعد وترجع واللوب بيقفل."],
-      ["t-beat", "على الإيقاع", "social", "كلمة جديدة بلون وتكوين مختلف مع كل ضربة، وبعدين الدروب باسم البراند بيومض."],
-      ["t-flow", "رسم توضيحي للخطوات", "explain", "كروت الخطوات بتظهر متعرّجة، والخطوط بينها بتترسم ونقط بتجري عليها، والنتيجة في الآخر."],
-      ["t-title3d", "عنوان مجسّم", "social", "عنوان بحروف بارزة طالع من أرض لامعة، والكاميرا بتلف حواليه، ولمعة بتعدّي، زي تترات المسلسلات."],
-      ["t-dossier", "ملف قضية مطبوع", "art", "ورقة أرشيف بنقط طباعة: المشتبه فيه في صورة الفيش، دليل برقم عملاق، وختم «اتقفلت» بيخبط."],
-      ["t-woodcut", "طباعة خشب محفور", "art", "لوح خشب أسود والسكينة بتحفر النور: فرن ونار، رغيف، وعنوان محفور بلون واحد."],
-      ["t-sketch", "سكتش مدينة بالقلم", "art", "كراسة رسم بخطوط قلم وألوان مية، وبالونة حمرا بتطير في الشارع لحد باب المحل."],
-      ["t-redcut", "قص ورق أحمر", "art", "وردة ورق بتتفتح، وبرواز مسنن فيه بيت وشجرة وعصافير، والاسم مقصوص جوه دايرة."],
-      ["t-pictogram", "بطاقات بيكتوجرام", "social", "رسومات بشرية هندسية بتتحرك على الإيقاع، كل بطاقة بلون وعنوان ضخم ورقم."],
-      ["t-microgame", "ألعاب سريعة", "retro", "ألعاب صغيرة ورا بعض بستايلات مختلفة والإيقاع بيسرع، والمنتج هو الجايزة."],
-      ["t-screencast", "عرض تطبيق حي", "explain", "تسجيل شاشة بماوس وزووم على الضغطات، وكائن بكسل صغير بيمثّل اللي التطبيق بيعمله."],
-      ["t-ytintro", "مقدمة ونهاية لقناة", "social", "افتتاحية بلوجو القناة، كارت عنوان الحلقة، وشاشة نهاية بفيديوهات مقترحة وزرار اشتراك."],
-      ["t-newsletter", "إعلان نشرة بريدية", "social", "ظرف بيتفتح، سؤال بيشد، تلات كروت من العدد، وخانة إيميل وزرار اشتراك."],
-      ["t-notch", "فيلم إطلاق بالنوتش", "social", "الكبسولة اللي فوق الشاشة بتكبر لودجتس (الطلب، الدفع، الخريطة) وبعدين تملى الشاشة باسم المنتج."],
-      ["t-onehero", "كورة واحدة بتحكي", "explain", "لقطة واحدة من غير قطع: كورة بتعدّي على قمع وبوابة ألوان وسوستة لحد العلبة."],
-      ["t-signature", "كارت شكر بتوقيع", "art", "كارت فاخر بيتفتح، كلمة الشكر بتترسم، توقيع بالقلم، وختم شمع باسم البراند."],
-      ["t-shopfloat", "متجر بمنتجات طايرة", "social", "جملة البراند كلمة كلمة بأيقونات المنتجات، بلوكات لون بتمسح الشاشة، كروت منتج بالسعر وزرار «أضف للسلة»، واللوجو."],
-      ["t-brandreveal", "كشف هوية البراند", "social", "على الإيقاع: العلامة والاسم، كاروسيل بوستات ثري دي، الحرف بيتحوّل، صفحات دليل البراند، ومطر رمز البراند."],
-      ["t-flipcards", "ستيكرات بتتقلب زي الكروت", "social", "٣ رسايل كل واحدة كارت: عنوان بشخبطة، صورة أبيض وأسود قدام دايرة، وستيكرات حواليها، والكارت بيتقلب للي بعده."]]
+      ["t-lantern", "صندوق ورق رمضان", "art", "طبقات ورق مقصوص: الهلال والجامع والبيوت والفوانيس، والشبابيك تضيء واحد واحد."],
+      ["t-keynote", "كينوت إطلاق تطبيق", "social", "فوضى إشعارات تتصف في قائمة مترتبة وتتعلّم صحيح، ثم الرقم الكبير واسم التطبيق."],
+      ["t-ascii", "شاشة كمبيوتر قديمة", "retro", "شاشة كهرماني تكتب أوامر، وفنجان يتطبع من حروف ورموز، والبخار يتحرك."],
+      ["t-audiogram", "أوديوجرام بودكاست", "social", "غلاف الحلقة وموجة صوت تتحرك، والجملة تظهر كلمة كلمة والكلمة الحالية متعلّمة."],
+      ["t-captions", "تعليق نصي تيك توك", "social", "فيديو منتج ونص تقيل يظهر كلمتين كلمتين، والكلمة المهمة ملوّنة، وأزرار التفاعل على الجنب."],
+      ["t-particles", "جزيئات تكتب الاسم", "social", "آلاف النقاط المنوّرة تدور مثل مجرة، وتكتب العنوان، وتنفجر، وتعود تكتب اسم العلامة."],
+      ["t-math", "شرح رياضي", "explain", "معادلة تظهر رمز رمز، ومنحنيين يتسابقون، والفرق بينهم يتعلّم بقوس وجملة."],
+      ["t-iso", "رسم أيزومتري", "explain", "رسم تقني أبيض وأسود يحكي رحلة الطلب: الجوال، السير، العربية، حتى باب البيت."],
+      ["t-logo", "ظهور شعار", "social", "نقطة تتنطط وتتحول شعار بتلات يُفتح ويدور، والخلفية تتقلب للون العلامة، والاسم يظهر."],
+      ["t-versus", "مقارنة VS", "social", "الشاشة تُقسّم بلونين وعلامة VS تخبط، وجولات مقارنة بأعمدة، والفايز يأخذ الشاشة كلها."],
+      ["t-lower", "شريط اسم المتكلم", "explain", "ثلاث أساليب لشريط الاسم والوظيفة على مشهد مقابلة، مع شارة البرنامج والموضوع."],
+      ["t-loop", "لوب هندسي", "art", "أشكال تتحول من دائرة لنجمة في شبكة ليس لها آخر، والكاميرا تبعد وتعود واللوب يقفل."],
+      ["t-beat", "على الإيقاع", "social", "كلمة جديدة بلون وتكوين مختلف مع كل ضربة، ثم الدروب باسم العلامة يومض."],
+      ["t-flow", "رسم توضيحي للخطوات", "explain", "بطاقات الخطوات تظهر متعرّجة، والخطوط بينها تُرسم ونقاط تجري عليها، والنتيجة في الآخر."],
+      ["t-title3d", "عنوان مجسّم", "social", "عنوان بحروف بارزة صاعد من أرض لامعة، والكاميرا تدور حواليه، ولمعة تعدّي، مثل تترات المسلسلات."],
+      ["t-dossier", "ملف قضية مطبوع", "art", "ورقة أرشيف بنقط طباعة: المشتبه فيه في صورة الفيش، دليل برقم عملاق، وختم «أُغلقت» يخبط."],
+      ["t-woodcut", "طباعة خشب محفور", "art", "لوح خشب أسود والسكينة تحفر الضوء: فرن ونار، رغيف، وعنوان محفور بلون واحد."],
+      ["t-sketch", "سكتش مدينة بالقلم", "art", "كراسة رسم بخطوط قلم وألوان مية، وبالونة حمراء تطير في الشارع حتى باب المحل."],
+      ["t-redcut", "قص ورق أحمر", "art", "وردة ورق تُفتح، وبرواز مسنن فيه بيت وشجرة وعصافير، والاسم مقصوص داخل دائرة."],
+      ["t-pictogram", "بطاقات بيكتوجرام", "social", "رسومات بشرية هندسية تتحرك على الإيقاع، كل بطاقة بلون وعنوان ضخم ورقم."],
+      ["t-microgame", "ألعاب سريعة", "retro", "ألعاب صغيرة خلف بعض بستايلات مختلفة والإيقاع يسرع، والمنتج هو الجايزة."],
+      ["t-screencast", "عرض تطبيق حي", "explain", "تسجيل شاشة بماوس وزووم على الضغطات، وكائن بكسل صغير يمثّل ما التطبيق يعمله."],
+      ["t-ytintro", "مقدمة ونهاية لقناة", "social", "افتتاحية بلوجو القناة، بطاقة عنوان الحلقة، وشاشة نهاية بفيديوهات مقترحة وزر اشتراك."],
+      ["t-newsletter", "إعلان نشرة بريدية", "social", "ظرف يُفتح، سؤال يشد، ثلاث بطاقات من العدد، وخانة بريد إلكتروني وزر اشتراك."],
+      ["t-notch", "فيلم إطلاق بالنوتش", "social", "الكبسولة التي أعلى الشاشة تكبر لودجتس (الطلب، الدفع، الخريطة) ثم تملأ الشاشة باسم المنتج."],
+      ["t-onehero", "كورة واحدة تحكي", "explain", "لقطة واحدة بدون قطع: كورة تعدّي على قمع وبوابة ألوان وسوستة حتى العلبة."],
+      ["t-signature", "بطاقة شكر بتوقيع", "art", "بطاقة فاخر يُفتح، كلمة الشكر تُرسم، توقيع بالقلم، وختم شمع باسم العلامة."],
+      ["t-shopfloat", "متجر بمنتجات طايرة", "social", "جملة العلامة كلمة كلمة بأيقونات المنتجات، بلوكات لون تحذف الشاشة، بطاقات منتج بالسعر وزر «أضف للسلة»، والشعار."],
+      ["t-brandreveal", "كشف هوية العلامة", "social", "على الإيقاع: العلامة والاسم، كاروسيل منشورات ثري هذه، الحرف يتحوّل، صفحات دليل العلامة، ومطر رمز العلامة."],
+      ["t-flipcards", "ستيكرات تتقلب مثل البطاقات", "social", "٣ رسائل كل واحدة بطاقة: عنوان بشخبطة، صورة أبيض وأسود أمام دائرة، وستيكرات حواليها، والبطاقة يتقلب للي بعده."]]
       .map(([id, name, cat, desc]) => ({ id, name, cat, desc, sample_url: `/gallery/${id}.mp4`, cover_url: `/gallery/${id}.jpg` }))];
   // تصنيفات القوالب اللي مش جاية من السيرفر
   const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات سوشيال" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "other", ar: "قوالبي" }];
@@ -98,21 +98,21 @@ const Gallery = (() => {
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
     S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
   }
-  const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "تانية";
+  const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "أخرى";
   // 🎡 العجلة: مالية الصفحة. أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
   // رول الماوس بيدّي العجلة دفعة فتجري وتهدى بالاحتكاك وتقف على أقرب قالب (فوق العجلة بتجري أكتر من فوق الكروت)، ومعاها تكّة سقاطة.
   // العجلة طبقات على عمق مختلف (حلقات ← أسماء ← طوق ← كورة ← زراير) فلما الماوس يقف عليها بتميل ناحيته والطبقات بتبعد عن بعض.
   const W = { list: [], pos: 0, vel: 0, mode: "snap", target: 0, fric: 1.7, shown: -1, cell: 0, lastTick: 0, G: {}, raf: 0, drag: null, tilt: { x: 0, y: 0, l: 0, tx: 0, ty: 0, tl: 0 } };
   const VMAX = 42, SNAPV = 1.6;
-  let STEP = 7.5 * Math.PI / 180;   // المسافة بين الأسماء: ثابتة، وعلى قد أطول اسم (سطر أو سطرين)
+  let STEP = 7.5 * Math.PI / 180;   // المسافة بين الأسماء: ثابتة، وعلى قدر أطول اسم (سطر أو سطرين)
   const pad = (n) => String(n).padStart(2, "0");
   // 🧪 مولّدات من غير قوالب (gen.js): زراير جوه الكورة الرمادي
-  const GENS = [["video", "🎬", "مولد فيديو", "وصف ← فيديو"], ["image", "🖼️", "مولد صور", "وصف ومرجع ← صور"], ["voice", "🎙️", "مولد صوت", "كلام ← صوت"]];
+  const GENS = [["video", "🎬", "مولد فيديو", "وصف ← فيديو"], ["image", "🖼️", "مولد صور", "وصف ومرجع ← صور"], ["voice", "🎙️", "مولد صوت", "نص ← صوت"]];
   const gensHTML = (cls) => `<div class="${cls}">${GENS.map(([k, i, b, s]) => `<button type="button" class="nh-wh-gen" data-gen="${k}"><i>${i}</i><span><b>${b}</b><small>${s}</small></span></button>`).join("")}</div>`;
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
   // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
-  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك انت"], ["editor", "فيديو إديتور", "مونتاج حر من غير قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة تانية"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "فيديو إديتور", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 2 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
@@ -157,19 +157,19 @@ const Gallery = (() => {
   }
   // 🧩 القوالب المخصصة: كروت بالقوالب اللي العميل عملها بخطواته، وكارت يعمل واحد جديد
   async function customIn(panel) {
-    panel.innerHTML = `<div class="nh-empty">بيحمّل…</div>`;
+    panel.innerHTML = `<div class="nh-empty">جارٍ التحميل…</div>`;
     let list = [];
     try { list = (await api("/api/automations")).filter((a) => a.saved); } catch (err) { toast(err.message, true); }
     if (CATS2[C.cur]?.[0] !== "custom") return;
-    panel.innerHTML = `<div class="nh-ct"><h3 class="nh-ct-h">قوالب مخصصة</h3><p class="nh-ct-hint">قوالب بخطواتك انت: تسحب من مكتبتك، تقطّع وتولّد وتصدّر، وكل تشغيل بيطلّع فيديو جديد. وبتظهر في الأوتوبايلوت كقالب تختاره.</p>
+    panel.innerHTML = `<div class="nh-ct"><h3 class="nh-ct-h">قوالب مخصصة</h3><p class="nh-ct-hint">قوالب بخطواتك أنت: تسحب من مكتبتك، تقطّع وتولّد وتصدّر، وكل تشغيل يُخرج فيديو جديد. وتظهر في الأوتوبايلوت كقالب تختاره.</p>
       <div class="nh-ct-grid">${list.map((a) => `<button type="button" class="nh-ct-card" data-ctopen="${esc(a.id)}"><i>🧩</i><b>${esc(a.name || "قالب مخصص")}</b>
-          <small><span class="num">${a.steps}</span> خطوة · اتشغّل <span class="num">${a.runs}</span> مرة</small></button>`).join("")}
+          <small><span class="num">${a.steps}</span> خطوة · شُغّل <span class="num">${a.runs}</span> مرة</small></button>`).join("")}
         <button type="button" class="nh-ct-card new" data-ctnew><i>＋</i><b>قالب مخصص جديد</b><small>رتّب خطواتك بنفسك</small></button></div></div>`;
   }
   function catGo(i) { C.target = Math.max(0, Math.min(CATS2.length - 1, i)); }
   function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
-      : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`;
+      : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`;
     return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
       <div class="nh-wc-h"><b>${esc(x.name)}</b><i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
   }
@@ -187,7 +187,7 @@ const Gallery = (() => {
     list.sort((a, b) => ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
-    if (!list.length) { box.innerHTML = `<div class="nh-empty">مفيش قوالب لسه.</div>`; return; }
+    if (!list.length) { box.innerHTML = `<div class="nh-empty">لا يوجد قوالب ما زال.</div>`; return; }
     box.innerHTML = `<div class="nh-wh" dir="ltr">
       <div class="nh-wh-wheel"><div class="nh-wh-3d">
         <svg class="nh-wh-l nh-wh-back" aria-hidden="true"></svg>
@@ -201,16 +201,16 @@ const Gallery = (() => {
         ${catsHTML("nh-wh-mcats")}
         <div class="nh-wh-eye"><span class="num"></span><span>·</span><span class="cat"></span></div>
         <h2 class="nh-wh-title"><span></span></h2><p class="nh-wh-desc"></p>
-        <button type="button" class="nh-wh-go">ابدأ بالقالب ده <span aria-hidden="true">←</span></button>
-        <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> فوق العجلة بيجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
+        <button type="button" class="nh-wh-go">ابدأ هذا بالقالب <span aria-hidden="true">←</span></button>
+        <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> أعلى العجلة يجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
       </section>
       <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
       <section class="nh-wh-panel" dir="rtl" hidden></section>
       <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
-        <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت شغال" : "شغّل الصوت"}</span></button></aside>
+        <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت يعمل" : "شغّل الصوت"}</span></button></aside>
     </div>`;
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
-    const want = CATS2.findIndex(([k]) => k === window.GAL_CAT);   // لو الصفحة اتفتحت على قسم بعينه (مثلًا الدبلجة)
+    const want = CATS2.findIndex(([k]) => k === window.GAL_CAT);   // إذا الصفحة فُتحت على قسم بعينه (مثلًا الدبلجة)
     window.GAL_CAT = null;
     Object.assign(C, { pos: Math.max(0, want), target: Math.max(0, want), vel: 0, cur: -1 });
     setCat(Math.max(0, want));
@@ -225,11 +225,11 @@ const Gallery = (() => {
     const mobile = innerWidth <= 720;
     el.style.height = Math.max(mobile ? 620 : 480, innerHeight - Math.max(0, el.getBoundingClientRect().top)) + "px";
     const wheel = el.querySelector(".nh-wh-wheel"), cards = el.querySelector(".nh-wh-cards");
-    wheel.style.top = mobile ? cards.offsetTop + "px" : "";   // على الموبايل العجلة جنب الكروت تحت الكلام
+    wheel.style.top = mobile ? cards.offsetTop + "px" : "";   // على الجوال العجلة بجانب البطاقات أسفل النص
     const h = wheel.clientHeight, w = wheel.clientWidth;
     // على الكمبيوتر الكورة باينة أكتر علشان الزراير تبقى جواها، وعلى الموبايل العجلة مستخبية أكتر ورا الحرف
     const R = mobile ? Math.min(h * .5, 300) : Math.min(h * .45, w * .7, 420), cx = mobile ? -R * .66 : -R * .1, cy = h * (mobile ? .36 : .5);
-    const rs = R * (mobile ? .6 : .63), rr = rs + R * .06;   // الكورة كبيرة كفاية إن أسماء الأقسام تبقى جواها
+    const rs = R * (mobile ? .6 : .63), rr = rs + R * .06;   // الكورة كبيرة كفاية أن أسماء الأقسام تصبح جواها
     // الخطين اللي حوالين العجلة بيترسموا كل فريم وفيهم فراغ مكان كل اسم معدّي عليهم
     const ring = (cls, sw, op) => `<path class="${cls}" fill="none" stroke="var(--nh-ink)" stroke-opacity="${op}" stroke-width="${sw}"/>`;
     el.querySelector(".nh-wh-back").innerHTML = ring("rg1", 1.2, .14) + ring("rg2", 1, .07) + `<path class="arc" fill="none" stroke="var(--nh-ink)" stroke-width="3" stroke-linecap="round"/><g class="ticks"></g>`;
@@ -292,10 +292,10 @@ const Gallery = (() => {
         if (Math.abs(e.deltaY) > 2 && now - C.last > 170) { C.last = now; catGo(Math.round(C.target) + Math.sign(e.deltaY)); }
         return;
       }
-      if (C.cur > 0) return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول بيسكرول فيها عادي
+      if (C.cur > 0) return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول يسكرول فيها عادي
       e.preventDefault(); if (W.drag) return;
       const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
-      if (W.mode === "snap" && Math.sign(d) !== Math.sign(W.vel)) W.vel *= .3;   // لو عكست الاتجاه العجلة تفرمل الأول
+      if (W.mode === "snap" && Math.sign(d) !== Math.sign(W.vel)) W.vel *= .3;   // إذا عكست الاتجاه العجلة تفرمل أولًا
       const onCards = cards.contains(e.target), k = onCards ? .022 : .075, cap = onCards ? 5 : 16;
       W.fric = onCards ? 3.2 : 1.4;
       W.vel = Math.max(-VMAX, Math.min(VMAX, W.vel + Math.sign(d) * Math.min(cap, Math.abs(d) * k)));
@@ -351,24 +351,24 @@ const Gallery = (() => {
     el.querySelectorAll(".nh-wh-dots i").forEach((d, j) => d.classList.toggle("on", j === Math.round(k / Math.max(1, N - 1) * 11)));
     el.querySelector(".nh-wh-eye .num").textContent = pad(k + 1) + " / " + pad(N);
     clearTimeout(W.swapT);
-    W.swapT = setTimeout(() => {   // الاسم بيتغيّر لما العجلة تهدى شوية (مش مع كل تكّة)
+    W.swapT = setTimeout(() => {   // الاسم يتغيّر عندما العجلة تهدى قليلًا (غير مع كل تكّة)
       const ti = el.querySelector(".nh-wh-title"); ti.innerHTML = ""; const s = document.createElement("span"); s.textContent = x.name; ti.appendChild(s);
       s.animate?.([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
       el.querySelector(".nh-wh-desc").textContent = x.desc || x.description || "";
       el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat);
     }, 60);
     clearTimeout(W.playT);
-    W.playT = setTimeout(() => W.G.cards.forEach((c, j) => play(c, j === W.shown)), 380);   // الفيديو بيشتغل للقالب اللي وقفت عليه بس
+    W.playT = setTimeout(() => W.G.cards.forEach((c, j) => play(c, j === W.shown)), 380);   // الفيديو يشتغل للقالب الذي وقفت عليه فقط
   }
   function loop(now) {
     const el = W.el;
-    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); dubOut(); Gen.close?.(); SceneStudio.close?.(); return; }   // الصفحة اتقفلت
+    if (!el || !el.isConnected) { W.raf = 0; W.G.cards?.forEach((c) => play(c, false)); dubOut(); Gen.close?.(); SceneStudio.close?.(); return; }   // الصفحة أُغلقت
     const dt = Math.min(.05, (now - (W.last || now)) / 1000), N = W.list.length, G = W.G; W.last = now;
-    if (W.mode === "coast") {   // بتجري بالدفعة وتهدى بالاحتكاك
+    if (W.mode === "coast") {   // تجري بالدفعة وتهدى بالاحتكاك
       W.pos += W.vel * dt; W.vel *= Math.exp(-W.fric * dt);
-      if (W.pos < 0 || W.pos > N - 1) snapTo(W.pos);   // خبطت في الطرف: ترجع بسبرنج
+      if (W.pos < 0 || W.pos > N - 1) snapTo(W.pos);   // خبطت في الطرف: تعود بسبرنج
       else if (Math.abs(W.vel) < SNAPV) snapTo(W.vel > 0 ? Math.ceil(W.pos - .15) : Math.floor(W.pos + .15));
-    } else if (W.mode === "snap") {   // سبرنج خفيف يقفلها على القالب (بيعدّي سنة صغيرة ويرجع)
+    } else if (W.mode === "snap") {   // سبرنج خفيف يقفلها على القالب (يعدّي سنة صغيرة ويعود)
       W.vel += ((W.target - W.pos) * 95 - W.vel * 16) * dt; W.pos += W.vel * dt;
       if (Math.abs(W.target - W.pos) < .0005 && Math.abs(W.vel) < .002) { W.pos = W.target; W.vel = 0; }
     }
@@ -394,7 +394,7 @@ const Gallery = (() => {
     G.d3.style.setProperty("--ry", (16 + T.x).toFixed(2) + "deg"); G.d3.style.setProperty("--rx", (T.y + spin * 3).toFixed(2) + "deg"); G.d3.style.setProperty("--lift", T.l.toFixed(3));
     const lx = G.cx + G.rs * (.35 + T.x * .02), ly = G.cy - G.rs * (.35 + T.y * .03);
     G.sph.setAttribute("cx", lx); G.sph.setAttribute("cy", ly); G.sph.setAttribute("fx", lx); G.sph.setAttribute("fy", ly);
-    const rl = G.R * .8, spans = [];   // كل اسم: زاويته وطوله لحد فين على نصف القطر
+    const rl = G.R * .8, spans = [];   // كل اسم: زاويته وطوله حتى أين على نصف القطر
     G.labs.forEach((s, i) => {
       const a = (i - pos) * STEP;
       if (Math.abs(a) > 1.2) { s.style.opacity = 0; return; }
@@ -430,7 +430,7 @@ const Gallery = (() => {
     G.cats.forEach((b, i) => {
       const t = i - C.pos, d = Math.abs(t), dy = t * rowH, sc = 1 - Math.min(.22, d * .1), op = Math.max(0, 1 - d * .28);
       const chord = Math.sqrt(Math.max(0, G.rs * G.rs - dy * dy)), w = (b._w || 0) * sc, h = (b._h || 0) * sc;
-      const x = Math.max(6, G.cx + chord * .9 - w);   // آخر المربع جوه الكورة، قبل الحرف والخط الأبيض
+      const x = Math.max(6, G.cx + chord * .9 - w);   // آخر المربع داخل الكورة، قبل الحرف والخط الأبيض
       b.style.opacity = op.toFixed(3);
       b.style.pointerEvents = d > 2.6 ? "none" : "";
       b.style.transform = `translate(${x.toFixed(1)}px,${(G.cy + dy).toFixed(1)}px) translateY(-50%) scale(${sc.toFixed(3)})`;
@@ -439,7 +439,7 @@ const Gallery = (() => {
     });
     const under = (px, py) => boxes.some(([x1, y1, x2, y2]) => px > x1 && px < x2 && py > y1 && py < y2);
     html = "";
-    for (let j = 0; j < 72; j++) {   // الحزوز بتنوّر في الناحية اللي جاي منها النور (فوق يمين)، وبتتمسح تحت أسماء الأقسام
+    for (let j = 0; j < 72; j++) {   // الحزوز تضيء في الناحية التي قادم منها الضوء (أعلى يمين)، وتُحذف أسفل أسماء الأقسام
       const a = (j - fr * 3) * Math.PI / 36, c = Math.cos(a), s = Math.sin(a);
       if (c < -.2) continue;
       const lit = Math.max(0, c * .7 - s * .7), r1 = G.rs * .9, r2 = G.rs * .985;
@@ -461,7 +461,7 @@ const Gallery = (() => {
   function setSound(on) {
     sndOn = on;
     try { localStorage.setItem("nh-wheel-snd", on ? "1" : "0"); } catch (e) {}
-    const b = W.el?.querySelector(".nh-wh-snd"); if (b) { b.setAttribute("aria-pressed", on); b.querySelector("span").textContent = on ? "الصوت شغال" : "شغّل الصوت"; }
+    const b = W.el?.querySelector(".nh-wh-snd"); if (b) { b.setAttribute("aria-pressed", on); b.querySelector("span").textContent = on ? "الصوت يعمل" : "شغّل الصوت"; }
     unlock(); if (on) setTimeout(() => tick(4), 60);
   }
   function tick(speed) {
@@ -537,13 +537,13 @@ const Gallery = (() => {
   function preview(x) {
     const pv = pvEl();
     pv.innerHTML = `<div class="nh-gal-pvbox">
-      <button type="button" class="nh-gal-x" data-gclose aria-label="اقفل">✕</button>
-      <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="">` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض جاي قريب</small></span>`}</div>
+      <button type="button" class="nh-gal-x" data-gclose aria-label="أغلق">✕</button>
+      <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="">` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
-        <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ بالقالب ده"}</button>
+        <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ هذا بالقالب"}</button>
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}
-        <small class="nh-gal-hint">${x.id === "editor" ? "بيفتح مشروع مونتاج جديد فاضي، وتلاقيه بعدين في «شغّال عليه»." : "المخ هيقترح عليك أفكار وسيناريوهات على قد البراند بتاعك، وانت تختار."}</small></div></div>`;
+        <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديد فارغ، وتلاقيه لاحقًا في «قيد العمل»." : "العقل سيقترح عليك أفكار وسيناريوهات على قدر العلامة الخاص بك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;
     pv.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
@@ -568,7 +568,7 @@ const Gallery = (() => {
 
   async function mount(root) {
     S.root = root;
-    if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر بيتعاد استخدامه لكل الصفحات: الأحداث مرة واحدة بس
+    if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر يُعاد استخدامه لكل الصفحات: الأحداث مرة واحدة فقط
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount, list: () => EXTRA, openEditor };

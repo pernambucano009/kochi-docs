@@ -1,9 +1,9 @@
 // StudioMania — الخطوة 6: المونتاج (محرر بتايم لاين زي كاب كات)
 
 const FPS = 30;
-let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (بيتغير مع مقاس الكادر)
+let PV_W = 252, PV_H = 448; // حجم كادر المعاينة (يتغير مع مقاس الكادر)
 const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
-const PPS_MIN = 0.5, PPS_MAX = 900; // حدود زووم التايم لاين (بكسل لكل ثانية): من ساعة كاملة على الشاشة لحد فريم فريم
+const PPS_MIN = 0.5, PPS_MAX = 900; // حدود زووم التايم لاين (بكسل لكل ثانية): من ساعة كاملة على الشاشة حتى فريم فريم
 // كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات الشخصيات / المسلسلات / الإعلانات)
 const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads", "6f": "free" };
 const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
@@ -24,7 +24,7 @@ let selPrimary = null;
 mt.extra = [];
 Object.defineProperty(mt, "sel", {
   get: () => selPrimary,
-  set: (v) => { selPrimary = v; mt.extra = []; }, // اختيار عادي بيلغي الاختيار المتعدد
+  set: (v) => { selPrimary = v; mt.extra = []; }, // اختيار عادي يلغي الاختيار المتعدد
 });
 const selKey = (x) => (x ? `${x.kind}:${x.i ?? x.p ?? ""}` : "");
 function allSelected() {
@@ -76,7 +76,7 @@ function blankProject(name) {
 
 async function initMontage() {
   const section = SECTION_OF_STEP[shell.step] || "coach";
-  if (section !== mt.section) mt.project = null;  // قسم تاني: متفتحش مشروع القسم اللي فات
+  if (section !== mt.section) mt.project = null;  // قسم آخر: لا تفتح مشروع القسم الذي فات
   mt.section = section;
   PROJECT_KEY = projectKey(section);
   const back = SECTION_BACK[section];
@@ -103,10 +103,10 @@ async function initMontage() {
 
 function fillSelects() {
   const keep = $("newFromVideo").value;
-  $("newFromVideo").innerHTML = `<option value="">مشروع فاضي</option>` +
+  $("newFromVideo").innerHTML = `<option value="">مشروع فارغ</option>` +
     mt.videos.map((v) => `<option value="${v.id}">من فيديو: ${escapeHtml(v.name)}${v.voice ? " 🎙️" : ""}</option>`).join("");
   $("newFromVideo").value = mt.videos.some((v) => v.id === keep) ? keep : "";
-  $("mCoach").innerHTML = `<option value="">— اختار —</option>` +
+  $("mCoach").innerHTML = `<option value="">— اختر —</option>` +
     mt.coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   $("mVoice").innerHTML = `<option value="">بدون تعليق صوتي</option>` +
     mt.voices.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
@@ -150,7 +150,7 @@ function openProject(p) {
 // ---------- الأوترو: قطعة فيديو عادية جوه التايم لاين ----------
 const OUTRO_PREFIX = "outro:";
 const isOutroClip = (c) => c.gen_id.startsWith(OUTRO_PREFIX);
-const EXTRA_OUTRO_PREFIX = "xoutro:"; // أوترو زيادة اترفع من المونتاج
+const EXTRA_OUTRO_PREFIX = "xoutro:"; // أوترو زيادة رُفع من المونتاج
 const isAnyOutro = (c) => isOutroClip(c) || c.gen_id.startsWith(EXTRA_OUTRO_PREFIX);
 const outroIdFor = (coachId) => `${OUTRO_PREFIX}${coachId}`;
 function coachHasOutro(coachId) {
@@ -164,7 +164,7 @@ function addOutroClip(d) {
 // المشاريع القديمة (والجديدة) فيها «ضيف الأوترو» كإعداد: بنحوّله لقطعة في آخر الفيديو مرة واحدة
 function migrateOutro(d) {
   if (!d.outro) return false;
-  if (!d.coach_id) return false; // لسه مفيش شخصية، الأوترو هيتضاف أول ما يتختار
+  if (!d.coach_id) return false; // لا يوجد بعد شخصية، الأوترو سيُضاف أول ما يُختار
   addOutroClip(d);
   d.outro = false;
   return true;
@@ -336,7 +336,7 @@ function renderBin() {
     && (!q || `${s.label} ${s.coach_name || ""}`.toLowerCase().includes(q)) && (!favOnly || favs.has(s.id)))
     .sort((a, b) => favs.has(b.id) - favs.has(a.id));
   $("binEmpty").hidden = list.length > 0;
-  $("binEmpty").textContent = q || favOnly ? "مفيش فيديوهات بالبحث ده." : $("binEmpty").textContent;
+  $("binEmpty").textContent = q || favOnly ? "لا يوجد فيديوهات هذا بالبحث." : $("binEmpty").textContent;
   const rep = mt.replacing != null;
   $("replaceBar").hidden = !rep;
   if (rep) $("replaceWhich").textContent = `رقم ${mt.replacing + 1}`;
@@ -345,10 +345,10 @@ function renderBin() {
     .map(
       (s) => `<div class="bin-item" data-id="${s.id}" draggable="true">
         ${lightVideo(s.url, "muted playsinline")}
-        <button class="add" title="${rep ? "حطه مكان القطعة" : "ضيف عند المؤشر"}">${rep ? "🔁" : "＋"}</button>
+        <button class="add" title="${rep ? "ضعه مكان القطعة" : "أضف عند المؤشر"}">${rep ? "🔁" : "＋"}</button>
         <button class="fav ${favs.has(s.id) ? "on" : ""}" title="مفضلة">${favs.has(s.id) ? "★" : "☆"}</button>
-        ${rep ? "" : `<button class="ovadd" title="ضيفه طبقة فوق الفيديو عند المؤشر">⧉</button>`}
-        ${s.extra ? `<button class="del" title="امسح الأوترو ده">✕</button>` : ""}
+        ${rep ? "" : `<button class="ovadd" title="أضفه طبقة أعلى الفيديو عند المؤشر">⧉</button>`}
+        ${s.extra ? `<button class="del" title="احذف هذا الأوترو">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
       </div>`
     )
@@ -393,7 +393,7 @@ $("edReplace").onclick = () => {
   mt.replacing = mt.sel.i;
   renderBin();
   $("binSearch").focus();
-  toast("اختار من المكتبة الفيديو اللي هيتحط مكانها");
+  toast("اختر من المكتبة الفيديو الذي سيوضع مكانها");
 };
 $("replaceCancel").onclick = () => { mt.replacing = null; renderBin(); };
 function replaceClip(i, genId) {
@@ -411,7 +411,7 @@ function replaceClip(i, genId) {
   mt.sel = { kind: "clip", i };
   changed();
   renderBin();
-  toast("اتبدّل الفيديو والتعديلات زي ما هي");
+  toast("استُبدل الفيديو والتعديلات كما هي");
 }
 $("binGrid").addEventListener("click", async (e) => {
   const item = e.target.closest(".bin-item");
@@ -421,13 +421,13 @@ $("binGrid").addEventListener("click", async (e) => {
   if (item && e.target.closest(".add")) insertClip(item.dataset.id, insertIndexAt(mt.t));
   if (item && e.target.closest(".del")) {
     const src = mt.sources.find((s) => s.id === item.dataset.id);
-    if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("الأوترو ده في التايم لاين. شيله منه الأول", true);
+    if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("هذا الأوترو في التايم لاين. أزله منه أولًا", true);
     if (!(await uiConfirm(`مسح «${src.label}»؟`))) return;
     try {
       await api(`/api/outros/${encodeURIComponent(src.id)}`, { method: "DELETE" });
       mt.sources = mt.sources.filter((s) => s.id !== src.id);
       renderBin();
-      toast("اتمسح");
+      toast("حُذف");
     } catch (err) {
       toast(err.message, true);
     }
@@ -445,12 +445,12 @@ $("outroUpload").addEventListener("change", async (e) => {
   form.append("name", `أوترو ${file.name.replace(/\.[^.]+$/, "")}`);
   if (d.coach_id) form.append("coach_id", d.coach_id);
   try {
-    toast(`⏳ بيرفع ${file.name}...`);
+    toast(`⏳ جارٍ الرفع ${file.name}...`);
     const o = await api("/api/outros", { method: "POST", body: form });
     mt.sources = await api("/api/montage/sources");
     renderBin();
     insertClip(o.id, d.clips.length);
-    toast("✅ الأوترو اتضاف في آخر المونتاج. تقدر تحركه وتقصه زي أي قطعة");
+    toast("✅ الأوترو أُضيف في آخر المونتاج. يمكنك تحركه وتقصه مثل أي قطعة");
   } catch (err) {
     toast(err.message, true);
   }
@@ -462,13 +462,13 @@ $("clipUpload").addEventListener("change", async (e) => {
   if (!file || !mt.project) return;
   const d = mt.project.data;
   const c = selectedClip();
-  const replace = c && (await uiConfirm("تبدّل فيديو القطعة المتحددة بالفيديو ده؟\n(لو لأ، هيتحط كقطعة جديدة عند المؤشر)"));
+  const replace = c && (await uiConfirm("تبدّل فيديو القطعة المتحددة هذا بالفيديو؟\n(إذا لا، سيوضع كقطعة جديدة عند المؤشر)"));
   const form = new FormData();
   form.append("file", file);
   if (d.coach_id) form.append("coach_id", d.coach_id);
   if (replace) form.append("replace", c.gen_id);
   try {
-    toast(`⏳ بيرفع ${file.name}...`);
+    toast(`⏳ جارٍ الرفع ${file.name}...`);
     const r = await api("/api/montage/upload", { method: "POST", body: form });
     mt.sources = await api("/api/montage/sources");
     renderBin();
@@ -478,11 +478,11 @@ $("clipUpload").addEventListener("change", async (e) => {
       Object.assign(c, { gen_id: r.id, start: 0, end: Math.min(r.duration, len || r.duration) });
       changed();
       toast(r.duration + 0.05 < len
-        ? `✅ اتبدّل الفيديو. خلي بالك: الفيديو الجديد ${r.duration.toFixed(1)}ث والقطعة كانت ${len.toFixed(1)}ث`
-        : `✅ اتبدّل الفيديو${r.synced_shot ? " واتضاف كمان على اللقطة في تبويب المسلسل" : ""}`);
+        ? `✅ استُبدل الفيديو. اجعل بالك: الفيديو الجديد ${r.duration.toFixed(1)}ث والقطعة كانت ${len.toFixed(1)}ث`
+        : `✅ استُبدل الفيديو${r.synced_shot ? " وأُضيف أيضًا على اللقطة في تبويب المسلسل" : ""}`);
     } else {
       insertClip(r.id, insertIndexAt(mt.t));
-      toast("✅ الفيديو اتضاف عند المؤشر");
+      toast("✅ الفيديو أُضيف عند المؤشر");
     }
   } catch (err) {
     toast(err.message, true);
@@ -645,7 +645,7 @@ function renderTimeline() {
           const w = (it.t1 - it.t0) * mt.pps;
           const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
           const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w, it.speed) : stripHtml("outro", it.coach.id, 0, w);
-          const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو اتمسح") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
+          const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو حُذف") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
           const kfd = hasKf(it.c) ? it.c.kf.map((k) => `<i class="kfd" style="left:${k.t * mt.pps}px"></i>`).join("") : "";
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"} ${it.c?.disabled ? "disabled" : ""}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
@@ -658,7 +658,7 @@ function renderTimeline() {
           </div>`;
         })
         .join("")
-    : `<div class="tl-drop-hint">اسحب فيديو هنا أو دوس ＋ على فيديو من المكتبة</div>`;
+    : `<div class="tl-drop-hint">اسحب فيديو هنا أو اضغط ＋ على فيديو من المكتبة</div>`;
   // موجة الصوت اللي جوه كل قطعة فيديو
   $("trkVideo").querySelectorAll(".tl-clip").forEach((el) => {
     const cv = el.querySelector("canvas.cw");
@@ -669,14 +669,14 @@ function renderTimeline() {
   const allMuted = clips.length > 0 && clips.every((c) => c.volume === 0);
   $("muteAll").hidden = !clips.length;
   $("muteAll").textContent = allMuted ? "🔇" : "🔊";
-  $("muteAll").title = allMuted ? "رجّع صوت كل الفيديوهات" : "اكتم صوت كل الفيديوهات";
+  $("muteAll").title = allMuted ? "استعد صوت كل الفيديوهات" : "اكتم صوت كل الفيديوهات";
   $("muteAll").classList.toggle("off", allMuted);
 
   for (const [kind, color] of [["voice", "#7fb2ff"], ["music", "#6fe0bd"]]) {
     const el = $(kind === "voice" ? "trkVoice" : "trkMusic");
     const parts = trackParts(kind);
     if (!parts.length) {
-      el.innerHTML = `<div class="tl-empty-track">${kind === "voice" ? "مفيش تعليق صوتي — اختاره من تاب 🔊 الصوت" : "مفيش موسيقى — اختارها من تاب 🔊 الصوت"}</div>`;
+      el.innerHTML = `<div class="tl-empty-track">${kind === "voice" ? "لا يوجد تعليق صوتي — اختره من تبويب 🔊 الصوت" : "لا يوجد موسيقى — اخترها من تبويب 🔊 الصوت"}</div>`;
       continue;
     }
     el.innerHTML = parts
@@ -697,7 +697,7 @@ function renderTimeline() {
   if (typeof renderTextRow === "function") renderTextRow();
   if (typeof renderOverRow === "function") renderOverRow();
   $("trkCaps").innerHTML = captionBlocks()
-    .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="دوسة تختاره · Delete تمسحه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
+    .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="ضغطة تختاره · Delete تحذفه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
 
   renderTrackHeads();
@@ -719,9 +719,9 @@ const TRACKS = {
   text: { row: "trkText", head: "h-text", can: ["lock", "hide"] },
   over: { row: "trkOver", head: "h-over", can: ["lock", "hide", "mute"] },
 };
-const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل التراك (متقدرش تحرّك أو تمسح حاجة فيه)", "افتح التراك"],
-  hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "رجّع التراك يظهر"],
-  mute: ["🔊", "🔇", "اكتم التراك", "رجّع صوت التراك"] };
+const FLAG_ICON = { lock: ["🔓", "🔒", "أغلق التراك (لا تستطيع تحرّك أو تحذف شيء فيه)", "افتح التراك"],
+  hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "استعد التراك يظهر"],
+  mute: ["🔊", "🔇", "اكتم التراك", "استعد صوت التراك"] };
 function trackFlag(trk, flag) {
   const d = mt.project?.data;
   if (!d) return false;
@@ -774,14 +774,14 @@ function soundBadge(it) {
   if (!hasSound(it)) return "";
   const v = Math.round(it.volume * 100);
   const icon = v === 0 ? "🔇" : v < 60 ? "🔉" : "🔊";
-  return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — دوس ترجّعه" : "الفيديو ده فيه صوت — دوس تكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
+  return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — اضغط ترجّعه" : "هذا الفيديو فيه صوت — اضغط تكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
 }
 // خط الصوت جوه القطعة: تسحبه لفوق يعلّي ولتحت يوطّي (من 0% لـ 200%)
 const VOL_MAX = 2;
 function volLine(vol) {
   const pct = Math.round(vol * 100);
   return `<i class="vline ${pct === 0 ? "zero" : ""} ${vol > 1.4 ? "hi" : ""}" data-vol style="bottom:${(clamp(vol, 0, VOL_MAX) / VOL_MAX) * 100}%"
-    title="اسحب لفوق أو لتحت عشان تعلّي أو توطّي الصوت · دبل كليك يرجّعه 100%"><em>${pct}%</em></i>`;
+    title="اسحب لفوق أو لتحت لكي تعلّي أو توطّي الصوت · نقرتان يرجّعه 100%"><em>${pct}%</em></i>`;
 }
 function volTarget(el) {
   const d = mt.project.data;
@@ -957,7 +957,7 @@ document.querySelectorAll(".tl-toolbar .tool").forEach((b) => (b.onclick = () =>
 
 function splitPart(x, t) {
   const cut = snap(t - x.t0);
-  if (cut < MIN_CLIP - 1e-6 || x.len - cut < MIN_CLIP - 1e-6) return toast("مفيش ولا فريم بين المؤشر وطرف القطعة", true);
+  if (cut < MIN_CLIP - 1e-6 || x.len - cut < MIN_CLIP - 1e-6) return toast("لا يوجد أي فريم بين المؤشر وطرف القطعة", true);
   pushHistory();
   const parts = x.t.parts;
   const rest = x.p.length == null ? null : snap(x.len - cut);
@@ -984,12 +984,12 @@ function splitAt(t, target) {
   if (s?.kind === "voice" || s?.kind === "music") {
     const x = trackParts(s.kind)[s.p];
     if (x && t > x.t0 && t < x.t1) return splitPart(x, t);
-    return toast("حط المؤشر على قطعة الصوت المختارة عشان تقسمها", true);
+    return toast("ضع المؤشر على قطعة الصوت المختارة لكي تقسمها", true);
   }
   const it = seq().items.find((x) => x.kind === "clip" && t > x.t0 && t < x.t1);
-  if (!it) return toast("حط المؤشر على قطعة فيديو عشان تقسمها", true);
+  if (!it) return toast("ضع المؤشر على قطعة فيديو لكي تقسمها", true);
   const at = snap(srcTimeAt(it, t));
-  if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("مفيش ولا فريم بين المؤشر وطرف القطعة", true);
+  if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("لا يوجد أي فريم بين المؤشر وطرف القطعة", true);
   pushHistory();
   const clips = mt.project.data.clips;
   // القطعة اللي بالعكس: الجزء الأول على التايم لاين هو آخر الفيديو الأصلي
@@ -1068,7 +1068,7 @@ function focusPane(sel) {
     h.classList.remove("flash"); void h.offsetWidth; h.classList.add("flash");
   }
 }
-const TAB_OF_KIND = {};  // التراكات الجديدة بتسجّل التاب بتاعها هنا
+const TAB_OF_KIND = {};  // التراكات الجديدة تسجّل التبويب الخاص بها هنا
 function selectItem(sel, seekInto) {
   mt.sel = sel;
   focusPane(sel);
@@ -1366,7 +1366,7 @@ $("tlCanvas").addEventListener("drop", (e) => {
 });
 
 // ---------- المعاينة والتشغيل ----------
-const pool = new Map(); // لكل فيديو عنصر جاهز عشان التنقل بين القطع يبقى سريع
+const pool = new Map(); // لكل فيديو عنصر جاهز لكي التنقل بين القطع يصبح سريع
 const audioEls = new Map(); // عنصر صوت لكل قطعة من التعليق أو الموسيقى
 function audioFor(key) {
   let el = audioEls.get(key);
@@ -1389,7 +1389,7 @@ function videoFor(url) {
     v.addEventListener("loadeddata", () => {
       if (mt.active !== v || mt.playing) return;
       layoutActive();
-      v.currentTime = v.currentTime; // نطلب الفريم تاني عشان يترسم
+      v.currentTime = v.currentTime; // نطلب الفريم مرة أخرى لكي يُرسم
     });
     $("pvStage").append(v);
     pool.set(url, v);
@@ -1462,7 +1462,7 @@ function drawBlurBg() {
   const sc = Math.max(cv.width / vw, cv.height / vh);
   g.setTransform(1, 0, 0, 1, cv.width / 2, cv.height / 2);
   g.rotate((rot * Math.PI) / 180);
-  try { g.drawImage(v, -v.videoWidth * sc / 2, -v.videoHeight * sc / 2, v.videoWidth * sc, v.videoHeight * sc); } catch (e) { /* لسه مفيش فريم */ }
+  try { g.drawImage(v, -v.videoWidth * sc / 2, -v.videoHeight * sc / 2, v.videoWidth * sc, v.videoHeight * sc); } catch (e) { /* لا يوجد بعد فريم */ }
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 function applyFx(post) {
@@ -1518,8 +1518,8 @@ function drawGrain(cv, amt) {
 
 // ---------- الحركة: نفس معادلات FFmpeg بالظبط (montage.py: kf_value / motion_exprs / post_fx) ----------
 let OUT_W = 1080, OUT_H = 1920;
-const ANIMS = [["", "بدون"], ["fade", "ظهور"], ["zoomin", "زووم إن"], ["zoomout", "زووم أوت"], ["pop", "بوب"], ["spin", "لفّة"],
-  ["slidel", "من اليمين"], ["slider", "من الشمال"], ["slideu", "من تحت"], ["slided", "من فوق"]];
+const ANIMS = [["", "بدون"], ["fade", "ظهور"], ["zoomin", "تكبير"], ["zoomout", "زووم أوت"], ["pop", "بوب"], ["spin", "لفّة"],
+  ["slidel", "من اليمين"], ["slider", "من الشمال"], ["slideu", "من أسفل"], ["slided", "من أعلى"]];
 const ANIM_FADES = new Set(["fade", "zoomin", "zoomout", "pop", "spin"]);
 const EFFECTS = [["shake", "اهتزاز"], ["pulse", "نبض"], ["flash", "فلاش"], ["glitch", "جليتش"], ["rgb", "ألوان مفصولة"], ["blur", "بلور"], ["grain", "حبيبات"]];
 const clipCrop = (c) => {
@@ -1662,7 +1662,7 @@ function showItem(it, t, playing) {
   if (!v) return;
   // أول ما الفيديو يظهر لازم نطلب الفريم من جديد، وإلا ممكن يفضل أسود
   if (changedItem) v.currentTime = want + 0.001;
-  else if (it.rev && playing) { if (Math.abs(v.currentTime - want) > 0.06) v.currentTime = want; }  // العكس: بنسحب الفيديو لورا فريم فريم
+  else if (it.rev && playing) { if (Math.abs(v.currentTime - want) > 0.06) v.currentTime = want; }  // العكس: نسحب الفيديو لورا فريم فريم
   else if (!playing || Math.abs(v.currentTime - want) > 0.3) {
     if (Math.abs(v.currentTime - want) > 0.0005) v.currentTime = want + 0.001;
   }
@@ -1814,7 +1814,7 @@ function clipBox() {
     el = document.createElement("div");
     el.id = "pvBox";
     el.className = "pv-box";
-    el.innerHTML = `<i data-bh="nw"></i><i data-bh="ne"></i><i data-bh="sw"></i><i data-bh="se"></i><b data-bh="rot" title="اسحب عشان تلف · Shift = كل 15°"></b>`;
+    el.innerHTML = `<i data-bh="nw"></i><i data-bh="ne"></i><i data-bh="sw"></i><i data-bh="se"></i><b data-bh="rot" title="اسحب لكي تدور · Shift = كل 15°"></b>`;
     $("previewFrame").closest(".ed-player").append(el);
     el.addEventListener("pointerdown", (e) => { if (e.target.closest("[data-bh]")) startClipDrag(e); });
   }
@@ -1905,9 +1905,9 @@ $("previewFrame").addEventListener(
 const ATTR_KEYS = ["zoom", "x", "y", "angle", "rotate", "flip_h", "flip_v", "fit", "crop", "speed", "adj", "look",
   "fade_in", "fade_out", "anim_in", "anim_out", "fx", "volume"];
 function copyAttrs(c = selectedClip()) {
-  if (!c) return toast("اختار قطعة فيديو الأول", true);
+  if (!c) return toast("اختر قطعة فيديو أولًا", true);
   mt.attrs = JSON.parse(JSON.stringify(Object.fromEntries(ATTR_KEYS.map((k) => [k, c[k] ?? null]))));
-  toast("📋 اتنسخت إعدادات القطعة · Ctrl+Shift+V تلصقها");
+  toast("📋 نُسخت إعدادات القطعة · Ctrl+Shift+V تلصقها");
 }
 function applyAttrs(c) {
   const a = JSON.parse(JSON.stringify(mt.attrs));
@@ -1915,25 +1915,25 @@ function applyAttrs(c) {
   Object.assign(c, a);
 }
 function pasteAttrs(all = false) {
-  if (!mt.attrs) return toast("انسخ إعدادات قطعة الأول (كليك يمين ← انسخ الإعدادات)", true);
+  if (!mt.attrs) return toast("انسخ إعدادات قطعة أولًا (كليك يمين ← انسخ الإعدادات)", true);
   const d = mt.project.data;
   const targets = all ? d.clips.filter((c) => !isOutroClip(c))
     : allSelected().filter((x) => x.kind === "clip").map((x) => d.clips[x.i]).filter(Boolean);
-  if (!targets.length) return toast("اختار القطعة اللي هتلصق عليها", true);
+  if (!targets.length) return toast("اختر القطعة التي ستلصق عليها", true);
   pushHistory();
   targets.forEach(applyAttrs);
   changed();
-  toast(`✓ اتلصقت على ${targets.length} قطعة`);
+  toast(`✓ أُلصقت على ${targets.length} قطعة`);
 }
 // امسح الجزء اللي قبل أو بعد المؤشر من القطعة اللي تحته (أو المختارة)
 function deleteSide(side) {
   const items = seq().items;
   const it = (mt.sel?.kind === "clip" && items[mt.sel.i] && mt.t > items[mt.sel.i].t0 && mt.t < items[mt.sel.i].t1)
     ? items[mt.sel.i] : items.find((x) => x.kind === "clip" && mt.t > x.t0 && mt.t < x.t1);
-  if (!it) return toast("حط المؤشر جوه قطعة فيديو", true);
+  if (!it) return toast("ضع المؤشر داخل قطعة فيديو", true);
   const at = snap(srcTimeAt(it, mt.t));
   const c = it.c;
-  if ((side === "left") !== !!it.rev ? at - c.start < MIN_CLIP : clipOut(c) - at < MIN_CLIP) return toast("مفيش ولا فريم يتمسح", true);
+  if ((side === "left") !== !!it.rev ? at - c.start < MIN_CLIP : clipOut(c) - at < MIN_CLIP) return toast("لا يوجد أي فريم يُحذف", true);
   pushHistory();
   const len = it.t1 - it.t0, cut = mt.t - it.t0;
   if (side === "left") {
@@ -1967,7 +1967,7 @@ $("tlMarker").onclick = addMarker;
 function renderMarkers() {
   const box = $("tlMarkers");
   if (!box || !mt.project) return;
-  box.innerHTML = markers().map((m, n) => `<i class="tl-mark" data-m="${n}" style="left:${m.t * mt.pps}px" title="${escapeHtml(m.label || "علامة")} · ${fmtTC(m.t)} · دوسة تروحلها · دبل كليك تكتب اسم · كليك يمين تمسحها"><em>${escapeHtml(m.label || "")}</em></i>`).join("");
+  box.innerHTML = markers().map((m, n) => `<i class="tl-mark" data-m="${n}" style="left:${m.t * mt.pps}px" title="${escapeHtml(m.label || "علامة")} · ${fmtTC(m.t)} · ضغطة تروحلها · نقرتان تكتب اسم · كليك يمين تحذفها"><em>${escapeHtml(m.label || "")}</em></i>`).join("");
 }
 $("tlMarkers").addEventListener("pointerdown", (e) => {
   const el = e.target.closest(".tl-mark");
@@ -1991,13 +1991,13 @@ $("tlMarkers").addEventListener("dblclick", async (e) => {
 function toggleLoop() {
   mt.loop = !mt.loop;
   $("tpLoop").classList.toggle("on", mt.loop);
-  toast(mt.loop ? "🔁 التشغيل المتكرر شغال" : "التشغيل المتكرر اتقفل");
+  toast(mt.loop ? "🔁 التشغيل المتكرر يعمل" : "التشغيل المتكرر أُغلق");
 }
 $("tpLoop").onclick = toggleLoop;
 function toggleFull() {
   const el = $("previewFrame").closest(".ed-player");
   if (document.fullscreenElement) document.exitFullscreen?.();
-  else el.requestFullscreen?.().catch(() => toast("المتصفح مش سامح بالشاشة الكاملة", true));
+  else el.requestFullscreen?.().catch(() => toast("المتصفح غير سامح بالشاشة الكاملة", true));
 }
 $("tpFull").onclick = toggleFull;
 document.addEventListener("fullscreenchange", () => {
@@ -2058,7 +2058,7 @@ $("tlCanvas").addEventListener("contextmenu", (e) => {
   if (!clipEl && !audEl) return;
   e.preventDefault();
   const x = selOfEl(clipEl || audEl);
-  if (kindLocked(x.kind)) return toast("التراك ده مقفول 🔒", true);
+  if (kindLocked(x.kind)) return toast("هذا التراك مغلق 🔒", true);
   if (!isSel(x)) selectItem(x);
   const c = clipEl ? mt.project.data.clips[x.i] : null;
   const k = (key) => `<kbd>${key}</kbd>`;
@@ -2068,15 +2068,15 @@ $("tlCanvas").addEventListener("contextmenu", (e) => {
     ["pasteAll", "📥 الصق الإعدادات على كل القطع", "", !mt.attrs],
     "-",
     ["split", "✂ قسّم عند المؤشر", k("S")],
-    ["delLeft", "⇤ امسح اللي قبل المؤشر", k("Q")],
-    ["delRight", "⇥ امسح اللي بعد المؤشر", k("W")],
+    ["delLeft", "⇤ احذف ما قبل المؤشر", k("Q")],
+    ["delRight", "⇥ احذف ما بعد المؤشر", k("W")],
     ["dup", "⧉ كرّر", ""],
     ["kf", "◇ كي فريم عند المؤشر", ""],
     "-",
     ["replace", "🔁 استبدل الفيديو", ""],
-    ["toOver", "⤴ خليها طبقة فوق الفيديو", ""],
+    ["toOver", "⤴ اجعلها طبقة أعلى الفيديو", ""],
     ["disable", c?.disabled ? "✓ فعّل القطعة" : "⊘ عطّل القطعة", ""],
-    ["resetFx", "↺ شيل كل التأثيرات", ""],
+    ["resetFx", "↺ أزل كل التأثيرات", ""],
     ["del", "🗑 احذف", k("Delete")],
   ] : [
     ["split", "✂ قسّم عند المؤشر", k("S")],
@@ -2168,7 +2168,7 @@ function renderInspector() {
   $("volVal").textContent = s.has_audio ? `${Math.round(c.volume * 100)}%` : "";
   $("edVol").disabled = !s.has_audio;
   $("edMute").hidden = !s.has_audio;
-  $("edMute").textContent = c.volume === 0 ? "🔊 رجّع الصوت" : "🔇 اكتم صوت الفيديو ده";
+  $("edMute").textContent = c.volume === 0 ? "🔊 استعد الصوت" : "🔇 اكتم صوت هذا الفيديو";
   $("noAudio").hidden = !!s.has_audio;
   renderFx(c);
   $("edDisable").textContent = c.disabled ? "✓ فعّل القطعة" : "⊘ عطّل";
@@ -2229,7 +2229,7 @@ $("edReset").onclick = editorInput(null, (c) => Object.assign(c, { zoom: 1, x: 0
 
 // ---------- لوحة التأثيرات (سرعة/عكس/شكل/فلتر/ألوان/ظهور) ----------
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
-const FITS = [["fill", "يملا الكادر"], ["blur", "كامل + خلفية مغبّشة"], ["black", "كامل + أسود"]];
+const FITS = [["fill", "يملأ الكادر"], ["blur", "كامل + خلفية مغبّشة"], ["black", "كامل + أسود"]];
 const ADJ = [["bright", "الإضاءة"], ["contrast", "التباين"], ["sat", "التشبّع"], ["temp", "دافي ⟷ بارد"], ["vignette", "إطار غامق"], ["sharp", "الحدّة"]];
 const REV_MAX = 60;
 $("fxSpeedChips").innerHTML = SPEEDS.map((v) => `<button class="chip" data-speed="${v}">${v}x</button>`).join("");
@@ -2291,7 +2291,7 @@ $("fxAlign").addEventListener("click", (e) => {
   editorInput(null, (c) => {
     const v = mt.active, it = selItem();
     const fit = c.fit === "blur" || c.fit === "black";
-    let ex = 1, ey = 1;  // في «كامل»: المكان اللي حرف الصورة فيه بيلزق في حرف الكادر
+    let ex = 1, ey = 1;  // في «كامل»: المكان الذي حرف الصورة فيه يلزق في حرف الكادر
     if (fit && v?.videoWidth && it) {
       const { dur, tl, tf } = itemTimes(it), g = clipGeom(c, v, tl, dur, tf);
       ex = g.w / OUT_W - 1; ey = g.h / OUT_H - 1;
@@ -2310,7 +2310,7 @@ $("clipFx").addEventListener("input", (e) => {
 // حركات الدخول والخروج
 $("fxAnimIn").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("");
 $("fxAnimOut").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("")
-  .replace("من اليمين", "لليمين").replace("من الشمال", "للشمال").replace("من تحت", "لتحت").replace("من فوق", "لفوق");
+  .replace("من اليمين", "لليمين").replace("من الشمال", "للشمال").replace("من أسفل", "لتحت").replace("من أعلى", "لفوق");
 for (const [box, key, dur] of [["fxAnimIn", "anim_in", "fxAnimInDur"], ["fxAnimOut", "anim_out", "fxAnimOutDur"]]) {
   $(box).addEventListener("click", (e) => {
     const b = e.target.closest("[data-anim]");
@@ -2393,7 +2393,7 @@ function renderFx(c) {
   }
   const kfOn = hasKf(c), here = kfOn && kfAt(c, clipLocalT(c)) >= 0;
   $("kfToggle").classList.toggle("on", here);
-  $("kfToggle").textContent = here ? "◆ شيل الكي فريم" : "◇ كي فريم";
+  $("kfToggle").textContent = here ? "◆ أزل الكي فريم" : "◇ كي فريم";
   $("kfInfo").textContent = kfOn ? `${c.kf.length} كي فريم` : "";
   $("kfClear").hidden = !kfOn;
   $("kfPrev").disabled = $("kfNext").disabled = !kfOn;
@@ -2403,7 +2403,7 @@ function renderFx(c) {
   const longSrc = clipOut(c) - c.start > REV_MAX;
   $("fxReverse").checked = !!c.reverse;
   $("fxReverse").disabled = longSrc && !c.reverse;
-  $("revNote").textContent = longSrc ? `(للقطع الأقصر من ${REV_MAX} ثانية بس)` : "";
+  $("revNote").textContent = longSrc ? `(للقطع الأقصر من ${REV_MAX} ثانية فقط)` : "";
   document.querySelectorAll("#fxFit [data-fit]").forEach((b) => b.classList.toggle("on", b.dataset.fit === fit));
   document.querySelectorAll("#fxLooks [data-look]").forEach((b) => b.classList.toggle("on", b.dataset.look === (c.look || "")));
   $("fxRotate").textContent = `⟳ لف 90°${c.rotate ? ` (${c.rotate}°)` : ""}`;
@@ -2432,14 +2432,14 @@ $("ttsBox").addEventListener("toggle", async () => {
 });
 function ttsCost() {
   const n = $("ttsText").value.trim().length;
-  $("ttsCost").textContent = n && ttsInfo ? `حوالي ${Math.max(0.001, (n / 1000) * ttsInfo.per_1k).toFixed(3)}$` : "";
+  $("ttsCost").textContent = n && ttsInfo ? `نحو ${Math.max(0.001, (n / 1000) * ttsInfo.per_1k).toFixed(3)}$` : "";
 }
 $("ttsText").addEventListener("input", ttsCost);
 $("ttsGo").onclick = async () => {
   const text = $("ttsText").value.trim();
-  if (!text || !mt.project) return toast("اكتب الكلام الأول", true);
+  if (!text || !mt.project) return toast("اكتب النص أولًا", true);
   $("ttsGo").disabled = true;
-  $("ttsGo").textContent = "⏳ بيحوّل…";
+  $("ttsGo").textContent = "⏳ يحوّل…";
   try {
     const a = await api("/api/montage/tts", { method: "POST", ...jsonBody({ text, voice_id: $("ttsVoice").value }) });
     mt.voices = await api("/api/audio?kind=voice");
@@ -2447,7 +2447,7 @@ $("ttsGo").onclick = async () => {
     placeNewAudio(a);
     $("ttsText").value = "";
     ttsCost();
-    toast(`🗣️ الصوت جاهز (${a.duration.toFixed(1)}ث) واتحط عند المؤشر`);
+    toast(`🗣️ الصوت جاهز (${a.duration.toFixed(1)}ث) ووُضع عند المؤشر`);
   } catch (err) {
     toast(err.message, true);
   } finally {
@@ -2478,7 +2478,7 @@ function renderSoundRow() {
   const h = Math.min(8, lanes) * SND_LANE_H + 4;
   $("trkSnd").style.height = $("hSnd").style.height = `${h}px`;
   if (!parts.length) {
-    $("trkSnd").innerHTML = `<div class="tl-empty-track">مؤثرات وأصوات زيادة: ضيفها من تاب 🔊 الصوت</div>`;
+    $("trkSnd").innerHTML = `<div class="tl-empty-track">مؤثرات وأصوات زيادة: أضفها من تبويب 🔊 الصوت</div>`;
     return;
   }
   $("trkSnd").innerHTML = parts.map((x) => {
@@ -2507,7 +2507,7 @@ function renderSfx() {
   const list = (mt.sfx || []).filter((x) => !q || x.name.toLowerCase().includes(q) || x.id.includes(q));
   $("sfxGrid").innerHTML = list.map((x) => `<div class="sfx-item" data-sfx="${x.id}" title="${escapeHtml(x.name)} · ${x.duration.toFixed(1)}ث">
       <button class="play" data-play="${x.id}" title="اسمعه">▶</button><span dir="auto">${escapeHtml(x.name)}</span>
-      <button class="add" data-addsfx="${x.id}" title="ضيفه عند المؤشر">＋</button></div>`).join("") || `<p class="muted">مفيش مؤثرات بالاسم ده</p>`;
+      <button class="add" data-addsfx="${x.id}" title="أضفه عند المؤشر">＋</button></div>`).join("") || `<p class="muted">لا يوجد مؤثرات هذا بالاسم</p>`;
   $("sndFromLib").innerHTML = `<option value="">＋ صوت من المكتبة…</option>` +
     [...mt.voices.map((a) => [a, "🎙️"]), ...mt.music.map((a) => [a, "🎵"])].map(([a, ic]) => `<option value="${a.id}">${ic} ${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
 }
@@ -2522,7 +2522,7 @@ $("sfxGrid").addEventListener("click", (e) => {
     sfxPreview.play().catch(() => {});
   }
   if (ad && mt.project) {
-    if (kindLocked("snd")) return toast("تراك الأصوات مقفول 🔒", true);
+    if (kindLocked("snd")) return toast("تراك الأصوات مغلق 🔒", true);
     pushHistory();
     addSound(soundSource(ad.dataset.addsfx), mt.t);
     changed();
@@ -2550,17 +2550,17 @@ $("sfxUpload").addEventListener("change", async (e) => {
     pushHistory();
     addSound(soundSource(a.id), mt.t);
     changed();
-    toast("⬆ اتحفظ في المكتبة واتحط عند المؤشر");
+    toast("⬆ حُفظ في المكتبة ووُضع عند المؤشر");
   } catch (err) { toast(err.message, true); }
 });
 // تسجيل من المايك
 let rec = null;
 $("micRec").onclick = async () => {
   if (rec) { rec.stop(); return; }
-  if (!navigator.mediaDevices?.getUserMedia) return toast("المتصفح ده مش بيدعم التسجيل", true);
+  if (!navigator.mediaDevices?.getUserMedia) return toast("هذا المتصفح لا يدعم التسجيل", true);
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { return toast("محتاج تسمح للبرنامج يستخدم المايك", true); }
+  catch { return toast("يحتاج تسمح للبرنامج يستخدم الميكروفون", true); }
   const chunks = [], t0 = mt.t, started = Date.now();
   rec = new MediaRecorder(stream);
   rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
@@ -2571,7 +2571,7 @@ $("micRec").onclick = async () => {
     rec = null;
     $("micRec").textContent = "🎙️ سجّل";
     $("micRec").classList.remove("rec");
-    $("micInfo").textContent = "⬆ بيرفع…";
+    $("micInfo").textContent = "⬆ يرفع…";
     const blob = new Blob(chunks, { type: chunks[0]?.type || "audio/webm" });
     const form = new FormData();
     form.append("kind", "voice");
@@ -2583,12 +2583,12 @@ $("micRec").onclick = async () => {
       mt.t = t0;
       placeNewAudio(a);
       $("micInfo").textContent = "";
-      toast("🎙️ التسجيل اتحط عند المؤشر");
+      toast("🎙️ التسجيل وُضع عند المؤشر");
     } catch (err) { $("micInfo").textContent = ""; toast(err.message, true); }
   };
   rec.start();
-  if (!mt.playing) togglePlayback();  // بتسمع الفيديو وانت بتسجّل (زي كاب كات)
-  $("micRec").textContent = "⏹ وقّف التسجيل";
+  if (!mt.playing) togglePlayback();  // تسمع الفيديو وأنت تسجّل (مثل كاب كات)
+  $("micRec").textContent = "⏹ أوقف التسجيل";
   $("micRec").classList.add("rec");
 };
 // ظبط الصوت كله
@@ -2618,7 +2618,7 @@ $("mixPunch").addEventListener("change", () => setMix({ punch: $("mixPunch").che
 
 // ---------- مقاس الكادر ولون الخلفية وإعدادات التصدير ----------
 const RATIOS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "3:4": [1080, 1440], "1:1": [1080, 1080], "16:9": [1920, 1080] };
-const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 بوست إنستا", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
+const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 منشور إنستا", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
 const BG_SWATCHES = ["#000000", "#ffffff", "#111827", "#1d3557", "#e63946", "#f4a261", "#2a9d8f", "#7b2cbf"];
 const EXPORT_RES = { 720: "720p", 1080: "1080p (Full HD)", 1440: "2K", 2160: "4K" };
 const EXPORT_Q = { small: "حجم صغير", normal: "عادي", high: "جودة عالية" };
@@ -2626,7 +2626,7 @@ const canvasRatio = () => (RATIOS[mt.project?.data.canvas?.ratio] ? mt.project.d
 function applyCanvas() {
   const [w, h] = RATIOS[canvasRatio()];
   OUT_W = w; OUT_H = h;
-  const H = Math.max(320, Math.min(448, (window.innerHeight || 900) - 520));   // الكادر على قد الشاشة عشان المونتاج كله يبان من غير سكرول
+  const H = Math.max(320, Math.min(448, (window.innerHeight || 900) - 520));   // الكادر على قدر الشاشة لكي المونتاج كله يظهر بدون سكرول
   const s = Math.min(H / h, 640 / w);
   PV_W = Math.round(w * s); PV_H = Math.round(h * s);
   const fr = $("previewFrame");
@@ -2634,7 +2634,7 @@ function applyCanvas() {
   fr.style.height = `${PV_H}px`;
   fr.classList.toggle("not-916", canvasRatio() !== "9:16");
   $("rgbDefsReset")?.remove();
-  $("pvRgbDefs")?.remove();  // الفلاتر بتتعمل تاني بمقاس الكادر الجديد
+  $("pvRgbDefs")?.remove();  // الفلاتر تُنشأ مرة أخرى بمقاس الكادر الجديد
 }
 function exportCfg() {
   const ex = mt.project?.data.export || {};
@@ -2655,12 +2655,12 @@ function renderCanvasPane() {
   const r = canvasRatio(), bg = mt.project.data.canvas?.bg || "#000000", ex = exportCfg();
   $("cvRatio").innerHTML = Object.keys(RATIOS).map((k) => `<button class="chip ${k === r ? "on" : ""}" data-ratio="${k}">${RATIO_LABEL[k]}</button>`).join("");
   $("cvBg").innerHTML = BG_SWATCHES.map((c) => `<button class="sw ${c === bg ? "on" : ""}" data-bg="${c}" style="background:${c}" title="${c}"></button>`).join("") +
-    `<label class="sw pick" title="لون تاني"><input type="color" id="cvBgPick" value="${bg}"></label>`;
+    `<label class="sw pick" title="لون آخر"><input type="color" id="cvBgPick" value="${bg}"></label>`;
   $("exRes").innerHTML = Object.entries(EXPORT_RES).map(([k, l]) => `<option value="${k}" ${Number(k) === ex.res ? "selected" : ""}>${l}</option>`).join("");
   $("exFps").innerHTML = [24, 25, 30, 50, 60].map((f) => `<option value="${f}" ${f === ex.fps ? "selected" : ""}>${f} فريم/ث</option>`).join("");
   $("exQuality").innerHTML = Object.entries(EXPORT_Q).map(([k, l]) => `<option value="${k}" ${k === ex.quality ? "selected" : ""}>${l}</option>`).join("");
   const [w, h] = RATIOS[r], k = ex.res / Math.min(w, h);
-  $("exInfo").textContent = `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2} · ${ex.fps} فريم · ${fmtTC(totalLength()).slice(0, 5)} · الحجم حوالي ${sizeEstimate().toFixed(sizeEstimate() < 10 ? 1 : 0)} ميجا`;
+  $("exInfo").textContent = `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2} · ${ex.fps} فريم · ${fmtTC(totalLength()).slice(0, 5)} · الحجم نحو ${sizeEstimate().toFixed(sizeEstimate() < 10 ? 1 : 0)} ميجا`;
   $("cvNote").hidden = r === "9:16";
 }
 function setCanvas(patch) {
@@ -2688,7 +2688,7 @@ $("exAudio").onclick = async () => {
   if (!mt.project) return;
   await saveProject();
   $("exAudio").disabled = true;
-  $("exAudio").textContent = "⏳ بيجهّز الصوت…";
+  $("exAudio").textContent = "⏳ جارٍ التجهيز الصوت…";
   try {
     const r = await api(`/api/projects/${mt.project.id}/render-audio`, { method: "POST" });
     $("exAudioLink").href = r.url;
@@ -2696,7 +2696,7 @@ $("exAudio").onclick = async () => {
     $("exAudioLink").textContent = `⬇ حمّل الصوت (MP3 · ${(r.size / 1e6).toFixed(1)} ميجا)`;
     toast("🎧 الصوت جاهز");
   } catch (err) { toast(err.message, true); }
-  finally { $("exAudio").disabled = false; $("exAudio").textContent = "🎧 صدّر الصوت بس (MP3)"; }
+  finally { $("exAudio").disabled = false; $("exAudio").textContent = "🎧 صدّر الصوت فقط (MP3)"; }
 };
 
 // ---------- القطعة المختارة من التعليق أو الموسيقى: ظهور واختفاء بالتدريج ----------
@@ -2740,19 +2740,19 @@ function renderSide() {
   const outros = d.clips.filter(isOutroClip);
   $("mOutro").checked = outros.length > 0;
   $("mOutro").disabled = !coach?.outro_url;
-  $("outroInfo").textContent = !coach ? "" : coach.outro_url ? `(${fmtDuration(coach.outro_duration)})` : "(الشخصية دي مالهاش أوترو)";
+  $("outroInfo").textContent = !coach ? "" : coach.outro_url ? `(${fmtDuration(coach.outro_duration)})` : "(هذه الشخصية ليس لها أوترو)";
   const ov = outros[0]?.volume ?? d.outro_volume ?? 1;
   $("mOutroVol").value = Math.round(ov * 100);
   $("outroVolVal").textContent = `${Math.round(ov * 100)}%`;
 
   $("mCharIntro").disabled = !coach?.intro_url;
   $("mCharIntro").checked = !!coach?.intro_url && d.char_intro !== false;
-  $("charIntroInfo").textContent = !coach ? "(مفيش شخصية)" : coach.intro_url ? `(${fmtDuration(coach.intro_duration)})` : "(الشخصية دي مالهاش إنترو)";
+  $("charIntroInfo").textContent = !coach ? "(لا يوجد شخصية)" : coach.intro_url ? `(${fmtDuration(coach.intro_duration)})` : "(هذه الشخصية ليس لها إنترو)";
   for (const [k, id] of [["intro", "mBrandIntro"], ["outro", "mBrandOutro"]]) {
     const has = !!clientx.cur?.[`${k}_url`];
     $(id).disabled = !has;
     $(id).checked = has && d[`brand_${k}`] !== false;
-    $(`brand${k[0].toUpperCase()}${k.slice(1)}Info`).textContent = has ? "" : "(البراند مالوش، أو مقفول من عقل البراند)";
+    $(`brand${k[0].toUpperCase()}${k.slice(1)}Info`).textContent = has ? "" : "(العلامة ليس له، أو مغلق من عقل العلامة)";
   }
 
   $("mVoice").value = d.voice?.id || "";
@@ -2774,7 +2774,7 @@ function renderSide() {
     const end = trackEnd("music");
     const total = totalLength();
     $("musicWarn").hidden = !end || end >= total - 0.05;
-    $("musicWarn").textContent = `⚠️ الموسيقى بتخلص عند ${fmtDuration(end)} والفيديو طوله ${fmtDuration(total)}، فآخر الفيديو هيبقى من غير موسيقى.`;
+    $("musicWarn").textContent = `⚠️ الموسيقى تنتهي عند ${fmtDuration(end)} والفيديو طوله ${fmtDuration(total)}، فآخر الفيديو سيصبح بدون موسيقى.`;
   }
   $("renderBtn").disabled = d.clips.length === 0 || mt.project.render_status === "rendering";
   if (typeof renderBrandPanels === "function") renderBrandPanels();
@@ -2813,7 +2813,7 @@ document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListen
   form.append("kind", kind);
   form.append("file", file);
   try {
-    toast(`⏳ بيرفع ${file.name}...`);
+    toast(`⏳ جارٍ الرفع ${file.name}...`);
     const a = await api("/api/audio", { method: "POST", body: form });
     (kind === "voice" ? mt.voices : mt.music).unshift(a);
     fillSelects();
@@ -2821,7 +2821,7 @@ document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListen
     sel.value = a.id;
     sel.dispatchEvent(new Event("change"));
     renderAll();
-    toast(kind === "voice" ? "✅ التعليق الصوتي اترفع واتحط في المونتاج" : "✅ الموسيقى اترفعت واتحطت في المونتاج");
+    toast(kind === "voice" ? "✅ التعليق الصوتي رُفع ووُضع في المونتاج" : "✅ الموسيقى رُفعت ووُضعت في المونتاج");
   } catch (err) {
     toast(err.message, true);
   }
@@ -2829,12 +2829,12 @@ document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListen
 // 🎙️ تعليق صوتي جديد مكان القديم: بيفضل بنفس العلو ونفس مكان البداية، والملف كله من أوله (القص والتقسيم بتوع القديم بيتشالوا)
 function newVoiceTrack(d, id) {
   const vol = d.voice?.parts?.[0]?.volume ?? d.voice?.volume ?? 1, delay = d.voice?.parts?.[0]?.delay ?? d.voice?.delay ?? 0;
-  if (d.captions?.removed?.length) d.captions.removed = [];  // الكلام اللي اتمسح من الكابشن كان من الصوت القديم
+  if (d.captions?.removed?.length) d.captions.removed = [];  // النص الذي حُذف من التعليق النصي كان من الصوت القديم
   return id ? { id, volume: vol, delay: 0, offset: 0, length: null, fade_out: false, parts: [{ delay, offset: 0, length: null, volume: vol }] } : null;
 }
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
   d.voice = newVoiceTrack(d, $("mVoice").value);
-  if (d.voice) toast("✅ التعليق الصوتي اتبدّل في المونتاج");
+  if (d.voice) toast("✅ التعليق الصوتي استُبدل في المونتاج");
 }));
 // لو التعليق الصوتي بتاع المشروع (الفيديو الخام) اتغير بعد ما المونتاج اتعمل: تنبيه وزرار يبدّله
 function renderVoiceSync() {
@@ -2845,12 +2845,12 @@ function renderVoiceSync() {
   box.hidden = $("voiceSyncTop").hidden = !stale;
   if (!stale) return;
   const cur = mt.voices.find((a) => a.id === d.voice?.id);
-  box.innerHTML = `<b>⚠️ التعليق الصوتي بتاع المشروع اتغيّر</b>
-    <span>المشروع دلوقتي على «<b data-no-i18n>${escapeHtml(fresh.name)}</b>» والمونتاج لسه ${cur ? `على «<b data-no-i18n>${escapeHtml(cur.name)}</b>»` : "من غير تعليق"}.</span>
+  box.innerHTML = `<b>⚠️ التعليق الصوتي الخاص بالمشروع تغيّر</b>
+    <span>المشروع الآن على «<b data-no-i18n>${escapeHtml(fresh.name)}</b>» والمونتاج ما زال ${cur ? `على «<b data-no-i18n>${escapeHtml(cur.name)}</b>»` : "بدون تعليق"}.</span>
     <button type="button" class="btn sm primary" id="voiceSyncGo">🔁 بدّله بالجديد</button>`;
   $("voiceSyncGo").onclick = $("voiceSyncTop").onclick = sideInput(null, (dd) => {
     dd.voice = newVoiceTrack(dd, fresh.id);
-    toast(`✅ التعليق الصوتي اتبدّل بـ «${fresh.name}»`);
+    toast(`✅ التعليق الصوتي استُبدل بـ «${fresh.name}»`);
   });
 }
 // سلايدر الصوت في التاب بيغيّر كل قطع التعليق مرة واحدة
@@ -2892,10 +2892,10 @@ async function saveProject() {
     if (i >= 0) mt.projects[i] = saved;
     if (mt.project?.id === saved.id) mt.project.name = saved.name;
     renderProjectSelect();
-    $("saveState").textContent = "✓ اتحفظ";
+    $("saveState").textContent = "✓ حُفظ";
   } catch (err) {
     $("saveState").textContent = "";
-    toast(`مش قادر أحفظ: ${err.message}`, true);
+    toast(`لا قادر أحفظ: ${err.message}`, true);
   }
 }
 
@@ -2937,8 +2937,8 @@ async function pickVideoCoach(videoId) {
   return new Promise((resolve) => {
     const dlg = document.createElement("dialog");
     dlg.className = "bulk-dlg coach-pick-dlg";
-    dlg.innerHTML = `<div class="panel-head"><h2>🎬 عايز مونتاج أنهي شخصية؟</h2><button class="btn sm" data-x>إلغاء</button></div>
-      <p class="hint">المشروع ده اتولّد بأكتر من شخصية. كل شخصية ليها مونتاج لوحده.</p>
+    dlg.innerHTML = `<div class="panel-head"><h2>🎬 تريد مونتاج أي شخصية؟</h2><button class="btn sm" data-x>إلغاء</button></div>
+      <p class="hint">هذا المشروع وُلّد بأكتر من شخصية. كل شخصية لها مونتاج تلقائيًا.</p>
       <div class="coach-pick">${list.map((c, i) => `<button type="button" class="coach-pick-item" data-i="${i}">
         <img src="${c.image_url}" alt=""><b data-no-i18n>${escapeHtml(c.name)}</b>
         <small class="muted">${c.ready} / ${c.total} جاهز</small></button>`).join("")}</div>`;
@@ -2988,7 +2988,7 @@ async function kochiLayout(projectId, quiet = false) {
   const r = await api(`/api/projects/${projectId}/kochi-layout`, { method: "POST" });
   if (!quiet) {
     const s = r.report;
-    toast(!s.sentences ? "مفيش تعليق صوتي في المشروع ده" : `✨ اترتّب: ${s.sentences} جملة${s.music ? " والموسيقى متقطّعة عليها" : ""}${s.overflow ? ` (التعليق أطول من الفيديو بـ ${s.overflow} ث)` : ""}`, !s.sentences);
+    toast(!s.sentences ? "لا يوجد تعليق صوتي في هذا المشروع" : `✨ رُتّب: ${s.sentences} جملة${s.music ? " والموسيقى متقطّعة عليها" : ""}${s.overflow ? ` (التعليق أطول من الفيديو بـ ${s.overflow} ث)` : ""}`, !s.sentences);
   }
   return r.project;
 }
@@ -3009,7 +3009,7 @@ $("kochiLayoutBtn").onclick = async () => {
   }
 };
 $("deleteProject").onclick = async () => {
-  if (!(await uiConfirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات اللي اتصدّرت منه هتفضل موجودة)`))) return;
+  if (!(await uiConfirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات التي صُدّرت منه ستظل موجودة)`))) return;
   try {
     await api(`/api/projects/${mt.project.id}`, { method: "DELETE" });
     mt.projects = mt.projects.filter((p) => p.id !== mt.project.id);
@@ -3023,7 +3023,7 @@ $("deleteProject").onclick = async () => {
 function renderRender() {
   const p = mt.project;
   const btn = $("renderBtn");
-  btn.textContent = p.render_status === "rendering" ? `⏳ ${p.render_progress || "بيصدّر..."}` : "🎬 صدّر الفيديو";
+  btn.textContent = p.render_status === "rendering" ? `⏳ ${p.render_progress || "جارٍ التصدير..."}` : "🎬 صدّر الفيديو";
   $("renderCancel").hidden = p.render_status !== "rendering";
   $("renderError").hidden = p.render_status !== "failed";
   $("renderError").textContent = p.render_error || "";
@@ -3043,7 +3043,7 @@ function renderRender() {
 // 🌍 دبلجة الفيديو اللي اتصدّر: مشروع دبلجة جديد بيتفتح على طول في قسم «الترجمة والدبلجة»
 $("resultDub").onclick = async () => {
   const p = mt.project;
-  if (!(p.render_status === "done" && p.export_id)) return toast("صدّر الفيديو الأول", true);
+  if (!(p.render_status === "done" && p.export_id)) return toast("صدّر الفيديو أولًا", true);
   const btn = $("resultDub");
   btn.disabled = true;
   try {
@@ -3064,7 +3064,7 @@ function exportFileName(name) {
 $("renderBtn").onclick = async () => {
   pause();
   const pend = silPending().filter((m) => m.del).length;
-  if (pend && !(await uiConfirm(`لسه فيه ${pend} جزء أحمر (سكتة/حشو) ماراجعتهوش. تصدّر من غير ما تشيلهم؟`))) return;
+  if (pend && !(await uiConfirm(`ما زال فيه ${pend} جزء أحمر (سكتة/حشو) لم تراجعه. تصدّر بدون ما تزيلهم؟`))) return;
   await saveProject();
   try {
     await api(`/api/projects/${mt.project.id}/render`, { method: "POST" });
@@ -3083,7 +3083,7 @@ $("renderCancel").onclick = async () => {
   if (!(await uiConfirm("توقّف التصدير؟"))) return;
   try {
     await api(`/api/projects/${mt.project.id}/render/cancel`, { method: "POST" });
-    toast("⏹ بيوقف التصدير…");
+    toast("⏹ يوقف التصدير…");
   } catch (err) {
     toast(err.message, true);
   }
@@ -3107,17 +3107,17 @@ async function pollRender() {
   renderRender();
   if (fresh.render_status === "rendering") mt.pollTimer = setTimeout(pollRender, 2000);
   else if (fresh.render_status === "done") toast("✅ الفيديو جاهز");
-  else if (fresh.render_status === "failed") toast("✕ التصدير فشل، شوف السبب تحت الزرار", true);
+  else if (fresh.render_status === "failed") toast("✕ التصدير فشل، انظر السبب أسفل الزر", true);
 }
 
 // ---------- الربط بالفيديو الخام ----------
 function reportDraft(draft) {
   const got = draft.gen_ids.length;
-  if (!draft.clips_total) return toast("الفيديو ده لسه متقطّعش", true);
+  if (!draft.clips_total) return toast("هذا الفيديو ما زال لم يُقطّع", true);
   if (draft.missing.length) {
-    toast(`جبت ${got} من ${draft.clips_total} قطعة. القطع رقم ${draft.missing.join("، ")} لسه متولّدتش`, true);
+    toast(`جبت ${got} من ${draft.clips_total} قطعة. القطع رقم ${draft.missing.join("، ")} ما زال لم تُولّد`, true);
   } else {
-    toast(`✅ جبت ${got} قطعة بالترتيب${draft.voice ? " والتعليق الصوتي بتاعهم" : ""}`);
+    toast(`✅ جبت ${got} قطعة بالترتيب${draft.voice ? " والتعليق الصوتي الخاص بهم" : ""}`);
   }
 }
 
@@ -3128,7 +3128,7 @@ function renderLinkedVideo() {
   if (d?.video_id) {
     $("linkedVideo").textContent = video
       ? `🔗 من فيديو: ${video.name}${video.voice ? ` · 🎙️ ${video.voice.name}` : ""}`
-      : "🔗 الفيديو الخام اتمسح";
+      : "🔗 الفيديو الخام حُذف";
   }
 }
 
@@ -3143,7 +3143,7 @@ $("refreshFromVideo").onclick = async () => {
     const outros = d.clips.filter(isAnyOutro);
     d.clips = [...draft.gen_ids.map((gen_id) => old.get(gen_id) || { gen_id, ...CLIP_DEFAULTS }), ...outros];
     if (draft.voice && d.voice?.id !== draft.voice.id) {
-      d.voice = newVoiceTrack(d, draft.voice.id);  // كان بيتحط من غير قطع فمكانش بيظهر في التايم لاين
+      d.voice = newVoiceTrack(d, draft.voice.id);  // كان يوضع بدون قطع فلم يكن يظهر في التايم لاين
     }
     if (!d.coach_id) d.coach_id = draft.coach_id;
     mt.sel = null;
@@ -3173,7 +3173,7 @@ async function algoPrep(force = false) {
   if (ALGO_ON === null) { try { ALGO_ON = (await api("/api/algo/mode")).on; } catch { ALGO_ON = false; } }
   if (!ALGO_ON && !force) return;
   const d = p.data, sig = JSON.stringify(d.clips.map((c) => [c.gen_id, c.start, c.end]));
-  if (!force && !d.clips.length) return;   // مشروع فاضي (الفيديو إديتور): مفيش حاجة تتجهز، ومفيش هوك يتحط لوحده
+  if (!force && !d.clips.length) return;   // مشروع فارغ (الفيديو إديتور): لا شيء تتجهز، ولا يوجد خطاف يوضع تلقائيًا
   if (!force && d.algo?.sig === sig && d.algo?.caps !== "working") return renderSilReview();
   await saveProject();
   let r;
@@ -3185,7 +3185,7 @@ async function algoPrep(force = false) {
     texts().push({ text: r.hook, t0: 0, dur: 3, font: "SM Changa", size: 88, color: "#FFFFFF", x: 0.5, y: 0.22, angle: 0, scale: 1, opacity: 1, spacing: 0,
       stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false, color: "#000000" }, bold: true, italic: false,
       anim_in: { type: "pop", dur: 0.35 }, anim_out: { type: "fade", dur: 0.25 }, lane: freeTextLane(0, 3), algo: true });
-    toast("⚡ اتحط هوك مكتوب على الشاشة أول ٣ ثواني (تقدر تعدّله من تاب النص)");
+    toast("⚡ وُضع خطاف مكتوب على الشاشة أول ٣ ثواني (يمكنك تعدّله من تبويب النص)");
   }
   if (r.caps === "done" && d.voice && d.captions?.enabled === undefined) d.captions = { ...(d.captions || {}), enabled: true };
   renderAll();
@@ -3196,10 +3196,10 @@ function silMarksHtml(it) {
   const list = silPending().filter((m) => m.i === it.i);
   if (!list.length || it.rev) return "";
   const sp = it.speed || 1;
-  return list.map((m) => `<i class="tl-sil ${m.del ? "del" : "keep"}" data-mk="${m.id}" title="${m.kind === "filler" ? `حشو «${escapeHtml(m.text || "")}»` : m.kind === "repeat" ? `تكرار «${escapeHtml(m.text || "")}»` : m.kind === "end" ? "سكوت بعد النهاية" : m.kind === "start" ? "سكوت قبل البداية" : "سكتة"} ${(m.b - m.a).toFixed(1)}ث · دوسة تسيبه/تشيله"
+  return list.map((m) => `<i class="tl-sil ${m.del ? "del" : "keep"}" data-mk="${m.id}" title="${m.kind === "filler" ? `حشو «${escapeHtml(m.text || "")}»` : m.kind === "repeat" ? `تكرار «${escapeHtml(m.text || "")}»` : m.kind === "end" ? "سكوت بعد النهاية" : m.kind === "start" ? "سكوت قبل البداية" : "سكتة"} ${(m.b - m.a).toFixed(1)}ث · ضغطة تسيبه/تزيله"
       style="left:${Math.max(0, (m.a - it.in) / sp) * mt.pps}px;width:${Math.max(2, (m.b - m.a) / sp * mt.pps)}px"></i>`).join("");
 }
-const SIL_KIND = { silence: "سكتة", start: "سكوت في الأول", end: "سكوت في الآخر", filler: "حشو", repeat: "تكرار" };
+const SIL_KIND = { silence: "سكتة", start: "سكوت في أولًا", end: "سكوت في الآخر", filler: "حشو", repeat: "تكرار" };
 function silTime(m) {
   const it = seq().items.find((x) => x.kind === "clip" && x.i === m.i);
   return it ? it.t0 + (m.a - it.in) / (it.speed || 1) : 0;
@@ -3210,15 +3210,15 @@ function renderSilReview() {
   if (!list.length) { box.hidden = true; return; }
   const dels = list.filter((m) => m.del), secs = dels.reduce((s, m) => s + (m.b - m.a), 0);
   box.hidden = false;
-  box.innerHTML = `<div class="sr-head"><b>⚡ لقيت ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} ممكن تتشال</b>
-      <span class="muted">الأحمر هيتشال (${secs.toFixed(1)} ثانية). اسمع كل واحد ودوس عليه لو عايز تسيبه.</span>
+  box.innerHTML = `<div class="sr-head"><b>⚡ لقيت ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} يمكن تُزال</b>
+      <span class="muted">الأحمر سيُزال (${secs.toFixed(1)} ثانية). اسمع كل واحد واضغط عليه إذا تريد تسيبه.</span>
       <button class="btn sm primary" id="srApply" ${dels.length ? "" : "disabled"}>✂️ احذف الأحمر (${dels.length})</button>
-      <button class="btn sm" id="srFillers" title="بيكتب كلام الفيديوهات ويدوّر على «أمم/آه» والكلام المتكرر (بيتحسب من رصيد Atlas)">🔎 الحشو كمان</button>
+      <button class="btn sm" id="srFillers" title="يكتب نص الفيديوهات ويبحث عن «أمم/نعم» والنص المتكرر (يُحسب من رصيد Atlas)">🔎 الحشو أيضًا</button>
       <button class="btn sm" id="srDismiss">سيبهم كلهم</button></div>
     <div class="sr-list">${list.map((m) => `<div class="sr-row ${m.del ? "del" : "keep"}" data-mk="${m.id}">
       <button class="ic" data-srplay="${m.id}" title="اسمعه">▶︎</button><span>${SIL_KIND[m.kind] || "سكتة"}${m.text ? ` «${escapeHtml(m.text)}»` : ""}</span>
       <small class="num">${fmtTC(silTime(m))} · ${(m.b - m.a).toFixed(1)}ث</small>
-      <label class="check"><input type="checkbox" data-srdel="${m.id}" ${m.del ? "checked" : ""}> يتشال</label></div>`).join("")}</div>`;
+      <label class="check"><input type="checkbox" data-srdel="${m.id}" ${m.del ? "checked" : ""}> يُزال</label></div>`).join("")}</div>`;
 }
 function silToggle(id, val) {
   const m = silAll().find((x) => x.id === id);
@@ -3254,7 +3254,7 @@ function silApply() {
   renderAll();
   renderSilReview();
   scheduleSave();
-  toast(`✂️ اتشال ${n} ${n === 1 ? "جزء" : "أجزاء"} (${secs.toFixed(1)} ثانية). Ctrl+Z يرجّعهم`);
+  toast(`✂️ أُزيل ${n} ${n === 1 ? "جزء" : "أجزاء"} (${secs.toFixed(1)} ثانية). Ctrl+Z يرجّعهم`);
 }
 $("silReview").addEventListener("change", (e) => { const id = e.target.dataset?.srdel; if (id) silToggle(id, e.target.checked); });
 $("silReview").addEventListener("click", async (e) => {
@@ -3272,16 +3272,16 @@ $("silReview").addEventListener("click", async (e) => {
   if (e.target.closest("#srDismiss")) { silPending().forEach((m) => (m.done = true)); renderTimeline(); renderSilReview(); return scheduleSave(); }
   if (e.target.closest("#srFillers")) {
     const b = e.target.closest("#srFillers");
-    b.disabled = true; b.textContent = "⏳ بيسمع الكلام…";
+    b.disabled = true; b.textContent = "⏳ جارٍ الاستماع النص…";
     await saveProject();
     try {
       const r = await api(`/api/projects/${mt.project.id}/fillers`, { method: "POST" });
       const have = new Set(silAll().map((m) => m.id));
       const add = r.marks.filter((m) => !have.has(m.id)).map((m) => ({ ...m, del: true, done: false }));
       mt.project.data.algo = { ...(mt.project.data.algo || {}), marks: [...silAll(), ...add] };
-      toast(add.length ? `🔎 لقيت ${add.length} حشو/تكرار` : "مفيش حشو واضح 👌");
+      toast(add.length ? `🔎 لقيت ${add.length} حشو/تكرار` : "لا يوجد حشو واضح 👌");
       renderTimeline(); renderSilReview(); scheduleSave();
-    } catch (err) { toast(err.message, true); b.disabled = false; b.textContent = "🔎 الحشو كمان"; }
+    } catch (err) { toast(err.message, true); b.disabled = false; b.textContent = "🔎 الحشو أيضًا"; }
   }
 });
 function d_speed(m) { return clipSpeed(mt.project.data.clips[m.i]); }
@@ -3303,7 +3303,7 @@ function beatFit(beats, period) {
     if (j < 0) return;
     let end = beats[Math.min(beats.length - 1, j + step - 1)];
     for (let s = step; s > 1 && end - t > room; s--) end = beats[Math.min(beats.length - 1, j + s - 2)];
-    if (end - t > room) end = t + room;   // القطعة أقصر من دقة: بتفضل بطولها
+    if (end - t > room) end = t + room;   // القطعة أقصر من دقة: تظل بطولها
     c.end = +(c.start + (end - t) * sp).toFixed(3);
     t = end;
     n++;
@@ -3311,8 +3311,8 @@ function beatFit(beats, period) {
   return n;
 }
 $("tlBeat").onclick = async () => {
-  if (!mt.project?.data.clips.length) return toast("ضيف فيديو الأول", true);
-  if (!mt.project.data.music) return toast("حط مزيكا في المشروع الأول 🎵", true);
+  if (!mt.project?.data.clips.length) return toast("أضف فيديو أولًا", true);
+  if (!mt.project.data.music) return toast("ضع مزيكا في المشروع أولًا 🎵", true);
   const b = $("tlBeat");
   b.disabled = true;
   try {
@@ -3320,20 +3320,20 @@ $("tlBeat").onclick = async () => {
     const r = await api(`/api/projects/${mt.project.id}/beats`);
     pushHistory();
     const n = beatFit(r.beats, r.period);
-    const al = mt.project.data.algo;   // السكتات اللي بقت برّه القطعة بعد القص ماتتعرضش
+    const al = mt.project.data.algo;   // السكتات التي بقت خارج القطعة بعد القص لا تُعرض
     if (al?.marks) al.marks = al.marks.filter((m) => { const c = mt.project.data.clips[m.i]; return c && m.a >= c.start && m.b <= clipOut(c); });
     renderAll();
     renderSilReview();
     scheduleSave();
-    toast(`🎵 ${n} ${n === 1 ? "قطعة اتظبطت" : "قطع اتظبطوا"} على الإيقاع (دقة كل ${r.period} ثانية). Ctrl+Z يرجّعهم`);
+    toast(`🎵 ${n} ${n === 1 ? "قطعة ضُبطت" : "قطع ضُبطوا"} على الإيقاع (دقة كل ${r.period} ثانية). Ctrl+Z يرجّعهم`);
   } catch (err) { toast(err.message, true); }
   b.disabled = false;
 };
 $("tlSilence").onclick = async () => {
-  if (!mt.project?.data.clips.length) return toast("ضيف فيديو الأول", true);
+  if (!mt.project?.data.clips.length) return toast("أضف فيديو أولًا", true);
   const b = $("tlSilence");
   b.disabled = true;
   await algoPrep(true);
   b.disabled = false;
-  if (!silPending().length) toast("مفيش سكتات واضحة في الفيديوهات اللي بصوت 👌");
+  if (!silPending().length) toast("لا يوجد سكتات واضحة في الفيديوهات التي بصوت 👌");
 };

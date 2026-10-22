@@ -36,7 +36,7 @@ function renderSeries() {
       <div class="ser-name" data-sid="${s.id}" data-no-i18n>🎭 ${escapeHtml(s.name)}</div>
       ${s.id === ser.sid ? `<ul>${s.episodes.map((e) => `<li data-eid="${e.id}" class="${ser.ep?.id === e.id ? "active" : ""}" data-no-i18n>${e.number}. ${escapeHtml(e.name)}</li>`).join("")}
         <li class="ser-add"><form id="serEpForm"><input type="text" id="serEpName" placeholder="اسم الحلقة"><button class="btn sm" type="submit">＋ حلقة</button></form></li></ul>` : ""}
-    </li>`).join("") || `<li class="muted">لسه مفيش مسلسلات.</li>`;
+    </li>`).join("") || `<li class="muted">لا يوجد بعد مسلسلات.</li>`;
   const s = ser.cur();
   $("serMain").hidden = !s;
   $("serEmpty").hidden = !!s;
@@ -105,7 +105,7 @@ $("serTabs").addEventListener("click", async (e) => {
       ser.ep = await api(`/api/series/${ser.sid}/episodes`, { method: "POST", ...jsonBody({ name: "" }) });
       await loadSeries();
       remember();
-      toast("اتعملت الحلقة الأولى. غيّر اسمها من خانة «اسم الحلقة» لو حابب");
+      toast("أُنشئت الحلقة الأولى. غيّر اسمها من خانة «اسم الحلقة» إذا حابب");
     } catch (err) { return toast(err.message, true); }
   }
   ser.tab = t;
@@ -117,13 +117,13 @@ function renderSeriesTab(s) {
   for (const [id, v] of [["serName", s.name], ["serBible", s.bible], ["serCharacter", s.character]]) {
     if (document.activeElement !== $(id)) $(id).value = v;
   }
-  $("serRefs").innerHTML = s.refs.map((r) => `<div class="ref"><a href="${r.url}" target="_blank"><img src="${r.url}" alt=""></a><button class="del" data-ref="${r.file}" title="امسح">✕</button></div>`).join("")
-    + `<label class="lib-add" title="ضيف صور للشخصية">＋<input type="file" id="serRefAdd" accept="image/*" multiple hidden></label>`;
+  $("serRefs").innerHTML = s.refs.map((r) => `<div class="ref"><a href="${r.url}" target="_blank"><img src="${r.url}" alt=""></a><button class="del" data-ref="${r.file}" title="احذف">✕</button></div>`).join("")
+    + `<label class="lib-add" title="أضف صور للشخصية">＋<input type="file" id="serRefAdd" accept="image/*" multiple hidden></label>`;
   if (document.activeElement !== $("serTextModel")) $("serTextModel").value = ser.settings.text_model;
   if (document.activeElement !== $("serVideoModel")) $("serVideoModel").value = ser.settings.video_model;
 }
 async function saveSeries(patch) {
-  try { ser.list = (await api(`/api/series/${ser.sid}`, { method: "PATCH", ...jsonBody(patch) })).series; renderSeries(); toast("اتحفظ"); }
+  try { ser.list = (await api(`/api/series/${ser.sid}`, { method: "PATCH", ...jsonBody(patch) })).series; renderSeries(); toast("حُفظ"); }
   catch (err) { toast(err.message, true); }
 }
 $("serName").addEventListener("change", () => saveSeries({ name: $("serName").value }));
@@ -138,13 +138,13 @@ $("serRefs").addEventListener("change", async (e) => {
 });
 $("serRefs").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-ref]");
-  if (!b || !(await uiConfirm("مسح الصورة دي؟"))) return;
+  if (!b || !(await uiConfirm("مسح هذه الصورة؟"))) return;
   try { ser.list = (await api(`/api/series/${ser.sid}/refs?file=${encodeURIComponent(b.dataset.ref)}`, { method: "DELETE" })).series; renderSeries(); }
   catch (err) { toast(err.message, true); }
 });
 for (const [id, key] of [["serTextModel", "text_model"], ["serVideoModel", "video_model"]]) {
   $(id).addEventListener("change", async () => {
-    try { ser.settings = await api("/api/series-settings", { method: "PUT", ...jsonBody({ [key]: $(id).value }) }); toast("اتحفظ"); }
+    try { ser.settings = await api("/api/series-settings", { method: "PUT", ...jsonBody({ [key]: $(id).value }) }); toast("حُفظ"); }
     catch (err) { toast(err.message, true); }
   });
 }
@@ -155,28 +155,28 @@ function renderWriteTab() {
   let v = 0;
   $("serChat").innerHTML = ep.chat.map((m) => m.role === "user"
     ? `<div class="msg user">${escapeHtml(m.content)}</div>`
-    : `<div class="msg assistant"><details><summary>📝 نسخة ${++v} من السكريبت</summary><pre>${escapeHtml(m.content)}</pre></details></div>`).join("")
-    || `<div class="muted">لسه مفيش. دوس «✍️ اكتب الحلقة» والبرنامج يكتبها استكمالًا للحلقات اللي فاتت، أو الزق سكريبت جاهز تحت.</div>`;
+    : `<div class="msg assistant"><details><summary>📝 نسخة ${++v} من النص</summary><pre>${escapeHtml(m.content)}</pre></details></div>`).join("")
+    || `<div class="muted">لا يوجد بعد. اضغط «✍️ اكتب الحلقة» والبرنامج يكتبها استكمالًا للحلقات التي فاتت، أو ألصق نص جاهز أسفل.</div>`;
   $("serChat").scrollTop = $("serChat").scrollHeight;
   $("serWriteGo").textContent = ep.chat.length ? "✍️ عدّل" : "✍️ اكتب الحلقة";
-  $("serApproveScript").textContent = ep.script_approved ? "✅ معتمد (دوس تلغي)" : "✅ اعتمد السكريبت";
+  $("serApproveScript").textContent = ep.script_approved ? "✅ معتمد (اضغط تلغي)" : "✅ اعتمد النص";
   $("serApproveScript").classList.toggle("primary", !ep.script_approved);
   $("serApproveScript").disabled = !ep.lines.length;
   renderRewrite();
   const orig = ep.copy_of && ser.cur()?.episodes.find((e) => e.id === ep.copy_of);
   $("serCopyNote").hidden = !ep.copy_of;
-  $("serCopyNote").textContent = ep.copy_of ? `📑 دي نسخة${orig ? ` من «${orig.name}»` : ""}. أي تعديل هنا مش بيلمس الأصلية.` : "";
-  $("serWriteState").textContent = ep.script_approved ? "✅ السكريبت معتمد: سجّل الفويس أوفر وارفعه في «3 الفويس أوفر»" : ep.lines.length ? `${ep.lines.length} جملة فويس أوفر` : "";
+  $("serCopyNote").textContent = ep.copy_of ? `📑 هذه نسخة${orig ? ` من «${orig.name}»` : ""}. أي تعديل هنا لا يلمس الأصلية.` : "";
+  $("serWriteState").textContent = ep.script_approved ? "✅ النص معتمد: سجّل التعليق الصوتي وارفعه في «3 التعليق الصوتي»" : ep.lines.length ? `${ep.lines.length} جملة تعليق صوتي` : "";
 }
 $("serEpDup").onclick = async () => {
-  if (!(await uiConfirm(`تعمل نسخة كاملة من «${ser.ep.name}»؟\nالنسخة فيها السكريبت والصوت والستوري بورد والفيديوهات، وأي تعديل فيها مش هيلمس الحلقة الأصلية.`))) return;
-  busyButton($("serEpDup"), "⏳ بينسخ...", async () => {
+  if (!(await uiConfirm(`تعمل نسخة كاملة من «${ser.ep.name}»؟\nالنسخة فيها النص والصوت والستوري بورد والفيديوهات، وأي تعديل فيها لن يلمس الحلقة الأصلية.`))) return;
+  busyButton($("serEpDup"), "⏳ ينسخ...", async () => {
     const copy = await api(`/api/episodes/${ser.ep.id}/duplicate`, { method: "POST" });
     await loadSeries();
     ser.ep = copy;
     remember();
     renderSeries();
-    toast(`📑 اتعملت «${copy.name}» وإنت دلوقتي جواها. الأصلية في القايمة زي ما هي`);
+    toast(`📑 أُنشئت «${copy.name}» وأنت الآن جواها. الأصلية في القائمة كما هي`);
   });
 };
 $("serWriteForm").addEventListener("submit", async (e) => {
@@ -184,8 +184,8 @@ $("serWriteForm").addEventListener("submit", async (e) => {
   const message = $("serWriteMsg").value.trim();
   if (ser.ep.chat.length && !message) return $("serWriteMsg").focus();
   if (ser.ep.shots.some((s) => s.takes.length)
-    && !(await uiConfirm("الحلقة دي ليها فيديوهات خلاص. الكاتب هنا بيكتب الحلقة من الأول، ولو غيّرت السكريبت اللقطات مش هتمشي معاه.\nلو عايز تغيّر الكلام بس وتسيب الفيديوهات، استخدم «🎭 كلام جديد على نفس الفيديوهات» فوق.\n\nتكمّل برضه؟"))) return;
-  busyButton($("serWriteGo"), "⏳ بيكتب...", async () => {
+    && !(await uiConfirm("هذه الحلقة لها فيديوهات انتهى. الكاتب هنا يكتب الحلقة من أولًا، وإذا غيّرت النص اللقطات لن تسير معه.\nإذا تريد تغيّر النص فقط وتترك الفيديوهات، استخدم «🎭 نص جديد على نفس الفيديوهات» أعلى.\n\nتُكمل أيضًا؟"))) return;
+  busyButton($("serWriteGo"), "⏳ جارٍ الكتابة...", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/write`, { method: "POST", ...jsonBody({ message }) });
     $("serWriteMsg").value = "";
     renderSeries();
@@ -196,7 +196,7 @@ $("serWriteMsg").addEventListener("keydown", (e) => {
 });
 $("serApproveScript").onclick = () => busyButton($("serApproveScript"), "⏳", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/approve-script?approved=${!ser.ep.script_approved}`, { method: "POST" });
-  if (ser.ep.script_approved) { ser.tab = "script"; toast("اتعتمد. سجّل الفويس أوفر وارفعه هنا"); }
+  if (ser.ep.script_approved) { ser.tab = "script"; toast("اعتُمد. سجّل التعليق الصوتي وارفعه هنا"); }
   renderSeries();
 });
 
@@ -221,10 +221,10 @@ function rwRowHtml(r) {
   return `<div class="rw-line ${old ? "" : "new"}" data-k="${escapeHtml(r.k || "")}" data-n="${r.n ?? ""}"><b>${old ? r.n : "➕"}</b>
     <div class="rw-body">${old
       ? `<div class="old">«${escapeHtml(old.text)}» <span class="muted">· ${(old.end - old.start).toFixed(1)}ث</span></div>`
-      : `<div class="old new-tag">جملة جديدة: هيتعمل لها لقطة وفيديو بعد ما تسجّل</div>`}
+      : `<div class="old new-tag">جملة جديدة: سيُنشأ لها لقطة وفيديو بعد ما تسجّل</div>`}
       <div class="rw-edit"><textarea rows="1" placeholder="اكتب الجملة...">${escapeHtml(r.text)}</textarea>
         <span class="wc" title="${old ? "عدد الكلمات: الجديد / القديم" : "وقتها تقريبًا"}"></span>
-        <span class="rw-tools"><button class="btn sm" data-rw-add title="جملة جديدة بعد دي">➕</button><button class="btn sm" data-rw-del title="شيل الجملة">🗑️</button></span></div></div></div>`;
+        <span class="rw-tools"><button class="btn sm" data-rw-add title="جملة جديدة بعد هذه">➕</button><button class="btn sm" data-rw-del title="أزل الجملة">🗑️</button></span></div></div></div>`;
 }
 function renderRewrite() {
   const ep = ser.ep;
@@ -234,13 +234,13 @@ function renderRewrite() {
   $("serVoicePending2").hidden = !ep.voice_pending;
   if (!ready) return;
   const rw = ep.rewrite.lines;
-  $("serRwGo").textContent = rw.length ? "🎭 عدّل" : "🎭 اكتب كلام جديد";
+  $("serRwGo").textContent = rw.length ? "🎭 عدّل" : "🎭 اكتب نص جديد";
   $("serRwManual").hidden = !!rw.length;
   $("serRwActs").hidden = !rw.length;
   const changed = rw.filter((x) => x.n != null && x.text !== ep.lines.find((l) => l.n === x.n)?.text).length;
   const added = rw.filter((x) => x.n == null).length;
   const removed = ep.lines.length - rw.filter((x) => x.n != null).length;
-  $("serRwState").textContent = rw.length ? [`${changed} جملة اتغيرت`, added && `➕ ${added} جديدة`, removed && `🗑️ ${removed} اتشالت`].filter(Boolean).join(" · ") : "";
+  $("serRwState").textContent = rw.length ? [`${changed} جملة تغيّرت`, added && `➕ ${added} جديدة`, removed && `🗑️ ${removed} أُزيلت`].filter(Boolean).join(" · ") : "";
   if (!rw.length) { $("serRwLines").innerHTML = ""; return; }
   if ($("serRwLines").contains(document.activeElement)) return;
   $("serRwLines").innerHTML = rw.map(rwRowHtml).join("");
@@ -258,8 +258,8 @@ $("serRwForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const message = $("serRwMsg").value.trim();
   if (ser.ep.rewrite.lines.length && !message) return $("serRwMsg").focus();
-  busyButton($("serRwGo"), "⏳ بيكتب...", async () => {
-    ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "POST", ...jsonBody({ message: message || "خليه مضحك أكتر" }) });
+  busyButton($("serRwGo"), "⏳ جارٍ الكتابة...", async () => {
+    ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite`, { method: "POST", ...jsonBody({ message: message || "اجعله مضحك أكثر" }) });
     $("serRwMsg").value = "";
     renderSeries();
   });
@@ -283,7 +283,7 @@ $("serRwLines").addEventListener("click", async (e) => {
     rwCount(fresh);
     fresh.querySelector("textarea").focus();
   } else if (e.target.closest("[data-rw-del]")) {
-    if (row.dataset.n && !(await uiConfirm("تشيل الجملة دي؟ اللقطة بتاعتها بتفضل بفيديوها بس من غير كلام عليها (وتقدر تحذفها من تبويب اللقطات)."))) return;
+    if (row.dataset.n && !(await uiConfirm("تزيل هذه الجملة؟ اللقطة الخاصة بها تظل بفيديوها فقط بدون نص عليها (ويمكنك تحذفها من تبويب اللقطات)."))) return;
     row.remove();
     saveRw();
   }
@@ -291,7 +291,7 @@ $("serRwLines").addEventListener("click", async (e) => {
 // نسخ كلام الفويس أوفر بس (من غير أرقام ولا مشاهد)، كل جملة في سطر، عشان يتحط في برنامج الصوت
 const voiceText = (texts) => texts.map((t) => (t || "").trim()).filter(Boolean).join("\n");
 async function copyText(text) {
-  if (!text) return toast("مفيش كلام", true);
+  if (!text) return toast("لا يوجد نص", true);
   try { await navigator.clipboard.writeText(text); }
   catch {
     const ta = document.createElement("textarea");
@@ -301,13 +301,13 @@ async function copyText(text) {
     document.execCommand("copy");
     ta.remove();
   }
-  toast(`📋 اتنسخ الكلام (${text.split("\n").length} جملة)`);
+  toast(`📋 نُسخ النص (${text.split("\n").length} جملة)`);
 }
 $("serRwCopy").onclick = () => copyText(voiceText(rwRows().map((r) => r.text)));
 $("serCopyVoice").onclick = $("serCopyVoice2").onclick = () => copyText(voiceText(ser.ep.lines.map((l) => l.text)));
 $("serVoiceTxt").onclick = () => {
   const text = voiceText(ser.ep.lines.map((l) => l.text));
-  if (!text) return toast("مفيش كلام", true);
+  if (!text) return toast("لا يوجد نص", true);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text + "\n"], { type: "text/plain;charset=utf-8" }));
   a.download = `episode-${ser.ep.number}-voiceover.txt`;
@@ -318,11 +318,11 @@ $("serVoiceTxt").onclick = () => {
 };
 $("serRwApply").onclick = async () => {
   const added = ser.ep.rewrite.lines.filter((x) => x.n == null && x.text.trim()).length;
-  if (!(await uiConfirm(`الكلام الجديد هيبقى سكريبت الحلقة. بعدها تسجّل الفويس أوفر بيه وترفعه، واللقطات تتظبط عليه.${added ? `\nالجمل الجديدة (${added}) هيتعمل لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو اللي صدّرته قبل كده بيفضلوا زي ما هما.)`))) return;
+  if (!(await uiConfirm(`النص الجديد سيصبح نص الحلقة. بعدها تسجّل التعليق الصوتي به وترفعه، واللقطات تُضبط عليه.${added ? `\nالجمل الجديدة (${added}) سيُنشأ لها لقطات جديدة بعد ما ترقّم الجمل على الصوت.` : ""}\n(المونتاج والفيديو الذي صدّرته من قبل يظلون كما هم.)`))) return;
   busyButton($("serRwApply"), "⏳", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/rewrite/apply`, { method: "POST" });
     ser.tab = "script";
-    toast("اتعتمد ✅ سجّل الفويس أوفر الجديد وارفعه هنا");
+    toast("اعتُمد ✅ سجّل التعليق الصوتي الجديد وارفعه هنا");
     renderSeries();
   });
 };
@@ -332,13 +332,13 @@ $("serRwDiscard").onclick = () => busyButton($("serRwDiscard"), "⏳", async () 
 });
 
 // ---------- 3. الفويس أوفر: كل جملة بوقتها ----------
-const TIMING_LABEL = { stt: "✅ من موديل الكلام (كل كلمة بوقتها)", estimate: "≈ تقدير من السكتات في الصوت", manual: "✍️ متعدّل بإيدك" };
+const TIMING_LABEL = { stt: "✅ من نموذج النص (كل كلمة بوقتها)", estimate: "≈ تقدير من السكتات في الصوت", manual: "✍️ متعدّل بنفسك" };
 function renderScriptTab() {
   const ep = ser.ep;
   if (document.activeElement !== $("serScript")) $("serScript").value = ep.script;
   if (document.activeElement !== $("serEpRename")) $("serEpRename").value = ep.name;
   if (document.activeElement !== $("serNotes")) $("serNotes").value = ep.notes;
-  $("serAudioInfo").textContent = ep.audio ? `${ep.audio.name || "الفويس أوفر"} · ${serFmt(ep.audio.duration)} (ده طول الحلقة)` : "لسه مفيش صوت";
+  $("serAudioInfo").textContent = ep.audio ? `${ep.audio.name || "التعليق الصوتي"} · ${serFmt(ep.audio.duration)} (هذا طول الحلقة)` : "لا يوجد بعد صوت";
   const player = $("serAudio");
   if (ep.audio && !player.src.endsWith(ep.audio.url)) player.src = ep.audio.url;
   player.hidden = !ep.audio;
@@ -356,16 +356,16 @@ function renderScriptTab() {
       <td><input type="number" step="0.05" min="0" data-f="start" value="${ln.start ?? ""}"></td>
       <td><input type="number" step="0.05" min="0" data-f="end" value="${ln.end ?? ""}"></td>
       <td>${dur}ث ${ln.start != null ? `<button class="btn sm" data-play="${ln.start}:${ln.end}" title="اسمعها">▶</button>` : ""}</td></tr>`;
-  }).join("") || `<tr><td colspan="5" class="muted">${ep.audio ? "دوس «⏱️ رقّم الجمل على الصوت»: البرنامج هيسمع الصوت ويقسّمه جمل بتوقيتها (حتى من غير سكريبت)." : "ارفع الفويس أوفر الأول."}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="muted">${ep.audio ? "اضغط «⏱️ رقّم الجمل على الصوت»: البرنامج سيسمع الصوت ويقسّمه جمل بتوقيتها (حتى بدون نص)." : "ارفع التعليق الصوتي أولًا."}</td></tr>`;
 }
 async function patchEpisode(body) {
   ser.ep = await api(`/api/episodes/${ser.ep.id}`, { method: "PATCH", ...jsonBody(body) });
 }
 $("serScript").addEventListener("change", async () => {
-  try { await patchEpisode({ script: $("serScript").value }); renderSeries(); toast(`اتحفظ · ${ser.ep.lines.length} جملة`); } catch (err) { toast(err.message, true); }
+  try { await patchEpisode({ script: $("serScript").value }); renderSeries(); toast(`حُفظ · ${ser.ep.lines.length} جملة`); } catch (err) { toast(err.message, true); }
 });
 $("serEpRename").addEventListener("change", async () => {
-  try { await patchEpisode({ name: $("serEpRename").value }); await loadSeries(); renderSeries(); toast("اتحفظ"); } catch (err) { toast(err.message, true); }
+  try { await patchEpisode({ name: $("serEpRename").value }); await loadSeries(); renderSeries(); toast("حُفظ"); } catch (err) { toast(err.message, true); }
 });
 $("serNotes").addEventListener("change", async () => {
   try { await patchEpisode({ notes: $("serNotes").value }); } catch (err) { toast(err.message, true); }
@@ -383,14 +383,14 @@ $("serAudioFile").addEventListener("change", async (e) => {
   if (!f) return;
   const form = new FormData();
   form.append("file", f);
-  $("serAudioInfo").textContent = "⏳ بيرفع...";
+  $("serAudioInfo").textContent = "⏳ جارٍ الرفع...";
   try {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/audio`, { method: "POST", body: form });
     renderSeries();
     $("serTiming").click();
   } catch (err) { toast(err.message, true); renderSeries(); }
 });
-$("serTiming").onclick = () => busyButton($("serTiming"), "⏳ بيسمع الصوت...", async () => {
+$("serTiming").onclick = () => busyButton($("serTiming"), "⏳ جارٍ الاستماع الصوت...", async () => {
   ser.ep = await api(`/api/episodes/${ser.ep.id}/timing`, { method: "POST" });
   renderSeries();
 });
@@ -418,31 +418,31 @@ $("serAudio").addEventListener("timeupdate", () => {
 });
 
 // ---------- 3. اللقطات: كل لقطة بمدتها من الصوت، وبرومبتها، ونسخها ----------
-const TAKE_STATE = { queued: "⏳ مستنية", working: "🎬 بتتولد...", failed: "✕ فشلت" };
+const TAKE_STATE = { queued: "⏳ تنتظر", working: "🎬 تُولّد...", failed: "✕ فشلت" };
 function takeThumb(t, chosen) {
   const busy = t.status === "queued" || t.status === "working";
   const media = t.url ? lightVideo(t.url, 'muted loop playsinline') : `<div class="car-wait">${busy ? `<div class="spin"></div>` : ""}${TAKE_STATE[t.status] || ""}</div>`;
   return `<div class="take ${t.id === chosen ? "sel" : ""} ${t.status} ${t.approved ? "ok" : ""}" data-take="${t.id}" title="${t.source === "upload" ? escapeHtml(t.name || "فيديو مرفوع") : "Seedance"}${t.error ? ` — ${escapeHtml(t.error)}` : ""}">
     ${media}<em>${t.approved ? "✅" : t.source === "upload" ? "⬆" : "✨"} ${t.duration ? `${t.duration.toFixed(1)}ث` : ""}</em>
-    ${busy ? "" : `<b data-del-take title="امسح النسخة">✕</b>`}
+    ${busy ? "" : `<b data-del-take title="احذف النسخة">✕</b>`}
     ${t.url ? `<i class="zoom" data-zoom title="كبّر">🔍</i>` : ""}
-    ${t.status === "failed" && t.source === "seedance" ? `<button class="retry" data-retry-take title="حاول تاني (لو الطلب اتبعت بيكمّل من غير دفع تاني)">↻</button>` : ""}</div>`;
+    ${t.status === "failed" && t.source === "seedance" ? `<button class="retry" data-retry-take title="حاول مرة أخرى (إذا الطلب أُرسل يُكمل بدون دفع آخر)">↻</button>` : ""}</div>`;
 }
-const FRAME_STATE = { queued: "⏳ مستنية", working: "🎨 بترسم...", failed: "✕ فشلت" };
+const FRAME_STATE = { queued: "⏳ تنتظر", working: "🎨 ترسم...", failed: "✕ فشلت" };
 function renderShotsTab() {
   const ep = ser.ep;
   const ready = ep.audio && ep.lines.length && ep.lines.every((l) => l.start != null);
   $("serShotsGo").disabled = !ready;
-  $("serShotsGo").textContent = ep.shots.length ? "✨ قسّم تاني (النسخ بتتحفظ)" : "✨ جهّز اللقطات";
-  $("serShotsHint").textContent = ready ? `الحلقة ${serFmt(ep.audio.duration)} · ${ep.shots.length} لقطة · الموديل: ${ser.settings.text_model}` : "رقّم جمل الفويس أوفر على الصوت الأول (تبويب السكريبت والصوت).";
+  $("serShotsGo").textContent = ep.shots.length ? "✨ قسّم آخر (النسخ تُحفظ)" : "✨ جهّز اللقطات";
+  $("serShotsHint").textContent = ready ? `الحلقة ${serFmt(ep.audio.duration)} · ${ep.shots.length} لقطة · النموذج: ${ser.settings.text_model}` : "رقّم جمل التعليق الصوتي على الصوت أولًا (تبويب النص والصوت).";
   const lines = Object.fromEntries(ep.lines.map((l) => [l.n, l]));
   let scene = null;
   const rt = ep.retimed;
   $("serRetimed").hidden = !rt;
   if (rt) $("serRetimed").textContent = rt.short.length
-    ? `🔁 اللقطات اتظبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو بتاعها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج هتتبطّأ شوية وآخر فريم يقف، أو دوس «🔄 واحد تاني» عليها يتولد على الوقت الجديد.`
-    : "🔁 اللقطات اتظبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
-  if (rt?.added?.length) $("serRetimed").textContent += ` ➕ اتعملت لقطات جديدة للجمل اللي ضفتها (${rt.added.join("، ")}): ارسم لها ستوري بورد واعتمدها وولّدها.`;
+    ? `🔁 اللقطات ضُبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو الخاص بها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج ستتبطّأ قليلًا وآخر فريم يقف، أو اضغط «🔄 واحد آخر» عليها يُولّد على الوقت الجديد.`
+    : "🔁 اللقطات ضُبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
+  if (rt?.added?.length) $("serRetimed").textContent += ` ➕ أُنشئت لقطات جديدة للجمل الذي ضفتها (${rt.added.join("، ")}): ارسم لها ستوري بورد واعتمدها وولّدها.`;
   // الكلام الجديد على اللقطات: من المسودة (لسه ما اتعتمدتش)، والجمل الجديدة بتظهر مكانها قبل ما تتسجل
   const draft = ep.rewrite.lines.length ? ep.rewrite.lines : null;
   const newText = draft ? Object.fromEntries(draft.filter((x) => x.n != null).map((x) => [x.n, x.text])) : null;
@@ -466,12 +466,12 @@ function renderShotsTab() {
     (ghostAfter[key] ||= []).push(...texts);
   }
   const ghost = (texts) => texts.map((t) => `<div class="shot-ghost" data-no-i18n><b>➕</b> «${escapeHtml(t)}»
-      <span class="muted">${draft ? "جملة جديدة في المسودة" : "جملة جديدة لسه ما اتسجلتش"}: هيتعمل لها لقطة هنا بعد ما تسجّل الصوت وترقّم الجمل</span></div>`).join("");
+      <span class="muted">${draft ? "جملة جديدة في المسودة" : "جملة جديدة ما زال ما لم تُسجّل"}: سيُنشأ لها لقطة هنا بعد ما تسجّل الصوت وترقّم الجمل</span></div>`).join("");
   const changed = draft ? ep.lines.filter((l) => newText[l.n] !== l.text).length : 0;
   $("serDraftNote").hidden = !draft && !Object.keys(pending).length;
   $("serDraftNote").textContent = draft
-    ? `📝 بتشوف الكلام الجديد من المسودة في «2 كتابة الحلقة» (لسه ما اتعتمدش): ${changed} جملة اتغيرت. اللون الأخضر الكلام الجديد، والمشطوب القديم. شوف كل فيديو لسه مناسب ولا لأ: لو لأ دوس «✍️ برومبت للكلام الجديد» وارسم وولّد تاني، أو احذف اللقطة.`
-    : "📝 فيه جمل جديدة لسه ما اتسجلتش، ظاهرة في أماكنها. سجّل الصوت وارفعه ورقّم الجمل عشان يتعمل لها لقطات.";
+    ? `📝 ترى النص الجديد من المسودة في «2 كتابة الحلقة» (ما زال ما لم يُعتمد): ${changed} جملة تغيّرت. اللون الأخضر النص الجديد، والمشطوب القديم. انظر كل فيديو ما زال مناسب ولا لا: إذا لا اضغط «✍️ وصف للكلام الجديد» وارسم وولّد آخر، أو احذف اللقطة.`
+    : "📝 فيه جمل جديدة ما زال ما لم تُسجّل، ظاهرة في أماكنها. سجّل الصوت وارفعه ورقّم الجمل لكي يُنشأ لها لقطات.";
   $("serShots").innerHTML = (ghostAfter.start ? ghost(ghostAfter.start) : "") + ep.shots.map((s) => {
     const head = s.scene !== scene ? `<div class="ser-scene">المشهد ${s.scene}</div>` : "";
     scene = s.scene;
@@ -480,21 +480,21 @@ function renderShotsTab() {
       if (!(l.n in newText)) return `<s class="old-said">«${escapeHtml(l.text)}»</s>`;
       return newText[l.n] === l.text ? `«${escapeHtml(l.text)}»`
         : `<span class="new-said">«${escapeHtml(newText[l.n])}»</span> <s class="old-said">«${escapeHtml(l.text)}»</s>`;
-    }).join(" ") || `<span class="muted">(من غير كلام)</span>`;
+    }).join(" ") || `<span class="muted">(بدون نص)</span>`;
     const chosen = s.takes.find((t) => t.id === s.chosen);
     const short = chosen?.duration && chosen.duration - (s.offset || 0) < s.duration - 0.05;
     const fbusy = s.frame_status === "queued" || s.frame_status === "working";
     const frame = s.frame_url
       ? `<a href="${s.frame_url}" target="_blank"><img src="${s.frame_url}" alt=""></a>${fbusy ? `<div class="car-wait over"><div class="spin"></div></div>` : ""}`
-      : `<div class="car-wait">${fbusy ? `<div class="spin"></div>` : ""}${FRAME_STATE[s.frame_status] || "لسه من غير ستوري بورد"}</div>`;
+      : `<div class="car-wait">${fbusy ? `<div class="spin"></div>` : ""}${FRAME_STATE[s.frame_status] || "ما زال بدون ستوري بورد"}</div>`;
     const frames = (s.frames || []).length > 1 ? `<div class="frame-vers">${s.frames.map((f, i) => `<img src="${f.url}" data-frame="${f.file}" class="${f.url === s.frame_url ? "sel" : ""}" title="نسخة ${i + 1}" alt="">`).join("")}</div>` : "";
     const ready = chosen?.approved;
     return `${head}<article class="shot ${s.approved ? "approved" : ""} ${ready ? "ready" : ""}" data-shot="${s.id}">
-      <header><span class="drag" title="اسحب اللقطة لمكان تاني">⠿</span><b>${s.n}</b>${s.added ? `<span class="added" title="لقطة ضفتها بإيدك">➕</span>` : ""}<span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
-        <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع الكلام اللي على اللقطة">▶</button>
-        <button class="btn sm mv" data-move="-1" title="قدّمها لقطة (تيجي قبل اللي قبلها)" ${s.n === 1 ? "disabled" : ""}>→</button>
-        <button class="btn sm mv" data-move="1" title="أخّرها لقطة (تيجي بعد اللي بعدها)" ${s.n === ep.shots.length ? "disabled" : ""}>←</button>
-        <button class="btn sm" data-add-after title="ضيف لقطة جديدة بعد دي">➕</button>
+      <header><span class="drag" title="اسحب اللقطة لمكان آخر">⠿</span><b>${s.n}</b>${s.added ? `<span class="added" title="لقطة ضفتها بنفسك">➕</span>` : ""}<span class="t">${serFmt(s.start)} → ${serFmt(s.end)}</span><span class="dur">${s.duration.toFixed(1)}ث</span>
+        <button class="btn sm" data-play="${s.start}:${s.end}" title="اسمع النص الذي على اللقطة">▶</button>
+        <button class="btn sm mv" data-move="-1" title="قدّمها لقطة (تأتي قبل ما قبلها)" ${s.n === 1 ? "disabled" : ""}>→</button>
+        <button class="btn sm mv" data-move="1" title="أخّرها لقطة (تأتي بعد ما بعدها)" ${s.n === ep.shots.length ? "disabled" : ""}>←</button>
+        <button class="btn sm" data-add-after title="أضف لقطة جديدة بعد هذه">➕</button>
         <button class="btn sm danger" data-del-shot title="احذف اللقطة">🗑️</button></header>
       <div class="said" data-no-i18n>${said}</div>
       <div class="frame">${frame}</div>
@@ -502,25 +502,25 @@ function renderShotsTab() {
       ${s.frame_error ? `<div class="err">${escapeHtml(s.frame_error)}</div>` : ""}
       <input type="text" class="title" data-f="title" value="${escapeHtml(s.title || "")}" placeholder="وصف اللقطة" data-no-i18n>
       <div class="meta" data-no-i18n>${[s.shot, s.camera, s.location, s.sfx && `🔊 ${s.sfx}`, s.transition && `↪ ${s.transition}`].filter(Boolean).map(escapeHtml).join(" · ")}</div>
-      ${s.prompt_status === "working" ? `<div class="prompt-busy"><div class="spin"></div> ✍️ بيكتب برومبت للكلام الجديد...</div>` : ""}
+      ${s.prompt_status === "working" ? `<div class="prompt-busy"><div class="spin"></div> ✍️ يكتب وصف للكلام الجديد...</div>` : ""}
       ${s.prompt_status === "failed" && s.prompt_error ? `<div class="err">✍️ ${escapeHtml(s.prompt_error)}</div>` : ""}
-      ${s.prompt_new ? `<div class="prompt-new">🆕 برومبت جديد على الكلام الجديد${s.takes.length ? " · الفيديوهات اللي تحت من البرومبت القديم: استخدم واحد منهم أو ولّد واحد جديد" : ""}</div>` : ""}
+      ${s.prompt_new ? `<div class="prompt-new">🆕 وصف جديد على النص الجديد${s.takes.length ? " · الفيديوهات التي أسفل من الوصف القديم: استخدم واحد منهم أو ولّد واحد جديد" : ""}</div>` : ""}
       <textarea data-f="prompt" rows="4" dir="ltr" placeholder="Prompt" data-no-i18n>${escapeHtml(s.prompt || "")}</textarea>
       <div class="acts">
-        <button class="btn sm" data-redescribe title="الموديل يكتب وصف وبرومبت جديد للقطة على الكلام الجديد (الصور والفيديوهات القديمة بتفضل كنسخ)">✍️ برومبت للكلام الجديد</button>
-        <button class="btn sm" data-frame-go ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم تاني" : "ارسم الستوري بورد"}</button>
-        <button class="btn sm ${s.approved ? "" : "primary"}" data-approve>${s.approved ? "✅ معتمدة (دوس تلغي)" : "✅ اعتمد اللقطة"}</button>
+        <button class="btn sm" data-redescribe title="النموذج يكتب وصف ووصف جديد للقطة على النص الجديد (الصور والفيديوهات القديمة تظل كنسخ)">✍️ وصف للكلام الجديد</button>
+        <button class="btn sm" data-frame-go ${fbusy ? "disabled" : ""}>🎨 ${s.frame_url ? "ارسم مرة أخرى" : "ارسم الستوري بورد"}</button>
+        <button class="btn sm ${s.approved ? "" : "primary"}" data-approve>${s.approved ? "✅ معتمدة (اضغط تلغي)" : "✅ اعتمد اللقطة"}</button>
       </div>
       <div class="takes">${s.takes.map((t) => takeThumb(t, s.chosen)).join("")}</div>
       ${(() => { const bad = s.takes.filter((t) => t.status === "failed" && t.error).slice(-1)[0]; return bad ? `<div class="err">✕ الفيديو فشل: ${escapeHtml(bad.error)}</div>` : ""; })()}
       ${chosen && chosen.status === "done" ? `<div class="acts take-acts">
         <button class="btn sm ${chosen.approved ? "" : "primary"}" data-take-ok="${chosen.id}">${chosen.approved ? "✅ موافق عليه" : "✅ موافق على الفيديو"}</button>
-        <button class="btn sm" data-gen ${s.approved ? "" : "disabled"}>🔄 واحد تاني</button></div>` : ""}
+        <button class="btn sm" data-gen ${s.approved ? "" : "disabled"}>🔄 واحد آخر</button></div>` : ""}
       <div class="acts">
-        ${chosen ? "" : `<button class="btn sm primary" data-gen ${s.approved ? "" : "disabled"} title="${s.approved ? "" : "اعتمد اللقطة الأول"}">🎬 ولّد الفيديو</button>`}
+        ${chosen ? "" : `<button class="btn sm primary" data-gen ${s.approved ? "" : "disabled"} title="${s.approved ? "" : "اعتمد اللقطة أولًا"}">🎬 ولّد الفيديو</button>`}
         <label class="btn sm">⬆ ارفع فيديو<input type="file" data-up accept="video/*" hidden></label>
         ${chosen ? `<label class="off">يبدأ من <input type="number" step="0.1" min="0" data-f="offset" value="${s.offset || 0}">ث</label>` : ""}
-        ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة: هتتبطّأ شوية وآخر فريم يقف</span>` : ""}
+        ${short ? `<span class="warn">⚠️ النسخة أقصر من اللقطة: ستتبطّأ قليلًا وآخر فريم يقف</span>` : ""}
       </div>
     </article>${ghostAfter[s.id] ? ghost(ghostAfter[s.id]) : ""}`;
   }).join("");
@@ -536,16 +536,16 @@ function renderShotsTab() {
   // نسخ محفوظة من قوايم قديمة
   $("serPool").hidden = !ep.pool.length;
   $("serPoolList").innerHTML = ep.pool.map((t) => `<div class="pool-item">${takeThumb(t, null)}
-      <select data-attach="${t.id}"><option value="">حطها على لقطة…</option>${ep.shots.map((s) => `<option value="${s.id}">${s.n}. ${escapeHtml((s.title || "").slice(0, 30))}</option>`).join("")}</select></div>`).join("");
+      <select data-attach="${t.id}"><option value="">ضعها على لقطة…</option>${ep.shots.map((s) => `<option value="${s.id}">${s.n}. ${escapeHtml((s.title || "").slice(0, 30))}</option>`).join("")}</select></div>`).join("");
   $("serGalleryGo").disabled = !n;
   const writing = ep.shots.filter((s) => s.prompt_status === "working").length;
   $("serRepromptAll").disabled = !n || !!writing;
-  $("serRepromptAll").textContent = writing ? `✍️ بيكتب برومبتات (${writing} لقطة)...` : "✍️ برومبتات للكلام الحالي";
+  $("serRepromptAll").textContent = writing ? `✍️ يكتب أوصاف (${writing} لقطة)...` : "✍️ أوصاف للكلام الحالي";
   if ($("serGalDialog").open) renderGallery();
 }
 $("serShotsGo").onclick = async () => {
-  if (ser.ep.shots.length && !(await uiConfirm("تقسيم جديد للحلقة؟ النسخ اللي اتولدت أو اترفعت هتفضل محفوظة تحت «نسخ محفوظة» وتقدر تحطها على أي لقطة."))) return;
-  busyButton($("serShotsGo"), "⏳ الموديل بيقسّم الحلقة...", async () => {
+  if (ser.ep.shots.length && !(await uiConfirm("تقسيم جديد للحلقة؟ النسخ الذي وُلّدت أو رُفعت ستظل محفوظة أسفل «نسخ محفوظة» ويمكنك تحطها على أي لقطة."))) return;
+  busyButton($("serShotsGo"), "⏳ النموذج يقسّم الحلقة...", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/shots`, { method: "POST" });
     renderSeries();
   });
@@ -561,7 +561,7 @@ $("serShots").addEventListener("change", async (e) => {
       if (!f) return;
       const form = new FormData();
       form.append("file", f);
-      toast("⏳ بيرفع الفيديو...");
+      toast("⏳ جارٍ الرفع الفيديو...");
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/takes`, { method: "POST", body: form });
     } else if (e.target.dataset.f) {
       const v = e.target.dataset.f === "offset" ? Number(e.target.value) : e.target.value;
@@ -582,10 +582,10 @@ $("serShots").addEventListener("click", async (e) => {
     if (e.target.closest("[data-del-shot]")) return askDeleteShot(id);
     if (e.target.closest("[data-add-after]")) return askAddShot(id);
     const rd = e.target.closest("[data-redescribe]");
-    if (rd) return busyButton(rd, "⏳ بيكتب...", async () => {
+    if (rd) return busyButton(rd, "⏳ جارٍ الكتابة...", async () => {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/describe`, { method: "POST" });
       renderSeries();
-      toast("✍️ اتكتب برومبت جديد. راجعه، ودوس «🎨 ارسم تاني» وبعدين ولّد الفيديو");
+      toast("✍️ كُتب وصف جديد. راجعه، واضغط «🎨 ارسم مرة أخرى» ثم ولّد الفيديو");
     });
     const mv = e.target.closest("[data-move]");
     if (mv) {
@@ -623,7 +623,7 @@ $("serShots").addEventListener("click", async (e) => {
     }
     if (e.target.closest("[data-zoom]")) return openGallery(id, take.dataset.take);
     if (e.target.closest("[data-del-take]")) {
-      if (!(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
+      if (!(await uiConfirm("مسح هذه النسخة نهائي؟"))) return;
       ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" });
     } else {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}/pick`, { method: "POST", ...jsonBody({ take_id: take.dataset.take }) });
@@ -644,7 +644,7 @@ $("serPoolList").addEventListener("change", async (e) => {
 });
 $("serPoolList").addEventListener("click", async (e) => {
   const take = e.target.closest("[data-take]");
-  if (!take || !e.target.closest("[data-del-take]") || !(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
+  if (!take || !e.target.closest("[data-del-take]") || !(await uiConfirm("مسح هذه النسخة نهائي؟"))) return;
   try { ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" }); renderSeries(); }
   catch (err) { toast(err.message, true); }
 });
@@ -656,19 +656,19 @@ function askDeleteShot(id) {
   const s = shots[k];
   const prev = shots[k - 1];
   const next = shots[k + 1];
-  if (!prev && !next) return toast("دي آخر لقطة في الحلقة", true);
+  if (!prev && !next) return toast("هذه آخر لقطة في الحلقة", true);
   $("serDelNum").textContent = s.n;
-  $("serDelInfo").textContent = `مدتها ${s.duration.toFixed(1)} ثانية. الوقت ده يتضاف على أنهي لقطة؟ ${s.takes.length ? "الفيديوهات بتاعتها هتروح للنسخ المحفوظة." : ""}`;
+  $("serDelInfo").textContent = `مدتها ${s.duration.toFixed(1)} ثانية. هذا الوقت يُضاف على أي لقطة؟ ${s.takes.length ? "الفيديوهات الخاصة بها ستروح للنسخ المحفوظة." : ""}`;
   $("serDelPrev").hidden = !prev;
   $("serDelNext").hidden = !next;
-  if (prev) $("serDelPrev").textContent = `→ اللي قبلها (${prev.n}): ${prev.duration.toFixed(1)} ← ${(prev.duration + s.duration).toFixed(1)}ث`;
-  if (next) $("serDelNext").textContent = `← اللي بعدها (${next.n}): ${next.duration.toFixed(1)} ← ${(next.duration + s.duration).toFixed(1)}ث`;
+  if (prev) $("serDelPrev").textContent = `→ ما قبلها (${prev.n}): ${prev.duration.toFixed(1)} ← ${(prev.duration + s.duration).toFixed(1)}ث`;
+  if (next) $("serDelNext").textContent = `← ما بعدها (${next.n}): ${next.duration.toFixed(1)} ← ${(next.duration + s.duration).toFixed(1)}ث`;
   const go = async (merge) => {
     $("serDelDialog").close();
     try {
       ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${id}?merge=${merge}`, { method: "DELETE" });
       renderSeries();
-      toast(`اتحذفت اللقطة ${s.n}`);
+      toast(`حُذفت اللقطة ${s.n}`);
     } catch (err) { toast(err.message, true); }
   };
   $("serDelPrev").onclick = () => go("prev");
@@ -753,12 +753,12 @@ function renderAddPlan() {
     const parts = [];
     if (p.a > 0.001) parts.push(`${prev.n}: ${prev.duration.toFixed(1)} ← ${(prev.duration - p.a).toFixed(1)}ث`);
     if (p.b > 0.001) parts.push(`${next.n}: ${next.duration.toFixed(1)} ← ${(next.duration - p.b).toFixed(1)}ث`);
-    const short = p.got < secs - 0.05 ? ` · ⚠️ المتاح ${p.got.toFixed(1)}ث بس` : "";
-    return `${parts.join(" · ") || "مفيش وقت متاح"}${short}`;
+    const short = p.got < secs - 0.05 ? ` · ⚠️ المتاح ${p.got.toFixed(1)}ث فقط` : "";
+    return `${parts.join(" · ") || "لا يوجد وقت متاح"}${short}`;
   };
   $("serAddBoth").textContent = `من الاتنين (${label("both")})`;
-  $("serAddPrev").textContent = `من اللي قبلها (${label("prev")})`;
-  $("serAddNext").textContent = next ? `من اللي بعدها (${label("next")})` : "";
+  $("serAddPrev").textContent = `مما قبلها (${label("prev")})`;
+  $("serAddNext").textContent = next ? `مما بعدها (${label("next")})` : "";
   $("serAddNext").closest("label").hidden = !next;
   $("serAddBoth").closest("label").hidden = !next;
   if (!next) document.querySelector('[name="serAddFrom"][value="prev"]').checked = true;
@@ -776,7 +776,7 @@ function askAddShot(id) {
 }
 $("serAddSecs").addEventListener("input", renderAddPlan);
 $("serAddCancel").onclick = () => $("serAddDialog").close();
-$("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ بيكتب اللقطة...", async () => {
+$("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ جارٍ الكتابة اللقطة...", async () => {
   const body = { after: ser.adding.prev.id, seconds: Number($("serAddSecs").value) || 2, idea: $("serAddIdea").value.trim(),
     take_from: document.querySelector('[name="serAddFrom"]:checked').value };
   const r = await api(`/api/episodes/${ser.ep.id}/shots/insert`, { method: "POST", ...jsonBody(body) });
@@ -784,17 +784,17 @@ $("serAddGo").onclick = () => busyButton($("serAddGo"), "⏳ بيكتب اللق
   $("serAddDialog").close();
   renderSeries();
   const s = ser.ep.shots.find((x) => x.id === r.new_shot);
-  toast(`➕ اتضافت اللقطة ${s.n}. راجع البرومبت، ارسم الستوري بورد، واعتمدها عشان تتولد`);
+  toast(`➕ أُضيفت اللقطة ${s.n}. راجع الوصف، ارسم الستوري بورد، واعتمدها لكي تُولّد`);
   const card = document.querySelector(`[data-shot="${r.new_shot}"]`);
   if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 2500); }
 });
 
 $("serRepromptAll").onclick = async () => {
-  if (!(await uiConfirm("الموديل يكتب وصف وبرومبت جديد لكل اللقطات على الكلام الحالي؟\nالستوري بورد والفيديوهات الموجودة بيفضلوا زي ما هما، والتوليد الجاي هيبقى على البرومبتات الجديدة."))) return;
+  if (!(await uiConfirm("النموذج يكتب وصف ووصف جديد لكل اللقطات على النص الحالي؟\nالستوري بورد والفيديوهات الموجودة يظلون كما هم، والتوليد القادم سيصبح على الأوصاف الجديدة."))) return;
   busyButton($("serRepromptAll"), "⏳", async () => {
     ser.ep = await api(`/api/episodes/${ser.ep.id}/reprompt`, { method: "POST" });
     renderSeries();
-    toast("✍️ البرومبتات بتتكتب في الخلفية، وكل لقطة بتتحدث أول ما تخلص");
+    toast("✍️ الأوصاف تُكتب في الخلفية، وكل لقطة تتحدث أول ما تنتهي");
   });
 };
 $("serFramesGo").onclick = () => busyButton($("serFramesGo"), "⏳", async () => {
@@ -808,7 +808,7 @@ $("serApproveAll").onclick = () => busyButton($("serApproveAll"), "⏳", async (
 });
 $("serGenApproved").onclick = () => busyButton($("serGenApproved"), "⏳", async () => {
   const todo = ser.ep.shots.filter((s) => s.approved && !s.takes.some((t) => t.status !== "failed")).length;
-  if (!(await uiConfirm(`هيتولد فيديو لـ ${todo} لقطة معتمدة بـ Seedance. نكمّل؟`))) return;
+  if (!(await uiConfirm(`سيُولّد فيديو لـ ${todo} لقطة معتمدة بـ Seedance. نكمّل؟`))) return;
   ser.ep = await api(`/api/episodes/${ser.ep.id}/generate-approved`, { method: "POST" });
   renderSeries();
 });
@@ -821,17 +821,17 @@ function renderRenderTab() {
   $("serToEditor").disabled = !ep.shots.length;
   $("serToEditor").classList.toggle("primary", !notOk.length);
   $("serMissing").hidden = !notOk.length;
-  $("serMissing").innerHTML = notOk.length ? `<b>⚠️ لقطات لسه من غير فيديو موافق عليه:</b> ${ep.shots.filter((s) => notOk.includes(s.n)).map((s) => `<button class="chip" data-gal-open="${s.id}" title="افتحها">${s.n}</button>`).join("")}` : "";
+  $("serMissing").innerHTML = notOk.length ? `<b>⚠️ لقطات ما زال بدون فيديو موافق عليه:</b> ${ep.shots.filter((s) => notOk.includes(s.n)).map((s) => `<button class="chip" data-gal-open="${s.id}" title="افتحها">${s.n}</button>`).join("")}` : "";
   const missing = ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.status === "done")).length;
   const r = ep.render;
   $("serRenderGo").disabled = !ep.shots.length;
-  $("serRenderState").textContent = r.status === "working" ? "🎞️ بيجمّع الحلقة..." : r.status === "failed" ? `✕ ${r.error || ""}` : "";
-  $("serRenderHint").textContent = !ep.shots.length ? "جهّز اللقطات الأول."
-    : notOk.length ? `🎬 لسه ${notOk.length} لقطة من غير فيديو موافق عليه. دوس على رقم أي لقطة تفتحها. المعاينة السريعة بتحط مكانهم أسود أو النسخة المختارة.`
-    : missing ? `⚠️ ${missing} لقطة لسه من غير فيديو، هتطلع سودا بمدتها. تقدر تجمّع عشان تشوف الإيقاع.`
-      : "كل اللقطات جاهزة. كل لقطة بتتقص على مدتها بالظبط من الصوت، والفويس أوفر فوقهم.";
+  $("serRenderState").textContent = r.status === "working" ? "🎞️ يجمّع الحلقة..." : r.status === "failed" ? `✕ ${r.error || ""}` : "";
+  $("serRenderHint").textContent = !ep.shots.length ? "جهّز اللقطات أولًا."
+    : notOk.length ? `🎬 ما زال ${notOk.length} لقطة بدون فيديو موافق عليه. اضغط على رقم أي لقطة تفتحها. المعاينة السريعة تضع مكانهم أسود أو النسخة المختارة.`
+    : missing ? `⚠️ ${missing} لقطة ما زال بدون فيديو، ستظهر سوداء بمدتها. يمكنك تجمّع لكي ترى الإيقاع.`
+      : "كل اللقطات جاهزة. كل لقطة تُقص على مدتها بالضبط من الصوت، والفويس أوفر فوقهم.";
   $("serRendered").innerHTML = ep.export_url ? `<video src="${ep.export_url}" controls preload="metadata"></video>
-    <p class="hint">اتحفظت في الفيديوهات الجاهزة، وتقدر تنشرها من صفحة النشر.</p>` : "";
+    <p class="hint">حُفظت في الفيديوهات الجاهزة، ويمكنك تنشرها من صفحة النشر.</p>` : "";
 }
 $("serMissing").addEventListener("click", (e) => {
   const b = e.target.closest("[data-gal-open]");
@@ -840,7 +840,7 @@ $("serMissing").addEventListener("click", (e) => {
 $("serToEditor").onclick = () => {
   const missing = ser.ep.shots.filter((s) => !s.takes.some((t) => t.id === s.chosen && t.approved));
   if (missing.length) {
-    toast(`فيه ${missing.length} لقطة لسه من غير فيديو موافق عليه (${missing.map((s) => s.n).join("، ")}). وافق عليهم وبعدين افتح المحرر.`, true);
+    toast(`فيه ${missing.length} لقطة ما زال بدون فيديو موافق عليه (${missing.map((s) => s.n).join("، ")}). وافق عليهم ثم افتح المحرر.`, true);
     return openGallery(missing[0].id);
   }
   openInEditor();
@@ -849,7 +849,7 @@ const openInEditor = () => busyButton($("serToEditor"), "⏳", async () => {
   const r = await api(`/api/episodes/${ser.ep.id}/to-editor`, { method: "POST" });
   storageSet("studiomania.projectId.series", r.project_id);
   if (typeof mt !== "undefined") mt.project = null;
-  toast("اتفتحت الحلقة في مونتاج المسلسلات");
+  toast("فُتحت الحلقة في مونتاج المسلسلات");
   showStep("6s");
 });
 $("serRenderGo").onclick = () => busyButton($("serRenderGo"), "⏳", async () => {
@@ -859,7 +859,7 @@ $("serRenderGo").onclick = () => busyButton($("serRenderGo"), "⏳", async () =>
 
 // ---------- معرض فيديوهات الحلقة: كل اللقطات قدامك، ودوس على أي واحدة تكبر وتعاينها ----------
 const gal = { filter: "all", shot: null, take: null, list: [] };
-const GAL_LABEL = { done: "✅ موافق عليه", review: "👀 مستني موافقتك", busy: "🎬 بيتولد...", todo: "لسه" };
+const GAL_LABEL = { done: "✅ موافق عليه", review: "👀 ينتظر موافقتك", busy: "🎬 يُولّد...", todo: "ما زال" };
 function galState(s) {
   const chosen = s.takes.find((t) => t.id === s.chosen);
   if (chosen?.status === "done") return chosen.approved ? "done" : "review";
@@ -889,7 +889,7 @@ function renderGallery() {
   if (!ep) return;
   const counts = { all: ep.shots.length, done: 0, review: 0, busy: 0, todo: 0 };
   ep.shots.forEach((s) => counts[galState(s)]++);
-  $("serGalCount").textContent = `✅ ${counts.done} · 👀 ${counts.review} · 🎬 ${counts.busy} · لسه ${counts.todo} — من ${counts.all} لقطة`;
+  $("serGalCount").textContent = `✅ ${counts.done} · 👀 ${counts.review} · 🎬 ${counts.busy} · ما زال ${counts.todo} — من ${counts.all} لقطة`;
   document.querySelectorAll("#serGalTabs [data-f]").forEach((b) => {
     b.classList.toggle("active", b.dataset.f === gal.filter);
     b.dataset.count = counts[b.dataset.f];
@@ -909,8 +909,8 @@ function renderGallery() {
       ? lightVideo(t.url, "muted loop playsinline")
       : `${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}${st === "busy" ? `<div class="spin"></div>` : ""}`;
     return `<button class="gal-tile ${st}" data-gal="${s.id}" title="${escapeHtml(s.title || "")}" data-no-i18n>${media}
-      <span class="n">${s.n}</span><span class="st">${failed ? "✕ فشل" : s.approved || st !== "todo" ? GAL_LABEL[st] : "اللقطة مش معتمدة"} · ${s.duration.toFixed(1)}ث</span></button>`;
-  }).join("") || `<p class="muted">مفيش لقطات هنا.</p>`;
+      <span class="n">${s.n}</span><span class="st">${failed ? "✕ فشل" : s.approved || st !== "todo" ? GAL_LABEL[st] : "اللقطة غير معتمدة"} · ${s.duration.toFixed(1)}ث</span></button>`;
+  }).join("") || `<p class="muted">لا يوجد لقطات هنا.</p>`;
 }
 function renderGalView() {
   const ep = ser.ep;
@@ -922,7 +922,7 @@ function renderGalView() {
   $("serGalPrev").disabled = k <= 0;
   $("serGalNext").disabled = k < 0 || k >= gal.list.length - 1;
   const lines = Object.fromEntries(ep.lines.map((l) => [l.n, l]));
-  $("serGalSaid").innerHTML = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => `«${escapeHtml(l.text)}»`).join(" ") || `<span class="muted">(من غير كلام)</span>`;
+  $("serGalSaid").innerHTML = (s.lines || []).map((n) => lines[n]).filter(Boolean).map((l) => `«${escapeHtml(l.text)}»`).join(" ") || `<span class="muted">(بدون نص)</span>`;
   // المسرح: الفيديو الكبير (من غير ما نعيد تحميله لو هو هو)
   const stage = $("serGalStage");
   const cur = stage.querySelector("video");
@@ -935,7 +935,7 @@ function renderGalView() {
   } else {
     galStop();
     const busy = t && (t.status === "queued" || t.status === "working");
-    stage.innerHTML = `${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}<div style="position:absolute">${busy ? `<div class="spin"></div>${TAKE_STATE[t.status]}` : t?.status === "failed" ? "✕ الفيديو فشل" : "لسه مفيش فيديو"}</div>`;
+    stage.innerHTML = `${s.frame_url ? `<img src="${s.frame_url}" alt="">` : ""}<div style="position:absolute">${busy ? `<div class="spin"></div>${TAKE_STATE[t.status]}` : t?.status === "failed" ? "✕ الفيديو فشل" : "لا يوجد بعد فيديو"}</div>`;
     stage.style.position = "relative";
   }
   $("serGalTakes").innerHTML = s.takes.length > 1 ? s.takes.map((x) => takeThumb(x, s.chosen).replace(`class="take `, `class="take ${x.id === gal.take ? "viewing " : ""}`)).join("") : "";
@@ -943,18 +943,18 @@ function renderGalView() {
   $("serGalErr").textContent = t?.error ? `✕ ${t.error}` : "";
   const acts = [];
   if (t?.status === "done") {
-    if (t.id !== s.chosen) acts.push(`<button class="btn sm" data-gal-pick>👈 استخدم النسخة دي</button>`);
-    else acts.push(`<button class="btn ${t.approved ? "" : "primary"}" data-gal-ok>${t.approved ? "✅ موافق عليه (دوس تلغي)" : "✅ موافق على الفيديو"}</button>`);
+    if (t.id !== s.chosen) acts.push(`<button class="btn sm" data-gal-pick>👈 استخدم هذه النسخة</button>`);
+    else acts.push(`<button class="btn ${t.approved ? "" : "primary"}" data-gal-ok>${t.approved ? "✅ موافق عليه (اضغط تلغي)" : "✅ موافق على الفيديو"}</button>`);
   }
-  if (t?.status === "failed" && t.source === "seedance") acts.push(`<button class="btn sm" data-gal-retry>↻ حاول تاني</button>`);
+  if (t?.status === "failed" && t.source === "seedance") acts.push(`<button class="btn sm" data-gal-retry>↻ حاول مرة أخرى</button>`);
   acts.push(s.approved
-    ? `<button class="btn sm" data-gal-gen>${t ? "🔄 ولّد واحد تاني" : "🎬 ولّد الفيديو"}</button>`
-    : `<button class="btn sm" data-gal-approve-shot>✅ اعتمد اللقطة الأول</button>`);
-  acts.push(`<label class="btn sm" title="فيديو من عندك للقطة دي (بيتعتمد على طول)">⬆ ارفع فيديو<input type="file" data-gal-up accept="video/*,.mkv,.mov" hidden></label>`);
+    ? `<button class="btn sm" data-gal-gen>${t ? "🔄 ولّد واحد آخر" : "🎬 ولّد الفيديو"}</button>`
+    : `<button class="btn sm" data-gal-approve-shot>✅ اعتمد اللقطة أولًا</button>`);
+  acts.push(`<label class="btn sm" title="فيديو من جهازك هذه للقطة (يُعتمد مباشرة)">⬆ ارفع فيديو<input type="file" data-gal-up accept="video/*,.mkv,.mov" hidden></label>`);
   acts.push(s.prompt_status === "working"
-    ? `<span class="muted">✍️ بيكتب برومبت جديد...</span>`
-    : `<button class="btn sm" data-gal-reprompt title="وصف وبرومبت جديد على الكلام الجديد؛ الفيديو الجاي بيتولد عليه">✍️ برومبت جديد للكلام الجديد</button>`);
-  if (s.prompt_new) acts.push(`<div class="prompt-new">🆕 البرومبت اتحدث على الكلام الجديد${t ? "، والفيديو ده من البرومبت القديم" : ""}</div>`);
+    ? `<span class="muted">✍️ يكتب وصف جديد...</span>`
+    : `<button class="btn sm" data-gal-reprompt title="وصف ووصف جديد على النص الجديد؛ الفيديو القادم يُولّد عليه">✍️ وصف جديد للكلام الجديد</button>`);
+  if (s.prompt_new) acts.push(`<div class="prompt-new">🆕 الوصف حُدّث على النص الجديد${t ? "، هذا والفيديو من الوصف القديم" : ""}</div>`);
   $("serGalActs").innerHTML = acts.join("");
 }
 // الفويس أوفر بتاع اللقطة يمشي مع الفيديو
@@ -1016,7 +1016,7 @@ $("serGalTakes").addEventListener("click", async (e) => {
   const take = e.target.closest("[data-take]");
   if (!take) return;
   if (e.target.closest("[data-del-take]")) {
-    if (!(await uiConfirm("مسح النسخة دي نهائي؟"))) return;
+    if (!(await uiConfirm("مسح هذه النسخة نهائي؟"))) return;
     try { ser.ep = await api(`/api/episodes/${ser.ep.id}/takes/${take.dataset.take}`, { method: "DELETE" }); renderSeries(); }
     catch (err) { toast(err.message, true); }
     return;
@@ -1033,11 +1033,11 @@ $("serGalActs").addEventListener("change", async (e) => {
   const form = new FormData();
   form.append("file", f);
   try {
-    toast(`⏳ بيرفع ${f.name}...`);
+    toast(`⏳ جارٍ الرفع ${f.name}...`);
     ser.ep = await api(`/api/episodes/${ser.ep.id}/shots/${gal.shot}/takes`, { method: "POST", body: form });
     gal.take = null;
     renderSeries();
-    toast("✅ الفيديو اترفع واتعتمد للقطة دي");
+    toast("✅ الفيديو رُفع واعتُمد هذه للقطة");
   } catch (err) { toast(err.message, true); }
 });
 $("serGalActs").addEventListener("click", async (e) => {
@@ -1059,9 +1059,9 @@ $("serGalActs").addEventListener("click", async (e) => {
       ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/generate`, { method: "POST" });
       gal.take = null;
     } else if (b.matches("[data-gal-reprompt]")) {
-      b.textContent = "⏳ بيكتب...";
+      b.textContent = "⏳ جارٍ الكتابة...";
       ser.ep = await api(`/api/episodes/${eid}/shots/${sid}/describe`, { method: "POST" });
-      toast("✍️ اتكتب برومبت جديد. دوس «🔄 ولّد واحد تاني» عشان يتولد عليه");
+      toast("✍️ كُتب وصف جديد. اضغط «🔄 ولّد واحد آخر» لكي يُولّد عليه");
     } else if (b.matches("[data-gal-approve-shot]")) {
       await patchEpisode({ shot: { id: sid, approved: true } });
     }

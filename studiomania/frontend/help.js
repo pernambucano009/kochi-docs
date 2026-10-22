@@ -30,7 +30,7 @@ const Help = (() => {
   const ICON_Q = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 17h.01"/></svg>`;
   // الصفحة اللي العميل فيها دلوقتي (الرئيسية لو مفيش صفحة مفتوحة)
   const pageKey = () => (document.getElementById("nhPage")?.hidden !== false ? "home" : document.getElementById("nhPGrid")?.dataset.key || "home");
-  const pageName = (k) => S.names[k]?.name || "الصفحة دي";
+  const pageName = (k) => S.names[k]?.name || "هذه الصفحة";
   function draw() {
     const box = document.querySelector(".hp-box");
     if (!box) return;

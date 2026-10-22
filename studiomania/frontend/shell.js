@@ -21,7 +21,7 @@ const STEP_INFO = {
   12: { num: "", title: "التايبوجرافي", en: "Typography" },
   13: { num: "", title: "الدبلجة باللهجات", en: "Dubbing" },
   14: { num: "", title: "القوالب", en: "Templates" },
-  15: { num: "", title: "الكومنتات والرسايل", en: "Inbox" },
+  15: { num: "", title: "التعليقات والرسائل", en: "Inbox" },
   16: { num: "", title: "الأفاتار", en: "Avatar" },
   "6s": { num: "", title: "مونتاج المسلسلات", en: "Series montage" },
   "6a": { num: "", title: "مونتاج الإعلانات", en: "Ad montage" },
@@ -192,8 +192,8 @@ async function goNext(step) {
 
 async function nextFromProjects() {
   const f = fol.current || (await flowFolder(true));
-  if (!f) return toast("اختار مشروع الأول", true);
-  if (!f.video) return toast("المشروع ده لسه مفيهوش فيديو خام. ارفعه الأول", true);
+  if (!f) return toast("اختر مشروع أولًا", true);
+  if (!f.video) return toast("هذا المشروع ما زال لا يحتوي فيديو خام. ارفعه أولًا", true);
   setFlowFolder(f.id);
   fol.current = f;
   $("goCut").onclick();
@@ -201,29 +201,29 @@ async function nextFromProjects() {
 
 async function nextFromCutting() {
   const v = state.current;
-  if (!v) return toast("افتح الفيديو اللي عايز تقطّعه الأول", true);
+  if (!v) return toast("افتح الفيديو الذي تريد تقطّعه أولًا", true);
   setFlowByVideo(v.id);
   if (v.clips_count) return openGenerateWith(v.id, v.coach?.id || null);
-  if (!v.cuts?.length) return toast("علّم أماكن القطع الأول بزرار «اقطع هنا»", true);
-  await splitCurrent(true); // بيقطّع ويفتح التوليد بالقطع
+  if (!v.cuts?.length) return toast("علّم أماكن القطع أولًا بزرار «اقطع هنا»", true);
+  await splitCurrent(true); // يقطّع ويفتح التوليد بالقطع
 }
 
 async function nextFromGenerate() {
   const f = await flowFolder(true);
-  if (!f?.video) return toast("مش عارف المشروع. افتح المشروع من خطوة المشاريع الأول", true);
-  if (!f.video.generated) return toast("لسه مفيش فيديوهات اتولّدت للمشروع ده. ولّد القطع الأول", true);
+  if (!f?.video) return toast("لا تعرف المشروع. افتح المشروع من خطوة المشاريع أولًا", true);
+  if (!f.video.generated) return toast("لا يوجد بعد فيديوهات وُلّدت هذا للمشروع. ولّد القطع أولًا", true);
   fol.current = f;
   await $("goMontage").onclick();
 }
 
 function nextFromMontage() {
   const p = mt.project;
-  if (!p) return toast("افتح مشروع المونتاج الأول", true);
+  if (!p) return toast("افتح مشروع المونتاج أولًا", true);
   if (p.render_status !== "done" || !p.export_id) {
     showTab("export");
-    return toast("صدّر الفيديو الأول، وبعدين كمّل للنشر", true);
+    return toast("صدّر الفيديو أولًا، ثم أكمل للنشر", true);
   }
-  pub.videoId = p.export_id; // الفيديو اللي لسه متصدّر بيبقى متختار في فورم النشر
+  pub.videoId = p.export_id; // الفيديو الذي ما زال متصدّر يصبح متختار في فورم النشر
   showStep("7");
 }
 
@@ -279,7 +279,7 @@ async function loadMoney() {
     money.last = await api("/api/atlas/money");
     $("moneyBtn").hidden = false;
     $("moneyVal").textContent = `$${money.last.balance.toFixed(2)}`;
-    $("moneyBtn").title = `رصيد Atlas · اتصرف النهارده $${money.last.spent_today.toFixed(2)}`;
+    $("moneyBtn").title = `رصيد Atlas · صُرف اليوم $${money.last.spent_today.toFixed(2)}`;
     // نفس الرصيد في راس الصفحات: رقم صحيح جوه دايرة، والدايرة = الرصيد من (الرصيد + صرف الأسبوع)
     const m = money.last, c = 2 * Math.PI * 16;
     $("stageMoney").hidden = false;
@@ -287,18 +287,18 @@ async function loadMoney() {
     $("stageMoney").title = $("moneyBtn").title;
     $("stageMoneyRing").style.strokeDasharray = `${(c * Math.min(1, m.balance / Math.max(m.balance + m.spent_week, 1))).toFixed(1)} ${c.toFixed(1)}`;
     if ($("moneyDialog").open) renderMoney();
-  } catch { /* من غير مفتاح أو Atlas مش بيرد: العداد بيستخبى */ }
+  } catch { /* بدون مفتاح أو Atlas لا يرد: العداد يختفي */ }
 }
 function renderMoney() {
   const m = money.last;
   if (!m) return;
   const since = new Date(m.tracked_since).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
   $("moneyBody").innerHTML = `<div class="money-grid">
-      <div><span>الرصيد دلوقتي</span><b>$${m.balance.toFixed(2)}</b></div>
-      <div><span>اتصرف النهارده</span><b>$${m.spent_today.toFixed(2)}</b></div>
-      <div><span>اتصرف آخر 7 أيام</span><b>$${m.spent_week.toFixed(2)}</b></div></div>
-    <p class="muted">الصرف بيتحسب من نزول الرصيد من ساعة ما البرنامج بدأ يتابعه (${since}). الشحن مش بيتحسب صرف.</p>
-    ${m.models_recent.length ? `<h4>الطلبات لكل موديل (آخر يومين)</h4><table class="money-tbl">${m.models_recent.map((x) =>
+      <div><span>الرصيد الآن</span><b>$${m.balance.toFixed(2)}</b></div>
+      <div><span>صُرف اليوم</span><b>$${m.spent_today.toFixed(2)}</b></div>
+      <div><span>صُرف آخر 7 أيام</span><b>$${m.spent_week.toFixed(2)}</b></div></div>
+    <p class="muted">الصرف يُحسب من نزول الرصيد من ساعة ما البرنامج بدأ يتابعه (${since}). الشحن لا يُحسب صرف.</p>
+    ${m.models_recent.length ? `<h4>الطلبات لكل نموذج (آخر يومين)</h4><table class="money-tbl">${m.models_recent.map((x) =>
       `<tr><td dir="ltr">${escapeHtml(x.name)}</td><td>${x.requests}</td></tr>`).join("")}</table>` : ""}`;
 }
 $("moneyBtn").onclick = () => { renderMoney(); $("moneyDialog").showModal(); loadMoney(); };

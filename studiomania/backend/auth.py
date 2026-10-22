@@ -133,7 +133,7 @@ class Auth:
             value = os.environ.get(env_name) or ""
             out[name] = {
                 "set": bool(value),
-                "hint": f"…{value[-4:]}" if len(value) >= 8 else ("متسجل" if value else ""),
+                "hint": f"…{value[-4:]}" if len(value) >= 8 else ("مسجل" if value else ""),
                 "saved_here": bool(self._get(f"key:{env_name}")),
             }
         return out

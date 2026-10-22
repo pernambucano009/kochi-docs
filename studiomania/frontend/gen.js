@@ -80,7 +80,7 @@ const Gen = (() => {
   }
   const HEAD = { video: ["GENERATE VIDEO", "صِف الفيديو الذي تريده", "vprompt", "مثلًا: الكاميرا تقترب ببطء من فنجان قهوة يتصاعد منه البخار، والضوء يتحرك على الطاولة"],
     image: ["GENERATE IMAGE", "صِف الصورة التي تريدها", "iprompt", "مثلًا: فنجان قهوة على طاولة خشبية بجانب نافذة، ضوء الصباح، تصوير منتج"],
-    voice: ["GENERATE VOICE", "اكتب الكلام الذي تريد أن يُقال", "text", "اكتب النص هنا"] };
+    voice: ["GENERATE VOICE", "اكتب النص الذي تريد أن يُقال", "text", "اكتب النص هنا"] };
   function cost() {
     const A = S.info, d = S.d;
     if (S.tab === "image") return (A.image_models[d.imodel]?.price || 0) * Number(d.count || 1);
@@ -120,7 +120,7 @@ const Gen = (() => {
     if (!S.hist) return "";
     const L = mine();
     return `<aside class="gn-dw" aria-label="كل ما ولّدته"><div class="gn-dh"><b>كل ما ولّدته</b><span class="num">${L.length}</span><button type="button" class="gn-ib" data-ghist aria-label="إغلاق">✕</button></div>
-      <div class="gn-hl">${L.map((g) => `<button type="button" class="gn-hi" data-gview="${esc(g.id)}"><span class="gn-th">${media(g)}</span><span dir="auto">${esc(g.prompt.slice(0, 90))}</span></button>`).join("") || `<p class="gn-note">ما تولّده يظهر هنا ويبقى محفوظًا.</p>`}</div></aside>`;
+      <div class="gn-hl">${L.map((g) => `<button type="button" class="gn-hi" data-gview="${esc(g.id)}"><span class="gn-th">${media(g)}</span><span dir="auto">${esc(g.prompt.slice(0, 90))}</span></button>`).join("") || `<p class="gn-note">ما تولّده يظهر هنا ويصبح محفوظًا.</p>`}</div></aside>`;
   }
   function render() {
     if (!S.el || !S.info) return;
@@ -155,7 +155,7 @@ const Gen = (() => {
     if (!S.list.some((g) => g.status === "working")) return;
     S.timer = setTimeout(async () => {
       if (!S.el || S.el.hidden) return;
-      try { S.list = await api("/api/gens"); patchGrid(); } catch { /* بيعيد المحاولة */ }
+      try { S.list = await api("/api/gens"); patchGrid(); } catch { /* يعيد المحاولة */ }
       poll();
     }, 3000);
   }
@@ -165,7 +165,7 @@ const Gen = (() => {
     let res;
     try {
       if (S.tab === "voice") {
-        if (!(d.text || "").trim()) return toast("اكتب الكلام", true);
+        if (!(d.text || "").trim()) return toast("اكتب النص", true);
         res = await api("/api/gens/voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: d.text, lang: d.lang, voice: d.voice, name: d.name || "" }) });
       } else {
         const fd = new FormData();

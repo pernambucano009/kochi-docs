@@ -138,7 +138,7 @@ def mock_concept(i: dict) -> dict:
     beats = [{"t0": 0, "t1": 1, "what": "نقطة صغيرة بتنور في النص", "text": "", "transition": "النقطة بتكبر", "camera": "ثابتة", "sound": "pop"},
              {"t0": 1, "t1": d * .55, "what": "دواير بتفتح طبقة ورا طبقة", "text": i["title"], "transition": "قزحية", "camera": "ثابتة", "sound": "whoosh"},
              {"t0": d * .55, "t1": d - 1.5, "what": "الكلام بيتكتب", "text": i["idea"][:30], "transition": "فريز", "camera": "ثابتة", "sound": "click"}]
-    return {"title": p["title"], "format": "kinetic type", "logline": i["idea"][:80], "why": "", "payoff": "الكلام الأخير", "device": "النقطة",
+    return {"title": p["title"], "format": "kinetic type", "logline": i["idea"][:80], "why": "", "payoff": "النص الأخير", "device": "النقطة",
             "beats": beats, "end_card": {"text": i["closing"] or "SimsimKit", "t0": d - 1.5}, "sfx": p["sfx"], "music": p["music"]}
 
 

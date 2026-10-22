@@ -124,7 +124,7 @@ def mock_plan(text: str) -> dict:
     if re.search(r"ثابت|مش بيلف", t):
         prod["anim"]["spin"] = 0
     return {"scene": clean(s), "prompt": "Premium product commercial, soft studio light, clean reflections. Keep the exact camera move, layout and object motion of the reference video; replace the grey placeholders with the real objects.",
-            "say": "عملت مسودة: قاعدة والمنتج عليها بيلف، والكاميرا بتقرّب. عدّل اللي عايزه وطلّع المسودة."}
+            "say": "عملت مسودة: قاعدة والمنتج عليها يدور، والكاميرا تقرّب. عدّل الذي تريده وطلّع المسودة."}
 
 
 def gen_prompt(sc: dict, prompt: str, refs: list[dict]) -> str:

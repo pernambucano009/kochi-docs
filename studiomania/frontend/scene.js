@@ -153,28 +153,28 @@ const SceneStudio = (() => {
     return `<div class="sc-edit">
       <label class="sc-f"><span>الاسم</span><input data-sco="name" value="${esc(o.name)}"></label>
       <div class="sc-pills">${Object.entries(M.shapes).map(([k, t]) => `<button type="button" class="sc-pill${o.shape === k ? " on" : ""}" data-scshape="${k}">${esc(t)}</button>`).join("")}</div>
-      <label class="sc-f"><span>هو إيه في الحقيقة (بيتبعت للموديل)</span><textarea rows="2" data-sco="what" dir="auto" placeholder="مثلًا: جزمة جري بيضا بنعل برتقاني">${esc(o.what)}</textarea></label>
+      <label class="sc-f"><span>هو ماذا في الحقيقة (يُرسل للنموذج)</span><textarea rows="2" data-sco="what" dir="auto" placeholder="مثلًا: حذاء جري بيضاء بنعل برتقالي">${esc(o.what)}</textarea></label>
       <div class="sc-row"><label class="sc-f sc-c"><span>اللون</span><input type="color" data-sco="color" value="${o.color}"></label>
-        <div class="sc-f"><span>صورة العنصر (بتتلزق على الشكل وبتتبعت مرجع)</span>${o.img ? `<span class="sc-chip"><img src="${esc(o.img.thumb)}" alt=""><b>${esc(o.img.label)}</b><button type="button" data-scimgrm>✕</button></span>` : ""}
-          <button type="button" class="sc-btn sm" data-scimg>🖼️ ${o.img ? "غيّر الصورة" : "اختار صورة"}</button></div></div>
+        <div class="sc-f"><span>صورة العنصر (تُلصق على الشكل وتُرسل مرجع)</span>${o.img ? `<span class="sc-chip"><img src="${esc(o.img.thumb)}" alt=""><b>${esc(o.img.label)}</b><button type="button" data-scimgrm>✕</button></span>` : ""}
+          <button type="button" class="sc-btn sm" data-scimg>🖼️ ${o.img ? "غيّر الصورة" : "اختر صورة"}</button></div></div>
       <div class="sc-f"><span>المكان</span>${v3("pos", o.pos)}</div>
       <div class="sc-f"><span>المقاس (متر)</span>${v3("scale", o.scale)}</div>
       <div class="sc-f"><span>الميلان (درجة)</span>${v3("rot", o.rot, 5)}</div>
-      <div class="sc-row"><label class="sc-f"><span>بيلف (درجة/ثانية)</span><input type="number" step="15" data-sco="anim.spin" value="${a.spin || 0}"></label>
-        <label class="sc-f"><span>بيطلع وينزل (متر)</span><input type="number" step="0.05" min="0" data-sco="anim.bob" value="${a.bob || 0}"></label></div>
-      <div class="sc-f"><span>بيتحرك لحد (لو فاضي: ثابت مكانه)</span>${a.move ? v3("move", a.move) : ""}
-        <button type="button" class="sc-btn sm" data-scmove>${a.move ? "✕ خليه ثابت" : "➜ خليه يتحرك"}</button></div>
-      <div class="sc-acts"><button type="button" class="sc-btn sm" data-scdup>⧉ نسخة</button><button type="button" class="sc-btn sm danger" data-scdel>🗑 شيله</button></div></div>`;
+      <div class="sc-row"><label class="sc-f"><span>يدور (درجة/ثانية)</span><input type="number" step="15" data-sco="anim.spin" value="${a.spin || 0}"></label>
+        <label class="sc-f"><span>يظهر وينزل (متر)</span><input type="number" step="0.05" min="0" data-sco="anim.bob" value="${a.bob || 0}"></label></div>
+      <div class="sc-f"><span>يتحرك حتى (إذا فارغ: ثابت مكانه)</span>${a.move ? v3("move", a.move) : ""}
+        <button type="button" class="sc-btn sm" data-scmove>${a.move ? "✕ اجعله ثابت" : "➜ اجعله يتحرك"}</button></div>
+      <div class="sc-acts"><button type="button" class="sc-btn sm" data-scdup>⧉ نسخة</button><button type="button" class="sc-btn sm danger" data-scdel>🗑 أزله</button></div></div>`;
   }
   function camEditor() {
     const sc = SH();
     return sc.camera.map((k, i) => `<div class="sc-key"><b>نقطة ${i + 1}</b>
       <label class="sc-f"><span>الثانية</span><input type="number" step="0.1" min="0" max="${sc.duration}" data-sck="${i}.t" value="${k.t}"></label>
       <div class="sc-f"><span>مكان الكاميرا</span>${["x", "y", "z"].map((a, j) => `<input type="number" step="0.1" data-sck="${i}.pos.${j}" value="${k.pos[j]}">`).join("")}</div>
-      <div class="sc-f"><span>بتبص على</span>${["x", "y", "z"].map((a, j) => `<input type="number" step="0.1" data-sck="${i}.look.${j}" value="${k.look[j]}">`).join("")}</div>
+      <div class="sc-f"><span>تنظر على</span>${["x", "y", "z"].map((a, j) => `<input type="number" step="0.1" data-sck="${i}.look.${j}" value="${k.look[j]}">`).join("")}</div>
       <label class="sc-f"><span>الزوم (fov)</span><input type="number" step="1" min="12" max="100" data-sck="${i}.fov" value="${k.fov}"></label>
-      <div class="sc-acts"><button type="button" class="sc-btn sm" data-sckgo="${i}">👁 روح هنا</button>
-        <button type="button" class="sc-btn sm" data-sckset="${i}" ${S.view === "free" ? "" : "disabled"} title="من المنظر الحر">📍 خد المنظر الحالي</button>
+      <div class="sc-acts"><button type="button" class="sc-btn sm" data-sckgo="${i}">👁 اذهب هنا</button>
+        <button type="button" class="sc-btn sm" data-sckset="${i}" ${S.view === "free" ? "" : "disabled"} title="من المنظر الحر">📍 خذ المنظر الحالي</button>
         ${sc.camera.length > 2 ? `<button type="button" class="sc-btn sm danger" data-sckdel="${i}">✕</button>` : ""}</div></div>`).join("")
       + `<button type="button" class="sc-btn sm" data-sckadd>＋ نقطة كاميرا عند الثانية ${AR(S.t)}</button>`;
   }
@@ -186,11 +186,11 @@ const SceneStudio = (() => {
   const sic = (k, s = 16) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${SIC[k]}"/></svg>`;
   function stepBody(d, sc, M, sel, ms, model, est) {
     const k = S.step;
-    if (k === 1) return `<textarea class="sc2-pr" rows="4" data-scdesc dir="auto" aria-label="وصف المشهد" placeholder="مثلًا: حذاء يدور على قاعدة في المنتصف، والكاميرا تبدأ بعيدة ثم تقترب ببطء وترتفع">${esc(S.desc || "")}</textarea>
+    if (k === 1) return `<textarea class="sc2-pr" rows="4" data-scdesc dir="auto" aria-label="وصف المشهد" placeholder="مثلًا: حذاء يبحث على قاعدة في المنتصف، والكاميرا تبدأ بعيدة ثم تقترب ببطء وترتفع">${esc(S.desc || "")}</textarea>
       <p class="sc-note">${d.say ? esc(d.say) : "يبني العقل الأشكال وحركة الكاميرا (تُخصم التكلفة حسب طول الوصف)، ثم تعدّل ما تريد بنفسك."}</p>`;
     if (k === 2) return `<div class="sc-pills">${sc.objects.map((o) => `<button type="button" class="sc-pill${o.id === S.sel ? " on" : ""}" data-scsel="${o.id}">${esc(o.name)}</button>`).join("")}
         <button type="button" class="sc-pill" data-scadd>＋ شكل</button></div>
-      ${sel ? objEditor(sel) : `<p class="sc-note">اختر شكلًا هنا أو في المشهد لتعدّله. كل شكل يمثّل شيئًا حقيقيًا: اكتب ما هو، وأضف صورته إن وُجدت.</p>`}`;
+      ${sel ? objEditor(sel) : `<p class="sc-note">اختر شكلًا هنا أو في المشهد لتعدّله. كل شكل يمثّل شيئًا حقيقيًا: اكتب ما هو، وأضف صورته أن وُجدت.</p>`}`;
     if (k === 3) return `<p class="sc-note">تتحرك الكاميرا بنعومة من نقطة إلى أخرى. الأسهل: اختر «منظر حر» من أعلى المشهد، ولُفّ حتى الزاوية التي تريدها، ثم «خذ المنظر الحالي».</p>${camEditor()}`;
     if (k === 4) return d.draft_url ? `<video src="${esc(d.draft_url)}" controls muted playsinline loop class="sc-draft"></video>` : `<p class="sc-note">تُسجَّل المسودة من المتصفح مجانًا.</p>`;
     return `<label class="sc-f"><span>الوصف الحقيقي (الخامات والإضاءة والأجواء)</span><textarea rows="3" data-scprompt dir="auto">${esc(d.prompt)}</textarea></label>
@@ -283,8 +283,8 @@ const SceneStudio = (() => {
     if (!S.refs) { try { S.refs = await api("/api/automations-refs"); } catch (err) { return toast(err.message, true); } }
     const imgs = S.refs.filter((r) => ["char", "twin", "bg"].includes(r.kind) || (r.kind === "file" && /صورة/.test(r.sub)));
     box.hidden = false;
-    box.innerHTML = `<div class="sc-pick-in"><b>اختار صورة (شخصية، أفاتار، خلفية، أو صورة من المكتبة)</b>
-      <div class="sc-grid">${imgs.map((r, i) => `<button type="button" data-scpk="${i}">${r.thumb ? `<img src="${esc(r.thumb)}" alt="">` : "🖼️"}<small>${esc(r.label)}</small></button>`).join("") || `<p class="sc-note">مفيش صور. ارفع صور في «مكتبة محتويات البراند».</p>`}</div>
+    box.innerHTML = `<div class="sc-pick-in"><b>اختر صورة (شخصية، أفاتار، خلفية، أو صورة من المكتبة)</b>
+      <div class="sc-grid">${imgs.map((r, i) => `<button type="button" data-scpk="${i}">${r.thumb ? `<img src="${esc(r.thumb)}" alt="">` : "🖼️"}<small>${esc(r.label)}</small></button>`).join("") || `<p class="sc-note">لا يوجد صور. ارفع صور في «مكتبة المحتويات».</p>`}</div>
       <div class="sc-acts"><button type="button" class="sc-btn" data-scpkx>إلغاء</button></div></div>`;
     box.onclick = (e) => {
       const b = e.target.closest("[data-scpk]");
@@ -330,7 +330,7 @@ const SceneStudio = (() => {
     S.rec = true; S.play = false; S.sel = null; S.view = "cam";
     render();
     sizeGL(w, h);
-    const ov = S.el.querySelector(".sc-recov"), prog = (f) => { if (ov) ov.textContent = `⏺ بيرسم المسودة… ${Math.round(f * 100)}٪`; };
+    const ov = S.el.querySelector(".sc-recov"), prog = (f) => { if (ov) ov.textContent = `⏺ يرسم المسودة… ${Math.round(f * 100)}٪`; };
     const drawAt = (t) => { S.t = t; pose(t); G.r.render(G.scene, G.cam); };
     const fd = new FormData();
     fd.append("fps", String(FPS));
@@ -345,7 +345,7 @@ const SceneStudio = (() => {
         if (i % 6 === 0) prog(i / n);
       }
     }
-    if (ov) ov.textContent = "⏳ بيجهّز المسودة…";
+    if (ov) ov.textContent = "⏳ جارٍ التجهيز المسودة…";
     try { Object.assign(S.cur, await sAPI("/draft", { method: "POST", body: fd })); toast("✓ المسودة جاهزة. ولّد الآن الفيديو الحقيقي"); S.step = 5; }
     catch (err) { toast(err.message, true); }
     S.rec = false; S.t = 0;
@@ -360,11 +360,11 @@ const SceneStudio = (() => {
         const r = await sAPI();
         const before = (S.cur.takes || []).map((t) => t.status).join();
         Object.assign(S.cur, { takes: r.takes });
-        if (r.takes.map((t) => t.status).join() !== before) {   // بنغيّر قايمة اللقطات بس، المشهد مايترسمش تاني
+        if (r.takes.map((t) => t.status).join() !== before) {   // نغيّر قائمة اللقطات فقط، المشهد لا يُرسم آخر
           render();
           if (r.takes.some((t) => t.status === "done")) toast("✓ اللقطة جاهزة");
         }
-      } catch { /* بيحاول تاني */ }
+      } catch { /* يحاول مرة أخرى */ }
       watch();
     }, 4000);
   }

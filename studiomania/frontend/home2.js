@@ -43,43 +43,43 @@ const NH = (() => {
   // go = خطوة في البرنامج (showStep) · page = صفحة جوه الرئيسية · fn = حاجة خاصة
   const T = {
     create: KOCHI ? { en: "New Project", ar: "مشروع جديد", icon: "create", go: "0", desc: "الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر، خطوة خطوة." }
-      : { en: "Create", ar: "ابدأ مشروع جديد", icon: "create", page: "create", desc: "كل أنواع الشغل من هنا: اختار النوع، والخطوات بتمشي معاك لحد التصدير." },
-    brand: { en: "Your Brand", ar: "عقل البراند", icon: "brand", page: "brand", desc: "كل تفاصيل البراند وتفضيلاته وستايله. أي شغل بيتعمل بيبني عليه." },
-    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى اللي بتستخدمها في أي شغل." },
+      : { en: "Create", ar: "ابدأ مشروعًا جديدًا", icon: "create", page: "create", desc: "كل أنواع العمل من هنا: اختر النوع، والخطوات تسير معك حتى التصدير." },
+    brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاته وستايله. أي عمل يُنشأ يبني عليه." },
+    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى الذي تستخدمها في أي عمل." },
     // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل البراند)
-    dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة تانية: ترجمة الكلام، صوت جديد، وتظبيط البُق." },
+    dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، صوت جديد، وتظبيط البُق." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
-    progress: { en: "In Progress", ar: "شغّال عليه", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. دوس على أي خط يكمّل من مكان ما وقفت." },
-    publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي اتنشر." }
-      : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والكومنتات والرسايل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
+    progress: { en: "In Progress", ar: "قيد العمل", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. اضغط على أي خط يُكمل من مكان ما وقفت." },
+    publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي نُشر." }
+      : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
-    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة واللي اتنشر." },
-    inbox: { en: "Comments & DMs", ar: "الكومنتات والرسايل", icon: "mic", go: "15", desc: "رد على الكومنتات والرسايل من مكان واحد." },
-    audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "مين الجمهور اللي هيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
+    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة واللي نُشر." },
+    inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد." },
+    audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
-    reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختار ستايل، اكتب فكرتك، والقالب بيكمّل: سكريبت ← صوت ← مشاهد." },
+    reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوب، اكتب فكرتك، والقالب يُكمل: نص ← صوت ← مشاهد." },
     raw: { en: "From Footage", ar: "فيديو من تصويرك", icon: "cut", go: "0", desc: "المشروع ← التقطيع ← التوليد ← المونتاج ← النشر." },
-    series: { en: "Series", ar: "مسلسل من حلقات", icon: "clapper", go: "9", desc: "حلقات ورا بعض بنفس الشخصيات والعالم." },
+    series: { en: "Series", ar: "مسلسل من حلقات", icon: "clapper", go: "9", desc: "حلقات خلف بعض بنفس الشخصيات والعالم." },
     carousel: { en: "Carousel", ar: "كاروسيل", icon: "slides", go: "8", desc: "فكرة ← نص ← تصميم ← سلايدات." },
-    ad: { en: "Ad", ar: "إعلان", icon: "megaphone", go: "10", desc: "إعلان من مرجع أو من الصفر على براند العميل." },
-    typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "كلام متحرك من صوت أو سكريبت." },
-    dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة تانية." },
+    ad: { en: "Ad", ar: "إعلان", icon: "megaphone", go: "10", desc: "إعلان من مرجع أو من الصفر على علامة العميل." },
+    typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "نص متحرك من صوت أو نص." },
+    dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة أخرى." },
     edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: KOCHI ? "6" : "6f", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
-    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر شيت وصوتها والإنترو والأوترو." },
+    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر ورقة وصوتها والإنترو والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
-    viral: { en: "Trends", ar: "اللي ماشي في مجالك", icon: "megaphone", page: "viral", desc: "بوستات المجال مرتّبة بقد إيه عدّت العادي، وأفكار بنفس الهيكل." },
-    plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، بتتبني لوحدها من كل اللي العقل عرفه عنك." },
-    rivals: { en: "Your Competitors", ar: "منافسينك", icon: "megaphone", page: "rivals", desc: "البرنامج بيقترح منافسين وانت بتوافق، ومنهم اللي بينجح عندهم ووصفة الاستهداف." },
-    wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الناس، واعمل رسايل متوافق عليها، وابعت حملات وسلاسل متابعة للمشتركين بس." },
-    plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقطك، والأبجريد، والنقط الزيادة." },
-    adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج بوست أو اعمل إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، واعمل جماهير." },
-    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كام بوست في اليوم، في أحسن أوقات، من القوالب اللي تختارها. يعمل لوحده أو يستنى موافقتك." },
-    auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات بترتّبها بنفسك (اسحب، حط، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
-    brainlib: { en: "Content Library", ar: "مكتبة محتويات البراند", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، وفولدراتك. كل ملف تقدر تمنشنه في الأوتوميشن." },
-    comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، علشان تتحط في مكانها الصح." },
-    ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← برومبت جاهز بـ 14 جزء ← توليد." },
-    motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تتضاف للأصول بضغطة." },
+    viral: { en: "Trends", ar: "ما حسنًا في مجالك", icon: "megaphone", page: "viral", desc: "منشورات المجال مرتّبة بقد ماذا عدّت العادي، وأفكار بنفس الهيكل." },
+    plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، تُبنى تلقائيًا من كل ما العقل عرفه عنك." },
+    rivals: { en: "Your Competitors", ar: "منافسوك", icon: "megaphone", page: "rivals", desc: "البرنامج يقترح منافسين وأنت توافق، ومنهم الذي ينجح لديهم ووصفة الاستهداف." },
+    wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل متوافق عليها، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
+    plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الزيادة." },
+    adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشور أو أنشئ إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
+    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كم منشور في اليوم، في أحسن أوقات، من القوالب الذي تختارها. يعمل تلقائيًا أو ينتظر موافقتك." },
+    auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات ترتّبها بنفسك (اسحب، ضع، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
+    brainlib: { en: "Content Library", ar: "مكتبة المحتويات", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، ومجلداتك. كل ملف يمكنك تشير إليه في القالب المخصص." },
+    comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، لكي توضع في مكانها الصحيح." },
+    ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← وصف جاهز بـ 14 جزء ← توليد." },
+    motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تُضاف للأصول بضغطة." },
   };
   // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
   const CREATE_ALL = ["reel", "series", "carousel", "ad", "typo", "dub", "edit"];
@@ -105,7 +105,7 @@ const NH = (() => {
   }
   function lineHTML(f) {
     if (f.section) {   // ستوديومانيا: مشروع مونتاج (مسلسل / إعلان / مونتاج حر)
-      return `<div class="nh-line" data-proj="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b><span class="nh-sec">${esc(SEC[f.section]?.[0] || "")}</span><span class="step">${f.render_status === "done" ? "اتصدّر" : "مونتاج"}</span></div>`;
+      return `<div class="nh-line" data-proj="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b><span class="nh-sec">${esc(SEC[f.section]?.[0] || "")}</span><span class="step">${f.render_status === "done" ? "صُدّر" : "مونتاج"}</span></div>`;
     }
     const s = folderStage(f);
     return `<div class="nh-line" data-folder="${esc(f.id)}" tabindex="0" role="button"><b>${esc(f.name)}</b>${dots(5, s.done)}<span class="step">${STEPS5[s.done] || ""}</span></div>`;
@@ -118,15 +118,15 @@ const NH = (() => {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
     brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>العقل فاهمك <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
-    dubhub: () => `<span>نفس الفيديو بلغة أو لهجة تانية</span>`,
-    pilot: () => `<span>${D.pilot?.settings?.on ? `شغّال · ${D.pilot.settings.times.length} بوست في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} مستنيين منك</em>` : ""}` : "مقفول"}</span>`,
+    dubhub: () => `<span>نفس الفيديو بلغة أو لهجة أخرى</span>`,
+    pilot: () => `<span>${D.pilot?.settings?.on ? `يعمل · ${D.pilot.settings.times.length} منشور في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} ينتظرون منك</em>` : ""}` : "مغلق"}</span>`,
     progress: () => {
       const n = D.work.length, r = D.work.filter((p) => p.render_status === "rendering").length;
-      return `<span>${n ? `${n} مشروع${r ? ` · ${r} بيتصدّر دلوقتي` : ""}` : "مفيش مشاريع لسه"}</span>`;
+      return `<span>${n ? `${n} مشروع${r ? ` · ${r} قيد التصدير الآن` : ""}` : "لا توجد مشاريع بعد"}</span>`;
     },
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      return `<span>${up ? `${up} بوست متجدول` : "مفيش بوستات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
+      return `<span>${up ? `${up} منشور متجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
     settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
@@ -136,22 +136,22 @@ const NH = (() => {
   const sideIc = (id) => (GLKEY[id] ? `<span class="nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon));
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">
       <span class="nh-sic">${sideIc(id)}</span><b class="nh-sname">${esc(T[id].ar)}</b>${tipOf(id, META[id]())}</div>`;
-  const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروع جديد">
-      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروع جديد</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
+  const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
+      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
   function contHTML() {
     // آخر حاجة اتلمست: مشروع مونتاج، أو قالب/تايبوجرافي/دبلجة لسه ما خلصوش
     const p = [...D.work, ...(D.drafts || [])].sort((a, b) => String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")))[0];
     if (!p && KOCHI) return "";
-    const where = !p ? "" : p.kind ? `${p.sec} · ${p.step}` : p.section ? (p.render_status === "done" ? "اتصدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
+    const where = !p ? "" : p.kind ? `${p.sec} · ${p.step}` : p.section ? (p.render_status === "done" ? "صُدّر" : "المونتاج") : STEPS5[folderStage(p).done] || "";
     const attr = !p ? "" : p.kind ? `data-draft="${p.kind}:${esc(p.id)}"` : p.section ? `data-proj="${esc(p.id)}"` : `data-folder="${esc(p.id)}"`;
     const n = D.work.length + (D.drafts || []).length, r = D.work.filter((x) => x.render_status === "rendering").length;
-    const count = n ? `${n} مشروع${r ? ` · ${r} بيتصدّر` : ""}` : "";
+    const count = n ? `${n} مشروع${r ? ` · ${r} يُصدّر` : ""}` : "";
     // «شغّال عليه»: أيقونة واسم، وآخر مشروع وعدد المشاريع في الفقاعة. زرار التشغيل الصغير بيكمّل آخر مشروع على طول
-    return `<div class="nh-tile nh-cont nh-cont-ic" data-id="progress" tabindex="0" role="button" aria-label="شغّال عليه">
-        <span class="nh-sic"><span class="nh-glt">${glImg("progress")}</span></span><b class="nh-sname">شغّال عليه</b>
-        ${p ? `<span class="nh-cplay" data-cont ${attr} role="button" tabindex="0" aria-label="كمّل آخر مشروع"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>` : ""}
-        ${tipOf("progress", p ? `${count ? `${count} · ` : ""}آخر مشروع: ${esc(p.name)} · ${esc(where)}${p ? " · ▶ يكمّله على طول" : ""}` : "مفيش مشاريع لسه")}</div>`;
+    return `<div class="nh-tile nh-cont nh-cont-ic" data-id="progress" tabindex="0" role="button" aria-label="قيد العمل">
+        <span class="nh-sic"><span class="nh-glt">${glImg("progress")}</span></span><b class="nh-sname">قيد العمل</b>
+        ${p ? `<span class="nh-cplay" data-cont ${attr} role="button" tabindex="0" aria-label="أكمل آخر مشروع"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>` : ""}
+        ${tipOf("progress", p ? `${count ? `${count} · ` : ""}آخر مشروع: ${esc(p.name)} · ${esc(where)}${p ? " · ▶ يكمّله مباشرة" : ""}` : "لا توجد مشاريع بعد")}</div>`;
   }
 
   // ---------- الهيكل ----------
@@ -164,7 +164,7 @@ const NH = (() => {
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
       <header class="nh-ptop">
-        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">SIMSIMKIT</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل اللي شغال عليه"></button></div>
+        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">SIMSIMKIT</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل الذي قيد العمل"></button></div>
         <div class="nh-phead"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></div>
         <nav class="nh-ptabs" id="nhPTabs" aria-label="الأصول"></nav>
       </header>
@@ -178,12 +178,12 @@ const NH = (() => {
   bar.innerHTML = `<div class="nh-bar-r">
       <div class="nh-logo" aria-label="SimsimKit">SIMSIMKIT</div>
       <button class="nh-goback" id="nhGoBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
-      <nav class="nh-crumbs" id="nhCrumbs" aria-label="انت فين" hidden></nav>
+      <nav class="nh-crumbs" id="nhCrumbs" aria-label="موقعك" hidden></nav>
     </div>
     <div class="nh-tools" id="nhTools">
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
       <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
-      <button class="nh-chip" id="nhClient" title="العميل اللي شغال عليه"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
+      <button class="nh-chip" id="nhClient" title="العميل الذي قيد العمل"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-chip nh-acct" id="nhAcct" title="حسابك" aria-label="حسابك"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></button>
       <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
     </div>`;
@@ -253,7 +253,7 @@ const NH = (() => {
     if (el.querySelector(":scope > .nh-snake")) return;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "nh-snake");
-    svg.setAttribute("data-keep", "");   // التحديث مايشيلوش
+    svg.setAttribute("data-keep", "");   // التحديث لا يزيلون
     svg.innerHTML = ["s3", "s2", "s1"].map((c) => `<rect class="${c}" pathLength="1000"/>`).join("");
     el.prepend(svg);
     const fit = () => {
@@ -272,20 +272,20 @@ const NH = (() => {
   let live = 0, shown = null;
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
-    if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو كمّل مشروع من «شغّال عليه».</p>`;
+    if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو أكمل مشروع من «قيد العمل».</p>`;
     if (!key) return `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
       return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div>`;
     }
     const t = T[key];
-    return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div>`;   // الاسم بس، والشرح في فقاعة القسم
+    return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div>`;   // الاسم فقط، والشرح في فقاعة القسم
   }
   // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها
   let stageLock = false, pendingKey = null;
   function setStage(key) {
     key = key || "";
-    if (!key) return;   // مفيش «فراغ»: آخر مجسّم بيفضل
+    if (!key) return;   // لا يوجد «فراغ»: آخر مجسّم يظل
     if (stageLock || zoom) { pendingKey = key; return; }
     if (key === shown) return;
     if (T[key]) storageSet(STAGE_KEY, key);
@@ -350,7 +350,7 @@ const NH = (() => {
   // 👤 الحساب: بيوري الإيميل، ومنه تسجيل الخروج
   document.getElementById("nhAcct").onclick = async () => {
     let who = "";
-    try { const r = await fetch("/api/me"); if (r.ok) { const m = await r.json(); who = m.email || ""; } } catch { /* من غير بوابة الحسابات */ }
+    try { const r = await fetch("/api/me"); if (r.ok) { const m = await r.json(); who = m.email || ""; } } catch { /* بدون بوابة الحسابات */ }
     if (!(await uiConfirm(who ? `مسجّل الدخول بـ ${who}\nتسجيل الخروج؟` : "تسجيل الخروج؟", { ok: "تسجيل الخروج" }))) return;
     try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
     location.href = "/login";
@@ -373,7 +373,7 @@ const NH = (() => {
     return { f, r, color: cs.color };
   }
   /* zoomTo: tile = المربع اللي اتداس · key = أيقونته · dest = { latin, name, icon } عناصر العنوان في الصفحة الجديدة
-     content = اللي بيظهر بعد ما المربع يكبر · bg = لون الصفحة الجديدة · parent/z = فين الإطار بيترسم */
+     content = ما يظهر بعد ما المربع يكبر · bg = لون الصفحة الجديدة · parent/z = أين الإطار يُرسم */
   function zoomTo(tile, { key, dest, content, bg, parent, z }) {
     const o = { duration: DUR(), easing: EASE, fill: "both" };
     const r = rectOf(tile), vw = innerWidth, vh = innerHeight;
@@ -396,7 +396,7 @@ const NH = (() => {
     [[src?.querySelector(".latin"), dest.latin], [src?.querySelector("b"), dest.name]].forEach(([from, to]) => {
       if (!from || !to || !from.textContent.trim()) return;
       const t = rectOf(to);
-      if (!t.w) return;   // العنوان مستخبي في الصفحة دي (المونتاج مثلًا)
+      if (!t.w) return;   // العنوان مستخبي في هذه الصفحة (المونتاج مثلًا)
       const { f, r: fr, color } = flyText(from), toColor = getComputedStyle(to).color;
       anims.push(f.animate([{ transform: "none", color }, { transform: `translate(${t.x - fr.x}px,${t.y - fr.y}px)`, color: toColor }], o));
       flies.push(f); real.push(from, to);
@@ -417,7 +417,7 @@ const NH = (() => {
       document.body.appendChild(f);
       anims.push(f.animate([{ transform: "none", opacity: 1 }, { opacity: 1, offset: .8 }, { transform: `translate(${tx}px,${ty}px) scale(${s})`, opacity: 0 }], o),
         dest.icon.animate([{ opacity: 0 }, { opacity: 0, offset: .8 }, { opacity: 1 }], o));
-      if (glEl) anims.push(glEl.animate([{ opacity: 0 }, { opacity: 0 }], o));   // المجسّم الحي بيستخبى من أول فريم (الصورة مكانه بالظبط)
+      if (glEl) anims.push(glEl.animate([{ opacity: 0 }, { opacity: 0 }], o));   // المجسّم الحي يختفي من أول فريم (الصورة مكانه بالضبط)
       flies.push(f);
     } else if (ti?.w) real.push(dest.icon);
     real.forEach((e) => (e.style.opacity = 0));
@@ -471,7 +471,7 @@ const NH = (() => {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
     // زي البروتوتايب: تختار نوع الشغل الأول (كارت باختيار)، وبعدين «التالي» يفتحه. دبل كليك على الكارت بيفتحه على طول
     // 🎬 معرض القوالب: كل قالب ستايل بفيديو بيعبّر عنه (بيشتغل لما تقف عليه)، متقسّمين بالستايل
-    create: () => `<div class="nh-gal" id="nhGal"><div class="nh-gal-grid"><div class="nh-empty">بيحمّل القوالب…</div></div></div>
+    create: () => `<div class="nh-gal" id="nhGal"><div class="nh-gal-grid"><div class="nh-empty">يُحمّل القوالب…</div></div></div>
 `,
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
@@ -479,14 +479,14 @@ const NH = (() => {
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
     publish: () => [["pubpost", 4, META.publish()], ["inbox", 4], ["adsmgr", 4], ["audience", 6], ["wacamp", 6]]
       .map(([id, c, m]) => panel(c, 3, `${head(id)}<div class="nh-body">${m || esc(T[id].desc)}</div>`, `data-id="${id}" tabindex="0" role="button"`)).join(""),
-    progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">مفيش مشاريع لسه.</div>`}</div>`) : projectsBoard(),
+    progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">لا توجد مشاريع بعد.</div>`}</div>`) : projectsBoard(),
   };
   // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
   const PJ_ICON = { series: "series", ads: "publish", free: "film" };
-  const PJ_AV = { series: "س", ads: "إ", free: "م" };   // دايرة صغيرة بأول حرف من القسم (مسلسل / إعلان / مونتاج حر)
+  const PJ_AV = { series: "س", ads: "إ", free: "م" };   // دائرة صغيرة بأول حرف من القسم (مسلسل / إعلان / مونتاج حر)
   const PJ_ART = ["linear-gradient(160deg, #4A4542, #24211F)", "linear-gradient(160deg, #57514C, #2B2724)", "linear-gradient(160deg, #46403C, #1E1B19)", "linear-gradient(160deg, #3A3836, #181718)", "linear-gradient(160deg, #4F5A63, #22282D)", "linear-gradient(160deg, #5A4F48, #2A2420)"];
-  const pjState = (p) => p.render_status === "rendering" ? ["run", `بيتصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
-    : p.render_status === "done" ? ["done", "اتصدّر"] : p.render_status === "failed" ? ["fail", "التصدير وقف"] : ["run", "في المونتاج"];
+  const pjState = (p) => p.render_status === "rendering" ? ["run", `يُصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
+    : p.render_status === "done" ? ["done", "صُدّر"] : p.render_status === "failed" ? ["fail", "التصدير توقف"] : ["run", "في المونتاج"];
   function projectsBoard() {
     const drafts = D.drafts || [];
     const n = (k) => D.work.filter((p) => pjState(p)[0] === k).length + (k === "run" ? drafts.length : 0);
@@ -508,13 +508,13 @@ const NH = (() => {
     }).join("");
     return `<div class="nh-pj">
       <div class="nh-pj-bar">
-        <label class="nh-pj-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input type="search" placeholder="دوّر على مشروع" aria-label="دوّر على مشروع"></label>
+        <label class="nh-pj-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input type="search" placeholder="ابحث عن مشروع" aria-label="ابحث عن مشروع"></label>
         <button type="button" class="on" data-pjf="">الكل · <span class="num">${D.work.length + drafts.length}</span></button>
-        <button type="button" data-pjf="run">شغّالة · <span class="num">${n("run")}</span></button>
-        <button type="button" data-pjf="done">اتصدّرت · <span class="num">${n("done")}</span></button>
+        <button type="button" data-pjf="run">تعمل · <span class="num">${n("run")}</span></button>
+        <button type="button" data-pjf="done">صُدّرت · <span class="num">${n("done")}</span></button>
         ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
       </div>
-      <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>ابدأ مشروع جديد</button></div>
+      <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>ابدأ مشروعًا جديدًا</button></div>
     </div>`;
   }
   function pjFilter() {
@@ -545,11 +545,11 @@ const NH = (() => {
     if (key === "assets") key = "coaches";
     const tabs = !KOCHI && pTitle.dataset.key === "assets" && AS_TABS.some((x) => x[0] === key);
     pGrid.dataset.key = key;
-    page.classList.toggle("nh-full", key === "create");   // 🎡 عجلة القوالب مالية الشاشة من غير عنوان
+    page.classList.toggle("nh-full", key === "create");   // 🎡 عجلة القوالب مالية الشاشة بدون عنوان
     pGrid.classList.toggle("nh-scroll", !!MODS[key]);
     // شغّال عليه: «＋ مشروع جديد» فوق جنب العنوان (زي البروتوتايب)
     document.getElementById("nhPTabs").innerHTML = tabs ? asTabs(key)
-      : key === "progress" && !KOCHI ? `<button type="button" class="nh-pj-new nh-tile" data-id="create"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>ابدأ مشروع جديد</button>` : "";
+      : key === "progress" && !KOCHI ? `<button type="button" class="nh-pj-new nh-tile" data-id="create"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>ابدأ مشروعًا جديدًا</button>` : "";
     document.getElementById("nhPClient").innerHTML = document.getElementById("nhClient").innerHTML;
     pGrid.innerHTML = MODS[key] ? MODS[key].html() : PAGES[key]();
     if (MODS[key]) MODS[key].mount(pGrid, pageArg);
@@ -750,13 +750,13 @@ const NH = (() => {
   }
   function onActivate(e) {
     const line = e.target.closest(".nh-line, [data-cont]");
-    if (line?.dataset.draft) {   // شغل قالب لسه ما خلصش: يكمّل من مكان ما وقف
+    if (line?.dataset.draft) {   // عمل قالب ما زال ما لم ينته: يُكمل من مكان ما توقف
       const [kind, id] = line.dataset.draft.split(":");
       if (kind === "flow") return Flow.open(id);
       // التايبوجرافي والدبلجة بيفتحوا آخر مشروع متسجّل، فنسجّل ده ونفضّي المفتوح عشان يفتحه هو
       if (kind === "typo") return openSection(line, () => { storageSet("studiomania.typo", id); tyx.cur = null; showStep("12"); });
       if (kind === "dub") return openSection(line, () => { storageSet("studiomania.dub", id); dbx.cur = null; showStep("13"); });
-      if (kind === "scene") {   // استوديو المشهد جوه عجلة «ابدأ مشروع جديد»: بتفتح على المشهد ده
+      if (kind === "scene") {   // استوديو المشهد داخل عجلة «ابدأ مشروعًا جديدًا»: تفتح على هذا المشهد
         try { localStorage.setItem("studiomania.scene", id); } catch { /* */ }
         window.GAL_CAT = "scene";
         if (zoom?.page) return window.NHNav("create");
@@ -764,7 +764,7 @@ const NH = (() => {
       }
       return openSection(line, async () => { try { tplx.cur = await api(`/api/tvideos/${id}`); } catch { tplx.cur = null; } showStep("14"); });
     }
-    if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج بتاع قسمه
+    if (line?.dataset.proj) {   // مشروع مونتاج في ستوديومانيا: يفتح في المونتاج الخاص بـ قسمه
       const p = D.work.find((x) => x.id === line.dataset.proj);
       if (!p) return;
       return openSection(line, () => { storageSet(projectKey(p.section), p.id); showStep(SEC[p.section]?.[1] || "6f"); });
@@ -805,21 +805,21 @@ const NH = (() => {
     ]);
     if (!KOCHI) D.pilot = await api("/api/pilot").catch(() => null);
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
-    const FLOW_ST = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
+    const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
     D.drafts = [
       ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
         sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at,
         // كفر الفكرة اللي لسه شغّالة: غلاف القالب نفسه من المعرض
         thumb: (typeof Gallery !== "undefined" && Gallery.list().find((x) => x.id === f.template?.id)?.cover_url) || (f.template?.id ? `/gallery/${encodeURIComponent(f.template.id)}.jpg` : "") })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
-        sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "وقف" : "لسه بيتعمل", updated_at: v.updated_at, thumb: v.thumb })),
+        sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "توقف" : "ما زال يُنشأ", updated_at: v.updated_at, thumb: v.thumb })),
       // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
       ...typos.filter((t) => !t.done).map((t) => ({ kind: "typo", id: t.id, name: t.name || "تايبوجرافي", sec: "تايبوجرافي",
-        step: t.busy ? "بيشتغل دلوقتي" : t.status === "failed" ? "وقف" : "لسه ما اتصدّرش", updated_at: t.updated_at })),
+        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "ما زال ما لم يُصدّر", updated_at: t.updated_at })),
       ...(dubs.items || []).filter((x) => !x.done).map((x) => ({ kind: "dub", id: x.id, name: x.name || "دبلجة", sec: "ترجمة ودبلجة",
-        step: x.busy ? "بيشتغل دلوقتي" : "لسه مفيش لغة جاهزة", updated_at: x.updated_at })),
+        step: x.busy ? "يشتغل الآن" : "لا يوجد بعد لغة جاهزة", updated_at: x.updated_at })),
       ...scenes.filter((x) => x.busy || !x.takes).map((x) => ({ kind: "scene", id: x.id, name: x.name || "مشهد", sec: "استوديو المشهد",
-        step: x.busy ? "بيتولّد دلوقتي" : "لسه ما اتولّدش", updated_at: x.updated_at })),
+        step: x.busy ? "يُولّد الآن" : "ما زال ما لم يُولّد", updated_at: x.updated_at })),
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,

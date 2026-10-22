@@ -21,14 +21,14 @@ function renderClientList() {
   $("clientList").innerHTML = clientx.list.map((c) => `<button type="button" class="client-card ${c.active ? "on" : ""}" data-client="${c.id}">
       <i class="client-av">${c.logo ? `<img src="${c.logo}" alt="">` : escapeHtml(c.name.trim().slice(0, 1).toUpperCase())}</i>
       <span><b data-no-i18n>${escapeHtml(c.name)}</b>${c.domain ? `<small class="muted" data-no-i18n>${escapeHtml(c.domain)}</small>` : ""}</span>
-      ${c.active ? `<small class="client-now">✓ شغال عليه</small>` : ""}</button>`).join("");
+      ${c.active ? `<small class="client-now">✓ قيد العمل</small>` : ""}</button>`).join("");
 }
 
 async function switchClient(id) {
   if (id === clientx.active) return $("clientDialog").close();
   try {
     await api("/api/clients/active", { method: "PUT", ...jsonBody({ id }) });
-    location.reload();  // كل صفحة بتتحمّل من جديد بحاجات العميل ده
+    location.reload();  // كل صفحة تُحمّل من جديد بحاجات هذا العميل
   } catch (err) { toast(err.message, true); }
 }
 

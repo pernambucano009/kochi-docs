@@ -72,7 +72,7 @@ def fetch(name: str, keys: dict | None = None) -> dict:
         if name == "atlas":
             key = _env(keys, "ATLASCLOUD_API_KEY", "ATLAS_CLOUD_API_KEY")
             if not key:
-                return {"ok": False, "error": "مفيش مفتاح"}
+                return {"ok": False, "error": "لا يوجد مفتاح"}
             base = os.environ.get("ATLASCLOUD_BASE_URL", "https://api.atlascloud.ai").rstrip("/") + "/public/v1"
             r = httpx.get(f"{base}/balance", headers={"Authorization": f"Bearer {key}"}, timeout=20)
             if r.status_code >= 400:
@@ -83,11 +83,11 @@ def fetch(name: str, keys: dict | None = None) -> dict:
             bal = _num(av.get("value") or av.get("amount")) if isinstance(av, dict) else _num(av)
             if bal is None:
                 bal = _num(d.get("balance") or d.get("total"))
-            return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else f"رد مش مفهوم: {str(d)[:150]}"}
+            return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else f"رد غير مفهوم: {str(d)[:150]}"}
         if name == "scrape":
             key = _env(keys, "SCRAPECREATORS_API_KEY", "SCRAPE_CREATORS_API_KEY")
             if not key:
-                return {"ok": False, "error": "مفيش مفتاح"}
+                return {"ok": False, "error": "لا يوجد مفتاح"}
             r = httpx.get("https://api.scrapecreators.com/v1/account/credit-balance", headers={"x-api-key": key}, timeout=20)
             if r.status_code == 402:
                 return {"ok": True, "balance": 0.0}
@@ -95,11 +95,11 @@ def fetch(name: str, keys: dict | None = None) -> dict:
                 return {"ok": False, "error": f"HTTP {r.status_code}"}
             d = r.json()
             bal = _num(d.get("creditCount") if isinstance(d, dict) else None)
-            return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else "رد مش مفهوم"}
+            return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else "رد غير مفهوم"}
         if name == "zernio":
             key = _env(keys, "ZERNIO_API_KEY", "LATE_API_KEY")
             if not key:
-                return {"ok": False, "error": "مفيش مفتاح"}
+                return {"ok": False, "error": "لا يوجد مفتاح"}
             r = httpx.get(os.environ.get("ZERNIO_BASE_URL", "https://zernio.com/api/v1") + "/profiles", headers={"Authorization": f"Bearer {key}"}, timeout=20)
             return {"ok": r.status_code < 400, "error": None if r.status_code < 400 else f"HTTP {r.status_code}: {r.text[:120]}"}
     except (httpx.HTTPError, ValueError) as exc:

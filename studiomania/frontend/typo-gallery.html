@@ -39,7 +39,7 @@
 <div class="gal">
   <a href="/" class="btn sm">→ رجوع للبرنامج</a>
   <h1>🎨 معرض العناصر</h1>
-  <p class="hint">كل حركات «ستوديو» شغالة قدامك بكلام تجربة. البرنامج بيختار منهم لوحده لما تدوس «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، وتقدر تغيّر أي لقطة بإيدك من قايمة الحركة جوه مشروع التايبوجرافي. دوس على أي كارت عشان تشوفه كبير.</p>
+  <p class="hint">كل حركات «ستوديو» تعمل قدامك بكلام تجربة. البرنامج يختار منهم تلقائيًا عندما تضغط «🧠 وزّع» (كوليكشن مخفية عشوائي كل مرة)، ويمكنك تغيّر أي لقطة بنفسك من قائمة الحركة داخل مشروع التايبوجرافي. اضغط على أي بطاقة لكي تشوفه كبير.</p>
   <div class="gal-bar" id="cols"></div>
   <div class="gal-bar">
     <button type="button" class="chip on" data-lang="ar">عربي</button>
@@ -61,15 +61,15 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const COL_NAMES = { editorial: "✒️ إديتوريال", pop: "💗 بوب", retro: "📰 ريترو", tech: "💻 تكنولوجيا", collage: "✂️ كولاج", screens: "📱 شاشات", print: "🎞️ طباعة وفيلم",
   vintage: "🕰️ قديم ودافي", social: "💬 سوشيال", product: "🧩 إعلان منتج", cinema: "🎬 سينمائي" };
-const TRANS_NAMES = { whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دايرة بتفتح", leak: "🌅 تسريب نور", burn: "🔥 حرق فيلم",
-  rise: "⬆️ طالع من تحت", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من جوه" };
+const TRANS_NAMES = { whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دائرة تفتح", leak: "🌅 تسريب ضوء", burn: "🔥 حرق فيلم",
+  rise: "⬆️ صاعد من أسفل", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من داخل" };
 // كلام التجربة: عام لكل حركة، وخاص للحركات اللي محتاجة رقم أو مقارنة أو اسم
 const SAMPLE = {
-  ar: { _: "كده انت بتكسب بجد النهارده", counter: "وصلنا 230 عميل", digits: "فاضل 230 بس", years: "في سنة 1930 كل حاجة اتغيرت", dates: "نشوفك يوم 14",
+  ar: { _: "هكذا أنت تكسب بجد اليوم", counter: "وصلنا 230 عميل", digits: "فاضل 230 فقط", years: "في سنة 1930 كل شيء تغيّرت", dates: "نشوفك يوم 14",
     progress: "30 خبير موافقين 84 في المية من العملا", split: "قبل التعديل ضد بعد التعديل", endcard: "ستوديو ابنيه بطريقتك", bigtype: "03 الأتمتة",
-    signature: "مع تحياتي", checks: "الدومين اتوصل اللينك اتظبط البراند جاهز", flow: "كل يوم الصبح شوف الحجوزات ابعت تذكير", notify: "جالك طلب جديد واتنين كمان اشتروا",
-    chat: "ازيك عامل ايه تمام الحمد لله", comments: "حلو جدا الفيديو ده عايز أعرف أكتر", steps: "خد فكرة عدّلها وخلّص أسرع", list: "صورة حوار موسيقى مؤثرات",
-    emoji: "ساعات القرب بيبقى خطر وفلوس", prompt: "اعمل فيديو طولي مقاسه مظبوط", search: "ملفات مشاريع جاهزة", chalk: "دي مش مجرد أداة جديدة", torn: "شركة جزم حطت سوستة" },
+    signature: "مع تحياتي", checks: "الدومين وُصل الرابط ضُبط العلامة جاهز", flow: "كل يوم الصبح انظر الحجوزات أرسل تذكير", notify: "جالك طلب جديد واثنان أيضًا اشتروا",
+    chat: "ازيك عامل ماذا حسنًا الحمد لله", comments: "جميل جدا هذا الفيديو تريد أعرف أكثر", steps: "خذ فكرة عدّلها وخلّص أسرع", list: "صورة حوار موسيقى مؤثرات",
+    emoji: "ساعات القرب يصبح خطر ومال", prompt: "أنشئ فيديو طولي مقاسه مظبوط", search: "ملفات مشاريع جاهزة", chalk: "هذه غير مجرد أداة جديدة", torn: "شركة جزم حطت سوستة" },
   en: { _: "this is how you win today", counter: "we reached 230 clients", digits: "only 230 left", years: "back in 1930 everything changed", dates: "see you on the 14",
     progress: "30 experts agree 84 percent of clients", split: "before editing vs after editing", endcard: "studio build it your way", bigtype: "03 automations",
     signature: "best regards", checks: "domain is connected url is set brand is ready", flow: "every morning check bookings send a reminder", notify: "you got a new order and two more bought",
@@ -109,7 +109,7 @@ function build() {
   const grid = $("grid");
   grid.className = ratio === "v" ? "grid" : "grid wide";
   let list;
-  if (col === "trans") list = G.trans.map((t) => ({ kind: "serif", trans: t, title: TRANS_NAMES[t] || t, code: t, desc: "الترانزيشن في أول اللقطة التانية" }));
+  if (col === "trans") list = G.trans.map((t) => ({ kind: "serif", trans: t, title: TRANS_NAMES[t] || t, code: t, desc: "الترانزيشن في أول اللقطة الأخرى" }));
   else {
     const keys = col === "all" ? Object.keys(G.kinds) : G.collections[col].kinds.filter((k) => G.kinds[k]);
     list = keys.map((k) => { const d = G.kinds[k]; const cut = d.indexOf("("); return { kind: k, title: (cut > 0 ? d.slice(0, cut) : d).trim(), code: k, desc: cut > 0 ? d.slice(cut + 1).replace(/\)$/, "") : "" }; });
@@ -136,7 +136,7 @@ $("modal").onclick = () => { $("modal").hidden = true; big = null; $("mbox").inn
 let last = 0;
 function loop(now) {
   requestAnimationFrame(loop);
-  if (now - last < 40) return;   // حوالي 25 فريم في الثانية كفاية للمعاينة
+  if (now - last < 40) return;   // نحو 25 فريم في الثانية كفاية للمعاينة
   last = now;
   const s = now / 1000;
   const draw = (t) => { try { t.eng.renderAt(((s - t.t0) % t.dur)); } catch (e) { /* حركة وقعت: نسيبها */ } };

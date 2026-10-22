@@ -207,7 +207,7 @@ def estimate(segments: list[tuple[float, float]], lines: list[dict]) -> list[dic
 
 SHOTS_FORMAT = """{"shots": [
   {"scene": 1, "start": 0.0, "end": 2.4, "lines": [1],
-   "title": "وصف قصير بالعربي للقطة",
+   "title": "وصف قصير بالعربية للقطة",
    "shot": "extreme close-up | close-up | medium | wide | over-the-shoulder | POV | insert ...",
    "camera": "static | slow push-in | handheld follow | tracking | pan ...",
    "location": "المكان",
@@ -359,7 +359,7 @@ def mock_script(number: int, chat: list[dict]) -> str:
 
 
 
-ONE_SHOT_FORMAT = """{"title": "وصف قصير بالعربي للقطة",
+ONE_SHOT_FORMAT = """{"title": "وصف قصير بالعربية للقطة",
  "shot": "close-up | medium | wide | insert ...", "camera": "static | slow push-in | ...",
  "location": "المكان", "sfx": "المؤثرات الصوتية", "transition": "cut | match cut ...",
  "prompt": "English prompt for the video model ..."}"""

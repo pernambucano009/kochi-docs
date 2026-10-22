@@ -25,7 +25,7 @@ const AdsMgrPage = (() => {
     };
     return `${(d.ad_accounts || []).map((a) => `<div class="pk-li"><b>${esc(platName(a.platform))}</b><small>${esc(a.name)} · <span dir="ltr">${esc(a.ad_account)} · ${esc(a.currency)}</span></small></div>`).join("")}
       ${btn("facebook", "ميتا (فيسبوك وإنستجرام)")}${btn("tiktok", "تيك توك")}${btn("google", "جوجل ويوتيوب")}${btn("linkedin", "لينكدإن")}${btn("pinterest", "بنترست")}${btn("x", "X")}
-      <p class="pk-note">ميتا ولينكدإن وبنترست تستخدم ربط النشر نفسه. تيك توك وX وجوجل تطلب تسجيل الدخول على المنصة ثم تعود إلى هنا.</p>`;
+      <p class="pk-note">ميتا ولينكدإن ونترست تستخدم ربط النشر نفسه. تيك توك وX وجوجل تطلب تسجيل الدخول على المنصة ثم تعود إلى هنا.</p>`;
   }
   // 🎯 الاستهداف: البلوك نفسه في الترويج والإعلان الجديد
   function target(p) {
@@ -130,7 +130,7 @@ const AdsMgrPage = (() => {
       ${kind === "lookalike" ? `<label class="pk-f">من جمهور<select data-amf="source">${list.filter((x) => x.type !== "lookalike").map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("") || `<option value="">أنشئ جمهور زوار أو عملاء أولًا</option>`}</select></label>
           <div class="pk-row2"><label class="pk-f">الدولة<input type="text" maxlength="2" dir="ltr" data-amf="country" value="${esc(val("country", S.d.recipe?.countries?.[0] || "SA"))}"></label>
           <label class="pk-f">الحجم<select data-amf="ratio">${[1, 2, 3, 5, 10].map((r) => `<option value="${r / 100}" ${+val("ratio", 0.01) === r / 100 ? "selected" : ""}>${r}٪ ${r === 1 ? "(الأقرب)" : ""}</option>`).join("")}</select></label></div>` : ""}
-      ${kind === "customer_list" ? `<p class="pk-note">بعد إنشائه، ارفع ملف CSV فيه بريد أو رقم كل عميل (بمفتاح الدولة، مثل +966…). يجب أن يكونوا عملاءك فعلًا وقد وافقوا على التواصل، وتُشفَّر البيانات قبل وصولها إلى ميتا.</p>` : ""}
+      ${kind === "customer_list" ? `<p class="pk-note">بعد إنشائه، ارفع ملف CSV فيه بريد أو رقم كل عميل (بمفتاح الدولة، مثل +966…). يجب أن يكونون عملاءك فعلًا وقد وافقوا على التواصل، وتُشفَّر البيانات قبل وصولها إلى ميتا.</p>` : ""}
       <div class="pk-dacts"><button class="nb-btn fs-go" data-amaudnew ${S.busy ? "disabled" : ""}>أنشئ الجمهور</button></div>
       <input type="file" accept=".csv,text/csv" hidden data-amfile>`;
   }

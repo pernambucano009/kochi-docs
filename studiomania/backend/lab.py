@@ -255,7 +255,7 @@ def cut_audio(ffmpeg: str, src: Path, start: float, dur: float, out: Path) -> Pa
 AUDIO_FORMAT = """{
   "music": [{"start": 0.0, "end": 12.5, "description": "نوع الموسيقى وآلاتها", "mood": "المود"}],
   "speech": [{"start": 0.4, "end": 2.1, "speaker": "مين بيتكلم", "text": "الكلام حرفيًا"}],
-  "sfx": [{"t": 1.23, "dur": 0.25, "label": "اسم الصوت بالعربي (مثلًا: كليك ماوس)", "category": "click | whoosh | pop | impact | typing | swipe | notification | riser | transition | ui | foley | ambience | other",
+  "sfx": [{"t": 1.23, "dur": 0.25, "label": "اسم الصوت بالعربية (مثلًا: كليك ماوس)", "category": "click | whoosh | pop | impact | typing | swipe | notification | riser | transition | ui | foley | ambience | other",
            "what": "إيه اللي بيحصل في الصورة وقتها والصوت ده مربوط بإيه"}]
 }"""
 
@@ -382,8 +382,8 @@ COMPONENTS_FORMAT = """{
      "tags": ["ماوس", "سحب"],
      "controls": [
        {"label": "لون المؤشر", "type": "color", "target": "مؤشر ماوس أخضر", "value": "#3CFF6B"},
-       {"label": "اسم الملف الأول", "type": "text", "target": "ملف صورة: علي", "value": "علي"},
-       {"label": "الملفات بتترمي فين", "type": "choice", "target": "سلة المهملات", "value": "سلة المهملات", "options": ["سلة المهملات", "فولدر"]}
+       {"label": "اسم الملف أولًا", "type": "text", "target": "ملف صورة: علي", "value": "علي"},
+       {"label": "الملفات تترمي أين", "type": "choice", "target": "سلة المهملات", "value": "سلة المهملات", "options": ["سلة المهملات", "مجلد"]}
      ]}
   ]
 }"""
@@ -483,7 +483,7 @@ def mock_components(d: dict) -> dict:
                       "tags": ["ماوس", "سحب"],
                       "controls": [{"label": "لون المؤشر", "type": "color", "target": els[0]["name"], "value": "#3CFF6B"},
                                    {"label": "اسم الملف", "type": "text", "target": els[-1]["name"], "value": "علي"},
-                                   {"label": "الملف بيروح فين", "type": "choice", "target": "السلة", "value": "سلة المهملات",
+                                   {"label": "الملف يروح أين", "type": "choice", "target": "السلة", "value": "سلة المهملات",
                                     "options": ["سلة المهملات", "فولدر"]}]})
     return {"components": comps}
 
@@ -658,9 +658,9 @@ def mock_connectors(d: dict) -> dict:
 TRIAL_FORMAT = """{
   "adapted": "الوصفة هتتنفذ بين اللقطتين دول إزاي (بالعربي، خطوات قصيرة مرقمة)",
   "anchors": ["اللي هيفضل ثابت والعين ماسكاه بين اللقطتين دول"],
-  "keyframes": [{"label": "اسم المرحلة بالعربي (مثلًا: الإطار اتشال والخلفية بقت خريطة)",
+  "keyframes": [{"label": "اسم المرحلة بالعربية (مثلًا: الإطار أُزيل والخلفية بقت خريطة)",
                  "prompt": "English image-edit instruction. IMAGE 1 is the current frame, IMAGE 2 is the final frame we are heading to. Describe exactly the in-between state to draw from IMAGE 1: what stays identical (layout, text, cursor...), what has changed and how far along the transformation is"}],
-  "segments": [{"label": "الحركة دي بالعربي",
+  "segments": [{"label": "هذه الحركة بالعربية",
                 "prompt": "English prompt for a start-frame/end-frame video model: one continuous shot with no cut, the exact motion from the start frame to the end frame (camera move, what transforms into what and in which order, easing), keep everything else steady",
                 "seconds": 2.0}]
 }"""
@@ -712,9 +712,9 @@ def clean_trial_plan(data: dict, max_keys: int = 2) -> dict:
 
 def mock_trial_plan() -> dict:
     return {"adapted": "١. زووم ناعم على العنصر اللي اتداس\n٢. الخلفية تتحول للمشهد الجديد", "anchors": ["الكلام المكتوب"],
-            "keyframes": [{"label": "النص: الخلفية بتتحول", "prompt": "Halfway state: background morphing into the next scene."}],
+            "keyframes": [{"label": "النص: الخلفية تتحول", "prompt": "Halfway state: background morphing into the next scene."}],
             "segments": [{"label": "زووم وبداية التحوّل", "prompt": "Slow zoom in, background starts morphing.", "seconds": 1.5},
-                         {"label": "التحوّل بيكمل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
+                         {"label": "التحوّل يُكمل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
 
 
 # ------------------------------------------------------------ 🎞️ فيديو مبني على الكونيكتورز
@@ -722,7 +722,7 @@ def mock_trial_plan() -> dict:
 FILM_FORMAT = """{
   "title": "اسم الفيديو",
   "idea": "الفكرة في سطرين: القصة اللي بتربط المشاهد والكونيكتورز",
-  "scenes": [{"label": "اسم المشهد بالعربي", "feature": "الميزة اللي المشهد بيعرضها",
+  "scenes": [{"label": "اسم المشهد بالعربية", "feature": "الميزة التي المشهد يعرضها",
               "voice": "جملة الفويس أوفر اللي بتتقال على المشهد ده (بلغة ولهجة العميل، طبيعية ومتسلسلة مع اللي قبلها، تتقال في وقت المشهد والكونيكتور اللي بعده)",
               "text": "الكلام المكتوب على الشاشة في المشهد ده (قصير، بلغة ولهجة العميل) أو فاضي",
               "screen": "اسم شاشة / لوجو / صورة منتج من ملف العميل لو المشهد محتاجها بالظبط، أو فاضي",
@@ -841,7 +841,7 @@ def film_script_rewrite_messages(brain_txt: str, plan: dict, instruction: str) -
 SCHEMA_ROLES = {"hook": "🪝 هوك", "problem": "😣 مشكلة", "feature": "✨ ميزة", "proof": "📈 دليل", "cta": "👉 دعوة", "other": "• تاني"}
 
 SCHEMA_FORMAT = """{
-  "title": "اسم قصير للأسلوب ده (بالعربي)",
+  "title": "اسم قصير هذا للأسلوب (بالعربية)",
   "summary": "الفيديو ده ماشي إزاي في سطرين (بالعربي)",
   "beat_sec": 0.5,
   "style": "English: the single visual world of the whole video (render style, materials, lighting, background, depth, typography look) so it can be recreated",
@@ -930,7 +930,7 @@ def mock_schema(d: dict) -> dict:
     n = max(2, min(5, int(dur // 2)))
     step = dur / n
     roles = ["hook", "feature", "feature", "proof", "cta"]
-    return {"title": "موبايل في النص والكاميرا ماشية", "summary": "موبايل ثابت في النص والكاميرا بتدخل جوه الشاشات", "beat_sec": 0.5,
+    return {"title": "جوال في النص والكاميرا ماشية", "summary": "جوال ثابت في النص والكاميرا تدخل داخل الشاشات", "beat_sec": 0.5,
             "style": "Clean 3D render, soft studio light, pastel background.", "palette": "teal, cream", "spine": "A phone at center.",
             "camera": "Always pushing in slowly.", "text_style": "Bold sans headline in the top third.", "music": "بيت خفيف",
             "beats": [{"t0": round(i * step, 2), "t1": round((i + 1) * step, 2), "role": roles[min(i, 4)], "what": f"جزء {i + 1}",
@@ -947,7 +947,7 @@ TEXT_MODES = {"blank": "مساحات فاضية (الكلام العربي في 
 FILL_FORMAT = """{
   "title": "اسم الفيديو",
   "world": "English: ONE consistent world for the whole video (style, lighting, background, the spine element, the brand colors) repeated in every panel",
-  "panels": [{"desc": "English: exactly what the frame looks like at this moment (composition per the template layout, which real brand asset fills which slot)", "asset": "اسم الأصل من ملف العميل اللي بيظهر هنا أو فاضي"}],
+  "panels": [{"desc": "English: exactly what the frame looks like at this moment (composition per the template layout, which real brand asset fills which slot)", "asset": "اسم الأصل من ملف العميل الذي يظهر هنا أو فارغ"}],
   "beats": [{"motion": "English prompt for a start-frame/end-frame video model: the continuous motion from this panel to the next one (camera move + the template's into_next), no cut",
              "text": "الكلام اللي على الشاشة في الجزء ده", "voice": "جملة فويس أوفر للجزء ده (بلغة ولهجة العميل) أو فاضي"}]
 }"""
@@ -1243,8 +1243,8 @@ def to_json(d: dict) -> str:
 
 VEDIT_MODELS = {
     "gemini": {"model": "google/gemini-omni-1.1-flash/video-edit", "label": "Gemini Omni 1.1 (الأدق في الحفاظ على الحركة)", "per_sec": 0.107},
-    "flux": {"model": "black-forest-labs/flux-3/edit-video", "label": "FLUX 3 (أرخص، بيغيّر التوقيت أحيانًا)", "per_sec": 0.03},
-    "kling": {"model": "kwaivgi/kling-video-o3-std/video-edit", "label": "Kling O3 (ضعيف في الكلام العربي)", "per_sec": 0.107},
+    "flux": {"model": "black-forest-labs/flux-3/edit-video", "label": "FLUX 3 (أرخص، يغيّر التوقيت أحيانًا)", "per_sec": 0.03},
+    "kling": {"model": "kwaivgi/kling-video-o3-std/video-edit", "label": "Kling O3 (ضعيف في النص العربية)", "per_sec": 0.107},
 }
 
 VEDIT_FORMAT = """{"prompt": "the full English edit instruction"}"""

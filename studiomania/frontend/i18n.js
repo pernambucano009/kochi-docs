@@ -39,7 +39,7 @@
     }
   }
   frags.sort((a, b) => b[0].length - a[0].length);
-  pats.sort((a, b) => b.staticLen - a.staticLen); // الأدق الأول: «{0} من {1} قطعة اتولّدت» قبل «{0} من {1}: {2}»
+  pats.sort((a, b) => b.staticLen - a.staticLen); // الأدق أولًا: «{0} من {1} قطعة وُلّدت» قبل «{0} من {1}: {2}»
 
   const fill = (p, vals) => p.en.replace(/\{(\d)\}/g, (_, i) => t(vals[p.order.indexOf(+i)] ?? ""));
   const cache = new Map();
@@ -92,7 +92,7 @@
       const v = el.getAttribute(a);
       if (v && AR.test(v)) {
         const tv = t(v);
-        if (tv !== v) el.setAttribute(a, tv); // لو ماتغيّرش منكتبوش تاني، وإلا المراقب يفضل يلف
+        if (tv !== v) el.setAttribute(a, tv); // إذا لا تغيّر لا نكتبه آخر، وإلا المراقب يظل يدور
       }
     }
     // الأماكن اللي كانت مجبورة يمين لشمال عشان العربي

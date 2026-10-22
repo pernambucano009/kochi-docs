@@ -133,11 +133,11 @@ const PlansView = (() => {
   // اللي بيزيد في الباقة عن اللي قبلها (من بيانات الباقات نفسها، ومن «features» لو اتضافت في billing.json)
   function adds(p, prev) {
     const out = [];
-    if (!prev) out.push("كل الأدوات والقوالب", "عقل البراند");
-    if (p.accounts && !(prev && prev.accounts)) out.push(p.accounts === 2 ? "حسابين سوشيال للنشر" : `${p.accounts} حسابات سوشيال للنشر`, "جدولة ونشر", "الكومنتات والرسايل");
-    else if (prev && p.accounts > prev.accounts) out.push(`${p.accounts} حسابات سوشيال${p.max_accounts ? ` (لحد ${p.max_accounts})` : ""}`);
-    if (p.autopilot && !(prev && prev.autopilot)) out.push("أوتوبايلوت: بيعمل وينشر لوحده");
-    if (!p.accounts) out.push("من غير نشر");
+    if (!prev) out.push("كل الأدوات والقوالب", "عقل العلامة");
+    if (p.accounts && !(prev && prev.accounts)) out.push(p.accounts === 2 ? "حسابين سوشيال للنشر" : `${p.accounts} حسابات سوشيال للنشر`, "جدولة ونشر", "التعليقات والرسائل");
+    else if (prev && p.accounts > prev.accounts) out.push(`${p.accounts} حسابات سوشيال${p.max_accounts ? ` (حتى ${p.max_accounts})` : ""}`);
+    if (p.autopilot && !(prev && prev.autopilot)) out.push("أوتوبايلوت: يعمل وينشر تلقائيًا");
+    if (!p.accounts) out.push("بدون نشر");
     return out.concat(p.features || []);
   }
   const credLine = (p) => `<span class="num">${n(p.credits)}</span> نقطة ${p.once ? "مرة واحدة" : "كل شهر"}`;
@@ -149,7 +149,7 @@ const PlansView = (() => {
     const curI = guest ? -2 : plans.findIndex((p) => p.key === d.plan);
     const moP = (p) => S.cyc === "year" ? Math.round(p.price * ym / 12) : p.price;
     const fmtD = (t) => t ? new Date(t * 1000).toLocaleDateString(typeof UI_LOCALE === "function" ? UI_LOCALE() : "ar-EG", { day: "numeric", month: "long" }) : "";
-    const renew = d.ends_at ? `بتخلص ${fmtD(d.ends_at)}` : d.renews_at ? `بتتجدد ${fmtD(d.renews_at)}` : "";
+    const renew = d.ends_at ? `تنتهي ${fmtD(d.ends_at)}` : d.renews_at ? `تتجدد ${fmtD(d.renews_at)}` : "";
     const providers = [d.stripe && ["stripe", "بالكارت"], d.paypal && ["paypal", "PayPal"]].filter(Boolean);
     const sameCycle = () => (d.cycle || "month") === S.cyc;
 
@@ -162,22 +162,22 @@ const PlansView = (() => {
     }
     function small(p, i) {
       const s = state(p, i);
-      const act = s === "buy" ? `<button class="pv-act ${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? "اشترك" : "ابدأ ببلاش"}</button>`
+      const act = s === "buy" ? `<button class="pv-act ${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? "اشترك" : "ابدأ مجانًا"}</button>`
         : s === "cur" ? `<span class="pv-act cur">✓ باقتك</span>`
         : s === "up" || s === "switch" ? `<button class="pv-act go" data-pvopen>${s === "switch" ? "حوّل" : curI < 0 ? "اشترك" : "ترقية"}</button>`
         : s === "owner" ? "" : `<span class="pv-act low">${p.once ? "خلصت" : "أقل من باقتك"}</span>`;
-      const tipM = s === "cur" ? renew : s === "up" ? "ترقية فورية، والفرق بيتحسب بالأيام" : "";
+      const tipM = s === "cur" ? renew : s === "up" ? "ترقية فورية، والفرق يُحسب بالأيام" : "";
       return `<div class="pv-pl${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
-        ${guest && p.popular ? `<span class="pv-hot">الأكتر اختيارًا</span>` : ""}
+        ${guest && p.popular ? `<span class="pv-hot">الأكثر اختيارًا</span>` : ""}
         <b class="nm">${esc(p.name)}</b>
-        <span class="pr">${p.price ? `<span class="num">$${moP(p)}</span><small>/ شهر</small>` : `<span class="free">ببلاش</span>`}</span>
+        <span class="pr">${p.price ? `<span class="num">$${moP(p)}</span><small>/ شهر</small>` : `<span class="free">مجانًا</span>`}</span>
         ${act}
         <span class="pv-tip"><b>${esc(p.name)}</b><span>${credLine(p)}<br>${adds(p, plans[i - 1]).slice(0, 3).map(esc).join("<br>")}</span>${tipM ? `<span class="m">${esc(tipM)}</span>` : ""}</span></div>`;
     }
     function big(p, i) {
       const s = state(p, i), yr = S.cyc === "year" && p.price;
       let cta;
-      if (s === "buy") cta = `<button class="${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? `اشترك في ${esc(p.name)}` : "ابدأ ببلاش"}</button>`;
+      if (s === "buy") cta = `<button class="${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? `اشترك في ${esc(p.name)}` : "ابدأ مجانًا"}</button>`;
       else if (s === "cur") cta = `<span class="cur">✓ باقتك${renew ? ` · ${esc(renew)}` : ""}</span>`;
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل للسنوي" : "حوّل للشهري") : `${curI < 0 ? "اشترك في" : "ترقية لـ"} ${esc(p.name)}`;
@@ -185,14 +185,14 @@ const PlansView = (() => {
           : `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
       } else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "خلصت التجربة" : "أقل من باقتك"}</span>`;
-      const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكتر اختيارًا</em>` : "";
+      const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكثر اختيارًا</em>` : "";
       const prev = plans[i - 1];
       return `<article class="pv-pc${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
         <div class="t"><b>${esc(p.name)}</b>${tag}</div>
         <div class="p">${p.price ? `<div><span class="num">$${moP(p)}</span><small>/ شهر</small></div><span class="yr">${yr ? `<span class="num">$${p.price * ym}</span> مرة واحدة في السنة` : ""}</span>`
-          : `<div><span class="free">ببلاش</span></div><span class="yr">من غير كارت</span>`}</div>
+          : `<div><span class="free">مجانًا</span></div><span class="yr">بدون بطاقة</span>`}</div>
         <div class="k">${credLine(p)}</div>
-        <ul>${prev ? `<li class="inh">كل اللي في ${prev.once ? "التجربة" : esc(prev.name)}، وكمان:</li>` : ""}${adds(p, prev).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
+        <ul>${prev ? `<li class="inh">كل ما في ${prev.once ? "التجربة" : esc(prev.name)}، وأيضًا:</li>` : ""}${adds(p, prev).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
         <div class="pv-cta">${cta}</div></article>`;
     }
     function bottom() {
@@ -203,16 +203,16 @@ const PlansView = (() => {
       const c = d.me.credits || {}, cur = plans[curI], full = (cur?.credits || 0) + (c.topup_credits || 0);
       const pct = full ? Math.max(0, Math.min(100, Math.round((c.total || 0) / full * 100))) : 0;
       return `<div class="pv-cont${S.tops ? " open" : ""}"><svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="trk"/><circle cx="20" cy="20" r="16" class="val" style="stroke-dasharray:${pct} 100.5"/></svg>
-        <b class="ttl" title="نقط الباقة ${n(c.plan_credits)} · نقط زيادة ${n(c.topup_credits)}"><span class="num">${n(c.total)}</span> نقطة</b><span class="sep"></span>${tops}<button class="more" data-pvmore aria-label="زوّد نقاط">+</button></div>`;
+        <b class="ttl" title="نقاط الباقة ${n(c.plan_credits)} · نقاط زيادة ${n(c.topup_credits)}"><span class="num">${n(c.total)}</span> نقطة</b><span class="sep"></span>${tops}<button class="more" data-pvmore aria-label="زوّد نقاط">+</button></div>`;
     }
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
         <div class="pv-mid">
-          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "اقفل التفاصيل" : "تفاصيل الباقات"}</span><i aria-hidden="true"></i></button>
+          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "أغلق التفاصيل" : "تفاصيل الباقات"}</span><i aria-hidden="true"></i></button>
           <div class="pv-stack">
             <div class="pv-row">${plans.map(small).join("")}</div>
             <div class="pv-wrap" aria-hidden="${!S.open}">
-              ${plans.some((p) => p.price) ? `<div class="pv-seg"><button data-pvcyc="month" class="${S.cyc === "month" ? "on" : ""}">شهري</button><button data-pvcyc="year" class="${S.cyc === "year" ? "on" : ""}">سنوي <em>${ym < 12 ? (12 - ym === 2 ? "شهرين ببلاش" : `${12 - ym} شهور ببلاش`) : ""}</em></button></div>` : ""}
+              ${plans.some((p) => p.price) ? `<div class="pv-seg"><button data-pvcyc="month" class="${S.cyc === "month" ? "on" : ""}">شهري</button><button data-pvcyc="year" class="${S.cyc === "year" ? "on" : ""}">سنوي <em>${ym < 12 ? (12 - ym === 2 ? "شهرين مجانًا" : `${12 - ym} شهور مجانًا`) : ""}</em></button></div>` : ""}
               <div class="pv-cards">${plans.map(big).join("")}</div>
             </div>
           </div>
@@ -222,7 +222,7 @@ const PlansView = (() => {
     const pv = () => el.querySelector(".pv");
     let shut;
     const zoom = (on) => { clearTimeout(shut); S.open = on; if (!on) S.pick = null; pv().classList.toggle("open", on); el.querySelector("[data-pvcap]").setAttribute("aria-expanded", on);
-      el.querySelector("[data-pvcapt]").textContent = on ? "اقفل التفاصيل" : "تفاصيل الباقات";
+      el.querySelector("[data-pvcapt]").textContent = on ? "أغلق التفاصيل" : "تفاصيل الباقات";
       el.querySelector(".pv-wrap").setAttribute("aria-hidden", !on); };
     const pay = async (kind, key, prov) => {
       if (!o.pay) return;
@@ -246,7 +246,7 @@ const PlansView = (() => {
       if (t) {
         if (guest) return o.signup?.("", S.cyc);
         if (t.dataset.prov) return pay("topup", t.dataset.pvtop, t.dataset.prov);
-        if (!providers.length) return o.toast?.("الدفع لسه بيتجهز، هيتفتح قريب.");
+        if (!providers.length) return o.toast?.("الدفع ما زال يُجهّز، سيُفتح قريب.");
         if (providers.length === 1) return pay("topup", t.dataset.pvtop, providers[0][0]);
         S.top = t.dataset.pvtop; render(); if (S.open) pv().classList.add("open");
       }

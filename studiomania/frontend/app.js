@@ -34,7 +34,7 @@ async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   if (res.status === 401 && !path.startsWith("/api/auth/")) {
     location.href = "/login";
-    throw new Error("لازم تسجّل دخول");
+    throw new Error("يجب تسجّل دخول");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
@@ -84,7 +84,7 @@ function morphSame(x, y) {
 function morphNode(x, y) {
   if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
   const busy = x === document.activeElement || x.contains?.(document.activeElement) && x.isContentEditable;
-  const dirty = (x.tagName === "INPUT" || x.tagName === "TEXTAREA") && x.value !== x.defaultValue;   // كتبت فيها ولسه ماتحفظتش
+  const dirty = (x.tagName === "INPUT" || x.tagName === "TEXTAREA") && x.value !== x.defaultValue;   // كتبت فيها وما زال لم تُحفظ
   for (const at of [...x.attributes]) if (!y.hasAttribute(at.name) && !(at.name === "open" && x.tagName === "DETAILS")) x.removeAttribute(at.name);
   for (const at of [...y.attributes]) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value);
   if (x.tagName === "INPUT" && !busy) {
@@ -99,7 +99,7 @@ function morphNode(x, y) {
     if (!busy) { morphKids(x, y); const o = y.querySelector("option[selected]"); x.value = o ? o.value : (y.options[0]?.value ?? x.value); }
     return;
   }
-  if (busy && x.isContentEditable) return;   // اللي بتكتبه دلوقتي مايتلمسش
+  if (busy && x.isContentEditable) return;   // ما تكتبه الآن لا يُلمس
   if (/^(VIDEO|AUDIO|CANVAS|IFRAME|svg)$/.test(x.tagName) && x.childNodes.length) return;
   morphKids(x, y);
 }
@@ -133,7 +133,7 @@ function renderLibrary() {
       const badge = v.clips_count
         ? `<span class="badge ok">${v.clips_count} قطعة جاهزة</span>`
         : longCount
-          ? `<span class="badge warn">محتاج تقطيع</span>`
+          ? `<span class="badge warn">يحتاج تقطيع</span>`
           : "";
       return `<li data-id="${v.id}" class="${state.current?.id === v.id ? "active" : ""}">
         <div class="name">${escapeHtml(v.name)}</div>
@@ -167,7 +167,7 @@ function uploadFile(file) {
       let data = {};
       try { data = JSON.parse(xhr.responseText); } catch {}
       if (xhr.status >= 200 && xhr.status < 300) {
-        toast(`اترفع: ${file.name}`);
+        toast(`رُفع: ${file.name}`);
         resolve(data);
       } else {
         toast(`فشل رفع ${file.name}: ${data.detail || xhr.status}`, true);
@@ -233,8 +233,8 @@ async function loadCoachLink() {
   const v = state.current;
   if (!v) return;
   const coaches = await api("/api/coaches");
-  $("coachLinkSelect").innerHTML = `<option value="">— مفيش —</option>` +
-    coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.outro_url ? "" : " (من غير أوترو)"}</option>`).join("");
+  $("coachLinkSelect").innerHTML = `<option value="">— لا يوجد —</option>` +
+    coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.outro_url ? "" : " (بدون أوترو)"}</option>`).join("");
   $("coachLinkSelect").value = v.coach?.id || "";
   renderCoachLink();
 }
@@ -244,8 +244,8 @@ function renderCoachLink() {
   $("coachLinkImg").hidden = !c;
   if (c) $("coachLinkImg").src = c.image_url;
   $("coachLinkInfo").textContent = !c
-    ? "اربطه عشان صورته تتبعت لـ Seedance والأوترو بتاعه يتحط في الآخر لوحدهم"
-    : c.has_outro ? "✓ صورته للتوليد والأوترو بتاعه في الآخر" : "⚠️ الشخصية دي مالهاش أوترو، ضيفه من صفحة الشخصيات";
+    ? "اربطه لكي صورته تُرسل لـ Seedance والأوترو الخاص به يوضع في الآخر تلقائيًا"
+    : c.has_outro ? "✓ صورته للتوليد والأوترو الخاص به في الآخر" : "⚠️ هذه الشخصية ليس لها أوترو، أضفه من صفحة الشخصيات";
 }
 
 $("coachLinkSelect").addEventListener("change", async () => {
@@ -261,7 +261,7 @@ $("coachLinkSelect").addEventListener("change", async () => {
     if (i >= 0) state.videos[i] = saved;
     renderLibrary();
     renderCoachLink();
-    toast(saved.coach ? `✅ الفيديو اتربط بـ ${saved.coach.name}` : "اتفك الربط");
+    toast(saved.coach ? `✅ الفيديو رُبط بـ ${saved.coach.name}` : "فُكّ الربط");
   } catch (err) {
     toast(err.message, true);
   }
@@ -272,7 +272,7 @@ async function loadVoiceLink() {
   const v = state.current;
   if (!v) return;
   const voices = await api("/api/audio?kind=voice");
-  $("voiceSelect").innerHTML = `<option value="">— مفيش —</option>` +
+  $("voiceSelect").innerHTML = `<option value="">— لا يوجد —</option>` +
     voices.map((a) => `<option value="${a.id}">${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
   $("voiceSelect").value = v.voice?.id || "";
   renderVoiceInfo();
@@ -282,7 +282,7 @@ function renderVoiceInfo() {
   const v = state.current;
   const info = $("voiceInfo");
   if (!v?.voice) {
-    info.textContent = "اربطه عشان المونتاج يلاقيه جاهز";
+    info.textContent = "اربطه لكي المونتاج يلاقيه جاهز";
     return;
   }
   const diff = Math.abs(v.voice.duration - v.duration);
@@ -303,7 +303,7 @@ async function linkVoice(voiceId) {
     if (i >= 0) state.videos[i] = saved;
     renderLibrary();
     renderVoiceInfo();
-    toast(voiceId ? "✅ التسجيل اتربط بالفيديو" : "اتفك الربط");
+    toast(voiceId ? "✅ التسجيل رُبط بالفيديو" : "فُكّ الربط");
   } catch (err) {
     toast(err.message, true);
   }
@@ -318,7 +318,7 @@ $("voiceUpload").addEventListener("change", async (e) => {
   form.append("kind", "voice");
   form.append("file", file);
   try {
-    toast(`⏳ بيرفع ${file.name}...`);
+    toast(`⏳ جارٍ الرفع ${file.name}...`);
     const a = await api("/api/audio", { method: "POST", body: form });
     await linkVoice(a.id);
     await loadVoiceLink();
@@ -348,16 +348,16 @@ function renderEditor() {
         ? `<span class="status">مستبعدة</span>`
         : s.too_long
           ? `<span class="status long">أطول من ${state.maxClip} ث</span>`
-          : `<span class="status ok">تمام</span>`;
+          : `<span class="status ok">حسنًا</span>`;
       const removeCut = s.index > 0
-        ? `<button class="btn sm" data-act="merge" data-i="${s.index}" title="امسح نقطة القطع اللي في بداية القطعة دي">دمج مع اللي قبلها</button>`
+        ? `<button class="btn sm" data-act="merge" data-i="${s.index}" title="احذف نقطة القطع الذي في بداية هذه القطعة">دمج مع ما قبلها</button>`
         : "";
       return `<tr class="${cls}">
         <td>${s.index + 1}</td><td>${fmt(s.start)}</td><td>${fmt(s.end)}</td><td>${s.duration.toFixed(1)} ث</td>
         <td>${status}</td>
         <td class="actions">
           <button class="btn sm" data-act="play" data-i="${s.index}">▶︎</button>
-          <button class="btn sm" data-act="skip" data-i="${s.index}">${s.skipped ? "رجّعها" : "استبعد"}</button>
+          <button class="btn sm" data-act="skip" data-i="${s.index}">${s.skipped ? "أعدها" : "استبعد"}</button>
           ${removeCut}
         </td>
       </tr>`;
@@ -370,11 +370,11 @@ function renderEditor() {
   const alert = $("tooLongAlert");
   alert.hidden = tooLong.length === 0;
   if (tooLong.length) {
-    alert.textContent = `⚠️ فيه ${tooLong.length} قطعة أطول من ${state.maxClip} ثانية (رقم ${tooLong.map((s) => s.index + 1).join("، ")}). زوّد نقط قطع فيها أو استبعدها قبل ما تقطّع.`;
+    alert.textContent = `⚠️ فيه ${tooLong.length} قطعة أطول من ${state.maxClip} ثانية (رقم ${tooLong.map((s) => s.index + 1).join("، ")}). زوّد نقاط قطع فيها أو استبعدها قبل ما تقطّع.`;
   }
   $("splitBtn").disabled = $("splitSendBtn").disabled = tooLong.length > 0 || active.length === 0;
   $("splitInfo").textContent = active.length
-    ? `هيطلع ${active.length} قطعة`
+    ? `سيظهر ${active.length} قطعة`
     : "كل القطع مستبعدة";
   $("undoCut").disabled = state.history.length === 0;
   updatePlayhead();
@@ -472,7 +472,7 @@ function renderCutTimeline() {
       </div>`;
     })
     .join("") + v.cuts
-    .map((c, i) => `<div class="ct-cut" data-c="${i}" style="left:${c * ct.pps}px" title="${fmtFrames(c)} · اسحب تحرّكه · دبل كليك يمسحه"></div>`)
+    .map((c, i) => `<div class="ct-cut" data-c="${i}" style="left:${c * ct.pps}px" title="${fmtFrames(c)} · اسحب تحرّكه · نقرتان يمسحه"></div>`)
     .join("");
   $("ctZoom").value = Math.round((Math.log(ct.pps / CT_MIN) / Math.log(CT_MAX / CT_MIN)) * 1000);
   updatePlayhead();
@@ -557,7 +557,7 @@ $("timeline").addEventListener("pointerdown", (e) => {
     // دبل كليك على خط القطع = امسحه
     const c = v.cuts[Number(cutEl.dataset.c)];
     commit(v.cuts.filter((x) => x !== c), v.skipped.filter((s) => Math.abs(s - c) > 0.006));
-    toast("اتمسحت نقطة القطع");
+    toast("حُذفت نقطة القطع");
     e.preventDefault();
     return;
   }
@@ -636,7 +636,7 @@ async function save() {
     renderLibrary();
     renderEditor();
   } catch (err) {
-    toast(`مش قادر أحفظ: ${err.message}`, true);
+    toast(`لا قادر أحفظ: ${err.message}`, true);
   }
 }
 
@@ -645,7 +645,7 @@ function cutHere() {
   if (!v) return;
   const t = Math.round(snapFrame(player.currentTime) * 1000) / 1000;
   if (t < state.minGap || t > v.duration - state.minGap) {
-    toast("مينفعش تقطع في أول أو آخر الفيديو بالظبط");
+    toast("لا يصلح تقطع في أول أو آخر الفيديو بالضبط");
     return;
   }
   if (v.cuts.some((c) => Math.abs(c - t) < state.minGap)) {
@@ -746,7 +746,7 @@ document.addEventListener("keydown", (e) => {
 
 $("deleteVideo").onclick = async () => {
   const v = state.current;
-  if (!(await uiConfirm(`حذف "${v.name}" وكل القطع اللي اتعملت منه؟`))) return;
+  if (!(await uiConfirm(`حذف "${v.name}" وكل القطع الذي أُنشئت منه؟`))) return;
   await api(`/api/videos/${v.id}`, { method: "DELETE" });
   state.current = null;
   player.removeAttribute("src");
@@ -762,9 +762,9 @@ async function splitCurrent(thenSend) {
   const label = btn.textContent;
   clearTimeout(saveTimer);
   await save();
-  if (v.clips_count && !(await uiConfirm("الفيديو ده اتقطّع قبل كده. التقطيع الجديد هيمسح القطع القديمة. تكمّل؟"))) return;
+  if (v.clips_count && !(await uiConfirm("هذا الفيديو قُطّع من قبل. التقطيع الجديد سيحذف القطع القديمة. تُكمل؟"))) return;
   $("splitBtn").disabled = $("splitSendBtn").disabled = true;
-  btn.textContent = "⏳ بيقطّع...";
+  btn.textContent = "⏳ جارٍ التقطيع...";
   try {
     const res = await api(`/api/videos/${v.id}/split`, { method: "POST" });
     await loadVideos();
@@ -774,7 +774,7 @@ async function splitCurrent(thenSend) {
       openGenerateWith(v.id, v.coach?.id || null);
       return;
     }
-    toast(`✅ اتعمل ${res.clips_count} قطعة. دوس «✨ ابعت القطع لـ Seedance» تحت`);
+    toast(`✅ أُنشئ ${res.clips_count} قطعة. اضغط «✨ أرسل القطع لـ Seedance» أسفل`);
     await loadClips();
     $("clipsSection").scrollIntoView({ behavior: "smooth", block: "start" });
     $("toSeedance").classList.add("pulse");
@@ -810,14 +810,14 @@ async function loadClips() {
 
 $("clipsGrid").addEventListener("click", async (e) => {
   const id = e.target.closest("[data-del]")?.dataset.del;
-  if (!id || !(await uiConfirm("حذف القطعة دي؟"))) return;
+  if (!id || !(await uiConfirm("حذف هذه القطعة؟"))) return;
   await api(`/api/clips/${id}`, { method: "DELETE" });
   await loadVideos();
   await loadClips();
 });
 
 // ---------- التنقل بين الخطوات ----------
-const viewHooks = {}; // كل صفحة بتسجّل هنا اللي يحصل لما تفتح
+const viewHooks = {}; // كل صفحة تسجّل هنا الذي يحدث عندما تفتح
 // "home" = الرئيسية (المربعات). أي خطوة تانية بتفتح في الشاشة الكبيرة (shell.js)
 // خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات الشخصيات
 const VIEW_OF = { "6s": "6", "6a": "6", "6f": "6", cal: "7" };
@@ -848,7 +848,7 @@ const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
 
 // 🎬 موديلات الفيديو (كل اللي عند Atlas): الاسم، وتكلفة الفيديو جنبه
 let VMODELS = [];
-const vmLoad = async () => { try { VMODELS = await api("/api/video-models"); } catch { /* القايمة القديمة تفضل */ } return VMODELS; };
+const vmLoad = async () => { try { VMODELS = await api("/api/video-models"); } catch { /* القائمة القديمة تظل */ } return VMODELS; };
 function vmCost(m, secs, res) {
   const c = m.per_sec * secs * (res === "720p" ? 2 : 1);
   return c < 0.1 ? c.toFixed(3) : c.toFixed(2);
@@ -863,9 +863,9 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-humanize]");
   if (!b) return;
   const ta = document.querySelector(b.dataset.humanize);
-  if (!ta || !ta.value.trim()) return toast("اكتب الكلام الأول", true);
+  if (!ta || !ta.value.trim()) return toast("اكتب النص أولًا", true);
   const label = b.innerHTML;
-  b.disabled = true; b.textContent = "⏳ بينضّف…";
+  b.disabled = true; b.textContent = "⏳ ينضّف…";
   try {
     const r = await api("/api/humanize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
     const old = ta.value;

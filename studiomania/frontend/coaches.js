@@ -20,8 +20,8 @@ function renderCoaches() {
           ${c.instagram || c.tiktok ? `<div class="handles" dir="ltr">${c.instagram ? `<a href="https://instagram.com/${c.instagram}" target="_blank">📸 @${escapeHtml(c.instagram)}</a>` : ""}${c.tiktok ? `<a href="https://tiktok.com/@${c.tiktok}" target="_blank">🎵 @${escapeHtml(c.tiktok)}</a>` : ""}</div>` : ""}
           <div class="outro">${
             c.outro_url
-              ? `🎬 أوترو ${fmt(c.outro_duration)} <button class="btn sm" data-act="outro" data-id="${c.id}">▶︎ شوف</button>`
-              : "مفيش أوترو"
+              ? `🎬 أوترو ${fmt(c.outro_duration)} <button class="btn sm" data-act="outro" data-id="${c.id}">▶︎ انظر</button>`
+              : "لا يوجد أوترو"
           }</div>
           <div class="acts">
             <button class="btn sm" data-act="edit" data-id="${c.id}">تعديل</button>
@@ -74,7 +74,7 @@ $("coachForm").addEventListener("submit", async (e) => {
   form.append("name", $("coachName").value.trim());
   const image = $("coachImage").files[0];
   const outro = $("coachOutro").files[0];
-  if (!editing && !image) return toast("اختار صورة الشخصية", true);
+  if (!editing && !image) return toast("اختر صورة الشخصية", true);
   if (image) form.append("image", image);
   if (outro) form.append("outro", outro);
   if (editing && $("removeOutro").checked) form.append("remove_outro", "true");
@@ -83,13 +83,13 @@ $("coachForm").addEventListener("submit", async (e) => {
 
   const btn = $("coachSubmit");
   btn.disabled = true;
-  btn.textContent = "⏳ بيحفظ...";
+  btn.textContent = "⏳ جارٍ الحفظ...";
   try {
     await api(editing ? `/api/coaches/${editing.id}` : "/api/coaches", {
       method: editing ? "PATCH" : "POST",
       body: form,
     });
-    toast(editing ? "✅ اتعدّل" : "✅ الشخصية اتضافت");
+    toast(editing ? "✅ عُدّل" : "✅ الشخصية أُضيفت");
     resetCoachForm();
     await loadCoaches();
   } catch (err) {
@@ -149,7 +149,7 @@ function findByKey(list, key, getKey) {
   if (exact.length) return exact[0];
   if (key.length < 3) return null;
   const partial = list.filter((x) => { const k = getKey(x); return k.length >= 3 && (k.includes(key) || key.includes(k)); });
-  return partial.length === 1 ? partial[0] : null; // لو فيه أكتر من احتمال، نسيبه للمستخدم
+  return partial.length === 1 ? partial[0] : null; // إذا فيه أكثر من احتمال، نسيبه للمستخدم
 }
 
 function buildBulkRows() {
@@ -187,34 +187,34 @@ function renderBulk() {
   renderUnmatched(unmatched);
   const noOutro = rows.filter((r) => r.outro === null).length;
   const warn = [];
-  if (noOutro && outros.length) warn.push(`${noOutro} شخصية من غير أوترو.`);
-  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو اتجاهل ومش هيترفع.`);
+  if (noOutro && outros.length) warn.push(`${noOutro} شخصية بدون أوترو.`);
+  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو اتجاهل ولن يُرفع.`);
   $("bulkWarn").hidden = !warn.length;
   $("bulkWarn").innerHTML = warn.map(escapeHtml).join("<br>");
   const names = new Map();
   rows.forEach((r) => names.set(r.name.trim(), (names.get(r.name.trim()) || 0) + 1));
   $("bulkRows").innerHTML = rows
     .map((r, ri) => {
-      const opts = `<option value="">— من غير أوترو —</option>` + outros
+      const opts = `<option value="">— بدون أوترو —</option>` + outros
         .map((f, i) => `<option value="${i}" ${r.outro === i ? "selected" : ""}>${assigned.has(i) && r.outro !== i ? "✓ " : ""}${escapeHtml(f.name)}</option>`)
         .join("");
       const action = r.existingId
         ? `<span class="pill scheduled">تحديث شخصية موجودة${r.image ? " (صورة" + (r.outro !== null ? " + أوترو)" : ")") : r.outro !== null ? " (أوترو)" : ""}</span>`
         : `<span class="pill published">شخصية جديدة</span>`;
-      const dup = names.get(r.name.trim()) > 1 ? `<div class="err">الاسم ده متكرر</div>` : "";
+      const dup = names.get(r.name.trim()) > 1 ? `<div class="err">هذا الاسم متكرر</div>` : "";
       return `<tr data-i="${ri}">
         <td>${r.preview ? `<img src="${r.preview}" alt="">` : ""}</td>
         <td><input type="text" data-f="name" value="${escapeHtml(r.name)}">${dup}</td>
         <td><select data-f="outro">${opts}</select></td>
         <td>${action}</td>
-        <td><button class="btn sm danger" data-f="remove" title="شيله">✕</button></td>
+        <td><button class="btn sm danger" data-f="remove" title="أزله">✕</button></td>
       </tr>`;
     })
     .join("");
   const bad = rows.some((r) => !r.name.trim() || names.get(r.name.trim()) > 1 || (!r.existingId && !r.image));
   $("bulkUpload").disabled = !rows.length || bad || bulk.busy || unmatched.length > 0;
   $("bulkUpload").textContent = unmatched.length
-    ? `🔗 اربط ${unmatched.length} أوترو الأول`
+    ? `🔗 اربط ${unmatched.length} أوترو أولًا`
     : `⬆ ارفع الكل (${rows.length})`;
 }
 
@@ -245,14 +245,14 @@ function renderUnmatched(unmatched) {
     .map((i) => `<div class="um-card" data-o="${i}">
       <div class="um-video"><video src="${outroUrl(i)}" controls preload="none" playsinline></video>
         <div class="um-name" title="${escapeHtml(bulk.outros[i].name)}">🎬 ${escapeHtml(bulk.outros[i].name)}</div>
-        <button class="btn sm" data-ignore="${i}">تجاهل الأوترو ده</button></div>
+        <button class="btn sm" data-ignore="${i}">تجاهل هذا الأوترو</button></div>
       <div class="um-coaches">${choices
         .map((c) => `<button class="um-coach" data-o="${i}" data-c="${c.key}" title="${escapeHtml(c.name)}">
           ${c.img ? `<img src="${c.img}" alt="">` : `<span class="um-noimg">؟</span>`}
           <span>${escapeHtml(c.name)}</span>
-          ${c.hasOutro ? `<small>عنده أوترو</small>` : ""}${c.existing ? `<small>موجود قبل كده</small>` : ""}
+          ${c.hasOutro ? `<small>لديه أوترو</small>` : ""}${c.existing ? `<small>موجود من قبل</small>` : ""}
         </button>`)
-        .join("") || `<p class="muted">مفيش شخصيات. ارفع صورها الأول.</p>`}</div>
+        .join("") || `<p class="muted">لا يوجد شخصيات. ارفع صورها أولًا.</p>`}</div>
     </div>`)
     .join("");
 }
@@ -275,10 +275,10 @@ $("unmatchedList").addEventListener("click", async (e) => {
     row = { key: matchKey(c.name), image: null, name: c.name, existingId: c.id, outro: null, preview: c.image_url };
     bulk.rows.push(row);
   }
-  if (row.outro !== null && row.outro !== o && !(await uiConfirm(`${row.name} عنده أوترو متربط بالفعل (${bulk.outros[row.outro].name}). تبدّله بالأوترو ده؟`))) return;
+  if (row.outro !== null && row.outro !== o && !(await uiConfirm(`${row.name} لديه أوترو متربط بالفعل (${bulk.outros[row.outro].name}). تبدّله هذا بالأوترو؟`))) return;
   bulk.rows.forEach((r) => { if (r.outro === o) r.outro = null; });
   row.outro = o;
-  toast(`✅ ${bulk.outros[o].name} اتربط بـ ${row.name}`);
+  toast(`✅ ${bulk.outros[o].name} رُبط بـ ${row.name}`);
   renderBulk();
 });
 
@@ -358,14 +358,14 @@ $("bulkUpload").onclick = async () => {
   bulk.busy = false;
   await loadCoaches();
   if (failed.length) {
-    $("bulkProgress").textContent = `✅ ${ok} تمام · ✕ ${failed.length} فشلوا`;
+    $("bulkProgress").textContent = `✅ ${ok} حسنًا · ✕ ${failed.length} فشلوا`;
     $("bulkWarn").hidden = false;
     $("bulkWarn").innerHTML = failed.map(escapeHtml).join("<br>");
     bulk.rows = bulk.rows.filter((r) => failed.some((f) => f.startsWith(r.name.trim() + ":")));
     renderBulk();
   } else {
     $("bulkDialog").close();
-    toast(`✅ اترفع ${ok} شخصية`);
+    toast(`✅ رُفع ${ok} شخصية`);
   }
 };
 
@@ -390,9 +390,9 @@ $("handlesFile").addEventListener("change", async (e) => {
 });
 
 function renderHandles() {
-  const opts = (sel) => `<option value="">— مش في البرنامج —</option>` + handlesState.coaches
+  const opts = (sel) => `<option value="">— غير في البرنامج —</option>` + handlesState.coaches
     .map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
-  const bad = (v) => `<span class="warn-text" title="اسم الحساب مش مظبوط، ومش هيتحفظ">⚠️ ${escapeHtml(v)}</span>`;
+  const bad = (v) => `<span class="warn-text" title="اسم الحساب غير مظبوط، ولن يُحفظ">⚠️ ${escapeHtml(v)}</span>`;
   $("handlesRows").innerHTML = handlesState.rows
     .map((r, i) => `<tr data-i="${i}">
       <td>${escapeHtml(r.name)}</td>
@@ -418,7 +418,7 @@ $("handlesApply").onclick = async () => {
       body: JSON.stringify({ rows: handlesState.rows }),
     });
     $("handlesDialog").close();
-    toast(`✅ اتحفظ · ${res.coaches_updated} شخصية اتحدّثت`);
+    toast(`✅ حُفظ · ${res.coaches_updated} شخصية حُدّثت`);
     await loadCoaches();
   } catch (err) {
     toast(err.message, true);

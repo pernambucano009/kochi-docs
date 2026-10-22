@@ -5,12 +5,12 @@
 
 const tsx = { data: null, pick: null, timer: null };
 const TS_TRANS = { cut: "قطع مباشر", fade: "تلاشي", fadeblack: "سواد", fadewhite: "فلاش أبيض", dissolve: "ذوبان", wipeleft: "مسحة", slideleft: "زحلقة",
-  smoothleft: "زحلقة ناعمة", circleopen: "دايرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "عصرة", diagtl: "مايلة", slideup: "لفوق" };
+  smoothleft: "زحلقة ناعمة", circleopen: "دائرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "عصرة", diagtl: "مايلة", slideup: "لفوق" };
 const tse = (s) => escapeHtml(String(s ?? ""));
 
 viewHooks["14"] = tsInit;
 
-function tsHostTpl() {   // لوحة تفاصيل الفيديو (من templates.js) بتتنقل جوه القسم ده
+function tsHostTpl() {   // لوحة تفاصيل الفيديو (من templates.js) تُنقل داخل هذا القسم
   const box = $("labTpl");
   if (box.parentElement !== $("tsHost")) $("tsHost").appendChild(box);
   tplx.host = "studio";
@@ -42,40 +42,40 @@ function tsHome() {
     return `<article class="ts-card ${tsx.pick === t.id ? "on" : ""}" data-tspick="${t.id}">
       <div class="ts-media">${t.sample_url ? `<video src="${t.sample_url}" muted loop playsinline autoplay preload="metadata"></video>`
         : t.cover_url ? `<img src="${t.cover_url}" alt="">` : `<span class="ts-ph">${tse(t.icon || "🎬")}</span>`}
-        ${busy ? `<span class="ts-badge"><span class="spin-inline"></span> ${tse(t.sample_step || "بيعمل العينة")}</span>` : ""}</div>
+        ${busy ? `<span class="ts-badge"><span class="spin-inline"></span> ${tse(t.sample_step || "يعمل العينة")}</span>` : ""}</div>
       <div class="ts-info"><b data-no-i18n>${tse(t.icon || "")} ${tse(t.name)}</b>
         ${t.uses ? `<small class="muted">مناسب لـ: ${tse(t.uses)}</small>` : ""}
-        <small class="muted">${t.mode === "still" ? "📦 صور ثابتة · صورة المنتج هي المرجع" : t.mode === "ad" ? "🎯 شخصية ثابتة · صورة المنتج · سكريبت ← فيديو بالمراجع" : "🎬 مشاهد ١٠ ثواني · مفتاح ستايل · صوت المؤثرات"}</small>
+        <small class="muted">${t.mode === "still" ? "📦 صور ثابتة · صورة المنتج هي المرجع" : t.mode === "ad" ? "🎯 شخصية ثابتة · صورة المنتج · نص ← فيديو بالمراجع" : "🎬 مشاهد ١٠ ثواني · مفتاح أسلوب · صوت المؤثرات"}</small>
         ${t.sample_error ? `<small class="err">⚠️ ${tse(t.sample_error)}</small>` : ""}
         <div class="row wrap"><button class="btn sm primary" data-tsuse="${t.id}">✨ استخدم القالب</button>
-          ${t.mode === "ad" || t.mode === "still" ? "" : !t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ اعمل عينة (~$${t.sample_cost})</button>`
+          ${t.mode === "ad" || t.mode === "still" ? "" : !t.sample_url || t.sample_status === "failed" || t.sample_old ? `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""}>🎞️ أنشئ عينة (~$${t.sample_cost})</button>`
             : `<button class="btn sm" data-tssample="${t.id}" ${busy ? "disabled" : ""} title="عينة جديدة">↻</button>`}</div></div></article>`;
   };
   const t = D.templates.find((x) => x.id === tsx.pick);
   const opt = (g) => Object.entries(D.dialects).filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}">${tse(v.label)}</option>`).join("");
   $("tsGallery").innerHTML = `
-    <section class="panel"><div class="car-head"><h2>القوالب</h2><small class="muted">اختار ستايل، اكتب فكرتك، والباقي علينا: سكريبت ← فويس أوفر ← ستوري بورد ← فيديو متصل ← مونتاج</small></div>
+    <section class="panel"><div class="car-head"><h2>القوالب</h2><small class="muted">اختر أسلوب، اكتب فكرتك، والباقي علينا: نص ← تعليق صوتي ← ستوري بورد ← فيديو متصل ← مونتاج</small></div>
       <div class="ts-grid">${D.templates.map(card).join("")}</div></section>
     ${t ? `<section class="panel ts-new" id="tsNew"><h3>${tse(t.icon || "")} فيديو جديد على «${tse(t.name)}»</h3>
-      <label>الفيديو عن إيه؟ <textarea id="tsBrief" rows="2" placeholder="${tse(t.sample_brief || "مثلًا: أهم ٣ مميزات في التطبيق والختام: جرّبه النهارده")}"></textarea></label>
-      <div class="ts-mode"><label class="check"><input type="radio" name="tsMode" value="ai" checked> ✍️ الـ AI يكتب السكريبت على قد القالب</label>
+      <label>الفيديو عن ماذا؟ <textarea id="tsBrief" rows="2" placeholder="${tse(t.sample_brief || "مثلًا: أهم ٣ مميزات في التطبيق والختام: جرّبه اليوم")}"></textarea></label>
+      <div class="ts-mode"><label class="check"><input type="radio" name="tsMode" value="ai" checked> ✍️ الـ AI يكتب النص على قدر القالب</label>
         <label class="check"><input type="radio" name="tsMode" value="own"> 📝 هكتبه بنفسي</label></div>
-      <textarea id="tsScript" rows="4" placeholder="اكتب السكريبت هنا، والبرنامج هيوزّعه على لقطات القالب من غير ما يغيّر كلامك" hidden></textarea>
+      <textarea id="tsScript" rows="4" placeholder="اكتب النص هنا، والبرنامج سيوزّعه على لقطات القالب بدون ما يغيّر كلامك" hidden></textarea>
       <div class="row wrap">
         <label>🗣️ اللغة / اللهجة <select id="tsLang"><optgroup label="لهجات عربية">${opt("ar")}</optgroup><optgroup label="لغات أجنبية">${opt("foreign")}</optgroup></select></label>
         <label>🎙️ الصوت <select id="tsVoice"></select></label>
-        <label class="check"><input type="checkbox" id="tsVoiceOn" checked> فويس أوفر (بيحدد مدة كل لقطة)</label>
+        <label class="check"><input type="checkbox" id="tsVoiceOn" checked> تعليق صوتي (يحدد مدة كل لقطة)</label>
       </div>
-      ${t.mode === "still" ? `<small class="muted">📦 صور بس (من غير فيديو). ارفع صورة المنتج جوه، وكل صورة بتوريك تمنها قبل ما تترسم.</small>` : t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية بتتكلم بصوتها جوه الفيديو." : "🎬 الطول وعدد اللقطات بتختارهم جوه."} الخطوات: الشخصية ← صورة المنتج ← السكريبت ← التوليد.</small>` : `
+      ${t.mode === "still" ? `<small class="muted">📦 صور فقط (بدون فيديو). ارفع صورة المنتج داخل، وكل صورة توريك تمنها قبل ما تُرسم.</small>` : t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية تتكلم بصوتها داخل الفيديو." : "🎬 الطول وعدد اللقطات تختارهم داخل."} الخطوات: الشخصية ← صورة المنتج ← النص ← التوليد.</small>` : `
       <div class="row wrap"><label>⏱️ الطول <select id="tsLen">${[30, 60, 90, 120].map((x) => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x} ثانية (${x / 10} مشاهد)</option>`).join("")}</select></label>
-        <small class="muted">كل مشهد ١٠ ثواني وليه جملة فويس أوفر. الأرقام اللي عايزها في الفيديو اكتبها في الفكرة (البرنامج مش بيخترع أرقام).</small></div>`}
+        <small class="muted">كل مشهد ١٠ ثواني وليه جملة تعليق صوتي. الأرقام الذي تريدها في الفيديو اكتبها في الفكرة (البرنامج لا يخترع أرقام).</small></div>`}
       <div class="row wrap">
         <label>المقاس <select id="tsRatio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}" ${k === (t.ratio || "9:16") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <label>موديل الصور <select id="tsImg"><option value="sunburst">GPT Image 2.5 (زي ChatGPT)</option><option value="nano2">Nano Banana 2 (أرخص)</option><option value="nanopro">Nano Banana Pro</option></select></label>
-        <label>الكلام على الشاشة <select id="tsText"><option value="blank">مساحات فاضية (الكلام في المونتاج)</option><option value="en">إنجليزي جوه الصور</option></select></label>
+        <label>نموذج الصور <select id="tsImg"><option value="sunburst">GPT Image 2.5 (مثل ChatGPT)</option><option value="nano2">Nano Banana 2 (أرخص)</option><option value="nanopro">Nano Banana Pro</option></select></label>
+        <label>النص على الشاشة <select id="tsText"><option value="blank">مساحات فارغة (النص في المونتاج)</option><option value="en">إنجليزي داخل الصور</option></select></label>
       </div>
-      ${!D.fasih ? `<small class="err">اللهجات العربية مش متاحة دلوقتي، اقفل الفويس أوفر أو اختار لغة تانية.</small>` : ""}
-      <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Seedance 2.0 Mini (الأرخص) وتقدر تختار أي موديل تاني جوه، وكل خطوة بتوريك تمنها قبل ما تبدأ</small></div>
+      ${!D.fasih ? `<small class="err">اللهجات العربية غير متاحة الآن، أغلق التعليق الصوتي أو اختر لغة أخرى.</small>` : ""}
+      <div class="row wrap"><button class="btn primary" id="tsGo">🚀 ابدأ</button><small class="muted">الحركة بـ Seedance 2.0 Mini (الأرخص) ويمكنك تختار أي نموذج آخر داخل، وكل خطوة توريك تمنها قبل ما تبدأ</small></div>
     </section>` : ""}
     ${D.videos.length ? `<section class="panel"><h3>فيديوهاتك من القوالب</h3><div class="fm-list">${D.videos.map((v) => `<article class="fm-card" data-tsopen="${v.id}">
       ${v.thumb ? `<img src="${v.thumb}" alt="">` : `<span class="ph">🎬</span>`}<b data-no-i18n>${tse(v.name)}</b>
@@ -113,7 +113,7 @@ function tsPoll() {
         if (t && t.sample_status !== "working") toast(t.sample_status === "done" ? `🎞️ عينة «${t.name}» جاهزة` : `⚠️ عينة «${t.name}»: ${t.sample_error || "فشلت"}`, t.sample_status !== "done");
       }
       if (!tplx.cur && !$("tsGallery").hidden && !$("tsGallery").contains(document.activeElement)) tsHome();
-    } catch { /* السيرفر بيعيد التشغيل */ }
+    } catch { /* الخادم يعيد التشغيل */ }
     tsPoll();
   }, 4000);
 }
@@ -123,8 +123,8 @@ $("tsGallery").addEventListener("click", async (e) => {
   if (!b) return;
   if (b.dataset.tssample) {
     const t = tsx.data.templates.find((x) => x.id === b.dataset.tssample);
-    if (!(await uiConfirm(`تعمل عينة لـ «${t.name}»؟ حوالي $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p من غير صوت)`))) return;
-    try { await api(`/api/templates/${t.id}/sample`, { method: "POST" }); tsx.data = await api("/api/tpl-studio"); tsHome(); tsPoll(); toast("🎞️ بيعمل العينة… دقايق"); }
+    if (!(await uiConfirm(`تعمل عينة لـ «${t.name}»؟ نحو $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p بدون صوت)`))) return;
+    try { await api(`/api/templates/${t.id}/sample`, { method: "POST" }); tsx.data = await api("/api/tpl-studio"); tsHome(); tsPoll(); toast("🎞️ يعمل العينة… دقايق"); }
     catch (err) { toast(err.message, true); }
     return;
   }
@@ -134,8 +134,8 @@ $("tsGallery").addEventListener("click", async (e) => {
     const mode = document.querySelector('input[name="tsMode"]:checked').value;
     const brief = $("tsBrief").value.trim(), script = $("tsScript").value.trim();
     const still = tsx.data.templates.find((x) => x.id === tsx.pick)?.mode === "still";
-    if (mode === "ai" && !brief && !still) { toast("اكتب الفيديو عن إيه الأول", true); return; }
-    if (mode === "own" && !script) { toast("اكتب السكريبت الأول", true); return; }
+    if (mode === "ai" && !brief && !still) { toast("اكتب الفيديو عن ماذا أولًا", true); return; }
+    if (mode === "own" && !script) { toast("اكتب النص أولًا", true); return; }
     return busyButton(b, "⏳", async () => {
       tplx.user = {};
       const v = await api("/api/tvideos", { method: "POST", ...jsonBody({ template: tsx.pick, section: "templates", brief: brief || script.slice(0, 300),
@@ -146,7 +146,7 @@ $("tsGallery").addEventListener("click", async (e) => {
       tsx.pick = null;
       tsx.data = await api("/api/tpl-studio");
       tsOpenVideo(v.id);
-      if (tplx.cur?.mode !== "ad") toast("✍️ بيكتب السكريبت ويسجّل الفويس أوفر…");
+      if (tplx.cur?.mode !== "ad") toast("✍️ يكتب النص ويسجّل التعليق الصوتي…");
     });
   }
   if (b.dataset.tspick && !e.target.closest("button")) { tsx.pick = b.dataset.tspick; tsHome(); }
@@ -162,17 +162,17 @@ function tvVoiceBlock(v) {
   const langs = D ? Object.entries(D.dialects).map(([k, d]) => `<option value="${k}" ${k === v.lang ? "selected" : ""}>${tse(d.label)}</option>`).join("") : "";
   const voices = D && D.dialects[v.lang] ? D.dialects[v.lang].voices.map((x) => `<option value="${x}" ${x === v.voice ? "selected" : ""}>${tse(D.voices[x])}</option>`).join("") : "";
   return `<details class="panel tv-step" data-dk="s0" ${(tplx.user?.s0 ?? !v.panel_files.some((p) => p.cell)) ? "open" : ""}>
-    <summary>🎙️ السكريبت والفويس أوفر <small class="muted">الصوت بيحدد مدة كل لقطة</small></summary>
+    <summary>🎙️ النص والفويس أوفر <small class="muted">الصوت يحدد مدة كل لقطة</small></summary>
     ${v.vo_url ? `<audio src="${v.vo_url}" controls preload="metadata" class="ts-vo"></audio>` : ""}
     <div class="row wrap"><label>🗣️ اللغة <select data-vo="lang" ${busy ? "disabled" : ""}>${langs}</select></label>
       <label>🎙️ الصوت <select data-vo="voice" ${busy ? "disabled" : ""}>${voices}</select></label>
-      <label class="check"><input type="checkbox" data-vo="on" ${v.voice_on !== false ? "checked" : ""} ${busy ? "disabled" : ""}> فويس أوفر</label></div>
-    <div class="ts-lines">${beats.map((b, i) => `<div class="ts-line"><span class="muted">${i + 1} · ${(b.t1 - b.t0).toFixed(1)}ث${vo.durs?.[i] ? ` (الكلام ${vo.durs[i]}ث)` : ""}</span>
+      <label class="check"><input type="checkbox" data-vo="on" ${v.voice_on !== false ? "checked" : ""} ${busy ? "disabled" : ""}> تعليق صوتي</label></div>
+    <div class="ts-lines">${beats.map((b, i) => `<div class="ts-line"><span class="muted">${i + 1} · ${(b.t1 - b.t0).toFixed(1)}ث${vo.durs?.[i] ? ` (النص ${vo.durs[i]}ث)` : ""}</span>
       <textarea data-voline="${i}" rows="2" dir="auto" ${busy ? "disabled" : ""}>${tse(lines[i] || "")}</textarea>
       ${v.vo_line_urls?.[i] ? `<audio src="${v.vo_line_urls[i]}" controls preload="none"></audio>` : ""}</div>`).join("")}</div>
-    ${lines.some((x) => x) && typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "script", what: v.title || v.name || "سكريبت", ref: `tv:${v.id}:${lines.join("|").length}`, text: lines.filter(Boolean).join("\n") }) : ""}
-    <button class="btn sm primary" data-vosave ${busy ? "disabled" : ""}>🎙️ سجّل الفويس أوفر تاني (والمدد تتظبط)</button>
-    <small class="muted">لو المدد اتغيرت، اللقطات اللي اتولدت قبل كده هتتعمل من جديد.</small>
+    ${lines.some((x) => x) && typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "script", what: v.title || v.name || "نص", ref: `tv:${v.id}:${lines.join("|").length}`, text: lines.filter(Boolean).join("\n") }) : ""}
+    <button class="btn sm primary" data-vosave ${busy ? "disabled" : ""}>🎙️ سجّل التعليق الصوتي آخر (والمدد تُضبط)</button>
+    <small class="muted">إذا المدد تغيّرت، اللقطات التي وُلّدت من قبل ستُنشأ من جديد.</small>
   </details>`;
 }
 
@@ -197,22 +197,22 @@ $("labTpl").addEventListener("change", (e) => {
 // ---------- 🎬 قوالب المشاهد (Vox): مفتاح الستايل + مشهد مشهد
 function tvScenesBlock(v) {
   const cfg = v.scene_cfg || {}, busy = v.busy, sc = v.scenes || [], miss = v.scene_urls.filter((x) => !x).length;
-  return `<details class="panel tv-step" data-dk="k1" ${(tplx.user?.k1 ?? !v.stylekey_url) ? "open" : ""}><summary>🎨 مفتاح الستايل <small class="muted">صورة واحدة بتقفل شكل الفيديو كله وبتتبعت مع كل مشهد</small></summary>
+  return `<details class="panel tv-step" data-dk="k1" ${(tplx.user?.k1 ?? !v.stylekey_url) ? "open" : ""}><summary>🎨 مفتاح الأسلوب <small class="muted">صورة واحدة تقفل شكل الفيديو كله وتُرسل مع كل مشهد</small></summary>
       <div class="sc-chips">${(cfg.variants || []).map(([k, l]) => `<button class="sc-chip ${k === (v.style_variant || "classic") ? "on" : ""}" data-skvar="${k}" ${busy ? "disabled" : ""}>${tse(l)}</button>`).join("")}</div>
       <div class="ts-key">${v.stylekey_url ? `<img src="${v.stylekey_url}" alt="">` : ""}
-        <button class="btn sm primary" data-skgo ${busy || !sc.length ? "disabled" : ""}>${v.stylekey_url ? "↻ ارسمه تاني" : "🎨 ارسم مفتاح الستايل"} (~$0.10)</button></div>
+        <button class="btn sm primary" data-skgo ${busy || !sc.length ? "disabled" : ""}>${v.stylekey_url ? "↻ ارسمه مرة أخرى" : "🎨 ارسم مفتاح الأسلوب"} (~$0.10)</button></div>
     </details>
-    <details class="panel tv-step" data-dk="k2" ${(tplx.user?.k2 ?? !!v.stylekey_url) ? "open" : ""}><summary>🎬 المشاهد <small class="muted">${sc.length - miss}/${sc.length} اتولّد · كل مشهد ١٠ ثواني بصوت مؤثراته</small></summary>
-      ${v.through_line ? `<p class="hint">🧵 العنصر اللي بيتكرر في كل المشاهد: <span dir="ltr" data-no-i18n>${tse(v.through_line)}</span></p>` : ""}
-      <div class="row wrap"><button class="btn primary" data-scgo ${busy || !v.stylekey_url ? "disabled" : ""}>${miss ? `🎬 ولّد ${miss === sc.length ? "كل المشاهد" : `الناقص (${miss})`} (~$${(miss * v.scene_cost).toFixed(2)})` : "🎞️ جمّع الفيديو تاني (ببلاش)"}</button>
-        ${!v.stylekey_url ? `<small class="muted">ارسم مفتاح الستايل الأول</small>` : ""}</div>
+    <details class="panel tv-step" data-dk="k2" ${(tplx.user?.k2 ?? !!v.stylekey_url) ? "open" : ""}><summary>🎬 المشاهد <small class="muted">${sc.length - miss}/${sc.length} وُلّد · كل مشهد ١٠ ثواني بصوت مؤثراته</small></summary>
+      ${v.through_line ? `<p class="hint">🧵 العنصر الذي يتكرر في كل المشاهد: <span dir="ltr" data-no-i18n>${tse(v.through_line)}</span></p>` : ""}
+      <div class="row wrap"><button class="btn primary" data-scgo ${busy || !v.stylekey_url ? "disabled" : ""}>${miss ? `🎬 ولّد ${miss === sc.length ? "كل المشاهد" : `الناقص (${miss})`} (~$${(miss * v.scene_cost).toFixed(2)})` : "🎞️ جمّع الفيديو مرة أخرى (مجانًا)"}</button>
+        ${!v.stylekey_url ? `<small class="muted">ارسم مفتاح الأسلوب أولًا</small>` : ""}</div>
       <div class="ts-scenes">${sc.map((s, i) => `<article class="ts-scene" data-sci="${i}"><header><b>مشهد ${i + 1}</b> <small dir="auto">«${tse((v.vo?.lines || v.script_lines || [])[i] || "")}»</small></header>
-        <div class="ts-sbody">${v.scene_urls[i] ? `<video src="${v.scene_urls[i]}" controls playsinline preload="metadata"></video>` : `<div class="fm-ph">لسه</div>`}
+        <div class="ts-sbody">${v.scene_urls[i] ? `<video src="${v.scene_urls[i]}" controls playsinline preload="metadata"></video>` : `<div class="fm-ph">ما زال</div>`}
           <div class="ts-sf"><label>🖼️ المشهد <textarea rows="3" dir="ltr" data-scf="scene" data-no-i18n ${busy ? "disabled" : ""}>${tse(s.scene)}</textarea></label>
             <label>🎥 الحركة <textarea rows="2" dir="ltr" data-scf="motion" data-no-i18n ${busy ? "disabled" : ""}>${tse(s.motion)}</textarea></label>
             <label>🔊 المؤثرات <input dir="ltr" data-scf="audio" value="${tse(s.audio)}" data-no-i18n ${busy ? "disabled" : ""}></label>
             ${cfg.allow_label ? `<label>🏷️ الكلمة المطبوعة <input dir="ltr" data-scf="label" value="${tse(s.label)}" maxlength="24" ${busy ? "disabled" : ""}></label>` : ""}
-            <button class="btn sm" data-scone="${i}" ${busy || !v.stylekey_url ? "disabled" : ""}>${v.scene_urls[i] ? "↻ ولّده تاني" : "🎬 ولّده"} (~$${v.scene_cost})</button></div></div>
+            <button class="btn sm" data-scone="${i}" ${busy || !v.stylekey_url ? "disabled" : ""}>${v.scene_urls[i] ? "↻ ولّده مرة أخرى" : "🎬 ولّده"} (~$${v.scene_cost})</button></div></div>
       </article>`).join("")}</div>
     </details>`;
 }
@@ -231,6 +231,6 @@ $("labTpl").addEventListener("change", async (e) => {
   const f = e.target.dataset.scf;
   if (!f || !tplx.cur) return;
   const i = e.target.closest("[data-sci]").dataset.sci;
-  try { tplx.cur = await api(`/api/tvideos/${tplx.cur.id}/scenes/${i}`, { method: "PUT", ...jsonBody({ [f]: e.target.value }) }); toast("✅ اتحفظ"); }
+  try { tplx.cur = await api(`/api/tvideos/${tplx.cur.id}/scenes/${i}`, { method: "PUT", ...jsonBody({ [f]: e.target.value }) }); toast("✅ حُفظ"); }
   catch (err) { toast(err.message, true); }
 });

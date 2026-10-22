@@ -31,7 +31,7 @@ const RivalsPage = (() => {
   function digest(d) {
     if (!d || !Object.keys(d).length) return "";
     const col = (k, t) => (d[k] || []).length ? `<div><span class="pk-lbl">${t}</span><ul>${d[k].slice(0, 5).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
-    return `<div class="rv-dg2"><b class="pk-h3">ما ينجح عندهم</b>${d.summary ? `<p class="pk-note">${esc(d.summary)}</p>` : ""}
+    return `<div class="rv-dg2"><b class="pk-h3">ما ينجح لديهم</b>${d.summary ? `<p class="pk-note">${esc(d.summary)}</p>` : ""}
       <div class="rv-cols">${col("hooks", "خطافات تكسب")}${col("concepts", "أفكار تجلب المشاهدات")}${col("formats", "أشكال ناجحة")}${col("angles", "زوايا فارغة لك")}${col("avoid", "يجلب مشاهدات قليلة")}</div></div>`;
   }
   function rivalsView() {
@@ -68,7 +68,7 @@ const RivalsPage = (() => {
       <div class="pk-row2"><input type="text" class="pk-q" data-btin placeholder="@حساب العلامة" dir="ltr" value="${esc(handle)}">
         <select data-btpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}" ${k === plat ? "selected" : ""}>${t}</option>`).join("")}</select>
         ${pkIb("download", B.busy === "fetch" ? "جارٍ الجلب…" : "اجلب آخر ١٠", `data-btfetch ${B.busy ? "disabled" : ""}`, "sm")}</div>`;
-    if (!c) return head + `<p class="pk-note">إن كانت لديك أرقام العملاء أو المتابعين التي جلبها كل فيديو، فاكتبها بجانبه: يقدّمها التحليل على المشاهدات.</p>`;
+    if (!c) return head + `<p class="pk-note">أن كانت لديك أرقام العملاء أو المتابعين التي جلبها كل فيديو، فاكتبها بجانبه: يقدّمها التحليل على المشاهدات.</p>`;
     const rows = c.rows.map((r, i) => `<div class="bt-row ${r.tier}">
         <span class="bt-x num">${r.x != null ? "×" + r.x : "—"}${TIER[r.tier] ? " " + TIER[r.tier] : ""}</span>
         <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" class="bt-cap"><b>${i + 1}.</b> ${esc((r.caption || "").slice(0, 90) || "—")}<small>${fmt(r.views)} مشاهدة · ${ago(r.ts)}</small></a>
@@ -112,7 +112,7 @@ const RivalsPage = (() => {
       <div class="pk-acts">${d.approved ? pkIb("refresh", "حدّث من تعليقات المنافسين", `data-augo ${busy ? "disabled" : ""}`) : ""}${has ? pkIb("copy", "انسخ الوصفة كلها", 'data-aucp="all"') : ""}
         ${has && d.approved ? `<button class="nb-btn fs-go" data-auads>أنشئ إعلانًا لهذا الجمهور</button>` : ""}</div></div>`;
     if (!d.approved) return top + `<div class="pk-hero"><span class="pk-big">${pkIc("target", 40)}</span><h2>تحتاج منافسًا معتمدًا</h2><p>${NEED_OK}</p>${d.pending ? `<button class="nb-btn fs-go" data-rvgo>راجع الاقتراحات (${d.pending})</button>` : ""}</div>`;
-    const pills = L.length ? `<div class="au-sel"><span class="pk-lbl">${d.audiences?.length ? `استخلص العقل ${L.length === 1 ? "جمهورًا واحدًا" : `${L.length} جماهير`} من وصف علامتك` : "الشرائح من كلام جمهور المنافسين"}</span>
+    const pills = L.length ? `<div class="au-sel"><span class="pk-lbl">${d.audiences?.length ? `استخلص العقل ${L.length === 1 ? "جمهورًا واحدًا" : `${L.length} جماهير`} من وصف علامتك` : "الشرائح من نص جمهور المنافسين"}</span>
         <div class="pk-pills">${L.map((x, k) => `<button class="au-p${k === i ? " on" : ""}" data-aupick="${k}">${esc(x.name)}${x.share ? ` <small class="num">${x.share}٪</small>` : ""}</button>`).join("")}${d.client ? pkIb("plus", "أضف جمهورًا", "data-auadd", "sm") : ""}</div></div>` : "";
     if (!has) return top + pills + (busy || d.brief_due ? "" : `<div class="pk-empty">لا توجد وصفة بعد.${d.error ? ` ${esc(d.error)}` : ""}</div>`);
     const m = a.meta, g = a.google, t = a.tiktok, p = cur?.p;
@@ -153,7 +153,7 @@ const RivalsPage = (() => {
   const KIND_C = { reel: "#E5613E", carousel: "#181718", phone: "#9DB3BE", avatar: "#C9A86A", custom: "#8FA98B" };
   const codeTpls = () => (typeof Gallery !== "undefined" && Gallery.list ? Gallery.list() : []).filter((x) => String(x.id).startsWith("t-")).map((x) => ({ id: x.id, name: x.name, desc: x.desc || "" }));
   const moFmts = (x) => {
-    const a = [{ id: "phone", name: "تصوير بالموبايل" }, { id: "carousel", name: "كاروسيل" }, { id: "avatar", name: "فيديو بالأفاتار" }, ...codeTpls().map((t) => ({ id: t.id, name: t.name }))];
+    const a = [{ id: "phone", name: "تصوير بالجوال" }, { id: "carousel", name: "كاروسيل" }, { id: "avatar", name: "فيديو بالأفاتار" }, ...codeTpls().map((t) => ({ id: t.id, name: t.name }))];
     return a.some((f) => f.id === x.tpl) ? a : [{ id: x.tpl, name: x.tpl_name || x.tpl }, ...a];
   };
   function ring(score, need) {
@@ -210,7 +210,7 @@ const RivalsPage = (() => {
     const P = S.pl, st = P.d?.strategy, G = P.d?.games || {}, AX = P.d?.axes || {}, pl = P.d?.plan;
     if (!P.d) return `<div class="pk-empty">جارٍ التحميل…</div>`;
     const fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
-    const cnt = pl ? `<p class="pk-note"><b class="num">${pl.count}</b> معلومة يبني منها العقل خطتك${pl.status === "working" ? " · ⏳ تُبنى الآن…" : fresh && pl.has ? ` · ${fresh} جديدة ستدخل في التحديث القادم` : ""}. تتحدّث تلقائيًا كلما عرف العقل شيئًا جديدًا عنك.</p>
+    const cnt = pl ? `<p class="pk-note"><b class="num">${pl.count}</b> معلومة يبني منها العقل خطتك${pl.status === "working" ? " · ⏳ تُبنى الآن…" : fresh && pl.has ? ` · ${fresh} جديدة ستدخل في التحديث القادم` : ""}. تُحدّث تلقائيًا كلما عرف العقل شيئًا جديدًا عنك.</p>
       ${st && pl.status !== "working" ? `<button class="pk-chip" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "جارٍ التحديث…" : "حدّثها الآن"}</button>` : ""}${pl.error ? `<p class="pk-err">⚠️ ${esc(pl.error)}</p>` : ""}` : "";
     if (!st) return cnt + `<p class="pk-note">تحدد لعبتك (شهرة أم بيع)، وجملة التموضع، والشخص الذي تخاطبه، ودوائر الجمهور، والمواضيع والأشكال، وأسبوعًا بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ الذي تركه المنافسون.</p>
       ${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="pk-note">ستُبنى تلقائيًا عندما يعرف العقل ${pl.min} معلومات على الأقل (منها «المجال» أو «عن العلامة»).</p>` : ""}`;

@@ -26,7 +26,7 @@
   // الخطوط: هندسي للكلام، إمضا، وخط إيد للافتتاح (عربي ولاتيني). خط الكلام بيتغير من الستايل/المشروع (style.moments.sans / sansAr)
   const FONTS = { sans: ["TY Outfit", "TY Alexandria"], sign: ["TY Sign", "TY Ruqaa"], hand: ["TY Rock", "TY Ruqaa"] };
   E.MOMENT_FONTS = {
-    latin: [["TY Outfit", "Outfit (زي الفيديو المرجع)"], ["TY Urbanist", "Urbanist"], ["TY Gabarito", "Gabarito"], ["TY Jakarta", "Plus Jakarta Sans"],
+    latin: [["TY Outfit", "Outfit (مثل الفيديو المرجع)"], ["TY Urbanist", "Urbanist"], ["TY Gabarito", "Gabarito"], ["TY Jakarta", "Plus Jakarta Sans"],
       ["TY Readex", "Readex Pro"]],
     arabic: [["TY Alexandria", "Alexandria (هندسي)"], ["TY Readex", "Readex Pro"], ["SM Cairo", "القاهرة"], ["SM Tajawal", "تجوال"], ["SM Changa", "تشانجا"],
       ["SM Lalezar", "لاله‌زار (عريض)"], ["SM Kufi", "كوفي"]],
@@ -141,21 +141,21 @@
         const y = r.y1 + h * 0.12;
         return this.mPen(`M${r.x0 - h * 0.1},${y + 6} C${r.x0 + w * 0.35},${y - 6} ${r.x1 - w * 0.3},${y + 12} ${r.x1 + h * 0.15},${y - 4}`, p(0.02, 0.12), pw, red, 1 - p(0.6, 0.7));
       }
-      case "strike": {   // شطب: للنفي واللي مش صح
+      case "strike": {   // شطب: للنفي واللي غير صحيح
         const y = (r.y0 + r.y1) / 2;
         return this.mPen(`M${r.x0 - h * 0.1},${y + h * 0.08} L${r.x1 + h * 0.1},${y - h * 0.1} M${r.x0},${y - h * 0.12} L${r.x1 + h * 0.05},${y + h * 0.06}`, p(0.08, 0.2), pw * 1.3, m.color ? red : pal.scribble);
       }
-      case "arrow": {   // سهم بالإيد جاي على الكلمة من تحت
+      case "arrow": {   // سهم بالإيد قادم على الكلمة من أسفل
         const tx = (r.x0 + r.x1) / 2, ty = r.y1 + h * 0.15, fx = tx + w * 0.6 + h * 0.4, fy = ty + h * 1.4;
         return this.mPen(`M${fx},${fy} C${fx - w * 0.1},${fy - h * 0.6} ${tx + w * 0.3},${ty + h * 0.5} ${tx},${ty} M${tx},${ty} l${h * 0.28},${h * 0.05} M${tx},${ty} l${h * 0.02},${h * 0.3}`,
           p(-0.05, 0.12), pw, red, 1 - p(0.7, 0.8));
       }
-      case "highlight": {   // خلفية ملوّنة ورا الكلمة بتتمد
+      case "highlight": {   // خلفية ملوّنة خلف الكلمة تتمد
         const k = eOut(p(0, 0.12));
         return `<div style="position:absolute;left:${(r.x0 - h * 0.08).toFixed(1)}px;top:${(r.y0 + h * 0.05).toFixed(1)}px;width:${((w + h * 0.16) * k).toFixed(1)}px;height:${(h * 0.9).toFixed(1)}px;
           background:${m.color === "yellow" ? pal.yellow : pal.scribble};opacity:.85;mix-blend-mode:multiply;z-index:-1"></div>`;
       }
-      case "redact": {   // شريط أسود بيغطيها قبل ما تتقال وبينسحب
+      case "redact": {   // شريط أسود يغطيها قبل ما تُقال وينسحب
         if (t < tw - 0.05 || t > tw + 0.09) return "";
         const k = eIO(p(0, 0.09));
         return `<div style="position:absolute;left:${lerp(r.x0 - h * 0.1, r.x1 - h * 0.3, k).toFixed(1)}px;top:${(r.y0 - h * 0.05 - k * h * 0.15).toFixed(1)}px;
@@ -186,7 +186,7 @@
     const ws = this.words(b), ar = AR.test(ws.map((w) => w.w).join(" "));
     // افتتاح: 3 لقطات سريعة (خط إيد ← أحمر ممطوط ← أصفر)
     if (b.intro === "flash" && t < b.t0 + 0.125) return this.mFlash(b, t, ws[0]?.w || "", ar);
-    if (b.intro === "card" && t < b.t0 + 0.17) return this.mFlash(b, t, ws[0]?.w || "", ar, b.tone === "red" ? 1 : 2);   // كارت ملوّن بالكلمة الأولى
+    if (b.intro === "card" && t < b.t0 + 0.17) return this.mFlash(b, t, ws[0]?.w || "", ar, b.tone === "red" ? 1 : 2);   // بطاقة ملوّن بالكلمة الأولى
     const tone = this.mTone(b), stack = b.layout === "stack";
     const BIG = S * (stack ? (tall ? 0.2 : 0.17) : tall ? 0.27 : 0.315), F = `800 ${BIG}px ${this.fam("sans", ar)}`, LS = ar ? 0 : -BIG * 0.045;
     let base = H * (tall ? 0.55 : 0.57), top = base - BIG * (ar ? 0.42 : 0.52);
@@ -312,7 +312,7 @@
     const pw = S * 0.0045;
     // أقواس حوالين اللي اتقال (أول البلوك، وبتومض مرة)
     const frame = b.frame || "brackets";
-    if (frame === "box" && sent.some((w) => w.t0 <= t)) {   // مستطيل متقطع حوالين الكلام كله
+    if (frame === "box" && sent.some((w) => w.t0 <= t)) {   // مستطيل متقطع حوالين النص كله
       const xs = Object.values(at).map((p) => [p.x, p.x + p.w]).flat(), ys = Object.values(at).map((p) => p.y);
       const bx0 = Math.min(...xs) - SM * 0.5, bx1 = Math.max(...xs) + SM * 0.5, by0 = Math.min(...ys) - SM * 1.2, by1 = Math.max(...ys) + SM * 0.6;
       const kb = eOut(seg(t, b.t0, b.t0 + 0.2));
@@ -331,7 +331,7 @@
     // الإمضا بتتكتب تحت الكلام
     const yS = y0 + (L.length - 1) * lh + SM * 1.2;
     const sigpos = b.sigpos || "below";
-    if (sigpos === "behind" && k < 0.9) {   // الإمضا كبيرة ورا الكلام (بتتكتب وهو بيتقال)
+    if (sigpos === "behind" && k < 0.9) {   // الإمضا كبيرة خلف النص (تُكتب وهو يُقال)
       const rv = eIO(seg(k, 0.0, 0.7));
       h += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(y0 - S * 0.17).toFixed(1)}px;text-align:center;font:${(S * 0.26).toFixed(1)}px ${this.fam("sign", ar)};color:${pal.scribble};
         white-space:nowrap;opacity:${(0.5 * (1 - seg(k, 0.75, 0.9))).toFixed(2)};clip-path:inset(0 ${ar ? 0 : (100 - rv * 100).toFixed(1)}% 0 ${ar ? (100 - rv * 100).toFixed(1) : 0}%);transform:rotate(-6deg);z-index:0">${esc(sig)}</div>`;
@@ -426,7 +426,7 @@
     const total = (f) => measure(sent.map((w) => w.w).join(" "), f, ar ? 0 : -SM * 0.02);
     if (!tall) while (total(F) > W * 0.985 && SM > S * 0.03) { SM -= 1; F = `${ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)}`; }
     const L = lines(sent, F, ar ? 0 : -SM * 0.02, W * (tall ? 0.74 : 0.985), ar);
-    const shift = tall ? (right ? -1 : 1) * W * 0.07 : 0;   // في الطولي الكلام بيبعد عن ناحية النجمة
+    const shift = tall ? (right ? -1 : 1) * W * 0.07 : 0;   // في الطولي النص يبعد عن ناحية النجمة
     const lh = SM * 1.35, y0 = H * 0.5 - (L.length - 1) * lh / 2, rects = {};
     const focus = Number.isInteger(b.focus) && b.focus >= 0 ? this.words(b)[b.focus] : null;
     L.forEach((ln, li) => ln.items.forEach((it) => {
@@ -436,7 +436,7 @@
       const hot = focus && w.t0 === focus.t0 && t >= w.t0;
       const x = (W - ln.width) / 2 + it.x + shift;
       rects[it.i] = { x0: x, x1: x + it.w, y0: y0 + li * lh - SM * 0.78, y1: y0 + li * lh + SM * 0.12 };
-      const lead = ar ? it.x > ln.width * 0.7 : it.x < ln.width * 0.18;   // أول الجملة بيبهت ناحية النجمة
+      const lead = ar ? it.x > ln.width * 0.7 : it.x < ln.width * 0.18;   // أول الجملة يبهت ناحية النجمة
       h += `<span dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${x.toFixed(1)}px;top:${(y0 + li * lh - SM * 0.8).toFixed(1)}px;font:${hot ? 800 : ar ? 800 : 700} ${SM}px ${this.fam("sans", ar)};
         letter-spacing:${ar ? 0 : -SM * 0.02}px;white-space:nowrap;color:${dark ? (hot ? "#ffffff" : tone.ink) : hot ? "#0d0c0c" : `rgba(25,23,22,${lerp(1, 0.82, v).toFixed(2)})`};
         opacity:${(lerp(0.25, 1, a) * (lead ? lerp(1, 0.55, v) : 1)).toFixed(2)}">${esc(w.w)}</span>`;
@@ -447,7 +447,7 @@
       const pk = seg(t, focus.t0 - 0.1, focus.t0 + 0.1);
       h += `<div style="position:absolute;inset:0;background:radial-gradient(45% 55% at ${right ? 44 : 56}% 50%, rgba(255,214,205,${(0.5 * pk).toFixed(2)}), rgba(0,0,0,0) 70%)"></div>`;
     }
-    if (b.outro === "white") {   // فلاش أبيض (نور بيغطي الكادر)
+    if (b.outro === "white") {   // فلاش أبيض (ضوء يغطي الكادر)
       const wk = seg(t, b.t1 - 0.12, b.t1);
       if (wk) h += `<div style="position:absolute;inset:0;background:radial-gradient(60% 70% at 50% 50%, rgba(255,255,255,${wk}), rgba(255,250,240,${(wk * 0.9).toFixed(2)}))"></div>`;
     }

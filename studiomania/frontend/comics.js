@@ -15,7 +15,7 @@ const ComicsPage = (() => {
       ${run ? `<div class="pk-busy">⏳ ${esc(s.step || "جارٍ العمل…")} · ${s.progress || 0}% · أُضيف ${s.added || 0} ${pkIb("close", "أوقف", "data-cmstop", "sm")}</div>` : ""}
       ${s.last_error ? `<p class="pk-err">⚠️ ${esc(s.last_error)}</p>` : ""}
       <label class="pk-f">كلمات إضافية (كلمة في كل سطر)<textarea rows="4" data-cmq placeholder="اسم فيلم كوميدي&#10;عبارة مشهورة"></textarea></label>
-      <label class="pk-tg">ردود فعل فقط، بدون كلام على الشاشة<input type="checkbox" data-cmreact ${S.react ? "checked" : ""}></label>
+      <label class="pk-tg">ردود فعل فقط، بدون نص على الشاشة<input type="checkbox" data-cmreact ${S.react ? "checked" : ""}></label>
       <label class="pk-tg">استخدم الكلمات الجاهزة (${st.seeds})<input type="checkbox" data-cmseeds checked></label>
       ${Object.entries(st.kind_names).filter(([k]) => k !== "image").map(([k, t]) => { const off = S.react && !["gif", "clip"].includes(k); return `<label class="pk-tg${off ? " dim" : ""}">${esc(t)}<input type="checkbox" data-cmkind="${k}" ${off ? "disabled" : (k !== "sticker" ? "checked" : "")}></label>`; }).join("")}
       <label class="pk-f">عدد الصفحات لكل كلمة<select data-cmpages><option value="1">صفحة</option><option value="2">صفحتان</option><option value="3">3 صفحات</option></select></label>
@@ -112,8 +112,8 @@ const ComicsPage = (() => {
       if (e.target.matches("[data-cmfiles]") && e.target.files.length) {
         const fd = new FormData();
         [...e.target.files].forEach((f) => fd.append("files", f));
-        toast("⬆ بيرفع…");
-        try { const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ اتضاف ${r.added}`); await refresh(); render(); poll(); } catch (err) { toast(err.message, true); }
+        toast("⬆ يرفع…");
+        try { const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ أُضيف ${r.added}`); await refresh(); render(); poll(); } catch (err) { toast(err.message, true); }
       }
     });
     w.addEventListener("mouseover", (e) => { const v = e.target.closest(".cm-item video"); if (v) v.play().catch(() => {}); });
@@ -133,11 +133,11 @@ const ComicsPage = (() => {
         if (q("[data-cmdx]")) { S.drawer = false; return render(); }
         if (q("[data-cmst]")) { S.status = q("[data-cmst]").dataset.cmst; S.open = null; await load(); return render(); }
         if (S.menu && !q(".pk-menu")) { S.menu = false; render(); }
-        if (q("[data-cmstop]")) { await api("/api/comics/harvest/stop", { method: "POST" }); return toast("هيقف بعد الخطوة اللي شغالة"); }
+        if (q("[data-cmstop]")) { await api("/api/comics/harvest/stop", { method: "POST" }); return toast("سيقف بعد الخطوة التي تعمل"); }
         if (q("[data-cmtag]")) { S.st = await api("/api/comics/tag", { method: "POST" }); render(); return poll(); }
         if (q("[data-cmurl]")) {
           const fd = new FormData(); fd.append("urls", w.querySelector("[data-cmurls]").value);
-          const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ اتضاف ${r.added}`); await refresh(); render(); return poll();
+          const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ أُضيف ${r.added}`); await refresh(); render(); return poll();
         }
         if (q("[data-cmmore]")) { await load(true); return render(); }
         if (q("[data-cmgk]")) { S.kind = q("[data-cmgk]").dataset.cmgk; S.open = null; await load(); return render(); }
@@ -145,29 +145,29 @@ const ComicsPage = (() => {
         if (q("[data-cmsel]")) { S.sel = new Set(); S.open = null; return render(); }
         if (q("[data-cmselx]")) { S.sel = null; return render(); }
         if (q("[data-cmselall]")) { S.items.forEach((c) => { if (!c.approved) S.sel.add(c.id); }); return render(); }
-        if (q("[data-cmappr]") || q(".cm-appr")) return;   // التشيك بوكس بيتعامل معاه في change
+        if (q("[data-cmappr]") || q(".cm-appr")) return;   // التشيك بوكس يتعامل معه في change
         const flt = { q: S.q, kind: S.kind, status: S.status, lang: S.lang };
         if (q("[data-cmapprvis]") || q("[data-cmunapprvis]") || q("[data-cmapprall]")) {
           const all = !!q("[data-cmapprall]"), value = !q("[data-cmunapprvis]");
           const r = await api("/api/comics/approve", { method: "POST", ...jsonBody(all ? { all: true, value } : { all: true, value, ...flt }) });
-          toast(value ? `✅ اتعتمد ${r.changed}` : `اتشال الاعتماد من ${r.changed}`); S.st = r; await load(); return render();
+          toast(value ? `✅ اعتُمد ${r.changed}` : `أُزيل الاعتماد من ${r.changed}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmseldel]")) {
-          if (!(await uiConfirm(`تمسح ${S.sel.size} كوميك؟ المسح نهائي.`))) return;
+          if (!(await uiConfirm(`تحذف ${S.sel.size} كوميك؟ المسح نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody({ ids: [...S.sel] }) });
-          toast(`🗑 اتمسح ${r.deleted}`); S.sel = null; S.st = r; await load(); return render();
+          toast(`🗑 حُذف ${r.deleted}`); S.sel = null; S.st = r; await load(); return render();
         }
         if (q("[data-cmdelall]") || q("[data-cmdelevery]")) {
           const every = !!q("[data-cmdelevery]");
-          if (!(await uiConfirm(every ? "تمسح كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تمسح الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`))) return;
+          if (!(await uiConfirm(every ? "تحذف كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تحذف الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody(every ? { all: true } : { all: true, ...flt }) });
-          toast(`🗑 اتمسح ${r.deleted}${r.kept_approved ? ` · فضل ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
+          toast(`🗑 حُذف ${r.deleted}${r.kept_approved ? ` · فضل ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmclose]")) { S.open = null; return render(); }
         const it = q(".cm-item");
         if (it && S.sel) {
           const id = it.dataset.cid;
-          if (S.items.find((c) => c.id === id)?.approved) return toast("ده معتمد: شيل الاعتماد الأول علشان تقدر تعلّم عليه للمسح", true);
+          if (S.items.find((c) => c.id === id)?.approved) return toast("هذا معتمد: أزل الاعتماد أولًا لكي يمكنك تعلّم عليه للمسح", true);
           S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); return render();
         }
         if (it && S.st.admin) { S.open = it.dataset.cid; S.drawer = false; return render(); }
@@ -177,14 +177,14 @@ const ComicsPage = (() => {
           const ctx = Object.fromEntries([...w.querySelectorAll("[data-cmf]")].map((x) => [x.dataset.cmf, x.value]));
           ctx.tags = ctx.tags.split(/[،,]/).map((t) => t.trim()).filter(Boolean);
           const r = await api(`/api/comics/${cur.id}`, { method: "PATCH", ...jsonBody({ ctx, lang: w.querySelector("[data-cmlang]")?.value }) });
-          S.items = S.items.map((c) => (c.id === r.id ? r : c)); toast("✅ اتحفظ"); return render();
+          S.items = S.items.map((c) => (c.id === r.id ? r : c)); toast("✅ حُفظ"); return render();
         }
         if (q("[data-cmhide]")) {
           const r = await api(`/api/comics/${cur.id}`, { method: "PATCH", ...jsonBody({ status: cur.status === "hidden" ? "ready" : "hidden" }) });
           S.items = S.items.filter((c) => c.id !== r.id); S.open = null; await refresh(); return render();
         }
         if (q("[data-cmdel]")) {
-          if (!(await uiConfirm("تمسح الكوميك ده؟"))) return;
+          if (!(await uiConfirm("تحذف هذا الكوميك؟"))) return;
           await api(`/api/comics/${cur.id}`, { method: "DELETE" }); S.items = S.items.filter((c) => c.id !== cur.id); S.open = null; await refresh(); return render();
         }
       } catch (err) { toast(err.message, true); }

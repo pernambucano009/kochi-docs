@@ -37,13 +37,13 @@
   // ---------- الأدوات: أيقونة بس، والاسم في الفقاعة ----------
   const clean = (s) => s.replace(/[\u{1F000}-\u{1FFFF}☀-➿️]/gu, "").replace(/\s+/g, " ").trim();
   tabs.querySelectorAll("button[data-tab]").forEach((b) => { b.dataset.tip = clean(b.textContent); b.setAttribute("aria-label", b.dataset.tip); });
-  tabs.querySelector('[data-tab="typo"]')?.setAttribute("hidden", "");   // بقت جوه الكابشن
+  tabs.querySelector('[data-tab="typo"]')?.setAttribute("hidden", "");   // بقت داخل التعليق النصي
 
   // ---------- كارت الأداة: بيظهر لما تختار أداة، وبيستخبى لما تدوس عليها تاني أو تقفله ----------
   const close = document.createElement("button");
   close.type = "button";
   close.className = "mtu-x";
-  close.setAttribute("aria-label", "اقفل");
+  close.setAttribute("aria-label", "أغلق");
   close.textContent = "×";
   insp.append(close);
   const isOpen = () => insp.classList.contains("mtu-open");
@@ -86,7 +86,7 @@
   const capPane = insp.querySelector('.pane[data-pane="caps"]');
   const seg = document.createElement("div");
   seg.className = "mtu-seg";
-  seg.innerHTML = `<button type="button" data-capmode="plain">كابشن عادي</button><button type="button" data-capmode="typo">تايبوجرافي 3D</button>`;
+  seg.innerHTML = `<button type="button" data-capmode="plain">تعليق نصي عادي</button><button type="button" data-capmode="typo">تايبوجرافي 3D</button>`;
   const typoBox = document.createElement("div");
   typoBox.className = "mtu-typo";
   typoBox.hidden = true;
@@ -119,7 +119,7 @@
       if (typeof scheduleSave === "function") scheduleSave();
       if (typeof mtTypoDraw === "function") mtTypoDraw();
       if (typeof renderTimeline === "function") renderTimeline();
-      if (user && m === "typo" && typeof toast === "function" && !(typeof mtx !== "undefined" && mtx.doc?.blocks?.length)) toast("دوس «وزّع التايبوجرافي» عشان الكلام يتحوّل لتايبوجرافي 3D");
+      if (user && m === "typo" && typeof toast === "function" && !(typeof mtx !== "undefined" && mtx.doc?.blocks?.length)) toast("اضغط «وزّع التايبوجرافي» لكي النص يتحوّل لتايبوجرافي 3D");
     }
     syncCapMode();
   }
@@ -177,7 +177,7 @@
     afterH = hd; after = row;
   }
   const GROUPS = { video: ["h-video", "h-over"], audio: ["h-voice", "h-music", "h-snd"], caps: ["h-caps", "h-typo", "h-click"] };
-  const NAMES = { "h-over": "طبقات", "h-video": "فيديو", "h-voice": "تعليق", "h-music": "موسيقى", "h-snd": "أصوات", "h-text": "نصوص", "h-caps": "كابشن", "h-typo": "تايبوجرافي", "h-click": "كليكات", "h-fx": "عناصر" };
+  const NAMES = { "h-over": "طبقات", "h-video": "فيديو", "h-voice": "تعليق", "h-music": "موسيقى", "h-snd": "أصوات", "h-text": "نصوص", "h-caps": "تعليق نصي", "h-typo": "تايبوجرافي", "h-click": "كليكات", "h-fx": "عناصر" };
   const KEY = "studiomania.mtGroups";
   let openG = {};
   try { openG = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { openG = {}; }
@@ -207,7 +207,7 @@
       mh.classList.add("mtu-gh");
       mh.classList.toggle("mtu-closed", !open && extra.length > 0);
       mh.dataset.more = !open && extra.length ? `+${extra.length}` : "";
-      mh.dataset.tip = open ? "دبل كليك يلمّ التراكات دي في خط واحد" : extra.length ? `فيها كمان: ${extra.map((h) => NAMES[h]).join("، ")} · دبل كليك يفردهم` : "";
+      mh.dataset.tip = open ? "نقرتان يلمّ هذه التراكات في خط واحد" : extra.length ? `فيها أيضًا: ${extra.map((h) => NAMES[h]).join("، ")} · نقرتان يفردهم` : "";
       for (const h of rest) {
         const hd = heads.querySelector("." + h), row = rowOf(h);
         const mini = !open, gone = !open && empty(row);

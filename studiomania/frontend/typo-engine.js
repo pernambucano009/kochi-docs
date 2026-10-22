@@ -78,7 +78,7 @@
       for (const k of ["light", "dark", "accent"]) this.style[k] = { ...DEFAULT_STYLE[k], ...((doc.style || {})[k] || {}) };
       const { w, h } = doc;
       this.u = Math.min(w, h) / 100;   // وحدة المقاسات: 1% من الضلع الصغير
-      this.ts = h > w * 1.2 ? 1.5 : 1;  // الكلام الصغير بيكبر في الطولي (الموبايل)
+      this.ts = h > w * 1.2 ? 1.5 : 1;  // النص الصغير يكبر في الطولي (الجوال)
       Object.assign(this.stage.style, {
         width: `${w}px`, height: `${h}px`, position: "relative", overflow: "hidden", direction: "ltr",
         fontFamily: `"${this.style.font}", "SM Tajawal", sans-serif`, fontWeight: this.style.weight,
@@ -160,7 +160,7 @@
                 ${(this[`k_${b.kind}`] || this.k_build).call(this, b, t, k, th, i)}</div>`;
         } else {
           const fn = this[`k_${b.kind === "anchor" ? "build" : b.kind}`] || this.k_build;
-          const zoom = 1 + 0.035 * easeInOut(k);    // الكاميرا مش واقفة أبدًا: زووم خفيف طول البلوك
+          const zoom = 1 + 0.035 * easeInOut(k);    // الكاميرا غير واقفة أبدًا: زووم خفيف طول البلوك
           html = `<div class="ty-cam" style="position:absolute;inset:0;transform:scale(${zoom.toFixed(4)})">${fn.call(this, b, t, k, th, i)}</div>`;
           // أول لحظة في البلوك: فلاش صغير (القطع بيبان مقصود)
           const flash = 1 - clamp((t - b.t0) / 0.08);
@@ -170,7 +170,7 @@
       }
       if (this.showAnchors) html += this.anchorGuides(t);
       if (!this.doc.transparent) html += this.vignette(th);
-      if (this.style.grain > 0 && !this.doc.transparent) html += this.grain(t);   // فوق صورة/فيديو: الحبيبات بتتحط في FFmpeg
+      if (this.style.grain > 0 && !this.doc.transparent) html += this.grain(t);   // أعلى صورة/فيديو: الحبيبات توضع في FFmpeg
       this.stage.style.background = bg;
       this.stage.style.color = th.ink;
       this.stage.innerHTML = html;
@@ -335,9 +335,9 @@
       if (plain && !this.editing) { this._xf = null; return; }
       const had = this._cb?.has(this.cbKey(b));
       const box = this.contentBox(b);
-      if (!had) this.renderRaw(t);   // القياس رسم وقت تاني: نرجع للفريم الحالي
+      if (!had) this.renderRaw(t);   // القياس رسم وقت آخر: نرجع للفريم الحالي
       const { w, h } = this.doc;
-      const fx = (el) => {   // خلفية مالية الكادر من غير كلام ولا صور: بتفضل ثابتة
+      const fx = (el) => {   // خلفية مالية الكادر بدون نص ولا صور: تظل ثابتة
         if (el.textContent.trim() || el.matches("img,svg,video,canvas") || el.querySelector("img,svg,video,canvas")) return false;
         const cs = el.style;
         return (cs.inset === "0px" || cs.inset === "0") || (el.offsetWidth >= w * 0.95 && el.offsetHeight >= h * 0.95);
@@ -390,7 +390,7 @@
 
     grain(t) {
       const tiles = TypoEngine.noise();
-      const f = Math.floor(t * 12) % tiles.length;   // الحبيبات بتتغير 12 مرة في الثانية زي الفيلم
+      const f = Math.floor(t * 12) % tiles.length;   // الحبيبات تتغير 12 مرة في الثانية مثل الفيلم
       return `<div style="position:absolute;inset:0;pointer-events:none;opacity:${this.style.grain};mix-blend-mode:overlay;
         background-image:url(${tiles[f]});background-size:${Math.round(this.u * 40)}px"></div>`;
     }
@@ -479,7 +479,7 @@
         const p = easeOut((t - sw0.t0 + 0.05) / 0.45);
         const cx = (bx.x0 + bx.x1) / 2, cy = (bx.y0 + bx.y1) / 2, rx = (bx.x1 - bx.x0) / 2 + u * 3, ry = (bx.y1 - bx.y0) / 2 + u * 3;
         const r0 = rng(i + 3), pts = [];
-        for (let a = 0; a <= 1.12; a += 0.04) {   // دايرة بالإيد: مش مقفولة بالظبط ونصف قطرها بيتهز شوية
+        for (let a = 0; a <= 1.12; a += 0.04) {   // دائرة بالإيد: غير مغلقة بالضبط ونصف قطرها يهتز قليلًا
           const ang = -Math.PI / 2 + a * Math.PI * 2, wob = 1 + (r0() - 0.5) * 0.06;
           pts.push(`${(cx + Math.cos(ang) * rx * wob).toFixed(1)},${(cy + Math.sin(ang) * ry * wob).toFixed(1)}`);
         }
@@ -580,7 +580,7 @@
           left:50%;top:50%;transform:translate(-62%,-60%) rotate(${(12 + sk * 20).toFixed(1)}deg);opacity:${(1 - clamp((k - 0.7) / 0.3)).toFixed(2)}">
           <path d="M0,-50 C4,-8 8,-4 50,0 C8,4 4,8 0,50 C-4,8 -8,4 -50,0 C-8,-4 -4,-8 0,-50Z" fill="${th.accent}"/></svg>` : "";
       const iconBox = img ? `<div style="position:relative;display:flex;align-items:center;justify-content:center">${spark}<div style="position:relative">${img}</div></div>` : "";
-      const tall = this.doc.h > this.doc.w * 1.2;   // الطولي: الأيقونة فوق والكلمة تحتها
+      const tall = this.doc.h > this.doc.w * 1.2;   // الطولي: الأيقونة أعلى والكلمة تحتها
       return swoosh + `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:${(u * 7).toFixed(0)}px;
           flex-direction:${tall ? "column" : this.dir(txt) === "rtl" ? "row-reverse" : "row"}">${iconBox}
         <div dir="${this.dir(txt)}" style="font-size:${size}px;white-space:nowrap">${esc(shown)}${this.cursor(t, th, size)}</div></div>`;

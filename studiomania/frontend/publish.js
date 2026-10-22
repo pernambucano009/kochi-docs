@@ -4,9 +4,9 @@ const pub = { exports: [], posts: [], platforms: {}, accounts: {}, service: null
 const PLATFORMS_KEY = "studiomania.platforms";
 const POST_STATUS = {
   scheduled: ["متجدول", "scheduled"],
-  sending: ["بيتبعت للنشر...", "active"],
-  publishing: ["بيتنشر...", "active"],
-  published: ["اتنشر", "published"],
+  sending: ["يُرسل للنشر...", "active"],
+  publishing: ["جارٍ النشر...", "active"],
+  published: ["نُشر", "published"],
   failed: ["فشل", "failed"],
 };
 
@@ -24,7 +24,7 @@ async function initPublish() {
   alert.hidden = info.service === "mock" || (info.service === "zernio" && !info.accounts_error);
   alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
   if (!info.service) {
-    alert.innerHTML = `⚠️ خدمة النشر لسه مش متوصّلة. تقدر تجدول البوستات عادي، وأول ما تتوصّل البرنامج هيبعتهم لوحده.`;
+    alert.innerHTML = `⚠️ خدمة النشر ما زال غير متصلة. يمكنك تجدول المنشورات عادي، وأول ما تتوصّل البرنامج سيبعتهم تلقائيًا.`;
   } else if (info.accounts_error) {
     alert.textContent = `⚠️ ${info.accounts_error}`;
   }
@@ -52,7 +52,7 @@ function renderReady() {
   const scheduled = new Set(pub.posts.filter((p) => p.status === "scheduled" || p.status === "sending").map((p) => p.export_id));
   $("readyGrid").innerHTML = pub.exports
     .map(
-      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="دوس عشان تجدوله">
+      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="اضغط لكي تجدوله">
         <div class="ready-art">${lightVideo(e.url, "muted playsinline loop")}<span class="ready-dur">${fmtDuration(e.duration)}</span><i class="ready-tick" aria-hidden="true"></i>${typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "video", what: e.name, ref: `exp:${e.id}`, compact: true }) : ""}</div>
         <div class="body">
           <div class="name" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div>
@@ -99,7 +99,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       const cap = $("postCaption").value.trim();
       if (!pub.editing && (!cap || cap === pub.autoCaption)) $("postCaption").value = pub.autoCaption = ex.name;
       $("postCaption").focus();
-      pcAuto();   // الفحص قبل النشر بيشتغل لوحده
+      pcAuto();   // الفحص قبل النشر يشتغل تلقائيًا
     }
     if (btn.dataset.act === "rename") {
       const name = (await uiPrompt("الاسم الجديد:", ex.name));
@@ -109,7 +109,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       await pubLoadPosts();
     }
     if (btn.dataset.act === "delete") {
-      if (!(await uiConfirm(`حذف "${ex.name}" من الفولدر؟`))) return;
+      if (!(await uiConfirm(`حذف "${ex.name}" من المجلد؟`))) return;
       await api(`/api/exports/${ex.id}`, { method: "DELETE" });
       await pubLoadExports();
     }
@@ -193,7 +193,7 @@ function renderAccounts() {
   box.hidden = !pub.service;
   if (!pub.service) return;
   const plats = Object.entries(pub.platforms);
-  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختار تنشر على أنهي حساب وانت بتجدول.</small></div>
+  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر تنشر على أي حساب وأنت تجدول.</small></div>
     <div class="pa-grid">${plats.filter(([k]) => pub.list.some((a) => a.platform === k)).map(([k, label]) => {
       const accs = pub.list.filter((a) => a.platform === k);
       return `<div class="pa-plat ${accs.length ? "on" : ""}">
@@ -202,12 +202,12 @@ function renderAccounts() {
         ${accs.map((a) => `<div class="pa-acc${a.needs_reconnect ? " bad" : ""}">
           ${a.avatar ? `<img src="${escapeHtml(a.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i>${escapeHtml((a.name || a.username || "?").slice(0, 1))}</i>`}
           <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}
-            ${a.needs_reconnect ? `<small class="err">محتاج يتربط تاني</small>` : ""}</span>
-          ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط تاني</button>` : ""}
+            ${a.needs_reconnect ? `<small class="err">يحتاج يتربط مرة أخرى</small>` : ""}</span>
+          ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط مرة أخرى</button>` : ""}
           <button type="button" class="pa-x" data-padel="${escapeHtml(a.id)}" data-paname="${escapeHtml(a.name || a.username)}" title="افصل الحساب">✕</button></div>`).join("")}
       </div>`;
     }).join("")}</div>
-    <div class="pa-more"><small class="muted">${pub.list.length ? "اربط منصة تانية:" : "اربط أول حساب:"}</small>
+    <div class="pa-more"><small class="muted">${pub.list.length ? "اربط منصة أخرى:" : "اربط أول حساب:"}</small>
       ${plats.filter(([k]) => !pub.list.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
         ? `<span class="pa-chip soon" title="${escapeHtml(pub.soon[k])}">${pLogo(k, "sm")}${escapeHtml(label)} <em>قريبًا</em></span>`
         : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسايل</em>` : ""}</button>`).join("")}</div>`;
@@ -230,15 +230,15 @@ function paModal(html) {
 const paRefresh = (info) => { pub.list = info.account_list || []; pub.accounts = info.accounts || {}; renderAccounts(); renderPlatformBoxes(); };
 // المنصات اللي من غير تسجيل دخول: فورم عندنا
 const PA_FORMS = {
-  bluesky: { t: "اربط بلوسكاي", fields: [["identifier", "اسم الحساب أو الإيميل", "you.bsky.social", "ltr"], ["password", "باسورد التطبيق (App Password)", "xxxx-xxxx-xxxx-xxxx", "ltr"]],
-    help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ الباسورد اللي بيطلع وحطه هنا (مش باسورد حسابك العادي).", url: "/api/publisher/connect/bluesky" },
+  bluesky: { t: "اربط بلوسكاي", fields: [["identifier", "اسم الحساب أو البريد الإلكتروني", "you.bsky.social", "ltr"], ["password", "كلمة مرور التطبيق (App Password)", "xxxx-xxxx-xxxx-xxxx", "ltr"]],
+    help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ كلمة المرور الذي يظهر وضعه هنا (غير كلمة مرور حسابك العادي).", url: "/api/publisher/connect/bluesky" },
   whatsapp: { t: "اربط واتساب بيزنس", fields: [["token", "Access Token (دايم، من System User)", "EAAG…", "ltr"], ["waba", "WhatsApp Business Account ID", "1234567890", "ltr"],
-      ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "PIN التحقق بخطوتين (لو مفعّله)", "6 أرقام", "ltr"]],
-    help: `واتساب هنا للرسايل والرد على العملاء (الإنبوكس والرسايل الجماعية بقوالب متوافق عليها)، مش لنشر الفيديوهات.
-محتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، مش تطبيق واتساب بيزنس العادي على الموبايل.
-<ol><li>من business.facebook.com اعمل أو اختار WhatsApp Business Account، وضيف رقم مش متسجّل على واتساب عادي.</li>
-<li>من Business Settings ← System Users اعمل System User واديله صلاحيات whatsapp_business_management و whatsapp_business_messaging.</li>
-<li>اعمل له Access Token دايم.</li><li>من WhatsApp Manager ← Phone Numbers هتلاقي الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
+      ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "PIN التحقق بخطوتين (إذا مفعّله)", "6 أرقام", "ltr"]],
+    help: `واتساب هنا للرسايل والرد على العملاء (الإنبوكس والرسائل الجماعية بقوالب متوافق عليها)، غير لنشر الفيديوهات.
+يحتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، غير تطبيق واتساب بيزنس العادي على الجوال.
+<ol><li>من business.facebook.com أنشئ أو اختر WhatsApp Business Account، وأضف رقم غير مسجّل على واتساب عادي.</li>
+<li>من Business Settings ← System Users أنشئ System User واديله صلاحيات whatsapp_business_management و whatsapp_business_messaging.</li>
+<li>أنشئ له Access Token دايم.</li><li>من WhatsApp Manager ← Phone Numbers ستجد الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
 };
 async function paForm(k) {
   if (k === "telegram") return paTelegram();
@@ -250,8 +250,8 @@ async function paForm(k) {
   m.el.querySelector("[data-pa-go]").onclick = async (e) => {
     const body = {};
     m.el.querySelectorAll("[data-paf]").forEach((i) => (body[i.dataset.paf] = i.value.trim()));
-    e.target.disabled = true; e.target.textContent = "⏳ بيربط…";
-    try { paRefresh(await api(F.url, { method: "POST", ...jsonBody(body) })); m.close(); toast("✅ اتربط"); }
+    e.target.disabled = true; e.target.textContent = "⏳ يربط…";
+    try { paRefresh(await api(F.url, { method: "POST", ...jsonBody(body) })); m.close(); toast("✅ رُبط"); }
     catch (err) { toast(err.message, true); e.target.disabled = false; e.target.textContent = "اربط"; }
   };
 }
@@ -260,18 +260,18 @@ async function paTelegram() {
   let r;
   try { r = await api("/api/publisher/connect/telegram", { method: "POST" }); } catch (err) { return toast(err.message, true); }
   const m = paModal(`<p class="ui-dlg-msg"><b>اربط قناة أو جروب تيليجرام</b></p>
-    <ol class="pa-help"><li>ضيف <b dir="ltr">@${escapeHtml(r.bot || "")}</b> أدمن في القناة أو الجروب.</li>
-      <li>ابعت للبوت الرسالة دي (فيها الكود واسم القناة): <code dir="ltr" class="pa-code">${escapeHtml(r.code || "")} @قناتك</code></li>
-      <li>استنى هنا، أول ما يتربط هيظهر لوحده.</li></ol>
-    <p class="pa-wait">⏳ مستني الربط… <small>(الكود شغال ${Math.round((r.expires_in || 900) / 60)} دقيقة)</small></p>
-    <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>اقفل</button></div>`);
+    <ol class="pa-help"><li>أضف <b dir="ltr">@${escapeHtml(r.bot || "")}</b> أدمن في القناة أو الجروب.</li>
+      <li>أرسل للبوت هذه الرسالة (فيها الكود واسم القناة): <code dir="ltr" class="pa-code">${escapeHtml(r.code || "")} @قناتك</code></li>
+      <li>انتظر هنا، أول ما يتربط سيظهر تلقائيًا.</li></ol>
+    <p class="pa-wait">⏳ ينتظر الربط… <small>(الكود يعمل ${Math.round((r.expires_in || 900) / 60)} دقيقة)</small></p>
+    <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>أغلق</button></div>`);
   const tick = async () => {
     if (!m.el.isConnected) return;
     try {
       const st = await api(`/api/publisher/connect/telegram/${encodeURIComponent(r.code)}`);
-      if (st.status === "connected") { m.close(); toast("✅ تيليجرام اتربط"); return paRefresh(await api("/api/publisher")); }
-      if (st.status === "expired") { m.el.querySelector(".pa-wait").textContent = "⌛ الكود خلص. اقفل وابدأ تاني."; return; }
-    } catch { /* بيحاول تاني */ }
+      if (st.status === "connected") { m.close(); toast("✅ تيليجرام رُبط"); return paRefresh(await api("/api/publisher")); }
+      if (st.status === "expired") { m.el.querySelector(".pa-wait").textContent = "⌛ الكود خلص. أغلق وابدأ مرة أخرى."; return; }
+    } catch { /* يحاول مرة أخرى */ }
     setTimeout(tick, 3000);
   };
   setTimeout(tick, 3000);
@@ -281,30 +281,30 @@ async function connectReturn() {
   const q = new URLSearchParams(location.search);
   if (!q.has("step") && !q.has("connected") && !q.has("error")) return;
   const params = Object.fromEntries(q.entries());
-  history.replaceState(null, "", location.pathname + location.hash);   // اللينك مايفضلش فيه بيانات الربط
-  if (params.error) return toast(`⚠️ الربط ماكملش: ${params.error_message || params.error}`, true);
-  if (params.connected) { toast("✅ الحساب اتربط"); return paRefresh(await api("/api/publisher")); }
+  history.replaceState(null, "", location.pathname + location.hash);   // الرابط لا يظل فيه بيانات الربط
+  if (params.error) return toast(`⚠️ الربط لم يكتمل: ${params.error_message || params.error}`, true);
+  if (params.connected) { toast("✅ الحساب رُبط"); return paRefresh(await api("/api/publisher")); }
   let r;
   try { r = await api("/api/publisher/connect/pending", { method: "POST", ...jsonBody({ params }) }); } catch (err) { return toast(err.message, true); }
   const WHAT = { facebook: "الصفحة", instagram: "حساب إنستجرام", linkedin: "الحساب", googlebusiness: "المكان", pinterest: "البورد" };
-  const opts = [...(r.personal ? [{ id: "personal", name: "حسابي الشخصي", sub: "تنشر باسمك انت" }] : []), ...r.options];
-  const m = paModal(`<p class="ui-dlg-msg"><b>اختار ${WHAT[r.platform] || ""} اللي هتنشر عليه في ${escapeHtml(r.label)}</b></p>
+  const opts = [...(r.personal ? [{ id: "personal", name: "حسابي الشخصي", sub: "تنشر باسمك أنت" }] : []), ...r.options];
+  const m = paModal(`<p class="ui-dlg-msg"><b>اختر ${WHAT[r.platform] || ""} ما ستنشر عليه في ${escapeHtml(r.label)}</b></p>
     <div class="pa-opts">${opts.map((o) => `<button type="button" class="pa-opt" data-paopt="${escapeHtml(o.id)}">${o.img ? `<img src="${escapeHtml(o.img)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((o.name || "?").slice(0, 1))}</i>`}
-      <span><b dir="auto">${escapeHtml(o.name)}</b>${o.sub ? `<small dir="auto">${escapeHtml(o.sub)}</small>` : ""}</span></button>`).join("") || `<p class="muted">مفيش حاجة تتختار. اتأكد إنك مدير على الصفحة أو المكان، وابدأ الربط تاني.</p>`}</div>
+      <span><b dir="auto">${escapeHtml(o.name)}</b>${o.sub ? `<small dir="auto">${escapeHtml(o.sub)}</small>` : ""}</span></button>`).join("") || `<p class="muted">لا شيء تتختار. تأكد أنك مدير على الصفحة أو المكان، وابدأ الربط مرة أخرى.</p>`}</div>
     <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>إلغاء</button></div>`);
   m.el.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-paopt]");
     if (!b) return;
     m.el.querySelectorAll("[data-paopt]").forEach((x) => (x.disabled = true));
     b.classList.add("on");
-    try { paRefresh(await api("/api/publisher/connect/select", { method: "POST", ...jsonBody({ sid: r.sid, choice: b.dataset.paopt }) })); m.close(); toast("✅ اتربط"); }
+    try { paRefresh(await api("/api/publisher/connect/select", { method: "POST", ...jsonBody({ sid: r.sid, choice: b.dataset.paopt }) })); m.close(); toast("✅ رُبط"); }
     catch (err) { toast(err.message, true); m.close(); }
   });
 }
 document.addEventListener("click", async (e) => {
   const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
   if (!add && !del) return;
-  if (pub.service === "mock" && !(add && ["bluesky", "telegram", "whatsapp"].includes(add.dataset.paadd))) return toast("ده وضع تجريبي: الربط الحقيقي بيشتغل لما خدمة النشر تتوصّل", true);
+  if (pub.service === "mock" && !(add && ["bluesky", "telegram", "whatsapp"].includes(add.dataset.paadd))) return toast("هذا وضع تجريبي: الربط الحقيقي يشتغل عندما خدمة النشر تتوصّل", true);
   try {
     if (add) {
       const k = add.dataset.paadd;
@@ -313,7 +313,7 @@ document.addEventListener("click", async (e) => {
       if (r.form) return paForm(r.form);
       // تسجيل الدخول على المنصة نفسها في نفس الصفحة، وبعدها بيرجع هنا على طول (ولو محتاج يختار صفحة بيختار عندنا)
       location.assign(r.url);
-    } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ البوستات المتجدولة عليه مش هتنزل.`))) {
+    } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ المنشورات المتجدولة عليه لن تنزل.`))) {
       const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
       pub.list = info.account_list || [];
       pub.accounts = info.accounts || {};
@@ -329,7 +329,7 @@ window.addEventListener("focus", async () => {
     const info = await api("/api/publisher");
     pub.list = info.account_list || []; pub.accounts = info.accounts || {};
     renderAccounts(); renderPlatformBoxes();
-  } catch { /* مش مهم */ }
+  } catch { /* غير مهم */ }
 });
 function renderPlatformBoxes() {
   let saved = [];
@@ -352,7 +352,7 @@ function renderPlatformBoxes() {
   $("postPlatforms").innerHTML = Object.entries(pub.platforms)
     .map(([k, label]) => {
       const off = needLink && !pub.accounts[k];
-      return `<label title="${off ? "الحساب ده مش مربوط" : escapeHtml(label)}" class="plat ${off ? "off" : ""}">
+      return `<label title="${off ? "هذا الحساب غير مربوط" : escapeHtml(label)}" class="plat ${off ? "off" : ""}">
         <input type="checkbox" value="${k}" ${saved.includes(k) && !off ? "checked" : ""} ${off ? "disabled" : ""}>
         ${pLogo(k)}<span>${label}</span></label>`;
     })
@@ -367,7 +367,7 @@ function renderPostVideo() {
   const ex = pub.exports.find((x) => x.id === pub.videoId);
   $("postVideo").innerHTML = ex
     ? `🎬 ${escapeHtml(ex.name)} <span class="muted">(${fmtDuration(ex.duration)})</span>`
-    : `<span class="muted">اختار فيديو من الفولدر (دوس «جدول»)</span>`;
+    : `<span class="muted">اختر فيديو من المجلد (اضغط «جدول»)</span>`;
   // التاج: حساب شخصية المشروع بيتحط لوحده (إلا لو انت كتبت حاجة بإيدك)
   const coachTag = ex?.coach?.instagram ? `@${ex.coach.instagram}` : "";
   if (!pub.tagsTouched && !pub.editing) {
@@ -376,8 +376,8 @@ function renderPostVideo() {
     $("igCollab").checked = !!coachTag;
   }
   $("igTagsHint").textContent = ex?.coach
-    ? (ex.coach.instagram ? `الشخصية: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ الشخصية ${ex.coach.name} مالهاش حساب إنستجرام متسجل. ضيفه من صفحة الشخصيات`)
-    : "اكتب الحسابات اللي عايز تعملها تاج، وافصل بينهم بفاصلة.";
+    ? (ex.coach.instagram ? `الشخصية: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ الشخصية ${ex.coach.name} ليس لها حساب إنستجرام مسجل. أضفه من صفحة الشخصيات`)
+    : "اكتب الحسابات التي تريد تعملها تاج، وافصل بينهم بفاصلة.";
   // الغلاف بيتختار من نفس الفيديو
   const v = $("coverVideo");
   if (ex && v.dataset.src !== ex.url) {
@@ -394,20 +394,20 @@ const coverDefaultMs = (dur) => Math.max(0, Math.round((dur - 2) * 1000));
 // ⚡ وضع الخوارزمية: الكابشن والغلاف وعلامة AI بيتجهزوا لوحدهم أول ما تختار الفيديو (تقدر تعدّلهم)
 async function algoPack(force) {
   const id = pub.videoId, note = $("pubAlgo");
-  if (!id) return force && toast("اختار فيديو من الفولدر الأول", true);
+  if (!id) return force && toast("اختر فيديو من المجلد أولًا", true);
   if (!force && $("postCaption").value.trim()) return;
-  if (force) { note.hidden = false; note.textContent = "⏳ بيكتب الكابشن…"; }
+  if (force) { note.hidden = false; note.textContent = "⏳ جارٍ الكتابة التعليق النصي…"; }
   try {
     const pl = checkedPlatforms().map(platOf)[0] || "";
     const r = await api("/api/algo/post-pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ export_id: id, platform: pl }) });
     if (pub.videoId !== id || pub.editing) return;
-    if (!r.on) { note.hidden = !force; note.textContent = "⚡ وضع الخوارزمية مقفول (افتحه من عقل البراند ← منافسينك في المجال)"; return; }
+    if (!r.on) { note.hidden = !force; note.textContent = "⚡ وضع الخوارزمية مغلق (افتحه من عقل العلامة ← منافسوك في المجال)"; return; }
     if (force || !$("postCaption").value.trim()) $("postCaption").value = r.caption;
     $("coverOn").checked = true;
     setCover(r.cover_ms);
     pub.notAi = !r.ai;
     note.hidden = false;
-    note.textContent = `⚡ اتجهز بالخوارزمية: كابشن (هوك تاني${r.cta ? " + دعوة الخطة" : ""} + هاشتاجات المجال) · الغلاف ${r.cover_hook ? "على فريم الهوك" : "قبل الآخر بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل براحتك.`;
+    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + هاشتاجات المجال) · الغلاف ${r.cover_hook ? "على فريم الخطاف" : "قبل الآخر بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل براحتك.`;
     renderPostExtras();
   } catch (err) {
     note.hidden = !force;
@@ -463,7 +463,7 @@ function brandCaption(text) {
 }
 $("brandCaption").onclick = () => {
   const out = brandCaption($("postCaption").value);
-  if (out === null) return toast("مفيش كابشن افتراضي في عقل البراند (تاب «التسليم»)", true);
+  if (out === null) return toast("لا يوجد تعليق نصي افتراضي في عقل العلامة (تبويب «التسليم»)", true);
   $("postCaption").value = out;
   $("postCaption").focus();
 };
@@ -496,13 +496,13 @@ async function dmFlowLoad() {
   try { dmFlowD = await api("/api/dm/flow"); } catch { return; }
   $("dmAsk").value = dmFlowD.ask; $("dmNudge").value = dmFlowD.nudge; $("dmYes").value = dmFlowD.yes.join("، ");
   if (!pub.editing) $("dmGate").checked = dmFlowD.on;
-  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم اللينك · ${dmFlowD.nudged} مستنيين يعملوا فولو` : "";
+  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم الرابط · ${dmFlowD.nudged} ينتظرون يعملون فوإذا` : "";
 }
 $("dmFlowSave").addEventListener("click", async () => {
   try {
     dmFlowD = await api("/api/dm/flow", { method: "POST", ...jsonBody({ on: $("dmGate").checked, ask: $("dmAsk").value, nudge: $("dmNudge").value,
       yes: $("dmYes").value.split(/[,،]/).map((x) => x.trim()).filter(Boolean) }) });
-    toast("✅ السيناريو اتحفظ للبراند");
+    toast("✅ السيناريو حُفظ للعلامة");
   } catch (err) { toast(err.message, true); }
 });
 async function dmFill() {
@@ -534,10 +534,10 @@ $("postCaption").addEventListener("input", async () => {
 });
 $("dmCta").addEventListener("click", () => {
   const w = $("dmWords").value.split(/[,،]/)[0]?.trim();
-  if (!w) return toast("اكتب الكلمة الأول", true);
+  if (!w) return toast("اكتب الكلمة أولًا", true);
   const tt = [...$("postPlatforms").querySelectorAll("input:checked")].some((i) => platOf(i.value) === "tiktok");
-  const lines = [`💬 اكتب «${w}» في كومنت ويوصلك على الخاص`];
-  if (tt && dmDef?.number) lines.push(`📩 على تيك توك: ابعت «${w}» على الواتساب ${dmDef.number}`);
+  const lines = [`💬 اكتب «${w}» في تعليق ويوصلك على الخاص`];
+  if (tt && dmDef?.number) lines.push(`📩 على تيك توك: أرسل «${w}» على الواتساب ${dmDef.number}`);
   else if (tt) lines.push(`📩 على تيك توك: ابعتلنا «${w}» في رسالة`);
   const c = $("postCaption");
   c.value = `${c.value.trim()}\n\n${lines.join("\n")}`.trim();
@@ -559,9 +559,9 @@ function nextSlot() {
 }
 const QUICK = [
   ["بعد ساعة", () => nextSlot()],
-  ["بكرة 12 الضهر", () => atHour(1, 12)],
-  ["بكرة 6 المغرب", () => atHour(1, 18)],
-  ["بكرة 9 بالليل", () => atHour(1, 21)],
+  ["غدًا 12 الضهر", () => atHour(1, 12)],
+  ["غدًا 6 المغرب", () => atHour(1, 18)],
+  ["غدًا 9 بالليل", () => atHour(1, 21)],
 ];
 function atHour(daysAhead, hour) {
   const d = new Date();
@@ -574,7 +574,7 @@ $("quickTimes").addEventListener("click", (e) => {
   const b = e.target.closest("[data-q]");
   if (!b) return;
   setWhen(QUICK[Number(b.dataset.q)][1]());
-  $("quickTimes").querySelectorAll("[data-q]").forEach((x) => x.classList.toggle("on", x === b));   // الميعاد اللي اتختار بيبان غامق
+  $("quickTimes").querySelectorAll("[data-q]").forEach((x) => x.classList.toggle("on", x === b));   // الموعد الذي اختير يظهر غامق
 });
 $("postWhen").addEventListener("input", () => $("quickTimes").querySelectorAll(".on").forEach((x) => x.classList.remove("on")));
 
@@ -582,7 +582,7 @@ function resetPostForm() {
   pub.editing = null;
   pub.notAi = false;
   $("pubAlgo").hidden = true;
-  $("postFormTitle").textContent = "جدولة بوست";
+  $("postFormTitle").textContent = "جدولة منشور";
   $("postSubmit").textContent = "جدول";
   $("postCancel").hidden = true;
   $("postCaption").value = "";
@@ -607,14 +607,14 @@ $("postForm").addEventListener("submit", (e) => {
 $("postNow").onclick = () => submitPost(true);
 
 async function submitPost(now) {
-  if (!pub.videoId) return toast("اختار فيديو من الفولدر الأول", true);
+  if (!pub.videoId) return toast("اختر فيديو من المجلد أولًا", true);
   const platforms = checkedPlatforms();
-  if (!platforms.length) return toast("اختار منصة واحدة على الأقل", true);
+  if (!platforms.length) return toast("اختر منصة واحدة على الأقل", true);
   const when = now ? new Date() : new Date($("postWhen").value);
-  if (isNaN(when)) return toast("اختار الميعاد", true);
+  if (isNaN(when)) return toast("اختر الموعد", true);
   const names = platforms.map(tLabel).join("، ");
-  if (now && !(await uiConfirm(`البوست هينزل دلوقتي على: ${names}. تكمّل؟`))) return;
-  if (!now && when < new Date() && !(await uiConfirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟"))) return;
+  if (now && !(await uiConfirm(`المنشور سينزل الآن على: ${names}. تُكمل؟`))) return;
+  if (!now && when < new Date() && !(await uiConfirm("هذا الموعد عدّى، فالمنشور سيُنشر مباشرة. تُكمل؟"))) return;
   const body = JSON.stringify({
     export_id: pub.videoId,
     caption: $("postCaption").value,
@@ -628,8 +628,8 @@ async function submitPost(now) {
       headers: { "Content-Type": "application/json" },
       body,
     });
-    toast(now ? "🚀 البوست بيتبعت للنشر دلوقتي" : pub.editing ? "✅ البوست اتعدّل"
-      : `✅ اتجدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
+    toast(now ? "🚀 المنشور يُرسل للنشر الآن" : pub.editing ? "✅ المنشور عُدّل"
+      : `✅ جُدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
     resetPostForm();
     await pubLoadPosts();
   } catch (err) {
@@ -644,7 +644,7 @@ async function pubLoadPosts() {
   // بوست كان بيتبعت أو متجدول وفشل: نقول على طول والسبب إيه
   for (const p of pub.posts) {
     const was = before.get(p.id);
-    if (p.status === "failed" && was && was !== "failed") toast(`✕ البوست ماتبعتش: ${p.error || "فشل"}`, true);
+    if (p.status === "failed" && was && was !== "failed") toast(`✕ المنشور لم تُرسل: ${p.error || "فشل"}`, true);
   }
   renderPosts();
   renderReady();
@@ -676,10 +676,10 @@ function renderPosts() {
         ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
-          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو اتمسح"))} · ${p.platforms.map(tLabel).join("، ")}</span>
+          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو حُذف"))} · ${p.platforms.map(tLabel).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
-          ${p.options?.dm ? `<span class="tags" title="${escapeHtml(Object.entries(p.options.dm_auto || {}).map(([k, v]) => `${k}: ${v.error || "شغال"}`).join(" · "))}">💬 «${escapeHtml(p.options.dm.words[0])}»${p.options.dm_auto ? (Object.values(p.options.dm_auto).some((v) => v.error) ? " ⚠️" : " ✓ شغال") : ""}</span>` : ""}
+          ${p.options?.dm ? `<span class="tags" title="${escapeHtml(Object.entries(p.options.dm_auto || {}).map(([k, v]) => `${k}: ${v.error || "يعمل"}`).join(" · "))}">💬 «${escapeHtml(p.options.dm.words[0])}»${p.options.dm_auto ? (Object.values(p.options.dm_auto).some((v) => v.error) ? " ⚠️" : " ✓ يعمل") : ""}</span>` : ""}
           ${p.error ? `<span class="err">${escapeHtml(p.error)}</span>` : ""}
         </div>
         <span class="pill ${cls}">${label}</span>
@@ -708,7 +708,7 @@ function postEditable(p) {
 function editPost(p) {
   pub.editing = p.id;
   pub.videoId = p.export_id;
-  $("postFormTitle").textContent = "تعديل البوست";
+  $("postFormTitle").textContent = "تعديل المنشور";
   $("postSubmit").textContent = "💾 حفظ التعديل";
   $("postCancel").hidden = false;
   $("postCaption").value = p.caption;
@@ -743,7 +743,7 @@ async function postAction(act, p) {
       await pubLoadPosts();
     }
     if (act === "delete") {
-      if (!(await uiConfirm(p.status === "scheduled" ? "إلغاء البوست ده؟" : "حذف البوست ده من القايمة؟"))) return false;
+      if (!(await uiConfirm(p.status === "scheduled" ? "إلغاء هذا المنشور؟" : "حذف هذا المنشور من القائمة؟"))) return false;
       await api(`/api/posts/${p.id}`, { method: "DELETE" });
       if (pub.editing === p.id) resetPostForm();
       await pubLoadPosts();
@@ -764,15 +764,15 @@ async function loadRemoteOrphans(verbose = false) {
   try {
     const list = await api("/api/posts/remote");
     box.hidden = !list.length;
-    if (verbose && !list.length) toast("✅ كل البوستات المتجدولة موجودة هنا");
+    if (verbose && !list.length) toast("✅ كل المنشورات المتجدولة موجودة هنا");
     const when = (iso) => (iso ? new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "");
-    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} بوست متجدول على حساباتك ومش في القايمة هنا</p>` + list.map((o) => `
+    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} منشور متجدول على حساباتك ومش في القائمة هنا</p>` + list.map((o) => `
       <div class="orphan" data-rid="${escapeHtml(o.id)}">
         ${o.media_url ? lightVideo(escapeHtml(o.media_url), "muted") : ""}
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
           <span>${o.platforms.map(tLabel).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
-        <span class="acts"><button class="btn sm" data-oact="adopt">＋ ضيفه للقايمة</button>
+        <span class="acts"><button class="btn sm" data-oact="adopt">＋ أضفه للقايمة</button>
           <button class="btn sm danger" data-oact="cancel">✕ الغيه</button></span>
       </div>`).join("") : "";
   } catch (err) {
@@ -787,11 +787,11 @@ $("remoteOrphans").addEventListener("click", async (e) => {
   try {
     if (btn.dataset.oact === "adopt") {
       await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
-      toast("✅ البوست اتضاف للقايمة");
+      toast("✅ المنشور أُضيف للقايمة");
     } else {
-      if (!(await uiConfirm("تلغي البوست ده؟ مش هيتنشر."))) return;
+      if (!(await uiConfirm("تلغي هذا المنشور؟ لن يُنشر."))) return;
       await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
-      toast("✅ اتلغى");
+      toast("✅ أُلغي");
     }
     await pubLoadPosts();
     await loadRemoteOrphans();
@@ -823,7 +823,7 @@ async function loadPublished(verbose = false) {
           <span class="pl-links">${plats}</span></div>
       </li>`;
     }).join("");
-    if (verbose) toast("✅ اتحدّث");
+    if (verbose) toast("✅ حُدّث");
   } catch (err) {
     if (verbose) toast(err.message, true);
   }
@@ -853,9 +853,9 @@ function dmCheck(cap, pl) {
   dmSpokenLoad();
   const spoken = pub.spoken?.id === pub.videoId ? pub.spoken.word : "", inCap = dmDetect(cap), word = inCap || spoken;
   if (!word) return [];
-  const where = inCap ? "في الكابشن" : "في آخر الفيديو";
-  if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد الأوتوماتيك بيشتغل على إنستجرام وفيسبوك بس، وفي تيك توك خلّي الدعوة «ابعت الكلمة على الواتساب»`, tip: "تيك توك مش بيسمح بالرد الأوتوماتيك على الكومنتات في منطقتنا" }];
-  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» شغال: اللي هيعلّق هيوصله رسالة على الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد الأوتوماتيك مش متفعّل`, tip: "من غيره اللي هيعلّق مش هيوصله حاجة، وده بيضيّع العميل", act: "dm", word }];
+  const where = inCap ? "في التعليق النصي" : "في آخر الفيديو";
+  if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يشتغل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على الواتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
+  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: ما سيعلّق سيوصله رسالة على الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير متفعّل`, tip: "من غيره الذي سيعلّق لن يوصله شيء، وده يضيّع العميل", act: "dm", word }];
 }
 function pubChecks() {
   const cap = $("postCaption").value.trim(), first = cap.split("\n").find((l) => l.trim()) || "";
@@ -863,15 +863,15 @@ function pubChecks() {
   const fw = first.replace(/#[\p{L}\p{N}_]+/gu, "").trim().split(/\s+/).filter(Boolean).length;
   const pl = checkedPlatforms(), visual = pl.some((v) => ["instagram", "tiktok"].includes(platOf(v)));
   return [
-    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر هوك تاني (مختصر، بيكمّل الفضول، مش «أهلًا بيكم»)", tip: "آخر حاجة بيقراها قبل ما يسكرول: سيب سؤال مفتوح أو كمّل وعد الفيديو" },
-    { ok: PC_CTA.test(cap), t: "فيه دعوة واضحة (علّق بكلمة، احفظ، اللينك…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
-    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (دلوقتي ${tags.length})`, tip: "الهاشتاج تأثيره ضعيف؛ ٣–٥ محددين كفاية" },
-    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "من غير #fyp #viral #explore", tip: "بيودّوا الفيديو لناس مش مهتمة فوقت المشاهدة يقل" },
-    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "الغلاف متختار بنفسك (فريم مثير)", tip: "فرصة هوك زيادة في البروفايل", act: "cover" }] : []),
+    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، غير «أهلًا بيكم»)", tip: "آخر شيء يقرؤها قبل ما يسكرول: اترك سؤال مفتوح أو أكمل وعد الفيديو" },
+    { ok: PC_CTA.test(cap), t: "فيه دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
+    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (الآن ${tags.length})`, tip: "الهاشتاج تأثيره ضعيف؛ ٣–٥ محددين كفاية" },
+    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "يودّون الفيديو لناس غير مهتمة فوقت المشاهدة يقل" },
+    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "الغلاف متختار بنفسك (فريم مثير)", tip: "فرصة خطاف زيادة في البروفايل", act: "cover" }] : []),
     ...dmCheck(cap, pl),
-    { ok: PC_AI.test(cap) || !!pub.notAi, t: "لو الفيديو معمول بالذكاء الصناعي معلّم عليه", tip: "مفيش عقاب، والمنصة ممكن تشيله لو ماعلّمتش", act: "ai" },
-    { ok: null, t: "الترجمة في نص الشاشة ومش مستخبية تحت الكابشن والأزرار", tip: "اتأكد من الفيديو نفسه" },
-    { ok: null, t: "بعد النشر: رد على أول ٣٠ كومنت", tip: "النقاش في الكومنتات بيطوّل وقت المشاهدة" },
+    { ok: PC_AI.test(cap) || !!pub.notAi, t: "إذا الفيديو معمول بالذكاء الصناعي معلّم عليه", tip: "لا يوجد عقاب، والمنصة يمكن تزيله إذا لم تحدد", act: "ai" },
+    { ok: null, t: "الترجمة في نص الشاشة ومش مستخبية أسفل التعليق النصي والأزرار", tip: "تأكد من الفيديو نفسه" },
+    { ok: null, t: "بعد النشر: رد على أول ٣٠ تعليق", tip: "النقاش في التعليقات يطوّل وقت المشاهدة" },
   ];
 }
 function renderPubCheck() {
@@ -879,11 +879,11 @@ function renderPubCheck() {
   if (!box) return;
   const list = pubChecks(), scored = list.filter((c) => c.ok !== null), n = scored.filter((c) => c.ok).length;
   box.innerHTML = `<div class="pc-head"><b>✅ قبل ما تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
-      <button type="button" class="btn sm" id="pcReview" title="الموديل بيقيّم الكابشن بقواعد الخوارزميات ويقترح واحد أحسن">📡 افحص الكابشن</button></div>
+      <button type="button" class="btn sm" id="pcReview" title="النموذج يقيّم التعليق النصي بقواعد الخوارزميات ويقترح واحد أحسن">📡 افحص التعليق النصي</button></div>
     <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
-      ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختار الغلاف</button>` : ""}
+      ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختر الغلاف</button>` : ""}
       ${c.act === "dm" && !c.ok ? `<button type="button" class="btn xs" data-pc="dm" data-word="${escapeHtml(c.word)}">💬 فعّله</button>` : ""}
-      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم إنه AI</button><button type="button" class="btn xs" data-pc="notai">مش AI</button>` : ""}</li>`).join("")}</ul>
+      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم أنه AI</button><button type="button" class="btn xs" data-pc="notai">غير AI</button>` : ""}</li>`).join("")}</ul>
     <div id="pcOut"></div>`;
 }
 $("postCaption").addEventListener("input", renderPubCheck);
@@ -915,9 +915,9 @@ $("pubCheck").addEventListener("click", async (e) => {
   if (use) { $("postCaption").value = use.dataset.pcuse; return renderPubCheck(); }
   if (!e.target.closest("#pcReview")) return;
   const cap = $("postCaption").value.trim();
-  if (cap.length < 8) return toast("اكتب الكابشن الأول", true);
+  if (cap.length < 8) return toast("اكتب التعليق النصي أولًا", true);
   const out = $("pcOut");
-  out.innerHTML = `<p class="muted">⏳ بيفحص…</p>`;
+  out.innerHTML = `<p class="muted">⏳ يفحص…</p>`;
   try {
     const pl = checkedPlatforms().map(platOf)[0] || "";
     const r = await api("/api/algo/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cap, kind: "caption", platform: pl }) });

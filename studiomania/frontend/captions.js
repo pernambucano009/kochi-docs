@@ -16,7 +16,7 @@ async function loadBrandOptions() {
     $("capTemplates").innerHTML = Object.entries(brand.options.templates)
       .map(([k, t]) => `<button type="button" data-t="${k}" style="font-family:'${t.font}';color:${t.color};${
         t.box ? `background:${t.box_color};` : `-webkit-text-stroke:1px #000;paint-order:stroke fill;`}">
-        كابشن <span style="color:${t.highlight_on ? t.highlight : t.color}">&nbsp;هنا</span><small>${t.label}</small></button>`)
+        تعليق نصي <span style="color:${t.highlight_on ? t.highlight : t.color}">&nbsp;هنا</span><small>${t.label}</small></button>`)
       .join("");
   }
   brand.logoUrl = (await api("/api/logo")).url;
@@ -53,12 +53,12 @@ function renderBrandPanels() {
   $("capHlOn").checked = !!c.highlight_on; $("capBox").checked = !!c.box; $("capPop").checked = !!c.pop;
   renderTranscriptStatus();
   $("capRestore").hidden = !c.removed?.length;
-  $("capRestore").textContent = `↺ رجّع الكابشن المحذوف (${c.removed?.length || 0} كلمة)`;
+  $("capRestore").textContent = `↺ استعد التعليق النصي المحذوف (${c.removed?.length || 0} كلمة)`;
 
   $("logoOn").checked = !!l.enabled;
   $("logoThumb").hidden = $("logoRemove").hidden = !brand.logoUrl;
   if (brand.logoUrl) $("logoThumb").src = brand.logoUrl;
-  $("logoUpLabel").textContent = brand.logoUrl ? "غيّر اللوجو" : "ارفع اللوجو";
+  $("logoUpLabel").textContent = brand.logoUrl ? "غيّر الشعار" : "ارفع الشعار";
   $("logoOpts").hidden = !l.enabled || !brand.logoUrl;
   $("logoSize").value = l.size; $("logoSizeVal").textContent = `${l.size}%`;
   $("logoX").value = l.x; $("logoXVal").textContent = `${l.x}%`;
@@ -89,8 +89,8 @@ let capLangs = null;
 async function capLangFill() {
   if (capLangs) return;
   capLangs = {};
-  try { capLangs = await api("/api/captions/langs"); } catch { /* القايمة فاضية */ }
-  $("capLang").innerHTML = `<option value="">نفس لغة الكلام</option>` + Object.entries(capLangs).map(([k, v]) => `<option value="${k}">${escapeHtml(v)}</option>`).join("");
+  try { capLangs = await api("/api/captions/langs"); } catch { /* القائمة فارغة */ }
+  $("capLang").innerHTML = `<option value="">نفس لغة النص</option>` + Object.entries(capLangs).map(([k, v]) => `<option value="${k}">${escapeHtml(v)}</option>`).join("");
   $("capLang").value = mt.project?.data.captions?.lang || "";
 }
 async function capLangLoad(lang) {
@@ -99,12 +99,12 @@ async function capLangLoad(lang) {
   const key = `${voice.id}:${lang}`;
   brand.trx = brand.trx || {};
   brand.trxBusy = brand.trxBusy || {};
-  if (key in brand.trx || brand.trxBusy[key]) return;   // (لو فشلت مش بتتعاد لوحدها؛ تغيير اللغة بيعيدها)
+  if (key in brand.trx || brand.trxBusy[key]) return;   // (إذا فشلت لا تُعاد تلقائيًا؛ تغيير اللغة يعيدها)
   brand.trxBusy[key] = true;
-  $("capLangHint").textContent = "⏳ بيترجم الكابشن…";
+  $("capLangHint").textContent = "⏳ جارٍ الترجمة التعليق النصي…";
   try {
     brand.trx[key] = (await api(`/api/audio/${voice.id}/transcript/${lang}`)).words;
-    $("capLangHint").textContent = "✓ اتترجم";
+    $("capLangHint").textContent = "✓ تُرجم";
   } catch (err) { brand.trx[key] = null; $("capLangHint").textContent = `⚠️ ${err.message}`; }
   delete brand.trxBusy[key];
   updatePreviewOverlays();
@@ -145,13 +145,13 @@ $("logoUpload").addEventListener("change", async (e) => {
     logoCfg().enabled = true;
     renderBrandPanels();
     scheduleSave();
-    toast("✅ اللوجو اترفع");
+    toast("✅ الشعار رُفع");
   } catch (err) {
     toast(err.message, true);
   }
 });
 $("logoRemove").onclick = async () => {
-  if (!(await uiConfirm("حذف اللوجو من كل الفيديوهات الجاية؟"))) return;
+  if (!(await uiConfirm("حذف الشعار من كل الفيديوهات القادمة؟"))) return;
   await api("/api/logo", { method: "DELETE" });
   brand.logoUrl = null;
   renderBrandPanels();
@@ -190,7 +190,7 @@ $("pvLogo").addEventListener("load", updatePreviewOverlays);
 function liveCaption(c) {
   const blocks = captionBlocks();
   if (!blocks.length) {
-    if (!mt.project?.data.clips?.length) return { words: [], hl: -1 };   // مشروع فاضي: مفيش كابشن مثال
+    if (!mt.project?.data.clips?.length) return { words: [], hl: -1 };   // مشروع فارغ: لا يوجد تعليق نصي مثال
     const words = sampleWords(c.words);
     return { words, hl: c.highlight_on && words.length > 1 ? 1 : -1 };
   }
@@ -210,7 +210,7 @@ function liveCaption(c) {
 function sampleWords(n) {
   const voice = mt.project?.data.voice;
   const tr = voice && brand.tr[voice.id];
-  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "ده مثال للكابشن على الفيديو بتاعك".split(" ");
+  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "هذا مثال للكابشن على الفيديو الخاص بك".split(" ");
   return src.slice(0, Math.max(1, n));
 }
 
@@ -229,7 +229,7 @@ function renderTranscriptStatus() {
   clearTimeout(brand.trTimer);
   if (!voice) {
     st.className = "cap-status err";
-    st.textContent = "⚠️ اختار تعليق صوتي الأول (تحت)، الكابشن بيتكتب منه.";
+    st.textContent = "⚠️ اختر تعليق صوتي أولًا (أسفل)، التعليق النصي يُكتب منه.";
     return;
   }
   if (!tr) {
@@ -240,7 +240,7 @@ function renderTranscriptStatus() {
   }
   if (tr.status === "working") {
     st.className = "cap-status";
-    st.textContent = "⏳ بيسمع التعليق الصوتي ويكتب الكلام...";
+    st.textContent = "⏳ جارٍ الاستماع التعليق الصوتي ويكتب النص...";
     $("capTranscribe").disabled = true;
     brand.trTimer = setTimeout(async () => {
       await loadTranscript(voice.id);
@@ -250,16 +250,16 @@ function renderTranscriptStatus() {
     }, 3000);
   } else if (tr.status === "done") {
     st.className = "cap-status ok";
-    st.textContent = `✓ الكلام جاهز (${tr.words.length} كلمة)${tr.edited ? " · متعدّل" : ""}`;
-    $("capTranscribe").textContent = "🎧 اكتبه تاني من الأول";
+    st.textContent = `✓ النص جاهز (${tr.words.length} كلمة)${tr.edited ? " · متعدّل" : ""}`;
+    $("capTranscribe").textContent = "🎧 اكتبه مرة أخرى من أولًا";
   } else if (tr.status === "failed") {
     st.className = "cap-status err";
     st.textContent = `✕ ${tr.error || "فشل"}`;
-    $("capTranscribe").textContent = "🎧 جرّب تاني";
+    $("capTranscribe").textContent = "🎧 جرّب مرة أخرى";
   } else {
     st.className = "cap-status";
-    st.textContent = "لسه الكلام متكتبش.";
-    $("capTranscribe").textContent = "🎧 اكتب الكلام من التعليق الصوتي";
+    st.textContent = "ما زال النص لم يُكتب.";
+    $("capTranscribe").textContent = "🎧 اكتب النص من التعليق الصوتي";
     // الكابشن شغال: الكلام بيتكتب من التعليق الصوتي لوحده (مرة واحدة لكل صوت)
     brand.autoTr ||= new Set();
     if (capCfg().enabled && !brand.autoTr.has(voice.id)) {
@@ -274,7 +274,7 @@ function renderTranscriptStatus() {
 $("capTranscribe").onclick = async () => {
   const voice = mt.project.data.voice;
   const tr = brand.tr[voice.id];
-  if (tr?.edited && !(await uiConfirm("إنت عدّلت الكلام قبل كده. الكتابة من الأول هتمسح تعديلاتك. تكمّل؟"))) return;
+  if (tr?.edited && !(await uiConfirm("أنت عدّلت النص من قبل. الكتابة من أولًا ستحذف تعديلاتك. تُكمل؟"))) return;
   try {
     await api(`/api/audio/${voice.id}/transcribe`, { method: "POST" });
     brand.tr[voice.id] = { status: "working", words: [] };
@@ -339,7 +339,7 @@ $("trSave").onclick = async () => {
   document.querySelectorAll("#trList .tr-row").forEach((row) => {
     const g = groups[Number(row.dataset.i)];
     const texts = row.querySelector("input").value.split(/\s+/).filter(Boolean);
-    if (!texts.length) return; // لو مسحت الجملة كلها، بتختفي
+    if (!texts.length) return; // إذا مسحت الجملة كلها، تختفي
     if (texts.length === g.length) {
       texts.forEach((t, i) => words.push({ w: t, s: g[i].s, e: g[i].e }));
     } else {
@@ -354,7 +354,7 @@ $("trSave").onclick = async () => {
       body: JSON.stringify({ words }),
     });
     closeTr();
-    toast("✅ الكلام اتحفظ");
+    toast("✅ النص حُفظ");
     renderBrandPanels();
     scheduleTimeline();
   } catch (err) {

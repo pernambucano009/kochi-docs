@@ -29,9 +29,9 @@
 <div class="refs">
   <a href="/" class="btn sm">→ رجوع للبرنامج</a>
   <h1>📦 أرشيف المراجع</h1>
-  <p class="hint">ارفع هنا الفيديوهات والصور اللي عايزنا نطلّع منها ستايلات وعناصر جديدة. بتتحفظ زي ما هي: من غير تقسيم ولا تحليل ولا أي تكلفة.</p>
+  <p class="hint">ارفع هنا الفيديوهات والصور الذي عايزنا نطلّع منها أساليب وعناصر جديدة. تُحفظ كما هي: بدون تقسيم ولا تحليل ولا أي تكلفة.</p>
   <label class="refs-drop" id="drop">
-    <b>اسحب الفيديوهات هنا أو دوس واختارهم</b><br><small class="muted">فيديو أو صورة أو zip · تقدر تختار كذا ملف مرة واحدة</small>
+    <b>اسحب الفيديوهات هنا أو اضغط واخترهم</b><br><small class="muted">فيديو أو صورة أو zip · يمكنك تختار كذا ملف مرة واحدة</small>
     <input type="file" id="pick" multiple accept="video/*,image/*,.zip,.mov,.mkv" hidden>
   </label>
   <div id="queue"></div>
@@ -49,7 +49,7 @@ async function load() {
   const r = await fetch("/api/refs");
   if (r.status === 401) { location.href = "/login"; return; }
   const items = await r.json();
-  $("sum").textContent = items.length ? `${items.length} ملف · ${mb(items.reduce((a, x) => a + x.size, 0))}` : "لسه مفيش حاجة في الأرشيف.";
+  $("sum").textContent = items.length ? `${items.length} ملف · ${mb(items.reduce((a, x) => a + x.size, 0))}` : "لا يوجد بعد شيء في الأرشيف.";
   $("list").innerHTML = items.map((x) => `<div class="refs-row">
     <span class="nm" dir="auto" data-no-i18n>${esc(x.name)}</span><small class="muted">${mb(x.size)} · ${esc((x.created_at || "").slice(0, 16).replace("T", " "))}</small>
     <a class="btn sm" href="${x.url}" target="_blank" rel="noopener">▶️</a>
@@ -73,12 +73,12 @@ function upload(file) {
     };
     xhr.onload = () => {
       let d = {};
-      try { d = JSON.parse(xhr.responseText); } catch { /* مش JSON */ }
+      try { d = JSON.parse(xhr.responseText); } catch { /* غير JSON */ }
       if (xhr.status >= 200 && xhr.status < 300) { row.remove(); load(); }
       else { pct.textContent = `⚠️ ${d.detail || xhr.status}`; pct.className = "err"; }
       resolve();
     };
-    xhr.onerror = () => { pct.textContent = "⚠️ الرفع وقف: جرب تاني"; pct.className = "err"; resolve(); };
+    xhr.onerror = () => { pct.textContent = "⚠️ الرفع توقف: جرب مرة أخرى"; pct.className = "err"; resolve(); };
     const fd = new FormData();
     fd.append("file", file);
     xhr.send(fd);
@@ -101,7 +101,7 @@ drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); add([...e.dataTransfer.files]); });
 $("list").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-del]");
-  if (!b || !(await uiConfirm(`تمسح «${b.dataset.name}» من الأرشيف؟`))) return;
+  if (!b || !(await uiConfirm(`تحذف «${b.dataset.name}» من الأرشيف؟`))) return;
   await fetch(`/api/refs/${b.dataset.del}`, { method: "DELETE" });
   load();
 });

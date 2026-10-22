@@ -5,8 +5,8 @@
 const OV_LANE_H = 30;
 const OV_BLENDS = [["normal", "عادي"], ["screen", "تفتيح (Screen)"], ["lighten", "الأفتح"], ["addition", "إضافة"],
   ["multiply", "تغميق (Multiply)"], ["darken", "الأغمق"], ["overlay", "Overlay"], ["softlight", "Soft light"]];
-const OV_MASKS = [["", "بدون"], ["circle", "دايرة"], ["rounded", "حواف مدوّرة"], ["heart", "قلب"], ["diamond", "معيّن"]];
-const OV_ANIMS = [["", "بدون"], ["fade", "ظهور"], ["pop", "بوب"], ["zoom", "زووم"], ["slideup", "من تحت"], ["slidedown", "من فوق"],
+const OV_MASKS = [["", "بدون"], ["circle", "دائرة"], ["rounded", "حواف مدوّرة"], ["heart", "قلب"], ["diamond", "معيّن"]];
+const OV_ANIMS = [["", "بدون"], ["fade", "ظهور"], ["pop", "بوب"], ["zoom", "زووم"], ["slideup", "من أسفل"], ["slidedown", "من أعلى"],
   ["slideleft", "من اليمين"], ["slideright", "من الشمال"]];
 
 const overlays = () => mt.project?.data.overlays || (mt.project ? (mt.project.data.overlays = []) : []);
@@ -165,7 +165,7 @@ function overPointerDown(e) {
   if (!box || e.button !== 0) return;
   e.preventDefault();
   e.stopPropagation();
-  if (kindLocked("over")) return toast("تراك الطبقات مقفول 🔒", true);
+  if (kindLocked("over")) return toast("تراك الطبقات مغلق 🔒", true);
   pause();
   const i = Number(box.dataset.i), o = overlays()[i];
   selectItem({ kind: "over", i });
@@ -212,12 +212,12 @@ function renderOverRow() {
   const lanes = Math.max(1, ...list.map((o) => (o.lane | 0) + 1)) + (list.length ? 1 : 0);
   const h = Math.min(6, lanes) * OV_LANE_H + 4;
   row.style.height = head.style.height = `${h}px`;
-  if (!list.length) { row.innerHTML = `<div class="tl-empty-track">طبقات فوق الفيديو: دوس ⧉ على فيديو في المكتبة أو ارفع صورة من تاب 🖼️ طبقة</div>`; return; }
+  if (!list.length) { row.innerHTML = `<div class="tl-empty-track">طبقات أعلى الفيديو: اضغط ⧉ على فيديو في المكتبة أو ارفع صورة من تبويب 🖼️ طبقة</div>`; return; }
   row.innerHTML = list.map((o, i) => {
     const src = ovSource(o), sel = isSel({ kind: "over", i });
     const thumb = src?.image ? `<img src="${src.url}" alt="">` : src ? lightVideo(src.url, "muted playsinline") : "";
     return `<div class="tl-over ${sel ? "selected" : ""} ${o.disabled ? "disabled" : ""}" data-oi="${i}" style="left:${o.t0 * mt.pps}px;width:${Math.max(4, o.dur * mt.pps)}px;top:${2 + (o.lane | 0) * OV_LANE_H}px;height:${OV_LANE_H - 3}px">
-      ${thumb}<span class="nm" dir="auto">${src?.image ? "🖼️" : "🎞️"} ${escapeHtml(src?.name || "⚠️ اتمسح")}</span><b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
+      ${thumb}<span class="nm" dir="auto">${src?.image ? "🖼️" : "🎞️"} ${escapeHtml(src?.name || "⚠️ حُذف")}</span><b class="h l" data-h="l"></b><b class="h r" data-h="r"></b></div>`;
   }).join("");
 }
 function overTrackDown(e) {
@@ -265,7 +265,7 @@ function overTrackDown(e) {
 }
 function splitOver(i, t) {
   const o = overlays()[i];
-  if (!o || t <= o.t0 + 0.05 || t >= o.t0 + o.dur - 0.05) return toast("حط المؤشر جوه الطبقة عشان تقسمها", true);
+  if (!o || t <= o.t0 + 0.05 || t >= o.t0 + o.dur - 0.05) return toast("ضع المؤشر داخل الطبقة لكي تقسمها", true);
   pushHistory();
   const b = JSON.parse(JSON.stringify(o));
   const cut = t - o.t0;
@@ -285,7 +285,7 @@ function freeOverLane(t0, dur) {
 }
 function addOverlay(src, extra = {}) {
   if (!mt.project) return;
-  if (kindLocked("over")) return toast("تراك الطبقات مقفول 🔒", true);
+  if (kindLocked("over")) return toast("تراك الطبقات مغلق 🔒", true);
   pushHistory();
   const s = ovSource({ src, ...extra });
   const t0 = snap(extra.t0 ?? mt.t), dur = extra.dur ?? (s?.image ? 3 : Math.min(5, s?.duration || 3));
@@ -300,22 +300,22 @@ function addOverlay(src, extra = {}) {
 // القطعة من التراك الأساسي ← طبقة (في نفس وقتها)، والعكس
 function clipToOverlay() {
   const c = selectedClip(), it = selItem();
-  if (!c || !it) return toast("اختار قطعة فيديو الأول", true);
+  if (!c || !it) return toast("اختر قطعة فيديو أولًا", true);
   const t0 = it.t0, dur = it.t1 - it.t0;
   pushHistory();
   mt.project.data.clips.splice(it.i, 1);
   const o = { id: Math.random().toString(36).slice(2, 10), src: c.gen_id, t0, dur, start: c.start, x: 0.5, y: 0.5, w: 0.6, angle: 0, opacity: 1,
     blend: "normal", mask: "", chroma: null, volume: c.volume ?? 1, speed: clipSpeed(c), anim_in: null, anim_out: null, lane: freeOverLane(t0, dur) };
   overlays().push(o);
-  mt.undo.pop();  // خطوة واحدة بس
+  mt.undo.pop();  // خطوة واحدة فقط
   mt.sel = { kind: "over", i: overlays().length - 1 };
   showTab("over");
   changed();
-  toast("⤴ بقت طبقة فوق الفيديو");
+  toast("⤴ بقت طبقة أعلى الفيديو");
 }
 function overlayToMain() {
   const o = selOver();
-  if (!o || ovSource(o)?.image) return toast("الصور مينفعش تبقى في التراك الأساسي", true);
+  if (!o || ovSource(o)?.image) return toast("الصور لا يصلح تصبح في التراك الأساسي", true);
   pushHistory();
   const sp = o.speed || 1, d = mt.project.data;
   const idx = insertIndexAt(o.t0);
@@ -410,7 +410,7 @@ function initOverPane() {
     const form = new FormData();
     form.append("file", file);
     try {
-      toast(`⏳ بيرفع ${file.name}...`);
+      toast(`⏳ جارٍ الرفع ${file.name}...`);
       const img = file.type.startsWith("image/");
       const r = await api(img ? "/api/montage/overlay-image" : "/api/montage/upload", { method: "POST", body: form });
       if (img) ovImages.set(r.src, { url: r.url, w: r.w, h: r.h, name: r.name, image: true });
@@ -421,7 +421,7 @@ function initOverPane() {
       Object.assign(o, { src: img ? r.src : r.id, start: 0, src_w: w, src_h: h, name: r.name, w: cover, broll: o.broll ? "mine" : o.broll,
         dur: img ? o.dur : Math.min(o.dur, r.duration || o.dur) });
       drawOverlayLayer(); renderOverPane(); changed();
-      toast("✅ اتبدّلت");
+      toast("✅ استُبدلت");
     } catch (err) { toast(err.message, true); }
   });
   $("trkOver").addEventListener("pointerdown", overTrackDown);

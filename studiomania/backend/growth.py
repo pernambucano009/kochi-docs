@@ -129,14 +129,14 @@ def viral_messages(brand: str, niche: str, rows: list[dict]) -> list[dict]:
             f"حلّل أعلى ٣ (أو أقل لو مفيش). لكل واحد: ليه نجح، وأنهي قالب هوك استخدم من دول ({formulas})، والمبدأ النفسي اللي شغال بيه، وهيكله (بيبدأ إزاي ويكمّل إزاي ويخلص إزاي).\n"
             "وبعدين طلّع النمط المشترك، و٣ أفكار للبراند بنفس الهيكل بس بزاوية البراند وصوته (ممنوع تنسخ نفس الكلام أو الفكرة).\n"
             'رجّع JSON بس: {"top": [{"n": رقم البوست, "why": "", "formula": "", "principle": "", "structure": ""}], "pattern": "", '
-            '"ideas": [{"title": "", "hook": "", "idea": "", "principle": "", "based_on": رقم البوست}]}')
+            '"ideas": [{"title": "", "hook": "", "idea": "", "principle": "", "based_on": رقم المنشور}]}')
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
 def mock_viral(rows: list[dict]) -> dict:
     top = [{"n": r["n"], "why": "الهوك سؤال مباشر من مشكلة حقيقية", "formula": "سؤال يوقف", "principle": "فجوة الفضول", "structure": "سؤال ← مثال ← حل في جملة"} for r in rows[:3]]
     return {"top": top, "pattern": "البوستات اللي عدّت متوسطها بتبدأ بمشكلة الجمهور مش بالبراند",
-            "ideas": [{"title": "فكرة تجريبية", "hook": "أغلب الناس بتبدأ غلط هنا", "idea": "نفس الهيكل بزاوية البراند", "based_on": rows[0]["n"] if rows else 1}]}
+            "ideas": [{"title": "فكرة تجريبية", "hook": "أغلب الأشخاص تبدأ خطأ هنا", "idea": "نفس الهيكل بزاوية العلامة", "based_on": rows[0]["n"] if rows else 1}]}
 
 
 # ---------------------------------------------------------------- 💬 فرز الكومنتات

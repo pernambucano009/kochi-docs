@@ -15,7 +15,7 @@
     svg.setAttribute("aria-hidden", "true");
     svg.innerHTML = ["s3", "s2", "s1"].map((c) => `<rect class="${c}" pathLength="1000"/>`).join("");
     if (getComputedStyle(el).position === "static") el.style.position = "relative";
-    el.append(svg);   // في الآخر (فيه كود بيقرا أول عنصر في الزرار)
+    el.append(svg);   // في الآخر (فيه كود يقرأ أول عنصر في الزر)
     const fit = () => {
       const w = el.offsetWidth, h = el.offsetHeight, cs = getComputedStyle(el);
       const bw = parseFloat(cs.borderTopWidth) || 0;

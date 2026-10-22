@@ -21,7 +21,7 @@ BUILTIN = {
         "voice_tone": "warm, grateful, slow and proud",
         "sample": "تكريم مدرب رياضي بعد ١٠ سنين: أول فصل، أول بطولة، ١٠٠٠ متدرب، وشكرًا في الآخر",
         "schema": {
-            "title": "تكريم ورقي عتيق", "summary": "كولاج أرشيفي على ورق كريمي: صور مقصوصة زي الستيكر، خط إيد ونجوم، وكارت شكر في الآخر.",
+            "title": "تكريم ورقي عتيق", "summary": "كولاج أرشيفي على ورق كريمي: صور مقصوصة مثل الستيكر، خط يد ونجوم، وبطاقة شكر في الآخر.",
             "beat_sec": 0.0,
             "style": "Archival scrapbook collage on aged cream ruled paper: cut-out photos with a white sticker border and colored rings, "
                      "hand-drawn ink stars and underlines, stencil/typewriter headings, soft paper grain, gentle drop shadows, flat top light.",
@@ -50,7 +50,7 @@ BUILTIN = {
         "voice_tone": "calm, reflective storyteller, low and steady",
         "sample": "قصة متدرب: بدأ بوزن زيادة، فشل مرتين، وبعدين قرر يكمل ونجح",
         "schema": {
-            "title": "الأرشيف الحركي", "summary": "أبيض وأسود بالكامل: صور مقصوصة على ورق رسالة مكتوبة على آلة كاتبة، وكلام كبير بيتحرك.",
+            "title": "الأرشيف الحركي", "summary": "أبيض وأسود بالكامل: صور مقصوصة على ورق رسالة مكتوبة على آلة كاتبة، ونص كبير يتحرك.",
             "beat_sec": 0.0,
             "style": "Fully black-and-white archival kinetic typography: cut-out photos on a typewritten letter background, soft shadows, "
                      "film grain, scenes dissolve into each other through a blur.",
@@ -78,7 +78,7 @@ BUILTIN = {
         "voice_tone": "confident, clear teacher, punchy",
         "sample": "بطّل تتمرن كل يوم من غير راحة، وابدأ تنظم أيام الراحة: العضلة بتكبر وانت مرتاح",
         "schema": {
-            "title": "تحريري محفور", "summary": "أبيض وأسود على ورق خشن برسومات محفورة زي الكتب القديمة، وشعار بازل بيتفك ويتركب.",
+            "title": "تحريري محفور", "summary": "أبيض وأسود على ورق خشن برسومات محفورة مثل الكتب القديمة، وشعار بازل يتفك ويتركب.",
             "beat_sec": 0.0,
             "style": "Black-and-white editorial engraving on rough light paper: copperplate-style engraved illustrations like old books, "
                      "a jigsaw-puzzle emblem that breaks apart and reassembles, sharp arrows used as transitions.",
@@ -104,7 +104,7 @@ BUILTIN = {
         "voice_tone": "premium, assured, slightly dramatic",
         "sample": "نادي رياضي كبر من ٥٠ مشترك لـ ٥٠٠٠ في سنتين: إزاي القرار الصح غيّر كل حاجة",
         "schema": {
-            "title": "زجاجي ثلاثي الأبعاد", "summary": "رندر ثلاثي الأبعاد فخم: ألواح زجاج شفافة متكدسة، رقم ضخم بيطلع، وفلاش أبيض في النص.",
+            "title": "زجاجي ثلاثي الأبعاد", "summary": "رندر ثلاثي الأبعاد فخم: ألواح زجاج شفافة متكدسة، رقم ضخم يظهر، وفلاش أبيض في النص.",
             "beat_sec": 0.0,
             "style": "Premium dark 3D render: stacked translucent frosted-glass panels with soft refraction, a huge counting number, "
                      "studio rim light, shallow depth; mid-video a white flash flips the scene from black to white.",
@@ -131,7 +131,7 @@ BUILTIN = {
         "voice_tone": "upbeat, modern tech presenter",
         "sample": "تطبيق تمارين بالذكاء الاصطناعي: بيعملك جدول، بيعدّ التكرارات، بيظبط الأكل، جربه النهارده",
         "schema": {
-            "title": "الغليتش الأبيض", "summary": "أبيض ورمادي نضيف، عناصر ثلاثية الأبعاد ناعمة زي الصلصال، ولمسة غليتش أحمر-سماوي على الحواف.",
+            "title": "الغليتش الأبيض", "summary": "أبيض ورمادي نضيف، عناصر ثلاثية الأبعاد ناعمة مثل الصلصال، ولمسة غليتش أحمر-سماوي على الحواف.",
             "beat_sec": 0.0,
             "style": "Clean white and light-grey tech ad: soft matte clay-like 3D objects, gentle studio light, a subtle red-cyan chromatic glitch "
                      "on the edges of every element as the visual signature.",
@@ -160,7 +160,7 @@ BUILTIN = {
         "voice_tone": "elegant, slow, almost whispered",
         "sample": "أجواء مقهى قديم في وسط البلد: الزبونة بتبص من النضارة فتلاقي المقهى، والكاميرا تدخل وترجع ليها",
         "schema": {
-            "title": "لوحة آرت ديكو بزووم مالوش آخر", "summary": "رسم فلات بألوان قليلة، الشخصية بالكاد بتتحرك، والكاميرا بتدخل في تفصيلة وتطلع منها لنفس اللقطة الأولى (لوب).",
+            "title": "لوحة آرت ديكو بزووم ليس له آخر", "summary": "رسم فلات بألوان قليلة، الشخصية بالكاد تتحرك، والكاميرا تدخل في تفصيلة وتظهر منها لنفس اللقطة الأولى (لوب).",
             "beat_sec": 0.0, "loop": True,
             "style": "Flat vector art-deco poster illustration, mid-century travel-poster feel: crisp geometric shapes, no outlines, hard-edged two-tone shadows, "
                      "subtle paper grain, living-illustration animation (slow blinks, breathing, a curl of steam), never cartoon bouncy.",
@@ -185,7 +185,7 @@ BUILTIN = {
         "voice_tone": "intimate, quiet, honest inner voice",
         "sample": "الضغط اللي البنات بتحس بيه من التعليقات على شكلها، وإزاي بتتعلم تحب نفسها",
         "schema": {
-            "title": "لوحات تحريرية بتتحول", "summary": "رسومات مجلة مرسومة بإيد، كل مشهد استعارة للفكرة، وكل مشهد بيذوب في اللي بعده من غير قطع، والآخر بيرجع للأول.",
+            "title": "لوحات تحريرية تتحول", "summary": "رسومات مجلة مرسومة بإيد، كل مشهد استعارة للفكرة، وكل مشهد يذوب في ما بعده بدون قطع، والآخر يعود للأول.",
             "beat_sec": 0.0, "loop": True,
             "style": "Contemporary editorial illustration, gouache and colored pencil on paper, pale porcelain skin with rosy cheeks, muted flat backgrounds, "
                      "surreal visual metaphors (objects growing out of the head, clothes turning into bones, notes piling up), continuous morph between scenes.",
@@ -212,7 +212,7 @@ BUILTIN = {
         "voice_tone": "upbeat, short punchy words",
         "sample": "شركة تصميم: «حركة» ← «تصميم» ← «براند»، كل كلمة على عالم مقصوص مختلف",
         "schema": {
-            "title": "كولاج صور مقصوصة على ورق", "summary": "صور حقيقية مقصوصة (بيوت، شجر، منارة) على ورق كرافت ملون بخدوش، العناصر بتنزل وتتركب، وكلمة كبيرة في النص.",
+            "title": "كولاج صور مقصوصة على ورق", "summary": "صور حقيقية مقصوصة (يوت، شجر، منارة) على ورق كرافت ملون بخدوش، العناصر تنزل وتتركب، وكلمة كبيرة في النص.",
             "beat_sec": 0.0,
             "style": "Photo-collage stop-motion: real photographic cut-outs (houses, trees, landmarks) with crisp edges on scratched craft-paper color fields, "
                      "a torn-paper street strip, objects drop in and settle with a little bounce, one circular window holding a moving real scene (waves, clouds).",
@@ -235,7 +235,7 @@ BUILTIN = {
         "voice_tone": "clear, confident explainer, friendly",
         "sample": "صاحب ورشة كان بيخسر زباين علشان مفيش تقييمات، ومن التطبيق بقى بيجمعها وبيكسب ثقة",
         "schema": {
-            "title": "كولاج أبيض وأسود بدايرة حمرا", "summary": "شخص حقيقي أبيض وأسود مقصوص زي الستيكر، دايرة لون ورا، شخبطة بالأحمر، موبايل وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
+            "title": "كولاج أبيض وأسود بدايرة حمراء", "summary": "شخص حقيقي أبيض وأسود مقصوص مثل الستيكر، دائرة لون خلف، شخبطة بالأحمر، جوال وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
             "beat_sec": 2.0,
             "style": "Mixed-media paper collage: black-and-white photographic cut-out people with a thin white sticker border, a big flat crimson circle behind them, "
                      "cream handmade paper with fibers, hand-drawn crimson marker arrows/circles/loops that draw themselves, tape strips, a wax seal, torn paper scraps.",
@@ -263,7 +263,7 @@ BUILTIN = {
         "voice_tone": "light, modern, few words",
         "sample": "ساعة ذكية بـ ٣ أشكال: رياضة (برتقالي)، سفر (أزرق)، ستايل (بمبي)",
         "schema": {
-            "title": "المنتج بيفرقع لعالمه", "summary": "رندر ثري دي ناعم: المنتج طاير ولافف، بيتفكك لسحابة حاجات من نفس عالمه، وبيرجع يتجمع بلون تاني.",
+            "title": "المنتج يفرقع لعالمه", "summary": "رندر ثري هذه ناعم: المنتج طاير ولافف، يتفكك لسحابة أشياء من نفس عالمه، ويعود يتجمع بلون آخر.",
             "beat_sec": 0.0,
             "style": "Soft pastel 3D product render: the product floats and rotates in a dreamy blurred room, then explodes into a floating cloud of themed props "
                      "(matching its use) that hang in the air and collapse back into the next color version; glossy clay-like props, soft global illumination.",
@@ -288,7 +288,7 @@ BUILTIN = {
         "voice_tone": "friendly, direct, a little playful",
         "sample": "مصمم جرافيك بيعرّف نفسه ويعرض شغله (مجلات، هويات، تغليف) ويقول «ابعتلي تصميم»",
         "schema": {
-            "title": "بروموشن فريلانسر: «محتاج الحباية دي؟»", "summary": "هوك بحباية ثري دي، الشخص مقصوص بيقول هاي، فولدر بيتفتح بأعماله، كل نوع شغل بموك أب، حيطة سبوت لايت، ودعوة رسالة.",
+            "title": "بروموشن فريلانسر: «يحتاج هذه الحباية؟»", "summary": "خطاف بحباية ثري هذه، الشخص مقصوص يقول هاي، مجلد يُفتح بأعماله، كل نوع عمل بموك أب، حيطة سبوت لايت، ودعوة رسالة.",
             "beat_sec": 0.0,
             "style": "Clean 3D motion-graphics promo on a light grey grid wall with diagonal window-light shadows: glossy 3D capsule pill, a real person photo cut-out, "
                      "a 3D blue folder opening with work samples, realistic mockups (magazine spreads, business cards, snack packaging with flying pieces), "

@@ -164,7 +164,7 @@ def read_site(url: str, pages: int = 6) -> str:
 FORMAT = """{
   "fields": {"<خانة>": {"value": "...", "why": "ليه الاقتراح ده"}},
   "rules": ["قاعدة صريحة لازم تتراعى", "..."],
-  "notes": [{"section": "voice|products|offers|audience|seasonal|claims|campaigns|identity|visual|other", "title": "عنوان قصير", "summary": "سطر واحد بيقول الصفحة دي فيها إيه", "body": "التفاصيل"}],
+  "notes": [{"section": "voice|products|offers|audience|seasonal|claims|campaigns|identity|visual|other", "title": "عنوان قصير", "summary": "سطر واحد يقول هذه الصفحة فيها ماذا", "body": "التفاصيل"}],
   "questions": ["سؤال عن حاجة مهمة ناقصة ومش موجودة في المصدر"]
 }"""
 

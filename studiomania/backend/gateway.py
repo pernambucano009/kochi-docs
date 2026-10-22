@@ -164,13 +164,13 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def norm_email(e: str) -> str:
     e = (e or "").strip().lower()
     if not EMAIL_RE.match(e) or len(e) > 200:
-        raise HTTPException(400, "الإيميل مش مظبوط")
+        raise HTTPException(400, "البريد الإلكتروني غير مظبوط")
     return e
 
 
 def check_pw(p: str) -> None:
     if len(p or "") < 8:
-        raise HTTPException(400, "الباسورد لازم يكون 8 حروف أو أرقام على الأقل")
+        raise HTTPException(400, "كلمة المرور يجب يكون 8 حروف أو أرقام على الأقل")
 
 
 # محاولات الدخول الغلط: ١٠ في ١٥ دقيقة لكل إيميل / IP
@@ -183,7 +183,7 @@ def throttle(*keys: str) -> None:
         lst = [t for t in _fails.get(k, []) if now - t < 900]
         _fails[k] = lst
         if len(lst) >= 10:
-            raise HTTPException(429, "محاولات كتير غلط. استنى ربع ساعة وجرّب تاني")
+            raise HTTPException(429, "محاولات كثير خطأ. انتظر ربع ساعة وجرّب مرة أخرى")
 
 
 def failed(*keys: str) -> None:
@@ -317,7 +317,7 @@ def _spawn(wid: str) -> Tenant:
     deadline = time.time() + 90
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise HTTPException(503, "البرنامج مقدرش يفتح، جرّب تاني بعد شوية")
+            raise HTTPException(503, "البرنامج لم يستطع يفتح، جرّب مرة أخرى بعد قليلًا")
         try:
             if httpx.get(f"http://127.0.0.1:{port}/health", timeout=2).status_code == 200:
                 return Tenant(wid, port, proc)
@@ -325,7 +325,7 @@ def _spawn(wid: str) -> Tenant:
             pass
         time.sleep(0.4)
     proc.kill()
-    raise HTTPException(503, "البرنامج اتأخر في الفتح، جرّب تاني")
+    raise HTTPException(503, "البرنامج تأخر في الفتح، جرّب مرة أخرى")
 
 
 async def ensure(wid: str) -> Tenant:
@@ -591,7 +591,7 @@ def me_dict(u: sqlite3.Row) -> dict:
 def me(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "لازم تسجّل دخول")
+        raise HTTPException(401, "يجب تسجّل دخول")
     return me_dict(u)
 
 
@@ -606,14 +606,14 @@ class SetupIn(BaseModel):
 def owner_setup(body: SetupIn, request: Request):
     """أول مرة: حساب صاحب البرنامج (الأدمن)، ومساحته هي البيانات القديمة زي ما هي."""
     if not needs_owner_setup():
-        raise HTTPException(400, "حساب الأدمن متعمل قبل كده")
+        raise HTTPException(400, "حساب الأدمن متعمل من قبل")
     want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
     email = norm_email(body.email)
     if want and email != want:
-        raise HTTPException(403, "الإيميل ده مش هو إيميل الأدمن المتسجل في السيرفر")
+        raise HTTPException(403, "هذا البريد الإلكتروني غير هو بريد إلكتروني الأدمن المتسجل في الخادم")
     if old_password_set() and not old_password_ok(body.old_password):
         failed(client_ip(request))
-        raise HTTPException(401, "الباسورد القديم بتاع البرنامج غلط")
+        raise HTTPException(401, "كلمة المرور القديم الخاص بالبرنامج خطأ")
     check_pw(body.password)
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
@@ -671,11 +671,11 @@ def send_verify(u: sqlite3.Row, request: Request) -> tuple[bool, str | None]:
 def signup(body: SignupIn, request: Request):
     throttle(client_ip(request))
     if needs_owner_setup():
-        raise HTTPException(400, "البرنامج لسه بيتجهز")
+        raise HTTPException(400, "البرنامج ما زال يُجهّز")
     email = norm_email(body.email)
     check_pw(body.password)
     if user_by("email", email):
-        raise HTTPException(400, "الإيميل ده عنده حساب. ادخل بيه أو استخدم «نسيت الباسورد»")
+        raise HTTPException(400, "هذا البريد الإلكتروني لديه حساب. ادخل به أو استخدم «نسيت كلمة المرور»")
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
@@ -702,7 +702,7 @@ def login(body: LoginIn, request: Request):
     if not u or not pw_ok(body.password, u["pw"]):
         failed(email, client_ip(request))
         time.sleep(0.8)
-        raise HTTPException(401, "الإيميل أو الباسورد غلط")
+        raise HTTPException(401, "البريد الإلكتروني أو كلمة المرور خطأ")
     with closing(db()) as c, c:
         c.execute("UPDATE users SET last_login=?, verified=MAX(verified, ?) WHERE id=?", (time.time(), int(SKIP_VERIFY), u["id"]))
     return with_session(JSONResponse({"ok": True, "verify": not (u["verified"] or SKIP_VERIFY)}), u, request)
@@ -719,7 +719,7 @@ def logout():
 def resend(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "لازم تسجّل دخول")
+        raise HTTPException(401, "يجب تسجّل دخول")
     if u["verified"]:
         return {"ok": True, "verified": True}
     throttle("resend:" + u["id"])
@@ -735,7 +735,7 @@ def verify(token: str, request: Request):
     with closing(db()) as c, c:
         r = c.execute("SELECT * FROM tokens WHERE token=? AND kind='verify'", (token,)).fetchone()
         if not r or r["expires"] < time.time():
-            raise HTTPException(400, "اللينك ده خلص أو اتستخدم قبل كده. ادخل واطلب لينك جديد")
+            raise HTTPException(400, "هذا الرابط خلص أو اتستخدم من قبل. ادخل واطلب رابط جديد")
         c.execute("UPDATE users SET verified=1 WHERE id=?", (r["user_id"],))
         c.execute("DELETE FROM tokens WHERE token=?", (token,))
     return with_session(JSONResponse({"ok": True}), user_by("id", r["user_id"]), request)
@@ -775,7 +775,7 @@ def reset(body: ResetIn, request: Request):
     with closing(db()) as c, c:
         r = c.execute("SELECT * FROM tokens WHERE token=? AND kind='reset'", (body.token,)).fetchone()
         if not r or r["expires"] < time.time():
-            raise HTTPException(400, "اللينك ده خلص أو اتستخدم قبل كده. اطلب لينك جديد")
+            raise HTTPException(400, "هذا الرابط خلص أو اتستخدم من قبل. اطلب رابط جديد")
         # تغيير الباسورد من الإيميل = الإيميل اتأكد كمان
         c.execute("UPDATE users SET pw=?, verified=1 WHERE id=?", (pw_hash(body.password), r["user_id"]))
         c.execute("DELETE FROM tokens WHERE user_id=? AND kind='reset'", (r["user_id"],))
@@ -791,9 +791,9 @@ class ChangePwIn(BaseModel):
 def change_pw(body: ChangePwIn, request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "لازم تسجّل دخول")
+        raise HTTPException(401, "يجب تسجّل دخول")
     if u["pw"] and not pw_ok(body.current, u["pw"]):
-        raise HTTPException(400, "الباسورد الحالي غلط")
+        raise HTTPException(400, "كلمة المرور الحالي خطأ")
     check_pw(body.new)
     with closing(db()) as c, c:
         c.execute("UPDATE users SET pw=? WHERE id=?", (pw_hash(body.new), u["id"]))
@@ -806,7 +806,7 @@ def change_pw(body: ChangePwIn, request: Request):
 def google_start(request: Request):
     cid = os.environ.get("GOOGLE_CLIENT_ID")
     if not cid:
-        raise HTTPException(404, "الدخول بجوجل مش متفعّل")
+        raise HTTPException(404, "الدخول بجوجل غير متفعّل")
     state = secrets.token_urlsafe(16)
     q = urlencode({"client_id": cid, "redirect_uri": f"{base_url(request)}/auth/google/callback", "response_type": "code",
                    "scope": "openid email profile", "state": state, "prompt": "select_account"})
@@ -989,9 +989,9 @@ threading.Thread(target=expirer, daemon=True).start()
 def customer_user(request: Request) -> sqlite3.Row:
     u = current_user(request)
     if not u or not u["verified"]:
-        raise HTTPException(401, "لازم تسجّل دخول")
+        raise HTTPException(401, "يجب تسجّل دخول")
     if u["workspace"] == OWNER:
-        raise HTTPException(400, "حساب صاحب البرنامج مش محتاج اشتراك")
+        raise HTTPException(400, "حساب صاحب البرنامج لا يحتاج اشتراك")
     return u
 
 
@@ -1008,7 +1008,7 @@ def billing_page(request: Request, ok: str = "", err: str = ""):
 def billing_state(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "لازم تسجّل دخول")
+        raise HTTPException(401, "يجب تسجّل دخول")
     w = workspace(u["workspace"])
     with closing(db()) as c:
         hist = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? ORDER BY at DESC LIMIT 30",
@@ -1043,7 +1043,7 @@ def checkout(body: CheckoutIn, request: Request):
         if body.kind == "topup":
             t = next((x for x in cfg["topups"] if x["key"] == body.topup), None)
             if not t:
-                raise HTTPException(400, "باقة النقط دي مش موجودة")
+                raise HTTPException(400, "باقة هذه النقاط غير موجودة")
             name = f"SimsimKit · {t['credits']:,} نقطة"
             if body.provider == "stripe":
                 url = payments.stripe_checkout(mode="payment", lines=[(name, t["price"], 1)],
@@ -1054,7 +1054,7 @@ def checkout(body: CheckoutIn, request: Request):
                 url = payments.paypal_order(t["price"], f"{wid}|topup|{t['key']}", name,
                                             ret=f"{back}/api/billing/paypal/order", cancel=f"{back}/billing")
             else:
-                raise HTTPException(400, "طريقة دفع مش معروفة")
+                raise HTTPException(400, "طريقة دفع غير معروفة")
             return {"url": url}
         try:
             tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
@@ -1080,7 +1080,7 @@ def checkout(body: CheckoutIn, request: Request):
             url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", u["email"],
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
         else:
-            raise HTTPException(400, "طريقة دفع مش معروفة")
+            raise HTTPException(400, "طريقة دفع غير معروفة")
         return {"url": url}
     except payments.PayError as e:
         raise HTTPException(502, str(e))
@@ -1091,7 +1091,7 @@ def portal(request: Request):
     u = customer_user(request)
     w = workspace(u["workspace"])
     if not w or w["provider"] != "stripe" or not w["customer"]:
-        raise HTTPException(400, "مفيش اشتراك بالكارت")
+        raise HTTPException(400, "لا يوجد اشتراك بالكارت")
     try:
         return {"url": payments.stripe_portal(w["customer"], f"{base_url(request)}/billing")}
     except payments.PayError as e:
@@ -1104,14 +1104,14 @@ def cancel_sub(request: Request):
     u = customer_user(request)
     w = workspace(u["workspace"])
     if not w or not w["sub_id"]:
-        raise HTTPException(400, "مفيش اشتراك شغال")
+        raise HTTPException(400, "لا يوجد اشتراك يعمل")
     try:
         if w["provider"] == "paypal":
             nxt = payments.paypal_sub(w["sub_id"]).get("next")
             payments.paypal_cancel(w["sub_id"])
             end_subscription(u["workspace"], _iso(nxt))
         else:
-            raise HTTPException(400, "الاشتراك بالكارت بيتلغي من «إدارة الاشتراك»")
+            raise HTTPException(400, "الاشتراك بالكارت يتلغي من «إدارة الاشتراك»")
     except payments.PayError as e:
         raise HTTPException(502, str(e))
     return {"ok": True}
@@ -1216,7 +1216,7 @@ async def paypal_hook(request: Request):
 def admin(request: Request) -> sqlite3.Row:
     u = current_user(request)
     if not u or u["role"] != "admin":
-        raise HTTPException(403, "للأدمن بس")
+        raise HTTPException(403, "للأدمن فقط")
     return u
 
 
@@ -1267,7 +1267,7 @@ async def backup_run(request: Request):
     import backup
     admin(request)
     if not kv_get("drive_refresh"):
-        raise HTTPException(400, "اربط جوجل درايف الأول")
+        raise HTTPException(400, "اربط جوجل درايف أولًا")
     try:
         await asyncio.to_thread(backup_now)
     except backup.BackupError as exc:

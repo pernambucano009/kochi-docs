@@ -32,7 +32,7 @@
   (document.head || document.documentElement).appendChild(st);
   const DANGER = /(تمسح|امسح|حذف|تحذف|تشيل|شيل|مسح|delete|remove)/i;
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  let chain = Promise.resolve();   // لو اتفتح أكتر من مربع ورا بعض: واحد واحد
+  let chain = Promise.resolve();   // إذا فُتح أكثر من مربع خلف بعض: واحد واحد
 
   function open(kind, msg, def, opts = {}) {
     const run = () => new Promise((resolve) => {
@@ -40,7 +40,7 @@
       back.className = "ui-dlg";
       back.setAttribute("role", "dialog");
       back.setAttribute("aria-modal", "true");
-      const okT = opts.ok || (kind === "alert" ? "تمام" : kind === "prompt" ? "تمام" : DANGER.test(msg) ? "أيوه، كمّل" : "أيوه");
+      const okT = opts.ok || (kind === "alert" ? "حسنًا" : kind === "prompt" ? "حسنًا" : DANGER.test(msg) ? "نعم، تابع" : "نعم");
       back.innerHTML = `<div class="ui-dlg-box" dir="auto"><p class="ui-dlg-msg">${esc(msg)}</p>
         ${kind === "prompt" ? `<input class="ui-dlg-in" type="text" dir="auto" value="${esc(def ?? "")}" placeholder="${esc(opts.placeholder || "")}">` : ""}
         <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok${kind === "confirm" && DANGER.test(msg) ? " danger" : ""}">${esc(okT)}</button>
@@ -76,12 +76,12 @@
     back.setAttribute("aria-modal", "true");
     const fmt = (n) => (Math.round(n * 10) / 10).toString();
     back.innerHTML = `<div class="ui-dlg-box ui-kn" dir="rtl"><h3>العقل فاهمك <span class="num">${k.score}٪</span> · ${esc(k.level)}</h3>
-      <p class="sub">النسبة دي مجموع نقط الشروط اللي تحت: كل شرط ليه نقط ثابتة، وبتاخدها لما يتحقق. من <b>${k.need}٪</b> ومعاها الشروط الأساسية (●) العقل بيبقى فاهمك وخطة المحتوى بتتعمل لوحدها.</p>
+      <p class="sub">هذه النسبة مجموع نقاط الشروط الذي أسفل: كل شرط له نقاط ثابتة، وتاخدها عندما يتحقق. من <b>${k.need}٪</b> ومعها الشروط الأساسية (●) العقل يصبح فاهمك وخطة المحتوى تُنشأ تلقائيًا.</p>
       <div class="bar"><i style="width:${Math.min(100, k.score)}%"></i><em style="inset-inline-start:${k.need}%"></em></div>
       <ul>${k.items.map((i) => `<li class="${i.done ? "ok" : ""}"><span class="ck">${i.done ? "✅" : "○"}</span>
         <span><b>${esc(i.t)}</b>${i.core ? `<span class="core">● أساسي</span>` : ""}${i.done ? "" : `<small>${esc(i.hint)}</small>`}</span>
         <span class="pt num" dir="ltr">${fmt(i.got)} / ${i.pts}</span></li>`).join("")}</ul>
-      <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok">تمام</button></div></div>`;
+      <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok">حسنًا</button></div></div>`;
     const done = () => { document.removeEventListener("keydown", key, true); back.remove(); };
     const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(); } };
     back.querySelector(".ui-dlg-ok").onclick = done;

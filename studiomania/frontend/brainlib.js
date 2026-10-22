@@ -107,7 +107,7 @@ const BrainLibPage = (() => {
   function poll() {
     clearTimeout(S.timer);
     if (!S.lib?.tagging) return;
-    S.timer = setTimeout(async () => { try { await refresh(); if (!S.hits) render(); } catch { /* السيرفر بيعيد التشغيل */ } poll(); }, 3000);
+    S.timer = setTimeout(async () => { try { await refresh(); if (!S.hits) render(); } catch { /* الخادم يعيد التشغيل */ } poll(); }, 3000);
   }
   async function upload(files) {
     const list = [...files];

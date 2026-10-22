@@ -18,9 +18,9 @@
   <form class="login glass" id="form">
     <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#111"/><path d="M24 19.5v25l20-12.5z" fill="#fff"/><circle cx="47" cy="17" r="4.5" fill="#E5613E"/></svg>
     <div class="wordmark"><b>Simsim</b><span>Kit</span></div>
-    <p class="muted" id="hint">اكتب الباسورد عشان تدخل</p>
-    <label class="field">الباسورد <input type="password" id="pw" autocomplete="current-password" required autofocus></label>
-    <label class="field" id="pw2Wrap" hidden>اكتبه تاني <input type="password" id="pw2" autocomplete="new-password"></label>
+    <p class="muted" id="hint">اكتب كلمة المرور لكي تدخل</p>
+    <label class="field">كلمة المرور <input type="password" id="pw" autocomplete="current-password" required autofocus></label>
+    <label class="field" id="pw2Wrap" hidden>اكتبه مرة أخرى <input type="password" id="pw2" autocomplete="new-password"></label>
     <button class="btn primary wide" id="submit">دخول</button>
     <p class="err" id="err" hidden></p>
     <button type="button" class="lang-link" id="langToggle"></button>
@@ -36,17 +36,17 @@ const $ = (id) => document.getElementById(id);
   if (s.logged_in) return location.replace(new URLSearchParams(location.search).get("next") === "/kochi" ? "/kochi" : "/");
   setup = s.needs_setup;
   if (setup) {
-    $("hint").textContent = "أول مرة: اعمل باسورد للبرنامج (8 حروف أو أرقام على الأقل). احفظه كويس.";
+    $("hint").textContent = "أول مرة: أنشئ كلمة مرور للبرنامج (8 حروف أو أرقام على الأقل). احفظه كويس.";
     $("pw2Wrap").hidden = false;
     $("pw").autocomplete = "new-password";
-    $("submit").textContent = "اعمل الباسورد وادخل";
+    $("submit").textContent = "أنشئ كلمة المرور وادخل";
   }
 })();
 $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("err").hidden = true;
   if (setup && $("pw").value !== $("pw2").value) {
-    $("err").textContent = "الباسوردين مش زي بعض";
+    $("err").textContent = "الباسوردين غير مثل بعض";
     $("err").hidden = false;
     return;
   }

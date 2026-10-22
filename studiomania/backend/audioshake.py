@@ -126,7 +126,7 @@ def get_task(tid: str) -> dict:
 
 
 def wait(tid: str, on_status=None, max_seconds: int = 1800, interval: float = 6) -> dict[str, dict]:
-    """بيرجع لكل تراك: {"status": completed|error|..., "link": لينك التحميل, "error": ...}."""
+    """يعود لكل تراك: {"status": completed|error|..., "link": رابط التحميل, "error": ...}."""
     t0 = time.time()
     while True:
         task = get_task(tid)

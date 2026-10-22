@@ -2,41 +2,41 @@
 // وكمان خطوة «🔤 التايبوجرافي» في معمل التفكيك (اللي بتطلّع الستايل والأيقونات من فيديو).
 
 const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: null, eng: null, play: null, t: 0, open: {} };
-const TY_KINDS = { track: "⭐ 🎬 كلام كبير على الخطوط", sign: "⭐ ✍️ سطر وإمضا", spot: "⭐ 🌟 نجمة وبقعة نور", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف بيتبدل بصورة", scatter: "🌪️ حروف بتتجمع", ring: "⭕ دايرة أيقونات", anchor: "📍 مندمج مع الفيديو",
-  behind: "🎬 🧍 كلام عملاق ورا الشخص", arc: "🎬 🌙 كلام متقوّس حوالين الراس", artype: "🎬 ⌨️ كتابة بمؤشر برتقاني", redword: "🎬 🔴 كلمة حمرا واحدة", signature: "🎬 ✒️ إمضا بتتكتب",
-  poster: "🎬 🟥 بوستر أحمر", stack: "🎬 📚 كومة كلام مايلة جنب الشخص", push: "🎬 ➡️ كلمة بتزق اللي قبلها", crt: "🎬 📺 شاشة قديمة وجلتش",
-  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دايرة حوالين الراس", floor: "🎬 🛣️ كلام على الأرض", hand: "🎬 🖊️ خط إيد بيرتعش", tags: "🎬 🏷️ كلمات على مربعات حمرا",
-  space: "🎬 🌌 كلام في فراغ 3D", route: "🎬 ✈️ خريطة ومسار وطيارة", board: "🎬 🧵 لوحة تحقيق", cube: "🎬 🧊 مكعب سلكي حوالين الشخص",
-  comments: "🎬 💬 كومنتات على لوحة زجاج", lock: "🎬 🔒 كبسولة بقفل", thermal: "🎬 🌡️ كاميرا حرارية", shapes: "🎬 🎞️ أشكال فيلم بتترعش",
-  select: "🎬 🖱️ مربع تحديد وماوس", chat: "🎬 📱 فقاعات شات", counter: "🎬 🔢 رقم بيعدّ",
-  fill: "🎬 🖼️ الصورة جوه الحروف", polaroid: "🎬 📸 بولارويد بخط إيد", cards: "🎬 🃏 كروت طايرة 3D", burst: "🎬 💥 انفجار كوميكس",
-  dots: "🎬 ✨ الشخص بيتحول لنقط", neon: "🎬 🔴 نيون ورا الشخص",
-  outline: "🎬 🩷 كلمة بحدود بينك بتنط", spin: "🎬 🌀 حروف عملاقة بتلف", sweep: "🎬 💨 كلمة بتعدّي ودايرة نسخ", extrude: "🎬 🧱 كلام بينك 3D ومربع أسود",
-  stories: "🎬 📲 كروت ستوري 3D", post: "🎬 🖼️ كارت بوست والكلام طالع منه",
-  retro: "🎬 📰 بوستر قديم ونجمة حمرا", duotone: "🎬 🟦 فيديو أزرق وكلام ورا الشخص", label: "🎬 🏷️ كلمة حمرا وتاج أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
-  banners: "🎬 🎗️ شرايط مايلة بتتحرك", tiles: "🎬 🔲 كروت صور وكارت أحمر", bubble: "🎬 💬 فقاعة كلام حمرا", band: "🎬 🟦 شريط أزرق ورا كلمة", emerge: "🎬 🗣️ الكلام بيطلع من ورا الراس",
-  film: "🎬 🎞️ برواز فيلم", ghost: "🎬 👻 كلمة عملاقة باهتة ورا", notify: "🎬 🔔 إشعارات موبايل", dialog: "🎬 🖥️ رسالة نظام قديمة",
-  pills: "🎬 💊 زراير لامعة والماوس", steps: "🎬 🔢 كروت مرقّمة", scribble: "🎬 ⭕ دايرة بالقلم", list: "🎬 📋 لستة بسهم",
-  prompt: "🎬 🤖 مربع ذكاء اصطناعي", spread: "🎬 ✨ كلام متفرّق",
-  serif: "🎬 🖋️ كلمة بخط سيريف مايل", chalk: "🎬 🧑‍🏫 سبورة طباشير", ticket: "🎬 🎟️ تذكرة سينما", frame: "🎬 🖼️ برواز دهب", toggle: "🎬 🔘 زرار تشغيل",
-  years: "🎬 📅 أرقام بتلف", wave: "🎬 〰️ كلام على خط متعرج", spaced: "🎬 ↔️ كلام بمسافات واسعة", search: "🎬 🔎 خانة بحث", digits: "🎬 🔢 أرقام في مربعات",
-  torn: "🎬 📜 شرايط ورق مقطوع", emoji: "🎬 😀 إيموجي على قد المعنى", doodle: "🎬 ✏️ خربشة بالقلم", browser: "🎬 🌐 شباك متصفح", split: "🎬 ↔️ قبل وبعد",
-  spotlight: "🎬 🔦 كشاف نور", phone: "🎬 📱 موبايل",
-  window: "🎬 🪟 الفيديو في برواز", inline: "🎬 🖼️ صورة جوه السطر", bigtype: "🎬 ⌨️ كلمة عملاقة بتتكتب", checks: "🎬 ✅ لستة بتتعلّم", progress: "🎬 📊 شرايط نسب",
-  flow: "🎬 🔀 خطوات أوتوميشن", aura: "🎬 🌈 ألوان ناعمة", stairs: "🎬 🪜 كلمات زي السلم", dates: "🎬 📆 شريط أيام", endcard: "🎬 🏁 كارت النهاية", wintitle: "🎬 🪟 كلمة عملاقة على البرواز", corners: "🎬 📐 كلام في الركنين", inbox: "🎬 📥 صندوق رسايل", doc: "🎬 📝 دوكيومنت بهايلايتر", workcards: "🎬 📅 كارت موعد ورسالة وملف", call: "🎬 📞 مكالمة فيديو", canvas: "🎬 🗂️ لوحة كروت والكاميرا بتقرّب", colorcard: "🎬 🟦 كارت لون وكلام صغير", imsg: "🎬 📲 محادثة موبايل", dashboard: "🎬 📈 كارت داشبورد", apps: "🎬 🔌 تطبيقات بتتوصل", bell: "🎬 🔔 جرس والعداد بيزيد", chapter: "🎬 🔢 رقم فصل عملاق", sidepanel: "🎬 🗃️ فيديو وبانل جنبه", clones: "🎬 👯 الشخص متكرر", megapan: "🎬 🔠 كلمة عملاقة والكاميرا ماشية عليها", badge: "🎬 🔴 دايرة بأول حرف بتكبر", leaderboard: "🎬 🏆 لوحة ترتيب", donut: "🎬 🍩 دايرة نسبة", photowords: "🎬 🖼️ كلمات وصور طايرة", titlecard: "🎬 🎬 عنوان سينمائي بيتبني", departures: "🎬 🚆 لوحة مواعيد قطر", loading: "🎬 ⚙️ شاشة بيتعمل دلوقتي", countdown: "🎬 ⏳ عدّاد تنازلي", dragdrop: "🎬 🖐️ صور بتطير لمربع الكتابة", lineup: "🎬 🎤 قايمة أسامي كبيرة", isomap: "🎬 🗺️ خريطة أيزومتريك", stickers: "🎬 🏷️ كلمة عملاقة وتاجات مايلة", promptline: "🎬 ⌨️ سطر كتابة وزرار إرسال", crowd: "🎬 👥 بوستر بسيلويتات", photohero: "🎬 🖼️ صورة وكلمة عملاقة عليها", menu: "🎬 🖱️ قايمة منسدلة", pricing: "🎬 💲 اختيارات بأسعار", pins: "🎬 📍 نقط مرقّمة على صورة", result: "🎬 🔗 نتيجة بحث", calendar: "🎬 🗓️ كاليندر وموعد", mapdots: "🎬 🗺️ خريطة ودواير بتنبض", marker: "🎬 🖍️ عنوان بهايلايتر أصفر", lowerthird: "🎬 🪪 اسم ووظيفة تحت", cardwords: "🎬 🃏 كروت بكلمات عملاقة", bars: "🎬 📊 رسم بياني بيكبر", table: "🎬 🧾 جدول بتاجات", dayplan: "🎬 🕘 جدول اليوم", stutter: "🎬 🔁 كلمة بتتهته", section: "🎬 🔢 فصل كامل برقم ورمز", worklog: "🎬 📋 سجل شغل", toggles: "🎬 🔛 مفاتيح بتتفتح", checkout: "🎬 🛒 فاتورة وزرار الدفع", lockscreen: "🎬 📱 شاشة مقفولة وإشعارات", wizard: "🎬 🪜 خطوات بشريط تقدّم", wordroll: "🎬 🎰 كلمات بتلف رأسي", bignum: "🎬 🔢 رقم عملاق على الحرف", stickynote: "🎬 🗒️ ملاحظات متعلقة", colorpicker: "🎬 🎨 لوحة اختيار لون", uploads: "🎬 📎 ملفات بتترفع", timer: "🎬 ⏱️ تايمر تنازلي", anchorword: "🎬 🅱️ كلمة ضخمة تحت", orders: "🎬 🧾 تذاكر طلبات", stats: "🎬 🔢 دواير أرقام", duo: "🎬 🪟 شاشتين جنب بعض", route: "🎬 🗺️ طريق على الخريطة", flank: "🎬 ▫️ كلمة بين كادرين", flood: "🎬 📆 نتيجة بتتزحم", chips: "🎬 ▪️ شرايح كلمات", wordtiles: "🎬 🧩 بلاطات كلمات", profile: "🎬 👤 كارت بروفايل", bigbutton: "🎬 🔘 زرار عملاق", gauge: "🎬 ⭕ عداد دايري", rule: "🎬 ⚡ جملة أتمتة", iconrow: "🎬 ✳️ صف أيقونات", led: "🎬 🔴 أرقام ديجيتال", drop: "🎬 🚀 عداد إطلاق", report: "🎬 📡 كارت تقرير مباشر", serp: "🎬 🔍 نتيجة بحث", files: "🎬 🗂️ قايمة ملفات بتتحدد", generating: "🎬 🖼️ صور بتتعمل", portfolio: "🎬 📷 صفحة بورتفوليو", letterorb: "🎬 🟠 كلمة بكورة متدرجة", connect: "🎬 🔗 زرارين بيتوصلوا", assistant: "🎬 ✨ كارت مساعد ذكي", themeswap: "🎬 🎨 ألوان الصفحة بتتبدّل", slider: "🎬 🎚️ سلايدر وقت", weather: "🎬 🌤️ ويدجت طقس", post: "🎬 📝 بوست بكلام متظلل", highlightpan: "🎬 🖍️ كلام عملاق متظلل", blocklines: "🎬 🟧 سطور على بلوكات", reactions: "🎬 👍 تفاعلات بوست", qr: "🎬 🔳 ورقة QR", codetag: "🎬 ‹› كلام بين أقواس كود", toolbar: "🎬 🧰 شريط أدوات", terminal: "🎬 ⌨️ تيرمينال", scan: "🎬 🛡️ فحص أمان", toasts: "🎬 🔔 إشعارات بتتراكم", footer: "🎬 🦶 فوتر موقع", marquee: "🎬 〰️ سطرين ماشيين", datestrip: "🎬 🗓️ شريط أيام", fileicon: "🎬 📄 أيقونة ملف", chaos: "🎬 🌀 سطح مكتب زحمة", gradword: "🎬 🌈 جملة وكلمة متدرّجة", meshprompt: "🎬 🫧 كتابة على خلفية ضبابية", orbsplit: "🎬 🟠 كلمتين وكورة بينهم", bento: "🎬 🍱 شبكة كروت", figdays: "📅 شبكة أيام", figcurve: "📈 منحنى نمو", figplay: "▶️ كادر تشغيل", figequal: "≠ مش زي بعض", figwords: "🔠 كلام بأحجام", figphone: "📱 موبايل مرسوم", figdrop: "📉 وقعة", figcount: "⏺ عداد REC", figgears: "⚙️ تروس", figbar: "▮▮ شريط مجهود", figcheck: "☑️ بنود وريكورد", figcta: "💬 علّق بالكلمة", goldcap: "✨ عنوان دهبي", iconbelt: "⚗️ شريط رموز", glowsweep: "🌟 نور ولوح إزاز", namepill: "💊 كبسولة اسم", kashida: "ـــ كشيدة", molecule: "🧬 جزيء", weightstack: "☰ سطور تقيل/رفيع", stretch: "↔ كلمة بتتمد", desatpop: "⚫ بهتان وكلمة", arcs: "◯ دواير رفيعة", chrome: "💎 كلمة معدن", inkverse: "🖋️ نسخ بالحبر", poemfade: "🌫️ شعر بيظهر", hashend: "#️⃣ هاشتاج النهاية", flipverb: "🔁 فعل بيتقلب", strobe: "⚡ ستروب كلمات", duoline: "▤ سطرين مضغوط", capstack: "❓ سؤال مضغوط", pillword: "🟨 كبسولة ورا الكلمة", blurduo: "🟢 سطرين بدايرة", tagstack: "🏷️ سطور بتاج", underbars: "▁ خطوط تحت الكلام", contactcard: "📇 كارت تواصل", iconorbit: "🪐 أيقونات في قوس", blurstrobe: "💥 كلمة بسحبة", kinstack: "⇋ كلام متدرّج", incall: "📞 مكالمة واردة", cineband: "🎞️ شريط سينما", scriptover: "✍️ خط إيد فوق الفيديو", tricolor: "🟪 تلات ألوان", drumpicker: "🎡 بكرة اختيار", redmix: "🔴 كبير أحمر وصغير", headbubble: "⚪ دايرة مكان الراس", pincard: "📌 كارت بدبوس", emojifloat: "🤡 إيموجي طايف", slotreel: "🎰 سلوت خدمات", posterwall: "🖼️ حيطة بوسترات", quoteline: "💬 سطر اقتباس", medallion: "🏅 ميدالية بوستر", clockhand: "🕰️ عقرب ساعة", roadtext: "🛣️ طريق متعرج", markpan: "🖍️ ماركر ودايرة", objectquote: "⏳ رمز وحكمة", racechart: "📈 خطين بيتسابقوا", calflip: "📆 نتيجة بتقلب", glosscards: "🃏 كروت لامعة", dropword: "💧 قطرة وتحول", tasklens: "🔍 مهام تحت عدسة", monostack: "⚫ سرد مونو", dashbox: "⬚ مربع متقطع وماوس", sparklist: "✦ قايمة بنجوم", followbtn: "👆 زرار متابعة", silhouette: "🕴️ راجل ببدلة", petalstack: "🌸 بتلات وعنوان", followcount: "👤 عداد متابعين", twopillars: "🏛️ عمودين وفجوة", cutmat: "🟩 مفرش قص", labelbox: "🏷️ تيكت أسود", stampcard: "✉️ طابع بريد", lcdtype: "📟 شاشة موبايل قديم", genpanel: "🪟 لوح توليد طاير", holopulse: "💚 حلقات وهولوجرام", coverflow: "💿 كاروسيل كروت", featuretag: "🟢 عنوان ميزة", luxmix: "✨ سيريف فاخر", goldframes: "🔶 إطارات دهبي", goldrows: "📜 صفوف دهبي", tilegrid: "🔲 موقع بشبكة", goldpill: "🟡 كبسولة دهبي", holoclock: "🕚 ساعة وفولدرات", curvewall: "🎞️ حيطة مقوّسة", newsscan: "📰 جرنال وماركر", neonvenn: "⭕ حلقات نور", wavebelt: "〰️ موجة بتشيل حاجات", cardarc: "🌙 قوس كروت", shadowquote: "🪟 بوستر بظل شيش", haloring: "💫 حلقة نور بتكبر", noirtitle: "🕵️ عنوان نوار", stickerstack: "🏴 ستيكرات سودا", graphhop: "📈 دواير على رسم بياني", podium: "🥇 منصة وميدالية", hudcallout: "📐 إطار تقني", termbar: "⌨️ شريط ترمينال", glowtoggle: "🌈 سويتش ألوان", pinkdoodle: "✳️ نجمة ودوائر بينك", lensfind: "🔎 عدسة بتدور", echostack: "🔁 صدى سطور", dofwords: "🎥 كلام بعمق", portalchat: "🫧 شات في دايرة", cardframe: "🎴 الفيديو في كارت", wordvoid: "🌌 فضا كلمات", facecam: "🔥 دايرة الشارح", spreadcaps: "🏛️ سيريف فخم وكابيتال", tinysub: "▁ ترجمة صغيرة فخمة", ringword: "⭕ كلمة بحلقة إيد", handcap: "✍️ كابشن خط إيد", blobcam: "🥚 فيديو في بقعة", brushbar: "🖌️ ضربة فرشة زرقا", beforeafter: "🆚 قبل وبعد", pillcarousel: "💊 معرض كبسولات", namescript: "🌟 اسم أصفر وسكريبت", stackrepeat: "🔂 كلمة متكررة عمود", vertword: "🏙️ كلمة طولية", serifsolo: "📜 كلمة سيريف وحيدة", selectword: "🔵 كلمة بتتحدد", tornlabel: "📄 ورقة مقطوعة", radartags: "📡 رادار وتاجات" };
+const TY_KINDS = { track: "⭐ 🎬 نص كبير على الخطوط", sign: "⭐ ✍️ سطر وإمضا", spot: "⭐ 🌟 نجمة وبقعة ضوء", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف يُستبدل بصورة", scatter: "🌪️ حروف تُجمع", ring: "⭕ دائرة أيقونات", anchor: "📍 مندمج مع الفيديو",
+  behind: "🎬 🧍 نص عملاق خلف الشخص", arc: "🎬 🌙 نص متقوّس حوالين الرأس", artype: "🎬 ⌨️ كتابة بمؤشر برتقالي", redword: "🎬 🔴 كلمة حمراء واحدة", signature: "🎬 ✒️ إمضا تُكتب",
+  poster: "🎬 🟥 بوستر أحمر", stack: "🎬 📚 كومة نص مايلة بجانب الشخص", push: "🎬 ➡️ كلمة تدفع ما قبلها", crt: "🎬 📺 شاشة قديمة وجلتش",
+  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دائرة حوالين الرأس", floor: "🎬 🛣️ نص على الأرض", hand: "🎬 🖊️ خط يد يرتجف", tags: "🎬 🏷️ كلمات على مربعات حمراء",
+  space: "🎬 🌌 نص في فراغ 3D", route: "🎬 ✈️ خريطة ومسار وطيارة", board: "🎬 🧵 لوحة تحقيق", cube: "🎬 🧊 مكعب سلكي حوالين الشخص",
+  comments: "🎬 💬 تعليقات على لوحة زجاج", lock: "🎬 🔒 كبسولة بقفل", thermal: "🎬 🌡️ كاميرا حرارية", shapes: "🎬 🎞️ أشكال فيلم ترتجف",
+  select: "🎬 🖱️ مربع تحديد وماوس", chat: "🎬 📱 فقاعات شات", counter: "🎬 🔢 رقم يعدّ",
+  fill: "🎬 🖼️ الصورة داخل الحروف", polaroid: "🎬 📸 بولارويد بخط يد", cards: "🎬 🃏 بطاقات طايرة 3D", burst: "🎬 💥 انفجار كوميكس",
+  dots: "🎬 ✨ الشخص يتحول لنقط", neon: "🎬 🔴 نيون خلف الشخص",
+  outline: "🎬 🩷 كلمة بحدود بينك تقفز", spin: "🎬 🌀 حروف عملاقة تدور", sweep: "🎬 💨 كلمة تعدّي ودائرة نسخ", extrude: "🎬 🧱 نص بينك 3D ومربع أسود",
+  stories: "🎬 📲 بطاقات ستوري 3D", post: "🎬 🖼️ بطاقة منشور والنص صاعد منه",
+  retro: "🎬 📰 بوستر قديم ونجمة حمراء", duotone: "🎬 🟦 فيديو أزرق ونص خلف الشخص", label: "🎬 🏷️ كلمة حمراء وتاج أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
+  banners: "🎬 🎗️ شرايط مايلة تتحرك", tiles: "🎬 🔲 بطاقات صور وبطاقة أحمر", bubble: "🎬 💬 فقاعة نص حمراء", band: "🎬 🟦 شريط أزرق خلف كلمة", emerge: "🎬 🗣️ النص يظهر من خلف الرأس",
+  film: "🎬 🎞️ برواز فيلم", ghost: "🎬 👻 كلمة عملاقة باهتة خلف", notify: "🎬 🔔 إشعارات جوال", dialog: "🎬 🖥️ رسالة نظام قديمة",
+  pills: "🎬 💊 أزرار لامعة والماوس", steps: "🎬 🔢 بطاقات مرقّمة", scribble: "🎬 ⭕ دائرة بالقلم", list: "🎬 📋 لستة بسهم",
+  prompt: "🎬 🤖 مربع ذكاء اصطناعي", spread: "🎬 ✨ نص متفرّق",
+  serif: "🎬 🖋️ كلمة بخط سيريف مايل", chalk: "🎬 🧑‍🏫 سبورة طباشير", ticket: "🎬 🎟️ تذكرة سينما", frame: "🎬 🖼️ برواز دهب", toggle: "🎬 🔘 زر تشغيل",
+  years: "🎬 📅 أرقام تدور", wave: "🎬 〰️ نص على خط متعرج", spaced: "🎬 ↔️ نص بمسافات واسعة", search: "🎬 🔎 خانة بحث", digits: "🎬 🔢 أرقام في مربعات",
+  torn: "🎬 📜 شرايط ورق مقطوع", emoji: "🎬 😀 إيموجي على قدر المعنى", doodle: "🎬 ✏️ خربشة بالقلم", browser: "🎬 🌐 نافذة متصفح", split: "🎬 ↔️ قبل وبعد",
+  spotlight: "🎬 🔦 كشاف ضوء", phone: "🎬 📱 جوال",
+  window: "🎬 🪟 الفيديو في برواز", inline: "🎬 🖼️ صورة داخل السطر", bigtype: "🎬 ⌨️ كلمة عملاقة تُكتب", checks: "🎬 ✅ لستة تتعلّم", progress: "🎬 📊 شرايط نسب",
+  flow: "🎬 🔀 خطوات قالب مخصص", aura: "🎬 🌈 ألوان ناعمة", stairs: "🎬 🪜 كلمات مثل السلم", dates: "🎬 📆 شريط أيام", endcard: "🎬 🏁 بطاقة النهاية", wintitle: "🎬 🪟 كلمة عملاقة على البرواز", corners: "🎬 📐 نص في الركنين", inbox: "🎬 📥 صندوق رسائل", doc: "🎬 📝 دوكيومنت بهايلايتر", workcards: "🎬 📅 بطاقة موعد ورسالة وملف", call: "🎬 📞 مكالمة فيديو", canvas: "🎬 🗂️ لوحة بطاقات والكاميرا تقرّب", colorcard: "🎬 🟦 بطاقة لون ونص صغير", imsg: "🎬 📲 محادثة جوال", dashboard: "🎬 📈 بطاقة داشبورد", apps: "🎬 🔌 تطبيقات تتوصل", bell: "🎬 🔔 جرس والعداد يزيد", chapter: "🎬 🔢 رقم فصل عملاق", sidepanel: "🎬 🗃️ فيديو وبانل جنبه", clones: "🎬 👯 الشخص متكرر", megapan: "🎬 🔠 كلمة عملاقة والكاميرا ماشية عليها", badge: "🎬 🔴 دائرة بأول حرف تكبر", leaderboard: "🎬 🏆 لوحة ترتيب", donut: "🎬 🍩 دائرة نسبة", photowords: "🎬 🖼️ كلمات وصور طايرة", titlecard: "🎬 🎬 عنوان سينمائي يُبنى", departures: "🎬 🚆 لوحة مواعيد قطر", loading: "🎬 ⚙️ شاشة يُنشأ الآن", countdown: "🎬 ⏳ عدّاد تنازلي", dragdrop: "🎬 🖐️ صور تطير لمربع الكتابة", lineup: "🎬 🎤 قائمة أسامي كبيرة", isomap: "🎬 🗺️ خريطة أيزومتريك", stickers: "🎬 🏷️ كلمة عملاقة وتاجات مايلة", promptline: "🎬 ⌨️ سطر كتابة وزر إرسال", crowd: "🎬 👥 بوستر بسيلويتات", photohero: "🎬 🖼️ صورة وكلمة عملاقة عليها", menu: "🎬 🖱️ قائمة منسدلة", pricing: "🎬 💲 اختيارات بأسعار", pins: "🎬 📍 نقاط مرقّمة على صورة", result: "🎬 🔗 نتيجة بحث", calendar: "🎬 🗓️ كاليندر وموعد", mapdots: "🎬 🗺️ خريطة ودوائر تنبض", marker: "🎬 🖍️ عنوان بهايلايتر أصفر", lowerthird: "🎬 🪪 اسم ووظيفة أسفل", cardwords: "🎬 🃏 بطاقات بكلمات عملاقة", bars: "🎬 📊 رسم بياني يكبر", table: "🎬 🧾 جدول بتاجات", dayplan: "🎬 🕘 جدول اليوم", stutter: "🎬 🔁 كلمة تتهته", section: "🎬 🔢 فصل كامل برقم ورمز", worklog: "🎬 📋 سجل عمل", toggles: "🎬 🔛 مفاتيح تُفتح", checkout: "🎬 🛒 فاتورة وزر الدفع", lockscreen: "🎬 📱 شاشة مغلقة وإشعارات", wizard: "🎬 🪜 خطوات بشريط تقدّم", wordroll: "🎬 🎰 كلمات تدور رأسي", bignum: "🎬 🔢 رقم عملاق على الحرف", stickynote: "🎬 🗒️ ملاحظات متعلقة", colorpicker: "🎬 🎨 لوحة اختيار لون", uploads: "🎬 📎 ملفات تُرفع", timer: "🎬 ⏱️ تايمر تنازلي", anchorword: "🎬 🅱️ كلمة ضخمة أسفل", orders: "🎬 🧾 تذاكر طلبات", stats: "🎬 🔢 دوائر أرقام", duo: "🎬 🪟 شاشتين بجانب بعض", route: "🎬 🗺️ طريق على الخريطة", flank: "🎬 ▫️ كلمة بين كادرين", flood: "🎬 📆 نتيجة تتزحم", chips: "🎬 ▪️ شرايح كلمات", wordtiles: "🎬 🧩 بلاطات كلمات", profile: "🎬 👤 بطاقة بروفايل", bigbutton: "🎬 🔘 زر عملاق", gauge: "🎬 ⭕ عداد دايري", rule: "🎬 ⚡ جملة أتمتة", iconrow: "🎬 ✳️ صف أيقونات", led: "🎬 🔴 أرقام ديجيتال", drop: "🎬 🚀 عداد إطلاق", report: "🎬 📡 بطاقة تقرير مباشر", serp: "🎬 🔍 نتيجة بحث", files: "🎬 🗂️ قائمة ملفات تتحدد", generating: "🎬 🖼️ صور تُنشأ", portfolio: "🎬 📷 صفحة بورتفوليو", letterorb: "🎬 🟠 كلمة بكورة متدرجة", connect: "🎬 🔗 زرارين يتوصلون", assistant: "🎬 ✨ بطاقة مساعد ذكي", themeswap: "🎬 🎨 ألوان الصفحة تُستبدل", slider: "🎬 🎚️ سلايدر وقت", weather: "🎬 🌤️ ويدجت طقس", post: "🎬 📝 منشور بكلام متظلل", highlightpan: "🎬 🖍️ نص عملاق متظلل", blocklines: "🎬 🟧 سطور على بلوكات", reactions: "🎬 👍 تفاعلات منشور", qr: "🎬 🔳 ورقة QR", codetag: "🎬 ‹› نص بين أقواس كود", toolbar: "🎬 🧰 شريط أدوات", terminal: "🎬 ⌨️ تيرمينال", scan: "🎬 🛡️ فحص أمان", toasts: "🎬 🔔 إشعارات تتراكم", footer: "🎬 🦶 فوتر موقع", marquee: "🎬 〰️ سطرين ماشيين", datestrip: "🎬 🗓️ شريط أيام", fileicon: "🎬 📄 أيقونة ملف", chaos: "🎬 🌀 سطح مكتب زحمة", gradword: "🎬 🌈 جملة وكلمة متدرّجة", meshprompt: "🎬 🫧 كتابة على خلفية ضبابية", orbsplit: "🎬 🟠 كلمتين وكورة بينهم", bento: "🎬 🍱 شبكة بطاقات", figdays: "📅 شبكة أيام", figcurve: "📈 منحنى نمو", figplay: "▶️ كادر تشغيل", figequal: "≠ غير مثل بعض", figwords: "🔠 نص بأحجام", figphone: "📱 جوال مرسوم", figdrop: "📉 وقعة", figcount: "⏺ عداد REC", figgears: "⚙️ تروس", figbar: "▮▮ شريط مجهود", figcheck: "☑️ بنود وريكورد", figcta: "💬 علّق بالكلمة", goldcap: "✨ عنوان دهبي", iconbelt: "⚗️ شريط رموز", glowsweep: "🌟 ضوء ولوح إزاز", namepill: "💊 كبسولة اسم", kashida: "ـــ كشيدة", molecule: "🧬 جزيء", weightstack: "☰ سطور تقيل/رفيع", stretch: "↔ كلمة تتمد", desatpop: "⚫ بهتان وكلمة", arcs: "◯ دوائر رفيعة", chrome: "💎 كلمة معدن", inkverse: "🖋️ نسخ بالحبر", poemfade: "🌫️ شعر يظهر", hashend: "#️⃣ هاشتاج النهاية", flipverb: "🔁 فعل يتقلب", strobe: "⚡ ستروب كلمات", duoline: "▤ سطرين مضغوط", capstack: "❓ سؤال مضغوط", pillword: "🟨 كبسولة خلف الكلمة", blurduo: "🟢 سطرين بدايرة", tagstack: "🏷️ سطور بتاج", underbars: "▁ خطوط أسفل النص", contactcard: "📇 بطاقة تواصل", iconorbit: "🪐 أيقونات في قوس", blurstrobe: "💥 كلمة بسحبة", kinstack: "⇋ نص متدرّج", incall: "📞 مكالمة واردة", cineband: "🎞️ شريط سينما", scriptover: "✍️ خط يد أعلى الفيديو", tricolor: "🟪 ثلاث ألوان", drumpicker: "🎡 غدًا اختيار", redmix: "🔴 كبير أحمر وصغير", headbubble: "⚪ دائرة مكان الرأس", pincard: "📌 بطاقة بدبوس", emojifloat: "🤡 إيموجي طايف", slotreel: "🎰 سلوت خدمات", posterwall: "🖼️ حيطة بوسترات", quoteline: "💬 سطر اقتباس", medallion: "🏅 ميدالية بوستر", clockhand: "🕰️ عقرب ساعة", roadtext: "🛣️ طريق متعرج", markpan: "🖍️ ماركر ودائرة", objectquote: "⏳ رمز وحكمة", racechart: "📈 خطين يتسابقون", calflip: "📆 نتيجة تقلب", glosscards: "🃏 بطاقات لامعة", dropword: "💧 قطرة وتحول", tasklens: "🔍 مهام أسفل عدسة", monostack: "⚫ سرد مونو", dashbox: "⬚ مربع متقطع وماوس", sparklist: "✦ قائمة بنجوم", followbtn: "👆 زر متابعة", silhouette: "🕴️ راجل ببدلة", petalstack: "🌸 بتلات وعنوان", followcount: "👤 عداد متابعين", twopillars: "🏛️ عمودين وفجوة", cutmat: "🟩 مفرش قص", labelbox: "🏷️ تيكت أسود", stampcard: "✉️ طابع بريد", lcdtype: "📟 شاشة جوال قديم", genpanel: "🪟 لوح توليد طاير", holopulse: "💚 حلقات وهولوجرام", coverflow: "💿 كاروسيل بطاقات", featuretag: "🟢 عنوان ميزة", luxmix: "✨ سيريف فاخر", goldframes: "🔶 إطارات دهبي", goldrows: "📜 صفوف دهبي", tilegrid: "🔲 موقع بشبكة", goldpill: "🟡 كبسولة دهبي", holoclock: "🕚 ساعة ومجلدات", curvewall: "🎞️ حيطة مقوّسة", newsscan: "📰 جرنال وماركر", neonvenn: "⭕ حلقات ضوء", wavebelt: "〰️ موجة تزيل أشياء", cardarc: "🌙 قوس بطاقات", shadowquote: "🪟 بوستر بظل شيش", haloring: "💫 حلقة ضوء تكبر", noirtitle: "🕵️ عنوان نوار", stickerstack: "🏴 ستيكرات سوداء", graphhop: "📈 دوائر على رسم بياني", podium: "🥇 منصة وميدالية", hudcallout: "📐 إطار تقني", termbar: "⌨️ شريط ترمينال", glowtoggle: "🌈 مفتاح ألوان", pinkdoodle: "✳️ نجمة ودوائر بينك", lensfind: "🔎 عدسة تدور", echostack: "🔁 صدى سطور", dofwords: "🎥 نص بعمق", portalchat: "🫧 شات في دائرة", cardframe: "🎴 الفيديو في بطاقة", wordvoid: "🌌 فضا كلمات", facecam: "🔥 دائرة الشارح", spreadcaps: "🏛️ سيريف فخم وكابيتال", tinysub: "▁ ترجمة صغيرة فخمة", ringword: "⭕ كلمة بحلقة يد", handcap: "✍️ تعليق نصي خط يد", blobcam: "🥚 فيديو في بقعة", brushbar: "🖌️ ضربة فرشة زرقاء", beforeafter: "🆚 قبل وبعد", pillcarousel: "💊 معرض كبسولات", namescript: "🌟 اسم أصفر ونص", stackrepeat: "🔂 كلمة متكررة عمود", vertword: "🏙️ كلمة طولية", serifsolo: "📜 كلمة سيريف وحيدة", selectword: "🔵 كلمة تتحدد", tornlabel: "📄 ورقة مقطوعة", radartags: "📡 رادار وتاجات" };
 // العناصر اللي ليها «الكلمة اللي عليها الضغط»
 const TY_FOCUS = ["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble", "film", "ghost", "scribble", "spread",
   "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "years", "digits", "spaced", "phone", "browser", "inline", "endcard", "wintitle", "megapan", "badge", "photohero", "result", "marker", "stutter", "anchorword", "letterorb", "themeswap", "post", "highlightpan", "gradword"];
-const TY_TRANS = { "": "من غير ترانزيشن", whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دايرة بتفتح",
-  leak: "🌅 تسريب نور", burn: "🔥 حرق فيلم", rise: "⬆️ طالع من تحت", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من جوه", slab: "🚪 لوح معدّي", bars: "▥ شرايح ألوان", orb: "🟢 دايرة بتكبر" };
-const TY_INTRO = { track: { "": "من غير افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "من غير فلاش", burst: "💛 فلاش أصفر قبلها" } };
-const TY_OUTRO = { track: { "": "من غير قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "من غير قفلة", red: "🔴 فلاش أحمر في الآخر" } };
-const TY_PLACES = { auto: "📍 مكان الكلام: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
-const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 حاجة", product: "🛍️ منتج", face: "🙂 وش", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فاضية" };
+const TY_TRANS = { "": "بدون ترانزيشن", whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دائرة تفتح",
+  leak: "🌅 تسريب ضوء", burn: "🔥 حرق فيلم", rise: "⬆️ صاعد من أسفل", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من داخل", slab: "🚪 لوح معدّي", bars: "▥ شرايح ألوان", orb: "🟢 دائرة تكبر" };
+const TY_INTRO = { track: { "": "بدون افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "بدون فلاش", burst: "💛 فلاش أصفر قبلها" } };
+const TY_OUTRO = { track: { "": "بدون قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "بدون قفلة", red: "🔴 فلاش أحمر في الآخر" } };
+const TY_PLACES = { auto: "📍 مكان النص: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
+const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 شيء", product: "🛍️ منتج", face: "🙂 وجه", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فارغة" };
 const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
-const TY_BG = { theme: "🎨 ألوان الستايل", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
-const TY_ST = { new: "", bgauto: "🎬 بيجيب خلفيات على حسب الكلام", ready: "📝 الكلام جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
-  transcribing: "🎧 بيسمع", analyzing: "👁️ بيحلل الفيديو", planning: "🧠 بيوزّع", drawing: "🎨 بيرسم الأيقونات", rendering: "🎬 بيعمل الفيديو", tracking: "🎯 بيعمل تراك" };
+const TY_BG = { theme: "🎨 ألوان الأسلوب", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
+const TY_ST = { new: "", bgauto: "🎬 يجلب خلفيات على حسب النص", ready: "📝 النص جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
+  transcribing: "🎧 يسمع", analyzing: "👁️ يحلل الفيديو", planning: "🧠 يوزّع", drawing: "🎨 يرسم الأيقونات", rendering: "🎬 يعمل الفيديو", tracking: "🎯 يعمل تراك" };
 const tye = (v) => escapeHtml(v == null ? "" : String(v));
 const tyT = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
 const TY = (p) => `/api/typo${p}`;
@@ -64,7 +64,7 @@ async function tyOpen(id) {
 function tyRender() {
   $("tyStkCount").textContent = tyx.stk.length ? `(${tyx.stk.length})` : "";
   $("tyList").innerHTML = tyx.list.map((p) => `<li class="${tyx.cur?.id === p.id && tyx.view === "proj" ? "active" : ""}" data-tyopen="${p.id}">
-    <b data-no-i18n>${tye(p.name)}</b><small class="muted">${p.ratio} · ${TY_ST[p.status] || ""}</small></li>`).join("") || `<li class="muted">لسه مفيش</li>`;
+    <b data-no-i18n>${tye(p.name)}</b><small class="muted">${p.ratio} · ${TY_ST[p.status] || ""}</small></li>`).join("") || `<li class="muted">لا يوجد بعد</li>`;
   $("tyMain").hidden = tyx.view !== "proj" || !tyx.cur;
   $("tyStk").hidden = tyx.view !== "stk";
   $("tySfx").hidden = tyx.view !== "sfx";
@@ -102,43 +102,43 @@ function tyRenderProj() {
     <div class="fm-status" id="tyStatus"></div>
     <div class="row wrap tv-opts">
       <label>المقاس <select data-tyopt="ratio">${v.ratios.map((r) => `<option ${r === v.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
-      <label>الستايل <select data-tyopt="style">${stOpts}</select></label>
-      <label title="من غير ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس بس، والكلام بيتفرّغ على السيرفر لو متفعّل">الذكاء <select data-tyopt="ai">
-        <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ من غير ذكاء اصطناعي</option></select></label>
-      <label title="0 = مفيش كليكات خالص، 100 = كليك على كل كلمة، وما بينهم الكليكات بتقل أو تكتر">🔊 الكليكات
+      <label>الأسلوب <select data-tyopt="style">${stOpts}</select></label>
+      <label title="بدون ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس فقط، والنص يتفرّغ على الخادم إذا متفعّل">الذكاء <select data-tyopt="ai">
+        <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ بدون ذكاء اصطناعي</option></select></label>
+      <label title="0 = لا يوجد كليكات تمامًا، 100 = كليك على كل كلمة، وما بينهم الكليكات تقل أو تكتر">🔊 الكليكات
         <input type="range" min="0" max="100" step="5" data-tysfx value="${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}">
         <b data-tysfxval>${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}</b></label>
       ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
-        <label>خط الإنجليزي <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <label>خط العربي <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
+        <label>خط الإنجليزية <select data-tyfont="sans">${TypoEngine.MOMENT_FONTS.latin.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sans || "TY Outfit") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+        <label>خط العربية <select data-tyfont="sansAr">${TypoEngine.MOMENT_FONTS.arabic.map(([f, l]) => `<option value="${f}" ${f === (v.fonts?.sansAr || "TY Alexandria") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
       <label>الخلفية <select data-tybg="kind">${Object.entries(TY_BG).filter(([k]) => k !== "source" || v.source?.kind === "video")
         .map(([k, l]) => `<option value="${k}" ${k === bg.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       ${bg.kind === "solid" ? `<label>اللون <input type="color" data-tybg="color" value="${tye(bg.color || "#101010")}"></label>` : ""}
       ${bg.kind === "image" || bg.kind === "video" ? `<label class="btn sm">⬆ ${bg.file ? "غيّر" : "ارفع"} ${bg.kind === "image" ? "الصورة" : "الفيديو"}
         <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>
         <button type="button" class="btn sm" data-tystock="${bg.kind}">🔎 من المكتبة</button>
-        <button type="button" class="btn sm primary" data-tybgauto="${bg.kind}" ${v.busy || !v.words?.length ? "disabled" : ""} title="البرنامج بيقسّم الكلام لمقاطع ويختار لكل مقطع ${bg.kind === "image" ? "صورة" : "فيديو"} حقيقي بيعبّر عنه">✨ على حسب الكلام</button>` : ""}
+        <button type="button" class="btn sm primary" data-tybgauto="${bg.kind}" ${v.busy || !v.words?.length ? "disabled" : ""} title="البرنامج يقسّم النص لمقاطع ويختار لكل مقطع ${bg.kind === "image" ? "صورة" : "فيديو"} حقيقي يعبّر عنه">✨ على حسب النص</button>` : ""}
       ${bg.auto?.length && bg.kind === "video" ? `<small class="muted ty-credit" data-no-i18n title="${tye(bg.auto.map((a) => `${tyT(a.t0)} ${a.q}`).join("\n"))}">🎬 ${bg.auto.length} مقاطع من <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>${bg.credit?.by ? ` · ${tye(bg.credit.by)}` : ""}</small>`
         : bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
       ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
     </div>
-    <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ الكلام <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
-      <p class="hint">اكتب الكلام (وكل كلمة بتاخد وقت تقريبي)، أو ارفع صوت أو فيديو والكلام بيتكتب بتوقيته. لو رفعت فيديو، التايبوجرافي بيتركب فوقه.</p>
+    <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ النص <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
+      <p class="hint">اكتب النص (وكل كلمة تأخذ وقت تقريبي)، أو ارفع صوت أو فيديو والنص يُكتب بتوقيته. إذا رفعت فيديو، التايبوجرافي يتركب فوقه.</p>
       ${v.source?.kind === "audio" || v.source?.kind === "video" ? `<p class="ty-words" dir="auto" data-no-i18n>${(v.words || []).map((w) => tye(w.w)).join(" ")}</p>`
-        : `<textarea rows="4" dir="auto" data-tytext placeholder="الكلام اللي هيتحوّل لتايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
-           <button type="button" class="btn sm" data-tysavetext ${busy ? "disabled" : ""}>✍️ استخدم الكلام ده</button>`}
+        : `<textarea rows="4" dir="auto" data-tytext placeholder="النص الذي سيتحوّل لتايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
+           <button type="button" class="btn sm" data-tysavetext ${busy ? "disabled" : ""}>✍️ استخدم هذا النص</button>`}
       <div class="row wrap"><label class="btn sm">⬆ ارفع صوت أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
-        <button type="button" class="btn sm ${tyx.rec ? "danger" : ""}" data-tyrec ${busy ? "disabled" : ""}>${tyx.rec ? "⏹ وقّف واستخدم التسجيل" : "🎙️ سجّل صوتك"}</button>
+        <button type="button" class="btn sm ${tyx.rec ? "danger" : ""}" data-tyrec ${busy ? "disabled" : ""}>${tyx.rec ? "⏹ أوقف واستخدم التسجيل" : "🎙️ سجّل صوتك"}</button>
         ${tyx.rec ? `<b class="num" data-tyrect>0:00</b>` : ""}</div>
-      ${tyx.styles.find((x) => x.id === v.style)?.audio_only ? `<p class="hint">✏️ الستايل ده بياخد الصوت بس: لو رفعت فيديو، الصورة مش هتظهر، والكلام والرسومات بالخط الرفيع على أسود.</p>` : ""}
+      ${tyx.styles.find((x) => x.id === v.style)?.audio_only ? `<p class="hint">✏️ هذا الأسلوب يأخذ الصوت فقط: إذا رفعت فيديو، الصورة لن تظهر، والنص والرسومات بالخط الرفيع على أسود.</p>` : ""}
       ${v.source_url && v.source?.kind !== "text" ? (v.source.kind === "video" ? `<video src="${v.source_url}" controls playsinline preload="metadata" class="ty-src"></video>`
         : `<audio src="${v.source_url}" controls preload="metadata"></audio>`) : ""}
     </details>
     ${v.source?.kind === "video" ? tySceneView(v, busy) : ""}
     <details class="panel tv-step" ${tyx.open.s2 ?? !!v.words?.length ? "open" : ""} data-tydk="s2"><summary>٢. 🧠 الحركات <small class="muted">${v.blocks?.length ? `${v.blocks.length} لقطة` : ""}</small></summary>
-      <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): مين بيتكلم ولمين وإيه الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
-        <button type="button" class="btn primary" data-typlan ${busy || !v.words?.length ? "disabled" : ""}>🧠 ${v.blocks?.length ? "وزّعه من جديد" : "وزّع الكلام على الحركات"}</button></div>
-      ${v.missing_icons?.length ? `<div class="ty-miss"><span>أيقونات مش في المكتبة: ${v.missing_icons.map((n) => tyIconChip(n)).join("")}</span>
+      <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): من يتكلم ولمين وماذا الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
+        <button type="button" class="btn primary" data-typlan ${busy || !v.words?.length ? "disabled" : ""}>🧠 ${v.blocks?.length ? "وزّعه من جديد" : "وزّع النص على الحركات"}</button></div>
+      ${v.missing_icons?.length ? `<div class="ty-miss"><span>أيقونات غير في المكتبة: ${v.missing_icons.map((n) => tyIconChip(n)).join("")}</span>
         <button type="button" class="btn sm primary" data-tyicons ${busy ? "disabled" : ""}>🎨 ارسمهم (~${v.draw_cost}$)</button></div>` : ""}
       <div class="ty-blocks">${(v.blocks || []).map((b, i) => tyBlockRow(v, b, i)).join("")}</div>
     </details>
@@ -146,12 +146,12 @@ function tyRenderProj() {
       <div class="ty-screen" id="tyScreen"><div class="ty-wrap"><div class="ty-box" id="tyBox" style="touch-action:none"><div class="ty-bg" id="tyBg"></div><div id="tyStage"></div></div>
         <svg class="ty-giz" id="tyGiz"></svg></div></div>
       <div class="ty-gbar" id="tyGbar"></div>
-      <p class="hint">✋ اسحب البلوك من نصه عشان تحركه، ومن الأركان عشان تكبّره أو تصغّره، والدواير التلاتة بتلفّه: 🔵 الأزرق لفّة عادية، 🔴 الأحمر لقدام وورا، 🟢 الأخضر يمين وشمال. «🔲 أركان» بيخليك تلزق كل ركن لوحده على ورقة أو شاشة في الفيديو.</p>
+      <p class="hint">✋ اسحب البلوك من نصه لكي تحركه، ومن الأركان لكي تكبّره أو تصغّره، والدوائر التلاتة تلفّه: 🔵 الأزرق لفّة عادية، 🔴 الأحمر لقدام وخلف، 🟢 الأخضر يمين وشمال. «🔲 أركان» يخليك تلزق كل ركن تلقائيًا على ورقة أو شاشة في الفيديو.</p>
       <div class="ty-ctrl"><button type="button" class="btn sm" data-typlay>▶️</button>
         <input type="range" min="0" max="${v.duration}" step="0.01" value="${tyx.t}" data-tyscrub><small class="muted" id="tyTime"></small></div>
       <div class="row wrap"><select data-tyq><option value="high">جودة كاملة (1080)</option><option value="fast">أسرع (720)</option></select>
-        <button type="button" class="btn primary" data-tyrender ${busy ? "disabled" : ""}>🎬 ${v.final_url ? "اعمل الفيديو تاني" : "اعمل الفيديو"}</button>
-        <small class="muted">المعاينة هنا بنفس الرسم اللي هيطلع في الفيديو. الفيديو بيترسم على السيرفر فريم فريم (دقيقة تقريبًا لكل 15 ثانية).</small></div>
+        <button type="button" class="btn primary" data-tyrender ${busy ? "disabled" : ""}>🎬 ${v.final_url ? "أنشئ الفيديو مرة أخرى" : "أنشئ الفيديو"}</button>
+        <small class="muted">المعاينة هنا بنفس الرسم الذي سيظهر في الفيديو. الفيديو يُرسم على الخادم فريم فريم (دقيقة تقريبًا لكل 15 ثانية).</small></div>
       ${tySoundLine(v.sound)}
       ${v.final_url ? `<video src="${v.final_url}" controls playsinline preload="metadata" class="ty-final"></video>` : ""}
     </section>` : ""}`;
@@ -161,13 +161,13 @@ function tyRenderProj() {
 
 function tySceneView(v, busy) {
   const an = v.scene?.anchors;
-  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ اللي في الفيديو <small class="muted">${an ? `${an.length} حاجة` : "لسه ما اتحللش"}</small></summary>
-    <p class="hint">البرنامج بيشوف الحاجات اللي في الكادر (صورة، ورقة، شاشة، وش...) وأماكنها وهي بتتحرك، عشان الكلام يتكتب جنبها أو عليها، والكلمة اللي بتشاور على حاجة (زي «me» وفيه صورتك) ما تتكتبش والحاجة نفسها تبقى مكانها. بيتعمل لوحده مع «🧠 وزّع».</p>
+  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ ما في الفيديو <small class="muted">${an ? `${an.length} شيء` : "ما زال ما لم يُحلّل"}</small></summary>
+    <p class="hint">البرنامج يرى الأشياء التي في الكادر (صورة، ورقة، شاشة، وجه...) وأماكنها وهي تتحرك، لكي النص يُكتب جنبها أو عليها، والكلمة التي تشاور على شيء (مثل «me» وفيه صورتك) ما لا تُكتب والشيء نفسها تصبح مكانها. يُنشأ تلقائيًا مع «🧠 وزّع».</p>
     <div class="row wrap"><button type="button" class="btn sm" data-tyscene ${busy ? "disabled" : ""}>👁️ ${an ? "حلّله من جديد" : "حلّل الفيديو"}</button>
       <label class="ty-check"><input type="checkbox" data-tyguides ${tyx.guides ? "checked" : ""}> اعرض أماكنها على المعاينة</label></div>
-    ${v.scene ? `<p class="hint">${!v.scene.person?.present ? "🧍 مفيش شخص ظاهر بوضوح في الفيديو"
-      : v.scene.person.model === "video" ? "🧍 الشخص اتقرا بموديل الفيديو ✓"
-      : "🧍 الشخص اتقرا بالموديل القديم (حلّل الفيديو تاني بعد تحديث السيرفر)"}</p>` : ""}
+    ${v.scene ? `<p class="hint">${!v.scene.person?.present ? "🧍 لا يوجد شخص ظاهر بوضوح في الفيديو"
+      : v.scene.person.model === "video" ? "🧍 الشخص قُرئ بموديل الفيديو ✓"
+      : "🧍 الشخص قُرئ بالنموذج القديم (حلّل الفيديو مرة أخرى بعد تحديث الخادم)"}</p>` : ""}
     ${an?.length ? `<div class="ty-anchors">${an.map((a) => `<figure class="ty-anchor" data-tyseek="${a.t0}">${a.thumb_url ? `<img src="${a.thumb_url}" alt="">` : ""}
       <figcaption><b>${a.id}</b> ${TY_AKINDS[a.kind] || a.kind}<small dir="ltr" data-no-i18n>${tye(a.label)}</small><small class="muted">${tyT(a.t0)} ← ${tyT(a.t1)}</small></figcaption></figure>`).join("")}</div>` : ""}
   </details>`;
@@ -182,29 +182,29 @@ function tyBlockRow(v, b, i) {
       <select data-tbf="kind">${Object.entries(TY_KINDS).map(([k, l]) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select data-tbf="theme">${Object.entries(TY_THEMES).map(([k, l]) => `<option value="${k}" ${k === b.theme ? "selected" : ""}>${l}</option>`).join("")}</select>
       <small class="muted" dir="auto" data-no-i18n>«${tye((b.words || []).map((w) => w.w).join(" "))}»</small>
-      ${i < v.blocks.length - 1 ? `<button type="button" class="btn sm" data-tymerge="${i}" title="يضم اللقطة دي مع اللي بعدها">⤵ ضم</button>` : ""}
+      ${i < v.blocks.length - 1 ? `<button type="button" class="btn sm" data-tymerge="${i}" title="يضم هذه اللقطة مع ما بعدها">⤵ ضم</button>` : ""}
       ${(b.to - b.from) >= 1 ? `<button type="button" class="btn sm" data-tysplit="${i}" title="يقسم اللقطة نصين">✂️ قسّم</button>` : ""}</header>
     ${v.scene?.anchors?.length && v.bg?.kind === "source" ? `<div class="row wrap">
-      <select data-tbf="anchor"><option value="">📍 من غير مرساة (نص الشاشة)</option>${v.scene.anchors.map((a) => `<option value="${a.id}" ${a.id === b.anchor ? "selected" : ""}>📍 ${a.id} · ${TY_AKINDS[a.kind] || a.kind} · ${tye(a.label)}</option>`).join("")}</select>
+      <select data-tbf="anchor"><option value="">📍 بدون مرساة (نص الشاشة)</option>${v.scene.anchors.map((a) => `<option value="${a.id}" ${a.id === b.anchor ? "selected" : ""}>📍 ${a.id} · ${TY_AKINDS[a.kind] || a.kind} · ${tye(a.label)}</option>`).join("")}</select>
       ${b.anchor ? `<select data-tbf="place">${Object.entries(TY_PLACES).map(([k, l]) => `<option value="${k}" ${k === (b.place || "auto") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-      ${b.anchor && b.kind === "anchor" ? `<label>الكلمة اللي الحاجة نفسها مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${b.anchor && b.kind === "anchor" ? `<label>الكلمة التي الشيء نفسها مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
     </div>` : ""}
     ${TY_INTRO[b.kind] || b.kind === "sign" || b.kind === "signature" || TY_FOCUS.includes(b.kind) ? `<div class="row wrap">
       ${TY_INTRO[b.kind] ? `<select data-tbf="intro">${Object.entries(TY_INTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.intro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
         <select data-tbf="outro">${Object.entries(TY_OUTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.outro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-      ${TY_FOCUS.includes(b.kind) ? `<label>الكلمة اللي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${TY_FOCUS.includes(b.kind) ? `<label>الكلمة التي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
       ${b.kind === "sign" || b.kind === "signature" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
     </div>` : ""}
-    <div class="row wrap"><label>📐 حجم الكلام <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>
+    <div class="row wrap"><label>📐 حجم النص <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>
       ${window.TypoEngine?.STUDIO?.has(b.kind) ? `<label>🎞️ الدخول <select data-tbf="trans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (b.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
-      ${(b.mx || b.my || (b.ms ?? 1) !== 1) ? `<button type="button" class="btn sm" data-tyreset="${i}">↺ رجّع المكان والحجم</button>` : ""}</div>
-    ${v.words?.length && b.to >= b.from ? `<div class="wd-row" dir="auto" title="دوس على أي كلمة وصلّحها لو اتسمعت غلط">✏️ ${v.words.slice(b.from, b.to + 1).map((w, j) => `<input class="wd" data-tyword="${b.from + j}" value="${tye(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false" data-no-i18n>`).join("")}</div>` : ""}
+      ${(b.mx || b.my || (b.ms ?? 1) !== 1) ? `<button type="button" class="btn sm" data-tyreset="${i}">↺ استعد المكان والحجم</button>` : ""}</div>
+    ${v.words?.length && b.to >= b.from ? `<div class="wd-row" dir="auto" title="اضغط على أي كلمة وصلّحها إذا سُمعت خطأ">✏️ ${v.words.slice(b.from, b.to + 1).map((w, j) => `<input class="wd" data-tyword="${b.from + j}" value="${tye(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false" data-no-i18n>`).join("")}</div>` : ""}
     <div class="row wrap"><label>المكتوب <input data-tbf="text" value="${tye(b.text)}" dir="auto" data-no-i18n></label>
-      ${b.kind === "build" ? `<label>الكلمة اللي تنوّر <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
-      ${b.kind === "letters" ? `<label>الحرف اللي يتبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
+      ${b.kind === "build" ? `<label>الكلمة التي تضيء <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${b.kind === "letters" ? `<label>الحرف الذي يُستبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
       ${["icon", "letters", "ring", "spot"].includes(b.kind) ? `<span class="ty-icons">${icons.map((n, j) => tyIconChip(n, `data-tyrm="${j}"`)).join("")}
         <select data-tyadd>${stkOpts}</select></span>` : ""}
-      ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ستيكر", "＋ صورة جنب الكلام")}</select>`}</span>` : ""}
+      ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ستيكر", "＋ صورة بجانب النص")}</select>`}</span>` : ""}
     </div></article>`;
 }
 
@@ -221,7 +221,7 @@ function tyUpload(url, file) {
     const el = $("tyStatus");
     const mb = (file.size / 1048576).toFixed(1);
     const show = (pct) => {
-      if (el) el.innerHTML = `<span class="lab-st working"><span class="spin-inline"></span> ⬆ بيرفع ${tye(file.name)} (${mb} ميجا): ${pct}%</span>
+      if (el) el.innerHTML = `<span class="lab-st working"><span class="spin-inline"></span> ⬆ يرفع ${tye(file.name)} (${mb} ميجا): ${pct}%</span>
         <span class="bar" style="display:inline-block;width:160px;height:6px;border-radius:3px;background:rgba(127,127,127,.25);vertical-align:middle;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:var(--accent,#3b82f6)"></i></span>`;
     };
     show(0);
@@ -230,12 +230,12 @@ function tyUpload(url, file) {
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) show(Math.round((e.loaded / e.total) * 100)); };
     xhr.onload = () => {
       let data = {};
-      try { data = JSON.parse(xhr.responseText); } catch { /* مش JSON */ }
-      if (xhr.status >= 200 && xhr.status < 300) { toast("✅ اترفع"); resolve(data); }
+      try { data = JSON.parse(xhr.responseText); } catch { /* غير JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) { toast("✅ رُفع"); resolve(data); }
       else reject(new Error(typeof data.detail === "string" ? data.detail : `الرفع فشل (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error("الرفع وقف: اتأكد من النت وجرب تاني"));
-    xhr.ontimeout = () => reject(new Error("الرفع خد وقت طويل جدًا: جرب فيديو أصغر"));
+    xhr.onerror = () => reject(new Error("الرفع توقف: تأكد من النت وجرب مرة أخرى"));
+    xhr.ontimeout = () => reject(new Error("الرفع خذ وقت طويل جدًا: جرب فيديو أصغر"));
     const fd = new FormData();
     fd.append("file", file);
     xhr.send(fd);
@@ -247,8 +247,8 @@ function tySoundLine(sd) {
   if (!sd) return "";
   const n = (sd.sfx?.click || 0) + (sd.sfx?.key || 0) + (sd.sfx?.typing || 0);
   const voice = sd.voice === "source" ? "🎙️ صوت الفيديو" : sd.voice === "bg" ? "🎙️ صوت فيديو الخلفية"
-    : sd.voice === "silent" ? "⚠️ الفيديو اللي رفعته مفيهوش صوت (لو ده «الصورة بس» من المعمل، ارفع الفيديو الأصلي)" : "🔇 مفيش صوت كلام (الكلام مكتوب)";
-  const fx = !sd.sfx_on ? "🔇 من غير كليكات" : n ? `🔊 الكليكات ${sd.sfx_level ?? 100}٪ (${n} صوت في المكتبة)` : "⚠️ مكتبة الأصوات فاضية على السيرفر: ارفعها تاني من «🔊 الأصوات»";
+    : sd.voice === "silent" ? "⚠️ الفيديو الذي رفعته لا يحتوي صوت (إذا هذا «الصورة فقط» من المعمل، ارفع الفيديو الأصلي)" : "🔇 لا يوجد صوت نص (النص مكتوب)";
+  const fx = !sd.sfx_on ? "🔇 بدون كليكات" : n ? `🔊 الكليكات ${sd.sfx_level ?? 100}٪ (${n} صوت في المكتبة)` : "⚠️ مكتبة الأصوات فارغة على الخادم: ارفعها مرة أخرى من «🔊 الأصوات»";
   return `<p class="hint">${voice} · ${fx}</p>`;
 }
 
@@ -260,7 +260,7 @@ async function tyMountPreview() {
   const doc = await api(TY(`/${v.id}/doc`));
   tyx.eng = new TypoEngine(stage, doc);
   Object.assign(stage.style, { position: "absolute", left: "0", top: "0" });
-  tyx.eng.showAnchors = !!tyx.guides;   // الصفحة عربي (RTL): المسرح يفضل من الشمال
+  tyx.eng.showAnchors = !!tyx.guides;   // الصفحة عربي (RTL): المسرح يظل من الشمال
   tyx.doc = doc;
   const screen = $("tyScreen");
   const fit = () => {
@@ -311,7 +311,7 @@ function tyDrag(box, doc) {
     const blocks = JSON.parse(JSON.stringify(tyx.cur.blocks));
     if (!blocks[i] || (Math.abs((blocks[i].mx || 0) - b.mx) < 0.002 && Math.abs((blocks[i].my || 0) - b.my) < 0.002)) return;
     Object.assign(blocks[i], { mx: Math.round(b.mx * 1000) / 1000, my: Math.round(b.my * 1000) / 1000 });
-    tySaveBlocks(blocks, "✋ مكان الكلام اتحفظ");
+    tySaveBlocks(blocks, "✋ مكان النص حُفظ");
   };
   box.addEventListener("pointerup", end);
   box.addEventListener("pointercancel", end);
@@ -328,7 +328,7 @@ function tySeek(t) {
   const tm = $("tyTime");
   if (tm) tm.textContent = `${tyT(tyx.t)} / ${tyT(tyx.doc.duration)}`;
   const bv = $("tyBg")?.querySelector("video");
-  if (bv && !tyx.play) { try { bv.currentTime = tyx.t % (bv.duration || 1e9); } catch { /* لسه بيحمّل */ } }
+  if (bv && !tyx.play) { try { bv.currentTime = tyx.t % (bv.duration || 1e9); } catch { /* ما زال يُحمّل */ } }
 }
 
 function tyStop() {
@@ -341,7 +341,7 @@ function tyStop() {
   const b = document.querySelector("[data-typlay]");
   if (b) b.textContent = "▶️";
   GZ = GZ_TYPO;
-  tyGizDraw();   // أدوات التحكم بتستخبى وقت التشغيل وبترجع أول ما يقف
+  tyGizDraw();   // أدوات التحكم تختفي وقت التشغيل وتعود أول ما يقف
 }
 
 function tyStart() {
@@ -421,9 +421,9 @@ async function tyPatch(body) {
 // 🎙️ تسجيل الصوت من المتصفح: لما يوقف، التسجيل بيترفع كأنه ملف صوت (والكلام بيتكتب بتوقيته)
 async function tyRecord(v) {
   if (tyx.rec) { tyx.rec.mr.stop(); return; }
-  if (v.blocks?.length && !(await uiConfirm("تسجّل من جديد؟ الكلام والحركات الحالية هيتبدلوا."))) return;
+  if (v.blocks?.length && !(await uiConfirm("تسجّل من جديد؟ النص والحركات الحالية سيتبدلون."))) return;
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("مقدرتش أفتح المايك. اسمح للمتصفح يستخدمه", true); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("تعذّر فتح الميكروفون. اسمح للمتصفح يستخدمه", true); }
   const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || "";
   const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
   mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
@@ -432,8 +432,8 @@ async function tyRecord(v) {
     clearInterval(tyx.rec?.tick);
     tyx.rec = null;
     tyRender();
-    if ((Date.now() - t0) < 1500 || !parts.length) return toast("التسجيل قصير أوي", true);
-    const ext = (mr.mimeType || type).includes("mp4") ? "m4a" : "weba";   // weba مش webm: عشان يتعامل كصوت (بيتحوّل m4a) مش فيديو
+    if ((Date.now() - t0) < 1500 || !parts.length) return toast("التسجيل قصير جدًا", true);
+    const ext = (mr.mimeType || type).includes("mp4") ? "m4a" : "weba";   // weba غير webm: لكي يتعامل كصوت (يتحوّل m4a) غير فيديو
     const file = new File(parts, `تسجيل.${ext}`, { type: mr.mimeType || type || "audio/webm" });
     try { tyx.cur = await tyUpload(TY(`/${v.id}/source`), file); tyx.force = true; tyRender(); tyPoll(); } catch (err) { toast(err.message, true); }
   };
@@ -456,7 +456,7 @@ function tyPoll() {
         if (tyx.cur.status === "failed") toast(tyx.cur.error || "فشل", true);
         else if (was === "rendering") toast("🎬 الفيديو جاهز");
       } else tyStatusOnly();
-    } catch { /* السيرفر بيعيد التشغيل */ }
+    } catch { /* الخادم يعيد التشغيل */ }
     tyPoll();
   }, 1500);
 }
@@ -472,16 +472,16 @@ $("tyNew").onclick = async () => {
 };
 
 // ---------- 🔊 الأصوات الرسمية
-const TY_SFX = { click: ["🖱️ كليكات", "على كل كلمة أو حرف أو عنصر بيظهر أو بيختفي (البرنامج بيبدّل بينهم)"],
-  key: ["⌨️ ضغطات كيبورد", "على كتابة الرسايل بس (حرف حرف)"], typing: ["💬 تايبينج", "صوت كتابة رسالة كامل (احتياطي لو مفيش ضغطات)"] };
+const TY_SFX = { click: ["🖱️ كليكات", "على كل كلمة أو حرف أو عنصر يظهر أو يختفي (البرنامج يبدّل بينهم)"],
+  key: ["⌨️ ضغطات كيبورد", "على كتابة الرسائل فقط (حرف حرف)"], typing: ["💬 تايبينج", "صوت كتابة رسالة كامل (احتياطي إذا لا يوجد ضغطات)"] };
 function tyRenderSfx() {
   const lib = tyx.sfx || {};
   $("tySfx").innerHTML = `<div class="car-head"><h2>🔊 الأصوات الرسمية <small class="muted">${Object.values(lib).flat().length}</small></h2>
       <label class="btn sm primary">⬆ ارفع wav أو zip<input type="file" data-sfxup accept=".wav,.zip,audio/wav" multiple hidden></label></div>
-    <p class="hint">اسم الملف بيحدد هو بيتحط فين: <b>click_</b>… كليك ظهور واختفاء · <b>key_</b>… ضغطة كيبورد · <b>typing_</b>… كتابة رسالة. الأصوات بتتحط لوحدها لما تعمل الفيديو، وتقدر تقفلها من «الأصوات» في المشروع.</p>
+    <p class="hint">اسم الملف يحدد هو يوضع أين: <b>click_</b>… كليك ظهور واختفاء · <b>key_</b>… ضغطة كيبورد · <b>typing_</b>… كتابة رسالة. الأصوات توضع تلقائيًا عندما تعمل الفيديو، ويمكنك تقفلها من «الأصوات» في المشروع.</p>
     ${Object.entries(TY_SFX).map(([k, [l, h]]) => `<section class="ty-sfx"><h3>${l} <small class="muted">${(lib[k] || []).length} · ${h}</small></h3>
       <div class="ty-sfx-list">${(lib[k] || []).map((f) => `<div class="ty-sfx-row"><button type="button" class="btn sm" data-sfxplay="${f.url}">▶️</button>
-        <span data-no-i18n>${tye(f.name)}</span><button type="button" class="btn sm danger" data-sfxdel="${tye(f.name)}">🗑️</button></div>`).join("") || `<p class="muted">لسه مفيش.</p>`}</div></section>`).join("")}`;
+        <span data-no-i18n>${tye(f.name)}</span><button type="button" class="btn sm danger" data-sfxdel="${tye(f.name)}">🗑️</button></div>`).join("") || `<p class="muted">لا يوجد بعد.</p>`}</div></section>`).join("")}`;
 }
 $("tySfxBtn").onclick = async () => {
   tyStop();
@@ -493,7 +493,7 @@ $("tySfx").addEventListener("click", async (e) => {
   const pl = e.target.closest("[data-sfxplay]");
   if (pl) { new Audio(pl.dataset.sfxplay).play().catch(() => {}); return; }
   const del = e.target.closest("[data-sfxdel]");
-  if (del && (await uiConfirm(`تمسح ${del.dataset.sfxdel}؟`))) {
+  if (del && (await uiConfirm(`تحذف ${del.dataset.sfxdel}؟`))) {
     try { tyx.sfx = await api(TY(`/sfx/${encodeURIComponent(del.dataset.sfxdel)}`), { method: "DELETE" }); tyRender(); } catch (err) { toast(err.message, true); }
   }
 });
@@ -504,7 +504,7 @@ $("tySfx").addEventListener("change", async (e) => {
   e.target.value = "";
   try {
     const r = await api(TY("/sfx"), { method: "POST", body: fd });
-    tyx.sfx = r; toast(`🔊 اتضاف ${r.added.length} صوت`); tyRender();
+    tyx.sfx = r; toast(`🔊 أُضيف ${r.added.length} صوت`); tyRender();
   } catch (err) { toast(err.message, true); }
 });
 
@@ -546,15 +546,15 @@ const tyStockOrient = () => ({ "9:16": "portrait", "4:5": "portrait", "16:9": "l
 function tyStockDraw() {
   const el = document.getElementById("tyStock"), st = TY_STOCK;
   el.innerHTML = `<div class="ty-stock-box" role="dialog" aria-label="مكتبة الخلفيات">
-    <div class="ty-stock-top"><b>📚 مكتبة الخلفيات</b><small class="muted">صور وفيديوهات حقيقية متصوّرة، مش متولّدة</small><button type="button" class="btn sm" data-stclose>✕</button></div>
-    <div class="ty-stock-bar"><input type="search" data-stq dir="auto" placeholder="دوّر بأي كلمة: قهوة، مدينة بالليل، بحر، مكتب…" value="${tye(st.q)}">
+    <div class="ty-stock-top"><b>📚 مكتبة الخلفيات</b><small class="muted">صور وفيديوهات حقيقية متصوّرة، غير متولّدة</small><button type="button" class="btn sm" data-stclose>✕</button></div>
+    <div class="ty-stock-bar"><input type="search" data-stq dir="auto" placeholder="ابحث بأي كلمة: قهوة، مدينة بالليل، بحر، مكتب…" value="${tye(st.q)}">
       <div class="seg"><button type="button" class="btn sm ${st.kind === "video" ? "primary" : ""}" data-stkind="video">🎬 فيديو</button><button type="button" class="btn sm ${st.kind === "photo" ? "primary" : ""}" data-stkind="photo">🖼️ صورة</button></div>
-      <button type="button" class="btn primary sm" data-stgo>دوّر</button></div>
-    ${st.q_en && st.q_en !== st.q ? `<small class="muted">بيدوّر على: <span data-no-i18n dir="ltr">${tye(st.q_en)}</span></small>` : ""}
-    <div class="ty-stock-grid">${st.busy && !st.items.length ? `<p class="muted">⏳ بيدوّر…</p>` : st.items.length ? st.items.map((it, i) => `<button type="button" class="ty-stock-it" data-stpick="${i}" ${it.kind === "video" ? "data-stv" : ""} title="${tye(it.author)}">
+      <button type="button" class="btn primary sm" data-stgo>ابحث</button></div>
+    ${st.q_en && st.q_en !== st.q ? `<small class="muted">يبحث عن: <span data-no-i18n dir="ltr">${tye(st.q_en)}</span></small>` : ""}
+    <div class="ty-stock-grid">${st.busy && !st.items.length ? `<p class="muted">⏳ جارٍ البحث…</p>` : st.items.length ? st.items.map((it, i) => `<button type="button" class="ty-stock-it" data-stpick="${i}" ${it.kind === "video" ? "data-stv" : ""} title="${tye(it.author)}">
         <img src="${tye(it.thumb)}" alt="" loading="lazy">${it.kind === "video" ? `<video src="${tye(it.preview)}" muted loop playsinline preload="none"></video><em class="num">${Math.round(it.dur || 0)}ث</em>` : ""}
-        <small data-no-i18n>${tye(it.author)}</small></button>`).join("") : st.q ? `<p class="muted">مفيش نتايج. جرّب كلمة تانية.</p>` : `<p class="muted">اكتب كلمة ودوس Enter.</p>`}</div>
-    <div class="ty-stock-foot">${st.next ? `<button type="button" class="btn sm" data-stmore ${st.busy ? "disabled" : ""}>نتايج أكتر</button>` : "<span></span>"}
+        <small data-no-i18n>${tye(it.author)}</small></button>`).join("") : st.q ? `<p class="muted">لا يوجد نتائج. جرّب كلمة أخرى.</p>` : `<p class="muted">اكتب كلمة واضغط Enter.</p>`}</div>
+    <div class="ty-stock-foot">${st.next ? `<button type="button" class="btn sm" data-stmore ${st.busy ? "disabled" : ""}>نتائج أكثر</button>` : "<span></span>"}
       <a href="https://www.pexels.com" target="_blank" rel="noopener" class="muted" data-no-i18n>Photos & videos provided by Pexels</a></div></div>`;
 }
 async function tyStockSearch(q, page) {
@@ -584,13 +584,13 @@ async function tyStockClick(e) {
     const it = st.items[Number(pk.dataset.stpick)], v = tyx.cur;
     if (!it || !v) return;
     pk.classList.add("busy");
-    toast(it.kind === "video" ? "⏳ بينزّل الفيديو…" : "⏳ بينزّل الصورة…");
+    toast(it.kind === "video" ? "⏳ ينزّل الفيديو…" : "⏳ ينزّل الصورة…");
     try {
       tyx.cur = await api(TY(`/${v.id}/bg-stock`), { method: "POST", ...jsonBody({ kind: it.kind, file: it.file, author: it.author, author_url: it.author_url, page: it.page }) });
       el.hidden = true;
       tyx.force = true;
       tyRender();
-      toast("✓ الخلفية اتحطت");
+      toast("✓ الخلفية وُضعت");
     } catch (err) { pk.classList.remove("busy"); toast(err.message, true); }
   }
 }
@@ -603,7 +603,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (stk) return tyStockOpen(v, stk.dataset.tystock);
   const bga = t.closest("[data-tybgauto]");
   if (bga) {
-    if ((v.bg?.file) && !(await uiConfirm("الخلفية الحالية هتتبدل بخلفيات بيختارها البرنامج على حسب الكلام. تكمّل؟"))) return;
+    if ((v.bg?.file) && !(await uiConfirm("الخلفية الحالية ستُستبدل بخلفيات يختارها البرنامج على حسب النص. تُكمل؟"))) return;
     return wrap(bga, async () => { tyx.cur = await api(TY(`/${v.id}/bg-auto`), { method: "POST", ...jsonBody({ kind: bga.dataset.tybgauto === "image" ? "photo" : "video" }) }); tyRender(); tyPoll(); });
   }
   const play = t.closest("[data-typlay]");
@@ -612,7 +612,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (rs) {
     const blocks = JSON.parse(JSON.stringify(v.blocks));
     Object.assign(blocks[Number(rs.dataset.tyreset)], { mx: 0, my: 0, ms: 1 });
-    return tySaveBlocks(blocks, "↺ رجع مكانه");
+    return tySaveBlocks(blocks, "↺ أعد مكانه");
   }
   const seek = t.closest("[data-tyseek]");
   if (seek) { tyStop(); tySeek(Number(seek.dataset.tyseek)); return $("tyScreen")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
@@ -623,7 +623,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
   const plan = t.closest("[data-typlan]");
   if (plan) {
-    if (v.blocks?.length && !(await uiConfirm("توزّع الكلام من جديد؟ التعديلات اللي عملتها على اللقطات هتتبدل."))) return;
+    if (v.blocks?.length && !(await uiConfirm("توزّع النص من جديد؟ التعديلات التي عملتها على اللقطات ستُستبدل."))) return;
     return wrap(plan, async () => {
       tyx.cur = await api(TY(`/${v.id}/plan`), { method: "POST", ...jsonBody({ brief: document.querySelector("[data-tybrief]").value }) });
       tyRender(); tyPoll();
@@ -631,7 +631,7 @@ $("tyMain").addEventListener("click", async (e) => {
   }
   const ic = t.closest("[data-tyicons]");
   if (ic) {
-    if (!(await uiConfirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة بالستايل ده؟ حوالي ${v.draw_cost}$`))) return;
+    if (!(await uiConfirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة هذا بالستايل؟ نحو ${v.draw_cost}$`))) return;
     return wrap(ic, async () => { tyx.cur = await api(TY(`/${v.id}/icons`), { method: "POST" }); tyRender(); tyPoll(); });
   }
   const ren = t.closest("[data-tyrender]");
@@ -649,13 +649,13 @@ $("tyMain").addEventListener("click", async (e) => {
       const r = await api(TY(`/${v.id}/to-editor`), { method: "POST" });
       storageSet("studiomania.projectId.ads", r.project_id);
       if (typeof mt !== "undefined") mt.project = null;
-      toast("🎞️ اتفتح في مونتاج الإعلانات");
+      toast("🎞️ فُتح في مونتاج الإعلانات");
       showStep("6a");
     });
   }
   const del = t.closest("[data-tydel]");
   if (del) {
-    if (!(await uiConfirm(`تمسح «${v.name}»؟`))) return;
+    if (!(await uiConfirm(`تحذف «${v.name}»؟`))) return;
     return wrap(del, async () => {
       await api(TY(`/${v.id}`), { method: "DELETE" });
       tyx.cur = null; tyx.view = "home";
@@ -678,7 +678,7 @@ $("tyMain").addEventListener("click", async (e) => {
     bl.splice(i + 1, 0, { ...b, from: mid + 1, text: "", kind: b.kind === "pop" ? "build" : b.kind });
     b.to = mid;
     b.text = "";
-    return tySaveBlocks(bl, "✂️ اتقسمت");
+    return tySaveBlocks(bl, "✂️ قُسّمت");
   }
   const rm = t.closest("[data-tyrm]");
   if (rm) {
@@ -701,17 +701,17 @@ $("tyMain").addEventListener("input", (e) => {
 $("tyMain").addEventListener("change", async (e) => {
   const t = e.target, v = tyx.cur;
   try {
-    if (t.matches("[data-tyword]")) {   // تصليح كلمة اتسمعت غلط: نفس التوقيت
+    if (t.matches("[data-tyword]")) {   // تصليح كلمة سُمعت خطأ: نفس التوقيت
       const val = t.value.trim(), i = Number(t.dataset.tyword);
       if (!val) { t.value = v.words[i].w; return; }
       const words = v.words.map((w) => w.w);
       words[i] = val;
       await tyPatch({ words });
-      return toast("✏️ الكلمة اتصلّحت");
+      return toast("✏️ الكلمة أُصلحت");
     }
     if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
     if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
-    if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 الكليكات: ${t.value}` : "🔇 من غير كليكات"); }
+    if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 الكليكات: ${t.value}` : "🔇 بدون كليكات"); }
     if (t.matches("[data-tyfont]")) return tyPatch({ fonts: { ...(v.fonts || {}), [t.dataset.tyfont]: t.value } });
     if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
     if (t.matches("[data-tybgfile]") && t.files[0]) {
@@ -720,7 +720,7 @@ $("tyMain").addEventListener("change", async (e) => {
       return tyRender();
     }
     if (t.matches("[data-tysrc]") && t.files[0]) {
-      if (v.blocks?.length && !(await uiConfirm("ترفع ملف جديد؟ الكلام والحركات الحالية هيتبدلوا."))) return;
+      if (v.blocks?.length && !(await uiConfirm("ترفع ملف جديد؟ النص والحركات الحالية سيتبدلون."))) return;
       tyx.cur = await tyUpload(TY(`/${v.id}/source`), t.files[0]);
       tyx.force = true;
       tyRender();
@@ -738,7 +738,7 @@ $("tyMain").addEventListener("change", async (e) => {
       bl[Number(t.closest("[data-tyb]").dataset.tyb)].side = t.value;
       return tySaveBlocks(bl);
     }
-    if (t.matches("[data-tbf]")) return tySaveBlocks(tyBlocksFromDom(), "✅ اتحفظ");
+    if (t.matches("[data-tbf]")) return tySaveBlocks(tyBlocksFromDom(), "✅ حُفظ");
     if (t.matches("[data-tybrief]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ brief: t.value }) }); }
   } catch (err) { toast(err.message, true); }
 });
@@ -752,18 +752,18 @@ $("tyMain").addEventListener("input", (e) => {
 function tyRenderStk() {
   $("tyStk").innerHTML = `<div class="car-head"><h2>🧩 مكتبة الستيكرات <small class="muted">${tyx.stk.length}</small></h2>
       <div class="row wrap"><label class="btn sm primary">⬆ ارفع صور<input type="file" data-stkup accept="image/*" multiple hidden></label>
-        <label class="ty-check"><input type="checkbox" data-stkkey checked> شيل الخلفية السادة</label></div></div>
+        <label class="ty-check"><input type="checkbox" data-stkkey checked> أزل الخلفية السادة</label></div></div>
     <div class="row wrap"><input type="text" data-stkdesc placeholder="وصف أيقونة جديدة (مثلًا: pixel art dumbbell)" data-no-i18n>
       <select data-stkstyle>${tyx.styles.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("")}</select>
       <button type="button" class="btn sm" data-stkdraw>🎨 ارسمها (~0.03$)</button></div>
-    <p class="hint">الستيكرات اللي اتقصت من فيديو ممكن يبقى فيها حتت من حاجات جنبها: «✨ نضّفها» بيرسمها لوحدها بنفس شكلها (حوالي 0.03$).</p>
+    <p class="hint">الستيكرات التي قُصّت من فيديو يمكن يصبح فيها حتت من أشياء جنبها: «✨ نضّفها» يرسمها تلقائيًا بنفس شكلها (نحو 0.03$).</p>
     ${tyDictView()}
     <div class="ty-stk">${tyx.stk.map((s) => `<figure data-stk="${s.id}"><div class="ty-checker"><img src="${s.url}" alt=""></div>
       <input value="${tye(s.name)}" data-stkname data-no-i18n>
-      <label class="ty-concept" title="معنى الأيقونة في القاموس: الكلام اللي بيدل عليه بيجيب الأيقونة دي">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
+      <label class="ty-concept" title="معنى الأيقونة في القاموس: النص الذي يدل عليه يجلب هذه الأيقونة">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
       <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
-      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها لوحدها نضيفة بنفس شكلها">✨ نضّفها</button>` : ""}
-        <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لسه مفيش ستيكرات</p>`}</div>`;
+      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نضيفة بنفس شكلها">✨ نضّفها</button>` : ""}
+        <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لا يوجد بعد ستيكرات</p>`}</div>`;
 }
 
 $("tyStk").addEventListener("click", async (e) => {
@@ -775,17 +775,17 @@ $("tyStk").addEventListener("click", async (e) => {
     if (!desc) return toast("اكتب وصف الأيقونة", true);
     return wrap(draw, async () => {
       await api(TY("/stickers/draw"), { method: "POST", ...jsonBody({ desc, style: document.querySelector("[data-stkstyle]").value }) });
-      tyx.stk = await api(TY("/stickers")); tyRender(); toast("🎨 اتضافت");
+      tyx.stk = await api(TY("/stickers")); tyRender(); toast("🎨 أُضيفت");
     });
   }
   const fig = t.closest("[data-stk]");
   if (!fig) return;
   const id = fig.dataset.stk;
   const clean = t.closest("[data-stkclean]");
-  if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ اتضافت نسخة نضيفة"); });
+  if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ أُضيفت نسخة نضيفة"); });
   const del = t.closest("[data-stkdel]");
   if (del) {
-    if (!(await uiConfirm("تمسح الستيكر ده؟"))) return;
+    if (!(await uiConfirm("تحذف هذا الستيكر؟"))) return;
     return wrap(del, async () => { await api(TY(`/stickers/${id}`), { method: "DELETE" }); tyx.stk = await api(TY("/stickers")); tyRender(); });
   }
 });
@@ -797,7 +797,7 @@ $("tyStk").addEventListener("change", async (e) => {
       const fd = new FormData();
       [...t.files].forEach((f) => fd.append("files", f));
       fd.append("key", document.querySelector("[data-stkkey]").checked ? "1" : "0");
-      toast("⬆ بيرفع...");
+      toast("⬆ يرفع...");
       await api(TY("/stickers"), { method: "POST", body: fd });
       tyx.stk = await api(TY("/stickers"));
       return tyRender();
@@ -806,11 +806,11 @@ $("tyStk").addEventListener("change", async (e) => {
       tyx.stk = await api(TY(`/stickers/${t.closest("[data-stk]").dataset.stk}`), { method: "PATCH", ...jsonBody({ concept: t.value }) });
       tyx.dict = await api(TY("/concepts"));
       tyRender();
-      return toast("📖 اتحفظ في القاموس");
+      return toast("📖 حُفظ في القاموس");
     }
     if (t.matches("[data-stkname]")) {
       tyx.stk = await api(TY(`/stickers/${t.closest("[data-stk]").dataset.stk}`), { method: "PATCH", ...jsonBody({ name: t.value }) });
-      return toast("✅ اتحفظ");
+      return toast("✅ حُفظ");
     }
   } catch (err) { toast(err.message, true); }
 });
@@ -820,13 +820,13 @@ $("tyStk").addEventListener("change", async (e) => {
 function tyDictView() {
   const d = tyx.dict;
   if (!d) return "";
-  return `<details class="panel ty-dict" ${tyx.open.dict ? "open" : ""} data-tydictdk><summary>📖 القاموس <small class="muted">${d.concepts.length} معنى · ${d.learned} كلمة اتعلّمت</small></summary>
-    <p class="hint">بيتملي لوحده: كل أيقونة بتتطلّع من فيديو في المعمل (أو بتترسم) بتدخل بمعناها وكلماتها عربي وإنجليزي. الكلمة اللي ميعرفهاش بيسأل عليها موديل صغير مرة واحدة ويحفظ الإجابة.
-      ونفس المعنى ممكن يبقى ليه أيقونة مختلفة في كل ستايل: المشروع بياخد أيقونة الستايل بتاعه الأول.</p>
+  return `<details class="panel ty-dict" ${tyx.open.dict ? "open" : ""} data-tydictdk><summary>📖 القاموس <small class="muted">${d.concepts.length} معنى · ${d.learned} كلمة تعلّمت</small></summary>
+    <p class="hint">يُملأ تلقائيًا: كل أيقونة تُستخرج من فيديو في المعمل (أو تُرسم) تدخل بمعناها وكلماتها عربي وإنجليزي. الكلمة التي لا يعرفها يسأل عليها نموذج صغير مرة واحدة ويحفظ الإجابة.
+      ونفس المعنى يمكن يصبح له أيقونة مختلفة في كل أسلوب: المشروع يأخذ أيقونة الأسلوب الخاص به أولًا.</p>
     ${d.untagged ? `<button type="button" class="btn sm" data-dicttag>🏷️ دخّل ${d.untagged} أيقونة قديمة للقاموس</button>` : ""}
     <div class="row wrap"><input type="text" data-dictc placeholder="المعنى (مثلًا dumbbell)" data-no-i18n><input type="text" data-dictar placeholder="كلمات عربي: حديد، دمبل، جيم" data-no-i18n>
-      <input type="text" data-dicten placeholder="English words: weights, gym" data-no-i18n><button type="button" class="btn sm" data-dictadd>＋ ضيف</button></div>
-    <div class="ty-dict-list">${d.concepts.map((c) => `<div><b data-no-i18n>${tye(c.concept)}</b> <small class="muted">${c.stickers.length ? `🧩 ${c.stickers.length}` : "❔ مفيش أيقونة"}</small>
+      <input type="text" data-dicten placeholder="English words: weights, gym" data-no-i18n><button type="button" class="btn sm" data-dictadd>＋ أضف</button></div>
+    <div class="ty-dict-list">${d.concepts.map((c) => `<div><b data-no-i18n>${tye(c.concept)}</b> <small class="muted">${c.stickers.length ? `🧩 ${c.stickers.length}` : "❔ لا يوجد أيقونة"}</small>
       <small dir="auto" data-no-i18n>${tye([...c.ar, ...c.en].slice(0, 14).join("، "))}</small></div>`).join("")}</div></details>`;
 }
 
@@ -836,7 +836,7 @@ $("tyStk").addEventListener("click", async (e) => {
   const t = e.target;
   const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
   const tag = t.closest("[data-dicttag]");
-  if (tag) return wrap(tag, async () => { tyx.dict = await api(TY("/concepts/tag"), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("🏷️ اتضافوا للقاموس"); });
+  if (tag) return wrap(tag, async () => { tyx.dict = await api(TY("/concepts/tag"), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("🏷️ أُضيفوا للقاموس"); });
   const add = t.closest("[data-dictadd]");
   if (add) {
     const val = (k) => document.querySelector(`[data-dict${k}]`).value.trim();
@@ -844,7 +844,7 @@ $("tyStk").addEventListener("click", async (e) => {
     if (!val("c")) return toast("اكتب المعنى", true);
     return wrap(add, async () => {
       tyx.dict = await api(TY("/concepts"), { method: "POST", ...jsonBody({ concept: val("c"), ar: split(val("ar")), en: split(val("en")) }) });
-      tyx.open.dict = true; tyRender(); toast("📖 اتضاف");
+      tyx.open.dict = true; tyRender(); toast("📖 أُضيف");
     });
   }
 });
@@ -858,14 +858,14 @@ function renderLabTypo(d) {
   el.hidden = false;
   const sw = (th) => `<span class="ty-sw" style="background:${th.bg};color:${th.ink}">Aa<i style="background:${th.accent}"></i></span>`;
   el.innerHTML = `<details class="sch" open><summary><b>🔤 التايبوجرافي</b>
-      ${ty.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> ${tye(ty.step || "بيتفرج على الفيديو")}</span>
-        <button type="button" class="btn sm" data-ltstop>⏹ وقّف</button>` : ""}
-      ${ty.status !== "working" && (data || ty.error) ? `<button type="button" class="btn sm danger" data-ltdel title="الستايل والستيكرات اللي اتحفظوا بيفضلوا">🗑️ امسح النتيجة</button>` : ""}
+      ${ty.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> ${tye(ty.step || "يشاهد الفيديو")}</span>
+        <button type="button" class="btn sm" data-ltstop>⏹ أوقف</button>` : ""}
+      ${ty.status !== "working" && (data || ty.error) ? `<button type="button" class="btn sm danger" data-ltdel title="الأسلوب والستيكرات التي حُفظت يظلون">🗑️ احذف النتيجة</button>` : ""}
       ${ty.error ? `<small class="err">${tye(ty.error)}</small>` : ""}
       ${data ? `<small class="muted">${data.moments.length} لحظة · ${data.moments.reduce((a, m) => a + m.icons.filter((i) => i.url).length, 0)} ستيكر</small>` : ""}</summary>
     ${data ? `<div class="ty-labstyle"><b data-no-i18n>${tye(data.style.name)}</b> ${sw(data.style.light)}${sw(data.style.dark)}${sw(data.style.accent)}
         <small class="muted" dir="ltr" data-no-i18n>${tye(data.style.font_look)} ${data.style.icon_style ? `· ${tye(data.style.icon_style)}` : ""}</small>
-        <button type="button" class="btn sm primary" data-ltuse>🔤 اعمل فيديو بالستايل ده</button></div>
+        <button type="button" class="btn sm primary" data-ltuse>🔤 أنشئ فيديو هذا بالستايل</button></div>
       ${data.style.rules?.length ? `<ul class="ty-rules" data-no-i18n>${data.style.rules.map((r) => `<li>${tye(r)}</li>`).join("")}</ul>` : ""}
       <div class="ty-moments">${data.moments.map((m) => `<article class="ty-moment">
         <button type="button" class="btn sm" data-schplay="${m.t0}" data-to="${m.t1}">▶️ ${lt(m.t0)}</button>
@@ -880,8 +880,8 @@ function renderLabTypo(d) {
 
 $("labTypoBtn").onclick = async () => {
   const has = labx.cur?.typo?.data;
-  if (!(await uiConfirm(has ? `تطلّع تايبوجرافي «${labx.cur.name}» من جديد؟ (الستايل والستيكرات القديمة بيفضلوا في المكتبة)`
-    : `يطلّع التايبوجرافي من «${labx.cur.name}»: الستايل، وكل لحظة الكلام اتحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`))) return;
+  if (!(await uiConfirm(has ? `تُخرج تايبوجرافي «${labx.cur.name}» من جديد؟ (الأسلوب والستيكرات القديمة يظلون في المكتبة)`
+    : `يُخرج التايبوجرافي من «${labx.cur.name}»: الأسلوب، وكل لحظة النص تحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`))) return;
   busyButton($("labTypoBtn"), "⏳", async () => {
     try {
       labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "POST" });
@@ -895,11 +895,11 @@ $("labTypo").addEventListener("click", async (e) => {
   const pl = t.closest("[data-schplay]");
   if (pl) { e.preventDefault(); return schPlay(Number(pl.dataset.schplay), Number(pl.dataset.to)); }
   const stop = t.closest("[data-ltstop]");
-  if (stop) { e.preventDefault(); labx.cur = await api(`/api/lab/${labx.cur.id}/typo/stop`, { method: "POST" }); renderLab(); return toast("⏹ اتوقف"); }
+  if (stop) { e.preventDefault(); labx.cur = await api(`/api/lab/${labx.cur.id}/typo/stop`, { method: "POST" }); renderLab(); return toast("⏹ توقف"); }
   const del = t.closest("[data-ltdel]");
   if (del) {
     e.preventDefault();
-    if (!(await uiConfirm("تمسح نتيجة التايبوجرافي؟ (الستايل والستيكرات بيفضلوا في المكتبة)"))) return;
+    if (!(await uiConfirm("تحذف نتيجة التايبوجرافي؟ (الأسلوب والستيكرات يظلون في المكتبة)"))) return;
     labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "DELETE" });
     return renderLab();
   }
@@ -932,7 +932,7 @@ const TYG_RING = { z: "#3B82F6", x: "#EF4444", y: "#22C55E" };
 
 function tyGizBlock() {
   const blocks = GZ.doc?.blocks || [];
-  const want = GZ.selIndex?.();   // اللقطة المختارة لو بتغطي الوقت ده (العناصر الحرة ممكن تتراكب)
+  const want = GZ.selIndex?.();   // اللقطة المختارة إذا تغطي هذا الوقت (العناصر الحرة يمكن تتراكب)
   if (want != null && blocks[want] && GZ.t >= blocks[want].t0 && GZ.t < blocks[want].t1) return { i: want, b: blocks[want] };
   const i = blocks.findIndex((b) => GZ.t >= b.t0 && GZ.t < b.t1);
   return i < 0 ? null : { i, b: blocks[i] };
@@ -965,7 +965,7 @@ const GZI = {   // أيقونات خطوط بسيطة (24×24)
   paper: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
 };
 const gzIcon = (n) => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${GZI[n]}</svg>`;
-const GZ_MODES = [["move", "تحريك ولفّ", "اسحب من نص الكلام عشان تحرّكه، ومن الأركان عشان تكبّره، والدواير بتلفّه: الأزرق لفّة عادية (Shift = كل 15°)، الأحمر لقدام وورا، الأخضر يمين وشمال"],
+const GZ_MODES = [["move", "تحريك ولفّ", "اسحب من نص النص لكي تحرّكه، ومن الأركان لكي تكبّره، والدوائر تلفّه: الأزرق لفّة عادية (Shift = كل 15°)، الأحمر لقدام وخلف، الأخضر يمين وشمال"],
   ["track", "تراك", ""]];
 
 function tyGizDraw() {
@@ -989,7 +989,7 @@ function tyGizDraw() {
   if (mode === "move") {
     h += `<polygon points="${poly}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="3"/>
       <polygon data-g="move" points="${poly}" fill="rgba(91,140,255,.07)" stroke="#fff" stroke-width="1.2" style="cursor:move"/>`;
-    if (!pin) {   // الدواير: لفّة عادية (Z) وقدام/ورا (X) ويمين/شمال (Y)
+    if (!pin) {   // الدوائر: لفّة عادية (Z) وأمام/خلف (X) ويمين/شمال (Y)
       const ring = (role, el, col, lx, ly, lab) => `${el.replace("/>", ` fill="none" stroke="${col}" stroke-width="2.2" opacity=".95" filter="url(#gzSh)" style="pointer-events:none"/>`)}
         ${el.replace("/>", ` data-g="${role}" fill="none" stroke="transparent" stroke-width="14" style="cursor:${role === "rx" ? "ns-resize" : role === "ry" ? "ew-resize" : "grab"}"/>`)}
         <g filter="url(#gzSh)" style="pointer-events:none"><rect x="${lx - 8}" y="${ly - 8}" width="16" height="16" rx="5" fill="${col}"/><text x="${lx}" y="${ly + 3.6}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="system-ui">${lab}</text></g>`;
@@ -1002,7 +1002,7 @@ function tyGizDraw() {
   } else {
     const acc = "#FACC15";
     h += `<polygon points="${poly}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1" stroke-dasharray="3 4" style="pointer-events:none"/>`;
-    if (tq) {   // حدود الحاجة اللي البرنامج متعرف عليها في الفريم ده، وأركانها بتتسحب لو غلط
+    if (tq) {   // حدود الشيء الذي البرنامج متعرف عليها في هذا الفريم، وأركانها تتسحب إذا خطأ
       const k = P.W / GZ.doc.w, q = tq.map(([x, y]) => [x * k + o, y * k + o]);
       h += `<polygon points="${q.map((p) => p.join(",")).join(" ")}" fill="rgba(250,204,21,.10)" stroke="${acc}" stroke-width="2" filter="url(#gzSh)" style="pointer-events:none"/>`;
       if (!GZ.playing) h += q.map((p, j) => `<g filter="url(#gzSh)"><rect data-g="t${j}" x="${p[0] - 6.5}" y="${p[1] - 6.5}" width="13" height="13" rx="2.5" transform="rotate(45 ${p[0]} ${p[1]})" fill="${acc}" stroke="#1a1a1a" stroke-width="1.4" style="cursor:crosshair"/></g>`).join("");
@@ -1031,28 +1031,28 @@ function tyGizBar(g, pin) {
   let sub = "", hint = "";
   if (mode === "move") {
     hint = GZ_MODES[0][2];
-    if (pin) { hint = "الكلام متلزق على الحاجة: اسحبه من النص أو كبّره من الأركان"; sub = `<button type="button" class="gz-pill" data-tyg="unpin">${gzIcon("x")}فك اللزق</button>`; }
+    if (pin) { hint = "النص متلزق على الشيء: اسحبه من النص أو كبّره من الأركان"; sub = `<button type="button" class="gz-pill" data-tyg="unpin">${gzIcon("x")}فك اللزق</button>`; }
     else sub = `<button type="button" class="gz-pill" data-tyg="zrot">${gzIcon("reset")}صفّر اللفّ</button>`;
-  } else if (busy) hint = `⏳ ${GZ.cur.step || "بيتابع الحاجة…"}`;
+  } else if (busy) hint = `⏳ ${GZ.cur.step || "يتابع الشيء…"}`;
   else if (!f.tr || GZ.st.pick) {
     const rg = GZ.st.reg;
-    hint = rg?.loading ? "⏳ بيتعرّف على الحاجات اللي في الفريم ده…" : "عدّي بالماوس على الحاجة اللي في الفيديو: حدودها هتنوّر. دوس عليها والبرنامج هيتابعها فريم فريم";
-    sub = `<button type="button" class="gz-pill ${GZ.st.keymode || keys ? "on" : ""}" data-tyg="keys">${gzIcon("keys")}حركة بالوقت (من غير تراك)</button>`;
+    hint = rg?.loading ? "⏳ يتعرّف على الأشياء التي في هذا الفريم…" : "مرّر بالماوس على الشيء الذي في الفيديو: حدودها ستضيء. اضغط عليها والبرنامج سيتابعها فريم فريم";
+    sub = `<button type="button" class="gz-pill ${GZ.st.keymode || keys ? "on" : ""}" data-tyg="keys">${gzIcon("keys")}حركة بالوقت (بدون تراك)</button>`;
   } else {
-    hint = "شغّل الفيديو وشوف الحدود الصفرا ماشية مع الحاجة. لو غلطت في فريم: وقّف عليه واسحب أركانها لمكانها الصح";
-    sub = `<button type="button" class="gz-pill" data-tyg="stick">${gzIcon("pin")}${pin ? "فك اللزق" : "الزق الكلام عليها"}</button>
-      <button type="button" class="gz-pill" data-tyg="repick">${gzIcon("track")}حاجة تانية</button>
-      <button type="button" class="gz-pill" data-tyg="notrack">${gzIcon("x")}شيل التراك</button>
+    hint = "شغّل الفيديو وانظر الحدود الصفرا ماشية مع الشيء. إذا غلطت في فريم: أوقف عليه واسحب أركانها لمكانها الصحيح";
+    sub = `<button type="button" class="gz-pill" data-tyg="stick">${gzIcon("pin")}${pin ? "فك اللزق" : "ألصق النص عليها"}</button>
+      <button type="button" class="gz-pill" data-tyg="repick">${gzIcon("track")}شيء أخرى</button>
+      <button type="button" class="gz-pill" data-tyg="notrack">${gzIcon("x")}أزل التراك</button>
       <button type="button" class="gz-pill ${GZ.st.keymode || keys ? "on" : ""}" data-tyg="keys">${gzIcon("keys")}حركة بالوقت</button>`;
   }
-  if (keys) sub += `<span class="gz-chip">${gzIcon("keys")}${keys} نقط حركة</span><button type="button" class="gz-pill" data-tyg="nokeys">${gzIcon("trash")}امسحهم</button>`;
-  else if (GZ.st.keymode) hint = "⏱️ حركة بالوقت: روح لثانية تانية وحرّك الكلام أو لفّه من «تحريك ولفّ»: البرنامج هيحرّكه لوحده من مكانه هنا لمكانه هناك";
+  if (keys) sub += `<span class="gz-chip">${gzIcon("keys")}${keys} نقاط حركة</span><button type="button" class="gz-pill" data-tyg="nokeys">${gzIcon("trash")}احذفهم</button>`;
+  else if (GZ.st.keymode) hint = "⏱️ حركة بالوقت: اذهب لثانية أخرى وحرّك النص أو لفّه من «تحريك ولفّ»: البرنامج سيحرّكه تلقائيًا من مكانه هنا لمكانه هناك";
   bar.innerHTML = `<div class="gz-bar" role="toolbar">
       <div class="gz-seg">${btn("mode:move", "move", "تحريك ولفّ", mode === "move")}${canTrack ? btn("mode:track", "track", "تراك", mode === "track") : ""}</div>
       <i class="gz-sep"></i>
-      ${btn("z", "person", f.z === "behind" ? "ورا الشخص" : "قدام الشخص", f.z === "behind", person ? 'title="الكلام يبان ورا الشخص ولا قدامه"' : 'disabled title="حلّل الفيديو الأول عشان البرنامج يعرف مكان الشخص"')}
+      ${btn("z", "person", f.z === "behind" ? "خلف الشخص" : "أمام الشخص", f.z === "behind", person ? 'title="النص يظهر خلف الشخص ولا قدامه"' : 'disabled title="حلّل الفيديو أولًا لكي البرنامج يعرف مكان الشخص"')}
       <i class="gz-sep"></i>
-      ${btn("reset", "reset", "رجّع", false, 'title="يرجّع اللقطة زي ما كانت"')}
+      ${btn("reset", "reset", "استعد", false, 'title="يعود اللقطة كما كانت"')}
     </div>
     <div class="gz-sub"><small class="gz-hint">لقطة ${g.i + 1} · ${hint}</small>${sub}</div>`;
 }
@@ -1086,7 +1086,7 @@ function tyGizBind(ctx = GZ) {
   GZ = ctx;
   const svg = ctx.svg(), bar = ctx.bar();
   if (!svg) return;
-  svg._gz = ctx;   // نفس المكان ممكن يخدم أكتر من طبقة (الكلام والعناصر الحرة في المونتاج)
+  svg._gz = ctx;   // نفس المكان يمكن يخدم أكثر من طبقة (النص والعناصر الحرة في المونتاج)
   if (svg.dataset.bound) return;
   svg.dataset.bound = "1";
   const use = () => { GZ = svg._gz; };
@@ -1098,7 +1098,7 @@ function tyGizBind(ctx = GZ) {
     if (!g) return;
     const [x, y, W, H] = at(e);
     GZ.stop();
-    if (e.target.dataset?.g === "pick" || e.target.closest?.("#gzHover")) {   // التراك: دوسة على الحاجة (أو مربع حواليها)
+    if (e.target.dataset?.g === "pick" || e.target.closest?.("#gzHover")) {   // التراك: ضغطة على الشيء (أو مربع حواليها)
       d = { pick: true, x0: x, y0: y, W, H, i: g.i };
       svg.setPointerCapture(e.pointerId);
       return;
@@ -1128,7 +1128,7 @@ function tyGizBind(ctx = GZ) {
     } else if (d.role[0] === "c") {
       const j = Number(d.role[1]);
       if (v.pin && (GZ.st.mode || "move") === "pin") { const pin = v.pin.map((p) => [...p]); pin[j] = [v.pin[j][0] + dx / d.W, v.pin[j][1] + dy / d.H]; tyXfPatch(b, { pin }); }
-      else if (v.pin) {   // الأركان متلزقة ووضع التحريك: الركن بيكبّر/يصغّر الشكل كله حوالين نصه
+      else if (v.pin) {   // الأركان متلزقة ووضع التحريك: الركن يكبّر/يصغّر الشكل كله حوالين نصه
         const c0 = v.pin.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]), C = [c0[0] * d.W, c0[1] * d.H];
         const k = Math.hypot(x - C[0], y - C[1]) / Math.max(1, Math.hypot(d.q[j][0] - C[0], d.q[j][1] - C[1]));
         tyXfPatch(b, { pin: v.pin.map(([px, py]) => [c0[0] + (px - c0[0]) * k, c0[1] + (py - c0[1]) * k]) });
@@ -1143,7 +1143,7 @@ function tyGizBind(ctx = GZ) {
       tyXfPatch(b, { rz });
     } else if (d.role === "rx") tyXfPatch(b, { rx: Math.max(-85, Math.min(85, v.rx - dy * 0.45)) });
     else if (d.role === "ry") tyXfPatch(b, { ry: Math.max(-85, Math.min(85, v.ry + dx * 0.45)) });
-    else if (d.role[0] === "t") {   // تصليح التراك بالإيد في الفريم ده (والفريمات اللي جنبه بتتظبط معاه بالراحة)
+    else if (d.role[0] === "t") {   // تصليح التراك بالإيد في هذا الفريم (والفريمات التي جنبه تُضبط معه بالراحة)
       const j = Number(d.role[1]), tr = GZ.doc.tracks[b.xf.tr], k = GZ.doc.w / d.W;
       tyTrackNudge(tr, GZ.t, j, (dx * k) / GZ.doc.w, (dy * k) / GZ.doc.h, d);
     }
@@ -1159,7 +1159,7 @@ function tyGizBind(ctx = GZ) {
       const drag = dd.x1 != null && Math.abs(dd.x1 - dd.x0) > 8 && Math.abs(dd.y1 - dd.y0) > 8;
       tyGizDraw();
       if (drag) return tyTrackRun(dd.i, { box: [Math.min(dd.x0, dd.x1) / dd.W, Math.min(dd.y0, dd.y1) / dd.H, Math.max(dd.x0, dd.x1) / dd.W, Math.max(dd.y0, dd.y1) / dd.H] });
-      const reg = tyGizRegionAt(dd.x0 / dd.W, dd.y0 / dd.H);   // الحاجة اللي كانت منوّرة تحت الماوس
+      const reg = tyGizRegionAt(dd.x0 / dd.W, dd.y0 / dd.H);   // الشيء الذي كانت منوّرة أسفل الماوس
       if (reg) return tyTrackRun(dd.i, { quad: reg.quad, mode: reg.kind });
       return tyTrackRun(dd.i, { point: [dd.x0 / dd.W, dd.y0 / dd.H] });
     }
@@ -1177,21 +1177,21 @@ function tyGizBind(ctx = GZ) {
     const b = g.b, act = btn.dataset.tyg;
     if (act.startsWith("mode:")) { GZ.st.mode = act.slice(5); GZ.st.pick = null; return tyGizDraw(); }
     if (act === "repick") { GZ.st.pick = true; return tyGizDraw(); }
-    if (act === "stick") {   // الكلام بيتلزق على حدود الحاجة (في الفريم اللي اتعمل فيه التراك) وبيتميّل معاها
-      if (TypoEngine.xfAt(b, GZ.t).pin) { tyXfPatch(b, { pin: null }); return tyGizSave(g.i, "اتفك من الحاجة"); }
+    if (act === "stick") {   // النص يُلصق على حدود الشيء (في الفريم الذي أُنشئ فيه التراك) ويتميّل معها
+      if (TypoEngine.xfAt(b, GZ.t).pin) { tyXfPatch(b, { pin: null }); return tyGizSave(g.i, "فُكّ من الشيء"); }
       const q = GZ.eng.trackQuad(b.xf.tr, b.xf.tref || 0);
       if (!q) return;
       tyXfPatch(b, { pin: q.map(([x, y]) => [x / GZ.doc.w, y / GZ.doc.h]) });
-      return tyGizSave(g.i, "📌 الكلام اتلزق على الحاجة");
+      return tyGizSave(g.i, "📌 النص أُلصق على الشيء");
     }
     if (act.startsWith("pick:")) { const m = act.slice(5); GZ.st.pick = GZ.st.pick === m ? null : m; return tyGizDraw(); }
-    if (act === "unpin") { tyXfPatch(b, { pin: null }); return tyGizSave(g.i, "اتفك من الحاجة"); }
+    if (act === "unpin") { tyXfPatch(b, { pin: null }); return tyGizSave(g.i, "فُكّ من الشيء"); }
     if (act === "zrot") { tyXfPatch(b, { rx: 0, ry: 0, rz: 0 }); return tyGizSave(g.i); }
     if (act === "pin") {
       const v = TypoEngine.xfAt(b, GZ.t);
       if (v.pin) tyXfPatch(b, { pin: null });
       else { const P = tyGizPts(); tyXfPatch(b, { pin: P.pts.slice(0, 4).map(([x, y]) => [x / P.W, y / P.H]) }); }
-      return tyGizSave(g.i, v.pin ? "🔲 رجع بلوك عادي" : "🔲 اسحب كل ركن لمكانه");
+      return tyGizSave(g.i, v.pin ? "🔲 أعد بلوك عادي" : "🔲 اسحب كل ركن لمكانه");
     }
     if (act === "z") { b.xf = { ...(b.xf || {}), z: b.xf?.z === "behind" ? "" : "behind" }; return tyGizSave(g.i); }
     if (act === "keys") {
@@ -1199,14 +1199,14 @@ function tyGizBind(ctx = GZ) {
       GZ.st.keymode = true;
       const v = TypoEngine.xfAt(b, GZ.t);
       b.xk = [{ t: b.t0, x: v.x, y: v.y, s: v.s, rx: v.rx, ry: v.ry, rz: v.rz, ...(v.pin ? { pin: v.pin } : {}) }];
-      toast("⏱️ اتسجّل مكانه هنا. روح لثانية تانية وحرّكه: هيمشي لوحده من هنا لهناك");
+      toast("⏱️ سُجّل مكانه هنا. اذهب لثانية أخرى وحرّكه: سيسير تلقائيًا من هنا لهناك");
       return tyGizSave(g.i);
     }
-    if (act === "nokeys") { b.xk = []; GZ.st.keymode = false; return tyGizSave(g.i, "🗑️ المفاتيح اتمسحت"); }
-    if (act === "reset") { b.xf = b.xf?.tr ? { tr: b.xf.tr, tref: b.xf.tref } : {}; b.xk = []; GZ.st.keymode = false; GZ.st.mode = "move"; return tyGizSave(g.i, "↺ رجع زي ما كان"); }
+    if (act === "nokeys") { b.xk = []; GZ.st.keymode = false; return tyGizSave(g.i, "🗑️ المفاتيح حُذفت"); }
+    if (act === "reset") { b.xf = b.xf?.tr ? { tr: b.xf.tr, tref: b.xf.tref } : {}; b.xk = []; GZ.st.keymode = false; GZ.st.mode = "move"; return tyGizSave(g.i, "↺ أعد كما كان"); }
     if (act === "track") { GZ.st.pick = GZ.st.pick ? null : "follow"; return tyGizDraw(); }
     if (act === "pickmode") { GZ.st.pick = GZ.st.pick === "surface" ? "follow" : "surface"; return tyGizDraw(); }
-    if (act === "notrack") { const { tr, tref, ...rest } = b.xf; b.xf = rest; return tyGizSave(g.i, "✖ التراك اتشال"); }
+    if (act === "notrack") { const { tr, tref, ...rest } = b.xf; b.xf = rest; return tyGizSave(g.i, "✖ التراك أُزيل"); }
   });
 }
 
@@ -1223,7 +1223,7 @@ async function tyTrackRun(i, sel) {
       await GZ.save(list);
     }
     GZ.cur = await api(TY(`/${GZ.cur.id}/track`), { method: "POST", ...jsonBody({ block: i, t: GZ.t, ...sel, fx: !!GZ.isFx }) });
-    toast("🎯 بيدوّر على الحاجة ويتابعها… لما يخلص هتلاقي حدودها بالأصفر");
+    toast("🎯 يبحث عن الشيء ويتابعها… عندما ينتهي ستجد حدودها بالأصفر");
     GZ.after();
   } catch (err) { toast(err.message, true); }
 }
@@ -1243,7 +1243,7 @@ function tyTrackNudge(tr, t, j, dx, dy, d) {
 async function tyTrackSave(tid) {
   try {
     await api(TY(`/${GZ.cur.id}/tracks/${tid}`), { method: "PUT", ...jsonBody({ q: GZ.doc.tracks[tid].q }) });
-    toast("✋ التراك اتصلّح");
+    toast("✋ التراك أُصلح");
   } catch (err) { toast(err.message, true); }
 }
 

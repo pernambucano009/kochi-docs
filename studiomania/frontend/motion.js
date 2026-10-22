@@ -3,11 +3,11 @@
 
 const MotionPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const CATS = { all: "الكل", motion_graphics: "موشن جرافيك", character: "شخصيات", text: "كلام", effect: "مؤثرات", product: "منتجات" };
+  const CATS = { all: "الكل", motion_graphics: "موشن جرافيك", character: "شخصيات", text: "نص", effect: "مؤثرات", product: "منتجات" };
   const RATIO = { "9:16": "طولي", "1:1": "مربع", "16:9": "عرضي" };
   const S = { list: [], cat: "all", el: null, poll: null, view: null, brand: null, schema: {} };
 
-  const html = () => `<div class="nb-wrap" id="mlWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+  const html = () => `<div class="nb-wrap" id="mlWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
 
   function card(m) {
     const job = m.job, pct = job?.status === "working" ? Math.round((job.progress || 0) * 100) : null;
@@ -16,8 +16,8 @@ const MotionPage = (() => {
         ${m.ratio ? `<span class="ml-ratio">${esc(RATIO[m.ratio] || m.ratio)}</span>` : ""}</div>
       <div class="ml-meta"><b>${esc(m.name)}</b><small>${esc(m.use || "")}</small></div>
       <div class="ml-act">${pct !== null ? `<span class="ml-busy"><i style="width:${pct}%"></i><b class="num">${pct}%</b></span>`
-        : job?.status === "error" ? `<small class="ml-err" title="${esc(job.error)}">فشل، جرّب تاني</small>`
-        : m.assets ? `<span class="ml-ok">✓ ${m.assets} في الأصول</span>` : `<small class="ml-hint">دوس عشان تعدّله</small>`}</div></div>`;
+        : job?.status === "error" ? `<small class="ml-err" title="${esc(job.error)}">فشل، جرّب مرة أخرى</small>`
+        : m.assets ? `<span class="ml-ok">✓ ${m.assets} في الأصول</span>` : `<small class="ml-hint">اضغط لكي تعدّله</small>`}</div></div>`;
   }
 
   function render() {
@@ -32,8 +32,8 @@ const MotionPage = (() => {
         <div class="ml-chips">${cats.map((k) => `<button class="ml-chip ${k === S.cat ? "on" : ""}" data-cat="${k}">${CATS[k]}<span class="num">${k === "all" ? S.list.length : S.list.filter((m) => m.category === k).length}</span></button>`).join("")}</div>
         <span class="nb-state">${added ? `${added} نسخة في الأصول <button class="nb-btn sm" data-lib>افتح مكتبة الأصول</button>` : ""}</span>
       </div>
-      <p class="nb-hint ml-hint">عناصر متحركة جاهزة: دوس على أي واحد، هيتملا لوحده بكلام وألوان ولوجو البراند، وتقدر تغيّر أي حاجة وتشوفها على طول. «ضيفه للأصول» بيعمله فيديو (ببلاش) وتلاقيه في المونتاج.</p>
-      <div class="ml-grid">${list.map(card).join("") || `<div class="nh-empty">مفيش حاجة هنا.</div>`}</div>`;
+      <p class="nb-hint ml-hint">عناصر متحركة جاهزة: اضغط على أي واحد، سيُملأ تلقائيًا بكلام وألوان وشعار العلامة، ويمكنك تغيّر أي شيء وتشوفها مباشرة. «أضفه للأصول» يعمله فيديو (مجانًا) وتلاقيه في المونتاج.</p>
+      <div class="ml-grid">${list.map(card).join("") || `<div class="nh-empty">لا شيء هنا.</div>`}</div>`;
   }
 
   async function load() {
@@ -50,7 +50,7 @@ const MotionPage = (() => {
       S.list = await api("/api/motion-library").catch(() => S.list);
       render();
       const now = S.list.filter((m) => m.job?.status === "working").length;
-      if (now < was) toast(S.list.some((m) => m.job?.status === "error") ? "⚠️ فيه عنصر فشل، جرّب تاني" : "✅ اتضاف للأصول، تلاقيه في المونتاج");
+      if (now < was) toast(S.list.some((m) => m.job?.status === "error") ? "⚠️ فيه عنصر فشل، جرّب مرة أخرى" : "✅ أُضيف للأصول، تلاقيه في المونتاج");
       if (!now) clearInterval(S.poll);
     }, 2500);
   }
@@ -94,7 +94,7 @@ const MotionPage = (() => {
   function counter(f, v) {
     if (!f.max || typeof v !== "string") return "";
     const n = [...v].length;
-    return `<small class="ml-cnt ${n > f.max ? "over" : ""}">${n}/${f.max}${n > f.max ? " · أطول من المقترح، هيصغر" : ""}</small>`;
+    return `<small class="ml-cnt ${n > f.max ? "over" : ""}">${n}/${f.max}${n > f.max ? " · أطول من المقترح، سيصغر" : ""}</small>`;
   }
   function fieldHTML(k, f, v) {
     const hint = f.hint ? `<small class="ml-hint2">${esc(f.hint)}</small>` : "";
@@ -117,7 +117,7 @@ const MotionPage = (() => {
     if (f.kind === "image") {
       const b = S.brand || {}, imgs = [...(b.products || []), ...(b.logos || []), ...(b.screens || [])].slice(0, 14), im = f.img || {};
       const own = v && !imgs.some((x) => x.url === v);
-      const tip = [im.ratio ? `مقاس ${im.ratio}` : "", im.cut ? "من غير خلفية" : ""].filter(Boolean).join(" · ");
+      const tip = [im.ratio ? `مقاس ${im.ratio}` : "", im.cut ? "بدون خلفية" : ""].filter(Boolean).join(" · ");
       return `<div class="ml-f">${lab}${tip ? `<small class="ml-badge">${esc(tip)}</small>` : ""}
         <div class="ml-imgs"><button type="button" class="ml-img ${!v ? "on" : ""}" data-pimg="${k}" data-src="">بدون</button>
           ${own ? `<button type="button" class="ml-img on" data-pimg="${k}" data-src="${esc(v)}"><img src="${esc(v)}" alt=""></button>` : ""}
@@ -134,13 +134,13 @@ const MotionPage = (() => {
     const box = document.createElement("div");
     box.className = "ml-view";
     box.innerHTML = `<div class="ml-vin">
-      <div class="ml-vtop"><b>${esc(m.name)}</b><span class="nb-state" data-vs>بيحمّل…</span>
+      <div class="ml-vtop"><b>${esc(m.name)}</b><span class="nb-state" data-vs>جارٍ التحميل…</span>
         <button class="nb-btn sm" data-mute title="الصوت">🔊</button><button class="nb-btn sm" data-x title="قفل">✕</button></div>
       <div class="ml-vbody"><div class="ml-left"><div class="ml-stage"><iframe title="${esc(m.name)}"></iframe></div>
           <div class="ml-tl"><button class="nb-btn sm" data-play title="تشغيل/إيقاف">⏸</button><div class="ml-tlbar" data-tlbar><i class="ml-ph"></i></div><span class="num" data-tt>0.0</span></div></div>
-        <aside class="ml-side"><div class="ml-fields"><div class="nh-empty">بيحمّل الخانات…</div></div>
-          <div class="ml-sact"><button class="nb-btn sm" data-brand>🎨 من البراند</button><button class="nb-btn sm" data-reset>↺ الأصلي</button>
-            <button class="nb-btn ml-add" data-add>${m.template ? "🎬 صدّر الفيديو" : "＋ ضيفه للأصول"}</button></div></aside></div></div>`;
+        <aside class="ml-side"><div class="ml-fields"><div class="nh-empty">يُحمّل الخانات…</div></div>
+          <div class="ml-sact"><button class="nb-btn sm" data-brand>🎨 من العلامة</button><button class="nb-btn sm" data-reset>↺ الأصلي</button>
+            <button class="nb-btn ml-add" data-add>${m.template ? "🎬 صدّر الفيديو" : "＋ أضفه للأصول"}</button></div></aside></div></div>`;
     document.body.appendChild(box);
     const v = { m, box, raf: 0, audio: null, vals: {}, n: 0, muted: false, open: null, range: null, paused: false, t: 0, key: (e) => e.key === "Escape" && closeView() };
     S.view = v;
@@ -160,13 +160,13 @@ const MotionPage = (() => {
       fit();
       if (!v.ro) { v.ro = new ResizeObserver(() => S.view === v && v.fit?.()); v.ro.observe(stage); }
       v.fit = fit;
-      if (!v.schema) {   // أول مرة: نقرا الخانات وقصة القالب ونملاها من البراند
+      if (!v.schema) {   // أول مرة: نقرا الخانات وقصة القالب ونملاها من العلامة
         v.schema = win.PARAM_SCHEMA || {};
         v.meta = win.TEMPLATE_META || null;
         S.schema[m.id] = v.schema;
         await brandValues();
         if (S.view !== v) return;
-        const vals = m.vals ? { ...m.vals } : applyBrand(v.schema, {}, await brandValues());   // جاي من المسار: كلام السكريبت وألوان البراند جاهزين
+        const vals = m.vals ? { ...m.vals } : applyBrand(v.schema, {}, await brandValues());   // قادم من المسار: نص النص وألوان العلامة جاهزين
         renderFields();
         renderTl();
         if (Object.keys(vals).length) { v.vals = vals; renderFields(); return reload(0); }
@@ -195,7 +195,7 @@ const MotionPage = (() => {
           else { if (v.voa.paused) v.voa.play().catch(() => {}); if (Math.abs(v.voa.currentTime - v.t) > .25) v.voa.currentTime = v.t; }
         }
         last = now;
-        try { win.seek(v.t % D); } catch { return; }   // المعاينة بتتحمّل من جديد (تعديل)
+        try { win.seek(v.t % D); } catch { return; }   // المعاينة تُحمّل من جديد (تعديل)
         const ph = box.querySelector(".ml-ph"); if (ph) ph.style.insetInlineStart = `${(v.t / D) * 100}%`;
         box.querySelector("[data-tt]").textContent = v.t.toFixed(1);
         v.raf = requestAnimationFrame(tick);
@@ -204,7 +204,7 @@ const MotionPage = (() => {
     });
     const reload = (delay = 500) => {
       clearTimeout(v.reloadT);
-      v.reloadT = setTimeout(() => { if (S.view !== v) return; box.querySelector("[data-vs]").textContent = "بيحدّث…"; fr.src = srcOf(m, v.vals, ++v.n); }, delay);
+      v.reloadT = setTimeout(() => { if (S.view !== v) return; box.querySelector("[data-vs]").textContent = "جارٍ التحديث…"; fr.src = srcOf(m, v.vals, ++v.n); }, delay);
     };
     // التايم لاين: المشاهد كأجزاء ملوّنة، الدوسة على مشهد بتشغّله لوحده
     function renderTl() {
@@ -215,7 +215,7 @@ const MotionPage = (() => {
       const sch = v.schema || {}, el = box.querySelector(".ml-fields"), meta = v.meta;
       const val = (k) => (k in v.vals ? v.vals[k] : sch[k].def);
       const keys = Object.keys(sch);
-      if (!keys.length) { el.innerHTML = `<div class="nh-empty">العنصر ده مفيهوش حاجة تتعدّل.</div>`; return; }
+      if (!keys.length) { el.innerHTML = `<div class="nh-empty">هذا العنصر لا يحتوي شيء تُعدّل.</div>`; return; }
       // الخانات متقسمة على المشاهد بترتيبها، وبعدها الشكل العام (ألوان وخطوط)
       const order = [...(meta?.scenes || []).map((s) => s.name)];
       keys.forEach((k) => { const g = sch[k].group || (["color", "font"].includes(sch[k].kind) ? GS : "الخانات"); if (!order.includes(g)) order.push(g); });
@@ -251,7 +251,7 @@ const MotionPage = (() => {
       const up = e.target.dataset?.pup;
       if (!up || !e.target.files?.[0]) return;
       const fl = e.target.files[0];
-      if (fl.size > 8 * 1024 * 1024) return toast("الصورة كبيرة أوي (أقصى ٨ ميجا)", true);
+      if (fl.size > 8 * 1024 * 1024) return toast("الصورة كبيرة جدًا (أقصى ٨ ميجا)", true);
       const rd = new FileReader();
       rd.onload = () => { v.vals[up] = rd.result; renderFields(); reload(0); };
       rd.readAsDataURL(fl);
@@ -280,17 +280,17 @@ const MotionPage = (() => {
       const add = t.closest("[data-add]");
       if (add) {
         add.disabled = true; add.textContent = "⏳";
-        if (m.onExport) {   // من المسار: التصدير بيرجع للمسار بالخانات (والمشاهد على قد الصوت)
+        if (m.onExport) {   // من المسار: التصدير يعود للمسار بالخانات (والمشاهد على قدر الصوت)
           try { await m.onExport(v.vals); closeView(); } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = "🎬 صدّر الفيديو"; }
           return;
         }
         try {
           const name = [m.name, S.brand?.name].filter(Boolean).join(" · ");
           await api(`/api/motion-library/${m.id}/import`, { method: "POST", ...jsonBody({ params: v.vals, name }) });
-          toast("🎞️ بيتعمل فيديو بتعديلاتك… دقيقة أو اتنين، وتلاقيه في الأصول");
+          toast("🎞️ يُنشأ فيديو بتعديلاتك… دقيقة أو اثنان، وتلاقيه في الأصول");
           closeView();
           if (!m.template) await load();
-        } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = m.template ? "🎬 صدّر الفيديو" : "＋ ضيفه للأصول"; }
+        } catch (err) { toast(err.message, true); add.disabled = false; add.textContent = m.template ? "🎬 صدّر الفيديو" : "＋ أضفه للأصول"; }
       }
     });
     fr.src = srcOf(m, {}, ++v.n);

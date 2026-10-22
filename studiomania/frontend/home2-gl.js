@@ -69,7 +69,7 @@ window.NHGL = (stage, getClient) => {
     ringAt(.74, .04, "#ffffff", .85, .7);
     ringAt(.6, .03, mid, .45, .8);
     ringAt(.45, .05, "#ffffff", .55, .85);
-    const hl = (ang, r, w, h, a) => {   // لمعة بيضا
+    const hl = (ang, r, w, h, a) => {   // لمعة بيضاء
       x.save(); x.translate(R + Math.cos(ang) * r * R, R - Math.sin(ang) * r * R); x.rotate(-ang + Math.PI / 2);
       const q = x.createRadialGradient(0, 0, 0, 0, 0, w * R); q.addColorStop(0, `rgba(255,255,255,${a})`); q.addColorStop(1, "rgba(255,255,255,0)");
       x.scale(1, h / w); x.fillStyle = q; x.beginPath(); x.arc(0, 0, w * R, 0, Math.PI * 2); x.fill(); x.restore();
@@ -127,7 +127,7 @@ window.NHGL = (stage, getClient) => {
   // ---------- shapes
   // حواف مدوّرة وتخينة زي الزجاج المصبوب (المرجع)
   const EX = { depth: .26, bevelEnabled: true, bevelThickness: .32, bevelSize: .22, bevelSegments: 18, curveSegments: 64 };
-  function extrude(shape, o = {}) {   // كل الأشكال أتخن من الأول عشان يبقى فيها حجم زجاج والمخ يتحط جواها
+  function extrude(shape, o = {}) {   // كل الأشكال أتخن من أولًا لكي يصبح فيها حجم زجاج والعقل يوضع جواها
     const opt = { ...EX, ...o };
     opt.depth *= 1.7; opt.bevelThickness *= 1.5;
     const g = new THREE.ExtrudeGeometry(shape, opt);
@@ -159,7 +159,7 @@ window.NHGL = (stage, getClient) => {
   }
   // ---------- «طبق» زجاج مصبوب (زي المرجع): حافة مدوّرة تخينة ماشية على الحدود، وأرضية رفيعة غاطسة في النص
   const V2 = (x, y) => new THREE.Vector2(x, y);
-  function chaikin(pts, n = 5) {   // يدوّر الزوايا (كل ما n يزيد، الزاوية أنعم)
+  function chaikin(pts, n = 5) {   // يبحث الزوايا (كل ما n يزيد، الزاوية أنعم)
     for (let k = 0; k < n; k++) {
       const o = [];
       pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; o.push(V2(p.x * .75 + q.x * .25, p.y * .75 + q.y * .25), V2(p.x * .25 + q.x * .75, p.y * .25 + q.y * .75)); });
@@ -179,7 +179,7 @@ window.NHGL = (stage, getClient) => {
     return out;
   }
   const ring = (r, n = 96) => Array.from({ length: n }, (_, i) => V2(Math.cos(i / n * Math.PI * 2) * r, Math.sin(i / n * Math.PI * 2) * r));
-  function rimTube(pts, r, m) {   // أنبوبة زجاج مقفولة على خط
+  function rimTube(pts, r, m) {   // أنبوبة زجاج مغلقة على خط
     const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p.x, p.y, 0)), true, "centripetal");
     return new THREE.Mesh(new THREE.TubeGeometry(c, pts.length * 2, r, 28, true), m);
   }
@@ -193,9 +193,9 @@ window.NHGL = (stage, getClient) => {
     holes.forEach((h) => sh.holes.push(new THREE.Path(fl(h, lip * 1.2, true))));
     const fg = new THREE.ExtrudeGeometry(sh, { depth: o.floor ?? .03, bevelEnabled: true, bevelThickness: .025, bevelSize: rim * .9, bevelSegments: 8, curveSegments: 32 });
     fg.translate(0, 0, -rim * .55);
-    const fm = m.clone(); fm.attenuationDistance = 2.5; fm.thickness = .3; fm.envMapIntensity = 1.6;   // الأرضية رفيعة: شبه شفافة خالص
+    const fm = m.clone(); fm.attenuationDistance = 2.5; fm.thickness = .3; fm.envMapIntensity = 1.6;   // الأرضية رفيعة: شبه شفافة تمامًا
     out.push(new THREE.Mesh(fg, fm));
-    (o.lines || []).forEach(([a, b]) => {   // خطوط التقطيع الخفيفة اللي على الأرضية
+    (o.lines || []).forEach(([a, b]) => {   // خطوط التقطيع الخفيفة التي على الأرضية
       const t = new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(a.x, a.y, -rim * .55 + .06), new THREE.Vector3(b.x, b.y, -rim * .55 + .06)), 8, .009, 6, false);
       out.push(new THREE.Mesh(t, m));
     });
@@ -212,7 +212,7 @@ window.NHGL = (stage, getClient) => {
     let outer = clean(S.outer);
     const sz = new THREE.Box2().setFromPoints(outer).getSize(V2());
     const rim = Math.max(.035, Math.min(.11, Math.min(sz.x, sz.y) * .065));
-    if (outer.length <= 8) outer = roundPoly(outer, rim * 1.6);   // مضلّع بزوايا حادة (مثلث): ندوّر زواياه زي المصبوب
+    if (outer.length <= 8) outer = roundPoly(outer, rim * 1.6);   // مضلّع بزوايا حادة (مثلث): ندوّر زواياه مثل المصبوب
     const d = new THREE.Group();
     dish(m, outer, S.holes.map(clean), { rim }).forEach((o) => d.add(o));
     d.position.copy(mesh.position); d.rotation.copy(mesh.rotation); d.scale.copy(mesh.scale);
@@ -260,7 +260,7 @@ window.NHGL = (stage, getClient) => {
   }
 
   // ---------- أدوات الأشكال
-  function inset(poly, d, hole) {   // يزق كل نقطة لجوه المادة بمسافة d (للفتحة: لبرّه الفتحة)
+  function inset(poly, d, hole) {   // يدفع كل نقطة لجوه المادة بمسافة d (للفتحة: لبرّه الفتحة)
     let area = 0;
     for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; area += p.x * q.y - q.x * p.y; }
     const sgn = (area > 0 ? 1 : -1) * (hole ? -1 : 1), n = poly.length, out = [];
@@ -274,7 +274,7 @@ window.NHGL = (stage, getClient) => {
     return out;
   }
   const BUILD = {
-    app(m) {   // مثلث تشغيل: طبق بحافة تخينة (زي المرجع)
+    app(m) {   // مثلث تشغيل: طبق بحافة تخينة (مثل المرجع)
       return dish(m, roundPoly([V2(-.62, -1), V2(1.05, 0), V2(-.62, 1)], .3), [], { rim: .13 });
     },
     create(m) {
@@ -286,7 +286,7 @@ window.NHGL = (stage, getClient) => {
     brand(m) {
       const plate = new THREE.Mesh(extrude(rr(2.1, 2.1, .52), { depth: .55 }), m);
       const mark = markPlane(1.6);
-      mark.userData.mark = true;   // معتم وجوه الزجاج: بيتشاف من ورا الزجاج متكسّر زي المخ
+      mark.userData.mark = true;   // معتم وداخل الزجاج: يُرى من خلف الزجاج متكسّر مثل العقل
       return [plate, mark];
     },
     assets(m) {
@@ -362,13 +362,13 @@ window.NHGL = (stage, getClient) => {
       return [cap, arc, stem, base];
     },
     // 📤 أقسام النشر: الكومنتات والرسايل، إعلاناتك، وصفة الاستهداف، حملات واتساب
-    inbox(m) {   // فقاعة كلام بديل وتلات نقط
+    inbox(m) {   // فقاعة نص بديل وثلاث نقاط
       const P = [V2(-1.25, -.75), V2(-.55, -.75), V2(-.95, -1.25), V2(-.05, -.75), V2(1.25, -.75), V2(1.25, .95), V2(-1.25, .95)];
       const out = dish(m, roundPoly(P, .22), [], { rim: .1 });
       for (const x of [-.55, 0, .55]) { const d = new THREE.Mesh(sph(.15), m); d.position.set(x, .1, .12); out.push(d); }
       return out;
     },
-    adsmgr(m) {   // ميكروفون إعلانات (بوق): بوق مفتوح وإيد
+    adsmgr(m) {   // ميكروفون إعلانات (بوق): بوق مفتوح ويد
       const horn = new THREE.Mesh(new THREE.CylinderGeometry(.95, .32, 1.55, 64, 1, true), m); horn.rotation.z = Math.PI / 2; horn.position.x = .25;
       const lip = new THREE.Mesh(new THREE.TorusGeometry(.95, .11, 24, 96), m); lip.rotation.y = Math.PI / 2; lip.position.x = 1.02;
       const back = new THREE.Mesh(capsule(.34, .35), m); back.rotation.z = Math.PI / 2; back.position.x = -.78;
@@ -382,7 +382,7 @@ window.NHGL = (stage, getClient) => {
       out.push(dart);
       return out;
     },
-    wacamp(m) {   // فقاعة مدوّرة بديل وعلامة «اتبعت»
+    wacamp(m) {   // فقاعة مدوّرة بديل وعلامة «أُرسل»
       const P = [];
       for (let i = 0; i < 40; i++) { const a = -Math.PI * .62 + i / 40 * Math.PI * 1.8; P.push(V2(Math.cos(a) * 1.2, Math.sin(a) * 1.2)); }
       P.push(V2(-1.15, -1.2));
@@ -405,7 +405,7 @@ window.NHGL = (stage, getClient) => {
         gl_FragColor = vec4(c.rgb, c.a * a); }`,
     transparent: true, depthWrite: false,
   });
-  const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
+  const RIM = () => 1;   // حافة منوّرة رفيعة مثل حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
   const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "autopilot"], loader = new THREE.TextureLoader(), imgPlanes = [];
   // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
@@ -429,13 +429,13 @@ window.NHGL = (stage, getClient) => {
     const key = plane.userData.img;
     const want = (plane.userData.want = dark);
     loadTex(texUrl(key, dark), (t) => {
-      if (plane.userData.want !== want) return;   // الثيم اتغيّر تاني قبل ما الصورة توصل
+      if (plane.userData.want !== want) return;   // الثيم تغيّر مرة أخرى قبل ما الصورة توصل
       plane.material.map = t; plane.material.needsUpdate = true;
       plane.material.visible = true;
       const w = t.image.width, h = t.image.height, mx = Math.max(w, h);
       plane.scale.set(w / mx, h / mx, 1);
     });
-    loadTex(texUrl(key, !dark));   // نسخة الثيم التاني جاهزة كمان
+    loadTex(texUrl(key, !dark));   // نسخة الثيم الآخر جاهزة أيضًا
   }
   function imgIcon(key) {
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
@@ -483,11 +483,11 @@ window.NHGL = (stage, getClient) => {
   const clock = new THREE.Clock();
   let order = 0;
   let firstShow = true;
-  function show(key) {   // مفيش قطع: كل مجسّم بيكمّل من مكانه (اللي داخل بيكبر واللي خارج بيختفي في نفس الوقت)
+  function show(key) {   // لا يوجد قطع: كل مجسّم يُكمل من مكانه (ما داخل يكبر واللي خارج يختفي في الوقت نفسه)
     const g = group(key);
-    if (firstShow) { firstShow = false; g.userData.a = 1; }   // أول مرة (فتح الصفحة / ريفرش): بيبان كامل على طول، من غير ما يبهت ويكبر
+    if (firstShow) { firstShow = false; g.userData.a = 1; }   // أول مرة (فتح الصفحة / ريفرش): يظهر كامل مباشرة، بدون ما يبهت ويكبر
     cur = g;
-    order += 2;   // اللي داخل بيترسم فوق اللي خارج على طول (من غير ما الترتيب يتقلب كل فريم)
+    order += 2;   // ما داخل يُرسم أعلى الذي خارج مباشرة (بدون ما الترتيب يتقلب كل فريم)
     g.traverse((o) => { if (o.isMesh) o.renderOrder = order + (o.userData.mark ? 1 : 0); });
     Object.values(cache).forEach((o) => { o.userData.to = o === g ? 1 : 0; });
     g.visible = true;
@@ -504,7 +504,7 @@ window.NHGL = (stage, getClient) => {
       const k = KEYS.find((x) => !cache[x]);
       if (!k) return;
       const g = group(k);
-      g.visible = true;          // يترسم مرة شفاف عشان يترفع على كارت الشاشة
+      g.visible = true;          // يُرسم مرة شفاف لكي يُرفع على بطاقة الشاشة
       g.userData.warm = true;
       idle(next);
     };
@@ -571,11 +571,11 @@ window.NHGL = (stage, getClient) => {
       if (u.a === 0 && u.to === 0) { g.visible = false; continue; }
       const e = smooth(u.a);
       setOpacity(g, e);
-      u.mats.forEach((m) => { m.depthWrite = u.to === 1; });   // اللي خارج ميخبّيش اللي داخل
-      grow(g, Math.pow(e, 1.4));   // اللوجو بيكبر جوه الزجاج بعد ما الزجاج يبان
+      u.mats.forEach((m) => { m.depthWrite = u.to === 1; });   // ما خارج لا يُخفي الذي داخل
+      grow(g, Math.pow(e, 1.4));   // الشعار يكبر داخل الزجاج بعد ما الزجاج يظهر
       g.scale.setScalar(u.k * (.88 + .12 * e));
       g.position.y = lift + (reduce.matches ? 0 : Math.sin(t * .8) * .1);
-      const tilt = u.img ? .45 : 1;   // الصورة بتميل أقل عشان متبانش كارت مسطّح
+      const tilt = u.img ? .45 : 1;   // الصورة تميل أقل لكي لا تظهر بطاقة مسطّح
       g.rotation.y = reduce.matches ? 0 : Math.sin(t * .45) * .22 * tilt;
       g.rotation.x = reduce.matches ? 0 : Math.sin(t * .3) * .06 * tilt;
       g.children.forEach((c) => { if (c.userData.spin && !reduce.matches) c.rotation.z = t * .25; });

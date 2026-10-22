@@ -2,8 +2,8 @@
 // الاتنين نفس الشكل، الفرق في نوع الملفات اللي بتتحفظ
 
 const AUDIO_TEXT = {
-  voice: { title: "مكتبة التعليق الصوتي", empty: "لسه مفيش تعليقات صوتية. ارفع أول ملف.", drop: "اسحب ملفات التعليق الصوتي وحطها هنا" },
-  music: { title: "مكتبة الموسيقى", empty: "لسه مفيش موسيقى. ارفع أول ملف.", drop: "اسحب ملفات الموسيقى وحطها هنا" },
+  voice: { title: "مكتبة التعليق الصوتي", empty: "لا يوجد بعد تعليقات صوتية. ارفع أول ملف.", drop: "اسحب ملفات التعليق الصوتي وضعها هنا" },
+  music: { title: "مكتبة الموسيقى", empty: "لا يوجد بعد موسيقى. ارفع أول ملف.", drop: "اسحب ملفات الموسيقى وضعها هنا" },
 };
 const AUDIO_ACCEPT = ".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*";
 
@@ -21,12 +21,12 @@ function mountAudioLibrary(root) {
     <div class="dropzone" data-el="drop">${t.drop}</div>
     <div data-el="uploads"></div>
     <div class="audio-tools">
-      <input type="search" data-el="search" placeholder="دوّر بالاسم...">
+      <input type="search" data-el="search" placeholder="ابحث بالاسم...">
       <select data-el="sort">
         <option value="new">الأحدث</option>
         <option value="name">بالاسم</option>
-        <option value="short">الأقصر الأول</option>
-        <option value="long">الأطول الأول</option>
+        <option value="short">الأقصر أولًا</option>
+        <option value="long">الأطول أولًا</option>
       </select>
     </div>
     <ul class="audio-list" data-el="list"></ul>
@@ -71,7 +71,7 @@ function mountAudioLibrary(root) {
         </li>`
       )
       .join("");
-    if (lib.items.length && !items.length) el("list").innerHTML = `<li class="none">مفيش نتايج</li>`;
+    if (lib.items.length && !items.length) el("list").innerHTML = `<li class="none">لا يوجد نتائج</li>`;
   }
 
   async function upload(files) {

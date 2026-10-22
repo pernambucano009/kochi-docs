@@ -82,7 +82,7 @@ def ugc_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[dic
         "- lighting (English, short): النور اللي يناسب المكان (natural window light / warm lamp light / daylight through the windshield...).\n"
         "- action (English) لكل نبضة: زاوية كاميرا جديدة أو تبديل بين الكاميرا الأمامية والخلفية مكتوب كحركة هي بتعملها، ولحظة واحدة للمنتج "
         "(@Image3): تميله في النور، تقرّبه من العدسة، تملا بيه الكادر، أو تمسكه جنب وشها.\n"
-        'رجّع JSON بس: {"title": "اسم قصير", "world": "...", "lighting": "...", '
+        'استعد JSON فقط: {"title": "اسم قصير", "world": "...", "lighting": "...", '
         '"beats": [{"line": "الجملة بالظبط", "action": "English camera + action"}]} أربع نبضات بالظبط.')
     task = (f"العميل كتب السكريبت ده: «{own}». قسّمه على الأربع نبضات بكلامه هو، وقصّر بس لو أطول من الوقت. لو جزء ناقص اكتبه إنت."
             if own else f"الفكرة: {d.get('brief') or ''}")
@@ -162,7 +162,7 @@ def cinema_messages(d: dict, lang_txt: str, guide: str, brain_txt: str, total: i
         "- end: الكارت الأخير (اسم البراند زي ما بيتكتب + جملة قصيرة ٢-٥ كلمات بنفس اللغة).\n"
         "- world (English): سطر واحد ثابت لكل اللقطات: المكان والوقت والنور والألوان، عشان كلهم يتقطعوا على بعض.\n"
         "- ممنوع تخترع أرقام أو ادعاءات، وممنوع أسامي أو وشوش ناس حقيقيين أو شعارات تانية.\n"
-        'رجّع JSON بس: {"title": "اسم قصير", "world": "...", "end": {"brand": "...", "slogan": "..."}, '
+        'استعد JSON فقط: {"title": "اسم قصير", "world": "...", "end": {"brand": "...", "slogan": "..."}, '
         '"shots": [{"beat": "HOOK", "dur": 2.5, "what": "وصف قصير بالعامية", "visual": "...", "camera": "...", "audio": "...", "with": ["hero", "product"], "line": ""}]}')
     p = a.get("product") or {}
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
@@ -328,7 +328,7 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
                f"- السكريبت بلغة: {lang_txt}. {guide} سؤال فضول في الأول ← ٥-٧ نبضات بتتصاعد (جملة واحدة لكل نبضة ولكل درجة في السلم) ← النتيجة "
                "(انتصار أو كارثة) + دعوة خفيفة. المجموع حوالي ٧٠-١١٠ كلمة. المنتج بيدخل في نبضة واحدة واضحة (اللفة).\n"
                "- line: جملة الراوي للنبضة دي.\n" + common +
-               'رجّع JSON بس: {"title": "...", "angle": "الزاوية والسلم في سطر", "shots": [{"line": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
+               'استعد JSON فقط: {"title": "...", "angle": "الزاوية والسلم في سطر", "shots": [{"line": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
     elif kind == "talking":
         sys = ("إنت كاتب ومخرج إعلانات «الشخصية اللي بتتكلم»: شخصية أنيميشن بتكلم الكاميرا وتقول السكريبت، والصورة هي دليل الجملة.\n"
                "- الشكل: «أنا X. بعمل Y. فـ Z بيحصلك». اختار: تعريف مباشر / مشكلة بعدين حل / شرير بعدين بطل، واختار نبرة واحدة وثبّتها.\n"
@@ -336,7 +336,7 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
                "أول فريم لازم يشد من غير صوت، وأول جملة بتنادي على مشكلة المشاهد بالظبط.\n"
                "- line: الجملة اللي الشخصية بتقولها. emotion (English): نبرة الصوت (warm, reassuring / frustrated / proud...).\n"
                "- كل نبضة فيها حركتين على الأقل من: الكاميرا بتتحرك، الشخصية بتتحرك وبتعمل اللي بتقوله، المكان بيتفاعل.\n" + common +
-               'رجّع JSON بس: {"title": "...", "angle": "الشكل والنبرة في سطر", "shots": [{"line": "...", "emotion": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
+               'استعد JSON فقط: {"title": "...", "angle": "الشكل والنبرة في سطر", "shots": [{"line": "...", "emotion": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
     else:
         sys = ("إنت كاتب أغاني إعلانات: أغنية حقيقية (مش جينجل) بتحكي نتيجة العميل، فوق فيديو أنيميشن والبطل بيغني في لقطة أو اتنين.\n"
                f"- الكلمات بلغة: {lang_txt}. {guide} الهوك في أول ٥ ثواني، والكلمات عن النتيجة اللي العميل بيوصلها مش اسم البراند. "
@@ -344,7 +344,7 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
                "- style (English, under 25 words): genre, vocal, tempo/BPM, mood, production. Genre from the audience. No artist names.\n"
                "- shots: لقطة لكل سطر أو سطرين بالترتيب: lyric = السطور اللي بتتغنى في اللقطة دي بالظبط، sing = true للقطات اللي البطل بيغني فيها "
                "قدام الكاميرا (الهوك والكورس الأخير غالبًا)، والباقي صورة بتوضح الكلام.\n" + common +
-               'رجّع JSON بس: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
+               'استعد JSON فقط: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
                '"shots": [{"lyric": "...", "sing": false, "visual": "...", "camera": "...", "with": ["hero"]}]}')
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":
             f"ملف العميل:\n{brain_txt or '(مفيش)'}\n\nالمنتج: {p.get('name') or '-'} ({p.get('kind') or '-'})\nالشخصية: {hero.get('handle') or '-'}\n"

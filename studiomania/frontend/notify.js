@@ -6,7 +6,7 @@ const NTF_EVERY = 20000;
 
 function ntfAgo(iso) {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
-  if (m < 1) return "دلوقتي";
+  if (m < 1) return "الآن";
   if (m < 60) return m === 1 ? "من دقيقة" : `من ${m} دقيقة`;
   const h = Math.floor(m / 60);
   if (h < 24) return h === 1 ? "من ساعة" : `من ${h} ساعة`;
@@ -58,13 +58,13 @@ function ntfRender() {
   const box = $("bellPanel");
   const canAsk = "Notification" in window && Notification.permission === "default";
   box.innerHTML = `<div class="ntf-head"><b>الإشعارات</b>
-      ${ntf.unread ? `<button type="button" class="btn sm" data-n="readall">✓ علّم الكل اتقرا</button>` : ""}
-      ${ntf.items.length ? `<button type="button" class="btn sm" data-n="clear" title="امسح كل الإشعارات">🗑️</button>` : ""}</div>
-    ${canAsk ? `<button type="button" class="ntf-ask" data-n="ask">🔔 وصّلّي الإشعارات على الجهاز حتى لو الصفحة مقفولة</button>` : ""}
+      ${ntf.unread ? `<button type="button" class="btn sm" data-n="readall">✓ علّم الكل قُرئ</button>` : ""}
+      ${ntf.items.length ? `<button type="button" class="btn sm" data-n="clear" title="احذف كل الإشعارات">🗑️</button>` : ""}</div>
+    ${canAsk ? `<button type="button" class="ntf-ask" data-n="ask">🔔 وصّلّي الإشعارات على الجهاز حتى إذا الصفحة مغلقة</button>` : ""}
     <ul class="ntf-list">${ntf.items.map((x) => `<li class="${x.read ? "" : "unread"} ${x.level}" data-id="${x.id}">
         <i class="ntf-ic">${x.level === "bad" ? "✕" : x.kind === "autopilot" ? "🤖" : x.kind === "render" ? "🎬" : "✓"}</i>
         <span class="ntf-txt"><b>${escapeHtml(x.title)}</b>${x.body ? `<small>${escapeHtml(x.body)}</small>` : ""}<small class="ntf-ago">${ntfAgo(x.created_at)}</small></span>
-      </li>`).join("") || `<li class="ntf-empty">مفيش إشعارات لسه. هيوصلك هنا لما فيديو يخلص تصدير أو بوست يتنشر.</li>`}</ul>`;
+      </li>`).join("") || `<li class="ntf-empty">لا يوجد إشعارات ما زال. سيوصلك هنا عندما فيديو ينتهي تصدير أو منشور يُنشر.</li>`}</ul>`;
 }
 
 // اللوحة بتفتح جنب الجرس اللي اتداس (في الشريط الجانبي أو فوق في الرئيسية)
@@ -74,10 +74,10 @@ function ntfPlace(box, anchor) {
   let left, top;
   if (!r || !r.width) { left = pad; top = pad; }
   else if (r.top < 120 && r.width < innerWidth / 2 && anchor.id !== "bellBtn" || innerWidth <= 640) {
-    top = r.bottom + 8;                            // تحت الجرس
+    top = r.bottom + 8;                            // أسفل الجرس
     left = document.dir === "rtl" ? r.right - w : r.left;
   } else {
-    top = Math.min(r.top, innerHeight - h - pad);  // جنب الشريط الجانبي
+    top = Math.min(r.top, innerHeight - h - pad);  // بجانب الشريط الجانبي
     left = document.dir === "rtl" ? r.left - w - 12 : r.right + 12;
   }
   box.style.left = `${Math.max(pad, Math.min(left, innerWidth - w - pad))}px`;
@@ -127,7 +127,7 @@ new MutationObserver(() => { if (document.getElementById("nhBell") && !document.
   .observe(document.body, { childList: true, subtree: true });
     }
     if (b?.dataset.n === "clear") {
-      if (!(await uiConfirm("تمسح كل الإشعارات؟"))) return;
+      if (!(await uiConfirm("تحذف كل الإشعارات؟"))) return;
       await api("/api/notifications", { method: "DELETE" });
       return ntfPoll();
 // الرئيسية بتتبني بعد الملف ده، فنحدّث العداد عليها لما تظهر

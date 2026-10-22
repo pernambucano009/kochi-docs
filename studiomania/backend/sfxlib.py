@@ -193,7 +193,7 @@ SOUNDS = {
     "ding": ("دينج", ding),
     "notify": ("إشعار", notify),
     "success": ("نجاح", success),
-    "error": ("غلط", error),
+    "error": ("خطأ", error),
     "coin": ("عملة", coin),
     "shutter": ("كاميرا", shutter),
     "typing": ("كتابة كيبورد", typing),

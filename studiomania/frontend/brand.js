@@ -33,27 +33,27 @@ const BrandPage = (() => {
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  const ALGO_G = { strategy: "الاستراتيجية والتوزيع", ideas: "الأفكار", hook: "الهوك", script: "السكريبت والحكي", edit: "المونتاج والشكل",
-    publish: "النشر والكابشن", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الصناعي" };
+  const ALGO_G = { strategy: "الاستراتيجية والتوزيع", ideas: "الأفكار", hook: "الخطاف", script: "النص والحكي", edit: "المونتاج والشكل",
+    publish: "النشر والتعليق النصي", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الاصطناعي" };
   // الخريطة: كل فرع وكل نقطة فيه. النوع بيحدد الكارت اللي بيفتح
   function branches(b) {
     return [
       { k: "identity", t: "الهوية", en: "Identity", leaves: [
-        { f: "@name", t: "الاسم", type: "text", ph: "اسم البراند" },
+        { f: "@name", t: "الاسم", type: "text", ph: "اسم العلامة" },
         { f: "type", t: "نوع المنتج", type: "pick", opts: [["app", "تطبيق"], ["physical", "منتج ملموس"], ["service", "خدمة"]] },
         { f: "domain", t: "المجال", type: "text", ph: "مطاعم، تجميل، تعليم، عقارات…" },
-        { f: "niche", t: "النيتش", type: "text", ph: "المجال + الجمهور + الزاوية بالظبط", hint: "بيتكتب لوحده لما تحلّل حساب السوشيال، وتقدر تعدّله." },
-        { f: "about", t: "عن البراند", type: "text", ph: "البراند بيعمل إيه، وبيفرق في إيه عن غيره" },
-        { f: "audience", t: "الجمهور", type: "text", ph: "مين اللي بنكلمه؟ سنه، اهتماماته، بيدوّر على إيه" },
+        { f: "niche", t: "النيتش", type: "text", ph: "المجال + الجمهور + الزاوية بالضبط", hint: "يُكتب تلقائيًا عندما تحلّل حساب السوشيال، ويمكنك تعدّله." },
+        { f: "about", t: "عن العلامة", type: "text", ph: "العلامة يعمل ماذا، ويفرق في ماذا عن غيره" },
+        { f: "audience", t: "الجمهور", type: "text", ph: "من الذين نكلمه؟ سنه، اهتماماته، يبحث عن ماذا" },
         { f: "audiences", t: "الجماهير المستهدفة", type: "auds" },
         { f: "market", t: "السوق", type: "text", ph: "مثلًا: السعودية والخليج" },
         { f: "language", t: "اللغة واللهجة", type: "text", ph: "مثلًا: اللهجة السعودية البيضاء" },
       ] },
       { k: "look", t: "الشكل", en: "Look", leaves: [
-        { f: "logos", t: "اللوجو", type: "imgs" },
+        { f: "logos", t: "الشعار", type: "imgs" },
         { f: "palette", t: "الألوان", type: "palette" },
         { f: "typography", t: "الخطوط", type: "text", ph: "مثلًا: Cairo للعناوين و IBM Plex للكلام" },
-        { f: "derived", t: "اللي البرنامج استنبطه", type: "multi", fields: [["theme", "الثيم"], ["logo_rule", "مكان اللوجو"], ["logo_description", "وصف اللوجو"], ["ui_style", "شكل الواجهة"]] },
+        { f: "derived", t: "ما البرنامج استنبطه", type: "multi", fields: [["theme", "الثيم"], ["logo_rule", "مكان الشعار"], ["logo_description", "وصف الشعار"], ["ui_style", "شكل الواجهة"]] },
         { f: "analyze", t: "استنبط الهوية من الصور", type: "action" },
       ] },
       { k: "rules", t: "القواعد", en: "Rules", leaves: [
@@ -61,12 +61,12 @@ const BrandPage = (() => {
         { f: "rule+", t: "قاعدة جديدة", type: "rule-new" },
       ] },
       { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
-        { f: "logo_on", t: "اللوجو على الفيديو", type: "pick", opts: [["", "أيوه"], ["0", "لأ"]] },
+        { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["", "نعم"], ["0", "لا"]] },
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
-        { f: "cta", t: "الدعوة (CTA)", type: "text", ph: "مثلًا: حمّل التطبيق دلوقتي" },
-        { f: "link", t: "اللينك", type: "text", ph: "https://…", ltr: true },
-        { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} كابشن الفيديو · {cta} الدعوة · {link} اللينك. بيتحطوا لوحدهم وقت النشر." },
+        { f: "cta", t: "الدعوة (CTA)", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
+        { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
+        { f: "caption", t: "التعليق النصي الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#هاشتاج", hint: "{caption} تعليق نصي الفيديو · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
       // 🧑‍🎤 الشخصيات والأفاتار: دراع لوحده من المخ، فيه بندين: الشخصيات لوحدها والأفاتار لوحده
       { k: "chars", t: "الشخصيات والأفاتار", en: "Characters", leaves: [
@@ -74,7 +74,7 @@ const BrandPage = (() => {
         { f: "pg", i: "twin", page: "twin", t: "🪞 الأفاتار", type: "page" },
       ] },
       // 📚 مكتبة محتويات البراند: صور، فيديوهات، تعليقات صوتية، موسيقى (كل واحد فولدرات جوه فولدرات)، والكوميكس. صفحة واحدة بتابات
-      { k: "content", t: "مكتبة محتويات البراند", en: "Content Library", leaves: [
+      { k: "content", t: "مكتبة المحتويات", en: "Content Library", leaves: [
         { f: "pg", i: "bl:ideas", page: "brainlib", t: "💡 الأفكار", type: "page" },
         { f: "pg", i: "bl:images", page: "brainlib", t: "🖼️ الصور", type: "page" },
         { f: "pg", i: "bl:videos", page: "brainlib", t: "🎬 الفيديوهات", type: "page" },
@@ -85,14 +85,14 @@ const BrandPage = (() => {
       ] },
       // 🤖 القالب المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
       { k: "tools", t: "القالب المخصص", en: "Custom Template", leaves: [
-        { f: "pg", i: "auto", page: "auto", t: "🤖 القالب المخصص (أوتوميشن)", type: "page" },
+        { f: "pg", i: "auto", page: "auto", t: "🤖 القالب المخصص (قالب مخصص)", type: "page" },
       ] },
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
-      { k: "pulse", t: "منافسينك", en: "Competitors", leaves: [
+      { k: "pulse", t: "منافسوك", en: "Competitors", leaves: [
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
-        ...((b?.rivals || []).length && !b?.rivals_pending ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: b?.rivals_pending ? `🆕 ${b.rivals_pending} مستنيين موافقتك` : "🏆 منافسينك", type: "page" }]),
-        { f: "pg", i: "rv:works", page: "rivals", t: "🧠 اللي بينجح عندهم", type: "page" },
-        { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات ليك", type: "page" },
+        ...((b?.rivals || []).length && !b?.rivals_pending ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: b?.rivals_pending ? `🆕 ${b.rivals_pending} ينتظرون موافقتك` : "🏆 منافسوك", type: "page" }]),
+        { f: "pg", i: "rv:works", page: "rivals", t: "🧠 ما ينجح لديهم", type: "page" },
+        { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات لك", type: "page" },
       ] },
       // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
       { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },
@@ -114,13 +114,13 @@ const BrandPage = (() => {
   }
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
-  const FIELD_T = { niche: "النيتش", about: "عن البراند", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
-    palette: "الألوان", cta: "الدعوة (CTA)", link: "اللينك", caption: "الكابشن الافتراضي" };
+  const FIELD_T = { niche: "النيتش", about: "عن العلامة", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
+    palette: "الألوان", cta: "الدعوة (CTA)", link: "الرابط", caption: "التعليق النصي الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
   // النقطة مليانة ولا لسه ناقصة: القيم اللي البرنامج حاطها لوحده (الاسم الافتراضي، النوع الافتراضي) مش بتتحسب مليانة
-  const DEFAULT_NAMES = new Set(["عميل جديد", "عميلي", "براند جديد", "My Brand", "New client"]);
+  const DEFAULT_NAMES = new Set(["عميل جديد", "عميلي", "علامة جديد", "My Brand", "New client"]);
   function filled(b, l) {
     if (!b) return false;
     switch (l.type) {
@@ -132,7 +132,7 @@ const BrandPage = (() => {
       case "video": return !!b[`${l.f}_url`];
       case "auds": return (b.audiences || []).length > 0;
       case "rule": case "note": case "algo": return true;
-      case "page": return false;   // لينك لصفحة، مش خانة تتملي
+      case "page": return false;   // رابط لصفحة، غير خانة تُملأ
       case "todo": return !!l.todo.done;
       default: return false;
     }
@@ -142,8 +142,8 @@ const BrandPage = (() => {
     if (l.type === "pick") return l.opts.find(([v]) => v === String(b?.[l.f] || ""))?.[1] || "";
     if (l.type === "imgs") return (b?.[l.f] || []).length ? `${(b[l.f]).length} صورة` : "";
     if (l.type === "palette") return hexes(b?.palette).join(" ");
-    if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "شغّال" : "موجود ومقفول") : "";
-    if (l.type === "todo") return l.todo.done ? "اتعملت ✓" : l.todo.why;
+    if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "يعمل" : "موجود ومغلق") : "";
+    if (l.type === "todo") return l.todo.done ? "أُنشئت ✓" : l.todo.why;
     if (l.type === "auds") return (b?.audiences || []).map((a) => a.name).join("، ");
     return "";
   };
@@ -154,7 +154,7 @@ const BrandPage = (() => {
   async function toggleRec() {
     if (S.rec) { S.rec.mr.stop(); return; }
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("المتصفح مش سامح بالمايك. اسمح بيه من جنب اللينك وجرّب تاني", true); }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("المتصفح غير سامح بالمايك. اسمح به من بجانب الرابط وجرّب مرة أخرى", true); }
     const type = ["audio/webm", "audio/mp4", "audio/ogg"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
     const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
     S.rec = { mr, timer: setInterval(() => { const n = Math.round((Date.now() - t0) / 1000), el = S.el?.querySelector("[data-rect]"); if (el) el.textContent = `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`; if (n >= 600) mr.stop(); }, 500) };
@@ -163,16 +163,16 @@ const BrandPage = (() => {
     mr.onstop = () => {
       clearInterval(S.rec.timer); S.rec = null; stream.getTracks().forEach((t) => t.stop()); refreshCard();
       const mt = mr.mimeType || type || "audio/webm", ext = /mp4/.test(mt) ? "m4a" : /ogg/.test(mt) ? "ogg" : "webm";
-      if (Date.now() - t0 < 1200 || !parts.length) return toast("التسجيل قصير أوي", true);
+      if (Date.now() - t0 < 1200 || !parts.length) return toast("التسجيل قصير جدًا", true);
       const form = new FormData();
       form.append("files", new File(parts, `تسجيل صوتي ${new Date().toLocaleTimeString("ar-EG-u-nu-latn", { hour: "2-digit", minute: "2-digit" })}.${ext}`, { type: mt }));
-      form.append("note", "تسجيل صوتي من صاحب البراند");
+      form.append("note", "تسجيل صوتي من صاحب العلامة");
       addSource(form);
     };
     mr.start(1000);
   }
   function html() {
-    return `<div class="bm" id="nbWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+    return `<div class="bm" id="nbWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   }
 
   // ---------- الرسم ----------
@@ -181,8 +181,8 @@ const BrandPage = (() => {
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
-      <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>المخ هيقرا الملف ويحط كل معلومة في مكانها</small></div>
-      <p class="bm-hint"><i class="bm-lg o"></i> مليانة · <i class="bm-lg e"></i> لسه ناقصة · <i class="bm-lg b"></i> معلومات وقواعد ثابتة · <i class="bm-lg g"></i> اقتراحات وأسئلة مستنياك · دوس على المخ تبدّل البراند</p>`;
+      <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>العقل سيقرأ الملف ويضع كل معلومة في مكانها</small></div>
+      <p class="bm-hint"><i class="bm-lg o"></i> ممتلئة · <i class="bm-lg e"></i> ما زال ناقصة · <i class="bm-lg b"></i> معلومات وقواعد ثابتة · <i class="bm-lg g"></i> اقتراحات وأسئلة مستنياك · اضغط على العقل تبدّل العلامة</p>`;
   }
   // الخريطة ليها عالم خاص بيها بمسافات واسعة ثابتة (المخ في 0,0)، والشاشة بتتفرّج عليه بزوم وسحب.
   // كده الفروع عمرها ما تدخل في بعض مهما الشاشة صغرت: الخريطة بتبعد شوية، وتقدر تقرّب بالعجلة أو الأزرار
@@ -256,7 +256,7 @@ const BrandPage = (() => {
       const e = document.getElementById(id);
       if (e && e.offsetHeight && S.el.closest("#nh")?.contains(S.el)) y = Math.max(y, e.getBoundingClientRect().bottom - r.top + 12);
     }
-    S.headY = y;   // لحد هنا الخريطة بتختفي تحت الشريط (mask)
+    S.headY = y;   // حتى هنا الخريطة تختفي أسفل الشريط (mask)
     return y;
   }
   function applyView() {
@@ -294,37 +294,37 @@ const BrandPage = (() => {
   function nodeHTML(n, b) {
     if (n.kind === "center") {
       const reading = (b?.sources || []).filter((s) => s.status === "working").length, waiting = (b?.pending || []).length;
-      const st = b?.status === "working" ? `<small class="bm-st">بيستنبط الهوية من الصور…</small>` : b?.status === "failed" ? `<small class="bm-st bad">${esc(b.error || "الاستنباط فشل")}</small>`
-        : reading ? `<small class="bm-st">بيقرا ${reading === 1 ? "مصدر" : `${reading} مصادر`}…</small>` : waiting ? `<small class="bm-st">${waiting} اقتراح مستني موافقتك</small>` : "";
-      return `<button class="bm-n bm-center" data-n="c" title="بدّل البراند أو اعمل واحد جديد">
+      const st = b?.status === "working" ? `<small class="bm-st">يستنبط الهوية من الصور…</small>` : b?.status === "failed" ? `<small class="bm-st bad">${esc(b.error || "الاستنباط فشل")}</small>`
+        : reading ? `<small class="bm-st">يقرأ ${reading === 1 ? "مصدر" : `${reading} مصادر`}…</small>` : waiting ? `<small class="bm-st">${waiting} اقتراح ينتظر موافقتك</small>` : "";
+      return `<button class="bm-n bm-center" data-n="c" title="بدّل العلامة أو أنشئ واحد جديد">
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
-        <b>${esc(b?.name || "براند جديد")}</b>${st}
-        ${b?.knowledge ? `<small class="bm-kn" data-know title="دوس تشوف الشروط">العقل فاهمك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
+        <b>${esc(b?.name || "علامة جديد")}</b>${st}
+        ${b?.knowledge ? `<small class="bm-kn" data-know title="اضغط ترى الشروط">العقل فاهمك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
     }
     if (n.kind === "quiz") {
       if (b && S.tqFor !== b.id && S.tqLoading !== b.id) loadTasks(b);
       const tq = S.tqFor === b?.id ? S.tq : null;
       const qd = Math.min((b?.quiz_done || []).length, S.quiz?.length || 17), done = qd + (tq?.done || 0), total = (S.quiz?.length || 17) + (tq?.total || 0);
-      return `<button class="bm-n bm-quiz${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل اللي العقل محتاجه: أسئلة قصيرة + مهام (ترفع صور، فيديو، صوتك…)"><i>?</i><b>كمّل العقل</b><small class="num">${done}/${total}</small></button>`;
+      return `<button class="bm-n bm-quiz${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل ما العقل تحتاجه: أسئلة قصيرة + مهام (ترفع صور، فيديو، صوتك…)"><i>?</i><b>أكمل العقل</b><small class="num">${done}/${total}</small></button>`;
     }
     if (n.kind === "trends") {
       if (b && S.trFor !== b.id && S.trLoading !== b.id) loadTrends(b);
       const tr = S.trFor === b?.id ? S.tr : null, nw = tr?.new || 0;
-      return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند اللي ماشي دلوقتي في سوقك (بيتحدّث لوحده)">
+      return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند الذي حسنًا الآن في سوقك (يُحدّث تلقائيًا)">
         <span class="bm-trbox">${svg(IC.trends, 18)}<b>الترند</b>${nw ? `<em class="num">${nw}</em>` : ""}</span>
-        <small>${tr?.status === "working" ? "بيدوّر…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
+        <small>${tr?.status === "working" ? "جارٍ البحث…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
     }
     if (n.kind === "plan") {
       if (b && S.plFor !== b.id && S.plLoading !== b.id) loadPlan(b);
       const pl = S.plFor === b?.id ? S.pl : null, fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
-      return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="خطة المحتوى بتتبني لوحدها من كل اللي العقل عرفه عنك">
+      return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="خطة المحتوى تُبنى تلقائيًا من كل ما العقل عرفه عنك">
         <span class="bm-trbox">🧭<b>خطة المحتوى</b><em class="num">${pl ? pl.count : "…"}</em></span>
-        <small>${!pl ? "" : pl.status === "working" ? "بتتبني دلوقتي…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `محتاجة معلومات أكتر (${pl.count}/${pl.min})` : "هتتبني لوحدها")
-          : fresh ? `+${fresh} معلومة جديدة هتدخل فيها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
+        <small>${!pl ? "" : pl.status === "working" ? "تُبنى الآن…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `تحتاج معلومات أكثر (${pl.count}/${pl.min})` : "ستُبنى تلقائيًا")
+          : fresh ? `+${fresh} معلومة جديدة ستدخل فيها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
     }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
-      return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="ضيف للعقل: ملف أو لينك أو كلام"><i>+</i><b>ضيف للعقل</b></button>`;
+      return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="أضف للعقل: ملف أو رابط أو نص"><i>+</i><b>أضف للعقل</b></button>`;
     }
     if (n.kind === "branch") {
       return `<button class="bm-n bm-branch${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.br.t)}">
@@ -334,7 +334,7 @@ const BrandPage = (() => {
     if (l.type === "pending") {
       const p = l.p, sub = p.kind === "field" || p.kind === "rule" ? p.value : p.kind === "question" ? p.title : p.summary;
       return `<button class="bm-n bm-leaf pend${p.kind === "question" ? " ask" : ""}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
-        <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">مستني موافقتك</small></span></button>`;
+        <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">ينتظر موافقتك</small></span></button>`;
     }
     // المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها لوحدها
     const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : l.type === "page" ? "go" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
@@ -343,7 +343,7 @@ const BrandPage = (() => {
     const side = (S.byId?.[n.from]?.x ?? 0) + 0 > n.x ? "l" : "r";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>${lab ? `<span class="bm-lab ${side}">${esc(short(lab))}</span>` : ""}
-      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح جوه</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح داخل</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">ما زال ناقصة</small>`}</span></button>`;
   }
   // أول ٣ كلمات (بحد أقصى ٢٢ حرف) وبعدين «…»
   function short(t) {
@@ -524,7 +524,7 @@ const BrandPage = (() => {
     S.trLoading = null;
     redrawNode("trends");
     if (S.open?.id === "trends") refreshCard();
-    clearTimeout(S.trT);   // وهو بيدوّر بنشوف كل شوية، وبعدها كل ١٠ دقايق (السيرفر بيحدّث لوحده كل ١٢ ساعة)
+    clearTimeout(S.trT);   // وهو يبحث نرى كل قليلًا، وبعدها كل ١٠ دقايق (الخادم يحدّث تلقائيًا كل ١٢ ساعة)
     S.trT = setTimeout(() => { if (S.el?.isConnected && cur()?.id === b.id) { S.trFor = null; loadTrends(b); } }, S.tr?.status === "working" ? 4000 : 600000);
   }
   async function loadPlan(b) {
@@ -532,7 +532,7 @@ const BrandPage = (() => {
     try { S.pl = await bAPI("/plan"); S.plFor = b.id; } catch { S.pl = null; S.plFor = b.id; }
     S.plLoading = null;
     redrawNode("plan");
-    clearTimeout(S.plT);   // وهي بتتبني بنشوف كل شوية لحد ما تخلص
+    clearTimeout(S.plT);   // وهي تُبنى نرى كل قليلًا حتى ما تنتهي
     if (S.pl?.status === "working") S.plT = setTimeout(() => { if (S.el?.isConnected && cur()?.id === b.id) { S.plFor = null; loadPlan(b); } }, 4000);
   }
   function redrawNode(id) {
@@ -542,20 +542,20 @@ const BrandPage = (() => {
   function trendsHTML(b) {
     const tr = S.trFor === b?.id ? S.tr : null;
     const head = `<div class="bm-ch"><span class="latin">TRENDS</span><b>📈 الترند</b></div>`;
-    if (!tr) { if (b && S.trLoading !== b.id) loadTrends(b); return head + `<p class="bm-note">بيجيب الترند…</p>`; }
+    if (!tr) { if (b && S.trLoading !== b.id) loadTrends(b); return head + `<p class="bm-note">يجلب الترند…</p>`; }
     if (tr.new && !S.trSeenBusy) { S.trSeenBusy = true; bAPI("/trends/seen", { method: "POST" }).then((x) => { S.tr = x; redrawNode("trends"); }).catch(() => {}).finally(() => (S.trSeenBusy = false)); }
     const ago = tr.checked_at ? Math.round((Date.now() / 1000 - tr.checked_at) / 3600) : null;
     const row = (x) => `<li class="bm-tr${x.seen ? "" : " new"}"><div><b>${x.seen ? "" : "🔴 "}${esc(x.title)}</b>${x.what ? `<small>${esc(x.what)}</small>` : ""}
-        ${x.angle ? `<p class="bm-note">💡 ليك: ${esc(x.angle)}</p>` : ""}
+        ${x.angle ? `<p class="bm-note">💡 لك: ${esc(x.angle)}</p>` : ""}
         ${(x.posts || []).length ? `<small class="bm-trsrc">${x.posts.slice(0, 3).map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" dir="ltr">@${esc(p.handle)}</a>`).join(" · ")}</small>` : ""}</div>
-      <div class="bm-acts"><button class="bm-go" data-trnow="${esc(x.id)}">✨ استخدمه في بوست دلوقتي</button>
+      <div class="bm-acts"><button class="bm-go" data-trnow="${esc(x.id)}">✨ استخدمه في منشور الآن</button>
         <button class="bm-pill" data-trsave="${esc(x.id)}" ${x.saved ? "disabled" : ""}>${x.saved ? "🔖 محفوظ" : "🔖 احفظه لبعدين"}</button>
-        <button class="bm-pill" data-trdel="${esc(x.id)}" title="امسحه من القايمة">✕</button></div></li>`;
-    return head + `<p class="bm-note">اللي ماشي دلوقتي في ${esc(tr.market || "سوقك")} ومجالك. بيتحدّث لوحده، والترند بيفضل هنا لحد ما تمسحه.${tr.live ? "" : " (وضع تجربة: ترندات تجريبية لحد ما يتحط مفتاح مصدر الداتا)"}</p>
-      <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ بيدوّر…" : "🔄 دوّر دلوقتي"}</button>
+        <button class="bm-pill" data-trdel="${esc(x.id)}" title="احذفه من القائمة">✕</button></div></li>`;
+    return head + `<p class="bm-note">ما حسنًا الآن في ${esc(tr.market || "سوقك")} ومجالك. يُحدّث تلقائيًا، والترند يظل هنا حتى ما تحذفه.${tr.live ? "" : " (وضع تجربة: ترندات تجريبية حتى ما يوضع مفتاح مصدر الداتا)"}</p>
+      <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ جارٍ البحث…" : "🔄 ابحث الآن"}</button>
         ${ago != null ? `<small class="bm-note">آخر تحديث من ${ago < 1 ? "أقل من ساعة" : `${ago} ساعة`}</small>` : ""}</div>
       ${tr.error ? `<p class="bm-note bad">⚠️ ${esc(tr.error)}</p>` : ""}
-      ${(tr.items || []).length ? `<ul class="bm-trs">${tr.items.map(row).join("")}</ul>` : `<p class="bm-note">لسه مفيش ترندات.${tr.market ? "" : " اكتب «السوق» و«المجال» في الهوية علشان يبدأ يدوّر."}</p>`}`;
+      ${(tr.items || []).length ? `<ul class="bm-trs">${tr.items.map(row).join("")}</ul>` : `<p class="bm-note">لا يوجد بعد ترندات.${tr.market ? "" : " اكتب «السوق» و«المجال» في الهوية لكي يبدأ يبحث."}</p>`}`;
   }
   // 📡 قواعد الخوارزميات: كل مجموعة نقطة، وجوّاها الفريمويركس وقواعدها (تشغيل/قفل، تعديل، زيادة، مسح، رجوع للأصل)
   async function loadAlgo(b) {
@@ -567,18 +567,18 @@ const BrandPage = (() => {
   function algoHTML(b, l) {
     const head = `<div class="bm-ch"><span class="latin">ALGORITHM RULES</span><b>${esc(l.t)}</b></div>`;
     const ar = S.arFor === b?.id ? S.ar : null;
-    if (!ar) { if (b && S.arLoading !== b.id) loadAlgo(b); return head + `<p class="bm-note">بيجيب القواعد…</p>`; }
+    if (!ar) { if (b && S.arLoading !== b.id) loadAlgo(b); return head + `<p class="bm-note">يجلب القواعد…</p>`; }
     const parts = ar.parts.filter((p) => p.group === l.i);
     return head + `<p class="bm-warn">⚠️ ${esc(ar.warn)}</p>
-      <p class="bm-note">دي القواعد الأساسية اللي كل أدوات البرنامج بتمشي عليها وهي بتكتب الأفكار والهوكات والسكريبتات والكابشن. علامة ✓ معناها القاعدة شغالة.</p>
-      ${parts.map((p) => `<div class="bm-ar"><div class="bm-arh"><b>${esc(p.title)}</b>${p.changed ? `<button class="bm-pill" data-arreset="${p.id}" title="يرجع للقواعد الأصلية">↺ رجّع الأصل</button>` : ""}</div>
-        <ul>${p.rules.map((r, i) => `<li class="${r.on ? "" : "off"}${r.custom ? " custom" : ""}"><input type="checkbox" data-aron="${p.id}:${i}" ${r.on ? "checked" : ""} title="شغّال / مقفول">
-          ${editable(`ar:${p.id}:${i}`, r.t, "القاعدة")}<button class="bm-x2" data-ardel="${p.id}:${i}" title="امسح القاعدة">✕</button></li>`).join("")}</ul>
+      <p class="bm-note">هذه القواعد الأساسية التي كل أدوات البرنامج تسير عليها وهي تكتب الأفكار والخطافات والنصوص والتعليق النصي. علامة ✓ معناها القاعدة تعمل.</p>
+      ${parts.map((p) => `<div class="bm-ar"><div class="bm-arh"><b>${esc(p.title)}</b>${p.changed ? `<button class="bm-pill" data-arreset="${p.id}" title="يعود للقواعد الأصلية">↺ استعد الأصل</button>` : ""}</div>
+        <ul>${p.rules.map((r, i) => `<li class="${r.on ? "" : "off"}${r.custom ? " custom" : ""}"><input type="checkbox" data-aron="${p.id}:${i}" ${r.on ? "checked" : ""} title="يعمل / مغلق">
+          ${editable(`ar:${p.id}:${i}`, r.t, "القاعدة")}<button class="bm-x2" data-ardel="${p.id}:${i}" title="احذف القاعدة">✕</button></li>`).join("")}</ul>
         <button class="bm-link" data-aradd="${p.id}">＋ قاعدة جديدة</button></div>`).join("")}
-      ${ar.changed ? `<div class="bm-acts"><button class="bm-pill" data-arreset="all">↺ رجّع كل القواعد للأصل</button></div>` : ""}`;
+      ${ar.changed ? `<div class="bm-acts"><button class="bm-pill" data-arreset="all">↺ استعد كل القواعد للأصل</button></div>` : ""}`;
   }
   async function algoSave(fid, rows, reset) {
-    try { S.ar = await bAPI("/algo-rules", { method: "PUT", ...jsonBody(reset ? { reset: [fid] } : { parts: { [fid]: rows } }) }); S.arFor = cur()?.id; refreshCard(); savedPill(reset ? "✅ القواعد رجعت للأصل" : "✅ قواعد الخوارزميات اتحدّثت"); }
+    try { S.ar = await bAPI("/algo-rules", { method: "PUT", ...jsonBody(reset ? { reset: [fid] } : { parts: { [fid]: rows } }) }); S.arFor = cur()?.id; refreshCard(); savedPill(reset ? "✅ القواعد رجعت للأصل" : "✅ قواعد الخوارزميات حُدّثت"); }
     catch (err) { toast(err.message, true); }
   }
   const arRows = (fid) => (S.ar?.parts.find((p) => p.id === fid)?.rules || []).map((r) => ({ t: r.t, on: r.on }));
@@ -594,37 +594,37 @@ const BrandPage = (() => {
   }
   function tasksHTML(b) {
     const tq = S.tqFor === b?.id ? S.tq : null;
-    if (!tq) { if (b && S.tqLoading !== b.id) loadTasks(b); return `<p class="bm-note">بيشوف إيه اللي ناقص…</p>`; }
+    if (!tq) { if (b && S.tqLoading !== b.id) loadTasks(b); return `<p class="bm-note">يرى ماذا الذي ناقص…</p>`; }
     const left = tq.items.filter((x) => !x.done);
     return `<div class="bm-qbar"><i style="width:${Math.round(100 * tq.done / Math.max(1, tq.total))}%"></i></div>
-      <p class="bm-note">${left.length ? `فاضل ${left.length} من ${tq.total}. كل مهمة بتتعلّم لوحدها أول ما تتعمل.` : "خلصت كل المهام 🎉"}</p>
+      <p class="bm-note">${left.length ? `فاضل ${left.length} من ${tq.total}. كل مهمة تتعلّم تلقائيًا أول ما تُنشأ.` : "خلصت كل المهام 🎉"}</p>
       <ul class="bm-tasks">${[...left, ...tq.items.filter((x) => x.done)].map((x) => `<li class="${x.done ? "ok" : ""}"><span class="bm-tck">${x.done ? "✓" : ""}</span>
-        <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">اعملها ←</button>`}</li>`).join("")}</ul>`;
+        <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">أنشئها ←</button>`}</li>`).join("")}</ul>`;
   }
   function quizHTML(b) {
     const tq = S.tqFor === b?.id ? S.tq : null, qn = S.quiz?.length || 0, qd = Math.min((b?.quiz_done || []).length, qn || 99);
     const tabs = `<div class="bm-pills bm-qtabs"><button class="bm-pill${S.qtab !== "t" ? " on" : ""}" data-qtab="q">🧩 الأسئلة <span class="num">${qd}/${qn || "…"}</span></button>
       <button class="bm-pill${S.qtab === "t" ? " on" : ""}" data-qtab="t">✅ المهام <span class="num">${tq ? `${tq.done}/${tq.total}` : "…"}</span></button></div>`;
-    const head = `<div class="bm-ch"><span class="latin">COMPLETE THE BRAIN</span><b>كمّل العقل</b></div>
-      <p class="bm-note">لما الأسئلة والمهام يخلصوا، العقل بيبقى عنده كل اللي محتاجه علشان يعرفك.</p>${tabs}`;
+    const head = `<div class="bm-ch"><span class="latin">COMPLETE THE BRAIN</span><b>أكمل العقل</b></div>
+      <p class="bm-note">عندما الأسئلة والمهام يخلصون، العقل يصبح لديه كل ما تحتاجه لكي يعرفك.</p>${tabs}`;
     if (S.qtab === "t") return head + tasksHTML(b);
-    if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">بيجهّز الأسئلة…</p>`; }
+    if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">يُجهّز الأسئلة…</p>`; }
     const qs = S.quiz, total = qs.length, done = new Set(b.quiz_done || []);
     if (S.qi == null) { const i = qs.findIndex((q) => !done.has(q.id)); S.qi = i < 0 ? total : i; }
     const bar = `<div class="bm-qbar"><i style="width:${Math.round(100 * Math.min(done.size, total) / total)}%"></i></div>`;
     if (S.qi >= total) {
       return head + bar + `<p class="bm-q">${done.size >= total ? "خلصت كل الأسئلة 🎉" : "وصلت لآخر سؤال"}</p>
-        <p class="bm-note">${done.size >= total ? "كل إجابة اتحطت في خانتها في العقل. تقدر ترجع تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة اللي اتخطت تقدر ترجع لها في أي وقت.`}</p>
-        <div class="bm-acts">${tq && tq.done < tq.total ? `<button class="bm-go" data-qtab="t">✅ كمّل المهام (فاضل ${tq.total - tq.done})</button>` : ""}<button class="${tq && tq.done < tq.total ? "bm-pill" : "bm-go"}" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">كمّل الناقص</button>` : ""}</div>`;
+        <p class="bm-note">${done.size >= total ? "كل إجابة وُضعت في خانتها في العقل. يمكنك تعود تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة التي اتخطت يمكنك تعود لها في أي وقت.`}</p>
+        <div class="bm-acts">${tq && tq.done < tq.total ? `<button class="bm-go" data-qtab="t">✅ أكمل المهام (فاضل ${tq.total - tq.done})</button>` : ""}<button class="${tq && tq.done < tq.total ? "bm-pill" : "bm-go"}" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">أكمل الناقص</button>` : ""}</div>`;
     }
     const q = qs[S.qi], val = S.qa?.[q.id] || "";
     const field = q.opts ? `<div class="bm-pills">${q.opts.map(([v, t]) => `<button class="bm-pill${val === v ? " on" : ""}" data-qpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>`
       : `<div class="bm-write bm-qans${q.multi ? " multi" : ""}" contenteditable="plaintext-only" data-k="@quiz" data-ph="${esc(q.ph || "اكتب إجابتك…")}"${q.ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
     return head + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ متجاوب</small>` : ""}</div>` + bar
       + `<p class="bm-q">${esc(q.q)}</p>` + field
-      + (q.multi ? `<p class="bm-note">كل حاجة في سطر (Enter لسطر جديد).</p>` : "")
+      + (q.multi ? `<p class="bm-note">كل شيء في سطر (Enter لسطر جديد).</p>` : "")
       + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>→ السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطّي</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "خلّصت" : "التالي ←"}</button></div>
-      <p class="bm-note bm-qsave">إجابتك بتتحفظ في العقل أول ما تدوس «التالي». تقدر تخرج وتكمّل في أي وقت.</p>`;
+      <p class="bm-note bm-qsave">إجابتك تُحفظ في العقل أول ما تضغط «التالي». يمكنك تخرج وتُكمل في أي وقت.</p>`;
   }
   async function quizStep(step, pick) {
     const b = cur(), q = S.quiz?.[S.qi];
@@ -632,10 +632,10 @@ const BrandPage = (() => {
     const ed = S.el.querySelector('.bm-card [data-k="@quiz"]');
     const ans = (pick ?? (ed ? ed.innerText.replace(/\u00a0/g, " ").trim() : "")) || "";
     const move = () => { S.qi = Math.max(0, S.qi + step); refreshCard(); S.el.querySelector('.bm-card [data-k="@quiz"]')?.focus(); };
-    if (step > 0 && pick == null && !ans && !(b.quiz_done || []).includes(q.id)) return toast("اكتب الإجابة، أو دوس «تخطّي»", true);
+    if (step > 0 && pick == null && !ans && !(b.quiz_done || []).includes(q.id)) return toast("اكتب الإجابة، أو اضغط «تخطّي»", true);
     if (ans && ans !== (S.qa?.[q.id] || "")) {
       S.qa = { ...S.qa, [q.id]: ans };
-      if (await save(() => bAPI("/quiz", { method: "POST", ...jsonBody({ qid: q.id, answer: ans, lang: QLANG() }) }), { card: false }) && ans) savedPill("✅ الإجابة اتحفظت في العقل");
+      if (await save(() => bAPI("/quiz", { method: "POST", ...jsonBody({ qid: q.id, answer: ans, lang: QLANG() }) }), { card: false }) && ans) savedPill("✅ الإجابة حُفظت في العقل");
     }
     move();
   }
@@ -643,114 +643,114 @@ const BrandPage = (() => {
   function cardHTML(n) {
     const b = cur();
     if (n.kind === "center") {
-      return `<div class="bm-ch"><span class="latin">BRANDS</span><b>البراندات</b></div>
+      return `<div class="bm-ch"><span class="latin">BRANDS</span><b>العلامات</b></div>
         <div class="bm-pills">${S.brains.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-brain="${x.id}">${esc(x.name)}</button>`).join("")}</div>
-        <div class="bm-new">${editable("@new", "", "اكتب اسم براند جديد واضغط Enter")}</div>
+        <div class="bm-new">${editable("@new", "", "اكتب اسم علامة جديد واضغط Enter")}</div>
         ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
     }
     if (n.kind === "add") {
       const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse(), rec = S.rec;
       const TABS = [["file", "📎 ملف"], ["social", "📱 حساب سوشيال"], ["text", "✍️ اكتب"], ["rec", "🎙️ سجّل"], ["url", "🔗 موقع"]];
-      return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>ضيف للعقل</b></div>
-        <p class="bm-note">ارمي أي حاجة عن البراند، والمخ يقراها ويفصّصها: كل معلومة بتظهر نقطة منوّرة في الفرع بتاعها وانت توافق عليها.</p>
+      return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>أضف للعقل</b></div>
+        <p class="bm-note">ارمي أي شيء عن العلامة، والعقل يقرؤها ويفصّصها: كل معلومة تظهر نقطة منوّرة في الفرع الخاص بها وأنت توافق عليها.</p>
         <div class="bm-pills bm-tabs">${TABS.map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
-        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو دوس تختار (أو ارميه في أي حتة على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
-          : tab === "social" ? `${editable("@social", "", "لينك الحساب أو @اليوزر · واضغط Enter", true)}
-            <p class="bm-note">إنستجرام أو تيك توك. المخ بياخد البايو والمعلومات والنيتش، وبينزّل الصور ويحط كل واحدة مكانها، وبيحلل البوستات والمشاهدات وأحسن وأضعف الفيديوهات، والأخطاء واللي ناقص بيتسجلوا في «نقاط للتحسين».</p>
-            <p class="bm-note bm-cost">💳 بيتخصم من رصيدك على قد الشغل اللي اتعمل فعلًا (عادةً ما بين ١٠ و٦٠ نقطة).</p>`
-          : tab === "text" ? editable("@text", "", "اكتب أي حاجة عن البراند: الجمهور، النبرة، العروض، اللي ممنوع… واضغط Enter")
+        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو اضغط تختار (أو ارميه في أي جزء على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
+          : tab === "social" ? `${editable("@social", "", "رابط الحساب أو @اليوزر · واضغط Enter", true)}
+            <p class="bm-note">إنستجرام أو تيك توك. العقل يأخذ السيرة والمعلومات والنيتش، وينزّل الصور ويضع كل واحدة مكانها، ويحلل المنشورات والمشاهدات وأحسن وأضعف الفيديوهات، والأخطاء واللي ناقص يتسجلون في «نقاط للتحسين».</p>
+            <p class="bm-note bm-cost">💳 يُخصم من رصيدك على قدر العمل الذي أُنشئ فعلًا (عادةً ما بين ١٠ و٦٠ نقطة).</p>`
+          : tab === "text" ? editable("@text", "", "اكتب أي شيء عن العلامة: الجمهور، النبرة، العروض، ما ممنوع… واضغط Enter")
           : tab === "rec" ? `<div class="bm-rec"><button class="bm-recb${rec ? " on" : ""}" data-ibrec>${rec ? "⏹" : "🎙️"}</button>
-            <div><b>${rec ? `بيسجّل <span class="num" data-rect>0:00</span>` : "سجّل واحكي عن البراند بصوتك"}</b><small class="muted">${rec ? "دوس تاني لما تخلص، والتسجيل بيتبعت للمخ لوحده" : "احكي براحتك: بتعمل إيه، لمين، وإيه اللي بيميزك. لحد ١٠ دقايق."}</small></div></div>`
+            <div><b>${rec ? `جارٍ التسجيل <span class="num" data-rect>0:00</span>` : "سجّل واحكي عن العلامة بصوتك"}</b><small class="muted">${rec ? "اضغط مرة أخرى عندما تنتهي، والتسجيل يُرسل للمخ تلقائيًا" : "احكي براحتك: تعمل ماذا، لمين، وماذا الذي يميزك. حتى ١٠ دقايق."}</small></div></div>`
           : editable("@url", "", "example.com · واضغط Enter", true)}
         ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
-          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? esc(s.step || "بيتقرا…") : s.status === "failed" ? esc(s.error || "فشل") : `${s.count ? `خلص · ${s.count} اقتراح` : "خلص · مفيش جديد"}${s.credits ? ` · ${s.credits} نقطة` : ""}`}</small></span>
-          <button data-sdel="${s.id}" title="شيله">✕</button></li>`).join("")}</ul>` : ""}`;
+          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? esc(s.step || "يُقرأ…") : s.status === "failed" ? esc(s.error || "فشل") : `${s.count ? `خلص · ${s.count} اقتراح` : "خلص · لا يوجد جديد"}${s.credits ? ` · ${s.credits} نقطة` : ""}`}</small></span>
+          <button data-sdel="${s.id}" title="أزله">✕</button></li>`).join("")}</ul>` : ""}`;
     }
     if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">لسه فاضية. ارمي ملف أو لينك من «ضيف للعقل» والمعرفة هتطلع هنا.</p>` : ""}
+      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زال فارغة. ارمي ملف أو رابط من «أضف للعقل» والمعرفة ستظهر هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
     switch (l.type) {
       case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "") + suggBox(b, l);
-      case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">شيل القاعدة دي</button>`;
-      case "auds": {   // 👥 أكتر من جمهور: العقل بيستخلصهم من الوصف، وكل فكرة وإعلان بيتوجّه لواحد منهم
+      case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">أزل هذه القاعدة</button>`;
+      case "auds": {   // 👥 أكثر من جمهور: العقل يستخلصهم من الوصف، وكل فكرة وإعلان يتوجّه لواحد منهم
         const A = b?.audiences || [];
-        return head + `<p class="bm-note">${b?.audiences_busy ? "⏳ العقل بيستخلص الجماهير من وصف البراند…" : "العقل بيستخلصهم لوحده من «عن البراند» و«الجمهور»، وكل فكرة وإعلان بيتوجّه لواحد منهم."}</p>
+        return head + `<p class="bm-note">${b?.audiences_busy ? "⏳ العقل يستخلص الجماهير من وصف العلامة…" : "العقل يستخلصهم تلقائيًا من «عن العلامة» و«الجمهور»، وكل فكرة وإعلان يتوجّه لواحد منهم."}</p>
           <div class="bm-auds">${A.map((a, i) => `<div class="bm-aud" data-audi="${i}">
             <input class="bm-in" data-audk="name" value="${esc(a.name)}" placeholder="اسم الجمهور" aria-label="اسم الجمهور">
             <input class="bm-in sm" data-audk="share" value="${esc(a.share || "")}" placeholder="٪" aria-label="النسبة" inputmode="numeric">
-            <input class="bm-in wide" data-audk="who" value="${esc(a.who)}" placeholder="مين هو" aria-label="مين هو">
-            <input class="bm-in wide" data-audk="pain" value="${esc(a.pain)}" placeholder="إيه اللي مضايقه" aria-label="إيه اللي مضايقه">
-            <input class="bm-in wide" data-audk="want" value="${esc(a.want)}" placeholder="عايز إيه" aria-label="عايز إيه">
-            <button class="bm-x2" data-auddel="${i}" title="شيل الجمهور ده">✕</button></div>`).join("")}</div>
+            <input class="bm-in wide" data-audk="who" value="${esc(a.who)}" placeholder="من هو" aria-label="من هو">
+            <input class="bm-in wide" data-audk="pain" value="${esc(a.pain)}" placeholder="ماذا الذي مضايقه" aria-label="ماذا الذي مضايقه">
+            <input class="bm-in wide" data-audk="want" value="${esc(a.want)}" placeholder="تريد ماذا" aria-label="تريد ماذا">
+            <button class="bm-x2" data-auddel="${i}" title="أزل هذا الجمهور">✕</button></div>`).join("")}</div>
           <div class="bm-acts"><button class="bm-pill" data-audadd>＋ جمهور</button>${A.length ? `<button class="bm-go" data-audsave>احفظ</button>` : ""}<button class="bm-pill" data-audx ${b?.audiences_busy ? "disabled" : ""}>✨ استخلصهم من الوصف</button></div>`;
       }
-      case "rule-new": return head + `<p class="bm-note">أي حاجة لازم تتراعى في كل شغل للبراند: السكريبت والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: من غير مزيكا · واضغط Enter");
+      case "rule-new": return head + `<p class="bm-note">أي شيء يجب تتراعى في كل عمل للعلامة: النص والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: بدون مزيكا · واضغط Enter");
       case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${String(b?.[l.f] || "") === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
         const hs = hexes(b?.palette);
-        return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · دوس تشيله"></button>`).join("")}
-          <label class="bm-swadd" title="ضيف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true) + suggBox(b, l);
+        return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · اضغط تزيله"></button>`).join("")}
+          <label class="bm-swadd" title="أضف لون">+<input type="color" data-hadd hidden></label></div>` + editable("palette", b?.palette, "#E5613E برتقالي، #111111 أسود", true) + suggBox(b, l);
       }
       case "imgs": {
         const xs = b?.[l.f] || [];
         return head + `<div class="bm-imgs">${xs.map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><button data-adel title="احذف">✕</button></figure>`).join("")}
           <label class="bm-up">+<small>ارفع</small><input type="file" accept="image/*" multiple data-up="${l.f}" hidden></label></div>
-          <p class="bm-note">${l.f === "logos" ? "اللوجو بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من البراند. البرنامج بيوصفها ويستخدمها بالظبط بدل ما يخترع."} تقدر تسحب الصور وترميها هنا.</p>`;
+          <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من العلامة. البرنامج يوصفها ويستخدمها بالضبط بدل ما يخترع."} يمكنك تسحب الصور وترميها هنا.</p>`;
       }
       case "video": {
         const url = b?.[`${l.f}_url`];
         return head + (url ? `<video src="${esc(url)}" controls preload="metadata" playsinline></video>
-          <div class="bm-pills"><button class="bm-pill${b[`${l.f}_on`] ? " on" : ""}" data-von="${l.f}" data-v="1">شغّال</button><button class="bm-pill${b[`${l.f}_on`] ? "" : " on"}" data-von="${l.f}" data-v="">مقفول</button></div>
-          <button class="bm-link bad" data-vdel="${l.f}">شيل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
+          <div class="bm-pills"><button class="bm-pill${b[`${l.f}_on`] ? " on" : ""}" data-von="${l.f}" data-v="1">يعمل</button><button class="bm-pill${b[`${l.f}_on`] ? "" : " on"}" data-von="${l.f}" data-v="">مغلق</button></div>
+          <button class="bm-link bad" data-vdel="${l.f}">أزل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`);
       }
-      case "multi": return head + `<p class="bm-note">بيتكتب لوحده من اللوجو والصور، وتقدر تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
+      case "multi": return head + `<p class="bm-note">يُكتب تلقائيًا من الشعار والصور، ويمكنك تعدّله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
       case "todo": {
         const x = l.todo;
-        return head + (x.why ? `<div class="bm-sub"><small>ليه</small><p class="bm-now">${esc(x.why)}</p></div>` : "") + (x.how ? `<div class="bm-sub"><small>تتصلّح إزاي</small><p class="bm-now">${esc(x.how)}</p></div>` : "")
-          + `<div class="bm-acts"><button class="bm-go" data-tdone="${x.id}" data-v="${x.done ? "" : "1"}">${x.done ? "↩︎ لسه ماتعملتش" : "✓ اتعملت"}</button><button class="bm-pill" data-tdel="${x.id}">شيلها</button></div>`
+        return head + (x.why ? `<div class="bm-sub"><small>له</small><p class="bm-now">${esc(x.why)}</p></div>` : "") + (x.how ? `<div class="bm-sub"><small>تتصلّح كيف</small><p class="bm-now">${esc(x.how)}</p></div>` : "")
+          + `<div class="bm-acts"><button class="bm-go" data-tdone="${x.id}" data-v="${x.done ? "" : "1"}">${x.done ? "↩︎ ما زال لم تُنشأ" : "✓ أُنشئت"}</button><button class="bm-pill" data-tdel="${x.id}">أزلها</button></div>`
           + (srcName(x.source) ? `<p class="bm-note">من تحليل «${esc(srcName(x.source))}»</p>` : "");
       }
-      case "social-go": return head + `<p class="bm-note">حط لينك حساب البراند على إنستجرام أو تيك توك، والمخ يحلل البوستات والفيديوهات ويكتب هنا النقاط اللي لازم تتشتغل.</p>
+      case "social-go": return head + `<p class="bm-note">ضع رابط حساب العلامة على إنستجرام أو تيك توك، والعقل يحلل المنشورات والفيديوهات ويكتب هنا النقاط الذي يجب تتشتغل.</p>
         <button class="bm-go" data-socialgo>📱 حلّل حساب</button>`;
       case "pending": {
         const p = l.p, from = srcName(p.source);
         if (p.kind === "image") {
-          const KN = { products: "صور المنتج", characters: "شخصيات البراند", sets: "الأماكن والخلفيات", props: "الأدوات", logos: "اللوجو" };
+          const KN = { products: "صور المنتج", characters: "شخصيات العلامة", sets: "الأماكن والخلفيات", props: "الأدوات", logos: "الشعار" };
           S.imgTarget = S.imgTarget?.id === p.id ? S.imgTarget : { id: p.id, t: p.target };
           return `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>صورة من الحساب</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}
             <img class="bm-pimg" src="/media/ads/brains/${esc(b.id)}/src/${esc(p.file)}" alt="">${p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : ""}
-            <div class="bm-sub"><small>تتحط في</small><div class="bm-pills">${Object.entries(KN).map(([k, t]) => `<button class="bm-pill${S.imgTarget.t === k ? " on" : ""}" data-itgt="${k}">${t}</button>`).join("")}</div></div>
-            <div class="bm-acts"><button class="bm-go" data-ok="${p.id}">حطها</button><button class="bm-pill" data-no="${p.id}">لأ</button></div>`;
+            <div class="bm-sub"><small>توضع في</small><div class="bm-pills">${Object.entries(KN).map(([k, t]) => `<button class="bm-pill${S.imgTarget.t === k ? " on" : ""}" data-itgt="${k}">${t}</button>`).join("")}</div></div>
+            <div class="bm-acts"><button class="bm-go" data-ok="${p.id}">ضعها</button><button class="bm-pill" data-no="${p.id}">لا</button></div>`;
         }
         const now = p.kind === "field" ? String(b?.[p.field] || "").trim() : "";
         const top = `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
-          : (now ? `<div class="bm-sub"><small>المكتوب في العقل دلوقتي (هيتشال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>المخ بيقترح يتكتب بداله (تقدر تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
+          : (now ? `<div class="bm-sub"><small>المكتوب في العقل الآن (سيُزال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>العقل يقترح يُكتب بداله (يمكنك تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
         // بنقول بوضوح «موافق» هتعمل إيه بالظبط
         const what = p.kind === "field" ? [`لو وافقت: هتتكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل اللي مكتوب دلوقتي" : ""}، وكل سكريبت وفيديو جديد هيمشي عليها.`, "اكتبها في الخانة"]
-          : p.kind === "rule" ? ["لو وافقت: هتتضاف للقواعد، وكل شغل جديد للبراند لازم يلتزم بيها.", "ضيف القاعدة"]
-          : p.kind === "question" ? ["إجابتك هتتحفظ في «المعرفة»، والمخ هيرجع لها وهو بيكتب.", "احفظ الإجابة"]
-          : ["دي معلومة عن البراند، مش مهمة مطلوب منك تعملها. لو وافقت: هتتحفظ في «المعرفة»، والمخ هيقراها وهو بيكتب أي سكريبت أو فكرة جديدة. تقدر تعدّل الكلام قبل ما توافق.", "احفظها في المعرفة"];
+          : p.kind === "rule" ? ["إذا وافقت: ستُضاف للقواعد، وكل عمل جديد للعلامة يجب يلتزم بها.", "أضف القاعدة"]
+          : p.kind === "question" ? ["إجابتك ستُحفظ في «المعرفة»، والعقل سيعود لها وهو يكتب.", "احفظ الإجابة"]
+          : ["هذه معلومة عن العلامة، غير مهمة مطلوب منك تعملها. إذا وافقت: ستُحفظ في «المعرفة»، والعقل سيقرؤها وهو يكتب أي نص أو فكرة جديدة. يمكنك تعدّل النص قبل ما توافق.", "احفظها في المعرفة"];
         return top + (p.why ? `<p class="bm-note bm-why">${esc(p.why)}</p>` : "") + body + `<p class="bm-note bm-what">${what[0]}</p>`
-          + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${what[1]}</button><button class="bm-pill" data-no="${p.id}">لأ، مش محتاجها</button></div>`;
+          + `<div class="bm-acts"><button class="bm-go" data-ok="${p.id}">${what[1]}</button><button class="bm-pill" data-no="${p.id}">لا، لا تحتاجها</button></div>`;
       }
       // معلومة في «المعرفة»: حاجة المخ عرفها عن البراند وبيرجع لها وهو بيكتب (مش مهمة مطلوب منك تعملها)
       case "algo": return algoHTML(b, l);
       case "note": return head.replace(esc(l.t), "معلومة")
-        + `<p class="bm-note">دي معلومة المخ عرفها عن البراند${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الكويز" : ""}، وبيرجع لها وهو بيكتب السكريبتات والأفكار والكابشن. لو فيها حاجة غلط عدّلها هنا، وأي تعديل بيتحفظ لوحده.</p>`
+        + `<p class="bm-note">هذه معلومة العقل عرفها عن العلامة${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الكويز" : ""}، ويعود لها وهو يكتب النصوص والأفكار والتعليق النصي. إذا فيها شيء خطأ عدّلها هنا، وأي تعديل يُحفظ تلقائيًا.</p>`
         + `<div class="bm-sub"><small>العنوان</small>${editable(`note:t:${l.i}`, l.note.title, "العنوان")}</div>`
-        + `<div class="bm-sub"><small>الملخص (سطر واحد بيظهر لما تقف على النقطة)</small>${editable(`note:s:${l.i}`, l.note.summary || "", "سطر واحد")}</div>`
-        + `<div class="bm-sub"><small>التفاصيل (الكلام اللي المخ بيقراه)</small>${editable(`note:b:${l.i}`, l.note.body, "التفاصيل")}</div>`
-        + (l.note.quiz === "seasons_ai" ? `<p class="bm-note">المواسم دي المخ جابها لوحده من «السوق» و«الجمهور» في الهوية (الأعياد الرسمية والإسلامية ورمضان والمواسم المحلية)، وبتتجدد لوحدها لما تغيّرهم.</p>
-          <div class="bm-acts"><button class="bm-pill" data-seasons>🔄 هات المواسم من جديد</button></div>` : "")
-        + `<button class="bm-link bad" data-ndel="${l.i}">🗑 امسح المعلومة دي من العقل (لو غلط أو مش محتاجها)</button>`;
-      case "action": return head + `<p class="bm-note">البرنامج بيبص على اللوجو وصور البراند ويكتب الثيم والستايل وشكل اللوجو لوحده.</p>
-        <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "بيستنبط…" : "ابدأ الاستنباط"}</button>`;
+        + `<div class="bm-sub"><small>الملخص (سطر واحد يظهر عندما تقف على النقطة)</small>${editable(`note:s:${l.i}`, l.note.summary || "", "سطر واحد")}</div>`
+        + `<div class="bm-sub"><small>التفاصيل (النص الذي العقل يقرؤه)</small>${editable(`note:b:${l.i}`, l.note.body, "التفاصيل")}</div>`
+        + (l.note.quiz === "seasons_ai" ? `<p class="bm-note">هذه المواسم العقل جابها تلقائيًا من «السوق» و«الجمهور» في الهوية (الأعياد الرسمية والإسلامية ورمضان والمواسم المحلية)، وتتجدد تلقائيًا عندما تغيّرهم.</p>
+          <div class="bm-acts"><button class="bm-pill" data-seasons>🔄 اجلب المواسم من جديد</button></div>` : "")
+        + `<button class="bm-link bad" data-ndel="${l.i}">🗑 احذف هذه المعلومة من العقل (إذا خطأ أو لا تحتاجها)</button>`;
+      case "action": return head + `<p class="bm-note">البرنامج ينظر على الشعار وصور العلامة ويكتب الثيم والأسلوب وشكل الشعار تلقائيًا.</p>
+        <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "يستنبط…" : "ابدأ الاستنباط"}</button>`;
     }
     return head;
   }
@@ -760,12 +760,12 @@ const BrandPage = (() => {
     const ps = l.sugg || [], from = (p) => (p.source === "suggest" ? "" : srcName(p.source));
     return ps.map((p) => `<div class="bm-sugg"><small>💡 اقتراح البرنامج${from(p) ? ` (من «${esc(from(p))}»)` : ""}</small><p>${esc(p.value)}</p>${p.why ? `<p class="bm-note">${esc(p.why)}</p>` : ""}
         <div class="bm-acts"><button class="bm-go" data-sugok="${esc(p.id)}">استخدم الاقتراح</button><button class="bm-pill" data-no="${esc(p.id)}">تجاهل</button></div></div>`).join("")
-      + (SUGGEST[l.f] && !ps.length ? `<div class="bm-acts"><button class="bm-pill" data-suggest="${esc(l.f)}" ${S.suggBusy ? "disabled" : ""}>${S.suggBusy ? "⏳ بيفكّر…" : SUGGEST[l.f]}</button></div>` : "");
+      + (SUGGEST[l.f] && !ps.length ? `<div class="bm-acts"><button class="bm-pill" data-suggest="${esc(l.f)}" ${S.suggBusy ? "disabled" : ""}>${S.suggBusy ? "⏳ جارٍ التفكير…" : SUGGEST[l.f]}</button></div>` : "");
   }
   function openCard(n) {
     if (n?.kind === "plan") { window.RV_FOCUS = "plan-only"; return window.NHNav?.("plan"); }
-    if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم لوحده (مش صفحة جوه العقل)
-    if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; window.BL_TAB = n.l.page === "brainlib" ? String(n.l.i).split(":")[1] : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها بتفتح جوه العقل («رجوع» بيرجّعك هنا)
+    if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم تلقائيًا (غير صفحة داخل العقل)
+    if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; window.BL_TAB = n.l.page === "brainlib" ? String(n.l.i).split(":")[1] : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها تفتح داخل العقل («رجوع» يرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
     // رجوع: للكارت اللي كنت فيه قبل كده، ولو فتحت النقطة من الخريطة على طول فلفرعها
@@ -775,8 +775,8 @@ const BrandPage = (() => {
     if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; }
     S.open = { id: n.id, br: n.br?.k, n };
     const back = S.hist.length ? S.nodes.find((x) => x.id === S.hist[S.hist.length - 1]) : n.kind === "leaf" ? S.byId[n.br.k] : null;
-    card.innerHTML = `<button class="bm-x" data-close aria-label="اقفل">✕</button>`
-      + (back ? `<button class="bm-back" data-back="${esc(back.id)}">→ ${esc(back.kind === "branch" ? back.br.t : back.kind === "leaf" ? back.l.t : back.kind === "center" ? "البراندات" : "رجوع")}</button>` : "") + cardHTML(n);
+    card.innerHTML = `<button class="bm-x" data-close aria-label="أغلق">✕</button>`
+      + (back ? `<button class="bm-back" data-back="${esc(back.id)}">→ ${esc(back.kind === "branch" ? back.br.t : back.kind === "leaf" ? back.l.t : back.kind === "center" ? "العلامات" : "رجوع")}</button>` : "") + cardHTML(n);
     card.hidden = false;
     S.el.classList.add("has-card");
     markOpen();
@@ -816,8 +816,8 @@ const BrandPage = (() => {
     try {
       const b = await fn();
       S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
-      if (S.tqFor === b.id) S.tqFor = null;   // المهام بتتحسب تاني (ممكن تكون واحدة اتعملت)
-      if (S.plFor === b.id) S.plFor = null;   // وعدّاد خطة المحتوى (وممكن تتبني لوحدها)
+      if (S.tqFor === b.id) S.tqFor = null;   // المهام تُحسب مرة أخرى (يمكن تكون واحدة أُنشئت)
+      if (S.plFor === b.id) S.plFor = null;   // وعدّاد خطة المحتوى (ويمكن تُبنى تلقائيًا)
       const keep = S.open && S.el.querySelector(".bm-card").contains(document.activeElement) && document.activeElement.matches(".bm-write");
       layout();
       if (S.open) {
@@ -831,7 +831,7 @@ const BrandPage = (() => {
   }
   // مصدر جديد (ملف / لينك / كلام): بيتقرا في الخلفية والاقتراحات بتظهر لوحدها
   function addSource(form) {
-    toast("⏳ بيقرا… الاقتراحات هتظهر على الخريطة");
+    toast("⏳ جارٍ القراءة… الاقتراحات ستظهر على الخريطة");
     return save(() => bAPI("/sources", { method: "POST", body: form }));
   }
   const busy = (b) => b?.status === "working" || (b?.sources || []).some((s) => s.status === "working");
@@ -851,7 +851,7 @@ const BrandPage = (() => {
   // ✅ أي تعديل في العقل بيطلع فوقه رسالة صغيرة إنه اتحفظ (ومن إيه لإيه لو الكلام قصير)، وبتختفي لوحدها
   function fieldLabel(k) {
     if (k === "rules") return "القواعد";
-    if (k === "styles" || k === "style") return "الستايل";
+    if (k === "styles" || k === "style") return "الأسلوب";
     for (const br of branches(cur())) for (const l of br.leaves) {
       if (l.f === k) return l.t;
       const m = (l.fields || []).find(([f]) => f === k);
@@ -862,20 +862,20 @@ const BrandPage = (() => {
   const shortV = (k, v, b) => { if (k === "styles") return styleIds({ ...b, styles: v }).map((id) => allStyles(b).find((c) => c.id === id)?.ar).filter(Boolean).join("، ");
     const l = branches(b).flatMap((br) => br.leaves).find((x) => x.f === k && x.type === "pick"); return l ? l.opts.find(([o]) => o === String(v))?.[1] || "" : String(v ?? "").trim(); };
   function savedMsg(fields, name, before) {
-    if (name != null) return `✅ اسم البراند اتحدّث لـ «${name}»`;
+    if (name != null) return `✅ اسم العلامة حُدّث لـ «${name}»`;
     const ks = Object.keys(fields || {});
     if (!ks.length) return "";
-    if (ks.length > 1) return `✅ اتحفظ: ${ks.map(fieldLabel).join("، ")}`;
+    if (ks.length > 1) return `✅ حُفظ: ${ks.map(fieldLabel).join("، ")}`;
     const k = ks[0], t = fieldLabel(k);
-    if (k === "rules") return "✅ القواعد اتحدّثت";
+    if (k === "rules") return "✅ القواعد حُدّثت";
     const a = shortV(k, before?.[k], before), z = shortV(k, fields[k], before);
-    if (!z) return `✅ «${t}» اتمسح`;
-    if (a && a.length <= 40 && z.length <= 40) return `✅ «${t}» اتحدّث من «${a}» لـ «${z}»`;
-    return `✅ «${t}» اتحدّث`;
+    if (!z) return `✅ «${t}» حُذف`;
+    if (a && a.length <= 40 && z.length <= 40) return `✅ «${t}» حُدّث من «${a}» لـ «${z}»`;
+    return `✅ «${t}» حُدّث`;
   }
   function savedPill(msg) {
     if (!msg || !S.el) return;
-    let el = document.querySelector("body > .bm-saved");   // على الـ body علشان مايتغطاش تحت عنوان الصفحة
+    let el = document.querySelector("body > .bm-saved");   // على الـ body لكي لا يُغطّى أسفل عنوان الصفحة
     if (!el) { el = document.createElement("div"); el.className = "bm-saved"; el.setAttribute("role", "status"); document.body.appendChild(el); }
     el.textContent = msg;
     el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
@@ -904,7 +904,7 @@ const BrandPage = (() => {
       const [, part, id] = k.split(":"), n = (b.notes || []).find((x) => x.id === id);
       const key = { t: "title", s: "summary", b: "body" }[part];
       if (!n || (n[key] || "") === v || (part === "t" && !v)) return;
-      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody({ [key]: v }) }), { card: false }).then((ok) => ok && savedPill(`✅ «${n.title || "المعلومة"}» اتحدّثت`));
+      return save(() => bAPI(`/notes/${id}`, { method: "PATCH", ...jsonBody({ [key]: v }) }), { card: false }).then((ok) => ok && savedPill(`✅ «${n.title || "المعلومة"}» حُدّثت`));
     }
     if (k.startsWith("rule:")) {
       const rs = rulesOf(b), i = +k.slice(5);
@@ -918,11 +918,11 @@ const BrandPage = (() => {
   }
   const upload = (kind, files) => {
     const imgs = [...files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
-    if (!imgs.length) return toast("مفيش صور (PNG / JPG / WEBP)", true);
+    if (!imgs.length) return toast("لا يوجد صور (PNG / JPG / WEBP)", true);
     const form = new FormData();
     form.append("kind", kind);
     imgs.slice(0, 120).forEach((f) => form.append("files", f));
-    toast(`⏳ بيرفع ${imgs.length} صورة…`);
+    toast(`⏳ جارٍ الرفع ${imgs.length} صورة…`);
     return save(() => bAPI("/assets", { method: "POST", body: form }));
   };
 
@@ -1043,22 +1043,22 @@ const BrandPage = (() => {
       if (trb) {
         const now = !!trb.dataset.trnow, id = trb.dataset.trnow || trb.dataset.trsave;
         try { S.tr = await bAPI(`/trends/${id}/save`, { method: "POST", ...jsonBody({ now }) }); redrawNode("trends"); } catch (err) { return toast(err.message, true); }
-        if (!now) { toast("🔖 اتحفظ. هيظهرلك وانت بتختار الفكرة في أي قالب"); return refreshCard(); }
-        toast("✨ اختار القالب، والفكرة هتتبني على الترند ده");
+        if (!now) { toast("🔖 حُفظ. سيظهرلك وأنت تختار الفكرة في أي قالب"); return refreshCard(); }
+        toast("✨ اختر القالب، والفكرة ستُبنى على هذا الترند");
         openCard(null);
         return window.NHNav?.("create");
       }
       const trd = t.closest("[data-trdel]");
-      if (trd) { if (!(await uiConfirm("تمسح الترند ده من القايمة؟"))) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
+      if (trd) { if (!(await uiConfirm("تحذف هذا الترند من القائمة؟"))) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
       if (t.closest("[data-trref]")) { try { S.tr = await bAPI("/trends/refresh", { method: "POST" }); redrawNode("trends"); refreshCard(); S.trFor = null; loadTrends(cur()); } catch (err) { toast(err.message, true); } return; }
       const aro = t.closest("[data-aron]");
       if (aro) { const [fid, i] = aro.dataset.aron.split(":"), rows = arRows(fid); rows[+i].on = aro.checked; return algoSave(fid, rows); }
       const ard = t.closest("[data-ardel]");
-      if (ard) { if (!(await uiConfirm("تمسح القاعدة دي؟ (تقدر ترجّعها بـ «رجّع الأصل»)"))) return; const [fid, i] = ard.dataset.ardel.split(":"), rows = arRows(fid); rows.splice(+i, 1); return algoSave(fid, rows); }
+      if (ard) { if (!(await uiConfirm("تحذف هذه القاعدة؟ (يمكنك ترجّعها بـ «استعد الأصل»)"))) return; const [fid, i] = ard.dataset.ardel.split(":"), rows = arRows(fid); rows.splice(+i, 1); return algoSave(fid, rows); }
       const ara = t.closest("[data-aradd]");
       if (ara) { const v = (await uiPrompt("القاعدة الجديدة:")); if (!v?.trim()) return; const rows = arRows(ara.dataset.aradd); rows.push({ t: v.trim(), on: true }); return algoSave(ara.dataset.aradd, rows); }
       const arr = t.closest("[data-arreset]");
-      if (arr) { if (!(await uiConfirm(arr.dataset.arreset === "all" ? "ترجّع كل قواعد الخوارزميات للأصل؟ أي تعديل عملته هيتمسح." : "ترجّع القواعد دي للأصل؟"))) return; return algoSave(arr.dataset.arreset, null, true); }
+      if (arr) { if (!(await uiConfirm(arr.dataset.arreset === "all" ? "تعود كل قواعد الخوارزميات للأصل؟ أي تعديل عملته سيُحذف." : "تعود هذه القواعد للأصل؟"))) return; return algoSave(arr.dataset.arreset, null, true); }
       const qt = t.closest("[data-qtab]");
       if (qt) { S.qtab = qt.dataset.qtab; if (S.qtab === "t") { const b = cur(); if (b) { S.tqFor = null; loadTasks(b); } } return refreshCard(); }
       const tg = t.closest("[data-tgo]");
@@ -1067,7 +1067,7 @@ const BrandPage = (() => {
         if (go.page) { S.tqFor = null; window.BL_TAB = go.tab || null; return window.NHNav?.(go.page); }
         const ln = S.nodes.find((x) => x.id === go.leaf);
         S.tqFor = null;
-        return ln ? openCard(ln) : toast("مش لاقي النقطة دي في الخريطة", true);
+        return ln ? openCard(ln) : toast("غير لاقي هذه النقطة في الخريطة", true);
       }
       if (t.closest("[data-qskip]")) { S.qi += 1; return refreshCard(); }
       if (t.closest("[data-qprev]")) return quizStep(-1);
@@ -1078,7 +1078,7 @@ const BrandPage = (() => {
       const td = t.closest("[data-tdone]");
       if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
       const tdl = t.closest("[data-tdel]");
-      if (tdl) { if ((await uiConfirm("تشيل النقطة دي؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
+      if (tdl) { if ((await uiConfirm("تزيل هذه النقطة؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
       if (t.closest("[data-socialgo]")) { S.addTab = "social"; const a = S.nodes.find((x) => x.id === "add"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
       const itg = t.closest("[data-itgt]");
       if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
@@ -1119,23 +1119,23 @@ const BrandPage = (() => {
       const no = t.closest("[data-no]");
       if (no) { if (!no.closest(".bm-sugg")) openCard(null); return save(() => bAPI(`/pending/${no.dataset.no}`, { method: "DELETE" })); }
       const sdel = t.closest("[data-sdel]");
-      if (sdel) { if ((await uiConfirm("تشيل المصدر ده واقتراحاته اللي لسه مستنية؟"))) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
+      if (sdel) { if ((await uiConfirm("تزيل هذا المصدر واقتراحاته الذي ما زال تنتظر؟"))) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-seasons]")) {
-        try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ المخ بيجيب المواسم… هتتحدّث هنا بعد شوية"); } catch (err) { return toast(err.message, true); }
+        try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ العقل يجلب المواسم… ستُحدّث هنا بعد قليلًا"); } catch (err) { return toast(err.message, true); }
         const id = S.id; setTimeout(() => { if (S.id === id) save(() => bAPI("")); }, 15000);
         return;
       }
       const ndel = t.closest("[data-ndel]");
-      if (ndel) { if ((await uiConfirm("تمسح المعلومة دي؟ المخ مش هيعرفها تاني ومش هيستخدمها في أي كتابة جديدة. (اللي اتعمل قبل كده مش هيتغير)"))) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
+      if (ndel) { if ((await uiConfirm("تحذف هذه المعلومة؟ العقل لن يعرفها مرة أخرى ولن يستخدمها في أي كتابة جديدة. (ما أُنشئ من قبل لن يتغير)"))) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
       const von = t.closest("[data-von]");
       if (von) return patch({ [`${von.dataset.von}_on`]: von.dataset.v });
       const vdel = t.closest("[data-vdel]");
-      if (vdel) { if ((await uiConfirm("تشيل الفيديو ده؟"))) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
+      if (vdel) { if ((await uiConfirm("تزيل هذا الفيديو؟"))) save(() => bAPI(`/brand-video/${vdel.dataset.vdel}`, { method: "DELETE" })); return; }
       const audRows = () => [...S.el.querySelectorAll(".bm-aud")].map((r) => Object.fromEntries([...r.querySelectorAll("[data-audk]")].map((x) => [x.dataset.audk, x.value.trim()])));
-      if (t.closest("[data-audx]")) { toast("⏳ العقل بيستخلص الجماهير…"); return save(() => bAPI("/audiences/extract", { method: "POST" })); }
-      if (t.closest("[data-audsave]")) return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: audRows().filter((a) => a.name) }) })).then((ok) => ok && toast("✓ اتحفظت الجماهير"));
+      if (t.closest("[data-audx]")) { toast("⏳ العقل يستخلص الجماهير…"); return save(() => bAPI("/audiences/extract", { method: "POST" })); }
+      if (t.closest("[data-audsave]")) return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: audRows().filter((a) => a.name) }) })).then((ok) => ok && toast("✓ حُفظت الجماهير"));
       if (t.closest("[data-audadd]")) { const rows = audRows(); rows.push({ name: "جمهور جديد", who: "", pain: "", want: "", share: "" }); return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: rows }) })); }
       const audd = t.closest("[data-auddel]");
       if (audd) { const rows = audRows(); rows.splice(+audd.dataset.auddel, 1); return save(() => bAPI("/audiences", { method: "PUT", ...jsonBody({ items: rows }) })); }
@@ -1145,7 +1145,7 @@ const BrandPage = (() => {
       if (hdel) return patch({ palette: String(cur()?.palette || "").replace(new RegExp(`${hdel.dataset.hdel}[^,\\n]*[,\\n]?\\s*`, "i"), "").trim() });
       if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
       const fig = t.closest("[data-file]");
-      if (fig && t.closest("[data-adel]")) { if ((await uiConfirm("تحذف الصورة دي؟"))) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
+      if (fig && t.closest("[data-adel]")) { if ((await uiConfirm("تحذف هذه الصورة؟"))) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
       // دوسة في الفاضي بتقفل الكارت
       if (!t.closest(".bm-card")) openCard(null);
     });
@@ -1206,7 +1206,7 @@ const BrandPage = (() => {
         const form = new FormData();
         form.append("kind", el.dataset.vup);
         form.append("file", f);
-        toast("⏳ بيرفع الفيديو…");
+        toast("⏳ جارٍ الرفع الفيديو…");
         return save(() => bAPI("/brand-video", { method: "POST", body: form }));
       }
     });
@@ -1278,10 +1278,10 @@ const BrainRate = (() => {
   function html({ kind = "", what = "", ref = "", text = "", compact = false }) {
     const v = ref ? seen()[ref] : "";
     return `<div class="br-rate${compact ? " compact" : ""}" data-kind="${escapeHtml(kind)}" data-what="${escapeHtml(what)}" data-ref="${escapeHtml(ref)}" data-text="${escapeHtml(text)}">
-      ${compact ? "" : `<span class="br-q">النتيجة دي؟</span>`}
+      ${compact ? "" : `<span class="br-q">هذه النتيجة؟</span>`}
       <button type="button" data-rv="great" class="${v === "great" ? "on" : ""}" title="ممتاز (يتعلم منها)">★${compact ? "" : " ممتاز"}</button>
-      <button type="button" data-rv="bad" class="${v === "bad" ? "on" : ""}" title="مش عاجبني (قول ليه)">${thumb}${compact ? "" : " مش عاجبني"}</button>
-      <div class="br-why" hidden><div class="br-write" contenteditable="plaintext-only" data-ph="إيه اللي مش عاجبك؟ مثلًا: الجمل طويلة"></div><button type="button" data-rsend>ابعت</button></div>
+      <button type="button" data-rv="bad" class="${v === "bad" ? "on" : ""}" title="غير يعجبني (قل له)">${thumb}${compact ? "" : " غير يعجبني"}</button>
+      <div class="br-why" hidden><div class="br-write" contenteditable="plaintext-only" data-ph="ماذا الذي لم يعجبك؟ مثلًا: الجمل طويلة"></div><button type="button" data-rsend>أرسل</button></div>
     </div>`;
   }
   async function send(box, rating, note = "") {
@@ -1290,7 +1290,7 @@ const BrainRate = (() => {
       if (box.dataset.ref) mark(box.dataset.ref, rating);
       box.querySelectorAll("[data-rv]").forEach((b) => b.classList.toggle("on", b.dataset.rv === rating));
       box.querySelector(".br-why").hidden = true;
-      toast(r.suggested ? "✓ اتسجّل، وفيه اقتراح جديد مستنيك في عقل البراند" : "✓ اتسجّل. العقل بيتعلم من تقييماتك");
+      toast(r.suggested ? "✓ سُجّل، وفيه اقتراح جديد مستنيك في عقل العلامة" : "✓ سُجّل. العقل يتعلم من تقييماتك");
     } catch (err) { toast(err.message, true); }
   }
   // بيشتغل قبل أي دوسة تانية على الكارت (عشان التقييم ميختارش الفيديو مثلًا)

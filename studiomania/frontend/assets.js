@@ -6,7 +6,7 @@ async function labLibCount() {
   try {
     asx.list = await api("/api/assets");
     $("labLibCount").textContent = asx.list.length ? `(${asx.list.length})` : "";
-  } catch { /* مش مهم */ }
+  } catch { /* غير مهم */ }
 }
 
 async function openLib(aid) {
@@ -34,7 +34,7 @@ function scheduleAssetPoll() {
       const playing = [...$("labLib").querySelectorAll("video")].some((v) => !v.paused);
       const typing = $("labLib").contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
       if (!playing && !typing) renderLib();
-    } catch { /* السيرفر بيعيد التشغيل */ }
+    } catch { /* الخادم يعيد التشغيل */ }
     scheduleAssetPoll();
   }, 2500);
 }
@@ -49,9 +49,9 @@ function assetGrid() {
     && (!q || [a.name, a.summary, ...(a.tags || [])].join(" ").toLowerCase().includes(q)));
   const counts = asx.list.reduce((m, a) => ((m[a.category] = (m[a.category] || 0) + 1), m), {});
   return `<div class="car-head"><h2>📚 مكتبة الأصول <span class="muted">(${asx.list.length})</span></h2>
-      ${asx.list.length ? `<button type="button" class="btn sm danger" data-asclear>🗑️ امسح المكتبة كلها</button>` : ""}</div>
+      ${asx.list.length ? `<button type="button" class="btn sm danger" data-asclear>🗑️ احذف المكتبة كلها</button>` : ""}</div>
     <div class="row wrap as-filter">
-      <input type="search" data-asq placeholder="🔎 دوّر بالاسم أو التاجز" value="${le(asx.q)}" data-no-i18n>
+      <input type="search" data-asq placeholder="🔎 ابحث بالاسم أو التاجز" value="${le(asx.q)}" data-no-i18n>
       <div class="lab-chips"><button type="button" class="chip ${asx.cat ? "" : "on"}" data-ascat="">الكل</button>
         ${Object.entries(ASSET_CATS).filter(([k]) => counts[k]).map(([k, l]) => `<button type="button" class="chip ${asx.cat === k ? "on" : ""}" data-ascat="${k}">${l} <small>${counts[k]}</small></button>`).join("")}</div>
     </div>
@@ -61,7 +61,7 @@ function assetGrid() {
       <small class="muted">${ASSET_CATS[a.category] || ""} · ${a.duration} ث · ${a.elements} عنصر${a.variants ? ` · ${a.variants} نسخة` : ""}</small>
       ${(a.tags || []).length ? `<small class="as-tags" data-no-i18n>${a.tags.map((t) => `#${le(t)}`).join(" ")}</small>` : ""}
     </article>`).join("")}</div>`
-    : `<p class="panel muted">${asx.list.length ? "مفيش أصول بالبحث ده." : "المكتبة لسه فاضية. افتح أي فيديو في المعمل، وفي أي لقطة دوس «📚 احفظ كأصل في المكتبة»."}</p>`}`;
+    : `<p class="panel muted">${asx.list.length ? "لا يوجد أصول هذا بالبحث." : "المكتبة ما زال فارغة. افتح أي فيديو في المعمل، وفي أي لقطة اضغط «📚 احفظ كأصل في المكتبة»."}</p>`}`;
 }
 
 
@@ -76,8 +76,8 @@ function assetDetail(a) {
       <video data-asmain src="${a.url}" poster="${a.thumb_url}" controls playsinline preload="metadata"></video>
       <div class="as-meta">
         <label>النوع <select data-asf="category">${labOpts(ASSET_CATS, a.category)}</select></label>
-        <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، فولدر" data-no-i18n></label>
-        <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="هتستخدمه في إيه؟ إيه اللي حلو فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
+        <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، مجلد" data-no-i18n></label>
+        <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="ستستخدمه في ماذا؟ ماذا الذي جميل فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
         <small class="muted">${a.duration} ث · ${a.width}×${a.height} · ${src.motion ? "من 🎞️ مكتبة الموشن" : `من
           <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})`}</small>
         ${a.description || a.summary ? `<p data-no-i18n>${le(a.description || a.summary)}</p>` : ""}
@@ -85,7 +85,7 @@ function assetDetail(a) {
       </div>
     </div>
     ${a.connector ? assetConnector(a) + assetTrials(a) : ""}
-    <section class="panel lab-sec"><h4>🧩 اللي جواه</h4>
+    <section class="panel lab-sec"><h4>🧩 ما جواه</h4>
       ${a.background?.name ? `<div class="lab-row"><b>🖼️ الخلفية:</b> <span data-no-i18n>${le(a.background.name)}</span> <small class="muted" data-no-i18n>${le(a.background.description)}</small></div>` : ""}
       ${(a.elements || []).map((e) => `<div class="lab-el">
         <div class="lab-row"><span>${LAB_TYPES[e.type] || ""}</span> <b data-no-i18n>${le(e.name)}</b>
@@ -93,41 +93,41 @@ function assetDetail(a) {
           <span class="lab-time">${lt(e.first_t)} ← ${lt(e.last_t)}</span></div>
         ${(e.actions || []).map((x) => `<div class="lab-row lab-act"><button type="button" class="btn sm" data-asplay="${x.t0}" data-to="${x.t1}">▶️</button>
           <span class="lab-time">${lt(x.t0)}–${lt(x.t1)}</span> ${LAB_ACTIONS[x.action] || le(x.action)} <small class="grow" data-no-i18n>${le(x.detail)}</small></div>`).join("")}
-      </div>`).join("") || `<p class="muted">مفيش عناصر متفككة في المقطع ده.</p>`}
+      </div>`).join("") || `<p class="muted">لا يوجد عناصر متفككة في هذا المقطع.</p>`}
       ${(a.sfx || []).length ? `<div class="lab-chips">${a.sfx.map((x) => `<button type="button" class="chip" data-asplay="${x.t}" data-to="${x.t + 0.4}">🔊 ${le(x.label || x.category)} <small>${lt(x.t)}</small></button>`).join("")}</div>` : ""}
     </section>
     <section class="panel lab-sec"><div class="lab-vedit" data-asedit>
-      <b>✏️ اطلع منه نسخة</b> <small class="muted">المشهد بيفضل بحركته وخلفيته، واللي بتطلبه بس هو اللي بيتغيّر</small>
-      ${(a.controls || []).length ? `<div class="as-ctls"><b>🎛️ مفاتيح التحكم</b> <small class="muted">غيّر اللي إنت عايزه بس وسيب الباقي</small>
+      <b>✏️ اطلع منه نسخة</b> <small class="muted">المشهد يظل بحركته وخلفيته، واللي تطلبه فقط هو ما يتغيّر</small>
+      ${(a.controls || []).length ? `<div class="as-ctls"><b>🎛️ مفاتيح التحكم</b> <small class="muted">غيّر ما أنت تريده فقط واترك الباقي</small>
         ${a.controls.map((k) => `<label class="as-ctl" title="${le(k.target)}"><span data-no-i18n>${le(k.label)}</span>
           ${k.type === "color" ? `<input type="color" value="${/^#[0-9a-f]{6}$/i.test(k.value) ? k.value : "#000000"}" data-ctl="${k.key}">`
             : k.type === "choice" ? `<select data-ctl="${k.key}">${(k.options || []).map((o) => `<option ${o === k.value ? "selected" : ""} data-no-i18n>${le(o)}</option>`).join("")}</select>`
             : `<input type="${k.type === "number" ? "number" : "text"}" value="${le(k.value)}" data-ctl="${k.key}" data-no-i18n>`}</label>`).join("")}
       </div>` : ""}
       ${(a.elements || []).length ? `<div class="lab-chips">${a.elements.map((e) => `<button type="button" class="chip" data-vchip="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)}</button>`).join("")}</div>` : ""}
-      <textarea rows="2" data-vtext placeholder="${(a.controls || []).length ? "وأي حاجة تانية عايز تغيّرها بالكلام (اختياري)" : "مثلًا: «مؤشر الماوس» خليه بلون البراند، والفولدر اسمه «عملاء»"}"></textarea>
+      <textarea rows="2" data-vtext placeholder="${(a.controls || []).length ? "وأي شيء أخرى تريد تغيّرها بالكلام (اختياري)" : "مثلًا: «مؤشر الماوس» اجعله بلون العلامة، والمجلد اسمه «عملاء»"}"></textarea>
       <div class="row wrap">
         <select data-vmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${(m.per_sec * dur).toFixed(2)}$</option>`).join("")}</select>
         ${done.length ? `<select data-vbase><option value="">على الأصل</option>${done.map((v) => `<option value="${v.id}">على النسخة ${vs.indexOf(v) + 1}</option>`).join("")}</select>` : ""}
         <button type="button" class="btn sm primary" data-vgo>✨ عدّل</button>
       </div>
-      <details class="lab-speed"><summary>⏩ سرّع / بطّأ جزء (ببلاش، من غير AI)</summary>
+      <details class="lab-speed"><summary>⏩ سرّع / بطّأ جزء (مجانًا، بدون AI)</summary>
         <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${dur}" value="0" data-sp="t0"></label>
           <label>لـ <input type="number" step="0.05" min="0" max="${dur}" value="${dur}" data-sp="t1"></label>
           <label>السرعة <input type="number" step="0.1" min="0.2" max="5" value="1.5" data-sp="factor">×</label>
           <button type="button" class="btn sm" data-vspeed>⏩ طبّق</button></div></details>
       ${vs.length ? `<div class="lab-vgrid">${vs.map((v, i) => `<div class="lab-ver">
         ${v.status === "done" ? `<video data-asvar="${v.id}" src="${v.url}" playsinline controls preload="metadata"></video>`
-          : v.status === "working" ? `<div class="lab-ver-wait"><span class="spin"></span><small>${le(v.step || "شغال...")}</small></div>`
+          : v.status === "working" ? `<div class="lab-ver-wait"><span class="spin"></span><small>${le(v.step || "يعمل...")}</small></div>`
           : `<div class="lab-ver-wait err">✕ ${le(v.error)}</div>`}
         <small data-no-i18n><b>${i + 1}.</b> ${le(v.instruction)}${v.base ? ` <span class="muted">(على نسخة ${vs.findIndex((x) => x.id === v.base) + 1})</span>` : ""}</small>
-        ${v.prompt ? `<details><summary class="muted">التعليمات اللي اتبعتت للموديل</summary><small dir="ltr" data-no-i18n>${le(v.prompt)}</small></details>` : ""}
+        ${v.prompt ? `<details><summary class="muted">التعليمات التي أُرسلت للنموذج</summary><small dir="ltr" data-no-i18n>${le(v.prompt)}</small></details>` : ""}
         <div class="row wrap">${v.status === "done" ? `<button type="button" class="btn sm" data-ascmp="${v.id}">▶️ مع الأصل</button>
             <a class="btn sm" href="${v.url}" download>⬇️</a>` : ""}
           <button type="button" class="btn sm danger" data-asvdel="${v.id}">🗑️</button>
           ${v.status === "done" ? `<span class="lab-rv" data-asrv="${v.id}">
-            <button type="button" class="${v.review?.ok === true ? "on ok" : ""}" data-asok="1" title="حلوة">✅</button>
-            <button type="button" class="${v.review?.ok === false ? "on bad" : ""}" data-asok="0" title="وحشة">❌</button>
+            <button type="button" class="${v.review?.ok === true ? "on ok" : ""}" data-asok="1" title="جميلة">✅</button>
+            <button type="button" class="${v.review?.ok === false ? "on bad" : ""}" data-asok="0" title="سيئة">❌</button>
             <input type="text" class="lab-note" value="${le(v.review?.note)}" placeholder="ملاحظة" data-asnote></span>` : ""}</div>
       </div>`).join("")}</div>` : ""}
     </div></section>`;
@@ -136,47 +136,47 @@ function assetDetail(a) {
 // 🔗 وصفة الكونيكتور: الشرارة واللي بيفضل ثابت والتحوّلات والكاميرا والإيقاع، والفريمات المفتاحية
 function assetConnector(a) {
   const c = a.connector || {}, t0 = a.source?.t0 || 0;
-  return `<section class="panel lab-sec as-conn"><h4>🔗 وصفة الكونيكتور</h4>
+  return `<section class="panel lab-sec as-conn"><h4>🔗 وصفة الموصل</h4>
     ${(a.keyframes || []).length ? `<div class="lab-conn-keys">${a.keyframes.map((k) => `<figure><img src="${k.url}" alt="" data-asplay="${k.t}" data-to="${k.t + 0.6}"><figcaption>${k.label} · ${lt(k.t)}</figcaption></figure>`).join("")}</div>` : ""}
     ${c.from_scene || c.to_scene ? `<div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>` : ""}
     <dl class="lab-conn-dl">
       ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
-      ${(c.anchors || []).length ? `<dt>📌 بيفضل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
+      ${(c.anchors || []).length ? `<dt>📌 يظل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
       ${(c.transforms || []).length ? `<dt>🔄 التحوّلات</dt><dd><ol class="lab-conn-tr">${c.transforms.map((x) => `<li><button type="button" class="btn sm" data-asplay="${Math.max(0, x.t0 - t0)}" data-to="${Math.max(0, x.t1 - t0)}">▶️</button>
         <span data-no-i18n><b>${le(x.from)}</b> ← ${le(x.to)}${x.how ? ` <small class="muted">(${le(x.how)})</small>` : ""}</span></li>`).join("")}</ol></dd>` : ""}
       ${c.camera ? `<dt>🎥 الكاميرا</dt><dd data-no-i18n>${le(c.camera)}</dd>` : ""}
       ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
       ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
-      ${c.story_role ? `<dt>📖 بيخدم القصة إزاي</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
+      ${c.story_role ? `<dt>📖 يخدم القصة كيف</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
     </dl>
     ${(c.recipe || []).length ? `<h4>🧪 الوصفة</h4><ol class="as-recipe" data-no-i18n>${c.recipe.map((x) => `<li>${le(x)}</li>`).join("")}</ol>` : ""}
   </section>`;
 }
 
 // 🧪 جرّب الكونيكتور: بين نفس النقطتين في الفيديو الأصلي (إعادة بناء) أو بين لقطتين تانيين (نقل)
-const TRIAL_ST = { planning: "🧠 بيكتب الخطة", planned: "📝 الخطة جاهزة", working: "🎬 بيولّد", done: "✅ خلص", failed: "✕ فشل" };
+const TRIAL_ST = { planning: "🧠 يكتب الخطة", planned: "📝 الخطة جاهزة", working: "🎬 يولّد", done: "✅ خلص", failed: "✕ فشل" };
 function trialSidePick(side) {
   const sel = asx.tsel[side] || {}, labs = asx.labs || [];
   const shots = (asx.shots[sel.lab] || []).filter((x) => !x.ignored || true);
-  return `<div class="as-tside"><b>${side === "a" ? "اللقطة A (هنبدأ من آخرها)" : "اللقطة B (هنوصل لأولها)"}</b>
-    <select data-tlab="${side}"><option value="">اختار فيديو من المعمل</option>${labs.map((l) => `<option value="${l.id}" ${l.id === sel.lab ? "selected" : ""} data-no-i18n>${le(l.name)}</option>`).join("")}</select>
-    ${sel.lab ? `<select data-tshot="${side}"><option value="">اختار اللقطة</option>${shots.map((x) => `<option value="${x.n}" ${String(x.n) === String(sel.n) ? "selected" : ""} data-no-i18n>لقطة ${x.n} (${lt(x.start)}–${lt(x.end)}) ${le((x.analysis?.summary || "").slice(0, 50))}</option>`).join("")}</select>` : ""}
+  return `<div class="as-tside"><b>${side === "a" ? "اللقطة A (سنبدأ من آخرها)" : "اللقطة B (سنوصل لأولها)"}</b>
+    <select data-tlab="${side}"><option value="">اختر فيديو من المعمل</option>${labs.map((l) => `<option value="${l.id}" ${l.id === sel.lab ? "selected" : ""} data-no-i18n>${le(l.name)}</option>`).join("")}</select>
+    ${sel.lab ? `<select data-tshot="${side}"><option value="">اختر اللقطة</option>${shots.map((x) => `<option value="${x.n}" ${String(x.n) === String(sel.n) ? "selected" : ""} data-no-i18n>لقطة ${x.n} (${lt(x.start)}–${lt(x.end)}) ${le((x.analysis?.summary || "").slice(0, 50))}</option>`).join("")}</select>` : ""}
     ${sel.lab && sel.n ? (() => { const x = shots.find((y) => String(y.n) === String(sel.n)); const fr = x?.frames || []; const f = side === "a" ? fr[fr.length - 1] : fr[0];
       return f ? `<img src="${f.url}" alt="" class="as-tthumb">` : ""; })() : ""}
   </div>`;
 }
 function assetTrials(a) {
   const models = a.trial_models || [];
-  return `<section class="panel lab-sec as-trials" data-trials><h4>🧪 جرّب الكونيكتور ده</h4>
-    <p class="hint">البرنامج بيكتب خطة على مقاس اللقطتين (ببلاش تقريبًا)، تراجعها وتعدّلها، وبعدين يولّد: صور مفتاحية للمراحل، وحركة بين كل صورتين بموديل فيديو بياخد صورة بداية وصورة نهاية، ويجمّع آخر A ← الكونيكتور ← أول B.</p>
+  return `<section class="panel lab-sec as-trials" data-trials><h4>🧪 جرّب هذا الموصل</h4>
+    <p class="hint">البرنامج يكتب خطة على مقاس اللقطتين (مجانًا تقريبًا)، تراجعها وتعدّلها، ثم يولّد: صور مفتاحية للمراحل، وحركة بين كل صورتين بموديل فيديو يأخذ صورة بداية وصورة نهاية، ويجمّع آخر A ← الموصل ← أول B.</p>
     <div class="row wrap as-tmode">
       <label class="check"><input type="radio" name="tmode" value="rebuild" data-tmode ${asx.tmode === "rebuild" ? "checked" : ""}> 🔁 إعادة بناء (نفس المكان في الفيديو الأصلي: نقارن بالأصلي)</label>
-      <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين تانيين)</label>
+      <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين آخرين)</label>
     </div>
     ${asx.tmode === "transfer" ? `<div class="as-tsides">${trialSidePick("a")}<span class="as-tarrow">⟵ 🔗 ⟵</span>${trialSidePick("b")}</div>` : ""}
     <div class="row wrap"><select data-tmodel>${vmOptions(models, models[0]?.key, 10)}</select>
       <select data-tres><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select>
-      <button type="button" class="btn sm primary" data-tnew>🧠 اعمل الخطة</button></div>
+      <button type="button" class="btn sm primary" data-tnew>🧠 أنشئ الخطة</button></div>
     ${(a.trials || []).map((t) => trialCard(a, t)).join("")}
   </section>`;
 }
@@ -190,25 +190,25 @@ function trialCard(a, t) {
       <button type="button" class="btn sm danger" data-tdel>🗑️</button></header>
     <div class="as-tchain">${imgs.map((u, i) => u ? `<figure><img src="${u}" alt=""><figcaption>${i === 0 ? "A" : i === imgs.length - 1 ? "B" : `مرحلة ${i}`}</figcaption></figure>` : "").join(`<span>←</span>`)}</div>
     ${t.status === "done" ? `<div class="as-tvids">
-        <figure><figcaption>🧪 التجربة (آخر A ← الكونيكتور ← أول B)</figcaption><video data-tvid="gen" src="${t.final_url}" playsinline controls preload="metadata"></video></figure>
-        <figure><figcaption>🎯 الكونيكتور الأصلي</figcaption><video data-tvid="ref" src="${a.url}" playsinline controls preload="metadata" muted></video></figure></div>
+        <figure><figcaption>🧪 التجربة (آخر A ← الموصل ← أول B)</figcaption><video data-tvid="gen" src="${t.final_url}" playsinline controls preload="metadata"></video></figure>
+        <figure><figcaption>🎯 الموصل الأصلي</figcaption><video data-tvid="ref" src="${a.url}" playsinline controls preload="metadata" muted></video></figure></div>
       <div class="row wrap"><button type="button" class="btn sm" data-tboth>▶️ شغّل الاتنين مع بعض</button>
-        <a class="btn sm" href="${t.conn_url}" download>⬇️ الكونيكتور لوحده</a>
+        <a class="btn sm" href="${t.conn_url}" download>⬇️ الموصل تلقائيًا</a>
         <span class="lab-rv" data-trv><button type="button" class="${t.review?.ok === true ? "on ok" : ""}" data-tok="1">✅</button><button type="button" class="${t.review?.ok === false ? "on bad" : ""}" data-tok="0">❌</button>
-          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="إيه اللي حلو أو وحش؟ (مهم للتجارب الجاية)" data-tnote></span></div>
-      <div class="fm-redo"><b>مش عاجبك؟</b>
-        <input type="text" data-tredonote placeholder="قول إيه اللي مش عاجبك (مثلًا: الحركة سريعة، عايز الزووم أوضح) أو سيبها فاضية لمحاولة جديدة بنفس الخطة" data-no-i18n>
-        <button type="button" class="btn sm primary" data-tredo>↻ ولّد تاني (~${t.cost}$)</button>
-        ${(t.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك اللي فاتت: ${t.notes.map(le).join(" · ")}</small>` : ""}</div>` : ""}
-    ${p.segments ? `<details class="as-tplan" ${t.status === "planned" ? "open" : ""}><summary>📝 الخطة ${t.cost ? `<small class="muted">· التوليد حوالي ${t.cost}$</small>` : ""}</summary>
+          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="ماذا الذي جميل أو سيئ؟ (مهم للتجارب القادمة)" data-tnote></span></div>
+      <div class="fm-redo"><b>لم يعجبك؟</b>
+        <input type="text" data-tredonote placeholder="قل ماذا الذي لم يعجبك (مثلًا: الحركة سريعة، تريد الزووم أوضح) أو اتركها فارغة لمحاولة جديدة بنفس الخطة" data-no-i18n>
+        <button type="button" class="btn sm primary" data-tredo>↻ ولّد مرة أخرى (~${t.cost}$)</button>
+        ${(t.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك الذي فاتت: ${t.notes.map(le).join(" · ")}</small>` : ""}</div>` : ""}
+    ${p.segments ? `<details class="as-tplan" ${t.status === "planned" ? "open" : ""}><summary>📝 الخطة ${t.cost ? `<small class="muted">· التوليد نحو ${t.cost}$</small>` : ""}</summary>
       ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
-      ${(p.anchors || []).length ? `<p><b>📌 بيفضل ثابت:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
+      ${(p.anchors || []).length ? `<p><b>📌 يظل ثابت:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
       ${(p.keyframes || []).map((k, i) => `<label class="lab-xe">🖼️ مرحلة ${i + 1}: <span data-no-i18n>${le(k.label)}</span><textarea rows="2" data-tk="${i}" dir="ltr" ${editable ? "" : "disabled"} data-no-i18n>${le(k.prompt)}</textarea></label>`).join("")}
       ${p.segments.map((x, i) => `<label class="lab-xe">🎬 حركة ${i + 1}: <span data-no-i18n>${le(x.label)}</span>
         <span class="row">الطول في الفيديو <input type="number" step="0.1" min="0.6" max="6" value="${x.seconds}" data-tsec="${i}" ${editable ? "" : "disabled"}> ث</span>
         <textarea rows="2" data-ts="${i}" dir="ltr" ${editable ? "" : "disabled"} data-no-i18n>${le(x.prompt)}</textarea></label>`).join("")}
-      ${editable ? `<div class="row wrap"><button type="button" class="btn sm primary" data-trun>🎬 ${t.status === "done" ? "ولّد تاني" : "ولّد"} (~${t.cost}$)</button>
-        <small class="muted">التعديلات بتتحفظ لوحدها قبل التوليد</small></div>` : ""}
+      ${editable ? `<div class="row wrap"><button type="button" class="btn sm primary" data-trun>🎬 ${t.status === "done" ? "ولّد مرة أخرى" : "ولّد"} (~${t.cost}$)</button>
+        <small class="muted">التعديلات تُحفظ تلقائيًا قبل التوليد</small></div>` : ""}
     </details>` : ""}
   </article>`;
 }
@@ -258,11 +258,11 @@ $("labLib").addEventListener("click", async (e) => {
   if (t.closest("[data-asback]")) { asx.cur = null; return openLib(); }
   const clear = t.closest("[data-asclear]");
   if (clear) {
-    if (!(await uiConfirm(`تمسح كل الأصول اللي في المكتبة (${asx.list.length}) بكل نسخها؟ مفيش رجوع.`))) return;
-    if (!(await uiConfirm("متأكد؟ المكتبة هتبقى فاضية. (الفيديوهات اللي في المعمل مش هتتمسح، والكومبوننتس اللي كنت قبلتها هترجع «لسه» وتقدر تقبلها تاني)"))) return;
+    if (!(await uiConfirm(`تحذف كل الأصول الذي في المكتبة (${asx.list.length}) بكل نسخها؟ لا يوجد رجوع.`))) return;
+    if (!(await uiConfirm("متأكد؟ المكتبة ستصبح فارغة. (الفيديوهات التي في المعمل لن تُحذف، والكومبوننتس الذي كنت قبلتها ستعود «ما زال» ويمكنك تقبلها مرة أخرى)"))) return;
     return busyButton(clear, "⏳", async () => {
       const r = await api("/api/assets", { method: "DELETE" });
-      toast(`🗑️ اتمسح ${r.deleted} أصل. المكتبة فاضية`);
+      toast(`🗑️ حُذف ${r.deleted} أصل. المكتبة فارغة`);
       asx.cur = null; asx.cat = ""; asx.q = "";
       if (labx.cur) labx.cur = await api(`/api/lab/${labx.cur.id}`);
       await openLib();
@@ -271,12 +271,12 @@ $("labLib").addEventListener("click", async (e) => {
   const golab = t.closest("[data-asgolab]");
   if (golab) {
     e.preventDefault();
-    if (!labx.list.some((x) => x.id === golab.dataset.asgolab)) return toast("الفيديو الأصلي اتمسح من المعمل", true);
+    if (!labx.list.some((x) => x.id === golab.dataset.asgolab)) return toast("الفيديو الأصلي حُذف من المعمل", true);
     labx.view = "lab";
     return openLab(golab.dataset.asgolab);
   }
   if (t.closest("[data-asdel]")) {
-    if (!(await uiConfirm("تمسح الأصل ده من المكتبة بكل نسخه؟"))) return;
+    if (!(await uiConfirm("تحذف هذا الأصل من المكتبة بكل نسخه؟"))) return;
     try { await api(`/api/assets/${asx.cur.id}`, { method: "DELETE" }); asx.cur = null; return openLib(); }
     catch (err) { return toast(err.message, true); }
   }
@@ -293,7 +293,7 @@ $("labLib").addEventListener("click", async (e) => {
       const body = { mode: asx.tmode, model: trials.querySelector("[data-tmodel]").value, resolution: trials.querySelector("[data-tres]").value };
       if (asx.tmode === "transfer") {
         const a = asx.tsel.a || {}, b = asx.tsel.b || {};
-        if (!a.lab || !a.n || !b.lab || !b.n) return toast("اختار اللقطة A واللقطة B", true);
+        if (!a.lab || !a.n || !b.lab || !b.n) return toast("اختر اللقطة A واللقطة B", true);
         body.a = { lab: a.lab, n: Number(a.n) }; body.b = { lab: b.lab, n: Number(b.n) };
       }
       return busyButton(nb, "⏳", async () => { asx.cur = await T("", { method: "POST", ...jsonBody(body) }); renderLib(); scheduleAssetPoll(); });
@@ -305,7 +305,7 @@ $("labLib").addEventListener("click", async (e) => {
       return busyButton(run, "⏳", async () => {
         asx.cur = await T(`/${tid}`, { method: "PATCH", ...jsonBody({ plan: trialPlanFrom(card) }) });
         const cost = asx.cur.trials.find((x) => x.id === tid).cost;
-        if (!(await uiConfirm(`يولّد التجربة دي؟ هتتحسب على Atlas حوالي ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وبتاخد كام دقيقة.`))) return renderLib();
+        if (!(await uiConfirm(`يولّد هذه التجربة؟ ستُحسب على Atlas نحو ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وتأخذ كم دقيقة.`))) return renderLib();
         asx.cur = await T(`/${tid}/run`, { method: "POST" });
         renderLib(); scheduleAssetPoll();
       });
@@ -313,11 +313,11 @@ $("labLib").addEventListener("click", async (e) => {
     const redo = t.closest("[data-tredo]");
     if (redo) {
       const note = card.querySelector("[data-tredonote]").value.trim(), tr = asx.cur.trials.find((x) => x.id === tid);
-      if (!(await uiConfirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد تاني` : "يولّد تاني بنفس الخطة (محاولة جديدة)"}؟ حوالي ${tr.cost}$، والنتيجة القديمة بتتبدل.`))) return;
+      if (!(await uiConfirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد آخر` : "يولّد مرة أخرى بنفس الخطة (محاولة جديدة)"}؟ نحو ${tr.cost}$، والنتيجة القديمة تُستبدل.`))) return;
       return busyButton(redo, "⏳", async () => { asx.cur = await T(`/${tid}/redo`, { method: "POST", ...jsonBody({ note }) }); renderLib(); scheduleAssetPoll(); });
     }
     if (t.closest("[data-tdel]")) {
-      if (!(await uiConfirm("تمسح التجربة دي؟"))) return;
+      if (!(await uiConfirm("تحذف هذه التجربة؟"))) return;
       try { asx.cur = await T(`/${tid}`, { method: "DELETE" }); renderLib(); } catch (err) { toast(err.message, true); }
       return;
     }
@@ -349,7 +349,7 @@ $("labLib").addEventListener("click", async (e) => {
       return String(v).toLowerCase() === String(k.value).toLowerCase() ? null : `${k.label}${k.target ? ` («${k.target}»)` : ""}: من «${k.value}» لـ «${v}»`;
     }).filter(Boolean);
     const text = [...changes, box.querySelector("[data-vtext]").value.trim()].filter(Boolean).join("\n");
-    if (!text) return toast("غيّر مفتاح أو اكتب عايز تغيّر إيه", true);
+    if (!text) return toast("غيّر مفتاح أو اكتب تريد تغيّر ماذا", true);
     const sel = box.querySelector("[data-vmodel]");
     if (!(await uiConfirm(`يعدّل الأصل بـ ${sel.selectedOptions[0].textContent}؟`))) return;
     return busyButton(go, "⏳", async () => {
@@ -365,11 +365,11 @@ $("labLib").addEventListener("click", async (e) => {
     });
   }
   if (del) {
-    if (!(await uiConfirm("تمسح النسخة دي؟"))) return;
+    if (!(await uiConfirm("تحذف هذه النسخة؟"))) return;
     asx.cur = await api(`/api/assets/${asx.cur.id}/variants/${del.dataset.asvdel}`, { method: "DELETE" });
     return renderLib();
   }
-  if (cmp) {  // الأصل والنسخة بيبدأوا مع بعض
+  if (cmp) {  // الأصل والنسخة يبدأون مع بعض
     const v = box.querySelector(`[data-asvar="${cmp.dataset.ascmp}"]`), o = $("labLib").querySelector("[data-asmain]");
     v.currentTime = 0; o.currentTime = 0; o.muted = true; v.muted = false;
     v.play().catch(() => {}); o.play().catch(() => {});
@@ -407,7 +407,7 @@ $("labLib").addEventListener("change", async (e) => {
       asx.cur = await api(`/api/assets/${asx.cur.id}`, { method: "PATCH", ...jsonBody({ [f]: f === "tags" ? v.split(/[,،]/) : v }) });
       const i = asx.list.findIndex((x) => x.id === asx.cur.id);
       if (i >= 0) Object.assign(asx.list[i], { name: asx.cur.name, category: asx.cur.category, tags: asx.cur.tags });
-      toast("✅ اتحفظ");
+      toast("✅ حُفظ");
     } catch (err) { toast(err.message, true); }
     return;
   }

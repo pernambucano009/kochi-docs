@@ -7,7 +7,7 @@ const cal = { view: "list", cursor: new Date(), jobs: [], tz: 3, jobsAt: 0 };
 try { cal.view = localStorage.getItem(CAL_KEY) || "list"; } catch {}
 if (!["list", "week", "month"].includes(cal.view)) cal.view = "list";
 
-const CAL_MAX = 3; // كام بوست يظهر في اليوم قبل «+ كمان»
+const CAL_MAX = 3; // كم منشور يظهر في اليوم قبل «+ أيضًا»
 const CAL_DOT = { scheduled: "sch", sending: "act", publishing: "act", published: "pub", failed: "bad" };
 
 const calKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -56,8 +56,8 @@ function calPlatIcons(keys) {
 function calCard(it, compact) {
   if (it.kind === "job") {
     const j = it.j;
-    return `<div class="cal-card job" title="${escapeHtml(`🤖 الأوتوبايلوت لسه بيحضّره: ${AP_STEPS?.[j.step] || j.step}`)}">
-      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">أوتوبايلوت بيحضّره</span></div>`;
+    return `<div class="cal-card job" title="${escapeHtml(`🤖 الأوتوبايلوت ما زال يحضّره: ${AP_STEPS?.[j.step] || j.step}`)}">
+      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">أوتوبايلوت يحضّره</span></div>`;
   }
   const p = it.p;
   const thumb = p.image_url || thumbOf(p.export_url || "");
@@ -83,9 +83,9 @@ function calDayCell(date, items, compact, extraCls = "") {
   return `<div class="cal-day ${extraCls}${today ? " today" : ""}${past ? " past" : ""}" data-day="${key}">
     <div class="cal-dh">${compact ? "" : `<span class="cal-wd">${date.toLocaleDateString(UI_LOCALE(), { weekday: "short" })}</span>`}<span class="cal-dn">${date.getDate()}</span></div>
     <div class="cal-list">${shown.map((it) => calCard(it, compact)).join("")}</div>
-    ${more > 0 ? `<button type="button" class="cal-more" data-more="${key}">+${more} كمان</button>` : ""}
+    ${more > 0 ? `<button type="button" class="cal-more" data-more="${key}">+${more} أيضًا</button>` : ""}
     ${open && items.length > CAL_MAX ? `<button type="button" class="cal-more" data-more="">أقل</button>` : ""}
-    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدول بوست في اليوم ده"><span>＋</span><b>جدول هنا</b></button>`}
+    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدول منشور في هذا اليوم"><span>＋</span><b>جدول هنا</b></button>`}
   </div>`;
 }
 
@@ -129,11 +129,11 @@ function renderCal() {
   }
   const unsched = cal.jobs.length;
   box.innerHTML = `<div class="cal-head">
-      <button type="button" class="btn sm" data-nav="-1" aria-label="اللي فات">${document.dir === "rtl" ? "›" : "‹"}</button>
+      <button type="button" class="btn sm" data-nav="-1" aria-label="ما فات">${document.dir === "rtl" ? "›" : "‹"}</button>
       <b class="cal-title">${title}</b>
-      <button type="button" class="btn sm" data-nav="1" aria-label="اللي جاي">${document.dir === "rtl" ? "‹" : "›"}</button>
-      <button type="button" class="btn sm" data-nav="0">النهارده</button>
-      <span class="cal-legend"><i class="cal-dot sch"></i>متجدول <i class="cal-dot pub"></i>اتنشر <i class="cal-dot bad"></i>فشل${unsched ? ` <i class="cal-dot job"></i>بيتحضّر` : ""}</span>
+      <button type="button" class="btn sm" data-nav="1" aria-label="ما قادم">${document.dir === "rtl" ? "‹" : "›"}</button>
+      <button type="button" class="btn sm" data-nav="0">اليوم</button>
+      <span class="cal-legend"><i class="cal-dot sch"></i>متجدول <i class="cal-dot pub"></i>نُشر <i class="cal-dot bad"></i>فشل${unsched ? ` <i class="cal-dot job"></i>يتحضّر` : ""}</span>
     </div>${body}`;
 }
 
@@ -174,7 +174,7 @@ $("postsCal").addEventListener("click", (e) => {
     // من صفحة المواعيد بيرجع للنشر والميعاد متحط في الفورم
     if (calPage()) showStep("7");
     setTimeout(() => $("postForm").scrollIntoView({ behavior: "smooth", block: "start" }), calPage() ? 0 : 400);
-    toast(`📅 الميعاد اتحط: ${calFull(when)} — اختار الفيديو وجدول`);
+    toast(`📅 الموعد وُضع: ${calFull(when)} — اختر الفيديو وجدول`);
     return;
   }
   const card = e.target.closest("[data-pid]");
@@ -211,8 +211,8 @@ $("postsCal").addEventListener("drop", async (e) => {
   const [y, m, d] = day.dataset.day.split("-").map(Number);
   const when = new Date(y, m - 1, d, old.getHours(), old.getMinutes());
   if (calKey(when) === calKey(old)) return;
-  if (when < new Date()) return toast("الميعاد ده عدّى. افتح البوست واختار ساعة جاية", true);
-  if (!(await uiConfirm(`تنقل «${p.export_name || "البوست"}» لـ ${calFull(when)}؟`))) return;
+  if (when < new Date()) return toast("هذا الموعد عدّى. افتح المنشور واختر ساعة قادمة", true);
+  if (!(await uiConfirm(`تنقل «${p.export_name || "المنشور"}» لـ ${calFull(when)}؟`))) return;
   await calReschedule(p, when);
 });
 
@@ -223,7 +223,7 @@ async function calReschedule(p, when) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ export_id: p.export_id, caption: p.caption, platforms: p.platforms, scheduled_at: when.toISOString(), options: p.options || {} }),
     });
-    toast(`✅ الميعاد الجديد: ${calFull(when)}`);
+    toast(`✅ الموعد الجديد: ${calFull(when)}`);
     await pubLoadPosts();
     return true;
   } catch (err) {
@@ -243,20 +243,20 @@ function calOpenPost(p) {
   const media = p.image_url ? `<img src="${p.image_url}" alt="">`
     : p.export_url ? `<video src="${p.export_url}" controls playsinline preload="metadata"${thumbOf(p.export_url) ? ` poster="${thumbOf(p.export_url)}"` : ""}></video>` : "";
   const o = p.options || {};
-  dlg.innerHTML = `<button type="button" class="cal-x" data-x aria-label="اقفل">✕</button>
+  dlg.innerHTML = `<button type="button" class="cal-x" data-x aria-label="أغلق">✕</button>
     <div class="cal-dlg-body">
       ${media ? `<div class="cal-media">${media}</div>` : ""}
       <div class="cal-info">
-        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو اتمسح"))}</h3>
+        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو حُذف"))}</h3>
         <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "متجدول للنشر ✓" : label}</span>
         <p class="when">📅 ${calFull(when)}</p>
         <p>${p.platforms.map((k) => `${PLATFORM_ICON[k] || ""} ${escapeHtml(pub.platforms[k] || k)}`).join(" · ")}</p>
         ${o.ig_tags?.length ? `<p dir="ltr" class="muted">🏷️ ${o.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${o.ig_collab ? " · 🤝" : ""}</p>` : ""}
         ${p.caption ? `<p class="cal-cap">${escapeHtml(p.caption)}</p>` : ""}
         ${p.error ? `<p class="err">${escapeHtml(p.error)}</p>` : ""}
-        ${canMove ? `<label class="field">ميعاد جديد <input type="datetime-local" data-when value="${toLocalInput(when)}"></label>` : ""}
+        ${canMove ? `<label class="field">موعد جديد <input type="datetime-local" data-when value="${toLocalInput(when)}"></label>` : ""}
         <div class="row">
-          ${canMove ? `<button type="button" class="btn primary sm" data-a="move">💾 غيّر الميعاد</button>
+          ${canMove ? `<button type="button" class="btn primary sm" data-a="move">💾 غيّر الموعد</button>
             <button type="button" class="btn sm" data-a="edit">✎ تعديل كامل</button>` : ""}
           ${p.status === "failed" ? `<button type="button" class="btn sm" data-a="retry">↻ إعادة المحاولة</button>` : ""}
           ${p.status !== "publishing" && p.status !== "sending" ? `<button type="button" class="btn sm danger" data-a="delete">${p.status === "scheduled" ? "إلغاء النشر" : "حذف"}</button>` : ""}
@@ -271,8 +271,8 @@ function calOpenPost(p) {
     if (!b) return;
     if (b.dataset.a === "move") {
       const d = new Date(dlg.querySelector("[data-when]").value);
-      if (isNaN(d)) return toast("اختار الميعاد", true);
-      if (d < new Date() && !(await uiConfirm("الميعاد ده عدّى، فالبوست هيتنشر على طول. تكمّل؟"))) return;
+      if (isNaN(d)) return toast("اختر الموعد", true);
+      if (d < new Date() && !(await uiConfirm("هذا الموعد عدّى، فالمنشور سيُنشر مباشرة. تُكمل؟"))) return;
       b.disabled = true;
       if (await calReschedule(p, d)) dlg.close();
       b.disabled = false;

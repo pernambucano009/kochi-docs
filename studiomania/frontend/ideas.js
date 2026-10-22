@@ -4,7 +4,7 @@
 const IdeasPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { el: null, list: [], timer: null, rec: null, clip: null, edit: null, busy: {} };
-  const html = () => `<div class="nb-wrap id-wrap" id="idWrap"><div class="nh-empty">بيحمّل…</div></div>`;
+  const html = () => `<div class="nb-wrap id-wrap" id="idWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const ago = (t) => { try { return new Date(t).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" }); } catch { return ""; } };
 
   function card(x) {
@@ -12,44 +12,44 @@ const IdeasPage = (() => {
       return `<article class="id-card on" data-iid="${esc(x.id)}">
         <input class="id-in" data-ie="title" value="${esc(x.title)}" placeholder="عنوان الفكرة">
         <textarea class="id-in" rows="4" data-ie="text" placeholder="الفكرة">${esc(x.text)}</textarea>
-        <input class="id-in" data-ie="url" dir="ltr" value="${esc(x.url)}" placeholder="https://… لينك فيديو أو بوست (اختياري)">
+        <input class="id-in" data-ie="url" dir="ltr" value="${esc(x.url)}" placeholder="https://… رابط فيديو أو منشور (اختياري)">
         <div class="id-acts"><button type="button" class="nb-btn fs-go" data-isave>✓ احفظ</button><button type="button" class="nb-btn" data-icancel>إلغاء</button></div></article>`;
     }
     const busy = x.status === "transcribing", pol = S.busy[x.id];
     return `<article class="id-card" data-iid="${esc(x.id)}">
       <div class="id-h"><b>${esc(x.title || "فكرة")}</b><small class="muted">${x.polished ? "✨ متنقّحة · " : ""}${x.used_at ? "✓ اتستخدمت · " : ""}${ago(x.at)}</small></div>
       ${x.hook ? `<p class="id-hook">«${esc(x.hook)}»</p>` : ""}
-      ${busy ? `<p class="muted">⏳ بيكتب الفويس نوت كلام…</p>` : x.script ? "" : x.text ? `<p class="id-t">${esc(x.text)}</p>` : ""}
-      ${x.script ? `<div class="id-script"><small class="muted">📝 السكريبت</small><p>${esc(x.script)}</p></div>` : ""}
+      ${busy ? `<p class="muted">⏳ جارٍ الكتابة الفويس نوت نص…</p>` : x.script ? "" : x.text ? `<p class="id-t">${esc(x.text)}</p>` : ""}
+      ${x.script ? `<div class="id-script"><small class="muted">📝 النص</small><p>${esc(x.script)}</p></div>` : ""}
       ${(x.sources || []).length ? `<div class="id-src"><small class="muted">📚 السندات</small><ul>${x.sources.map((r) => `<li><b>${esc(r.label)}</b> ${esc(r.ref)}${r.where ? ` <small class="muted">· ${esc(r.where)}</small>` : ""}</li>`).join("")}</ul></div>` : ""}
-      ${x.script && x.dropped ? `<p class="muted id-drop">شلنا ${x.dropped} سند مقدرناش نتأكد إنه موجود بالنص ده.</p>` : ""}
+      ${x.script && x.dropped ? `<p class="muted id-drop">شلنا ${x.dropped} سند لم نتمكن نتأكد أنه موجود هذا بالنص.</p>` : ""}
       ${x.audio_url ? `<audio src="${esc(x.audio_url)}" controls preload="none"></audio>` : ""}
       ${x.url ? `<a class="id-link" href="${esc(x.url)}" target="_blank" rel="noopener" dir="ltr">🔗 ${esc(x.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a>` : ""}
       ${x.error ? `<p class="fs-err">⚠️ ${esc(x.error)}</p>` : ""}
       <div class="id-acts">
-        <button type="button" class="nb-btn fs-go" data-ipolish ${busy || pol ? "disabled" : ""} title="الذكاء الصناعي يرتّب الكلام ويظبطه (بيتخصم من الرصيد)">${pol === true ? "⏳ بينقّح…" : "✨ نقّح"}</button>
-        <button type="button" class="nb-btn" data-iscript ${busy || pol ? "disabled" : ""} title="يكتبها سكريبت يتقال، ويحط سندات حقيقية في مكانها لو موجودة (بيتخصم من الرصيد)">${pol === "script" ? "⏳ بينسّق…" : x.script ? "📝 نسّق تاني" : "📝 نسّق كسكريبت"}</button>
-        ${x.polished ? `<button type="button" class="nb-btn" data-irevert>↩ رجّعها زي ما كتبتها</button>` : ""}
+        <button type="button" class="nb-btn fs-go" data-ipolish ${busy || pol ? "disabled" : ""} title="الذكاء الاصطناعي يرتّب النص ويظبطه (يُخصم من الرصيد)">${pol === true ? "⏳ ينقّح…" : "✨ نقّح"}</button>
+        <button type="button" class="nb-btn" data-iscript ${busy || pol ? "disabled" : ""} title="يكتبها نص يُقال، ويضع سندات حقيقية في مكانها إذا موجودة (يُخصم من الرصيد)">${pol === "script" ? "⏳ ينسّق…" : x.script ? "📝 نسّق مرة أخرى" : "📝 نسّق كسكريبت"}</button>
+        ${x.polished ? `<button type="button" class="nb-btn" data-irevert>↩ أعدها كما كتبتها</button>` : ""}
         <button type="button" class="nb-btn" data-iedit ${busy ? "disabled" : ""}>✏️ عدّل</button>
-        <button type="button" class="nb-btn danger" data-idel>🗑 امسح</button></div></article>`;
+        <button type="button" class="nb-btn danger" data-idel>🗑 احذف</button></div></article>`;
   }
   function render() {
     const w = S.el;
     if (!w) return;
     const recOn = !!S.rec;
     w.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الأفكار</b><span class="latin">IDEAS</span></div>
-        <p>حط هنا أي فكرة تيجي في بالك: اكتبها، أو سجّلها بصوتك، أو حط لينك فيديو أو بوست عاجبك. الأفكار دي بتظهرلك وانت بتختار الفكرة في أي مشروع جديد لو حابب تستخدمها. ولو عايز الذكاء الصناعي يرتّبلك الكلام، دوس «✨ نقّح»، ولو عايزها سكريبت جاهز بسنداته (آيات، كتب، دراسات) دوس «📝 نسّق كسكريبت».</p>
+        <p>ضع هنا أي فكرة تأتي في بالك: اكتبها، أو سجّلها بصوتك، أو ضع رابط فيديو أو منشور يعجبك. هذه الأفكار تظهرلك وأنت تختار الفكرة في أي مشروع جديد إذا حابب تستخدمها. وإذا تريد الذكاء الاصطناعي يرتّبلك النص، اضغط «✨ نقّح»، وإذا تريدها نص جاهز بسنداته (آيات، كتب، دراسات) اضغط «📝 نسّق كسكريبت».</p>
         <div class="cm-stats"><span><b class="num">${S.list.length}</b> فكرة</span></div></section>
       <section class="id-new">
-        <textarea class="id-in" rows="3" data-inew="text" placeholder="اكتب فكرتك… مثلًا: فيديو بيوري ٣ غلطات الناس بتعملها في…"></textarea>
-        <input class="id-in" data-inew="url" dir="ltr" placeholder="https://… لينك فيديو أو بوست (اختياري)">
+        <textarea class="id-in" rows="3" data-inew="text" placeholder="اكتب فكرتك… مثلًا: فيديو يوري ٣ غلطات الأشخاص تعملها في…"></textarea>
+        <input class="id-in" data-inew="url" dir="ltr" placeholder="https://… رابط فيديو أو منشور (اختياري)">
         <div class="id-acts">
-          <button type="button" class="nb-btn${recOn ? " danger" : ""}" data-irec>${recOn ? `⏹ وقّف التسجيل <span class="num" data-irect>0:00</span>` : "🎙️ سجّل بصوتك"}</button>
+          <button type="button" class="nb-btn${recOn ? " danger" : ""}" data-irec>${recOn ? `⏹ أوقف التسجيل <span class="num" data-irect>0:00</span>` : "🎙️ سجّل بصوتك"}</button>
           <label class="nb-btn">⬆ ارفع فويس نوت<input type="file" accept="audio/*,video/*" data-ifile hidden></label>
           ${S.clip ? `<span class="id-clip">🎧 ${esc(S.clip.name)} <button type="button" class="nb-btn sm" data-iclip>✕</button></span>` : ""}
-          <button type="button" class="nb-btn fs-go" data-iadd>＋ ضيف الفكرة</button></div>
+          <button type="button" class="nb-btn fs-go" data-iadd>＋ أضف الفكرة</button></div>
       </section>
-      <div class="id-list">${S.list.map(card).join("") || `<div class="nh-empty">لسه مفيش أفكار. ضيف أول فكرة فوق.</div>`}</div>`;
+      <div class="id-list">${S.list.map(card).join("") || `<div class="nh-empty">لا يوجد بعد أفكار. أضف أول فكرة أعلى.</div>`}</div>`;
   }
   async function load() { S.list = await api("/api/my-ideas"); }
   function poll() {
@@ -60,7 +60,7 @@ const IdeasPage = (() => {
   async function recToggle() {
     if (S.rec) { S.rec.mr.stop(); return; }
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("مقدرتش أوصل للمايك. اسمح للمتصفح يستخدمه", true); }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("تعذّر الوصول للمايك. اسمح للمتصفح يستخدمه", true); }
     const chunks = [], mr = new MediaRecorder(stream);
     const t0 = Date.now();
     S.rec = { mr, timer: setInterval(() => { const s = Math.round((Date.now() - t0) / 1000), el = S.el?.querySelector("[data-irect]"); if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }, 500) };
@@ -89,10 +89,10 @@ const IdeasPage = (() => {
           const fd = new FormData();
           fd.append("text", draft.text || ""); fd.append("url", draft.url || "");
           if (S.clip) fd.append("file", S.clip);
-          if (!(draft.text || "").trim() && !(draft.url || "").trim() && !S.clip) return toast("اكتب الفكرة، أو سجّلها بصوتك، أو حط لينك", true);
+          if (!(draft.text || "").trim() && !(draft.url || "").trim() && !S.clip) return toast("اكتب الفكرة، أو سجّلها بصوتك، أو ضع رابط", true);
           S.list = await api("/api/my-ideas", { method: "POST", body: fd });
           draft = {}; S.clip = null; render(); poll();
-          return toast("💡 الفكرة اتحفظت، وهتظهرلك وانت بتعمل مشروع جديد");
+          return toast("💡 الفكرة حُفظت، وستظهرلك وأنت تعمل مشروع جديد");
         }
         if (!id) return;
         if (q("[data-iedit]")) { S.edit = id; return render(); }
@@ -104,19 +104,19 @@ const IdeasPage = (() => {
         }
         if (q("[data-ipolish]")) {
           S.busy[id] = true; render();
-          try { S.list = await api(`/api/my-ideas/${id}/polish`, { method: "POST" }); toast("✨ اتنقّحت. لو مش عاجباك رجّعها زي ما كتبتها"); }
+          try { S.list = await api(`/api/my-ideas/${id}/polish`, { method: "POST" }); toast("✨ نُقّحت. إذا لم تعجبك أعدها كما كتبتها"); }
           finally { delete S.busy[id]; render(); }
           return;
         }
         if (q("[data-iscript]")) {
           S.busy[id] = "script"; render();
-          try { S.list = await api(`/api/my-ideas/${id}/script`, { method: "POST" }); toast("📝 اتنسّقت سكريبت. لو مش عاجبك رجّعها زي ما كتبتها"); }
+          try { S.list = await api(`/api/my-ideas/${id}/script`, { method: "POST" }); toast("📝 نُسّقت نص. إذا لم يعجبك أعدها كما كتبتها"); }
           finally { delete S.busy[id]; render(); }
           return;
         }
         if (q("[data-irevert]")) { S.list = await api(`/api/my-ideas/${id}/revert`, { method: "POST" }); return render(); }
         if (q("[data-idel]")) {
-          if (!(await uiConfirm("تمسح الفكرة دي؟"))) return;
+          if (!(await uiConfirm("تحذف هذه الفكرة؟"))) return;
           S.list = await api(`/api/my-ideas/${id}`, { method: "DELETE" }); return render();
         }
       } catch (err) { toast(err.message, true); }
