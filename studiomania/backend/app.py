@@ -532,6 +532,7 @@ with closing(db()) as _conn, _conn:
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 
+
 # الصفحات والملفات اللي بتفتح من غير دخول
 PUBLIC_PATHS = {"/login", "/login.html", "/pricing", "/pricing.html", "/api/pricing", "/style.css", "/i18n.js", "/i18n-en.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
 
@@ -4494,6 +4495,19 @@ import stylegen  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
 import wallet  # noqa: E402
+
+
+# أي غلطة من خدمة الذكاء الصناعي أو الرصيد بتوصل للعميل برسالتها، مش «خطأ 500» من غير معنى
+@app.exception_handler(wallet.NoCredits)
+async def _no_credits(request: Request, exc: Exception):
+    return JSONResponse({"detail": str(exc)}, status_code=402)
+
+
+@app.exception_handler(atlas.AtlasError)
+async def _atlas_err(request: Request, exc: Exception):
+    print(f"AtlasError on {request.url.path}: {exc}", flush=True)
+    return JSONResponse({"detail": f"خدمة الذكاء الصناعي مردّتش زي المتوقع: {str(exc)[:300]}"}, status_code=502)
+
 import comics  # noqa: E402
 
 
@@ -28452,15 +28466,24 @@ def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None
         tmp = TMP_DIR / f"autodesc_{uuid.uuid4().hex[:8]}{Path(audio.filename).suffix.lower() or '.webm'}"
         with tmp.open("wb") as out:
             shutil.copyfileobj(audio.file, out)
+        wav = tmp.with_suffix(".stt.wav")
         try:
-            dur = probe_duration(tmp) or 30.0
+            # تسجيل المتصفح (webm) بيتحوّل wav مونو الأول، زي باقي التسجيلات في البرنامج (خدمة الكلام مابتقبلش webm)
+            r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(tmp), "-vn", "-ac", "1", "-ar", "16000", str(wav)],
+                               capture_output=True, timeout=300)
+            dur = probe_duration(wav) if r.returncode == 0 and wav.exists() else 0
+            if dur < .5:
+                raise HTTPException(400, "التسجيل مفيهوش صوت مسموع. سجّل تاني وقرّب من المايك")
             if dur > 300:
                 raise HTTPException(400, "التسجيل طويل أوي، خليه أقل من ٥ دقايق")
             wallet.need(wallet.credits(wallet.est(chars=12000, stt_min=dur / 60)), "فهم وصف الموديل")
-            words = atlas.transcribe(tmp, dur) or []
+            words = atlas.transcribe(wav, dur) or []
             usd += wallet.est(stt_min=dur / 60)
+        except atlas.AtlasError as exc:
+            raise HTTPException(502, f"مقدرتش أسمع التسجيل: {exc}") from None
         finally:
             tmp.unlink(missing_ok=True)
+            wav.unlink(missing_ok=True)
         heard = " ".join(w["w"] for w in words).strip()
         if atlas.mock_mode() and not said:
             heard = "قطّع الفيديو لقطع 15 ثانية وولّد كل قطعة برومبت: cinematic anime style وحط موسيقى"
