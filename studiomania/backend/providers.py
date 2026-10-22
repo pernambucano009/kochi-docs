@@ -21,6 +21,7 @@ PROVIDERS = {
     "scrape": {"name": "ScrapeCreators", "what": "تحليل الحسابات والمنافسين", "unit": "رصيد", "api": True, "default_min": 500},
     "audioshake": {"name": "AudioShake", "what": "فصل الصوت عن الموسيقى في الدبلجة", "unit": "رصيد", "api": False, "default_min": 5},
     "fasih": {"name": "فصيح", "what": "الأصوات العربي", "unit": "", "api": False, "default_min": 0},
+    "munsit": {"name": "منصت", "what": "الأصوات الخليجي", "unit": "", "api": False, "default_min": 0},
     "zernio": {"name": "Zernio", "what": "النشر والرسايل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0},
 }
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|top.?up|رصيد", re.I)

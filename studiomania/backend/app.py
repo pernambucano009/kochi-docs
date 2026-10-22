@@ -19894,6 +19894,17 @@ reset_stuck_typo()
 
 import dub  # noqa: E402
 import fasih  # noqa: E402
+import munsit  # noqa: E402
+
+
+def ar_speak(v: dict, text: str, dest: Path) -> Path:
+    """صوت عربي جاهز: منصت للخليجي (لو صوته من منصت)، وفصيح للباقي."""
+    if v["provider"] == "munsit":
+        try:
+            return munsit.speak(text, v["voice"], dest)
+        except munsit.MunsitError as e:
+            raise fasih.FasihError(str(e)) from e
+    return fasih.speak(text, v["voice"], v["dialect"], dest)
 
 
 _FASIH_SYNC = {"running": False}
@@ -19909,6 +19920,7 @@ def fasih_sync() -> None:
         try:
             dub.merge_fasih(fasih.catalog())
             dub.merge_fasih(fasih.custom_voices())   # 🎨 الصوت الخاص المتصمم في حساب فصيح
+            dub.merge_munsit(munsit.catalog())       # 🗣️ أصوات منصت الخليجية (لو المفتاح متسجل)
         finally:
             _FASIH_SYNC["running"] = False
     threading.Thread(target=run, daemon=True, name="fasih-catalog").start()
@@ -20254,8 +20266,8 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
             else:
                 raw = work / f"l{i:03d}.src"
                 v = dub.VOICES[t["voice"]]
-                if v["provider"] == "fasih":
-                    fasih.speak(texts[i], v["voice"], v["dialect"], raw)
+                if v["provider"] in ("fasih", "munsit"):
+                    ar_speak(v, texts[i], raw)
                 else:
                     atlas.download(atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2), raw)
                 subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
@@ -20457,8 +20469,8 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
         return out
     raw = out.with_suffix(".src")
     v = dub.VOICES[voice]
-    if v["provider"] == "fasih":
-        fasih.speak(text, v["voice"], v["dialect"], raw)
+    if v["provider"] in ("fasih", "munsit"):
+        ar_speak(v, text, raw)
     else:
         atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "الفويس أوفر", max_seconds=300, interval=2), raw)
     subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
@@ -23179,14 +23191,14 @@ class VoiceSampleIn(BaseModel):
 @app.post("/api/voice-sample")
 def voice_sample(body: VoiceSampleIn):
     v = dub.VOICES.get(body.voice)
-    if not v or v.get("provider") != "fasih" or v.get("hidden"):
-        raise HTTPException(400, "العينة متاحة لأصوات فصيح بس")
-    dest = VSAMPLE_DIR / f"{Path(body.voice).name}.mp3"
+    if not v or v.get("provider") not in ("fasih", "munsit") or v.get("hidden"):
+        raise HTTPException(400, "العينة متاحة للأصوات العربي بس")
+    dest = VSAMPLE_DIR / f"{Path(body.voice.replace(':', '_')).name}.{'wav' if v['provider'] == 'munsit' else 'mp3'}"
     if not dest.exists():
         if atlas.mock_mode():
             raise HTTPException(400, "العينات مش متاحة في وضع التجربة")
         try:
-            fasih.speak(VSAMPLE_TEXT.get(v["dialect"], VSAMPLE_GULF), v["voice"], v["dialect"], dest)
+            ar_speak(v, VSAMPLE_TEXT.get(v["dialect"], VSAMPLE_GULF), dest)
         except fasih.FasihError as e:
             dest.unlink(missing_ok=True)
             raise HTTPException(400, str(e)) from e

@@ -81,6 +81,40 @@ def merge_fasih(voices: list[dict]) -> int:
     return added
 
 
+# 🗣️ منصت للهجات الخليجية: كل صوت بيروح للهجته من الـ id أو الوصف، وبيبقى أول اختيار فيها (فصيح بيفضل بعده).
+# الفصحى مش من منصت (هتبقى SILMA)، والصوت اللي لهجته مش معروفة بيروح للخليجي العام.
+MUNSIT_PER_1K = 0.08   # باقة منصت: 200 ألف كريدت بـ $8، وكل 1000 كريدت ≈ 500 حرف
+MUNSIT_HINTS = (("najd", "ar-sa-najdi"), ("hijaz", "ar-sa-hijazi"), ("uae", "ar-ae"), ("emira", "ar-ae"), ("kuwai", "ar-kw"), ("-kw-", "ar-kw"),
+                ("qatar", "ar-qa"), ("bahrain", "ar-bh"), ("oman", "ar-om"), ("saudi", "ar-sa-najdi"), ("-sa-", "ar-sa-najdi"), ("gulf", "ar-gulf"), ("khaleej", "ar-gulf"))
+
+
+def munsit_dialect(x: dict) -> str | None:
+    txt = " ".join(str(x.get(k) or "") for k in ("voice_id", "id", "description", "dialect", "accent")).lower() + " " + " ".join(map(str, x.get("languages") or [])).lower()
+    if any(w in txt for w in ("fusha", "msa", "formal", "modern standard")) and not any(h in txt for h, _ in MUNSIT_HINTS):
+        return None
+    return next((d for h, d in MUNSIT_HINTS if h in txt), "ar-gulf")
+
+
+def merge_munsit(voices: list[dict]) -> int:
+    added = 0
+    for x in voices or []:
+        vid = str(x.get("voice_id") or x.get("id") or "")
+        dia = munsit_dialect(x)
+        if not vid or not dia or dia not in DIALECTS:
+            continue
+        key = f"munsit:{vid}"
+        g = "female" if str(x.get("gender") or "").lower().startswith(("f", "w")) else "male"
+        name = x.get("name") or vid
+        VOICES[key] = {"label": f"{name} ({'ست' if g == 'female' else 'راجل'})", "provider": "munsit", "voice": vid, "dialect": dia, "gender": g,
+                       "per_1k": MUNSIT_PER_1K}
+        if key not in DIALECTS[dia]["voices"]:
+            # أصوات منصت قبل أصوات فصيح في لهجتها (بالترتيب اللي جت بيه)
+            at = sum(1 for v in DIALECTS[dia]["voices"] if VOICES.get(v, {}).get("provider") == "munsit")
+            DIALECTS[dia]["voices"].insert(at, key)
+            added += 1
+    return added
+
+
 GUIDES = {
     "ar-eg-cairo": ("عامية مصرية قاهرية طبيعية زي ما صناع المحتوى المصريين بيتكلموا. كلام زي: بص، يعني، كده، دلوقتي، عشان، مش، إيه، ليه، إزاي، أوي، خالص، "
                     "بقى، طب، يلا، هـ للمستقبل (هقولك)، بـ للمضارع (بيعمل)، ده/دي/دول. ممنوع الفصحى (سوف، لماذا، هذا، الذي، لكي، جدًا)."),

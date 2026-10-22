@@ -101,7 +101,7 @@ function renderProviders(d) {
     return `<div class="prov ${st[1]}" data-prov="${p.key}"><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.what)}</small></div>
       <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
       <span class="prov-st">${st[0]}</span>
-      ${p.key === "zernio" || p.key === "fasih" ? "<span></span>" : `<label class="prov-min">نبّهني تحت <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
+      ${p.key === "zernio" || p.key === "fasih" || p.key === "munsit" ? "<span></span>" : `<label class="prov-min">نبّهني تحت <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
       ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}</div>`;
   }).join("");
   $("provAt").textContent = d.checked ? `آخر تشييك ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
