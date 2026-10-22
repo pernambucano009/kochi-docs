@@ -92,7 +92,8 @@ const NH = (() => {
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
-    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish" };
+    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
+    inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;

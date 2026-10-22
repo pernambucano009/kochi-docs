@@ -361,6 +361,36 @@ window.NHGL = (stage, getClient) => {
       const base = new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, .1, 40), m); base.position.y = -1.15;
       return [cap, arc, stem, base];
     },
+    // 📤 أقسام النشر: الكومنتات والرسايل، إعلاناتك، وصفة الاستهداف، حملات واتساب
+    inbox(m) {   // فقاعة كلام بديل وتلات نقط
+      const P = [V2(-1.25, -.75), V2(-.55, -.75), V2(-.95, -1.25), V2(-.05, -.75), V2(1.25, -.75), V2(1.25, .95), V2(-1.25, .95)];
+      const out = dish(m, roundPoly(P, .22), [], { rim: .1 });
+      for (const x of [-.55, 0, .55]) { const d = new THREE.Mesh(sph(.15), m); d.position.set(x, .1, .12); out.push(d); }
+      return out;
+    },
+    adsmgr(m) {   // ميكروفون إعلانات (بوق): بوق مفتوح وإيد
+      const horn = new THREE.Mesh(new THREE.CylinderGeometry(.95, .32, 1.55, 64, 1, true), m); horn.rotation.z = Math.PI / 2; horn.position.x = .25;
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(.95, .11, 24, 96), m); lip.rotation.y = Math.PI / 2; lip.position.x = 1.02;
+      const back = new THREE.Mesh(capsule(.34, .35), m); back.rotation.z = Math.PI / 2; back.position.x = -.78;
+      const grip = new THREE.Mesh(capsule(.14, .55), m); grip.position.set(-.35, -.62, 0); grip.rotation.z = -.2;
+      return [horn, lip, back, grip];
+    },
+    audience(m) {   // تارجت: حلقتين وبؤرة
+      const out = [.55, 1.15].map((r) => new THREE.Mesh(new THREE.TorusGeometry(r, .13, 28, 120), m));
+      out.push(new THREE.Mesh(sph(.24), m));
+      const dart = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, 1.6, 20), m); dart.position.set(.62, .62, .5); dart.rotation.set(.6, 0, -Math.PI / 4);
+      out.push(dart);
+      return out;
+    },
+    wacamp(m) {   // فقاعة مدوّرة بديل وعلامة «اتبعت»
+      const P = [];
+      for (let i = 0; i < 40; i++) { const a = -Math.PI * .62 + i / 40 * Math.PI * 1.8; P.push(V2(Math.cos(a) * 1.2, Math.sin(a) * 1.2)); }
+      P.push(V2(-1.15, -1.2));
+      const out = dish(m, roundPoly(P, .08, 6), [], { rim: .1 });
+      const tick = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-.5, .05, .12), new THREE.Vector3(-.12, -.32, .12), new THREE.Vector3(.55, .42, .12)], false, "catmullrom", .05), 64, .12, 24, false), m);
+      out.push(tick);
+      return out;
+    },
   };
   BUILD.pulse = BUILD.progress;
 
