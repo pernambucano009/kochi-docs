@@ -362,18 +362,6 @@ window.NHGL = (stage, getClient) => {
       return [cap, arc, stem, base];
     },
   };
-  // 🛫 الأوتوبايلوت: سهم بيلف حوالين نفسه (شغل بيتكرر لوحده) زي أنبوبة «شغّال عليه»
-  BUILD.pilot = (m) => {
-    const R = 1.15, a0 = Math.PI * .62, a1 = Math.PI * 2.32, pts = [];
-    for (let i = 0; i <= 48; i++) { const a = a0 + (a1 - a0) * i / 48; pts.push(new THREE.Vector3(Math.cos(a) * R, Math.sin(a) * R, 0)); }
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, .16, 32, false), m);
-    const end = pts[pts.length - 1], dir = end.clone().sub(pts[pts.length - 2]).normalize();
-    const head = new THREE.Mesh(new THREE.ConeGeometry(.36, .62, 40), m);
-    head.position.copy(end.clone().add(dir.clone().multiplyScalar(.22)));
-    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    const cap = new THREE.Mesh(sph(.16, 32, 24), m); cap.position.copy(pts[0]);
-    return [tube, head, cap];
-  };
   BUILD.pulse = BUILD.progress;
 
   // طبقة لمعة فوق الزجاج (الماتكاب اللي فوق)، شغالة على أي شكل
@@ -389,7 +377,7 @@ window.NHGL = (stage, getClient) => {
   });
   const RIM = () => 1;   // حافة منوّرة رفيعة زي حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
-  const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"], loader = new THREE.TextureLoader(), imgPlanes = [];
+  const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "autopilot"], loader = new THREE.TextureLoader(), imgPlanes = [];
   // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
   const texCache = {};
   const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=9`;
