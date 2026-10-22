@@ -2313,7 +2313,28 @@ label.dim { opacity: .4; }
 #nh .nh-wh-cat b { font-size: 13.5px; font-weight: 600; } #nh .nh-wh-cat small { font-size: 10.5px; opacity: .65; }
 #nh .nh-wh-cat.near { background: color-mix(in srgb, var(--wh-gen-ink) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wh-gen-ink) 26%, transparent); }
 #nh .nh-wh-cat.main b::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-inline-end: 7px; border-radius: 50%; border: 2.5px solid var(--nh-accent, #E5613E); vertical-align: -1px; }
-#nh .nh-wh-cat.main.near { box-shadow: inset 0 0 0 1.5px var(--nh-accent, #E5613E); }
+/* المربع حوالين القسم محفور جوه الكورة: غاطس لجوه بضل من فوق ولمعة خفيفة من تحت، ومايعدّيش حرف الكورة */
+#nh .nh-wh-cat.near { background: rgba(0, 0, 0, .28);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(255, 255, 255, .1), inset 0 0 0 1px rgba(255, 255, 255, .06); }
+#nh .nh-wh-cat.main.near { box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(255, 255, 255, .1), inset 0 0 0 1.5px color-mix(in srgb, var(--nh-accent, #E5613E) 85%, transparent), inset 0 0 12px rgba(229, 97, 62, .22); }
+/* 🧩 تابين «القوالب»: جاهزة ومخصصة */
+#nh .nh-wh-kind { position: absolute; z-index: 5; top: 104px; right: 64px; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--nh-fill, rgba(127, 127, 127, .08)); }
+#nh .nh-wh-kind button { height: 32px; padding: 0 16px; border-radius: 999px; font-size: 12.5px; color: var(--nh-muted); transition: background .2s, color .2s; }
+#nh .nh-wh-kind button.on { background: var(--card, #fff); color: var(--nh-ink); box-shadow: 0 2px 8px rgba(24, 23, 24, .08); }
+#nh .nh-wh.cat-other .nh-wh-kind { display: none; }
+#nh .nh-wh:not(.cat-other) .nh-wh-panel { top: 160px; }
+#nh .nh-ct { display: grid; gap: 14px; }
+#nh .nh-ct-hint { margin: 0; font-size: 13px; line-height: 1.8; color: var(--nh-muted); max-width: 560px; }
+#nh .nh-ct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+#nh .nh-ct-card { display: grid; gap: 4px; justify-items: start; text-align: start; padding: 16px; border-radius: 18px; background: var(--card, #fff); box-shadow: 0 4px 24px rgba(24, 23, 24, .06); transition: transform .25s; }
+#nh .nh-ct-card:hover { transform: translateY(-3px); }
+#nh .nh-ct-card i { font-style: normal; font-size: 22px; }
+#nh .nh-ct-card b { font-size: 14px; font-weight: 500; }
+#nh .nh-ct-card small { font-size: 11.5px; color: var(--nh-muted); }
+#nh .nh-ct-card.new { background: none; box-shadow: inset 0 0 0 1.5px var(--nh-line, rgba(127, 127, 127, .25)); color: var(--nh-muted); }
+@media (max-width: 720px) { #nh .nh-wh-kind { position: static; margin: 0 auto 10px; } }
+/* «الرئيسية» وهي بتطلع لفوق مع الهوفر مابتتقصّش */
+#nhBar .nh-crumbs { padding-block: 6px; margin-block: -6px; }
 #nh .nh-wh-mcats { display: none; }
 /* اللي على اليمين لما تختار قسم غير المشاريع: صفحته بتظهر مكان القوالب */
 #nh .nh-wh-panel { position: absolute; z-index: 4; top: 96px; bottom: 0; right: 64px; left: 50%; overflow: auto; padding: 8px 8px 28px 0; }
