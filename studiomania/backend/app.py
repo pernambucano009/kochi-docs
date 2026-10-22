@@ -22241,6 +22241,8 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
         return {"id": tid, "name": name or "تايبوجرافي", "cat": cat, "desc": desc, "kind": "typo"}
     if tid == "phone":
         return {"id": tid, "name": name or "تصوير بالموبايل", "cat": cat, "desc": desc, "kind": "phone"}
+    if tid == "carousel":   # 🖼️ كاروسيل صور (الأوتوبايلوت): فكرة ← نص السلايدات ← الشكل العام ← السلايدات
+        return {"id": tid, "name": name or "كاروسيل", "cat": cat, "desc": desc, "kind": "carousel"}
     if tid == "avatar":   # 🪞 نفس سكريبت الكلام للكاميرا، بس اللي بيقوله نسختك (الأوتوبايلوت)
         return {"id": tid, "name": name or "تصوير الفيديو بالأفاتار", "cat": cat, "desc": desc, "kind": "avatar"}
     try:
@@ -22275,6 +22277,9 @@ def flow_profile(tpl: dict) -> str:
             out.append("الخانات اللي بتتغير في القالب (والباقي شكل وحركة ثابتين مبيتغيروش):\n" + "\n".join(rows))
         out.append("يعني: الفكرة لازم تتحكي بالكامل جوه الخانات دي وبنفس تسلسل القالب. مفيش مشاهد أو شخصيات أو أماكن جديدة غير اللي القالب بيرسمها، "
                    "الكلام بس (والألوان) هو اللي بيتغير. خلي الكلام بنفس طول الأمثلة تقريبًا.")
+    elif kind == "carousel":
+        out.append("القالب ده كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد هوك بيشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
+                   "وآخر سلايد دعوة. الفكرة لازم تتقسم لنقط أو خطوات أو مقارنة أو قايمة، مش حكاية فيديو.")
     elif kind in ("phone", "avatar"):
         out.append("القالب ده فيديو بيصوّره صاحب البراند بنفسه بالموبايل وهو بيتكلم للكاميرا (Talking head)، ومعاه لقطات قصيرة يصورها (B-roll). "
                    "السكريبت = الجمل اللي هيقولها بصوته بالترتيب، بلغة طبيعية سهلة تتقال، والهوك أول جملة، وكل beat فيه say (اللي هيتقال) "
@@ -22548,7 +22553,7 @@ def flow_list():
             d = json.loads(f.read_text(encoding="utf-8"))
         except ValueError:
             continue
-        if owned(d.get("client_id")) and (d.get("template") or {}).get("kind") != "avatar":   # الأفاتار بيتعمل من الأوتوبايلوت بس
+        if owned(d.get("client_id")) and (d.get("template") or {}).get("kind") not in ("avatar", "carousel"):   # الأفاتار والكاروسيل بيتعملوا من الأوتوبايلوت بس
             out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
                         "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
     return sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)[:40]
@@ -22713,11 +22718,12 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
             if not it:
                 raise HTTPException(404, "الفكرة دي مش موجودة")
         # قالب كود (موشن أو تايبوجرافي): مفيش نوع بوست، على السكريبت على طول
-        code = d["template"].get("kind") in ("motion", "typo", "phone", "avatar")
-        d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "reel"} if code else {}))
+        kd = d["template"].get("kind")
+        code = kd in ("motion", "typo", "phone", "avatar", "carousel")
+        d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "carousel" if kd == "carousel" else "reel"} if code else {}))
     d = flow_update(fid, fn)
     mark_idea_used(d, d["idea"], fid)
-    if d["template"].get("kind") in ("motion", "typo", "phone", "avatar"):
+    if d["template"].get("kind") in ("motion", "typo", "phone", "avatar", "carousel"):
         flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid))
     return flow_to_dict(fid, flow_load(fid))
 
@@ -22800,7 +22806,7 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") == "motion"
         # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
         kd = d["template"].get("kind")
-        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "cast", **({"vo_track": None} if code else {}))
+        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "carousel" if kd == "carousel" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     d = flow_update(fid, fn)
@@ -28908,7 +28914,7 @@ def pilot_job_set(jid: str, **kw) -> None:
 
 
 def pilot_kind(tpl: str) -> str:
-    return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar") else "motion"
+    return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar", "carousel") else "motion"
 
 
 def pilot_tpl_name(tpl: str, names: dict) -> str:
@@ -28916,6 +28922,8 @@ def pilot_tpl_name(tpl: str, names: dict) -> str:
         return "تصوير بالموبايل"
     if tpl == "avatar":
         return "تصوير الفيديو بالأفاتار"
+    if tpl == "carousel":
+        return "كاروسيل"
     if tpl.startswith("auto:"):
         try:
             return auto_load(tpl[5:], active_client_id()).get("name") or "قالب مخصص"
@@ -29050,7 +29058,10 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         when = max(datetime.fromisoformat(j["at"]), datetime.now(timezone.utc) + timedelta(minutes=3))
         plats = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
         caption = j.get("caption") or (pilot_caption(flow_load(j["fid"])) if j.get("fid") else j["name"])
-        post = create_post(PostIn(export_id=j["export_id"], caption=caption, platforms=plats, scheduled_at=when))
+        if kind == "carousel":   # 🖼️ الكاروسيل بيتنشر صور على إنستجرام
+            post = publish_carousel(j["carousel_id"], CarouselPostIn(caption=caption, scheduled_at=when))
+        else:
+            post = create_post(PostIn(export_id=j["export_id"], caption=caption, platforms=plats, scheduled_at=when))
         notify("autopilot", "ok", f"🛫 اتجدول: {j['name']}", when.isoformat(timespec="minutes"), "7", post["id"])
         return put(status="done", phase="done", gate=None, post_id=post["id"], note="اتجدول")
 
@@ -29086,8 +29097,55 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             return
         pick = j.get("pick") if any(x["id"] == j.get("pick") for x in d["scenarios"]) else d["scenarios"][0]["id"]
         flow_pick_scenario(fid, FlowPickIn(id=pick))
-        nxt = {"motion": "voice", "phone": "shoot", "avatar": "say"}[kind]
+        nxt = {"motion": "voice", "phone": "shoot", "avatar": "say", "carousel": "car"}[kind]
         return put(phase=nxt, pick=None, note="بيكمّل")
+
+    # 🖼️ الكاروسيل: نص السلايدات ← الشكل العام (مراجعة «المونتاج») ← السلايدات
+    if ph == "car":
+        sc = d.get("scenario") or {}
+        n = max(2, min(10, len(sc.get("slides") or []) or 6))
+        if not atlas.mock_mode():
+            wallet.need(wallet.credits(wallet.est(chars=12000, images=n + 1)), "كاروسيل")
+        car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
+        cid = car["id"]
+        patch_carousel(cid, CarouselPatch(settings={"slides": n}))
+        brief = flow_brief({**d, "_id": fid})
+        put(phase="car_plan", carousel_id=cid, note="بيكتب السلايدات")
+
+        def write():   # الكتابة بتاخد دقيقة: في الخلفية عشان لفة المجدول ماتقفش
+            try:
+                carousel_chat(cid, ChatIn(message="اعمل الكاروسيل ده بالظبط، بنفس السلايدات والكلام:\n" + brief))
+                carousel_plan(cid)
+                carousel_overview(cid)
+                pilot_job_set(jid, phase="car_over", note="بيرسم الشكل العام")
+            except Exception as exc:  # noqa: BLE001
+                pilot_job_set(jid, status="failed", error=str(getattr(exc, "detail", None) or exc)[:300], note=None)
+        threading.Thread(target=write, daemon=True).start()
+        return
+    if ph == "car_plan":
+        return
+    if ph in ("car_over", "car_slides"):
+        c = get_carousel(j["carousel_id"])
+        if c["busy"]:
+            return
+        if ph == "car_over":
+            if c["overview"]["status"] == "failed":
+                raise HTTPException(400, c["overview"].get("error") or "رسم الشكل العام وقف")
+            if c["overview"]["status"] != "done":
+                return
+            if gate("montage", "شكل الكاروسيل جاهز: شوفه ووافق عشان يرسم السلايدات"):
+                return
+            carousel_approve(j["carousel_id"])
+            carousel_slides(j["carousel_id"])
+            return put(phase="car_slides", note="بيرسم السلايدات")
+        bad = [s for s in c["slides"] if s.get("status") == "failed"]
+        if bad:
+            raise HTTPException(400, bad[0].get("error") or "سلايد وقفت")
+        if any(s.get("status") != "done" for s in c["slides"]):
+            return put(note=f"بيرسم السلايدات {sum(s.get('status') == 'done' for s in c['slides'])}/{len(c['slides'])}")
+        if not atlas.mock_mode():   # الرسم والكتابة على حساب العميل
+            wallet.charge(wallet.credits(wallet.est(chars=12000, images=len(c["slides"]) + 1)), "الأوتوبايلوت: كاروسيل", jid)
+        return put(phase="final", note="الكاروسيل جاهز")
 
     # 🎨 قالب كود: فويس أوفر ← رسم الفيديو
     if ph == "voice":
@@ -29231,6 +29289,12 @@ def pilot_job_dict(j: dict) -> dict:
         with closing(db()) as conn:
             r = conn.execute("SELECT filename FROM exports WHERE id = ?", (j["export_id"],)).fetchone()
         out["video_url"] = f"/media/exports/{r['filename']}" if r else None
+    if j.get("carousel_id"):   # صور الكاروسيل: الشكل العام وقت مراجعته، والسلايدات بعد ما تترسم
+        try:
+            c = get_carousel(j["carousel_id"])
+            out["images"] = [s["url"] for s in c["slides"] if s.get("url")] or ([c["overview"]["url"]] if c["overview"].get("url") else [])
+        except HTTPException:
+            out["images"] = []
     return out
 
 
@@ -29288,7 +29352,7 @@ def pilot_put(body: PilotIn, request: Request):
         if body.tz is not None:
             s["tz"] = max(-720, min(840, int(body.tz)))
         if body.templates is not None:
-            s["templates"] = [t for t in dict.fromkeys(body.templates) if t in ("phone", "avatar") or t.startswith("auto:") or re.fullmatch(r"t-[\w-]+", t)][:30]
+            s["templates"] = [t for t in dict.fromkeys(body.templates) if t in ("phone", "avatar", "carousel") or t.startswith("auto:") or re.fullmatch(r"t-[\w-]+", t)][:30]
         if body.mode in ("auto", "approve"):
             s["mode"] = body.mode
         if body.steps is not None:

@@ -83,6 +83,8 @@ const PilotPage = (() => {
 #nh .ap .ap-acts .ok { background: var(--nh-accent); color: #fff; }
 #nh .ap-acts input { display: none; }
 #nh .ap-say { margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--ap-field); font-size: 12.5px; line-height: 1.8; }
+#nh .ap-imgs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+#nh .ap-imgs img { height: 150px; border-radius: 10px; flex: none; }
 #nh .ap-qi video { width: 100%; max-height: 260px; border-radius: 12px; background: #000; }
 #nh .ap-err { font-size: 11.5px; color: #C2482E; }
 #nh .ap-none { padding: 16px; text-align: center; font-size: 12.5px; color: var(--nh-muted); }
@@ -157,6 +159,7 @@ const PilotPage = (() => {
       { id: "phone", n: "تصوير بالموبايل", k: "قالب", tag: ["cam", "📱 محتاج تصوّر بنفسك"] },
       { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بنسخة ${twin.name}` : "قالب", tag: twin ? null : ["", "محتاج نسخة في «نسختي»"], off: !twin },
       ...d.custom.map((c) => ({ id: c.id, n: c.name, k: "قالب مخصص" })),
+      { id: "carousel", n: "كاروسيل", k: "قالب", tag: ["", "🖼️ صور على إنستجرام"] },
       ...d.settings.templates.filter((t) => t.startsWith("t-")).map((t) => ({ id: t, n: names[t] || codeTpls().find((x) => x.id === t)?.name || t, k: "قالب" })),
     ];
   }
@@ -177,6 +180,8 @@ const PilotPage = (() => {
       ? STEP_N.map(([k, n], i) => `${i ? "<i>←</i>" : ""}<button type="button" data-step="${k}" class="${s.steps.includes(k) ? "on" : ""}">${s.steps.includes(k) ? "✓ " : ""}${n}</button>`).join("")
       : `<small style="font-size:12.5px;color:var(--nh-muted)">بيختار الفكرة ويكتب السكريبت ويعمل الفيديو وينشر من غير ما يرجعلك${cam ? " · قالب الموبايل هيستناك تصوّر" : ""}</small>`;
   }
+  // صور الكاروسيل صف واحد بيتسحب بالعرض
+  const imgs = (j) => (j.images || []).length ? `<div class="ap-imgs">${j.images.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div>` : "";
   const ST = { run: "شغّال", wait: "مستنيك", cam: "مستني تصويرك", done: "اتجدول", failed: "وقف", stopped: "اتوقف" };
   function jobHTML(j) {
     const head = `<div class="ap-qh"><div class="tx">${esc(j.title || j.name)}<small>${esc(when(j.at))} · ${esc(j.name)}${j.note && j.status === "run" ? ` · ${esc(j.note)}` : ""}</small></div>
@@ -185,6 +190,10 @@ const PilotPage = (() => {
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
         <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختار فكرة" : "اختار سكريبت"}</span><button type="button" data-stop="${esc(j.id)}">شيل الميعاد ده</button></div>`;
+    } else if (j.status === "wait" && j.gate === "montage" && j.kind === "carousel") {
+      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم السلايدات</button></div>`;
+    } else if (j.status === "wait" && j.gate === "video" && j.kind === "carousel") {
+      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage") {
       body = `<div class="ap-acts"><button type="button" data-edit="${esc(j.project_id)}">افتح المونتاج</button><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، صدّره</button></div>`;
     } else if (j.status === "wait" && j.gate === "video") {
@@ -195,6 +204,8 @@ const PilotPage = (() => {
         <div class="ap-acts"><label class="ok">📱 ارفع الفيديو اللي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">شيل الميعاد ده</button></div>`;
     } else if (j.status === "failed") {
       body = `<span class="ap-err">${esc(j.error || "")}</span><div class="ap-acts"><button type="button" data-retry="${esc(j.id)}">جرّب تاني</button><button type="button" data-del="${esc(j.id)}">امسحها</button></div>`;
+    } else if (j.status === "done" && (j.images || []).length) {
+      body = imgs(j);
     } else if (j.status === "done" && j.video_url) {
       body = `<div class="ap-acts"><a href="${esc(j.video_url)}" target="_blank" rel="noopener">شوف الفيديو</a></div>`;
     }

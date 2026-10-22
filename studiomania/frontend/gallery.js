@@ -10,6 +10,8 @@ const Gallery = (() => {
     // 🪞 رقم ٢: نفس الكلام للكاميرا بس نسختك (من «نسختي») هي اللي بتقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
     { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cat: "ugc", pin: 2,
     desc: "نفس فكرة التصوير بالموبايل، بس من غير ما تصوّر: نسختك (من «نسختي») هي اللي بتقول السكريبت بوشّك وحركتك." },
+    { id: "carousel", name: "كاروسيل", icon: "🖼️", cat: "social", pin: 4,
+    desc: "صور ورا بعض على إنستجرام: سلايد هوك يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل البراند وألوانه." },
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
     desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل بيطلّع فيديو جديد. وبيظهر في الأوتوبايلوت كقالب تختاره." },
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
@@ -459,6 +461,7 @@ const Gallery = (() => {
           if (x.id === "hairline") return startHairline();
           if (x.id === "avatar") return showStep("16");
           if (x.id === "custom") return window.NHNav?.("auto");
+          if (x.id === "carousel") return showStep("8");
           return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
         }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
