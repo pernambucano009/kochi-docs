@@ -2275,6 +2275,10 @@ label.dim { opacity: .4; }
 #nh .id-h b { font-size: 15px; font-weight: 500; }
 #nh .id-hook { margin: 0; color: var(--nh-accent, #E5613E); font-size: 13.5px; }
 #nh .id-t { margin: 0; font-size: 13.5px; line-height: 1.7; white-space: pre-line; }
+#nh .id-script, #nh .id-src { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--nh-fill, rgba(127, 127, 127, .07)); }
+#nh .id-script p { margin: 0; font-size: 13.5px; line-height: 1.9; white-space: pre-line; }
+#nh .id-src ul { margin: 0; padding-inline-start: 18px; font-size: 12.5px; line-height: 1.8; }
+#nh .id-drop { margin: 0; font-size: 12px; }
 #nh .id-card audio { width: 100%; height: 36px; }
 #nh .id-link { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root[data-nh-theme="dark"] #nh .id-in { border-color: rgba(255, 255, 255, .12); }

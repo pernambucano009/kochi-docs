@@ -22672,6 +22672,9 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     brain = flow_brain(d)
     idea = d.get("idea") or {}
     idea_txt = "\n".join(str(idea.get(k) or "") for k in ("title", "hook", "idea") if idea.get(k))
+    if idea.get("script"):   # 📝 العميل نسّق فكرته كسكريبت (بسنداته): الكلام المنطوق يمشي عليه زي ما هو
+        idea_txt += ("\nسكريبت العميل الجاهز: الكلام المنطوق يمشي عليه زي ما هو (تقدر تقسّمه على المشاهد بس)، "
+                     "والآيات والأحاديث والمراجع اللي فيه تتقال بنصها بالظبط ومتتشالش ومتتغيرش:\n" + str(idea["script"])[:6000])
     if (pk := idea.get("pack")) and pk.get("for", idea.get("hook")) == idea.get("hook"):   # الهوك التلاتي (لو العميل مابدّلش الهوك): أول مشهد لازم يبقى عليه
         idea_txt += ("\nالهوك التلاتي (أول مشهد لازم يطبقه بالظبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · اللي بيتشاف: " + pk.get("visual", "")
                      + " · اللي بيتقال: «" + pk.get("spoken", "") + "» · جمل القفل بعده: «" + pk.get("lockin", "") + "»")
@@ -23125,6 +23128,7 @@ def my_ideas_dir(cid: str) -> Path:
 def my_idea_dict(s: dict) -> dict:
     it = s["item"]
     return {"id": s["id"], "title": it.get("title") or "", "text": it.get("idea") or "", "hook": it.get("hook") or "", "url": it.get("url") or "",
+            "script": it.get("script") or "", "sources": it.get("sources") or [], "dropped": it.get("dropped") or 0,
             "audio_url": f"/api/my-ideas/{s['id']}/audio" if it.get("audio") else None, "status": s.get("status") or "ready", "error": s.get("error"),
             "polished": bool(it.get("raw")), "mine": bool(s.get("mine")), "at": s.get("at"), "used_at": s.get("used_at")}
 
@@ -23262,7 +23266,102 @@ def my_ideas_revert(iid: str):
     cid = my_ideas_cid()
     s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
     if s and s["item"].get("raw"):
-        set_my_idea(cid, iid, item={**s["item"]["raw"], "raw": None})
+        set_my_idea(cid, iid, item={**s["item"]["raw"], "raw": None, "script": "", "sources": [], "dropped": 0})
+    return my_ideas_list()
+
+
+# 📝 «نسّق كسكريبت»: الفكرة بتتكتب كلام يتقال، ومعاها سندات (آيات، أحاديث، كتب، دراسات) في مكانها لو موجودة فعلًا، من غير اختراع.
+# الآيات بتتراجع على نص القرآن (api.alquran.cloud) وبتتحط بنصها الرسمي، واللي مايتأكدش منه بيتشال.
+SRC_KINDS = {"quran": "آية", "hadith": "حديث", "book": "كتاب", "study": "دراسة", "other": "مرجع"}
+AR_DIG = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
+
+
+def quran_ayah(surah: int, ayah: int) -> dict | None:
+    """النص الرسمي للآية واسم السورة، أو None لو الآية مش موجودة أو مقدرناش نوصل."""
+    try:
+        r = httpx.get(f"https://api.alquran.cloud/v1/ayah/{int(surah)}:{int(ayah)}/quran-simple", timeout=15)
+        d = r.json().get("data") if r.status_code == 200 else None
+        if isinstance(d, dict) and d.get("text"):
+            return {"text": d["text"].strip(), "surah": str((d.get("surah") or {}).get("name") or "").replace("سُورَةُ", "").strip()}
+    except (httpx.HTTPError, ValueError, TypeError):
+        pass
+    return None
+
+
+def drop_line(script: str, sid: str) -> str:
+    """السند اللي اتشال بيتشال سطره كله (المقدمة بتاعته زي «وربنا قال:» مالهاش لازمة من غيره)."""
+    return "\n".join(ln for ln in script.split("\n") if f"[[{sid}]]" not in ln)
+
+
+def script_sources(raw: dict) -> tuple[str, list[dict], int]:
+    """بيحط نص كل سند مكان علامته [[S1]] في السكريبت. الآيات بنصها الرسمي، واللي مايتأكدش بيتشال هو وعلامته."""
+    script = str(raw.get("script") or "").strip()
+    out, dropped = [], 0
+    for i, x in enumerate(raw.get("sources") or [], 1):
+        if not isinstance(x, dict):
+            continue
+        sid = str(x.get("id") or f"S{i}").strip("[] ")
+        kind = x.get("kind") if x.get("kind") in SRC_KINDS else "other"
+        quote, ref = str(x.get("quote") or "").strip()[:1200], str(x.get("ref") or "").strip()[:300]
+        if kind == "quran":
+            try:
+                ay = quran_ayah(int(x.get("surah")), int(x.get("ayah")))
+            except (TypeError, ValueError):
+                ay = None
+            if not ay:
+                dropped += 1
+                script = drop_line(script, sid)
+                continue
+            quote, ref = ay["text"], f"{ay['surah'] or ref} ({str(int(x['ayah'])).translate(AR_DIG)})"
+            text = f"﴿{quote}﴾ [{ref}]"
+        elif not quote or not ref:
+            dropped += 1
+            script = drop_line(script, sid)
+            continue
+        else:
+            text = f"«{quote}» ({ref})"
+        script = script.replace(f"[[{sid}]]", text) if f"[[{sid}]]" in script else f"{script}\n{text}"
+        out.append({"kind": kind, "label": SRC_KINDS[kind], "ref": ref, "quote": quote, "where": str(x.get("where") or "").strip()[:300]})
+    return re.sub(r"\[\[S\d+\]\]", "", script).strip(), out, dropped
+
+
+@app.post("/api/my-ideas/{iid}/script")
+def my_ideas_script(iid: str):
+    cid = my_ideas_cid()
+    s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
+    if not s:
+        raise HTTPException(404, "الفكرة دي مش موجودة")
+    it = s["item"]
+    raw = it.get("raw") or {k: it.get(k) or "" for k in ("title", "idea", "hook")}
+    src = f"{raw.get('idea') or ''}\n{('لينك مرجعي: ' + it['url']) if it.get('url') else ''}".strip()
+    if not src:
+        raise HTTPException(400, "الفكرة فاضية لسه")
+    if atlas.mock_mode():
+        out = {"title": (raw.get("title") or "فكرة")[:50], "hook": "استنى قبل ما تقفل الفيديو",
+               "script": f"{raw.get('idea', '')}\nوربنا قال: [[S1]]\nوده اللي اتأكد في دراسة: [[S2]]",
+               "sources": [{"id": "S1", "kind": "quran", "surah": 94, "ayah": 5, "ref": "الشرح 5", "quote": "", "where": "الصبر"},
+                           {"id": "S2", "kind": "study", "ref": "دراسة تجريبية (2020)", "quote": "", "where": "تجربة"}]}
+    else:
+        wallet.need(1, "تنسيق الفكرة كسكريبت")
+        msgs = [{"role": "system", "content": "You turn a creator's raw idea into a spoken short-form video script, in the same language and dialect they wrote in. "
+                                              "Keep every point they made, keep their voice, and do not invent facts, products, prices or names. "
+                                              "Add supporting sources ONLY when they genuinely exist and you are certain of them: Quran verses (give surah number and ayah number), "
+                                              "well-known authentic hadith (with the collection, e.g. صحيح البخاري), real books (author + title), or real published studies "
+                                              "(authors/institution + year + journal or source). If you are not sure a source exists exactly as you cite it, leave it out. "
+                                              "Zero sources is a fine answer. Never make up a quote, a number, a year or a study. Return JSON only."},
+                {"role": "user", "content": f"Brand context:\n{growth_brand()[:3000]}\n\nRaw idea notes:\n{src[:4000]}\n\n"
+                                            'Return JSON: {"title": "short title (max 8 words)", "hook": "the first spoken line (2 seconds)", '
+                                            '"script": "the full spoken script, short lines separated by \\n. Put a marker like [[S1]] exactly where each source is quoted, on its own line together with its short lead-in", '
+                                            '"sources": [{"id": "S1", "kind": "quran|hadith|book|study|other", "surah": 0, "ayah": 0, '
+                                            '"ref": "where it comes from (book/author/year, hadith collection, study authors + year + journal)", '
+                                            '"quote": "the exact wording (for quran leave empty, we fetch it)", "where": "which point of the script it supports"}]}'}]
+        out = az.parse_json(series_chat(msgs), "تنسيق السكريبت")
+        wallet.charge(wallet.credits(wallet.est(chars=len(src) + 9000)), "فولدر الأفكار: تنسيق فكرة كسكريبت", iid)
+    script, sources, dropped = script_sources(out if isinstance(out, dict) else {})
+    if not script:
+        raise HTTPException(502, "التنسيق مارجعش سكريبت، جرّب تاني")
+    set_my_idea(cid, iid, item={"title": str(out.get("title") or raw.get("title") or "")[:200], "hook": str(out.get("hook") or "")[:400],
+                                "idea": raw.get("idea") or "", "script": script[:6000], "sources": sources, "dropped": dropped, "raw": raw})
     return my_ideas_list()
 
 
