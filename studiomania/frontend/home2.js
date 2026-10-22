@@ -678,10 +678,15 @@ const NH = (() => {
     const list = crumbs(), nav = document.getElementById("nhCrumbs");
     const deep = list.length > 1;
     bar.classList.toggle("deep", deep);
-    document.getElementById("nhGoBack").hidden = !deep;
-    nav.hidden = !deep;
-    nav.innerHTML = list.map((c, k) => k === list.length - 1 ? `<b aria-current="page">${esc(c.label)}</b>`
-      : `<button type="button" data-crumb="${k}">${esc(c.label)}</button><i aria-hidden="true">›</i>`).join("");
+    // في الرئيسية التسلسل مابيختفيش: «الرئيسية» زي ما هي وجنبها مربع فاضي (الكلام اللي جواه بس هو اللي بيمشي)، و«رجوع» مكانه محجوز
+    const back = document.getElementById("nhGoBack");
+    back.hidden = false;
+    back.classList.toggle("off", !deep);
+    back.tabIndex = deep ? 0 : -1;
+    nav.hidden = false;
+    nav.innerHTML = list.map((c, k) => k === list.length - 1 && deep ? `<b class="nh-cb" aria-current="page">${esc(c.label)}</b>`
+      : `<button type="button" class="nh-cb" data-crumb="${k}" ${deep ? "" : 'aria-current="page"'}>${esc(c.label)}</button><i aria-hidden="true">›</i>`).join("")
+      + (deep ? "" : `<span class="nh-cb nh-cb-empty" aria-hidden="true"></span>`);
     nav._list = list;
   }
   // رجوع خطوة واحدة: القسم اللي قبله، أو تقفل القسم، أو الصفحة اللي قبلها، أو الرئيسية
@@ -698,6 +703,7 @@ const NH = (() => {
     }
   }
   window.NHBar = () => renderBar();
+  setTimeout(renderBar, 0);   // من أول فتحة: «الرئيسية» والمربع الفاضي جنبها
   // تدوس على أي حتة في التسلسل: ترجع لها بالظبط
   async function goCrumb(k) {
     if (busy) return;
