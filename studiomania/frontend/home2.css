@@ -2425,3 +2425,11 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 /* الرفعة في الهوفر بتزق الزرار من تحت الماوس لو واقف على طرفه، فبيرتعش (هوفر/مش هوفر). مساحة شفافة حواليه بتمسك الهوفر */
 .nh-tile:hover::after, .nh-cta:hover::after, #nh .nh-pj-card:hover::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; }
 #nh .nh-pj-card, .nh-cta { position: relative; }
+
+/* 🏷️ عقل البراند: اللي اتكتب في كل نقطة باين جنبها (أول كام كلمة…)، والنقط اللي لينك لصفحة دايرة فاضية بخط */
+#nh .bm-lab { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 10.5px; line-height: 1; color: var(--nh-muted); pointer-events: none; transition: opacity .2s; }
+#nh .bm-lab.r { left: calc(100% + 3px); }
+#nh .bm-lab.l { right: calc(100% + 3px); }
+#nh .bm-leaf.hot .bm-lab, #nh .bm-leaf.on .bm-lab { opacity: 0; }
+#nh .bm-leaf.go > i { background: var(--card, #fff); border: 1.5px solid #BDB5AC; }
+:root[data-nh-theme="dark"] #nh .bm-leaf.go > i { background: #121212; border-color: #5A5550; }

@@ -10121,7 +10121,7 @@ def update_brain(bid: str, fn) -> None:
 def brain_to_dict(b: dict) -> dict:
     base = f"/media/ads/brains/{b['id']}"
     out = {k: b.get(k, "") for k in ("id", "name", "created_at", *BRAIN_FIELDS)}
-    out.update(status=b.get("status", "idle"), error=b.get("error"))
+    out.update(status=b.get("status", "idle"), error=b.get("error"), type_set=bool(b.get("type_set")))
     for kind in BRAND_VIDEOS:   # إنترو وأوترو البراند (فيديو)
         f = b.get(f"{kind}_file")
         out[f"{kind}_url"] = f"{base}/{f}" if f and (brain_dir(b["id"]) / f).exists() else None
@@ -10644,6 +10644,8 @@ def patch_brain(bid: str, body: BrainIn):
                 v = str(body.fields[k] or "")
                 if k == "type" and v not in az.BRAIN_TYPES:
                     continue
+                if k == "type":
+                    d["type_set"] = True   # النوع اتختار بإيد العميل (مش الافتراضي)
                 d[k] = v[:8000]
                 if k in ("palette", "theme", "typography", "ui_style", "logo_description") and k not in d.setdefault("edited", []):
                     d["edited"].append(k)  # الاستنباط بعد كده ميغيّرش اللي كتبته بإيدك

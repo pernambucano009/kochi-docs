@@ -122,24 +122,26 @@ const BrandPage = (() => {
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
-  // النقطة مليانة ولا لسه ناقصة
+  // النقطة مليانة ولا لسه ناقصة: القيم اللي البرنامج حاطها لوحده (الاسم الافتراضي، النوع الافتراضي) مش بتتحسب مليانة
+  const DEFAULT_NAMES = new Set(["عميل جديد", "عميلي", "براند جديد", "My Brand", "New client"]);
   function filled(b, l) {
     if (!b) return false;
     switch (l.type) {
-      case "text": return !!String(l.f === "@name" ? b.name : b[l.f] || "").trim();
-      case "pick": return l.f === "type" ? !!b.type : true;
+      case "text": return l.f === "@name" ? !!String(b.name || "").trim() && !DEFAULT_NAMES.has(String(b.name).trim()) : !!String(b[l.f] || "").trim();
+      case "pick": return l.f === "type" ? !!b.type && !!(b.type_set || String(b.about || "").trim() || String(b.domain || "").trim()) : true;
       case "imgs": return (b[l.f] || []).length > 0;
       case "palette": return hexes(b.palette).length > 0;
       case "styles": return styleIds(b).length > 0;
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
-      case "rule": case "note": case "page": case "algo": return true;
+      case "rule": case "note": case "algo": return true;
+      case "page": return false;   // لينك لصفحة، مش خانة تتملي
       case "todo": return !!l.todo.done;
       default: return false;
     }
   }
   const leafValue = (b, l) => {
-    if (l.type === "text") return String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim();
+    if (l.type === "text") return filled(b, l) ? String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim() : "";
     if (l.type === "pick") return l.opts.find(([v]) => v === String(b?.[l.f] || ""))?.[1] || "";
     if (l.type === "imgs") return (b?.[l.f] || []).length ? `${(b[l.f]).length} صورة` : "";
     if (l.type === "palette") return hexes(b?.palette).join(" ");
@@ -204,7 +206,7 @@ const BrandPage = (() => {
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
       const g = growth(b, br), D = 250 + 140 * (1 - Math.exp(-g / 8));
       const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D * ey;
-      const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && l.type !== "action" && l.type !== "pending");
+      const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && !["action", "pending", "page"].includes(l.type));
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
       nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g });
       // ورق الفرع على قوس برّه، ولو كتير بيبقى على صفين؛ بين كل نقطة والتانية مسافة كفاية
@@ -329,7 +331,7 @@ const BrandPage = (() => {
     }
     if (n.kind === "branch") {
       return `<button class="bm-n bm-branch${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.br.t)}">
-        <span class="bm-bic">${svg(IC[n.br.k])}${n.waiting ? `<em class="num">${n.waiting}</em>` : ""}</span><b>${esc(n.br.t)}</b><small class="num">${n.br.k === "knowledge" ? n.total : `${n.done}/${n.total}`}</small></button>`;
+        <span class="bm-bic">${svg(IC[n.br.k])}${n.waiting ? `<em class="num">${n.waiting}</em>` : ""}</span><b>${esc(n.br.t)}</b>${n.total ? `<small class="num">${n.br.k === "knowledge" ? n.total : `${n.done}/${n.total}`}</small>` : ""}</button>`;
     }
     const l = n.l, val = leafValue(b, l);
     if (l.type === "pending") {
@@ -338,10 +340,20 @@ const BrandPage = (() => {
         <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">مستني موافقتك</small></span></button>`;
     }
     // المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها لوحدها
-    const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
+    const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : l.type === "page" ? "go" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
+    // 🏷️ اللي اتكتب في النقطة باين جنبها على طول (أول كام كلمة…)، من غير ما تفتحها
+    const lab = l.type === "page" ? l.t.replace(/^\S+\s/, "") : l.type === "rule" ? l.t : l.type === "note" ? l.note.title || "" : n.on ? val : "";
+    const side = (S.byId?.[n.from]?.x ?? 0) + 0 > n.x ? "l" : "r";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
-      <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>
+      <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>${lab ? `<span class="bm-lab ${side}">${esc(short(lab))}</span>` : ""}
       <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح جوه</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لسه ناقصة</small>`}</span></button>`;
+  }
+  // أول ٣ كلمات (بحد أقصى ٢٢ حرف) وبعدين «…»
+  function short(t) {
+    const w = String(t).replace(/\s+/g, " ").trim().split(" ");
+    let s = w.slice(0, 3).join(" ");
+    if (s.length > 22) s = s.slice(0, 21).trim();
+    return s.length < String(t).trim().length ? s + "…" : s;
   }
   function draw() {
     const w = S.el, b = cur();
