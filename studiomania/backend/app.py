@@ -2547,10 +2547,13 @@ def tag_project_sections() -> None:
 
 
 def project_to_dict(r: sqlite3.Row) -> dict:
+    data = json.loads(r["data"])
     return {
         "id": r["id"],
         "name": r["name"],
-        "data": json.loads(r["data"]),
+        # 🖼️ الكفر (فريم من الفيديو المتصدّر أو من أول قطعة) لكارت المشروع في «شغّال عليه»
+        "cover_url": f"/api/projects/{r['id']}/cover?v={quote(str(r['updated_at'] or ''))}" if r["export_id"] or data.get("clips") else None,
+        "data": data,
         "section": json.loads(r["data"]).get("section") or "coach",
         "render_status": r["render_status"],
         "render_error": r["render_error"],
@@ -2558,6 +2561,40 @@ def project_to_dict(r: sqlite3.Row) -> dict:
         "export_id": r["export_id"],
         "updated_at": r["updated_at"],
     }
+
+
+PROJECT_COVERS = DATA_DIR / "project_covers"
+
+
+def project_cover_src(conn: sqlite3.Connection, r: sqlite3.Row) -> Path | None:
+    if r["export_id"]:
+        e = conn.execute("SELECT filename FROM exports WHERE id = ?", (r["export_id"],)).fetchone()
+        if e and (EXPORTS_DIR / e["filename"]).exists():
+            return EXPORTS_DIR / e["filename"]
+    for c in json.loads(r["data"]).get("clips") or []:
+        g = conn.execute("SELECT output_filename FROM generations WHERE id = ?", (str(c.get("gen_id") or ""),)).fetchone()
+        if g and g["output_filename"] and (GENERATED_DIR / g["output_filename"]).exists():
+            return GENERATED_DIR / g["output_filename"]
+    return None
+
+
+@app.get("/api/projects/{project_id}/cover")
+def project_cover(project_id: str):
+    """فريم واحد صغير من الفيديو، بيتعمل مرة ويتحفظ لحد ما المشروع يتغير."""
+    with closing(db()) as conn:
+        r = get_project(conn, project_id)
+        src = project_cover_src(conn, r)
+    if not src:
+        raise HTTPException(404, "مفيش فيديو لسه")
+    PROJECT_COVERS.mkdir(parents=True, exist_ok=True)
+    out = PROJECT_COVERS / f"{Path(project_id).name}.jpg"
+    if not out.exists() or out.stat().st_mtime < src.stat().st_mtime:
+        dur = media_info(src).duration or 0
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{min(1.0, dur / 3):.2f}", "-i", str(src),
+                        "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "4", str(out)], capture_output=True, timeout=60)
+        if not out.exists():
+            raise HTTPException(404, "مقدرناش نطلّع الكفر")
+    return FileResponse(out, headers={"Cache-Control": "max-age=86400"})
 
 
 def get_project(conn: sqlite3.Connection, project_id: str) -> sqlite3.Row:

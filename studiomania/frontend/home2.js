@@ -486,7 +486,7 @@ const NH = (() => {
       const when = p.updated_at ? new Date(p.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
       const pct = p.render_status === "rendering" && p.render_progress != null ? Math.round(p.render_progress) : null;
       return `<article class="nh-line nh-pj-card" data-proj="${esc(p.id)}" data-st="${k}" data-q="${esc(p.name.toLowerCase())}" tabindex="0" role="button">
-        <div class="nh-pj-art" style="background:${PJ_ART[(p.id.charCodeAt(0) + p.id.charCodeAt(1)) % PJ_ART.length]}">${pct != null ? `<span class="nh-pj-bar"><i style="width:${pct}%"></i></span>` : ""}</div>
+        <div class="nh-pj-art" style="background:${p.cover_url ? `center/cover no-repeat url('${esc(p.cover_url)}'), ` : ""}${PJ_ART[(p.id.charCodeAt(0) + p.id.charCodeAt(1)) % PJ_ART.length]}">${pct != null ? `<span class="nh-pj-bar"><i style="width:${pct}%"></i></span>` : ""}</div>
         <div class="nh-pj-name"><span class="nh-pj-av s-${esc(p.section)}">${PJ_AV[p.section] || "م"}</span><b>${esc(p.name)}</b></div>
         <small class="st-${k}">${esc(SEC[p.section]?.[0] || "")} · ${label}${when ? ` · ${when}` : ""}</small></article>`;
     }).join("");
@@ -785,7 +785,9 @@ const NH = (() => {
     const FLOW_ST = { idea: "الفكرة", format: "نوع البوست", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
     D.drafts = [
       ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
-        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at })),
+        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at,
+        // كفر الفكرة اللي لسه شغّالة: غلاف القالب نفسه من المعرض
+        thumb: (typeof Gallery !== "undefined" && Gallery.list().find((x) => x.id === f.template?.id)?.cover_url) || (f.template?.id ? `/gallery/${encodeURIComponent(f.template.id)}.jpg` : "") })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
         sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "وقف" : "لسه بيتعمل", updated_at: v.updated_at, thumb: v.thumb })),
       // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
