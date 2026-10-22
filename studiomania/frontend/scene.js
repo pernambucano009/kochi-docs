@@ -178,55 +178,66 @@ const SceneStudio = (() => {
         ${sc.camera.length > 2 ? `<button type="button" class="sc-btn sm danger" data-sckdel="${i}">✕</button>` : ""}</div></div>`).join("")
       + `<button type="button" class="sc-btn sm" data-sckadd>＋ نقطة كاميرا عند الثانية ${AR(S.t)}</button>`;
   }
+  // من البروتوتايب: خطوات مرقّمة على اليمين (خطوة واحدة ظاهرة)، والمشهد على الشمال بأزرار صغيرة فوقه
+  const STEPS = ["صِف المشهد بكلماتك", "الأشكال", "حركة الكاميرا", "المسودة", "الفيديو الحقيقي"];
+  const SIC = { ratio: "M7 3.5h10v17H7z", light: "M12 3v2 M12 19v2 M4.2 4.2l1.4 1.4 M18.4 18.4l1.4 1.4 M3 12h2 M19 12h2 M4.2 19.8l1.4-1.4 M18.4 5.6l1.4-1.4 M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z",
+    bg: "M4.5 5h15v14h-15z M3.5 15.5l4.5-4.5 4 4 3-3 5 5", view: "M3 7l9-4 9 4-9 4z M3 7v10l9 4 9-4V7 M12 11v10", list: "M5 7h14 M5 12h14 M5 17h10", plus: "M12 5v14 M5 12h14",
+    play: "M8 5v14l11-7z", pause: "M8 5h3v14H8z M13 5h3v14h-3z" };
+  const sic = (k, s = 16) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${SIC[k]}"/></svg>`;
+  function stepBody(d, sc, M, sel, ms, model, est) {
+    const k = S.step;
+    if (k === 1) return `<textarea class="sc2-pr" rows="4" data-scdesc dir="auto" aria-label="وصف المشهد" placeholder="مثلًا: حذاء يدور على قاعدة في المنتصف، والكاميرا تبدأ بعيدة ثم تقترب ببطء وترتفع">${esc(S.desc || "")}</textarea>
+      <p class="sc-note">${d.say ? esc(d.say) : "يبني العقل الأشكال وحركة الكاميرا (تُخصم التكلفة حسب طول الوصف)، ثم تعدّل ما تريد بنفسك."}</p>`;
+    if (k === 2) return `<div class="sc-pills">${sc.objects.map((o) => `<button type="button" class="sc-pill${o.id === S.sel ? " on" : ""}" data-scsel="${o.id}">${esc(o.name)}</button>`).join("")}
+        <button type="button" class="sc-pill" data-scadd>＋ شكل</button></div>
+      ${sel ? objEditor(sel) : `<p class="sc-note">اختر شكلًا هنا أو في المشهد لتعدّله. كل شكل يمثّل شيئًا حقيقيًا: اكتب ما هو، وأضف صورته إن وُجدت.</p>`}`;
+    if (k === 3) return `<p class="sc-note">تتحرك الكاميرا بنعومة من نقطة إلى أخرى. الأسهل: اختر «منظر حر» من أعلى المشهد، ولُفّ حتى الزاوية التي تريدها، ثم «خذ المنظر الحالي».</p>${camEditor()}`;
+    if (k === 4) return d.draft_url ? `<video src="${esc(d.draft_url)}" controls muted playsinline loop class="sc-draft"></video>` : `<p class="sc-note">تُسجَّل المسودة من المتصفح مجانًا.</p>`;
+    return `<label class="sc-f"><span>الوصف الحقيقي (الخامات والإضاءة والأجواء)</span><textarea rows="3" data-scprompt dir="auto">${esc(d.prompt)}</textarea></label>
+      <div class="sc-f"><span>مراجع إضافية (اختيارية)</span><div class="sc-pills">${(d.refs || []).map((r) => `<span class="sc-chip"><img src="${esc(r.thumb)}" alt=""><b>${esc(r.label)}</b><button type="button" data-screfrm="${esc(r.kind)}|${esc(r.id)}">✕</button></span>`).join("")}
+        <button type="button" class="sc-pill" data-scref>＋ مرجع</button></div></div>
+      <div class="sc-pills">${ms.map((m) => `<button type="button" class="sc-pill${m.model === model?.model ? " on" : ""}" data-scmodelp="${esc(m.model)}">${esc(m.label)}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}</button>`).join("")}</div>
+      ${!d.draft_url ? `<p class="sc-note">سجّل المسودة أولًا.</p>` : ""}
+      ${(d.takes || []).length ? `<div class="sc-takes">${[...(d.takes || [])].reverse().map((t, i, a) => `<figure class="sc-take ${t.status}">
+        ${t.status === "done" ? `<video src="${esc(t.url)}" controls playsinline loop></video>` : `<div class="sc-ph">${t.status === "failed" ? "⚠️" : '<span class="flw-spin"></span>'}<small>${esc(t.error || t.step || "")}</small></div>`}
+        <figcaption><b>لقطة ${a.length - i}</b><span class="sc-acts">${t.url ? `<a class="sc-ib" href="${esc(t.url)}" download aria-label="نزّل" title="نزّل">⬇</a>` : ""}<button type="button" class="sc-ib" data-sctakedel="${t.id}" aria-label="احذف" title="احذف">✕</button></span></figcaption></figure>`).join("")}</div>` : ""}`;
+  }
+  function pop(sc, M) {
+    if (S.pop === "ratio") return `<div class="sc2-pop"><div class="sc-pills">${M.ratios.map((r) => `<button type="button" class="sc-pill${r === sc.ratio ? " on" : ""}" data-scset="ratio|${r}">${r}</button>`).join("")}</div>
+      <label class="sc-f"><span>المدة (ثانية)</span><input type="number" min="2" max="15" step="0.5" data-scs="duration" value="${sc.duration}"></label></div>`;
+    if (S.pop === "light") return `<div class="sc2-pop"><div class="sc-pills">${Object.entries(M.lights).map(([k, t]) => `<button type="button" class="sc-pill${k === sc.light ? " on" : ""}" data-scset="light|${k}">${esc(t)}</button>`).join("")}</div></div>`;
+    if (S.pop === "bg") return `<div class="sc2-pop"><label class="sc-f sc-c"><span>لون الخلفية</span><input type="color" data-scs="bg" value="${sc.bg}"></label><label class="sc-f sc-chk"><input type="checkbox" data-scs="floor" ${sc.floor ? "checked" : ""}><span>أرضية</span></label></div>`;
+    if (S.pop === "view") return `<div class="sc2-pop"><div class="sc-pills"><button type="button" class="sc-pill${S.view === "cam" ? " on" : ""}" data-scview="cam">عين الكاميرا</button><button type="button" class="sc-pill${S.view === "free" ? " on" : ""}" data-scview="free">منظر حر (اسحب ولُفّ)</button></div></div>`;
+    return "";
+  }
   function render() {
     const d = S.cur, sc = SH(), M = S.meta;
     const sel = sc.objects.find((o) => o.id === S.sel);
     const ms = M.models || [], model = ms.find((m) => m.model === d.model) || ms[0];
     const est = model ? Math.max(1, Math.round((model.per_sec || 0.17) * sc.duration * (model.mode === "refs" ? 2 : 1) * 100)) : 0;
-    S.el.innerHTML = `<div class="sc-wrap">
-      <header class="sc-head"><div><small class="latin">SCENE STUDIO</small><b>🧊 استوديو المشهد</b></div>
-        <nav class="sc-pills">${S.list.map((x) => `<button type="button" class="sc-pill${x.id === d.id ? " on" : ""}" data-scpick="${x.id}">${esc(x.name)}${x.takes ? ` · ${x.takes}` : ""}</button>`).join("")}
-          <button type="button" class="sc-pill" data-scnew>＋ مشهد جديد</button></nav></header>
-      <div class="sc-main">
-        <section class="sc-stage">
-          <div class="sc-tabs"><button type="button" class="${S.view === "cam" ? "on" : ""}" data-scview="cam">🎥 عين الكاميرا</button><button type="button" class="${S.view === "free" ? "on" : ""}" data-scview="free">🧭 منظر حر (اسحب ولفّ)</button></div>
-          <div class="sc-view"><canvas></canvas>${S.rec ? `<div class="sc-recov">⏺ بيسجّل المسودة…</div>` : ""}</div>
-          <div class="sc-time"><button type="button" class="sc-btn sm" data-scplay>${S.play ? "⏸" : "▶"}</button>
-            <input type="range" min="0" max="${sc.duration}" step="0.02" value="${S.t}" data-sct><small class="num" data-sctv></small></div>
-          <div class="sc-row sc-set">
-            <label class="sc-f"><span>المدة</span><input type="number" min="2" max="15" step="0.5" data-scs="duration" value="${sc.duration}"></label>
-            <label class="sc-f"><span>المقاس</span><select data-scs="ratio">${M.ratios.map((r) => `<option ${r === sc.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
-            <label class="sc-f"><span>الإضاءة</span><select data-scs="light">${Object.entries(M.lights).map(([k, t]) => `<option value="${k}" ${k === sc.light ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-            <label class="sc-f sc-c"><span>الخلفية</span><input type="color" data-scs="bg" value="${sc.bg}"></label>
-            <label class="sc-f sc-chk"><input type="checkbox" data-scs="floor" ${sc.floor ? "checked" : ""}><span>أرضية</span></label></div>
-        </section>
-        <aside class="sc-side">
-          <details class="sc-box" open><summary>✨ ١. اوصفه بكلامك</summary>
-            <textarea rows="3" data-scdesc dir="auto" placeholder="مثلًا: جزمة بتلف على قاعدة في النص، والكاميرا بتبدأ بعيد وتقرّب ببطء وبعدين تطلع لفوق">${esc(S.desc || "")}</textarea>
-            <div class="sc-acts"><button type="button" class="sc-btn pri" data-scplan>🧱 ابني المسودة</button></div>
-            ${d.say ? `<p class="sc-note">${esc(d.say)}</p>` : `<p class="sc-note">المخ بيبني الأشكال وحركة الكاميرا (بيتخصم على قد الكلام)، وبعدين تعدّل اللي عايزه بإيدك.</p>`}</details>
-          <details class="sc-box" ${S.sel ? "open" : ""}><summary>🧱 ٢. الأشكال <small class="num">${sc.objects.length}</small></summary>
-            <div class="sc-pills">${sc.objects.map((o) => `<button type="button" class="sc-pill${o.id === S.sel ? " on" : ""}" data-scsel="${o.id}">${o.img ? "🖼️ " : ""}${esc(o.name)}</button>`).join("")}
-              <button type="button" class="sc-pill" data-scadd>＋ شكل</button></div>
-            ${sel ? objEditor(sel) : `<p class="sc-note">دوس على شكل هنا أو في المشهد علشان تعدّله. كل شكل مكان حاجة حقيقية: اكتب هو إيه، وحط صورته لو عندك.</p>`}</details>
-          <details class="sc-box"><summary>🎥 ٣. حركة الكاميرا <small class="num">${sc.camera.length}</small></summary>
-            <p class="sc-note">الكاميرا بتمشي بنعومة من نقطة للتانية. أسهل طريقة: افتح «منظر حر»، لفّ لحد الزاوية اللي عايزها، ودوس «خد المنظر الحالي».</p>${camEditor()}</details>
-          <details class="sc-box" open><summary>🎞️ ٤. المسودة</summary>
-            ${d.draft_url ? `<video src="${esc(d.draft_url)}" controls muted playsinline loop class="sc-draft"></video>` : `<p class="sc-note">لسه مفيش مسودة للشكل الحالي. المسودة بتتسجّل من المتصفح ببلاش.</p>`}
-            <div class="sc-acts"><button type="button" class="sc-btn ${d.draft_url ? "" : "pri"}" data-screc ${S.rec ? "disabled" : ""}>⏺ ${d.draft_url ? "سجّلها تاني" : "طلّع المسودة"}</button></div></details>
-          <details class="sc-box" open><summary>🎬 ٥. ولّد الفيديو الحقيقي</summary>
-            <label class="sc-f"><span>البرومبت (الشكل الحقيقي: الخامات، الإضاءة، المود)</span><textarea rows="4" data-scprompt dir="auto">${esc(d.prompt)}</textarea></label>
-            <div class="sc-f"><span>مراجع زيادة (اختياري)</span><div class="sc-pills">${(d.refs || []).map((r) => `<span class="sc-chip"><img src="${esc(r.thumb)}" alt=""><b>${esc(r.label)}</b><button type="button" data-screfrm="${esc(r.kind)}|${esc(r.id)}">✕</button></span>`).join("")}
-              <button type="button" class="sc-btn sm" data-scref>＋ مرجع</button></div></div>
-            <div class="sc-f"><span>الموديل (كلهم بياخدوا المسودة كفيديو مرجع)</span><select data-scmodel>${ms.map((m) => `<option value="${esc(m.model)}" ${m.model === model?.model ? "selected" : ""}>${esc(m.label)}${m.mode === "refs" ? " · مراجع" : " · تعديل فيديو"}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}</option>`).join("")}</select></div>
-            <div class="sc-acts"><button type="button" class="sc-btn pri" data-scgen ${d.draft_url && !(d.takes || []).some((t) => t.status === "working") ? "" : "disabled"}>✨ ولّد ${model ? `<small>· حوالي ${est} نقطة</small>` : ""}</button></div>
-            ${!d.draft_url ? `<p class="sc-note">طلّع المسودة الأول.</p>` : ""}
-            <div class="sc-takes">${[...(d.takes || [])].reverse().map((t, i, a) => `<figure class="sc-take ${t.status}">
-              ${t.status === "done" ? `<video src="${esc(t.url)}" controls playsinline loop></video>` : `<div class="sc-ph">${t.status === "failed" ? "⚠️" : '<span class="flw-spin"></span>'}<small>${esc(t.error || t.step || "")}</small></div>`}
-              <figcaption><b>لقطة ${a.length - i}</b><small>${esc(t.model_label || "")}</small>
-                <span class="sc-acts">${t.url ? `<a class="sc-btn sm" href="${esc(t.url)}" download>⬇ نزّل</a>` : ""}<button type="button" class="sc-btn sm" data-sctakedel="${t.id}">✕</button></span></figcaption></figure>`).join("")}</div>
-          </details>
-        </aside></div>
+    S.step = S.step || (d.draft_url ? 5 : sc.objects.length ? 2 : 1);
+    const k = S.step, busyGen = (d.takes || []).some((t) => t.status === "working");
+    const cta = k === 1 ? `<button type="button" class="sc2-go" data-scplan>ابنِ المسودة</button>`
+      : k === 4 ? `<button type="button" class="sc2-go" data-screc ${S.rec ? "disabled" : ""}>${d.draft_url ? "سجّلها مرة أخرى" : "سجّل المسودة"}</button>${d.draft_url ? `<button type="button" class="sc2-ghost" data-scstep="5">التالي</button>` : ""}`
+      : k === 5 ? `<button type="button" class="sc2-go" data-scgen ${d.draft_url && !busyGen ? "" : "disabled"}>ولّد الفيديو</button><span class="sc-note">التكلفة نحو <b class="num">${est}</b> نقطة</span>`
+      : `<button type="button" class="sc2-go" data-scstep="${k + 1}">التالي</button>`;
+    const ib = (p, t) => `<button type="button" class="sc-ib dark${S.pop === p ? " on" : ""}" data-scpop="${p}" title="${t}" aria-label="${t}">${sic(p)}</button>`;
+    S.el.innerHTML = `<div class="sc2">
+      <div class="sc2-l">
+        <div class="sc2-h"><div><span class="latin">SCENE STUDIO</span><h2>${esc(d.name || "استوديو المشهد")}</h2></div>
+          <div class="sc-acts"><span class="sc2-wrap"><button type="button" class="sc-ib" data-scpop="list" title="مشاهدي" aria-label="مشاهدي">${sic("list")}</button>
+            ${S.pop === "list" ? `<div class="sc2-pop sc2-list">${S.list.map((x) => `<button type="button" class="sc-pill${x.id === d.id ? " on" : ""}" data-scpick="${x.id}">${esc(x.name)}${x.takes ? ` · ${x.takes}` : ""}</button>`).join("")}</div>` : ""}</span>
+            <button type="button" class="sc-ib" data-scnew title="مشهد جديد" aria-label="مشهد جديد">${sic("plus")}</button></div></div>
+        <div class="sc2-steps">${STEPS.map((t, i) => `<button type="button" class="sc2-st${i + 1 === k ? " on" : i + 1 < k ? " done" : ""}" data-scstep="${i + 1}" title="${t}" aria-label="${t}">${i + 1}</button>${i < STEPS.length - 1 ? `<span class="sc2-ln"></span>` : ""}`).join("")}</div>
+        <div class="sc2-body"><h3>${STEPS[k - 1]}</h3>${stepBody(d, sc, M, sel, ms, model, est)}</div>
+        <div class="sc2-cta">${cta}${k > 1 ? `<button type="button" class="sc2-ghost" data-scstep="${k - 1}">السابق</button>` : ""}</div>
+      </div>
+      <div class="sc2-r">
+        <div class="sc2-stage"><div class="sc-view"><canvas></canvas>${S.rec ? `<div class="sc-recov">⏺ جارٍ تسجيل المسودة…</div>` : ""}</div>
+          <div class="sc2-tools">${ib("ratio", `المقاس ${sc.ratio} · ${sc.duration} ث`)}${ib("light", "الإضاءة")}${ib("bg", "الخلفية والأرضية")}${ib("view", S.view === "cam" ? "عين الكاميرا" : "منظر حر")}</div>${pop(sc, M)}</div>
+        <div class="sc2-time"><button type="button" class="sc-ib" data-scplay aria-label="شغّل الحركة">${sic(S.play ? "pause" : "play")}</button>
+          <input type="range" min="0" max="${sc.duration}" step="0.02" value="${S.t}" data-sct aria-label="الزمن"><small class="num" data-sctv dir="ltr"></small></div>
+      </div>
       <div class="sc-pick" hidden></div></div>`;
     const cv = S.el.querySelector("canvas");
     if (G.r) { G.r.dispose(); G.r = null; }
@@ -335,7 +346,7 @@ const SceneStudio = (() => {
       }
     }
     if (ov) ov.textContent = "⏳ بيجهّز المسودة…";
-    try { Object.assign(S.cur, await sAPI("/draft", { method: "POST", body: fd })); toast("✅ المسودة جاهزة. دلوقتي ولّد الفيديو الحقيقي"); }
+    try { Object.assign(S.cur, await sAPI("/draft", { method: "POST", body: fd })); toast("✓ المسودة جاهزة. ولّد الآن الفيديو الحقيقي"); S.step = 5; }
     catch (err) { toast(err.message, true); }
     S.rec = false; S.t = 0;
     render();
@@ -350,9 +361,8 @@ const SceneStudio = (() => {
         const before = (S.cur.takes || []).map((t) => t.status).join();
         Object.assign(S.cur, { takes: r.takes });
         if (r.takes.map((t) => t.status).join() !== before) {   // بنغيّر قايمة اللقطات بس، المشهد مايترسمش تاني
-          const keepOpen = [...S.el.querySelectorAll(".sc-box")].map((x) => x.open);
-          render(); S.el.querySelectorAll(".sc-box").forEach((x, i) => (x.open = keepOpen[i]));
-          if (r.takes.some((t) => t.status === "done")) toast("✨ اللقطة جاهزة");
+          render();
+          if (r.takes.some((t) => t.status === "done")) toast("✓ اللقطة جاهزة");
         }
       } catch { /* بيحاول تاني */ }
       watch();
@@ -364,16 +374,21 @@ const SceneStudio = (() => {
     try {
       if ((b = q("[data-scpick]"))) return load(b.dataset.scpick);
       if (q("[data-scnew]")) {
-        const name = await uiPrompt("اسم المشهد (مثلًا: إعلان الجزمة):"); if (name == null) return;
+        const name = await uiPrompt("اسم المشهد (مثلًا: إعلان الحذاء):"); if (name == null) return;
         const r = await api("/api/scenes", { method: "POST", ...jsonBody({ name }) }); S.list = await api("/api/scenes"); return load(r.id);
       }
-      if ((b = q("[data-scview]"))) { S.view = b.dataset.scview; return render(); }
-      if (q("[data-scplay]")) { if (S.t >= SH().duration) S.t = 0; S.play = !S.play; S.last = performance.now(); b = q("[data-scplay]"); b.textContent = S.play ? "⏸" : "▶"; return; }
+      if ((b = q("[data-scview]"))) { S.view = b.dataset.scview; S.pop = null; return render(); }
+      if ((b = q("[data-scpop]"))) { S.pop = S.pop === b.dataset.scpop ? null : b.dataset.scpop; return render(); }
+      if ((b = q("[data-scstep]"))) { S.step = +b.dataset.scstep; S.pop = null; return render(); }
+      if ((b = q("[data-scset]"))) { const [k, v] = b.dataset.scset.split("|"); editScene((sc) => (sc[k] = v)); return render(); }
+      if ((b = q("[data-scmodelp]"))) { save({ model: b.dataset.scmodelp }, false); S.cur.model = b.dataset.scmodelp; return render(); }
+      if (S.pop && !q(".sc2-pop")) { S.pop = null; render(); }
+      if (q("[data-scplay]")) { if (S.t >= SH().duration) S.t = 0; S.play = !S.play; S.last = performance.now(); b = q("[data-scplay]"); b.innerHTML = sic(S.play ? "pause" : "play"); return; }
       if (q("[data-scplan]")) {
         const text = S.el.querySelector("[data-scdesc]").value.trim(); S.desc = text;
-        if (!text) return toast("اوصف الفيديو الأول", true);
-        b = q("[data-scplan]"); b.disabled = true; b.textContent = "⏳ بيبني…";
-        try { S.cur = await sAPI("/plan", { method: "POST", ...jsonBody({ text }) }); S.sel = null; S.t = 0; render(); toast("🧱 المسودة اتبنت. شغّلها وعدّل اللي عايزه"); }
+        if (!text) return toast("صِف المشهد أولًا", true);
+        b = q("[data-scplan]"); b.disabled = true; b.textContent = "جارٍ البناء…";
+        try { S.cur = await sAPI("/plan", { method: "POST", ...jsonBody({ text }) }); S.sel = null; S.t = 0; S.step = 2; render(); toast("✓ بُنيت المسودة. شغّلها وعدّل ما تريد"); }
         finally { b.disabled = false; }
         return;
       }
@@ -393,7 +408,7 @@ const SceneStudio = (() => {
       if ((b = q("[data-sckset]"))) {
         const p = G.free.position, i = +b.dataset.sckset;
         editScene((sc) => { sc.camera[i].pos = [p.x, p.y, p.z].map((v) => +v.toFixed(2)); sc.camera[i].look = [0, 0.6, 0]; sc.camera[i].fov = Math.round(G.free.fov); });
-        toast("📍 النقطة اخدت المنظر الحالي"); return render();
+        toast("✓ أخذت النقطة المنظر الحالي"); return render();
       }
       if ((b = q("[data-sckdel]"))) { editScene((sc) => sc.camera.splice(+b.dataset.sckdel, 1)); return render(); }
       if (q("[data-sckadd]")) {
@@ -406,10 +421,10 @@ const SceneStudio = (() => {
       if ((b = q("[data-screfrm]"))) { const [k, ...id] = b.dataset.screfrm.split("|"); save({ refs: (S.cur.refs || []).filter((x) => !(x.kind === k && x.id === id.join("|"))) }, false); return render(); }
       if (q("[data-scgen]")) {
         clearTimeout(S.saveT);
-        await sAPI("", { method: "PATCH", ...jsonBody({ prompt: S.cur.prompt, model: S.el.querySelector("[data-scmodel]").value, refs: S.cur.refs || [] }) });
-        S.cur = await sAPI("/generate", { method: "POST" }); render(); watch(); return toast("✨ بيولّد… اللقطة هتظهر تحت أول ما تخلص");
+        await sAPI("", { method: "PATCH", ...jsonBody({ prompt: S.cur.prompt, model: S.cur.model || (S.meta.models || [])[0]?.model, refs: S.cur.refs || [] }) });
+        S.cur = await sAPI("/generate", { method: "POST" }); render(); watch(); return toast("✓ بدأ التوليد، وتظهر اللقطة عند انتهائها");
       }
-      if ((b = q("[data-sctakedel]"))) { if (!(await uiConfirm("تمسح اللقطة دي؟"))) return; S.cur = await sAPI(`/takes/${b.dataset.sctakedel}`, { method: "DELETE" }); return render(); }
+      if ((b = q("[data-sctakedel]"))) { if (!(await uiConfirm("هل تحذف هذه اللقطة؟"))) return; S.cur = await sAPI(`/takes/${b.dataset.sctakedel}`, { method: "DELETE" }); return render(); }
     } catch (err) { toast(err.message, true); }
   }
   function onInput(e) {
@@ -425,7 +440,7 @@ const SceneStudio = (() => {
     if (t.dataset.sck) { if (Number.isNaN(val)) return; editScene((sc) => setPath(sc.camera, t.dataset.sck, val)); }
   }
   async function load(id) {
-    S.cur = await api(`/api/scenes/${id}`); S.sel = null; S.t = 0; S.desc = "";
+    S.cur = await api(`/api/scenes/${id}`); S.sel = null; S.t = 0; S.desc = ""; S.step = 0; S.pop = null;
     try { localStorage.setItem("studiomania.scene", id); } catch { /* */ }
     render(); watch();
   }
