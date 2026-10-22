@@ -33,7 +33,7 @@ systemctl enable --now docker
 echo "== 2) الجدار الناري: 80 و443 مفتوحين (صور Oracle بتقفلهم في iptables)"
 if command -v iptables >/dev/null; then
   for p in 80 443; do
-    iptables -C INPUT -p tcp --dport $p -j ACCEPT 2>/dev/null || iptables -I INPUT 6 -p tcp --dport $p -j ACCEPT
+    iptables -C INPUT -p tcp --dport $p -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport $p -j ACCEPT   # أول قاعدة، قبل الـ REJECT بتاعة Oracle
   done
   command -v netfilter-persistent >/dev/null && netfilter-persistent save || true
 fi
