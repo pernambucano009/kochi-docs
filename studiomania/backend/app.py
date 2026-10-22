@@ -5911,7 +5911,7 @@ def wa_get():
     w = wa_state(bid)
     acc = wa_account() if service in ("zernio", "mock") else None
     number = w.get("number") or (wacamp.phone(acc.get("username")) if acc else "")
-    kw = w.get("keyword") or "عايز العرض"
+    kw = w.get("keyword") or "أريد العرض"
     out = {"ready": service in ("zernio", "mock"), "mock": service == "mock", "account": acc, "number": number, "keyword": kw,
            "link": wacamp.wa_link(number, kw) if number else "", "langs": wacamp.LANGS, "categories": wacamp.CATEGORIES, "stop": wacamp.STOP_FOOTER,
            "fee_per_100": wa_fee(100), "templates": [], "broadcasts": [], "sequences": [], "automations": [], "contacts": {"total": 0, "subscribed": 0, "tags": []},

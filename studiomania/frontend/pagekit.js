@@ -3,6 +3,7 @@
 const PK_IC = {
   search: "M11 5a6 6 0 1 1 0 12 6 6 0 0 1 0-12z M20 20l-4.5-4.5",
   upload: "M12 16V4 M7 9l5-5 5 5 M5 20h14",
+  download: "M12 4v12 M7 11l5 5 5-5 M5 20h14",
   plus: "M12 5v14 M5 12h14",
   more: "M5.5 12h.01 M12 12h.01 M18.5 12h.01",
   close: "M6 6l12 12 M18 6L6 18",
