@@ -97,11 +97,9 @@ const Flow = (() => {
   function meter(k) {
     if (!k) return "";
     const r = 15, c = 2 * Math.PI * r;
-    return `<button type="button" class="flw-meter" data-why title="المخ يعرفك قد إيه">
+    return `<button type="button" class="flw-meter" data-why title="العقل فاهمك قد إيه (دوس تشوف الشروط)">
       <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="${r}" class="bg"/><circle cx="18" cy="18" r="${r}" class="fg" stroke-dasharray="${(k.score / 100) * c} ${c}"/></svg>
-      <span><b class="num">${k.score}٪</b><small>${esc(k.level)}</small></span></button>
-      ${S.why ? `<div class="flw-tips"><b>المخ يعرفك ${k.score}٪</b><small>كل ما تقيّم وتكمّل بيانات البراند، الاقتراحات بتبقى على ذوقك أكتر.</small>
-        ${(k.tips || []).map((t) => `<p>• ${esc(t)}</p>`).join("")}<small class="muted">${k.counts?.prefs || 0} تقييم متسجل</small></div>` : ""}`;
+      <span><b class="num">${k.score}٪</b><small>${esc(k.level)}</small></span></button>`;
   }
   function stepper(d) {
     const cur = idx(d.stage, d);
@@ -733,8 +731,7 @@ const Flow = (() => {
     const t = e.target;
     const q = (sel) => t.closest(sel);
     if (q("[data-close]")) return close();
-    if (q("[data-why]")) { S.why = !S.why; return render(); }
-    if (S.why && !q(".flw-tips")) { S.why = false; render(); }
+    if (q("[data-why]")) return window.uiKnow?.(S.d?.knowledge);
     let b;
     if (q("[data-skipshoot]")) { reset(); return call("/skip-shoot", {}); }
     if ((b = q("[data-lib]"))) {

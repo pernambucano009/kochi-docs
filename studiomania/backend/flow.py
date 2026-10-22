@@ -37,28 +37,62 @@ def prefs_text(brain: dict | None, limit: int = 24) -> str:
     return "\n".join(out)
 
 
-def knowledge(brain: dict | None, fields: tuple[str, ...], kinds: tuple[str, ...]) -> dict:
-    """«المخ يعرفك قد إيه»: نسبة من ١٠٠ محسوبة من عدد المعلومات اللي عنده عن البراند وذوقك."""
+# 🧠 «العقل فاهمك قد إيه»: قايمة شروط واضحة، كل شرط ليه نقط ثابتة ومعروف إمتى بيتحقق، والنسبة = مجموع اللي اتحقق.
+# مفيش أوزان مخفية: العميل بيشوف كل شرط عارفه ولا ناقصه. «core» = لازم يتحققوا عشان خطة المحتوى تتعمل.
+# (key, label, points, core, hint)
+KNOW = (
+    ("domain", "المجال", 10, True, "اكتب مجالك (أو حلّل حساب السوشيال والمخ يكتبه)"),
+    ("about", "عن البراند (بيعمل إيه وبيفرق في إيه)", 10, True, "اكتب عن البراند جملتين على الأقل"),
+    ("audience", "الجمهور اللي بتكلمه", 10, True, "اكتب مين الجمهور: سنه واهتماماته وبيدوّر على إيه"),
+    ("market", "السوق", 5, False, "اكتب السوق (مثلًا: السعودية والخليج)"),
+    ("language", "اللغة واللهجة", 5, False, "اكتب اللهجة اللي بتتكلم بيها"),
+    ("goal", "الهدف (الدعوة أو اللينك)", 5, False, "اكتب الدعوة (CTA) أو اللينك في «التسليم»"),
+    ("logo", "اللوجو", 5, False, "ارفع اللوجو"),
+    ("palette", "الألوان", 5, False, "حط ألوان البراند"),
+    ("typography", "الخطوط", 3, False, "اختار خطوط البراند"),
+    ("rules", "قواعد المحتوى", 5, False, "ضيف قاعدة واحدة على الأقل (حاجة لازم تتعمل أو ممنوعة)"),
+    ("knowledge", "معرفة من مصادرك (٣ معلومات)", 10, False, "ضيف لينك موقعك أو ملف تعريفي ووافق على المعلومات"),
+    ("social", "تحليل حساب السوشيال بتاعك", 10, False, "حلّل حساب السوشيال من العقل"),
+    ("rivals", "منافس معتمد واحد على الأقل", 7, False, "وافق على منافس واحد على الأقل"),
+    ("taste", "ذوقك (١٠ لايك أو ديسلايك)", 10, False, "قيّم الأفكار والسيناريوهات باللايك والديسلايك"),
+)
+KNOW_READY = 70   # من هنا العقل «فاهمك» وخطة المحتوى بتتعمل (ومعاها الشروط الأساسية)
+
+
+def _know_got(b: dict) -> dict[str, float]:
+    """كل شرط اتحقق قد إيه (٠ لـ ١). اللي بيتعد (المعرفة والذوق) بياخد جزء على قد اللي اتعمل."""
+    txt = lambda k, n=1: len(str(b.get(k) or "").strip()) >= n  # noqa: E731
+    import rivals  # noqa: PLC0415
+    return {
+        "domain": float(txt("domain", 2) or txt("niche", 2)),
+        "about": float(txt("about", 40)),
+        "audience": float(txt("audience", 15)),
+        "market": float(txt("market", 2)),
+        "language": float(txt("language", 2)),
+        "goal": float(txt("cta", 3) or txt("link", 8)),
+        "logo": float(bool(b.get("logos"))),
+        "palette": float(txt("palette", 4)),
+        "typography": float(txt("typography", 2)),
+        "rules": float(txt("rules", 5)),
+        "knowledge": min(1.0, len(b.get("notes") or []) / 3),
+        "social": float(bool(b.get("todos") or (b.get("batch") or {}).get("analysis") or txt("niche", 2))),
+        "rivals": float(bool(rivals.approved(b.get("competitors") or {}))),
+        "taste": min(1.0, len(b.get("prefs") or []) / 10),
+    }
+
+
+def knowledge(brain: dict | None, fields: tuple[str, ...] = (), kinds: tuple[str, ...] = ()) -> dict:
+    """«العقل فاهمك قد إيه»: مجموع نقط الشروط اللي اتحققت (من ١٠٠)، ومعاها القايمة كلها عشان الرقم يبقى مفهوم."""
     b = brain or {}
-    filled = sum(1 for k in fields if str(b.get(k) or "").strip() and k not in ("type", "logo_on", "intro_on", "outro_on"))
-    assets = sum(len(b.get(k) or []) for k in kinds)
-    notes = len(b.get("notes") or [])
-    prefs = len(b.get("prefs") or [])
-    seasons = 1 if (b.get("seasons") or {}).get("items") else 0
-    # كل نوع معلومة ليه سقف عشان محدش يملا النسبة من حتة واحدة
-    score = (min(filled, 14) / 14 * 40 + min(assets, 12) / 12 * 15 + min(notes, 20) / 20 * 15 + min(prefs, 30) / 30 * 25 + seasons * 5)
-    score = round(min(100, score))
-    level = ("لسه بيتعرّف عليك" if score < 25 else "بدأ يفهمك" if score < 50 else "فاهمك كويس" if score < 75 else "حافظك")
-    tips = []
-    if filled < 8:
-        tips.append("كمّل بيانات البراند (الجمهور، القواعد، الألوان، اللغة)")
-    if assets < 3:
-        tips.append("ارفع لوجو وصور منتج وشخصيات")
-    if notes < 5:
-        tips.append("زوّد مصادر (لينك موقعك، ملف تعريفي) في عقل البراند")
-    if prefs < 10:
-        tips.append("قيّم الأفكار والسيناريوهات باللايك والديسلايك")
-    return {"score": score, "level": level, "counts": {"fields": filled, "assets": assets, "notes": notes, "prefs": prefs, "seasons": seasons}, "tips": tips[:3]}
+    got = _know_got(b)
+    items = [{"k": k, "t": t, "pts": p, "core": core, "got": round(p * got[k], 1), "done": got[k] >= 1, "hint": hint} for k, t, p, core, hint in KNOW]
+    score = round(sum(i["got"] for i in items))
+    core_ok = all(i["done"] for i in items if i["core"])
+    ready = score >= KNOW_READY and core_ok
+    level = "لسه بيتعرّف عليك" if score < 30 else "بدأ يفهمك" if score < 50 else "قرّب يفهمك" if not ready else "فاهمك"
+    missing = sorted((i for i in items if not i["done"]), key=lambda i: (not i["core"], -(i["pts"] - i["got"])))
+    return {"score": score, "level": level, "ready": ready, "need": KNOW_READY, "core_ok": core_ok, "items": items,
+            "tips": [i["hint"] for i in missing[:3]]}
 
 
 # ---------------------------------------------------------------- البرومبتات (دراع المخ)

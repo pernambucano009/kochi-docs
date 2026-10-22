@@ -4636,20 +4636,24 @@ def plan_out(bid: str) -> dict:
     return {"count": len(inputs), "built_from": int(st.get("built_from") or 0) if st else 0, "made_at": st.get("made_at"), "has": bool(st),
             "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle", "error": job[6:] if job.startswith("error") else None,
             "by": [{"k": k, "t": algo.PLAN_KINDS.get(k, k), "n": n} for k, n in by.items()], "min": algo.PLAN_MIN,
-            "ready": bool(b.get("domain") or b.get("about")), "score": brain_score(b), "need": PLAN_SCORE}
+            "ready": bool(b.get("domain") or b.get("about")), "score": brain_score(b), "need": PLAN_SCORE, "know": fz.knowledge(b)}
 
 
-PLAN_SCORE = 55   # 🧠 الخطة مابتتعملش غير لما العقل يفهم العميل للدرجة دي («المخ يعرفك قد إيه»)
+PLAN_SCORE = 70   # (نفس flow.KNOW_READY) 🧠 الخطة مابتتعملش غير لما العقل يفهم العميل: النسبة دي + الشروط الأساسية (المجال، عن البراند، الجمهور)
 
 
 def brain_score(b: dict | None) -> int:
-    return int(fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)["score"])
+    return int(fz.knowledge(b)["score"])
+
+
+def brain_ready(b: dict | None) -> bool:
+    return bool(fz.knowledge(b)["ready"])
 
 
 def plan_maybe(bid: str) -> None:
     """الخطة بتتعمل من جديد لوحدها لما يتجمع معلومات جديدة كفاية أو حاجة أساسية تتغير."""
     b = brain_row(bid) or {}
-    if PLAN_BUSY.get(bid) == "working" or brain_score(b) < PLAN_SCORE or not algo.plan_should(b, len(algo.plan_inputs(b))):
+    if PLAN_BUSY.get(bid) == "working" or not brain_ready(b) or not algo.plan_should(b, len(algo.plan_inputs(b))):
         return
     if str(PLAN_BUSY.get(bid) or "").startswith("error") and not (atlas.api_key() or atlas.mock_mode()):
         return
@@ -4781,9 +4785,9 @@ def month_out(bid: str) -> dict:
     b = brain_row(bid) or {}
     m = b.get("month") or None
     job = MONTH_BUSY.get(bid) or ""
-    score = brain_score(b)
-    return {"month": m, "kinds": MONTH_KINDS, "score": score, "need": PLAN_SCORE, "has_strategy": bool(b.get("strategy")),
-            "ready": score >= PLAN_SCORE and bool(b.get("strategy")),
+    kn = fz.knowledge(b)
+    return {"month": m, "kinds": MONTH_KINDS, "score": kn["score"], "need": PLAN_SCORE, "has_strategy": bool(b.get("strategy")),
+            "know": kn, "ready": kn["ready"] and bool(b.get("strategy")),
             "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle", "error": job[6:] if job.startswith("error") else None}
 
 
@@ -4803,7 +4807,7 @@ def month_make(body: MonthIn):
     bid = rivals_client()
     st = month_out(bid)
     if not st["ready"]:
-        raise HTTPException(400, f"العقل لسه فاهمك {st['score']}٪، والخطة بتتعمل من {PLAN_SCORE}٪ (ومعاها خطة المحتوى). كمّل العقل الأول")
+        raise HTTPException(400, f"العقل لسه فاهمك {st['score']}٪، والخطة بتتعمل من {PLAN_SCORE}٪ ومعاها المجال وعن البراند والجمهور. كمّل العقل الأول")
     if st["status"] == "working":
         raise HTTPException(400, "الخطة بتتعمل دلوقتي")
     ps = pilot_load()["settings"]
@@ -10345,7 +10349,7 @@ def brain_to_dict(b: dict) -> dict:
     out["credits"] = wallet.balance()
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
-    out["knowledge"] = fz.knowledge(b, BRAIN_FIELDS, BRAIN_KINDS)
+    out["knowledge"] = fz.knowledge(b)
     out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in rivals.approved(b.get("competitors") or {})]
     out["rivals_pending"] = sum(1 for i in (b.get("competitors") or {}).get("items") or [] if not rivals.is_ok(i))
     out["custom_styles"] = [{**c, "cover_url": f"{base}/{c['cover']}" if c.get("cover") else None} for c in b.get("custom_styles") or []]
@@ -22407,7 +22411,7 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     elif d.get("busy"):
         out["busy_for"] = round(time.time() - (d.get("busy_at") or time.time()))
     brain = flow_brain(d)
-    out["knowledge"] = fz.knowledge(brain, BRAIN_FIELDS, BRAIN_KINDS)
+    out["knowledge"] = fz.knowledge(brain)
     out["brand_name"] = (brain or {}).get("name") or ""
     out["algo_mode"] = algo.mode_on(brain)
     out["guide"] = flow_guide(d["template"])
@@ -23625,7 +23629,7 @@ def flow_rate(fid: str, body: FlowRateIn):
 
 @app.get("/api/brain-knowledge")
 def brain_knowledge():
-    return fz.knowledge(active_client(), BRAIN_FIELDS, BRAIN_KINDS)
+    return fz.knowledge(active_client())
 
 
 class FlowGoIn(BaseModel):

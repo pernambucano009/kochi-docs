@@ -15,6 +15,15 @@
 .ui-dlg-no{background:var(--ui-dlg-field,#F1EFEC);color:inherit}
 :root[data-nh-theme="dark"] .ui-dlg-box{--ui-dlg-bg:#1f1f24;--ui-dlg-ink:#f2f2f2;--ui-dlg-field:rgba(255,255,255,.07)}
 :root[data-nh-theme="dark"] .ui-dlg-in{border-color:rgba(255,255,255,.14)}
+.ui-kn{width:min(520px,100%);max-height:86vh;overflow:auto}
+.ui-kn h3{margin:0 0 2px;font-size:18px}.ui-kn .sub{margin:0 0 12px;font-size:13px;opacity:.7;line-height:1.7}
+.ui-kn .bar{position:relative;height:6px;border-radius:99px;background:rgba(127,127,127,.18);margin:0 0 14px}
+.ui-kn .bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:#E5613E}
+.ui-kn .bar em{position:absolute;top:-3px;width:2px;height:12px;background:currentColor;opacity:.45}
+.ui-kn ul{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}
+.ui-kn li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start;padding:8px 10px;border-radius:12px;background:var(--ui-dlg-field,#F7F7F5);font-size:13.5px;line-height:1.55}
+.ui-kn li.ok{opacity:.75}.ui-kn li b{font-weight:500}.ui-kn li small{display:block;opacity:.7;font-size:12px}
+.ui-kn li .pt{font-size:12px;opacity:.7;white-space:nowrap}.ui-kn li .ck{font-size:14px}.ui-kn li .core{color:#E5613E;font-size:11px;margin-inline-start:6px}
 @keyframes uiDlgIn{from{opacity:0}to{opacity:1}}
 @keyframes uiDlgPop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.ui-dlg,.ui-dlg-box{animation:none}}`;
@@ -58,6 +67,28 @@
     return p;
   }
   window.uiConfirm = (msg, opts) => open("confirm", msg, null, opts);
+  // 🧠 «العقل فاهمك قد إيه»: النسبة ومعاها كل شرط (اتحقق ولا لأ، ونقطه، وإزاي تكمّله)
+  window.uiKnow = (k) => {
+    if (!k || !k.items) return;
+    const back = document.createElement("div");
+    back.className = "ui-dlg";
+    back.setAttribute("role", "dialog");
+    back.setAttribute("aria-modal", "true");
+    const fmt = (n) => (Math.round(n * 10) / 10).toString();
+    back.innerHTML = `<div class="ui-dlg-box ui-kn" dir="rtl"><h3>العقل فاهمك <span class="num">${k.score}٪</span> · ${esc(k.level)}</h3>
+      <p class="sub">النسبة دي مجموع نقط الشروط اللي تحت: كل شرط ليه نقط ثابتة، وبتاخدها لما يتحقق. من <b>${k.need}٪</b> ومعاها الشروط الأساسية (●) العقل بيبقى فاهمك وخطة المحتوى بتتعمل لوحدها.</p>
+      <div class="bar"><i style="width:${Math.min(100, k.score)}%"></i><em style="inset-inline-start:${k.need}%"></em></div>
+      <ul>${k.items.map((i) => `<li class="${i.done ? "ok" : ""}"><span class="ck">${i.done ? "✅" : "○"}</span>
+        <span><b>${esc(i.t)}</b>${i.core ? `<span class="core">● أساسي</span>` : ""}${i.done ? "" : `<small>${esc(i.hint)}</small>`}</span>
+        <span class="pt num" dir="ltr">${fmt(i.got)} / ${i.pts}</span></li>`).join("")}</ul>
+      <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok">تمام</button></div></div>`;
+    const done = () => { document.removeEventListener("keydown", key, true); back.remove(); };
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(); } };
+    back.querySelector(".ui-dlg-ok").onclick = done;
+    back.addEventListener("mousedown", (e) => { if (e.target === back) done(); });
+    document.addEventListener("keydown", key, true);
+    document.body.appendChild(back);
+  };
   window.uiPrompt = (msg, def, opts) => open("prompt", msg, def, opts);
   window.uiAlert = (msg, opts) => open("alert", msg, null, opts);
 })();

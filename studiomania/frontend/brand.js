@@ -296,7 +296,7 @@ const BrandPage = (() => {
       return `<button class="bm-n bm-center" data-n="c" title="بدّل البراند أو اعمل واحد جديد">
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
         <b>${esc(b?.name || "براند جديد")}</b>${st}
-        ${b?.knowledge ? `<small class="bm-kn" title="${esc((b.knowledge.tips || []).join(" · "))}">المخ يعرفك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
+        ${b?.knowledge ? `<small class="bm-kn" data-know title="دوس تشوف الشروط">العقل فاهمك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
     }
     if (n.kind === "quiz") {
       if (b && S.tqFor !== b.id && S.tqLoading !== b.id) loadTasks(b);
@@ -1010,6 +1010,7 @@ const BrandPage = (() => {
     w.addEventListener("click", async (e) => {
       const t = e.target;
       if (S.noClick) { S.noClick = false; return; }
+      if (t.closest("[data-know]")) { e.stopPropagation(); return window.uiKnow?.(cur()?.knowledge); }
       const node = t.closest(".bm-n") || (S.hovNode && !t.closest(".bm-card, .bm-zoom") ? S.hovNode.el : null);
       if (node) {
         const n = S.nodes.find((x) => x.id === node.dataset.n);

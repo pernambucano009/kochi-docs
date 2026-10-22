@@ -113,7 +113,8 @@ const NH = (() => {
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
   const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "pilot"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["publish", "settings"];   // RTL: أول عمود على اليمين
   const META = {
-    brand: () => { const pct = brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>مكتمل <span class="num">${pct}%</span></span>`; },
+    // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
+    brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>العقل فاهمك <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
     dubhub: () => `<span>نفس الفيديو بلغة أو لهجة تانية</span>`,
     pilot: () => `<span>${D.pilot?.settings?.on ? `شغّال · ${D.pilot.settings.times.length} بوست في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} مستنيين منك</em>` : ""}` : "مقفول"}</span>`,

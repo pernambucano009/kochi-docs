@@ -111,13 +111,13 @@ const RivalsPage = (() => {
     const M = S.mo, d = M.d;
     if (!d) return "";
     const m = d.month, busy = d.status === "working" || M.busy === "make", applied = m?.status === "applied";
-    const meter = `<div class="mo-meter"><div><b>العقل فاهمك <span class="num">${d.score}٪</span></b><small>الخطة بتتعمل من ${d.need}٪${d.has_strategy ? "" : " ومعاها خطة المحتوى"}</small></div>
+    const meter = `<div class="mo-meter" data-moknow role="button" tabindex="0" title="دوس تشوف الشروط"><div><b>العقل فاهمك <span class="num">${d.score}٪</span></b><small>الخطة بتتعمل من ${d.need}٪ ومعاها الشروط الأساسية${d.has_strategy ? "" : " وخطة المحتوى"} · دوس تشوف الشروط</small></div>
         <span class="mo-bar"><i style="width:${Math.min(100, d.score)}%"></i><em style="inset-inline-start:${d.need}%"></em></span></div>`;
     const per = M.per || m?.per_day || 2;
     const make = `<div class="nb-bar mo-make"><span class="mo-step">بوستات في اليوم <button class="nb-btn sm" data-moper="-1">−</button><b class="num">${per}</b><button class="nb-btn sm" data-moper="1">+</button></span>
         <button class="nb-btn ${m ? "" : "fs-go"}" data-momake ${busy || !d.ready ? "disabled" : ""}>${busy ? "⏳ بتتعمل… (دقيقة أو اتنين)" : m ? "🔄 اعمل خطة جديدة" : "🗓️ اعمل خطة الشهر"}</button></div>`;
     const head = `<section class="fs-card mo-card"><h3>🗓️ خطة الشهر <small>كل يوم كام بوست، وكل بوست بشكله وقالبه وفكرته وهوكه</small></h3>
-        ${meter}${d.ready ? "" : `<p class="nb-hint">الخطة مابتتعملش غير لما العقل يفهمك كويس. كمّل العقل من الكويز أو ضيف معلومات عنك، والعدّاد هيزيد.</p>`}
+        ${meter}${d.ready ? "" : `<p class="nb-hint">الخطة مابتتعملش غير لما العقل يفهمك. دوس على العدّاد تشوف الشروط اللي ناقصة، وكل شرط تكمّله بيزوّد نقطه.</p>`}
         ${make}${d.error ? `<div class="fs-err">⚠️ ${esc(d.error)}</div>` : ""}`;
     if (!m?.items?.length) return head + `</section>`;
     const items = m.items.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), byDay = {};
@@ -335,6 +335,7 @@ const RivalsPage = (() => {
         catch (err) { toast(err.message, true); }
         S.pl.busy = false; return render();
       }
+      if (e.target.closest("[data-moknow]")) return window.uiKnow?.(S.mo.d?.know);
       const per = e.target.closest("[data-moper]");
       if (per) { S.mo.per = Math.max(1, Math.min(6, (S.mo.per || S.mo.d?.month?.per_day || 2) + +per.dataset.moper)); return render(); }
       if (e.target.closest("[data-momake]")) {
