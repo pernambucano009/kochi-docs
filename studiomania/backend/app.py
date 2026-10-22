@@ -5371,7 +5371,7 @@ def rivals_out(bid: str) -> dict:
             "items": items, "approved": sum(1 for i in items if i["state"] == "approved"), "pending": sum(1 for i in items if i["state"] == "pending"),
             "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
             "error": c.get("error"), "updated_at": c.get("updated_at"), "found_at": c.get("found_at"), "excluded": len(c.get("excluded") or []),
-            "audience": aud, "brief_due": bool(ok) and rivals.sig(ok) != aud.get("sig")}
+            "audience": aud, "brief_due": bool(ok) and rivals.sig(ok) != aud.get("sig"), "audiences": b.get("audiences") or []}
 
 
 def rivals_client() -> str:
