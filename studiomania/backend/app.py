@@ -28319,6 +28319,9 @@ def auto_to_dict(rid: str, d: dict, bid: str) -> dict:
     for s in d.get("steps") or []:   # الصور والصوت اللي هيتولّدوا
         if s["verb"] == "genimg" and (m := auto_img_model(s["opts"])):
             est += wallet.credits(m["price"]) * max(1, int(s["opts"].get("count") or 1))
+        elif s["verb"] == "genvid":
+            m = next((x for x in auto_vid_models() if x["model"] == s["opts"].get("model")), None) or next(iter(auto_vid_models()), None)
+            est += wallet.credits((m or {}).get("per_sec", 0.1) * float(s["opts"].get("sec") or 5)) * max(1, int(s["opts"].get("count") or 1))
         elif s["verb"] == "genvoice":
             m = auto_voice_model(s["opts"])
             est += wallet.credits(m.get("price") or max(0.01, len(s["opts"].get("text") or "") / 1000 * 0.1))
@@ -28330,6 +28333,7 @@ def automations_meta():
     return {"verbs": {k: {x: v[x] for x in ("t", "desc", "accept", "opts")} for k, v in automate.VERBS.items()},
             "orders": automate.ORDERS, "trans": automate.TRANS, "ratios": automate.RATIOS, "when": automate.WHEN, "fixed": automate.FIXED,
             "lane_verbs": automate.LANE_VERBS, "max_lanes": automate.MAX_LANES, "roles": automate.ROLES, "rules_verbs": automate.RULES_VERBS,
+            "frame_out": automate.FRAME_OUT, "vid_modes": AUTO_VID_MODES,
             "stock_pexels": stock.live() or atlas.mock_mode(),
             "gen_models": [{k: m.get(k) for k in ("model", "label", "per_sec", "kind", "mode", "video_in")} for m in auto_gen_models()],
             "gen_modes": GEN_MODE_T, "ref_kinds": automate.REF_KINDS, "max_refs": automate.MAX_REFS,
@@ -28439,7 +28443,7 @@ def automation_delete(rid: str):
 
 
 @app.post("/api/automations/{rid}/describe")
-def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None = File(default=None)):
+def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None = File(default=None), dry: bool = Form(False)):
     """✨ «اوصفه بكلامك»: كتابة أو تسجيل صوت، والمخ بيفهم وبيبني الخطوات (التقطيع والمسارات والتوليد والتجميع…)."""
     bid = active_client_id()
     d = auto_load(rid, bid)
@@ -28486,11 +28490,28 @@ def automation_describe(rid: str, text: str = Form(""), audio: UploadFile | None
             else:
                 st["src"] = {"mode": "search", "q": str(src["label"]).split("/")[-1]}
     steps = automate.clean_steps(res["steps"])
-    prev = d.get("steps") or []
-    d = auto_update(rid, lambda x: x.update(steps=steps, undo=prev), bid)
     if usd:
         wallet.charge(wallet.credits(usd), "قالب مخصص: فهم الوصف وبناء الخطوات", rid)
+    if dry:   # 👀 بيوريك فهم إيه وهيعمل إيه، ومابيغيّرش حاجة لحد ما توافق
+        return {"heard": said, "say": res.get("say") or "", "steps": steps, "plan": automate.plan_lines(steps)}
+    prev = d.get("steps") or []
+    d = auto_update(rid, lambda x: x.update(steps=steps, undo=prev), bid)
     return {**auto_to_dict(rid, d, bid), "say": res.get("say") or "", "heard": said}
+
+
+class AutoApplyIn(BaseModel):
+    steps: list = []
+
+
+@app.post("/api/automations/{rid}/apply")
+def automation_apply(rid: str, body: AutoApplyIn):
+    """✓ «نفّذ الخطوات دي»: الخطوات اللي اتفهمت من الوصف بتتحط (و«رجّع زي ما كان» بيرجّع اللي قبلها)."""
+    bid = active_client_id()
+    d = auto_load(rid, bid)
+    steps = automate.clean_steps(body.steps)
+    prev = d.get("steps") or []
+    d = auto_update(rid, lambda x: x.update(steps=steps, undo=prev), bid)
+    return auto_to_dict(rid, d, bid)
 
 
 @app.post("/api/automations/{rid}/undo")
@@ -28511,8 +28532,8 @@ def automation_run(rid: str, request: Request):
     d = auto_load(rid, bid)
     if any(r.get("status") == "working" for r in d.get("runs") or []):
         raise HTTPException(400, "فيه تشغيل شغال، استنى يخلص")
-    if not any(s["verb"] in ("pull", "intro", "outro", "split", "genimg") for s in d.get("steps") or []):
-        raise HTTPException(400, "القالب محتاج خطوة «اسحب» أو «ولّد صورة» أو «قطّع الفيديو»، على الأقل")
+    if not any(s["verb"] in ("pull", "intro", "outro", "split", "genimg", "genvid", "frames") for s in d.get("steps") or []):
+        raise HTTPException(400, "القالب محتاج خطوة «اسحب» أو «ولّد صورة» أو «ولّد فيديو» أو «قطّع الفيديو»، على الأقل")
     run = {"id": uuid.uuid4().hex[:8], "at": now(), "status": "working", "step": "بيبدأ…", "project_id": None, "report": [], "error": None}
     auto_update(rid, lambda x: x.update(runs=[run, *(x.get("runs") or [])][:20]), bid)
     port = (request.scope.get("server") or ("127.0.0.1", 8000))[1]
@@ -28704,6 +28725,127 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+AUTO_VID_MODES = ("text", "refs", "image", "startend", "avatar")   # «ولّد فيديو» في الخط الأساسي: من غير قطعة
+
+
+def auto_vid_models() -> list[dict]:
+    """الموديلات اللي مش محتاجة قطعة، و«من الكلام» الأول (الافتراضي بيشتغل بالبرومبت بس)."""
+    return sorted((m for m in auto_gen_models() if (m.get("mode") or "") in AUTO_VID_MODES), key=lambda m: AUTO_VID_MODES.index(m["mode"]))
+
+
+def auto_gen_video(bid: str, s: dict, ratio: str, run_id: str, report: list[str]) -> list[dict]:
+    """«ولّد فيديو»: البرومبت (والمراجع/الصورة/الصوت على حسب الموديل) ← فيديو أو أكتر، بيدخل الفيديو وبيتحفظ في المكتبة."""
+    ms = auto_vid_models()
+    if not ms:
+        raise RuntimeError("مفيش موديل توليد فيديو متاح دلوقتي")
+    o = s["opts"]
+    m = next((x for x in ms if x["model"] == o.get("model")), ms[0])
+    g = {**s, "opts": {**o, "model": m["model"], "use_piece": False}}
+    tmp = GENERATED_DIR / f"autovid_{run_id}_{s['id']}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        made = []
+        for i in range(max(1, min(4, int(o.get("count") or 1)))):
+            name = f"gen_{uuid.uuid4().hex[:10]}.mp4"
+            dest = tmp / name
+            if atlas.mock_mode():
+                W, H = AUTO_CANVAS.get(ratio, AUTO_CANVAS["9:16"])
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"testsrc2=size={W // 2}x{H // 2}:rate=30:duration={float(o.get('sec') or 5)}",
+                                "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast", str(dest)], check=True, capture_output=True, timeout=300)
+                label = f"{m['label']} · {GEN_MODE_T.get(m.get('mode'), '')}"
+            else:
+                label = auto_gen_piece(None, float(o.get("sec") or 5), g, dest, run_id, ratio)
+            dur = probe_duration(dest) or float(o.get("sec") or 5)
+            made.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"✨ {o.get('prompt', '')[:40]}"), "kind": "video", "size": dest.stat().st_size, "dur": dur,
+                         "desc": o.get("prompt", "")[:300], "tags": ["اتولّدت"], "status": "ready", "at": now(), "origin": bid})
+        report.append(f"✓ اتولّد {len(made)} فيديو ({label})")
+        return auto_lib_add(bid, "videos", made, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+FRAME_MODELS = ["google/gemini-2.5-flash-lite", "google/gemini-3.1-flash-lite", "google/gemini-2.5-flash"]   # رخاص وبيشوفوا صور كويس
+AUTO_FRAMES_SUB = "🎯 فريمات مختارة"
+
+
+def auto_pick_frames(bid: str, s: dict, f: dict, ratio: str, run_id: str, report: list[str]) -> list[dict]:
+    """«اختار الفريمات»: فريم كل ثانية (صغير) ← موديل رخيص بيقول أنهي فريمات فيها الوصف ← الفريمات دي بجودة كاملة (أو لقطات قصيرة حواليها).
+    التكلفة على قد عدد الفريمات (فيديو دقيقة ≈ أقل من سنت)."""
+    o = s["opts"]
+    want = (o.get("want") or "").strip()
+    if not want:
+        report.append("⚠️ «اختار الفريمات» من غير وصف للي عايزه، فاتخطّت")
+        return []
+    src = lib_path(f, bid)
+    dur = float(f.get("dur") or probe_duration(src) or 0)
+    if dur <= 0:
+        report.append(f"⚠️ مقدرتش أعرف طول «{f['name']}»")
+        return []
+    step = max(1.0, dur / 120)   # لحد ١٢٠ فريم للفيديو الطويل
+    tmp = GENERATED_DIR / f"autofr_{run_id}_{s['id']}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", f"fps=1/{step:.3f},scale=384:-2", "-q:v", "5", str(tmp / "s_%04d.jpg")],
+                       capture_output=True, timeout=600)
+        shots = sorted(tmp.glob("s_*.jpg"))
+        if not shots:
+            report.append(f"⚠️ مقدرتش أطلّع فريمات من «{f['name']}»")
+            return []
+        times = [round(i * step, 2) for i in range(len(shots))]
+        keep: list[int] = []
+        meter = {"usd": 0.0}
+        if atlas.mock_mode():
+            keep = list(range(0, len(shots), 3))
+        else:
+            wallet.need(max(1, wallet.credits(len(shots) * 0.0001 + 0.002)), "اختيار الفريمات")
+            for a in range(0, len(shots), 40):
+                parts = [{"type": "text", "text": (f"These are {len(shots[a:a + 40])} frames from a video, numbered from {a}. "
+                                                   f"Which frames clearly show: «{want}»? Be strict: only frames that really match. "
+                                                   'Reply JSON only: {"keep": [frame numbers]}')}]
+                for i, p in enumerate(shots[a:a + 40]):
+                    parts += [{"type": "text", "text": f"Frame {a + i}:"}, {"type": "image_url", "image_url": {"url": data_url(p, "image/jpeg")}}]
+                raw = ad_json(ad_media_chat([{"role": "user", "content": parts}], 2000, models=FRAME_MODELS, meter=meter), "اختيار الفريمات")
+                keep += [int(x) for x in raw.get("keep") or [] if isinstance(x, (int, float)) and a <= int(x) < a + 40]
+            wallet.charge(max(1, wallet.credits(meter["usd"] or len(shots) * 0.0001)), f"قالب مخصص: اختيار الفريمات ({len(shots)} فريم)", run_id)
+        keep = sorted(set(keep))
+        if not keep:
+            report.append(f"⚠️ «اختار الفريمات»: مالقيتش «{want[:40]}» في «{f['name']}»")
+            return []
+        n = max(1, min(20, int(o.get("count") or 6)))
+        made = []
+        if o.get("out") == "clips":   # الثواني اللي ورا بعض بتبقى لقطة واحدة
+            spans = []
+            for i in keep:
+                t0, t1 = max(0.0, times[i] - step / 2), min(dur, times[i] + step / 2)
+                if spans and t0 <= spans[-1][1] + 0.05:
+                    spans[-1][1] = t1
+                else:
+                    spans.append([t0, t1])
+            spans = sorted(spans, key=lambda x: x[1] - x[0], reverse=True)[:n]
+            for t0, t1 in sorted(spans):
+                t1 = max(t1, min(dur, t0 + 1.0))
+                name = f"pick_{uuid.uuid4().hex[:10]}.mp4"
+                r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t0:.2f}", "-i", str(src), "-t", f"{t1 - t0:.2f}",
+                                    "-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", str(tmp / name)], capture_output=True, timeout=300)
+                if r.returncode == 0 and (tmp / name).exists():
+                    made.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"🎯 {want[:30]} {t0:.0f}s"), "kind": "video", "size": (tmp / name).stat().st_size,
+                                 "dur": round(t1 - t0, 2), "desc": f"{want[:200]} · من «{f['name']}»", "tags": ["فريمات مختارة"], "status": "ready", "at": now(), "origin": bid})
+        else:
+            if len(keep) > n:   # متوزعين على طول الفيديو
+                keep = [keep[round(i * (len(keep) - 1) / (n - 1))] for i in range(n)] if n > 1 else keep[:1]
+            for i in keep:
+                name = f"pick_{uuid.uuid4().hex[:10]}.jpg"
+                r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{times[i]:.2f}", "-i", str(src), "-frames:v", "1", "-q:v", "2", str(tmp / name)],
+                                   capture_output=True, timeout=120)
+                if r.returncode == 0 and (tmp / name).exists():
+                    made.append({"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"🎯 {want[:30]} {times[i]:.0f}s"), "kind": "image", "size": (tmp / name).stat().st_size,
+                                 "desc": f"{want[:200]} · من «{f['name']}»", "tags": ["فريمات مختارة"], "status": "ready", "at": now(), "origin": bid})
+        report.append(f"✓ «اختار الفريمات»: {len(made)} {'لقطة' if o.get('out') == 'clips' else 'فريم'} فيها «{want[:40]}» من {len(shots)} اتشافوا (والباقي اتشال)")
+        return auto_lib_add(bid, "videos" if o.get("out") == "clips" else "images", made, tmp, AUTO_FRAMES_SUB) if made else []
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def auto_run_split(bid: str, s: dict, merge: dict | None, f: dict, ratio: str, run_id: str, setr, report: list[str]) -> list[dict]:
     """قطّع ← كل قطعة تمشي في مسارها (ولّد…) ← جمّع المخرجات المختارة بالترتيب. بيرجّع لقطات للمونتاج."""
     src = lib_path(f, bid)
@@ -28854,6 +28996,16 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                     else:
                         outro = got[0]
                     report.append(f"✓ {'الإنترو' if v == 'intro' else 'الأوترو'}: {got[0]['name']}")
+            elif v == "genvid":
+                setr(step="🎬 بيولّد الفيديو")
+                picked += [{"f": f, "sec": float(f.get("dur") or o.get("sec") or 5)} for f in auto_gen_video(bid, s, ratio, run_id, report)]
+            elif v == "frames":
+                got, _ = take(s, ("video",), 1, o.get("order") or "fresh")
+                if not got:
+                    report.append(f"⚠️ «اختار الفريمات» مالقاش فيديو في «{(s.get('src') or {}).get('label') or 'المكتبة'}»")
+                    continue
+                setr(step="🎯 بيتفرّج على الفيديو ويختار الفريمات")
+                picked += [{"f": f, "sec": float(o.get("sec") or 2.5)} for f in auto_pick_frames(bid, s, got[0], ratio, run_id, report)]
             elif v == "genimg":
                 setr(step="🖼️ بيولّد الصور")
                 picked += [{"f": f, "sec": float(o.get("sec") or 2.5)} for f in auto_gen_images(bid, s, ratio, run_id, report)]

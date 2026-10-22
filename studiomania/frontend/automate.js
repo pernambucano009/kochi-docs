@@ -21,6 +21,8 @@ const AutoPage = (() => {
     merge: "M3.5 6.5h5L14 12l-5.5 5.5h-5 M3.5 12H20 M16.5 9 20 12l-3.5 3",
     genimg: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M16 7l.8 1.9 1.9.8-1.9.8L16 12.4l-.8-1.9-1.9-.8 1.9-.8z",
     genvoice: "M10 3.5a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0v-5a3 3 0 0 1 3-3z M4 11a6 6 0 0 0 12 0 M10 17v3.5 M18.5 4l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z",
+    genvid: "M3.5 6.5h12v11h-12z M15.5 10l5-3v10l-5-3 M19 2.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z",
+    frames: "M3.5 5h7v6h-7z M13.5 5h7v6h-7z M3.5 13h7v6h-7z M13.5 13h7v6h-7z M15 16l1.5 1.5 3-3",
     piece: "M5 4.5h14v15H5z M5 9h14 M5 15h14 M8 4.5v4.5 M16 15v4.5",
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -47,7 +49,10 @@ const AutoPage = (() => {
       split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
         { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
         { f: "note", t: "محتاج إيه في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أنهي فيديو", val: M.orders[o.order] }],
-      gen: genLeaves(o), genimg: imgLeaves(o), genvoice: voiceLeaves(o),
+      gen: genLeaves(o), genvid: genLeaves(o), genimg: imgLeaves(o), genvoice: voiceLeaves(o),
+      frames: [{ ...srcLeaf, t: "الفيديو" }, { f: "want", t: "عايز أنهي فريمات", val: (o.want || "").slice(0, 40), miss: !(o.want || "").trim() },
+        { f: "out", t: "يطلّعها إزاي", val: M.frame_out?.[o.out] || "" }, { f: "count", t: "أقصى عدد", val: AR_N(o.count) },
+        ...(o.out === "clips" ? [] : [{ f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }]), { f: "order", t: "أنهي فيديو", val: M.orders[o.order] }],
       merge: [{ f: "items", t: "إيه اللي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب بتاعك` : "آخر حاجة في كل مسار" }],
       publish: [{ f: "when", t: "إمتى", val: M.when[o.when] }, { f: "platforms", t: "على فين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
@@ -56,19 +61,23 @@ const AutoPage = (() => {
     return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو شيلها", type: "action" }])];
   }
   // ✨ «ولّد»: النقط بتتغيّر على حسب نوع الموديل (من القطعة / مراجع / صورة / بداية ونهاية / الكلام بس)
-  const genModel = (o) => (S.meta.gen_models || []).find((m) => m.model === o.model) || (S.meta.gen_models || [])[0] || null;
+  // «ولّد فيديو» (opts.main) في الخط الأساسي: الموديلات اللي مش محتاجة قطعة بس
+  const genList = (o) => { const V = S.meta.vid_modes || [], xs = S.meta.gen_models || []; return o.main ? xs.filter((m) => V.includes(m.mode)).sort((a, b) => V.indexOf(a.mode) - V.indexOf(b.mode)) : xs; };
+  const genModel = (o) => genList(o).find((m) => m.model === o.model) || genList(o)[0] || null;
   const genMode = (o) => genModel(o)?.mode || "video";
   function genLeaves(o) {
     const m = genModel(o), mode = genMode(o), refs = o.refs || [];
     const L = [{ f: "model", t: "الموديل", val: m ? `${m.label} · ${S.meta.gen_modes?.[mode] || ""}` : "الافتراضي" },
       { f: "prompt", t: "البرومبت", val: (o.prompt || "").slice(0, 40), miss: mode !== "lipsync" && !(o.prompt || "").trim() }];
-    if (mode === "image" || mode === "startend") L.push({ f: "start", t: "صورة البداية", val: o.start?.label || refs[0]?.label || "أول فريم من القطعة" });
-    if (mode === "avatar") L.push({ f: "start", t: "صورة اللي بيتكلم", val: o.start?.label || refs[0]?.label || "أول فريم من القطعة" });
-    if (mode === "avatar" || mode === "lipsync") L.push({ f: "audio", t: "الصوت", val: o.audio?.label || (mode === "avatar" ? "صوت القطعة نفسها" : ""), miss: mode === "lipsync" && !o.audio });
+    const frame0 = o.main ? "" : "أول فريم من القطعة";
+    if (mode === "image" || mode === "startend") L.push({ f: "start", t: "صورة البداية", val: o.start?.label || refs[0]?.label || frame0, miss: o.main && !o.start && !refs.length });
+    if (mode === "avatar") L.push({ f: "start", t: "صورة اللي بيتكلم", val: o.start?.label || refs[0]?.label || frame0, miss: o.main && !o.start && !refs.length });
+    if (mode === "avatar" || mode === "lipsync") L.push({ f: "audio", t: "الصوت", val: o.audio?.label || (mode === "avatar" && !o.main ? "صوت القطعة نفسها" : ""), miss: (mode === "lipsync" || o.main) && !o.audio });
     if (mode === "startend") L.push({ f: "end", t: "صورة النهاية", val: o.end?.label || refs[1]?.label || "", miss: !o.end && refs.length < 2 });
     if (mode === "refs" || mode === "video") L.push({ f: "refs", t: mode === "refs" ? "المراجع (شخصيات وخلفيات وصور)" : "مراجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "",
-      miss: mode === "refs" && !refs.length && !(m?.video_in && o.use_piece) });
-    if (mode === "refs" && m?.video_in) L.push({ f: "use_piece", t: "القطعة كمرجع فيديو", val: o.use_piece ? "أيوه" : "لأ" });
+      miss: mode === "refs" && !refs.length && !(m?.video_in && o.use_piece && !o.main) });
+    if (mode === "refs" && m?.video_in && !o.main) L.push({ f: "use_piece", t: "القطعة كمرجع فيديو", val: o.use_piece ? "أيوه" : "لأ" });
+    if (o.main) L.push({ f: "sec", t: "مدة الفيديو", val: `${AR_N(o.sec)} ث` }, { f: "count", t: "عدد الفيديوهات", val: AR_N(o.count) });
     return L;
   }
   // 🖼️ «ولّد صورة»: المراجع بتظهر بس لو الموديل بيقبل صور مرجع
@@ -123,14 +132,14 @@ const AutoPage = (() => {
       start: mode === "avatar" ? "صورة الشخص اللي هيتكلم (شخصية، أفاتار، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة اللي الفيديو هيبدأ منها. الافتراضي: أول فريم من القطعة.",
       end: "الصورة اللي الفيديو هيخلص عليها.",
       audio: mode === "avatar" ? "الصوت اللي الشخص هيقوله (صوت شخصية، صوت أفاتار، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو بيطلع على قد الصوت." : "الصوت اللي الشفايف هتتظبط عليه." }[f];
-    if (s.verb !== "gen") return `<p class="bm-note">${note || ""}</p>
+    if (s.verb !== "gen" && s.verb !== "genvid") return `<p class="bm-note">${note || ""}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>
       <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
     return `<p class="bm-note">${note}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="شيله">✕</button></span>`).join("")}</div>` : ""}
-      ${f === "start" ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
-      ${f === "audio" && mode === "avatar" ? `<div class="bm-pills"><button class="bm-pill${o.audio?.kind === "piece_audio" || !o.audio ? " on" : ""}" data-refset="audio|piece_audio|">🎞️ صوت القطعة نفسها</button></div>` : ""}
+      ${f === "start" && !o.main ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
+      ${f === "audio" && mode === "avatar" && !o.main ? `<div class="bm-pills"><button class="bm-pill${o.audio?.kind === "piece_audio" || !o.audio ? " on" : ""}" data-refset="audio|piece_audio|">🎞️ صوت القطعة نفسها</button></div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 دوّر بالاسم">${esc(S.refQ || "")}</div>
       <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
   }
@@ -267,7 +276,9 @@ const AutoPage = (() => {
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ اوصف القالب بكلامك (كتابة أو صوت)</button>
         <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو اللي في فولدر «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وكابشن، واستنى موافقتي قبل النشر"></div>
           <div class="bm-acts"><button class="bm-pill" data-rec>🎙️ سجّل صوتك</button><span class="am-recst"></span>
-            <button class="bm-go" data-desc-go>✨ اعمل الخطوات</button><button class="bm-pill" data-undo hidden>↩ رجّع زي ما كان</button></div>
+            <button class="bm-go" data-desc-go>✨ افهم اللي قلته</button><button class="bm-pill" data-undo hidden>↩ رجّع زي ما كان</button></div>
+          <div class="am-clip" hidden></div>
+          <div class="am-plan" hidden></div>
           <p class="bm-note am-say"></p></div></div>
       <p class="bm-hint">الخطوات من الشمال لليمين · دوس على أي نقطة تغيّرها · «قطّع الفيديو» بيفتح مسار لكل قطعة، و«جمّع» بيلمّهم · «+» خطوة جديدة · «▶» على الشمال يشغّل القالب</p>`;
   }
@@ -492,7 +503,7 @@ const AutoPage = (() => {
     if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«يستنى موافقتي»: الفيديو بيتصدّر ويستناك في صفحة النشر. «ينزل على طول»: بينزل على الحسابات اللي هتختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
     if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن اللي هينزل مع الفيديو (لو فاضي: اسم القالب)") + `<p class="bm-note">بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
-    if (l.f === "prompt" && s.verb === "gen") {
+    if (l.f === "prompt" && (s.verb === "gen" || s.verb === "genvid")) {
       const mode = genMode(o), PH = { video: "مثلًا: نفس المشهد بس بستايل أنمي، ألوان دافية", refs: "مثلًا: @سارة ماشية في @المكتب وبتشاور على الشاشة", image: "مثلًا: الكاميرا بتقرّب ببطء والناس بتتحرك",
         startend: "مثلًا: الكاميرا بتلف من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الناس، الحركة، الإضاءة",
         avatar: "مثلًا: @سارة بتتكلم بحماس وبتشاور بإيدها", lipsync: "اختياري" };
@@ -539,11 +550,16 @@ const AutoPage = (() => {
     if (l.f === "model") {
       const cur = genModel(o)?.model;
       return head + `<p class="bm-note">كل موديل بياخد حاجة مختلفة، والنقط اللي حوالين الخطوة بتتغيّر على حسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
-        const xs = (M.gen_models || []).filter((m) => m.mode === mode);
+        const xs = genList(o).filter((m) => m.mode === mode);
         return xs.length ? `<p class="am-gh">${esc(t)}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`]), cur) : "";
       }).join("");
     }
     if (l.f === "items") return head + mergeCard(s);
+    if (l.f === "want") return head + editable("opt:want", o.want || "", "مثلًا: الدكتور بيبتسم للكاميرا، أو المنتج في إيد حد، أو أي لقطة فيها البحر")
+      + `<p class="bm-note">موديل رخيص بيتفرّج على فريم كل ثانية ويختار اللي فيه وصفك بس، والباقي بيتشال (فيديو دقيقة ≈ أقل من نقطة). اللي بيطلع بيتحفظ في المكتبة في «🎯 فريمات مختارة». بيتحفظ لوحده لما تقف عن الكتابة.</p>`;
+    if (l.f === "out") return head + pills("out", Object.entries(M.frame_out || {}), o.out) + `<p class="bm-note">«صور»: كل فريم صورة بتظهر كام ثانية. «لقطات»: الثواني اللي فيها وصفك بتتقص فيديوهات قصيرة.</p>`;
+    if (s.verb === "genvid" && l.f === "sec") return head + pills("sec", [[4, "٤ ث"], [5, "٥ ث"], [6, "٦ ث"], [8, "٨ ث"], [10, "١٠ ث"]], o.sec) + `<p class="bm-note">التكلفة على قد الثواني.</p>`;
+    if (s.verb === "genvid" && l.f === "count") return head + pills("count", [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"]], o.count);
     if (s.verb === "pull" && l.f === "volume") return head + pills("volume", [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]], o.volume);
     if (["fit", "duck", "on", "use_piece"].includes(l.f)) return head + pills(l.f, [[true, "أيوه"], [false, "لأ"]], o[l.f]);
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
@@ -552,9 +568,9 @@ const AutoPage = (() => {
       + `<p class="bm-note">كل قطعة هتطلع أقل من (أو قد) الطول ده. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
   }
-  const RULES_PH = { gen: "مثلًا: من غير نصوص على الشاشة، ألوان البراند، الشخصية دايمًا لابسة أبيض", genimg: "مثلًا: خلفية فاتحة، من غير ناس، ستايل مينيمال",
+  const RULES_PH = { gen: "مثلًا: من غير نصوص على الشاشة، ألوان البراند، الشخصية دايمًا لابسة أبيض", genvid: "مثلًا: من غير نصوص على الشاشة، إضاءة دافية، حركة كاميرا هادية", genimg: "مثلًا: خلفية فاتحة، من غير ناس، ستايل مينيمال",
     pull: "مثلًا: قبل وبعد بس، من غير صور فيها وشوش", music: "مثلًا: هادية، من غير كلام", voice: "مثلًا: صوت سارة بس" };
-  const RULES_NOTE = { gen: "بتتضاف للبرومبت كل مرة.", genimg: "بتتضاف للوصف كل مرة.", split: "بيختار الفيديو اللي يطابقها من المنشن.",
+  const RULES_NOTE = { gen: "بتتضاف للبرومبت كل مرة.", genvid: "بتتضاف للبرومبت كل مرة.", genimg: "بتتضاف للوصف كل مرة.", split: "بيختار الفيديو اللي يطابقها من المنشن.",
     pull: "بيختار من المنشن الملفات اللي تطابقها بالمعنى. ولو من الستوك: بتتضاف لكلمة البحث.", music: "بيختار من المنشن اللي يطابقها. ولو من الستوك: بتتضاف لكلمة البحث.",
     voice: "بيختار من المنشن التسجيل اللي يطابقها.", intro: "بيختار الفيديو اللي يطابقها.", outro: "بيختار الفيديو اللي يطابقها." };
   // «جمّع»: كل مخرج ممكن (القطعة الأصلية أو بعد «ولّد») زرار، واللي بتختاره بيتحط في الترتيب
@@ -753,14 +769,30 @@ const AutoPage = (() => {
           const box = S.el.querySelector(".am-desc"), text = box.querySelector('[data-k="desc"]').innerText.trim();
           if (!text && !S.recBlob) return toast("اكتب أو سجّل اللي عايزه الأول", true);
           const fd = new FormData(); fd.append("text", text); if (S.recBlob) fd.append("audio", S.recBlob, "describe.webm");
-          const go = box.querySelector("[data-desc-go]"); go.disabled = true; go.textContent = "⏳ بيفهم…";
-          try {
-            const r = await aAPI("/describe", { method: "POST", body: fd });
-            S.recBlob = null; box.querySelector(".am-recst").textContent = ""; box.querySelector(".am-say").textContent = r.say || "";
-            box.querySelector("[data-undo]").hidden = false; openCard(null); S.view = null; await setRec(r); toast("✨ الخطوات اتعملت. راجعها");
-          } finally { go.disabled = false; go.textContent = "✨ اعمل الخطوات"; }
+          fd.append("dry", "true");
+          const go = box.querySelector("[data-desc-go]"); go.disabled = true; go.textContent = S.recBlob ? "⏳ بيسمع ويفهم…" : "⏳ بيفهم…";
+          try { S.plan = await aAPI("/describe", { method: "POST", body: fd }); drawPlan(); }
+          finally { go.disabled = false; go.textContent = "✨ افهم اللي قلته"; }
           return;
         }
+        if (t.closest("[data-plan-ok]")) {
+          const box = S.el.querySelector(".am-desc"), r = await aAPI("/apply", { method: "POST", ...jsonBody({ steps: S.plan.steps }) });
+          box.querySelector(".am-say").textContent = S.plan.say || ""; S.plan = null; drawPlan(); clipReset();
+          box.querySelector('[data-k="desc"]').innerText = "";
+          box.querySelector("[data-undo]").hidden = false; openCard(null); S.view = null; await setRec(r); toast("✨ الخطوات اتعملت. راجعها");
+          return;
+        }
+        if (t.closest("[data-plan-re]")) {   // افهم تاني من الكلام المكتوب (من غير ما يسمع التسجيل تاني)
+          const box = S.el.querySelector(".am-desc"), heard = box.querySelector('[data-k="heard"]')?.innerText.trim() || "";
+          if (!heard) return toast("اكتب اللي عايزه", true);
+          box.querySelector('[data-k="desc"]').innerText = heard; clipReset();
+          const fd = new FormData(); fd.append("text", heard); fd.append("dry", "true");
+          const b2 = t.closest("[data-plan-re]"); b2.disabled = true; b2.textContent = "⏳ بيفهم…";
+          try { S.plan = await aAPI("/describe", { method: "POST", body: fd }); } finally { drawPlan(); }
+          return;
+        }
+        if (t.closest("[data-plan-x]")) { S.plan = null; return drawPlan(); }
+        if (t.closest("[data-clip-x]")) return clipReset();
         if (t.closest("[data-undo]")) { const r = await aAPI("/undo", { method: "POST" }); S.el.querySelector("[data-undo]").hidden = true; openCard(null); S.view = null; return setRec(r); }
         if (t.closest("[data-run]")) { const r = await aAPI("/run", { method: "POST" }); return setRec(r); }
         if ((b = t.closest("[data-openpj]"))) { storageSet(projectKey("free"), b.dataset.openpj); return showStep("6f"); }
@@ -857,16 +889,66 @@ const AutoPage = (() => {
     await setRec(await aAPI());
   }
   // 🎙️ تسجيل الوصف بالصوت (بيتبعت مع الكتابة لو فيه)
+  // 🎙️ وانت بتسجّل: عدّاد وموجة بتتحرك مع صوتك (علشان تعرف إنه لاقط)، وبعد ما توقّف: تسمع التسجيل قبل ما يتبعت
   async function recToggle() {
     const box = S.el.querySelector(".am-desc"), btn = box.querySelector("[data-rec]"), st = box.querySelector(".am-recst");
     if (S.rec_?.state === "recording") { S.rec_.stop(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true }), chunks = [], t0 = Date.now();
       const mr = new MediaRecorder(stream);
+      const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser();
+      an.fftSize = 256; ac.createMediaStreamSource(stream).connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      st.innerHTML = `<span class="am-live"><i class="dot"></i><span class="am-bars">${"<i></i>".repeat(12)}</span><b class="num">٠:٠٠</b><small></small></span>`;
+      const bars = [...st.querySelectorAll(".am-bars i")], clock = st.querySelector("b"), hint = st.querySelector("small");
+      let heardAt = 0;
+      const draw = () => {
+        if (mr.state !== "recording") return;
+        an.getByteTimeDomainData(buf);
+        let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v - 128) / 128);
+        if (pk > .06) heardAt = Date.now();
+        bars.push(bars.shift()); bars.forEach((b, i) => { if (i === bars.length - 1) b.style.height = `${Math.round(3 + Math.min(1, pk * 2.2) * 19)}px`; st.querySelector(".am-bars").appendChild(b); });
+        const sec = Math.round((Date.now() - t0) / 1000);
+        clock.textContent = `${AR_N(Math.floor(sec / 60))}:${AR_N(String(sec % 60).padStart(2, "0"))}`;
+        hint.textContent = Date.now() - t0 > 2500 && Date.now() - heardAt > 2500 ? "مش سامع صوت… قرّب من المايك" : "لاقط صوتك ✓";
+        hint.classList.toggle("bad", Date.now() - t0 > 2500 && Date.now() - heardAt > 2500);
+        requestAnimationFrame(draw);
+      };
       mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      mr.onstop = () => { stream.getTracks().forEach((x) => x.stop()); S.recBlob = new Blob(chunks, { type: mr.mimeType || "audio/webm" }); btn.textContent = "🎙️ سجّل تاني"; st.textContent = `✓ تسجيل ${AR_N(Math.round((Date.now() - t0) / 1000))} ث جاهز`; };
-      mr.start(); S.rec_ = mr; btn.textContent = "⏹ وقّف التسجيل"; st.textContent = "بيسجّل…";
+      mr.onstop = () => {
+        stream.getTracks().forEach((x) => x.stop()); ac.close();
+        S.recBlob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+        btn.textContent = "🎙️ سجّل من الأول"; st.textContent = "";
+        const clip = box.querySelector(".am-clip");
+        if (S.recUrl) URL.revokeObjectURL(S.recUrl);
+        S.recUrl = URL.createObjectURL(S.recBlob);
+        clip.innerHTML = `<small>🎧 تسجيلك (<span class="num">${AR_N(Math.round((Date.now() - t0) / 1000))}</span> ث). اسمعه قبل ما تدوس «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 امسحه</button>`;
+        clip.hidden = false;
+      };
+      mr.start(); S.rec_ = mr; btn.textContent = "⏹ وقّف التسجيل"; requestAnimationFrame(draw);
     } catch { toast("مقدرتش أفتح المايك. اسمح للمتصفح يستخدمه", true); }
+  }
+  function clipReset() {
+    const clip = S.el?.querySelector(".am-clip");
+    S.recBlob = null; if (S.recUrl) URL.revokeObjectURL(S.recUrl); S.recUrl = null;
+    if (clip) { clip.hidden = true; clip.innerHTML = ""; }
+    const btn = S.el?.querySelector("[data-rec]"); if (btn) btn.textContent = "🎙️ سجّل صوتك";
+  }
+  // 👀 قبل ما ينفّذ: سمع منك إيه (تقدر تصلّحه) وهيعمل أنهي خطوات بالظبط
+  function drawPlan() {
+    const box = S.el?.querySelector(".am-plan");
+    if (!box) return;
+    const p = S.plan;
+    box.hidden = !p;
+    if (!p) { box.innerHTML = ""; return; }
+    box.innerHTML = `<p class="am-gh">🎧 فهمت إنك عايز:</p>
+      <div class="bm-write" contenteditable="plaintext-only" data-k="heard">${esc(p.heard || "")}</div>
+      <p class="bm-note">لو فيه كلمة غلط صلّحها هنا ودوس «افهم تاني».</p>
+      <p class="am-gh">🧩 هعمل الخطوات دي بالترتيب:</p>
+      <ol class="am-planl">${(p.plan || []).reduce((a, l) => { if (/^\s+↳/.test(l) && a.length) a[a.length - 1].push(l.replace(/^\s+↳\s*/, "↳ ")); else a.push([l]); return a; }, [])
+        .map(([l, ...sub]) => `<li>${esc(l)}${sub.map((x) => `<small class="sub">${esc(x)}</small>`).join("")}</li>`).join("")}</ol>
+      ${p.say ? `<p class="bm-note">${esc(p.say)}</p>` : ""}
+      <div class="bm-acts"><button class="bm-go" data-plan-ok>✓ نفّذ الخطوات دي</button><button class="bm-pill" data-plan-re>↻ افهم تاني</button><button class="bm-pill" data-plan-x>✕ إلغاء</button></div>`;
   }
   function html() { return `<div class="bm am" id="amWrap"><div class="nh-empty">بيحمّل…</div></div>`; }
   async function mount(root) {

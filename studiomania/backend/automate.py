@@ -29,6 +29,10 @@ VERBS = {
                "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "count": 1, "sec": 2.5}},
     "genvoice": {"t": "ولّد صوت", "desc": "تعليق صوتي (أو موسيقى) جديد بالذكاء الصناعي من الكلام اللي تكتبه، وبصوت مرجع لو الموديل بيقبل. بيدخل الفيديو وبيتحفظ في المكتبة",
                  "accept": (), "opts": {"text": "", "lyrics": "", "model": "", "lang": "", "voice": "", "ref": None, "fit": True, "volume": 35, "duck": True}},
+    "genvid": {"t": "ولّد فيديو", "desc": "فيديو جديد بالذكاء الصناعي: من الكلام، أو من صورة بداية (ونهاية)، أو من مراجع (شخصيات وخلفيات)، أو صورة + صوت (أفاتار). بيدخل الفيديو وبيتحفظ في المكتبة",
+               "accept": (), "opts": {"prompt": "", "model": "", "refs": [], "start": None, "end": None, "audio": None, "count": 1, "sec": 5, "main": True}},
+    "frames": {"t": "اختار الفريمات", "desc": "الذكاء الصناعي بيتفرّج على فيديو، ويطلّع الفريمات (أو اللقطات) اللي بتوصفها بالكلام بس، والباقي بيتشال",
+               "accept": ("video",), "opts": {"want": "", "out": "frames", "count": 6, "sec": 2.5, "order": "fresh"}},
     "merge": {"t": "جمّع", "desc": "يجمع المخرجات اللي تختارها في فيديو واحد بالترتيب اللي تحدده", "accept": (), "opts": {"items": []}},
     "cut": {"t": "طول اللقطات", "desc": "أقصى طول لكل لقطة، وانتقال بين اللقطات", "accept": (), "opts": {"max": 3.0, "trans": "fade"}},
     "caption": {"t": "حط كابشن", "desc": "الكلام مكتوب على الشاشة من التعليق الصوتي", "accept": (), "opts": {"on": True}},
@@ -36,12 +40,13 @@ VERBS = {
     "publish": {"t": "انشر", "desc": "على حساباتك المربوطة في صفحة النشر، أو يستنى موافقتك", "accept": (), "opts": {"when": "draft", "platforms": [], "caption": ""}},
 }
 # «قواعدي»: كلام حر في الخطوات اللي بتختار أو بتولّد (بيفلتر الملفات بالمعنى، أو بيتضاف لكلمة بحث الستوك، أو للبرومبت)
-RULES_VERBS = ("pull", "intro", "outro", "voice", "music", "split", "gen", "genimg")
+RULES_VERBS = ("pull", "intro", "outro", "voice", "music", "split", "gen", "genimg", "genvid")
 for _k in RULES_VERBS:
     VERBS[_k]["opts"]["rules"] = ""
 # 🌐 الستوك أونلاين: صور وفيديوهات من Pexels، وموسيقى مجانية للاستخدام التجاري
 STOCK_KINDS = ("image", "video", "audio")
 ROLES = {"music": "موسيقى تحت الفيديو", "voice": "تعليق صوتي"}
+FRAME_OUT = {"frames": "صور (فريمات)", "clips": "لقطات فيديو قصيرة"}
 FIXED = ("export", "publish")
 LANE_VERBS = ("gen",)
 REF_KINDS = {"char": "شخصية", "twin": "نسختي", "bg": "خلفية", "file": "ملف", "folder": "فولدر", "export": "فيديو جاهز", "audio": "صوت",
@@ -112,6 +117,12 @@ def clean_opts(verb: str, raw: dict) -> dict:
             base[k] = raw[k]
         elif k == "rules":
             base[k] = str(raw[k] or "")[:1000]
+        elif k == "want":
+            base[k] = str(raw[k] or "")[:600]
+        elif k == "out" and raw[k] in FRAME_OUT:
+            base[k] = raw[k]
+        elif k == "main":
+            base[k] = True
         elif k == "order" and raw[k] in ORDERS:
             base[k] = raw[k]
         elif k == "trans" and raw[k] in TRANS:
@@ -291,6 +302,10 @@ Rules:
   If the client wants the same thing for every piece, give one lane. If he says what each piece should become, give one lane per piece.
 - merge ("جمّع") must come right after split. opts.items is an ordered list of {{"lane": <piece index from 0>, "node": "piece" (the original cut) or the id of a gen step in that lane}}.
   Empty items = the last output of every lane in order.
+- "src" can also be online stock: {{"mode": "stock", "q": "<english words>"}} (photos/videos, or music for music/pull audio) when the client asks for stock / Pexels / footage from the internet.
+- genvid ("ولّد فيديو") makes a brand-new AI video on the main line (from text, image or references); "gen" is only inside split lanes.
+- frames ("اختار الفريمات") watches one video from src and keeps only the frames (opts.out "frames") or short clips (opts.out "clips") matching opts.want (a short description), dropping the rest.
+- opts.rules is free text with the client's own rules for that step (filters what is picked, or is added to the prompt).
 - Give every step a short unique "id" (letters/digits).
 - Keep what the client did not ask to change from the current model: {json.dumps(current, ensure_ascii=False)[:3000]}
 Client's description: «{text}»
@@ -380,3 +395,34 @@ def plan_lengths(kinds_durs: list[tuple[str, float | None]], target: float | Non
             k = target / total
             out = [max(0.6, min((cap or 1e9) if kd[0] != "video" else min(cap or 1e9, kd[1] or 1e9), x * k)) for x, kd in zip(out, kinds_durs)]
     return [round(x, 2) for x in out]
+
+
+def plan_lines(steps: list[dict]) -> list[str]:
+    """الخطوات بالكلام (قبل ما تتنفّذ): «اسحب صور من @فولدر»، «ولّد فيديو: …»، ومسارات التقطيع تحتها."""
+    def one(s: dict) -> str:
+        v, o, src = VERBS[s["verb"]], s.get("opts") or {}, s.get("src") or {}
+        out = v["t"]
+        if s["verb"] == "pull":
+            out += " " + {"image": "صور", "video": "فيديوهات", "any": "صور وفيديوهات", "audio": "صوت"}.get(o.get("type"), "")
+            if o.get("type") != "audio":
+                out += f" ({o.get('count')})"
+        if src:
+            out += f" من {src.get('label') or src.get('q') or 'المكتبة'}" if src.get("mode") == "stock" else f" من @{src.get('label') or src.get('q') or 'المكتبة'}"
+        for k in ("prompt", "want", "text", "note"):
+            if str(o.get(k) or "").strip():
+                out += f": «{str(o[k]).strip()[:80]}»"
+                break
+        if s["verb"] == "split":
+            out += f" لقطع ≤ {o.get('max')} ث"
+        if s["verb"] == "publish":
+            out += f" ({WHEN.get(o.get('when'), '')})"
+        if str(o.get("rules") or "").strip():
+            out += f" · قواعدك: «{o['rules'][:60]}»"
+        return out
+    lines = []
+    for s in steps:
+        lines.append(one(s))
+        for i, lane in enumerate(s.get("lanes") or []):
+            if lane:
+                lines.append(f"   ↳ {'كل قطعة' if len(s['lanes']) == 1 else f'القطعة {i + 1}'}: " + " ← ".join(one(x) for x in lane))
+    return lines
