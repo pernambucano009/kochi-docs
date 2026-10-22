@@ -75,7 +75,25 @@ out.write("-----SIMSIM-END-----\n"); out.flush()
 EOF
 )
 B64=$(printf '%s' "$PY" | base64 -w0)
-railway ssh -- sh -c "echo $B64 | base64 -d | python3 -" > raw.txt || true
+RW=railway
+# النسخ الجديدة من الأداة بتدخل بـ ssh على port 22، ولو مقفول بنجرّب نسخة 4 اللي بتدخل من 443 (websocket)
+if ! timeout 8 bash -c '</dev/tcp/ssh.railway.com/22' 2>/dev/null; then
+  echo "port 22 مقفول، بنجرّب أداة Railway نسخة 4 (من غير ssh)"
+  ARCH=$(uname -m); [ "$ARCH" = "arm64" ] && ARCH=aarch64
+  URL=$(curl -fsSL "https://api.github.com/repos/railwayapp/cli/releases?per_page=100" | python3 -c "
+import json,sys
+for r in json.load(sys.stdin):
+    if not r['tag_name'].lstrip('v').startswith('4.'): continue
+    for a in r['assets']:
+        n=a['name']
+        if '$ARCH' in n and 'linux' in n and n.endswith('.tar.gz'): print(a['browser_download_url']); sys.exit()
+")
+  [ -n "$URL" ] || { echo "مالقيتش نسخة 4"; exit 1; }
+  mkdir -p "$WORK/rw4" && curl -fsSL "$URL" | tar xz -C "$WORK/rw4"
+  RW=$(find "$WORK/rw4" -type f -name railway | head -1); chmod +x "$RW"
+  "$RW" --version
+fi
+"$RW" ssh -- sh -c "echo $B64 | base64 -d | python3 -" > raw.txt || true
 sed -n '/-----SIMSIM-BEGIN-----/,/-----SIMSIM-END-----/p' raw.txt | sed '1d;$d' | tr -d '\r' | base64 -d > data.tgz
 grep -q -- "-----SIMSIM-END-----" raw.txt || { echo "⚠️ النقل ماكملش، شغّل الأمر تاني"; exit 1; }
 gzip -t data.tgz && tar tzf data.tgz >/dev/null
