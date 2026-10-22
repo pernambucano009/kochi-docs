@@ -76,7 +76,7 @@ import textlayer  # noqa: E402  (النصوص الحرة في المونتاج)
 import person  # noqa: E402  (قراءة الشخص في الفيديو: فصله ومكان راسه)
 import scene  # noqa: E402  (🪄 تغيير الخلفية وشيل الحاجات من الفيديو)
 import numpy as np  # noqa: E402
-from auth import SESSION_COOKIE, SESSION_DAYS, Auth  # noqa: E402
+from auth import BASIC_KEYS, SESSION_COOKIE, SESSION_DAYS, SETTING_KEYS, Auth  # noqa: E402
 
 MAX_CLIP_SECONDS = 15.0
 MIN_CUT_GAP = 0.2  # أقل مسافة مسموحة بين نقطتين قطع
@@ -749,6 +749,7 @@ class SettingsIn(BaseModel):
     zernio: str | None = None
     scrape: str | None = None   # ScrapeCreators: تحليل الحسابات و«نبض المجال»
     pexels: str | None = None   # مكتبة الصور والفيديوهات الحقيقية للخلفيات
+    keys: dict[str, str] | None = None   # باقي مفاتيح المنصة (الأدمن بس): {اسم: قيمة}
 
 
 @app.put("/api/settings")
@@ -757,6 +758,12 @@ def save_settings(body: SettingsIn):
         value = getattr(body, name)
         if value is not None:
             auth.save_key(name, value)
+    if body.keys:
+        if TENANT_ROLE != "admin":
+            raise HTTPException(403, "المفاتيح دي لصاحب المنصة بس")
+        for name, value in body.keys.items():
+            if name in SETTING_KEYS and name not in BASIC_KEYS and value is not None:
+                auth.save_key(name, str(value)[:2000])
     return get_settings()
 
 

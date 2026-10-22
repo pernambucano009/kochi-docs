@@ -104,6 +104,20 @@ echo "✓ العنوان بقى https://$D"
 EOF
 chmod 700 "$ROOT/domain.sh"
 
+# 🔄 تحديث لوحده: كل ٥ دقايق بيشوف لو فيه كود جديد على الفرع، ولو فيه بيبني ويشغّل (من غير ما حد يفتح السيرفر)
+cat > "$ROOT/autoupdate.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=/srv/simsimkit
+BRANCH="${BRANCH:-claude/new-program-gvemu5}"
+exec 9>"$ROOT/.update.lock"; flock -n 9 || exit 0
+git -C "$ROOT/src" fetch -q --depth 1 origin "$BRANCH"
+[ "$(git -C "$ROOT/src" rev-parse HEAD)" = "$(git -C "$ROOT/src" rev-parse FETCH_HEAD)" ] && exit 0
+"$ROOT/update.sh" >> "$ROOT/update.log" 2>&1
+EOF
+chmod 700 "$ROOT/autoupdate.sh"
+echo "*/5 * * * * root $ROOT/autoupdate.sh" > /etc/cron.d/simsimkit
+
 echo "== 6) بناء وتشغيل (أول مرة بتاخد حوالي ١٠ دقايق)"
 "$ROOT/update.sh"
 echo

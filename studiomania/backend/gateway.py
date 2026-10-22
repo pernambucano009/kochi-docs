@@ -456,9 +456,29 @@ def backup_tick() -> None:
             admin_alert("🔴 النسخة الاحتياطية مااتعملتش", str(exc)[:300], "backup", "افتح الإعدادات ← النسخة الاحتياطية، ودوس «اعمل نسخة دلوقتي» أو اربط جوجل درايف تاني.")
 
 
+ENV0 = set(os.environ)   # اللي جاي من الاستضافة نفسها ليه الأولوية على اللي اتحفظ من صفحة الإعدادات
+
+
+def sync_owner_keys() -> None:
+    """مفاتيح المنصة اللي الأدمن حفظها من صفحة الإعدادات (الدفع والإيميل والدخول بجوجل) بتوصل للبوابة من غير إعادة تشغيل."""
+    for k, v in owner_keys().items():
+        if k not in ENV0 and v and os.environ.get(k) != v:
+            os.environ[k] = v
+
+
+try:
+    sync_owner_keys()
+except Exception:  # noqa: BLE001
+    pass
+
+
 def reaper() -> None:
     while True:
         time.sleep(60)
+        try:
+            sync_owner_keys()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             provider_watch()
         except Exception:  # noqa: BLE001  (المراقبة عمرها ماتوقف البوابة)

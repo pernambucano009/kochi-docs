@@ -1,7 +1,17 @@
 // StudioMania — الإعدادات والخروج
 
+// باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
+const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربي"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
+  ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"],
+  ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
+  ["stripe", "Stripe Secret key", "الدفع"], ["stripe_hook", "Stripe Webhook secret", "الدفع"],
+  ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"]];
+
 async function loadSettings() {
   const s = await api("/api/settings");
+  const more = $("keysMore");
+  if (more) more.innerHTML = MORE_KEYS.filter(([k]) => s.keys[k]).map(([k, t, why]) => `<label class="field" title="${why}">${t}
+      <input type="password" data-mkey="${k}" autocomplete="off" placeholder="${s.keys[k].set ? `•••••••••••• (${s.keys[k].hint})` : "الصق المفتاح هنا"}"></label>`).join("");
   for (const name of ["atlas", "zernio", "scrape", "pexels"]) {
     const k = s.keys[name];
     // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
@@ -26,6 +36,7 @@ $("keysForm").addEventListener("submit", async (e) => {
     const v = $(`${name}Key`).value.trim();
     if (v) body[name] = v;
   }
+  document.querySelectorAll("[data-mkey]").forEach((i) => { if (i.value.trim()) (body.keys ||= {})[i.dataset.mkey] = i.value.trim(); });
   if (!Object.keys(body).length) return toast("الصق مفتاح الأول");
   try {
     await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
