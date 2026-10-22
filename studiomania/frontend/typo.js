@@ -669,7 +669,7 @@ $("tyMain").addEventListener("click", async (e) => {
     bl[i].to = bl[i + 1].to;
     bl[i].text = "";
     bl.splice(i + 1, 1);
-    return tySaveBlocks(bl, "⤵ اتضمّوا");
+    return tySaveBlocks(bl, "⤵ ضُمّوا");
   }
   const split = t.closest("[data-tysplit]");
   if (split) {

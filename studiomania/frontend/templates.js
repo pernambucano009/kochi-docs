@@ -487,7 +487,7 @@ $("labTpl").addEventListener("change", async (e) => {
     if (t.matches("[data-tvopt]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ [t.dataset.tvopt]: t.value }) });
       renderTpl();
-      return toast(t.dataset.tvopt === "text_mode" ? "✅ تغيّر. الأوصاف اتحدثت؛ ارسم الورقة مرة أخرى لكي يأخذ به"
+      return toast(t.dataset.tvopt === "text_mode" ? "✅ تغيّر. الأوصاف حُدّثت؛ ارسم الورقة مرة أخرى لكي يأخذ به"
         : t.dataset.tvopt === "image_model" ? "✅ تغيّر. اضغط «↻ ارسم الورقة مرة أخرى» لكي يُرسم بالنموذج الجديد" : "✅ حُفظ");
     }
     if (t.matches("[data-pd], [data-tf]")) {

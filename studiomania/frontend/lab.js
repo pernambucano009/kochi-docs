@@ -279,9 +279,9 @@ function labAudioInner(d) {
   if (a.none) return `<p class="muted">هذا الفيديو لا يحتوي صوت.</p>`;
   if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ يفكك الصوت..." : "ما زال ما لم يُفكّك."}</p>`;
   const sfx = a.sfx || [];
-  return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت اتقاست)</span></h4>
+  return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت قيست)</span></h4>
     ${labStems(d)}
-    <p class="hint">⏱️ = الوقت ضُبط على بداية الصوت الذي اتقاست بالكود (دقة 10 مللي ثانية)${a.from_stem ? "، ومن تراك المؤثرات النضيف" : ""}. ▶️ يشغّل الصوت تلقائيًا ويودّي الفيديو للحظته.</p>
+    <p class="hint">⏱️ = الوقت ضُبط على بداية الصوت الذي قيست بالكود (دقة 10 مللي ثانية)${a.from_stem ? "، ومن تراك المؤثرات النضيف" : ""}. ▶️ يشغّل الصوت تلقائيًا ويودّي الفيديو للحظته.</p>
     <h4>🔊 المؤثرات الصوتية</h4>
     <div class="lab-rows">${sfx.map((x) => `<div class="lab-row" data-sfx="${x.id}">
       <button type="button" class="btn sm" data-play="${x.clip_url}" data-seek="${x.t}">▶️</button>
@@ -404,7 +404,7 @@ function renderLabConns(d) {
     <p class="hint">الموصل = لحظة القصة فيها تتحوّل للمشهد الذي بعده أمام عينك بدون قطع (زووم داخل شيء، الخلفية تصبح عالم آخر، الماوس يودّينا لمكان...). النموذج يشاهد الفيديو كله ويكتب لكل واحد وصفته: الشرارة، واللي يظل ثابت، وماذا يتحول لإيه، والكاميرا والإيقاع. ✅ يدخل المكتبة بوصفته وفريماته.</p>
     ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "ينتظر...")}</p>` : ""}
     ${st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
-    ${!st.status && !all.length ? `<p class="muted">هذا الفيديو اتفكك قبل خطوة الموصلات. اضغط «↻ ابحث مرة أخرى» أعلى.</p>` : ""}
+    ${!st.status && !all.length ? `<p class="muted">هذا الفيديو فُكّك قبل خطوة الموصلات. اضغط «↻ ابحث مرة أخرى» أعلى.</p>` : ""}
     ${all.length ? `<div class="lab-chips">${Object.entries(COMP_FILTER).map(([k, l]) => `<button type="button" class="chip ${(labx.xfilter || "") === k ? "on" : ""}" data-xfilter="${k}">${l} <small>${k ? n[k] : all.length}</small></button>`).join("")}</div>` : ""}
     <div class="lab-conns">${items.map((c) => {
       const s = compState(c);
@@ -678,7 +678,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${merge.dataset.merge}/merge`, { method: "POST" });
       labx.pick = {};
       renderLab();
-      toast("🔗 اتدمجوا. إذا تريد الكومبوننتس تُضبط عليهم اضغط «↻ اقترح مرة أخرى»");
+      toast("🔗 دُمجوا. إذا تريد الكومبوننتس تُضبط عليهم اضغط «↻ اقترح مرة أخرى»");
     });
   }
   const hide = e.target.closest("[data-hide], [data-unhide]"), prune = e.target.closest("[data-prune]");
@@ -703,7 +703,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const cfresh = e.target.closest("[data-connfresh]");
   if (cfresh) {
-    if (!(await uiConfirm("تحذف كل الموصلات الذي اتلقطت في هذا الفيديو (حتى الذي قبلتها أو رفضتها) ويبحث من أولًا؟ ما في المكتبة يظل فيها."))) return;
+    if (!(await uiConfirm("تحذف كل الموصلات الذي التُقطت في هذا الفيديو (حتى الذي قبلتها أو رفضتها) ويبحث من أولًا؟ ما في المكتبة يظل فيها."))) return;
     return busyButton(cfresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=connectors&fresh=true`, { method: "POST" });
       labx.xfilter = "";

@@ -17,7 +17,7 @@ const IdeasPage = (() => {
     }
     const busy = x.status === "transcribing", pol = S.busy[x.id];
     return `<article class="id-card" data-iid="${esc(x.id)}">
-      <div class="id-h"><b>${esc(x.title || "فكرة")}</b><small class="muted">${x.polished ? "✨ متنقّحة · " : ""}${x.used_at ? "✓ اتستخدمت · " : ""}${ago(x.at)}</small></div>
+      <div class="id-h"><b>${esc(x.title || "فكرة")}</b><small class="muted">${x.polished ? "✨ متنقّحة · " : ""}${x.used_at ? "✓ استُخدمت · " : ""}${ago(x.at)}</small></div>
       ${x.hook ? `<p class="id-hook">«${esc(x.hook)}»</p>` : ""}
       ${busy ? `<p class="muted">⏳ جارٍ الكتابة الفويس نوت نص…</p>` : x.script ? "" : x.text ? `<p class="id-t">${esc(x.text)}</p>` : ""}
       ${x.script ? `<div class="id-script"><small class="muted">📝 النص</small><p>${esc(x.script)}</p></div>` : ""}

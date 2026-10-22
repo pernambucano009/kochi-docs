@@ -472,7 +472,7 @@ $("labFilm").addEventListener("toggle", (e) => {
   if (k) filmx.open[e.target.open ? "add" : "delete"](k);
 }, true);
 
-// خانة رفع الفويس أوفر برة الجزء اللي بيترسم تاني، عشان الملف ما يضيعش لو الصفحة اتحدثت وانت بتختاره
+// خانة رفع الفويس أوفر برة الجزء اللي بيترسم تاني، عشان الملف ما يضيعش لو الصفحة حُدّثت وانت بتختاره
 function fmVoiceInput() {
   let inp = document.getElementById("fmVoiceFile");
   if (inp) return inp;

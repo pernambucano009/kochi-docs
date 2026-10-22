@@ -288,7 +288,7 @@ function uploadWithProgress(url, form, bar) {
       if (xhr.status === 401) location.href = "/login";
       xhr.status < 300 ? resolve(data) : reject(new Error(data.detail || `خطأ ${xhr.status}`));
     };
-    xhr.onerror = () => { bar.hidden = true; reject(new Error("الاتصال اتقطع")); };
+    xhr.onerror = () => { bar.hidden = true; reject(new Error("الاتصال قُطع")); };
     xhr.send(form);
   });
 }

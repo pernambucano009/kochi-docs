@@ -188,7 +188,7 @@ function renderBulk() {
   const noOutro = rows.filter((r) => r.outro === null).length;
   const warn = [];
   if (noOutro && outros.length) warn.push(`${noOutro} شخصية بدون أوترو.`);
-  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو اتجاهل ولن يُرفع.`);
+  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو تُجوهل ولن يُرفع.`);
   $("bulkWarn").hidden = !warn.length;
   $("bulkWarn").innerHTML = warn.map(escapeHtml).join("<br>");
   const names = new Map();

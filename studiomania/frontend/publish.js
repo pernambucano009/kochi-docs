@@ -318,7 +318,7 @@ document.addEventListener("click", async (e) => {
       pub.list = info.account_list || [];
       pub.accounts = info.accounts || {};
       renderAccounts(); renderPlatformBoxes();
-      toast("اتفصل");
+      toast("فُصل");
     }
   } catch (err) { toast(err.message, true); }
 });

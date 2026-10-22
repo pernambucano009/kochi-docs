@@ -665,7 +665,7 @@ function libStatus(msg, isError = false) {
   el.classList.toggle("err", isError);
 }
 function uploadedMsg(res, count) {
-  return res.skipped ? `✅ أُضيف ${count - res.skipped} صورة · ${res.skipped} اتسابوا (12 صورة بالكتير لكل واحد)` : `✅ أُضيف ${count} صورة`;
+  return res.skipped ? `✅ أُضيف ${count - res.skipped} صورة · ${res.skipped} تُركوا (12 صورة بالكتير لكل واحد)` : `✅ أُضيف ${count} صورة`;
 }
 async function libPick(a) {
   const settings = libPickSettings(a);

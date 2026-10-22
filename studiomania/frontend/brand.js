@@ -614,7 +614,7 @@ const BrandPage = (() => {
     const bar = `<div class="bm-qbar"><i style="width:${Math.round(100 * Math.min(done.size, total) / total)}%"></i></div>`;
     if (S.qi >= total) {
       return head + bar + `<p class="bm-q">${done.size >= total ? "خلصت كل الأسئلة 🎉" : "وصلت لآخر سؤال"}</p>
-        <p class="bm-note">${done.size >= total ? "كل إجابة وُضعت في خانتها في العقل. يمكنك تعود تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة التي اتخطت يمكنك تعود لها في أي وقت.`}</p>
+        <p class="bm-note">${done.size >= total ? "كل إجابة وُضعت في خانتها في العقل. يمكنك تعود تعدّل أي إجابة في أي وقت." : `جاوبت ${done.size} من ${total}. الأسئلة التي تُخطّيت يمكنك تعود لها في أي وقت.`}</p>
         <div class="bm-acts">${tq && tq.done < tq.total ? `<button class="bm-go" data-qtab="t">✅ أكمل المهام (فاضل ${tq.total - tq.done})</button>` : ""}<button class="${tq && tq.done < tq.total ? "bm-pill" : "bm-go"}" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">أكمل الناقص</button>` : ""}</div>`;
     }
     const q = qs[S.qi], val = S.qa?.[q.id] || "";
@@ -732,7 +732,7 @@ const BrandPage = (() => {
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
           : (now ? `<div class="bm-sub"><small>المكتوب في العقل الآن (سيُزال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>العقل يقترح يُكتب بداله (يمكنك تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
         // بنقول بوضوح «موافق» هتعمل إيه بالظبط
-        const what = p.kind === "field" ? [`لو وافقت: هتتكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل اللي مكتوب دلوقتي" : ""}، وكل سكريبت وفيديو جديد هيمشي عليها.`, "اكتبها في الخانة"]
+        const what = p.kind === "field" ? [`لو وافقت: ستُكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل اللي مكتوب دلوقتي" : ""}، وكل سكريبت وفيديو جديد سيسير عليها.`, "اكتبها في الخانة"]
           : p.kind === "rule" ? ["إذا وافقت: ستُضاف للقواعد، وكل عمل جديد للعلامة يجب يلتزم بها.", "أضف القاعدة"]
           : p.kind === "question" ? ["إجابتك ستُحفظ في «المعرفة»، والعقل سيعود لها وهو يكتب.", "احفظ الإجابة"]
           : ["هذه معلومة عن العلامة، غير مهمة مطلوب منك تعملها. إذا وافقت: ستُحفظ في «المعرفة»، والعقل سيقرؤها وهو يكتب أي نص أو فكرة جديدة. يمكنك تعدّل النص قبل ما توافق.", "احفظها في المعرفة"];

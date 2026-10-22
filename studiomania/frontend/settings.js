@@ -123,7 +123,7 @@ async function loadProviders() {
 }
 $("provRefresh")?.addEventListener("click", async () => {
   $("provRefresh").disabled = true;
-  try { renderProviders(await api("/api/admin/providers/refresh", { method: "POST" })); toast("✅ اتشيّك"); } catch (err) { toast(err.message, true); }
+  try { renderProviders(await api("/api/admin/providers/refresh", { method: "POST" })); toast("✅ فُحص"); } catch (err) { toast(err.message, true); }
   $("provRefresh").disabled = false;
 });
 $("provList")?.addEventListener("change", async (e) => {
