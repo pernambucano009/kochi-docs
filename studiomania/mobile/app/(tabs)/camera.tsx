@@ -9,6 +9,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, logout } from "../../src/api";
 import { Icon, type IconName } from "../../src/icons";
+import { unregisterPush } from "../../src/push";
 import { shoot, toShoot, uploadShots, type Todo } from "../../src/shoot";
 import { ACCENT, F } from "../../src/theme";
 import { GlowButton, T } from "../../src/ui";
@@ -134,7 +135,7 @@ export default function Camera() {
   function account() {
     Alert.alert("حسابي", "نفس حسابك على simsimkit.com", [
       { text: "رجوع", style: "cancel" },
-      { text: "تسجيل الخروج", style: "destructive", onPress: async () => { await logout().catch(() => null); router.replace("/welcome"); } },
+      { text: "تسجيل الخروج", style: "destructive", onPress: async () => { await unregisterPush(); await logout().catch(() => null); router.replace("/welcome"); } },
     ]);
   }
 

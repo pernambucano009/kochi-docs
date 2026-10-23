@@ -1,5 +1,5 @@
 // قطع الواجهة المشتركة: الزرار البرتقالي المنوّر، والأزرار اللي بتبرز مع اللمس، والكروت والنصوص
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -7,7 +7,7 @@ import { ACCENT, F, GLOW, useTheme } from "./theme";
 
 // بيكبر شوية مع الضغط (زي الويب: scale 1.06) ويرجع بنعومة
 function usePop(to = 1.06) {
-  const s = useRef(new Animated.Value(1)).current;
+  const s = useState(() => new Animated.Value(1))[0];
   const spring = (v: number) => Animated.spring(s, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 8 }).start();
   return { scale: s, onPressIn: () => spring(to), onPressOut: () => spring(1) };
 }
@@ -16,7 +16,7 @@ export function GlowButton({ title, onPress, icon, style, textStyle, disabled }:
   title?: string; onPress?: () => void; icon?: ReactNode; style?: StyleProp<ViewStyle>; textStyle?: StyleProp<TextStyle>; disabled?: boolean;
 }) {
   const pop = usePop();
-  const glow = useRef(new Animated.Value(0)).current;
+  const glow = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(glow, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),

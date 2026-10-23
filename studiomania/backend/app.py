@@ -30399,11 +30399,83 @@ def pilot_update(fn) -> dict:
 
 
 def pilot_job_set(jid: str, **kw) -> None:
+    hit = []
     def fn(d):
         for j in d["jobs"]:
             if j["id"] == jid:
+                was = (j.get("status"), j.get("gate"))
                 j.update(kw, updated_at=now())
+                if j.get("status") in ("wait", "cam") and (j.get("status"), j.get("gate")) != was:
+                    hit.append(dict(j))
     pilot_update(fn)
+    for j in hit:
+        pilot_push(j)
+
+
+# 🔔 إشعارات تطبيق الموبايل (Expo push): كل موبايل داخل على الحساب بيسجّل توكنه، والأوتوبايلوت بيبعت لما يستناك
+PUSH_FILE = DATA_DIR / "push_tokens.json"
+PUSH_LOCK = threading.Lock()
+PUSH_TEXT = {"idea": ("فكرة جديدة لفيديو جاي", "اختار الفكرة اللي تعجبك"), "script": ("السكريبت جاهز", "راجعه واختار النسخة اللي تعجبك"),
+             "montage": ("المونتاج جاهز", "اتفرج عليه ووافق عشان يتصدّر"), "video": ("الفيديو جاهز قبل النشر", "اتفرج عليه ووافق عشان يتجدول"),
+             "shoot": ("📱 مستني تصويرك", "السكريبت جاهز على التيلي برومتر")}
+
+
+def push_tokens() -> list[str]:
+    try:
+        return [t for t in json.loads(PUSH_FILE.read_text(encoding="utf-8")) if isinstance(t, str)]
+    except (OSError, ValueError):
+        return []
+
+
+def push_send(title: str, body: str, data: dict) -> None:
+    toks = push_tokens()
+    if not toks or os.environ.get("PUBLISH_MOCK"):
+        return
+    msgs = [{"to": t, "title": title, "body": body[:180], "data": data, "sound": "default", "channelId": "approvals"} for t in toks]
+    def go():
+        try:
+            r = httpx.post("https://exp.host/--/api/v2/push/send", json=msgs, timeout=15)
+            dead = [m["to"] for m, x in zip(msgs, (r.json().get("data") or [])) if (x.get("details") or {}).get("error") == "DeviceNotRegistered"]
+            if dead:
+                with PUSH_LOCK:
+                    PUSH_FILE.write_text(json.dumps([t for t in push_tokens() if t not in dead]), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass   # الإشعار مش أساسي: الموافقة بتفضل مستنية في التطبيق والويب
+    threading.Thread(target=go, daemon=True).start()
+
+
+def pilot_push(j: dict) -> None:
+    gate = "shoot" if j.get("status") == "cam" else j.get("gate") or ""
+    title, body = PUSH_TEXT.get(gate, ("الأوتوبايلوت مستنيك", "فيه خطوة مستنية موافقتك"))
+    name = j.get("title") or ""
+    if not name and j.get("fid"):
+        try:
+            d = flow_load(j["fid"])
+            name = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or ""
+        except HTTPException:
+            pass
+    push_send(title, f"«{name}» · {body}" if name else body, {"kind": "pilot", "jid": j["id"], "gate": gate})
+
+
+class PushIn(BaseModel):
+    token: str
+
+
+@app.post("/api/push/register")
+def push_register(body: PushIn):
+    t = body.token.strip()
+    if not re.fullmatch(r"Expo(nent)?PushToken\[[\w-]{10,80}\]", t):
+        raise HTTPException(400, "توكن الإشعارات غير صحيح")
+    with PUSH_LOCK:
+        PUSH_FILE.write_text(json.dumps([*[x for x in push_tokens() if x != t], t][-20:]), encoding="utf-8")
+    return {"ok": True}
+
+
+@app.post("/api/push/unregister")
+def push_unregister(body: PushIn):
+    with PUSH_LOCK:
+        PUSH_FILE.write_text(json.dumps([x for x in push_tokens() if x != body.token.strip()]), encoding="utf-8")
+    return {"ok": True}
 
 
 def pilot_kind(tpl: str) -> str:

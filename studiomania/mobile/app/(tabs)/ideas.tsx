@@ -1,6 +1,6 @@
 // الأفكار: أكبر زرار بالبرتقالي «سجّل فكرة بصوتك»، والكلام بيتكتب لوحده، وبعدين تختار «نسّقها» أو «خليها زي ما هي».
 // نفس مجلد الأفكار اللي على الويب، فأي فكرة هنا بتظهر هناك والعكس.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import { useFocusEffect } from "expo-router";
@@ -33,15 +33,15 @@ export default function Ideas() {
   const t = useTheme();
   const ins = useSafeAreaInsets();
   const rec = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
-  const rs = useAudioRecorderState(rec, 90);
+  const rs = useAudioRecorderState(rec, 250);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [step, setStep] = useState<Step>("idle");
   const [cur, setCur] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(false);
-  const levels = useRef<number[]>(Array(BARS).fill(0));
-  const pulse = useRef(new Animated.Value(0)).current;
+  const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
+  const pulse = useState(() => new Animated.Value(0))[0];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,10 +51,14 @@ export default function Ideas() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // الموجة بتتحرك على قد صوتك (metering بالـ dB من -60 لـ 0)
-  if (rs.isRecording) {
-    const lv = Math.max(0, Math.min(1, ((rs.metering ?? -60) + 60) / 60));
-    levels.current = [...levels.current.slice(1), lv];
-  }
+  useEffect(() => {
+    if (step !== "rec") return;
+    const iv = setInterval(() => {
+      const lv = Math.max(0, Math.min(1, ((rec.getStatus().metering ?? -60) + 60) / 60));
+      setLevels((l) => [...l.slice(1), lv]);
+    }, 90);
+    return () => clearInterval(iv);
+  }, [step, rec]);
 
   useEffect(() => {
     if (step !== "idle") return;
@@ -87,7 +91,7 @@ export default function Ideas() {
     if (!p.granted) return Alert.alert("محتاجين المايك", "عشان تسجّل فكرتك بصوتك.");
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await rec.prepareToRecordAsync();
-    levels.current = Array(BARS).fill(0);
+    setLevels(Array(BARS).fill(0));
     rec.record();
     setStep("rec");
   }
@@ -160,7 +164,7 @@ export default function Ideas() {
         <GlowButton onPress={stopRec} style={s.big} icon={
           <View style={s.recRow}>
             <View style={s.wave}>
-              {levels.current.map((v, k) => <View key={k} style={[s.bar, { height: 8 + v * 34 }]} />)}
+              {levels.map((v, k) => <View key={k} style={[s.bar, { height: 8 + v * 34 }]} />)}
             </View>
             <Text style={s.recText}><Text style={{ fontFamily: F.latin }}>{mmss(rs.durationMillis)}</Text> · اضغط لما تخلص</Text>
           </View>

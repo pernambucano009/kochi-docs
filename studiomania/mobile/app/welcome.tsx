@@ -1,5 +1,5 @@
 // شاشة البداية: اللوجو الرأسي بيطفو، وتحته الدخول بـ Apple وجوجل والإيميل
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Easing, Image, Linking, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -7,7 +7,7 @@ import { API_BASE } from "../src/api";
 import { GlowButton, SoftButton, T } from "../src/ui";
 
 export default function Welcome() {
-  const y = useRef(new Animated.Value(0)).current;
+  const y = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(y, { toValue: -10, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),

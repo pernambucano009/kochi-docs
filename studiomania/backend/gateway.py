@@ -141,7 +141,9 @@ def user_by(field: str, value: str) -> sqlite3.Row | None:
 
 
 def current_user(request: Request) -> sqlite3.Row | None:
-    tok = request.cookies.get(COOKIE) or ""
+    # تطبيق الموبايل: مشغّل الفيديو مابيبعتش كوكي، فبيبعت نفس توكن الجلسة في Authorization
+    auth = request.headers.get("authorization") or ""
+    tok = request.cookies.get(COOKIE) or (auth[7:].strip() if auth[:7].lower() == "bearer " else "")
     parts = tok.split(".")
     if len(parts) != 4:
         return None
@@ -585,6 +587,15 @@ def me_dict(u: sqlite3.Row) -> dict:
     return {"email": u["email"], "name": u["name"], "verified": bool(u["verified"]), "role": u["role"],
             "workspace": u["workspace"], "plan": (w["plan"] if w else "owner"), "credits": wallet(u["workspace"]),
             "has_password": bool(u["pw"])}
+
+
+@app.get("/api/auth/app-token")
+def app_token(request: Request):
+    """📱 توكن الجلسة لمشغّل الفيديو في التطبيق (الفيديوهات محتاجة دخول، والمشغّل مابيشيلش الكوكي)."""
+    u = current_user(request)
+    if not u or not u["verified"]:
+        raise HTTPException(401, "يجب تسجّل دخول")
+    return {"token": make_session(u)}
 
 
 @app.get("/api/me")
@@ -1360,7 +1371,7 @@ async def proxy(path: str, request: Request):
     t = await ensure(OWNER if u_pub else u["workspace"])
     t.last = time.time()
     headers = [(k, v) for k, v in request.headers.raw
-               if (n := k.decode().lower()) not in HOP and n != "cookie" and not n.startswith(SPOOF)]
+               if (n := k.decode().lower()) not in HOP and n not in ("cookie", "authorization") and not n.startswith(SPOOF)]
     headers += [(b"x-gateway-secret", GATEWAY_SECRET.encode()), (b"x-forwarded-host", (request.headers.get("host") or "").encode()),
                 (b"x-forwarded-proto", (request.headers.get("x-forwarded-proto") or request.url.scheme).encode())]
     if u and not u_pub:

@@ -29,7 +29,7 @@ export default function Teleprompter() {
   const [secs, setSecs] = useState(0);
   const [draft, setDraft] = useState("");
   const [textH, setTextH] = useState(0);
-  const y = useRef(new Animated.Value(0)).current;
+  const y = useState(() => new Animated.Value(0))[0];
   const anim = useRef<Animated.CompositeAnimation | null>(null);
   const started = useRef(0);
 

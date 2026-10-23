@@ -31,9 +31,17 @@ export type AuthState = { logged_in: boolean; google?: boolean; user?: { email: 
 
 export const authState = () => api<AuthState>("/api/auth/state");
 export const login = (email: string, password: string) => api<{ verify?: boolean }>("/api/auth/login", json({ email, password }));
-export const logout = () => api("/api/auth/logout", { method: "POST" });
+export const logout = () => { appTok = null; return api("/api/auth/logout", { method: "POST" }); };
 
 // ملف من الموبايل (صوت أو فيديو) جوه FormData
 export function fileField(uri: string, name: string, type: string) {
   return { uri, name, type } as unknown as Blob;
 }
+
+// مشغّل الفيديو والصور مابيبعتوش كوكي الجلسة، فبنجيب توكن الجلسة مرة ونبعته في Authorization
+let appTok: Promise<string> | null = null;
+export function mediaHeaders(): Promise<Record<string, string>> {
+  appTok ||= api<{ token: string }>("/api/auth/app-token").then((r) => r.token).catch(() => { appTok = null; return ""; });
+  return appTok.then((t): Record<string, string> => (t ? { Authorization: `Bearer ${t}` } : {}));
+}
+export const mediaUrl = (u: string) => (u.startsWith("http") ? u : API_BASE + u);

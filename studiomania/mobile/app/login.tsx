@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View 
 import { router } from "expo-router";
 import Svg, { Circle, Path } from "react-native-svg";
 import { login } from "../src/api";
+import { registerPush } from "../src/push";
 import { F, useTheme } from "../src/theme";
 import { GlowButton, IconButton, T } from "../src/ui";
 
@@ -20,7 +21,7 @@ export default function Login() {
     try {
       const r = await login(email.trim(), pw);
       if (r.verify) setErr("أكّد إيميلك الأول من الرسالة اللي وصلتك، وبعدين ادخل.");
-      else router.replace("/camera");
+      else { router.replace("/camera"); registerPush(); }
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
   }
