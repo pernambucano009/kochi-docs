@@ -2935,3 +2935,8 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 .bm-mkopts>small,.bm-mkf small{font-size:11px;opacity:.65;margin-top:4px}
 .bm-mkf{display:flex;flex-direction:column;gap:3px}
 .bm-mkf input{font:inherit;font-size:12px;padding:6px 8px;border-radius:8px;border:1px solid var(--nh-line,rgba(127,127,127,.35));background:transparent;color:inherit}
+/* 📱 الشاشات الصغيرة: المربعات تحت بعض بمسافة، من غير الهامش السالب (اللي معمول لمساحة السنيك على الكمبيوتر) فمايدخلوش في بعض */
+@media (max-width: 820px) {
+  #nh .nh-col { gap: 12px; padding-block: 6px; }
+  #nh .nh-side { margin: 0; }
+}
