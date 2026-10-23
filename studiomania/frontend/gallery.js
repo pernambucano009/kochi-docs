@@ -8,7 +8,7 @@ const Gallery = (() => {
   const EXTRA = [{ id: "phone", name: "تصوير بالجوال", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg?v=2", cat: "ugc",
     desc: "صوّر نفسك بالجوال وأنت تتكلم: البرنامج يديك ملاحظات للتحسين، ويعمل مونتاج تلقائي بزوايا كاميرا وألوان وتايبوجرافي.", pin: 1 },
     // 🪞 رقم ٢: نفس الكلام للكاميرا بس الأفاتار هو اللي بيقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
-    { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cover_url: "/gallery/avatar.jpg?v=2", cat: "ugc", pin: 2,
+    { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", cover_url: "/gallery/avatar.jpg?v=3", cat: "ugc", pin: 2,
     desc: "نفس فكرة التصوير بالجوال، فقط بدون ما تصوّر: الأفاتار (من «الأفاتار»: أنت أو أي حد معك إذنه) هو ما يقول النص بوشّه وحركته." },
     { id: "carousel", name: "كاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
     desc: "صور خلف بعض على إنستجرام: سلايد خطاف يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل العلامة وألوانه." },
