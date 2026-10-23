@@ -496,7 +496,7 @@ async function dmFlowLoad() {
   try { dmFlowD = await api("/api/dm/flow"); } catch { return; }
   $("dmAsk").value = dmFlowD.ask; $("dmNudge").value = dmFlowD.nudge; $("dmYes").value = dmFlowD.yes.join("، ");
   if (!pub.editing) $("dmGate").checked = dmFlowD.on;
-  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم الرابط · ${dmFlowD.nudged} ينتظرون يعملون فوإذا` : "";
+  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم الرابط · ${dmFlowD.nudged} ينتظرون يعملون فولو` : "";
 }
 $("dmFlowSave").addEventListener("click", async () => {
   try {

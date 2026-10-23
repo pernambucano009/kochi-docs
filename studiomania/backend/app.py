@@ -4194,7 +4194,7 @@ class DmFlowIn(BaseModel):
 
 @app.get("/api/dm/flow")
 def dm_flow_get():
-    """⚙️ سيناريو «علّق بكلمة»: السؤال، والرد إذا ما زال ماعملش فوإذا، والكلمات التي تعتبر «نعم»."""
+    """⚙️ سيناريو «علّق بكلمة»: السؤال، والرد إذا ما زال ماعملش فولو، والكلمات التي تعتبر «نعم»."""
     bid = rivals_client()
     d = DM_STORE.load()
     mine = {k for k, g in d["gates"].items() if g.get("brand") == bid}
