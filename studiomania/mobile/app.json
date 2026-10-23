@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "SimsimKit",
+    "slug": "simsimkit",
+    "scheme": "simsimkit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-mark.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0C0C0E"
+    },
+    "ios": {
+      "bundleIdentifier": "com.geekzone.simsimkit",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.geekzone.simsimkit",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-fg.png",
+        "backgroundColor": "#121214"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SimsimKit يستخدم الكاميرا لتصوير لقطات مشاريعك.",
+          "microphonePermission": "SimsimKit يستخدم الميكروفون لتسجيل صوتك مع الفيديو.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "SimsimKit يستخدم الميكروفون لتسجيل أفكارك ووصف قوالبك بصوتك."
+        }
+      ],
+      "expo-notifications",
+      "expo-secure-store",
+      "expo-font",
+      "expo-image"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiBase": "https://simsimkit.com"
+    }
+  }
+}
