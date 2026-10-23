@@ -54,7 +54,22 @@
       "expo-notifications",
       "expo-secure-store",
       "expo-font",
-      "expo-image"
+      "expo-image",
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SimsimKit يفتح الاستوديو عشان ترفع فيديو صوّرته قبل كده لمشروعك."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "SimsimKit يحفظ الصور والفيديوهات اللي بتصوّرها في الاستوديو بتاعك.",
+          "isAccessMediaLocationEnabled": false,
+          "photosPermission": "SimsimKit يفتح الاستوديو عشان تختار فيديو أو صورة لمشروعك."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

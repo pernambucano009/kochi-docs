@@ -27441,6 +27441,48 @@ def flow_footage_upload(fid: str, role: str = Form("main"), file: UploadFile = F
     return flow_to_dict(fid, phone_set_footage(fid, phone_item(gid), "broll" if role == "broll" else "main"))
 
 
+def join_shots(files: list[UploadFile]) -> Path:
+    """📱 لقطات تطبيق الموبايل (كل جملة لوحدها) تتلصق بالترتيب في فيديو واحد، بمقاس أول لقطة."""
+    if not files or len(files) > 30:
+        raise HTTPException(400, "ابعت من لقطة لـ ٣٠ لقطة")
+    parts = [GENERATED_DIR / save_upload(f, VIDEO_EXTENSIONS, GENERATED_DIR, "shot") for f in files]
+    out = GENERATED_DIR / f"upload_{uuid.uuid4().hex[:8]}.mp4"
+    try:
+        infos = [media_info(p) for p in parts]
+        w, h = (infos[0].width or 1080) // 2 * 2, (infos[0].height or 1920) // 2 * 2
+        ins, fc = [], ""
+        for i, (p, inf) in enumerate(zip(parts, infos)):
+            ins += ["-i", str(p)]
+            fc += f"[{i}:v]scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v{i}];"
+            fc += f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[a{i}];" if inf.has_audio else \
+                  f"anullsrc=r=48000:cl=stereo,atrim=0:{inf.duration:.3f}[a{i}];"
+        fc += "".join(f"[v{i}][a{i}]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=1:a=1[v][a]"
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *ins, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)],
+                           capture_output=True, text=True, timeout=900)
+        if r.returncode != 0 or not out.exists():
+            out.unlink(missing_ok=True)
+            raise HTTPException(400, "تعذّر لصق اللقطات: " + (r.stderr or "")[-200:])
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        out.unlink(missing_ok=True)
+        raise HTTPException(400, "تعذّرت قراءة إحدى اللقطات") from exc
+    finally:
+        for p in parts:
+            p.unlink(missing_ok=True)
+    return out
+
+
+@app.post("/api/flows/{fid}/footage/shots")
+def flow_footage_shots(fid: str, files: list[UploadFile] = File(...)):
+    """📱 من تطبيق الموبايل: اللقطات بالترتيب تبقى الفيديو الأساسي للمشروع."""
+    flow_load(fid)
+    path = join_shots(files)
+    gid = phone_gen(path, "📱 من تطبيق الموبايل")
+    return flow_to_dict(fid, phone_set_footage(fid, phone_item(gid), "main"))
+
+
 class FootagePickIn(BaseModel):
     gen_id: str
     role: str = "main"
@@ -30902,6 +30944,18 @@ def pilot_footage(jid: str, file: UploadFile = File(...)):
     if not j or not j.get("fid"):
         raise HTTPException(404, "هذه المهمة غير موجودة")
     flow_footage_upload(j["fid"], "main", file)
+    if j.get("status") == "cam":
+        pilot_job_set(jid, status="run", gate=None, note="يشاهد الفيديو")
+    return pilot_state()
+
+
+@app.post("/api/pilot/jobs/{jid}/footage/shots")
+def pilot_footage_shots(jid: str, files: list[UploadFile] = File(...)):
+    """📱 نفس اللي فوق، بس اللقطات جاية من تطبيق الموبايل لقطة لقطة."""
+    j = next((x for x in pilot_load()["jobs"] if x["id"] == jid), None)
+    if not j or not j.get("fid"):
+        raise HTTPException(404, "هذه المهمة غير موجودة")
+    flow_footage_shots(j["fid"], files)
     if j.get("status") == "cam":
         pilot_job_set(jid, status="run", gate=None, note="يشاهد الفيديو")
     return pilot_state()
