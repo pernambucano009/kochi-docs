@@ -28,8 +28,11 @@
         "backgroundColor": "#121214"
       },
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "plugins": [
@@ -57,7 +60,15 @@
       "typedRoutes": false
     },
     "extra": {
-      "apiBase": "https://simsimkit.com"
+      "apiBase": "https://simsimkit.com",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "2e72bc46-1489-497c-94e9-6c231579a614"
+      }
     },
     "owner": "geekzone-sa"
   }
