@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>إشعار موافقة</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#181718;text-decoration:none}a:hover{color:#E5613E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.06);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-ib{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;cursor:pointer}.sk-ib:hover{transform:translateY(-2px)}.sk-ib:active{transform:scale(1.08)}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s;cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.sk-tab{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:active{transform:scale(1.12)}.sk-tab img{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:hover img{transform:translateY(-3px)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@media (prefers-reduced-motion: reduce){.sk-go{animation:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: linear-gradient(160deg, #E9C3A6 0%, #C98A6B 45%, #5B3A35 100%); font-family: 'Readex Pro', sans-serif; color: #FFFFFF">
+  <div style="position: absolute; top: 96px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 4px">
+    <span style="font-size: 15px; opacity: .9">الجمعة 23 أكتوبر</span>
+    <span class="lat" style="font-size: 64px; line-height: 1">9:41</span>
+  </div>
+
+  <div style="position: absolute; top: 300px; left: 12px; right: 12px; display: flex; flex-direction: column; gap: 10px">
+    <div style="background: rgba(250,249,246,.92); color: #181718; border-radius: 26px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.25)">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <img src="/_blob/fa1a056a765f222888fc748e43b6f9fa" alt="" style="width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0">
+        <span style="font-size: 12px; font-weight: 500; flex-grow: 1">SimsimKit · الأوتوبايلوت</span>
+        <span style="font-size: 11px; color: #8C8C88">الآن</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; font-weight: 500">فكرة جديدة لفيديو بكرة</span>
+        <span style="font-size: 13px; color: #5E5D59; line-height: 1.6">«3 أخطاء بتبوّظ قهوتك الصبح» — هوك: «لو قهوتك مُرّة، الغلط مش في البن»</span>
+      </div>
+      <sc-if value="{{pending}}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <button type="button" class="sk-go" onClick="{{approve}}" style="height: 44px; border: 0; border-radius: 14px; font: 500 13px 'Readex Pro', sans-serif; cursor: pointer">موافق</button>
+          <button type="button" class="sk-soft" onClick="{{another}}" style="height: 44px; border: 0; border-radius: 14px; background: #F3F2EF; color: #181718; font: 500 13px 'Readex Pro', sans-serif; cursor: pointer">فكرة أخرى</button>
+          <button type="button" class="sk-soft" onClick="{{skip}}" style="height: 44px; border: 0; border-radius: 14px; background: #F3F2EF; color: #181718; font: 500 13px 'Readex Pro', sans-serif; cursor: pointer">تخطَّ هذا اليوم</button>
+          <a href="Approvals.dc.html" class="sk-soft" style="height: 44px; border-radius: 14px; background: #F3F2EF; color: #181718; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center">عدّل في التطبيق</a>
+        </div>
+      </sc-if>
+      <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; gap: 8px; background: #E4F2EA; color: #21643F; border-radius: 14px; padding: 12px 14px; font-size: 13px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <span style="flex-grow: 1">{{doneText}}</span>
+          <button type="button" onClick="{{undo}}" style="border: 0; background: transparent; color: #21643F; font: 500 12px 'Readex Pro', sans-serif; text-decoration: underline; cursor: pointer; min-height: 44px">تراجع</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="background: rgba(250,249,246,.7); color: #181718; border-radius: 22px; padding: 12px 16px; display: flex; align-items: center; gap: 10px">
+      <img src="/_blob/fa1a056a765f222888fc748e43b6f9fa" alt="" style="width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0">
+      <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+        <span style="font-size: 12px; font-weight: 500">الفيديو جاهز قبل النشر</span>
+        <span style="font-size: 12px; color: #5E5D59">«عرض نهاية الأسبوع» · يُنشر 6 م</span>
+      </span>
+      <span style="font-size: 11px; color: #5E5D59">منذ ساعة</span>
+    </div>
+  </div>
+
+  <div style="position: absolute; bottom: 34px; left: 0; right: 0; display: flex; justify-content: center">
+    <span style="width: 134px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.8)"></span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { result: '' }; }
+  renderVals() {
+    const r = this.state.result;
+    const text = { ok: 'تمت الموافقة، سيُكتب السكريبت ويصلك للمراجعة', more: 'جارٍ تجهيز فكرة أخرى…', skip: 'لن يُنشر فيديو غدًا' };
+    return {
+      pending: !r, done: !!r, doneText: text[r] || '',
+      approve: () => this.setState({ result: 'ok' }),
+      another: () => this.setState({ result: 'more' }),
+      skip: () => this.setState({ result: 'skip' }),
+      undo: () => this.setState({ result: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>

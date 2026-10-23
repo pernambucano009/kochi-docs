@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>التسجيل الصوتي</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.06);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-ib{transition:transform .25s cubic-bezier(.2,.8,.2,1);cursor:pointer}.sk-ib:hover{transform:translateY(-2px)}.sk-ib:active{transform:scale(1.08)}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1);cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@keyframes wv{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.wv i{display:block;width:4px;border-radius:2px;background:#E5613E;transform-origin:center}
+.wv.on i{animation:wv 1s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.sk-go,.wv.on i{animation:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; background: #FAFAF8; font-family: 'Readex Pro', sans-serif; color: #181718; display: flex; flex-direction: column; padding: 54px 20px 40px">
+  <div style="display: flex; align-items: center; gap: 12px">
+    <a href="Main.dc.html" class="sk-ib" aria-label="رجوع" style="width: 40px; height: 40px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 2px 10px rgba(24,23,24,.06); display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#181718" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+    <span style="font-size: 18px; font-weight: 500">التسجيل الصوتي</span>
+  </div>
+
+  <div style="margin-top: 18px; background: #FFFFFF; border-radius: 20px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 24px rgba(24,23,24,.05)">
+    <span style="width: 36px; height: 36px; border-radius: 12px; background: #FFF6F2; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8 M12 16v4"/></svg></span>
+    <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+      <span style="font-size: 11px; color: #8C8C88">طلب من الويب · بيترفع على</span>
+      <span style="font-size: 13px; font-weight: 500">وصف القالب المخصص · «فيديو الأسبوع»</span>
+    </span>
+  </div>
+  <p style="margin: 10px 4px 0; font-size: 12px; color: #8C8C88; line-height: 1.7">اوصف القالب بصوتك: إيه الخطوات، وإيه الشكل اللي عايزه. هنحوّل كلامك لخطوات في القالب.</p>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px">
+    <div class="{{waveClass}}" style="height: 70px; display: flex; align-items: center; gap: 5px">
+      <sc-for list="{{bars}}" as="b" hint-placeholder-count="20"><i style="{{b.style}}"></i></sc-for>
+    </div>
+    <span class="lat" style="font-size: 30px">{{time}}</span>
+    <span style="font-size: 12.5px; color: {{statusInk}}">{{status}}</span>
+  </div>
+
+  <sc-if value="{{showMic}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; justify-content: center">
+      <button type="button" class="sk-go" onClick="{{toggle}}" aria-label="{{micAria}}" style="width: 84px; height: 84px; border-radius: 42px; display: flex; align-items: center; justify-content: center; padding: 0">
+        <sc-if value="{{rec}}" hint-placeholder-val="{{ false }}"><span style="width: 26px; height: 26px; border-radius: 7px; background: #FFFFFF"></span></sc-if>
+        <sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0 M12 18v3"/></svg></sc-if>
+      </button>
+    </div>
+  </sc-if>
+  <sc-if value="{{review}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; gap: 10px">
+      <button type="button" class="sk-soft" onClick="{{again}}" style="flex: 1; height: 52px; border: 0; border-radius: 99px; background: #F3F2EF; color: #181718; font: 400 13.5px 'Readex Pro', sans-serif">سجّل تاني</button>
+      <button type="button" class="sk-go" onClick="{{send}}" style="flex: 1.3; height: 52px; border-radius: 99px; font: 500 13.5px 'Readex Pro', sans-serif">ارفعه على الويب</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{sent}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="border-radius: 18px; background: #E4F2EA; color: #21643F; padding: 14px; font-size: 13px; text-align: center">اترفع ✓ — كمّل شغلك على الويب، الوصف ظهر هناك</div>
+      <button type="button" class="sk-soft" onClick="{{again}}" style="height: 48px; border: 0; border-radius: 99px; background: #F3F2EF; color: #181718; font: 400 13px 'Readex Pro', sans-serif">تسجيل جديد</button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { st: 'idle' }; }
+  renderVals() {
+    const st = this.state.st;
+    const hs = [18, 34, 52, 28, 60, 40, 22, 48, 66, 30, 44, 58, 26, 50, 36, 62, 24, 42, 54, 20];
+    const bars = hs.map((h, i) => ({ style: 'height:' + h + 'px;animation-delay:-' + (i * 0.07).toFixed(2) + 's;opacity:' + (st === 'idle' ? '.25' : '1') }));
+    const T = { idle: ['00:00', 'اضغط وابدأ الكلام', '#8C8C88'], rec: ['00:24', 'بيسجّل…', '#E5613E'], review: ['00:41', 'اسمعه قبل ما ترفعه', '#8C8C88'], sent: ['00:41', 'اترفع', '#21643F'] }[st];
+    return {
+      bars, waveClass: st === 'rec' ? 'wv on' : 'wv',
+      time: T[0], status: T[1], statusInk: T[2],
+      showMic: st === 'idle' || st === 'rec', rec: st === 'rec', idle: st === 'idle', review: st === 'review', sent: st === 'sent',
+      micAria: st === 'rec' ? 'إيقاف التسجيل' : 'ابدأ التسجيل',
+      toggle: () => this.setState({ st: st === 'rec' ? 'review' : 'rec' }),
+      again: () => this.setState({ st: 'idle' }),
+      send: () => this.setState({ st: 'sent' })
+    };
+  }
+}
+</script>
+</body>
+</html>

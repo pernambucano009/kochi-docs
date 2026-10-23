@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>الأفكار</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.04);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1);cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.sk-tab{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:active{transform:scale(1.12)}.sk-tab img{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:hover img{transform:translateY(-3px)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@keyframes wv{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.wv i{display:block;width:3px;border-radius:2px;background:#FFFFFF;transform-origin:center;animation:wv 1s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.sk-go,.wv i{animation:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; background: #FAFAF8; font-family: 'Readex Pro', sans-serif; color: #181718; display: flex; flex-direction: column; overflow: hidden">
+  <div style="flex-grow: 1; overflow: hidden; padding: 56px 20px 0; display: flex; flex-direction: column; gap: 14px">
+    <span style="font-size: 18px; font-weight: 500">الأفكار</span>
+
+    <sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">
+      <button type="button" class="sk-go" onClick="{{start}}" style="height: 132px; border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: 500 16px 'Readex Pro', sans-serif">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0 M12 18v3"/></svg>
+        سجّل فكرة بصوتك</button>
+      <button type="button" class="sk-soft" style="height: 46px; border: 0; border-radius: 99px; background: #F3F2EF; color: #181718; font: 400 13px 'Readex Pro', sans-serif; display: flex; align-items: center; justify-content: center; gap: 6px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>أو اكتبها</button>
+    </sc-if>
+
+    <sc-if value="{{rec}}" hint-placeholder-val="{{ false }}">
+      <button type="button" class="sk-go" onClick="{{stop}}" aria-label="إيقاف التسجيل" style="height: 132px; border-radius: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font: 400 13px 'Readex Pro', sans-serif">
+        <span class="wv" style="height: 40px; display: flex; align-items: center; gap: 4px">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="18"><i style="{{b.style}}"></i></sc-for>
+        </span>
+        <span><span class="lat" style="font-size: 12px">00:18</span> · اضغط لما تخلص</span>
+      </button>
+    </sc-if>
+
+    <sc-if value="{{review}}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 24px rgba(24,23,24,.06)">
+        <span style="font-size: 11px; color: #8C8C88">{{reviewLabel}}</span>
+        <p style="margin: 0; font-size: 14px; line-height: 1.8; white-space: pre-line">{{ideaText}}</p>
+        <div style="display: flex; gap: 8px">
+          <sc-if value="{{raw}}" hint-placeholder-val="{{ true }}">
+            <button type="button" class="sk-go" onClick="{{polish}}" style="flex: 1; height: 46px; border-radius: 99px; font: 500 13px 'Readex Pro', sans-serif">نسّقها</button>
+          </sc-if>
+          <button type="button" class="sk-soft" onClick="{{save}}" style="flex: 1; height: 46px; border: 0; border-radius: 99px; background: #F3F2EF; color: #181718; font: 400 13px 'Readex Pro', sans-serif">{{saveLabel}}</button>
+        </div>
+      </section>
+    </sc-if>
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px">
+      <span style="font-size: 14px; font-weight: 500">أفكارك</span>
+      <span style="font-size: 11.5px; color: #8C8C88">{{countLabel}}</span>
+    </div>
+    <sc-for list="{{ideas}}" as="it" hint-placeholder-count="3">
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; gap: 10px">
+        <span style="width: 30px; height: 30px; border-radius: 10px; background: #FFF6F2; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{it.icon}}"/></svg></span>
+        <span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0">
+          <span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.t}}</span>
+          <span style="font-size: 11px; color: #8C8C88">{{it.when}}</span>
+        </span>
+      </div>
+    </sc-for>
+  </div>
+
+  <nav style="height: 84px; background: #FFFFFF; display: flex; align-items: flex-start; justify-content: space-around; padding: 8px 8px 0; box-shadow: 0 -4px 20px rgba(24,23,24,.05)">
+    <a href="Approvals.dc.html" class="sk-tab" style="display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; min-width: 56px; color: #8C8C88">
+      <img src="/_blob/62e4ef740db216923254afaba672ead7" alt="" style="width: 34px; height: 34px; object-fit: contain">الموافقات</a>
+    <a href="Main.dc.html" class="sk-tab" style="display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; min-width: 56px; color: #8C8C88">
+      <img src="/_blob/ab40ecc9b9cc90230b4891af3bd269d6" alt="" style="width: 34px; height: 34px; object-fit: contain">المشاريع</a>
+    <a href="Main.dc.html" class="sk-tab" aria-label="الكاميرا" style="display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 10.5px; min-width: 56px; color: #8C8C88; padding-top: 10px">
+      <span style="width: 22px; height: 22px; border-radius: 11px; border: 2px solid #181718"></span>الكاميرا</a>
+    <a href="Ideas.dc.html" class="sk-tab" style="display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; min-width: 56px; color: #E5613E; font-weight: 500">
+      <img src="/_blob/59fdf06507196c287ea09899a4a057ef" alt="" style="width: 34px; height: 34px; object-fit: contain">الأفكار</a>
+    <a href="Storage.dc.html" class="sk-tab" style="display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; min-width: 56px; color: #8C8C88">
+      <img src="/_blob/1a327348ebea1b4e613f4c90d4a6adb5" alt="" style="width: 34px; height: 34px; object-fit: contain">المساحة</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { st: 'idle', polished: false, saved: [] }; }
+  renderVals() {
+    const S = this.state;
+    const raw = 'فكرة فيديو عن الناس اللي بتشرب قهوة على معدة فاضية الصبح وده بيعمل إيه، ونقول ٣ حاجات تعملها بدل كده… يعني مثلًا تاكل حاجة خفيفة الأول';
+    const pol = 'الفكرة: قهوة الصبح على معدة فاضية\nالهوك: «بتشرب قهوتك أول ما تصحى؟ استنى»\nالنقاط: ليه بتتعب منها · ٣ بدائل سهلة · كُل حاجة خفيفة الأول';
+    const base = [
+      { t: 'أخطاء بتبوّظ القهوة في البيت', when: 'امبارح · صوت', icon: 'M9 3h6v11H9z M5 11a7 7 0 0 0 14 0' },
+      { t: 'مقارنة بن عربي وبن برازيلي', when: 'من ٣ أيام · كتابة', icon: 'M4 20h4L19 9l-4-4L4 16z' },
+      { t: 'رد على كومنت: القهوة بتجفف؟', when: 'الأسبوع اللي فات · صوت', icon: 'M9 3h6v11H9z M5 11a7 7 0 0 0 14 0' }
+    ];
+    const ideas = S.saved.concat(base);
+    const bars = [14, 26, 38, 20, 34, 40, 18, 30, 24, 36, 16, 28, 40, 22, 32, 18, 26, 14].map((h, i) => ({ style: 'height:' + h + 'px;animation-delay:-' + (i * 0.08).toFixed(2) + 's' }));
+    return {
+      idle: S.st === 'idle', rec: S.st === 'rec', review: S.st === 'review', bars,
+      raw: !S.polished, ideaText: S.polished ? pol : raw,
+      reviewLabel: S.polished ? 'بعد التنسيق' : 'اتكتب من صوتك (تقدر تعدّل فيه)',
+      saveLabel: S.polished ? 'احفظها' : 'خليها زي ما هي',
+      ideas, countLabel: ideas.length + ' فكرة · بتظهر في الويب كمان',
+      start: () => this.setState({ st: 'rec' }),
+      stop: () => this.setState({ st: 'review', polished: false }),
+      polish: () => this.setState({ polished: true }),
+      save: () => this.setState({ st: 'idle', polished: false, saved: [{ t: S.polished ? 'قهوة الصبح على معدة فاضية' : 'قهوة على معدة فاضية الصبح', when: 'دلوقتي · صوت', icon: 'M9 3h6v11H9z M5 11a7 7 0 0 0 14 0' }].concat(S.saved) })
+    };
+  }
+}
+</script>
+</body>
+</html>

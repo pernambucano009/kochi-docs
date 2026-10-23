@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>الموافقات</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.06);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-ib{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;cursor:pointer}.sk-ib:hover{transform:translateY(-2px)}.sk-ib:active{transform:scale(1.08)}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s;cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.sk-tab{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:active{transform:scale(1.12)}.sk-tab img{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:hover img{transform:translateY(-3px)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@media (prefers-reduced-motion: reduce){.sk-go{animation:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; background: #FAFAF8; font-family: 'Readex Pro', sans-serif; color: #181718; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 56px 20px 12px; display: flex; align-items: center; gap: 12px">
+    <a href="Main.dc.html" class="sk-ib" aria-label="رجوع" style="width: 40px; height: 40px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 2px 10px rgba(24,23,24,.06); display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#181718" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+    <span style="font-size: 18px; font-weight: 500; flex-grow: 1">الموافقات</span>
+    <span style="font-size: 12px; color: #8C8C88">{{leftLabel}}</span>
+  </div>
+
+  <div style="flex-grow: 1; overflow: hidden; padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 12px">
+    <sc-for list="{{items}}" as="it" hint-placeholder-count="3">
+      <article style="background: #FFFFFF; border-radius: 24px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 24px rgba(24,23,24,.05)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; background: #FFF6F2; color: #D44E2C; border-radius: 99px; padding: 3px 10px">{{it.kind}}</span>
+          <span style="font-size: 11px; color: #8C8C88; flex-grow: 1">{{it.when}}</span>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: flex-start">
+          <sc-if value="{{it.hasThumb}}" hint-placeholder-val="{{ false }}">
+            <span style="width: 64px; height: 96px; border-radius: 14px; overflow: hidden; flex-shrink: 0; position: relative; background: #2A2A30">
+              <img src="/_blob/34b5b7be5625ef0dee4c73058a8a0dce" alt="معاينة الفيديو" style="width: 100%; height: 100%; object-fit: cover">
+              <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/><path d="M10 8v8l6-4z" fill="#FFFFFF"/></svg></span>
+            </span>
+          </sc-if>
+          <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+            <span style="font-size: 14px; font-weight: 500">{{it.title}}</span>
+            <span style="font-size: 12.5px; color: #5E5D59; line-height: 1.6; white-space: pre-line">{{it.body}}</span>
+          </div>
+        </div>
+        <sc-if value="{{it.open}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <button type="button" class="sk-go" onClick="{{it.ok}}" style="flex: 1 1 70px; height: 44px; border: 0; border-radius: 14px; font: 500 12.5px 'Readex Pro', sans-serif; cursor: pointer">{{it.okLabel}}</button>
+            <button type="button" class="sk-soft" onClick="{{it.redo}}" style="flex: 1 1 70px; height: 44px; border: 0; border-radius: 14px; background: #F3F2EF; color: #181718; font: 500 12.5px 'Readex Pro', sans-serif; cursor: pointer">{{it.redoLabel}}</button>
+            <button type="button" class="sk-soft" onClick="{{it.edit}}" style="flex: 1 1 56px; height: 44px; border: 0; border-radius: 14px; background: #F3F2EF; color: #181718; font: 500 12.5px 'Readex Pro', sans-serif; cursor: pointer">عدّل</button>
+            <button type="button" class="sk-soft" onClick="{{it.skip}}" style="flex: 1 1 56px; height: 44px; border: 0; border-radius: 14px; background: #F3F2EF; color: #181718; font: 500 12.5px 'Readex Pro', sans-serif; cursor: pointer">تخطَّ</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{it.closed}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 8px; background: {{it.resBg}}; color: {{it.resInk}}; border-radius: 14px; padding: 0 12px; font-size: 12.5px; min-height: 44px">
+            <span style="flex-grow: 1">{{it.resText}}</span>
+            <button type="button" onClick="{{it.undo}}" style="border: 0; background: transparent; color: inherit; font: 500 12px 'Readex Pro', sans-serif; text-decoration: underline; cursor: pointer; min-height: 44px">تراجع</button>
+          </div>
+        </sc-if>
+      </article>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { res: {} }; }
+  renderVals() {
+    const base = [
+      { id: 'i', kind: 'فكرة', when: 'منذ 5 دقائق · فيديو الغد', title: '3 أخطاء تفسد قهوتك الصباحية', body: 'الهوك: «لو قهوتك مُرّة، الغلط مش في البن»', okLabel: 'موافق', redoLabel: 'فكرة أخرى', hasThumb: false },
+      { id: 's', kind: 'سكريبت', when: 'منذ ساعة · 32 ثانية', title: 'القهوة الصباحية', body: 'القهوة دي غيّرت صباحي في أسبوع واحد بس…\nأول حاجة لازم تعرفها إن الحبوب نفسها بتفرق.', okLabel: 'موافق', redoLabel: 'سكريبت آخر', hasThumb: false },
+      { id: 'v', kind: 'فيديو قبل النشر', when: 'يُنشر اليوم 6 م · إنستجرام وتيك توك', title: '3 أفكار لمحتوى يجلب عملاء', body: 'الترجمة والموسيقى جاهزة.\nالكابشن: «جرّب الفكرة التانية النهارده»', okLabel: 'انشر', redoLabel: 'أعد المونتاج', hasThumb: true }
+    ];
+    const R = this.state.res;
+    const T = { ok: ['تمت الموافقة', '#E4F2EA', '#21643F'], redo: ['جارٍ تجهيز نسخة أخرى…', '#F3F2EF', '#5E5D59'], edit: ['افتح المحرر لتعديل النص', '#F3F2EF', '#5E5D59'], skip: ['تم التخطي', '#F3F2EF', '#5E5D59'] };
+    const set = (id, v) => this.setState({ res: Object.assign({}, R, { [id]: v }) });
+    const items = base.map((b) => {
+      const r = R[b.id], t = T[r] || ['', '', ''];
+      return Object.assign({}, b, {
+        open: !r, closed: !!r, resText: t[0], resBg: t[1], resInk: t[2],
+        ok: () => set(b.id, 'ok'), redo: () => set(b.id, 'redo'), edit: () => set(b.id, 'edit'), skip: () => set(b.id, 'skip'), undo: () => set(b.id, '')
+      });
+    });
+    const left = items.filter((x) => x.open).length;
+    return { items, leftLabel: left ? left + ' ينتظر ردك' : 'لا شيء ينتظرك' };
+  }
+}
+</script>
+</body>
+</html>

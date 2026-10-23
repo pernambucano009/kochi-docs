@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>الكاميرا والتيلي برومتر</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#F6B29E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.06);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-ib{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;cursor:pointer}.sk-ib:hover{transform:translateY(-2px)}.sk-ib:active{transform:scale(1.08)}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s;cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.sk-tab{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:active{transform:scale(1.12)}.sk-tab img{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:hover img{transform:translateY(-3px)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@media (prefers-reduced-motion: reduce){.sk-go{animation:none}}
+@keyframes tpScroll{from{transform:translateY(0)}to{transform:translateY(-62%)}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #0C0C0E; font-family: 'Readex Pro', sans-serif; color: #FFFFFF">
+  <img src="/_blob/96af0a263604b4d0f85b1c0749eed822" alt="معاينة الكاميرا الأمامية" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%">
+  <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.15) 42%, rgba(0,0,0,0) 60%, rgba(0,0,0,.7) 100%)"></div>
+
+  <div style="position: absolute; top: 52px; left: 16px; right: 16px; display: flex; align-items: center; justify-content: space-between">
+    <a href="Main.dc.html" class="sk-ib" aria-label="رجوع" style="width: 40px; height: 40px; border-radius: 20px; background: rgba(20,20,22,.35); display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></a>
+    <span style="display: flex; align-items: center; gap: 8px; background: rgba(20,20,22,.35); border-radius: 99px; padding: 7px 14px; font-size: 11.5px">
+      <span style="width: 8px; height: 8px; border-radius: 4px; background: {{recDot}}; box-shadow: 0 0 10px {{recDot}}"></span><span class="lat" style="font-size: 11px">{{recLabel}}</span></span>
+    <span style="font-size: 11.5px; background: rgba(20,20,22,.35); border-radius: 99px; padding: 8px 12px">لقطة 1 من 3 · الهوك</span>
+  </div>
+
+  <div style="position: absolute; top: 108px; left: 16px; right: 16px; height: 210px; border-radius: 22px; background: rgba(12,12,14,.55); overflow: hidden">
+    <div style="position: absolute; top: 0; left: 0; right: 0; height: 30px; background: linear-gradient(180deg, rgba(12,12,14,.9), rgba(12,12,14,0)); z-index: 1"></div>
+    <div style="position: absolute; top: 62px; right: 0; width: 4px; height: 34px; border-radius: 2px; background: #E5613E; box-shadow: 0 0 12px rgba(240,117,79,.8); z-index: 1"></div>
+    <div style="{{scrollStyle}}">
+      <p style="margin: 0; padding: 58px 20px 0; line-height: 1.6; font-weight: 400; text-align: right">القهوة دي غيّرت صباحي في أسبوع واحد بس، وهقولك ليه. أول حاجة لازم تعرفها إن الحبوب نفسها بتفرق. تاني حاجة طريقة التحضير. وآخر حاجة، لو عايز تجرب، الرابط في البايو.</p>
+    </div>
+  </div>
+  <p style="position: absolute; top: 326px; left: 16px; right: 16px; margin: 0; font-size: 11px; color: rgba(255,255,255,.75); text-align: center">النص يظهر فيه الكلام المنطوق فقط، بدون وقفات أو تعليمات</p>
+
+  <div style="position: absolute; bottom: 150px; left: 16px; right: 16px; display: flex; gap: 10px; justify-content: center">
+    <div style="display: flex; align-items: center; gap: 4px; background: rgba(20,20,22,.45); border-radius: 99px; padding: 4px">
+      <button type="button" class="sk-ib" onClick="{{fontDown}}" aria-label="تصغير الخط" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #FFFFFF; font: 400 13px 'Readex Pro', sans-serif; cursor: pointer">A-</button>
+      <span class="lat" style="font-size: 11px; min-width: 44px; text-align: center">{{fontLabel}}</span>
+      <button type="button" class="sk-ib" onClick="{{fontUp}}" aria-label="تكبير الخط" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #FFFFFF; font: 400 16px 'Readex Pro', sans-serif; cursor: pointer">A+</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 4px; background: rgba(20,20,22,.45); border-radius: 99px; padding: 4px">
+      <button type="button" class="sk-ib" onClick="{{slower}}" aria-label="أبطأ" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #FFFFFF; font-size: 18px; cursor: pointer">−</button>
+      <span style="font-size: 11.5px; min-width: 56px; text-align: center">السرعة <span class="lat" style="font-size: 11px">{{speedLabel}}</span></span>
+      <button type="button" class="sk-ib" onClick="{{faster}}" aria-label="أسرع" style="width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: #FFFFFF; font-size: 18px; cursor: pointer">+</button>
+    </div>
+  </div>
+
+  <div style="position: absolute; bottom: 40px; left: 0; right: 0; display: flex; align-items: center; justify-content: space-around; padding: 0 30px">
+    <button type="button" class="sk-ib" aria-label="اللقطات" style="width: 48px; height: 48px; border-radius: 14px; border: 2px solid rgba(255,255,255,.85); background: rgba(20,20,22,.35); color: #FFFFFF; font: 400 11px 'Readex Pro', sans-serif; cursor: pointer">3 تيك</button>
+    <button type="button" class="sk-go" onClick="{{toggle}}" aria-label="{{recAria}}" style="width: 78px; height: 78px; border-radius: 39px; display: flex; align-items: center; justify-content: center; padding: 0; outline: 4px solid rgba(255,255,255,.9); outline-offset: 4px">
+      <span style="{{shutterStyle}}"></span>
+    </button>
+    <button type="button" class="sk-ib" aria-label="تبديل الكاميرا" style="width: 48px; height: 48px; border-radius: 24px; border: 0; background: rgba(20,20,22,.35); display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a8 8 0 0 0-14.6-3.5M4 14a8 8 0 0 0 14.6 3.5"/><path d="M20 4v6h-6M4 20v-6h6"/></svg></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { size: 24, speed: 1, rec: false }; }
+  renderVals() {
+    const s = this.state;
+    const dur = Math.round(34 / s.speed);
+    return {
+      fontLabel: s.size + ' px',
+      speedLabel: s.speed.toFixed(2).replace(/0$/, '') + 'x',
+      recLabel: s.rec ? '00:07' : '3 · 2 · 1',
+      recDot: s.rec ? '#E5613E' : 'rgba(255,255,255,.6)',
+      recAria: s.rec ? 'إيقاف التسجيل' : 'ابدأ التسجيل',
+      scrollStyle: 'font-size:' + s.size + 'px;animation:tpScroll ' + dur + 's linear infinite;animation-play-state:' + (s.rec ? 'running' : 'paused'),
+      shutterStyle: s.rec ? 'width:26px;height:26px;border-radius:7px;background:#FFFFFF' : 'width:0;height:0',
+      fontUp: () => this.setState({ size: Math.min(40, s.size + 2) }),
+      fontDown: () => this.setState({ size: Math.max(16, s.size - 2) }),
+      faster: () => this.setState({ speed: Math.min(2, +(s.speed + 0.25).toFixed(2)) }),
+      slower: () => this.setState({ speed: Math.max(0.5, +(s.speed - 0.25).toFixed(2)) }),
+      toggle: () => this.setState({ rec: !s.rec })
+    };
+  }
+}
+</script>
+</body>
+</html>

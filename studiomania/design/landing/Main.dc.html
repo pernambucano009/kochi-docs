@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SimsimKit · Landing (Web)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&amp;family=Readex+Pro:wght@300;400;500&amp;family=Unbounded:wght@400;500&amp;family=IBM+Plex+Sans+Arabic:wght@400;500&amp;display=swap">
+<style>.hd-b{transition:transform .25s cubic-bezier(.2,.8,.2,1)}.hd-b:hover{transform:translateY(-2px)}.hd-b:active{transform:scale(1.08)}</style>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.lp-nav a{transition:color .3s,letter-spacing .5s cubic-bezier(.65,0,.35,1)}.lp-nav a:hover{letter-spacing:.36em}
+.lp-side{transition:color .3s,transform .3s cubic-bezier(.2,.8,.2,1)}.lp-side:hover{transform:translateX(-4px)}
+@keyframes lpFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.lp-jf{animation:lpFloat 7s ease-in-out infinite}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06);transform:translateY(-2px);color:#FFFFFF}.sk-go:hover::after{background-position:-30% 0}.sk-go:active{transform:scale(1.05)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+@media (prefers-reduced-motion: reduce){.lp-jf,.sk-go{animation:none}}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+  <div style="{{glowStyle}}"></div>
+  <div class="lp-jf" style="position: absolute; left: 50%; top: 84px; width: 497px; height: 690px; margin-left: -248px">
+    <img src="/_blob/048b45a775dbb8e3a1d3225fcbe6a257" alt="Glass jellyfish" style="{{lightJelly}}">
+    <img src="/_blob/de96970a1478b98d300f4874959fd6f3" alt="" style="{{darkJelly}}">
+  </div>
+
+  <header dir="rtl" style="position: absolute; top: 22px; left: 48px; right: 48px; height: 52px; display: flex; align-items: center; justify-content: space-between; z-index: 5; font-family: 'IBM Plex Sans Arabic', 'Readex Pro', sans-serif">
+    <div style="display: flex; align-items: center; gap: 14px">
+      <a href="#top" aria-label="SimsimKit" style="display: flex; align-items: center; direction: ltr; font: 500 15px Jost, Futura, sans-serif; letter-spacing: .32em">
+        <img src="{{markSrc}}" alt="" style="height: 26px; width: auto; margin-right: 8px">SIMSIMKIT</a>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <a href="#top" class="hd-b" style="{{chipClient}}">تسجيل الدخول</a>
+      <button type="button" class="hd-b" style="{{chipLang}}">EN</button>
+      <button type="button" onClick="{{toggleTheme}}" aria-pressed="{{dark}}" aria-label="Switch theme" style="display: flex; align-items: center; gap: 10px; border: 0; background: transparent; cursor: pointer; color: inherit; font: 400 11px Jost, sans-serif; letter-spacing: .2em; min-height: 44px; padding: 0">
+        <span style="{{trackStyle}}"><span style="width: 18px; height: 18px; border-radius: 9px; background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.2)"></span></span>{{themeLabel}}</button>
+    </div>
+  </header>
+
+  <nav class="lp-nav" aria-label="Main">
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="4">
+      <a href="#top" onClick="{{n.pick}}" style="{{n.style}}">{{n.label}}<span style="{{n.lineStyle}}"></span></a>
+    </sc-for>
+  </nav>
+
+  <a href="#top" class="lp-side" style="position: absolute; top: 218px; right: 62px; display: flex; align-items: center; gap: 14px; font: 400 19px Jost, sans-serif; letter-spacing: .24em">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l5.5-3.5z"/></svg>WATCH A DEMO</a>
+  <a href="#top" class="lp-side" style="position: absolute; top: 648px; right: 62px; display: flex; align-items: center; gap: 14px; font: 400 19px Jost, sans-serif; letter-spacing: .24em">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 1 3.3 6.5L3.5 20l1.3-3.5A8 8 0 0 1 4 12z"/><path d="M8.5 10.5h7 M8.5 13.5h4.5"/></svg>TALK TO US</a>
+
+  <a href="#top" class="sk-go" style="position: absolute; bottom: 26px; left: 50%; translate: -50% 0; height: 50px; padding: 0 30px; border-radius: 99px; display: flex; align-items: center; gap: 10px; font: 500 14px Jost, sans-serif; letter-spacing: .2em; white-space: nowrap">START FREE<span style="font: 400 13px 'Readex Pro', sans-serif; letter-spacing: 0">· ابدأ مجانًا</span></a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":810}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { dark: false, active: 0 }; }
+  renderVals() {
+    const d = this.state.dark, act = this.state.active;
+    const ink = d ? '#F1F1F3' : '#181718';
+    const tops = [214, 372, 506, 640];
+    const nav = ['HOME', 'FEATURES', 'PRICES', 'FAQ'].map((label, i) => {
+      const on = i === act;
+      return {
+        label,
+        style: 'position:absolute;top:' + tops[i] + 'px;left:' + (on ? 98 : 70) + 'px;display:flex;flex-direction:column;gap:20px;font-family:Jost,sans-serif;font-weight:400;letter-spacing:.3em;' + (on ? 'font-size:28px' : 'font-size:19px'),
+        lineStyle: on ? 'display:block;width:94px;height:1.5px;background:linear-gradient(90deg,' + ink + ',' + (d ? 'rgba(241,241,243,0)' : 'rgba(24,23,24,0)') + ')' : 'display:none',
+        pick: () => this.setState({ active: i })
+      };
+    });
+    return {
+      dark: d, nav,
+      themeLabel: d ? 'DARK' : 'LIGHT',
+      markSrc: d ? '/_blob/2ad7b4f1227f708bbf168ef6fe697e18' : '/_blob/379b1415dcab42f9d2fa372cf6fce3e1',
+      trk: d ? 'rgba(255,255,255,.14)' : 'rgba(20,20,22,.1)',
+      chipRound: 'position:relative;width:44px;height:44px;border-radius:22px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;color:' + ink + ';background:' + (d ? '#1C1C1F' : '#FFFFFF') + ';box-shadow:' + (d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)'),
+      chipBell: 'position:relative;width:44px;height:44px;border-radius:22px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;color:' + ink + ';background:' + (d ? '#1C1C1F' : '#FFFFFF') + ';box-shadow:' + (d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)'),
+      chipLang: 'height:44px;padding:0 20px;border-radius:22px;border:0;cursor:pointer;font:400 14px Jost,sans-serif;letter-spacing:.2em;color:' + ink + ';background:' + (d ? '#1C1C1F' : '#FFFFFF') + ';box-shadow:' + (d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)'),
+      chipClient: 'height:44px;padding:0 20px;border-radius:22px;border:0;cursor:pointer;display:flex;align-items:center;gap:10px;box-sizing:border-box;font:400 14px \'IBM Plex Sans Arabic\',\'Readex Pro\',sans-serif;color:' + ink + ';background:' + (d ? '#1C1C1F' : '#FFFFFF') + ';box-shadow:' + (d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)'),
+      avStyle: 'width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;color:#E5613E;background:' + (d ? 'rgba(255,255,255,.1)' : 'rgba(20,20,22,.1)'),
+      backStyle: 'width:94px;height:42px;border-radius:21px;box-sizing:border-box;border:1px solid ' + ink + ';background:' + (d ? '#1C1C1F' : '#FFFFFF') + ';opacity:.9',
+      crumbStyle: 'padding:6px 14px;border-radius:12px;background:' + (d ? 'rgba(255,255,255,.08)' : 'rgba(20,20,22,.05)'),
+      crumbEmpty: 'display:inline-block;width:72px;height:32px;border-radius:12px;background:' + (d ? 'rgba(255,255,255,.06)' : 'rgba(20,20,22,.045)'),
+      rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;transition:background .8s ease,color .8s ease;color:' + ink + ';background:' + (d ? '#0C0C0E' : '#FFFFFF'),
+      trackStyle: 'width:48px;height:24px;border-radius:12px;display:flex;align-items:center;padding:3px;box-sizing:border-box;transition:background .4s;' + (d ? 'background:#E5613E;justify-content:flex-end;box-shadow:0 0 14px rgba(240,117,79,.5)' : 'background:#F3F2EF;justify-content:flex-start;box-shadow:inset 0 1px 3px rgba(24,23,24,.12)'),
+      glowStyle: 'position:absolute;left:50%;top:52%;width:1100px;height:1100px;translate:-50% -50%;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)' : 'none'),
+      lightJelly: 'position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:multiply;transition:opacity .8s ease;opacity:' + (d ? 0 : 1),
+      darkJelly: 'position:absolute;inset:0;width:100%;height:100%;transition:opacity .8s ease;opacity:' + (d ? 1 : 0),
+      jellyStyle: 'position:absolute;left:50%;top:' + (d ? 70 : 84) + 'px;height:' + (d ? 700 : 690) + 'px;width:auto;translate:-50% 0;' + (d ? '' : 'mix-blend-mode:multiply'),
+      toggleTheme: () => this.setState({ dark: !d })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>المساحة السحابية</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&amp;family=Unbounded:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06) saturate(1.05);transform:translateY(-1px)}.sk-go:hover::after{background-position:-30% 0}
+.sk-go:active{transform:scale(1.06);filter:brightness(1.1)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+.sk-ib{transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;cursor:pointer}.sk-ib:hover{transform:translateY(-2px)}.sk-ib:active{transform:scale(1.08)}
+.sk-soft{transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s;cursor:pointer}.sk-soft:hover{transform:translateY(-1px)}.sk-soft:active{transform:scale(1.05)}
+.sk-tab{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:active{transform:scale(1.12)}.sk-tab img{transition:transform .3s cubic-bezier(.2,.8,.2,1)}.sk-tab:hover img{transform:translateY(-3px)}
+.lat{font-family:Unbounded,'Readex Pro',sans-serif;font-weight:300;letter-spacing:.03em;direction:ltr;unicode-bidi:isolate}
+@media (prefers-reduced-motion: reduce){.sk-go{animation:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 390px; height: 844px; box-sizing: border-box; background: #FAFAF8; font-family: 'Readex Pro', sans-serif; color: #181718; display: flex; flex-direction: column; overflow: hidden">
+  <div style="padding: 56px 20px 12px; display: flex; align-items: center; gap: 12px">
+    <a href="Main.dc.html" class="sk-ib" aria-label="رجوع" style="width: 40px; height: 40px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 2px 10px rgba(24,23,24,.06); display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#181718" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></a>
+    <span style="font-size: 18px; font-weight: 500">المساحة السحابية</span>
+  </div>
+
+  <div style="flex-grow: 1; overflow: hidden; padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 14px">
+    <section style="background: #FFFFFF; border-radius: 26px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 24px rgba(24,23,24,.05)">
+      <div style="display: flex; align-items: baseline; gap: 6px">
+        <span class="lat" style="font-size: 28px">3.2</span>
+        <span style="font-size: 13px; color: #8C8C88">من {{capLabel}} جيجا مستخدمة</span>
+      </div>
+      <div style="height: 10px; border-radius: 5px; background: #E3E2DE; display: flex; overflow: hidden; gap: 2px">
+        <span style="width: {{w1}}; background: #E5613E; box-shadow: 0 0 10px rgba(240,117,79,.6)"></span>
+        <span style="width: {{w2}}; background: #E8916F"></span>
+        <span style="width: {{w3}}; background: #3B3352"></span>
+        <span style="width: {{w4}}; background: #8C8C88"></span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; font-size: 12px">
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #E5613E"></span>الفيديوهات النهائية · 1.4</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #E8916F"></span>اللقطات الخام · 1.1</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #3B3352"></span>الصور والتصاميم · 0.4</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #8C8C88"></span>الأصوات والموسيقى · 0.3</span>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 14px; font-weight: 500">ملفاتك</span>
+      <sc-for list="{{folders}}" as="f" hint-placeholder-count="3">
+        <div style="background: #FFFFFF; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8C8C88" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span style="flex-grow: 1; font-size: 13px">{{f.name}}</span>
+          <span style="font-size: 12px; color: #8C8C88">{{f.size}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 14px; font-weight: 500">زوّد مساحتك</span>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{plans}}" as="p" hint-placeholder-count="3">
+          <button type="button" onClick="{{p.pick}}" aria-pressed="{{p.on}}" style="{{p.style}}">
+            <span class="lat" style="font-size: 15px">+{{p.gb}}</span>
+            <span style="font-size: 11px">جيجا</span>
+            <span style="font-size: 11px; opacity: .8">[السعر]/شهر</span>
+          </button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 11.5px; color: #8C8C88; line-height: 1.7">نفس المساحة في التطبيق وعلى الموقع. لما تقرب تخلص هيوصلك إشعار.</p>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { add: 0 }; }
+  renderVals() {
+    const cap = 10 + this.state.add;
+    const pct = (g) => (g / cap * 100).toFixed(1) + '%';
+    const plans = [50, 200, 1000].map((gb) => {
+      const on = this.state.add === gb;
+      return {
+        gb: gb === 1000 ? '1 تيرا' : gb, on,
+        style: 'height:86px;border-radius:18px;cursor:pointer;transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-family:Readex Pro,sans-serif;'
+          + (on ? 'border:2px solid #E5613E;background:#FFF6F2;color:#181718;transform:scale(1.05);box-shadow:0 8px 26px rgba(229,97,62,.22)' : 'border:2px solid transparent;background:#FFFFFF;color:#181718'),
+        pick: () => this.setState({ add: on ? 0 : gb })
+      };
+    });
+    return {
+      capLabel: cap >= 1000 ? cap : cap, w1: pct(1.4), w2: pct(1.1), w3: pct(0.4), w4: pct(0.3), plans,
+      folders: [
+        { name: 'مشاريع الفيديو', size: '2.5 جيجا' },
+        { name: 'مكتبة العلامة (صور وخلفيات)', size: '0.4 جيجا' },
+        { name: 'الأصوات والموسيقى', size: '0.3 جيجا' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
