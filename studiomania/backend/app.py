@@ -4214,6 +4214,66 @@ def dm_flow_set(body: DmFlowIn):
     return dm_flow_get()
 
 
+# ---------------------------------------------------------------- 💸 مصاريف المنصة الشهرية (لصاحب المنصة بس)
+# كل اشتراك أو خدمة بتدفعلها: المبلغ، شهري ولا سنوي ولا على قد الاستخدام، ويوم التجديد. المجموع الشهري بيتحسب لوحده.
+EXPENSES_F = DATA_DIR / "expenses.json"
+EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "على قد الاستخدام", "free": "مجاني"}
+EXPENSE_PRESET = [
+    {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
+    {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد الدومين"},
+    {"name": "Zernio (النشر والرسايل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، من ٣ لـ ١٠ بـ $6 للحساب"},
+    {"name": "Atlas Cloud (الذكاء الصناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
+    {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري محتاج باقة مدفوعة"},
+    {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة"},
+    {"name": "منصت", "amount": 8, "cycle": "usage", "day": 0, "note": ""},
+    {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "note": ""},
+]
+
+
+def expenses_load() -> list[dict]:
+    try:
+        return json.loads(EXPENSES_F.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [dict(x) for x in EXPENSE_PRESET]
+
+
+def expenses_out(rows: list[dict]) -> dict:
+    monthly = sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "monthly") + sum(float(r.get("amount") or 0) / 12 for r in rows if r.get("cycle") == "yearly")
+    usage = sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "usage")
+    return {"rows": rows, "cycles": EXPENSE_CYCLES, "monthly": round(monthly, 2), "usage": round(usage, 2)}
+
+
+@app.get("/api/expenses")
+def expenses_get():
+    if not wallet.free():
+        raise HTTPException(403, "لصاحب المنصة بس")
+    return expenses_out(expenses_load())
+
+
+class ExpensesIn(BaseModel):
+    rows: list[dict] = []
+
+
+@app.put("/api/expenses")
+def expenses_put(body: ExpensesIn):
+    if not wallet.free():
+        raise HTTPException(403, "لصاحب المنصة بس")
+    rows = []
+    for r in body.rows[:60]:
+        name = str(r.get("name") or "").strip()[:80]
+        if not name:
+            continue
+        try:
+            amount = max(0.0, min(100000.0, float(r.get("amount") or 0)))
+            day = max(0, min(31, int(r.get("day") or 0)))
+        except (TypeError, ValueError):
+            amount, day = 0.0, 0
+        rows.append({"name": name, "amount": round(amount, 2), "cycle": r.get("cycle") if r.get("cycle") in EXPENSE_CYCLES else "monthly", "day": day,
+                     "note": str(r.get("note") or "").strip()[:160]})
+    EXPENSES_F.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+    return expenses_out(rows)
+
+
 # ---------------------------------------------------------------- 🤖 بوتات الرسايل (Workflows عند Zernio)
 @app.get("/api/bots")
 def bots_get():

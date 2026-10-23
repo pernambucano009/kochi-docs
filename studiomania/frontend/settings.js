@@ -286,3 +286,40 @@ $("copyLog").onclick = async () => {
     toast("حدّد النص وانسخه بنفسك", true);
   }
 };
+
+// 💸 فواتيري الشهرية (لصاحب المنصة): جدول بيتعدّل في مكانه، وبيتحفظ بزرار
+const Exp = { rows: [], cycles: {} };
+function expRender(d) {
+  const box = $("expBox");
+  if (!box) return;
+  if (d) Object.assign(Exp, { rows: d.rows, cycles: d.cycles, monthly: d.monthly, usage: d.usage });
+  const esc = (s) => escapeHtml(String(s ?? ""));
+  box.innerHTML = `<div class="exp-tbl" role="table" aria-label="فواتيري الشهرية">
+    <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>المبلغ ($)</span><span>الدفع</span><span>يوم التجديد</span><span>ملاحظة</span><span></span></div>
+    ${Exp.rows.map((r, i) => `<div class="exp-row" role="row" data-ei="${i}">
+      <input type="text" data-ek="name" value="${esc(r.name)}" aria-label="الخدمة">
+      <input type="number" min="0" step="0.01" data-ek="amount" value="${esc(r.amount)}" aria-label="المبلغ" dir="ltr">
+      <select data-ek="cycle" aria-label="الدفع">${Object.entries(Exp.cycles).map(([k, t]) => `<option value="${k}" ${k === r.cycle ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      <input type="number" min="0" max="31" data-ek="day" value="${r.day || ""}" placeholder="—" aria-label="يوم التجديد" dir="ltr">
+      <input type="text" data-ek="note" value="${esc(r.note)}" aria-label="ملاحظة">
+      <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`).join("")}
+    </div>
+    <div class="exp-sum"><b>الشهري: $${Number(Exp.monthly || 0).toFixed(2)}</b><span>على قد الاستخدام (آخر شحن): $${Number(Exp.usage || 0).toFixed(2)}</span></div>
+    <div class="row wrap"><button type="button" class="btn sm" id="expAdd">+ خدمة</button><button type="button" class="btn primary sm" id="expSave">حفظ</button></div>`;
+}
+function expRead() {
+  document.querySelectorAll("#expBox .exp-row[data-ei]").forEach((row) => {
+    const r = Exp.rows[+row.dataset.ei];
+    row.querySelectorAll("[data-ek]").forEach((x) => { r[x.dataset.ek] = x.type === "number" ? Number(x.value || 0) : x.value; });
+  });
+}
+$("expBox")?.addEventListener("click", async (e) => {
+  if (e.target.closest("#expAdd")) { expRead(); Exp.rows.push({ name: "", amount: 0, cycle: "monthly", day: 0, note: "" }); return expRender(); }
+  const del = e.target.closest("[data-edel]");
+  if (del) { expRead(); Exp.rows.splice(+del.dataset.edel, 1); return expRender(); }
+  if (e.target.closest("#expSave")) {
+    expRead();
+    try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ اتحفظت الفواتير"); } catch (err) { toast(err.message, true); }
+  }
+});
+api("/api/expenses").then(expRender).catch(() => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; });
