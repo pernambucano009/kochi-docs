@@ -32,3 +32,7 @@ a { color: var(--accent); }
 .feat b { display: block; font-size: 17px; margin-bottom: 4px; }
 .feat p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.7; }
 .en-line { color: var(--muted); font-size: 14px; margin-top: 6px; direction: ltr; }
+.lg-co { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; line-height: 1.8; }
+.lg-co p { margin: 0; }
+.lg-co a { color: inherit; }
+.lg-co + .lg-foot { margin-top: 14px; border-top: 0; padding-top: 0; }

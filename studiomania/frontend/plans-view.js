@@ -140,6 +140,8 @@ const PlansView = (() => {
     if (!p.accounts) out.push("بدون نشر");
     return out.concat(p.features || []);
   }
+  // الأسعار بتتعرض بالريال (الدولار × ٣.٧٦ مقرّب)، والدفع نفسه بيتم بما يعادلها
+  const SAR = 3.76, sar = (v) => Math.round(v * SAR);
   const credLine = (p) => `<span class="num">${n(p.credits)}</span> نقطة ${p.once ? "مرة واحدة" : "كل شهر"}`;
 
   function mount(el, d, o = {}) {
@@ -170,7 +172,7 @@ const PlansView = (() => {
       return `<div class="pv-pl${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
         ${guest && p.popular ? `<span class="pv-hot">الأكثر اختيارًا</span>` : ""}
         <b class="nm">${esc(p.name)}</b>
-        <span class="pr">${p.price ? `<span class="num">$${moP(p)}</span><small>/ شهر</small>` : `<span class="free">مجانًا</span>`}</span>
+        <span class="pr">${p.price ? `<span class="num">${sar(moP(p))}</span><small>ر.س / شهر</small>` : `<span class="free">مجانًا</span>`}</span>
         ${act}
         <span class="pv-tip"><b>${esc(p.name)}</b><span>${credLine(p)}<br>${adds(p, plans[i - 1]).slice(0, 3).map(esc).join("<br>")}</span>${tipM ? `<span class="m">${esc(tipM)}</span>` : ""}</span></div>`;
     }
@@ -189,7 +191,7 @@ const PlansView = (() => {
       const prev = plans[i - 1];
       return `<article class="pv-pc${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
         <div class="t"><b>${esc(p.name)}</b>${tag}</div>
-        <div class="p">${p.price ? `<div><span class="num">$${moP(p)}</span><small>/ شهر</small></div><span class="yr">${yr ? `<span class="num">$${p.price * ym}</span> مرة واحدة في السنة` : ""}</span>`
+        <div class="p">${p.price ? `<div><span class="num">${sar(moP(p))}</span><small>ر.س / شهر</small></div><span class="yr">${yr ? `<span class="num">${sar(p.price * ym)}</span> ر.س مرة واحدة في السنة` : `≈ <span class="num">$${moP(p)}</span>`}</span>`
           : `<div><span class="free">مجانًا</span></div><span class="yr">بدون بطاقة</span>`}</div>
         <div class="k">${credLine(p)}</div>
         <ul>${prev ? `<li class="inh">كل ما في ${prev.once ? "التجربة" : esc(prev.name)}، وأيضًا:</li>` : ""}${adds(p, prev).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
@@ -198,7 +200,7 @@ const PlansView = (() => {
     function bottom() {
       const tops = d.topups.map((t) => S.top === t.key && !guest && providers.length > 1
         ? providers.map(([k, tx]) => `<button class="tp pick" data-pvtop="${esc(t.key)}" data-prov="${k}">${tx}</button>`).join("")
-        : `<button class="tp" data-pvtop="${esc(t.key)}">+<span class="num">${n(t.credits)}</span> <small class="num">$${t.price}</small></button>`).join("");
+        : `<button class="tp" data-pvtop="${esc(t.key)}">+<span class="num">${n(t.credits)}</span> <small><span class="num">${sar(t.price)}</span> ر.س</small></button>`).join("");
       if (guest) return `<div class="pv-cont${S.tops ? " open" : ""}"><b class="ttl" style="padding-inline-start:10px">نقاط زيادة</b><span class="sep"></span>${tops}<span class="how">صالحة ${d.rules?.topup_valid_months || 12} شهر</span><button class="more" data-pvmore aria-label="نقاط زيادة">+</button></div>`;
       const c = d.me.credits || {}, cur = plans[curI], full = (cur?.credits || 0) + (c.topup_credits || 0);
       const pct = full ? Math.max(0, Math.min(100, Math.round((c.total || 0) / full * 100))) : 0;
