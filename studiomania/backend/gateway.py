@@ -1364,6 +1364,23 @@ async def zernio_hook(request: Request):
         return JSONResponse({"detail": "tenant error"}, status_code=502)
 
 
+@app.post("/hooks/bot-ai/{token}")
+async def bot_ai_hook(token: str, request: Request):
+    """🤖 الرد الذكي لبوتات الرسايل: Zernio بيكلّم الرابط ده من نود webhook، والتوقيع اللي في الرابط بيقول البوت ده بتاع أنهي حساب."""
+    import botflows
+    wid = botflows.ai_token_ok(token, hook_secret())
+    if not wid or not workspace_dir(wid).exists():
+        return JSONResponse({"detail": "bad token"}, status_code=401)
+    raw = (await request.body())[:20000]
+    t = await ensure(wid)
+    try:
+        r = await _http.post(f"http://127.0.0.1:{t.port}/api/_hooks/bot-ai", content=raw,
+                             headers={"x-gateway-secret": GATEWAY_SECRET, "content-type": "application/json"}, timeout=60)
+        return JSONResponse(r.json(), status_code=r.status_code)
+    except (httpx.HTTPError, ValueError):
+        return JSONResponse({"text": "حد من الفريق هيرد عليك حالًا 🙏", "handoff": True})
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 async def proxy(path: str, request: Request):
     url_path = "/" + path

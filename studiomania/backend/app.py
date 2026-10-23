@@ -4214,6 +4214,103 @@ def dm_flow_set(body: DmFlowIn):
     return dm_flow_get()
 
 
+# ---------------------------------------------------------------- 🤖 بوتات الرسايل (Workflows عند Zernio)
+@app.get("/api/bots")
+def bots_get():
+    if publisher.service_name() == "mock" or not publisher.api_key():
+        return {"live": False, "bots": [], "accounts": [], "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS,
+                "note": "اربط Zernio وحساب إنستجرام أو فيسبوك أو واتساب من صفحة النشر الأول"}
+    try:
+        accs, bots = botflows.bot_accounts(), botflows.list_bots()
+    except publisher.PublishError as e:
+        raise HTTPException(400, str(e))
+    return {"live": True, "bots": bots, "accounts": [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in accs],
+            "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS}
+
+
+class BotIn(BaseModel):
+    recipe: str
+    account: str
+    name: str = ""
+    opts: dict = {}
+
+
+@app.post("/api/bots")
+def bots_create(body: BotIn):
+    if body.recipe not in botflows.RECIPES:
+        raise HTTPException(400, "الوصفة دي مش موجودة")
+    acc = next((a for a in botflows.bot_accounts() if a["id"] == body.account), None)
+    if not acc:
+        raise HTTPException(400, "الحساب ده مش مربوط")
+    if acc["platform"] not in botflows.RECIPES[body.recipe]["platforms"]:
+        raise HTTPException(400, f"«{botflows.RECIPES[body.recipe]['t']}» مش بيشتغل على {publisher.PLATFORMS[acc['platform']][1]}")
+    o = botflows.clean(body.recipe, body.opts)
+    if body.recipe in ("comment", "keyword", "story") and not (o.get("message") or "").strip():
+        raise HTTPException(400, "اكتب الرسالة اللي هتوصله")
+    try:
+        made = botflows.create(body.recipe, acc, body.name, o)
+    except publisher.PublishError as e:
+        raise HTTPException(400, str(e))
+    return {**made, **bots_get()}
+
+
+class BotStateIn(BaseModel):
+    on: bool
+
+
+@app.post("/api/bots/{wid}/state")
+def bots_state(wid: str, body: BotStateIn):
+    if wid not in {b["id"] for b in botflows.list_bots()}:
+        raise HTTPException(404, "البوت ده مش موجود")
+    try:
+        botflows.set_state(wid, body.on)
+    except publisher.PublishError as e:
+        raise HTTPException(400, str(e))
+    return bots_get()
+
+
+@app.delete("/api/bots/{wid}")
+def bots_delete(wid: str):
+    if wid not in {b["id"] for b in botflows.list_bots()}:
+        raise HTTPException(404, "البوت ده مش موجود")
+    try:
+        botflows.delete(wid)
+    except publisher.PublishError as e:
+        raise HTTPException(400, str(e))
+    return bots_get()
+
+
+def bot_brain_text(b: dict) -> str:
+    """ملف العلامة اللي الرد الذكي بيعتمد عليه: الهوية، والقواعد، والمعرفة، والدعوة والرابط."""
+    parts = [rivals.brand_info(b)]
+    for k, t in (("cta", "الدعوة"), ("link", "الرابط"), ("rules", "القواعد")):
+        if str(b.get(k) or "").strip():
+            parts.append(f"{t}: {str(b[k])[:1200]}")
+    for n in (b.get("notes") or [])[:40]:
+        parts.append(f"- {n.get('title') or ''}: {str(n.get('body') or n.get('summary') or '')[:400]}")
+    return "\n".join(p for p in parts if p)
+
+
+@app.post("/api/_hooks/bot-ai")
+async def bot_ai_hook(request: Request):
+    """الرد الذكي لبوتات الرسايل (جاي من البوابة بعد ما اتأكدت من التوقيع): رسالة العميل ← رد قصير من عقل العلامة."""
+    d = botflows.parse_hook_body(await request.body())
+    text = str(d.get("text") or "").strip()
+    if not text:
+        return {"text": "أهلًا 👋 إزاي أقدر أساعدك؟", "handoff": False}
+    if atlas.mock_mode():
+        return {"text": f"(رد تجريبي) وصلت رسالتك: {text[:80]}", "handoff": "انسان" in text or "حد" in text}
+    try:
+        import asyncio
+        b = active_client() or {}
+        raw = await asyncio.to_thread(llm, botflows.ai_messages(bot_brain_text(b), text, str(d.get("name") or "")), True, 0.4)
+        out = az.parse_json(raw, "رد البوت")
+        wallet.charge(wallet.credits(wallet.est(chars=len(text) + 7000)), "بوتات الرسايل: رد ذكي", "bot")
+        return {"text": str(out.get("text") or "").strip()[:900] or "حد من الفريق هيرد عليك حالًا 🙏", "handoff": bool(out.get("handoff"))}
+    except Exception:  # noqa: BLE001
+        return {"text": "حد من الفريق هيرد عليك حالًا 🙏", "handoff": True}
+
+
 @app.post("/api/_hooks/dm")
 async def dm_hook(request: Request):
     """الرسائل الذي على الخاص (قادمة من البوابة بعد ما تأكدت من التوقيع): نكمّل السيناريو."""
@@ -4479,6 +4576,7 @@ import algo  # noqa: E402
 import dialect  # noqa: E402
 import niches  # noqa: E402
 import voicelab  # noqa: E402
+import botflows  # noqa: E402
 import stylecl  # noqa: E402
 import fstudio  # noqa: E402
 import ref2p  # noqa: E402

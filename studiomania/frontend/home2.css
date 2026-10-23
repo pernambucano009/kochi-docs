@@ -2940,3 +2940,16 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
   #nh .nh-col { gap: 12px; padding-block: 6px; }
   #nh .nh-side { margin: 0; }
 }
+
+/* 🤖 بوتات الرسايل */
+#nh .bot-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 22px; align-items: start; }
+#nh .bot-list, #nh .bot-form { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 18px; background: var(--nh-fill); }
+#nh .bot-recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+#nh .bot-recipe { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 14px;
+  background: var(--nh-bg); border: 1px solid var(--nh-line); transition: border-color .2s, translate .2s; }
+#nh .bot-recipe:hover, #nh .bot-recipe:focus-visible { border-color: var(--nh-accent); translate: 0 -2px; }
+#nh .bot-recipe b { font-size: 14px; font-weight: 600; }
+#nh .bot-recipe small { font-size: 12px; color: var(--nh-muted); line-height: 1.6; }
+#nh .bot-recipe span { font-size: 11px; color: var(--nh-accent); }
+#nh .bot-formhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+@media (max-width: 900px) { #nh .bot-grid { grid-template-columns: 1fr; } }
