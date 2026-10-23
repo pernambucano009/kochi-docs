@@ -9,6 +9,7 @@ a { color: var(--accent); }
 .lg-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .lg-top .wm { font-family: var(--display); font-size: 20px; text-decoration: none; color: var(--text); }
 .lg-top .wm span { color: var(--accent); }
+.lg-top .wm { display: inline-flex; align-items: center; direction: ltr; } .lg-top .wm-mark { height: 1.5em; width: auto; margin-right: .45em; }
 .lg-top nav { display: flex; gap: 8px; flex-wrap: wrap; }
 .lg-top nav a, .pill { text-decoration: none; padding: 7px 14px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 14px; cursor: pointer; font-family: inherit; }
 .pill.on { background: var(--accent); color: #fff; border-color: var(--accent); }

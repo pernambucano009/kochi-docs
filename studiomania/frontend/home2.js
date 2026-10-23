@@ -165,7 +165,7 @@ const NH = (() => {
     </div>
     <section class="nh-page" id="nhPage" hidden role="dialog" aria-modal="true">
       <header class="nh-ptop">
-        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true">SIMSIMKIT</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل الذي قيد العمل"></button></div>
+        <div class="nh-prow"><span class="nh-plogo" aria-hidden="true"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</span><button class="nh-chip nh-pclient" id="nhPClient" title="العميل الذي قيد العمل"></button></div>
         <div class="nh-phead"><button class="nh-back" id="nhBack"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span id="nhBackT">الرئيسية</span></button><div class="nh-ptitle" id="nhPTitle"></div></div>
         <nav class="nh-ptabs" id="nhPTabs" aria-label="الأصول"></nav>
       </header>
@@ -177,7 +177,7 @@ const NH = (() => {
   bar.id = "nhBar";
   bar.className = "nh-top nh-bar";
   bar.innerHTML = `<div class="nh-bar-r">
-      <div class="nh-logo" aria-label="SimsimKit">SIMSIMKIT</div>
+      <div class="nh-logo" aria-label="SimsimKit"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</div>
       <button class="nh-goback" id="nhGoBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
       <nav class="nh-crumbs" id="nhCrumbs" aria-label="موقعك" hidden></nav>
     </div>

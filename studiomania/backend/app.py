@@ -534,7 +534,7 @@ app = FastAPI(title="StudioMania")
 
 
 # الصفحات والملفات اللي بتفتح من غير دخول
-PUBLIC_PATHS = {"/login", "/login.html", "/pricing", "/pricing.html", "/api/pricing", "/style.css", "/i18n.js", "/i18n-en.js", "/pw-eye.js", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
+PUBLIC_PATHS = {"/login", "/login.html", "/pricing", "/pricing.html", "/api/pricing", "/style.css", "/i18n.js", "/i18n-en.js", "/pw-eye.js", "/icon-32.png", "/icon-180.png", "/icon-512.png", "/logo-mark-light.png", "/logo-mark-dark.png", "/health", "/api/auth/state", "/api/auth/login", "/api/auth/setup"}
 
 
 # ملفات الواجهة: كل تحديث ليه رقم نسخة جديد عشان المتصفح ميفضلش شغال بالقديم

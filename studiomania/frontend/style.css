@@ -3155,4 +3155,4 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .pw-eye button { position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; padding: 0; }
 .pw-eye button:hover, .pw-eye button:focus-visible { background: var(--surface-2); color: var(--text); }
 .pw-eye button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.login .logo-mark { width: 64px; height: 64px; flex: none; }
+.login .logo-mark { width: auto; height: 84px; flex: none; }

@@ -2953,3 +2953,9 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 :is(#nh, #ibBots) .bot-recipe span { font-size: 11px; color: var(--nh-accent); }
 :is(#nh, #ibBots) .bot-formhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 @media (max-width: 900px) { :is(#nh, #ibBots) .bot-grid { grid-template-columns: 1fr; } }
+
+/* 🪼 لوجو القنديل الزجاجي جنب الاسم في الهيدر (نسخة للفاتح ونسخة للغامق) */
+.nh-lm { height: 1.75em; width: auto; margin-right: .55em; vertical-align: middle; flex: none; }
+.nh-plogo { display: inline-flex; align-items: center; }
+.nh-lm.lm-d, :root[data-nh-theme="dark"] .nh-lm.lm-l { display: none; }
+:root[data-nh-theme="dark"] .nh-lm.lm-d { display: inline-block; }
