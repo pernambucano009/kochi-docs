@@ -878,11 +878,13 @@
             <div class="cal-views" id="ibTabs" role="tablist">
               <button type="button" data-t="comments" class="on">التعليقات <b class="ib-n" id="ibNC"></b></button>
               <button type="button" data-t="messages">الرسائل <b class="ib-n" id="ibNM"></b></button>
+              <button type="button" data-t="bots">🤖 البوتات</button>
             </div>
             <button class="btn sm" type="button" id="ibRefresh"><span class="emo">🔄</span> حدّث</button>
             <span class="muted ib-note" id="ibNote"></span>
           </div>
-          <div class="ib-layout">
+          <div class="ib-bots" id="ibBots" hidden></div>
+          <div class="ib-layout" id="ibLayout">
             <section class="panel ib-list-panel"><ul class="ib-list" id="ibList"></ul>
               <button class="btn sm wide" type="button" id="ibMore" hidden>حمّل أكثر</button>
               <p class="empty" id="ibEmpty" hidden></p></section>

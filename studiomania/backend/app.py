@@ -24053,6 +24053,7 @@ app.mount("/media/voicelab", StaticFiles(directory=VLAB_DIR), name="voicelab")
 VLAB_LOCK = threading.Lock()
 VLAB_PROV = {"fasih": "فصيح", "munsit": "منصت", "eleven_atlas": "ElevenLabs (عن طريق Atlas)", "eleven": "ElevenLabs (مباشر)",
              "minimax": "MiniMax", "silma": "SILMA"}
+VLAB_OTHER = {"eleven_dub": "ElevenLabs (دبلجة)", "fasih_dub": "دبلجتنا بفصيح"}
 
 
 def vlab_owner() -> None:
@@ -24197,10 +24198,10 @@ def voicelab_get():
     for d in runs:
         for c in d["clips"]:
             if c.get("score"):
-                k = (d["dialect"] if d["kind"] == "tts" else "clone", c["provider"])
+                k = (d["dialect"] if d["kind"] == "tts" else d["kind"], c["provider"])
                 score.setdefault(k, []).append(c["score"])
     table = [{"dialect": k[0], "provider": k[1], "avg": round(sum(v) / len(v), 2), "n": len(v)} for k, v in score.items()]
-    return {"providers": VLAB_PROV, "ready": vlab_ready(),
+    return {"providers": VLAB_PROV, "labels": {**VLAB_PROV, **VLAB_OTHER}, "ready": vlab_ready(),
             "dialects": {k: v["label"] for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
             "samples": {k: VSAMPLE_TEXT.get(k, VSAMPLE_GULF) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
             "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"]))}
@@ -24269,6 +24270,56 @@ def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), fil
         d["kind"] = "tts"
         (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_vlab, args=(rid,), daemon=True).start()
+    return vlab_out(d)
+
+
+def run_vlab_dub(rid: str) -> None:
+    """دبلجة ElevenLabs للفيديو: نبدأها ونستنى لحد ما تخلص (لحد ٢٥ دقيقة)، والنتيجة فيديو بنفس صوت المتكلم."""
+    folder = VLAB_DIR / rid
+    d = vlab_save(rid, lambda d: None)
+    t0 = time.time()
+    try:
+        if atlas.mock_mode():
+            shutil.copy(folder / d["source"], folder / "0.mp4")
+        else:
+            dub_id = voicelab.eleven_dub_start(folder / d["source"])
+            while True:
+                time.sleep(8)
+                st = voicelab.eleven_dub_status(dub_id)
+                if st.get("status") == "dubbed":
+                    break
+                if st.get("status") in ("failed", "error") or time.time() - t0 > 1500:
+                    raise voicelab.LabError(f"ElevenLabs: {st.get('error') or 'الدبلجة ماكملتش'}")
+            voicelab.eleven_dub_get(dub_id, "ar", folder / "0.mp4")
+        upd = {"file": "0.mp4", "status": "done", "sec": round(time.time() - t0, 1)}
+    except Exception as e:  # noqa: BLE001
+        upd = {"status": "failed", "error": str(getattr(e, "detail", None) or e)[:240]}
+    vlab_save(rid, lambda x: (x["clips"][0].update(upd), x.update(status="done")))   # نسختنا بفصيح بيكمّلها العميل بإيده
+
+
+@app.post("/api/voicelab/dub")
+def voicelab_dub(file: UploadFile = File(...)):
+    """🌍 نفس الفيديو: دبلجة ElevenLabs (صوت المتكلم نفسه) هنا، ونسخة دبلجتنا بفصيح بتتفتح في «الترجمة والدبلجة» تكمّلها وتقارن."""
+    vlab_owner()
+    if not (voicelab.eleven_key() or atlas.mock_mode()):
+        raise HTTPException(400, "دبلجة ElevenLabs محتاجة مفتاح ElevenLabs المباشر (بصلاحية Dubbing) في الإعدادات")
+    rid = uuid.uuid4().hex[:10]
+    folder = VLAB_DIR / rid
+    folder.mkdir(parents=True, exist_ok=True)
+    name = save_upload(file, VIDEO_EXTENSIONS, folder, "src")
+    if probe_duration(folder / name) > 300:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "للتجربة: فيديو لحد ٥ دقايق (ElevenLabs بيحاسب على الدقيقة)")
+    tmp = TMP_DIR / f"vlabdub_{rid}{Path(name).suffix}"
+    shutil.copy(folder / name, tmp)
+    ours = dub_create(tmp, f"🎧 مقارنة: {Path(file.filename or 'فيديو').stem}"[:80])
+    d = {"id": rid, "kind": "dub", "dialect": "ar-msa", "text": f"دبلجة فيديو «{Path(file.filename or 'فيديو').stem}»", "at": time.time(), "status": "working",
+         "source": name, "ours": ours.get("id"),
+         "clips": [{"provider": "eleven_dub", "provider_label": "ElevenLabs (دبلجة بصوت المتكلم)", "voice": "", "label": "عربي (من غير اختيار لهجة)", "status": "working", "score": 0},
+                   {"provider": "fasih_dub", "provider_label": "دبلجتنا بفصيح", "voice": "", "status": "manual", "score": 0,
+                    "label": f"كمّلها في «الترجمة والدبلجة» (اسمها «🎧 مقارنة: {Path(file.filename or 'فيديو').stem[:40]}») واختار اللهجة، وبعدين قيّمها هنا"}]}
+    (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    threading.Thread(target=run_vlab_dub, args=(rid,), daemon=True).start()
     return vlab_out(d)
 
 

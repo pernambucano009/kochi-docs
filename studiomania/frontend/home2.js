@@ -54,7 +54,7 @@ const NH = (() => {
       : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
     pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة واللي نُشر." },
-    inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد." },
+    inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد، وبوتات بترد لوحدها." },
     audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
     reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوب، اكتب فكرتك، والقالب يُكمل: نص ← صوت ← مشاهد." },
@@ -478,7 +478,7 @@ const NH = (() => {
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
-    publish: () => [["pubpost", 4, META.publish()], ["inbox", 4], ["adsmgr", 4], ["audience", 4], ["wacamp", 4], ["bots", 4]]
+    publish: () => [["pubpost", 4, META.publish()], ["inbox", 4], ["adsmgr", 4], ["audience", 6], ["wacamp", 6]]
       .map(([id, c, m]) => panel(c, 3, `${head(id)}<div class="nh-body">${m || esc(T[id].desc)}</div>`, `data-id="${id}" tabindex="0" role="button"`)).join(""),
     progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">لا توجد مشاريع بعد.</div>`}</div>`) : projectsBoard(),
   };

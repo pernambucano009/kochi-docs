@@ -21,6 +21,7 @@ function ibAlert(msg) {
 
 async function initInbox() {
   ibAlert("");
+  if (ib.tab === "bots") { $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
   await ibLoad(true);
 }
 
@@ -212,6 +213,10 @@ $("ibTabs").addEventListener("click", (e) => {
   ib.tab = b.dataset.t;
   ib.sel = null; ib.next = null;
   $("ibTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  // 🤖 البوتات: تبويب جوه التعليقات والرسائل (بوت بيرد عليهم لوحده)
+  const bots = ib.tab === "bots";
+  $("ibBots").hidden = !bots; $("ibLayout").hidden = bots; $("ibRefresh").hidden = bots; $("ibNote").hidden = bots;
+  if (bots) { ibAlert(""); $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
   $("ibThread").innerHTML = `<p class="empty">اختر ${ib.tab === "comments" ? "منشور" : "محادثة"} من القائمة.</p>`;
   ibAlert("");
   ibLoad(true);

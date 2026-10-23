@@ -202,3 +202,33 @@ def silma_say(text: str, voice: str, model: str, dest: Path) -> Path:
         w.setframerate(SILMA_RATE)
         w.writeframes(ints)
     return dest
+
+
+# ---------------------------------------------------------------- دبلجة ElevenLabs (للمقارنة مع دبلجتنا بفصيح)
+# الفيديو كله ← ElevenLabs بيترجم ويدبلج بصوت المتكلم نفسه (من غير اختيار لهجة). بيتحاسب على قد دقايق الفيديو.
+
+def eleven_dub_start(src: Path, target: str = "ar", source: str = "auto") -> str:
+    with httpx.Client(timeout=300) as c, src.open("rb") as f:
+        r = c.post(f"{EL_BASE}/dubbing", headers={"xi-api-key": eleven_key()},
+                   data={"target_lang": target, "source_lang": source, "num_speakers": "0", "watermark": "false"},
+                   files={"file": (src.name, f, "video/mp4" if src.suffix.lower() in (".mp4", ".mov", ".m4v") else "application/octet-stream")})
+    if r.status_code >= 400:
+        raise _fail(r, "ElevenLabs (الدبلجة)")
+    return r.json()["dubbing_id"]
+
+
+def eleven_dub_status(dub_id: str) -> dict:
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{EL_BASE}/dubbing/{dub_id}", headers={"xi-api-key": eleven_key()})
+    if r.status_code >= 400:
+        raise _fail(r, "ElevenLabs (حالة الدبلجة)")
+    return r.json()
+
+
+def eleven_dub_get(dub_id: str, lang: str, dest: Path) -> Path:
+    with httpx.Client(timeout=300) as c:
+        r = c.get(f"{EL_BASE}/dubbing/{dub_id}/audio/{lang}", headers={"xi-api-key": eleven_key()})
+    if r.status_code >= 400:
+        raise _fail(r, "ElevenLabs (تنزيل الدبلجة)")
+    dest.write_bytes(r.content)
+    return dest
