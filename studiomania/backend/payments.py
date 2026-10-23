@@ -1,17 +1,13 @@
-"""💳 الدفع: Stripe (بطاقة) و PayPal. النص مع الشركتين فقط، والنقاط والباقات في gateway.py.
+"""💳 الدفع: PayPal (حساب PayPal أو بالكارت من صفحة PayPal). النص مع PayPal فقط، والنقاط والباقات في gateway.py.
 
 المتغيرات (على الخادم):
-- STRIPE_SECRET_KEY و STRIPE_WEBHOOK_SECRET  (من لوحة Stripe ← Developers)
 - PAYPAL_CLIENT_ID و PAYPAL_SECRET و PAYPAL_WEBHOOK_ID و PAYPAL_MODE (sandbox للتجربة، live للحقيقي)
 - PAY_CURRENCY (افتراضي USD)
 
-Stripe: صفحة دفع Stripe (Checkout) للاشتراك أو النقاط، وبوابة العميل يغيّر كارته أو يلغي.
 PayPal: الاشتراك يُنشأ له «خطة» عند PayPal بنفس السعر أول مرة (وتُحفظ)، والنقاط طلب دفع مرة واحدة.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 import os
 import time
@@ -26,94 +22,12 @@ class PayError(RuntimeError):
     pass
 
 
-# ---------------------------------------------------------------- Stripe
+# ---------------------------------------------------------------- PayPal
 
 def _clean(v: str | None) -> str:
     # من غير مسافات ولا علامات تنصيص لو اتنسخت معاها بالغلط
     return (v or "").strip().strip('"').strip("'").strip()
 
-
-def stripe_on() -> bool:
-    return bool(_clean(os.environ.get("STRIPE_SECRET_KEY")))
-
-
-def _stripe(method: str, path: str, data: dict | None = None) -> dict:
-    key = _clean(os.environ.get("STRIPE_SECRET_KEY"))
-    if not key:
-        raise PayError("الدفع بالكارت غير متفعّل ما زال")
-    if key.startswith("whsec_"):
-        raise PayError("STRIPE_SECRET_KEY فيه مفتاح الـ Webhook (whsec_) بالغلط: يجب يكون الـ Secret key ما يبدأ بـ sk_test_ أو sk_live_")
-    if key.startswith("pk_"):
-        raise PayError("STRIPE_SECRET_KEY فيه الـ Publishable key (pk_) بالغلط: يجب يكون الـ Secret key ما يبدأ بـ sk_test_ أو sk_live_")
-    try:
-        r = httpx.request(method, f"https://api.stripe.com/v1/{path}", auth=(key, ""), data=_flat(data or {}), timeout=30)
-    except httpx.HTTPError as e:
-        raise PayError(f"Stripe لا يرد: {e}") from e
-    j = r.json() if r.content else {}
-    if r.status_code >= 400:
-        log.warning("stripe %s %s failed: %s %s", method, path, r.status_code, str(j.get("error") or j)[:400])
-        raise PayError((j.get("error") or {}).get("message") or f"Stripe HTTP {r.status_code}")
-    return j
-
-
-def _flat(d, prefix: str = "") -> dict:
-    """{"a": {"b": 1}, "l": [{"x": 2}]} ← {"a[b]": 1, "l[0][x]": 2} (شكل الفورم الذي Stripe تريده)."""
-    out = {}
-    items = d.items() if isinstance(d, dict) else enumerate(d)
-    for k, v in items:
-        key = f"{prefix}[{k}]" if prefix else str(k)
-        if isinstance(v, (dict, list)):
-            out.update(_flat(v, key))
-        elif v is not None:
-            out[key] = "true" if v is True else "false" if v is False else str(v)
-    return out
-
-
-def stripe_checkout(*, mode: str, lines: list[tuple[str, float, int]], meta: dict, email: str, customer: str | None,
-                    success: str, cancel: str, interval: str = "month") -> str:
-    """lines = [(الاسم، السعر بالدولار، الكمية)]. يعود رابط صفحة الدفع."""
-    items = []
-    for name, price, qty in lines:
-        if qty <= 0:
-            continue
-        pd = {"currency": CUR.lower(), "unit_amount": int(round(price * 100)), "product_data": {"name": name}}
-        if mode == "subscription":
-            pd["recurring"] = {"interval": interval}
-        items.append({"price_data": pd, "quantity": qty})
-    body = {"mode": mode, "line_items": items, "success_url": success, "cancel_url": cancel,
-            "client_reference_id": meta.get("wid"), "metadata": meta, "allow_promotion_codes": True}
-    if customer:
-        body["customer"] = customer
-    else:
-        body["customer_email"] = email
-    if mode == "subscription":
-        body["subscription_data"] = {"metadata": meta}
-    return _stripe("POST", "checkout/sessions", body)["url"]
-
-
-def stripe_portal(customer: str, back: str) -> str:
-    return _stripe("POST", "billing_portal/sessions", {"customer": customer, "return_url": back})["url"]
-
-
-def stripe_cancel(sub_id: str) -> None:
-    _stripe("DELETE", f"subscriptions/{sub_id}")
-
-
-def stripe_verify(payload: bytes, header: str, tolerance: int = 300) -> bool:
-    """التوقيع الذي Stripe يرسله مع كل إشعار (لكي محدش يزوّر إشعار دفع)."""
-    secret = _clean(os.environ.get("STRIPE_WEBHOOK_SECRET"))
-    if not secret or not header:
-        return False
-    parts = dict(p.split("=", 1) for p in header.split(",") if "=" in p)
-    sigs = [p.split("=", 1)[1] for p in header.split(",") if p.startswith("v1=")]
-    t = parts.get("t", "")
-    if not t.isdigit() or abs(time.time() - int(t)) > tolerance:
-        return False
-    good = hmac.new(secret.encode(), f"{t}.".encode() + payload, hashlib.sha256).hexdigest()
-    return any(hmac.compare_digest(good, s) for s in sigs)
-
-
-# ---------------------------------------------------------------- PayPal
 
 def _pp_cred() -> tuple[str, str]:
     # من غير مسافات ولا علامات تنصيص لو اتنسخت معاها بالغلط

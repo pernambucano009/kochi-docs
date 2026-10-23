@@ -296,7 +296,7 @@ def tenant_env(wid: str) -> dict:
     env.pop("APP_PASSWORD", None)
     # أسرار المنصة نفسها (الدفع والإيميل والدخول بجوجل) بتفضل في البوابة بس
     for k in list(env):
-        if k.startswith(("STRIPE_", "PAYPAL_", "TAP_", "SMTP_", "RESEND_", "GOOGLE_CLIENT_")):
+        if k.startswith(("PAYPAL_", "TAP_", "SMTP_", "RESEND_", "GOOGLE_CLIENT_")):
             env.pop(k)
     env["ZERNIO_HOOK_SECRET"] = hook_secret()   # توقيع الرسايل اللي جاية من خدمة النشر (علّق بكلمة)
     if wid == OWNER:
@@ -854,7 +854,7 @@ def google_back(request: Request, code: str = "", state: str = ""):
 
 
 
-# ---------------------------------------------------------------- 💳 الاشتراكات والنقط (Stripe / PayPal)
+# ---------------------------------------------------------------- 💳 الاشتراكات والنقط (PayPal)
 
 def plan_of(key: str) -> dict | None:
     return next((p for p in billing.config(DATA_DIR)["plans"] if p["key"] == key and not p.get("once")), None)
@@ -894,7 +894,8 @@ def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provide
     # اشتراك قديم بباقة تانية: بيتلغي (عشان العميل مايدفعش مرتين)
     if old[1] and old[1] != sub_id:
         try:
-            (payments.stripe_cancel if old[0] == "stripe" else payments.paypal_cancel)(old[1])
+            if old[0] == "paypal":
+                payments.paypal_cancel(old[1])
         except payments.PayError:
             pass
 
@@ -1018,8 +1019,7 @@ def billing_state(request: Request):
             "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
             "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
-            "can_portal": bool(w and w["provider"] == "stripe" and w["customer"]),
-            "stripe": payments.stripe_on(), "paypal": payments.paypal_on(),
+            "paypal": payments.paypal_on(),
             "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist}
 
 
@@ -1037,7 +1037,6 @@ class CheckoutIn(BaseModel):
 def checkout(body: CheckoutIn, request: Request):
     u = customer_user(request)
     wid, back = u["workspace"], base_url(request)
-    w = workspace(wid)
     cfg = billing.config(DATA_DIR)
     try:
         if body.kind == "topup":
@@ -1045,12 +1044,7 @@ def checkout(body: CheckoutIn, request: Request):
             if not t:
                 raise HTTPException(400, "باقة هذه النقاط غير موجودة")
             name = f"SimsimKit · {t['credits']:,} نقطة"
-            if body.provider == "stripe":
-                url = payments.stripe_checkout(mode="payment", lines=[(name, t["price"], 1)],
-                                               meta={"wid": wid, "kind": "topup", "topup": t["key"]}, email=u["email"],
-                                               customer=w["customer"] if w and w["provider"] == "stripe" else None,
-                                               success=f"{back}/billing?ok=topup", cancel=f"{back}/billing")
-            elif body.provider == "paypal":
+            if body.provider == "paypal":
                 url = payments.paypal_order(t["price"], f"{wid}|topup|{t['key']}", name,
                                             ret=f"{back}/api/billing/paypal/order", cancel=f"{back}/billing")
             else:
@@ -1060,20 +1054,12 @@ def checkout(body: CheckoutIn, request: Request):
             tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
         except ValueError as e:
             raise HTTPException(400, str(e))
-        p, add = plan_of(body.plan), {a["key"]: a for a in cfg["addons"]}
+        p = plan_of(body.plan)
         extra = tot["accounts"] - p["accounts"]
         ap_paid = tot["autopilot"] and not p.get("autopilot")
         yr = body.cycle == "year"
         px = (lambda v: billing.yearly(cfg, v)) if yr else (lambda v: v)
-        meta = {"wid": wid, "kind": "plan", "plan": p["key"], "extra": str(extra), "ap": "1" if ap_paid else "0", "cycle": "year" if yr else "month"}
-        if body.provider == "stripe":
-            lines = [(f"SimsimKit · باقة {p['name']}{' · سنوي' if yr else ''}", px(p["price"]), 1), (add["account"]["name"], px(add["account"]["price"]), extra)]
-            if ap_paid:
-                lines.append((add["autopilot"]["name"], px(add["autopilot"]["price"]), 1))
-            url = payments.stripe_checkout(mode="subscription", lines=lines, meta=meta, email=u["email"],
-                                           customer=w["customer"] if w and w["provider"] == "stripe" else None,
-                                           success=f"{back}/billing?ok=plan", cancel=f"{back}/billing", interval="year" if yr else "month")
-        elif body.provider == "paypal":
+        if body.provider == "paypal":
             key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}"
             pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' yearly' if yr else ''}",
                                        px(tot["total"]), "YEAR" if yr else "MONTH")
@@ -1086,21 +1072,9 @@ def checkout(body: CheckoutIn, request: Request):
         raise HTTPException(502, str(e))
 
 
-@app.post("/api/billing/portal")
-def portal(request: Request):
-    u = customer_user(request)
-    w = workspace(u["workspace"])
-    if not w or w["provider"] != "stripe" or not w["customer"]:
-        raise HTTPException(400, "لا يوجد اشتراك بالكارت")
-    try:
-        return {"url": payments.stripe_portal(w["customer"], f"{base_url(request)}/billing")}
-    except payments.PayError as e:
-        raise HTTPException(502, str(e))
-
-
 @app.post("/api/billing/cancel")
 def cancel_sub(request: Request):
-    """إلغاء اشتراك PayPal من داخل البرنامج (Stripe يتلغي من بوابة العميل)."""
+    """إلغاء اشتراك PayPal من داخل البرنامج."""
     u = customer_user(request)
     w = workspace(u["workspace"])
     if not w or not w["sub_id"]:
@@ -1111,7 +1085,7 @@ def cancel_sub(request: Request):
             payments.paypal_cancel(w["sub_id"])
             end_subscription(u["workspace"], _iso(nxt))
         else:
-            raise HTTPException(400, "الاشتراك بالكارت يتلغي من «إدارة الاشتراك»")
+            raise HTTPException(400, "لا يوجد اشتراك PayPal يعمل")
     except payments.PayError as e:
         raise HTTPException(502, str(e))
     return {"ok": True}
@@ -1125,41 +1099,6 @@ def _iso(s: str | None) -> float | None:
         return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
-
-
-@app.post("/api/billing/stripe/webhook")
-async def stripe_hook(request: Request):
-    raw = await request.body()
-    if not payments.stripe_verify(raw, request.headers.get("stripe-signature", "")):
-        raise HTTPException(400, "bad signature")
-    ev = json.loads(raw)
-    obj, typ = (ev.get("data") or {}).get("object") or {}, ev.get("type")
-    if typ == "checkout.session.completed" and obj.get("payment_status") in ("paid", "no_payment_required"):
-        m = obj.get("metadata") or {}
-        wid, amount = m.get("wid") or obj.get("client_reference_id"), (obj.get("amount_total") or 0) / 100
-        if wid and workspace(wid):
-            if m.get("kind") == "topup":
-                add_topup(wid, m.get("topup", ""), "stripe", obj["id"], amount)
-            elif m.get("kind") == "plan" and obj.get("subscription"):
-                apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), m.get("ap") == "1", "stripe",
-                                   obj["subscription"], obj.get("customer"), obj["id"], amount, m.get("cycle") or "month")
-    elif typ == "invoice.paid" and obj.get("billing_reason") == "subscription_cycle":
-        with closing(db()) as c:
-            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("subscription"),)).fetchone()
-        if r:
-            renew(r["id"], obj["id"], (obj.get("amount_paid") or 0) / 100)
-    elif typ == "customer.subscription.deleted":
-        with closing(db()) as c:
-            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("id"),)).fetchone()
-        if r:
-            end_subscription(r["id"])
-    elif typ == "customer.subscription.updated" and obj.get("cancel_at_period_end"):
-        with closing(db()) as c:
-            r = c.execute("SELECT id FROM workspaces WHERE provider='stripe' AND sub_id=?", (obj.get("id"),)).fetchone()
-        if r and obj.get("current_period_end"):
-            with closing(db()) as c, c:
-                c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (float(obj["current_period_end"]) + 3600, r["id"]))
-    return {"ok": True}
 
 
 @app.get("/api/billing/paypal/order")

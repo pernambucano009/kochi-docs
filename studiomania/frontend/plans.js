@@ -4,7 +4,7 @@ const PlansPage = (() => {
   const html = () => `<div class="bq-wrap" id="bqWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const DEMO = {
     me: { credits: { total: 1240, plan_credits: 740, topup_credits: 500 } }, owner: false, plan: "starter", cycle: "month", extra_accounts: 0, autopilot: false,
-    renews_at: Date.now() / 1000 + 18 * 86400, ends_at: null, stripe: true, paypal: true,
+    renews_at: Date.now() / 1000 + 18 * 86400, ends_at: null, paypal: true,
     plans: [{ key: "trial", name: "تجربة مجانية", price: 0, credits: 300, accounts: 0, once: true },
       { key: "starter", name: "بداية", price: 29, credits: 1000, accounts: 2, autopilot: false },
       { key: "pro", name: "محترف", price: 79, credits: 3500, accounts: 4, autopilot: true, popular: true },

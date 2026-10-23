@@ -150,7 +150,7 @@ const PlansView = (() => {
     const moP = (p) => S.cyc === "year" ? Math.round(p.price * ym / 12) : p.price;
     const fmtD = (t) => t ? new Date(t * 1000).toLocaleDateString(typeof UI_LOCALE === "function" ? UI_LOCALE() : "ar-EG", { day: "numeric", month: "long" }) : "";
     const renew = d.ends_at ? `تنتهي ${fmtD(d.ends_at)}` : d.renews_at ? `تتجدد ${fmtD(d.renews_at)}` : "";
-    const providers = [d.stripe && ["stripe", "بالكارت"], d.paypal && ["paypal", "PayPal"]].filter(Boolean);
+    const providers = [d.paypal && ["paypal", "PayPal"]].filter(Boolean);
     const sameCycle = () => (d.cycle || "month") === S.cyc;
 
     function state(p, i) {
@@ -181,7 +181,7 @@ const PlansView = (() => {
       else if (s === "cur") cta = `<span class="cur">✓ باقتك${renew ? ` · ${esc(renew)}` : ""}</span>`;
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل للسنوي" : "حوّل للشهري") : `${curI < 0 ? "اشترك في" : "ترقية لـ"} ${esc(p.name)}`;
-        cta = S.pick === p.key && providers.length > 1 ? providers.map(([k, t]) => `<button class="${k === "stripe" ? "go" : "soft"}" data-pvpay="${k}" data-plan="${esc(p.key)}" ${S.busy ? "disabled" : ""}>${t}</button>`).join("")
+        cta = S.pick === p.key && providers.length > 1 ? providers.map(([k, t]) => `<button class="go" data-pvpay="${k}" data-plan="${esc(p.key)}" ${S.busy ? "disabled" : ""}>${t}</button>`).join("")
           : `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
       } else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "خلصت التجربة" : "أقل من باقتك"}</span>`;

@@ -4,7 +4,6 @@
 const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["eleven", "مفتاح ElevenLabs", "الأصوات وكلون الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات وكلون الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات عربي فصحى وسعودي"], ["recraft", "مفتاح Recraft", "اللوجو والرسومات الفيكتور"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
   ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "إيميلات تأكيد الحساب"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
-  ["stripe", "Stripe Secret key", "الدفع"], ["stripe_hook", "Stripe Webhook secret", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"]];
 
 async function loadSettings() {
