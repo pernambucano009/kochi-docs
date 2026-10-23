@@ -58,6 +58,7 @@
     },
     "extra": {
       "apiBase": "https://simsimkit.com"
-    }
+    },
+    "owner": "geekzone-sa"
   }
 }
