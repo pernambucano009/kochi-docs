@@ -24495,6 +24495,46 @@ def voicelab_rate(rid: str, body: VLabRateIn):
     return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(score=max(0, min(5, body.score))) if 0 <= body.clip < len(d["clips"]) else None))
 
 
+class VLabNoteIn(BaseModel):
+    clip: int
+    note: str = ""
+
+
+@app.post("/api/voicelab/runs/{rid}/note")
+def voicelab_note(rid: str, body: VLabNoteIn):
+    """📝 ملاحظة صاحب المنصة على صوت بعينه (بتطلع في تقرير النتايج جنب النجوم)."""
+    vlab_owner()
+    if not (VLAB_DIR / Path(rid).name / "run.json").exists():
+        raise HTTPException(404, "التجربة دي مش موجودة")
+    note = body.note.strip()[:2000]
+    return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(note=note) if 0 <= body.clip < len(d["clips"]) else None))
+
+
+@app.get("/api/voicelab/report")
+def voicelab_report():
+    """📋 كل التجارب بالنجوم والملاحظات في نص واحد: يتنسخ أو يتنزّل ويتبعت للمراجعة."""
+    vlab_owner()
+    dl = {k: v["label"] for k, v in dub.DIALECTS.items()}
+    kinds = {"clone": "كلون صوت", "dub": "دبلجة فيديو", "tts": "مقارنة لهجة"}
+    lines = [f"# نتايج مختبر الأصوات ({time.strftime('%Y-%m-%d %H:%M')})", ""]
+    for d in vlab_runs():
+        rated = [c for c in d["clips"] if c.get("score") or (c.get("note") or "").strip()]
+        if not rated:
+            continue
+        lines += [f"## {kinds.get(d['kind'], d['kind'])} · {dl.get(d['dialect'], d['dialect'])} · {time.strftime('%Y-%m-%d', time.localtime(d.get('at') or 0))}",
+                  f"النص: {d.get('text', '')}"]
+        for c in d["clips"]:
+            stars = "★" * int(c.get("score") or 0) + "☆" * (5 - int(c.get("score") or 0)) if c.get("score") else "بدون تقييم"
+            lines.append(f"- {c.get('provider_label', c.get('provider'))} · {c.get('label') or c.get('voice') or ''} · {stars}"
+                         + (f" · ❌ {c.get('error')}" if c.get("status") == "failed" else ""))
+            if (c.get("note") or "").strip():
+                lines.append(f"  ملاحظة: {c['note'].strip()}")
+        lines.append("")
+    if len(lines) == 2:
+        lines.append("لا توجد تقييمات أو ملاحظات بعد.")
+    return {"text": "\n".join(lines)}
+
+
 @app.get("/api/voicelab/runs/{rid}")
 def voicelab_one(rid: str):
     vlab_owner()

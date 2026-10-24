@@ -3,6 +3,8 @@
 const VoiceLab = (() => {
   const S = { el: null, d: null, tab: "cmp", dialect: "ar-sa-najdi", provs: null, text: "", timer: 0, all: false, texts: null, dirty: new Set(), review: false };
   const esc = (s) => escapeHtml(String(s ?? ""));
+  // 📝 ملاحظتك على الصوت ده: بتتحفظ وانت بتكتب، وبتطلع في «انسخ النتايج» جنب النجوم
+  const noteBox = (rid, i, v) => `<textarea class="vl-note" rows="2" dir="auto" data-note="${esc(rid)}:${i}" placeholder="📝 ملاحظاتك على الصوت ده (النطق، اللهجة، الإحساس، السرعة…)">${esc(v || "")}</textarea>`;
   const stars = (rid, i, v) => `<span class="vl-stars" role="group" aria-label="التقييم">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="${n <= v ? "on" : ""}" data-rate="${esc(rid)}:${i}:${n}" aria-label="${n} من 5">★</button>`).join("")}</span>`;
 
   async function load() {
@@ -22,16 +24,18 @@ const VoiceLab = (() => {
       ${r.sample ? `<audio controls preload="metadata" src="/media/voicelab/${esc(r.id)}/${esc(r.sample)}" title="العينة الأصلية"></audio>` : ""}
       <button type="button" class="vl-x" data-del="${esc(r.id)}" aria-label="احذف التجربة">✕</button></header>
       <div class="vl-clips">${r.clips.map((c, i) => `<div class="vl-clip ${c.status}" data-sig="${esc([c.status, c.score || 0, c.url || "", c.error || ""].join("|"))}"><p><b>${esc(c.provider_label)}</b><small>${esc(c.label)}${c.sec ? ` · ${c.sec} ث` : ""}</small></p>
-        ${c.status === "done" ? `${/\.mp4$/.test(c.url || "") ? `<video controls preload="metadata" playsinline src="${esc(c.url)}"></video>` : `<audio controls preload="metadata" src="${esc(c.url)}"></audio>`}${stars(r.id, i, c.score || 0)}`
-          : c.status === "manual" ? stars(r.id, i, c.score || 0)
+        ${c.status === "done" ? `${/\.mp4$/.test(c.url || "") ? `<video controls preload="metadata" playsinline src="${esc(c.url)}"></video>` : `<audio controls preload="metadata" src="${esc(c.url)}"></audio>`}${stars(r.id, i, c.score || 0)}${noteBox(r.id, i, c.note)}`
+          : c.status === "manual" ? stars(r.id, i, c.score || 0) + noteBox(r.id, i, c.note)
           : c.status === "failed" ? `<p class="vl-err">${esc(c.error || "ماكملش")}</p>` : `<p class="vl-wait">⏳ بيتولّد…</p>`}</div>`).join("")}</div></article>`;
   }
   function tableHTML() {
     const rows = S.d.table;
-    if (!rows.length) return `<p class="hint">قيّم الأصوات بالنجوم في «المقارنة» و«الكلون»، والنتيجة هتظهر هنا: متوسط كل مزوّد في كل لهجة.</p>`;
+    const exp = `<div class="row wrap vl-exp"><button type="button" class="btn primary" id="vlCopy">📋 انسخ كل النتايج والملاحظات</button>
+      <button type="button" class="btn" id="vlDown">⬇️ نزّلها كملف</button><small class="hint">الصقها في المحادثة مع Claude عشان يشوف نتايج الاختبار.</small></div>`;
+    if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، والنتيجة هتظهر هنا: متوسط كل مزوّد في كل لهجة.</p>`;
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
-    return `<table class="vl-table"><thead><tr><th>اللهجة</th><th>الترتيب (متوسط النجوم · عدد التقييمات)</th></tr></thead><tbody>${Object.entries(groups).map(([d, xs]) =>
+    return `${exp}<table class="vl-table"><thead><tr><th>اللهجة</th><th>الترتيب (متوسط النجوم · عدد التقييمات)</th></tr></thead><tbody>${Object.entries(groups).map(([d, xs]) =>
       `<tr><td>${esc(d === "clone" ? "🧬 كلون الصوت" : d === "dub" ? "🌍 دبلجة فيديو" : S.d.dialects[d] || d)}</td><td>${xs.map((r, k) => `<span class="vl-rank${k === 0 ? " best" : ""}">${k === 0 ? "🏆 " : ""}${esc((S.d.labels || S.d.providers)[r.provider] || r.provider)} <b>${r.avg}</b><small>(${r.n})</small></span>`).join("")}</td></tr>`).join("")}</tbody></table>`;
   }
   function render() {
@@ -124,7 +128,19 @@ ${S.review ? reviewHTML() : `
     });
     return true;
   }
+  const noteT = {}, pending = new Set();
+  function saveNote(el) {
+    const [rid, i] = el.dataset.note.split(":");
+    clearTimeout(noteT[el.dataset.note]);
+    pending.delete(el);
+    const c = S.d?.runs.find((r) => r.id === rid)?.clips[+i];
+    if (c) c.note = el.value;   // لو الشاشة اترسمت تاني قبل التحميل الجاي: الملاحظة تفضل زي ما كتبتها
+    return api(`/api/voicelab/runs/${rid}/note`, { method: "POST", ...jsonBody({ clip: +i, note: el.value }) })
+      .then(() => { el.classList.add("saved"); setTimeout(() => el.classList.remove("saved"), 1200); })
+      .catch((err) => toast(err.message, true));
+  }
   function onInput(e) {
+    if (e.target.dataset?.note) { const el = e.target; pending.add(el); clearTimeout(noteT[el.dataset.note]); noteT[el.dataset.note] = setTimeout(() => saveNote(el), 900); return; }
     if (e.target.id === "vlCloneText") S.text = e.target.value;
     const k = e.target.dataset?.text;
     if (k) {
@@ -134,6 +150,7 @@ ${S.review ? reviewHTML() : `
     }
   }
   function onChange(e) {
+    if (e.target.dataset?.note) return saveNote(e.target);
     const k = e.target.dataset?.text;
     if (k && S.dirty.has(k)) saveTexts([k]).catch((err) => toast(err.message, true));
   }
@@ -147,7 +164,20 @@ ${S.review ? reviewHTML() : `
     if (b("#vlReviewBack")) { S.review = false; return render(); }
     if (b("[data-prov]")?.disabled) return;
     if (b("[data-prov]")) { const k = b("[data-prov]").dataset.prov; S.provs = S.provs.includes(k) ? S.provs.filter((x) => x !== k) : [...S.provs, k]; return render(); }
+    if (b("[data-rate]")) await Promise.all([...pending].map(saveNote));   // الملاحظة اللي لسه بتتكتب تتحفظ قبل ما الكارت يتحدّث
     if (b("[data-rate]")) { const [rid, i, n] = b("[data-rate]").dataset.rate.split(":"); await api(`/api/voicelab/runs/${rid}/rate`, { method: "POST", ...jsonBody({ clip: +i, score: +n }) }).catch((err) => toast(err.message, true)); return load(); }
+    if (b("#vlCopy") || b("#vlDown")) {
+      try {
+        const { text } = await api("/api/voicelab/report");
+        if (b("#vlDown")) {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+          a.download = `voicelab-results-${new Date().toISOString().slice(0, 10)}.md`;
+          a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        } else { await navigator.clipboard.writeText(text); toast("✓ اتنسخت النتايج والملاحظات، الصقها في المحادثة"); }
+      } catch (err) { toast(err.message, true); }
+      return;
+    }
     if (b("[data-del]")) { if (await uiConfirm("تحذف التجربة دي؟")) { await api(`/api/voicelab/runs/${b("[data-del]").dataset.del}`, { method: "DELETE" }); load(); } return; }
     try {
       if (b("#vlGo")) {
