@@ -21,6 +21,7 @@
     --chip-sh: 0 4px 18px rgba(0, 0, 0, .35); color-scheme: dark; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
+  body { overflow-x: clip; }   /* فقاعات الشرح على الأطراف ماتعملش سكرول بالعرض */
   body { background: var(--nh-bg); color: var(--nh-ink); font: 14px/1.5 var(--nh-arabic); -webkit-font-smoothing: antialiased; }
   .scr { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: 52px minmax(0, 1fr) auto; padding: 22px 48px 18px; }
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -72,10 +73,10 @@
   const toast = (m) => { const el = document.getElementById("toast"); el.textContent = m; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2600); };
   fetch("/api/pricing").then((r) => r.json()).then((d) => {
     PlansView.mount(document.getElementById("pv"), { plans: d.plans, topups: d.topups, rules: d.rules, me: null }, {
-      toast,
+      toast, open: true,
       signup: (plan, cycle) => { location.href = `/signup${plan ? `?plan=${encodeURIComponent(plan)}&cycle=${cycle}` : ""}`; },
     });
-  }).catch(() => { document.getElementById("pv").innerHTML = `<p style="text-align:center;color:var(--nh-muted);padding-top:20vh">الأسعار لا تحمّل الآن، جرّب أيضًا قليلًا.</p>`; });
+  }).catch(() => { document.getElementById("pv").innerHTML = `<p style="text-align:center;color:var(--nh-muted);padding-top:20vh">الأسعار لا تُحمّل الآن، جرّب بعد قليل.</p>`; });
 </script>
 </body>
 </html>

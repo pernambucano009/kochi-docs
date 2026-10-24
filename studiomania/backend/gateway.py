@@ -32,7 +32,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
@@ -1362,6 +1362,9 @@ async def proxy(path: str, request: Request):
             return Response(f.read_bytes(), media_type={".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml",
                                                         ".png": "image/png"}.get(f.suffix, "application/octet-stream"),
                             headers={"Cache-Control": "no-cache"})
+        # 🌐 صفحة الهبوط: صور الموقع (site/) وعيّنات القوالب (gallery/: فيديو وغلاف) مفتوحة للزوار
+        if f.parent in (FRONTEND.resolve() / "site", FRONTEND.resolve() / "gallery") and f.suffix in (".webp", ".png", ".jpg", ".mp4") and f.is_file():
+            return FileResponse(f, headers={"Cache-Control": "public, max-age=86400"})
     u_pub = False
     if not u:
         if url_path.startswith("/api/") and url_path not in PUBLIC_FILES or url_path.startswith("/media/"):

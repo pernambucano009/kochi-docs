@@ -3,28 +3,524 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SimsimKit · استوديو محتوى بالذكاء الاصطناعي · SimsimKit</title>
-<meta name="description" content="AI content studio — SimsimKit by GeekZone">
+<title>سمسمكيت · محتوى كل يوم، من غير فريق</title>
+<meta name="description" content="سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. ابدأ بـ 300 نقطة مجانًا بدون بطاقة.">
+<meta property="og:title" content="سمسمكيت · محتوى كل يوم، من غير فريق">
+<meta property="og:description" content="عقل يعرف علامتك، وقوالب تصنع الفيديو بلهجتك، والأوتوبايلوت ينشره في موعده.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@300;400;500;600;700&family=Unbounded:wght@500;700&display=swap">
-<link rel="stylesheet" href="/legal.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&family=Alexandria:wght@300;400;500;600&display=swap">
+<script>
+  // نفس اختيار الوضع (فاتح/غامق) واللغة اللي في البرنامج
+  try {
+    const t = localStorage.getItem("studiomania.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.nhTheme = t;
+    if (localStorage.getItem("studiomania.site.lang") === "en") { document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; }
+  } catch { }
+</script>
+<style>
+  /* 🌐 صفحة الهبوط: صفحة واحدة بتتسكرول (الهيرو ← كيف يعمل ← أمثلة لمجالك ← المميزات ← الأسعار ← الأسئلة ← الفوتر)،
+     بنفس هوية البرنامج (الجيلي فيش الزجاجي، الزرار البرتقالي، فاتح/غامق). الأسعار من نفس مصدر أسعار البرنامج (/api/pricing). */
+  :root { --bg: #FAFAF8; --ink: #181718; --muted: #6B6B67; --accent: #E5613E; --card: #FFFFFF; --soft: #F3F2EF; --tint: #FFF6F2;
+    --sh: 0 4px 18px rgba(24, 23, 24, .08); --track: #E3E2DE; --ar: "Alexandria", "Readex Pro", sans-serif; --lat: "Jost", "Futura", system-ui, sans-serif; color-scheme: light; }
+  :root[data-nh-theme="dark"] { --bg: #0C0C0E; --ink: #F1F1F3; --muted: #A3A3AB; --accent: #F0754F; --card: #1C1C1F; --soft: #17171A; --tint: rgba(240, 117, 79, .12);
+    --sh: 0 4px 18px rgba(0, 0, 0, .4); --track: #3D3C3D; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 var(--ar); -webkit-font-smoothing: antialiased; transition: background .6s; }
+  :root[lang="en"] body { font-family: var(--lat), var(--ar); }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+  img, video { max-width: 100%; }
+  .wrap { width: min(1120px, calc(100% - 32px)); margin-inline: auto; }
+
+  /* الشريط */
+  .bar { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 78%, transparent); }
+  .bar .wrap { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .logo { display: flex; align-items: center; gap: .55em; direction: ltr; font: 500 15px var(--lat); letter-spacing: .32em; }
+  .logo img { height: 26px; width: auto; }
+  .lm-d { display: none; } :root[data-nh-theme="dark"] .lm-l { display: none; } :root[data-nh-theme="dark"] .lm-d { display: inline; }
+  .tools { display: flex; align-items: center; gap: 10px; }
+  .chip { height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: var(--card); box-shadow: var(--sh); cursor: pointer; display: inline-flex; align-items: center; white-space: nowrap;
+    font-size: 14px; transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
+  .chip:hover { transform: translateY(-2px); }
+  .chip.lang { font: 400 13px var(--lat); letter-spacing: .16em; padding: 0 16px; }
+  .sw { display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; padding: 0 4px; font-size: 13px; }
+  .sw .track { width: 42px; height: 24px; border-radius: 99px; background: var(--track); position: relative; }
+  .sw .knob { position: absolute; top: 3px; inset-inline-start: 21px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .2); transition: inset-inline-start .45s cubic-bezier(.65, 0, .35, 1); }
+  :root[data-nh-theme="dark"] .sw .knob { inset-inline-start: 3px; }
+  .menu-b { display: none; width: 42px; padding: 0; justify-content: center; }
+
+  /* القائمة: روابط للأقسام (على الشمال في الديسكتوب) */
+  .side { position: fixed; inset-inline-end: max(16px, calc((100vw - 1320px) / 2)); top: 50%; translate: 0 -50%; z-index: 20; display: flex; flex-direction: column; gap: 4px; }
+  .side a { padding: 8px 14px; border-radius: 12px; font-size: 14px; color: var(--muted); transition: color .3s, background .3s; }
+  .side a:hover { color: var(--accent); }
+  .side a.on { color: var(--ink); background: var(--card); box-shadow: var(--sh); }
+
+  /* الهيرو: العنوان والجملة والزرار أول حاجة، والجيلي فيش خلفية */
+  .hero { position: relative; padding: 56px 0 24px; overflow: hidden; }
+  .hero .wrap { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 40px; align-items: center; }
+  .hero h1 { margin: 0; font: 600 clamp(34px, 5vw, 58px)/1.25 var(--ar); }
+  :root[lang="en"] .hero h1 { font-family: var(--lat); font-weight: 500; letter-spacing: -.01em; }
+  .hero .lead { margin: 18px 0 0; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.85; color: var(--muted); max-width: 560px; }
+  .ctas { display: flex; align-items: center; gap: 18px; margin-top: 28px; flex-wrap: wrap; }
+  .go { position: relative; isolation: isolate; overflow: hidden; height: 54px; padding: 0 34px; border: 0; border-radius: 27px; cursor: pointer; color: #fff; font-size: 17px; font-weight: 500;
+    background: linear-gradient(180deg, #F48A62 0%, #E5613E 55%, #D44E2C 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 0 0 1px rgba(229, 97, 62, .28), 0 8px 22px -6px rgba(229, 97, 62, .65), 0 0 24px rgba(240, 117, 79, .32);
+    transition: transform .32s cubic-bezier(.2, .8, .2, 1), filter .3s; }
+  .go::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .45) 48%, transparent 66%) no-repeat;
+    background-size: 220% 100%; background-position: 130% 0; transition: background-position .75s ease; }
+  .go:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.06); } .go:hover::after { background-position: -30% 0; }
+  .go.sm { height: 46px; padding: 0 24px; font-size: 15px; }
+  .ghost { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; font-size: 15px; color: var(--ink); }
+  .ghost:hover { color: var(--accent); }
+  .note { margin: 12px 0 0; font-size: 13.5px; color: var(--muted); }
+  .jf { position: relative; justify-self: center; width: min(420px, 90%); aspect-ratio: 560 / 778; pointer-events: none; }
+  .jf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 1.2s ease; opacity: 0; }
+  .jf-float { position: absolute; inset: 0; animation: float 7s ease-in-out infinite; }
+  .jf .l { opacity: 1; } :root[data-nh-theme="dark"] .jf .l { opacity: 0; } :root[data-nh-theme="dark"] .jf .d { opacity: 1; }
+  .lit .jf .l, .lit .jf .d { opacity: 0 !important; } .lit .jf .ll { opacity: 1; } :root[data-nh-theme="dark"] .lit .jf .ll { opacity: 0; } :root[data-nh-theme="dark"] .lit .jf .dl { opacity: 1; }
+  .lit .jf-float { animation: float 7s ease-in-out infinite, litup 1.6s cubic-bezier(.3, 0, .2, 1) both; }
+  .glow { position: absolute; z-index: 1; inset-inline-start: 6%; top: 10%; width: 520px; height: 520px; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 1.2s;
+    background: radial-gradient(circle, rgba(126, 178, 240, .35), transparent 65%); }
+  .lit .glow { opacity: 1; }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+  @keyframes litup { 0% { filter: brightness(1); } 30% { filter: brightness(1.45) saturate(1.3); } 100% { filter: brightness(1); } }
+
+  /* الفيديو */
+  .demo { margin-top: 8px; }
+  .vid { position: relative; border-radius: 26px; overflow: hidden; background: var(--soft); box-shadow: var(--sh); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 28px; padding: 26px; }
+  .vid video { width: 100%; max-height: 460px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 18px; background: #000; justify-self: center; max-width: 280px; }
+  .vid h2 { margin: 0; }
+  .vid p { color: var(--muted); }
+
+  /* الأقسام */
+  section.sec { padding: 72px 0 0; }
+  .sec h2, .vid h2 { font: 600 clamp(24px, 3vw, 34px)/1.35 var(--ar); margin: 0 0 8px; }
+  :root[lang="en"] .sec h2, :root[lang="en"] .vid h2 { font-family: var(--lat); font-weight: 500; }
+  .sec .sub { margin: 0 0 26px; color: var(--muted); font-size: 16px; }
+  .card { background: var(--card); box-shadow: var(--sh); border-radius: 22px; }
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .step { padding: 22px; }
+  .step .n { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; background: var(--tint); color: var(--accent); font: 500 15px var(--lat); }
+  .step h3, .feat h3 { margin: 14px 0 6px; font-size: 17px; font-weight: 600; }
+  .step p, .feat p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  .fields { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .fields button { height: 38px; padding: 0 16px; border: 0; border-radius: 19px; cursor: pointer; background: var(--card); box-shadow: var(--sh); font-size: 14px; transition: background .3s, color .3s; }
+  .fields button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .samples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .sample { overflow: hidden; padding: 0; }
+  .sample video { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: var(--soft); }
+  .sample figcaption { padding: 12px 16px 14px; font-size: 14px; }
+  .sample figcaption small { display: block; color: var(--muted); font-size: 12.5px; }
+  .s-note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
+  .feats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .feat { padding: 22px; }
+  .ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--tint); }
+  .ic svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  .phead { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 26px; }
+  .phead .sub { margin: 0; }
+  .cyc { display: flex; gap: 4px; padding: 4px; border-radius: 24px; background: var(--card); box-shadow: var(--sh); }
+  .cyc button { height: 38px; padding: 0 16px; border: 0; border-radius: 19px; background: none; cursor: pointer; font-size: 14px; }
+  .cyc button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+  .plan { padding: 26px; display: flex; flex-direction: column; }
+  .plan.pop { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .plan .top { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+  .plan h3 { margin: 0; font-size: 19px; font-weight: 600; }
+  .badge { font-size: 12px; padding: 5px 11px; border-radius: 99px; background: var(--accent); color: #fff; }
+  .price { margin: 18px 0 0; display: flex; align-items: baseline; gap: 6px; }
+  .price b { font: 400 42px var(--lat); letter-spacing: -.01em; }
+  .price span, .usd { color: var(--muted); font-size: 13.5px; }
+  .usd { margin: 2px 0 0; font-family: var(--lat); }
+  .plan ul { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; flex: 1; align-content: start; }
+  .plan li { display: flex; gap: 8px; font-size: 14.5px; }
+  .plan li svg { flex: none; width: 16px; height: 16px; margin-top: 5px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .plan .btn { margin-top: 22px; height: 48px; border-radius: 24px; border: 0; cursor: pointer; font-size: 15px; font-weight: 500; background: var(--soft); width: 100%; }
+  .plan .btn.go { padding: 0; color: #fff; background: linear-gradient(180deg, #F48A62 0%, #E5613E 55%, #D44E2C 100%); }
+  .p-note { margin: 16px 0 0; text-align: center; color: var(--muted); font-size: 13.5px; }
+  .p-note a { color: var(--accent); }
+
+  .faq { display: grid; gap: 10px; max-width: 860px; }
+  .q { overflow: hidden; }
+  .q button { width: 100%; min-height: 58px; padding: 0 22px; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: start; font-size: 15.5px; font-weight: 500; }
+  .q button svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; transition: rotate .3s; }
+  .q[open] { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
+  .q[open] button svg { rotate: 45deg; }
+  .q p { margin: 0; padding: 0 22px 18px; color: var(--muted); font-size: 14.5px; line-height: 1.9; }
+
+  .final { margin: 80px 0 0; padding: 40px 28px; text-align: center; }
+  .final h2 { margin: 0 0 8px; }
+  .final .note { margin-top: 12px; }
+
+  footer { margin-top: 72px; padding: 34px 0 40px; background: var(--soft); font-size: 13px; color: var(--muted); line-height: 1.9; }
+  footer .wrap { display: grid; gap: 14px; }
+  footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
+  footer a:hover { color: var(--accent); }
+  footer .logo { color: var(--ink); font-size: 13px; }
+  footer .logo img { height: 22px; }
+  footer p { margin: 0; }
+
+  .sheet { position: fixed; inset: 0; z-index: 40; background: rgba(15, 15, 20, .4); display: none; }
+  .sheet.on { display: block; }
+  .sheet nav { position: absolute; top: 12px; inset-inline: 12px; padding: 12px; border-radius: 22px; background: var(--card); box-shadow: var(--sh); display: grid; gap: 2px; }
+  .sheet nav a { padding: 12px 14px; border-radius: 12px; font-size: 16px; } .sheet nav a:hover { background: var(--soft); }
+
+  /* التابلت */
+  @media (max-width: 1240px) { .side { display: none; } }
+  @media (max-width: 960px) {
+    .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .plans { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+    .vid { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* الموبايل: نفس ترتيب لوحة الموبايل */
+  @media (max-width: 760px) {
+    .bar .wrap { height: 60px; }
+    .bar .signin, .bar .sw .t { display: none; }
+    .menu-b { display: inline-flex; }
+    .hero { padding-top: 18px; }
+    .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .ctas { margin-top: 20px; } .ctas .go { width: 100%; }
+    .ctas .ghost { display: none; }
+    .note { text-align: center; width: 100%; }
+    .jf { width: 230px; margin-top: -4px; }
+    .steps, .samples { grid-template-columns: minmax(0, 1fr); }
+    .samples { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .sample figcaption { padding: 8px 10px 10px; font-size: 12.5px; } .sample figcaption small { display: none; }
+    section.sec { padding-top: 48px; }
+    .feats { gap: 10px; } .feat { padding: 16px; } .feat p { font-size: 13px; }
+    .vid { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .jf-float, .lit .jf-float { animation: none; } .go, .chip { transition: none; } }
+</style>
 </head>
 <body>
-<main class="lg">
-<header class="lg-top"><a class="wm" href="/"><img class="wm-mark" src="/logo-mark-light.png" alt="" width="20" height="28">SIMSIM<span>KIT</span></a><nav><a href="/pricing">الأسعار · Pricing</a><a href="/login">دخول · Sign in</a></nav></header>
+<header class="bar">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="SimsimKit"><img class="lm-l" src="/logo-mark-light.png" alt=""><img class="lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</a>
+    <div class="tools">
+      <button class="chip lang" id="lang" type="button"></button>
+      <a class="chip signin" href="/login" data-t="signin"></a>
+      <button class="sw" id="sw" type="button"><span class="track"><span class="knob"></span></span><span class="t" id="swT"></span></button>
+      <button class="chip menu-b" id="menu" type="button" data-ta="menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </div>
+</header>
+<nav class="side" id="side" data-ta="navAria"></nav>
+<div class="sheet" id="sheet"><nav id="sheetNav"></nav></div>
 
-<section class="hero"><h1>استوديو محتوى كامل<br>بالذكاء الاصطناعي</h1>
-<p>من الفكرة إلى الفيديو إلى النشر في مكان واحد، بلهجتك وهوية علامتك التجارية.<br><span class="en-line" style="display:block">An all-in-one AI content studio for social media — from idea to video to publishing.</span></p>
-<a class="cta" href="/signup">ابدأ مجانًا · Start free</a><a class="cta ghost" href="/pricing">الأسعار · Pricing</a></section>
-<div class="feats"><div class="feat"><b>✍️ أفكار ونصوص</b><p>أفكار بافتتاحيات مُقيَّمة، ونصوص بلهجة جمهورك.</p><p class="en-line">AI ideas & scripts</p></div><div class="feat"><b>🎬 فيديو وصور وصوت</b><p>توليد الفيديو والصور والتعليق الصوتي من فكرة أو من قالب جاهز.</p><p class="en-line">Video, images & voice</p></div><div class="feat"><b>✂️ مونتاج ودبلجة</b><p>مونتاج بالترجمة والموسيقى، ودبلجة الفيديو نفسه إلى لهجات أخرى.</p><p class="en-line">Editing & dubbing</p></div><div class="feat"><b>🧠 عقل العلامة التجارية</b><p>تتعلم المنصة هويتك وألوانك وقواعدك وتلتزم بها في كل ما تنتجه.</p><p class="en-line">Brand brain</p></div><div class="feat"><b>📅 جدولة ونشر</b><p>انشر وجدول على جميع حساباتك من مكان واحد، ورُدّ على التعليقات.</p><p class="en-line">Scheduling & publishing</p></div><div class="feat"><b>🎨 استنساخ الأسلوب</b><p>ارفع مرجعًا بأسلوب يعجبك واحصل على رسوم متحركة بالأسلوب نفسه لفكرتك.</p><p class="en-line">Style cloning</p></div></div>
-<section class="feat" style="margin-top:22px"><b>من نحن · About</b><p>SimsimKit منتج من شركة GeekZone (المملكة العربية السعودية)، الشركة المطوّرة لمنصة KOCHI. للتواصل: <a href="mailto:islam@simsimkit.com">islam@simsimkit.com</a></p>
-<p class="en-line">SimsimKit is a product of GeekZone (Kingdom of Saudi Arabia), the company behind KOCHI. Contact: islam@simsimkit.com</p></section>
-<div class="lg-co"><p>شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد <span dir="ltr">7054472456</span> · مكة المكرمة، حي العوالي، شارع الوميض، مبنى 3305، الرقم الفرعي 8268، الرمز البريدي 24373 (العنوان المختصر MDAB3305) · جوال <a href="tel:+966560053050" dir="ltr">0560053050</a></p><p dir="ltr">GeekZone Company (LLC) · Unified No. 7054472456 · Building 3305, Al Wamid St, Al Awali, Makkah 24373-8268, Saudi Arabia · +966 56 005 3050</p></div>
-<footer class="lg-foot"><span>© <span data-year></span> SimsimKit · GeekZone</span>
-<nav><a href="/terms">الشروط · Terms</a><a href="/privacy">الخصوصية · Privacy</a><a href="/refund">الاسترجاع · Refunds</a><a href="mailto:islam@simsimkit.com">islam@simsimkit.com</a></nav></footer>
+<main id="top">
+  <section class="hero" id="hero">
+    <div class="glow" aria-hidden="true"></div>
+    <div class="wrap">
+      <div>
+        <h1 data-t="heroTitle"></h1>
+        <p class="lead" data-t="heroLead"></p>
+        <div class="ctas">
+          <button class="go" type="button" data-start data-t="start"></button>
+          <a class="ghost" href="#demo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l5.5-3.5z"/></svg><span data-t="demo"></span></a>
+        </div>
+        <p class="note" data-t="heroNote"></p>
+      </div>
+      <div class="jf" aria-hidden="true"><div class="jf-float">
+        <img class="l" src="/site/jf-light.webp" alt="" width="560" height="778" fetchpriority="high">
+        <img class="ll" src="/site/jf-light-lit.webp" alt="" width="560" height="778" loading="lazy">
+        <img class="d" src="/site/jf-dark.webp" alt="" width="560" height="778" loading="lazy">
+        <img class="dl" src="/site/jf-dark-lit.webp" alt="" width="560" height="778" loading="lazy">
+      </div></div>
+    </div>
+  </section>
+
+  <div class="wrap demo" id="demo">
+    <div class="vid">
+      <video src="/gallery/t-brandreveal.mp4" poster="/gallery/t-brandreveal.jpg" muted loop playsinline preload="none" controls></video>
+      <div>
+        <h2 data-t="demoTitle"></h2>
+        <p data-t="demoLead"></p>
+        <button class="go sm" type="button" data-start data-t="start"></button>
+      </div>
+    </div>
+  </div>
+
+  <section class="sec" id="how"><div class="wrap">
+    <h2 data-t="howTitle"></h2><p class="sub" data-t="howLead"></p>
+    <div class="steps" id="steps"></div>
+  </div></section>
+
+  <section class="sec" id="examples"><div class="wrap">
+    <h2 data-t="exTitle"></h2><p class="sub" data-t="exLead"></p>
+    <div class="fields" id="fields" role="group"></div>
+    <div class="samples" id="samples"></div>
+    <p class="s-note" data-t="exNote"></p>
+  </div></section>
+
+  <section class="sec" id="features"><div class="wrap">
+    <h2 data-t="fTitle"></h2><p class="sub" data-t="fLead"></p>
+    <div class="feats" id="feats"></div>
+  </div></section>
+
+  <section class="sec" id="prices"><div class="wrap">
+    <div class="phead">
+      <div><h2 data-t="pTitle"></h2><p class="sub" data-t="pLead"></p></div>
+      <div class="cyc" id="cyc"><button type="button" data-cyc="month" aria-pressed="true" data-t="monthly"></button><button type="button" data-cyc="year" aria-pressed="false" data-t="yearly"></button></div>
+    </div>
+    <div class="plans" id="plans"></div>
+    <p class="p-note"><span data-t="pNote"></span> <a href="/pricing" data-t="pAll"></a></p>
+  </div></section>
+
+  <section class="sec" id="faq"><div class="wrap">
+    <h2 data-t="qTitle"></h2>
+    <div class="faq" id="faqList"></div>
+    <div class="card final">
+      <h2 data-t="finalTitle"></h2>
+      <button class="go" type="button" data-start data-t="start"></button>
+      <p class="note" data-t="heroNote"></p>
+    </div>
+  </div></section>
 </main>
-<script src="/legal.js"></script>
+
+<footer>
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="SimsimKit"><img class="lm-l" src="/logo-mark-light.png" alt=""><img class="lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</a>
+    <nav data-ta="footAria"><a href="/terms" data-t="terms"></a><a href="/privacy" data-t="privacy"></a><a href="/refund" data-t="refund"></a><a href="/pricing" data-t="pricing"></a></nav>
+    <p><a href="mailto:islam@simsimkit.com" dir="ltr">islam@simsimkit.com</a> · <a href="https://wa.me/966560053050" data-t="whatsapp"></a></p>
+    <p data-t="company"></p>
+    <p data-t="vat"></p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const T = {
+    ar: {
+      signin: "تسجيل الدخول", lang: "EN", langAria: "Switch to English", menu: "القائمة", navAria: "أقسام الصفحة", footAria: "روابط الصفحة", light: "فاتح", dark: "غامق",
+      nav: [["how", "كيف يعمل"], ["examples", "أمثلة"], ["features", "المميزات"], ["prices", "الأسعار"], ["faq", "الأسئلة"]],
+      heroTitle: "محتوى كل يوم، من غير فريق",
+      heroLead: "سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.",
+      start: "ابدأ مجانًا", demo: "شاهد مثالًا", heroNote: "300 نقطة مجانًا للتجربة · بدون بطاقة",
+      demoTitle: "من فكرة إلى فيديو جاهز للنشر", demoLead: "هذا الفيديو صُنع بقالب من قوالب سمسمكيت: تكتب فكرتك، والعقل يكتب النص بلهجتك، والقالب يصنع الفيديو بالصوت والترجمة.",
+      howTitle: "كيف يعمل؟", howLead: "ثلاث خطوات، والباقي علينا.",
+      steps: [["العقل يتعلّم علامتك", "تجيب على أسئلة قصيرة عن مجالك ولهجتك وجمهورك، فيبدأ العقل من بروفايل مجالك بدل الصفر."],
+        ["توافق على الفكرة من جوالك", "يقترح الأفكار والسكريبت بلهجتك، وأنت تختار بضغطة أو تعدّل."],
+        ["الفيديو يُنشر في موعده", "القالب يصنع الفيديو بالصوت والترجمة، والأوتوبايلوت ينشره على حساباتك."]],
+      exTitle: "أمثلة لمجالك", exLead: "اختر مجالك وشاهد القوالب التي تناسبه.",
+      exNote: "عيّنات من قوالب سمسمكيت. بعد التسجيل تُصنع بأفكار علامتك ولهجتك.",
+      fTitle: "كل ما تحتاجه في مكان واحد", fLead: "عقل يعرف علامتك، وقوالب تصنع الفيديو، والأوتوبايلوت ينشر في موعده.",
+      feats: [["عقل العلامة", "يتعلّم علامتك ولهجتك وجمهورك، فتخرج كل فكرة وكل سكريبت بصوتك."], ["أكثر من 110 قوالب", "موشن جرافيك، ذكاء اصطناعي، إعلانات، كاروسيل، وتصوير بالجوال."],
+        ["الأوتوبايلوت", "حتى 6 منشورات يوميًا وفق خطة شهرية، وأنت توافق بضغطة."], ["دبلجة بـ 17 لهجة", "الفيديو نفسه بالنجدية والحجازية والخليجية والمصرية، وبـ 11 لغة."],
+        ["النشر على 13 منصة", "تيك توك وإنستجرام ويوتيوب وX وغيرها، من جدولة واحدة."], ["تطبيق الجوال", "صوّر مع الملقّن، وسجّل أفكارك بصوتك، ووافق من أي مكان."]],
+      pTitle: "باقات بسيطة، وتبدأ مجانًا", pLead: "ادفع شهريًا أو سنويًا، وألغِ متى شئت.", monthly: "شهري", yearly: "سنوي · شهران مجانًا",
+      perMonth: "ر.س / شهر", perYear: "ر.س / سنة", popular: "الأكثر طلبًا", choose: "اختر الباقة", choosePop: "ابدأ بباقة {0}",
+      credits: "{0} نقطة شهريًا", accounts: "{0} حسابات تواصل", accounts2: "حسابا تواصل", accountsMax: "{0} حسابات (حتى {1})", autoOn: "الأوتوبايلوت والخطة الشهرية",
+      autoAdd: "الأوتوبايلوت إضافة بـ {0} ر.س", allTpl: "كل القوالب والدبلجة", mobile: "تطبيق الجوال والموافقات", perClient: "عقل منفصل لكل عميل", topup: "شحن النقاط بضعف القيمة",
+      pNote: "كل حساب جديد يبدأ بـ 300 نقطة مجانًا للتجربة.", pAll: "كل تفاصيل الباقات والنقاط الإضافية", pFail: "الأسعار لا تُحمّل الآن. افتح صفحة الأسعار.",
+      qTitle: "أسئلة تتكرر",
+      faq: [["ماذا يفعل سمسمكيت بالضبط؟", "يصنع محتواك من الفكرة حتى النشر: عقل يعرف علامتك، وقوالب تُخرج الفيديو، والأوتوبايلوت ينشر في المواعيد التي تختارها."],
+        ["هل يجب أن أصوّر نفسي؟", "لا. هناك قوالب كاملة بلا تصوير، وأفاتار بوجهك وصوتك. وإن أردت التصوير، ففي تطبيق الجوال ملقّن، وتعيد اللقطة التي لم تعجبك فقط."],
+        ["هل يدعم اللهجة السعودية؟", "نعم: النجدية والحجازية والخليجية العامة، وإجمالًا 17 لهجة عربية و11 لغة، في الكتابة والصوت والدبلجة."],
+        ["ما هي النقاط؟", "في كل باقة نقاط شهرية تُصرف على التوليد. ترى تكلفة العملية قبل أن تبدأها، وإذا فشلت العملية من جهتنا تعود إليك النقاط."],
+        ["هل أستطيع الإلغاء في أي وقت؟", "نعم، من صفحة «باقتي» قبل التجديد. ولأول اشتراك استرداد كامل خلال 7 أيام، إن لم تستخدم أكثر من 10٪ من نقاط الباقة."],
+        ["على أي منصات ينشر؟", "تيك توك، إنستجرام، يوتيوب شورتس، فيسبوك، X، لينكدإن، ثريدز، بنترست، وغيرها، كلها من جدولة واحدة."],
+        ["هل يناسب الوكالات؟", "نعم. في باقة «وكالات» عقل منفصل لكل عميل، وخطة وموافقات لكل عميل، وحتى 25 حساب تواصل."]],
+      finalTitle: "جاهز تبدأ؟", terms: "الشروط", privacy: "الخصوصية", refund: "الاسترجاع", pricing: "الأسعار", whatsapp: "واتساب 0560053050",
+      company: "© 2026 سمسمكيت · شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد 7054472456 · مكة المكرمة، حي العوالي، شارع الوميض، مبنى 3305، الرقم الفرعي 8268، الرمز البريدي 24373 (العنوان المختصر MDAB3305)",
+      vat: "الأسعار بالريال السعودي شاملة، ويتم الدفع بما يعادلها.",
+    },
+    en: {
+      signin: "Sign in", lang: "ع", langAria: "التبديل إلى العربية", menu: "Menu", navAria: "Page sections", footAria: "Page links", light: "Light", dark: "Dark",
+      nav: [["how", "How it works"], ["examples", "Examples"], ["features", "Features"], ["prices", "Prices"], ["faq", "FAQ"]],
+      heroTitle: "Daily content, no team needed",
+      heroLead: "SimsimKit learns your brand and dialect, writes the idea and the script, makes the video and posts it on time. You approve from your phone.",
+      start: "Start free", demo: "See an example", heroNote: "300 free credits to try. No card needed.",
+      demoTitle: "From an idea to a video ready to post", demoLead: "This video was made with one of SimsimKit's templates: you write your idea, the brain writes the script in your dialect, and the template makes the video with voice and captions.",
+      howTitle: "How it works", howLead: "Three steps. We handle the rest.",
+      steps: [["The brain learns your brand", "Answer a few short questions about your field, dialect and audience. The brain starts from your field's profile, not from zero."],
+        ["Approve the idea from your phone", "It suggests ideas and scripts in your dialect. Pick one with a tap, or edit it."],
+        ["The video posts on time", "The template makes the video with voice and captions, and the autopilot posts it to your accounts."]],
+      exTitle: "Examples for your field", exLead: "Pick your field and see the templates that fit it.",
+      exNote: "Samples from SimsimKit templates. After you sign up, they are made with your brand's ideas and dialect.",
+      fTitle: "Everything in one place", fLead: "A brain that knows your brand, templates that make the video, and an autopilot that posts on time.",
+      feats: [["Brand brain", "Learns your brand, tone and audience, so every idea and script sounds like you."], ["110+ templates", "Motion graphics, AI video, ads, carousels and phone shoots."],
+        ["Autopilot", "Up to 6 posts a day from a monthly plan. You approve with one tap."], ["Dubbing in 17 dialects", "The same video in Najdi, Hijazi, Gulf or Egyptian, plus 11 languages."],
+        ["Posts to 13 platforms", "TikTok, Instagram, YouTube, X and more, from one schedule."], ["Mobile app", "Shoot with the teleprompter, capture ideas by voice, approve from anywhere."]],
+      pTitle: "Simple plans. Start free.", pLead: "Pay monthly or yearly, cancel anytime.", monthly: "Monthly", yearly: "Yearly · 2 months free",
+      perMonth: "SAR / mo", perYear: "SAR / yr", popular: "Most popular", choose: "Choose plan", choosePop: "Start with {0}",
+      credits: "{0} credits a month", accounts: "{0} social accounts", accounts2: "2 social accounts", accountsMax: "{0} accounts (up to {1})", autoOn: "Autopilot and monthly plan",
+      autoAdd: "Autopilot add-on, {0} SAR", allTpl: "All templates and dubbing", mobile: "Mobile app and approvals", perClient: "A separate brain per client", topup: "Top-ups at double credits",
+      pNote: "Every new account starts with 300 free trial credits.", pAll: "Full plan details and extra credits", pFail: "Prices are not loading right now. Open the pricing page.",
+      qTitle: "Questions we get",
+      faq: [["What exactly does SimsimKit do?", "It makes your content from idea to post: a brain that knows your brand, templates that produce the video, and an autopilot that posts on your schedule."],
+        ["Do I have to film myself?", "No. There are full templates with no filming, and an avatar with your face and voice. If you want to film, the mobile app has a teleprompter and you only redo the take you did not like."],
+        ["Does it support Saudi dialects?", "Yes: Najdi, Hijazi and general Gulf. In total 17 Arabic dialects and 11 languages, across writing, voice and dubbing."],
+        ["What are credits?", "Every plan includes monthly credits spent on generation. You see the cost of a job before you start it, and if a job fails on our side the credits go back to your balance."],
+        ["Can I cancel anytime?", "Yes, from the My Plan page before renewal. Your first subscription has a full refund within 7 days if you used no more than 10% of its credits."],
+        ["Which platforms does it post to?", "TikTok, Instagram, YouTube Shorts, Facebook, X, LinkedIn, Threads, Pinterest and more, all from one schedule."],
+        ["Is it built for agencies?", "Yes. The Agency plan gives every client their own brain, plan and approvals, with up to 25 social accounts."]],
+      finalTitle: "Ready to start?", terms: "Terms", privacy: "Privacy", refund: "Refunds", pricing: "Pricing", whatsapp: "WhatsApp +966 56 005 3050",
+      company: "© 2026 SimsimKit · GeekZone Company (LLC) · Unified No. 7054472456 · Building 3305, Al Wamid St, Al Awali, Makkah 24373-8268, Saudi Arabia",
+      vat: "Prices are in Saudi riyals, taxes included. You pay the equivalent amount.",
+    },
+  };
+  // أمثلة لكل مجال: قوالب المجال الرخيصة (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)
+  const FIELDS = [
+    ["food", "مطاعم وكافيهات", "Restaurants & cafés", ["t-price", "t-chat", "t-map"]],
+    ["beauty", "عيادات وتجميل", "Clinics & beauty", ["t-review", "t-flow", "t-flipcards"]],
+    ["ecom", "متاجر إلكترونية", "Online stores", ["t-shopfloat", "t-count", "t-price"]],
+    ["realestate", "عقارات", "Real estate", ["t-map", "t-chart", "t-price"]],
+    ["edu", "تعليم وكوتشينج", "Education & coaching", ["t-board", "t-flow", "t-show"]],
+    ["fitness", "رياضة ولياقة", "Sports & fitness", ["t-pictogram", "t-count", "t-review"]],
+  ];
+  const TPL = { "t-price": ["كشف السعر", "Price reveal", "السعر القديم يُشطب والجديد يظهر بعدّاد وزر اطلب."], "t-chat": ["قصة شات", "Chat story", "محادثة بين العميل والمتجر تنتهي بتأكيد الطلب."],
+    "t-map": ["خريطة متحركة", "Animated map", "دبابيس على الأحياء وطريق التوصيل يُرسم."], "t-review": ["رأي عميل", "Customer review", "اقتباس يظهر كلمة كلمة ونجوم تضيء."],
+    "t-flow": ["خطوات الخدمة", "Service steps", "بطاقات الخطوات تظهر والخطوط بينها تُرسم."], "t-flipcards": ["بطاقات تتقلب", "Flip cards", "ثلاث رسائل، كل واحدة في بطاقة تتقلب."],
+    "t-shopfloat": ["متجر بمنتجات طائرة", "Floating store", "بطاقات منتج بالسعر وزر «أضف للسلة»."], "t-count": ["عد تنازلي", "Countdown", "رقم يقلب حتى الصفر ثم يظهر العرض."],
+    "t-chart": ["رسم بياني", "Chart", "أرقام تتحرك وتحكي القصة."], "t-board": ["سبورة", "Whiteboard", "شرح يُرسم أمامك على سبورة."],
+    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."] };
+  const ICONS = ["M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16", "M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z",
+    "M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z", "M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5",
+    "M4 12l16-8-6 16-3-7z M11 13l9-9", "M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M11 18h2"];
+  const CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+  const root = document.documentElement, $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const fmt = (s, ...a) => s.replace(/\{(\d)\}/g, (_, i) => a[i]);
+  const S = { lang: root.lang === "en" ? "en" : "ar", field: 0, cyc: "month", pricing: null };
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+
+  function render() {
+    const t = T[S.lang], en = S.lang === "en";
+    root.lang = S.lang; root.dir = en ? "ltr" : "rtl";
+    document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = t[el.dataset.t] ?? ""; });
+    document.querySelectorAll("[data-ta]").forEach((el) => el.setAttribute("aria-label", t[el.dataset.ta] ?? ""));
+    $("lang").textContent = t.lang; $("lang").setAttribute("aria-label", t.langAria);
+    $("swT").textContent = root.dataset.nhTheme === "dark" ? t.dark : t.light;
+    const links = t.nav.map(([id, n]) => `<a href="#${id}" data-sec="${id}">${esc(n)}</a>`).join("");
+    $("side").innerHTML = links; $("sheetNav").innerHTML = links;
+    $("steps").innerHTML = t.steps.map(([h, p], i) => `<article class="card step"><span class="n">${i + 1}</span><h3>${esc(h)}</h3><p>${esc(p)}</p></article>`).join("");
+    $("feats").innerHTML = t.feats.map(([h, p], i) => `<article class="card feat"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[i]}"/></svg></span><h3>${esc(h)}</h3><p>${esc(p)}</p></article>`).join("");
+    $("faqList").innerHTML = t.faq.map(([q, a], i) => `<div class="card q"${i === 0 ? " open" : ""}><button type="button" aria-expanded="${i === 0}">${esc(q)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><p${i === 0 ? "" : " hidden"}>${esc(a)}</p></div>`).join("");
+    $("fields").setAttribute("aria-label", t.exTitle);
+    renderFields(); renderPlans(); spy();
+  }
+  function renderFields() {
+    const en = S.lang === "en";
+    $("fields").innerHTML = FIELDS.map((f, i) => `<button type="button" data-field="${i}" aria-pressed="${i === S.field}">${esc(en ? f[2] : f[1])}</button>`).join("");
+    $("samples").innerHTML = FIELDS[S.field][3].map((id) => {
+      const m = TPL[id] || [id, id, ""];
+      return `<figure class="card sample" style="margin:0"><video src="/gallery/${id}.mp4" poster="/gallery/${id}.jpg?v=2" muted loop playsinline preload="none" aria-label="${esc(en ? m[1] : m[0])}"></video>
+        <figcaption>${esc(en ? m[1] : m[0])}${en ? "" : `<small>${esc(m[2])}</small>`}</figcaption></figure>`;
+    }).join("");
+    watchVideos();
+  }
+  // الأسعار من نفس مصدر البرنامج: السعر بالدولار × 3.76 ريال (نفس صفحة الأسعار و«باقتي ونقاطي»)، والسنوي = عدد شهور السنة في القواعد
+  function renderPlans() {
+    const t = T[S.lang], d = S.pricing;
+    $("cyc").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.cyc === S.cyc));
+    if (!d) { $("plans").innerHTML = S.pricingFailed ? `<p class="p-note">${esc(t.pFail)}</p>` : ""; return; }
+    const SAR = 3.76, sar = (v) => Math.round(v * SAR), months = (d.rules && d.rules.yearly_months) || 10, en = S.lang === "en";
+    const autoAdd = (d.addons || []).find((a) => a.key === "autopilot");
+    const n = (v) => Number(v).toLocaleString("en-US");
+    $("plans").innerHTML = (d.plans || []).filter((p) => p.price > 0).map((p) => {
+      const name = en ? p.name_en || p.name : p.name;
+      const feats = [fmt(t.credits, n(p.credits)),
+        p.max_accounts ? fmt(t.accountsMax, p.accounts, p.max_accounts) : p.accounts === 2 ? t.accounts2 : fmt(t.accounts, p.accounts)];
+      if (p.autopilot) feats.push(t.autoOn); else feats.push(t.allTpl, ...(autoAdd && (autoAdd.for || []).includes(p.key) ? [fmt(t.autoAdd, sar(autoAdd.price))] : []));
+      if (p.max_accounts) feats.push(t.perClient); else if (p.autopilot) feats.push(t.mobile);
+      if (p.topup_bonus) feats.push(t.topup);
+      const price = S.cyc === "year" ? sar(p.price * months) : sar(p.price);
+      const usd = S.cyc === "year" ? p.price * months : p.price;
+      return `<article class="card plan${p.popular ? " pop" : ""}"><div class="top"><h3>${esc(name)}</h3>${p.popular ? `<span class="badge">${esc(t.popular)}</span>` : ""}</div>
+        <p class="price"><b>${n(price)}</b><span>${esc(S.cyc === "year" ? t.perYear : t.perMonth)}</span></p><p class="usd">≈ $${n(usd)}</p>
+        <ul>${[...new Set(feats)].map((f) => `<li>${CHECK}<span>${esc(f)}</span></li>`).join("")}</ul>
+        <a class="btn${p.popular ? " go" : ""}" style="display:grid;place-items:center" href="/signup?plan=${encodeURIComponent(p.key)}&cycle=${S.cyc}">${esc(p.popular ? fmt(t.choosePop, name) : t.choose)}</a></article>`;
+    }).join("");
+  }
+  // الفيديوهات: تشتغل لما تظهر على الشاشة بس، وتقف لما تختفي (مفيش تحميل في الخلفية)
+  let io;
+  function watchVideos() {
+    io = io || new IntersectionObserver((es) => es.forEach((e) => {
+      const v = e.target;
+      if (e.isIntersecting && !reduce.matches) { v.preload = "auto"; v.play().catch(() => {}); } else v.pause();
+    }), { threshold: .45 });
+    document.querySelectorAll(".sample video").forEach((v) => io.observe(v));
+  }
+  // القائمة: القسم اللي على الشاشة متعلّم
+  let so;
+  function spy() {
+    so?.disconnect();
+    so = new IntersectionObserver((es) => es.forEach((e) => {
+      if (!e.isIntersecting) return;
+      document.querySelectorAll("#side a").forEach((a) => a.classList.toggle("on", a.dataset.sec === e.target.id));
+    }), { rootMargin: "-40% 0px -55% 0px" });
+    T[S.lang].nav.forEach(([id]) => { const el = $(id); if (el) so.observe(el); });
+  }
+
+  // ✨ «ابدأ مجانًا»: الجيلي فيش ينوّر مع صوت هادي، والتسجيل يفتح بعدها (قرار صاحب المنتج). مع «تقليل الحركة» يفتح فورًا بلا صوت.
+  let ac;
+  function chime() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = ac || new AC();
+      if (ac.state === "suspended") ac.resume();
+      const t0 = ac.currentTime + .02, out = ac.createGain();
+      out.gain.value = .22; out.connect(ac.destination);
+      const noise = (sec) => { const len = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(1, len, ac.sampleRate), ch = b.getChannelData(0); for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1; const s = ac.createBufferSource(); s.buffer = b; return s; };
+      const filt = (type, f, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+      const s1 = noise(.32), hp = filt("highpass", 1400), bp = filt("bandpass", 3600, .9), g1 = ac.createGain();
+      g1.gain.setValueAtTime(0, t0);
+      for (let k = 0; k < 36; k++) { const x = k / 36, env = Math.min(1, x / .25) * Math.pow(1 - x, 1.4); g1.gain.setValueAtTime(env * (.25 + Math.random() * .75) * .9, t0 + k * .0075); }
+      g1.gain.setValueAtTime(0, t0 + .28);
+      s1.connect(hp); hp.connect(bp); bp.connect(g1); g1.connect(out); s1.start(t0); s1.stop(t0 + .32);
+      for (let i = 0; i < 20; i++) {
+        const at = t0 + .2 + Math.pow(Math.random(), 1.6) * 1.2, len = .004 + Math.random() * .01, c = noise(len + .004), b2 = filt("bandpass", 1500 + Math.random() * 3500, .8 + Math.random() * 1.5), g = ac.createGain();
+        g.gain.setValueAtTime(.15 + Math.random() * .3, at); g.gain.exponentialRampToValueAtTime(.001, at + len);
+        c.connect(b2); b2.connect(g); g.connect(out); c.start(at); c.stop(at + len + .004);
+      }
+    } catch { /* الصوت إضافة */ }
+  }
+  let starting = false;
+  function start() {
+    const url = "/signup";
+    if (reduce.matches) return location.assign(url);
+    if (starting) return;
+    starting = true;
+    chime();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("hero").classList.add("lit");
+    setTimeout(() => location.assign(url), 1900);
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest("[data-start]")) { e.preventDefault(); return start(); }
+    const f = t.closest("[data-field]");
+    if (f) { S.field = +f.dataset.field; return renderFields(); }
+    const c = t.closest("[data-cyc]");
+    if (c) { S.cyc = c.dataset.cyc; return renderPlans(); }
+    const q = t.closest(".q > button");
+    if (q) { const box = q.parentElement, open = !box.hasAttribute("open"); box.toggleAttribute("open", open); q.setAttribute("aria-expanded", open); box.querySelector("p").hidden = !open; return; }
+    if (t.closest("#menu")) return $("sheet").classList.add("on");
+    if (t.closest("#sheet")) $("sheet").classList.remove("on");
+    if (t.closest("#lang")) { S.lang = S.lang === "en" ? "ar" : "en"; try { localStorage.setItem("studiomania.site.lang", S.lang); } catch { } return render(); }
+    if (t.closest("#sw")) {
+      const next = root.dataset.nhTheme === "dark" ? "light" : "dark";
+      const apply = () => { root.dataset.nhTheme = next; $("swT").textContent = T[S.lang][next]; };
+      try { localStorage.setItem("studiomania.theme", next); } catch { }
+      document.startViewTransition && !reduce.matches ? document.startViewTransition(apply) : apply();
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("sheet").classList.remove("on"); });
+  document.querySelector("#demo video").addEventListener("play", (e) => { e.target.muted = false; }, { once: true });
+
+  render();
+  fetch("/api/pricing").then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => { S.pricing = d; renderPlans(); })
+    .catch(() => { S.pricingFailed = true; renderPlans(); });
+})();
+</script>
 </body>
 </html>

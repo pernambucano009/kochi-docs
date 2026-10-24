@@ -105,7 +105,10 @@ const PlansView = (() => {
 :is(#nh, body) .pv-cont.open .more { rotate: 45deg; }
 :is(#nh, body) .pv-cont:not(.open) .sep, :is(#nh, body) .pv-cont:not(.open) .tp { display: none; }
 :is(#nh, body) .pv-cont .how { font-size: 11.5px; color: var(--pv-muted); padding-inline: 6px; }
-@media (max-width: 1100px) { .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
+@media (max-width: 1100px) { :is(#nh, body) .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
+/* التابلت: الكروت الأربعة صفّين بدل ما تتقطع */
+@media (min-width: 821px) and (max-width: 1020px) { :is(#nh, body) .pv-cards { flex-wrap: wrap; justify-content: center; max-width: 640px; } :is(#nh, body) .pv-pc { width: calc(50% - 12px); }
+  :is(#nh, body) .pv-row { flex-wrap: wrap; justify-content: center; max-width: 640px; } :is(#nh, body) .pv.open .pv-row { display: none; } :is(#nh, body) .pv-tip { display: none; } }
 @media (max-width: 820px) {
   :is(#nh, body) .pv-mid { place-content: start stretch; gap: 20px; padding-top: 8px; }
   :is(#nh, body) .pv.open .pv-mid { justify-items: stretch; } :is(#nh, body) .pv.open .pv-cap { justify-self: center; }
@@ -145,7 +148,7 @@ const PlansView = (() => {
   const credLine = (p) => `<span class="num">${n(p.credits)}</span> نقطة ${p.once ? "مرة واحدة" : "كل شهر"}`;
 
   function mount(el, d, o = {}) {
-    const S = { cyc: "month", open: false, pick: null, tops: false, top: null, busy: false };
+    const S = { cyc: "month", open: !!o.open, pick: null, tops: false, top: null, busy: false };   // open: التفاصيل مفتوحة من الأول (صفحة الأسعار العامة)
     const plans = ORDER.map((k) => d.plans.find((p) => p.key === k)).filter(Boolean).concat(d.plans.filter((p) => !ORDER.includes(p.key)));
     const guest = !d.me, ym = +(d.rules?.yearly_months || 10);
     const curI = guest ? -2 : plans.findIndex((p) => p.key === d.plan);
