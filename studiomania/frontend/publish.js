@@ -178,8 +178,8 @@ function pLogo(k, cls = "") {
   return `<i class="plogo ${cls}" style="--pb:${l[1]};--pf:${l[2]}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${l[0]}"/></svg></i>`;
 }
 const platOf = (t) => String(t).split("@")[0];
-// 🔗 pub.all = كل الحسابات المربوطة (لإدارتها وتحديد كل حساب تبع أنهي براند)، pub.list = حسابات البراند المفتوح بس (للنشر)
-function setAcc(info) { pub.all = info.account_list || []; pub.list = pub.all.filter((a) => a.visible !== false); pub.brands = info.brands || []; }
+// 🔗 حسابات البراند المفتوح بس (السيرفر بيربط كل حساب بالبراند اللي اتربط منه تلقائيًا)
+function setAcc(info) { pub.all = pub.list = info.account_list || []; }
 const accOf = (id) => (pub.all || pub.list || []).find((a) => a.id === id);
 // اسم الهدف: المنصة، ولو عندك أكتر من حساب عليها بيتكتب الحساب كمان
 function tLabel(t) {
@@ -196,7 +196,7 @@ function renderAccounts() {
   if (!pub.service) return;
   const plats = Object.entries(pub.platforms);
   pub.all ||= pub.list || [];
-  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر تنشر على أي حساب وأنت تجدول. ${(pub.brands || []).length > 1 ? "وحدد كل حساب تبع أنهي براند: تعليقاته ورسائله والنشر عليه بيظهروا في البراند ده بس." : ""}</small></div>
+  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر الحساب الذي تنشر عليه وأنت تجدول. الحسابات التي تربطها هنا خاصة بهذه العلامة فقط.</small></div>
     <div class="pa-grid">${plats.filter(([k]) => pub.all.some((a) => a.platform === k)).map(([k, label]) => {
       const accs = pub.all.filter((a) => a.platform === k);
       return `<div class="pa-plat ${accs.length ? "on" : ""}">
@@ -205,9 +205,8 @@ function renderAccounts() {
         ${accs.map((a) => `<div class="pa-acc${a.needs_reconnect ? " bad" : ""}">
           ${a.avatar ? `<img src="${escapeHtml(a.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i>${escapeHtml((a.name || a.username || "?").slice(0, 1))}</i>`}
           <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}
-            ${a.needs_reconnect ? `<small class="err">يحتاج يتربط مرة أخرى</small>` : ""}
-            ${(pub.brands || []).length > 1 ? `<label class="pa-brand${a.visible === false ? " other" : ""}" title="الحساب ده تبع أنهي براند: تعليقاته ورسائله ونشره بيظهروا في البراند ده بس">تبع
-              <select data-pabrand="${escapeHtml(a.id)}"><option value="">كل البراندات</option>${pub.brands.map((b) => `<option value="${escapeHtml(b.id)}"${b.id === a.brand_id ? " selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select></label>` : ""}</span>
+            ${a.needs_reconnect ? `<small class="err">يحتاج إلى إعادة الربط</small>` : ""}
+</span>
           ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط مرة أخرى</button>` : ""}
           <button type="button" class="pa-x" data-padel="${escapeHtml(a.id)}" data-paname="${escapeHtml(a.name || a.username)}" title="افصل الحساب">✕</button></div>`).join("")}
       </div>`;
@@ -306,13 +305,6 @@ async function connectReturn() {
     catch (err) { toast(err.message, true); m.close(); }
   });
 }
-// الحساب ده تبع أنهي براند
-document.addEventListener("change", async (e) => {
-  const sel = e.target.closest?.("[data-pabrand]");
-  if (!sel) return;
-  try { paRefresh(await api(`/api/publisher/accounts/${encodeURIComponent(sel.dataset.pabrand)}/brand`, { method: "POST", ...jsonBody({ client_id: sel.value }) })); toast("✓ اتحفظ"); }
-  catch (err) { toast(err.message, true); }
-});
 document.addEventListener("click", async (e) => {
   const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
   if (!add && !del) return;

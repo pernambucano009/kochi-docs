@@ -3631,8 +3631,8 @@ MOCK_ACCOUNTS = [{"id": "m-tt1", "platform": "tiktok", "name": "حساب تجر�
                  {"id": "m-ig1", "platform": "instagram", "name": "إنستا تجريبي", "username": "demo.ig", "avatar": None, "url": None, "needs_reconnect": True}]
 
 
-# 🔗 كل حساب سوشيال تبع براند: التعليقات والرسائل والحسابات اللي بتظهر للنشر بتاعة البراند المفتوح بس.
-# حساب مش متحدد له براند بيظهر في كل البراندات لحد ما تحدده، وأي حساب جديد بيتربط بيتسجّل على البراند المفتوح وقتها.
+# 🔗 كل حساب سوشيال تبع براند تلقائيًا (من غير ما حد يختار): التعليقات والرسائل والحسابات اللي بتظهر للنشر بتاعة البراند المفتوح بس.
+# الحساب اللي بيتربط وانت جوه براند بيتسجّل عليه، والحسابات القديمة (من قبل البراندات) تبع أول براند.
 def acct_brands() -> dict:
     try:
         return json.loads(auth.get_setting("acct_brand") or "{}")
@@ -3640,9 +3640,19 @@ def acct_brands() -> dict:
         return {}
 
 
-def acct_visible(account_id: str | None) -> bool:
+def acct_pending_mark() -> None:
+    """الحساب اللي بيتربط دلوقتي تبع البراند المفتوح."""
+    auth.set_setting("acct_pending", json.dumps({"brand": active_client_id(), "at": time.time()}))
+
+
+def acct_brand_of(account_id: str | None) -> str | None:
     b = acct_brands().get(str(account_id or ""))
-    return not b or not brain_row(b) or b == active_client_id()
+    return b if b and brain_row(b) else first_client_id()
+
+
+def acct_visible(account_id: str | None) -> bool:
+    cur = active_client_id()
+    return not cur or acct_brand_of(account_id) == cur
 
 
 def acct_tag(lst: list[dict]) -> list[dict]:
@@ -3653,7 +3663,13 @@ def acct_tag(lst: list[dict]) -> list[dict]:
         first = auth.get_setting("acct_seen") is None
     except ValueError:
         seen, first = set(), True
-    cur, changed = active_client_id(), False
+    # الحساب الجديد يتسجّل على البراند اللي اتبدأ منه الربط (لو في آخر ساعة)، وإلا البراند المفتوح
+    try:
+        pend = json.loads(auth.get_setting("acct_pending") or "{}")
+    except ValueError:
+        pend = {}
+    cur = pend.get("brand") if time.time() - float(pend.get("at") or 0) < 3600 and brain_row(pend.get("brand") or "") else active_client_id()
+    changed = False
     for a in lst:
         if a["id"] not in seen:
             seen.add(a["id"])
@@ -3663,27 +3679,7 @@ def acct_tag(lst: list[dict]) -> list[dict]:
     if changed:
         auth.set_setting("acct_seen", json.dumps(sorted(seen)))
         auth.set_setting("acct_brand", json.dumps(m))
-    names = {b["id"]: b["name"] for b in list_brains()}
-    return [{**a, "brand_id": m.get(a["id"]) if m.get(a["id"]) in names else None, "brand": names.get(m.get(a["id"]), ""),
-             "visible": acct_visible(a["id"])} for a in lst]
-
-
-class AcctBrandIn(BaseModel):
-    client_id: str = ""
-
-
-@app.post("/api/publisher/accounts/{account_id}/brand")
-def publisher_account_brand(account_id: str, body: AcctBrandIn):
-    """الحساب ده تبع أنهي براند (فاضي = كل البراندات)."""
-    m = acct_brands()
-    if body.client_id and not brain_row(body.client_id):
-        raise HTTPException(404, "البراند ده غير موجود")
-    if body.client_id:
-        m[account_id] = body.client_id
-    else:
-        m.pop(account_id, None)
-    auth.set_setting("acct_brand", json.dumps(m))
-    return publisher_status()
+    return [{**a, "visible": acct_visible(a["id"])} for a in lst]
 
 
 @app.get("/api/publisher")
@@ -3706,8 +3702,7 @@ def publisher_status():
         "service": service,
         "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
         "accounts": linked,            # أول حساب لكل منصة (القديم)
-        "account_list": lst,           # كل الحسابات (أكتر من حساب على نفس المنصة)، وكل حساب تبع أنهي براند و«visible» = بتاع البراند المفتوح
-        "brands": [{"id": b["id"], "name": b["name"]} for b in list_brains()],
+        "account_list": [a for a in lst if a["visible"]],   # حسابات البراند المفتوح بس (أكتر من حساب على نفس المنصة)
         "credentials": sorted(publisher.CREDENTIALS),   # بتتربط بفورم عندنا (من غير تسجيل دخول)
         "soon": publisher.SOON,                          # لسه مش متاحة عند المنصة: «قريبًا»
         "not_for_posts": sorted(publisher.NOT_FOR_POSTS),
@@ -3744,6 +3739,7 @@ def publisher_connect(body: ConnectIn, request: Request):
     if body.platform in publisher.CREDENTIALS:
         return {"form": body.platform}
     pub_ready()
+    acct_pending_mark()   # الحساب اللي هيتربط تبع البراند ده
     return {"url": pub_call(publisher.connect_url, body.platform, pub_back(request))}
 
 
@@ -3765,6 +3761,7 @@ class PickIn(BaseModel):
 
 @app.post("/api/publisher/connect/select")
 def publisher_select(body: PickIn, request: Request):
+    acct_pending_mark()
     pub_ready()
     pub_call(publisher.pending_select, body.sid, body.choice, pub_back(request))
     return publisher_status()
@@ -3777,6 +3774,7 @@ class BlueskyIn(BaseModel):
 
 @app.post("/api/publisher/connect/bluesky")
 def publisher_bluesky(body: BlueskyIn):
+    acct_pending_mark()
     if publisher.service_name() == "mock":
         MOCK_ACCOUNTS.append({"id": f"m-bs{len(MOCK_ACCOUNTS)}", "platform": "bluesky", "name": body.identifier, "username": body.identifier, "avatar": None, "url": None, "needs_reconnect": False})
         return publisher_status()
@@ -3790,6 +3788,7 @@ MOCK_TG: dict = {}
 
 @app.post("/api/publisher/connect/telegram")
 def publisher_telegram():
+    acct_pending_mark()
     if publisher.service_name() == "mock":
         MOCK_TG["n"] = 0
         return {"code": "SIMSIM-4821", "bot": "SimsimKitBot", "expires_in": 900}
@@ -3817,6 +3816,7 @@ class WhatsAppIn(BaseModel):
 
 @app.post("/api/publisher/connect/whatsapp")
 def publisher_whatsapp(body: WhatsAppIn):
+    acct_pending_mark()
     if not (body.token.strip() and body.waba.strip() and body.phone.strip()):
         raise HTTPException(400, "أكمل الخانات التلاتة")
     if publisher.service_name() == "mock":
@@ -24176,7 +24176,7 @@ app.mount("/media/voicelab", StaticFiles(directory=VLAB_DIR), name="voicelab")
 VLAB_LOCK = threading.Lock()
 VLAB_PROV = {"fasih": "فصيح", "munsit": "منصت", "eleven_atlas": "ElevenLabs (عن طريق Atlas)", "eleven": "ElevenLabs (مباشر)",
              "minimax": "MiniMax", "silma": "SILMA"}
-VLAB_OTHER = {"eleven_dub": "ElevenLabs (دبلجة)", "fasih_dub": "دبلجتنا بفصيح"}
+VLAB_OTHER = {"eleven_dub": "ElevenLabs (دبلجة)", "fasih_dub": "دبلجتنا بالأصوات العربية"}
 
 
 # قطعة أطول لكل لهجة (٤–٥ جمل) عشان الفرق بين المزودين يبان. صاحب المنصة بيراجعها ويعدّلها، والتعديل بيتحفظ في texts.json
@@ -24322,9 +24322,9 @@ def vlab_busy(msg: str) -> bool:
 def vlab_nice_error(msg: str, provider: str) -> str:
     m = msg.lower()
     if "insufficient balance" in m or "balance not enough" in m:
-        return f"رصيد {VLAB_PROV.get(provider, provider)} خلص: اشحن الحساب من موقعهم وجرّب تاني"
+        return f"رصيد {VLAB_PROV.get(provider, provider)} نفد: اشحن الحساب من موقعهم ثم أعد المحاولة"
     if vlab_busy(msg):
-        return f"{VLAB_PROV.get(provider, provider)} مشغول دلوقتي (حد الطلبات في نفس الوقت). جرّب تاني بعد شوية"
+        return f"{VLAB_PROV.get(provider, provider)} مشغول الآن (الحد الأقصى للطلبات المتزامنة). أعد المحاولة بعد قليل"
     return msg
 
 
@@ -24418,19 +24418,19 @@ class VLabIn(BaseModel):
 def voicelab_run(body: VLabIn):
     vlab_owner()
     if body.dialect not in dub.DIALECTS:
-        raise HTTPException(400, "اللهجة مش موجودة")
+        raise HTTPException(400, "هذه اللهجة غير موجودة")
     text = (body.text or "").strip()[:600] or vlab_texts()[body.dialect]
     ready, sup = vlab_ready(), vlab_support(body.dialect)
     provs = [p for p in body.providers if p in VLAB_PROV and (ready.get(p) or atlas.mock_mode())] or [p for p, ok in ready.items() if ok]
     provs = [p for p in provs if sup.get(p)]   # المزوّد اللي مبيدعمش اللهجة مقفول فيها
     if not provs:
-        raise HTTPException(400, "مفيش مزوّد من اللي اخترتهم بيدعم اللهجة دي")
+        raise HTTPException(400, "لا يوجد مزوّد ممن اخترتهم يدعم هذه اللهجة")
     try:
         jobs = vlab_jobs(body.dialect, provs)
     except voicelab.LabError as e:
         raise HTTPException(400, str(e))
     if not jobs:
-        raise HTTPException(400, "مفيش مزوّد جاهز: حط مفاتيح المزودين في الإعدادات الأول")
+        raise HTTPException(400, "لا يوجد مزوّد جاهز: أضف مفاتيح المزوّدين في الإعدادات أولًا")
     rid = uuid.uuid4().hex[:10]
     (VLAB_DIR / rid).mkdir(parents=True, exist_ok=True)
     d = {"id": rid, "kind": "tts", "dialect": body.dialect, "text": text, "at": time.time(), "status": "working",
@@ -24446,7 +24446,7 @@ def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), fil
     vlab_owner()
     provs = [p for p in ("eleven", "minimax") if (voicelab.eleven_key() if p == "eleven" else voicelab.minimax_key()) or atlas.mock_mode()]
     if not provs:
-        raise HTTPException(400, "الكلون محتاج مفتاح ElevenLabs أو MiniMax المباشر في الإعدادات")
+        raise HTTPException(400, "الكلون يحتاج مفتاح ElevenLabs أو MiniMax المباشر في الإعدادات")
     rid = uuid.uuid4().hex[:10]
     folder = VLAB_DIR / rid
     folder.mkdir(parents=True, exist_ok=True)
@@ -24458,12 +24458,12 @@ def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), fil
                         "-b:a", "160k", str(folder / "sample.mp3")], check=True, capture_output=True, timeout=120)
     except subprocess.SubprocessError:
         shutil.rmtree(folder, ignore_errors=True)
-        raise HTTPException(400, "الملف ده مش صوت سليم")
+        raise HTTPException(400, "هذا الملف ليس صوتًا سليمًا")
     finally:
         src.unlink(missing_ok=True)
     if probe_duration(folder / "sample.mp3") < 8:
         shutil.rmtree(folder, ignore_errors=True)
-        raise HTTPException(400, "العينة لازم تبقى ١٠ ثواني على الأقل (الأحسن من ٣٠ ثانية لدقيقة كلام واضح)")
+        raise HTTPException(400, "يجب أن تكون العينة ١٠ ثوانٍ على الأقل (والأفضل من ٣٠ ثانية إلى دقيقة كلام واضح)")
     text = text.strip()[:600] or vlab_texts().get(dialect, VSAMPLE_GULF)
     d = {"id": rid, "kind": "clone", "dialect": dialect if dialect in dub.DIALECTS else "ar-msa", "text": text, "at": time.time(), "status": "working", "sample": "sample.mp3",
          "clips": [{"provider": p, "provider_label": VLAB_PROV[p], "voice": "clone", "label": "كلون من العينة", "status": "working", "score": 0} for p in provs]}
@@ -24493,7 +24493,7 @@ def run_vlab_dub(rid: str) -> None:
                 if st.get("status") == "dubbed":
                     break
                 if st.get("status") in ("failed", "error") or time.time() - t0 > 1500:
-                    raise voicelab.LabError(f"ElevenLabs: {st.get('error') or 'الدبلجة ماكملتش'}")
+                    raise voicelab.LabError(f"ElevenLabs: {st.get('error') or 'لم تكتمل الدبلجة'}")
             voicelab.eleven_dub_get(dub_id, "ar", folder / "0.mp4")
         upd = {"file": "0.mp4", "status": "done", "sec": round(time.time() - t0, 1)}
     except Exception as e:  # noqa: BLE001
@@ -24506,22 +24506,22 @@ def voicelab_dub(file: UploadFile = File(...)):
     """🌍 نفس الفيديو: دبلجة ElevenLabs (صوت المتكلم نفسه) هنا، ونسخة دبلجتنا بفصيح بتتفتح في «الترجمة والدبلجة» تكمّلها وتقارن."""
     vlab_owner()
     if not (voicelab.eleven_key() or atlas.mock_mode()):
-        raise HTTPException(400, "دبلجة ElevenLabs محتاجة مفتاح ElevenLabs المباشر (بصلاحية Dubbing) في الإعدادات")
+        raise HTTPException(400, "دبلجة ElevenLabs تحتاج مفتاح ElevenLabs المباشر (بصلاحية Dubbing) في الإعدادات")
     rid = uuid.uuid4().hex[:10]
     folder = VLAB_DIR / rid
     folder.mkdir(parents=True, exist_ok=True)
     name = save_upload(file, VIDEO_EXTENSIONS, folder, "src")
     if probe_duration(folder / name) > 300:
         shutil.rmtree(folder, ignore_errors=True)
-        raise HTTPException(400, "للتجربة: فيديو لحد ٥ دقايق (ElevenLabs بيحاسب على الدقيقة)")
+        raise HTTPException(400, "للتجربة: فيديو حتى ٥ دقائق (ElevenLabs يحاسب بالدقيقة)")
     tmp = TMP_DIR / f"vlabdub_{rid}{Path(name).suffix}"
     shutil.copy(folder / name, tmp)
     ours = dub_create(tmp, f"🎧 مقارنة: {Path(file.filename or 'فيديو').stem}"[:80])
     d = {"id": rid, "kind": "dub", "dialect": "ar-msa", "text": f"دبلجة فيديو «{Path(file.filename or 'فيديو').stem}»", "at": time.time(), "status": "working",
          "source": name, "ours": ours.get("id"),
-         "clips": [{"provider": "eleven_dub", "provider_label": "ElevenLabs (دبلجة بصوت المتكلم)", "voice": "", "label": "عربي (من غير اختيار لهجة)", "status": "working", "score": 0},
-                   {"provider": "fasih_dub", "provider_label": "دبلجتنا بفصيح", "voice": "", "status": "manual", "score": 0,
-                    "label": f"كمّلها في «الترجمة والدبلجة» (اسمها «🎧 مقارنة: {Path(file.filename or 'فيديو').stem[:40]}») واختار اللهجة، وبعدين قيّمها هنا"}]}
+         "clips": [{"provider": "eleven_dub", "provider_label": "ElevenLabs (دبلجة بصوت المتكلم)", "voice": "", "label": "عربي (دون اختيار لهجة)", "status": "working", "score": 0},
+                   {"provider": "fasih_dub", "provider_label": "دبلجتنا بالأصوات العربية", "voice": "", "status": "manual", "score": 0,
+                    "label": f"أكملها في «الترجمة والدبلجة» (اسمها «🎧 مقارنة: {Path(file.filename or 'فيديو').stem[:40]}») واختر اللهجة، ثم قيّمها هنا"}]}
     (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_vlab_dub, args=(rid,), daemon=True).start()
     return vlab_out(d)
@@ -24537,7 +24537,7 @@ def voicelab_text(body: VLabTextIn):
     """حفظ قطعة لهجة بعد المراجعة (نص فاضي = يرجع للأصلي)."""
     vlab_owner()
     if body.dialect not in dub.DIALECTS:
-        raise HTTPException(400, "اللهجة مش موجودة")
+        raise HTTPException(400, "هذه اللهجة غير موجودة")
     with VLAB_LOCK:
         try:
             saved = json.loads(VLAB_TEXT_FILE.read_text(encoding="utf-8"))
@@ -24561,7 +24561,7 @@ class VLabRateIn(BaseModel):
 def voicelab_rate(rid: str, body: VLabRateIn):
     vlab_owner()
     if not (VLAB_DIR / Path(rid).name / "run.json").exists():
-        raise HTTPException(404, "التجربة دي مش موجودة")
+        raise HTTPException(404, "هذه التجربة غير موجودة")
     return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(score=max(0, min(5, body.score))) if 0 <= body.clip < len(d["clips"]) else None))
 
 
@@ -24575,7 +24575,7 @@ def voicelab_note(rid: str, body: VLabNoteIn):
     """📝 ملاحظة صاحب المنصة على صوت بعينه (بتطلع في تقرير النتايج جنب النجوم)."""
     vlab_owner()
     if not (VLAB_DIR / Path(rid).name / "run.json").exists():
-        raise HTTPException(404, "التجربة دي مش موجودة")
+        raise HTTPException(404, "هذه التجربة غير موجودة")
     note = body.note.strip()[:2000]
     return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(note=note) if 0 <= body.clip < len(d["clips"]) else None))
 
@@ -24597,24 +24597,24 @@ def vlab_report_text(dialect: str = "") -> str:
     runs = [d for d in vlab_runs() if not dialect or d["dialect"] == dialect]
     clips = [c for d in runs for c in d["clips"]]
     failed = [(d, i, c) for d in runs for i, c in enumerate(d["clips"]) if c.get("status") == "failed"]
-    lines = [f"# نتايج مختبر الأصوات ({time.strftime('%Y-%m-%d %H:%M')})", "",
-             f"الأصوات: {len(clips)} · طلعت: {sum(c.get('status') == 'done' for c in clips)} · فشلت: {len(failed)} · متقيّمة: {sum(bool(c.get('score')) for c in clips)}"
+    lines = [f"# نتائج مختبر الأصوات ({time.strftime('%Y-%m-%d %H:%M')})", "",
+             f"الأصوات: {len(clips)} · نجحت: {sum(c.get('status') == 'done' for c in clips)} · فشلت: {len(failed)} · مُقيّمة: {sum(bool(c.get('score')) for c in clips)}"
              + f" · عليها ملاحظات: {sum(bool((c.get('note') or '').strip()) for c in clips)}", ""]
     for d in runs:
         lines += [f"## {VLAB_KINDS.get(d['kind'], d['kind'])} · {dl.get(d['dialect'], d['dialect'])} · {time.strftime('%Y-%m-%d', time.localtime(d.get('at') or 0))}",
                   f"النص: {d.get('text', '')}"]
         for i, c in enumerate(d["clips"]):
             sc = int(c.get("score") or 0)
-            state = (f"❌ ماطلعش: {c.get('error') or 'خطأ غير معروف'}" if c.get("status") == "failed"
-                     else "⏳ لسه بيتولّد" if c.get("status") == "working" else ("★" * sc + "☆" * (5 - sc)) if sc else "بدون تقييم")
+            state = (f"❌ لم يُنشأ: {c.get('error') or 'خطأ غير معروف'}" if c.get("status") == "failed"
+                     else "⏳ جارٍ التوليد" if c.get("status") == "working" else ("★" * sc + "☆" * (5 - sc)) if sc else "بدون تقييم")
             lines.append(f"- [{vlab_code(d['id'], i)}] {c.get('provider_label', c.get('provider'))} · {c.get('label') or c.get('voice') or ''} · {state}")
             if (c.get("note") or "").strip():
                 lines.append(f"  ملاحظة: {c['note'].strip()}")
         lines.append("")
     if failed:
-        lines += ["## الأصوات اللي ماطلعتش (تتعاد من زرار «أعد اللي فشل»)"]
+        lines += ["## الأصوات التي لم تُنشأ (تُعاد من زر «أعد ما فشل»)"]
         lines += [f"- [{vlab_code(d['id'], i)}] {dl.get(d['dialect'], d['dialect'])} · {c.get('provider_label')} · {c.get('label') or ''}: {c.get('error') or ''}"
-                  + (" (المزوّد مابيدعمش اللهجة، مش هتتعاد)" if c.get("skip") else "") for d, i, c in failed]
+                  + (" (المزوّد لا يدعم اللهجة، فلن تُعاد)" if c.get("skip") else "") for d, i, c in failed]
     if not runs:
         lines.append("لا توجد تجارب بعد.")
     return "\n".join(lines)
@@ -24656,13 +24656,13 @@ def voicelab_export(dialect: str = "", blind: bool = False):
         csv_text = "\n".join(",".join('"' + str(x).replace('"', '""') + '"' for x in r) for r in rows)
         if blind:
             z.writestr("ورقة التقييم.csv", "\ufeff" + csv_text)
-            z.writestr("اقرأني.txt", "اسمع كل ملف واكتب في «ورقة التقييم» تقييمك من 1 لـ 5 وملاحظاتك: هل النطق صح؟ هل اللهجة مظبوطة؟ هل الكلام طبيعي؟\n"
+            z.writestr("اقرأني.txt", "استمع إلى كل ملف واكتب في «ورقة التقييم» تقييمك من 1 إلى 5 وملاحظاتك: هل النطق صحيح؟ هل اللهجة دقيقة؟ هل الكلام طبيعي؟\n"
                                       "اسم كل ملف هو رقمه في الورقة.")
         else:
             z.writestr("التقرير.md", vlab_report_text(dialect))
     if not n:
         out.unlink(missing_ok=True)
-        raise HTTPException(400, "مفيش أصوات طالعة لسه" + (" في اللهجة دي" if dialect else ""))
+        raise HTTPException(400, "لا توجد أصوات جاهزة بعد" + (" في هذه اللهجة" if dialect else ""))
     tag = f"{dialect}-" if dialect else "all-"   # اسم الملف بحروف إنجليزي (بعض المتصفحات بتشيل الاسم العربي)، والملفات جواه بالعربي
     return FileResponse(out, media_type="application/zip", filename=f"voicelab-{tag}{'raters' if blind else 'full'}-{time.strftime('%Y-%m-%d')}.zip",
                         background=BackgroundTask(lambda: out.unlink(missing_ok=True)))
@@ -24692,9 +24692,9 @@ def voicelab_retry_one(rid: str):
     """🔁 الأصوات اللي فشلت في التجربة دي بس تتعاد (اللي طلعت بتفضل زي ما هي بنجومها وملاحظاتها)."""
     vlab_owner()
     if not (VLAB_DIR / Path(rid).name / "run.json").exists():
-        raise HTTPException(404, "التجربة دي مش موجودة")
+        raise HTTPException(404, "هذه التجربة غير موجودة")
     if not vlab_retry(Path(rid).name):
-        raise HTTPException(400, "مفيش أصوات فاشلة تتعاد في التجربة دي")
+        raise HTTPException(400, "لا توجد أصوات فاشلة لإعادتها في هذه التجربة")
     return vlab_out(vlab_save(rid, lambda d: None))
 
 
@@ -24704,7 +24704,7 @@ def voicelab_retry_all():
     vlab_owner()
     n = sum(vlab_retry(d["id"]) for d in vlab_runs() if any(vlab_retryable(c) for c in d["clips"]))
     if not n:
-        raise HTTPException(400, "مفيش أصوات فاشلة تتعاد")
+        raise HTTPException(400, "لا توجد أصوات فاشلة لإعادتها")
     return {"retried": n}
 
 
@@ -24712,7 +24712,7 @@ def voicelab_retry_all():
 def voicelab_one(rid: str):
     vlab_owner()
     if not (VLAB_DIR / Path(rid).name / "run.json").exists():
-        raise HTTPException(404, "التجربة دي مش موجودة")
+        raise HTTPException(404, "هذه التجربة غير موجودة")
     return vlab_out(vlab_save(rid, lambda d: None))
 
 

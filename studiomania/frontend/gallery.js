@@ -747,7 +747,7 @@ const Gallery = (() => {
       <div class="nh-gal-pvt"><span class="latin en-k">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
-        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ اعمل نسختك من القالب ده</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتتحفظ في «قوالبك المخصصة».</small>` : ""}
+        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ أنشئ نسختك من هذا القالب</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتتحفظ في «قوالبك المخصصة».</small>` : ""}
         <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديد فارغ، وتلاقيه لاحقًا في «قيد العمل»." : "العقل سيقترح عليك أفكار وسيناريوهات على قدر العلامة الخاص بك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;

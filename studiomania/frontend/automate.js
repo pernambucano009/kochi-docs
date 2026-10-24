@@ -587,7 +587,7 @@ const AutoPage = (() => {
     const M = S.meta, yes = [[true, "نعم"], [false, "لا"]];
     let body = "";
     if (f === "silence") body = pills("silence", Object.entries(M.silence || {}), o.silence) + `<p class="bm-note">«خفيف»: الوقفات الطويلة بس. «متوسط»: أي وقفة أطول من نص ثانية. «قوي»: إيقاع سريع. بيشتغل على الفيديوهات اللي فيها كلام.</p>`;
-    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">اللوجو من «عقل العلامة». الخانة اللي في النص = بدون لوجو.</p>`;
+    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">الشعار من «عقل العلامة». الخانة التي في المنتصف = بدون شعار.</p>`;
     else if (f === "logo_size") body = pills("logo_size", [[10, "صغير"], [14, "وسط"], [18, "عادي"], [24, "كبير"]], o.logo_size);
     else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">الموسيقى بتوطى لوحدها وقت كلام الراوي، وترجع بعده.</p>`;
     else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">الكابشن بيتكتب من التعليق الصوتي بتوقيته.</p>`;

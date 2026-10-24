@@ -787,7 +787,7 @@ const BrandPage = (() => {
       <div class="bm-mkopts"><small>الحركة</small>${row("style", MK_OPTS[kind].style)}<small>الخلفية</small>${row("bgk", MK_BG)}${MK_OPTS[kind].textk ? `<small>النص</small>${row("textk", MK_OPTS[kind].textk)}` : ""}<small>المقاس</small>${row("ratio", MK_RATIO)}${txt}</div></div>
       ${busy ? `<p class="bm-note">⏳ يرسم الفيديو… ${Math.round((job.progress || 0) * 100)}٪</p>` : job?.status === "error" ? `<p class="bm-note bad">ماكملش: ${esc(job.error || "")}</p>` : ""}
       <button class="bm-go" data-mkgo="${kind}" ${busy ? "disabled" : ""}>🎬 اعمل ${T} وحطه هنا</button>
-      <p class="bm-note">يُرسم بالكود دون ذكاء اصطناعي، فلا تُخصم نقاط. الاسم والألوان واللوجو من العقل${kind === "outro" ? "، والدعوة والحساب من «التسليم»" : ""}. ${b[`${kind}_url`] ? "الفيديو الجديد هيحل مكان الحالي." : ""}</p></div>`;
+      <p class="bm-note">يُرسم بالكود دون ذكاء اصطناعي، فلا تُخصم نقاط. الاسم والألوان واللوجو من العقل${kind === "outro" ? "، والدعوة والحساب من «التسليم»" : ""}. ${b[`${kind}_url`] ? "سيحلّ الفيديو الجديد محل الحالي." : ""}</p></div>`;
   }
   function mkPoll(bid, kind) {
     const key = `${bid}:${kind}`, m = S.mk[key];

@@ -4,7 +4,7 @@ const VoiceLab = (() => {
   const S = { el: null, d: null, tab: "cmp", dialect: "ar-sa-najdi", provs: null, text: "", timer: 0, all: false, texts: null, dirty: new Set(), review: false };
   const esc = (s) => escapeHtml(String(s ?? ""));
   // 📝 ملاحظتك على الصوت ده: بتتحفظ وانت بتكتب، وبتطلع في «انسخ النتايج» جنب النجوم
-  const noteBox = (rid, i, v) => `<textarea class="vl-note" rows="2" dir="auto" data-note="${esc(rid)}:${i}" placeholder="📝 ملاحظاتك على الصوت ده (النطق، اللهجة، الإحساس، السرعة…)">${esc(v || "")}</textarea>`;
+  const noteBox = (rid, i, v) => `<textarea class="vl-note" rows="2" dir="auto" data-note="${esc(rid)}:${i}" placeholder="📝 ملاحظاتك على هذا الصوت (النطق، اللهجة، الإحساس، السرعة…)">${esc(v || "")}</textarea>`;
   const stars = (rid, i, v) => `<span class="vl-stars" role="group" aria-label="التقييم">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="${n <= v ? "on" : ""}" data-rate="${esc(rid)}:${i}:${n}" aria-label="${n} من 5">★</button>`).join("")}</span>`;
 
   async function load() {
@@ -22,12 +22,12 @@ const VoiceLab = (() => {
     const head = r.kind === "clone" ? `🧬 كلون · ${esc(S.d.dialects[r.dialect] || "")}` : r.kind === "dub" ? "🌍 دبلجة فيديو" : esc(S.d.dialects[r.dialect] || r.dialect);
     return `<article class="vl-run" data-run="${esc(r.id)}"><header><b>${head}</b><small>${esc(r.text)}</small>
       ${r.sample ? `<audio controls preload="metadata" src="/media/voicelab/${esc(r.id)}/${esc(r.sample)}" title="العينة الأصلية"></audio>` : ""}
-      ${r.clips.some((c) => c.status === "failed" && !c.skip) && r.status !== "working" ? `<button type="button" class="btn sm" data-retry="${esc(r.id)}" title="الأصوات اللي فشلت بس تتعاد">🔁 أعد اللي فشل</button>` : ""}
+      ${r.clips.some((c) => c.status === "failed" && !c.skip) && r.status !== "working" ? `<button type="button" class="btn sm" data-retry="${esc(r.id)}" title="إعادة توليد الأصوات التي فشلت فقط">🔁 أعد ما فشل</button>` : ""}
       <button type="button" class="vl-x" data-del="${esc(r.id)}" aria-label="احذف التجربة">✕</button></header>
       <div class="vl-clips">${r.clips.map((c, i) => `<div class="vl-clip ${c.status}" data-sig="${esc([c.status, c.score || 0, c.url || "", c.error || ""].join("|"))}"><p><b>${esc(c.provider_label)}</b><small>${esc(c.label)}${c.sec ? ` · ${c.sec} ث` : ""}</small></p>
         ${c.status === "done" ? `${/\.mp4$/.test(c.url || "") ? `<video controls preload="metadata" playsinline src="${esc(c.url)}"></video>` : `<audio controls preload="metadata" src="${esc(c.url)}"></audio>`}${stars(r.id, i, c.score || 0)}${noteBox(r.id, i, c.note)}`
           : c.status === "manual" ? stars(r.id, i, c.score || 0) + noteBox(r.id, i, c.note)
-          : c.status === "failed" ? `<p class="vl-err">${esc(c.error || "ماكملش")}</p>` : `<p class="vl-wait">⏳ بيتولّد…</p>`}</div>`).join("")}</div></article>`;
+          : c.status === "failed" ? `<p class="vl-err">${esc(c.error || "لم يكتمل")}</p>` : `<p class="vl-wait">⏳ جارٍ التوليد…</p>`}</div>`).join("")}</div></article>`;
   }
   function tableHTML() {
     const rows = S.d.table;
@@ -35,12 +35,12 @@ const VoiceLab = (() => {
     const exp = `<div class="vl-expbox">
       <div class="row wrap vl-exp"><label class="field inline">اللهجة <select id="vlExpDia"><option value="">كل اللهجات</option>${Object.entries(S.d.dialects).map(([k, v]) => `<option value="${k}"${k === S.expDia ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label></div>
       <div class="row wrap vl-exp">
-        <button type="button" class="btn primary" id="vlZip" title="كل الأصوات (مجلد لكل لهجة) ومعاها التقرير بنجومك وملاحظاتك واللي فشل وسببه">⬇️ نزّل الأصوات مع التقرير (zip)</button>
-        <button type="button" class="btn" id="vlZipBlind" title="الأصوات بأرقام بس من غير أسماء المزوّدين، ومعاها ورقة تقييم: ابعتها لأهل اللهجة">🎧 نسخة للمقيّمين من أهل اللهجة</button>
+        <button type="button" class="btn primary" id="vlZip" title="كل الأصوات (مجلد لكل لهجة) ومعها التقرير بنجومك وملاحظاتك وما فشل وسببه">⬇️ نزّل الأصوات مع التقرير (zip)</button>
+        <button type="button" class="btn" id="vlZipBlind" title="الأصوات بأرقام فقط دون أسماء المزوّدين، ومعها ورقة تقييم: أرسلها لأهل اللهجة">🎧 نسخة للمقيّمين من أهل اللهجة</button>
         <button type="button" class="btn" id="vlCopy">📋 انسخ التقرير</button>
-        ${failed ? `<button type="button" class="btn" id="vlRetryAll">🔁 أعد كل اللي فشل (${failed})</button>` : ""}</div>
-      <small class="hint">نسخة المقيّمين أسماء ملفاتها أرقام زي «A1B2-3»، ونفس الرقم موجود في تقريرك جنب اسم المزوّد. لما المقيّمين يرجّعولك الورقة، ابعتها هنا مع التقرير.</small></div>`;
-    if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، والنتيجة هتظهر هنا: متوسط كل مزوّد في كل لهجة.</p>`;
+        ${failed ? `<button type="button" class="btn" id="vlRetryAll">🔁 أعد كل ما فشل (${failed})</button>` : ""}</div>
+      <small class="hint">أسماء الملفات في نسخة المقيّمين أرقام مثل «A1B2-3»، والرقم نفسه موجود في تقريرك بجانب اسم المزوّد. عندما يعيد المقيّمون الورقة، أرسلها هنا مع التقرير.</small></div>`;
+    if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، وستظهر النتيجة هنا: متوسط كل مزوّد في كل لهجة.</p>`;
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
     return `${exp}<table class="vl-table"><thead><tr><th>اللهجة</th><th>الترتيب (متوسط النجوم · عدد التقييمات)</th></tr></thead><tbody>${Object.entries(groups).map(([d, xs]) =>
@@ -51,29 +51,29 @@ const VoiceLab = (() => {
     const D = S.d, P = Object.entries(D.providers);
     const tabs = [["cmp", "مقارنة اللهجات"], ["clone", "كلون الصوت"], ["dub", "الدبلجة"], ["res", "النتيجة"]];
     const body = S.tab === "res" ? tableHTML() : S.tab === "dub" ? `
-      <p class="hint">ارفع فيديو قصير (لحد ٥ دقايق). ElevenLabs هيدبلجه للعربي بصوت المتكلم نفسه، وفي نفس الوقت بتتعمل نسخة في «الترجمة والدبلجة» تكمّلها بفصيح باللهجة اللي تختارها. قيّم الاتنين هنا بالنجوم.${D.ready.eleven ? "" : " محتاج مفتاح ElevenLabs المباشر بصلاحية Dubbing في «المفاتيح»."}</p>
+      <p class="hint">ارفع فيديو قصيرًا (حتى ٥ دقائق). سيدبلجه ElevenLabs إلى العربية بصوت المتحدث نفسه، وفي الوقت نفسه تُنشأ نسخة في «الترجمة والدبلجة» تكملها بالأصوات العربية باللهجة التي تختارها. قيّم الاثنين هنا بالنجوم.${D.ready.eleven ? "" : " يحتاج مفتاح ElevenLabs المباشر بصلاحية Dubbing في «المفاتيح»."}</p>
       <label class="field">الفيديو <input type="file" accept="video/*" id="vlDubFile"></label>
       <button type="button" class="btn primary" id="vlDubGo">🌍 ابدأ المقارنة</button>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>` : S.tab === "clone" ? `
-      <p class="hint">ارفع عينة صوت واضحة (٣٠ ثانية لدقيقة كلام من غير موسيقى). هنعمل منها كلون بـ ElevenLabs و MiniMax، ويقولوا نفس الجملة.${!D.ready.eleven || !D.ready.minimax ? " محتاج مفتاح ElevenLabs و MiniMax المباشرين في «المفاتيح» (كلون ElevenLabs محتاج اشتراك Starter على الأقل)." : ""}</p>
+      <p class="hint">ارفع عينة صوت واضحة (من ٣٠ ثانية إلى دقيقة كلام دون موسيقى). سننشئ منها نسخة صوتية في ElevenLabs و MiniMax، ويقولان الجملة نفسها.${!D.ready.eleven || !D.ready.minimax ? " يحتاج مفتاحي ElevenLabs و MiniMax المباشرين في «المفاتيح» (الكلون في ElevenLabs يحتاج اشتراك Starter على الأقل)." : ""}</p>
       <label class="field">العينة <input type="file" accept="audio/*,video/*" id="vlSample"></label>
       <label class="field">اللهجة <select id="vlCloneDia">${Object.entries(D.dialects).map(([k, v]) => `<option value="${k}"${k === S.dialect ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
-      <label class="field">الجملة اللي هيقولوها <textarea id="vlCloneText" rows="2">${esc(S.text)}</textarea></label>
-      <button type="button" class="btn primary" id="vlCloneGo">🧬 اعمل الكلون وقارن</button>
+      <label class="field">الجملة التي سيقولونها <textarea id="vlCloneText" rows="2">${esc(S.text)}</textarea></label>
+      <button type="button" class="btn primary" id="vlCloneGo">🧬 أنشئ الكلون وقارن</button>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>` : `
 ${S.review ? reviewHTML() : `
-      <p class="hint">كل لهجة ليها قطعة. راجعها وعدّلها لو حابب، وكل مزوّد بيقولها بصوتين. المزوّد اللي مبيدعمش اللهجة بيبان مقفول فيها. اسمع وقيّم بالنجوم، والنتيجة النهائية في تبويب «النتيجة».</p>
+      <p class="hint">لكل لهجة قطعة. راجعها وعدّلها إن أردت، وكل مزوّد يقولها بصوتين. المزوّد الذي لا يدعم اللهجة يظهر مقفلًا فيها. استمع وقيّم بالنجوم، والنتيجة النهائية في تبويب «النتيجة».</p>
       <div class="vl-pills">${Object.entries(D.dialects).map(([k, v]) => `<button type="button" class="${k === S.dialect ? "on" : ""}" data-dia="${k}">${esc(v)}${S.dirty.has(k) || (D.defaults[k] && S.texts[k] !== D.defaults[k]) ? " ✎" : ""}</button>`).join("")}</div>
       ${textBox(S.dialect, 6)}
       <div class="vl-pills">${provPills(S.dialect)}</div>
-      <div class="row wrap"><button type="button" class="btn primary" id="vlGo">🎧 قارن في اللهجة دي</button>
-        <button type="button" class="btn" id="vlReview" title="تراجع قطع كل اللهجات الأول، وبعدها تقارن الكل مرة واحدة">📝 راجع كل القطع وقارن كل اللهجات</button></div>
+      <div class="row wrap"><button type="button" class="btn primary" id="vlGo">🎧 قارن في هذه اللهجة</button>
+        <button type="button" class="btn" id="vlReview" title="راجع قطع كل اللهجات أولًا، ثم قارن الكل مرة واحدة">📝 راجع كل القطع وقارن كل اللهجات</button></div>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>`}`;
     const top = S.el.querySelector(".vl-box")?.scrollTop || 0, same = S.shown === shownKey();
     S.shown = shownKey();
     S.el.innerHTML = `<div class="vl-box" role="dialog" aria-modal="true" aria-label="مختبر الأصوات"><header class="vl-top"><h2>🎧 مختبر الأصوات</h2>
       <nav class="vl-tabs">${tabs.map(([k, t]) => `<button type="button" class="${S.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</nav>
-      <button type="button" class="vl-x" data-close aria-label="اقفل">✕</button></header><div class="vl-body">${body}</div></div>`;
+      <button type="button" class="vl-x" data-close aria-label="أغلق">✕</button></header><div class="vl-body">${body}</div></div>`;
     if (same) S.el.querySelector(".vl-box").scrollTop = top;
   }
   const shownKey = () => S.tab + (S.tab === "cmp" && S.review ? ":review" : "");
@@ -82,12 +82,12 @@ ${S.review ? reviewHTML() : `
   function textBox(k, rows) {
     const t = S.texts[k] || "", def = S.d.defaults[k] || "";
     return `<label class="field">قطعة ${esc(S.d.dialects[k])} <textarea data-text="${k}" rows="${rows}">${esc(t)}</textarea></label>
-      <div class="row wrap vl-tmeta"><small>${t.length} حرف</small>${def && t !== def ? `<button type="button" class="btn ghost" data-reset="${k}">↺ رجّع القطعة الأصلية</button>` : ""}</div>`;
+      <div class="row wrap vl-tmeta"><small>${t.length} حرف</small>${def && t !== def ? `<button type="button" class="btn ghost" data-reset="${k}">↺ أعد القطعة الأصلية</button>` : ""}</div>`;
   }
   function provPills(k) {
     return Object.entries(S.d.providers).map(([p, v]) => {
       const ok = supports(k, p), ready = S.d.ready[p];
-      const why = !ok ? "مبيدعمش اللهجة دي" : !ready ? "محتاج مفتاحه في «المفاتيح»" : "";
+      const why = !ok ? "لا يدعم هذه اللهجة" : !ready ? "يحتاج مفتاحه في «المفاتيح»" : "";
       return `<button type="button" class="${S.provs.includes(p) && ok ? "on" : ""}${ready && ok ? "" : " off"}" data-prov="${p}"${ok ? "" : " disabled aria-disabled=\"true\""} title="${why}">${ok ? "" : "🔒 "}${esc(v)}${why ? ` · ${why}` : ""}</button>`;
     }).join("");
   }
@@ -96,7 +96,7 @@ ${S.review ? reviewHTML() : `
     const D = S.d, ks = Object.keys(D.dialects);
     const n = ks.reduce((a, k) => a + (S.provs.some((p) => supports(k, p)) ? 1 : 0), 0);
     return `<div class="vl-review"><div class="row wrap"><button type="button" class="btn ghost" id="vlReviewBack">→ رجوع</button>
-        <p class="hint" style="margin:0">راجع قطعة كل لهجة وعدّلها أو سيبها زي ما هي. المزودين المختارين: ${S.provs.map((p) => esc(D.providers[p])).join("، ") || "ولا واحد"}. اللي مبيدعمش لهجة مش هيتجرّب فيها.</p></div>
+        <p class="hint" style="margin:0">راجع قطعة كل لهجة وعدّلها أو اتركها كما هي. المزوّدون المختارون: ${S.provs.map((p) => esc(D.providers[p])).join("، ") || "لا أحد"}. المزوّد الذي لا يدعم لهجة لن يُجرَّب فيها.</p></div>
       ${ks.map((k) => `<section class="vl-rv">${textBox(k, 4)}<div class="vl-pills vl-mini">${Object.entries(D.providers).filter(([p]) => S.provs.includes(p)).map(([p, v]) => `<span class="${supports(k, p) ? "on" : "off"}">${supports(k, p) ? "" : "🔒 "}${esc(v)}</span>`).join("")}</div></section>`).join("")}
       <div class="row wrap"><button type="button" class="btn primary" id="vlAll">🌍 قارن كل اللهجات (${n} لهجة)</button></div></div>`;
   }
@@ -178,7 +178,7 @@ ${S.review ? reviewHTML() : `
     if (b("#vlCopy")) {
       try {
         const { text } = await api(`/api/voicelab/report?dialect=${encodeURIComponent(S.expDia || "")}`);
-        await navigator.clipboard.writeText(text); toast("✓ اتنسخ التقرير، الصقه في المحادثة");
+        await navigator.clipboard.writeText(text); toast("✓ نُسخ التقرير، الصقه في المحادثة");
       } catch (err) { toast(err.message, true); }
       return;
     }
@@ -201,11 +201,11 @@ ${S.review ? reviewHTML() : `
       const one = b("[data-retry]")?.dataset.retry;
       try {
         await api(one ? `/api/voicelab/runs/${one}/retry` : "/api/voicelab/retry-failed", { method: "POST" });
-        toast("🔁 بيعيد الأصوات اللي فشلت…");
+        toast("🔁 جارٍ إعادة الأصوات التي فشلت…");
       } catch (err) { toast(err.message, true); }
       return load();
     }
-    if (b("[data-del]")) { if (await uiConfirm("تحذف التجربة دي؟")) { await api(`/api/voicelab/runs/${b("[data-del]").dataset.del}`, { method: "DELETE" }); load(); } return; }
+    if (b("[data-del]")) { if (await uiConfirm("هل تحذف هذه التجربة؟")) { await api(`/api/voicelab/runs/${b("[data-del]").dataset.del}`, { method: "DELETE" }); load(); } return; }
     try {
       if (b("#vlGo")) {
         const k = S.dialect, provs = S.provs.filter((p) => supports(k, p));
@@ -218,7 +218,7 @@ ${S.review ? reviewHTML() : `
         const jobs = Object.keys(S.d.dialects).map((k) => [k, S.provs.filter((p) => supports(k, p))]).filter(([, ps]) => ps.length);
         const voices = jobs.reduce((a, [, ps]) => a + ps.length * 2, 0);
         if (!jobs.length) return toast("لا يوجد مزوّد مختار يدعم أي لهجة", true);
-        if (!(await uiConfirm(`هنجرب ${jobs.length} لهجة بالقطع اللي راجعتها، كل لهجة بالمزودين اللي بيدعموها بس (حوالي ${voices} صوت). التكلفة على حساب المنصة. نكمل؟`))) return;
+        if (!(await uiConfirm(`سنجرّب ${jobs.length} لهجة بالقطع التي راجعتها، كل لهجة بالمزوّدين الذين يدعمونها فقط (نحو ${voices} صوت). التكلفة على حساب المنصة. هل نكمل؟`))) return;
         await saveTexts([...S.dirty]);
         for (const [k, ps] of jobs) await api("/api/voicelab/run", { method: "POST", ...jsonBody({ dialect: k, text: (S.texts[k] || "").trim(), providers: ps }) }).catch((err) => toast(`${S.d.dialects[k]}: ${err.message}`, true));
         S.review = false;
@@ -227,19 +227,19 @@ ${S.review ? reviewHTML() : `
       }
       if (b("#vlDubGo")) {
         const f = S.el.querySelector("#vlDubFile").files[0];
-        if (!f) return toast("اختار الفيديو الأول", true);
+        if (!f) return toast("اختر الفيديو أولًا", true);
         const fd = new FormData();
         fd.append("file", f);
-        toast("⏳ بيرفع الفيديو ويبدأ الدبلجة… ممكن تاخد كذا دقيقة");
+        toast("⏳ جارٍ رفع الفيديو وبدء الدبلجة… قد يستغرق ذلك بضع دقائق");
         await api("/api/voicelab/dub", { method: "POST", body: fd });
         return load();
       }
       if (b("#vlCloneGo")) {
         const f = S.el.querySelector("#vlSample").files[0];
-        if (!f) return toast("اختار ملف العينة الأول", true);
+        if (!f) return toast("اختر ملف العينة أولًا", true);
         const fd = new FormData();
         fd.append("file", f); fd.append("text", S.el.querySelector("#vlCloneText").value.trim()); fd.append("dialect", S.el.querySelector("#vlCloneDia").value);
-        toast("⏳ بيرفع العينة ويعمل الكلون…");
+        toast("⏳ جارٍ رفع العينة وإنشاء الكلون…");
         await api("/api/voicelab/clone", { method: "POST", body: fd });
         return load();
       }
