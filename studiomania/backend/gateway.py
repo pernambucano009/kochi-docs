@@ -586,7 +586,7 @@ def me_dict(u: sqlite3.Row) -> dict:
     w = workspace(u["workspace"])
     return {"email": u["email"], "name": u["name"], "verified": bool(u["verified"]), "role": u["role"],
             "workspace": u["workspace"], "plan": (w["plan"] if w else "owner"), "credits": wallet(u["workspace"]),
-            "has_password": bool(u["pw"])}
+            "has_password": bool(u["pw"]), "pts_per_usd": round(billing.MARKUP / billing.CREDIT_USD)}
 
 
 @app.get("/api/auth/app-token")

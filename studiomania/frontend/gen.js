@@ -52,7 +52,7 @@ const Gen = (() => {
     hist: "M4 12a8 8 0 1 0 2.3-5.6 M4 4v4h4 M12 8v4l3 2",
   };
   const gi = (k, s = 16) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${GI[k]}"/></svg>`;
-  const short = (t) => String(t || "").replace(/\s*\(.*?\)\s*/g, " ").trim();
+  const short = (t) => (window.IS_CUSTOMER ? String(t || "").replace(/\s*\((.*?)\)\s*/g, " · $1").trim() : String(t || "").replace(/\s*\(.*?\)\s*/g, " ").trim());
   function options() {
     const A = S.info, d = S.d;
     if (S.tab === "video") {

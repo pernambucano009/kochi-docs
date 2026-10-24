@@ -118,8 +118,8 @@ function tyRenderProj() {
         <input type="file" data-tybgfile accept="${bg.kind === "image" ? "image/*" : "video/*"}" hidden></label>
         <button type="button" class="btn sm" data-tystock="${bg.kind}">🔎 من المكتبة</button>
         <button type="button" class="btn sm primary" data-tybgauto="${bg.kind}" ${v.busy || !v.words?.length ? "disabled" : ""} title="البرنامج يقسّم النص لمقاطع ويختار لكل مقطع ${bg.kind === "image" ? "صورة" : "فيديو"} حقيقي يعبّر عنه">✨ على حسب النص</button>` : ""}
-      ${bg.auto?.length && bg.kind === "video" ? `<small class="muted ty-credit" data-no-i18n title="${tye(bg.auto.map((a) => `${tyT(a.t0)} ${a.q}`).join("\n"))}">🎬 ${bg.auto.length} مقاطع من <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>${bg.credit?.by ? ` · ${tye(bg.credit.by)}` : ""}</small>`
-        : bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
+      ${bg.auto?.length && bg.kind === "video" ? `<small class="muted ty-credit" data-no-i18n data-brand-keep title="${tye(bg.auto.map((a) => `${tyT(a.t0)} ${a.q}`).join("\n"))}">🎬 ${bg.auto.length} مقاطع من <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>${bg.credit?.by ? ` · ${tye(bg.credit.by)}` : ""}</small>`
+        : bg.credit && ["image", "video"].includes(bg.kind) ? `<small class="muted ty-credit" data-no-i18n data-brand-keep>${bg.kind === "video" ? "🎬" : "📷"} ${bg.credit.by_url ? `<a href="${tye(bg.credit.by_url)}" target="_blank" rel="noopener">${tye(bg.credit.by)}</a>` : tye(bg.credit.by)} · <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></small>` : ""}
       ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
     </div>
     <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ النص <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
@@ -555,7 +555,7 @@ function tyStockDraw() {
         <img src="${tye(it.thumb)}" alt="" loading="lazy">${it.kind === "video" ? `<video src="${tye(it.preview)}" muted loop playsinline preload="none"></video><em class="num">${Math.round(it.dur || 0)}ث</em>` : ""}
         <small data-no-i18n>${tye(it.author)}</small></button>`).join("") : st.q ? `<p class="muted">لا يوجد نتائج. جرّب كلمة أخرى.</p>` : `<p class="muted">اكتب كلمة واضغط Enter.</p>`}</div>
     <div class="ty-stock-foot">${st.next ? `<button type="button" class="btn sm" data-stmore ${st.busy ? "disabled" : ""}>نتائج أكثر</button>` : "<span></span>"}
-      <a href="https://www.pexels.com" target="_blank" rel="noopener" class="muted" data-no-i18n>Photos & videos provided by Pexels</a></div></div>`;
+      <a href="https://www.pexels.com" target="_blank" rel="noopener" class="muted" data-no-i18n data-brand-keep>Photos & videos provided by Pexels</a></div></div>`;
 }
 async function tyStockSearch(q, page) {
   const st = TY_STOCK;
