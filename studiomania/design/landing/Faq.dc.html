@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SimsimKit · FAQ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&amp;family=Readex+Pro:wght@300;400;500&amp;family=IBM+Plex+Sans+Arabic:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+/* نفس تحويل اللايت والدارك اللي في البرنامج (home2.css): موجة نور مايلة بتمسح الشاشة في 1.1 ثانية */
+:root.nh-wipe::view-transition-old(root){animation:none}
+:root.nh-wipe::view-transition-new(root){animation:nh-wipe 1.1s cubic-bezier(.5,0,.3,1) both;mix-blend-mode:normal;-webkit-mask-image:linear-gradient(112deg,transparent 0 44%,rgba(0,0,0,.35) 50%,#000 56% 100%);mask-image:linear-gradient(112deg,transparent 0 44%,rgba(0,0,0,.35) 50%,#000 56% 100%);-webkit-mask-size:310% 100%;mask-size:310% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+@keyframes nh-wipe{from{-webkit-mask-position:0% 0;mask-position:0% 0}to{-webkit-mask-position:100% 0;mask-position:100% 0}}
+
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+.hd-b{transition:transform .25s cubic-bezier(.2,.8,.2,1)}.hd-b:hover{transform:translateY(-2px)}.hd-b:active{transform:scale(1.08)}
+.lp-nav a{transition:color .3s,letter-spacing .5s cubic-bezier(.65,0,.35,1)}.lp-nav a:hover{letter-spacing:.36em}
+.lp-side{transition:color .3s,transform .3s cubic-bezier(.2,.8,.2,1)}.lp-side:hover{transform:translateX(-4px)}
+.ft-card{transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s}.ft-card:hover{transform:translateY(-4px)}
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite;transition:transform .2s ease,filter .2s ease}
+.sk-go:hover{filter:brightness(1.06);transform:translateY(-2px);color:#FFFFFF}.sk-go:active{transform:scale(1.06)}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
+@media (prefers-reduced-motion: reduce){.sk-go{animation:none}}
+</style>
+</helmet>
+<div style="{{rootStyle}}">
+  <div style="{{glowStyle}}"></div>
+
+  <header dir="rtl" style="position: absolute; top: 22px; left: 48px; right: 48px; height: 52px; display: flex; align-items: center; justify-content: space-between; z-index: 5; font-family: 'IBM Plex Sans Arabic', 'Readex Pro', sans-serif">
+    <a href="Main.dc.html" aria-label="SimsimKit" style="display: flex; align-items: center; direction: ltr; font: 500 15px Jost, Futura, sans-serif; letter-spacing: .32em">
+      <img src="{{markSrc}}" alt="" style="height: 26px; width: auto; margin-right: 8px">SIMSIMKIT</a>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <a href="#top" class="hd-b" style="{{chip}}">تسجيل الدخول</a>
+      <button type="button" class="hd-b" style="{{chip}}">EN</button>
+      <button type="button" onClick="{{toggleTheme}}" aria-pressed="{{dark}}" aria-label="Switch theme" style="display: flex; align-items: center; gap: 10px; border: 0; background: transparent; cursor: pointer; color: inherit; font: 400 11px Jost, sans-serif; letter-spacing: .2em; min-height: 44px; padding: 0">
+        <span style="{{trackStyle}}"><span style="width: 18px; height: 18px; border-radius: 9px; background: #FFFFFF; box-shadow: 0 1px 4px rgba(0,0,0,.2)"></span></span>{{themeLabel}}</button>
+    </div>
+  </header>
+
+  <nav class="lp-nav" aria-label="Main">
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="4">
+      <a href="{{n.href}}" style="{{n.style}}">{{n.label}}<span style="{{n.lineStyle}}"></span></a>
+    </sc-for>
+  </nav>
+
+  <a href="#top" class="lp-side" style="position: absolute; top: 218px; right: 62px; display: flex; align-items: center; gap: 14px; font: 400 19px Jost, sans-serif; letter-spacing: .24em">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l5.5-3.5z"/></svg>WATCH A DEMO</a>
+  <a href="#top" class="lp-side" style="position: absolute; top: 648px; right: 62px; display: flex; align-items: center; gap: 14px; font: 400 19px Jost, sans-serif; letter-spacing: .24em">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 1 3.3 6.5L3.5 20l1.3-3.5A8 8 0 0 1 4 12z"/><path d="M8.5 10.5h7 M8.5 13.5h4.5"/></svg>TALK TO US</a>
+
+  <section dir="rtl" style="position: absolute; top: 112px; left: 330px; width: 790px; font-family: 'Readex Pro', sans-serif">
+    <p style="margin: 0; font: 400 13px Jost, sans-serif; letter-spacing: .3em; color: #E5613E">FAQ</p>
+    <h1 style="margin: 10px 0 20px; font-weight: 500; font-size: 34px; line-height: 1.35">أسئلة بتتسأل كتير</h1>
+    <div style="display: grid; gap: 10px">
+      <sc-for list="{{qs}}" as="q" hint-placeholder-count="7">
+        <div style="{{q.style}}">
+          <button type="button" onClick="{{q.toggle}}" aria-expanded="{{q.open}}" style="{{q.btnStyle}}">
+            <span>{{q.q}}</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" style="{{q.iconStyle}}"><path d="M12 5v14 M5 12h14"/></svg>
+          </button>
+          <sc-if value="{{q.open}}" hint-placeholder-val="{{ false }}">
+            <p style="{{q.aStyle}}">{{q.a}}</p>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <a href="#top" class="sk-go" style="position: absolute; bottom: 26px; left: 50%; translate: -50% 0; height: 50px; padding: 0 30px; border-radius: 99px; display: flex; align-items: center; gap: 10px; font: 500 14px Jost, sans-serif; letter-spacing: .2em; white-space: nowrap">START FREE<span style="font: 400 13px 'Readex Pro', sans-serif; letter-spacing: 0">· ابدأ مجانًا</span></a>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":810}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { dark: false, open: 0 }; }
+  renderVals() {
+    const d = this.state.dark, act = 3, openI = this.state.open;
+    const ink = d ? '#F1F1F3' : '#181718', muted = d ? '#A3A3AB' : '#6B6B67';
+    const card = d ? '#1C1C1F' : '#FFFFFF', shadow = d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)';
+    const tops = [214, 372, 506, 640], hrefs = ['Main.dc.html', 'Features.dc.html', 'Prices.dc.html', 'Faq.dc.html'];
+    const nav = ['HOME', 'FEATURES', 'PRICES', 'FAQ'].map((label, i) => {
+      const on = i === act;
+      return {
+        label, href: hrefs[i],
+        style: 'position:absolute;top:' + tops[i] + 'px;left:' + (on ? 98 : 70) + 'px;display:flex;flex-direction:column;gap:20px;font-family:Jost,sans-serif;font-weight:400;letter-spacing:.3em;' + (on ? 'font-size:28px' : 'font-size:19px'),
+        lineStyle: on ? 'display:block;width:94px;height:1.5px;background:linear-gradient(90deg,' + ink + ',' + (d ? 'rgba(241,241,243,0)' : 'rgba(24,23,24,0)') + ')' : 'display:none'
+      };
+    });
+    const items = [
+      ['سمسمكيت بيعمل إيه بالظبط؟', 'بيعمل محتواك من الفكرة لحد النشر: عقل بيعرف البراند بتاعك، وقوالب بتطلّع الفيديو، وأوتوبايلوت بينشر في المواعيد اللي تختارها.'],
+      ['لازم أصوّر نفسي؟', 'لأ. فيه قوالب كاملة من غير تصوير، وأفاتار بوشك وصوتك. ولو حابب تصوّر، تطبيق الموبايل فيه تيلي برومبتر وبتعيد اللقطة اللي مش عاجباك بس.'],
+      ['بيدعم اللهجة السعودية؟', 'أيوه: النجدي والحجازي والخليجي العام، وفي المجموع 17 لهجة عربية و11 لغة، في الكتابة والصوت والدبلجة.'],
+      ['إيه هي النقاط؟', 'كل باقة فيها نقاط شهرية بتتصرف على التوليد. بتشوف تكلفة أي عملية قبل ما تبدأها، ولو العملية فشلت من عندنا النقاط بترجع لرصيدك.'],
+      ['أقدر ألغي في أي وقت؟', 'أيوه، من صفحة «باقتي» قبل التجديد. ولأول اشتراك فيه استرجاع كامل خلال 7 أيام، لو ما استخدمتش أكتر من 10٪ من نقاط الباقة.'],
+      ['بينشر على أنهي منصات؟', 'تيك توك، إنستجرام، يوتيوب شورتس، فيسبوك، X، لينكدإن، ثريدز، بنترست، وغيرهم، كلهم من جدولة واحدة.'],
+      ['ينفع للوكالات؟', 'أيوه. باقة «وكالات» فيها عقل منفصل لكل عميل، وخطة وموافقات لكل واحد، ولحد 25 حساب سوشيال.']
+    ];
+    const qs = items.map(([q, a], i) => {
+      const open = i === openI;
+      return {
+        q, a, open,
+        toggle: () => this.setState({ open: open ? -1 : i }),
+        style: 'border-radius:18px;background:' + card + ';box-shadow:' + shadow + (open ? ';outline:1.5px solid #E5613E;outline-offset:-1.5px' : ''),
+        btnStyle: 'width:100%;min-height:52px;padding:0 20px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:right;font:500 15.5px \'Readex Pro\',sans-serif;color:' + ink,
+        iconStyle: 'flex:none;transition:transform .3s;color:#E5613E;transform:rotate(' + (open ? 45 : 0) + 'deg)',
+        aStyle: 'margin:0;padding:0 20px 18px;font-size:14px;line-height:1.85;color:' + muted
+      };
+    });
+    return {
+      dark: d, nav, qs,
+      themeLabel: d ? 'DARK' : 'LIGHT',
+      markSrc: d ? '/_blob/2ad7b4f1227f708bbf168ef6fe697e18' : '/_blob/379b1415dcab42f9d2fa372cf6fce3e1',
+      chip: 'height:44px;padding:0 20px;border-radius:22px;border:0;cursor:pointer;display:flex;align-items:center;box-sizing:border-box;font:400 14px \'IBM Plex Sans Arabic\',\'Readex Pro\',sans-serif;color:' + ink + ';background:' + card + ';box-shadow:' + shadow,
+      leadStyle: 'margin:0;font-size:15px;line-height:1.8;color:' + muted,
+      iconWrap: 'width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:' + (d ? 'rgba(229,97,62,.14)' : '#FFF6F2'),
+      rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;color:' + ink + ';background:' + (d ? '#0C0C0E' : '#FAFAF8'),
+      trackStyle: 'width:48px;height:24px;border-radius:12px;display:flex;align-items:center;padding:3px;box-sizing:border-box;transition:background .4s;' + (d ? 'background:#E5613E;justify-content:flex-end;box-shadow:0 0 14px rgba(240,117,79,.5)' : 'background:#F3F2EF;justify-content:flex-start;box-shadow:inset 0 1px 3px rgba(24,23,24,.12)'),
+      glowStyle: 'position:absolute;left:50%;top:52%;width:1100px;height:1100px;translate:-50% -50%;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(120,150,255,.10) 0%,rgba(12,12,14,0) 58%)' : 'none'),
+      toggleTheme: () => {
+        const flip = () => new Promise((done) => { this.setState({ dark: !d }); requestAnimationFrame(() => requestAnimationFrame(done)); });
+        const root = document.documentElement;
+        if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return flip();
+        root.classList.add('nh-wipe');
+        document.startViewTransition(flip).finished.finally(() => root.classList.remove('nh-wipe'));
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
