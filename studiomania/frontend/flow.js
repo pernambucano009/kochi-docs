@@ -545,7 +545,7 @@ const Flow = (() => {
           ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video>
             <small class="muted">${esc(mn.name)} · ${secs(mn.duration)} · ${mn.w}×${mn.h}${mn.audio ? "" : " · ⚠️ بدون صوت"}</small>
             <button type="button" class="flw-link" data-fdel="${esc(mn.gen_id)}">بدّله</button></div>`
-          : `<div class="flw-acts"><label class="flw-btn pri">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
+          : `<div class="flw-acts">${beats ? `<button type="button" class="flw-btn pri" data-phone>📱 صوّر من موبايلك بالتيلي برومبتر</button>` : ""}<label class="flw-btn ${beats ? "" : "pri"}">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
               <button type="button" class="flw-btn" data-lib="main">☁️ أو اختر مما رفعته من قبل</button></div>${libBox("main")}`}
           ${(f.broll || []).length ? `<div class="flw-broll">${f.broll.map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="أزلها">✕</button></figure>`).join("")}</div>` : ""}</section>
         ${castBox(d)}</div>
@@ -735,6 +735,12 @@ const Flow = (() => {
     if (q("[data-why]")) return window.uiKnow?.(S.d?.knowledge);
     let b;
     if (q("[data-skipshoot]")) { reset(); return call("/skip-shoot", {}); }
+    // 📱 التصوير بيتبعت لتطبيق الموبايل: السكريبت على التيلي برومبتر، والفيديو بيرجع للخطوة دي لوحده
+    if (q("[data-phone]")) {
+      const done = await window.uiPhone?.({ kind: "shoot", fid: S.d.id, title: `صوّر «${S.d.scenario?.title || S.d.idea?.title || "الفيديو"}» بالتيلي برومبتر` });
+      if (done) { S.d = await api(`/api/flows/${S.d.id}`); render(); }
+      return;
+    }
     if ((b = q("[data-lib]"))) {
       if (S.lib?.role === b.dataset.lib) { S.lib = null; return render(); }
       S.lib = { role: b.dataset.lib, items: null }; render();

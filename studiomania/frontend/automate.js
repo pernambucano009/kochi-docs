@@ -281,7 +281,7 @@ const AutoPage = (() => {
       <div class="bm-card" hidden role="dialog"></div>
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ صِف القالب بكلامك (كتابة أو صوت)</button>
         <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وتعليق نصي، وانتظر موافقتي قبل النشر"></div>
-          <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><span class="am-recst"></span>
+          <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><button class="bm-pill" data-recphone data-nofx>📱 سجّل من موبايلك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ افهم ما قلته</button><button class="bm-pill" data-undo hidden>↩ استعد كما كان</button></div>
           <div class="am-clip" hidden></div>
           <div class="am-plan" hidden></div>
@@ -791,6 +791,7 @@ const AutoPage = (() => {
         if ((b = t.closest("[data-lanerm]"))) { const li = Number(b.dataset.lanerm); openCard(null); return saveSteps(mapLanes((L) => L.filter((_, i) => i !== li))); }
         if (t.closest("[data-desc-open]")) { S.descOpen = !S.descOpen; S.el.querySelector(".am-desc").classList.toggle("open", S.descOpen); if (S.descOpen) S.el.querySelector('[data-k="desc"]').focus(); return; }
         if (t.closest("[data-rec]")) return recToggle();
+        if (t.closest("[data-recphone]")) return recPhone();
         if (t.closest("[data-desc-go]")) {
           const box = S.el.querySelector(".am-desc"), text = box.querySelector('[data-k="desc"]').innerText.trim();
           if (!text && !S.recBlob) return toast("اكتب أو سجّل ما تريده أولًا", true);
@@ -955,6 +956,22 @@ const AutoPage = (() => {
       };
       mr.start(); S.rec_ = mr; btn.textContent = "⏹ أوقف التسجيل"; requestAnimationFrame(draw);
     } catch { toast("تعذّر فتح الميكروفون. اسمح للمتصفح يستخدمه", true); }
+  }
+  // 📱 الوصف بيتسجّل من تطبيق الموبايل، والتسجيل بيرجع هنا مكان تسجيل المتصفح بالظبط (تسمعه وبعدين «افهم»)
+  async function recPhone() {
+    const x = await window.uiPhone?.({ kind: "voice", title: `اوصف القالب بصوتك · «${S.rec?.name || "قالب مخصص"}»`,
+      prompt: "اوصف القالب بصوتك: إيه الخطوات، وإيه الشكل اللي عايزه. هنحوّل كلامك لخطوات في القالب." });
+    if (!x?.audio_url) return;
+    try {
+      const r = await fetch(x.audio_url, { credentials: "same-origin" });
+      if (!r.ok) throw new Error();
+      S.recBlob = await r.blob();
+    } catch { return toast("ما قدرناش نجيب التسجيل، جرّب تاني", true); }
+    const clip = S.el.querySelector(".am-clip");
+    if (S.recUrl) URL.revokeObjectURL(S.recUrl);
+    S.recUrl = URL.createObjectURL(S.recBlob);
+    clip.innerHTML = `<small>📱 تسجيلك من الموبايل. اسمعه قبل ما تضغط «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 احذفه</button>`;
+    clip.hidden = false;
   }
   function clipReset() {
     const clip = S.el?.querySelector(".am-clip");

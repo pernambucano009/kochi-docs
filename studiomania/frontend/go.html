@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>كمّل على موبايلك · SimsimKit</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500&display=swap">
+<style>
+  /* الصفحة اللي الـ QR بيفتحها: بتفتح التطبيق على طول على نفس الطلب، ولو التطبيق مش متسطّب بتقول كده */
+  :root { --bg: #FAFAF8; --ink: #181718; --muted: #8C8C88; --card: #FFFFFF; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0C0C0E; --ink: #F1F1F3; --muted: #8A8A92; --card: #1C1C1F; } }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--ink); font-family: "Readex Pro", sans-serif; }
+  main { width: min(360px, calc(100% - 32px)); text-align: center; background: var(--card); border-radius: 28px; padding: 32px 24px; box-shadow: 0 12px 40px rgba(24,23,24,.08); }
+  img { height: 64px; }
+  h1 { font-size: 19px; font-weight: 500; margin: 18px 0 8px; }
+  p { color: var(--muted); font-size: 13.5px; line-height: 1.8; margin: 0 0 22px; }
+  a.go { display: block; padding: 15px; border-radius: 99px; color: #FFF; text-decoration: none; font-weight: 500;
+    background: linear-gradient(180deg, #F48A62 0%, #E5613E 55%, #D44E2C 100%); box-shadow: 0 8px 22px -6px rgba(229,97,62,.65), 0 0 24px rgba(240,117,79,.32); }
+  a.go:active { transform: scale(1.06); }
+</style>
+</head>
+<body>
+<main>
+  <img src="/logo-mark-light.png" alt="SimsimKit">
+  <h1>بيفتح تطبيق سمسمكيت…</h1>
+  <p>لو التطبيق ما فتحش لوحده، دوس على الزرار. ولو مش متسطّب، نزّله الأول وادخل بنفس حسابك، وبعدين امسح الكود تاني.</p>
+  <a class="go" id="go" href="#">افتح التطبيق</a>
+</main>
+<script>
+  const id = (location.hash || "").slice(1).replace(/[^\w-]/g, "");
+  const url = id ? `simsimkit://handoff/${id}` : "simsimkit://";
+  document.getElementById("go").href = url;
+  if (id) location.href = url;
+</script>
+</body>
+</html>

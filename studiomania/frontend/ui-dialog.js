@@ -91,4 +91,44 @@
   };
   window.uiPrompt = (msg, def, opts) => open("prompt", msg, def, opts);
   window.uiAlert = (msg, opts) => open("alert", msg, null, opts);
+
+  // 📱 «كمّل على موبايلك»: الخطوة بتتبعت لتطبيق الموبايل (إشعار + QR)، والمربع بيستنى لحد ما الموبايل يرجّع النتيجة.
+  // await uiPhone({kind:"shoot", fid}) أو uiPhone({kind:"voice", title, prompt}) ← الطلب بعد ما يخلص، أو null لو اتلغى
+  const hreq = async (path, init = {}) => {
+    const r = await fetch(path, { credentials: "same-origin", ...init, headers: { "Content-Type": "application/json", ...(init.headers || {}) } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب مرة أخرى");
+    return d;
+  };
+  window.uiPhone = async (req) => {
+    let h;
+    try { h = await hreq("/api/handoff", { method: "POST", body: JSON.stringify(req) }); } catch (err) { uiAlert(err.message); return null; }
+    return new Promise((resolve) => {
+      const back = document.createElement("div");
+      back.className = "ui-dlg";
+      back.setAttribute("role", "dialog");
+      back.setAttribute("aria-modal", "true");
+      const qr = `/api/handoff/${h.id}/qr.svg?base=${encodeURIComponent(location.origin)}`;
+      back.innerHTML = `<div class="ui-dlg-box" dir="rtl" style="text-align:center">
+        <p class="ui-dlg-msg" style="margin-bottom:6px"><b>📱 كمّل على موبايلك</b></p>
+        <p style="margin:0 0 14px;font-size:13px;opacity:.72;line-height:1.7">${esc(req.kind === "shoot" ? "وصلك إشعار على تطبيق سمسمكيت: افتحه وصوّر بالتيلي برومبتر، والفيديو يرجع هنا لوحده." : "وصلك إشعار على تطبيق سمسمكيت: سجّل بصوتك، والتسجيل يرجع هنا لوحده.")}<br>ما وصلكش؟ صوّر الكود ده بكاميرا الموبايل.</p>
+        <img src="${qr}" alt="QR" width="190" height="190" style="width:190px;height:190px;box-sizing:border-box;border-radius:16px;background:#fff;padding:6px">
+        <p data-st style="margin:12px 0 16px;font-size:13px;opacity:.8">⏳ مستني الموبايل…</p>
+        <div class="ui-dlg-acts" style="justify-content:center"><button type="button" class="ui-dlg-no">إلغاء</button></div></div>`;
+      let timer = 0, over = false;
+      const finish = (val) => {
+        if (over) return; over = true;
+        clearInterval(timer); document.removeEventListener("keydown", key, true); back.remove(); resolve(val);
+      };
+      const cancel = () => { hreq(`/api/handoff/${h.id}`, { method: "DELETE" }).catch(() => {}); finish(null); };
+      const key = (e) => { if (e.key === "Escape") { e.preventDefault(); cancel(); } };
+      back.querySelector(".ui-dlg-no").onclick = cancel;
+      document.addEventListener("keydown", key, true);
+      document.body.appendChild(back);
+      timer = setInterval(async () => {
+        const x = await hreq(`/api/handoff/${h.id}`).catch(() => null);
+        if (x?.status === "done") { back.querySelector("[data-st]").textContent = "✓ وصل من الموبايل"; setTimeout(() => finish(x), 700); }
+      }, 3000);
+    });
+  };
 })();

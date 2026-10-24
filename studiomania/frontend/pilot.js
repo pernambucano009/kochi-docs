@@ -256,7 +256,7 @@ const PilotPage = (() => {
         <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
     } else if (j.status === "cam") {
       body = `${(j.script || []).length ? `<p class="ap-say">${j.script.map(esc).join("<br>")}</p>` : ""}
-        <div class="ap-acts"><label class="ok">📱 ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+        <div class="ap-acts"><button type="button" class="ok" data-phone="${esc(j.id)}">📱 صوّر من موبايلك بالتيلي برومبتر</button><label>⬆ ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "failed") {
       body = `<span class="ap-err">${esc(j.error || "")}</span><div class="ap-acts"><button type="button" data-retry="${esc(j.id)}">جرّب مرة أخرى</button><button type="button" data-del="${esc(j.id)}">احذفها</button></div>`;
     } else if (j.status === "done" && (j.images || []).length) {
@@ -329,6 +329,10 @@ const PilotPage = (() => {
       const b = e.target.closest("button, a"); const d = b?.dataset || {};
       if (!b) { if (!e.target.closest("[data-dock]") && S.open) { S.open = false; drawQ(); } return; }
       const s = S.d.settings;
+      if (d.phone) {
+        const j = S.d.jobs.find((x) => x.id === d.phone);
+        return window.uiPhone?.({ kind: "shoot", jid: d.phone, title: `صوّر «${j?.title || "فيديو الأوتوبايلوت"}» بالتيلي برومبتر` }).then((x) => x && refresh());
+      }
       if ("on" in d) return save({ on: !s.on }, !s.on ? "الأوتوبايلوت اشتغل" : "الأوتوبايلوت أُغلق، ولا يوجد شيء جديدة ستبدأ تلقائيًا");
       if (d.cnt) { const n = Math.max(1, Math.min(6, s.times.length + +d.cnt)); s.times = autoTimes(n); drawDay(); return saveTimes(); }
       if (d.tpl) {

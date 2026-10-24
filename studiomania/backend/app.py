@@ -27424,7 +27424,10 @@ def phone_set_footage(fid: str, item: dict, role: str) -> dict:
         elif item["gen_id"] not in [x["gen_id"] for x in f.get("broll") or []]:
             f.setdefault("broll", []).append(item)
             f["broll"] = f["broll"][-12:]
-    return flow_update(fid, fn)
+    d = flow_update(fid, fn)
+    if role == "main":
+        handoff_finish_flow(fid)
+    return d
 
 
 @app.post("/api/flows/{fid}/footage")
@@ -30455,6 +30458,121 @@ def pilot_push(j: dict) -> None:
         except HTTPException:
             pass
     push_send(title, f"«{name}» · {body}" if name else body, {"kind": "pilot", "jid": j["id"], "gate": gate})
+
+
+# 📱 «كمّل على موبايلك»: خطوة على الويب (تصوير بالسكريبت أو تسجيل صوت) بتتبعت للموبايل بإشعار أو QR،
+# والموبايل بيرجّع النتيجة لنفس الخطوة والويب شايفها لوحده (بيسأل كل كام ثانية)
+HANDOFF_FILE = DATA_DIR / "handoffs.json"
+HANDOFF_DIR = DATA_DIR / "handoff"
+HANDOFF_LOCK = threading.Lock()
+HANDOFF_KINDS = ("shoot", "voice")
+
+
+def handoffs_load() -> list[dict]:
+    try:
+        return [h for h in json.loads(HANDOFF_FILE.read_text(encoding="utf-8")) if isinstance(h, dict)]
+    except (OSError, ValueError):
+        return []
+
+
+def handoff_update(fn) -> list[dict]:
+    with HANDOFF_LOCK:
+        hs = handoffs_load()
+        fn(hs)
+        HANDOFF_FILE.write_text(json.dumps(hs[-60:], ensure_ascii=False), encoding="utf-8")
+        return hs
+
+
+def handoff_get(hid: str) -> dict:
+    h = next((x for x in handoffs_load() if x["id"] == hid), None)
+    if not h:
+        raise HTTPException(404, "الطلب ده مش موجود أو خلص")
+    return h
+
+
+def handoff_dict(h: dict) -> dict:
+    return {**h, "link": f"simsimkit://handoff/{h['id']}", "open_url": f"/go#{h['id']}",
+            "audio_url": f"/api/handoff/{h['id']}/audio" if h.get("audio") else None}
+
+
+def handoff_finish_flow(fid: str) -> None:
+    """الفيديو وصل للمشروع (من أي طريق): أي طلب تصوير مستني على المشروع ده بيخلص."""
+    def fn(hs):
+        for h in hs:
+            if h.get("fid") == fid and h["kind"] == "shoot" and h["status"] == "waiting":
+                h.update(status="done", done_at=now())
+    handoff_update(fn)
+
+
+class HandoffIn(BaseModel):
+    kind: str
+    fid: str = ""
+    jid: str = ""
+    title: str = ""
+    prompt: str = ""
+
+
+@app.post("/api/handoff")
+def handoff_new(body: HandoffIn):
+    if body.kind not in HANDOFF_KINDS:
+        raise HTTPException(400, "نوع الطلب غير معروف")
+    fid = body.fid.strip()
+    if body.kind == "shoot":
+        if body.jid and not fid:
+            fid = (next((j for j in pilot_load()["jobs"] if j["id"] == body.jid), None) or {}).get("fid") or ""
+        flow_load(fid)   # المشروع لازم يكون موجود وبتاع العميل ده
+    h = {"id": uuid.uuid4().hex[:10], "kind": body.kind, "fid": fid or None, "jid": body.jid.strip() or None,
+         "title": body.title.strip()[:120] or ("صوّر الفيديو بالسكريبت" if body.kind == "shoot" else "سجّل بصوتك"),
+         "prompt": body.prompt.strip()[:600], "status": "waiting", "created_at": now()}
+    handoff_update(lambda hs: hs.append(h))
+    push_send("📱 كمّل على موبايلك", h["title"], {"kind": "handoff", "hid": h["id"]})
+    return handoff_dict(h)
+
+
+@app.get("/api/handoff/{hid}")
+def handoff_read(hid: str):
+    return handoff_dict(handoff_get(hid))
+
+
+@app.delete("/api/handoff/{hid}")
+def handoff_cancel(hid: str):
+    handoff_update(lambda hs: hs.__setitem__(slice(None), [x for x in hs if x["id"] != hid]))
+    return {"ok": True}
+
+
+@app.get("/api/handoff/{hid}/qr.svg")
+def handoff_qr(hid: str, base: str = ""):
+    """QR بيفتح صفحة صغيرة على الموقع، والصفحة بتفتح التطبيق على الطلب ده (كاميرا الموبايل العادية بتقرا https)."""
+    import segno
+    handoff_get(hid)
+    origin = base if re.fullmatch(r"https?://[\w.:-]+", base or "") else "https://simsimkit.com"
+    buf = io.BytesIO()
+    segno.make(f"{origin}/go#{hid}", error="m").save(buf, kind="svg", scale=7, border=2, dark="#181718")
+    return Response(buf.getvalue(), media_type="image/svg+xml")
+
+
+@app.post("/api/handoff/{hid}/voice")
+def handoff_voice(hid: str, file: UploadFile = File(...)):
+    h = handoff_get(hid)
+    if h["kind"] != "voice":
+        raise HTTPException(400, "الطلب ده مش تسجيل صوت")
+    HANDOFF_DIR.mkdir(parents=True, exist_ok=True)
+    name = save_upload(file, IDEA_AUDIO_EXT, HANDOFF_DIR, f"h_{hid}")
+    def fn(hs):
+        for x in hs:
+            if x["id"] == hid:
+                x.update(status="done", audio=name, done_at=now())
+    handoff_update(fn)
+    return handoff_dict(handoff_get(hid))
+
+
+@app.get("/api/handoff/{hid}/audio")
+def handoff_audio(hid: str):
+    h = handoff_get(hid)
+    f = HANDOFF_DIR / Path(h.get("audio") or "_").name
+    if not f.is_file():
+        raise HTTPException(404, "لسه مفيش تسجيل")
+    return FileResponse(f)
 
 
 class PushIn(BaseModel):

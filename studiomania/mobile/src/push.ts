@@ -37,7 +37,8 @@ export async function unregisterPush() {
 }
 
 function openFrom(r: Notifications.NotificationResponse | null) {
-  const d = r?.notification.request.content.data as { kind?: string; jid?: string; gate?: string } | undefined;
+  const d = r?.notification.request.content.data as { kind?: string; jid?: string; gate?: string; hid?: string } | undefined;
+  if (d?.kind === "handoff" && d.hid) { router.navigate({ pathname: "/handoff/[id]", params: { id: d.hid } }); return; }
   if (d?.kind !== "pilot") return;
   router.navigate({ pathname: "/approvals", params: { jid: d.jid || "" } });
 }
