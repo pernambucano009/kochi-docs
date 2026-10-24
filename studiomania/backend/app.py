@@ -186,12 +186,17 @@ def db() -> sqlite3.Connection:
         # 🔗 فولدر متشارك بين البراندات (من «مكتبة محتويات البراند»): vis(client_id, 'chars') بيعرض بتاع كل البراندات
         sk = set(_BRAND["s"])
         conn.create_function("vis", 2, lambda cid, k: 1 if k in sk or (cid == c if cid else (not c or c == f)) else 0, deterministic=True)
+        # 🗂️ الفيديوهات الجاهزة والمنشورات: القديم اللي مالوش براند مايظهرش في أي براند (مش بيتحسب على أول براند)
+        conn.create_function("own", 1, lambda cid: 1 if (not c or (cid and cid == c)) else 0, deterministic=True)
+        conn.create_function("vis_own", 2, lambda cid, k: 1 if (not c or (cid and (k in sk or cid == c))) else 0, deterministic=True)
         for t in BRAND_TABLES:
             conn.execute(f"CREATE TEMP TRIGGER IF NOT EXISTS brand_{t} AFTER INSERT ON main.{t} WHEN NEW.client_id IS NULL AND cur_brand() IS NOT NULL "
                          f"BEGIN UPDATE {t} SET client_id = cur_brand() WHERE rowid = NEW.rowid; END")
     else:
         conn.create_function("mine", 1, lambda cid: 1)
         conn.create_function("vis", 2, lambda cid, k: 1)
+        conn.create_function("own", 1, lambda cid: 1)
+        conn.create_function("vis_own", 2, lambda cid, k: 1)
     return conn
 
 
@@ -3515,7 +3520,7 @@ def list_exports():
         coaches = {r["id"]: {"id": r["id"], "name": r["name"], "instagram": r["instagram"], "tiktok": r["tiktok"]}
                    for r in conn.execute("SELECT id, name, instagram, tiktok FROM coaches")}
         out = []
-        for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC"):
+        for r in conn.execute("SELECT * FROM exports WHERE vis_own(client_id, 'exports') ORDER BY created_at DESC"):
             e = export_to_dict(r)
             e["coach"] = coaches.get(coach_of.get(r["project_id"]))
             out.append(e)
@@ -3626,6 +3631,61 @@ MOCK_ACCOUNTS = [{"id": "m-tt1", "platform": "tiktok", "name": "حساب تجر�
                  {"id": "m-ig1", "platform": "instagram", "name": "إنستا تجريبي", "username": "demo.ig", "avatar": None, "url": None, "needs_reconnect": True}]
 
 
+# 🔗 كل حساب سوشيال تبع براند: التعليقات والرسائل والحسابات اللي بتظهر للنشر بتاعة البراند المفتوح بس.
+# حساب مش متحدد له براند بيظهر في كل البراندات لحد ما تحدده، وأي حساب جديد بيتربط بيتسجّل على البراند المفتوح وقتها.
+def acct_brands() -> dict:
+    try:
+        return json.loads(auth.get_setting("acct_brand") or "{}")
+    except ValueError:
+        return {}
+
+
+def acct_visible(account_id: str | None) -> bool:
+    b = acct_brands().get(str(account_id or ""))
+    return not b or not brain_row(b) or b == active_client_id()
+
+
+def acct_tag(lst: list[dict]) -> list[dict]:
+    """الحسابات بالبراند بتاعها، والجديد منها (أول مرة يظهر) يتسجّل على البراند المفتوح."""
+    m = acct_brands()
+    try:
+        seen = set(json.loads(auth.get_setting("acct_seen") or "null") or [])
+        first = auth.get_setting("acct_seen") is None
+    except ValueError:
+        seen, first = set(), True
+    cur, changed = active_client_id(), False
+    for a in lst:
+        if a["id"] not in seen:
+            seen.add(a["id"])
+            changed = True
+            if not first and cur and a["id"] not in m:
+                m[a["id"]] = cur
+    if changed:
+        auth.set_setting("acct_seen", json.dumps(sorted(seen)))
+        auth.set_setting("acct_brand", json.dumps(m))
+    names = {b["id"]: b["name"] for b in list_brains()}
+    return [{**a, "brand_id": m.get(a["id"]) if m.get(a["id"]) in names else None, "brand": names.get(m.get(a["id"]), ""),
+             "visible": acct_visible(a["id"])} for a in lst]
+
+
+class AcctBrandIn(BaseModel):
+    client_id: str = ""
+
+
+@app.post("/api/publisher/accounts/{account_id}/brand")
+def publisher_account_brand(account_id: str, body: AcctBrandIn):
+    """الحساب ده تبع أنهي براند (فاضي = كل البراندات)."""
+    m = acct_brands()
+    if body.client_id and not brain_row(body.client_id):
+        raise HTTPException(404, "البراند ده غير موجود")
+    if body.client_id:
+        m[account_id] = body.client_id
+    else:
+        m.pop(account_id, None)
+    auth.set_setting("acct_brand", json.dumps(m))
+    return publisher_status()
+
+
 @app.get("/api/publisher")
 def publisher_status():
     service = publisher.service_name()
@@ -3637,14 +3697,17 @@ def publisher_status():
             error = f"تعذّر الوصول لخدمة النشر: {exc}"
     elif service == "mock":
         lst = MOCK_ACCOUNTS
+    lst = acct_tag(lst)
     linked: dict = {}
     for a in lst:
-        linked.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
+        if a["visible"]:
+            linked.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
     return {
         "service": service,
         "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
         "accounts": linked,            # أول حساب لكل منصة (القديم)
-        "account_list": lst,           # كل الحسابات (أكتر من حساب على نفس المنصة)
+        "account_list": lst,           # كل الحسابات (أكتر من حساب على نفس المنصة)، وكل حساب تبع أنهي براند و«visible» = بتاع البراند المفتوح
+        "brands": [{"id": b["id"], "name": b["name"]} for b in list_brains()],
         "credentials": sorted(publisher.CREDENTIALS),   # بتتربط بفورم عندنا (من غير تسجيل دخول)
         "soon": publisher.SOON,                          # لسه مش متاحة عند المنصة: «قريبًا»
         "not_for_posts": sorted(publisher.NOT_FOR_POSTS),
@@ -3777,7 +3840,7 @@ def publisher_disconnect(account_id: str):
 @app.get("/api/posts")
 def list_posts():
     with closing(db()) as conn:
-        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) ORDER BY p.scheduled_at")]
+        return [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE own(p.client_id) ORDER BY p.scheduled_at")]
 
 
 class PostOptions(BaseModel):
@@ -3985,7 +4048,7 @@ def _remote_orphans() -> list[dict]:
 def published_posts():
     """ما نُشر: من Zernio (بلينك المنشور على كل منصة)، وإذا لا يوجد Zernio من القائمة هنا."""
     with closing(db()) as conn:
-        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' AND mine(p.client_id) ORDER BY p.published_at DESC")]
+        local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' AND own(p.client_id) ORDER BY p.published_at DESC")]
     if publisher.service_name() != "zernio":
         return [{"id": p["id"], "content": p["caption"], "published_at": p["published_at"] or p["scheduled_at"],
                  "media_url": p["export_url"], "name": p["export_name"],
@@ -4535,7 +4598,9 @@ def _inbox_call(fn, *args):
 
 @app.get("/api/inbox/comments")
 def inbox_posts(cursor: str | None = None):
-    return _inbox_call(publisher.inbox_posts, 50, cursor)
+    r = _inbox_call(publisher.inbox_posts, 50, cursor)
+    r["posts"] = [p for p in r.get("posts") or [] if acct_visible(p.get("account_id"))]   # تعليقات حسابات البراند المفتوح بس
+    return r
 
 
 @app.get("/api/inbox/comments/{post_id}")
@@ -4559,7 +4624,11 @@ def inbox_reply(post_id: str, body: InboxReplyIn):
 
 @app.get("/api/inbox/conversations")
 def inbox_conversations(cursor: str | None = None):
-    return _inbox_call(publisher.inbox_conversations, 50, cursor)
+    r = _inbox_call(publisher.inbox_conversations, 50, cursor)
+    key = next((k for k in ("conversations", "items", "data") if isinstance(r.get(k), list)), None)
+    if key:   # رسائل حسابات البراند المفتوح بس
+        r[key] = [c for c in r[key] if acct_visible(c.get("account_id") or c.get("accountId"))]
+    return r
 
 
 @app.get("/api/inbox/conversations/{conv_id}/messages")
@@ -5721,7 +5790,7 @@ def ads_social() -> list[dict]:
     if publisher.service_name() == "mock":
         return MOCK_ACCOUNTS
     try:
-        return publisher.account_list()
+        return [a for a in publisher.account_list() if acct_visible(a["id"])]
     except (publisher.PublishError, httpx.HTTPError):
         return []
 
@@ -5756,13 +5825,13 @@ def ads_get():
     except (adsmgr.AdsError, publisher.PublishError, httpx.HTTPError) as exc:
         out["error"] = str(exc)[:300]
     with closing(db()) as conn:
-        rows = conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 40").fetchall()
+        rows = conn.execute(POSTS_QUERY + " WHERE own(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 40").fetchall()
         out["posts"] = [{"id": r["id"], "caption": (r["caption"] or "")[:160], "published_at": r["published_at"], "name": r["export_name"] or r["carousel_name"] or "",
                          "platforms": [publisher.split_target(t)[0] for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] in ADS_BOOSTABLE]}
                         for r in rows]
         out["posts"] = [p for p in out["posts"] if p["platforms"]]
         out["exports"] = [{"id": r["id"], "name": r["name"], "url": f"/media/exports/{r['filename']}"}
-                          for r in conn.execute("SELECT id, name, filename FROM exports WHERE mine(client_id) ORDER BY created_at DESC LIMIT 40")]
+                          for r in conn.execute("SELECT id, name, filename FROM exports WHERE own(client_id) ORDER BY created_at DESC LIMIT 40")]
     return out
 
 
@@ -6096,7 +6165,7 @@ def wa_get():
     except (wacamp.WaError, publisher.PublishError, httpx.HTTPError) as exc:
         out["error"] = str(exc)[:300]
     with closing(db()) as conn:
-        rows = conn.execute(POSTS_QUERY + " WHERE mine(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 30").fetchall()
+        rows = conn.execute(POSTS_QUERY + " WHERE own(p.client_id) AND p.status = 'published' AND p.remote_id IS NOT NULL ORDER BY p.published_at DESC LIMIT 30").fetchall()
     out["posts"] = [{"id": r["id"], "caption": (r["caption"] or "")[:120], "platforms": [p for p in (publisher.split_target(t)[0] for t in json.loads(r["platforms"])) if p in ("instagram", "facebook")]}
                     for r in rows]
     out["posts"] = [p for p in out["posts"] if p["platforms"]]
@@ -28403,7 +28472,7 @@ def content_account():
     """📦 كل ما في حساب العلامة داخل «مكتبة المحتويات»: الشخصيات (صورها وصوتها)، نسختي (صورك وصوتك وأماكنك)، والفيديوهات الجاهزة."""
     with closing(db()) as conn:
         chars = [coach_to_dict(r) for r in conn.execute("SELECT * FROM coaches WHERE vis(client_id, 'chars') ORDER BY name")]
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC LIMIT 120")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis_own(client_id, 'exports') ORDER BY created_at DESC LIMIT 120")]
     return {"characters": [{k: c.get(k) for k in ("id", "name", "image_url", "voice_url", "about", "sheet")} for c in chars],
             "twins": [{k: t.get(k) for k in ("id", "name", "photos", "voice_url", "backgrounds")} for t in twins_list()],
             "exports": exports}
@@ -29326,7 +29395,7 @@ def auto_refs(q: str = "") -> list[dict]:
             out.append({"kind": "char", "id": str(c["id"]), "label": c["name"], "thumb": c["image_url"], "sub": "شخصية"})
             if c.get("voice_url"):
                 out.append({"kind": "audio", "id": f"cv:{c['id']}", "label": f"صوت {c['name']}", "thumb": c["image_url"], "sub": "🎙️ صوت شخصية"})
-        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis(client_id, 'exports') ORDER BY created_at DESC LIMIT 40")]
+        exports = [export_to_dict(r) for r in conn.execute("SELECT * FROM exports WHERE vis_own(client_id, 'exports') ORDER BY created_at DESC LIMIT 40")]
     for t in twins_list():
         ph = next((p for p in t.get("photos") or [] if p.get("angle") in ("front", "smile")), None) or next(iter(t.get("photos") or []), None)
         if ph:

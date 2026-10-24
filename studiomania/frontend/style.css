@@ -3170,3 +3170,7 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .login .logo-mark { width: auto; height: 84px; flex: none; }
 /* 🔤 الواجهة العربي فصحى بس: العناوين الإنجليزي الصغيرة فوق الأقسام بتظهر في الإنجليزي بس */
 html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }
+/* 🔗 الحساب تبع أنهي براند */
+.pa-brand { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.pa-brand select { font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); }
+.pa-brand.other select { opacity: .7; }

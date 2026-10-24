@@ -15,7 +15,7 @@ async function initPublish() {
   pub.platforms = info.platforms;
   pub.service = info.service;
   pub.accounts = info.accounts || {};
-  pub.list = info.account_list || [];
+  setAcc(info);
   pub.creds = info.credentials || [];
   pub.soon = info.soon || {};
   pub.noPost = info.not_for_posts || [];
@@ -178,7 +178,9 @@ function pLogo(k, cls = "") {
   return `<i class="plogo ${cls}" style="--pb:${l[1]};--pf:${l[2]}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${l[0]}"/></svg></i>`;
 }
 const platOf = (t) => String(t).split("@")[0];
-const accOf = (id) => (pub.list || []).find((a) => a.id === id);
+// 🔗 pub.all = كل الحسابات المربوطة (لإدارتها وتحديد كل حساب تبع أنهي براند)، pub.list = حسابات البراند المفتوح بس (للنشر)
+function setAcc(info) { pub.all = info.account_list || []; pub.list = pub.all.filter((a) => a.visible !== false); pub.brands = info.brands || []; }
+const accOf = (id) => (pub.all || pub.list || []).find((a) => a.id === id);
 // اسم الهدف: المنصة، ولو عندك أكتر من حساب عليها بيتكتب الحساب كمان
 function tLabel(t) {
   const [p, id] = String(t).split("@"), name = pub.platforms[p] || p, a = id && accOf(id);
@@ -193,22 +195,25 @@ function renderAccounts() {
   box.hidden = !pub.service;
   if (!pub.service) return;
   const plats = Object.entries(pub.platforms);
-  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر تنشر على أي حساب وأنت تجدول.</small></div>
-    <div class="pa-grid">${plats.filter(([k]) => pub.list.some((a) => a.platform === k)).map(([k, label]) => {
-      const accs = pub.list.filter((a) => a.platform === k);
+  pub.all ||= pub.list || [];
+  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر تنشر على أي حساب وأنت تجدول. ${(pub.brands || []).length > 1 ? "وحدد كل حساب تبع أنهي براند: تعليقاته ورسائله والنشر عليه بيظهروا في البراند ده بس." : ""}</small></div>
+    <div class="pa-grid">${plats.filter(([k]) => pub.all.some((a) => a.platform === k)).map(([k, label]) => {
+      const accs = pub.all.filter((a) => a.platform === k);
       return `<div class="pa-plat ${accs.length ? "on" : ""}">
         <div class="pa-ph">${pLogo(k)}<b>${escapeHtml(label)}</b>
           <button type="button" class="pa-add" data-paadd="${k}" title="اربط حساب ${escapeHtml(label)}">＋</button></div>
         ${accs.map((a) => `<div class="pa-acc${a.needs_reconnect ? " bad" : ""}">
           ${a.avatar ? `<img src="${escapeHtml(a.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i>${escapeHtml((a.name || a.username || "?").slice(0, 1))}</i>`}
           <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}
-            ${a.needs_reconnect ? `<small class="err">يحتاج يتربط مرة أخرى</small>` : ""}</span>
+            ${a.needs_reconnect ? `<small class="err">يحتاج يتربط مرة أخرى</small>` : ""}
+            ${(pub.brands || []).length > 1 ? `<label class="pa-brand${a.visible === false ? " other" : ""}" title="الحساب ده تبع أنهي براند: تعليقاته ورسائله ونشره بيظهروا في البراند ده بس">تبع
+              <select data-pabrand="${escapeHtml(a.id)}"><option value="">كل البراندات</option>${pub.brands.map((b) => `<option value="${escapeHtml(b.id)}"${b.id === a.brand_id ? " selected" : ""}>${escapeHtml(b.name)}</option>`).join("")}</select></label>` : ""}</span>
           ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط مرة أخرى</button>` : ""}
           <button type="button" class="pa-x" data-padel="${escapeHtml(a.id)}" data-paname="${escapeHtml(a.name || a.username)}" title="افصل الحساب">✕</button></div>`).join("")}
       </div>`;
     }).join("")}</div>
-    <div class="pa-more"><small class="muted">${pub.list.length ? "اربط منصة أخرى:" : "اربط أول حساب:"}</small>
-      ${plats.filter(([k]) => !pub.list.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
+    <div class="pa-more"><small class="muted">${pub.all.length ? "اربط منصة أخرى:" : "اربط أول حساب:"}</small>
+      ${plats.filter(([k]) => !pub.all.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
         ? `<span class="pa-chip soon" title="${escapeHtml(pub.soon[k])}">${pLogo(k, "sm")}${escapeHtml(label)} <em>قريبًا</em></span>`
         : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسايل</em>` : ""}</button>`).join("")}</div>`;
 }
@@ -227,7 +232,7 @@ function paModal(html) {
   document.body.appendChild(back);
   return { el: back, close };
 }
-const paRefresh = (info) => { pub.list = info.account_list || []; pub.accounts = info.accounts || {}; renderAccounts(); renderPlatformBoxes(); };
+const paRefresh = (info) => { setAcc(info); pub.accounts = info.accounts || {}; renderAccounts(); renderPlatformBoxes(); };
 // المنصات اللي من غير تسجيل دخول: فورم عندنا
 const PA_FORMS = {
   bluesky: { t: "اربط بلوسكاي", fields: [["identifier", "اسم الحساب أو البريد الإلكتروني", "you.bsky.social", "ltr"], ["password", "كلمة مرور التطبيق (App Password)", "xxxx-xxxx-xxxx-xxxx", "ltr"]],
@@ -301,6 +306,13 @@ async function connectReturn() {
     catch (err) { toast(err.message, true); m.close(); }
   });
 }
+// الحساب ده تبع أنهي براند
+document.addEventListener("change", async (e) => {
+  const sel = e.target.closest?.("[data-pabrand]");
+  if (!sel) return;
+  try { paRefresh(await api(`/api/publisher/accounts/${encodeURIComponent(sel.dataset.pabrand)}/brand`, { method: "POST", ...jsonBody({ client_id: sel.value }) })); toast("✓ اتحفظ"); }
+  catch (err) { toast(err.message, true); }
+});
 document.addEventListener("click", async (e) => {
   const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
   if (!add && !del) return;
@@ -315,7 +327,7 @@ document.addEventListener("click", async (e) => {
       location.assign(r.url);
     } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ المنشورات المتجدولة عليه لن تنزل.`))) {
       const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
-      pub.list = info.account_list || [];
+      setAcc(info);
       pub.accounts = info.accounts || {};
       renderAccounts(); renderPlatformBoxes();
       toast("فُصل");
@@ -327,7 +339,7 @@ window.addEventListener("focus", async () => {
   pub.waitLink = false;
   try {
     const info = await api("/api/publisher");
-    pub.list = info.account_list || []; pub.accounts = info.accounts || {};
+    setAcc(info); pub.accounts = info.accounts || {};
     renderAccounts(); renderPlatformBoxes();
   } catch { /* غير مهم */ }
 });
