@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<title>SimsimKit · Landing (Mobile)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&amp;family=Alexandria:wght@300;400;500;600&amp;family=Readex+Pro:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:#E5613E}
+button{font:inherit;color:inherit}
+.sk-go{border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 8px 22px -6px rgba(229,97,62,.65)}
+.m-card{background:#FFFFFF;box-shadow:0 4px 18px rgba(24,23,24,.08);border-radius:20px}
+.m-vid{transition:border-color .3s}.m-vid:hover{border-color:#E5613E !important}
+</style>
+</helmet>
+<div dir="rtl" style="position: relative; width: 390px; height: 4240px; overflow: hidden; background: #FAFAF8; color: #181718; font-family: 'Alexandria', 'Readex Pro', sans-serif; display: flex; flex-direction: column">
+
+  <header style="height: 56px; padding: 0 16px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; flex: none">
+    <a href="#top" style="display: flex; align-items: center; gap: 8px; min-height: 44px; font: 500 13px Jost, sans-serif; letter-spacing: .3em"><img src="/_blob/379b1415dcab42f9d2fa372cf6fce3e1" alt="" style="height: 22px; width: auto">SIMSIMKIT</a>
+    <div style="display: flex; align-items: center; gap: 8px">
+      <button type="button" aria-label="Switch to English" style="height: 40px; width: 48px; border-radius: 20px; border: 0; background: #FFFFFF; box-shadow: 0 4px 18px rgba(24,23,24,.08); cursor: pointer; font: 400 13px Jost, sans-serif; letter-spacing: .16em">EN</button>
+      <button type="button" aria-label="القائمة" style="height: 40px; width: 40px; border-radius: 20px; border: 0; background: #FFFFFF; box-shadow: 0 4px 18px rgba(24,23,24,.08); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </header>
+
+  <!-- أول شاشة: العنوان والجملة والزرار -->
+  <section id="top" style="padding: 18px 20px 0; display: flex; flex-direction: column; gap: 14px">
+    <h1 style="margin: 0; font: 600 30px/1.35 'Alexandria', sans-serif">محتوى كل يوم، من غير فريق</h1>
+    <p style="margin: 0; font: 400 15px/1.8 'Alexandria', sans-serif; color: #6B6B67">سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.</p>
+    <button type="button" class="sk-go" style="width: 100%; height: 52px; border-radius: 26px; font: 500 16px 'Alexandria', sans-serif">ابدأ مجانًا</button>
+    <p style="margin: 0; text-align: center; font: 400 12.5px 'Alexandria', sans-serif; color: #6B6B67">300 نقطة مجانًا للتجربة · بدون بطاقة</p>
+    <img src="/_blob/dc713995ae7a9f826ffae824497d342b" alt="" style="width: 230px; height: auto; align-self: center; margin-top: -6px">
+  </section>
+
+  <!-- مكان الفيديو -->
+  <section style="padding: 8px 20px 0">
+    <button type="button" class="m-vid" aria-label="شاهد العرض" style="width: 100%; height: 197px; box-sizing: border-box; border-radius: 20px; border: 1.5px dashed rgba(229,97,62,.45); background: #F3F2EF; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #6B6B67; font: 400 13px 'Alexandria', sans-serif">
+      <span style="width: 64px; height: 64px; border-radius: 32px; background: #FFFFFF; box-shadow: 0 8px 22px rgba(24,23,24,.12); display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="#E5613E" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg></span>
+      [مكان فيديو العرض · 30 ثانية]
+    </button>
+  </section>
+
+  <!-- كيف يشتغل -->
+  <section style="padding: 34px 20px 0; display: flex; flex-direction: column; gap: 12px">
+    <h2 style="margin: 0 0 4px; font: 600 22px/1.3 'Alexandria', sans-serif">كيف يشتغل؟</h2>
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+      <div class="m-card" style="padding: 16px; display: flex; gap: 14px; align-items: flex-start">
+        <span style="{{stepNum}}">{{s.n}}</span>
+        <div>
+          <h3 style="margin: 0; font: 600 15px 'Alexandria', sans-serif">{{s.t}}</h3>
+          <p style="margin: 4px 0 0; font: 400 13.5px/1.7 'Alexandria', sans-serif; color: #6B6B67">{{s.d}}</p>
+        </div>
+      </div>
+    </sc-for>
+  </section>
+
+  <!-- أمثلة لمجالك -->
+  <section style="padding: 34px 20px 0; display: flex; flex-direction: column; gap: 12px">
+    <h2 style="margin: 0; font: 600 22px/1.3 'Alexandria', sans-serif">أمثلة لمجالك</h2>
+    <p style="margin: 0; font: 400 14px/1.7 'Alexandria', sans-serif; color: #6B6B67">اختر مجالك وشاهد فيديوهات جاهزة بلهجتك.</p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <sc-for list="{{fields}}" as="f" hint-placeholder-count="5">
+        <button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="{{f.style}}">{{f.name}}</button>
+      </sc-for>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+      <sc-for list="{{samples}}" as="x" hint-placeholder-count="3">
+        <div style="height: 196px; box-sizing: border-box; border-radius: 16px; background: #F3F2EF; border: 1.5px dashed rgba(229,97,62,.4); display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; font: 400 12px/1.5 'Alexandria', sans-serif; color: #6B6B67">{{x.t}}</div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- المميزات -->
+  <section style="padding: 34px 20px 0; display: flex; flex-direction: column; gap: 12px">
+    <h2 style="margin: 0; font: 600 22px/1.3 'Alexandria', sans-serif">كل ما تحتاجه في مكان واحد</h2>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <sc-for list="{{feats}}" as="c" hint-placeholder-count="6">
+        <article class="m-card" style="padding: 14px; box-sizing: border-box">
+          <span style="{{iconWrap}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{c.icon}}"/></svg></span>
+          <h3 style="margin: 10px 0 4px; font: 600 14px 'Alexandria', sans-serif">{{c.title}}</h3>
+          <p style="margin: 0; font: 400 12.5px/1.65 'Alexandria', sans-serif; color: #6B6B67">{{c.text}}</p>
+        </article>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- الأسعار -->
+  <section style="padding: 34px 20px 0; display: flex; flex-direction: column; gap: 12px">
+    <h2 style="margin: 0; font: 600 22px/1.3 'Alexandria', sans-serif">باقات بسيطة، وتبدأ مجانًا</h2>
+    <div style="align-self: flex-start; display: flex; gap: 4px; padding: 4px; border-radius: 22px; background: #FFFFFF; box-shadow: 0 4px 18px rgba(24,23,24,.08)">
+      <span style="height: 34px; padding: 0 14px; border-radius: 17px; display: flex; align-items: center; color: #FFFFFF; background: #E5613E; font: 400 13px 'Alexandria', sans-serif">شهري</span>
+      <span style="height: 34px; padding: 0 14px; border-radius: 17px; display: flex; align-items: center; font: 400 13px 'Alexandria', sans-serif">سنوي · شهران مجانًا</span>
+    </div>
+    <sc-for list="{{plans}}" as="p" hint-placeholder-count="3">
+      <article class="m-card" style="{{p.style}}">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <h3 style="margin: 0; font: 600 17px 'Alexandria', sans-serif">{{p.name}}</h3>
+          <sc-if value="{{p.popular}}" hint-placeholder-val="{{ false }}">
+            <span style="font: 400 11.5px 'Alexandria', sans-serif; padding: 5px 10px; border-radius: 99px; color: #FFFFFF; background: #E5613E">الأكثر طلبًا</span>
+          </sc-if>
+        </div>
+        <p style="margin: 12px 0 0; display: flex; align-items: baseline; gap: 6px"><span style="font: 400 36px Jost, sans-serif">{{p.price}}</span><span style="font: 400 13px 'Alexandria', sans-serif; color: #6B6B67">ر.س / شهر</span></p>
+        <p style="margin: 2px 0 0; font: 400 12px Jost, sans-serif; color: #6B6B67">{{p.usd}}</p>
+        <ul style="list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+          <sc-for list="{{p.feats}}" as="f" hint-placeholder-count="4">
+            <li style="display: flex; gap: 8px; font: 400 13.5px/1.6 'Alexandria', sans-serif"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{f.t}}</li>
+          </sc-for>
+        </ul>
+        <button type="button" class="{{p.btnClass}}" style="{{p.btnStyle}}">{{p.cta}}</button>
+      </article>
+    </sc-for>
+    <p style="margin: 0; text-align: center; font: 400 12.5px 'Alexandria', sans-serif; color: #6B6B67">كل حساب جديد يبدأ بـ 300 نقطة مجانًا للتجربة.</p>
+  </section>
+
+  <!-- الأسئلة -->
+  <section style="padding: 34px 20px 0; display: flex; flex-direction: column; gap: 8px">
+    <h2 style="margin: 0 0 4px; font: 600 22px/1.3 'Alexandria', sans-serif">أسئلة تتكرر</h2>
+    <sc-for list="{{qs}}" as="q" hint-placeholder-count="7">
+      <div class="m-card" style="{{q.style}}">
+        <button type="button" onClick="{{q.toggle}}" aria-expanded="{{q.open}}" style="width: 100%; min-height: 48px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: start; font: 500 14px 'Alexandria', sans-serif"><span>{{q.q}}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="{{q.iconStyle}}"><path d="M12 5v14M5 12h14"/></svg></button>
+        <sc-if value="{{q.open}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 0 16px 14px; font: 400 13px/1.8 'Alexandria', sans-serif; color: #6B6B67">{{q.a}}</p>
+        </sc-if>
+      </div>
+    </sc-for>
+  </section>
+
+  <!-- الفوتر -->
+  <footer style="margin-top: 34px; padding: 24px 20px 28px; background: #F3F2EF; display: flex; flex-direction: column; gap: 14px; font: 400 12.5px/1.7 'Alexandria', sans-serif; color: #6B6B67">
+    <div style="display: flex; align-items: center; gap: 8px; font: 500 12px Jost, sans-serif; letter-spacing: .3em; color: #181718"><img src="/_blob/379b1415dcab42f9d2fa372cf6fce3e1" alt="" style="height: 20px; width: auto">SIMSIMKIT</div>
+    <nav aria-label="روابط الصفحة" style="display: flex; gap: 16px; flex-wrap: wrap">
+      <a href="https://simsimkit.com/terms">الشروط</a>
+      <a href="https://simsimkit.com/privacy">الخصوصية</a>
+      <a href="https://simsimkit.com/refund">الاسترجاع</a>
+    </nav>
+    <p style="margin: 0"><a href="mailto:islam@simsimkit.com">islam@simsimkit.com</a> · <a href="https://wa.me/966560053050">واتساب 0560053050</a></p>
+    <p style="margin: 0">© 2026 سمسمكيت · شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد 7054472456 · مكة المكرمة، حي العوالي، شارع الوميض، مبنى 3305</p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":4240}}'>
+const M_FEATS = [
+  ['عقل البراند', 'يتعلّم علامتك ولهجتك وجمهورك، فتخرج كل فكرة بصوتك.', 'M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16'],
+  ['أكثر من 110 قوالب', 'موشن جرافيك، ذكاء اصطناعي، إعلانات، كاروسيل، وتصوير بالجوال.', 'M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z'],
+  ['الطيار الآلي', 'حتى 6 منشورات يوميًا وفق خطة شهرية، وأنت توافق بضغطة.', 'M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z'],
+  ['دبلجة بـ 17 لهجة', 'الفيديو نفسه بالنجدية والحجازية والخليجية والمصرية، وبـ 11 لغة.', 'M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5'],
+  ['النشر على 13 منصة', 'تيك توك وإنستجرام ويوتيوب وX وغيرها، من جدولة واحدة.', 'M4 12l16-8-6 16-3-7z M11 13l9-9'],
+  ['تطبيق الجوال', 'صوّر مع الملقّن، وسجّل أفكارك بصوتك، ووافق من أي مكان.', 'M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M11 18h2']
+];
+const M_PLANS = [
+  { name: 'بداية', sar: '109', usd: '≈ $29', feats: ['1,000 نقطة شهريًا', 'حسابا تواصل', 'كل القوالب والدبلجة', 'الطيار الآلي إضافة بـ 56 ر.س'] },
+  { name: 'محترف', sar: '297', usd: '≈ $79', popular: true, feats: ['3,500 نقطة شهريًا', '4 حسابات تواصل', 'الطيار الآلي والخطة الشهرية', 'تطبيق الجوال والموافقات'] },
+  { name: 'وكالات', sar: '748', usd: '≈ $199', feats: ['30,000 نقطة شهريًا', '10 حسابات (حتى 25)', 'عقل منفصل لكل عميل', 'شحن النقاط بضعف القيمة'] }
+];
+const M_FAQ = [
+  ['ماذا يفعل سمسمكيت بالضبط؟', 'يصنع محتواك من الفكرة حتى النشر: عقل يعرف علامتك، وقوالب تُخرج الفيديو، وطيار آلي ينشر في المواعيد التي تختارها.'],
+  ['هل يجب أن أصوّر نفسي؟', 'لا. هناك قوالب كاملة بلا تصوير، وأفاتار بوجهك وصوتك. وإن أردت التصوير، ففي تطبيق الجوال ملقّن، وتعيد اللقطة التي لم تعجبك فقط.'],
+  ['هل يدعم اللهجة السعودية؟', 'نعم: النجدية والحجازية والخليجية العامة، وإجمالًا 17 لهجة عربية و11 لغة، في الكتابة والصوت والدبلجة.'],
+  ['ما هي النقاط؟', 'في كل باقة نقاط شهرية تُصرف على التوليد. ترى تكلفة أي عملية قبل أن تبدأها، وإذا فشلت العملية من جهتنا تعود النقاط إلى رصيدك.'],
+  ['هل أستطيع الإلغاء في أي وقت؟', 'نعم، من صفحة «باقتي» قبل التجديد. ولأول اشتراك استرداد كامل خلال 7 أيام، إن لم تستخدم أكثر من 10٪ من نقاط الباقة.'],
+  ['على أي منصات ينشر؟', 'تيك توك، إنستجرام، يوتيوب شورتس، فيسبوك، X، لينكدإن، ثريدز، بنترست، وغيرها، كلها من جدولة واحدة.'],
+  ['هل يناسب الوكالات؟', 'نعم. في باقة «وكالات» عقل منفصل لكل عميل، وخطة وموافقات لكل عميل، وحتى 25 حساب تواصل.']
+];
+const M_STEPS = [
+  ['1', 'العقل يتعلّم علامتك', 'تجيب على أسئلة قصيرة عن مجالك ولهجتك وجمهورك، أو تستورد حساباتك.'],
+  ['2', 'توافق على الفكرة من جوالك', 'يقترح الأفكار والسكريبت بلهجتك، وأنت تختار بضغطة أو تعدّل.'],
+  ['3', 'الفيديو يتنشر في موعده', 'القالب يصنع الفيديو بالصوت والترجمة، والطيار الآلي ينشره على حساباتك.']
+];
+const M_FIELDS = ['مطاعم وكافيهات', 'عيادات وتجميل', 'متاجر إلكترونية', 'عقارات', 'تعليم وكوتشينج'];
+
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { open: 0, field: 0 }; }
+  renderVals() {
+    const s = this.state;
+    const F = "'Alexandria', 'Readex Pro', sans-serif";
+    return {
+      steps: M_STEPS.map((x) => ({ n: x[0], t: x[1], d: x[2] })),
+      stepNum: 'flex:none;width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:#FFF6F2;color:#E5613E;font:500 14px Jost,sans-serif',
+      fields: M_FIELDS.map((name, i) => ({
+        name, on: i === s.field,
+        pick: () => this.setState({ field: i }),
+        style: 'height:34px;padding:0 12px;border:0;border-radius:17px;cursor:pointer;display:flex;align-items:center;font:400 12.5px ' + F + ';' + (i === s.field ? 'color:#FFFFFF;background:#E5613E' : 'color:#181718;background:#FFFFFF;box-shadow:0 4px 18px rgba(24,23,24,.08)')
+      })),
+      samples: ['نجدي', 'خليجي', 'مصري'].map((dl) => ({ t: '[مثال فيديو · ' + M_FIELDS[s.field] + ' · ' + dl + ']' })),
+      feats: M_FEATS.map((f) => ({ title: f[0], text: f[1], icon: f[2] })),
+      iconWrap: 'width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#FFF6F2',
+      plans: M_PLANS.map((p) => ({
+        name: p.name, price: p.sar, usd: p.usd, popular: !!p.popular,
+        feats: p.feats.map((t) => ({ t })),
+        cta: p.popular ? 'ابدأ بباقة محترف' : 'اختر الباقة',
+        btnClass: p.popular ? 'sk-go' : '',
+        style: 'padding:18px;box-sizing:border-box;display:flex;flex-direction:column' + (p.popular ? ';outline:2px solid #E5613E;outline-offset:-2px' : ''),
+        btnStyle: 'margin-top:16px;width:100%;height:46px;border-radius:23px;border:0;cursor:pointer;font:500 14px ' + F + (p.popular ? '' : ';color:#181718;background:#F3F2EF')
+      })),
+      qs: M_FAQ.map((it, i) => {
+        const open = i === s.open;
+        return {
+          q: it[0], a: it[1], open,
+          toggle: () => this.setState({ open: open ? -1 : i }),
+          style: open ? 'outline:1.5px solid #E5613E;outline-offset:-1.5px' : '',
+          iconStyle: 'flex:none;transition:transform .3s;transform:rotate(' + (open ? 45 : 0) + 'deg)'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>
