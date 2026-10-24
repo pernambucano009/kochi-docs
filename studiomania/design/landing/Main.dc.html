@@ -74,8 +74,8 @@ input{font:inherit}
   <div style="{{jellyWrap}}">
     <div class="lp-jf" style="position: absolute; inset: 0">
       <div class="{{litClass}}" style="position: absolute; inset: 0">
-        <img src="/_blob/f6f1ba6ef8865ef3adbd86a0547c04db" alt="Glass jellyfish" style="{{imgLight}}">
-        <img src="/_blob/36ac015011ad9b3bddd622826ae36047" alt="" style="{{imgLightLit}}">
+        <img src="/_blob/dc713995ae7a9f826ffae824497d342b" alt="Glass jellyfish" style="{{imgLight}}">
+        <img src="/_blob/cf9d0f57a91a9675963d3b0ba8662984" alt="" style="{{imgLightLit}}">
         <img src="/_blob/de96970a1478b98d300f4874959fd6f3" alt="" style="{{imgDark}}">
         <img src="/_blob/fb9543ae04ee7f0b84bd2f31e14bf35e" alt="" style="{{imgDarkLit}}">
       </div>
@@ -232,7 +232,7 @@ input{font:inherit}
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":810},"arFont":{"editor":"enum","default":"IBM Plex Sans Arabic","options":["IBM Plex Sans Arabic","Alexandria","Tajawal","Readex Pro"],"section":"الخط العربي"},"startLang":{"editor":"enum","default":"ar","options":["ar","en"],"section":"اللغة"}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":810},"arFont":{"editor":"enum","default":"Alexandria","options":["Alexandria","IBM Plex Sans Arabic","Tajawal","Readex Pro"],"section":"الخط العربي"},"startLang":{"editor":"enum","default":"ar","options":["ar","en"],"section":"اللغة"}}'>
 const LP_TEXT = {
   ar: {
     signin: 'تسجيل الدخول', langBtn: 'EN', langAria: 'Switch to English', themeAria: 'تبديل الوضع', light: 'فاتح', dark: 'داكن',
@@ -299,34 +299,47 @@ class Component extends DCLogic {
     const h = this.state.hist.slice();
     this.setState({ screen: h.length ? h.pop() : 'home', hist: h });
   }
-  // صوت بسيط: نفَس هوا خفيف + جرس رباعي ناعم (مولّد بالكود، من غير ملفات)
+  // صوت طبيعي: كحتة عود كبريت (احتكاك خشن قصير) وبعدها نفَس الاشتعال وطقطقة خفيفة. مولّد بالكود من غير ملفات
   chime() {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       const ac = this._ac || (this._ac = new AC());
       if (ac.state === 'suspended') ac.resume();
-      const t = ac.currentTime, out = ac.createGain();
-      out.gain.value = 0.2; out.connect(ac.destination);
-      const len = Math.floor(ac.sampleRate * 1.2), buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / len);
-      const noise = ac.createBufferSource(), bp = ac.createBiquadFilter(), ng = ac.createGain();
-      noise.buffer = buf; bp.type = 'bandpass'; bp.Q.value = 0.8;
-      bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(3200, t + 0.9);
-      ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(0.3, t + 0.25); ng.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
-      noise.connect(bp); bp.connect(ng); ng.connect(out); noise.start(t); noise.stop(t + 1.2);
-      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-        const o = ac.createOscillator(), g = ac.createGain(), s = t + 0.15 + i * 0.09;
-        o.type = 'sine'; o.frequency.value = f;
-        g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.22, s + 0.02); g.gain.exponentialRampToValueAtTime(0.001, s + 1.4);
-        o.connect(g); g.connect(out); o.start(s); o.stop(s + 1.5);
-      });
+      const t = ac.currentTime + 0.02, out = ac.createGain();
+      out.gain.value = 0.55; out.connect(ac.destination);
+      const noise = (sec) => {
+        const len = Math.floor(ac.sampleRate * sec), buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+        const src = ac.createBufferSource(); src.buffer = buf; return src;
+      };
+      const filter = (type, f, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+      // 1) الكحتة: حبيبات احتكاك عشوائية بتعلى وتهدى في ربع ثانية
+      const s1 = noise(0.32), hp1 = filter('highpass', 1400), bp1 = filter('bandpass', 3600, 0.9), g1 = ac.createGain();
+      g1.gain.setValueAtTime(0, t);
+      for (let k = 0; k < 36; k++) {
+        const x = k / 36, env = Math.min(1, x / 0.25) * Math.pow(1 - x, 1.4);
+        g1.gain.setValueAtTime(env * (0.25 + Math.random() * 0.75) * 0.9, t + k * 0.0075);
+      }
+      g1.gain.setValueAtTime(0, t + 0.28);
+      s1.connect(hp1); hp1.connect(bp1); bp1.connect(g1); g1.connect(out); s1.start(t); s1.stop(t + 0.32);
+      // 2) الاشتعال: «فووش» دافي بيفتح وبعدين يهدى
+      const s2 = noise(1.5), lp2 = filter('lowpass', 500, 0.7), g2 = ac.createGain();
+      lp2.frequency.setValueAtTime(500, t + 0.16); lp2.frequency.exponentialRampToValueAtTime(2400, t + 0.36); lp2.frequency.exponentialRampToValueAtTime(650, t + 1.4);
+      g2.gain.setValueAtTime(0, t + 0.16); g2.gain.linearRampToValueAtTime(0.5, t + 0.34); g2.gain.exponentialRampToValueAtTime(0.001, t + 1.45);
+      s2.connect(lp2); lp2.connect(g2); g2.connect(out); s2.start(t + 0.16); s2.stop(t + 1.5);
+      // 3) طقطقة خفيفة وهو بيولّع
+      for (let i = 0; i < 9; i++) {
+        const at = t + 0.3 + Math.random() * 0.9, c = noise(0.006), hp = filter('highpass', 2200), g = ac.createGain();
+        g.gain.setValueAtTime(0.12 + Math.random() * 0.2, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.006);
+        c.connect(hp); hp.connect(g); g.connect(out); c.start(at); c.stop(at + 0.008);
+      }
     } catch (e) { /* الصوت إضافة، لو المتصفح منعه نكمّل عادي */ }
   }
   renderVals() {
     const s = this.state, d = s.dark;
     const lang = s.lang || this.props.startLang || 'ar', ar = lang === 'ar', T = LP_TEXT[lang];
-    const arF = "'" + (this.props.arFont || 'IBM Plex Sans Arabic') + "', 'Readex Pro', sans-serif";
+    const arF = "'" + (this.props.arFont || 'Alexandria') + "', 'Readex Pro', sans-serif";
     const F = ar ? arF : 'Jost, Futura, sans-serif';
     const ls = (em) => (ar ? '0' : em);
     const ink = d ? '#F1F1F3' : '#181718', muted = d ? '#A3A3AB' : '#6B6B67';
@@ -413,8 +426,8 @@ class Component extends DCLogic {
       litGlow: 'position:absolute;left:50%;top:44%;width:1200px;height:1200px;translate:-50% -50%;border-radius:50%;pointer-events:none;' + (still || 'transition:opacity 1.6s ease;') + 'opacity:' + (lit ? (home ? 1 : 0.7) : (d ? 0.6 : 0)) + ';background:' + (d ? (lit ? 'radial-gradient(circle,rgba(255,226,160,.20) 0%,rgba(255,200,120,.06) 30%,rgba(23,23,26,0) 58%)' : 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)') : 'radial-gradient(circle,rgba(90,200,255,.20) 0%,rgba(120,190,255,.07) 32%,rgba(242,247,252,0) 60%)'),
       spreadStyle: 'position:absolute;left:50%;top:38%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(255,232,170,.32) 0%,rgba(255,232,170,0) 62%)' : 'radial-gradient(circle,rgba(80,200,255,.30) 0%,rgba(80,200,255,0) 62%)'),
       jellyWrap: 'position:absolute;left:50%;top:84px;width:497px;height:690px;margin-left:-248px;pointer-events:none;' + (still || 'transition:opacity .7s ease;') + 'opacity:' + jellyOp,
-      imgLight: 'position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:multiply;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && !lit ? 1 : 0),
-      imgLightLit: 'position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:multiply;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && lit ? 1 : 0),
+      imgLight: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && !lit ? 1 : 0),
+      imgLightLit: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && lit ? 1 : 0),
       imgDark: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (d && !lit ? 1 : 0),
       imgDarkLit: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (d && lit ? 1 : 0),
       chipSignin: chip + 'width:132px;font:400 ' + (ar ? 14 : 13) + 'px ' + F + ';letter-spacing:' + ls('.18em'),
