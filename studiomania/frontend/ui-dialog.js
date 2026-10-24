@@ -111,7 +111,7 @@
       const qr = `/api/handoff/${h.id}/qr.svg?base=${encodeURIComponent(location.origin)}`;
       back.innerHTML = `<div class="ui-dlg-box" dir="rtl" style="text-align:center">
         <p class="ui-dlg-msg" style="margin-bottom:6px"><b>📱 كمّل على موبايلك</b></p>
-        <p style="margin:0 0 14px;font-size:13px;opacity:.72;line-height:1.7">${esc(req.kind === "shoot" ? "وصلك إشعار على تطبيق سمسمكيت: افتحه وصوّر بالتيلي برومبتر، والفيديو يرجع هنا لوحده." : "وصلك إشعار على تطبيق سمسمكيت: سجّل بصوتك، والتسجيل يرجع هنا لوحده.")}<br>ما وصلكش؟ صوّر الكود ده بكاميرا الموبايل.</p>
+        <p style="margin:0 0 14px;font-size:13px;opacity:.72;line-height:1.7">${esc(req.kind === "shoot" ? "وصلك إشعار على تطبيق سمسمكيت: افتحه وصوّر بالملقّن، والفيديو يرجع هنا لوحده." : "وصلك إشعار على تطبيق سمسمكيت: سجّل بصوتك، والتسجيل يرجع هنا لوحده.")}<br>ما وصلكش؟ صوّر الكود ده بكاميرا الموبايل.</p>
         <img src="${qr}" alt="QR" width="190" height="190" style="width:190px;height:190px;box-sizing:border-box;border-radius:16px;background:#fff;padding:6px">
         <p data-st style="margin:12px 0 16px;font-size:13px;opacity:.8">⏳ مستني الموبايل…</p>
         <div class="ui-dlg-acts" style="justify-content:center"><button type="button" class="ui-dlg-no">إلغاء</button></div></div>`;

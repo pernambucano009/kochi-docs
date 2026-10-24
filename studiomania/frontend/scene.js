@@ -224,7 +224,7 @@ const SceneStudio = (() => {
     const ib = (p, t) => `<button type="button" class="sc-ib dark${S.pop === p ? " on" : ""}" data-scpop="${p}" title="${t}" aria-label="${t}">${sic(p)}</button>`;
     S.el.innerHTML = `<div class="sc2">
       <div class="sc2-l">
-        <div class="sc2-h"><div><span class="latin">SCENE STUDIO</span><h2>${esc(d.name || "استوديو المشهد")}</h2></div>
+        <div class="sc2-h"><div><span class="latin en-k">SCENE STUDIO</span><h2>${esc(d.name || "استوديو المشهد")}</h2></div>
           <div class="sc-acts"><span class="sc2-wrap"><button type="button" class="sc-ib" data-scpop="list" title="مشاهدي" aria-label="مشاهدي">${sic("list")}</button>
             ${S.pop === "list" ? `<div class="sc2-pop sc2-list">${S.list.map((x) => `<button type="button" class="sc-pill${x.id === d.id ? " on" : ""}" data-scpick="${x.id}">${esc(x.name)}${x.takes ? ` · ${x.takes}` : ""}</button>`).join("")}</div>` : ""}</span>
             <button type="button" class="sc-ib" data-scnew title="مشهد جديد" aria-label="مشهد جديد">${sic("plus")}</button></div></div>

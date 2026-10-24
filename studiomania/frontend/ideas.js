@@ -37,7 +37,7 @@ const IdeasPage = (() => {
     const w = S.el;
     if (!w) return;
     const recOn = !!S.rec;
-    w.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الأفكار</b><span class="latin">IDEAS</span></div>
+    w.innerHTML = `<section class="fs-hero"><div class="fs-hero-t"><b>الأفكار</b><span class="latin en-k">IDEAS</span></div>
         <p>ضع هنا أي فكرة تأتي في بالك: اكتبها، أو سجّلها بصوتك، أو ضع رابط فيديو أو منشور يعجبك. هذه الأفكار تظهرلك وأنت تختار الفكرة في أي مشروع جديد إذا حابب تستخدمها. وإذا تريد الذكاء الاصطناعي يرتّبلك النص، اضغط «✨ نقّح»، وإذا تريدها نص جاهز بسنداته (آيات، كتب، دراسات) اضغط «📝 نسّق كسكريبت».</p>
         <div class="cm-stats"><span><b class="num">${S.list.length}</b> فكرة</span></div></section>
       <section class="id-new">

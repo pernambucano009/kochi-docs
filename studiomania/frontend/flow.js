@@ -6,7 +6,7 @@
 const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   // 💳 التكلفة جنب زرار الصرف: «نحو N نقطة · رصيدك M» (والرصيد مش ظاهر لصاحب البرنامج)
-  const costTag = (pts, bal) => pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · رصيدك ${Number(bal).toLocaleString("en-US")}` : ""}</small>` : "";
+  const costTag = (pts, bal) => pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · نقاطك ${Number(bal).toLocaleString("en-US")}` : ""}</small>` : "";
   // 🗣️ اللهجة: سطر واحد «اللهجة: سعودي نجدي · تغيير» في خطوة النص وخطوة الصوت، والقايمة الكاملة بتفتح بس لما تضغط «تغيير»
   function dialLine(cur, key, off = false) {
     const all = S.vopts?.dialects || [];
@@ -139,7 +139,7 @@ const Flow = (() => {
     const it = S.d[stage];
     if (!it) return "";
     const open = S.chat === stage;
-    return `<div class="flw-picked"><div><small class="latin">${stage === "idea" ? "Idea" : "Scenario"}</small>
+    return `<div class="flw-picked"><div><small class="latin en-k">${stage === "idea" ? "Idea" : "Scenario"}</small>
         <b>${esc(it.title || "")}</b><p>${esc(stage === "idea" ? it.idea || it.hook || "" : it.summary || "")}</p></div>
       <div class="flw-pact"><button type="button" class="flw-link" data-chat="${stage}">💬 ${open ? "أغلق النقاش" : "ناقش مع العقل"}</button>
         <button type="button" class="flw-link" data-go="${stage}">↩︎ غيّر</button></div>
@@ -239,7 +239,7 @@ const Flow = (() => {
     return `<div class="flw-seasons"><small class="muted">🗓️ مناسبات قادمة${s.target ? ` في ${esc(s.target)}` : ""}:</small>
       ${s.items.slice(0, 8).map((x, i) => `<button type="button" class="flw-chip" data-season="${i}" title="${esc(x.angle || "")}">${esc(x.name)} <span class="num">${fmt(x.date)}</span></button>`).join("")}</div>`;
   }
-  // 📈 ترند محفوظ من عقل البراند: «تبني الفكرة عليه؟»، واللي اخترت «استخدمه دلوقتي» بيتطبّق لوحده أول ما تفتح القالب
+  // 📈 ترند محفوظ من عقل العلامة: «تبني الفكرة عليه؟»، واللي اخترت «استخدمه دلوقتي» بيتطبّق لوحده أول ما تفتح القالب
   function trendRow(d) {
     if (S.trendsFor !== d.id) {
       S.trendsFor = d.id; S.trends = null;
@@ -554,7 +554,7 @@ const Flow = (() => {
           ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video>
             <small class="muted">${esc(mn.name)} · ${secs(mn.duration)} · ${mn.w}×${mn.h}${mn.audio ? "" : " · ⚠️ بدون صوت"}</small>
             <button type="button" class="flw-link" data-fdel="${esc(mn.gen_id)}">بدّله</button></div>`
-          : `<div class="flw-acts">${beats ? `<button type="button" class="flw-btn pri" data-phone>📱 صوّر من موبايلك بالتيلي برومبتر</button>` : ""}<label class="flw-btn ${beats ? "" : "pri"}">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
+          : `<div class="flw-acts">${beats ? `<button type="button" class="flw-btn pri" data-phone>📱 صوّر من موبايلك بالملقّن</button>` : ""}<label class="flw-btn ${beats ? "" : "pri"}">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
               <button type="button" class="flw-btn" data-lib="main">☁️ أو اختر مما رفعته من قبل</button></div>${libBox("main")}`}
           ${(f.broll || []).length ? `<div class="flw-broll">${f.broll.map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="أزلها">✕</button></figure>`).join("")}</div>` : ""}</section>
         ${castBox(d)}</div>
@@ -644,7 +644,7 @@ const Flow = (() => {
       <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
         ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر غير معروف"}</small></label>`).join("")}</div>
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على النماذج المختارة</button>
-        <small class="muted">يُخصم من الرصيد على قدر النماذج التي اشتغلت فقط.</small></div>
+        <small class="muted">يُخصم من نقاطك على قدر النماذج التي اشتغلت فقط.</small></div>
       ${cb ? `<h4>اللقطة ${cb.shot + 1} · ${esc(cb.angle_ar)}${cb.photos ? ` · 📷 ومعها ${cb.photos} صور للشخص` : " · بدون صور للشخص"}</h4><div class="flw-camr"><figure><video src="/media/ads/flows/${esc(d.id)}/${esc(cb.src)}" controls loop playsinline></video><figcaption><b>الأصل</b></figcaption></figure>${runs}</div>` : ""}</div>`;
   }
   // نتايج تجربة الكاميرا: بنحدّث لحد ما كل الموديلات تخلص
@@ -675,7 +675,7 @@ const Flow = (() => {
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
     if (!d.busy) S.busyFrom = null;
-    const head = `<div class="flw-tpl"><small class="latin">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
+    const head = `<div class="flw-tpl"><small class="latin en-k">Template</small><b>${esc(d.template.name)}</b>${d.brand_name ? `<small class="muted">لـ ${esc(d.brand_name)}</small>` : ""}</div>
         ${stepper(d)}<div class="flw-hr">${meter(d.knowledge)}<button type="button" class="flw-x big" data-close aria-label="أغلق">✕</button></div>`;
     const main = body(d);
     let box = S.el.querySelector(".flw-box[data-built]");
@@ -744,9 +744,9 @@ const Flow = (() => {
     if (q("[data-why]")) return window.uiKnow?.(S.d?.knowledge);
     let b;
     if (q("[data-skipshoot]")) { reset(); return call("/skip-shoot", {}); }
-    // 📱 التصوير بيتبعت لتطبيق الموبايل: السكريبت على التيلي برومبتر، والفيديو بيرجع للخطوة دي لوحده
+    // 📱 التصوير بيتبعت لتطبيق الموبايل: السكريبت على الملقّن، والفيديو بيرجع للخطوة دي لوحده
     if (q("[data-phone]")) {
-      const done = await window.uiPhone?.({ kind: "shoot", fid: S.d.id, title: `صوّر «${S.d.scenario?.title || S.d.idea?.title || "الفيديو"}» بالتيلي برومبتر` });
+      const done = await window.uiPhone?.({ kind: "shoot", fid: S.d.id, title: `صوّر «${S.d.scenario?.title || S.d.idea?.title || "الفيديو"}» بالملقّن` });
       if (done) { S.d = await api(`/api/flows/${S.d.id}`); render(); }
       return;
     }

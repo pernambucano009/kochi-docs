@@ -16,7 +16,7 @@ const PR = M.params({
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
   fBody: { label: "خط الشعار", kind: "font", def: "tajawal" },
 });
-M.meta({ story: "إنترو قصير للبراند: اللوجو والاسم بحركة واحدة.", scenes: [{ name: "الإنترو", t0: 0, t1: 3, about: "اللوجو والاسم" }] });
+M.meta({ story: "مقدمة قصيرة للعلامة: الشعار والاسم بحركة واحدة.", scenes: [{ name: "الإنترو", t0: 0, t1: 3, about: "اللوجو والاسم" }] });
 const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
 const W = SZ[0], H = SZ[1], DUR = 3, S = Math.min(W, H) / 1080;
 const BG = PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";

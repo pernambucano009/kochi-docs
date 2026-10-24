@@ -454,16 +454,16 @@ const AutoPage = (() => {
   function cardHTML(n) {
     const r = S.rec, M = S.meta;
     if (n.kind === "add") {
-      return `<div class="bm-ch"><span class="latin">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختر الفعل، والخطوة توضع آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختر الإشارة من نقطة «منين».</p>
+      return `<div class="bm-ch"><span class="latin en-k">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختر الفعل، والخطوة توضع آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختر الإشارة من نقطة «منين».</p>
         <div class="am-verbs">${Object.entries(M.verbs).filter(([k]) => !M.fixed.includes(k) && !M.lane_verbs.includes(k) && k !== "merge" && !(k === "split" && r.steps.some((x) => x.verb === "split"))).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
     }
     if (n.kind === "ladd") {
-      return `<div class="bm-ch"><span class="latin">LANE ${n.li + 1}</span><b>خطوة في مسار ${lanesOf(n.sp).length === 1 && !n.sp.pieces ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
+      return `<div class="bm-ch"><span class="latin en-k">LANE ${n.li + 1}</span><b>خطوة في مسار ${lanesOf(n.sp).length === 1 && !n.sp.pieces ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
         <div class="am-verbs">${M.lane_verbs.map((k) => `<button class="am-verb" data-laneadd="${n.li}" data-verb="${k}">${svg(IC[k], 18)}<b>${esc(M.verbs[k].t)}</b><small>${esc(M.verbs[k].desc)}</small></button>`).join("")}</div>`;
     }
     if (n.kind === "piece") {
       const sp = n.sp, L = lanesOf(sp), span = (sp.spans || [])[n.li];
-      return `<div class="bm-ch"><span class="latin">PIECE ${n.li + 1}</span><b>${!sp.pieces && L.length === 1 ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
+      return `<div class="bm-ch"><span class="latin en-k">PIECE ${n.li + 1}</span><b>${!sp.pieces && L.length === 1 ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
         <p class="bm-note">${span ? `من ${AR_N(span[0].toFixed(1))} لـ ${AR_N(span[1].toFixed(1))} ثانية في «${esc(sp.video?.name || "")}». ` : ""}${sp.pieces
           ? `الفيديو سيُقطّع لـ ${AR_N(sp.pieces)} قطع، وكل قطعة لها مسار تلقائيًا. ضع في هذا المسار ما تريده يحدث هذه للقطعة («+» في آخر المسار).`
           : "عدد القطع يتعرف وقت التشغيل (على قدر طول الفيديو الذي سيُختار). القطع الزيادة عن المسارات التي هنا تسير مثل آخر مسار."}</p>
@@ -472,7 +472,7 @@ const AutoPage = (() => {
     }
     if (n.kind === "run") {
       const runs = r.runs || [];
-      return `<div class="bm-ch"><span class="latin">START</span><b>ابدأ</b></div>
+      return `<div class="bm-ch"><span class="latin en-k">START</span><b>ابدأ</b></div>
         ${editable("@name", r.name, "اسم القالب")}
         <p class="bm-note">يسير على الخطوات من الشمال لليمين: يعمل الفيديو، ويصدّره، وينشره (أو يستناك توافق).${r.est ? ` التكلفة نحو <b class="num">${AR_N(r.est)}</b> نقطة (كتابة النص للكابشن).` : " بدون تكلفة نقاط."}</p>
         <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ يعمل…" : "▶ شغّل القالب"}</button></div>
@@ -489,7 +489,7 @@ const AutoPage = (() => {
     // الخطوة نفسها: كل تفاصيلها في كارت واحد (تسحب إيه ومنين، المنشن، قواعدك…)، والنقط اللي فوقها بتوديك لنفس الكارت
     if (n.kind === "branch") {
       const v = M.verbs[n.s.verb], ls = leavesOf(n.s).filter((l) => l.type !== "action");
-      return `<div class="bm-ch"><span class="latin">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}.</p>
+      return `<div class="bm-ch"><span class="latin en-k">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}.</p>
         ${ls.map((l) => `<section class="am-sec${l.miss ? " miss" : ""}" data-sec="${esc(l.f)}"><p class="am-st"><b>${esc(l.t)}</b>${l.miss ? `<small>ما زال ناقصة</small>` : ""}</p>${leafBody(n.s, l)}</section>`).join("")}
         ${M.fixed.includes(n.s.verb) ? `<p class="bm-note">هذه من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» يأتي مع «قطّع الفيديو»، وإذا شلت التقطيع يُزال معه.</p>` : `<section class="am-sec"><p class="am-st"><b>رتّبها أو أزلها</b></p>${moveActs(n.s)}</section>`}`;
     }
@@ -587,11 +587,11 @@ const AutoPage = (() => {
     const M = S.meta, yes = [[true, "نعم"], [false, "لا"]];
     let body = "";
     if (f === "silence") body = pills("silence", Object.entries(M.silence || {}), o.silence) + `<p class="bm-note">«خفيف»: الوقفات الطويلة بس. «متوسط»: أي وقفة أطول من نص ثانية. «قوي»: إيقاع سريع. بيشتغل على الفيديوهات اللي فيها كلام.</p>`;
-    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">اللوجو من «عقل البراند». الخانة اللي في النص = بدون لوجو.</p>`;
+    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">اللوجو من «عقل العلامة». الخانة اللي في النص = بدون لوجو.</p>`;
     else if (f === "logo_size") body = pills("logo_size", [[10, "صغير"], [14, "وسط"], [18, "عادي"], [24, "كبير"]], o.logo_size);
     else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">الموسيقى بتوطى لوحدها وقت كلام الراوي، وترجع بعده.</p>`;
     else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">الكابشن بيتكتب من التعليق الصوتي بتوقيته.</p>`;
-    else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل البراند ← الإنترو والأوترو».</p>` : "");
+    else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل العلامة ← الإنترو والأوترو».</p>` : "");
     return body + (["logo", "logo_size", "cap_style"].includes(f) ? montPrev(o) : "");
   }
   const RULES_PH = { gen: "مثلًا: بدون نصوص على الشاشة، ألوان العلامة، الشخصية دائمًا لابسة أبيض", genvid: "مثلًا: بدون نصوص على الشاشة، إضاءة دافية، حركة كاميرا هادية", genimg: "مثلًا: خلفية فاتحة، بدون أشخاص، أسلوب مينيمال",
@@ -960,7 +960,7 @@ const AutoPage = (() => {
   // 📱 الوصف بيتسجّل من تطبيق الموبايل، والتسجيل بيرجع هنا مكان تسجيل المتصفح بالظبط (تسمعه وبعدين «افهم»)
   async function recPhone() {
     const x = await window.uiPhone?.({ kind: "voice", title: `اوصف القالب بصوتك · «${S.rec?.name || "قالب مخصص"}»`,
-      prompt: "اوصف القالب بصوتك: إيه الخطوات، وإيه الشكل اللي عايزه. هنحوّل كلامك لخطوات في القالب." });
+      prompt: "صِف القالب بصوتك: ما الخطوات، وما الشكل الذي تريده. سنحوّل كلامك إلى خطوات في القالب." });
     if (!x?.audio_url) return;
     try {
       const r = await fetch(x.audio_url, { credentials: "same-origin" });

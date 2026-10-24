@@ -48,7 +48,7 @@ async function noCredits(msg) {
   if (noCreditsOpen || !window.uiConfirm) return;
   noCreditsOpen = true;
   try {
-    const go = await uiConfirm(`${msg || "رصيدك من النقاط لا يكفي هذه العملية."}\nلم تُخصم أي نقاط.`, { ok: "💳 اشحن نقاطًا", cancel: "لاحقًا" });
+    const go = await uiConfirm(`${msg || "نقاطك لا تكفي هذه العملية."}\nلم تُخصم أي نقاط.`, { ok: "💳 اشحن نقاطًا", cancel: "لاحقًا" });
     if (go) {
       const b = document.getElementById("stagePlans");
       if (b) b.click(); else location.href = "/billing";

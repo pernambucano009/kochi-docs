@@ -3173,7 +3173,7 @@ async function algoPrep(force = false, minSec = 0) {
   if (ALGO_ON === null) { try { ALGO_ON = (await api("/api/algo/mode")).on; } catch { ALGO_ON = false; } }
   if (!ALGO_ON && !force) return;
   const d = p.data, sig = JSON.stringify(d.clips.map((c) => [c.gen_id, c.start, c.end]));
-  if (!force && !d.clips.length) return;   // مشروع فارغ (الفيديو إديتور): لا شيء تتجهز، ولا يوجد خطاف يوضع تلقائيًا
+  if (!force && !d.clips.length) return;   // مشروع فارغ (محرر الفيديو): لا شيء تتجهز، ولا يوجد خطاف يوضع تلقائيًا
   if (!force && d.algo?.sig === sig && d.algo?.caps !== "working") return renderSilReview();
   await saveProject();
   let r;

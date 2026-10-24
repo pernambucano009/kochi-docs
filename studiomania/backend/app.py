@@ -2509,7 +2509,7 @@ class ProjectIn(BaseModel):
     music: TrackEdit | None = None
     outro: bool = True
     outro_volume: float = 1.0
-    brand_intro: bool = True    # إنترو البراند (من عقل البراند) في أول الفيديو
+    brand_intro: bool = True    # إنترو البراند (من عقل العلامة) في أول الفيديو
     char_intro: bool = True     # إنترو الشخصية قبل الفيديو لو ليها
     brand_outro: bool = True    # أوترو البراند في آخر الفيديو
     captions: dict = {}  # {enabled, template, font, size, y, words, color, highlight, ...}
@@ -2858,7 +2858,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
                 montage.Segment(path, 0, info.duration, volume=clamp(data.get("outro_volume", 1), 0, 3), has_audio=info.has_audio)
             )
             outro_len = info.duration
-    # 🎬 أوترو البراند (من عقل البراند): بينزل لوحده في الآخر لو متفعّل، والمشروع يقدر يشيله.
+    # 🎬 أوترو البراند (من عقل العلامة): بينزل لوحده في الآخر لو متفعّل، والمشروع يقدر يشيله.
     # (إنترو البراند بيتركّب قدّام الفيديو بعد التصدير، عشان الصوت والكابشن والعناصر مايتزحزحوش)
     if data.get("brand_outro", True) and (p := brand_video("outro", data.get("client_id"))):
         info = media_info(p)
@@ -2890,7 +2890,7 @@ def build_montage(conn: sqlite3.Connection, data: dict):
 
 def project_logo(data: dict, total: float, outro_len: float) -> montage.Logo | None:
     cfg = {**LOGO_DEFAULTS, **(data.get("logo") or {})}
-    if "enabled" not in (data.get("logo") or {}):   # الديفولت من عقل البراند (اللوجو على كل الفيديوهات ولا لأ)
+    if "enabled" not in (data.get("logo") or {}):   # الديفولت من عقل العلامة (اللوجو على كل الفيديوهات ولا لأ)
         cfg["enabled"] = (active_client() or {}).get("logo_on") != "0"
     path = logo_path(data.get("client_id"))
     if not cfg["enabled"] or not path:
@@ -10567,7 +10567,7 @@ def run_ad_adapt(aid: str) -> None:
 BRAIN_KINDS = ("screens", "logos", "products", "characters", "sets", "props")
 BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "theme", "typography", "ui_style", "logo_description",
                 "style", "market", "language", "logo_rule", "modest",
-                # 🧠 عقل البراند: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
+                # 🧠 عقل العلامة: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
                 "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link",
                 "niche")   # النيتش: من تحليل حساب السوشيال (وتقدر تكتبه بإيدك)
 BRAND_VIDEOS = ("intro", "outro")
@@ -24746,7 +24746,7 @@ def flow_generate(fid: str, body: FlowGoIn):
                 params = fill
             else:
                 raw = flow_llm(fz.params_messages(schema, {**sc, "brief": brief}, (brain or {}).get("name") or "", flow_assets_list(d)), "خانات القالب")
-                # الكلام من السيناريو، والصور والألوان والاسم من عقل البراند (الموديل مايعرفش يجيب صورة)
+                # الكلام من السيناريو، والصور والألوان والاسم من عقل العلامة (الموديل مايعرفش يجيب صورة)
                 params = {**fill, **{k: v for k, v in fz.clean_params(schema, raw).items() if schema[k].get("kind") != "image" and not (schema[k].get("kind") == "color" and k in fill)}}
             before = motion_assets().get(mid, [])
             MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}

@@ -1,4 +1,4 @@
-// 🧠 عقل البراند: خريطة. المخ في النص، وطالع منه فروع (الهوية، الشكل، القواعد، التسليم، صور البراند)،
+// 🧠 عقل العلامة: خريطة. المخ في النص، وطالع منه فروع (الهوية، الشكل، القواعد، التسليم، صور البراند)،
 // وكل حاجة في البراند نقطة على فرعها. النقطة الفاضية لسه ناقصة. تدوس على أي نقطة يفتح جنبها كارت تكتب فيه على طول،
 // وأي تعديل بيتحفظ لوحده. مفيش فورم ولا مربعات: كل الشغل جوه الخريطة.
 
@@ -541,7 +541,7 @@ const BrandPage = (() => {
   }
   function trendsHTML(b) {
     const tr = S.trFor === b?.id ? S.tr : null;
-    const head = `<div class="bm-ch"><span class="latin">TRENDS</span><b>📈 الترند</b></div>`;
+    const head = `<div class="bm-ch"><span class="latin en-k">TRENDS</span><b>📈 الترند</b></div>`;
     if (!tr) { if (b && S.trLoading !== b.id) loadTrends(b); return head + `<p class="bm-note">يجلب الترند…</p>`; }
     if (tr.new && !S.trSeenBusy) { S.trSeenBusy = true; bAPI("/trends/seen", { method: "POST" }).then((x) => { S.tr = x; redrawNode("trends"); }).catch(() => {}).finally(() => (S.trSeenBusy = false)); }
     const ago = tr.checked_at ? Math.round((Date.now() / 1000 - tr.checked_at) / 3600) : null;
@@ -565,7 +565,7 @@ const BrandPage = (() => {
     if (S.open?.n?.l?.type === "algo") refreshCard();
   }
   function algoHTML(b, l) {
-    const head = `<div class="bm-ch"><span class="latin">ALGORITHM RULES</span><b>${esc(l.t)}</b></div>`;
+    const head = `<div class="bm-ch"><span class="latin en-k">ALGORITHM RULES</span><b>${esc(l.t)}</b></div>`;
     const ar = S.arFor === b?.id ? S.ar : null;
     if (!ar) { if (b && S.arLoading !== b.id) loadAlgo(b); return head + `<p class="bm-note">يجلب القواعد…</p>`; }
     const parts = ar.parts.filter((p) => p.group === l.i);
@@ -605,7 +605,7 @@ const BrandPage = (() => {
     const tq = S.tqFor === b?.id ? S.tq : null, qn = S.quiz?.length || 0, qd = Math.min((b?.quiz_done || []).length, qn || 99);
     const tabs = `<div class="bm-pills bm-qtabs"><button class="bm-pill${S.qtab !== "t" ? " on" : ""}" data-qtab="q">🧩 الأسئلة <span class="num">${qd}/${qn || "…"}</span></button>
       <button class="bm-pill${S.qtab === "t" ? " on" : ""}" data-qtab="t">✅ المهام <span class="num">${tq ? `${tq.done}/${tq.total}` : "…"}</span></button></div>`;
-    const head = `<div class="bm-ch"><span class="latin">COMPLETE THE BRAIN</span><b>أكمل العقل</b></div>
+    const head = `<div class="bm-ch"><span class="latin en-k">COMPLETE THE BRAIN</span><b>أكمل العقل</b></div>
       <p class="bm-note">عندما الأسئلة والمهام يخلصون، العقل يصبح لديه كل ما تحتاجه لكي يعرفك.</p>${tabs}`;
     if (S.qtab === "t") return head + tasksHTML(b);
     if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">يُجهّز الأسئلة…</p>`; }
@@ -643,7 +643,7 @@ const BrandPage = (() => {
   function cardHTML(n) {
     const b = cur();
     if (n.kind === "center") {
-      return `<div class="bm-ch"><span class="latin">BRANDS</span><b>العلامات</b></div>
+      return `<div class="bm-ch"><span class="latin en-k">BRANDS</span><b>العلامات</b></div>
         <div class="bm-pills">${S.brains.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-brain="${x.id}">${esc(x.name)}</button>`).join("")}</div>
         <div class="bm-new">${editable("@new", "", "اكتب اسم علامة جديد واضغط Enter")}</div>
         ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
@@ -651,13 +651,13 @@ const BrandPage = (() => {
     if (n.kind === "add") {
       const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse(), rec = S.rec;
       const TABS = [["file", "📎 ملف"], ["social", "📱 حساب سوشيال"], ["text", "✍️ اكتب"], ["rec", "🎙️ سجّل"], ["url", "🔗 موقع"]];
-      return `<div class="bm-ch"><span class="latin">ADD TO BRAIN</span><b>أضف للعقل</b></div>
+      return `<div class="bm-ch"><span class="latin en-k">ADD TO BRAIN</span><b>أضف للعقل</b></div>
         <p class="bm-note">ارمي أي شيء عن العلامة، والعقل يقرؤها ويفصّصها: كل معلومة تظهر نقطة منوّرة في الفرع الخاص بها وأنت توافق عليها.</p>
         <div class="bm-pills bm-tabs">${TABS.map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
         ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>ارمي الملف هنا أو اضغط تختار (أو ارميه في أي جزء على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
           : tab === "social" ? `${editable("@social", "", "رابط الحساب أو @اليوزر · واضغط Enter", true)}
             <p class="bm-note">إنستجرام أو تيك توك. العقل يأخذ السيرة والمعلومات والنيتش، وينزّل الصور ويضع كل واحدة مكانها، ويحلل المنشورات والمشاهدات وأحسن وأضعف الفيديوهات، والأخطاء واللي ناقص يتسجلون في «نقاط للتحسين».</p>
-            <p class="bm-note bm-cost">💳 يُخصم من رصيدك على قدر العمل الذي أُنشئ فعلًا (عادةً ما بين ١٠ و٦٠ نقطة).</p>`
+            <p class="bm-note bm-cost">💳 يُخصم من نقاطك على قدر العمل الذي أُنشئ فعلًا (عادةً ما بين ١٠ و٦٠ نقطة).</p>`
           : tab === "text" ? editable("@text", "", "اكتب أي شيء عن العلامة: الجمهور، النبرة، العروض، ما ممنوع… واضغط Enter")
           : tab === "rec" ? `<div class="bm-rec"><button class="bm-recb${rec ? " on" : ""}" data-ibrec>${rec ? "⏹" : "🎙️"}</button>
             <div><b>${rec ? `جارٍ التسجيل <span class="num" data-rect>0:00</span>` : "سجّل واحكي عن العلامة بصوتك"}</b><small class="muted">${rec ? "اضغط مرة أخرى عندما تنتهي، والتسجيل يُرسل للمخ تلقائيًا" : "احكي براحتك: تعمل ماذا، لمين، وماذا الذي يميزك. حتى ١٠ دقايق."}</small></div></div>`
@@ -669,10 +669,10 @@ const BrandPage = (() => {
     if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زال فارغة. ارمي ملف أو رابط من «أضف للعقل» والمعرفة ستظهر هنا.</p>` : ""}
+      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زال فارغة. ارمي ملف أو رابط من «أضف للعقل» والمعرفة ستظهر هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
     }
-    const l = n.l, head = `<div class="bm-ch"><span class="latin">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
+    const l = n.l, head = `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
     switch (l.type) {
       case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "") + suggBox(b, l);
       case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">أزل هذه القاعدة</button>`;
@@ -722,18 +722,18 @@ const BrandPage = (() => {
         if (p.kind === "image") {
           const KN = { products: "صور المنتج", characters: "شخصيات العلامة", sets: "الأماكن والخلفيات", props: "الأدوات", logos: "الشعار" };
           S.imgTarget = S.imgTarget?.id === p.id ? S.imgTarget : { id: p.id, t: p.target };
-          return `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>صورة من الحساب</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}
+          return `<div class="bm-ch"><span class="latin en-k">SUGGESTION</span><b>صورة من الحساب</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}
             <img class="bm-pimg" src="/media/ads/brains/${esc(b.id)}/src/${esc(p.file)}" alt="">${p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : ""}
             <div class="bm-sub"><small>توضع في</small><div class="bm-pills">${Object.entries(KN).map(([k, t]) => `<button class="bm-pill${S.imgTarget.t === k ? " on" : ""}" data-itgt="${k}">${t}</button>`).join("")}</div></div>
             <div class="bm-acts"><button class="bm-go" data-ok="${p.id}">ضعها</button><button class="bm-pill" data-no="${p.id}">لا</button></div>`;
         }
         const now = p.kind === "field" ? String(b?.[p.field] || "").trim() : "";
-        const top = `<div class="bm-ch"><span class="latin">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
+        const top = `<div class="bm-ch"><span class="latin en-k">SUGGESTION</span><b>${esc(p.kind === "question" ? "سؤال" : p.kind === "note" ? "معلومة جديدة" : l.t)}</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}`;
         const body = p.kind === "question" ? `<p class="bm-q">${esc(p.title)}</p>` + editable("@ans", "", "اكتب الإجابة…")
           : p.kind === "note" ? editable("@ttl", p.title, "العنوان") + (p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : "") + editable("@val", p.value, "التفاصيل")
           : (now ? `<div class="bm-sub"><small>المكتوب في العقل الآن (سيُزال)</small><p class="bm-now">${esc(now)}</p></div><div class="bm-sub"><small>العقل يقترح يُكتب بداله (يمكنك تعدّله)</small>` : "<div>") + editable("@val", p.value, "…", p.field === "link" || p.field === "palette") + "</div>";
         // بنقول بوضوح «موافق» هتعمل إيه بالظبط
-        const what = p.kind === "field" ? [`لو وافقت: ستُكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل اللي مكتوب دلوقتي" : ""}، وكل سكريبت وفيديو جديد سيسير عليها.`, "اكتبها في الخانة"]
+        const what = p.kind === "field" ? [`إذا وافقت: ستُكتب في خانة «${esc(String(l.t).replace(/^اقتراح:\s*/, ""))}» في العقل${now ? " بدل المكتوب الآن" : ""}، وكل سكريبت وفيديو جديد سيسير عليها.`, "اكتبها في الخانة"]
           : p.kind === "rule" ? ["إذا وافقت: ستُضاف للقواعد، وكل عمل جديد للعلامة يجب يلتزم بها.", "أضف القاعدة"]
           : p.kind === "question" ? ["إجابتك ستُحفظ في «المعرفة»، والعقل سيعود لها وهو يكتب.", "احفظ الإجابة"]
           : ["هذه معلومة عن العلامة، غير مهمة مطلوب منك تعملها. إذا وافقت: ستُحفظ في «المعرفة»، والعقل سيقرؤها وهو يكتب أي نص أو فكرة جديدة. يمكنك تعدّل النص قبل ما توافق.", "احفظها في المعرفة"];
@@ -787,7 +787,7 @@ const BrandPage = (() => {
       <div class="bm-mkopts"><small>الحركة</small>${row("style", MK_OPTS[kind].style)}<small>الخلفية</small>${row("bgk", MK_BG)}${MK_OPTS[kind].textk ? `<small>النص</small>${row("textk", MK_OPTS[kind].textk)}` : ""}<small>المقاس</small>${row("ratio", MK_RATIO)}${txt}</div></div>
       ${busy ? `<p class="bm-note">⏳ يرسم الفيديو… ${Math.round((job.progress || 0) * 100)}٪</p>` : job?.status === "error" ? `<p class="bm-note bad">ماكملش: ${esc(job.error || "")}</p>` : ""}
       <button class="bm-go" data-mkgo="${kind}" ${busy ? "disabled" : ""}>🎬 اعمل ${T} وحطه هنا</button>
-      <p class="bm-note">بيترسم بالكود من غير ذكاء صناعي، فمفيش نقط. الاسم والألوان واللوجو من العقل${kind === "outro" ? "، والدعوة والحساب من «التسليم»" : ""}. ${b[`${kind}_url`] ? "الفيديو الجديد هيحل مكان الحالي." : ""}</p></div>`;
+      <p class="bm-note">يُرسم بالكود دون ذكاء اصطناعي، فلا تُخصم نقاط. الاسم والألوان واللوجو من العقل${kind === "outro" ? "، والدعوة والحساب من «التسليم»" : ""}. ${b[`${kind}_url`] ? "الفيديو الجديد هيحل مكان الحالي." : ""}</p></div>`;
   }
   function mkPoll(bid, kind) {
     const key = `${bid}:${kind}`, m = S.mk[key];
@@ -1341,7 +1341,7 @@ const BrandPage = (() => {
   return { html, mount, styleIds: (b) => styleIds(b), cats: () => S.cats };
 })();
 
-// ⭐ تقييم أي نتيجة (سكريبت، فيديو…): «ممتاز» بيبقى مثال في عقل البراند، والملاحظة اللي بتتكرر بتتحول لقاعدة مقترحة.
+// ⭐ تقييم أي نتيجة (سكريبت، فيديو…): «ممتاز» بيبقى مثال في عقل العلامة، والملاحظة اللي بتتكرر بتتحول لقاعدة مقترحة.
 // كل ده بيظهر نقط منوّرة على خريطة العقل ومحتاج موافقتك.
 const BrainRate = (() => {
   const KEY = "studiomania.rated";

@@ -453,7 +453,7 @@ $("addRiyadh").onclick = () => {
   c.focus();
 };
 
-// ✨ كابشن البراند: القالب بتاع عقل البراند ({caption} {cta} {link})، واللي مكتوب يتحط مكان {caption}
+// ✨ كابشن البراند: القالب بتاع عقل العلامة ({caption} {cta} {link})، واللي مكتوب يتحط مكان {caption}
 function brandCaption(text) {
   const c = clientx.cur || {};
   const tpl = (c.caption || "").trim() || (c.cta || c.link ? "{caption}\n\n{cta}\n{link}" : "");

@@ -60,7 +60,7 @@ def need(n: int, what: str) -> None:
     """قبل العمل: إذا الرصيد مايكفيش التقدير نوقف قبل ما نصرف شيء."""
     b = balance()
     if b is not None and b < n:
-        raise NoCredits(f"رصيدك {b} نقطة، و«{what}» يحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
+        raise NoCredits(f"معك {b} نقطة، و«{what}» تحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
 
 
 def charge(n: int, what: str, ref: str = "") -> int:
@@ -124,7 +124,7 @@ def reserve(n: int, what: str, ref: str = "") -> dict | None:
             have = (r["plan_credits"] + r["topup_credits"]) if r else 0
             if have < n:
                 c.execute("ROLLBACK")
-                raise NoCredits(f"رصيدك {have} نقطة، و«{what}» يحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
+                raise NoCredits(f"معك {have} نقطة، و«{what}» تحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
             plan = min(r["plan_credits"], n)
             top = n - plan
             hid = uuid.uuid4().hex

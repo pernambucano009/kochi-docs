@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@300;400;500;600&family=Unbounded:wght@300;500&family=Jost:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap">
 <script>
-  // نفس اختيار الوضع الليلي بتاع البرنامج
+  // نفس اختيار الوضع الغامق بتاع البرنامج
   try { const t = localStorage.getItem("studiomania.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.nhTheme = t; } catch { }
 </script>
 <style>
@@ -52,7 +52,7 @@
     <div class="tools">
       <span class="ib" title="الباقات والأسعار" aria-label="الباقات والأسعار"><svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="3"></rect><path d="M3 10h18M7 15h3.5"></path></svg></span>
       <a class="chip" href="/login?next=/billing">تسجيل الدخول</a>
-      <button class="sw" id="sw" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="lat" id="swT">Light</span></button>
+      <button class="sw" id="sw" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span id="swT">فاتح</span></button>
     </div>
   </header>
   <main id="pv"></main>
@@ -63,10 +63,10 @@
 <script src="/plans-view.js"></script>
 <script>
   const root = document.documentElement, swT = document.getElementById("swT");
-  swT.textContent = root.dataset.nhTheme === "dark" ? "Dark" : "Light";
+  swT.textContent = root.dataset.nhTheme === "dark" ? "غامق" : "فاتح";
   document.getElementById("sw").onclick = () => {
     const t = root.dataset.nhTheme === "dark" ? "light" : "dark";
-    root.dataset.nhTheme = t; swT.textContent = t === "dark" ? "Dark" : "Light";
+    root.dataset.nhTheme = t; swT.textContent = t === "dark" ? "غامق" : "فاتح";
     try { localStorage.setItem("studiomania.theme", t); } catch { }
   };
   const toast = (m) => { const el = document.getElementById("toast"); el.textContent = m; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2600); };

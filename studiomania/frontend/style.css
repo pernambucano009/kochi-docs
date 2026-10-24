@@ -2006,7 +2006,7 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .st-tpl.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .st-tpl b { font-size: 13px; }
 .st-out { width: 220px; max-width: 100%; border-radius: 12px; border: 1px solid var(--line); }
-/* 🧠 عقل البراند: ستايلات وإنترو/أوترو */
+/* 🧠 عقل العلامة: ستايلات وإنترو/أوترو */
 .brain-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 8px 0; }
 .brain-style { border: 1px solid var(--border, rgba(127,127,127,.25)); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); }
 .brain-style.on { outline: 2px solid var(--accent, #7fa2ec); }
@@ -3163,3 +3163,5 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .pw-eye button:hover, .pw-eye button:focus-visible { background: var(--surface-2); color: var(--text); }
 .pw-eye button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .login .logo-mark { width: auto; height: 84px; flex: none; }
+/* 🔤 الواجهة العربي فصحى بس: العناوين الإنجليزي الصغيرة فوق الأقسام بتظهر في الإنجليزي بس */
+html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }

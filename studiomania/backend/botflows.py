@@ -1,7 +1,7 @@
 """🤖 بوتات الرسايل: Workflows عند Zernio (زي ManyChat) بتتبني من اختيارات بسيطة، من غير ما العميل يرسم أي حاجة.
 
 كل «وصفة» بتتحول لـ nodes + edges بنفس شكل ‎/v1/workflows: trigger ← رسايل ← استنى الرد ← تفرّع ← ذكاء صناعي ← تحويل لإنسان.
-الذكاء الصناعي مش نود «ai» بتاعة Zernio (محتاجة مفتاح عندهم): بنستخدم نود webhook بتكلّم منصتنا (عقل البراند + Atlas الرخيص)،
+الذكاء الصناعي مش نود «ai» بتاعة Zernio (محتاجة مفتاح عندهم): بنستخدم نود webhook بتكلّم منصتنا (عقل العلامة + Atlas الرخيص)،
 وردّنا بيترجع في {{ai.body.text}} وبيتبعت للعميل. الرابط فيه توقيع (token) بيعرّف البوابة الحساب صاحب البوت.
 """
 from __future__ import annotations
@@ -112,7 +112,7 @@ def _ai_loop(g: G, platform: str, start: str, bot_key: str, handle: str | None =
     wait = g.add("wait_for_reply", {"timeoutMinutes": 60, "saveAs": "reply"}, "استنى رده")
     g.link(start, wait, handle)
     hook = g.add("webhook", {"url": ai_url(bot_key), "method": "POST", "headers": {"content-type": "application/json"}, "saveAs": "ai",
-                             "bodyTemplate": '{"text": "{{lastMessage}}", "name": "{{contact.name}}", "platform": "' + platform + '"}'}, "رد من عقل البراند")
+                             "bodyTemplate": '{"text": "{{lastMessage}}", "name": "{{contact.name}}", "platform": "' + platform + '"}'}, "رد من عقل العلامة")
     g.link(wait, hook, "reply")
     end = g.add("end", {}, "خلص")
     g.link(wait, end, "timeout")
@@ -170,7 +170,7 @@ def build(recipe: str, platform: str, o: dict, bot_key: str) -> dict:
     elif recipe == "assistant":
         trig = g.add("trigger", {"triggerType": "inbound_message", "matchType": "any", "onlyFirstMessage": True, "cooldownHours": 12}, "أي رسالة")
         hook = g.add("webhook", {"url": ai_url(bot_key), "method": "POST", "headers": {"content-type": "application/json"}, "saveAs": "ai",
-                                 "bodyTemplate": '{"text": "{{lastMessage}}", "name": "{{contact.name}}", "platform": "' + platform + '"}'}, "رد من عقل البراند")
+                                 "bodyTemplate": '{"text": "{{lastMessage}}", "name": "{{contact.name}}", "platform": "' + platform + '"}'}, "رد من عقل العلامة")
         g.link(trig, hook)
         g.link(hook, g.add("handoff", {"note": "البوت ماقدرش يرد"}, "حوّل للفريق"), "error")
         cond = g.add("condition", {"rules": [{"id": "human", "variable": "ai.body.handoff", "operator": "is_true"}]}, "محتاج إنسان؟")

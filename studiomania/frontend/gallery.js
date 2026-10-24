@@ -12,8 +12,8 @@ const Gallery = (() => {
     desc: "نفس فكرة التصوير بالجوال، فقط بدون ما تصوّر: الأفاتار (من «الأفاتار»: أنت أو أي حد معك إذنه) هو ما يقول النص بوشّه وحركته." },
     { id: "carousel", name: "كاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
     desc: "صور خلف بعض على إنستجرام: سلايد خطاف يشد، وكل سلايد فكرة واحدة، وآخر سلايد دعوة. بستايل العلامة وألوانه." },
-    // 🎞️ فيديو إديتور: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
-    { id: "editor", name: "فيديو إديتور", icon: "🎞️", cover_url: "/gallery/editor.jpg?v=2", cat: "other", pin: 5,
+    // 🎞️ محرر الفيديو: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
+    { id: "editor", name: "محرر الفيديو", icon: "🎞️", cover_url: "/gallery/editor.jpg?v=2", cat: "other", pin: 5,
     desc: "محرر فيديو فارغ: ارفع فيديوهاتك من جهازك، وقطّع ورتّب وحط نص وموسيقى وانتقالات بنفسك، بدون قالب ولا توليد." },
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
     desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل يُخرج فيديو جديد. ويظهر في الأوتوبايلوت كقالب تختاره." },
@@ -186,7 +186,7 @@ const Gallery = (() => {
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // رول الماوس فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
   // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
-  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "فيديو إديتور", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "محرر الفيديو", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الصناعي"], ["scene", "استوديو المشهد", "مسودة 3D ← فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الصناعي"], ["voice", "توليد صوت", "بالذكاء الصناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 2 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
@@ -222,10 +222,10 @@ const Gallery = (() => {
     if (key === "scene") return SceneStudio.open(panel);
     Gen.open(key, panel);
   }
-  // 🎞️ فيديو إديتور: غلاف صغير وزرار واحد بيفتح مشروع مونتاج فاضي
+  // 🎞️ محرر الفيديو: غلاف صغير وزرار واحد بيفتح مشروع مونتاج فاضي
   function editorIn(panel) {
     const x = EXTRA.find((e) => e.id === "editor");
-    panel.innerHTML = `<div class="nh-ed"><img src="${x.cover_url}" alt=""><div><h3 class="nh-ct-h">فيديو إديتور</h3><p class="nh-ct-hint">${esc(x.desc)}</p>
+    panel.innerHTML = `<div class="nh-ed"><img src="${x.cover_url}" alt=""><div><h3 class="nh-ct-h">محرر الفيديو</h3><p class="nh-ct-hint">${esc(x.desc)}</p>
       <button type="button" class="nh-gal-go" data-edopen>🎞️ افتح الإديتور</button></div></div>`;
     panel.querySelector("[data-edopen]").addEventListener("click", () => openEditor());
   }
@@ -590,7 +590,7 @@ const Gallery = (() => {
       showStep("12");
     } catch (err) { toast(err.message, true); }
   }
-  // 🎞️ فيديو إديتور: مشروع مونتاج حر جديد فاضي، ويفتح المحرر عليه على طول
+  // 🎞️ محرر الفيديو: مشروع مونتاج حر جديد فاضي، ويفتح المحرر عليه على طول
   async function openEditor() {
     try {
       const p = await api("/api/projects", { method: "POST", ...jsonBody({ ...blankProject("مونتاج جديد"), section: "free" }) });
@@ -631,7 +631,7 @@ const Gallery = (() => {
     pv.innerHTML = `<div class="nh-gal-pvbox">
       <button type="button" class="nh-gal-x" data-gclose aria-label="أغلق">✕</button>
       <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="">` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`}</div>
-      <div class="nh-gal-pvt"><span class="latin">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
+      <div class="nh-gal-pvt"><span class="latin en-k">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ هذا بالقالب"}</button>
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}

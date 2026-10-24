@@ -32,7 +32,7 @@ const BotsPage = (() => {
     if (!S.f.account || !accs.some((a) => a.id === S.f.account)) S.f.account = accs[0]?.id || "";
     return `<div class="bot-formhead"><b class="pk-h3">${esc(r.t)}</b>${pkIb("close", "رجوع للأنواع", "data-bback", "sm")}</div><p class="pk-note">${esc(r.desc)}</p>
       ${accs.length ? `<label class="pk-f">على حساب<select data-bf="account">${accs.map((a) => `<option value="${esc(a.id)}" ${a.id === S.f.account ? "selected" : ""}>${PL[a.platform]} · ${esc(a.name || a.username)}</option>`).join("")}</select></label>`
-        : `<p class="pk-err">مفيش حساب ${r.platforms.map((p) => PL[p]).join(" أو ")} مربوط. اربطه من صفحة النشر الأول.</p>`}
+        : `<p class="pk-err">لا يوجد حساب ${r.platforms.map((p) => PL[p]).join(" أو ")} مربوط. اربطه من صفحة النشر أولًا.</p>`}
       <label class="pk-f">اسم البوت<input type="text" data-bf="name" value="${esc(S.f.name ?? r.t)}"></label>
       ${r.fields.map(field).join("")}
       ${S.recipe === "assistant" || S.f.ai ? `<p class="pk-note">الرد الذكي بيقرا من عقل العلامة (الهوية والمعرفة والقواعد)، وكل رد بيتخصم بنقطة تقريبًا. لو العميل طلب حد من الفريق أو سأل حاجة مش في العقل، المحادثة بتتحوّل لصندوق الرسايل.</p>` : ""}
@@ -45,7 +45,7 @@ const BotsPage = (() => {
       ${d.bots.map((b) => { const st = ST[b.status] || [b.status, ""]; return `<div class="pk-li"><b>${esc(b.name)}</b><small>${PL[b.platform] || esc(b.platform)} · ${esc(b.account)}</small>
         <span class="am-st ${st[1]}">${st[0]}</span><small>بدأ ${b.started} · خلص ${b.completed}${b.exited ? ` · اتحوّل ${b.exited}` : ""}</small>
         <span class="pk-acts">${pkIb(b.status === "active" ? "close" : "play", b.status === "active" ? "أوقف" : "شغّل", `data-btog="${esc(b.id)}" data-on="${b.status === "active" ? 0 : 1}"`, "sm")}${pkIb("trash", "احذف", `data-bdel="${esc(b.id)}"`, "sm")}</span></div>`; }).join("")
-        || `<p class="pk-note">لسه مفيش بوتات. اختار نوع من اليمين وشغّله في دقيقة.</p>`}
+        || `<p class="pk-note">لا توجد بوتات بعد. اختر نوعًا من اليمين وشغّله في دقيقة.</p>`}
       <p class="pk-note">المحادثات اللي البوت بيحوّلها للفريق بتظهر في «صندوق الرسايل».</p></section>
       <section class="bot-form">${formHTML()}</section></div>`;
   }

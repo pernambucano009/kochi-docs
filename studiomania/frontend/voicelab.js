@@ -152,7 +152,7 @@ ${S.review ? reviewHTML() : `
     try {
       if (b("#vlGo")) {
         const k = S.dialect, provs = S.provs.filter((p) => supports(k, p));
-        if (!provs.length) return toast("مفيش مزوّد من اللي اخترتهم بيدعم اللهجة دي", true);
+        if (!provs.length) return toast("لا يوجد مزوّد ممن اخترتهم يدعم هذه اللهجة", true);
         await saveTexts([...S.dirty]);
         await api("/api/voicelab/run", { method: "POST", ...jsonBody({ dialect: k, text: (S.texts[k] || "").trim(), providers: provs }) });
         return load();
@@ -160,7 +160,7 @@ ${S.review ? reviewHTML() : `
       if (b("#vlAll")) {
         const jobs = Object.keys(S.d.dialects).map((k) => [k, S.provs.filter((p) => supports(k, p))]).filter(([, ps]) => ps.length);
         const voices = jobs.reduce((a, [, ps]) => a + ps.length * 2, 0);
-        if (!jobs.length) return toast("مفيش مزوّد مختار بيدعم أي لهجة", true);
+        if (!jobs.length) return toast("لا يوجد مزوّد مختار يدعم أي لهجة", true);
         if (!(await uiConfirm(`هنجرب ${jobs.length} لهجة بالقطع اللي راجعتها، كل لهجة بالمزودين اللي بيدعموها بس (حوالي ${voices} صوت). التكلفة على حساب المنصة. نكمل؟`))) return;
         await saveTexts([...S.dirty]);
         for (const [k, ps] of jobs) await api("/api/voicelab/run", { method: "POST", ...jsonBody({ dialect: k, text: (S.texts[k] || "").trim(), providers: ps }) }).catch((err) => toast(`${S.d.dialects[k]}: ${err.message}`, true));

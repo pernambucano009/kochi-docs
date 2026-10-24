@@ -129,7 +129,7 @@ const Gen = (() => {
     S.el.innerHTML = `<div class="flw-box gn" data-built>
       ${inline ? "" : `<header class="gn-top"><nav class="gn-tabs">${Object.entries(TABS).map(([k, [, t]]) => `<button type="button" class="${k === S.tab ? "on" : ""}" data-gtab="${k}">${t}</button>`).join("")}</nav><button type="button" class="gn-ib" data-gclose aria-label="أغلق">✕</button></header>`}
       <div class="gn-main"><div class="gn-form">
-        <div class="gn-h"><span class="latin">${H[0]}</span><h2>${H[1]}</h2></div>
+        <div class="gn-h"><span class="latin en-k">${H[0]}</span><h2>${H[1]}</h2></div>
         <textarea class="gn-pr" data-g="${H[2]}" rows="3" dir="auto" aria-label="${H[1]}" placeholder="${H[3]}">${esc(d[H[2]] || "")}</textarea>
         <div class="gn-opts">${O.map((o) => o.file ? `<label class="gn-opt${S.files?.[o.k]?.length ? " set" : ""}" data-tip="${esc(o.label)}">${gi(o.ic)}<span>${esc(o.v)}</span><input type="file" accept="${o.file}" ${o.multi ? "multiple" : ""} data-gfile="${o.k}" hidden></label>`
           : `<button type="button" class="gn-opt${S.pop === o.k ? " on" : ""}" data-gopt="${o.k}" ${o.ask ? "data-gask" : ""} data-tip="${esc(o.label)}">${gi(o.ic)}<span>${esc(o.v)}</span></button>`).join("")}</div>

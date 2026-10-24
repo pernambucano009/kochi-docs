@@ -46,7 +46,7 @@ const NH = (() => {
       : { en: "Create", ar: "ابدأ مشروعًا جديدًا", icon: "create", page: "create", desc: "كل أنواع العمل من هنا: اختر النوع، والخطوات تسير معك حتى التصدير." },
     brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاته وستايله. أي عمل يُنشأ يبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى الذي تستخدمها في أي عمل." },
-    // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل البراند)
+    // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل العلامة)
     dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، صوت جديد، وتظبيط البُق." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "قيد العمل", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. اضغط على أي خط يُكمل من مكان ما وقفت." },
@@ -96,7 +96,7 @@ const NH = (() => {
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
     inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
-  const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
+  const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin en-k">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
   function brainPct(b) {
     if (!b) return 0;
@@ -129,7 +129,7 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} منشور متجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
-    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `رصيدك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
+    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
   // الرئيسية بسيطة: كل قسم أيقونة واسمه بس، والشرح والحالة بيظهروا في فقاعة لما تقف بالماوس عليه
@@ -138,7 +138,7 @@ const NH = (() => {
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">
       <span class="nh-sic">${sideIc(id)}</span><b class="nh-sname">${esc(T[id].ar)}</b>${tipOf(id, META[id]())}</div>`;
   const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
-      <div class="nh-head"><div class="nh-name"><span class="latin">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
+      <div class="nh-head"><div class="nh-name"><span class="latin en-k">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
   function contHTML() {
     // آخر حاجة اتلمست: مشروع مونتاج، أو قالب/تايبوجرافي/دبلجة لسه ما خلصوش
@@ -186,7 +186,7 @@ const NH = (() => {
       <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
       <button class="nh-chip" id="nhClient" title="العميل الذي قيد العمل"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-chip nh-acct" id="nhAcct" title="حسابك" aria-label="حسابك"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></button>
-      <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span class="latin" id="nhMode">Dark</span></button>
+      <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
   // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
@@ -196,7 +196,7 @@ const NH = (() => {
   corner.id = "nhCorner";
   corner.className = "nh-corner";
   corner.hidden = true;
-  corner.innerHTML = `<span class="nh-c-ic"></span><div class="nh-c-name"><span class="latin"></span><b></b><span class="nh-c-ask"></span></div>`;
+  corner.innerHTML = `<span class="nh-c-ic"></span><div class="nh-c-name"><span class="latin en-k"></span><b></b><span class="nh-c-ask"></span></div>`;
   document.body.appendChild(corner);
   const cIc = corner.querySelector(".nh-c-ic"), cLatin = corner.querySelector(".latin"), cName = corner.querySelector("b"), cAsk = corner.querySelector(".nh-c-ask");
   let cornerPage = "tr", cornerStage = "tr";
@@ -274,13 +274,21 @@ const NH = (() => {
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
     if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو أكمل مشروع من «قيد العمل».</p>`;
-    if (!key) return `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
+    if (!key) return window.I18N?.lang !== "en" ? homeTitle(big("app")) : `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
-      return `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div>`;
+      return window.I18N?.lang !== "en" ? homeTitle(big("pulse")) : `${big("pulse")}<h1 class="latin">Continue</h1><div class="ar">${esc(f?.name)}</div>`;
     }
     const t = T[key];
+    if (window.I18N?.lang !== "en") return homeTitle(big(t.icon));
     return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div>`;   // الاسم فقط، والشرح في فقاعة القسم
+  }
+  // 🏠 عنوان الرئيسية ثابت (مش بيتغير مع القسم اللي الماوس عليه): «ابدأ من هنا» لحد ما العقل يفهمك ٣٠٪، وبعدها اسم العلامة
+  function homeTitle(icon) {
+    const b = D.brand, pct = b?.knowledge?.score ?? brainPct(b), name = String(b?.name || "").trim();
+    return pct < 30 || !name || name === "عميلي"
+      ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو</div>`
+      : `${icon}<h1 class="nh-ttl">${esc(name)}</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
   }
   // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها
   let stageLock = false, pendingKey = null;
@@ -301,7 +309,7 @@ const NH = (() => {
     slots[live].classList.add("out");
     live = 1 - live;
   }
-  // المسرح بيبدأ بآخر مربع وقفت عليه (أو عقل البراند أول مرة)، ومبيرجعش لحاجة تانية لما الماوس يطلع في الفراغ
+  // المسرح بيبدأ بآخر مربع وقفت عليه (أو عقل العلامة أول مرة)، ومبيرجعش لحاجة تانية لما الماوس يطلع في الفراغ
   const STAGE_KEY = "studiomania.stage";
   const firstKey = (() => { const k = storageGet(STAGE_KEY); return T[k] && !KOCHI ? k : "brand"; })();
   shown = firstKey;
@@ -334,7 +342,7 @@ const NH = (() => {
   const mode = () => storageGet(THEME_KEY) || (sysDark.matches ? "dark" : "light");
   const sync = () => {
     root.dataset.nhTheme = mode();
-    document.getElementById("nhMode").textContent = mode() === "dark" ? "Dark" : "Light";
+    document.getElementById("nhMode").textContent = window.I18N?.lang === "en" ? (mode() === "dark" ? "Dark" : "Light") : (mode() === "dark" ? "غامق" : "فاتح");
     GL?.theme(mode() === "dark");
   };
   sync();
@@ -530,12 +538,12 @@ const NH = (() => {
     pGrid.querySelectorAll("[data-pjf]").forEach((x) => x.classList.toggle("on", x === b));
     pjFilter();
   });
-  // صفحات كاملة بتنزل لتحت (عقل البراند، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
+  // صفحات كاملة بتنزل لتحت (عقل العلامة، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
   const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, bots: BotsPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
-  const titleHTML = (t, key) => `<div class="nh-name"><span class="latin">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
+  const titleHTML = (t, key) => `<div class="nh-name"><span class="latin en-k">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
   const backLabel = () => { document.getElementById("nhBackT").textContent = pStack.length ? "رجوع" : "الرئيسية"; };
   // الأصول: تابات بالأيقونات الزجاج بين الشخصيات والتعليق الصوتي والموسيقى، والشخصيات أول واحدة
   const AS_TABS = [["coaches", "characters", "الشخصيات"], ["voice", "voices", "التعليق الصوتي"], ["music", "music", "الموسيقى"]];
@@ -821,6 +829,7 @@ const NH = (() => {
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
+    if (window.I18N?.lang !== "en" && !KOCHI) slots[live].innerHTML = stageHTML(shown);   // العنوان بيتحدّث لما العقل يتحمّل
     GL?.brand?.();
   }
   refresh();
@@ -829,7 +838,7 @@ const NH = (() => {
   // لما القسم يتقفل: الكاميرا بترجع لورا للرئيسية
   return {
     refresh,
-    // عقل البراند من أي مكان في البرنامج: لو فيه قسم مفتوح بيتقفل الأول، والصفحة بتفتح من مربع البراند
+    // عقل العلامة من أي مكان في البرنامج: لو فيه قسم مفتوح بيتقفل الأول، والصفحة بتفتح من مربع البراند
     // 💳 باقتي ونقاطي من أيقونة الشريط: الصفحة بتطلع من الأيقونة نفسها (زي ما المربع بيكبر في الرئيسية)
     openPlans(btn) {
       const go = () => {
