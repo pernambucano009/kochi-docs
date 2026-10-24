@@ -25,17 +25,17 @@ input{font:inherit}
 .lp-jf{animation:lpFloat 7s ease-in-out infinite}
 
 /* نفس «البروز» اللي في البرنامج (fx.js): بيطلع لفوق ويكبر 1.06 */
-.lp-btn{position:relative;transition:translate .32s cubic-bezier(.2,.8,.2,1),scale .32s cubic-bezier(.2,.8,.2,1),color .3s,background .3s}
-.lp-btn:hover,.lp-btn:focus-visible{translate:0 -3px;scale:1.06;z-index:2}
-.lp-btn:active{translate:0 0;scale:.98;transition-duration:.12s}
+.lp-btn{position:relative;transition:transform .32s cubic-bezier(.2,.8,.2,1),color .3s,background .3s}
+.lp-btn:hover,.lp-btn:focus-visible{transform:translateY(-3px) scale(1.06);z-index:2}
+.lp-btn:active{transform:scale(.98);transition-duration:.12s}
 /* الكروت: نفس بروز مربعات الرئيسية بهدوء */
-.lp-card{position:relative;transition:translate .32s cubic-bezier(.2,.8,.2,1),scale .32s cubic-bezier(.2,.8,.2,1)}
-.lp-card:hover{translate:0 -3px;scale:1.03;z-index:2}
+.lp-card{position:relative;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.lp-card:hover{transform:translateY(-3px) scale(1.03);z-index:2}
 .lp-gb-l:hover{background:#181718 !important;color:#FFFFFF !important}.lp-gb-d:hover{background:#F1F1F3 !important;color:#0C0C0E !important}
 .lp-link{transition:color .3s}.lp-link:hover{color:#E5613E}
 /* كارت الفيديو في أول شاشة */
-.lp-vid{transition:translate .32s cubic-bezier(.2,.8,.2,1),scale .32s cubic-bezier(.2,.8,.2,1),border-color .3s}
-.lp-vid:hover{translate:0 -3px;scale:1.02;border-color:#E5613E !important}
+.lp-vid{transition:transform .32s cubic-bezier(.2,.8,.2,1),border-color .3s}
+.lp-vid:hover{transform:translateY(-3px) scale(1.02);border-color:#E5613E !important}
 .lp-foot a{transition:color .3s}.lp-foot a:hover{color:#E5613E}
 
 /* نفس «الثعبان» اللي بيلف حوالين الزراير والمربعات في البرنامج (home2.css) */
@@ -57,16 +57,17 @@ input{font:inherit}
 @keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
 
 /* الجيلي فيش بينوّر لما تدوس «ابدأ مجانًا» */
-@keyframes lpLit{0%{filter:brightness(1);scale:1}30%{filter:brightness(1.45) saturate(1.3);scale:1.035}100%{filter:brightness(1);scale:1}}
+@keyframes lpLit{0%{filter:brightness(1);transform:scale(1)}30%{filter:brightness(1.45) saturate(1.3);transform:scale(1.035)}100%{filter:brightness(1);transform:scale(1)}}
 .lp-lit{animation:lpLit 1.6s cubic-bezier(.3,0,.2,1) both}
-@keyframes lpSpread{0%{opacity:0;scale:.25}25%{opacity:1}100%{opacity:0;scale:2.6}}
+@keyframes lpSpread{0%{opacity:0;transform:scale(.25)}25%{opacity:1}100%{opacity:0;transform:scale(2.6)}}
 .lp-spread{animation:lpSpread 1.8s cubic-bezier(.2,.7,.2,1) both}
-@keyframes lpIn{from{opacity:0;translate:0 14px}to{opacity:1;translate:0 0}}
+@keyframes lpIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .lp-in{animation:lpIn .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes lpPop{0%{opacity:0;transform:translateY(26px) scale(.94);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
+.lp-pop{animation:lpPop .9s cubic-bezier(.16,1,.3,1) both}
 
 .lp-field{width:100%;height:46px;box-sizing:border-box;border-radius:14px;padding:0 16px;outline:none;transition:box-shadow .25s,border-color .25s}
 .lp-field:focus{border-color:#E5613E !important;box-shadow:0 0 0 4px rgba(229,97,62,.14)}
-@media (prefers-reduced-motion: reduce){.lp-jf,.sk-go,.nh-snake rect,.lp-lit,.lp-spread,.lp-in{animation:none}.lp-btn,.lp-card,.lp-vid{translate:none !important;scale:none !important}}
 </style>
 </helmet>
 <div style="{{rootStyle}}">
@@ -226,7 +227,7 @@ input{font:inherit}
 
   <!-- ===== التسجيل / الدخول ===== -->
   <sc-if value="{{isSignup}}" hint-placeholder-val="{{ false }}">
-    <form class="lp-in" dir="{{dir}}" onSubmit="{{submit}}" style="{{formStyle}}">
+    <form class="lp-pop" dir="{{dir}}" onSubmit="{{submit}}" style="{{formStyle}}">
       <h1 style="{{formTitle}}">{{t.sTitle}}</h1>
       <p style="{{formLead}}">{{t.sLead}}</p>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px">
@@ -473,7 +474,7 @@ class Component extends DCLogic {
       monthly: !y, yearly: y, showPw: s.showPw,
       markSrc: d ? '/_blob/2ad7b4f1227f708bbf168ef6fe697e18' : '/_blob/379b1415dcab42f9d2fa372cf6fce3e1',
       rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;color:' + ink + ';background:' + bg + ';' + (still || 'transition:background-color 1.6s ease;'),
-      litGlow: 'position:absolute;left:548px;top:44%;width:1200px;height:1200px;translate:-50% -50%;border-radius:50%;pointer-events:none;' + (still || 'transition:opacity 1.6s ease;') + 'opacity:' + (lit ? (home ? 1 : 0.7) : (d ? 0.6 : 0)) + ';background:' + (d ? (lit ? 'radial-gradient(circle,rgba(255,226,160,.20) 0%,rgba(255,200,120,.06) 30%,rgba(23,23,26,0) 58%)' : 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)') : 'radial-gradient(circle,rgba(90,200,255,.20) 0%,rgba(120,190,255,.07) 32%,rgba(242,247,252,0) 60%)'),
+      litGlow: 'position:absolute;left:548px;top:44%;width:1200px;height:1200px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;' + (still || 'transition:opacity 1.6s ease;') + 'opacity:' + (lit ? (home ? 1 : 0.7) : (d ? 0.6 : 0)) + ';background:' + (d ? (lit ? 'radial-gradient(circle,rgba(255,226,160,.20) 0%,rgba(255,200,120,.06) 30%,rgba(23,23,26,0) 58%)' : 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)') : 'radial-gradient(circle,rgba(90,200,255,.20) 0%,rgba(120,190,255,.07) 32%,rgba(242,247,252,0) 60%)'),
       spreadStyle: 'position:absolute;left:548px;top:38%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(255,232,170,.32) 0%,rgba(255,232,170,0) 62%)' : 'radial-gradient(circle,rgba(80,200,255,.30) 0%,rgba(80,200,255,0) 62%)'),
       jellyWrap: 'position:absolute;left:300px;top:60px;width:497px;height:690px;pointer-events:none;' + (still || 'transition:opacity .7s ease;') + 'opacity:' + jellyOp,
       imgLight: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && !lit ? 1 : 0),
@@ -560,7 +561,7 @@ class Component extends DCLogic {
         const flip = () => new Promise((done) => { this.setState({ dark: !d, still: true }); requestAnimationFrame(() => requestAnimationFrame(done)); });
         const root = document.documentElement;
         const end = () => this.setState({ still: false });
-        if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { flip().then(() => requestAnimationFrame(end)); return; }
+        if (!document.startViewTransition) { flip().then(() => requestAnimationFrame(end)); return; }
         root.classList.add('nh-wipe');
         document.startViewTransition(flip).finished.finally(() => { root.classList.remove('nh-wipe'); end(); });
       }
