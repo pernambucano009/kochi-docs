@@ -29,8 +29,7 @@ const VoiceLab = (() => {
           : c.status === "manual" ? stars(r.id, i, c.score || 0) + noteBox(r.id, i, c.note)
           : c.status === "failed" ? `<p class="vl-err">${esc(c.error || "لم يكتمل")}</p>` : `<p class="vl-wait">⏳ جارٍ التوليد…</p>`}</div>`).join("")}</div></article>`;
   }
-  function tableHTML() {
-    const rows = S.d.table;
+  function expHTML() {
     const failed = S.d.runs.reduce((a, r) => a + r.clips.filter((c) => c.status === "failed" && !c.skip).length, 0);
     const exp = `<div class="vl-expbox">
       <div class="row wrap vl-exp"><label class="field inline">اللهجة <select id="vlExpDia"><option value="">كل اللهجات</option>${Object.entries(S.d.dialects).map(([k, v]) => `<option value="${k}"${k === S.expDia ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label></div>
@@ -40,6 +39,10 @@ const VoiceLab = (() => {
         <button type="button" class="btn" id="vlCopy">📋 انسخ التقرير</button>
         ${failed ? `<button type="button" class="btn" id="vlRetryAll">🔁 أعد كل ما فشل (${failed})</button>` : ""}</div>
       <small class="hint">أسماء الملفات في نسخة المقيّمين أرقام مثل «A1B2-3»، والرقم نفسه موجود في تقريرك بجانب اسم المزوّد. عندما يعيد المقيّمون الورقة، أرسلها هنا مع التقرير.</small></div>`;
+    return exp;
+  }
+  function tableHTML() {
+    const rows = S.d.table, exp = expHTML();
     if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، وستظهر النتيجة هنا: متوسط كل مزوّد في كل لهجة.</p>`;
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
@@ -73,7 +76,7 @@ ${S.review ? reviewHTML() : `
     S.shown = shownKey();
     S.el.innerHTML = `<div class="vl-box" role="dialog" aria-modal="true" aria-label="مختبر الأصوات"><header class="vl-top"><h2>🎧 مختبر الأصوات</h2>
       <nav class="vl-tabs">${tabs.map(([k, t]) => `<button type="button" class="${S.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</nav>
-      <button type="button" class="vl-x" data-close aria-label="أغلق">✕</button></header><div class="vl-body">${body}</div></div>`;
+      <button type="button" class="vl-x" data-close aria-label="أغلق">✕</button></header><div class="vl-body">${S.tab === "res" ? "" : expHTML()}${body}</div></div>`;
     if (same) S.el.querySelector(".vl-box").scrollTop = top;
   }
   const shownKey = () => S.tab + (S.tab === "cmp" && S.review ? ":review" : "");
