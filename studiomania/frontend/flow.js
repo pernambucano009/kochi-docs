@@ -7,6 +7,15 @@ const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   // 💳 التكلفة جنب زرار الصرف: «نحو N نقطة · رصيدك M» (والرصيد مش ظاهر لصاحب البرنامج)
   const costTag = (pts, bal) => pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · رصيدك ${Number(bal).toLocaleString("en-US")}` : ""}</small>` : "";
+  // 🗣️ اللهجة: سطر واحد «اللهجة: سعودي نجدي · تغيير» في خطوة النص وخطوة الصوت، والقايمة الكاملة بتفتح بس لما تضغط «تغيير»
+  function dialLine(cur, key, off = false) {
+    const all = S.vopts?.dialects || [];
+    if (!all.length) return "";
+    const lab = all.find((x) => x.id === cur)?.label || "—";
+    const chips = (g) => all.filter((x) => x.group === g).map((x) => `<button type="button" class="flw-chip${x.id === cur ? " on" : ""}" data-${key}="${esc(x.id)}" ${off ? "disabled" : ""}>${esc(x.label)}</button>`).join("");
+    return `<div class="flw-dial"><span>اللهجة: <b>${esc(lab)}</b></span><button type="button" class="flw-link" data-dialopen ${off ? "disabled" : ""}>${S.dialOpen ? "إغلاق" : "تغيير"}</button></div>
+      ${S.dialOpen ? `<div class="flw-langs">${chips("ar")}</div><div class="flw-langs">${chips("foreign")}</div>` : ""}`;
+  }
   const J = (o) => ({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
   const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع المنشور"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
@@ -393,11 +402,10 @@ const Flow = (() => {
     const ml = d.mlive, loading = d.busy === "scenarios";
     if (!ml) return `${picked("idea")}<div class="flw-empty bad">تعذّرت قراءة مشاهد القالب.</div>`;
     if (!S.vopts) loadVoice();
-    const langs = (S.vopts?.dialects || []).filter((x) => x.group === "ar");
     const cur = d.lang || S.vopts?.pick?.lang;
     return `${picked("idea")}<h2>النص على مشاهد القالب</h2>
       <p class="flw-sub">لكل مشهد جملة تعليق صوتي والنص الذي يظهر فيه. المشهد يأخذ طول جملته، فاجعل الجمل قريبة من طول المشهد (بجانب كل جملة ستأخذ قدر ماذا).</p>
-      ${langs.length ? `<div class="flw-tset"><small>لهجة التعليق الصوتي (النص يُكتب بها):</small><div class="flw-langs">${langs.map((x) => `<button type="button" class="flw-chip${x.id === cur ? " on" : ""}" data-slang="${esc(x.id)}" ${loading ? "disabled" : ""}>${esc(x.label)}</button>`).join("")}</div></div>` : ""}
+      ${dialLine(cur, "slang", loading)}
       ${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scriptCard(s, ml)).join("")}</div>
       ${loading ? working("العقل يكتب النص على مشاهد القالب…") : failed("scen")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد النص يصبح كيف؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
@@ -445,11 +453,11 @@ const Flow = (() => {
     const v = S.vo, on = v.speaker !== "none";
     const voices = o.voices[v.lang] || [];
     if (!voices.some((x) => x.id === v.voice)) v.voice = voices[0]?.id || "";
-    const grp = (g) => o.dialects.filter((x) => x.group === g).map((x) => `<button type="button" class="flw-chip${x.id === v.lang ? " on" : ""}" data-vlang="${esc(x.id)}">${esc(x.label)}</button>`).join("");
     return `${picked("scenario")}<h2>من الذي يتكلم؟</h2><p class="flw-sub">اختر صاحب الصوت، ثم اللهجة والصوت الذي سيُقال به النص.</p>
       <div class="flw-spk">${o.speakers.map((s) => `<button type="button" class="flw-person sm${s.id === v.speaker ? " on" : ""}" data-vspk="${esc(s.id)}">
         ${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy">` : `<i>${s.id === "none" ? "🔇" : "🎙️"}</i>`}<b>${esc(s.name)}</b><small>${esc(s.about || "")}</small></button>`).join("")}</div>
-      ${on ? `<h3 class="flw-h3">اللهجة</h3><div class="flw-langs">${grp("ar")}</div><div class="flw-langs">${grp("foreign")}</div>
+      ${on ? `${dialLine(v.lang, "vlang")}
+        ${isCode(d) && d.script_lang && d.script_lang !== v.lang ? `<div class="flw-empty">النص الحالي مكتوب بلهجة أخرى. <button type="button" class="flw-link" data-rewrite="${esc(v.lang)}">أعد كتابة النص بهذه اللهجة</button></div>` : ""}
         ${!o.fasih && o.dialects.find((x) => x.id === v.lang)?.group === "ar" ? `<div class="flw-empty bad">الأصوات العربية غير متاحة الآن، وفريقنا يعمل على إصلاحها.</div>` : ""}
         <h3 class="flw-h3">الصوت</h3><div class="flw-voices">${voices.map((x) => `<div class="flw-voice${x.id === v.voice ? " on" : ""}">
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
@@ -798,7 +806,9 @@ const Flow = (() => {
     if (q("[data-own]")) { S.own = true; S.edit = null; render(); return S.el.querySelector(".flw-form input")?.focus(); }
     if (q("[data-hint]")) { S.hint = true; render(); return S.el.querySelector("#flwHint")?.focus(); }
     if ((b = q("[data-retry]")) && b.dataset.retry === "vo") return call("/voice", S.vo);
-    if ((b = q("[data-slang]"))) return call("/scenarios", { lang: b.dataset.slang, more: false });
+    if (q("[data-dialopen]")) { S.dialOpen = !S.dialOpen; return render(); }
+    if ((b = q("[data-slang]"))) { S.dialOpen = false; if (S.vo) { S.vo.lang = b.dataset.slang; S.vo.voice = ""; } return call("/scenarios", { lang: b.dataset.slang, more: false }); }
+    if ((b = q("[data-rewrite]"))) { S.dialOpen = false; if (await call("/stage", { stage: "scenario" })) return call("/scenarios", { lang: b.dataset.rewrite, more: false }); return; }
     if (q("[data-panel]")) {
       const d = S.d;
       return MotionPage.openTemplate(d.template.id, d.template.name, {
@@ -844,7 +854,7 @@ const Flow = (() => {
     }
     if (q("[data-setcast]")) { S.vopts = null; S.vo = null; return call("/cast", { ids: S.cast || [] }); }
     if ((b = q("[data-vspk]"))) { S.vo.speaker = b.dataset.vspk; return render(); }
-    if ((b = q("[data-vlang]"))) { S.vo.lang = b.dataset.vlang; S.vo.voice = ""; return render(); }
+    if ((b = q("[data-vlang]"))) { S.vo.lang = b.dataset.vlang; S.vo.voice = ""; S.dialOpen = false; return call("/lang", { lang: b.dataset.vlang }); }
     if ((b = q("[data-vvoice]"))) { S.vo.voice = b.dataset.vvoice; return render(); }
     if ((b = q("[data-vplay]"))) return playSample(b.dataset.vplay);
     if (q("[data-setvoice]")) { S.audio?.pause(); return call("/voice", S.vo); }

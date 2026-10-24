@@ -10841,8 +10841,27 @@ def first_client_id() -> str | None:
     return r["id"] if r else None
 
 
+def onboard_apply() -> None:
+    """🗣️ البلد واللهجة اللي العميل اختارهم وقت التسجيل (onboard.json من البوابة) بيتحطوا في عقل العلامة مرة واحدة،
+    فالأفكار والهوك والنص والصوت كلهم بياخدوا نفس اللهجة من أول يوم."""
+    if auth.get_setting("onboard_v1"):
+        return
+    f = DATA_DIR / "onboard.json"
+    try:
+        ob = json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except ValueError:
+        ob = None
+    auth.set_setting("onboard_v1", "1")
+    bid = first_client_id()
+    if not ob or not bid:
+        return
+    update_brain(bid, lambda d: d.update({k: v for k, v in (("language", ob.get("dialect_label") or ""), ("market", ob.get("country") or ""))
+                                          if v and not str(d.get(k) or "").strip()}))
+
+
 def active_client_id() -> str | None:
     seed_brain()
+    onboard_apply()
     migrate_rules()
     cid = auth.get_setting("active_client")
     if cid and brain_row(cid):
@@ -23211,7 +23230,7 @@ def flow_fresh_scen(d: dict, items: list[dict], more: bool = False) -> tuple[lis
     return ideamem.fresh("scenario", items, ideamem.refs(mem_load(mem_cid(d)), "scenario"))
 
 
-def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
+def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: bool = False) -> None:
     d = flow_load(fid)
     brain = flow_brain(d)
     idea = d.get("idea") or {}
@@ -23222,9 +23241,12 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False) -> None:
     if (pk := idea.get("pack")) and pk.get("for", idea.get("hook")) == idea.get("hook"):   # الهوك التلاتي (لو العميل مابدّلش الهوك): أول مشهد لازم يبقى عليه
         idea_txt += ("\nالخطاف التلاتي (أول مشهد يجب يطبقه بالضبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · ما يُرى: " + pk.get("visual", "")
                      + " · ما يُقال: «" + pk.get("spoken", "") + "» · جمل القفل بعده: «" + pk.get("lockin", "") + "»")
+    if not idea.get("script"):   # 🗣️ الفكرة والهوك ممكن يكونوا اتكتبوا بلهجة تانية: الهوك بيتولد من جديد بلهجة النص، مش بيتنسخ
+        idea_txt += ("\nمهم: الفكرة والخطاف أعلاه ربما كُتبا بلهجة أخرى. لا تنسخ الخطاف كما هو: أعد كتابته بنفس المعنى والقوة "
+                     "بلهجة النص المطلوبة، وكذلك أي جملة تُقال من الخطاف التلاتي.")
     avoid = [s.get("title", "") for s in d.get("scenarios") or []]
     if d["template"].get("kind") == "motion":
-        return flow_gen_scripts(fid, d, brain, idea_txt, avoid if more else [], hint, more)
+        return flow_gen_scripts(fid, d, brain, idea_txt, avoid if more else [], hint, more, relang)
     if atlas.mock_mode():
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
@@ -23369,7 +23391,7 @@ def motion_live(mid: str) -> dict:
     return info
 
 
-def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], hint: str, more: bool) -> None:
+def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], hint: str, more: bool, relang: bool = False) -> None:
     mid = d["template"]["id"]
     live, schema = motion_live(mid), fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
@@ -23380,11 +23402,13 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
                                                  dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "النص")
-    items, rep = flow_fresh_scen(d, [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])], more)
+    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])]
+    # نفس النص بلهجة تانية مش تكرار: لما اللهجة تتغير، فلتر «اتستخدم قبل كده» مابيشتغلش
+    items, rep = (items, []) if relang else flow_fresh_scen(d, items, more)
     if not items:
         raise HTTPException(400, "كل النصوص التي طلعت شبه أشياء استخدمتها من قبل. جرّب «وجّه العقل» بفكرة مختلفة" if rep else "العقل مرجعش نص، جرّب مرة أخرى")
     flow_update(fid, lambda x: x.update(scen_repeats=len(rep)))
-    flow_update(fid, lambda x: x.update(lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
+    flow_update(fid, lambda x: x.update(lang=lang, script_lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
 
 
 def flow_motion_params(d: dict) -> dict:
@@ -23538,15 +23562,38 @@ def flow_format(fid: str, body: FlowFormatIn):
     return flow_to_dict(fid, flow_load(fid))
 
 
+def flow_set_lang(x: dict, lang: str) -> None:
+    """🗣️ لهجة واحدة للمشروع: النص والصوت. صوت مش من اللهجة الجديدة بيتشال ويتختار أول صوت فيها."""
+    x["lang"] = lang
+    vo = x.get("vo")
+    if vo:
+        vo["lang"] = lang
+        if vo.get("voice") not in dub.DIALECTS[lang]["voices"]:
+            vo["voice"] = dub.DIALECTS[lang]["voices"][0]
+
+
+class FlowLangIn(BaseModel):
+    lang: str
+
+
+@app.post("/api/flows/{fid}/lang")
+def flow_lang(fid: str, body: FlowLangIn):
+    """تغيير اللهجة من خطوة الصوت: بيتسجّل للمشروع كله (خطوة النص بتشوفه)، والنص نفسه مابيتكتبش تاني غير لو العميل طلب."""
+    if body.lang not in dub.DIALECTS:
+        raise HTTPException(400, "هذه اللهجة غير موجودة")
+    return flow_to_dict(fid, flow_update(fid, lambda x: flow_set_lang(x, body.lang)))
+
+
 @app.post("/api/flows/{fid}/scenarios")
 def flow_scenarios(fid: str, body: FlowGenIn):
     d = flow_load(fid)
     flow_idle(d)
     if not d.get("format"):
         raise HTTPException(400, "اختر نوع المنشور أولًا")
-    if body.lang in dub.DIALECTS:   # قالب كود: اللهجة اتغيرت ← السكريبت بيتكتب بيها
-        flow_update(fid, lambda x: x.update(lang=body.lang))
-    flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid, body.hint.strip()[:500], body.more))
+    relang = body.lang in dub.DIALECTS and bool(d.get("script_lang")) and body.lang != d.get("script_lang")
+    if body.lang in dub.DIALECTS:   # قالب كود: اللهجة اتغيرت ← السكريبت بيتكتب بيها، والصوت بياخدها كمان
+        flow_update(fid, lambda x: flow_set_lang(x, body.lang))
+    flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid, body.hint.strip()[:500], body.more, relang))
     return flow_to_dict(fid, flow_load(fid))
 
 
@@ -23971,7 +24018,7 @@ def flow_voice_options(fid: str):
                    "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")}
                   for x in v["voices"]] for k, v in dub.DIALECTS.items()}
     vo = d.get("vo") or {}
-    lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0]
     return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()), "balance": wallet.balance(),
             "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
@@ -24028,11 +24075,11 @@ def flow_voice(fid: str, body: FlowVoiceIn):
     voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] else dub.DIALECTS[body.lang]["voices"][0]
     vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
     if d["template"].get("kind") == "motion":
-        flow_update(fid, lambda x: x.update(vo=vo, vo_track=None, stage="voice" if vo["on"] else "panel"))
+        flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, vo_track=None, stage="voice" if vo["on"] else "panel"))
         if vo["on"]:
             flow_job(fid, "vo", lambda: flow_make_vo(fid))
         return flow_to_dict(fid, flow_load(fid))
-    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, stage="assets")))
+    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage="assets")))
 
 
 # 🔊 عينة لكل صوت (جملة قصيرة باللهجة)، بتتعمل مرة واحدة وتتحفظ، فمابتتحسبش غير أول مرة

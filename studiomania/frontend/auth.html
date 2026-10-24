@@ -26,6 +26,8 @@
   .au-dev { font-size: 12px; word-break: break-all; background: var(--surface-2); padding: 8px; border-radius: 10px; }
   .au-big { font-size: 40px; text-align: center; margin: 4px 0; }
   a.btn { text-decoration: none; text-align: center; }
+  .login .field select { padding: 12px 14px; font: inherit; font-size: 15px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); border-radius: 12px; }
+  .au-hint { font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -62,6 +64,19 @@ async function post(url, body) {
 }
 const next = () => { const n = Q.get("next"); return n && /^\/(?![\/\\])/.test(n) ? n : "/"; };
 
+// 🗣️ البلد بيقترح لهجة المحتوى (الأفكار والنص والصوت)، والعميل يغيّرها هنا قبل ما يكمّل
+const TZ_COUNTRY = { Riyadh: "SA", Dubai: "AE", Kuwait: "KW", Qatar: "QA", Bahrain: "BH", Muscat: "OM", Cairo: "EG", Amman: "JO", Beirut: "LB",
+  Damascus: "SY", Gaza: "PS", Hebron: "PS", Baghdad: "IQ", Aden: "YE", Khartoum: "SD", Tripoli: "LY", Tunis: "TN", Algiers: "DZ", Casablanca: "MA" };
+const guessCountry = () => { try { return TZ_COUNTRY[Intl.DateTimeFormat().resolvedOptions().timeZone.split("/").pop()] || "SA"; } catch { return "SA"; } };
+const dialectOf = (c) => (S.regions || []).find((r) => r.id === c)?.dialect || "ar-msa";
+function regionFields() {
+  if (!S.regions) return "";
+  const c = guessCountry();
+  return `<label class="field">بلدك <select id="country">${S.regions.map((r) => `<option value="${r.id}"${r.id === c ? " selected" : ""}>${r.name}</option>`).join("")}</select></label>
+    <label class="field">لهجة المحتوى (الأفكار والنص والصوت) <select id="dialect">${S.dialects.map((x) => `<option value="${x.id}"${x.id === dialectOf(c) ? " selected" : ""}>${x.name}</option>`).join("")}</select>
+    <small class="au-hint">اخترناها حسب بلدك، ويمكنك تغييرها الآن أو لاحقًا من عقل العلامة.</small></label>`;
+}
+
 const VIEWS = {
   login: () => `${tabs("login")}${google()}
     ${field("email", "البريد الإلكتروني", "email", "email")}${field("pw", "كلمة المرور", "password", "current-password")}
@@ -71,6 +86,7 @@ const VIEWS = {
     <p class="muted">ابدأ مجانًا: ${S.trial || 300} نقطة تجرّب بها.</p>${google()}
     ${field("name", "اسمك أو اسم العلامة", "text", "name")}${field("email", "البريد الإلكتروني", "email", "email")}
     ${field("pw", "كلمة المرور (8 حروف أو أرقام على الأقل)", "password", "new-password")}
+    ${regionFields()}
     <button class="btn primary wide" id="go">أنشئ الحساب</button>
     <div class="au-links"><a href="/pricing">الباقات والأسعار</a></div>`,
   forgot: () => `<p class="muted">اكتب إيميلك وسنبعتلك رابط تعمل به كلمة مرور جديد.</p>
@@ -93,7 +109,8 @@ const VIEWS = {
 const ACTIONS = {
   login: async () => { const d = await post("/api/auth/login", { email: $("email").value, password: $("pw").value }); location.replace(d.verify ? "/verify" : next()); },
   signup: async () => {
-    const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value });
+    const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value,
+      country: $("country")?.value || "", dialect: $("dialect")?.value || "" });
     sessionStorage.setItem("devlink", d.dev_link || ""); sessionStorage.setItem("mailfail", d.mail_failed ? "1" : ""); location.replace("/verify");
   },
   forgot: async () => {
@@ -132,6 +149,7 @@ async function render() {
     $("resend").onclick = async () => { try { const d = await post("/api/auth/resend"); if (d.verified) return location.replace("/"); $("dev").innerHTML = `<p class="au-ok">أُرسل مرة أخرى ✓</p>${devLink(d.dev_link)}`; } catch (e) { err(e.message); } };
     $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
   }
+  if ($("country")) $("country").onchange = () => { $("dialect").value = dialectOf($("country").value); };
   document.querySelector("#body input")?.focus();
   ACTIVE = v;
 }
