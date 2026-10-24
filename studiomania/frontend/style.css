@@ -3171,3 +3171,6 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .login .logo-mark { width: auto; height: 84px; flex: none; }
 /* 🔤 الواجهة العربي فصحى بس: العناوين الإنجليزي الصغيرة فوق الأقسام بتظهر في الإنجليزي بس */
 html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }
+
+/* 🌐 زرار اللغة لصاحب المنصة فقط لحد ما الترجمة الإنجليزية تكتمل (يظهر بعد ما نعرف نوع الحساب، فمش بيظهر ويختفي) */
+:root:not([data-role="admin"]) #nhLang, :root:not([data-role="admin"]) #langToggle { display: none !important; }
