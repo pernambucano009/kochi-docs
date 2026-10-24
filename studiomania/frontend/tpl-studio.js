@@ -169,7 +169,7 @@ function tvVoiceBlock(v) {
       <label class="check"><input type="checkbox" data-vo="on" ${v.voice_on !== false ? "checked" : ""} ${busy ? "disabled" : ""}> تعليق صوتي</label></div>
     <div class="ts-lines">${beats.map((b, i) => `<div class="ts-line"><span class="muted">${i + 1} · ${(b.t1 - b.t0).toFixed(1)}ث${vo.durs?.[i] ? ` (النص ${vo.durs[i]}ث)` : ""}</span>
       <textarea data-voline="${i}" rows="2" dir="auto" ${busy ? "disabled" : ""}>${tse(lines[i] || "")}</textarea>
-      ${v.vo_line_urls?.[i] ? `<audio src="${v.vo_line_urls[i]}" controls preload="none"></audio>` : ""}</div>`).join("")}</div>
+      ${v.vo_line_urls?.[i] ? `<audio src="${v.vo_line_urls[i]}" controls preload="metadata"></audio>` : ""}</div>`).join("")}</div>
     ${lines.some((x) => x) && typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "script", what: v.title || v.name || "نص", ref: `tv:${v.id}:${lines.join("|").length}`, text: lines.filter(Boolean).join("\n") }) : ""}
     <button class="btn sm primary" data-vosave ${busy ? "disabled" : ""}>🎙️ سجّل التعليق الصوتي آخر (والمدد تُضبط)</button>
     <small class="muted">إذا المدد تغيّرت، اللقطات التي وُلّدت من قبل ستُنشأ من جديد.</small>

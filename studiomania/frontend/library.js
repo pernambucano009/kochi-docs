@@ -41,7 +41,7 @@ const CharactersPage = (() => {
         <div class="nb-imgs">${c.sheet.map((x) => `<figure data-sfile="${libEsc(x.file)}"><img src="${libEsc(x.url)}" alt="" loading="lazy"><button class="nb-x" data-sdel title="احذف">✕</button></figure>`).join("") || `<div class="nb-none">لا يوجد صور ما زال</div>`}</div></div>
       <div class="ch-sec"><div class="nb-kh"><b>الصوت</b></div>
         <p class="nb-hint">عينة من صوت الشخصية (أي ملف صوت أو فيديو).</p>
-        <div class="nb-row">${c.voice_url ? `<audio src="${libEsc(c.voice_url)}" controls preload="none"></audio><button class="nb-btn sm danger" data-cdel="voice">أزله</button>` : `<span class="nb-none" style="flex:1">لا يوجد صوت ما زال</span>`}
+        <div class="nb-row">${c.voice_url ? `<audio src="${libEsc(c.voice_url)}" controls preload="metadata"></audio><button class="nb-btn sm danger" data-cdel="voice">أزله</button>` : `<span class="nb-none" style="flex:1">لا يوجد صوت ما زال</span>`}
           <label class="nb-btn sm">⬆ ارفع صوت<input type="file" accept="audio/*,video/*" data-cfile="voice" hidden></label></div></div>
       ${talkSec(c)}
       <div class="ch-sec"><p class="nb-hint">إذا الفيديو هذه للشخصية: إنترو الشخصية قبل الفيديو، وأوترو الشخصية بعده وقبل أوترو العلامة. يمكنك تزيلهم من أي مشروع في المونتاج.</p>

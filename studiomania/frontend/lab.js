@@ -149,12 +149,12 @@ function renderLabParts(d) {
       ${url ? `<a class="btn sm" href="${url}" download>⬇ نزّل</a>` : ""}</div>${media}</div>`;
   const noAudio = d.source?.has_audio === false;
   const stemMsg = noAudio ? "هذا الفيديو لا يحتوي صوت." : !d.audioshake ? "مفتاح AudioShake غير مسجل (AUDIOSHAKE_API_KEY على Railway)."
-    : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "ما زال ما لم يُقسّم.";
+    : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لم يُقسّم بعد.";
   const parts = Object.entries(LAB_PARTS).map(([k, [h, l]]) => {
     const x = st[k];
     const tog = x?.url ? ` <button type="button" class="lab-hear ${labx.hear[h] ? "on" : ""}" data-hear="${h}" title="اسمعه في الفيديو الذي أعلى / أغلقه">${labx.hear[h] ? "🔊" : "🔇"}</button>` : "";
     const [icon, ...rest] = l.split(" ");
-    return card(icon, rest.join(" "), x?.url ? `<audio src="${x.url}" controls preload="none"></audio>`
+    return card(icon, rest.join(" "), x?.url ? `<audio src="${x.url}" controls preload="metadata"></audio>`
       : x?.error ? `<span class="err">✕ ${le(x.error)}</span>` : wait(stemMsg), x?.url, tog);
   }).join("");
   const isNew = !d.steps?.split;
@@ -163,8 +163,8 @@ function renderLabParts(d) {
     ${labx.stems ? `<p class="hint">🎧 الفيديو الذي أعلى يشغّل التراكات المفصولة: اضغط 🔊 بجانب أي جزء لكي تقفله وتسمع الباقي تلقائيًا.</p>` : ""}
     <div class="lab-parts">
       ${card("🎬🔊", "الصورة + المؤثرات", d.picture_fx_url ? `<video src="${d.picture_fx_url}" controls playsinline preload="metadata"></video>`
-        : wait(noAudio ? "هذا الفيديو لا يحتوي صوت." : isNew ? "ما زال ما لم يُقسّم." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : stemMsg), d.picture_fx_url, "", "main")}
-      ${card("🎬", "الصورة (بدون صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "ما زال ما لم يُقسّم." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "ما زال."), d.picture_url)}
+        : wait(noAudio ? "هذا الفيديو لا يحتوي صوت." : isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : stemMsg), d.picture_fx_url, "", "main")}
+      ${card("🎬", "الصورة (بدون صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "ما زال."), d.picture_url)}
       ${parts}
     </div>`;
 }
@@ -277,7 +277,7 @@ function renderLabAudio(d) {
 function labAudioInner(d) {
   const a = d.audio || {};
   if (a.none) return `<p class="muted">هذا الفيديو لا يحتوي صوت.</p>`;
-  if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ يفكك الصوت..." : "ما زال ما لم يُفكّك."}</p>`;
+  if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ يفكك الصوت..." : "لم يُفكّك بعد."}</p>`;
   const sfx = a.sfx || [];
   return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت قيست)</span></h4>
     ${labStems(d)}
@@ -311,12 +311,12 @@ function labStems(d) {
   const st = d.stems || {}, step = d.steps?.stems || {};
   const rows = Object.entries(LAB_STEMS).filter(([k]) => st[k]).map(([k, l]) => `<div class="lab-row">
       <b class="lab-stem-l">${l}</b>
-      ${st[k].url ? `<audio src="${st[k].url}" controls preload="none"></audio><a class="btn sm" href="${st[k].url}" download>⬇</a>` : `<span class="err">✕ ${le(st[k].error || "لم يظهر")}</span>`}
+      ${st[k].url ? `<audio src="${st[k].url}" controls preload="metadata"></audio><a class="btn sm" href="${st[k].url}" download>⬇</a>` : `<span class="err">✕ ${le(st[k].error || "لم يظهر")}</span>`}
       ${st[k].url ? rv("stem", k, st[k].review) : ""}</div>`).join("");
   return `<h4>🎚️ التراكات المفصولة</h4>${rows ? `<div class="lab-rows">${rows}</div>`
     : `<p class="muted">${step.status === "working" ? `<span class="spin-inline"></span> ${le(step.progress || "يفصل التراكات...")}`
       : !d.audioshake ? "مفتاح AudioShake غير مسجل، فالتحليل اشتغل على الصوت كله. ضعه على Railway في المتغير AUDIOSHAKE_API_KEY ثم اضغط «🎚️ التراكات»."
-      : step.error ? `✕ ${le(step.error)}` : "ما زال ما لم تُفصل."}</p>`}`;
+      : step.error ? `✕ ${le(step.error)}` : "لم تُفصل بعد."}</p>`}`;
 }
 
 // 📚 احفظ مقطع من اللقطة (بحركته وخلفيته وصوته) كأصل في المكتبة
@@ -537,7 +537,7 @@ function renderLabShots(d) {
             ${x.sfx && sfxById[x.sfx] ? `<button type="button" class="btn sm" data-seek="${sfxById[x.sfx].t}" data-to="${sfxById[x.sfx].t + 0.4}" title="الصوت المربوط">🔊 ${le(sfxById[x.sfx].label)}</button>` : ""}
             </div>`).join("")}
         </div>`).join("") || `<p class="muted">لا يوجد عناصر.</p>`}</div>`
-        : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ يفكك العناصر..." : "العناصر ما زال ما لم تُفكّك."}</p>`}
+        : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ يفكك العناصر..." : "العناصر لم تُفكّك بعد."}</p>`}
       ${labAssetForm(d, s)}
       </div></div></article>`;
   }).join("");

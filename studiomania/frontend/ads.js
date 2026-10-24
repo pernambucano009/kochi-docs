@@ -896,7 +896,7 @@ function renderVoice(a, s) {
       <label class="check" title="الشخصية تتكلم أمام الكاميرا وبُقها يجب يتحرك مع النص"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 يتكلم أمام الكاميرا</label>
       ${s.a_end != null ? `<span class="muted">⏱️ من ${s.a_start} لـ ${s.a_end} في الصوت الكامل (${s.seconds} ث)</span>` : ""}
     </div>
-    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="none"></audio>` : `<span class="muted">${s.voice ? "الصوت الخاص بـ هذه اللقطة يُقص تلقائيًا عندما ترفع الصوت الكامل أعلى." : "هذه اللقطة بدون نص."}</span>`}
+    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="metadata"></audio>` : `<span class="muted">${s.voice ? "الصوت الخاص بـ هذه اللقطة يُقص تلقائيًا عندما ترفع الصوت الكامل أعلى." : "هذه اللقطة بدون نص."}</span>`}
     ${s.voice_error ? `<div class="muted">⚠️ ${adEsc(s.voice_error)}</div>` : ""}
     ${s.voice_url ? `<div class="row wrap ad-lip">
       <button class="btn sm primary" data-p="lipkavatar" ${s.frame_url && !lipBusy ? "" : "disabled"} title="صورة الستوري بورد + صوتنا + الوصف → فيديو جديد الشخصية تقول فيه النص بصوتنا">🎬👄 فيديو يتكلم بصوتنا من الستوري بورد (الأفضل)</button>
@@ -928,7 +928,7 @@ function renderVoices(a) {
       ${working ? `<span class="muted"><span class="spin-inline"></span> يسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
       ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · تطابق ${Math.round((fv.ratio || 0) * 100)}% من النص</span>` : ""}
     </div>
-    ${fv.url ? `<audio src="${fv.url}" controls preload="none"></audio>` : ""}
+    ${fv.url ? `<audio src="${fv.url}" controls preload="metadata"></audio>` : ""}
     ${fv.error ? `<div class="err">✕ ${adEsc(fv.error)}</div>` : ""}
   </div>`);
   if (document.activeElement !== $("adVideoModelSel")) {
@@ -1169,7 +1169,7 @@ $("adPDelFrames").onclick = async () => {
 };
 const castWarn = async () => {
   const n = (adx.cur.prod.cast || []).filter((c) => !c.approved).length;
-  return !n || (await uiConfirm(`في ${n} من الأبطال والمكونات المتكررة ما زال ما لم يُعتمد عليهم، فمش سيدخلون في الرسم. ترسم أيضًا؟`));
+  return !n || (await uiConfirm(`في ${n} من الأبطال والمكونات المتكررة لم يُعتمد عليهم بعد، فلن يدخلوا في الرسم. ترسم على أي حال؟`));
 };
 $("adPFrames").onclick = async () => {
   if (!(await castWarn())) return;

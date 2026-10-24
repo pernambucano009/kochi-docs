@@ -6263,7 +6263,7 @@ def wa_broadcast(body: WaBroadcastIn):
     acc = wa_need()
     tpl = next((t for t in wa_call(wacamp.templates, acc["id"]) if t["name"] == body.template), None)
     if not tpl or tpl["status"] != "APPROVED":
-        raise HTTPException(400, "هذا القالب ما زال ما لم يُعتمد عليه من واتساب")
+        raise HTTPException(400, "هذا القالب لم يُعتمد عليه بعد من واتساب")
     ids = wa_call(wa_audience, bid, body.tag)
     if not ids:
         raise HTTPException(400, "لا يوجد مشتركين في هذه القائمة")
@@ -13336,7 +13336,7 @@ AD_VIDEO_MODELS = {
     "kling-3-std": {"label": "Kling 3.0 Std (تمثيل وحركة أحسن)", "model": "kwaivgi/kling-v3.0-std/image-to-video", "kind": "i2v"},
     "kling-3-pro": {"label": "Kling 3.0 Pro (أعلى جودة)", "model": "kwaivgi/kling-v3.0-pro/image-to-video", "kind": "i2v"},
 }
-AR_VOICES = {"Arabic_FriendlyGuy": "راجل ودود", "Arabic_CalmWoman": "ست هادية"}
+AR_VOICES = {"Arabic_FriendlyGuy": "رجل ودود", "Arabic_CalmWoman": "امرأة هادئة"}
 TTS_MODEL = "minimax/speech-2.6-hd"
 LIPSYNC = {"video": "veed/lipsync", "image": "atlascloud/infinitetalk",
            # بيعملوا الفيديو من الأول: صورة الستوري بورد + صوتنا + برومبت → شخصية بتتكلم بصوتنا
@@ -24016,7 +24016,7 @@ def flow_voice(fid: str, body: FlowVoiceIn):
     d = flow_load(fid)
     names = {"narrator": "معلّق", "none": ""} | {c["id"]: c["name"] for c in d.get("cast") or []}
     if body.speaker not in names:
-        raise HTTPException(400, "اختر من الذين يتكلم")
+        raise HTTPException(400, "اختر من الذي يتكلم")
     if body.lang not in dub.DIALECTS:
         raise HTTPException(400, "هذه اللهجة غير موجودة")
     voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] else dub.DIALECTS[body.lang]["voices"][0]

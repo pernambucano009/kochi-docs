@@ -106,7 +106,7 @@ const Gen = (() => {
     if (g.status !== "done") return `<div class="gn-ph">${g.status === "failed" ? `⚠️ ${esc(g.error || "توقف")}` : `<span class="flw-spin"></span><small>${esc(g.step || "جارٍ التوليد…")}</small>`}</div>`;
     if (g.kind === "image") return `<img src="${esc(g.url)}" alt="" ${big ? "" : 'loading="lazy"'}>`;
     if (g.kind === "video") return big ? `<video src="${esc(g.url)}" controls playsinline preload="metadata"></video>` : `<video src="${esc(g.url)}#t=0.5" muted playsinline preload="metadata"></video>`;
-    return big ? `<div class="gn-ph au"><audio src="${esc(g.url)}" controls preload="none"></audio><small dir="auto">${esc(g.prompt.slice(0, 120))}</small></div>` : `<div class="gn-ph">${gi("voice", 18)}</div>`;
+    return big ? `<div class="gn-ph au"><audio src="${esc(g.url)}" controls preload="metadata"></audio><small dir="auto">${esc(g.prompt.slice(0, 120))}</small></div>` : `<div class="gn-ph">${gi("voice", 18)}</div>`;
   }
   function side() {
     const L = mine(), cur = L.find((g) => g.id === S.view) || L[0];

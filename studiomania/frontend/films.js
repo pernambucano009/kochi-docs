@@ -159,7 +159,7 @@ function fmScript(f) {
           <label>🔤 على الشاشة <input data-sf="text" value="${le(sc.text)}" ${lock} data-no-i18n></label>
           <div class="row wrap fm-smeta">
             <small class="fm-stale">✏️ تغيّر بعد ما الفريمات رُسمت</small>
-            ${ln ? `<audio src="${ln.url}" controls preload="none"></audio><small class="muted">${ln.dur} ث</small>
+            ${ln ? `<audio src="${ln.url}" controls preload="metadata"></audio><small class="muted">${ln.dur} ث</small>
               ${ln.stale ? `<small class="err">🎙️ الجملة تغيّرت، الصوت ما زال القديم</small>` : ""}${ln.missed ? `<small class="err">لم أجدها في التسجيل بالضبط (وُضعت بالتقريب)</small>` : ""}` : ""}
             <small class="muted">⏱️ المشهد ${sc.seconds} ث${link ? ` + الموصل ${link} ث` : ""}</small>
           </div>
@@ -180,7 +180,7 @@ function fmScript(f) {
         ${v?.mode === "upload" ? `<button type="button" class="btn sm" data-fmrecut ${busy ? "disabled" : ""} title="بعد ما عدّلت جمل النص">✂️ قطّعه مرة أخرى</button>` : ""}
         ${v ? `<button type="button" class="btn sm danger" data-fmvodel ${busy ? "disabled" : ""}>🗑️ أزل الفويس</button>` : ""}
       </div>
-      ${v?.full_url ? `<audio src="${v.full_url}" controls preload="none"></audio>` : ""}
+      ${v?.full_url ? `<audio src="${v.full_url}" controls preload="metadata"></audio>` : ""}
       <small class="muted">كل مشهد (والموصل الذي بعده) يأخذ طول جملته، وجملة كل مشهد تبدأ مع أوله. إذا مشهد طوله تغيّر كثير، حركته تُولّد مرة أخرى وده يظهر في ثمن «ولّد».
         التسجيل الكامل يجب يكون نفس نص جمل التعليق الصوتي الذي أعلى لكي يُقطّع صحيح.</small>
     </div>
@@ -323,7 +323,7 @@ $("labFilm").addEventListener("click", async (e) => {
     return;
   }
   const cp = t.closest("[data-fmcopy]");
-  if (cp) {   // من الخانات نفسها، لكي يأخذ آخر تعديل حتى إذا ما زال ما لم يُحفظ
+  if (cp) {   // من الخانات نفسها، لكي يأخذ آخر تعديل حتى إذا لم يُحفظ بعد
     const sc = filmPlanFrom().scenes;
     if (cp.dataset.fmcopy === "voice") return copyText(voiceText(sc.map((x) => x.voice)));
     return copyText(sc.map((x, i) => [`المشهد ${i + 1}: ${x.label}`, x.voice ? `🎙️ ${x.voice.trim()}` : "", x.text ? `🔤 ${x.text.trim()}` : ""]

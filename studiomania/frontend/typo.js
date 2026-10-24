@@ -161,7 +161,7 @@ function tyRenderProj() {
 
 function tySceneView(v, busy) {
   const an = v.scene?.anchors;
-  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ ما في الفيديو <small class="muted">${an ? `${an.length} شيء` : "ما زال ما لم يُحلّل"}</small></summary>
+  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ ما في الفيديو <small class="muted">${an ? `${an.length} شيء` : "لم يُحلّل بعد"}</small></summary>
     <p class="hint">البرنامج يرى الأشياء التي في الكادر (صورة، ورقة، شاشة، وجه...) وأماكنها وهي تتحرك، لكي النص يُكتب جنبها أو عليها، والكلمة التي تشاور على شيء (مثل «me» وفيه صورتك) ما لا تُكتب والشيء نفسها تصبح مكانها. يُنشأ تلقائيًا مع «🧠 وزّع».</p>
     <div class="row wrap"><button type="button" class="btn sm" data-tyscene ${busy ? "disabled" : ""}>👁️ ${an ? "حلّله من جديد" : "حلّل الفيديو"}</button>
       <label class="ty-check"><input type="checkbox" data-tyguides ${tyx.guides ? "checked" : ""}> اعرض أماكنها على المعاينة</label></div>

@@ -90,7 +90,7 @@ function renderFolderDetail() {
   const voiceOpts = `<option value="">— اختر من المكتبة —</option>` + fol.voices
     .map((a) => `<option value="${a.id}" ${f.voice?.id === a.id ? "selected" : ""}>${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
   $("elVoice").innerHTML = `<h3>🎙️ التعليق الصوتي</h3>` + (f.voice
-    ? `<audio src="${f.voice.url}" controls preload="none"></audio>
+    ? `<audio src="${f.voice.url}" controls preload="metadata"></audio>
        <div class="el-title">${escapeHtml(f.voice.name)} <span class="muted">${fmtDuration(f.voice.duration)}</span></div>
        ${f.video && Math.abs(f.voice.duration - f.video.duration) > 2 ? `<div class="warn-text">⚠️ طوله مختلف عن الفيديو (${fmtDuration(f.video.duration)})</div>` : ""}`
     : `<div class="el-empty">لا يوجد تعليق صوتي ما زال</div>`)

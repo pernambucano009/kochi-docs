@@ -466,12 +466,12 @@ function renderShotsTab() {
     (ghostAfter[key] ||= []).push(...texts);
   }
   const ghost = (texts) => texts.map((t) => `<div class="shot-ghost" data-no-i18n><b>➕</b> «${escapeHtml(t)}»
-      <span class="muted">${draft ? "جملة جديدة في المسودة" : "جملة جديدة ما زال ما لم تُسجّل"}: سيُنشأ لها لقطة هنا بعد ما تسجّل الصوت وترقّم الجمل</span></div>`).join("");
+      <span class="muted">${draft ? "جملة جديدة في المسودة" : "جملة جديدة لم تُسجّل بعد"}: سيُنشأ لها لقطة هنا بعد ما تسجّل الصوت وترقّم الجمل</span></div>`).join("");
   const changed = draft ? ep.lines.filter((l) => newText[l.n] !== l.text).length : 0;
   $("serDraftNote").hidden = !draft && !Object.keys(pending).length;
   $("serDraftNote").textContent = draft
-    ? `📝 ترى النص الجديد من المسودة في «2 كتابة الحلقة» (ما زال ما لم يُعتمد): ${changed} جملة تغيّرت. اللون الأخضر النص الجديد، والمشطوب القديم. انظر كل فيديو ما زال مناسب ولا لا: إذا لا اضغط «✍️ وصف للكلام الجديد» وارسم وولّد آخر، أو احذف اللقطة.`
-    : "📝 فيه جمل جديدة ما زال ما لم تُسجّل، ظاهرة في أماكنها. سجّل الصوت وارفعه ورقّم الجمل لكي يُنشأ لها لقطات.";
+    ? `📝 ترى النص الجديد من المسودة في «2 كتابة الحلقة» (لم يُعتمد بعد): ${changed} جملة تغيّرت. اللون الأخضر النص الجديد، والمشطوب القديم. انظر كل فيديو ما زال مناسب ولا لا: إذا لا اضغط «✍️ وصف للكلام الجديد» وارسم وولّد آخر، أو احذف اللقطة.`
+    : "📝 فيه جمل جديدة لم تُسجّل بعد، ظاهرة في أماكنها. سجّل الصوت وارفعه ورقّم الجمل لكي يُنشأ لها لقطات.";
   $("serShots").innerHTML = (ghostAfter.start ? ghost(ghostAfter.start) : "") + ep.shots.map((s) => {
     const head = s.scene !== scene ? `<div class="ser-scene">المشهد ${s.scene}</div>` : "";
     scene = s.scene;

@@ -23,7 +23,7 @@ const IdeasPage = (() => {
       ${x.script ? `<div class="id-script"><small class="muted">📝 النص</small><p>${esc(x.script)}</p></div>` : ""}
       ${(x.sources || []).length ? `<div class="id-src"><small class="muted">📚 السندات</small><ul>${x.sources.map((r) => `<li><b>${esc(r.label)}</b> ${esc(r.ref)}${r.where ? ` <small class="muted">· ${esc(r.where)}</small>` : ""}</li>`).join("")}</ul></div>` : ""}
       ${x.script && x.dropped ? `<p class="muted id-drop">شلنا ${x.dropped} سند لم نتمكن نتأكد أنه موجود هذا بالنص.</p>` : ""}
-      ${x.audio_url ? `<audio src="${esc(x.audio_url)}" controls preload="none"></audio>` : ""}
+      ${x.audio_url ? `<audio src="${esc(x.audio_url)}" controls preload="metadata"></audio>` : ""}
       ${x.url ? `<a class="id-link" href="${esc(x.url)}" target="_blank" rel="noopener" dir="ltr">🔗 ${esc(x.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a>` : ""}
       ${x.error ? `<p class="fs-err">⚠️ ${esc(x.error)}</p>` : ""}
       <div class="id-acts">

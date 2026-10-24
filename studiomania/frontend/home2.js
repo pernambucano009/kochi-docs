@@ -751,7 +751,7 @@ const NH = (() => {
   }
   function onActivate(e) {
     const line = e.target.closest(".nh-line, [data-cont]");
-    if (line?.dataset.draft) {   // عمل قالب ما زال ما لم ينته: يُكمل من مكان ما توقف
+    if (line?.dataset.draft) {   // عمل قالب لم ينتهِ بعد: يُكمل من مكان ما توقف
       const [kind, id] = line.dataset.draft.split(":");
       if (kind === "flow") return Flow.open(id);
       // التايبوجرافي والدبلجة بيفتحوا آخر مشروع متسجّل، فنسجّل ده ونفضّي المفتوح عشان يفتحه هو
@@ -786,12 +786,7 @@ const NH = (() => {
   host.addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches(".nh-tile[data-id], .nh-line, [data-cont]")) { e.preventDefault(); onActivate(e); }
   });
-  // Esc = رجوع (لو مفيش نافذة مفتوحة فوق)
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || e.defaultPrevented || document.querySelector("dialog[open], .ml-view")) return;
-    if (e.target.closest?.("input, textarea, select")) return;
-    if (bar.classList.contains("deep")) goBack();
-  });
+  // Esc بيقفل النافذة المفتوحة بس (كل نافذة بتقفل نفسها)، ومبيرجّعش من الصفحة عشان ما يضيّعش الشغل
 
   // ---------- الداتا الحقيقية ----------
   async function refresh() {
@@ -806,21 +801,21 @@ const NH = (() => {
     ]);
     if (!KOCHI) D.pilot = await api("/api/pilot").catch(() => null);
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
-    const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد" };
+    const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد", voice: "الصوت", panel: "لوحة التحكم", shoot: "التصوير", review: "المراجعة", montage: "المونتاج", output: "التصدير", story: "القصة", scenes: "المشاهد" };
     D.drafts = [
       ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
-        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || f.stage}`, updated_at: f.updated_at,
+        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || "خطوة لم تكتمل"}`, updated_at: f.updated_at,
         // كفر الفكرة اللي لسه شغّالة: غلاف القالب نفسه من المعرض
         thumb: (typeof Gallery !== "undefined" && Gallery.list().find((x) => x.id === f.template?.id)?.cover_url) || (f.template?.id ? `/gallery/${encodeURIComponent(f.template.id)}.jpg` : "") })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
         sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "توقف" : "ما زال يُنشأ", updated_at: v.updated_at, thumb: v.thumb })),
       // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
       ...typos.filter((t) => !t.done).map((t) => ({ kind: "typo", id: t.id, name: t.name || "تايبوجرافي", sec: "تايبوجرافي",
-        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "ما زال ما لم يُصدّر", updated_at: t.updated_at })),
+        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "لم يُصدّر بعد", updated_at: t.updated_at })),
       ...(dubs.items || []).filter((x) => !x.done).map((x) => ({ kind: "dub", id: x.id, name: x.name || "دبلجة", sec: "ترجمة ودبلجة",
         step: x.busy ? "يشتغل الآن" : "لا يوجد بعد لغة جاهزة", updated_at: x.updated_at })),
       ...scenes.filter((x) => x.busy || !x.takes).map((x) => ({ kind: "scene", id: x.id, name: x.name || "مشهد", sec: "استوديو المشهد",
-        step: x.busy ? "يُولّد الآن" : "ما زال ما لم يُولّد", updated_at: x.updated_at })),
+        step: x.busy ? "يُولّد الآن" : "لم يُولّد بعد", updated_at: x.updated_at })),
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,

@@ -173,10 +173,6 @@ $("stagePrev").onclick = () => {
   if (i > 0) showStep(PROCESS[i - 1]);
 };
 $("stageNext").onclick = () => goNext(shell.step);
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("stage").hidden && !document.querySelector("dialog[open]") &&
-      !e.target.matches("input, textarea, select") && !["6", "6s", "6a", "6f"].includes(shell.step)) showStep("home");
-});
 
 // ---------- الخطوة الجاية بناتج الخطوة دي ----------
 async function goNext(step) {

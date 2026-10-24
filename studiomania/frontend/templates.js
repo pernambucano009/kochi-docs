@@ -175,7 +175,7 @@ function tplHome() {
 
 function tvPanelImg(v, j) {
   const p = v.panel_files[j] || {}, u = p.full || p.cell;
-  return u ? `<img src="${u}" alt="" class="${p.full ? "" : "tv-cell"}" title="${p.full ? "واضحة" : "من الورقة (ما زال ما لم تتضح)"}">` : `<div class="fm-ph">لوحة ${j + 1}</div>`;
+  return u ? `<img src="${u}" alt="" class="${p.full ? "" : "tv-cell"}" title="${p.full ? "واضحة" : "من الورقة (لم تتضح بعد)"}">` : `<div class="fm-ph">لوحة ${j + 1}</div>`;
 }
 
 // صورة الشيت ومربعات القص (وفي وضع التعديل: المربعات بتتسحب وبتتكبّر بإيدك)
@@ -388,7 +388,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (up) { const inp = tvSheetInput(); inp.dataset.k = up.dataset.tvup; return inp.click(); }
   const sh = t.closest("[data-tvsharp]");
   if (sh) {
-    if (!(await uiConfirm(`يوضّح كل اللوحات التي ما زال ما لم تتضح؟ نحو ${tplx.cur.costs.sharpen}$`))) return;
+    if (!(await uiConfirm(`يوضّح كل اللوحات التي لم تتضح بعد؟ نحو ${tplx.cur.costs.sharpen}$`))) return;
     return go(sh, () => V("/sharpen", { method: "POST", ...jsonBody({}) }));
   }
   const edb = t.closest("[data-tvedit]");

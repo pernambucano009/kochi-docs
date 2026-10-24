@@ -408,7 +408,7 @@ const Flow = (() => {
     const rows = ml.scenes.map((s, i) => { const L = s.t1 - s.t0, n = t ? t[i] : L; return `<li><b>${esc(s.name)}</b><span class="num">${L.toFixed(1)}</span>${t ? ` ← <span class="num ${n > L * (ml.max_stretch || 1.5) ? "warn" : ""}">${n.toFixed(1)}</span>` : ""} ث</li>`; }).join("");
     return `${picked("scenario")}<h2>لوحة التحكم</h2>
       <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب ترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
-      ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="none"></audio>` : ""}
+      ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn big" data-panel>🎛️ افتح لوحة القالب</button>
         <button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 صدّر الفيديو</button></div>
@@ -444,15 +444,14 @@ const Flow = (() => {
     const voices = o.voices[v.lang] || [];
     if (!voices.some((x) => x.id === v.voice)) v.voice = voices[0]?.id || "";
     const grp = (g) => o.dialects.filter((x) => x.group === g).map((x) => `<button type="button" class="flw-chip${x.id === v.lang ? " on" : ""}" data-vlang="${esc(x.id)}">${esc(x.label)}</button>`).join("");
-    return `${picked("scenario")}<h2>من الذين يتكلم؟</h2><p class="flw-sub">اختر صاحب الصوت، ثم اللهجة والصوت الذي سيُقال به النص.</p>
+    return `${picked("scenario")}<h2>من الذي يتكلم؟</h2><p class="flw-sub">اختر صاحب الصوت، ثم اللهجة والصوت الذي سيُقال به النص.</p>
       <div class="flw-spk">${o.speakers.map((s) => `<button type="button" class="flw-person sm${s.id === v.speaker ? " on" : ""}" data-vspk="${esc(s.id)}">
         ${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy">` : `<i>${s.id === "none" ? "🔇" : "🎙️"}</i>`}<b>${esc(s.name)}</b><small>${esc(s.about || "")}</small></button>`).join("")}</div>
       ${on ? `<h3 class="flw-h3">اللهجة</h3><div class="flw-langs">${grp("ar")}</div><div class="flw-langs">${grp("foreign")}</div>
-        ${!o.fasih && o.dialects.find((x) => x.id === v.lang)?.group === "ar" ? `<div class="flw-empty bad">اللهجات العربية تحتاج مفتاح فصيح على الخادم.</div>` : ""}
+        ${!o.fasih && o.dialects.find((x) => x.id === v.lang)?.group === "ar" ? `<div class="flw-empty bad">الأصوات العربية غير متاحة الآن، وفريقنا يعمل على إصلاحها.</div>` : ""}
         <h3 class="flw-h3">الصوت</h3><div class="flw-voices">${voices.map((x) => `<div class="flw-voice${x.id === v.voice ? " on" : ""}">
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
-          ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>
-        <small class="muted">أول مرة تسمع عينة صوت تُحسب ثواني قليلة من رصيد فصيح، وبعدها تُحفظ.</small>` : ""}
+          ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
       ${isCode(d) ? failed("vo") : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? "🎙️ سجّل التعليق الصوتي واضبط المشاهد ←" : "أكمل ←"}</button></div>`;
   }

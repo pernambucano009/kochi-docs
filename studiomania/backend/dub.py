@@ -39,15 +39,15 @@ FOREIGN = [  # (المعرف، الاسم، اسم اللغة للموديل)
     ("ru", "🇷🇺 Русский", "natural conversational Russian"),
     ("ur", "🇵🇰 اردو", "natural conversational Urdu"),
 ]
-ELEVEN = {"eleven_liam": ("ليام (راجل)", "Liam"), "eleven_jessica": ("جيسيكا (ست)", "Jessica"),
-          "eleven_charlie": ("تشارلي (راجل)", "Charlie"), "eleven_bella": ("بيلا (ست)", "Bella")}
+ELEVEN = {"eleven_liam": ("ليام (رجل)", "Liam"), "eleven_jessica": ("جيسيكا (امرأة)", "Jessica"),
+          "eleven_charlie": ("تشارلي (رجل)", "Charlie"), "eleven_bella": ("بيلا (امرأة)", "Bella")}
 
 FASIH_PER_MIN = 0.19   # باقة فصيح: ١٠٠ دقيقة بـ $19
 VOICES: dict[str, dict] = {k: {"label": lab, "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
 DIALECTS: dict[str, dict] = {}
 for code, label, where, base, stable in AR:
     vs = []
-    for g, name in (("male", "عمر (راجل)"), ("female", "ليلى (ست)")):
+    for g, name in (("male", "عمر (رجل)"), ("female", "ليلى (امرأة)")):
         v = f"{base}-{g}-2"
         VOICES[v] = {"label": name + ("" if stable else " · تجريبي"), "provider": "fasih", "voice": v, "dialect": code,
                      "gender": g, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
@@ -68,7 +68,7 @@ def merge_fasih(voices: list[dict]) -> int:
         g = "female" if str(x.get("gender") or "").lower().startswith("f") else "male"
         name = x.get("arabicName") or x.get("name") or vid
         lab = (f"🎨 {name} (صوتك الخاص)" if x.get("custom") else
-               f"{name} ({'ست' if g == 'female' else 'راجل'})" + (" · تجريبي" if x.get("status") == "preview" else ""))
+               f"{name} ({'امرأة' if g == 'female' else 'رجل'})" + (" · تجريبي" if x.get("status") == "preview" else ""))
         if vid in VOICES and not VOICES[vid].get("hidden"):
             VOICES[vid]["label"] = lab
         else:
@@ -105,7 +105,7 @@ def merge_munsit(voices: list[dict]) -> int:
         key = f"munsit:{vid}"
         g = "female" if str(x.get("gender") or "").lower().startswith(("f", "w")) else "male"
         name = x.get("name") or vid
-        VOICES[key] = {"label": f"{name} ({'ست' if g == 'female' else 'راجل'})", "provider": "munsit", "voice": vid, "dialect": dia, "gender": g,
+        VOICES[key] = {"label": f"{name} ({'امرأة' if g == 'female' else 'رجل'})", "provider": "munsit", "voice": vid, "dialect": dia, "gender": g,
                        "per_1k": MUNSIT_PER_1K}
         if key not in DIALECTS[dia]["voices"]:
             # أصوات منصت قبل أصوات فصيح في لهجتها (بالترتيب اللي جت بيه)
