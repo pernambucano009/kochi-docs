@@ -60,7 +60,7 @@ def need(n: int, what: str) -> None:
     """قبل العمل: إذا الرصيد مايكفيش التقدير نوقف قبل ما نصرف شيء."""
     b = balance()
     if b is not None and b < n:
-        raise NoCredits(f"رصيدك {b} نقطة، و«{what}» يحتاج نحو {n} نقطة. اشحن نقاط زيادة وأكمل.")
+        raise NoCredits(f"رصيدك {b} نقطة، و«{what}» يحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
 
 
 def charge(n: int, what: str, ref: str = "") -> int:
@@ -79,3 +79,101 @@ def charge(n: int, what: str, ref: str = "") -> int:
         c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                   (uuid.uuid4().hex, TENANT, -(plan + top), "use", what[:120], ref[:60], time.time()))
     return plan + top
+
+
+# ---------------------------------------------------------------- 🔒 الحجز الموحّد: النقاط تتحجز قبل العملية، وترجع لو فشلت
+# reserve() بتخصم التقدير فورًا (فعمليتين في نفس الوقت مايصرفوش أكتر من الرصيد)، refund() بترجّعه لو العملية فشلت،
+# settle() بتظبط الفرق لو التكلفة الحقيقية طلعت أقل. covered(): جوه الحتة دي الخصم بيتعمل صراحةً، فالخصم التلقائي مايتكررش.
+import threading  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
+
+_local = threading.local()
+
+
+@contextmanager
+def covered():
+    _local.covered = getattr(_local, "covered", 0) + 1
+    try:
+        yield
+    finally:
+        _local.covered -= 1
+
+
+def is_covered() -> bool:
+    return getattr(_local, "covered", 0) > 0
+
+
+def covering(fn):
+    """ديكوريتور: الدالة دي بتخصم بنفسها، فأي توليد جواها مايتخصمش تاني."""
+    def wrap(*a, **kw):
+        with covered():
+            return fn(*a, **kw)
+    wrap.__name__, wrap.__doc__ = fn.__name__, fn.__doc__
+    return wrap
+
+
+def reserve(n: int, what: str, ref: str = "") -> dict | None:
+    """يحجز n نقطة قبل العملية (نقاط الباقة أولًا). لو الرصيد مايكفيش: NoCredits ومفيش حاجة بتتصرف."""
+    n = int(math.ceil(n))
+    if n <= 0 or free():
+        return None
+    with closing(_db()) as c:
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            r = c.execute("SELECT plan_credits, topup_credits FROM wallet WHERE workspace=?", (TENANT,)).fetchone()
+            have = (r["plan_credits"] + r["topup_credits"]) if r else 0
+            if have < n:
+                c.execute("ROLLBACK")
+                raise NoCredits(f"رصيدك {have} نقطة، و«{what}» يحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
+            plan = min(r["plan_credits"], n)
+            top = n - plan
+            hid = uuid.uuid4().hex
+            c.execute("UPDATE wallet SET plan_credits=plan_credits-?, topup_credits=topup_credits-?, updated_at=? WHERE workspace=?",
+                      (plan, top, time.time(), TENANT))
+            c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                      (hid, TENANT, -n, "use", what[:120], ref[:60], time.time()))
+            c.execute("COMMIT")
+        except NoCredits:
+            raise
+        except Exception:
+            c.execute("ROLLBACK")
+            raise
+    return {"id": hid, "n": n, "plan": plan, "top": top, "what": what}
+
+
+def refund(h: dict | None, n: int | None = None, why: str = "رجوع نقاط") -> int:
+    """يرجّع الحجز كله (أو n منه) لنفس الأماكن اللي اتخصم منها: الزيادة الأول ثم الباقة."""
+    if not h or free():
+        return 0
+    n = h["n"] if n is None else max(0, min(int(n), h["n"]))
+    if n <= 0:
+        return 0
+    top = min(h["top"], n)
+    plan = n - top
+    with closing(_db()) as c, c:
+        c.execute("UPDATE wallet SET plan_credits=plan_credits+?, topup_credits=topup_credits+?, updated_at=? WHERE workspace=?",
+                  (plan, top, time.time(), TENANT))
+        c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (uuid.uuid4().hex, TENANT, n, "refund", f"{why}: {h['what']}"[:120], h["id"][:60], time.time()))
+    h["n"] -= n
+    h["top"] -= top
+    h["plan"] -= plan
+    return n
+
+
+def settle(h: dict | None, actual: int) -> None:
+    """بعد ما العملية تخلص: لو التكلفة الحقيقية أقل من الحجز الفرق يرجع."""
+    if h and actual < h["n"]:
+        refund(h, h["n"] - int(math.ceil(actual)), "فرق التقدير")
+
+
+@contextmanager
+def spend(n: int, what: str, ref: str = ""):
+    """with wallet.spend(n, "…"): يحجز قبل، ويرجّع كل حاجة لو حصل خطأ جوه. والتوليد جواه مايتخصمش مرتين."""
+    h = reserve(n, what, ref)
+    try:
+        with covered():
+            yield h
+    except BaseException:
+        refund(h, why="العملية فشلت")
+        raise

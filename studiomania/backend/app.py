@@ -8125,6 +8125,7 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
     return files, refs
 
 
+@wallet.covering   # بتخصم بنفسها
 def draw(prompt: str, size: str, files: list[Path], dest: Path, mock_label: str, hue: int) -> None:
     if atlas.mock_mode():
         return mock_image(dest, size, mock_label, hue)
@@ -21213,6 +21214,7 @@ def voice_usd(voice: str, text: str) -> float:
     return n / 1000 * per_1k + (n / dub.CHARS_PER_SEC) / 60 * v.get("per_min", 0)
 
 
+@wallet.covering   # بتخصم بنفسها
 def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     """جملة تعليق صوتي (wav 48k): فصيح للهجات العربية، وElevenLabs للأجنبي."""
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
@@ -21220,6 +21222,8 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
         dur = max(0.6, len(text) / dub.CHARS_PER_SEC)
         subprocess.run(ff + ["-f", "lavfi", "-i", f"sine=frequency=330:duration={dur:.2f}", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
         return out
+    cost = wallet.credits(voice_usd(voice, text))
+    wallet.need(cost, "التعليق الصوتي")
     raw = out.with_suffix(".src")
     v = dub.VOICES[voice]
     if v["provider"] in ("fasih", "munsit"):
@@ -21228,7 +21232,7 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
         atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "التعليق الصوتي", max_seconds=300, interval=2), raw)
     subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
     raw.unlink(missing_ok=True)
-    wallet.charge(wallet.credits(voice_usd(voice, text)), "تعليق صوتي", out.stem[:60])
+    wallet.charge(cost, "تعليق صوتي", out.stem[:60])
     return out
 
 
@@ -23961,13 +23965,15 @@ def flow_voice_options(fid: str):
     speakers += [{"id": c["id"], "name": c["name"], "about": "البطل نفسه هو ما يتكلم", "image_url": c.get("image_url")} for c in d.get("cast") or []]
     speakers.append({"id": "none", "name": "بدون صوت", "about": "موسيقى ونص مكتوب فقط"})
     dialects = [{"id": k, "label": v["label"], "group": v["group"]} for k, v in dub.DIALECTS.items()]
-    voices = {k: [{"id": x, "label": dub.VOICES[x]["label"], "gender": dub.VOICES[x].get("gender") or "",
+    rows = (d.get("scenario") or {}).get("scenes") or []
+    say = "\n".join(str(r.get("say") or "").strip() for r in rows if str(r.get("say") or "").strip())
+    voices = {k: [{"id": x, "label": dub.VOICES[x]["label"], "gender": dub.VOICES[x].get("gender") or "", "pts": wallet.credits(voice_usd(x, say)),
                    "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")}
                   for x in v["voices"]] for k, v in dub.DIALECTS.items()}
     vo = d.get("vo") or {}
     lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0]
-    return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()),
+    return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()), "balance": wallet.balance(),
             "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
 
 
@@ -24827,6 +24833,18 @@ def gen_voice(body: GenVoiceIn):
     return gen_dict(gid, item)
 
 
+
+def billed(fn, hold, part: int | None = None):
+    """المولد بيشتغل والنقاط محجوزة قبله (wallet.reserve)؛ لو فشل نصيبه من الحجز بيرجع، والتوليد جواه مايتخصمش تاني."""
+    def run():
+        try:
+            with wallet.covered():
+                fn()
+        except BaseException:
+            wallet.refund(hold, part, "التوليد فشل")
+            raise
+    return run
+
 @app.post("/api/gens/image")
 def gen_image(prompt: str = Form(...), model: str = Form("nano2"), ratio: str = Form("9:16"), count: int = Form(1),
               refs: list[UploadFile] | None = File(None)):
@@ -24837,6 +24855,8 @@ def gen_image(prompt: str = Form(...), model: str = Form("nano2"), ratio: str = 
     model = model if model in TV_IMAGE_MODELS else "nano2"
     ratio = ratio if ratio in GEN_RATIOS else "9:16"
     n = max(1, min(4, int(count or 1)))
+    each = wallet.credits(TV_IMAGE_MODELS[model][0])
+    hold = None if atlas.mock_mode() else wallet.reserve(each * n, f"مولد الصور ({n} × صورة)")
     ids = []
     ref_files = []
     for i in range(n):
@@ -24861,7 +24881,7 @@ def gen_image(prompt: str = Form(...), model: str = Form("nano2"), ratio: str = 
                 images = [atlas.reference_url(first / f) for f in ref_files] or None
                 atlas.download(atlas.generate_image(model, prompt, GEN_RATIOS[ratio], "high", images), dest)
             gen_set(gid, status="done", step=None, file=dest.name)
-        return run
+        return billed(run, hold, each)
     for gid, _ in ids:
         gen_job(gid, make(gid))
     return [gen_dict(g, it) for g, it in ids]
@@ -24880,6 +24900,7 @@ def gen_video(prompt: str = Form(...), model: str = Form(VDEF), duration: int = 
     secs = max(3, min(15, int(duration or 5)))
     resolution = "720p" if resolution == "720p" else "480p"
     cost = round(vm["per_sec"] * secs * (2 if resolution == "720p" else 1) + (0 if image and image.filename else TV_IMAGE_MODELS["nano2"][0]), 3)
+    hold = None if atlas.mock_mode() else wallet.reserve(wallet.credits(cost), f"مولد الفيديو ({secs} ث)")
     gid, item = gen_new("video", prompt, model=model, model_label=vm["label"], duration=secs, ratio=ratio, resolution=resolution, cost=cost)
     folder = GEN_DIR / gid
     ref = save_upload(image, IMAGE_EXTENSIONS, folder, "start") if image and image.filename else None
@@ -24913,7 +24934,7 @@ def gen_video(prompt: str = Form(...), model: str = Form(VDEF), duration: int = 
             conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'gen', NULL, ?)",
                          (export_id, f"🎬 {prompt[:60]}", filename, dur, now()))
         gen_set(gid, status="done", step=None, file=dest.name, duration=round(dur, 2), export_id=export_id)
-    gen_job(gid, run)
+    gen_job(gid, billed(run, hold))
     return gen_dict(gid, item)
 
 
@@ -27375,6 +27396,7 @@ def twin_clip_set(tid: str, cid: str, **kw) -> None:
     twin_update(tid, fn)
 
 
+@wallet.covering   # بتخصم بنفسها
 def run_twin_clip(tid: str, cid: str) -> None:
     """النص الجديد بصوته ← فيديو به هو: يا إما على فيديو القراية الخاص به (ليب سينك)، يا إما من صورته القدامية."""
     folder = twin_dir(tid)
@@ -27835,6 +27857,7 @@ def phone_broll_stock(b: dict, vertical: bool, used: set) -> Path | None:
     return out if r.returncode == 0 else None
 
 
+@wallet.covering   # بتخصم بنفسها
 def phone_broll_avatar(b: dict, people: list[Path], bg: Path | None, vertical: bool) -> Path | None:
     out = GENERATED_DIR / f"broll_ai_{uuid.uuid4().hex[:8]}.mp4"
     if atlas.mock_mode():
@@ -28057,6 +28080,7 @@ def cam_twin_photos(tid: str, angle: str) -> list[Path]:
     return [have[a] for a in CAM_PHOTOS.get(angle, ("front",)) if a in have and have[a].exists()][:4]
 
 
+@wallet.covering   # بتخصم بنفسها
 def run_cam_try(fid: str, rid: str, cand: dict, clip: Path, angle: str, dur: float, photos: list[Path] | None = None) -> None:
     folder = FLOWS_DIR / Path(fid).name
     def setr(**kw):
@@ -28990,6 +29014,7 @@ def auto_lib_add(bid: str, root: str, files: list[dict], src_dir: Path, sub: str
     return [{**f, **({"_st": store} if store == SHARED_LIB else {})} for f in files]
 
 
+@wallet.covering   # بتخصم بنفسها
 def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str]) -> list[dict]:
     """«ولّد صورة»: الوصف + صور المرجع (إذا النموذج يقبل) ← صورة أو أكثر، والخصم على قدر الذي رُسم."""
     o = s["opts"]
@@ -29040,6 +29065,7 @@ def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+@wallet.covering   # بتخصم بنفسها
 def auto_gen_voice(bid: str, s: dict, run_id: str, report: list[str]) -> tuple[dict, str] | None:
     """«ولّد صوت»: النص ← تعليق صوتي بصوت من فصيح/ElevenLabs أو نموذج على Atlas (وبصوت مرجع إذا النموذج يقبل)، أو موسيقى."""
     o = s["opts"]
@@ -29594,6 +29620,7 @@ def auto_ref_audio(r: dict | None, src: Path | None, tmp: Path) -> Path | None:
     return None
 
 
+@wallet.covering   # بتخصم بنفسها
 def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, ratio: str) -> str:
     """«ولّد»: الوصف + ما النموذج ياخده (القطعة نفسها، أو صورة بداية/نهاية، أو مراجع من الإشارة) ← فيديو جديد، والخصم على قدر الثواني."""
     o = g["opts"]

@@ -134,23 +134,93 @@ def _adapt_video(body: dict) -> dict:
         return body
 
 
+# ---------------------------------------------------------------- 🔒 حجز النقاط قبل أي توليد (فيديو / صورة / صوت)
+# كل طلب بيروح للموديلات بيعدّي من هنا: النقاط بتتحجز بتقدير السعر قبل الطلب، ولو الطلب فشل بترجع.
+# الأماكن اللي بتخصم بنفسها بتتعلّم بـ wallet.covering، فمفيش خصم مرتين.
+_holds: dict[str, dict] = {}
+
+
+def _model_price(model: str) -> float | None:
+    try:
+        import vmodels  # noqa: PLC0415
+        return next((vmodels._price(e) for e in vmodels.catalog() if e.get("model") == model), None)  # noqa: SLF001
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _num(v, d: float) -> float:
+    try:
+        return float(str(v).rstrip("s")) if v not in (None, "") else d
+    except (TypeError, ValueError):
+        return d
+
+
+def est_usd(kind: str, body: dict) -> float:
+    """تقدير تكلفة الطلب بالدولار من سعر الموديل في الكتالوج (والاحتياطي لو السعر مش معروف)."""
+    p = _model_price(str(body.get("model") or ""))
+    if kind == "Video":
+        sec = _num(body.get("duration") or body.get("seconds") or body.get("length"), 5)
+        return (p if p is not None else 0.1) * max(1.0, sec)
+    if kind == "Image":
+        n = _num(body.get("num_images") or body.get("n"), 1)
+        return (p if p is not None else 0.06) * max(1.0, n)
+    return p if p is not None else 0.05
+
+
+def _bill(kind: str, body: dict, what: str):
+    if mock_mode() or str(body.get("model") or "") == STT_MODEL:
+        return None
+    import wallet  # noqa: PLC0415
+    if wallet.is_covered() or wallet.free():
+        return None
+    return wallet.reserve(wallet.credits(est_usd(kind, body)), what)
+
+
+def _unbill(h, why: str = "التوليد فشل") -> None:
+    if h:
+        import wallet  # noqa: PLC0415
+        wallet.refund(h, why=why)
+
+
+def _track(pid: str, h) -> None:
+    if h:
+        _holds[pid] = h
+
+
+def _closed(pid: str, ok: bool) -> None:
+    h = _holds.pop(pid, None)
+    if h and not ok:
+        _unbill(h)
+
+
 def submit_video(body: dict) -> str:
     body = _adapt_video(body)
     if body.get("prompt") is not None:
         body = {**body, "prompt": with_rules(body["prompt"])}
-    with httpx.Client(timeout=60) as client:
-        resp = client.post(f"{BASE_URL}/api/v1/model/generateVideo", headers=_headers(), json=body)
-    data = _check(resp, "طلب التوليد")
-    prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
-    if not prediction_id:
-        raise AtlasError(f"طلب التوليد: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+    h = _bill("Video", body, "توليد فيديو")
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(f"{BASE_URL}/api/v1/model/generateVideo", headers=_headers(), json=body)
+        data = _check(resp, "طلب التوليد")
+        prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
+        if not prediction_id:
+            raise AtlasError(f"طلب التوليد: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+    except BaseException:
+        _unbill(h)
+        raise
+    _track(prediction_id, h)
     return prediction_id
 
 
 def get_prediction(prediction_id: str) -> dict:
     with httpx.Client(timeout=45) as client:
         resp = client.get(f"{BASE_URL}/api/v1/model/prediction/{prediction_id}", headers=_headers())
-    return _check(resp, "متابعة الطلب") or {}
+    pred = _check(resp, "متابعة الطلب") or {}
+    if prediction_id in _holds:
+        st = str(pred.get("status", "")).lower()
+        if st in TERMINAL_OK or st in TERMINAL_FAIL:
+            _closed(prediction_id, st in TERMINAL_OK)
+    return pred
 
 
 def wait_for(prediction_id: str, on_status, max_seconds: int = 1800, interval: float = 4) -> str:
@@ -201,12 +271,18 @@ STT_MODEL = "xai/stt-v1"  # بيرجّع وقت كل كلمة، وبيدعم ا�
 
 
 def submit_audio(body: dict) -> str:
-    with httpx.Client(timeout=60) as client:
-        resp = client.post(f"{BASE_URL}/api/v1/model/generateAudio", headers=_headers(), json=body)
-    data = _check(resp, "طلب تحويل الصوت")
-    prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
-    if not prediction_id:
-        raise AtlasError(f"طلب تحويل الصوت: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+    h = _bill("Audio", body, "توليد صوت")
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(f"{BASE_URL}/api/v1/model/generateAudio", headers=_headers(), json=body)
+        data = _check(resp, "طلب تحويل الصوت")
+        prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
+        if not prediction_id:
+            raise AtlasError(f"طلب تحويل الصوت: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+    except BaseException:
+        _unbill(h)
+        raise
+    _track(prediction_id, h)
     return prediction_id
 
 
@@ -224,6 +300,7 @@ def wait_prediction(prediction_id: str, max_seconds: int = 600, interval: float 
         if status in TERMINAL_FAIL:
             raise AtlasError(f"{what} فشل: {str(pred.get('error') or status)[:300]}")
         time.sleep(interval)
+    _closed(prediction_id, False)
     raise AtlasError(f"{what} أخد وقت طويل. جرّب مرة أخرى")
 
 
@@ -476,17 +553,22 @@ def generate_image(family: str, prompt: str, size: str, quality: str, images: li
         body = {"model": edit if images else t2i, "prompt": with_rules(prompt[:30000]), "size": size, "quality": quality, "output_format": "png"}
     if images:
         body["images"] = images[:14]
-    with httpx.Client(timeout=90) as client:
-        resp = client.post(f"{BASE_URL}/api/v1/model/generateImage", headers=_headers(), json=body)
-    data = _check(resp, "طلب الصورة")
-    prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
-    if not prediction_id:
-        raise AtlasError(f"طلب الصورة: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
-    pred = wait_prediction(prediction_id, max_seconds=900, interval=4, what="رسم الصورة")
-    outputs = pred.get("outputs") or []
-    url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
-    if not url:
-        raise AtlasError("الصورة خلصت فقط مرجعش رابط")
+    h = _bill("Image", body, "رسم صورة")
+    try:
+        with httpx.Client(timeout=90) as client:
+            resp = client.post(f"{BASE_URL}/api/v1/model/generateImage", headers=_headers(), json=body)
+        data = _check(resp, "طلب الصورة")
+        prediction_id = (data or {}).get("id") or (data or {}).get("prediction_id")
+        if not prediction_id:
+            raise AtlasError(f"طلب الصورة: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+        pred = wait_prediction(prediction_id, max_seconds=900, interval=4, what="رسم الصورة")
+        outputs = pred.get("outputs") or []
+        url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
+        if not url:
+            raise AtlasError("الصورة خلصت فقط مرجعش رابط")
+    except BaseException:
+        _unbill(h)
+        raise
     return url
 
 
@@ -510,17 +592,22 @@ def run_model(kind: str, body: dict, what: str, max_seconds: int = 1800, interva
         body = _adapt_video(body)
     if kind in ("Video", "Image") and isinstance(body.get("prompt"), str):
         body = {**body, "prompt": with_rules(body["prompt"])}
-    with httpx.Client(timeout=90) as client:
-        resp = client.post(f"{BASE_URL}/api/v1/model/generate{kind}", headers=_headers(), json=body)
-    data = _check(resp, what)
-    pid = (data or {}).get("id") or (data or {}).get("prediction_id")
-    if not pid:
-        raise AtlasError(f"{what}: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
-    pred = wait_prediction(pid, max_seconds=max_seconds, interval=interval, what=what)
-    outputs = pred.get("outputs") or pred.get("output") or []
-    if isinstance(outputs, str):
-        outputs = [outputs]
-    url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
-    if not url:
-        raise AtlasError(f"{what} خلص فقط مرجعش رابط")
+    h = _bill(kind, body, what)
+    try:
+        with httpx.Client(timeout=90) as client:
+            resp = client.post(f"{BASE_URL}/api/v1/model/generate{kind}", headers=_headers(), json=body)
+        data = _check(resp, what)
+        pid = (data or {}).get("id") or (data or {}).get("prediction_id")
+        if not pid:
+            raise AtlasError(f"{what}: الرد لا يحتوي رقم طلب: {str(data)[:200]}")
+        pred = wait_prediction(pid, max_seconds=max_seconds, interval=interval, what=what)
+        outputs = pred.get("outputs") or pred.get("output") or []
+        if isinstance(outputs, str):
+            outputs = [outputs]
+        url = next((o for o in outputs if isinstance(o, str) and o.startswith("http")), None)
+        if not url:
+            raise AtlasError(f"{what} خلص فقط مرجعش رابط")
+    except BaseException:
+        _unbill(h)
+        raise
     return url

@@ -5,6 +5,8 @@
 // في كل خطوة: اختار / عدّل / اتناقش مع المخ / اقترح غيرهم / اكتب بنفسك، وكل 👍👎 بيتسجل في المخ.
 const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
+  // 💳 التكلفة جنب زرار الصرف: «نحو N نقطة · رصيدك M» (والرصيد مش ظاهر لصاحب البرنامج)
+  const costTag = (pts, bal) => pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · رصيدك ${Number(bal).toLocaleString("en-US")}` : ""}</small>` : "";
   const J = (o) => ({ headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) });
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
   const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع المنشور"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
@@ -411,7 +413,7 @@ const Flow = (() => {
       ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn big" data-panel>🎛️ افتح لوحة القالب</button>
-        <button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 صدّر الفيديو</button></div>
+        <button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 صدّر الفيديو<small class="flw-cost">بدون نقاط</small></button></div>
       <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
   }
 
@@ -453,7 +455,7 @@ const Flow = (() => {
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
           ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
       ${isCode(d) ? failed("vo") : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? "🎙️ سجّل التعليق الصوتي واضبط المشاهد ←" : "أكمل ←"}</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد ←${costTag(voices.find((x) => x.id === v.voice)?.pts, o.balance)}` : "أكمل ←"}</button></div>`;
   }
   async function loadVoice() {
     if (S.vLoading) return;

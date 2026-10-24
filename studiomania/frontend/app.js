@@ -37,8 +37,23 @@ async function api(path, opts = {}) {
     throw new Error("يجب تسجّل دخول");
   }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 402) noCredits(data.detail);
   if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
   return data;
+}
+
+// 💳 الرصيد مايكفيش: رسالة واضحة فيها رصيدك وتكلفة العملية، وزرار يفتح الباقات والشحن على طول (ومفيش حاجة اتخصمت)
+let noCreditsOpen = false;
+async function noCredits(msg) {
+  if (noCreditsOpen || !window.uiConfirm) return;
+  noCreditsOpen = true;
+  try {
+    const go = await uiConfirm(`${msg || "رصيدك من النقاط لا يكفي هذه العملية."}\nلم تُخصم أي نقاط.`, { ok: "💳 اشحن نقاطًا", cancel: "لاحقًا" });
+    if (go) {
+      const b = document.getElementById("stagePlans");
+      if (b) b.click(); else location.href = "/billing";
+    }
+  } finally { noCreditsOpen = false; }
 }
 
 // لغة التواريخ: أرقام عادية في العربي، وإنجليزي لو الواجهة إنجليزي
