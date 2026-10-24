@@ -35,6 +35,7 @@ import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi import Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24258,7 +24259,7 @@ def vlab_nice_error(msg: str, provider: str) -> str:
     return msg
 
 
-def run_vlab(rid: str) -> None:
+def run_vlab(rid: str, only: set | None = None) -> None:
     d = vlab_save(rid, lambda d: None)
     folder = VLAB_DIR / rid
 
@@ -24298,7 +24299,7 @@ def run_vlab(rid: str) -> None:
             upd = {"status": "failed", "error": vlab_nice_error(str(getattr(e, "detail", None) or e), c["provider"])[:240]}
         vlab_save(rid, lambda x: x["clips"][i].update(upd))
 
-    threads = [threading.Thread(target=one, args=(i, c), daemon=True) for i, c in enumerate(d["clips"])]
+    threads = [threading.Thread(target=one, args=(i, c), daemon=True) for i, c in enumerate(d["clips"]) if only is None or i in only]
     for t in threads:
         t.start()
     for t in threads:
@@ -24510,29 +24511,132 @@ def voicelab_note(rid: str, body: VLabNoteIn):
     return vlab_out(vlab_save(rid, lambda d: d["clips"][body.clip].update(note=note) if 0 <= body.clip < len(d["clips"]) else None))
 
 
-@app.get("/api/voicelab/report")
-def voicelab_report():
-    """📋 كل التجارب بالنجوم والملاحظات في نص واحد: يتنسخ أو يتنزّل ويتبعت للمراجعة."""
-    vlab_owner()
+VLAB_KINDS = {"clone": "كلون صوت", "dub": "دبلجة فيديو", "tts": "مقارنة لهجة"}
+
+
+def vlab_code(rid: str, i: int) -> str:
+    """رقم ثابت لكل صوت (بيطلع في التقرير وفي اسم الملف): المقيّم يكتب الرقم، وإحنا نعرف الصوت مين."""
+    return f"{rid[:4].upper()}-{i + 1}"
+
+
+def vlab_retryable(c: dict) -> bool:
+    return c.get("status") == "failed" and not c.get("skip")
+
+
+def vlab_report_text(dialect: str = "") -> str:
     dl = {k: v["label"] for k, v in dub.DIALECTS.items()}
-    kinds = {"clone": "كلون صوت", "dub": "دبلجة فيديو", "tts": "مقارنة لهجة"}
-    lines = [f"# نتايج مختبر الأصوات ({time.strftime('%Y-%m-%d %H:%M')})", ""]
-    for d in vlab_runs():
-        rated = [c for c in d["clips"] if c.get("score") or (c.get("note") or "").strip()]
-        if not rated:
-            continue
-        lines += [f"## {kinds.get(d['kind'], d['kind'])} · {dl.get(d['dialect'], d['dialect'])} · {time.strftime('%Y-%m-%d', time.localtime(d.get('at') or 0))}",
+    runs = [d for d in vlab_runs() if not dialect or d["dialect"] == dialect]
+    clips = [c for d in runs for c in d["clips"]]
+    failed = [(d, i, c) for d in runs for i, c in enumerate(d["clips"]) if c.get("status") == "failed"]
+    lines = [f"# نتايج مختبر الأصوات ({time.strftime('%Y-%m-%d %H:%M')})", "",
+             f"الأصوات: {len(clips)} · طلعت: {sum(c.get('status') == 'done' for c in clips)} · فشلت: {len(failed)} · متقيّمة: {sum(bool(c.get('score')) for c in clips)}"
+             + f" · عليها ملاحظات: {sum(bool((c.get('note') or '').strip()) for c in clips)}", ""]
+    for d in runs:
+        lines += [f"## {VLAB_KINDS.get(d['kind'], d['kind'])} · {dl.get(d['dialect'], d['dialect'])} · {time.strftime('%Y-%m-%d', time.localtime(d.get('at') or 0))}",
                   f"النص: {d.get('text', '')}"]
-        for c in d["clips"]:
-            stars = "★" * int(c.get("score") or 0) + "☆" * (5 - int(c.get("score") or 0)) if c.get("score") else "بدون تقييم"
-            lines.append(f"- {c.get('provider_label', c.get('provider'))} · {c.get('label') or c.get('voice') or ''} · {stars}"
-                         + (f" · ❌ {c.get('error')}" if c.get("status") == "failed" else ""))
+        for i, c in enumerate(d["clips"]):
+            sc = int(c.get("score") or 0)
+            state = (f"❌ ماطلعش: {c.get('error') or 'خطأ غير معروف'}" if c.get("status") == "failed"
+                     else "⏳ لسه بيتولّد" if c.get("status") == "working" else ("★" * sc + "☆" * (5 - sc)) if sc else "بدون تقييم")
+            lines.append(f"- [{vlab_code(d['id'], i)}] {c.get('provider_label', c.get('provider'))} · {c.get('label') or c.get('voice') or ''} · {state}")
             if (c.get("note") or "").strip():
                 lines.append(f"  ملاحظة: {c['note'].strip()}")
         lines.append("")
-    if len(lines) == 2:
-        lines.append("لا توجد تقييمات أو ملاحظات بعد.")
-    return {"text": "\n".join(lines)}
+    if failed:
+        lines += ["## الأصوات اللي ماطلعتش (تتعاد من زرار «أعد اللي فشل»)"]
+        lines += [f"- [{vlab_code(d['id'], i)}] {dl.get(d['dialect'], d['dialect'])} · {c.get('provider_label')} · {c.get('label') or ''}: {c.get('error') or ''}"
+                  + (" (المزوّد مابيدعمش اللهجة، مش هتتعاد)" if c.get("skip") else "") for d, i, c in failed]
+    if not runs:
+        lines.append("لا توجد تجارب بعد.")
+    return "\n".join(lines)
+
+
+@app.get("/api/voicelab/report")
+def voicelab_report(dialect: str = ""):
+    """📋 كل التجارب بالنجوم والملاحظات واللي فشل وسببه، في نص واحد يتنسخ ويتبعت."""
+    vlab_owner()
+    return {"text": vlab_report_text(dialect)}
+
+
+@app.get("/api/voicelab/export")
+def voicelab_export(dialect: str = "", blind: bool = False):
+    """⬇️ كل الأصوات في ملف zip، مجلد لكل لهجة.
+    عادي: اسم الملف فيه الرقم والمزوّد والصوت، ومعاه التقرير بنجومك وملاحظاتك واللي فشل.
+    للمقيّمين (blind): اسم الملف الرقم بس (من غير أسامي المزودين، عشان التقييم يبقى منصف)، ومعاه ورقة تقييم يملاها أهل اللهجة."""
+    vlab_owner()
+    dl = {k: v["label"].split(" ", 1)[-1] for k, v in dub.DIALECTS.items()}
+    safe = lambda t: re.sub(r'[\\/:*?"<>|]+', "-", str(t or "")).strip()[:60]
+    runs = [d for d in vlab_runs() if not dialect or d["dialect"] == dialect]
+    out = TMP_DIR / f"voicelab-{uuid.uuid4().hex[:8]}.zip"
+    rows = [["الرقم", "اللهجة", "النص", "التقييم من 5", "ملاحظات"]]
+    n = 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:
+        for d in runs:
+            folder = safe(dl.get(d["dialect"], d["dialect"])) if d["kind"] == "tts" else safe(VLAB_KINDS.get(d["kind"], d["kind"]))
+            for i, c in enumerate(d["clips"]):
+                f = VLAB_DIR / d["id"] / str(c.get("file") or "")
+                if c.get("status") != "done" or not c.get("file") or not f.exists():
+                    continue
+                code = vlab_code(d["id"], i)
+                name = code if blind else f"{code} - {safe(c.get('provider_label'))} - {safe(c.get('label') or c.get('voice'))}"
+                z.write(f, f"{folder}/{name}{f.suffix}")
+                rows.append([code, dl.get(d["dialect"], d["dialect"]), d.get("text", ""), "", ""])
+                n += 1
+            if d.get("sample") and (VLAB_DIR / d["id"] / d["sample"]).exists() and not blind:
+                z.write(VLAB_DIR / d["id"] / d["sample"], f"{folder}/{d['id'][:4].upper()}-العينة الأصلية.mp3")
+        csv_text = "\n".join(",".join('"' + str(x).replace('"', '""') + '"' for x in r) for r in rows)
+        if blind:
+            z.writestr("ورقة التقييم.csv", "\ufeff" + csv_text)
+            z.writestr("اقرأني.txt", "اسمع كل ملف واكتب في «ورقة التقييم» تقييمك من 1 لـ 5 وملاحظاتك: هل النطق صح؟ هل اللهجة مظبوطة؟ هل الكلام طبيعي؟\n"
+                                      "اسم كل ملف هو رقمه في الورقة.")
+        else:
+            z.writestr("التقرير.md", vlab_report_text(dialect))
+    if not n:
+        out.unlink(missing_ok=True)
+        raise HTTPException(400, "مفيش أصوات طالعة لسه" + (" في اللهجة دي" if dialect else ""))
+    tag = f"{dialect}-" if dialect else "all-"   # اسم الملف بحروف إنجليزي (بعض المتصفحات بتشيل الاسم العربي)، والملفات جواه بالعربي
+    return FileResponse(out, media_type="application/zip", filename=f"voicelab-{tag}{'raters' if blind else 'full'}-{time.strftime('%Y-%m-%d')}.zip",
+                        background=BackgroundTask(lambda: out.unlink(missing_ok=True)))
+
+
+def vlab_retry(rid: str) -> int:
+    idx: set = set()
+
+    def fn(d):
+        for i, c in enumerate(d["clips"]):
+            if vlab_retryable(c):
+                c.update(status="working", error=None)
+                idx.add(i)
+        if idx:
+            d["status"] = "working"
+    d = vlab_save(rid, fn)
+    if idx:
+        if d["kind"] == "dub":
+            threading.Thread(target=run_vlab_dub, args=(rid,), daemon=True).start()
+        else:
+            threading.Thread(target=run_vlab, args=(rid, idx), daemon=True).start()
+    return len(idx)
+
+
+@app.post("/api/voicelab/runs/{rid}/retry")
+def voicelab_retry_one(rid: str):
+    """🔁 الأصوات اللي فشلت في التجربة دي بس تتعاد (اللي طلعت بتفضل زي ما هي بنجومها وملاحظاتها)."""
+    vlab_owner()
+    if not (VLAB_DIR / Path(rid).name / "run.json").exists():
+        raise HTTPException(404, "التجربة دي مش موجودة")
+    if not vlab_retry(Path(rid).name):
+        raise HTTPException(400, "مفيش أصوات فاشلة تتعاد في التجربة دي")
+    return vlab_out(vlab_save(rid, lambda d: None))
+
+
+@app.post("/api/voicelab/retry-failed")
+def voicelab_retry_all():
+    """🔁 كل الأصوات اللي فشلت في كل التجارب تتعاد مرة واحدة."""
+    vlab_owner()
+    n = sum(vlab_retry(d["id"]) for d in vlab_runs() if any(vlab_retryable(c) for c in d["clips"]))
+    if not n:
+        raise HTTPException(400, "مفيش أصوات فاشلة تتعاد")
+    return {"retried": n}
 
 
 @app.get("/api/voicelab/runs/{rid}")

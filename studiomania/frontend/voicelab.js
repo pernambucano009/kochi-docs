@@ -22,6 +22,7 @@ const VoiceLab = (() => {
     const head = r.kind === "clone" ? `🧬 كلون · ${esc(S.d.dialects[r.dialect] || "")}` : r.kind === "dub" ? "🌍 دبلجة فيديو" : esc(S.d.dialects[r.dialect] || r.dialect);
     return `<article class="vl-run" data-run="${esc(r.id)}"><header><b>${head}</b><small>${esc(r.text)}</small>
       ${r.sample ? `<audio controls preload="metadata" src="/media/voicelab/${esc(r.id)}/${esc(r.sample)}" title="العينة الأصلية"></audio>` : ""}
+      ${r.clips.some((c) => c.status === "failed" && !c.skip) && r.status !== "working" ? `<button type="button" class="btn sm" data-retry="${esc(r.id)}" title="الأصوات اللي فشلت بس تتعاد">🔁 أعد اللي فشل</button>` : ""}
       <button type="button" class="vl-x" data-del="${esc(r.id)}" aria-label="احذف التجربة">✕</button></header>
       <div class="vl-clips">${r.clips.map((c, i) => `<div class="vl-clip ${c.status}" data-sig="${esc([c.status, c.score || 0, c.url || "", c.error || ""].join("|"))}"><p><b>${esc(c.provider_label)}</b><small>${esc(c.label)}${c.sec ? ` · ${c.sec} ث` : ""}</small></p>
         ${c.status === "done" ? `${/\.mp4$/.test(c.url || "") ? `<video controls preload="metadata" playsinline src="${esc(c.url)}"></video>` : `<audio controls preload="metadata" src="${esc(c.url)}"></audio>`}${stars(r.id, i, c.score || 0)}${noteBox(r.id, i, c.note)}`
@@ -30,8 +31,15 @@ const VoiceLab = (() => {
   }
   function tableHTML() {
     const rows = S.d.table;
-    const exp = `<div class="row wrap vl-exp"><button type="button" class="btn primary" id="vlCopy">📋 انسخ كل النتايج والملاحظات</button>
-      <button type="button" class="btn" id="vlDown">⬇️ نزّلها كملف</button><small class="hint">الصقها في المحادثة مع Claude عشان يشوف نتايج الاختبار.</small></div>`;
+    const failed = S.d.runs.reduce((a, r) => a + r.clips.filter((c) => c.status === "failed" && !c.skip).length, 0);
+    const exp = `<div class="vl-expbox">
+      <div class="row wrap vl-exp"><label class="field inline">اللهجة <select id="vlExpDia"><option value="">كل اللهجات</option>${Object.entries(S.d.dialects).map(([k, v]) => `<option value="${k}"${k === S.expDia ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label></div>
+      <div class="row wrap vl-exp">
+        <button type="button" class="btn primary" id="vlZip" title="كل الأصوات (مجلد لكل لهجة) ومعاها التقرير بنجومك وملاحظاتك واللي فشل وسببه">⬇️ نزّل الأصوات مع التقرير (zip)</button>
+        <button type="button" class="btn" id="vlZipBlind" title="الأصوات بأرقام بس من غير أسماء المزوّدين، ومعاها ورقة تقييم: ابعتها لأهل اللهجة">🎧 نسخة للمقيّمين من أهل اللهجة</button>
+        <button type="button" class="btn" id="vlCopy">📋 انسخ التقرير</button>
+        ${failed ? `<button type="button" class="btn" id="vlRetryAll">🔁 أعد كل اللي فشل (${failed})</button>` : ""}</div>
+      <small class="hint">نسخة المقيّمين أسماء ملفاتها أرقام زي «A1B2-3»، ونفس الرقم موجود في تقريرك جنب اسم المزوّد. لما المقيّمين يرجّعولك الورقة، ابعتها هنا مع التقرير.</small></div>`;
     if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، والنتيجة هتظهر هنا: متوسط كل مزوّد في كل لهجة.</p>`;
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
@@ -151,6 +159,7 @@ ${S.review ? reviewHTML() : `
   }
   function onChange(e) {
     if (e.target.dataset?.note) return saveNote(e.target);
+    if (e.target.id === "vlExpDia") { S.expDia = e.target.value; return render(); }
     const k = e.target.dataset?.text;
     if (k && S.dirty.has(k)) saveTexts([k]).catch((err) => toast(err.message, true));
   }
@@ -166,17 +175,35 @@ ${S.review ? reviewHTML() : `
     if (b("[data-prov]")) { const k = b("[data-prov]").dataset.prov; S.provs = S.provs.includes(k) ? S.provs.filter((x) => x !== k) : [...S.provs, k]; return render(); }
     if (b("[data-rate]")) await Promise.all([...pending].map(saveNote));   // الملاحظة اللي لسه بتتكتب تتحفظ قبل ما الكارت يتحدّث
     if (b("[data-rate]")) { const [rid, i, n] = b("[data-rate]").dataset.rate.split(":"); await api(`/api/voicelab/runs/${rid}/rate`, { method: "POST", ...jsonBody({ clip: +i, score: +n }) }).catch((err) => toast(err.message, true)); return load(); }
-    if (b("#vlCopy") || b("#vlDown")) {
+    if (b("#vlCopy")) {
       try {
-        const { text } = await api("/api/voicelab/report");
-        if (b("#vlDown")) {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
-          a.download = `voicelab-results-${new Date().toISOString().slice(0, 10)}.md`;
-          a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-        } else { await navigator.clipboard.writeText(text); toast("✓ اتنسخت النتايج والملاحظات، الصقها في المحادثة"); }
+        const { text } = await api(`/api/voicelab/report?dialect=${encodeURIComponent(S.expDia || "")}`);
+        await navigator.clipboard.writeText(text); toast("✓ اتنسخ التقرير، الصقه في المحادثة");
       } catch (err) { toast(err.message, true); }
       return;
+    }
+    if (b("#vlZip") || b("#vlZipBlind")) {
+      const blind = !!b("#vlZipBlind"), btn = b("#vlZip") || b("#vlZipBlind");
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/voicelab/export?blind=${blind}&dialect=${encodeURIComponent(S.expDia || "")}`);
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `خطأ ${r.status}`);
+        const cd = r.headers.get("content-disposition") || "";
+        const name = decodeURIComponent(cd.match(/filename\*=utf-8''([^;]+)/i)?.[1] || cd.match(/filename="?([^";]+)/i)?.[1] || "") || "voicelab.zip";
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(await r.blob()); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      } catch (err) { toast(err.message, true); } finally { btn.disabled = false; }
+      return;
+    }
+    if (b("[data-retry]") || b("#vlRetryAll")) {
+      const one = b("[data-retry]")?.dataset.retry;
+      try {
+        await api(one ? `/api/voicelab/runs/${one}/retry` : "/api/voicelab/retry-failed", { method: "POST" });
+        toast("🔁 بيعيد الأصوات اللي فشلت…");
+      } catch (err) { toast(err.message, true); }
+      return load();
     }
     if (b("[data-del]")) { if (await uiConfirm("تحذف التجربة دي؟")) { await api(`/api/voicelab/runs/${b("[data-del]").dataset.del}`, { method: "DELETE" }); load(); } return; }
     try {

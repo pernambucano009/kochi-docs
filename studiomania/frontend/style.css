@@ -3141,7 +3141,8 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .vl-note{width:100%;box-sizing:border-box;margin-top:6px;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font:inherit;font-size:12.5px;line-height:1.6;resize:vertical;transition:border-color .2s}
 .vl-note:focus{outline:none;border-color:#E5613E}
 .vl-note.saved{border-color:#3AA76D}
-.vl-exp{gap:8px;align-items:center;margin-bottom:12px}
+.vl-expbox{display:grid;gap:8px;margin-bottom:14px;padding:12px;border-radius:14px;background:var(--surface-2)}
+.vl-exp{gap:8px;align-items:center}
 .vl-stars button.on{color:#e8a54b}
 .vl-stars button:focus-visible{outline:2px solid var(--accent,#e5613e);border-radius:4px}
 .vl-table{width:100%;border-collapse:collapse;font-size:13px}
