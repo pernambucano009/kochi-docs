@@ -201,11 +201,8 @@ const NH = (() => {
   const cIc = corner.querySelector(".nh-c-ic"), cLatin = corner.querySelector(".latin"), cName = corner.querySelector("b"), cAsk = corner.querySelector(".nh-c-ask");
   let cornerPage = "tr", cornerStage = "tr";
   // الركن من مكان المربع على الشاشة؛ اللي في النص (ابدأ مشروع جديد / كمّل) بيروح فوق يمين
-  function cornerOf(tile) {
-    const r = tile.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    if (Math.abs(cx - innerWidth / 2) < innerWidth * .15) return "tr";
-    return (cy < innerHeight / 2 ? "t" : "b") + (cx < innerWidth / 2 ? "l" : "r");
-  }
+  // عنوان القسم دايمًا فوق تحت الشريط مباشرة، في نفس المكان لكل الأقسام
+  function cornerOf() { return "tr"; }
   function updateCorner(mode) {
     if (mode === undefined) mode = stageOpen() ? "stage" : zoom?.page ? "page" : null;
     if (mode === "stage" && $("stage").classList.contains("mt-mode")) mode = null;
@@ -684,7 +681,10 @@ const NH = (() => {
   const _showStep = showStep;
   showStep = function (step, opts = {}) {
     step = String(step);
-    if (step === "home") { if (location.hash !== "#home") history.replaceState(null, "", "#home"); return closeStage(); }
+    navReady = true;   // أول مرة = الرابط اللي الصفحة اتفتحت عليه، ومن بعدها الرابط بيتبع التنقل
+    if (isPageHash(step)) return goHash("#" + step);   // رابط صفحة (#brand، #publish/audience)
+    if (step === "home") return closeStage();
+    if (!popping && location.hash !== `#${step}`) history.pushState(null, "", `#${step}`);   // كل قسم خطوة في تاريخ المتصفح
     const was = stageOpen();
     if (!was && !sectionZoom) cornerStage = "tr";
     if (!was) stageTrail = [step];
@@ -721,7 +721,45 @@ const NH = (() => {
       : `<button type="button" class="nh-cb" data-crumb="${k}" ${deep ? "" : 'aria-current="page"'}>${esc(c.label)}</button><i aria-hidden="true">›</i>`).join("")
       + (deep ? "" : `<span class="nh-cb nh-cb-empty" aria-hidden="true"></span>`);
     nav._list = list;
+    syncHash();
   }
+  // 🔗 رابط لكل قسم وصفحة: #brand، #publish/audience، #7 … ورجوع المتصفح بيرجّع خطوة، والرابط لما يتفتح بيفتح نفس المكان
+  let popping = false, navReady = false;
+  function navHash() {
+    if (stageOpen() && stageTrail.length) return "#" + stageTrail[stageTrail.length - 1];
+    if (zoom?.page && pGrid.dataset.key) return "#" + [...pStack.map((x) => x.key), pGrid.dataset.key].join("/");
+    return "#home";
+  }
+  function syncHash() {
+    if (popping || busy || !navReady) return;
+    const h = navHash();
+    if (location.hash !== h) history[location.hash ? "pushState" : "replaceState"](null, "", h);
+  }
+  const pageTile = (key) => Object.keys(T).map((id) => T[id].page === key && bento.querySelector(`.nh-tile[data-id="${id}"]`)).find(Boolean);
+  function isPageHash(h) { const k = String(h || "").replace(/^#/, "").split("/")[0]; return !!k && !!pageTile(k); }
+  const idle = async () => { for (let i = 0; i < 60 && (busy || zoom?.anims?.some?.((a) => a.playState === "running")); i++) await new Promise((r) => setTimeout(r, 60)); };
+  async function goHash(h) {
+    const parts = String(h || "").replace(/^#/, "").split("/").filter(Boolean), first = parts[0] || "home";
+    popping = true;
+    try {
+      await idle();
+      if (first === "home") { if (stageOpen()) await closeStage(); await idle(); if (zoom?.page) await closePage(true); return; }
+      const tile = pageTile(first);
+      if (tile) {
+        if (stageOpen()) { await closeStage(); await idle(); }
+        if (!zoom?.page) { openPage(tile, first); await idle(); }
+        else window.NHNav(first);
+        for (const k of parts.slice(1)) if (T[k]) { window.NHNav(k); await idle(); }
+        return;
+      }
+      if (document.querySelector(`.view[data-view="${VIEW_OF[first] || first}"]`)) showStep(first);
+    } finally {
+      popping = false;
+      await idle();
+      renderBar();
+    }
+  }
+  window.addEventListener("popstate", () => { if (location.hash !== navHash()) goHash(location.hash); });
   // رجوع خطوة واحدة: القسم اللي قبله، أو تقفل القسم، أو الصفحة اللي قبلها، أو الرئيسية
   function goBack() {
     if (busy) return;
@@ -872,7 +910,7 @@ const NH = (() => {
     },
     // القسم بيتقفل: بالزوم بالعكس أو بيختفي بهدوء، والتسلسل اللي فوق بيتمسح
     closeSection(close) {
-      return closeSection(() => { close(); stageTrail = []; if (location.hash !== "#home") history.replaceState(null, "", "#home"); renderBar(); });
+      return closeSection(() => { close(); stageTrail = []; renderBar(); });
     },
     renderBar,
   };

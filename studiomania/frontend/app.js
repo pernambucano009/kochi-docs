@@ -858,6 +858,8 @@ const isStep1 = () => !document.querySelector('.view[data-view="1"]').hidden;
   state.maxClip = cfg.max_clip_seconds;
   state.minGap = cfg.min_cut_gap;
   await loadVideos();
+  // نستنى باقي ملفات الصفحة تتحمّل (shell.js والرئيسية) قبل ما نفتح الرابط، عشان #brand و #publish/audience يفتحوا مكانهم
+  if (document.readyState === "loading") await new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true }));
   showStep(location.hash.slice(1) || "home");
 })();
 

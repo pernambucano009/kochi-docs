@@ -698,9 +698,9 @@ body.stage-settled #nh { visibility: hidden; }
 /* كل حتة في التسلسل مربع، وفي الرئيسية بيفضل مربع فاضي بعد «الرئيسية» */
 #nhBar .nh-crumbs .nh-cb { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 10px; background: var(--nh-fill); }
 #nhBar .nh-crumbs .nh-cb-empty { min-width: 72px; }
-/* في الرئيسية «رجوع» إطاره بيفضل مكانه (زي المربع الفاضي جنب «الرئيسية»)، والكلام والسهم بس اللي بيختفوا */
-#nhBar .nh-goback.off { pointer-events: none; }
-#nhBar .nh-goback.off > * { visibility: hidden; }
+/* في الرئيسية «رجوع» والتسلسل مخفيين بالكامل بس مكانهم محجوز، فالشريط مابيتنطش لما تدخل قسم */
+#nhBar .nh-goback.off { pointer-events: none; visibility: hidden; }
+#nhBar:not(.deep) .nh-crumbs { visibility: hidden; }
 /* الرصيد والكومنتات والمواعيد بيبانوا في الرئيسية كمان */
 #nhBar .nh-tools .nh-xtra { box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
 /* اللي اتكرر في راس الصفحات بقى في الشريط: بيتخبّى (ومكانه بيفضل عشان الشريط يقعد فوقه) */
