@@ -78,8 +78,8 @@ def current(q: dict, brain: dict) -> str:
     to = q["to"]
     if "field" in to:
         return str(brain.get(to["field"]) or "")
-    if "pick" in to:
-        return str(brain.get(to["pick"]) or "")
+    if "pick" in to:   # النوع الافتراضي («تطبيق») لا يظهر كإجابة: إما ما اختاره العميل أو المجال، وإلا فارغ
+        return str(brain.get(to["pick"]) or "") if to["pick"] != "type" or brain.get("type_set") else ""
     if "note" in to:
         n = next((x for x in brain.get("notes") or [] if x.get("quiz") == q["id"]), None)
         return str((n or {}).get("body") or "")

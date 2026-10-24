@@ -283,9 +283,12 @@ const NH = (() => {
   // 🏠 عنوان الرئيسية ثابت (مش بيتغير مع القسم اللي الماوس عليه): «ابدأ من هنا» لحد ما العقل يفهمك ٣٠٪، وبعدها اسم العلامة
   function homeTitle(icon) {
     const b = D.brand, pct = b?.knowledge?.score ?? brainPct(b), name = String(b?.name || "").trim();
+    // 🎬 عميل جديد لم يبدأ أي مشروع: زر «اصنع أول فيديو» تحت العنوان (سؤالان ثم قالب موشن رخيص من مجاله)
+    const first = !KOCHI && D.loaded && !D.work.length && !(D.drafts || []).length && typeof FirstUse !== "undefined"
+      ? `<button type="button" class="nh-first" data-first>🎬 اصنع أول فيديو</button><small class="nh-first-note">سؤالان فقط، ونقاطك المجانية تكفيه</small>` : "";
     return pct < 30 || !name || name === "عميلي"
-      ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو</div>`
-      : `${icon}<h1 class="nh-ttl">${esc(name)}</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
+      ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو</div>${first}`
+      : `${icon}<h1 class="nh-ttl">${esc(name)}</h1><div class="ar">استوديو المحتوى والفيديو</div>${first}`;
   }
   // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها
   let stageLock = false, pendingKey = null;
@@ -872,6 +875,7 @@ const NH = (() => {
         step: x.busy ? "يُولّد الآن" : "لم يُولّد بعد", updated_at: x.updated_at })),
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
+    D.loaded = true;
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
@@ -879,6 +883,7 @@ const NH = (() => {
     // مجسّم العلامة بيتبني تاني بس لما العميل أو لوجوه أو ألوانه تتغير فعلًا (مش مع كل تحديث للبيانات، كان بيرمش)
     const bk = JSON.stringify([clientx?.active || "", D.brand?.id || "", (D.brand?.logos || []).map((l) => l.file || l.url || l).join(","), D.brand?.palette || "", D.brand?.name || ""]);
     if (bk !== lastBrandKey) { GL?.brand?.(); lastBrandKey = bk; }
+    if (!KOCHI && typeof FirstUse !== "undefined") FirstUse.check();
   }
   let lastBrandKey = null;
   refresh();

@@ -10682,6 +10682,7 @@ def brain_to_dict(b: dict) -> dict:
     out["todos"] = b.get("todos") or []
     out["niche"] = b.get("niche") or ""
     out["quiz_done"] = b.get("quiz_done") or []
+    out.update(field=b.get("field") or "", goal=b.get("goal") or "", onboarded=bool(b.get("onboarded")), first_at=b.get("first_at"))
     out["credits"] = wallet.balance()
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
@@ -10911,22 +10912,137 @@ def first_client_id() -> str | None:
     return r["id"] if r else None
 
 
-def onboard_apply() -> None:
-    """🗣️ البلد واللهجة اللي العميل اختارهم وقت التسجيل (onboard.json من البوابة) بيتحطوا في عقل العلامة مرة واحدة،
-    فالأفكار والهوك والنص والصوت كلهم بياخدوا نفس اللهجة من أول يوم."""
-    if auth.get_setting("onboard_v1"):
-        return
+import fieldpacks  # noqa: E402
+
+
+def onboard_load() -> dict | None:
     f = DATA_DIR / "onboard.json"
     try:
-        ob = json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
     except ValueError:
-        ob = None
-    auth.set_setting("onboard_v1", "1")
+        return None
+
+
+def field_pack_apply(bid: str, ob: dict) -> None:
+    """🧭 إجابات أول استخدام (البلد، اللهجة، المجال، الهدف) تملأ العقل: اللهجة والسوق، وبروفايل المجال (الجمهور والنبرة والكلمات
+    والقواعد والدعوة)، و٣٠ فكرة جاهزة بهوكاتها في مجلد الأفكار، وخطة شهر جاهزة (مسودة توافق عليها). الخانات المكتوبة لا تُمسح."""
+    field, goal = ob.get("field") or "", ob.get("goal") or ""
+
+    def fn(d):
+        for k, v in (("language", ob.get("dialect_label") or ""), ("market", ob.get("country") or "")):
+            if v and not str(d.get(k) or "").strip():
+                d[k] = v
+        fieldpacks.brain_fill(field, goal, d)
+        d["onboarded"] = now()
+    update_brain(bid, fn)
+    row = brain_row(bid) or {}
+    brand = str(ob.get("brand") or "").strip()
+    if brand and row.get("name") in ("عميلي", "", None):
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE ad_brains SET name = ? WHERE id = ?", (brand[:80], bid))
+    pack = fieldpacks.FIELDS.get(field)
+    if not pack:
+        return
+    # 💡 أفكار المجال في «مجلد الأفكار» (لا تتكرر إذا طُبّقت مرة ثانية)
+    cid = SHARED_LIB if "ideas" in share_keys() else bid
+
+    def add(m):
+        saved = m.get("saved") or []
+        if any(x.get("origin") == f"field:{field}" for x in saved):
+            return
+        items = [{"id": uuid.uuid4().hex[:10], "kind": "idea", "mine": True, "at": now(), "status": "ready", "origin": f"field:{field}",
+                  "item": {"title": it["title"], "idea": it["idea"], "hook": it["hook"], "url": "", "audio": ""}} for it in pack["ideas"]]
+        m["saved"] = ([*saved, *items])[-ideamem.SAVED_MAX:]
+    mem_update(cid, add)
+    # 🗓️ خطة شهر جاهزة للمجال: مسودة، والعميل يوافق عليها لكي تنزل على الأوتوبايلوت
+    if not (row.get("month") or {}).get("items"):
+        start = (datetime.now(timezone.utc) + timedelta(days=1)).date()
+        ok = lambda t: (MOTION_DIR / "r" / t / "reel.html").exists()  # noqa: E731
+        items = fieldpacks.month_items(field, start, MONTH_DAYS, "19:00", str(row.get("cta") or ""), ok)
+        if items:
+            month = {"status": "draft", "start": start.isoformat(), "days": MONTH_DAYS, "per_day": 1, "times": ["19:00"], "items": items,
+                     "made_at": now(), "from_field": field}
+            update_brain(bid, lambda d: d.update(month=month))
+
+
+def onboard_apply() -> None:
+    """🗣️ إجابات التسجيل (onboard.json من البوابة) تدخل عقل العلامة مرة واحدة، فالأفكار والهوك والنص والصوت تأخذ اللهجة
+    نفسها من أول يوم، والعقل يبدأ من بروفايل المجال بدل الصفر."""
+    if auth.get_setting("onboard_v1"):
+        return
+    ob = onboard_load()
     bid = first_client_id()
     if not ob or not bid:
+        auth.set_setting("onboard_v1", "1")
         return
-    update_brain(bid, lambda d: d.update({k: v for k, v in (("language", ob.get("dialect_label") or ""), ("market", ob.get("country") or ""))
-                                          if v and not str(d.get(k) or "").strip()}))
+    try:   # كل خطوة لا تتكرر إذا اكتملت، فإذا توقف في النص (مثلًا وقت تشغيل السيرفر) يُكمل في الطلب التالي
+        field_pack_apply(bid, ob)
+    except Exception as exc:  # noqa: BLE001
+        print("onboard_apply:", exc)
+        return
+    auth.set_setting("onboard_v1", "1")
+
+
+class OnboardIn(BaseModel):
+    country: str = ""
+    dialect: str = ""
+    field: str = ""
+    goal: str = ""
+
+
+class FirstIn(BaseModel):
+    about: str = ""
+    audience: str = ""
+
+
+@app.get("/api/onboard")
+def onboard_state():
+    """🧭 مسار أول استخدام: هل نسأل الأسئلة الأربعة (لمن دخل بجوجل ولم يمر بالتسجيل)، وأول قالب مقترح، وسؤالا أول فيديو."""
+    bid = active_client_id()
+    b = (brain_row(bid) or {}) if bid else {}
+    field = b.get("field") or ""
+    pack = fieldpacks.FIELDS.get(field) or {}
+    need = bool(b) and not b.get("onboarded") and not str(b.get("domain") or "").strip() and brain_score(b) < 30
+    return {"need": need, "field": field, "first": fieldpacks.first_video(field), "about": b.get("about") or "", "audience": b.get("audience") or "",
+            "about_ph": pack.get("about_ph") or "مثلًا: ماذا تبيع أو تقدم، وأين، وما الذي يميزك عن غيرك",
+            "audience_ph": "العمر، والاهتمامات، وما الذي يبحث عنه", "score": brain_score(b), **fieldpacks.signup_options()}
+
+
+@app.post("/api/onboard")
+def onboard_save(body: OnboardIn):
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    ob = fieldpacks.onboard_dict(body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20])
+    if not ob:
+        raise HTTPException(400, "اختر بلدك أو لهجة المحتوى")
+    field_pack_apply(bid, ob)
+    return onboard_state()
+
+
+@app.post("/api/onboard/first")
+def onboard_first(body: FirstIn):
+    """سؤالا أول فيديو فقط: ما الذي تقدمه، ومن عميلك المثالي. الباقي يُسأل تدريجيًا بعد كل مشروع."""
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    about, aud = body.about.strip()[:3000], body.audience.strip()[:2000]
+    if not about:
+        raise HTTPException(400, "اكتب ما الذي تقدمه في جملة أو جملتين")
+
+    def fn(d):
+        d["about"] = about
+        if aud:
+            d["audience"] = aud
+        d.setdefault("quiz_done", [])
+        for q in ("about", *(("audience",) if aud else ())):
+            if q not in d["quiz_done"]:
+                d["quiz_done"].append(q)
+        d["first_at"] = now()
+    old = brain_row(bid) or {}
+    update_brain(bid, fn)
+    seasons_if_changed(bid, old, brain_row(bid) or {})
+    return onboard_state()
 
 
 def active_client_id() -> str | None:
@@ -11939,6 +12055,8 @@ def brain_quiz_answer(bid: str, body: QuizIn):
             elif "pick" in to:
                 if ans in [o[0] for o in q["opts"]]:
                     d[to["pick"]] = ans
+                    if to["pick"] == "type":
+                        d["type_set"] = True
             elif "rules" in to:
                 have = [r for r in str(d.get("rules") or "").split("\n") if r.strip()]
                 # سؤال «إيه الممنوع؟»: الإجابة بتتكتب قاعدة واضحة («ممنوع في المحتوى: …») مش كلمة لوحدها

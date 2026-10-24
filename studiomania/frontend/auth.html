@@ -52,7 +52,7 @@ $("langToggle").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
 const G = `<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 const field = (id, label, type = "text", ac = "") => `<label class="field">${label} <input type="${type}" id="${id}" autocomplete="${ac}" required></label>`;
 const tabs = (on) => `<div class="au-tabs"><a href="/login" class="${on === "login" ? "on" : ""}">دخول</a><a href="/signup" class="${on === "signup" ? "on" : ""}">حساب جديد</a></div>`;
-const google = () => S.google ? `<a class="btn wide au-g" href="/auth/google">${G} أكمل بجوجل</a><div class="au-or">أو بالإيميل</div>` : "";
+const google = () => S.google ? `<a class="btn wide au-g" href="/auth/google">${G} أكمل بجوجل</a><div class="au-or">أو بالبريد الإلكتروني</div>` : "";
 const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (لا يوجد بريد إلكتروني متظبط): <a href="${l}">${l}</a></p>` : "";
 
 function err(m) { $("err").textContent = m || ""; $("err").hidden = !m; }
@@ -74,7 +74,10 @@ function regionFields() {
   const c = guessCountry();
   return `<label class="field">بلدك <select id="country">${S.regions.map((r) => `<option value="${r.id}"${r.id === c ? " selected" : ""}>${r.name}</option>`).join("")}</select></label>
     <label class="field">لهجة المحتوى (الأفكار والنص والصوت) <select id="dialect">${S.dialects.map((x) => `<option value="${x.id}"${x.id === dialectOf(c) ? " selected" : ""}>${x.name}</option>`).join("")}</select>
-    <small class="au-hint">اخترناها حسب بلدك، ويمكنك تغييرها الآن أو لاحقًا من عقل العلامة.</small></label>`;
+    <small class="au-hint">اخترناها حسب بلدك، ويمكنك تغييرها الآن أو لاحقًا من عقل العلامة.</small></label>
+    ${S.fields ? `<label class="field">مجال نشاطك <select id="field">${S.fields.map((f) => `<option value="${f.id}">${f.name}${f.hint ? ` (${f.hint})` : ""}</option>`).join("")}</select>
+    <small class="au-hint">نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، فلا تبدأ من الصفر.</small></label>
+    <label class="field">هدفك من المحتوى <select id="goal">${S.goals.map((g) => `<option value="${g.id}"${g.id === S.fields[0].goal ? " selected" : ""}>${g.name}</option>`).join("")}</select></label>` : ""}`;
 }
 
 const VIEWS = {
@@ -89,20 +92,20 @@ const VIEWS = {
     ${regionFields()}
     <button class="btn primary wide" id="go">أنشئ الحساب</button>
     <div class="au-links"><a href="/pricing">الباقات والأسعار</a></div>`,
-  forgot: () => `<p class="muted">اكتب إيميلك وسنبعتلك رابط تعمل به كلمة مرور جديد.</p>
+  forgot: () => `<p class="muted">اكتب بريدك الإلكتروني وسنرسل إليك رابطًا لتعيين كلمة مرور جديدة.</p>
     ${field("email", "البريد الإلكتروني", "email", "email")}<button class="btn primary wide" id="go">أرسل الرابط</button>
     <div class="au-links"><a href="/login">رجوع للدخول</a></div>`,
-  reset: () => `<p class="muted">اكتب كلمة المرور الجديد.</p>
-    ${field("pw", "كلمة المرور الجديد", "password", "new-password")}${field("pw2", "اكتبه مرة أخرى", "password", "new-password")}
+  reset: () => `<p class="muted">اكتب كلمة المرور الجديدة.</p>
+    ${field("pw", "كلمة المرور الجديدة", "password", "new-password")}${field("pw2", "اكتبها مرة أخرى", "password", "new-password")}
     <button class="btn primary wide" id="go">احفظ وادخل</button>`,
-  verify: () => `<div class="au-big">📬</div><p>بعتنالك بريد إلكتروني على <b>${S.user ? S.user.email : ""}</b>. اضغط على الرابط الذي فيه لكي نفتحلك حسابك.</p>
-    <p class="muted">غير لاقيه؟ انظر في الـ Spam.</p><div id="dev"></div>
+  verify: () => `<div class="au-big">📬</div><p>أرسلنا إليك بريدًا إلكترونيًا على <b>${S.user ? S.user.email : ""}</b>. اضغط على الرابط الذي فيه لتفعيل حسابك.</p>
+    <p class="muted">لم تجده؟ انظر في مجلد الرسائل غير المرغوب فيها (Spam).</p><div id="dev"></div>
     <button type="button" class="btn wide" id="resend">أرسله مرة أخرى</button>
-    <div class="au-links"><a href="#" id="out">دخول بإيميل آخر</a></div>`,
+    <div class="au-links"><a href="#" id="out">الدخول ببريد آخر</a></div>`,
   setup: () => `<p class="muted">أول مرة: أنشئ حساب الأدمن (صاحب البرنامج). كل شغلك القديم سيصبح في هذا الحساب.</p>
-    ${field("name", "اسمك", "text", "name")}${field("email", "إيميلك", "email", "email")}
-    ${field("pw", "كلمة مرور جديد (8 على الأقل)", "password", "new-password")}
-    ${S.old_password ? field("old", "كلمة المرور القديم الخاص بالبرنامج (للتأكيد)", "password", "current-password") : ""}
+    ${field("name", "اسمك", "text", "name")}${field("email", "بريدك الإلكتروني", "email", "email")}
+    ${field("pw", "كلمة مرور جديدة (8 على الأقل)", "password", "new-password")}
+    ${S.old_password ? field("old", "كلمة المرور القديمة للبرنامج (للتأكيد)", "password", "current-password") : ""}
     <button class="btn primary wide" id="go">أنشئ حساب الأدمن</button>`,
 };
 
@@ -110,12 +113,12 @@ const ACTIONS = {
   login: async () => { const d = await post("/api/auth/login", { email: $("email").value, password: $("pw").value }); location.replace(d.verify ? "/verify" : next()); },
   signup: async () => {
     const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value,
-      country: $("country")?.value || "", dialect: $("dialect")?.value || "" });
+      country: $("country")?.value || "", dialect: $("dialect")?.value || "", field: $("field")?.value || "", goal: $("goal")?.value || "" });
     sessionStorage.setItem("devlink", d.dev_link || ""); sessionStorage.setItem("mailfail", d.mail_failed ? "1" : ""); location.replace("/verify");
   },
   forgot: async () => {
     const d = await post("/api/auth/forgot", { email: $("email").value });
-    $("body").innerHTML = `<div class="au-big">📬</div><p class="au-ok">إذا هذا البريد الإلكتروني لديه حساب، بعتناله رابط. انظر على البريد الإلكتروني (وفي الـ Spam).</p>${devLink(d.dev_link)}<div class="au-links"><a href="/login">رجوع للدخول</a></div>`;
+    $("body").innerHTML = `<div class="au-big">📬</div><p class="au-ok">إذا كان لهذا البريد حساب، فقد أرسلنا إليه رابطًا. افتح بريدك، وانظر في مجلد Spam أيضًا.</p>${devLink(d.dev_link)}<div class="au-links"><a href="/login">رجوع للدخول</a></div>`;
   },
   reset: async () => {
     if ($("pw").value !== $("pw2").value) throw new Error("الباسوردين غير مثل بعض");
@@ -150,6 +153,7 @@ async function render() {
     $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
   }
   if ($("country")) $("country").onchange = () => { $("dialect").value = dialectOf($("country").value); };
+  if ($("field")) $("field").onchange = () => { const f = S.fields.find((x) => x.id === $("field").value); if (f) $("goal").value = f.goal; };
   document.querySelector("#body input")?.focus();
   ACTIVE = v;
 }

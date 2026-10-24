@@ -777,5 +777,5 @@ const Gallery = (() => {
     dubOut(); Gen.close?.(); SceneStudio.close?.();
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { mount, list: () => EXTRA, openEditor };
+  return { mount, list: () => EXTRA, openEditor, start: (id) => { const x = EXTRA.find((t) => t.id === id); if (!x) return false; startTpl(x); return true; } };
 })();

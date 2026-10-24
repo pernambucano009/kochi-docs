@@ -37,6 +37,7 @@ from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 import billing
+import fieldpacks
 import mailer
 import payments
 
@@ -579,8 +580,7 @@ def auth_state(request: Request):
     u = current_user(request)
     return {"logged_in": bool(u and u["verified"]), "user": me_dict(u) if u else None, "needs_setup": needs_owner_setup(),
             "old_password": old_password_set(), "google": bool(os.environ.get("GOOGLE_CLIENT_ID")),
-            "mail": mailer.configured(), "regions": [{"id": a, "name": b, "dialect": c} for a, b, c in REGIONS],
-            "dialects": [{"id": a, "name": b} for a, b in DIALECT_OPTS]}
+            "mail": mailer.configured(), **fieldpacks.signup_options()}
 
 
 def me_dict(u: sqlite3.Row) -> dict:
@@ -660,31 +660,20 @@ class SignupIn(BaseModel):
     name: str = ""
     country: str = ""
     dialect: str = ""
+    field: str = ""
+    goal: str = ""
 
 
-# 🗣️ لهجة المحتوى من البلد (اقتراح بس، والعميل يغيّرها قبل ما يكمّل): السعودية نجدي، كل بلد خليجي لهجته، مصر مصري، والباقي فصحى.
-# الحجازي اختيار يدوي من القايمة. اللهجة بتتحفظ في ملف onboard.json في مساحة العميل، والعقل بياخدها أول ما يتعمل.
-REGIONS = [("SA", "السعودية", "ar-sa-najdi"), ("AE", "الإمارات", "ar-ae"), ("KW", "الكويت", "ar-kw"), ("QA", "قطر", "ar-qa"),
-           ("BH", "البحرين", "ar-bh"), ("OM", "عُمان", "ar-om"), ("EG", "مصر", "ar-eg-cairo"), ("JO", "الأردن", "ar-msa"),
-           ("LB", "لبنان", "ar-msa"), ("SY", "سوريا", "ar-msa"), ("PS", "فلسطين", "ar-msa"), ("IQ", "العراق", "ar-msa"),
-           ("YE", "اليمن", "ar-msa"), ("SD", "السودان", "ar-msa"), ("LY", "ليبيا", "ar-msa"), ("TN", "تونس", "ar-msa"),
-           ("DZ", "الجزائر", "ar-msa"), ("MA", "المغرب", "ar-msa"), ("XX", "بلد آخر", "ar-msa")]
-DIALECT_OPTS = [("ar-sa-najdi", "سعودي نجدي"), ("ar-sa-hijazi", "سعودي حجازي"), ("ar-gulf", "خليجي عام"), ("ar-ae", "إماراتي"),
-                ("ar-kw", "كويتي"), ("ar-qa", "قطري"), ("ar-bh", "بحريني"), ("ar-om", "عماني"), ("ar-eg-cairo", "مصري"),
-                ("ar-levant", "شامي"), ("ar-iq", "عراقي"), ("ar-sd", "سوداني"), ("ar-ma", "مغربي"), ("ar-dz", "جزائري"),
-                ("ar-tn", "تونسي"), ("ar-msa", "فصحى"), ("en", "English")]
+# 🗣️ البلد واللهجة والمجال والهدف (fieldpacks): بيتحفظوا في onboard.json في مساحة العميل، والعقل بياخدهم أول ما يتعمل.
 
 
-def save_onboard(wid: str, country: str, dial: str) -> None:
-    reg = next((r for r in REGIONS if r[0] == country), None)
-    names = dict(DIALECT_OPTS)
-    if not reg and dial not in names:
+def save_onboard(wid: str, country: str, dial: str, field: str = "", goal: str = "", brand: str = "") -> None:
+    ob = fieldpacks.onboard_dict(country, dial, field, goal, brand)
+    if not ob:
         return
-    dial = dial if dial in names else reg[2]
     d = workspace_dir(wid)
     d.mkdir(parents=True, exist_ok=True)
-    (d / "onboard.json").write_text(json.dumps({"country": reg[1] if reg and reg[0] != "XX" else "", "dialect": dial,
-                                                "dialect_label": names[dial]}, ensure_ascii=False), encoding="utf-8")
+    (d / "onboard.json").write_text(json.dumps(ob, ensure_ascii=False), encoding="utf-8")
 
 
 SKIP_VERIFY = os.environ.get("SKIP_EMAIL_VERIFY") == "1"
@@ -716,7 +705,7 @@ def signup(body: SignupIn, request: Request):
     if user_by("email", email):
         raise HTTPException(400, "هذا البريد الإلكتروني لديه حساب. ادخل به أو استخدم «نسيت كلمة المرور»")
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
-    save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20])
+    save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], body.name.strip()[:80])
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
         c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, ?, 'customer', ?, ?)",

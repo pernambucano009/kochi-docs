@@ -828,6 +828,8 @@ const BrandPage = (() => {
     if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم تلقائيًا (غير صفحة داخل العقل)
     if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; window.BL_TAB = n.l.page === "brainlib" ? String(n.l.i).split(":")[1] : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها تفتح داخل العقل («رجوع» يرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
+    // 🧭 لحد ما العقل يفهمك ٣٠٪: «أكمل العقل» هو الشاشة الأساسية (كارت كبير في النص)، والخريطة خلفه
+    S.el.classList.toggle("bm-wiz", n?.kind === "quiz" && (cur()?.knowledge?.score ?? 100) < 30);
     if (!n) { S.open = null; card.hidden = true; S.el.classList.remove("has-card"); markOpen(); return; }
     // رجوع: للكارت اللي كنت فيه قبل كده، ولو فتحت النقطة من الخريطة على طول فلفرعها
     if (S.open && S.open.id !== n.id && !S.backing) S.hist = [...(S.hist || []), S.open.id].slice(-12);
@@ -853,6 +855,7 @@ const BrandPage = (() => {
   function placeCard(p) {
     const card = S.el.querySelector(".bm-card");
     if (!p || card.hidden) return;
+    if (S.el.classList.contains("bm-wiz")) { card.style.transform = ""; S.cardAt = null; return; }   // في النص بالـ CSS
     const W = S.el.clientWidth, H = S.el.clientHeight, cw = card.offsetWidth, ch = card.offsetHeight;
     // الناحية (يمين/شمال النقطة) بتتحدد مرة واحدة لما الكارت يفتح، فمش بيقفز من ناحية للتانية
     if (S.cardSide == null) {
@@ -1334,6 +1337,7 @@ const BrandPage = (() => {
     dotsSize();
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
     if (!S.raf) S.raf = requestAnimationFrame(loop);
+    if ((cur()?.knowledge?.score ?? 100) < 30 && S.byId?.quiz) openCard(S.byId.quiz);
     // أول ما الخريطة تفتح: النقط بتطلع من المخ لبرّه
     if (!reduce.matches) S.nodes.forEach((n, i) => n.el?.animate([{ opacity: 0, translate: `${S.nodes[0].x - n.x}px ${S.nodes[0].y - n.y}px`, scale: .3 }, { opacity: 1, translate: "0 0", scale: 1 }],
       { duration: 700, delay: n.kind === "center" ? 0 : n.kind === "branch" ? 120 : 260 + (i % 9) * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }));
