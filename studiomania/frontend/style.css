@@ -3149,6 +3149,7 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .vl-table th,.vl-table td{text-align:right;padding:8px;border-bottom:1px solid var(--line,#ddd);vertical-align:top}
 .vl-rank{display:inline-flex;gap:4px;align-items:baseline;margin:0 0 4px 12px;padding:3px 9px;border-radius:99px;background:var(--surface-2,rgba(0,0,0,.05))}
 .vl-rank.best{background:#e8a54b;color:#1d1b18}
+.vl-ok{color:#2e9d5b;font-weight:500}
 .vl-rank small{opacity:.65}
 
 /* 💸 فواتيري الشهرية */

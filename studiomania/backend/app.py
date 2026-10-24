@@ -20874,6 +20874,7 @@ def fasih_sync() -> None:
             dub.merge_fasih(fasih.catalog())
             dub.merge_fasih(fasih.custom_voices())   # 🎨 الصوت الخاص المتصمم في حساب فصيح
             dub.merge_munsit(munsit.catalog())       # 🗣️ أصوات منصت الخليجية (لو المفتاح متسجل)
+            dub.apply_approved()                     # ✅ المزوّد المعتمد لكل لهجة يظل أول اختيار
         finally:
             _FASIH_SYNC["running"] = False
     threading.Thread(target=run, daemon=True, name="fasih-catalog").start()
@@ -24523,7 +24524,7 @@ def voicelab_get():
             "dialects": {k: v["label"] for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
             "samples": vlab_texts(), "defaults": {k: VLAB_TEXT.get(k, "") for k in dub.DIALECTS if dub.DIALECTS[k]["group"] == "ar"},
             "support": {k: vlab_support(k) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
-            "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"]))}
+            "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"])), "approved": dict(dub.APPROVED)}
 
 
 class VLabIn(BaseModel):
