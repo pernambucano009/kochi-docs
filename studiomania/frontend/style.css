@@ -3117,6 +3117,13 @@ html[data-role="customer"] .admin-only { display: none !important; }
 .vl-x:hover,.vl-x:focus-visible{background:var(--surface-2,rgba(0,0,0,.06));opacity:1}
 .vl-body{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
 .vl-pills{display:flex;flex-wrap:wrap;gap:6px}
+.vl-pills button:disabled{cursor:not-allowed;opacity:.45;border-style:dashed}
+.vl-body textarea[data-text]{font-size:15px;line-height:1.85;resize:vertical}
+.vl-tmeta{justify-content:space-between;margin-top:-6px;color:var(--muted,#8C8C88)}
+.vl-review{display:flex;flex-direction:column;gap:12px}
+.vl-rv{padding:14px 16px;border-radius:14px;background:var(--field,#F3F2EF);display:flex;flex-direction:column;gap:8px}
+.vl-mini span{font-size:11.5px;padding:4px 10px;border-radius:99px;border:1px solid var(--line,#ddd)}
+.vl-mini span.off{opacity:.5;border-style:dashed}
 .vl-runs{display:flex;flex-direction:column;gap:12px;margin-top:6px}
 .vl-run{border:1px solid var(--line,#ddd);border-radius:14px;padding:12px 14px}
 .vl-run header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}

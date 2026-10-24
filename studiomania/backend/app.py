@@ -24056,6 +24056,49 @@ VLAB_PROV = {"fasih": "فصيح", "munsit": "منصت", "eleven_atlas": "ElevenL
 VLAB_OTHER = {"eleven_dub": "ElevenLabs (دبلجة)", "fasih_dub": "دبلجتنا بفصيح"}
 
 
+# قطعة أطول لكل لهجة (٤–٥ جمل) عشان الفرق بين المزودين يبان. صاحب المنصة بيراجعها ويعدّلها، والتعديل بيتحفظ في texts.json
+VLAB_TEXT = {
+    "ar-sa-najdi": "هلا والله وحيّاكم. اليوم بعلّمكم كيف تسوّون محتوى يومي لمشروعكم بدون ما تتعبون. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بجوالكم، ولا تشيلون هم المونتاج، حنّا نرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عشان يوصلكم كل جديد.",
+    "ar-sa-hijazi": "أهلين وسهلين يا جماعة. اليوم حنقولكم كيف تسوّوا محتوى كل يوم لمشروعكم من غير تعب. أول حاجة، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بجوالكم، ولا تشيلوا هم المونتاج، إحنا نرتّبو لكم. وإذا عجبكم الشغل، لا تنسوا تتابعونا عشان يوصلكم كل جديد.",
+    "ar-gulf": "هلا والله فيكم. اليوم بنعلّمكم شلون تسوّون محتوى يومي لمشروعكم بدون تعب. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتلفوناتكم، ولا تشيلون هم المونتاج، احنا نرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عشان يوصلكم كل جديد.",
+    "ar-ae": "هلا والله ومرحبا بكم. اليوم بنعلّمكم كيف تسوّون محتوى يومي لمشروعكم من دون تعب. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتيليفوناتكم، ولا تحاتون المونتاج، نحن بنرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عسب يوصلكم كل جديد.",
+    "ar-kw": "هلا والله فيكم. اليوم بنعلّمكم شلون تسوّون محتوى يومي لمشروعكم بدون تعب، والسالفة وايد سهلة. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتلفوناتكم، ولا تشيلون هم المونتاج، احنا نرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا علشان يوصلكم كل جديد.",
+    "ar-qa": "هلا والله ومرحبا. اليوم بنعلّمكم شلون تسوّون محتوى يومي لمشروعكم بدون تعب، والسالفة وايد بسيطة. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتلفوناتكم، ولا تشيلون هم المونتاج، احنا بنرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عشان يوصلكم كل جديد.",
+    "ar-bh": "هلا والله فيكم. اليوم بنعلّمكم شلون تسوّون محتوى يومي لمشروعكم بدون تعب، والموضوع وايد سهل. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتلفوناتكم، ولا تشيلون هم المونتاج، احنا بنرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عشان يوصلكم كل جديد.",
+    "ar-om": "هلا ومرحبا بكم. اليوم بنعلّمكم كيف تسوّون محتوى يومي لمشروعكم من غير تعب. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بتلفوناتكم، ولا تشلّون هم المونتاج، نحن بنرتّبه لكم. وإذا عجبكم الشغل، لا تنسون تتابعونا عشان يوصلكم كل جديد.",
+    "ar-eg-cairo": "أهلًا بيكم يا جماعة. النهارده هقولكم إزاي تعملوا محتوى كل يوم لمشروعكم من غير ما تتعبوا. أول حاجة، اكتبوا فكرة واحدة بس وخلّوها واضحة. بعد كده صوّروها بموبايلكم، ومتشيلوش هم المونتاج، إحنا هنظبطه لكم. ولو الشغل عجبكم، متنسوش تتابعونا عشان يوصلكم كل جديد.",
+    "ar-levant": "أهلا فيكن يا جماعة. اليوم رح قلّكن كيف تعملوا محتوى كل يوم لمشروعكن بلا تعب. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بموبايلاتكن، وما تحملوا همّ المونتاج، نحنا منرتّبلكن ياه. وإذا عجبكن الشغل، لا تنسوا تتابعونا لحتى يوصلكن كل جديد.",
+    "ar-iq": "هلا بيكم يا جماعة. اليوم راح أگلكم شلون تسوّون محتوى كل يوم لمشروعكم بدون تعب. أول شي، اكتبوا فكرة وحدة بس وخلّوها واضحة. بعدين صوّروها بموبايلاتكم، ولا تشيلون همّ المونتاج، إحنا نرتّبه إلكم. وإذا عجبكم الشغل، لا تنسون تتابعونا حتى يوصلكم كل جديد.",
+    "ar-sd": "أهلًا بيكم يا جماعة. الليلة حأقول ليكم كيف تعملوا محتوى كل يوم لمشروعكم من غير تعب. أول حاجة، اكتبوا فكرة واحدة بس وخلّوها واضحة. بعد داك صوّروها بموبايلاتكم، وما تشيلوا همّ المونتاج، نحن بنرتّبو ليكم. ولو الشغل عجبكم، ما تنسوا تتابعونا عشان يوصلكم كل جديد.",
+    "ar-ma": "مرحبا بيكم أ صحابي. اليوم غادي نقول ليكم كيفاش تديرو محتوى كل نهار للمشروع ديالكم بلا تعب. أول حاجة، كتبو فكرة وحدة صافي وخليوها واضحة. من بعد صوروها بالتيليفون ديالكم، وما تهزوش الهم ديال المونطاج، حنا غادي نوجدوه ليكم. وإلا عجباتكم الخدمة، ما تنساوش تبعونا باش يوصلكم كلشي جديد.",
+    "ar-dz": "مرحبا بيكم يا جماعة. اليوم راح نقولكم كيفاش ديرو محتوى كل يوم للمشروع تاعكم بلا تعب. أول حاجة، اكتبو فكرة وحدة برك وخليوها واضحة. من بعد صوروها بالتيليفون تاعكم، وما تديروش الهم تاع المونتاج، حنا نرتبوهولكم. وإذا عجبتكم الخدمة، ما تنساوش تتبعونا باش يوصلكم كل جديد.",
+    "ar-tn": "عسلامة بيكم يا جماعة. اليوم باش نقلكم كيفاش تعملو محتوى كل نهار للمشروع متاعكم بلاش تعب. أول حاجة، اكتبو فكرة وحدة برك وخليوها واضحة. من بعد صوروها بالتليفون متاعكم، وما تشيلوش هم المونتاج، أحنا نرتبوهولكم. وكان عجبتكم الخدمة، ما تنساوش تتبعونا باش يوصلكم كل جديد.",
+    "ar-msa": "مرحبًا بكم جميعًا. سأخبركم اليوم كيف تصنعون محتوى يوميًا لمشروعكم دون عناء. أولًا، اكتبوا فكرة واحدة فقط واجعلوها واضحة. ثم صوّروها بهواتفكم، ولا تقلقوا بشأن المونتاج، فنحن سنرتّبه لكم. وإن أعجبكم العمل، فلا تنسوا متابعتنا ليصلكم كل جديد.",
+}
+VLAB_TEXT_FILE = VLAB_DIR / "texts.json"
+
+
+def vlab_texts() -> dict:
+    """قطعة كل لهجة: تعديل صاحب المنصة لو موجود، وإلا القطعة الأصلية."""
+    try:
+        saved = json.loads(VLAB_TEXT_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        saved = {}
+    return {k: (saved.get(k) or VLAB_TEXT.get(k) or VSAMPLE_TEXT.get(k, VSAMPLE_GULF)) for k, v in dub.DIALECTS.items() if v["group"] == "ar"}
+
+
+SILMA_DIALECTS = ("ar-msa", "ar-gulf")   # SILMA عنده فصحى وسعودي بس (والخليجي العام قريب من السعودي)
+
+
+def vlab_support(dialect: str) -> dict:
+    """المزوّد بيدعم اللهجة دي؟ فصيح ومنصت: لو عندهم أصوات فيها. SILMA: فصحى وسعودي وخليجي عام. الباقي متعدد اللغات وبيقرا أي نص."""
+    dv = dub.DIALECTS[dialect]["voices"]
+    def has(p):
+        return any(dub.VOICES[v].get("provider") == p and dub.VOICES[v].get("dialect") == dialect for v in dub.VOICES) or any(dub.VOICES[v]["provider"] == p for v in dv)
+    return {"fasih": has("fasih"), "munsit": has("munsit"), "eleven_atlas": True, "eleven": True, "minimax": True,
+            "silma": dialect.startswith("ar-sa") or dialect in SILMA_DIALECTS}
+
+
 def vlab_owner() -> None:
     if not wallet.free():
         raise HTTPException(403, "مختبر الأصوات لصاحب المنصة بس")
@@ -24237,7 +24280,8 @@ def voicelab_get():
     table = [{"dialect": k[0], "provider": k[1], "avg": round(sum(v) / len(v), 2), "n": len(v)} for k, v in score.items()]
     return {"providers": VLAB_PROV, "labels": {**VLAB_PROV, **VLAB_OTHER}, "ready": vlab_ready(),
             "dialects": {k: v["label"] for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
-            "samples": {k: VSAMPLE_TEXT.get(k, VSAMPLE_GULF) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
+            "samples": vlab_texts(), "defaults": {k: VLAB_TEXT.get(k, "") for k in dub.DIALECTS if dub.DIALECTS[k]["group"] == "ar"},
+            "support": {k: vlab_support(k) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
             "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"]))}
 
 
@@ -24252,9 +24296,12 @@ def voicelab_run(body: VLabIn):
     vlab_owner()
     if body.dialect not in dub.DIALECTS:
         raise HTTPException(400, "اللهجة مش موجودة")
-    text = (body.text or "").strip()[:600] or VSAMPLE_TEXT.get(body.dialect, VSAMPLE_GULF)
-    ready = vlab_ready()
+    text = (body.text or "").strip()[:600] or vlab_texts()[body.dialect]
+    ready, sup = vlab_ready(), vlab_support(body.dialect)
     provs = [p for p in body.providers if p in VLAB_PROV and (ready.get(p) or atlas.mock_mode())] or [p for p, ok in ready.items() if ok]
+    provs = [p for p in provs if sup.get(p)]   # المزوّد اللي مبيدعمش اللهجة مقفول فيها
+    if not provs:
+        raise HTTPException(400, "مفيش مزوّد من اللي اخترتهم بيدعم اللهجة دي")
     try:
         jobs = vlab_jobs(body.dialect, provs)
     except voicelab.LabError as e:
@@ -24294,7 +24341,7 @@ def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), fil
     if probe_duration(folder / "sample.mp3") < 8:
         shutil.rmtree(folder, ignore_errors=True)
         raise HTTPException(400, "العينة لازم تبقى ١٠ ثواني على الأقل (الأحسن من ٣٠ ثانية لدقيقة كلام واضح)")
-    text = text.strip()[:600] or VSAMPLE_TEXT.get(dialect, VSAMPLE_GULF)
+    text = text.strip()[:600] or vlab_texts().get(dialect, VSAMPLE_GULF)
     d = {"id": rid, "kind": "clone", "dialect": dialect if dialect in dub.DIALECTS else "ar-msa", "text": text, "at": time.time(), "status": "working", "sample": "sample.mp3",
          "clips": [{"provider": p, "provider_label": VLAB_PROV[p], "voice": "clone", "label": "كلون من العينة", "status": "working", "score": 0} for p in provs]}
     (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
@@ -24355,6 +24402,31 @@ def voicelab_dub(file: UploadFile = File(...)):
     (folder / "run.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_vlab_dub, args=(rid,), daemon=True).start()
     return vlab_out(d)
+
+
+class VLabTextIn(BaseModel):
+    dialect: str
+    text: str = ""
+
+
+@app.post("/api/voicelab/texts")
+def voicelab_text(body: VLabTextIn):
+    """حفظ قطعة لهجة بعد المراجعة (نص فاضي = يرجع للأصلي)."""
+    vlab_owner()
+    if body.dialect not in dub.DIALECTS:
+        raise HTTPException(400, "اللهجة مش موجودة")
+    with VLAB_LOCK:
+        try:
+            saved = json.loads(VLAB_TEXT_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        t = body.text.strip()[:600]
+        if t and t != VLAB_TEXT.get(body.dialect):
+            saved[body.dialect] = t
+        else:
+            saved.pop(body.dialect, None)
+        VLAB_TEXT_FILE.write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
+    return {"dialect": body.dialect, "text": vlab_texts()[body.dialect]}
 
 
 class VLabRateIn(BaseModel):
