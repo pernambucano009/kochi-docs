@@ -4,6 +4,8 @@
 - AudioShake (فصل الصوت في الدبلجة) وفصيح (الأصوات العربية): مالهمش API للرصيد، فنعرف من أول طلب يفشل بسبب الرصيد،
   ونطلّع الرقم إذا مكتوب في الرسالة (مثل «Client has -1.5 credits»).
 - Zernio (النشر): اشتراك شهري غير رصيد، فنشيّك أنه يعمل فقط.
+- ElevenLabs: له API يقول الحروف المتبقية في الاشتراك. MiniMax و SILMA: مالهمش API للرصيد، فنعرف من أول طلب يفشل.
+كل منصة معها رابط صفحة الشحن (url) لكي الأدمن يدخل ويشحن على طول.
 الحالة في ملف واحد بجانب قاعدة بيانات المنصة، لكي كل نسخ العملاء تكتب فيه، والبوابة تنبّه الأدمن (جرس + بريد إلكتروني).
 """
 from __future__ import annotations
@@ -17,12 +19,20 @@ from pathlib import Path
 import httpx
 
 PROVIDERS = {
-    "atlas": {"name": "Atlas Cloud", "what": "الفيديو والصور والصوت والعقل", "unit": "$", "api": True, "default_min": 10},
-    "scrape": {"name": "ScrapeCreators", "what": "تحليل الحسابات والمنافسين", "unit": "رصيد", "api": True, "default_min": 500},
-    "audioshake": {"name": "AudioShake", "what": "فصل الصوت عن الموسيقى في الدبلجة", "unit": "رصيد", "api": False, "default_min": 5},
-    "fasih": {"name": "فصيح", "what": "الأصوات العربية", "unit": "", "api": False, "default_min": 0},
-    "munsit": {"name": "منصت", "what": "الأصوات الخليجي", "unit": "", "api": False, "default_min": 0},
-    "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0},
+    "atlas": {"name": "Atlas Cloud", "what": "الفيديو والصور والصوت والعقل", "unit": "$", "api": True, "default_min": 10,
+              "url": "https://console.atlascloud.ai/billing"},
+    "scrape": {"name": "ScrapeCreators", "what": "تحليل الحسابات والمنافسين", "unit": "رصيد", "api": True, "default_min": 500,
+               "url": "https://app.scrapecreators.com"},
+    "audioshake": {"name": "AudioShake", "what": "فصل الصوت عن الموسيقى في الدبلجة", "unit": "رصيد", "api": False, "default_min": 5,
+                   "url": "https://developer.audioshake.ai"},
+    "fasih": {"name": "فصيح", "what": "الأصوات العربية", "unit": "", "api": False, "default_min": 0, "url": "https://www.fasihtts.com"},
+    "munsit": {"name": "منصت", "what": "الأصوات الخليجي", "unit": "", "api": False, "default_min": 0, "url": "https://munsit.com"},
+    "eleven": {"name": "ElevenLabs", "what": "الأصوات والكلون والدبلجة (المفتاح المباشر)", "unit": "حرف", "api": True, "default_min": 10000,
+               "url": "https://elevenlabs.io/app/subscription"},
+    "minimax": {"name": "MiniMax", "what": "الأصوات والكلون (المفتاح المباشر)", "unit": "", "api": False, "default_min": 0,
+                "url": "https://platform.minimax.io/user-center/payment/balance"},
+    "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودي", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
+    "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0, "url": "https://zernio.com"},
 }
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|top.?up|رصيد", re.I)
 CHECK_EVERY = 30 * 60
@@ -96,6 +106,17 @@ def fetch(name: str, keys: dict | None = None) -> dict:
             d = r.json()
             bal = _num(d.get("creditCount") if isinstance(d, dict) else None)
             return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else "رد غير مفهوم"}
+        if name == "eleven":
+            key = _env(keys, "ELEVENLABS_API_KEY", "ELEVEN_API_KEY")
+            if not key:
+                return {"ok": None}   # المفتاح المباشر اختياري: من غيره المنصة مش مستخدمة
+            r = httpx.get("https://api.elevenlabs.io/v1/user/subscription", headers={"xi-api-key": key}, timeout=20)
+            if r.status_code >= 400:
+                return {"ok": False, "error": f"HTTP {r.status_code}: {r.text[:150]}"}
+            d = r.json()
+            used, limit = _num(d.get("character_count")), _num(d.get("character_limit"))
+            bal = None if used is None or limit is None else max(0.0, limit - used)
+            return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else "رد غير مفهوم"}
         if name == "zernio":
             key = _env(keys, "ZERNIO_API_KEY", "LATE_API_KEY")
             if not key:
@@ -156,7 +177,7 @@ def summary(d: dict) -> list[dict]:
         fail = cur.get("fail") or {}
         recent_fail = bool(fail) and time.time() - fail.get("at", 0) < 3 * 86400
         state = "bad" if (bal is not None and bal <= 0) or recent_fail else "low" if bal is not None and low and bal < low else "ok" if cur.get("ok") else "unknown"
-        out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api")}, "balance": bal, "min": low, "state": state,
+        out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api", "url")}, "balance": bal, "min": low, "state": state,
                     "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None})
     return out
 

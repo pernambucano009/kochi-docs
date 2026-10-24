@@ -17,6 +17,8 @@ from pathlib import Path
 
 import httpx
 
+import providers
+
 
 class LabError(RuntimeError):
     pass
@@ -43,6 +45,15 @@ def silma_key() -> str:
 
 
 def _fail(resp: httpx.Response, who: str) -> LabError:
+    err = _fail_msg(resp, who)
+    # لو السبب الرصيد: يتسجّل في «رصيد المنصات» ويتبعت تنبيه للأدمن
+    prov = {"ElevenLabs": "eleven", "MiniMax": "minimax", "SILMA": "silma"}.get(who)
+    if prov:
+        providers.note_error(prov, f"{resp.status_code} {err}")
+    return err
+
+
+def _fail_msg(resp: httpx.Response, who: str) -> LabError:
     try:
         d = resp.json()
         msg = d.get("detail") or d.get("message") or (d.get("base_resp") or {}).get("status_msg") or d
@@ -114,7 +125,9 @@ def minimax_say(text: str, voice_id: str, dest: Path, boost: str = "Arabic") -> 
         raise _fail(r, "MiniMax")
     d = r.json()
     if (d.get("base_resp") or {}).get("status_code") not in (0, None):
-        raise LabError(f"MiniMax: {(d.get('base_resp') or {}).get('status_msg')}")
+        msg = f"MiniMax: {(d.get('base_resp') or {}).get('status_msg')}"
+        providers.note_error("minimax", msg)
+        raise LabError(msg)
     audio = (d.get("data") or {}).get("audio") or ""
     if not audio:
         raise LabError("MiniMax: مارجعش صوت")
