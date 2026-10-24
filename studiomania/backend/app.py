@@ -24138,6 +24138,30 @@ def vlab_save(rid: str, fn) -> dict:
     return d
 
 
+# حد الطلبات في نفس الوقت لكل مزوّد (منصت و SILMA بيقبلوا طلب واحد بس في المرة، والباقي بيرجع 429)
+VLAB_SLOTS = {"munsit": threading.Semaphore(1), "silma": threading.Semaphore(1)}
+VLAB_SLOT_DEFAULT = 2
+
+
+def vlab_slot(provider: str) -> threading.Semaphore:
+    with VLAB_LOCK:
+        return VLAB_SLOTS.setdefault(provider, threading.Semaphore(VLAB_SLOT_DEFAULT))
+
+
+def vlab_busy(msg: str) -> bool:
+    m = msg.lower()
+    return "429" in m or "concurren" in m or "rate limit" in m or "too many" in m
+
+
+def vlab_nice_error(msg: str, provider: str) -> str:
+    m = msg.lower()
+    if "insufficient balance" in m or "balance not enough" in m:
+        return f"رصيد {VLAB_PROV.get(provider, provider)} خلص: اشحن الحساب من موقعهم وجرّب تاني"
+    if vlab_busy(msg):
+        return f"{VLAB_PROV.get(provider, provider)} مشغول دلوقتي (حد الطلبات في نفس الوقت). جرّب تاني بعد شوية"
+    return msg
+
+
 def run_vlab(rid: str) -> None:
     d = vlab_save(rid, lambda d: None)
     folder = VLAB_DIR / rid
@@ -24162,10 +24186,20 @@ def run_vlab(rid: str) -> None:
                                 str(folder / f"{i}.mp3")], check=True, capture_output=True, timeout=120)
                 (folder / f"{i}.src").unlink(missing_ok=True)
             else:
-                vlab_say(c, d["text"], d["dialect"], folder / f"{i}.mp3")
+                # طلب واحد في المرة للمزوّد اللي عنده حد، ولو رجع «مشغول» نستنى ونعيد (لحد ٣ مرات)
+                for attempt in range(4):
+                    try:
+                        with vlab_slot(c["provider"]):
+                            t0 = time.time()
+                            vlab_say(c, d["text"], d["dialect"], folder / f"{i}.mp3")
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        if attempt == 3 or not vlab_busy(str(getattr(e, "detail", None) or e)):
+                            raise
+                        time.sleep(4 * (attempt + 1))
             upd = {"file": f"{i}.mp3", "status": "done", "sec": round(time.time() - t0, 1)}
         except Exception as e:  # noqa: BLE001
-            upd = {"status": "failed", "error": str(getattr(e, "detail", None) or e)[:240]}
+            upd = {"status": "failed", "error": vlab_nice_error(str(getattr(e, "detail", None) or e), c["provider"])[:240]}
         vlab_save(rid, lambda x: x["clips"][i].update(upd))
 
     threads = [threading.Thread(target=one, args=(i, c), daemon=True) for i, c in enumerate(d["clips"])]

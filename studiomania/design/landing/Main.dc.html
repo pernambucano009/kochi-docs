@@ -323,16 +323,12 @@ class Component extends DCLogic {
       }
       g1.gain.setValueAtTime(0, t + 0.28);
       s1.connect(hp1); hp1.connect(bp1); bp1.connect(g1); g1.connect(out); s1.start(t); s1.stop(t + 0.32);
-      // 2) الاشتعال: «فووش» دافي بيفتح وبعدين يهدى
-      const s2 = noise(1.5), lp2 = filter('lowpass', 500, 0.7), g2 = ac.createGain();
-      lp2.frequency.setValueAtTime(500, t + 0.16); lp2.frequency.exponentialRampToValueAtTime(2400, t + 0.36); lp2.frequency.exponentialRampToValueAtTime(650, t + 1.4);
-      g2.gain.setValueAtTime(0, t + 0.16); g2.gain.linearRampToValueAtTime(0.5, t + 0.34); g2.gain.exponentialRampToValueAtTime(0.001, t + 1.45);
-      s2.connect(lp2); lp2.connect(g2); g2.connect(out); s2.start(t + 0.16); s2.stop(t + 1.5);
-      // 3) طقطقة خفيفة وهو بيولّع
-      for (let i = 0; i < 9; i++) {
-        const at = t + 0.3 + Math.random() * 0.9, c = noise(0.006), hp = filter('highpass', 2200), g = ac.createGain();
-        g.gain.setValueAtTime(0.12 + Math.random() * 0.2, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.006);
-        c.connect(hp); hp.connect(g); g.connect(out); c.start(at); c.stop(at + 0.008);
+      // 2) طقطقة الحرق (زي البلاستيك وهو بيولّع): فرقعات صغيرة متفرقة، كتير في الأول وبتقل مع الوقت
+      for (let i = 0; i < 26; i++) {
+        const at = t + 0.2 + Math.pow(Math.random(), 1.6) * 1.3, len = 0.004 + Math.random() * 0.01;
+        const c = noise(len + 0.004), bp = filter('bandpass', 1500 + Math.random() * 3500, 0.8 + Math.random() * 1.5), g = ac.createGain();
+        g.gain.setValueAtTime(0.18 + Math.random() * 0.4, at); g.gain.exponentialRampToValueAtTime(0.001, at + len);
+        c.connect(bp); bp.connect(g); g.connect(out); c.start(at); c.stop(at + len + 0.004);
       }
     } catch (e) { /* الصوت إضافة، لو المتصفح منعه نكمّل عادي */ }
   }
