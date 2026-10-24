@@ -483,8 +483,16 @@ const NH = (() => {
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
       + panel(4, 6, `${head("voice")}<div class="nh-body">${D.voices} تسجيل</div>`, `data-id="voice" tabindex="0" role="button"`)
       + panel(4, 6, `${head("music")}<div class="nh-body">${D.music} تراك</div>`, `data-id="music" tabindex="0" role="button"`),
-    publish: () => [["pubpost", 4, META.publish()], ["inbox", 4], ["adsmgr", 4], ["audience", 6], ["wacamp", 6]]
-      .map(([id, c, m]) => panel(c, 3, `${head(id)}<div class="nh-body">${m || esc(T[id].desc)}</div>`, `data-id="${id}" tabindex="0" role="button"`)).join(""),
+    // 📤 النشر بنفس شكل «مكتبة المحتويات» في البروتوتايب: أيقونات هادية في النص، باسم كل قسم وسطر صغير تحته (مش مربعات كبيرة)
+    publish: () => {
+      const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
+      const sub = { pubpost: up ? `${up} منشور متجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
+        audience: "من سيشتري، وكيف تصل إليه", wacamp: "رسائل لمشتركينك" };
+      const ic = { pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
+        audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z", wacamp: "M4.5 19.5l1.2-3.6A8 8 0 1 1 8.6 18.6z M9 9.5c.3 2.3 2.2 4.2 4.5 4.5" };
+      return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
+        <span class="bl-fi"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${ic[id]}"/></svg></span><b>${esc(T[id].ar)}</b><small>${esc(sub[id])}</small></button>`).join("")}</div></div>`;
+    },
     progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">لا توجد مشاريع بعد.</div>`}</div>`) : projectsBoard(),
   };
   // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
@@ -821,7 +829,7 @@ const NH = (() => {
       if (!f) return;
       return openSection(line, () => { setFlowFolder(f.id); fol.current = f; showStep(folderStage(f).next); });
     }
-    const tile = e.target.closest(".nh-tile[data-id]");
+    const tile = e.target.closest(".nh-tile[data-id], .nh-pubhub [data-id]");
     if (!tile) return;
     const id = tile.dataset.id, t = T[id];
     if (t.page) return zoom?.page ? (busy || pGrid.dataset.key === t.page ? null : swapPage(t.page)) : openPage(tile, t.page);
@@ -868,8 +876,11 @@ const NH = (() => {
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
     if (window.I18N?.lang !== "en" && !KOCHI) slots[live].innerHTML = stageHTML(shown);   // العنوان بيتحدّث لما العقل يتحمّل
-    GL?.brand?.();
+    // مجسّم العلامة بيتبني تاني بس لما العميل أو لوجوه أو ألوانه تتغير فعلًا (مش مع كل تحديث للبيانات، كان بيرمش)
+    const bk = JSON.stringify([clientx?.active || "", D.brand?.id || "", (D.brand?.logos || []).map((l) => l.file || l.url || l).join(","), D.brand?.palette || "", D.brand?.name || ""]);
+    if (bk !== lastBrandKey) { GL?.brand?.(); lastBrandKey = bk; }
   }
+  let lastBrandKey = null;
   refresh();
   setInterval(() => { if (!document.hidden && window.money?.last) { D.money = money.last; if (!zoom) renderTiles(); } }, 60000);
 

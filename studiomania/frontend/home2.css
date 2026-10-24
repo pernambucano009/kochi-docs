@@ -2994,3 +2994,7 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .gg-go { margin: 2px 4px 0; padding: 9px 14px; font-size: 13.5px; align-self: stretch; text-align: center; }
 #nh .gg-panel { min-height: 300px; }
 @media (max-width: 720px) { #nh .gg { padding: 84px 16px 40px; } #nh .gg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } #nh .gg-go { font-size: 12.5px; padding: 8px 10px; } }
+/* 📤 صفحة النشر بشكل «مكتبة المحتويات»: الأيقونات في نص الصفحة على عرضها كله */
+#nh .nh-pubhub { grid-column: 1 / -1; grid-row: 1 / -1; align-self: stretch; min-height: calc(100vh - 230px); }
+#nh .nh-pubhub .bl-folds { grid-template-columns: repeat(5, minmax(0, 1fr)); width: min(1080px, 100%); }
+@media (max-width: 820px) { #nh .nh-pubhub .bl-folds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

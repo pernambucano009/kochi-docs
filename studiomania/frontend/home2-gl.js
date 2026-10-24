@@ -517,7 +517,7 @@ window.NHGL = (stage, getClient) => {
     const was = g === cur;
     scene.remove(g);
     g.traverse((o) => { o.geometry?.dispose(); if (o.material?.map) o.material.map.dispose(); });
-    if (was) { cur = null; show("brand"); }
+    if (was) { cur = null; show("brand"); cur.userData.a = 1; }   // المجسّم الجديد بيظهر كامل مكان القديم على طول (من غير ما يبهت ويرجع)
   }
   function setOpacity(g, a) { g.userData.mats.forEach((m) => { m.opacity = a; }); g.userData.rim.uniforms.a.value = a * RIM(); }
   function grow(g, a) {
