@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&family=Unbounded:wght@300;500&family=Jost:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@300;400;500;600&family=Unbounded:wght@300;500&family=Jost:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap">
 <script>
   // نفس اختيار الوضع الليلي بتاع البرنامج
   try { const t = localStorage.getItem("studiomania.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.nhTheme = t; } catch { }
@@ -15,7 +15,7 @@
 <style>
   /* الصفحة العامة للأسعار (للي مش مسجّل دخول): نفس شريط البرنامج ونفس شكل «باقتي ونقاطي» */
   :root { --nh-bg: #FAFAF8; --nh-ink: #181718; --nh-muted: #8C8C88; --nh-accent: #E5613E; --card: #fff; --field: #F3F2EF;
-    --nh-latin: "Unbounded", "Readex Pro", sans-serif; --nh-arabic: "Readex Pro", "IBM Plex Sans Arabic", sans-serif;
+    --nh-latin: "Jost", "Alexandria", sans-serif; --nh-arabic: "Jost", "Alexandria", "Readex Pro", sans-serif;
     --bar-latin: "Jost", "Futura", system-ui, sans-serif; --track: #E3E2DE; --chip-sh: 0 4px 18px rgba(24, 23, 24, .08); color-scheme: light; }
   :root[data-nh-theme="dark"] { --nh-bg: #0c0c0e; --nh-ink: #f1f1f3; --nh-muted: #8a8a92; --nh-accent: #F0754F; --card: #1C1B1C; --field: #2A292A; --track: #3D3C3D;
     --chip-sh: 0 4px 18px rgba(0, 0, 0, .35); color-scheme: dark; }
@@ -29,7 +29,7 @@
   .ib { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--card); box-shadow: var(--chip-sh), inset 0 0 0 1.5px var(--nh-accent); color: var(--nh-accent); }
   .ib svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .chip { display: inline-flex; align-items: center; height: 44px; padding: 0 22px; white-space: nowrap; border-radius: 22px; background: var(--card); box-shadow: var(--chip-sh); color: var(--nh-ink);
-    font: 500 14px "IBM Plex Sans Arabic", var(--nh-arabic); text-decoration: none; transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
+    font: 500 14px var(--nh-arabic); text-decoration: none; transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
   .chip:hover { translate: 0 -3px; scale: 1.06; }
   .sw { display: flex; align-items: center; gap: 10px; background: none; border: 0; cursor: pointer; color: var(--nh-ink); padding: 0; }
   .sw .track { width: 44px; height: 24px; border-radius: 99px; background: var(--track); position: relative; }

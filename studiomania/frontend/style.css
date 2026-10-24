@@ -7,8 +7,8 @@
   --ink: #111111; --ok: #2EAF78; --danger: #DD4A3C; --warn: #E3A13A; --skip: #D6D6D2;
   --radius: 26px; --radius-sm: 16px;
   --shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 18px 40px -22px rgba(40, 20, 10, .28);
-  --font: "Readex Pro", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
-  --display: "Unbounded", "Readex Pro", sans-serif;
+  --font: "Jost", "Alexandria", "Readex Pro", "Segoe UI", Tahoma, Arial, sans-serif;
+  --display: "Jost", "Alexandria", sans-serif;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -2998,7 +2998,7 @@ html[data-role="customer"] .admin-only { display: none !important; }
 /* ============ 🎬 المونتاج الهادي (montage-ui.js) ============
    الأدوات أيقونات بس (الاسم في الفقاعة)، كارت الأداة بيظهر وقت الحاجة والمعاينة بتاخد مكانه،
    أدوات التايم لاين أيقونات، والتراكات المدموجة بتبان خطوط رفيعة لحد ما تفردها بدبل كليك. */
-.mtu-tip { position: fixed; z-index: 2147482000; max-width: 280px; padding: 6px 10px; border-radius: 10px; background: #181718; color: #fff; font: 12px/1.45 var(--font, "Readex Pro", sans-serif);
+.mtu-tip { position: fixed; z-index: 2147482000; max-width: 280px; padding: 6px 10px; border-radius: 10px; background: #181718; color: #fff; font: 12px/1.45 var(--font, "Jost", "Alexandria", sans-serif);
   box-shadow: 0 10px 24px rgba(24, 23, 24, .2); opacity: 0; pointer-events: none; transition: opacity .15s; white-space: pre-line; }
 .mtu-tip.on { opacity: 1; }
 :root[data-nh-theme="dark"] .mtu-tip { background: #F1F1F3; color: #141416; }

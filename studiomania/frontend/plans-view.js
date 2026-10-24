@@ -9,14 +9,14 @@ const PlansView = (() => {
   --pv-track: #E3E2DE; --pv-soft: rgba(229, 97, 62, .1); --pv-tip: #181718; --pv-tip-ink: #fff; --pv-tip-sub: rgba(255, 255, 255, .78); --pv-tip-m: #F6B29E;
   --pv-sh: 0 4px 24px rgba(24, 23, 24, .06); --pv-sh-hi: 0 16px 34px -18px rgba(24, 23, 24, .3); --pv-cont: 0 6px 24px rgba(24, 23, 24, .07);
   --pv-ease: cubic-bezier(.65, 0, .35, 1); --pv-pop: cubic-bezier(.2, .8, .2, 1);
-  position: relative; min-height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; color: var(--pv-ink); font-family: var(--nh-arabic, "Readex Pro", sans-serif); }
+  position: relative; min-height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; color: var(--pv-ink); font-family: var(--nh-arabic, "Jost", "Alexandria", sans-serif); }
 :root[data-nh-theme="dark"] :is(#nh, body) .pv { --pv-sub: #A3A29E; --pv-field: #2A292A; --pv-field-hi: #343334; --pv-fill: rgba(255, 255, 255, .05); --pv-line: rgba(255, 255, 255, .08);
   --pv-track: #3D3C3D; --pv-soft: rgba(240, 117, 79, .14); --pv-tip: #F1F1F3; --pv-tip-ink: #141416; --pv-tip-sub: rgba(20, 20, 22, .72); --pv-tip-m: #C2482E;
   --pv-sh: 0 4px 24px rgba(0, 0, 0, .28); --pv-sh-hi: 0 16px 34px -18px rgba(0, 0, 0, .7); --pv-cont: 0 6px 24px rgba(0, 0, 0, .35); }
 :is(#nh, body) .pv :where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 :is(#nh, body) .pv a { color: inherit; text-decoration: none; }
-:is(#nh, body) .pv .num { font-family: var(--nh-latin, "Unbounded", sans-serif); font-weight: 300; letter-spacing: .03em; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
-:is(#nh, body) .pv .lat { font-family: var(--nh-latin, "Unbounded", sans-serif); text-transform: uppercase; direction: ltr; unicode-bidi: isolate; }
+:is(#nh, body) .pv .num { font-family: var(--nh-latin, "Jost", sans-serif); font-weight: 300; letter-spacing: .03em; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+:is(#nh, body) .pv .lat { font-family: var(--nh-latin, "Jost", sans-serif); text-transform: uppercase; direction: ltr; unicode-bidi: isolate; }
 :is(#nh, body) .pv-mid { display: grid; place-content: center; justify-items: center; gap: 40px; padding: 24px 0; }
 :is(#nh, body) .pv-cap { cursor: pointer; display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 18px; border-radius: 99px; background: var(--pv-card); box-shadow: var(--pv-cont);
   font-size: 12.5px; color: var(--pv-ink); transition: scale .32s var(--pv-pop), box-shadow .3s; }
