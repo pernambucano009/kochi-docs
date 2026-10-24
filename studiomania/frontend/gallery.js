@@ -196,18 +196,19 @@ const Gallery = (() => {
     const v = document.querySelector('.view[data-view="13"]');
     if (!v) return;
     if (!DUB.home) { DUB.home = document.createComment("dub-home"); v.parentNode.insertBefore(DUB.home, v); }
+    DUB.el = v;
     panel.appendChild(v); v.hidden = false;
     viewHooks["13"]?.();
   }
   function dubOut() {
-    const v = document.querySelector('.view[data-view="13"]');
+    const v = DUB.el || document.querySelector('.view[data-view="13"]');   // الصفحة ممكن تكون اتقفلت والعنصر برّه الصفحة
     if (v && DUB.home && v.previousSibling !== DUB.home) { v.hidden = true; DUB.home.parentNode.insertBefore(v, DUB.home.nextSibling); }
   }
   function setCat(k) {
-    const el = W.el;
+    const el = S.view === "grid" ? S.root.querySelector(".gg") : W.el;
     if (!el || k === C.cur) return;
     C.cur = k;
-    const panel = el.querySelector(".nh-wh-panel");
+    const panel = el.querySelector(".nh-wh-panel, .gg-panel");
     el.classList.toggle("panel-on", k > 0);
 
     el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === k));
@@ -255,7 +256,116 @@ const Gallery = (() => {
     for (let k = 1; k < w.length; k++) { const d = Math.abs(w.slice(0, k).join(" ").length - w.slice(k).join(" ").length); if (d < diff) { diff = d; best = k; } }
     return `${esc(w.slice(0, best).join(" "))}<br>${esc(w.slice(best).join(" "))}`;
   }
+  // ▦ الشبكة (الافتراضي): كروت بالغلاف والاسم، وبحث، وفلتر بالنوع والمجال. 🎡 والعجلة بزرار لمن يحبها
+  const NICHES = [["food", "المطاعم والكافيهات"], ["beauty", "التجميل والعيادات"], ["retail", "المتاجر والمنتجات"], ["realestate", "العقارات"], ["edu", "التعليم والكورسات"],
+    ["fitness", "الرياضة واللياقة"], ["tech", "التقنية والتطبيقات"], ["travel", "السياحة والسفر"], ["services", "الشركات والخدمات"], ["creator", "صناع المحتوى"]];
+  // «موصى به لمجالك» بس للقوالب المختارة للمجال ده فعلًا (مش اللي بتنفع لأي مجال)
+  const recFor = (x, key) => !!key && (FIT[x.id] || "").split(" ").includes(key);
+  const GF = { q: "", type: "", niche: null };
+  try { S.view = localStorage.getItem("studiomania.galview") || "grid"; } catch { S.view = "grid"; }
+  function setView(v) {
+    S.view = v;
+    try { localStorage.setItem("studiomania.galview", v); } catch { /* */ }
+    dubOut(); Gen.close?.(); SceneStudio.close?.();
+    render();
+  }
+  function ggList() {
+    const key = GF.niche ?? S.niche.key, q = GF.q.trim().toLowerCase();
+    const list = S.items.map((x, i) => [x, i]).filter(([x]) => (!GF.type || x.cat === GF.type)
+      && (!q || [x.name, x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(q)))
+      && (!GF.niche || recFor(x, GF.niche) || FIT[x.id] === "*"));
+    list.sort((a, b) => (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
+    return list;
+  }
+  function ggCard([x, i]) {
+    const key = GF.niche ?? S.niche.key;
+    const art = x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy" decoding="async">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`;
+    return `<article class="gg-card" data-gi="${i}">
+      <button type="button" class="gg-art" data-gpv="${i}" aria-label="شاهد عرض «${esc(x.name)}»">${art}${x.sample_url ? `<span class="gg-play" aria-hidden="true">▶</span>` : ""}</button>
+      <div class="gg-meta"><b>${esc(x.name)}</b><small>${esc(catName(x.cat))}</small>${recFor(x, key) ? `<span class="gg-rec">موصى به لمجال ${esc((NICHES.find((n) => n[0] === key) || [, S.niche.name])[1])}</span>` : ""}</div>
+      <button type="button" class="nh-gal-go gg-go" data-gstart="${i}">${x.id === "editor" ? "🎞️ افتح المحرر" : "ابدأ بهذا القالب"}</button></article>`;
+  }
+  function ggFill() {
+    const box = S.root.querySelector(".gg-grid");
+    if (!box) return;
+    const list = ggList();
+    box.innerHTML = list.length ? list.map(ggCard).join("") : `<div class="nh-empty">لا يوجد قالب بهذا البحث. جرّب كلمة أخرى أو امسح الفلاتر.</div>`;
+    S.root.querySelector(".gg-count").textContent = `${list.length} قالب`;
+  }
+  function renderGrid() {
+    const box = S.root.querySelector(".nh-gal-grid");
+    const types = [...new Set(S.items.map((x) => x.cat))].map((id) => [id, catName(id)]);
+    const key = GF.niche ?? S.niche.key;
+    box.innerHTML = `<div class="gg" dir="rtl">
+      <div class="gg-tabs">${CATS2.map(([k, t, sub], i) => `<button type="button" class="gg-tab" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>
+      <div class="gg-main">
+        <div class="gg-bar"><input type="search" class="gg-q" placeholder="🔎 ابحث عن قالب بالاسم أو الوصف…" value="${esc(GF.q)}">
+          <select class="gg-niche" aria-label="المجال"><option value="">كل المجالات</option>${NICHES.map(([k, n]) => `<option value="${k}"${k === key ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
+          <span class="gg-count muted"></span>
+          <button type="button" class="btn sm gg-view" data-gview="wheel" title="اعرض القوالب على العجلة">🎡 العجلة</button></div>
+        <div class="gg-types"><button type="button" class="gg-type${GF.type ? "" : " on"}" data-gtype="">الكل</button>${types.map(([id, n]) => `<button type="button" class="gg-type${GF.type === id ? " on" : ""}" data-gtype="${esc(id)}">${esc(n)}</button>`).join("")}</div>
+        <div class="gg-grid"></div></div>
+      <section class="gg-panel" hidden></section></div>`;
+    const el = box.querySelector(".gg");
+    if (!el._b) {
+      el._b = true;
+      el.addEventListener("input", (e) => { if (e.target.matches(".gg-q")) { GF.q = e.target.value; ggFill(); } });
+      el.addEventListener("change", (e) => { if (e.target.matches(".gg-niche")) { GF.niche = e.target.value; ggFill(); } });
+      el.addEventListener("click", (e) => {
+        const t = e.target;
+        const tab = t.closest("[data-cat2]");
+        if (tab) { const k = +tab.dataset.cat2; el.classList.toggle("panel-on", k > 0); el.querySelector(".gg-main").hidden = k > 0; setCat(k); return; }
+        const ty = t.closest("[data-gtype]");
+        if (ty) { GF.type = ty.dataset.gtype; el.querySelectorAll("[data-gtype]").forEach((b) => b.classList.toggle("on", b === ty)); return ggFill(); }
+        if (t.closest("[data-gview]")) return setView("wheel");
+        const pv = t.closest("[data-gpv]");
+        if (pv) return preview(S.items[+pv.dataset.gpv]);
+        const go = t.closest("[data-gstart]");
+        if (go) return startTpl(S.items[+go.dataset.gstart]);
+        const op = t.closest("[data-ctopen]");
+        if (op) { storageSet("studiomania.auto", op.dataset.ctopen); return window.NHNav?.("auto"); }
+        if (t.closest("[data-ctnew]")) api("/api/automations", { method: "POST", ...jsonBody({ name: "قالب مخصص جديد" }) })
+          .then((r) => { storageSet("studiomania.auto", r.id); window.NHNav?.("auto"); }).catch((err) => toast(err.message, true));
+      });
+      // الفيديو بيتحمّل ويشتغل بس للكارت اللي الماوس عليه، والباقي صورة الغلاف بس
+      el.addEventListener("pointerover", (e) => { const c = e.target.closest(".gg-card"); if (c && c !== S.ggHot) { ggHover(S.ggHot, false); ggHover(c, true); } });
+      el.addEventListener("pointerleave", () => { ggHover(S.ggHot, false); });
+    }
+    const want = CATS2.findIndex(([k]) => k === window.GAL_CAT);
+    window.GAL_CAT = null;
+    C.cur = -1;
+    el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === Math.max(0, want)));
+    if (want > 0) { el.classList.add("panel-on"); el.querySelector(".gg-main").hidden = true; setCat(want); } else C.cur = 0;
+    ggFill();
+    ggWatch(el);
+  }
+  function ggHover(card, on) {
+    if (!card) return;
+    const x = S.items[+card.dataset.gi], art = card.querySelector(".gg-art");
+    if (on) {
+      S.ggHot = card;
+      if (!x?.sample_url || matchMedia("(hover: none)").matches) return;
+      clearTimeout(S.ggT);
+      S.ggT = setTimeout(() => {
+        if (S.ggHot !== card || art.querySelector("video")) return;
+        const v = Object.assign(document.createElement("video"), { src: x.sample_url, muted: true, loop: true, playsInline: true, autoplay: true });
+        v.setAttribute("preload", "auto");
+        art.appendChild(v); v.play().catch(() => {});
+      }, 250);
+    } else {
+      if (S.ggHot === card) S.ggHot = null;
+      const v = art.querySelector("video");
+      if (v) { v.pause(); v.removeAttribute("src"); v.load(); v.remove(); }   // الفيديو يتشال خالص: مايفضلش يحمّل في الخلفية
+    }
+  }
+  // الصفحة اتقفلت: الدبلجة ترجع مكانها، والمولّدات تتقفل
+  function ggWatch(el) {
+    cancelAnimationFrame(S.ggRaf);
+    const tick = () => { if (!el.isConnected) { dubOut(); Gen.close?.(); SceneStudio.close?.(); return; } S.ggRaf = requestAnimationFrame(tick); };
+    S.ggRaf = requestAnimationFrame(tick);
+  }
   function render() {
+    if (S.view === "grid") return renderGrid();
     const list = S.items.map((x, i) => [x, i]);
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
     // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
@@ -281,7 +391,7 @@ const Gallery = (() => {
       </section>
       <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
       <section class="nh-wh-panel" dir="rtl" hidden></section>
-      <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
+      <aside class="nh-wh-side"><button type="button" class="nh-wh-snd" data-gview="grid" title="اعرض القوالب شبكة بالبحث والفلاتر"><span>▦ الشبكة</span></button><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت يعمل" : "شغّل الصوت"}</span></button></aside>
     </div>`;
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
@@ -413,9 +523,10 @@ const Gallery = (() => {
       if (Math.abs(W.vel) > SNAPV) W.mode = "coast"; else snapTo(W.pos);
     };
     cards.addEventListener("pointerup", end); cards.addEventListener("pointercancel", () => end(null));
-    el.querySelector(".nh-wh-go").addEventListener("click", () => preview(S.items[W.list[W.shown][1]]));
+    el.querySelector(".nh-wh-go").addEventListener("click", () => startTpl(S.items[W.list[W.shown][1]]));   // يبدأ مسار القالب على طول، والمعاينة بالضغط على الكارت
     el.addEventListener("click", (e) => { const b = e.target.closest("[data-cat2]"); if (b) catGo(+b.dataset.cat2); });
-    el.querySelector(".nh-wh-snd").addEventListener("click", () => setSound(!sndOn));
+    el.querySelector(".nh-wh-snd:not([data-gview])").addEventListener("click", () => setSound(!sndOn));
+    el.querySelector("[data-gview]").addEventListener("click", () => setView("grid"));
   }
   // دوسة على القالب اللي في النص بتفتحه، وعلى أي قالب تاني بتلف العجلة عليه
   function tap(k) { if (k === W.shown && Math.abs(W.vel) < 1) preview(S.items[W.list[k][1]]); else snapTo(k); }
@@ -430,7 +541,7 @@ const Gallery = (() => {
       const ti = el.querySelector(".nh-wh-title"); ti.innerHTML = ""; const s = document.createElement("span"); s.textContent = x.name; ti.appendChild(s);
       s.animate?.([{ opacity: 0, transform: "translateY(14px)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" });
       el.querySelector(".nh-wh-desc").textContent = x.desc || x.description || "";
-      el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat) + (S.niche.key ? (fits(x) ? ` · مناسب لمجال ${S.niche.name}` : ` · بعيد عن مجال ${S.niche.name}`) : "");
+      el.querySelector(".nh-wh-eye .cat").textContent = catName(x.cat) + (recFor(x, S.niche.key) ? ` · موصى به لمجال ${S.niche.name}` : "");
     }, 60);
     clearTimeout(W.playT);
     W.playT = setTimeout(() => W.G.cards.forEach((c, j) => play(c, j === W.shown)), 380);   // الفيديو يشتغل للقالب الذي وقفت عليه فقط
@@ -475,7 +586,8 @@ const Gallery = (() => {
       if (Math.abs(a) > 1.2) { s.style.opacity = 0; return; }
       const d = Math.abs(i - pos), op = Math.max(0, 1 - d * .12), sc = d < .5 ? 1.12 : 1;
       s.style.opacity = op.toFixed(3);
-      s.style.transform = `translate(${G.cx + Math.cos(a) * rl}px,${G.cy + Math.sin(a) * rl - (s._h || 14) / 2}px) rotate(${a}rad) scale(${sc})`;
+      // الاسم أفقي دايمًا (من غير ميل على القوس) علشان العربي يتقري بسهولة
+      s.style.transform = `translate(${G.cx + Math.cos(a) * rl}px,${G.cy + Math.sin(a) * rl - (s._h || 14) / 2}px) scale(${sc})`;
       s.classList.toggle("on", i === idx);
       if (op > .05) spans.push([a, rl + (s._w || 0) * sc, (s._h || 14) * sc / 2]);
     });
@@ -537,7 +649,7 @@ const Gallery = (() => {
   function setSound(on) {
     sndOn = on;
     try { localStorage.setItem("nh-wheel-snd", on ? "1" : "0"); } catch (e) {}
-    const b = W.el?.querySelector(".nh-wh-snd"); if (b) { b.setAttribute("aria-pressed", on); b.querySelector("span").textContent = on ? "الصوت يعمل" : "شغّل الصوت"; }
+    const b = W.el?.querySelector(".nh-wh-snd:not([data-gview])"); if (b) { b.setAttribute("aria-pressed", on); b.querySelector("span").textContent = on ? "الصوت يعمل" : "شغّل الصوت"; }
     unlock(); if (on) setTimeout(() => tick(4), 60);
   }
   function tick(speed) {
@@ -579,7 +691,7 @@ const Gallery = (() => {
       if (!v.src) v.src = v.dataset.src;
       v.play().catch(() => {});
       cardEl.classList.add("playing");
-    } else { if (!v.paused) v.pause(); cardEl.classList.remove("playing"); }
+    } else if (v.getAttribute("src")) { v.pause(); v.removeAttribute("src"); v.load(); cardEl.classList.remove("playing"); }   // مايفضلش يحمّل في الخلفية
   }
   // ✏️ Hairline: مشروع تايبوجرافي جديد بالستايل ده، والصفحة بتفتح على «سجّل صوتك»
   async function startHairline() {
@@ -599,22 +711,23 @@ const Gallery = (() => {
       showStep("6f");
     } catch (err) { toast(err.message, true); }
   }
+  // 🧭 «ابدأ بهذا القالب»: يدخل مسار القالب على طول (flow.js)
+  function startTpl(x) {
+    if (!x) return;
+    if (x.id === "hairline") return startHairline();
+    if (x.id === "avatar") return showStep("16");
+    if (x.id === "custom") return window.NHNav?.("auto");
+    if (x.id === "carousel") return showStep("8");
+    if (x.id === "editor") return openEditor();
+    return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
+  }
   // المعاينة فوق الشاشة كلها (برّه الصفحة نفسها)
   function pvEl() {
     if (!S.pv) {
       S.pv = Object.assign(document.createElement("div"), { className: "nh-gal-pv", hidden: true });
       S.pv.setAttribute("role", "dialog");
       S.pv.addEventListener("click", (e) => {
-        if (e.target.closest("[data-gstart]")) {   // 🧭 مسار القالب (flow.js)
-          const x = S.pvItem;
-          closePv();
-          if (x.id === "hairline") return startHairline();
-          if (x.id === "avatar") return showStep("16");
-          if (x.id === "custom") return window.NHNav?.("auto");
-          if (x.id === "carousel") return showStep("8");
-          if (x.id === "editor") return openEditor();
-          return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
-        }
+        if (e.target.closest("[data-gstart]")) { const x = S.pvItem; closePv(); return startTpl(x); }
         if (e.target.closest("[data-gedit]")) {   // ✏️ محرر القالب: كل خانة بنصيحتها، والخطوط والألوان والمشاهد
           const x = S.pvItem;
           closePv();
@@ -633,8 +746,8 @@ const Gallery = (() => {
       <div class="nh-gal-pvart">${x.sample_url ? `<video src="${esc(x.sample_url)}" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} autoplay loop playsinline controls></video>` : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="">` : `<span class="nh-gal-ph big"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`}</div>
       <div class="nh-gal-pvt"><span class="latin en-k">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
-        <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح الإديتور" : "✨ ابدأ هذا بالقالب"}</button>
-        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ عدّله بنفسك</button>` : ""}
+        <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
+        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ اعمل نسختك من القالب ده</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتتحفظ في «قوالبك المخصصة».</small>` : ""}
         <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديد فارغ، وتلاقيه لاحقًا في «قيد العمل»." : "العقل سيقترح عليك أفكار وسيناريوهات على قدر العلامة الخاص بك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;
@@ -661,6 +774,7 @@ const Gallery = (() => {
   async function mount(root) {
     S.root = root;
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر يُعاد استخدامه لكل الصفحات: الأحداث مرة واحدة فقط
+    dubOut(); Gen.close?.(); SceneStudio.close?.();
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount, list: () => EXTRA, openEditor };
