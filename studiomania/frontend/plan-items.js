@@ -2,9 +2,9 @@
 // كل باقة بتعرض اللي بيزيد فيها عن اللي قبلها، من بيانات /api/pricing نفسها، ومن «features» لو اتضافت في billing.json.
 const PlanItems = (() => {
   const T = {
-    ar: { base: ["كل الأدوات والقوالب", "عقل العلامة"], acc1: (n) => (n === 2 ? "حسابين سوشيال للنشر" : `${n} حسابات سوشيال للنشر`),
-      sched: "جدولة ونشر", inbox: "التعليقات والرسائل", accN: (n, m) => `${n} حسابات سوشيال${m ? ` (حتى ${m})` : ""}`,
-      pilot: "أوتوبايلوت: يعمل وينشر تلقائيًا", addon: (p) => `الأوتوبايلوت إضافة بـ ${p} ر.س شهريًا`, nopub: "بدون نشر" },
+    ar: { base: ["كل الأدوات والقوالب", "عقل العلامة"], acc1: (n) => (n === 2 ? "حسابان للنشر على التواصل الاجتماعي" : `${n} حسابات للنشر على التواصل الاجتماعي`),
+      sched: "جدولة ونشر", inbox: "التعليقات والرسائل", accN: (n, m) => `${n} حسابات تواصل اجتماعي${m ? ` (حتى ${m})` : ""}`,
+      pilot: "الأوتوبايلوت: يصنع وينشر تلقائيًا", addon: (p) => `الأوتوبايلوت إضافة بـ ${p} ر.س شهريًا`, nopub: "بدون نشر" },
     en: { base: ["All tools and templates", "Brand brain"], acc1: (n) => `${n} social accounts for publishing`,
       sched: "Scheduling and publishing", inbox: "Comments and messages", accN: (n, m) => `${n} social accounts${m ? ` (up to ${m})` : ""}`,
       pilot: "Autopilot: makes and posts on its own", addon: (p) => `Autopilot add-on, ${p} SAR a month`, nopub: "No publishing" },

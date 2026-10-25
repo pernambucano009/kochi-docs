@@ -343,3 +343,78 @@ def auto_icons(tpl: str, params: dict) -> dict:
         used.add(pick)
         out[f"icon{i}"] = pick
     return out
+
+
+# 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
+NOUNS_EN = {
+    "food": ("dish", "your restaurant's menu", "the dish"), "beauty": ("service", "your salon's services", "the service"),
+    "ecom": ("product", "your store", "the product"), "realestate": ("property", "your listings", "the property"),
+    "edu": ("course", "your courses", "the course"), "fitness": ("membership", "your gym", "the membership"),
+    "home": ("service", "your services", "the service"), "shops": ("product", "your shop", "the product"),
+}
+EN = {
+    "سنصنع لك إعلانًا عن {n} من {from} بسعر مخفّض: السعر القديم يُشطب ويظهر الجديد، ثم عدّاد للوقت الذي تحدده.": "We'll make an ad for a {n} from {from} at a discount: the old price is struck through, the new one appears, then a countdown for the time you set.",
+    "اسم {the}": "Name of {the}", "مثال: مندي لحم عائلي": "e.g. Family lamb mandi", "صورة {the}": "Photo of {the}",
+    "صورة واضحة، والأفضل بلا خلفية. إن لم ترفعها نرسم {the} بنفس شكل القالب.": "A clear photo, ideally without background. If you don't upload one, we draw {the} in the template's style.",
+    "السعر قبل الخصم": "Price before discount", "مثال: 120": "e.g. 120", "السعر بعد الخصم": "Price after discount", "مثال: 89": "e.g. 89",
+    "العدّاد في الإعلان": "Countdown in the ad", "مدة العرض": "Offer duration", "وقت التوصيل": "Delivery time", "بدون عدّاد": "No countdown",
+    "المدة بالدقائق": "Duration in minutes", "مثال: 30 دقيقة، أو 120 لساعتين": "e.g. 30 minutes, or 120 for two hours",
+    "سنصنع لك محادثة قصيرة بين عميل و{brand} على الجوال، تنتهي بتأكيد طلب {n} من {from}.": "We'll make a short phone chat between a customer and {brand}, ending with a confirmed order of a {n} from {from}.",
+    "ماذا يطلب العميل في المحادثة؟": "What does the customer order in the chat?", "مثال: مندي دجاج لأربعة أشخاص": "e.g. Chicken mandi for four",
+    "متى يصل الطلب أو موعد الحجز؟": "When does the order arrive, or when is the booking?", "مثال: خلال 45 دقيقة": "e.g. within 45 minutes",
+    "طريقة الدفع": "Payment method", "مثال: الدفع عند الاستلام": "e.g. Cash on delivery",
+    "سنصنع لك إعلان توصيل: الطلب يخرج من فرعكم على الخريطة ويصل للعميل خلال الوقت الذي تحدده.": "We'll make a delivery ad: the order leaves your branch on the map and reaches the customer within the time you set.",
+    "اسم الفرع الذي يخرج منه الطلب": "Branch the order leaves from", "مثال: فرع العليا": "e.g. Olaya branch",
+    "خمسة أحياء أو مدن توصلون لها فعلًا": "Five areas or cities you really deliver to", "حي في كل سطر": "One area per line",
+    "وقت التوصيل بالدقائق": "Delivery time in minutes", "مثال: 30": "e.g. 30",
+    "سنصنع لك إعلانًا بآراء عملائكم الحقيقية وتقييمكم، بأسماء أصحابها (بإذنهم).": "We'll make an ad with your customers' real reviews and your rating, with their names (with permission).",
+    "رأي عميل حقيقي": "A real customer review", "انسخه كما كتبه العميل": "Copy it as the customer wrote it", "اسم صاحب الرأي": "Reviewer's name",
+    "الاسم الأول وأول حرف من العائلة، مثال: سارة م.": "First name and last initial, e.g. Sara M.", "رأي ثانٍ أقصر": "A second, shorter review",
+    "جملة واحدة": "One sentence", "اسم صاحب الرأي الثاني": "Second reviewer's name", "متوسط تقييمكم من 5": "Your average rating out of 5",
+    "مثال: 4.8": "e.g. 4.8", "عدد التقييمات": "Number of ratings", "مثال: 350": "e.g. 350", "هل الرأيان من مشترين فعليين؟": "Are both reviews from real buyers?",
+    "نعم": "Yes", "لا": "No",
+    "سنصنع لك مسابقة قصيرة: سؤال إجابته الصحيحة {the} أو ميزته، والفائز يحصل على جائزة حقيقية منكم.": "We'll make a short quiz: the right answer is {the} or its advantage, and the winner gets a real prize from you.",
+    "الإجابة الصحيحة: ما الذي يميزكم؟": "The right answer: what makes you stand out?", "مثال: توصيل خلال 30 دقيقة": "e.g. Delivery in 30 minutes",
+    "الجائزة الحقيقية للمتفاعلين": "The real prize for people who engage", "مثال: توصيل مجاني لأول طلب": "e.g. Free delivery on the first order",
+    "سنصنع لك شرحًا مرسومًا لخطوات خدمتكم من أول طلب حتى النتيجة التي يحصل عليها العميل.": "We'll make an animated explainer of your service steps, from the first order to the result the customer gets.",
+    "الخطوات (من 3 إلى 5)": "Steps (3 to 5)", "خطوة في كل سطر، مثال: احجز موعدك": "One step per line, e.g. Book your appointment",
+    "النتيجة التي يحصل عليها العميل": "The result the customer gets", "مثال: بيت نظيف خلال ساعتين": "e.g. A clean home in two hours",
+    "سنصنع لك سبورة مرسومة: مشكلة يعرفها عميلكم، وثلاث خطوات لحلها، والنتيجة.": "We'll make a drawn whiteboard: a problem your customer knows, three steps to solve it, and the result.",
+    "المشكلة أو السؤال": "The problem or question", "مثال: كيف تحافظ على بشرتك في الصيف؟": "e.g. How to protect your skin in summer?",
+    "ثلاث خطوات للحل": "Three steps to solve it", "خطوة في كل سطر": "One step per line", "النتيجة": "The result", "مثال: بشرة صحية": "e.g. Healthy skin",
+    "سنصنع لك رسالة على ثلاث بطاقات تنقلب، وعلى كل بطاقة صورة من {from}.": "We'll make a message on three flipping cards, each with a photo from {from}.",
+    "صورة البطاقة الأولى": "First card photo", "صورة البطاقة الثانية": "Second card photo", "صورة البطاقة الثالثة": "Third card photo",
+    "الرسالة التي تريد إيصالها": "The message you want to get across", "مثال: جلستك الأولى بنصف السعر هذا الأسبوع": "e.g. Your first session at half price this week",
+    "سنصنع لك عرضًا لمنتجين من {from} بصورهما وأسعارهما، مع زر الطلب.": "We'll show two products from {from} with their photos and prices, and an order button.",
+    "اسم المنتج الأول": "First product name", "مثال: فازة سيراميك": "e.g. Ceramic vase", "سعره": "Its price", "صورته": "Its photo",
+    "إن لم ترفعها نرسمه بنفس شكل القالب.": "If you don't upload one, we draw it in the template's style.", "اسم المنتج الثاني": "Second product name",
+    "سنصنع لك عدًّا تنازليًا يشد الانتباه، وعند الصفر يظهر عرضكم.": "We'll make an attention-grabbing countdown; at zero your offer appears.",
+    "ما العرض بالتفصيل؟": "What is the offer exactly?", "مثال: خصم 30٪ على كل الأحذية": "e.g. 30% off all shoes", "متى ينتهي العرض؟": "When does the offer end?",
+    "مثال: نهاية الأسبوع": "e.g. End of the week",
+    "سنصنع لك رسمًا بيانيًا متحركًا بأرقامكم الحقيقية، ينتهي بالنتيجة الكبيرة.": "We'll make an animated chart with your real numbers, ending with the big result.",
+    "ماذا تقيس الأرقام؟": "What do the numbers measure?", "مثال: عدد العملاء": "e.g. Number of customers", "الأرقام (من 3 إلى 8)": "Numbers (3 to 8)",
+    "الفترة|الرقم في كل سطر، مثال: يناير|120": "Period|number per line, e.g. January|120", "الوحدة": "Unit", "مثال: عميل": "e.g. customers",
+    "سنصنع لك بطاقات مرسومة لأنشطة {from}، وكل بطاقة فيها رسمة تتحرك بالنشاط نفسه.": "We'll make drawn cards for the activities at {from}, each with a figure doing that activity.",
+    "الأنشطة التي تقدمونها": "The activities you offer", "اختر حتى 6": "Pick up to 6",
+    "سنصنع لك مقارنة بين {the} والبديل المعتاد، جولة بجولة، بأرقام صادقة.": "We'll make a round-by-round comparison between {the} and the usual alternative, with honest scores.",
+    "مثال: باقتنا الذهبية": "e.g. Our gold plan", "نقاط المقارنة (من 3 إلى 5)": "Comparison points (3 to 5)",
+    "النقطة|درجتكم|درجة البديل من 10، مثال: السعر|8|5": "Point|your score|alternative's score out of 10, e.g. Price|8|5",
+}
+
+
+def brief_en(tpl: str, field: str = "", brand: str = "") -> dict | None:
+    """نفس brief() بالإنجليزي: المفاتيح عربي في BRIEFS، والترجمة من EN، وكلمات المجال من NOUNS_EN."""
+    b = BRIEFS.get(tpl)
+    if not b:
+        return None
+    n, frm, the = NOUNS_EN.get(field or "", ("product", "your products", "the product"))
+    fill = lambda s: str(EN.get(s, s)).replace("{n}", n).replace("{from}", frm).replace("{the}", the).replace("{brand}", brand or "your store")  # noqa: E731
+    ask = []
+    for q in b["ask"]:
+        q = {k: fill(v) if isinstance(v, str) else v for k, v in q.items()}
+        if isinstance(q.get("opts"), list):
+            q["opts"] = [[v, fill(t)] for v, t in q["opts"]]
+        if q.get("opts") == "pictos":
+            q["opts"] = [[a, e] for a, e in PICTOS]
+        ask.append(q)
+    return {"tpl": tpl, "idea": fill(b["idea"]), "ask": ask}

@@ -11021,6 +11021,7 @@ def onboard_state():
             "logo": bool(logo_path(bid)) if bid else False, "logo_asked": bool(b.get("logo_asked")),
             "job": job, "steps": steps, "first_done": bool(j.get("status") == "done"), "brand": first_brand_name(b),
             "briefs": {r: tplbrief.brief(r, field, first_brand_name(b)) for r in fieldpacks.field_reels(field) if tplbrief.brief(r, field)},
+            "briefs_en": {r: tplbrief.brief_en(r, field, first_brand_name(b)) for r in fieldpacks.field_reels(field) if tplbrief.brief(r, field)},
             "about_ph": pack.get("about_ph") or "مثلًا: ماذا تبيع أو تقدم، وأين، وما الذي يميزك عن غيرك",
             "audience_ph": "العمر، والاهتمامات، وما الذي يبحث عنه", "score": brain_score(b), **fieldpacks.signup_options()}
 

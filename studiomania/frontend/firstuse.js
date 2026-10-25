@@ -1,5 +1,5 @@
 // 🧭 مسار أول استخدام: من دخل بجوجل (ولم يمر بأسئلة التسجيل) تظهر له الأسئلة الأربعة مرة واحدة (البلد، اللهجة، المجال، الهدف)،
-// والعقل يتملأ من بروفايل المجال. بعدها شعار العلامة (اختياري): الأصلي جنب النسخة من غير خلفية والعميل يختار،
+// والعقل يتملأ من بروفايل المجال. بعدها شعار العلامة (اختياري): الأصلي جنب النسخة بلا خلفية والعميل يختار،
 // وألوانه تروح لفرع «الشكل» والأوترو يتعمل منه. وزر «اصنع أول فيديو»: قوالب المجال بأغلفتها ← سؤالان ← الفيديو يتعمل لوحده
 // بخطوات ظاهرة (النص، الصوت، الرسم، اللوجو والأوترو)، وأول فيديو على حسابنا.
 const FirstUse = (() => {
@@ -160,7 +160,7 @@ const FirstUse = (() => {
           res.innerHTML = r.already ? `<div class="fu-pick" style="grid-template-columns:1fr"><button type="button" class="fu-opt on" data-p="cut"><i class="chk"><img src="${esc(r.cut_url)}" alt=""></i>شعارك شفاف أصلًا</button></div>`
             : `<p class="fu-sub" style="margin:0 0 10px">أيهما تفضّل؟</p><div class="fu-pick">
               <button type="button" class="fu-opt" data-p="src"><i><img src="${esc(r.src_url)}" alt=""></i>الأصلي</button>
-              <button type="button" class="fu-opt on" data-p="cut"><i class="chk"><img src="${esc(r.cut_url)}" alt=""></i>من غير خلفية</button></div>`;
+              <button type="button" class="fu-opt on" data-p="cut"><i class="chk"><img src="${esc(r.cut_url)}" alt=""></i>بلا خلفية</button></div>`;
           res.onclick = (e) => { const o = e.target.closest(".fu-opt"); if (!o) return; pick = o.dataset.p; res.querySelectorAll(".fu-opt").forEach((x) => x.classList.toggle("on", x === o)); };
           ok.hidden = false;
         } catch (e) { err.textContent = e.message; err.hidden = false; drop.querySelector("b").textContent = "📤 اختر صورة الشعار أو اسحبها هنا"; }
@@ -264,7 +264,7 @@ const FirstUse = (() => {
     return `<label class="fu-f"${show}><span>${esc(q.label)}${req}</span><input id="${id}" ${q.kind === "num" ? 'inputmode="decimal"' : ""} dir="auto" data-k="${esc(q.key)}" placeholder="${esc(q.ph || "")}"${q.max ? ` maxlength="${q.max * 2}"` : ""}>${hint}</label>`;
   }
   async function askFacts(tpl) {
-    const br = state.briefs?.[tpl.id];
+    const br = (window.I18N?.lang === "en" ? state.briefs_en : state.briefs)?.[tpl.id];   // الفكرة والخانات بلغة الواجهة
     const about = !String(state.about || "").trim() ? `<label class="fu-f"><span>ما الذي تقدمه؟ <small style="display:inline;opacity:.6">(سطر واحد)</small></span><textarea id="fuA" rows="2" dir="auto" placeholder="${esc(state.about_ph)}"></textarea></label>` : "";
     const body = br ? `<div class="fu-idea"><b>فكرة الإعلان</b>${esc(br.idea)}</div>${br.ask.map(factField).join("")}${about}`
       : `<label class="fu-f"><span>ما الذي تقدمه؟</span><textarea id="fuA" rows="3" dir="auto" placeholder="${esc(state.about_ph)}">${esc(state.about)}</textarea></label>`;

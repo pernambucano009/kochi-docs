@@ -47,15 +47,15 @@ const NH = (() => {
     brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاته وستايله. أي عمل يُنشأ يبني عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى التي تستخدمها في أي عمل." },
     // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل العلامة)
-    dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، صوت جديد، وتظبيط البُق." },
+    dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، وصوت جديد، ومزامنة حركة الشفاه." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
     progress: { en: "In Progress", ar: "قيد العمل", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. اضغط على أي خط يُكمل من مكان ما وقفت." },
     publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي نُشر." }
       : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
-    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة واللي نُشر." },
-    inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد، وبوتات بترد لوحدها." },
-    audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
+    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة وما نُشر." },
+    inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد، وبوتات ترد تلقائيًا." },
+    audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من هو الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
     reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوب، اكتب فكرتك، والقالب يُكمل: نص ← صوت ← مشاهد." },
     raw: { en: "From Footage", ar: "فيديو من تصويرك", icon: "cut", go: "0", desc: "المشروع ← التقطيع ← التوليد ← المونتاج ← النشر." },
@@ -68,18 +68,18 @@ const NH = (() => {
     coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر ورقة وصوتها والإنترو والأوترو." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
-    viral: { en: "Trends", ar: "ما حسنًا في مجالك", icon: "megaphone", page: "viral", desc: "منشورات المجال مرتّبة بقد ماذا عدّت العادي، وأفكار بنفس الهيكل." },
-    plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، تُبنى تلقائيًا من كل ما العقل عرفه عنك." },
-    rivals: { en: "Your Competitors", ar: "منافسوك", icon: "megaphone", page: "rivals", desc: "البرنامج يقترح منافسين وأنت توافق، ومنهم الذي ينجح لديهم ووصفة الاستهداف." },
-    bots: { en: "Message Bots", ar: "بوتات الرسايل", icon: "megaphone", page: "bots", desc: "بوت يرد على التعليقات والرسايل والستوري لوحده، يسأل ويفرز، ويحوّل للفريق لما يلزم." },
-    wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل متوافق عليها، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
-    plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الزيادة." },
-    adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشور أو أنشئ إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
-    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كم منشور في اليوم، في أحسن أوقات، من القوالب التي تختارها. يعمل تلقائيًا أو ينتظر موافقتك." },
-    auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات ترتّبها بنفسك (اسحب، ضع، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
-    brainlib: { en: "Content Library", ar: "مكتبة المحتويات", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، ومجلداتك. كل ملف يمكنك تشير إليه في القالب المخصص." },
-    comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، لكي توضع في مكانها الصحيح." },
-    ref2p: { en: "Reference → Prompt", ar: "من مرجع لبرومبت", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← وصف جاهز بـ 14 جزء ← توليد." },
+    viral: { en: "Trends", ar: "الأفضل أداءً في مجالك", icon: "megaphone", page: "viral", desc: "منشورات المجال مرتّبة حسب تفوقها على المعتاد، وأفكار بالهيكل نفسه." },
+    plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، تُبنى تلقائيًا من كل ما عرفه العقل عنك." },
+    rivals: { en: "Your Competitors", ar: "منافسوك", icon: "megaphone", page: "rivals", desc: "البرنامج يقترح منافسين وأنت توافق، ومنهم نعرف ما ينجح لديهم ووصفة الاستهداف." },
+    bots: { en: "Message Bots", ar: "بوتات الرسائل", icon: "megaphone", page: "bots", desc: "بوت يرد على التعليقات والرسائل والستوري تلقائيًا، يسأل ويفرز، ويحوّل إلى الفريق عند الحاجة." },
+    wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل معتمدة، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
+    plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الإضافية." },
+    adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشورًا أو أنشئ إعلانًا جديدًا بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
+    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "عدد المنشورات في اليوم، في أفضل الأوقات، من القوالب التي تختارها. يعمل تلقائيًا أو ينتظر موافقتك." },
+    auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات ترتّبها بنفسك (اسحب، ضع، قطّع، صدّر) من مكتبة العقل، وكل تشغيل يصنع فيديو جديدًا." },
+    brainlib: { en: "Content Library", ar: "مكتبة المحتويات", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، ومجلداتك. ويمكنك الإشارة إلى أي ملف في القالب المخصص." },
+    comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية مع سياق كل منها، لتوضع في مكانها الصحيح." },
+    ref2p: { en: "Reference → Prompt", ar: "من مرجع إلى وصف", icon: "clapper", page: "ref2p", desc: "فيديو مرجعي ← وصف جاهز من 14 جزءًا ← توليد." },
     motion: { en: "Motion", ar: "مكتبة الموشن", icon: "clapper", page: "motion", desc: "أنيميشنات مكتوبة بالكود، كل واحدة تُضاف للأصول بضغطة." },
   };
   // «فيديو من تصويرك» (المشاريع) بقى برنامج كوتشي لوحده على /kochi، فمش في ستوديومانيا
@@ -124,15 +124,15 @@ const NH = (() => {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
     brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>العقل فاهمك <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
-    dubhub: () => `<span>نفس الفيديو بلغة أو لهجة أخرى</span>`,
-    pilot: () => `<span>${D.pilot?.settings?.on ? `يعمل · ${D.pilot.settings.times.length} منشور في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} ينتظرون منك</em>` : ""}` : "مغلق"}</span>`,
+    dubhub: () => `<span>الفيديو نفسه بلغة أو لهجة أخرى</span>`,
+    pilot: () => `<span>${D.pilot?.settings?.on ? `يعمل · ${D.pilot.settings.times.length} منشور في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} بانتظارك</em>` : ""}` : "مغلق"}</span>`,
     progress: () => {
       const n = D.work.length, r = D.work.filter((p) => p.render_status === "rendering").length;
       return `<span>${n ? `${n} مشروع${r ? ` · ${r} قيد التصدير الآن` : ""}` : "لا توجد مشاريع بعد"}</span>`;
     },
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      return `<span>${up ? `${up} منشور متجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
+      return `<span>${up ? `${up} منشور مجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
     settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
@@ -151,7 +151,7 @@ const NH = (() => {
   const cta = () => firstNeeded()
     ? `<div class="nh-tile nh-cta nh-gen" data-first tabindex="0" role="button" aria-label="${firstRun() ? "أول فيديو قيد التجهيز" : "اصنع أول فيديو"}">
       <div class="nh-head"><div class="nh-name"><span class="latin en-k">First video</span><b>${firstRun() ? "⏳ أول فيديو قيد التجهيز" : "🎬 اصنع أول فيديو"}</b></div>${gi("create")}</div>
-      <span class="nh-tip" role="tooltip"><b>اصنع أول فيديو</b><span>${firstRun() ? "اضغط لترى خطواته." : "اختر قالبًا وأجب عن سؤالين، وأول فيديو على حسابنا."}</span></span></div>`
+      <span class="nh-tip" role="tooltip"><b>اصنع أول فيديو</b><span>${firstRun() ? "اضغط لترى خطواته." : "اختر قالبًا واكتب معطيات إعلانك، وأول فيديو على حسابنا."}</span></span></div>`
     : `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
       <div class="nh-head"><div class="nh-name"><span class="latin en-k">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
@@ -503,7 +503,7 @@ const NH = (() => {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
     // زي البروتوتايب: تختار نوع الشغل الأول (كارت باختيار)، وبعدين «التالي» يفتحه. دبل كليك على الكارت بيفتحه على طول
     // 🎬 معرض القوالب: كل قالب ستايل بفيديو بيعبّر عنه (بيشتغل لما تقف عليه)، متقسّمين بالستايل
-    create: () => `<div class="nh-gal" id="nhGal"><div class="nh-gal-grid"><div class="nh-empty">يُحمّل القوالب…</div></div></div>
+    create: () => `<div class="nh-gal" id="nhGal"><div class="nh-gal-grid"><div class="nh-empty">جارٍ تحميل القوالب…</div></div></div>
 `,
     // (مكتبة الموشن اتشالت من الأصول، ومكانها هيبقى في «اعمل جديد»)
     assets: () => panel(4, 6, `${head("coaches")}<div class="nh-body">${D.coaches.length} شخصية</div><div class="nh-avs">${D.coaches.slice(0, 12).map((c) => `<img src="${esc(c.image_url)}" alt="">`).join("")}</div>`, `data-id="coaches" tabindex="0" role="button"`)
@@ -512,7 +512,7 @@ const NH = (() => {
     // 📤 النشر بنفس شكل «مكتبة المحتويات» في البروتوتايب: أيقونات هادية في النص، باسم كل قسم وسطر صغير تحته (مش مربعات كبيرة)
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      const sub = { pubpost: up ? `${up} منشور متجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
+      const sub = { pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
         audience: "من سيشتري، وكيف تصل إليه", wacamp: "رسائل لمشتركينك" };
       const ic = PUB_IC;
       return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
@@ -553,7 +553,7 @@ const NH = (() => {
         <button type="button" class="on" data-pjf="">الكل · <span class="num">${D.work.length + drafts.length}</span></button>
         <button type="button" data-pjf="run">تعمل · <span class="num">${n("run")}</span></button>
         <button type="button" data-pjf="done">صُدّرت · <span class="num">${n("done")}</span></button>
-        ${n("fail") ? `<button type="button" data-pjf="fail">وقفت · <span class="num">${n("fail")}</span></button>` : ""}
+        ${n("fail") ? `<button type="button" data-pjf="fail">متوقفة · <span class="num">${n("fail")}</span></button>` : ""}
       </div>
       <div class="nh-pj-grid">${cards}<button type="button" class="nh-tile nh-pj-add" data-id="create"><span>＋</span>ابدأ مشروعًا جديدًا</button></div>
     </div>`;
@@ -892,20 +892,20 @@ const NH = (() => {
       KOCHI ? [] : api("/api/scenes").catch(() => []),
     ]);
     if (!KOCHI) D.pilot = await api("/api/pilot").catch(() => null);
-    // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب واقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
+    // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب متوقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
     const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد", voice: "الصوت", panel: "لوحة التحكم", shoot: "التصوير", review: "المراجعة", montage: "المونتاج", output: "التصدير", story: "القصة", scenes: "المشاهد" };
     D.drafts = [
       ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
-        sec: `قالب «${f.template?.name || ""}»`, step: `واقف عند ${FLOW_ST[f.stage] || "خطوة لم تكتمل"}`, updated_at: f.updated_at,
+        sec: `قالب «${f.template?.name || ""}»`, step: `متوقف عند ${FLOW_ST[f.stage] || "خطوة لم تكتمل"}`, updated_at: f.updated_at,
         // كفر الفكرة اللي لسه شغّالة: غلاف القالب نفسه من المعرض
         thumb: (typeof Gallery !== "undefined" && Gallery.list().find((x) => x.id === f.template?.id)?.cover_url) || (f.template?.id ? `/gallery/${encodeURIComponent(f.template.id)}.jpg` : "") })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
         sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "توقف" : "ما زال يُنشأ", updated_at: v.updated_at, thumb: v.thumb })),
       // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
       ...typos.filter((t) => !t.done).map((t) => ({ kind: "typo", id: t.id, name: t.name || "تايبوجرافي", sec: "تايبوجرافي",
-        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "لم يُصدّر بعد", updated_at: t.updated_at, thumb: t.thumb || "/gallery/typo.jpg" })),
+        step: t.busy ? "يعمل الآن" : t.status === "failed" ? "توقف" : "لم يُصدّر بعد", updated_at: t.updated_at, thumb: t.thumb || "/gallery/typo.jpg" })),
       ...(dubs.items || []).filter((x) => !x.done).map((x) => ({ kind: "dub", id: x.id, name: x.name || "دبلجة", sec: "ترجمة ودبلجة",
-        step: x.busy ? "يشتغل الآن" : "لا يوجد بعد لغة جاهزة", updated_at: x.updated_at })),
+        step: x.busy ? "يعمل الآن" : "لا توجد لغة جاهزة بعد", updated_at: x.updated_at })),
       ...scenes.filter((x) => x.busy || !x.takes).map((x) => ({ kind: "scene", id: x.id, name: x.name || "مشهد", sec: "استوديو المشهد",
         step: x.busy ? "يُولّد الآن" : "لم يُولّد بعد", updated_at: x.updated_at })),
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
