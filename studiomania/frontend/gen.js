@@ -120,7 +120,7 @@ const Gen = (() => {
     if (!S.hist) return "";
     const L = mine();
     return `<aside class="gn-dw" aria-label="كل ما ولّدته"><div class="gn-dh"><b>كل ما ولّدته</b><span class="num">${L.length}</span><button type="button" class="gn-ib" data-ghist aria-label="إغلاق">✕</button></div>
-      <div class="gn-hl">${L.map((g) => `<button type="button" class="gn-hi" data-gview="${esc(g.id)}"><span class="gn-th">${media(g)}</span><span dir="auto">${esc(g.prompt.slice(0, 90))}</span></button>`).join("") || `<p class="gn-note">ما تولّده يظهر هنا ويصبح محفوظًا.</p>`}</div></aside>`;
+      <div class="gn-hl">${L.map((g) => `<button type="button" class="gn-hi" data-gview="${esc(g.id)}"><span class="gn-th">${media(g)}</span><span dir="auto">${esc(g.prompt.slice(0, 90))}</span></button>`).join("") || `<p class="gn-note">ما تولّده يظهر هنا ويُحفظ.</p>`}</div></aside>`;
   }
   function render() {
     if (!S.el || !S.info) return;
@@ -185,7 +185,7 @@ const Gen = (() => {
     } catch (err) { return toast(err.message, true); }
     S.list = [...(Array.isArray(res) ? res : [res]), ...S.list];
     S.files = {};
-    toast("✓ بدأ التوليد، وسيظهر بجانبك عند انتهائه");
+    toast("✓ بدأ التوليد، وستظهر النتيجة بجانبك عند انتهائه");
     S.view = null; render(); poll();
   }
   async function onClick(e) {

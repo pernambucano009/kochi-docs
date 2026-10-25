@@ -4,7 +4,7 @@
 const TEXT_FONTS = [
   ["SM Tajawal", "تجوال", "SM-Tajawal.ttf"], ["SM Almarai", "المراعي", "SM-Almarai.ttf"], ["SM Cairo", "القاهرة", "SM-Cairo.ttf"],
   ["SM Lalezar", "لاله‌زار (عريض)", "SM-Lalezar.ttf"], ["SM Changa", "تشانجا", "SM-Changa.ttf"], ["SM Kufi", "كوفي", "SM-Kufi.ttf"],
-  ["SM Plex", "بليكس", "SM-Plex.ttf"], ["IBM Plex Sans Arabic", "بليكس تقيل", "TY-PlexArabic-700.ttf", 700], ["Amiri", "أميري (نسخ)", "TY-Amiri-700.ttf", 700],
+  ["SM Plex", "بليكس", "SM-Plex.ttf"], ["IBM Plex Sans Arabic", "بليكس ثقيل", "TY-PlexArabic-700.ttf", 700], ["Amiri", "أميري (نسخ)", "TY-Amiri-700.ttf", 700],
   ["Anton", "Anton (إنجليزي)", "TY-Anton.ttf"], ["Outfit", "Outfit (إنجليزي)", "TY-Outfit-700.ttf", 700], ["Instrument Serif", "Instrument Serif (إنجليزي)", "TY-InstrumentSerif.ttf"],
 ];
 const TEXT_BOLD = new Set(TEXT_FONTS.filter((f) => f[3]).map((f) => f[0]));
@@ -12,9 +12,9 @@ const TEXT_ANIMS = [["", "بدون"], ["fade", "ظهور"], ["pop", "بوب"], [
   ["slideleft", "من اليمين"], ["slideright", "من الشمال"], ["type", "كتابة حرف حرف"]];
 const TEXT_PRESETS = [
   { label: "عنوان أصفر", font: "SM Lalezar", size: 120, color: "#ffd166", stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false } },
-  { label: "أبيض كلاسيك", font: "SM Tajawal", size: 80, color: "#ffffff", stroke: { w: 3, color: "#000000" }, shadow: true, bg: { on: false } },
-  { label: "بوكس أحمر", font: "SM Cairo", size: 70, color: "#ffffff", stroke: { w: 0 }, shadow: false, bg: { on: true, color: "#e63946" } },
-  { label: "بوكس أبيض", font: "IBM Plex Sans Arabic", size: 64, color: "#111111", stroke: { w: 0 }, shadow: false, bg: { on: true, color: "#ffffff" } },
+  { label: "أبيض كلاسيكي", font: "SM Tajawal", size: 80, color: "#ffffff", stroke: { w: 3, color: "#000000" }, shadow: true, bg: { on: false } },
+  { label: "خلفية حمراء", font: "SM Cairo", size: 70, color: "#ffffff", stroke: { w: 0 }, shadow: false, bg: { on: true, color: "#e63946" } },
+  { label: "خلفية بيضاء", font: "IBM Plex Sans Arabic", size: 64, color: "#111111", stroke: { w: 0 }, shadow: false, bg: { on: true, color: "#ffffff" } },
   { label: "نيون", font: "SM Changa", size: 90, color: "#ff4fd8", stroke: { w: 4, color: "#ffffff" }, shadow: true, bg: { on: false } },
   { label: "أسود على أصفر", font: "SM Kufi", size: 72, color: "#000000", stroke: { w: 0 }, shadow: false, bg: { on: true, color: "#ffd166" } },
   { label: "نسخ أنيق", font: "Amiri", size: 96, color: "#fff4d6", stroke: { w: 0 }, shadow: true, bg: { on: false } },
@@ -113,7 +113,7 @@ function drawTextLayer() {
       transform:translate(-50%,-50%) rotate(${x.angle || 0}deg) scale(${((x.scale || 1) * st.scale).toFixed(3)});
       opacity:${((x.opacity ?? 1) * st.alpha).toFixed(3)};font-family:'${x.font}','SM Tajawal';font-size:${size.toFixed(2)}px;
       font-weight:${weight};font-style:${x.italic ? "italic" : "normal"};color:${x.color || "#fff"};letter-spacing:${((x.spacing || 0) * k * fs).toFixed(2)}px;
-      ${stroke}${shadow}${box}">${escapeHtml(s.text)}${i === sel && !mt.playing ? `<b class="tx-rot" data-txh="rot" title="اسحب لكي تدور"></b><i class="tx-sz" data-txh="sz" title="اسحب لكي تكبّر أو تصغّر"></i>` : ""}</div>`);
+      ${stroke}${shadow}${box}">${escapeHtml(s.text)}${i === sel && !mt.playing ? `<b class="tx-rot" data-txh="rot" title="اسحب للتدوير"></b><i class="tx-sz" data-txh="sz" title="اسحب للتكبير أو التصغير"></i>` : ""}</div>`);
   });
   el.innerHTML = html.join("");
 }
@@ -124,7 +124,7 @@ function textPointerDown(e) {
   e.stopPropagation();
   pause();
   const i = Number(d.dataset.ti), x = texts()[i];
-  if (kindLocked("text")) return toast("تراك النصوص مغلق 🔒", true);
+  if (kindLocked("text")) return toast("مسار النصوص مقفل 🔒", true);
   selectItem({ kind: "text", i });
   pushHistory();
   const fr = $("previewFrame").getBoundingClientRect(), r = (fr.width / PV_W) * (PV_W / OUT_W);
@@ -224,7 +224,7 @@ function textTrackDown(e) {
 }
 function splitText(i, t) {
   const x = texts()[i];
-  if (!x || t <= x.t0 + 0.05 || t >= x.t0 + x.dur - 0.05) return toast("ضع المؤشر داخل النص لكي تقسمه", true);
+  if (!x || t <= x.t0 + 0.05 || t >= x.t0 + x.dur - 0.05) return toast("ضع المؤشر داخل النص لتقسيمه", true);
   pushHistory();
   const b = JSON.parse(JSON.stringify(x));
   b.t0 = snap(t); b.dur = snap(x.t0 + x.dur - t); b.anim_in = null;
@@ -241,7 +241,7 @@ function freeTextLane(t0, dur) {
 }
 function addText(preset) {
   if (!mt.project) return;
-  if (kindLocked("text")) return toast("تراك النصوص مغلق 🔒", true);
+  if (kindLocked("text")) return toast("مسار النصوص مقفل 🔒", true);
   pushHistory();
   const p = preset || TEXT_PRESETS[0];
   const t0 = snap(mt.t), dur = 3;

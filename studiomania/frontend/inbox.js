@@ -113,11 +113,11 @@ function ibRenderPost() {
   $("ibThread").innerHTML = `<div class="ib-post">
       <h3 class="ib-cap" dir="auto">${escapeHtml(p.content || "(بدون تعليق نصي)")}</h3>
       ${p.url ? `<a class="ib-open" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">افتح المنشور ↗</a>` : ""}
-      <label class="ib-filter"><input type="checkbox" id="ibOnlyWaiting" ${ib.onlyWaiting ? "checked" : ""}> ما ينتظر رد فقط${waiting ? ` (${waiting})` : ""}</label></div>
+      <label class="ib-filter"><input type="checkbox" id="ibOnlyWaiting" ${ib.onlyWaiting ? "checked" : ""}> ما ينتظر ردًا فقط${waiting ? ` (${waiting})` : ""}</label></div>
     ${waiting ? `<div class="ib-triage">
-      <b>🧠 رتّب التعليقات وجهّز ردود</b>
-      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الـ CTA، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
-        <input type="text" id="ibDm" placeholder="(اختياري) الرسالة الخاصة تقول ماذا؟ مثلًا: رابط الدليل" value="${escapeHtml(ib.tdm)}">
+      <b>🧠 رتّب التعليقات وجهّز ردودًا</b>
+      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الدعوة لاتخاذ إجراء، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
+        <input type="text" id="ibDm" placeholder="(اختياري) ماذا تقول الرسالة الخاصة؟ مثلًا: رابط الدليل" value="${escapeHtml(ib.tdm)}">
         <button type="button" class="btn sm primary" id="ibTriage">رتّب ${waiting} ${waiting === 1 ? "تعليق" : "تعليقات"}</button></div>
       ${ib.triage ? `<small class="muted">${ibTriageSummary()} · راجع كل رد واضغط «إرسال»، أو عدّله أولًا.</small>` : ""}</div>` : ""}
     <div class="ib-comments">${list.map((c) => ibCommentHTML(c)).join("") || `<p class="empty">${ib.onlyWaiting ? "✅ رديت على كل التعليقات" : "لا يوجد تعليقات"}</p>`}</div>`;
@@ -133,7 +133,7 @@ function ibTriageSummary() {
 async function ibRunTriage(btn) {
   ib.tkw = $("ibKw").value.trim(); ib.tdm = $("ibDm").value.trim();
   const coms = ib.comments.filter(ibWaiting).map((c) => ({ id: c.id, name: c.name || c.username || "", text: c.text }));
-  btn.disabled = true; btn.textContent = "⏳ يرتّب…";
+  btn.disabled = true; btn.textContent = "⏳ جارٍ الترتيب…";
   try {
     const r = await api("/api/inbox/triage", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ post: ib.post.content || "", platform: ib.post.platform || "", keyword: ib.tkw, dm_hint: ib.tdm, comments: coms }) });

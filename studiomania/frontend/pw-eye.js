@@ -10,7 +10,7 @@
     inp.replaceWith(wrap);
     const b = document.createElement("button");
     b.type = "button";
-    const set = (show) => { inp.type = show ? "text" : "password"; b.innerHTML = show ? SHUT : EYE; b.setAttribute("aria-label", show ? "اخفي كلمة المرور" : "اظهر كلمة المرور"); b.setAttribute("aria-pressed", show); };
+    const set = (show) => { inp.type = show ? "text" : "password"; b.innerHTML = show ? SHUT : EYE; b.setAttribute("aria-label", show ? "أخفِ كلمة المرور" : "أظهر كلمة المرور"); b.setAttribute("aria-pressed", show); };
     b.addEventListener("click", (e) => { e.preventDefault(); set(inp.type === "password"); inp.focus(); });
     wrap.append(inp, b);
     set(false);

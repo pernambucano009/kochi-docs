@@ -165,7 +165,7 @@ function overPointerDown(e) {
   if (!box || e.button !== 0) return;
   e.preventDefault();
   e.stopPropagation();
-  if (kindLocked("over")) return toast("تراك الطبقات مغلق 🔒", true);
+  if (kindLocked("over")) return toast("مسار الطبقات مقفل 🔒", true);
   pause();
   const i = Number(box.dataset.i), o = overlays()[i];
   selectItem({ kind: "over", i });
@@ -212,7 +212,7 @@ function renderOverRow() {
   const lanes = Math.max(1, ...list.map((o) => (o.lane | 0) + 1)) + (list.length ? 1 : 0);
   const h = Math.min(6, lanes) * OV_LANE_H + 4;
   row.style.height = head.style.height = `${h}px`;
-  if (!list.length) { row.innerHTML = `<div class="tl-empty-track">طبقات أعلى الفيديو: اضغط ⧉ على فيديو في المكتبة أو ارفع صورة من تبويب 🖼️ طبقة</div>`; return; }
+  if (!list.length) { row.innerHTML = `<div class="tl-empty-track">طبقات فوق الفيديو: اضغط ⧉ على فيديو في المكتبة أو ارفع صورة من تبويب 🖼️ طبقة</div>`; return; }
   row.innerHTML = list.map((o, i) => {
     const src = ovSource(o), sel = isSel({ kind: "over", i });
     const thumb = src?.image ? `<img src="${src.url}" alt="">` : src ? lightVideo(src.url, "muted playsinline") : "";
@@ -265,7 +265,7 @@ function overTrackDown(e) {
 }
 function splitOver(i, t) {
   const o = overlays()[i];
-  if (!o || t <= o.t0 + 0.05 || t >= o.t0 + o.dur - 0.05) return toast("ضع المؤشر داخل الطبقة لكي تقسمها", true);
+  if (!o || t <= o.t0 + 0.05 || t >= o.t0 + o.dur - 0.05) return toast("ضع المؤشر داخل الطبقة لتقسيمها", true);
   pushHistory();
   const b = JSON.parse(JSON.stringify(o));
   const cut = t - o.t0;
@@ -285,7 +285,7 @@ function freeOverLane(t0, dur) {
 }
 function addOverlay(src, extra = {}) {
   if (!mt.project) return;
-  if (kindLocked("over")) return toast("تراك الطبقات مغلق 🔒", true);
+  if (kindLocked("over")) return toast("مسار الطبقات مقفل 🔒", true);
   pushHistory();
   const s = ovSource({ src, ...extra });
   const t0 = snap(extra.t0 ?? mt.t), dur = extra.dur ?? (s?.image ? 3 : Math.min(5, s?.duration || 3));
@@ -311,11 +311,11 @@ function clipToOverlay() {
   mt.sel = { kind: "over", i: overlays().length - 1 };
   showTab("over");
   changed();
-  toast("⤴ بقت طبقة أعلى الفيديو");
+  toast("⤴ أصبحت طبقة فوق الفيديو");
 }
 function overlayToMain() {
   const o = selOver();
-  if (!o || ovSource(o)?.image) return toast("الصور لا يصلح تصبح في التراك الأساسي", true);
+  if (!o || ovSource(o)?.image) return toast("لا يمكن وضع الصور في المسار الأساسي", true);
   pushHistory();
   const sp = o.speed || 1, d = mt.project.data;
   const idx = insertIndexAt(o.t0);

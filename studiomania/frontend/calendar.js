@@ -248,7 +248,7 @@ function calOpenPost(p) {
       ${media ? `<div class="cal-media">${media}</div>` : ""}
       <div class="cal-info">
         <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو حُذف"))}</h3>
-        <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "متجدول للنشر ✓" : label}</span>
+        <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "مجدول للنشر ✓" : label}</span>
         <p class="when">📅 ${calFull(when)}</p>
         <p>${p.platforms.map((k) => `${PLATFORM_ICON[k] || ""} ${escapeHtml(pub.platforms[k] || k)}`).join(" · ")}</p>
         ${o.ig_tags?.length ? `<p dir="ltr" class="muted">🏷️ ${o.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${o.ig_collab ? " · 🤝" : ""}</p>` : ""}

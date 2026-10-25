@@ -76,7 +76,7 @@
     back.setAttribute("aria-modal", "true");
     const fmt = (n) => (Math.round(n * 10) / 10).toString();
     back.innerHTML = `<div class="ui-dlg-box ui-kn" dir="rtl"><h3>العقل فاهمك <span class="num">${k.score}٪</span> · ${esc(k.level)}</h3>
-      <p class="sub">هذه النسبة مجموع نقاط الشروط الذي أسفل: كل شرط له نقاط ثابتة، وتاخدها عندما يتحقق. من <b>${k.need}٪</b> ومعها الشروط الأساسية (●) العقل يصبح فاهمك وخطة المحتوى تُنشأ تلقائيًا.</p>
+      <p class="sub">هذه النسبة مجموع نقاط الشروط أدناه: لكل شرط نقاط ثابتة تحصل عليها عند تحققه. من <b>${k.need}٪</b> ومع الشروط الأساسية (●) يصبح العقل فاهمًا لك وتُنشأ خطة المحتوى تلقائيًا.</p>
       <div class="bar"><i style="width:${Math.min(100, k.score)}%"></i><em style="inset-inline-start:${k.need}%"></em></div>
       <ul>${k.items.map((i) => `<li class="${i.done ? "ok" : ""}"><span class="ck">${i.done ? "✅" : "○"}</span>
         <span><b>${esc(i.t)}</b>${i.core ? `<span class="core">● أساسي</span>` : ""}${i.done ? "" : `<small>${esc(i.hint)}</small>`}</span>
@@ -97,7 +97,7 @@
   const hreq = async (path, init = {}) => {
     const r = await fetch(path, { credentials: "same-origin", ...init, headers: { "Content-Type": "application/json", ...(init.headers || {}) } });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب مرة أخرى");
+    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حدثت مشكلة، جرّب مرة أخرى");
     return d;
   };
   window.uiPhone = async (req) => {
@@ -110,10 +110,10 @@
       back.setAttribute("aria-modal", "true");
       const qr = `/api/handoff/${h.id}/qr.svg?base=${encodeURIComponent(location.origin)}`;
       back.innerHTML = `<div class="ui-dlg-box" dir="rtl" style="text-align:center">
-        <p class="ui-dlg-msg" style="margin-bottom:6px"><b>📱 كمّل على موبايلك</b></p>
-        <p style="margin:0 0 14px;font-size:13px;opacity:.72;line-height:1.7">${esc(req.kind === "shoot" ? "وصلك إشعار على تطبيق سمسمكيت: افتحه وصوّر بالملقّن، والفيديو يرجع هنا لوحده." : "وصلك إشعار على تطبيق سمسمكيت: سجّل بصوتك، والتسجيل يرجع هنا لوحده.")}<br>ما وصلكش؟ صوّر الكود ده بكاميرا الموبايل.</p>
+        <p class="ui-dlg-msg" style="margin-bottom:6px"><b>📱 أكمل على جوالك</b></p>
+        <p style="margin:0 0 14px;font-size:13px;opacity:.72;line-height:1.7">${esc(req.kind === "shoot" ? "وصلك إشعار على تطبيق سمسم كيت: افتحه وصوّر بالملقّن، وسيعود الفيديو إلى هنا تلقائيًا." : "وصلك إشعار على تطبيق سمسم كيت: سجّل بصوتك، وسيعود التسجيل إلى هنا تلقائيًا.")}<br>لم يصلك؟ صوّر هذا الرمز بكاميرا الجوال.</p>
         <img src="${qr}" alt="QR" width="190" height="190" style="width:190px;height:190px;box-sizing:border-box;border-radius:16px;background:#fff;padding:6px">
-        <p data-st style="margin:12px 0 16px;font-size:13px;opacity:.8">⏳ مستني الموبايل…</p>
+        <p data-st style="margin:12px 0 16px;font-size:13px;opacity:.8">⏳ في انتظار الجوال…</p>
         <div class="ui-dlg-acts" style="justify-content:center"><button type="button" class="ui-dlg-no">إلغاء</button></div></div>`;
       let timer = 0, over = false;
       const finish = (val) => {
@@ -127,7 +127,7 @@
       document.body.appendChild(back);
       timer = setInterval(async () => {
         const x = await hreq(`/api/handoff/${h.id}`).catch(() => null);
-        if (x?.status === "done") { back.querySelector("[data-st]").textContent = "✓ وصل من الموبايل"; setTimeout(() => finish(x), 700); }
+        if (x?.status === "done") { back.querySelector("[data-st]").textContent = "✓ وصل من الجوال"; setTimeout(() => finish(x), 700); }
       }, 3000);
     });
   };

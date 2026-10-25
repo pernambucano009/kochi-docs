@@ -45,7 +45,7 @@ const Help = (() => {
     if (!box) return;
     box.hidden = !S.open;
     const k = pageKey();
-    box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : [{ role: "assistant", text: "أهلًا، أنا مساعد SimsimKit. اسألني عن أي صفحة أو خطوة." }])
+    box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : [{ role: "assistant", text: "أهلًا، أنا مساعد سمسم كيت. اسألني عن أي صفحة أو خطوة." }])
       .map((m) => `<div class="hp-m ${m.role === "user" ? "me" : "ai"}">${esc(m.text)}</div>`).join("") + (S.busy ? `<div class="hp-m ai">…</div>` : "");
     box.querySelector(".hp-sug").innerHTML = [`اشرح لي «${pageName(k)}»`, "كيف تُحسب النقاط؟", ...(S.msgs.some((m) => m.role === "assistant") ? ["أرسلها للدعم"] : [])]
       .map((t) => `<button type="button" data-hpq="${esc(t)}">${esc(t)}</button>`).join("");

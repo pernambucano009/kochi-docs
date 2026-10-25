@@ -674,7 +674,7 @@ function renderPosts() {
   $("postsList").innerHTML = list
     .map((p) => {
       let [label, cls] = POST_STATUS[p.status] || [p.status, ""];
-      if (p.status === "scheduled" && p.sent) label = "متجدول للنشر ✓";
+      if (p.status === "scheduled" && p.sent) label = "مجدول للنشر ✓";
       const when = new Date(p.scheduled_at).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
       return `<li data-id="${p.id}" class="${p.status === "failed" ? "failed" : ""}">
         ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}

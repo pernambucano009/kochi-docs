@@ -78,7 +78,7 @@ function assetDetail(a) {
         <label>النوع <select data-asf="category">${labOpts(ASSET_CATS, a.category)}</select></label>
         <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، مجلد" data-no-i18n></label>
         <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="ستستخدمه في ماذا؟ ماذا الذي جميل فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
-        <small class="muted">${a.duration} ث · ${a.width}×${a.height} · ${src.motion ? "من 🎞️ مكتبة الموشن" : `من
+        <small class="muted">${a.duration} ث · ${a.width}×${a.height} · ${src.motion ? "من 🎞️ مكتبة الحركة" : `من
           <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})`}</small>
         ${a.description || a.summary ? `<p data-no-i18n>${le(a.description || a.summary)}</p>` : ""}
         ${a.use ? `<small class="muted" data-no-i18n>💼 ${le(a.use)}</small>` : ""}

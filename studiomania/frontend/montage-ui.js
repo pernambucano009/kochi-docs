@@ -119,7 +119,7 @@
       if (typeof scheduleSave === "function") scheduleSave();
       if (typeof mtTypoDraw === "function") mtTypoDraw();
       if (typeof renderTimeline === "function") renderTimeline();
-      if (user && m === "typo" && typeof toast === "function" && !(typeof mtx !== "undefined" && mtx.doc?.blocks?.length)) toast("اضغط «وزّع التايبوجرافي» لكي النص يتحوّل لتايبوجرافي 3D");
+      if (user && m === "typo" && typeof toast === "function" && !(typeof mtx !== "undefined" && mtx.doc?.blocks?.length)) toast("اضغط «وزّع التايبوجرافي» ليتحوّل النص إلى تايبوجرافي 3D");
     }
     syncCapMode();
   }
@@ -207,7 +207,7 @@
       mh.classList.add("mtu-gh");
       mh.classList.toggle("mtu-closed", !open && extra.length > 0);
       mh.dataset.more = !open && extra.length ? `+${extra.length}` : "";
-      mh.dataset.tip = open ? "نقرتان يلمّ هذه التراكات في خط واحد" : extra.length ? `فيها أيضًا: ${extra.map((h) => NAMES[h]).join("، ")} · نقرتان يفردهم` : "";
+      mh.dataset.tip = open ? "نقرتان لضم هذه المسارات في خط واحد" : extra.length ? `فيه أيضًا: ${extra.map((h) => NAMES[h]).join("، ")} · نقرتان لفردها` : "";
       for (const h of rest) {
         const hd = heads.querySelector("." + h), row = rowOf(h);
         const mini = !open, gone = !open && empty(row);

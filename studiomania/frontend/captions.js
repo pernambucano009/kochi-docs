@@ -101,7 +101,7 @@ async function capLangLoad(lang) {
   brand.trxBusy = brand.trxBusy || {};
   if (key in brand.trx || brand.trxBusy[key]) return;   // (إذا فشلت لا تُعاد تلقائيًا؛ تغيير اللغة يعيدها)
   brand.trxBusy[key] = true;
-  $("capLangHint").textContent = "⏳ جارٍ الترجمة التعليق النصي…";
+  $("capLangHint").textContent = "⏳ جارٍ ترجمة التعليق النصي…";
   try {
     brand.trx[key] = (await api(`/api/audio/${voice.id}/transcript/${lang}`)).words;
     $("capLangHint").textContent = "✓ تُرجم";

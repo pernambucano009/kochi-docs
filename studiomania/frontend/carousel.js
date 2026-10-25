@@ -51,7 +51,7 @@ $("carNewForm").addEventListener("submit", async (e) => {
     await loadCarList();
     renderCarousel();
     // أول رسالة: الموضوع نفسه، والموديل يبدأ يقترح
-    sendChat(`تريد كاروسيل عن: ${topic}. اقترح عليّ أفكار.`);
+    sendChat(`أريد كاروسيل عن: ${topic}. اقترح عليّ أفكارًا.`);
   } catch (err) {
     toast(err.message, true);
   }

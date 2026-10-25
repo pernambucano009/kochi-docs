@@ -1339,7 +1339,7 @@ function renderBrain() {
   for (const kind of ["intro", "outro"]) {
     const url = b[`${kind}_url`];
     document.querySelector(`[data-bvid="${kind}"] .brain-vid-box`).innerHTML = url
-      ? `<video src="${url}" controls preload="metadata" playsinline></video>` : `<p class="muted">لا يوجد بعد فيديو.</p>`;
+      ? `<video src="${url}" controls preload="metadata" playsinline></video>` : `<p class="muted">لا يوجد فيديو بعد.</p>`;
     document.querySelector(`[data-bvdel="${kind}"]`).hidden = !url;
     document.querySelector(`[data-bf="${kind}_on"]`).disabled = !url;
   }
@@ -1351,7 +1351,7 @@ const brainStyleIds = (b) => String(b.styles || "").split(",").map((x) => x.trim
 async function renderBrainStyles(b) {
   const box = $("brainStyles");
   if (!adx.tpls) {
-    box.innerHTML = `<p class="muted"><span class="spin-inline"></span> يُحمّل الأساليب...</p>`;
+    box.innerHTML = `<p class="muted"><span class="spin-inline"></span> جارٍ تحميل الأساليب…</p>`;
     try { adx.tpls = await api("/api/templates"); } catch { adx.tpls = []; }
     if (curBrain()?.id !== b.id) return;
   }
@@ -1365,7 +1365,7 @@ async function renderBrainStyles(b) {
       <b data-no-i18n>${adEsc(t.icon || "")} ${adEsc(t.name)}</b>
       <div class="row">${on ? `<button type="button" class="btn sm${def ? " primary" : ""}" data-bstar title="اجعله الافتراضي">${def ? "⭐ الافتراضي" : "☆ افتراضي"}</button>` : ""}
         <button type="button" class="btn sm" data-btoggle>${on ? "✕ أزله" : "＋ اختره"}</button></div></div>`;
-  }).join("") || `<p class="muted">لا يوجد أساليب ما زال.</p>`;
+  }).join("") || `<p class="muted">لا توجد أساليب بعد.</p>`;
 }
 function setBrainStyles(ids) {
   return brainSave(() => bAPI("", { method: "PATCH", ...jsonBody({ fields: { styles: ids.join(",") } }) }));
@@ -1443,7 +1443,7 @@ $("adBrainBody").addEventListener("change", async (e) => {
 $("adBrainBody").addEventListener("click", async (e) => {
   const vdel = e.target.closest("[data-bvdel]");
   if (vdel) {
-    if ((await uiConfirm("تزيل هذا الفيديو من العلامة؟"))) brainSave(() => bAPI(`/brand-video/${vdel.dataset.bvdel}`, { method: "DELETE" }));
+    if ((await uiConfirm("أتزيل هذا الفيديو من العلامة؟"))) brainSave(() => bAPI(`/brand-video/${vdel.dataset.bvdel}`, { method: "DELETE" }));
     return;
   }
   const st = e.target.closest("[data-bstyle]");

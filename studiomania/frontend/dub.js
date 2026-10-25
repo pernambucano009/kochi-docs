@@ -2,7 +2,7 @@
 // فيديو ← الكلام بيتسمع ← يتحوّل للهجة (بتعدّله) ← صوت جاهز لكل جملة في مكانها + الموسيقى ← ليب سينك (اختياري) ← الفيديوهات الجاهزة للنشر.
 
 const dbx = { list: [], info: null, cur: null, timer: null };
-const DB_BG = { auto: "تلقائي", separate: "🎵 الموسيقى والمؤثرات من الأصل (يفصل النص)", low: "الصوت الأصلي واطي أسفل", none: "بدون خلفية" };
+const DB_BG = { auto: "تلقائي", separate: "🎵 الموسيقى والمؤثرات من الأصل (يفصل الكلام)", low: "الصوت الأصلي منخفضًا في الخلفية", none: "بدون خلفية" };
 const dbe = (s) => escapeHtml(String(s ?? ""));
 const dbTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
@@ -43,7 +43,7 @@ function dbRenderProj() {
     <div class="db-meta"><h2 data-no-i18n>${dbe(d.name)}</h2><p class="muted">${dbTime(d.source.duration || 0)} · ${d.lines.length} جملة</p>
       ${d.busy && d.step ? `<p><span class="spin-inline"></span> ${dbe(d.step)}</p>` : ""}
       ${d.error ? `<p class="err">⚠️ ${dbe(d.error)}</p>` : ""}
-      <label>عن الفيديو (اختياري، يساعد في الدبلجة) <input id="dbBrief" value="${dbe(d.brief)}" placeholder="مثلًا: كوتش يشرح غلطة في التمرين لناس مبتدئين"></label>
+      <label>عن الفيديو (اختياري، يساعد في الدبلجة) <input id="dbBrief" value="${dbe(d.brief)}" placeholder="مثلًا: مدرب يشرح خطأً في التمرين للمبتدئين"></label>
       <button class="btn sm danger" id="dbDel">🗑 احذف المشروع</button></div></div>`;
   if (!d.lines.length) { $("dbMain").innerHTML = h; return; }
   // لهجة / لغة جديدة: العربي بأصوات فصيح، والأجنبي بـ ElevenLabs
@@ -56,11 +56,11 @@ function dbRenderProj() {
     if (!dl) continue;
     h += `<div class="panel db-dialect"><div class="db-dh"><h3>${dl.label}</h3>`;
     h += `<select data-dbvoice="${k}" ${t.busy ? "disabled" : ""}>${dl.voices.map((v) => `<option value="${v}" ${v === t.voice ? "selected" : ""}>🎙️ ${dbe(info.voices[v])}</option>`).join("")}</select>
-      <button class="btn sm" data-dbadapt="${k}" ${t.busy || d.busy ? "disabled" : ""} title="النموذج يكتب النص من جديد (تعديلاتك ستُحذف)">↻ اكتبه من جديد</button></div>`;
+      <button class="btn sm" data-dbadapt="${k}" ${t.busy || d.busy ? "disabled" : ""} title="يكتب النموذج النص من جديد (ستُحذف تعديلاتك)">↻ اكتبه من جديد</button></div>`;
     if (t.busy && t.step) h += `<p><span class="spin-inline"></span> ${dbe(t.step)}</p>`;
     if (t.error) h += `<p class="err">⚠️ ${dbe(t.error)}</p>`;
     if (t.lines?.length) {
-      h += `<p class="hint">صلّح أي جملة غير طبيعية. كل جملة يجب تُقال في وقتها (الرقم على الشمال)، فلو طويلة اختصرها.</p><div class="db-lines">`
+      h += `<p class="hint">صحّح أي جملة غير طبيعية. يجب أن تُقال كل جملة في وقتها (الرقم على اليسار)، فإن كانت طويلة فاختصرها.</p><div class="db-lines">`
         + d.lines.map((ln, i) => {
           const room = (d.lines[i + 1]?.s ?? d.source.duration) - ln.s;
           const txt = t.lines[i]?.text || "", over = txt.length > room * 15;
@@ -71,12 +71,12 @@ function dbRenderProj() {
       const lc = t.lip_cost || {};
       h += `<div class="db-opts"><label>🎵 الخلفية <select data-dbbg="${k}">${Object.entries(DB_BG).filter(([b]) => b !== "separate" || info.separate).map(([b, l]) => `<option value="${b}">${l}</option>`).join("")}</select></label>
         <label>🔤 التعليق النصي <select data-dbcap="${k}"><option value="">بدون تعليق نصي</option><option value="same">بنفس لغة الدبلجة</option>${Object.entries(info.caption_langs || {}).map(([c, l]) => `<option value="${c}">مترجم: ${dbe(l)}</option>`).join("")}</select></label>
-        <label>👄 ليب سينك <select data-dblip="${k}"><option value="">بدون (الصوت فقط)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)} · نحو $${lc[m]}</option>`).join("")}</select></label>
+        <label>👄 مزامنة الشفاه <select data-dblip="${k}"><option value="">بدون (الصوت فقط)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)} · نحو $${lc[m]}</option>`).join("")}</select></label>
         <button class="btn primary" data-dbrender="${k}" ${t.busy || d.busy ? "disabled" : ""}>🎙️ أنشئ الدبلجة <small>${(t.cost || {})[t.voice] ? `(الصوت نحو $${t.cost[t.voice]})` : ""}</small></button></div>`;
     }
     if (t.video_url) {
       h += `<div class="db-out"><video src="${t.video_url}" controls playsinline preload="metadata"></video>
-        <p class="ok">✓ النسخة ${dl.label} في «الفيديوهات الجاهزة» ويمكنك تنشرها من خطوة النشر${t.lipsync ? " (بليب سينك)" : ""}.</p></div>`;
+        <p class="ok">✓ النسخة ${dl.label} في «الفيديوهات الجاهزة» ويمكنك نشرها من خطوة النشر${t.lipsync ? " (بمزامنة الشفاه)" : ""}.</p></div>`;
     }
     h += `</div>`;
   }
@@ -119,7 +119,7 @@ $("dbUpload").addEventListener("change", async (e) => {
   if (!f) return;
   const fd = new FormData();
   fd.append("file", f);
-  toast("⬆️ يرفع الفيديو…");
+  toast("⬆️ جارٍ رفع الفيديو…");
   try {
     const p = await api("/api/dub", { method: "POST", body: fd });
     await dbInit();
@@ -133,7 +133,7 @@ $("dbFromExport").addEventListener("click", async () => {
     const box = $("dbExports");
     box.hidden = !box.hidden;
     box.innerHTML = items.length ? items.slice(0, 40).map((x) => `<li data-dbexp="${x.id}"><span class="ph">🎬</span><span class="nm" data-no-i18n>${dbe(x.name)}<br><small class="muted">${dbTime(x.duration || 0)}</small></span></li>`).join("")
-      : `<li class="muted">لا يوجد فيديوهات جاهزة</li>`;
+      : `<li class="muted">لا توجد فيديوهات جاهزة</li>`;
   } catch (err) { toast(err.message, true); }
 });
 $("dbExports").addEventListener("click", async (e) => {
@@ -161,32 +161,32 @@ $("dbMain").addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   if (b.id === "dbDel") {
-    if (!(await uiConfirm("تحذف مشروع هذا الدبلجة؟ (النسخ الذي في الفيديوهات الجاهزة تظل)"))) return;
+    if (!(await uiConfirm("أتحذف مشروع الدبلجة هذا؟ (تبقى النسخ الموجودة في الفيديوهات الجاهزة)"))) return;
     try { await api(`/api/dub/${dbx.cur.id}`, { method: "DELETE" }); dbx.cur = null; storageSet("studiomania.dub", ""); await dbInit(); } catch (err) { toast(err.message, true); }
     return;
   }
   if (b.id === "dbAddLang") {
     const k = $("dbNewLang").value;
     if (!k) return;
-    return dbAct("/target", "POST", { dialect: k, brief: $("dbBrief")?.value || "" }, "✍️ يكتب النص…");
+    return dbAct("/target", "POST", { dialect: k, brief: $("dbBrief")?.value || "" }, "✍️ جارٍ كتابة النص…");
   }
   if (b.dataset.dbadapt) {
     const k = b.dataset.dbadapt;
-    if (dbx.cur.targets[k]?.lines?.length && !(await uiConfirm("النص سيُكتب من جديد وتعديلاتك ستُحذف. تُكمل؟"))) return;
-    return dbAct("/target", "POST", { dialect: k, voice: dbx.cur.targets[k]?.voice, brief: $("dbBrief")?.value || "" }, "✍️ يكتب النص باللهجة…");
+    if (dbx.cur.targets[k]?.lines?.length && !(await uiConfirm("سيُكتب النص من جديد وستُحذف تعديلاتك. أتُكمل؟"))) return;
+    return dbAct("/target", "POST", { dialect: k, voice: dbx.cur.targets[k]?.voice, brief: $("dbBrief")?.value || "" }, "✍️ جارٍ كتابة النص باللهجة…");
   }
   if (b.dataset.dbrender) {
     const k = b.dataset.dbrender, lip = document.querySelector(`[data-dblip="${k}"]`).value || null;
     const bg = document.querySelector(`[data-dbbg="${k}"]`).value;
     if (lip && !(await uiConfirm(`الليب سينك يتكلف نحو $${dbx.cur.targets[k].lip_cost[lip]} هذا للفيديو. تُكمل؟`))) return;
     const caps = document.querySelector(`[data-dbcap="${k}"]`)?.value || "";
-    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ يعمل الدبلجة…");
+    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ جارٍ إنشاء الدبلجة…");
   }
 });
 
 $("dbMain").addEventListener("change", async (e) => {
   const t = e.target;
-  if (t.dataset.dbvoice) return dbAct(`/target/${t.dataset.dbvoice}`, "PUT", { voice: t.value }, "🎙️ الصوت تغيّر");
+  if (t.dataset.dbvoice) return dbAct(`/target/${t.dataset.dbvoice}`, "PUT", { voice: t.value }, "🎙️ تغيّر الصوت");
   if (t.dataset.dbline) {
     const k = t.dataset.dbline;
     const texts = [...document.querySelectorAll(`textarea[data-dbline="${k}"]`)].map((x) => x.value);

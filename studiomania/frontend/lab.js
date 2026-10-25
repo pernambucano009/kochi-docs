@@ -130,7 +130,7 @@ function renderLab() {
   if (!busyEdit($("labShots")) && !shotPlaying) renderLabShots(d);
 }
 
-// 🎚️ الفيديو متقسم لـ ٤: كل جزء تسمعه / تشوفه لوحده وتنزّله، والفيديو الكبير فوق بيشغّل اللي مفتوح بس
+// 🎚️ الفيديو مقسّم إلى ٤: كل جزء تسمعه / تشوفه لوحده وتنزّله، والفيديو الكبير فوق بيشغّل اللي مفتوح بس
 const LAB_PARTS = { dialogue: ["speech", "🗣️ النص"], music: ["music", "🎵 الموسيقى"], effects: ["sfx", "🔊 المؤثرات"] };
 function renderLabParts(d) {
   const st = d.stems || {}, step = d.steps?.split || {}, el = $("labParts");
@@ -158,7 +158,7 @@ function renderLabParts(d) {
       : x?.error ? `<span class="err">✕ ${le(x.error)}</span>` : wait(stemMsg), x?.url, tog);
   }).join("");
   const isNew = !d.steps?.split;
-  el.innerHTML = `<h3>🎚️ الفيديو متقسم لـ ٤</h3>
+  el.innerHTML = `<h3>🎚️ الفيديو مقسّم إلى ٤</h3>
     ${isNew ? `<p class="hint">هذا الفيديو رُفع قبل التقسيم الجديد. اضغط «🎚️ قسّم آخر» أعلى لكي يُقسّم لصورة ونص وموسيقى ومؤثرات.</p>` : ""}
     ${labx.stems ? `<p class="hint">🎧 الفيديو الذي أعلى يشغّل التراكات المفصولة: اضغط 🔊 بجانب أي جزء لكي تقفله وتسمع الباقي تلقائيًا.</p>` : ""}
     <div class="lab-parts">
@@ -875,7 +875,7 @@ $("labFile").addEventListener("change", async (e) => {
     } catch (err) { toast(`${f.name}: ${err.message}`, true); }
   }
   if (last) await openLab(last.id);
-  if (ok) toast(files.length > 1 ? `🎚️ رُفع ${ok} من ${files.length} ويتقسمون` : "🎚️ بدأ التقسيم");
+  if (ok) toast(files.length > 1 ? `🎚️ رُفع ${ok} من ${files.length} وجارٍ تقسيمها` : "🎚️ بدأ التقسيم");
 });
 $("labName").addEventListener("change", async () => {
   try { labx.cur = await api(`/api/lab/${labx.cur.id}`, { method: "PATCH", ...jsonBody({ name: $("labName").value }) }); labx.list = await api("/api/lab"); renderLab(); }

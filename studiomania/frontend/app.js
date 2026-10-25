@@ -26,7 +26,7 @@ function toast(msg, isError = false) {
 window.ME = null;
 function showCredits(m) {
   const el = document.getElementById("setPlan");
-  if (m && el) el.textContent = `${m.email} · باقتك: ${{ trial: "تجربة مجانية", starter: "بداية", pro: "محترف", agency: "وكالات", owner: "صاحب البرنامج" }[m.plan] || m.plan} · رصيدك ${m.credits.total.toLocaleString("en-US")} نقطة`;
+  if (m && el) el.textContent = `${m.email} · باقتك: ${{ trial: "تجربة مجانية", starter: "بداية", pro: "محترف", agency: "وكالات", owner: "مالك البرنامج" }[m.plan] || m.plan} · رصيدك ${m.credits.total.toLocaleString("en-US")} نقطة`;
   if (m && m.credits) document.querySelectorAll("[data-credits]").forEach((x) => { x.textContent = m.credits.total.toLocaleString("en-US"); });
   if (m) document.dispatchEvent(new CustomEvent("credits", { detail: m.credits }));
 }
@@ -63,7 +63,7 @@ async function noCredits(msg) {
   if (noCreditsOpen || !window.uiConfirm) return;
   noCreditsOpen = true;
   try {
-    const go = await uiConfirm(`${msg || "نقاطك لا تكفي هذه العملية."}\nلم تُخصم أي نقاط.`, { ok: "💳 اشحن نقاطًا", cancel: "لاحقًا" });
+    const go = await uiConfirm(`${msg || "نقاطك لا تكفي لهذه العملية."}\nلم تُخصم أي نقاط.`, { ok: "💳 اشحن نقاطًا", cancel: "لاحقًا" });
     if (go) {
       const b = document.getElementById("stagePlans");
       if (b) b.click(); else location.href = "/billing";
@@ -897,7 +897,7 @@ document.addEventListener("click", async (e) => {
   const ta = document.querySelector(b.dataset.humanize);
   if (!ta || !ta.value.trim()) return toast("اكتب النص أولًا", true);
   const label = b.innerHTML;
-  b.disabled = true; b.textContent = "⏳ ينضّف…";
+  b.disabled = true; b.textContent = "⏳ جارٍ التنظيف…";
   try {
     const r = await api("/api/humanize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
     const old = ta.value;
