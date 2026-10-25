@@ -1453,7 +1453,7 @@ def coach_talk_new(coach_id: str, text: str = Form(""), voice: str = Form(""), l
                    prompt: str = Form(""), audio: UploadFile | None = File(None)):
     """🗣️ الشخصية تقول هذا النص (أو الصوت المرفوع) في فيديو."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     tid = uuid.uuid4().hex[:10]
     item = {"id": tid, "text": text.strip()[:1500], "voice": voice, "lang": lang, "model": model if model in AVATAR_MODELS else "pro",
             "prompt": prompt.strip()[:600], "status": "queued", "step": "في الطابور", "error": None, "file": None, "audio": None,
@@ -1501,7 +1501,7 @@ def coach_ai(body: AvatarImageIn):
     if not desc:
         raise HTTPException(400, "صِف الشخصية")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     cid = body.coach_id or uuid.uuid4().hex[:12]
     fname = f"{cid}_image_{uuid.uuid4().hex[:6]}.png"
     dest = COACHES_DIR / fname
@@ -1755,7 +1755,7 @@ class GenerationIn(BaseModel):
 @app.post("/api/generations")
 def create_generations(body: GenerationIn):
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     if not body.clip_ids:
         raise HTTPException(400, "اختر قطعة واحدة على الأقل")
 
@@ -1882,18 +1882,18 @@ def generate_again(gen_id: str):
     """توليد جديد لنفس القطعة (نفس المدرب والوصف والإعدادات) في نفس مكان القديم: الفيديو القديم يُحذف
     والطلب نفسه يُولّد من أولًا، فالترتيب ما يتغيرش."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         r = conn.execute("SELECT * FROM generations WHERE id = ?", (gen_id,)).fetchone()
     if r is None:
         raise HTTPException(404, "الطلب غير موجود")
     if r["clip_id"].startswith("series:") or r["clip_id"] == "upload":
-        raise HTTPException(400, "هذا الفيديو غير من قطعة مشروع")
+        raise HTTPException(400, "هذا الفيديو ليس من قطعة مشروع")
     if r["status"] not in ("completed", "failed"):
-        raise HTTPException(400, "الفيديو ما زال يُولّد")
+        raise HTTPException(400, "ما زال الفيديو قيد التوليد")
     with _running_lock:
         if gen_id in _running:
-            raise HTTPException(400, "الفيديو ما زال يُولّد")
+            raise HTTPException(400, "ما زال الفيديو قيد التوليد")
     if r["output_filename"]:
         (GENERATED_DIR / r["output_filename"]).unlink(missing_ok=True)
     set_generation(gen_id, status="queued", prediction_id=None, output_filename=None, error=None)
@@ -2251,7 +2251,7 @@ def montage_tts(body: MontageTtsIn):
         raise HTTPException(400, "اكتب النص أولًا")
     voice = body.voice_id if body.voice_id in AR_VOICES else "Arabic_FriendlyGuy"
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. تواصل مع الدعم")
     aid = uuid.uuid4().hex[:12]
     fname = f"voice_{aid}.mp3"
     out = AUDIO_DIR / fname
@@ -2918,7 +2918,7 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
     row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice["id"],)).fetchone()
     tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
     if tr.get("status") != "done" or not tr.get("words"):
-        raise HTTPException(400, "ما زال النص الخاص بالتعليق الصوتي لم يكتب. اضغط «اكتب النص» أولًا أو أغلق التعليق النصي")
+        raise HTTPException(400, "لم يُكتب نص التعليق الصوتي بعد. اضغط «اكتب النص» أولًا أو أطفئ التعليق النصي")
     # الكلام اللي اتمسح من الكابشن في المشروع ده (بمعاد بدايته جوه ملف الصوت)
     removed = {int(k) for k in cfg.get("removed") or []}
     source = [w for w in tr["words"] if round(w["s"] * 100) not in removed]
@@ -3720,7 +3720,7 @@ def pub_back(request: Request) -> str:
 
 def pub_ready() -> None:
     if publisher.service_name() != "zernio":
-        raise HTTPException(400, "خدمة النشر غير متصلة ما زال. كلّم الدعم")
+        raise HTTPException(400, "خدمة النشر غير متصلة بعد. تواصل مع الدعم")
 
 
 def pub_call(fn, *a):
@@ -3818,7 +3818,7 @@ class WhatsAppIn(BaseModel):
 def publisher_whatsapp(body: WhatsAppIn):
     acct_pending_mark()
     if not (body.token.strip() and body.waba.strip() and body.phone.strip()):
-        raise HTTPException(400, "أكمل الخانات التلاتة")
+        raise HTTPException(400, "أكمل الخانات الثلاث")
     if publisher.service_name() == "mock":
         MOCK_ACCOUNTS.append({"id": "m-wa1", "platform": "whatsapp", "name": "واتساب تجريبي", "username": "+966500000000", "avatar": None, "url": None, "needs_reconnect": False})
         return publisher_status()
@@ -4089,7 +4089,7 @@ def adopt_remote_post(body: AdoptIn):
     """منشور متجدول عند Zernio ومش هنا: نضيفه للقايمة لكي تتابعه وتلغيه من هنا."""
     post = next((p for p in _remote_orphans() if p["id"] == body.remote_id), None)
     if post is None:
-        raise HTTPException(404, "لم نجد هذا المنشور عند خدمة النشر، أو أنه موجود في القائمة بالفعل")
+        raise HTTPException(404, "لم نجد هذا المنشور لدى خدمة النشر، أو أنه موجود في القائمة بالفعل")
     try:
         when = datetime.fromisoformat(str(post["scheduled_for"]).replace("Z", "+00:00")).astimezone(timezone.utc)
     except ValueError:
@@ -4108,7 +4108,7 @@ def adopt_remote_post(body: AdoptIn):
 @app.post("/api/posts/remote/{remote_id}/cancel")
 def cancel_remote_post(remote_id: str):
     if not any(p["id"] == remote_id for p in _remote_orphans()):
-        raise HTTPException(404, "لم نجد هذا المنشور عند خدمة النشر، أو أنه موجود في القائمة بالفعل")
+        raise HTTPException(404, "لم نجد هذا المنشور لدى خدمة النشر، أو أنه موجود في القائمة بالفعل")
     try:
         publisher.cancel(remote_id)
     except (publisher.PublishError, httpx.HTTPError) as exc:
@@ -4280,13 +4280,13 @@ def dm_flow_set(body: DmFlowIn):
     return dm_flow_get()
 
 
-# ---------------------------------------------------------------- 💸 مصاريف المنصة الشهرية (لصاحب المنصة بس)
+# ---------------------------------------------------------------- 💸 مصاريف المنصة الشهرية (لمالك المنصة فقط)
 # كل اشتراك أو خدمة بتدفعلها: المبلغ، شهري ولا سنوي ولا على قد الاستخدام، ويوم التجديد. المجموع الشهري بيتحسب لوحده.
 EXPENSES_F = DATA_DIR / "expenses.json"
 EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "على قد الاستخدام", "free": "مجاني"}
 EXPENSE_PRESET = [
     {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
-    {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد الدومين"},
+    {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد النطاق"},
     {"name": "Zernio (النشر والرسايل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، من ٣ لـ ١٠ بـ $6 للحساب"},
     {"name": "Atlas Cloud (الذكاء الصناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
     {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري محتاج باقة مدفوعة"},
@@ -4312,7 +4312,7 @@ def expenses_out(rows: list[dict]) -> dict:
 @app.get("/api/expenses")
 def expenses_get():
     if not wallet.free():
-        raise HTTPException(403, "لصاحب المنصة بس")
+        raise HTTPException(403, "لمالك المنصة فقط")
     return expenses_out(expenses_load())
 
 
@@ -4323,7 +4323,7 @@ class ExpensesIn(BaseModel):
 @app.put("/api/expenses")
 def expenses_put(body: ExpensesIn):
     if not wallet.free():
-        raise HTTPException(403, "لصاحب المنصة بس")
+        raise HTTPException(403, "لمالك المنصة فقط")
     rows = []
     for r in body.rows[:60]:
         name = str(r.get("name") or "").strip()[:80]
@@ -4345,7 +4345,7 @@ def expenses_put(body: ExpensesIn):
 def bots_get():
     if publisher.service_name() == "mock" or not publisher.api_key():
         return {"live": False, "bots": [], "accounts": [], "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS,
-                "note": "اربط Zernio وحساب إنستجرام أو فيسبوك أو واتساب من صفحة النشر الأول"}
+                "note": "اربط حساب إنستغرام أو فيسبوك أو واتساب من صفحة النشر أولًا"}
     try:
         accs, bots = botflows.bot_accounts(), botflows.list_bots()
     except publisher.PublishError as e:
@@ -4364,15 +4364,15 @@ class BotIn(BaseModel):
 @app.post("/api/bots")
 def bots_create(body: BotIn):
     if body.recipe not in botflows.RECIPES:
-        raise HTTPException(400, "الوصفة دي مش موجودة")
+        raise HTTPException(400, "هذه الوصفة غير موجودة")
     acc = next((a for a in botflows.bot_accounts() if a["id"] == body.account), None)
     if not acc:
-        raise HTTPException(400, "الحساب ده مش مربوط")
+        raise HTTPException(400, "هذا الحساب غير مربوط")
     if acc["platform"] not in botflows.RECIPES[body.recipe]["platforms"]:
-        raise HTTPException(400, f"«{botflows.RECIPES[body.recipe]['t']}» مش بيشتغل على {publisher.PLATFORMS[acc['platform']][1]}")
+        raise HTTPException(400, f"«{botflows.RECIPES[body.recipe]['t']}» لا يعمل على {publisher.PLATFORMS[acc['platform']][1]}")
     o = botflows.clean(body.recipe, body.opts)
     if body.recipe in ("comment", "keyword", "story") and not (o.get("message") or "").strip():
-        raise HTTPException(400, "اكتب الرسالة اللي هتوصله")
+        raise HTTPException(400, "اكتب الرسالة التي ستصله")
     try:
         made = botflows.create(body.recipe, acc, body.name, o)
     except publisher.PublishError as e:
@@ -4387,7 +4387,7 @@ class BotStateIn(BaseModel):
 @app.post("/api/bots/{wid}/state")
 def bots_state(wid: str, body: BotStateIn):
     if wid not in {b["id"] for b in botflows.list_bots()}:
-        raise HTTPException(404, "البوت ده مش موجود")
+        raise HTTPException(404, "هذا البوت غير موجود")
     try:
         botflows.set_state(wid, body.on)
     except publisher.PublishError as e:
@@ -4398,7 +4398,7 @@ def bots_state(wid: str, body: BotStateIn):
 @app.delete("/api/bots/{wid}")
 def bots_delete(wid: str):
     if wid not in {b["id"] for b in botflows.list_bots()}:
-        raise HTTPException(404, "البوت ده مش موجود")
+        raise HTTPException(404, "هذا البوت غير موجود")
     try:
         botflows.delete(wid)
     except publisher.PublishError as e:
@@ -4591,7 +4591,7 @@ def publish_due_posts() -> None:
 
 def _inbox_call(fn, *args):
     if publisher.service_name() != "zernio":
-        raise HTTPException(400, "صندوق الردود يحتاج خدمة النشر، وما زال غير متصلة")
+        raise HTTPException(400, "صندوق الردود يحتاج إلى خدمة النشر، وهي غير متصلة بعد")
     try:
         return fn(*args)
     except (publisher.PublishError, httpx.HTTPError) as exc:
@@ -4739,7 +4739,7 @@ async def _no_credits(request: Request, exc: Exception):
 @app.exception_handler(atlas.AtlasError)
 async def _atlas_err(request: Request, exc: Exception):
     print(f"AtlasError on {request.url.path}: {exc}", flush=True)
-    return JSONResponse({"detail": f"خدمة الذكاء الاصطناعي مردّتش مثل المتوقع: {str(exc)[:300]}"}, status_code=502)
+    return JSONResponse({"detail": f"لم تردّ خدمة الذكاء الاصطناعي كما هو متوقع: {str(exc)[:300]}"}, status_code=502)
 
 import comics  # noqa: E402
 
@@ -5092,7 +5092,7 @@ def month_make(body: MonthIn):
     bid = rivals_client()
     st = month_out(bid)
     if not st["ready"]:
-        raise HTTPException(400, f"العقل ما زال فاهمك {st['score']}٪، والخطة تُنشأ من {PLAN_SCORE}٪ ومعها المجال وعن العلامة والجمهور. أكمل العقل أولًا")
+        raise HTTPException(400, f"العقل يفهمك الآن بنسبة {st['score']}٪، والخطة تُنشأ من {PLAN_SCORE}٪ مع المجال وعن العلامة والجمهور. أكمل العقل أولًا")
     if st["status"] == "working":
         raise HTTPException(400, "الخطة تُنشأ الآن")
     ps = pilot_load()["settings"]
@@ -5314,7 +5314,7 @@ def inbox_triage(body: TriageIn):
     coms = [{"id": str(c.get("id") or ""), "name": str(c.get("name") or "")[:60], "text": str(c.get("text") or "")[:500]}
             for c in body.comments if c.get("id") and str(c.get("text") or "").strip()][:60]
     if not coms:
-        raise HTTPException(400, "لا يوجد تعليقات تحتاج رد")
+        raise HTTPException(400, "لا توجد تعليقات تحتاج إلى رد")
     raw = growth.mock_triage(coms, body.keyword) if atlas.mock_mode() else growth_json(
         growth.triage_messages(growth_brand(), body.post, body.platform, body.keyword.strip()[:40], body.dm_hint.strip()[:400], coms), "فرز التعليقات")
     ids = {c["id"]: c for c in coms}
@@ -5343,9 +5343,9 @@ def viral_finder(body: ViralIn):
     """«ما حسنًا في مجالك»: كل منشور بمشاهداته ÷ متوسط حسابه، وتحليل له الأعلى نجحوا، وأفكار بنفس الهيكل للعلامة."""
     rows = growth.outliers([i for i in body.items if isinstance(i, dict)][:30])
     if not rows:
-        raise HTTPException(400, "أضف منشور واحد على الأقل")
+        raise HTTPException(400, "أضف منشورًا واحدًا على الأقل")
     if not any(r["multiple"] for r in rows):
-        raise HTTPException(400, "اكتب مشاهدات المنشور ومتوسط مشاهدات الحساب لكي نحسب المضاعف")
+        raise HTTPException(400, "اكتب مشاهدات المنشور ومتوسط مشاهدات الحساب لنحسب المضاعف")
     raw = growth.mock_viral(rows) if atlas.mock_mode() else growth_json(growth.viral_messages(growth_brand(), body.niche.strip()[:200], rows), "التحليل")
     return {"rows": rows, "top": raw.get("top") or [], "pattern": str(raw.get("pattern") or ""), "ideas": raw.get("ideas") or []}
 
@@ -5401,7 +5401,7 @@ def rivals_digest(brain: dict, items: list[dict]) -> dict:
 
 def rivals_job(bid: str, step: str, fn) -> None:
     if bid in RIVALS_BUSY:
-        raise HTTPException(409, "ما زال يعمل على المنافسين، انتظر قليلًا")
+        raise HTTPException(409, "ما زال العمل جاريًا على المنافسين، انتظر قليلًا")
     RIVALS_BUSY.add(bid)
     rivals_set(bid, status="working", step=step, error=None)
 
@@ -5422,7 +5422,7 @@ def rivals_key(i: dict) -> str:
 
 def rivals_search(bid: str, brain: dict, queries: list[str] | None = None) -> tuple[list[dict], list[str]]:
     """يبحث في المجال بكلام الأشخاص في السوق: منها نطلّع المنافسين والترند (أعلى منشورات آخر ٣٠ يوم)."""
-    rivals_set(bid, step="يبحث في المجال…")
+    rivals_set(bid, step="جارٍ البحث في المجال…")
     if not rivals.live():
         return rivals.mock_search(brain), queries or ["تجربة"]
     qs = queries
@@ -5540,7 +5540,7 @@ def rivals_brief(bid: str) -> None:
     brain = brain_row(bid) or {}
     items = rivals.approved(brain.get("competitors") or {})
     sg = rivals.sig(items)
-    rivals_set(bid, step="يحلّل ما ينجح لديهم…")
+    rivals_set(bid, step="جارٍ تحليل ما ينجح لديهم…")
     digest = rivals_digest(brain, items)
     if not rivals.live() or atlas.mock_mode():
         aud, n = rivals.mock_audience(), 0
@@ -5632,7 +5632,7 @@ def rivals_discover_ep():
     bid = rivals_client()
     b = brain_row(bid) or {}
     if not (b.get("domain") or b.get("about")):
-        raise HTTPException(400, "اكتب «المجال» في فرع الهوية أولًا، لكي نعرف ندوّر أين")
+        raise HTTPException(400, "اكتب «المجال» في فرع الهوية أولًا، لنعرف أين نبحث")
     if rivals.live() and not atlas.mock_mode():
         wallet.need(wallet.credits(wallet.est(scrape=40, chars=12000)), "اقتراح منافسين")
     rivals_job(bid, "يبحث عن منافسين في مجالك…", lambda: rivals_discover(bid))
@@ -5652,7 +5652,7 @@ def rivals_audience_ep():
     bid = rivals_client()
     ok = rivals.approved(rivals_state(bid))
     if not ok:
-        raise HTTPException(400, "يجب الموافقة على المنافسين الموجودين في صفحة المنافسين: يجب يصبح فيه منافس معتمد لكي الوصفة تُنشأ")
+        raise HTTPException(400, "وافق على المنافسين في صفحة المنافسين: يلزم منافس معتمد واحد على الأقل لتُنشأ الوصفة")
     if rivals.live() and not atlas.mock_mode():
         wallet.need(rivals_brief_cost(ok), "وصفة الاستهداف")
     rivals_set(bid, brief_try={"sig": rivals.sig(ok), "at": time.time()})
@@ -5673,16 +5673,16 @@ def rivals_add(body: RivalAddIn):
     handle = rivals.clean_handle(body.handle)
     plat = body.platform if body.platform in rivals.PLATFORMS else rivals.guess_platform(body.handle)
     if not handle:
-        raise HTTPException(400, "اكتب اسم الحساب أو الرابط الخاص به")
+        raise HTTPException(400, "اكتب اسم الحساب أو رابطه")
     items = rivals_state(bid).get("items") or []
     if any(rivals_key(i) == f"{plat}:{handle.lower()}" for i in items):
         raise HTTPException(400, "هذا الحساب موجود بالفعل")
     if not body.replace and sum(rivals.is_ok(i) for i in items) >= rivals.MAX_OK:
-        raise HTTPException(400, f"أقصى شيء {rivals.MAX_OK} منافس معتمد، أزل واحد أولًا")
+        raise HTTPException(400, f"الحد الأقصى {rivals.MAX_OK} منافسين معتمدين، أزل واحدًا أولًا")
 
     def work():
         it = rivals_fetch(plat, handle)
-        new = {**it, "id": uuid.uuid4().hex[:8], "why": "أنت ما ضفته", "state": "approved", "updated": time.time()}
+        new = {**it, "id": uuid.uuid4().hex[:8], "why": "لم تُضفه أنت", "state": "approved", "updated": time.time()}
 
         def fn(d):
             cc = d.setdefault("competitors", {})
@@ -5728,7 +5728,7 @@ def rivals_review(body: RivalReviewIn):
     """✅ وافق / ✕ ارفض: على واحد أو أكثر، أو على كل الاقتراحات مرة واحدة."""
     bid = rivals_client()
     if body.approve and sum(rivals.is_ok(i) for i in rivals_state(bid).get("items") or []) >= rivals.MAX_OK:
-        raise HTTPException(400, f"أقصى شيء {rivals.MAX_OK} منافس معتمد، أزل واحد أولًا")
+        raise HTTPException(400, f"الحد الأقصى {rivals.MAX_OK} منافسين معتمدين، أزل واحدًا أولًا")
     rivals_review_apply(bid, set(body.ids) or None, body.approve)
     return rivals_out(bid)
 
@@ -5784,7 +5784,7 @@ def ads_remember(bid: str, ad: dict) -> None:
 def ads_own(bid: str, ad_id: str) -> dict:
     hit = next((a for a in ads_mine(bid) if a["id"] == ad_id), None)
     if not hit:
-        raise HTTPException(404, "هذا الإعلان لا الخاص بـ هذا العلامة")
+        raise HTTPException(404, "هذا الإعلان لا يخص هذه العلامة")
     return hit
 
 
@@ -5869,7 +5869,7 @@ def ads_targeting(body: AdsTargetIn):
     bid = rivals_client()
     r = ads_recipe(bid)
     if not r:
-        raise HTTPException(400, "يجب الموافقة على المنافسين الموجودين في صفحة المنافسين لكي وصفة الاستهداف تُنشأ، وبعدها يمكنك تستخدمها هنا")
+        raise HTTPException(400, "وافق على المنافسين في صفحة المنافسين لتُنشأ وصفة الاستهداف، وبعدها يمكنك استخدامها هنا")
     names = r["tt_interests"] if body.platform == "tiktok" and r["tt_interests"] else r["interests"]
     found = ads_call(adsmgr.map_interests, names, body.account_id) if body.platform not in ("google",) else []
     return {"age_min": r["age"][0], "age_max": r["age"][1], "gender": r["gender"], "countries": r["countries"] or [], "locations": r["locations"],
@@ -5937,9 +5937,9 @@ def ads_check(body: AdsBase) -> None:
     if body.goal not in adsmgr.goals_for(body.platform):
         raise HTTPException(400, "هذا الهدف غير متاح على هذه المنصة")
     if not 1 <= body.days <= 90:
-        raise HTTPException(400, "مدة الإعلان من يوم لـ ٩٠ يوم")
+        raise HTTPException(400, "مدة الإعلان من يوم إلى ٩٠ يومًا")
     if not body.targeting.countries and body.platform != "google":
-        raise HTTPException(400, "اختر بلد واحدة على الأقل")
+        raise HTTPException(400, "اختر بلدًا واحدًا على الأقل")
 
 
 @app.post("/api/ads/boost")
@@ -5952,10 +5952,10 @@ def ads_boost(body: AdsBoostIn):
     with closing(db()) as conn:
         r = conn.execute("SELECT * FROM posts WHERE id = ? AND mine(client_id)", (body.post_id,)).fetchone()
     if not r or not r["remote_id"] or r["status"] != "published":
-        raise HTTPException(400, "هذا المنشور ما زال ما اتنشرش")
+        raise HTTPException(400, "لم يُنشر هذا المنشور بعد")
     tgt = next((t for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] == body.platform), None)
     if not tgt:
-        raise HTTPException(400, "هذا المنشور ما اتنشرش على هذه المنصة")
+        raise HTTPException(400, "لم يُنشر هذا المنشور على هذه المنصة")
     acc = body.account_id or (publisher.split_target(tgt)[1] or "")
     if not acc and publisher.service_name() == "zernio":
         acc = ads_call(publisher.resolve_targets, [tgt])[0][1]
@@ -5964,7 +5964,7 @@ def ads_boost(body: AdsBoostIn):
     ad = ads_call(adsmgr.boost, r["remote_id"], acc or "m-acc", body.ad_account, body.platform, body.name or f"ترويج: {(r['caption'] or '')[:40]}",
                   body.goal, body.budget, body.days, body.currency, body.targeting.model_dump())
     if not ad.get("id"):
-        raise HTTPException(400, "المنصة ما رجّعتش رقم الإعلان، انظر حساب الإعلانات")
+        raise HTTPException(400, "لم تُرجع المنصة رقم الإعلان، راجع حساب الإعلانات")
     ads_remember(bid, {"id": ad["id"], "name": ad["name"], "platform": body.platform, "kind": "boost", "goal": body.goal, "at": time.time(), "post": body.post_id})
     wallet.charge(fee, f"إعلاناتك: ترويج منشور على {adsmgr.PLATFORMS[body.platform][1]}", ad["id"])
     return ads_get()
@@ -5978,9 +5978,9 @@ def ads_create(body: AdsCreateIn):
     if not body.headline.strip():
         raise HTTPException(400, "اكتب عنوان الإعلان")
     if body.goal in ("traffic", "conversions", "lead_generation") and not body.link.startswith(("http://", "https://")):
-        raise HTTPException(400, "هذا الهدف يحتاج رابط يبدأ بـ https://")
+        raise HTTPException(400, "هذا الهدف يحتاج إلى رابط يبدأ بـ https://")
     if body.platform == "google" and not body.keywords:
-        raise HTTPException(400, "إعلان بحث جوجل يحتاج كلمات بحث")
+        raise HTTPException(400, "إعلان بحث جوجل يحتاج إلى كلمات بحث")
     media = ""
     if body.export_id:
         with closing(db()) as conn:
@@ -5997,7 +5997,7 @@ def ads_create(body: AdsCreateIn):
                   body.targeting.model_dump(), body.headline.strip(), body.body.strip(), body.link.strip(), media, body.cta, body.keywords,
                   body.more_headlines, body.more_bodies)
     if not ad.get("id"):
-        raise HTTPException(400, "المنصة ما رجّعتش رقم الإعلان، انظر حساب الإعلانات")
+        raise HTTPException(400, "لم تُرجع المنصة رقم الإعلان، راجع حساب الإعلانات")
     ads_remember(bid, {"id": ad["id"], "name": ad["name"], "platform": body.platform, "kind": "create", "goal": body.goal, "at": time.time()})
     wallet.charge(fee, f"إعلاناتك: إعلان جديد على {adsmgr.PLATFORMS[body.platform][1]}", ad["id"])
     return ads_get()
@@ -6053,7 +6053,7 @@ class AudienceIn(BaseModel):
 def ads_audience_new(body: AudienceIn):
     rivals_client()
     if not body.name.strip():
-        raise HTTPException(400, "اكتب اسم للجمهور")
+        raise HTTPException(400, "اكتب اسمًا للجمهور")
     a = ads_call(adsmgr.create_audience, body.account_id, body.ad_account, body.name.strip(), body.kind, body.source, body.country, body.ratio, body.pixel, body.days)
     return {"audience": a, **ads_audiences(body.account_id)}
 
@@ -6063,7 +6063,7 @@ async def ads_audience_users(audience_id: str, file: UploadFile = File(...), con
     """رفع عملائك (بريد إلكتروني أو رقم) لجمهور «قائمة عملاء». يجب يكونون وافقوا أنك تتواصل معهم، والبيانات تتشفّر قبل ما توصل للمنصة."""
     rivals_client()
     if consent != "yes":
-        raise HTTPException(400, "يجب تأكد أن هؤلاء العملاء وافقوا أنك تتواصل معهم")
+        raise HTTPException(400, "يجب أن تؤكد أن هؤلاء العملاء وافقوا على تواصلك معهم")
     raw = (await file.read())[:5_000_000].decode("utf-8-sig", errors="ignore")
     users = []
     for row in csv.reader(io.StringIO(raw)):
@@ -6128,13 +6128,13 @@ def wa_need() -> dict:
     wa_call(wacamp.ready)
     acc = wa_account()
     if not acc:
-        raise HTTPException(400, "اربط واتساب بيزنس أولًا من صفحة النشر")
+        raise HTTPException(400, "اربط واتساب للأعمال أولًا من صفحة النشر")
     return acc
 
 
 def wa_own(bid: str, key: str, val: str) -> None:
     if val not in (wa_state(bid).get(key) or []):
-        raise HTTPException(404, "هذا لا الخاص بـ هذا العلامة")
+        raise HTTPException(404, "هذا لا يخص هذه العلامة")
 
 
 @app.get("/api/wa")
@@ -6197,7 +6197,7 @@ def wa_number(body: WaNumberIn):
     bid = rivals_client()
     n = wacamp.phone(body.number) if body.number else ""
     if body.number and not n:
-        raise HTTPException(400, "الرقم يجب يكون بكود الدولة، مثلًا +966501234567")
+        raise HTTPException(400, "يجب أن يكون الرقم بمفتاح الدولة، مثلًا +966501234567")
     wa_set(bid, **({"number": n} if n else {}), **({"keyword": body.keyword.strip()[:60]} if body.keyword.strip() else {}))
     return wa_get()
 
@@ -6220,7 +6220,7 @@ def wa_add(body: WaPeopleIn):
     bid = rivals_client()
     acc = wa_need()
     if not body.consent:
-        raise HTTPException(400, "يجب تأكد أن هؤلاء الأشخاص وافقوا يوصلهم منك رسائل على واتساب")
+        raise HTTPException(400, "يجب أن تؤكد أن هؤلاء الأشخاص وافقوا على استقبال رسائل منك على واتساب")
     r = wa_call(wacamp.add_contacts, bid, acc["id"], body.people[:5000], body.tags, "manual")
     return {**r, **wa_get()}
 
@@ -6231,7 +6231,7 @@ async def wa_csv(file: UploadFile = File(...), tags: str = Form(""), consent: st
     bid = rivals_client()
     acc = wa_need()
     if consent != "yes":
-        raise HTTPException(400, "يجب تأكد أن هؤلاء الأشخاص وافقوا يوصلهم منك رسائل على واتساب")
+        raise HTTPException(400, "يجب أن تؤكد أن هؤلاء الأشخاص وافقوا على استقبال رسائل منك على واتساب")
     raw = (await file.read())[:5_000_000].decode("utf-8-sig", errors="ignore")
     people = []
     for row in csv.reader(io.StringIO(raw)):
@@ -6249,7 +6249,7 @@ class WaSubIn(BaseModel):
 
 def wa_own_contact(bid: str, cid: str) -> None:
     if not any(c["id"] == cid for c in wacamp.contacts(bid, limit=20000)["contacts"]):
-        raise HTTPException(404, "هذا المشترك لا الخاص بـ هذا العلامة")
+        raise HTTPException(404, "هذا المشترك لا يخص هذه العلامة")
 
 
 @app.patch("/api/wa/contacts/{cid}")
@@ -6335,10 +6335,10 @@ def wa_broadcast(body: WaBroadcastIn):
     acc = wa_need()
     tpl = next((t for t in wa_call(wacamp.templates, acc["id"]) if t["name"] == body.template), None)
     if not tpl or tpl["status"] != "APPROVED":
-        raise HTTPException(400, "هذا القالب لم يُعتمد عليه بعد من واتساب")
+        raise HTTPException(400, "لم يعتمد واتساب هذا القالب بعد")
     ids = wa_call(wa_audience, bid, body.tag)
     if not ids:
-        raise HTTPException(400, "لا يوجد مشتركين في هذه القائمة")
+        raise HTTPException(400, "لا يوجد مشتركون في هذه القائمة")
     fee = wa_fee(len(ids))
     wallet.need(fee, "حملة واتساب")
     when = body.when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if body.when else None
@@ -6378,7 +6378,7 @@ def wa_seq_new(body: WaSeqIn):
     acc = wa_need()
     ok = {t["name"] for t in wa_call(wacamp.templates, acc["id"]) if t["status"] == "APPROVED"}
     if any(s.template not in ok for s in body.steps):
-        raise HTTPException(400, "كل خطوة يجب يكون قالبها متوافق عليه من واتساب")
+        raise HTTPException(400, "يجب أن يكون قالب كل خطوة معتمدًا من واتساب")
     sq = wa_call(wacamp.sequence, acc["id"], body.name.strip() or "سلسلة متابعة", [s.model_dump() for s in body.steps], body.language)
     wa_push(bid, "sequences", sq["id"])
     n = 0
@@ -6419,19 +6419,19 @@ def wa_auto_new(body: WaAutoIn):
     bid = rivals_client()
     wa_call(wacamp.ready)
     if body.platform not in ("instagram", "facebook"):
-        raise HTTPException(400, "الرد التلقائي على التعليقات في إنستجرام وفيسبوك فقط")
+        raise HTTPException(400, "الرد التلقائي على التعليقات متاح في إنستغرام وفيسبوك فقط")
     with closing(db()) as conn:
         r = conn.execute("SELECT * FROM posts WHERE id = ? AND mine(client_id)", (body.post_id,)).fetchone()
     if not r or not r["remote_id"] or r["status"] != "published":
-        raise HTTPException(400, "هذا المنشور ما زال ما اتنشرش")
+        raise HTTPException(400, "لم يُنشر هذا المنشور بعد")
     tgt = next((t for t in json.loads(r["platforms"]) if publisher.split_target(t)[0] == body.platform), None)
     if not tgt:
-        raise HTTPException(400, "هذا المنشور ما اتنشرش على هذه المنصة")
+        raise HTTPException(400, "لم يُنشر هذا المنشور على هذه المنصة")
     acc = publisher.split_target(tgt)[1] or ("m-acc" if publisher.service_name() == "mock" else wa_call(publisher.resolve_targets, [tgt])[0][1])
     w = wa_get()
     dm = body.dm.strip() or (f"أهلًا! كلّمنا على واتساب من هنا وسنبعتلك التفاصيل: {w['link']}" if w["link"] else "")
     if not dm:
-        raise HTTPException(400, "اكتب رقم الواتساب أولًا لكي الرابط يُنشأ")
+        raise HTTPException(400, "اكتب رقم الواتساب أولًا ليُنشأ الرابط")
     pid = wa_call(wacamp.platform_post_id, r["remote_id"], body.platform)
     a = wa_call(wacamp.comment_automation, acc, pid, f"علّق بكلمة: {(r['caption'] or '')[:40]}", body.keywords, dm, body.reply.strip())
     if a.get("id"):
@@ -6859,7 +6859,7 @@ def autopilot_set_time(job_id: str, body: dict):
     """يغيّر موعد نشر مشروع ما زال متجدولش (فارغ = أول موعد فارغ)."""
     at = str(body.get("at") or "") or None
     if at and not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?", at):
-        raise HTTPException(400, "الموعد غير مظبوط")
+        raise HTTPException(400, "الموعد غير صحيح")
     autopilot_update(job_id, at=at)
     return autopilot_state()
 
@@ -6995,7 +6995,7 @@ def project_algo_prep(project_id: str, min_sec: float = 0.0):
 def project_fillers(project_id: str):
     """الحشو (أمم/نعم) والنص المتكرر في الفيديوهات التي بصوت: يكتب نص كل قطعة (يُحسب من رصيد Atlas) ويعلّمه بالأحمر."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "يحتاج مفتاح Atlas لكي يسمع النص")
+        raise HTTPException(400, "خدمة الاستماع للكلام غير مهيأة بعد. تواصل مع الدعم")
     with closing(db()) as conn:
         data = json.loads(get_project(conn, project_id)["data"])
         jobs = []
@@ -7035,14 +7035,14 @@ def project_beats(project_id: str):
         m = data.get("music")
         row = conn.execute("SELECT filename FROM audio WHERE id = ? AND kind = 'music'", (m["id"],)).fetchone() if m else None
     if not row or not (AUDIO_DIR / row["filename"]).exists():
-        raise HTTPException(400, "ضع مزيكا في المشروع أولًا")
+        raise HTTPException(400, "أضف موسيقى إلى المشروع أولًا")
     path = AUDIO_DIR / row["filename"]
     key = f"{row['filename']}:{path.stat().st_mtime}"
     if key not in BEATS_CACHE:
         BEATS_CACHE[key] = lab.beat_grid(lab.onsets(lab.pcm(ffmpeg_exe(), path), 2000), media_info(path).duration)
     g = BEATS_CACHE[key]
     if not g["beats"]:
-        raise HTTPException(400, "لم أجد إيقاع واضح في هذه المزيكا")
+        raise HTTPException(400, "لم أجد إيقاعًا واضحًا في هذه الموسيقى")
     part = track_parts(m)[0]
     delay, offset = max(0.0, float(part.get("delay") or 0)), max(0.0, float(part.get("offset") or 0))
     return {"period": g["period"], "beats": [round(delay + t - offset, 3) for t in g["beats"] if t >= offset]}
@@ -7151,7 +7151,7 @@ def caption_words(audio_id: str, lang: str) -> list[dict]:
         raise HTTPException(404, "الملف غير موجود")
     tr = transcript_of(row)
     if tr.get("status") != "done" or not tr.get("words"):
-        raise HTTPException(400, "ما زال النص الخاص بالتعليق الصوتي لم يكتب")
+        raise HTTPException(400, "لم يُكتب نص التعليق الصوتي بعد")
     if not lang:
         return tr["words"]
     if lang not in CAPTION_LANGS:
@@ -7226,7 +7226,7 @@ def upload_logo(file: UploadFile = File(...)):
     """الشعار الأساسي للعميل المختار (يصبح أول شعار في ملفه)."""
     cid = active_client_id()
     if not cid:
-        raise HTTPException(400, "اختر عميل أولًا")
+        raise HTTPException(400, "اختر عميلًا أولًا")
     name = save_upload(file, IMAGE_EXTENSIONS, brain_dir(cid), "logo")
     update_brain(cid, lambda d: d.update(logos=[{"file": name, "name": "الشعار", "description": ""}] + (d.get("logos") or [])))
     return get_logo()
@@ -8102,7 +8102,7 @@ def carousel_plan(cid: str):
     with closing(db()) as conn:
         _, data = load_carousel(conn, cid)
     if not data["chat"]:
-        raise HTTPException(400, "اتكلم مع النموذج عن الفكرة أولًا")
+        raise HTTPException(400, "تحدّث مع النموذج عن الفكرة أولًا")
     n = data["settings"]["slides"]
     check_kind_ready(data)
     ctx, _ = carousel_context(data)
@@ -8293,7 +8293,7 @@ def start_job(cid: str, target, *args) -> None:
 
 def need_atlas() -> None:
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
 
 
 @app.post("/api/carousels/{cid}/overview")
@@ -8417,7 +8417,7 @@ def ready_slides(cid: str) -> tuple[sqlite3.Row, dict, list[Path]]:
     with closing(db()) as conn:
         row, data = load_carousel(conn, cid)
     if not data["slides"] or any(s.get("status") != "done" or not s.get("file") for s in data["slides"]):
-        raise HTTPException(400, "خلّص رسم كل السلايدات أولًا")
+        raise HTTPException(400, "أكمل رسم كل الشرائح أولًا")
     if cid in CAROUSEL_JOBS:
         raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
     return row, data, post_images(cid, data)
@@ -8434,7 +8434,7 @@ def publish_carousel(cid: str, body: CarouselPostIn):
     """كاروسيل صور على إنستجرام عن طريق Zernio (فوري أو مجدول)، مع تاج المدرب على سلايد."""
     _, _, images = ready_slides(cid)
     if not 2 <= len(images) <= 10:
-        raise HTTPException(400, "إنستجرام يقبل كاروسيل من 2 لـ 10 صور")
+        raise HTTPException(400, "يقبل إنستغرام الكاروسيل من 2 إلى 10 صور")
     when = body.scheduled_at
     if when.tzinfo is None:
         raise HTTPException(400, "الموعد يجب يكون فيه المنطقة الزمنية")
@@ -8750,7 +8750,7 @@ def get_episode(eid: str):
 @app.delete("/api/episodes/{eid}")
 def delete_episode(eid: str):
     if eid in SERIES_JOBS:
-        raise HTTPException(400, "انتظر حتى ما التجميع ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التجميع")
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM episodes WHERE id = ?", (eid,))
     shutil.rmtree(SERIES_DIR / "episodes" / Path(eid).name, ignore_errors=True)
@@ -8993,13 +8993,13 @@ def episode_shots(eid: str):
         r, data = episode_row(conn, eid)
         _, sdata = series_for_episode(conn, r)
     if not data["audio"] or not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
-        raise HTTPException(400, "رقّم جمل التعليق الصوتي على الصوت أولًا")
+        raise HTTPException(400, "وقّت جمل التعليق الصوتي على الصوت أولًا")
     total = data["audio"]["duration"]
     if atlas.mock_mode():
         shots = sz.mock_shots(data["lines"], total)
     else:
         if not atlas.api_key():
-            raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
         reply = series_chat(sz.shots_messages(sdata["bible"], sdata["character"], data["script"], data["lines"], total, data["notes"]))
         try:
             shots = sz.parse_shots(reply, total)
@@ -9214,7 +9214,7 @@ def insert_times(shots: list[dict], after: str, seconds: float, take_from: str) 
         b = min(seconds - a, room_next)
         a = min(seconds - b, room_prev)
     if a + b < 0.3:
-        raise HTTPException(400, "لا يوجد وقت كفاية في اللقطات التي جنبها (كل لقطة يجب تظل نص ثانية على الأقل)")
+        raise HTTPException(400, "لا يوجد وقت كافٍ في اللقطات المجاورة (يجب أن تبقى كل لقطة نصف ثانية على الأقل)")
     start = prev["end"] - a
     return k, start, start + a + b, a + b
 
@@ -9296,12 +9296,12 @@ def run_reprompt(eid: str, ids: list[str]) -> None:
 def reprompt_episode(eid: str, shot_id: str | None = None):
     """أوصاف جديدة على النص الحالي: لقطة واحدة (shot_id) أو كل اللقطات. الستوري بورد والفيديوهات القديمة يظلون."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         _, data = episode_row(conn, eid)
     ids = [x["id"] for x in data["shots"] if (shot_id is None or x["id"] == shot_id) and x.get("prompt_status") != "working"]
     if not ids:
-        raise HTTPException(400, "الوصف يكتب بالفعل")
+        raise HTTPException(400, "الوصف قيد الكتابة بالفعل")
     start_reprompt(eid, ids)
     return episode_response(eid)
 
@@ -9326,7 +9326,7 @@ def describe_shot(eid: str, shot_id: str):
         fields = sz.mock_one_shot(prev, " ".join(said))
     else:
         if not atlas.api_key():
-            raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
         try:
             fields = sz.parse_one_shot(series_chat(sz.insert_shot_messages(
                 sdata["bible"], sdata["character"], prev, nxt, said, x["end"] - x["start"], idea)))
@@ -9398,7 +9398,7 @@ def retry_take(eid: str, take_id: str):
 @app.post("/api/episodes/{eid}/shots/{shot_id}/generate")
 def generate_take(eid: str, shot_id: str):
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     tid = uuid.uuid4().hex[:10]
     with closing(db()) as conn:
         r, _ = episode_row(conn, eid)
@@ -9512,11 +9512,11 @@ def write_episode(eid: str, body: WriteIn):
         reply = sz.mock_script(r["number"], chat)
     else:
         if not atlas.api_key():
-            raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
         reply = series_chat(sz.writer_messages(sdata["bible"], sdata["character"], previous, r["number"], chat), json_mode=False)
     script = sz.clean_script(reply)
     if not sz.parse_script(script)["lines"]:
-        raise HTTPException(400, "النموذج استعد رد غير نص. جرّب مرة أخرى أو وضّح طلبك")
+        raise HTTPException(400, "أعاد النموذج ردًا غير نصي. جرّب مرة أخرى أو وضّح طلبك")
     def fn(d):
         d["chat"] = chat + [{"role": "assistant", "content": script}]
         d["script"] = script
@@ -9554,7 +9554,7 @@ def rewrite_episode(eid: str, body: WriteIn):
         r, data = episode_row(conn, eid)
         _, sdata = series_for_episode(conn, r)
     if not data["lines"] or any(ln.get("start") is None for ln in data["lines"]):
-        raise HTTPException(400, "الحلقة ما زال لا تحتوي جمل متوقتة على الصوت")
+        raise HTTPException(400, "لا تحتوي الحلقة بعد على جمل موقّتة على الصوت")
     rows = rewrite_rows(data)
     rw = data.get("rewrite") or {"chat": [], "lines": []}
     chat = list(rw["chat"])
@@ -9564,7 +9564,7 @@ def rewrite_episode(eid: str, body: WriteIn):
         reply = sz.mock_rewrite(rows, chat)
     else:
         if not atlas.api_key():
-            raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
         reply = series_chat(sz.rewrite_messages(sdata["bible"], sdata["character"], rows, data["shots"], chat))
     try:
         new = sz.parse_rewrite(reply, rows)
@@ -9715,19 +9715,19 @@ def queue_frames(eid: str, ids: list[str]) -> None:
 def episode_frames(eid: str, shot_id: str | None = None):
     """يرسم الستوري بورد: لقطة واحدة (نسخة جديدة)، أو كل اللقطات التي ما زال ليس لها صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         _, data = episode_row(conn, eid)
     busy = {"queued", "working"}
     if shot_id:
         s = find_shot(data, shot_id)
         if s.get("frame_status") in busy:
-            raise HTTPException(400, "هذه الصورة ترسم")
+            raise HTTPException(400, "هذه الصورة قيد الرسم")
         ids = [shot_id]
     else:
         ids = [s["id"] for s in data["shots"] if not s.get("frame") and s.get("frame_status") not in busy]
     if not ids:
-        raise HTTPException(400, "كل اللقطات لها ستوري بورد")
+        raise HTTPException(400, "كل اللقطات لها لوحة قصة")
     queue_frames(eid, ids)
     return episode_response(eid)
 
@@ -9765,7 +9765,7 @@ def generate_approved(eid: str):
     todo = [s["id"] for s in data["shots"] if s.get("approved")
             and not any(data["takes"].get(t, {}).get("status") in ok for t in s.get("takes", []))]
     if not todo:
-        raise HTTPException(400, "لا يوجد لقطات معتمدة تحتاج توليد. اعتمد اللقطات أولًا")
+        raise HTTPException(400, "لا توجد لقطات معتمدة تحتاج إلى توليد. اعتمد اللقطات أولًا")
     for sid in todo:
         generate_take(eid, sid)
     return episode_response(eid)
@@ -9828,7 +9828,7 @@ def episode_to_editor(eid: str):
         return t.get("status") == "done" and bool(t.get("file")) and bool(t.get("approved"))
     missing = [s["n"] for s in data["shots"] if not ok(s)]
     if missing:
-        raise HTTPException(400, f"هذه اللقطات ما زال بدون فيديو موافق عليه: {', '.join(map(str, missing))}")
+        raise HTTPException(400, f"هذه اللقطات ما زالت بلا فيديو معتمد: {', '.join(map(str, missing))}")
     label = f"{sr['name']} — {r['name']}"
     clips = []
     with closing(db()) as conn, conn:
@@ -10014,7 +10014,7 @@ def atlas_money():
         return {"balance": 10.5, "currency": "usd", "spent_today": 0.42, "spent_week": 3.1, "tracked_since": now(),
                 "models_recent": [{"name": "kwaivgi/kling-v2.6-pro/avatar", "type": "video", "requests": 2}]}
     if not atlas.api_key():
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     try:
         with httpx.Client(timeout=20) as client:
             b = client.get(f"{ATLAS_PUBLIC}/balance", headers=atlas._headers()).json()
@@ -10189,7 +10189,7 @@ def apply_ad_edit(original: Path, out: Path, edit: dict | None) -> None:
              "-movflags", "+faststart", str(out)]
     r = subprocess.run(args, capture_output=True, text=True, timeout=900)
     if r.returncode != 0 or not out.exists():
-        raise HTTPException(400, f"تعذّر ذلك أقص الفيديو: {r.stderr[-300:]}")
+        raise HTTPException(400, f"تعذّر قص الفيديو: {r.stderr[-300:]}")
 
 
 def ad_source_from(folder: Path, original: str, edit: dict | None, display_name: str | None) -> dict:
@@ -10288,7 +10288,7 @@ def edit_ad(aid: str, body: AdEditIn):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if d.get("status") in ("queued", "working"):
-        raise HTTPException(400, "انتظر عندما التحليل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التحليل الجاري")
     folder = ad_dir(aid)
     original = d["source"].get("original") or d["source"]["file"]
     source = ad_source_from(folder, original, parse_ad_edit(body.start, body.end, body.crop), d["source"].get("name"))
@@ -10334,9 +10334,9 @@ def scene_components(aid: str):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if not d.get("analysis"):
-        raise HTTPException(400, "انتظر عندما التحليل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التحليل")
     if d.get("scomp_status") == "working":
-        raise HTTPException(400, "التفصيص يعمل بالفعل")
+        raise HTTPException(400, "التفصيل جارٍ بالفعل")
     update_ad(aid, lambda d: d.update(scomp_status="working"))
     threading.Thread(target=run_scene_components, args=(aid,), daemon=True).start()
     return ad_response(aid)
@@ -10347,7 +10347,7 @@ def reanalyze_ad(aid: str):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if d.get("status") in ("queued", "working"):
-        raise HTTPException(400, "التحليل يعمل بالفعل")
+        raise HTTPException(400, "التحليل جارٍ بالفعل")
     update_ad(aid, lambda d: d.update(status="queued", error=None))
     threading.Thread(target=run_ad_analysis, args=(aid,), daemon=True).start()
     return ad_response(aid)
@@ -10364,9 +10364,9 @@ def adapt_ad(aid: str, body: AdAdaptIn):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if not d.get("analysis"):
-        raise HTTPException(400, "انتظر عندما التحليل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التحليل")
     if d.get("adapt_status") == "working":
-        raise HTTPException(400, "الاقتراح يكتب بالفعل")
+        raise HTTPException(400, "الاقتراح قيد الكتابة بالفعل")
     msg = body.message.strip()[:3000]
     def fn(d):
         d["adapt_status"], d["adapt_error"] = "working", None
@@ -10477,9 +10477,9 @@ def audio_analyze(aid: str):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if not (d.get("source") or {}).get("has_audio"):
-        raise HTTPException(400, "هذا الفيديو لا يحتوي صوت")
+        raise HTTPException(400, "هذا الفيديو لا يحتوي على صوت")
     if d.get("audio_status") == "working":
-        raise HTTPException(400, "الصوت يتحلل بالفعل")
+        raise HTTPException(400, "الصوت قيد التحليل بالفعل")
     update_ad(aid, lambda d: d.update(audio_status="working", audio_error=None))
     threading.Thread(target=run_ad_audio, args=(aid,), daemon=True).start()
     return ad_response(aid)
@@ -10595,9 +10595,9 @@ def ad_directions(aid: str):
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     if not d.get("analysis"):
-        raise HTTPException(400, "انتظر عندما التحليل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التحليل")
     if d.get("directions_status") == "working":
-        raise HTTPException(400, "يفكر في الاتجاهات بالفعل")
+        raise HTTPException(400, "التفكير في الاتجاهات جارٍ بالفعل")
     update_ad(aid, lambda d: d.update(directions_status="working", directions_error=None))
     threading.Thread(target=run_ad_directions, args=(aid,), daemon=True).start()
     return ad_response(aid)
@@ -10724,7 +10724,7 @@ def help_chat(body: HelpIn):
         raise HTTPException(400, "اكتب سؤالك")
     day = datetime.now(timezone.utc).date().isoformat()
     if HELP_DAY.get(day, 0) >= HELP_LIMIT:
-        raise HTTPException(429, "وصلت حتى أسئلة اليوم. جرّب غدًا، أو أرسل المشكلة للدعم")
+        raise HTTPException(429, "بلغت حد أسئلة اليوم. جرّب غدًا، أو أرسل المشكلة إلى الدعم")
     if day not in HELP_DAY:   # يوم جديد: العدّاد بيبدأ من الأول
         HELP_DAY.clear()
     HELP_DAY[day] = HELP_DAY.get(day, 0) + 1
@@ -10741,7 +10741,7 @@ def help_chat(body: HelpIn):
         except (atlas.AtlasError, httpx.HTTPError) as exc:
             print(f"[help] {model}: {str(exc)[:160]}", flush=True)
             continue
-    raise HTTPException(502, "المساعد غير متاح الآن. جرّب بعد قليل، أو أرسل المشكلة للدعم")
+    raise HTTPException(502, "المساعد غير متاح الآن. جرّب بعد قليل، أو أرسل المشكلة إلى الدعم")
 
 
 class TicketIn(BaseModel):
@@ -10817,7 +10817,7 @@ def audiences_extract(bid: str) -> list[dict]:
     else:
         items = audiences_clean(flow_llm(audiences_messages(b), "استخلاص الجماهير").get("audiences"))   # flow_llm بيخصم من الرصيد
     if not items:
-        raise HTTPException(400, "تعذّر استخلاص جمهور من الوصف. اكتب عن العلامة وجمهوره في العقل أولًا")
+        raise HTTPException(400, "تعذّر استخلاص جمهور من الوصف. اكتب عن العلامة وجمهورها في العقل أولًا")
     update_brain(bid, lambda d: d.update(audiences=items, audiences_auto=True))
     return items
 
@@ -11231,7 +11231,7 @@ def first_wait(fid: str, ok, what: str, retry=None, limit: float = 900) -> dict:
             flow_update(fid, lambda x: x.update(error=None, busy=None))
             retry()
         time.sleep(2)
-    raise HTTPException(400, f"{what} أخذ وقتًا أطول من اللازم")
+    raise HTTPException(400, f"{what} استغرق وقتًا أطول من اللازم")
 
 
 FIRST_GIFT_MAX = 300   # سقف هدية أول فيديو (أكبر من تكلفته بكتير، عشان أي توليد تاني في نفس الوقت مايبقاش مجاني)
@@ -11294,7 +11294,7 @@ def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | 
             if o.get("status") == "done" and o.get("asset"):
                 break
             if time.time() - t0 > 1500:
-                raise HTTPException(400, "رسم الفيديو أخذ وقتًا أطول من اللازم")
+                raise HTTPException(400, "رسم الفيديو استغرق وقتًا أطول من اللازم")
             put(progress=round((o.get("progress") or 0) * 100))
             time.sleep(3)
         done.append("draw")
@@ -11405,7 +11405,7 @@ def migrate_rules() -> None:
 def upload_brand_video(bid: str, kind: str = Form("outro"), file: UploadFile = File(...)):
     """🎬 إنترو / أوترو العلامة: ينزل تلقائيًا في أول/آخر كل مونتاج إذا متفعّل."""
     if kind not in BRAND_VIDEOS:
-        raise HTTPException(400, "النوع يجب intro أو outro")
+        raise HTTPException(400, "يجب أن يكون النوع intro أو outro")
     if not brain_row(bid):
         raise HTTPException(404, "هذا العميل غير موجود")
     ext = Path(file.filename or "").suffix.lower()
@@ -11433,7 +11433,7 @@ def upload_brand_video(bid: str, kind: str = Form("outro"), file: UploadFile = F
 @app.delete("/api/ad-brains/{bid}/brand-video/{kind}")
 def delete_brand_video(bid: str, kind: str):
     if kind not in BRAND_VIDEOS:
-        raise HTTPException(400, "النوع يجب intro أو outro")
+        raise HTTPException(400, "يجب أن يكون النوع intro أو outro")
     def fn(d):
         old = d.pop(f"{kind}_file", None)
         if old:
@@ -11515,7 +11515,7 @@ def make_brand_video(bid: str, body: BrandMakeIn):
     if b is None:
         raise HTTPException(404, "هذا العميل غير موجود")
     if body.kind not in BRAND_REEL:
-        raise HTTPException(400, "النوع يجب intro أو outro")
+        raise HTTPException(400, "يجب أن يكون النوع intro أو outro")
     key = f"{bid}:{body.kind}"
     if (BRAND_JOBS.get(key) or {}).get("status") == "working":
         raise HTTPException(400, "يُرسم الآن، انتظر حتى ينتهي")
@@ -11758,7 +11758,7 @@ def run_style_clone(bid: str, sid: str, url: str, files: list[str], colors: list
 def add_custom_style(bid: str, url: str = Form(""), colors: str = Form(""), note: str = Form(""), name: str = Form(""),
                      files: list[UploadFile] = File(default=[])):
     if not brain_row(bid):
-        raise HTTPException(404, "هذا العلامة غير موجود")
+        raise HTTPException(404, "هذه العلامة غير موجودة")
     url = url.strip()
     if url:
         try:
@@ -11767,7 +11767,7 @@ def add_custom_style(bid: str, url: str = Form(""), colors: str = Form(""), note
             raise HTTPException(400, str(exc)) from None
     cols = [c for c in dict.fromkeys(("#" + x.lstrip("#").lower()) for x in re.findall(r"#?[0-9a-fA-F]{6}\b", colors or ""))][:6]
     if not url and not files and not cols:
-        raise HTTPException(400, "ضع رابط، أو ارفع صور وفيديوهات، أو اختر ألوان")
+        raise HTTPException(400, "ضع رابطًا، أو ارفع صورًا وفيديوهات، أو اختر ألوانًا")
     if not atlas.mock_mode():
         wallet.need(1)
     folder = brain_dir(bid) / "styles"
@@ -11838,12 +11838,12 @@ SUGGEST_FIELDS = {"typography": ("fonts for this brand: one font for headlines a
 def brain_suggest_field(bid: str, field: str):
     b = brain_row(bid)
     if not b:
-        raise HTTPException(404, "هذا العلامة غير موجود")
+        raise HTTPException(404, "هذه العلامة غير موجودة")
     if field not in SUGGEST_FIELDS:
-        raise HTTPException(400, "لا يوجد اقتراح هذه للخانة")
+        raise HTTPException(400, "لا يوجد اقتراح لهذه الخانة")
     ask, mock = SUGGEST_FIELDS[field]
     if atlas.mock_mode():
-        out = {"value": mock, "why": "خطوط واضحة وتدعم العربية، وشكلها مناسب للسوشيال"}
+        out = {"value": mock, "why": "خطوط واضحة تدعم العربية، وشكلها مناسب لمنصات التواصل"}
     else:
         wallet.need(1, "اقتراح")
         msgs = [{"role": "system", "content": "You are a brand designer. Return JSON only."},
@@ -11854,7 +11854,7 @@ def brain_suggest_field(bid: str, field: str):
         wallet.charge(wallet.credits(wallet.est(chars=6000)), f"عقل العلامة: اقتراح {field}", bid)
     val = str(out.get("value") or "").strip()[:600]
     if not val:
-        raise HTTPException(502, "العقل مااقترحش شيء، جرّب مرة أخرى")
+        raise HTTPException(502, "لم يقترح العقل شيئًا، جرّب مرة أخرى")
     item = {"id": uuid.uuid4().hex[:10], "kind": "field", "field": field, "value": val, "why": str(out.get("why") or "").strip()[:300], "source": "suggest"}
 
     def fn(d):
@@ -11924,7 +11924,7 @@ def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[Uploa
         name = save_upload(f, IMAGE_EXTENSIONS, folder, kind[:-1])
         added.append({"file": name, "name": Path(f.filename or name).stem[:60], "description": ""})
     if not added:
-        raise HTTPException(400, "لا يوجد صور في هذه الملفات (PNG / JPG / WEBP)")
+        raise HTTPException(400, "لا توجد صور في هذه الملفات (PNG / JPG / WEBP)")
     update_brain(bid, lambda d: d.setdefault(kind, []).extend(added) or d.update(status="working", error=None))
     threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
     return brain_to_dict(brain_row(bid))
@@ -12008,7 +12008,7 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
                                 else "تحليل الحسابات غير متاح الآن. جرّب مرة أخرى بعد قليل")
         new.append({"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle})
     if not new:
-        raise HTTPException(400, "ارمي ملف أو ضع رابط أو اكتب شيء")
+        raise HTTPException(400, "أضف ملفًا أو ضع رابطًا أو اكتب شيئًا")
     # 💳 قبل ما نبدأ: الرصيد لازم يكفي التقدير (تحليل الحساب أغلى من قراية ملف)
     try:
         wallet.need(sum(wallet.credits(wallet.est(scrape=3, chars=40000, images=20, stt_min=3)) if x["kind"] == "social" else 3 for x in new), "قراءة المصادر")
@@ -12457,7 +12457,7 @@ class FeedbackIn(BaseModel):
 @app.post("/api/feedback")
 def add_feedback(body: FeedbackIn):
     if body.rating not in ("great", "bad"):
-        raise HTTPException(400, "التقييم يجب يصبح ممتاز أو غير يعجبني")
+        raise HTTPException(400, "يجب أن يكون التقييم «ممتاز» أو «لم تعجبني»")
     bid = body.client_id or active_client_id()
     if not bid or brain_row(bid) is None:
         raise HTTPException(400, "اختر العميل أولًا")
@@ -12745,7 +12745,7 @@ def save_ad_style(aid: str, body: SaveStyleIn):
     folder = ad_dir(aid)
     frames = [folder / "frames" / s["frame"] for s in a.get("scenes") or [] if s.get("frame") and (folder / "frames" / s["frame"]).exists()]
     if not frames:
-        raise HTTPException(400, "لا يوجد صور من الإعلان ما زال. انتظر عندما التحليل ينتهي")
+        raise HTTPException(400, "لا توجد صور من الإعلان بعد. انتظر حتى ينتهي التحليل")
     step = max(1, len(frames) // 6)
     notes = "\n".join(x for x in [a.get("cinematography"), a.get("colors"), a.get("editing")] if x)
     sid = add_style(body.name.strip() or f"أسلوب {r['name']}", frames[::step][:6], notes, from_ad=aid)
@@ -12877,9 +12877,9 @@ def prod_start(aid: str):
         _, d = ad_row(conn, aid)
     a = d.get("adaptation")
     if not a or not a.get("scenes"):
-        raise HTTPException(400, "لا يوجد اقتراح هذا للإعلان ما زال")
+        raise HTTPException(400, "لا يوجد اقتراح لهذا الإعلان بعد")
     if prod_busy(d.get("prod")):
-        raise HTTPException(400, "في توليد يعمل في التنفيذ الحالي. انتظر عندما ينتهي")
+        raise HTTPException(400, "يوجد توليد جارٍ في التنفيذ الحالي. انتظر حتى ينتهي")
     settings = d.get("settings") or {}
     header = az.header_from(a, ad_style(settings.get("style_id")), brand_settings(), settings, ad_brain(settings))
     scenes = a["scenes"]
@@ -12935,7 +12935,7 @@ def prod_restore(aid: str, i: int = 0):
         if not 0 <= i < len(hist):
             raise HTTPException(404, "لا يوجد تنفيذ قديم هذا بالرقم")
         if prod_busy(d.get("prod")):
-            raise HTTPException(400, "في توليد يعمل في التنفيذ الحالي. انتظر عندما ينتهي")
+            raise HTTPException(400, "يوجد توليد جارٍ في التنفيذ الحالي. انتظر حتى ينتهي")
         old = {k: v for k, v in hist.pop(i).items() if k != "archived_at"}
         if d.get("prod") and d["prod"].get("shots"):
             hist.insert(0, {**d["prod"], "archived_at": now()})
@@ -13161,7 +13161,7 @@ def run_ad_frame(aid: str, sid: str, note: str = "", extra: list[str] | None = N
 def prod_frame_cancel(aid: str, sid: str, redo: bool = False):
     """✕ الغي الرسم الذي معلّق (وإذا redo يبدأ رسم جديد مباشرة). الرسم القديم إذا خلص لاحقًا نتيجته تترمي."""
     if redo and not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     def fn(d):
         s = find_pshot(prod_of(d), sid)
         s["frame_gen"] = s.get("frame_gen", 0) + 1
@@ -13178,7 +13178,7 @@ def prod_frames(aid: str, shot_id: str | None = None, note: str = "", redo: bool
     """redo: كل اللقطات التي غير معتمدة تُرسم من جديد والجديد يحذف القديم (المعتمدة متتلمسش)."""
     """الستوري بورد: لقطة واحدة (نسخة جديدة) أو كل اللقطات التي ما زال ليس لها صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
@@ -13186,9 +13186,9 @@ def prod_frames(aid: str, shot_id: str | None = None, note: str = "", redo: bool
     ids = [shot_id] if shot_id else [s["id"] for s in p["shots"] if s.get("frame_status") not in busy
                                      and (not s.get("frame") or (redo and not s.get("approved")))]
     if shot_id and find_pshot(p, shot_id).get("frame_status") in busy:
-        raise HTTPException(400, "هذه الصورة ترسم")
+        raise HTTPException(400, "هذه الصورة قيد الرسم")
     if not ids:
-        raise HTTPException(400, "كل اللقطات لها ستوري بورد")
+        raise HTTPException(400, "كل اللقطات لها لوحة قصة")
     def fn(d):
         for s in d["prod"]["shots"]:
             if s["id"] in ids:
@@ -13213,7 +13213,7 @@ def save_edit_refs(aid: str, files: list[UploadFile]) -> list[str]:
 def prod_edit_frame(aid: str, sid: str, note: str = Form(""), files: list[UploadFile] = File(default=[])):
     """✏️ تعديل الستوري بورد بطلبك، ومعه صور مرجعية إذا تريد."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     note = note.strip()[:1500]
     if not note:
         raise HTTPException(400, "اكتب تريد تعدّل ماذا")
@@ -13223,7 +13223,7 @@ def prod_edit_frame(aid: str, sid: str, note: str = Form(""), files: list[Upload
         if not s.get("frame"):
             raise HTTPException(400, "هذه اللقطة ليس لها ستوري بورد ما زال")
         if s.get("frame_status") in ("queued", "working"):
-            raise HTTPException(400, "هذه الصورة ترسم")
+            raise HTTPException(400, "هذه الصورة قيد الرسم")
         s.update(frame_status="queued", frame_error=None)
     update_ad(aid, fn)
     ad_executor.submit(run_ad_frame, aid, sid, note, extra)
@@ -13248,9 +13248,9 @@ def prod_pick_frame(aid: str, sid: str, body: FramePickIn):
 def clear_frames(s: dict, only: str | None = None) -> list[str]:
     """يزيل صورة ستوري بورد (نسخة واحدة أو كلها) من اللقطة ويعود أسامي الملفات لكي تُحذف."""
     if s.get("frame_status") in ("queued", "working"):
-        raise HTTPException(400, f"اللقطة {s['n']} ترسم الآن. انتظر عندما تنتهي")
+        raise HTTPException(400, f"اللقطة {s['n']} قيد الرسم الآن. انتظر حتى تنتهي")
     if any(t.get("status") in ("queued", "working") for t in s.get("takes") or []):
-        raise HTTPException(400, f"اللقطة {s['n']} يُولّد لها فيديو الآن. انتظر عندما ينتهي")
+        raise HTTPException(400, f"يُولَّد فيديو للقطة {s['n']} الآن. انتظر حتى ينتهي")
     frames = s.get("frames") or []
     gone = [f for f in frames if only is None or f == only]
     s["frames"] = [f for f in frames if f not in gone]
@@ -13345,7 +13345,7 @@ def run_ad_components(aid: str, sid: str) -> None:
 def prod_components(aid: str, shot_id: str | None = None):
     """استخراج المكونات: لقطة واحدة أو كل اللقطات التي لها ستوري بورد وما زال ليس لها مكونات."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = prod_of(d)
@@ -13357,7 +13357,7 @@ def prod_components(aid: str, shot_id: str | None = None):
     else:
         ids = [s["id"] for s in p["shots"] if s.get("frame") and not s.get("components") and s.get("comp_status") != "working"]
     if not ids:
-        raise HTTPException(400, "لا يوجد لقطات جاهزة (يجب الستوري بورد أولًا)")
+        raise HTTPException(400, "لا توجد لقطات جاهزة (يلزم لوحة القصة أولًا)")
     for i in ids:
         set_pshot(aid, i, comp_status="working", comp_error=None)
         ad_executor.submit(run_ad_components, aid, i)
@@ -13463,7 +13463,7 @@ def run_ad_comp_image(aid: str, sid: str, cid: str) -> None:
 def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None = None):
     """صور المكونات: مكون واحد (نسخة جديدة)، أو كل مكونات لقطة، أو كل المكونات التي ما زال ليس لها صورة."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     if not comp_id:
         safe_apply_brain(aid, [shot_id] if shot_id else None)  # الشاشات واللوجو من ملف العميل بدل ما يتولدوا
     with closing(db()) as conn:
@@ -13480,7 +13480,7 @@ def prod_comp_images(aid: str, shot_id: str | None = None, comp_id: str | None =
                 continue
             jobs.append((s["id"], c["id"]))
     if not jobs:
-        raise HTTPException(400, "لا يوجد مكونات تحتاج صور")
+        raise HTTPException(400, "لا توجد مكونات تحتاج إلى صور")
     for s_id, c_id in jobs:
         set_comp(aid, s_id, c_id, status="working", error=None)
         ad_executor.submit(run_ad_comp_image, aid, s_id, c_id)
@@ -13705,7 +13705,7 @@ def run_cast_image(aid: str, cid: str, note: str = "", extra: list[str] | None =
 def prod_cast_images(aid: str, cast_id: str | None = None, redo: bool = False):
     """🖼️ صورة مرجعية: عنصر واحد (نسخة جديدة)، أو كل ما ليس لهم صورة، أو (redo) كل ما غير معتمدين والجديد يحذف القديم."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     ids: list[str] = []
     def fn(d):
         for c in prod_of(d).get("cast") or []:
@@ -13767,7 +13767,7 @@ def approve_cast(aid: str, cid: str) -> None:
         _, d = ad_row(conn, aid)
     c = find_cast(prod_of(d), cid)
     if not c.get("image"):
-        raise HTTPException(400, f"«{c['name']}» ليس له صورة ما زال")
+        raise HTTPException(400, f"«{c['name']}» ليس له صورة بعد")
     brain = ad_brain(d.get("settings"))
     if not brain:
         raise HTTPException(400, "لا يوجد ملف عميل مختار. أنشئه من «👤 ملف العميل»")
@@ -13822,7 +13822,7 @@ def prod_cast_approve_all(aid: str):
         _, d = ad_row(conn, aid)
     todo = [c["id"] for c in prod_of(d).get("cast") or [] if c.get("image") and not c.get("approved")]
     if not todo:
-        raise HTTPException(400, "لا شيء لها صورة وتنتظر موافقة")
+        raise HTTPException(400, "لا يوجد ما له صورة وينتظر الموافقة")
     for cid in todo:
         approve_cast(aid, cid)
     return ad_response(aid)
@@ -13845,7 +13845,7 @@ def base_take(s: dict, tid: str | None = None) -> dict | None:
 AD_VIDEO_MODELS = {
     "seedance": {"label": "Seedance (من الإعدادات)", "kind": "ref"},
     "seedance-2": {"label": "Seedance 2.0", "model": "bytedance/seedance-2.0/reference-to-video", "kind": "ref"},
-    "kling-3-std": {"label": "Kling 3.0 Std (تمثيل وحركة أحسن)", "model": "kwaivgi/kling-v3.0-std/image-to-video", "kind": "i2v"},
+    "kling-3-std": {"label": "Kling 3.0 Std (أداء وحركة أفضل)", "model": "kwaivgi/kling-v3.0-std/image-to-video", "kind": "i2v"},
     "kling-3-pro": {"label": "Kling 3.0 Pro (أعلى جودة)", "model": "kwaivgi/kling-v3.0-pro/image-to-video", "kind": "i2v"},
 }
 AR_VOICES = {"Arabic_FriendlyGuy": "رجل ودود", "Arabic_CalmWoman": "امرأة هادئة"}
@@ -13913,7 +13913,7 @@ def run_ad_voice(aid: str, sid: str) -> None:
 def prod_voice(aid: str, shot_id: str | None = None):
     """🎙️ الصوت: نص كل لقطة يتحول لصوت عربي، وطوله يحدد مدة اللقطة (ومدة الفيديو الذي سيُولّد)."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     ids: list[str] = []
     def fn(d):
         for s in prod_of(d)["shots"]:
@@ -13925,7 +13925,7 @@ def prod_voice(aid: str, shot_id: str | None = None):
             ids.append(s["id"])
     update_ad(aid, fn)
     if not ids:
-        raise HTTPException(400, "لا يوجد لقطات تحتاج صوت (كلها لها صوت أو ليس لها نص)")
+        raise HTTPException(400, "لا توجد لقطات تحتاج إلى صوت (كلها لها صوت أو ليس لها نص)")
     for i in ids:
         ad_executor.submit(run_ad_voice, aid, i)
     return ad_response(aid)
@@ -14107,7 +14107,7 @@ def prod_full_voice(aid: str, file: UploadFile | None = File(default=None)):
     else:
         raise HTTPException(400, "ارفع ملف الصوت أولًا")
     if (p.get("full_voice") or {}).get("status") == "working":
-        raise HTTPException(400, "يقطّع الصوت بالفعل")
+        raise HTTPException(400, "تقطيع الصوت جارٍ بالفعل")
     original = name == (p.get("full_voice") or {}).get("file") and (p.get("full_voice") or {}).get("original", False)
     update_ad(aid, lambda d: d["prod"].update(full_voice={"file": name, "status": "working", "error": None, "original": original}))
     threading.Thread(target=run_full_voice, args=(aid,), daemon=True).start()
@@ -14168,7 +14168,7 @@ def prod_lipsync(aid: str, sid: str, method: str = "video", take_id: str | None 
     if method not in LIPSYNC:
         raise HTTPException(400, "طريقة غير معروفة")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     tid = uuid.uuid4().hex[:10]
     def fn(d):
         s = find_pshot(prod_of(d), sid)
@@ -14235,7 +14235,7 @@ def queue_ad_take(aid: str, sid: str, note: str = "", from_take: str | None = No
 def prod_generate(aid: str, sid: str, note: str = "", take_id: str | None = None):
     """فيديو جديد للقطة. note = تريد تعدّل ماذا في النسخة take_id (الوصف يُكتب من جديد بطلبك)."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     queue_ad_take(aid, sid, note.strip()[:1500], take_id)
     return ad_response(aid)
 
@@ -14243,13 +14243,13 @@ def prod_generate(aid: str, sid: str, note: str = "", take_id: str | None = None
 @app.post("/api/ads/{aid}/prod/generate-approved")
 def prod_generate_approved(aid: str):
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     todo = [s["id"] for s in prod_of(d)["shots"] if s.get("approved") and s.get("frame")
             and not any(t["status"] != "failed" for t in s.get("takes") or [])]
     if not todo:
-        raise HTTPException(400, "لا يوجد لقطات معتمدة لها ستوري بورد ومن غير فيديو")
+        raise HTTPException(400, "لا توجد لقطات معتمدة لها لوحة قصة وبلا فيديو")
     for sid in todo:
         queue_ad_take(aid, sid)
     return ad_response(aid)
@@ -14304,7 +14304,7 @@ def prod_take_act(aid: str, sid: str, body: TakeActIn, action: str = "pick"):
 def prod_edit_take(aid: str, sid: str, note: str = Form(""), take_id: str = Form(""), files: list[UploadFile] = File(default=[])):
     """✏️ نسخة جديدة من فيديو اللقطة بطلبك، ومعه صور مرجعية إذا تريد."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     note = note.strip()[:1500]
     if not note:
         raise HTTPException(400, "اكتب تريد تعدّل ماذا")
@@ -14377,7 +14377,7 @@ def prod_to_editor(aid: str):
         else:
             picks.append((s, t))
     if missing:
-        raise HTTPException(400, f"هذه اللقطات ما زال بدون فيديو موافق عليه: {', '.join(map(str, missing))}")
+        raise HTTPException(400, f"هذه اللقطات ما زالت بلا فيديو معتمد: {', '.join(map(str, missing))}")
     label = p["header"].get("title") or r["name"]
     clips = []
     with closing(db()) as conn, conn:
@@ -14574,7 +14574,7 @@ def lab_create(file: UploadFile = File(...), name: str = Form("")):
         raise HTTPException(400, f"تعذّرت قراءة الفيديو: {exc}") from exc
     if info.duration > 300:
         shutil.rmtree(folder, ignore_errors=True)
-        raise HTTPException(400, "الفيديو أطول من 5 دقايق. قصّه أولًا")
+        raise HTTPException(400, "الفيديو أطول من 5 دقائق. قصّه أولًا")
     d = {"name": name.strip() or Path(file.filename or "فيديو").stem, "created_at": now(), "updated_at": now(),
          "source": {"file": fname, "duration": round(info.duration, 2), "width": info.width, "height": info.height,
                     "has_audio": info.has_audio},
@@ -14776,7 +14776,7 @@ def lab_run(lid: str, step: str = "all", fresh: bool = False, steps: str = ""):
         raise HTTPException(400, "اختر خطوة واحدة على الأقل")
     d = lab_load(lid)
     if any((d.get("steps") or {}).get(k, {}).get("status") in ("working", "queued") for k in LAB_STEPS):
-        raise HTTPException(400, "التفكيك يعمل بالفعل. انتظر عندما ينتهي أو اضغط «⏹ أوقف»")
+        raise HTTPException(400, "التفكيك جارٍ بالفعل. انتظر حتى ينتهي أو اضغط «⏹ أوقف»")
     done = {k for k, v in (d.get("steps") or {}).items() if (v or {}).get("status") == "done"}
     steps_ = set(want)
     for k in list(want):
@@ -14825,7 +14825,7 @@ def lab_stop(lid: str):
 
 def lab_media_chat(messages: list[dict]) -> str:
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise atlas.AtlasError("مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise atlas.AtlasError("خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     return ad_media_chat(messages)
 
 
@@ -15227,9 +15227,9 @@ def lab_shot_split(lid: str, n: int, body: SplitIn):
     s = lab_shot(d, n)
     t = round(body.t, 3)
     if not (s["start"] + 0.25 <= t <= s["end"] - 0.25):
-        raise HTTPException(400, "اختر وقت داخل الجزء (غير في أولها أو آخرها بالضبط)")
+        raise HTTPException(400, "اختر وقتًا داخل الجزء (لا في بدايته أو نهايته بالضبط)")
     if any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values()):
-        raise HTTPException(400, "انتظر عندما التفكيك الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي التفكيك الجاري")
     src, folder = lab_dir(lid) / d["source"]["file"], lab_dir(lid) / "frames"
     keys = [uuid.uuid4().hex[:4], uuid.uuid4().hex[:4]]
     parts = [{"start": s["start"], "end": t, "cut": s.get("cut") or "hard", "uid": keys[0]},
@@ -15320,7 +15320,7 @@ def vedit_item(body) -> dict:
         if body.model not in lab.VEDIT_MODELS:
             raise HTTPException(400, "نموذج غير معروف")
         if not (atlas.api_key() or atlas.mock_mode()):
-            raise HTTPException(400, "مفتاح Atlas غير مسجل")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
         item = {"kind": "ai", "instruction": text, "model": body.model}
     return {**item, "id": uuid.uuid4().hex[:8], "base": body.base, "status": "working", "step": "جارٍ التجهيز", "file": None,
             "error": None, "review": None, "created_at": now()}
@@ -15645,7 +15645,7 @@ def lab_connector_refine(lid: str, cid: str, body: RefineIn):
                "connector": {"story_role": f"{c.get('story_role', '')} — {msg}", "t0": c["t0"] - a0, "t1": c["t1"] - a0}}
     else:
         if not (atlas.api_key()):
-            raise HTTPException(400, "مفتاح Atlas غير مسجل")
+            raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
         clip = lab_dir(lid) / "tmp" / f"refine-{cid}.mp4"
         clip.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a0:.3f}", "-i", str(lab_dir(lid) / d["source"]["file"]),
@@ -15659,7 +15659,7 @@ def lab_connector_refine(lid: str, cid: str, body: RefineIn):
             clip.unlink(missing_ok=True)
     fix = lab.apply_refine(c, res, a0, dur)
     if not fix:
-        raise HTTPException(502, "النموذج ما رجعش شرح مفهوم. جرّب مرة أخرى بكلام أوضح")
+        raise HTTPException(502, "لم يُرجع النموذج شرحًا مفهومًا. جرّب مرة أخرى بكلام أوضح")
     moved = abs(fix["t0"] - c["t0"]) > 0.005 or abs(fix["t1"] - c["t1"]) > 0.005
     reply = str(res.get("reply") or "عُدّل")[:500]
     def fn(d):
@@ -15723,7 +15723,7 @@ def assets_clear():
     busy = [f.parent.name for f in ASSETS_DIR.glob("*/asset.json")
             if any(v.get("status") == "working" for v in json.loads(f.read_text(encoding="utf-8")).get("variants") or [])]
     if busy:
-        raise HTTPException(400, "فيه نسخة تُنشأ الآن. انتظر عندما تنتهي")
+        raise HTTPException(400, "توجد نسخة قيد الإنشاء الآن. انتظر حتى تنتهي")
     n = 0
     for f in ASSETS_DIR.glob("*/asset.json"):
         shutil.rmtree(f.parent, ignore_errors=True)
@@ -15931,7 +15931,7 @@ def motion_import(mid: str, body: MotionImportIn | None = None):
     if meta is None:
         raise HTTPException(404, "هذا العنصر غير موجود")
     if (MOTION_JOBS.get(mid) or {}).get("status") == "working":
-        raise HTTPException(400, "يرسم الآن، انتظر عندما ينتهي")
+        raise HTTPException(400, "يجري الرسم الآن، انتظر حتى ينتهي")
     body = body or MotionImportIn()
     MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
     threading.Thread(target=run_motion_import, args=(mid, meta, body.params, body.name), daemon=True).start()
@@ -15992,7 +15992,7 @@ def asset_variant(aid: str, body: VeditIn):
     d = clip_load(aid)
     item = vedit_item(body)
     if item["kind"] == "ai" and d["duration"] > 10.5 and not body.base:
-        raise HTTPException(400, "الأصل أطول من 10 ثواني، ونماذج التعديل تقبل حتى 10")
+        raise HTTPException(400, "الأصل أطول من 10 ثوانٍ، ونماذج التعديل تقبل حتى 10")
     clip_update(aid, lambda d: d.setdefault("variants", []).append(item))
     threading.Thread(target=run_asset_variant, args=(aid, item["id"]), daemon=True).start()
     return clip_to_dict(aid, clip_load(aid))
@@ -16120,7 +16120,7 @@ def still_at(src: Path, t: float, out: Path) -> Path:
                     "-vf", "scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))'", "-q:v", "2", str(out)],
                    check=True, capture_output=True, timeout=60)
     if not out.exists():
-        raise HTTPException(400, "تعذّر ذلك أطلّع هذا الفريم")
+        raise HTTPException(400, "تعذّر استخراج هذا الإطار")
     return out
 
 
@@ -16159,9 +16159,9 @@ def asset_trial_create(aid: str, body: TrialIn):
     """🧪 تجربة جديدة: يُخرج فريم A وفريم B ويكتب الخطة (رخيص). التوليد ينتظر موافقتك."""
     asset = clip_load(aid)
     if asset.get("category") != "connector" or not asset.get("connector"):
-        raise HTTPException(400, "التجربة للكونيكتورز فقط")
+        raise HTTPException(400, "التجربة للموصلات فقط")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     src = asset.get("source") or {}
     if body.mode == "rebuild":
         if not src.get("lab") or not (lab_dir(src["lab"]) / "lab.json").exists():
@@ -16181,7 +16181,7 @@ def asset_trial_create(aid: str, body: TrialIn):
     t = {"id": tid, "mode": "rebuild" if body.mode == "rebuild" else "transfer", "a": a, "b": b,
          "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
-         "status": "planning", "step": "يكتب الخطة", "error": None, "plan": None,
+         "status": "planning", "step": "جارٍ كتابة الخطة", "error": None, "plan": None,
          "files": {"a": "a.jpg", "b": "b.jpg"}, "review": None, "created_at": now()}
     clip_update(aid, lambda x: x.setdefault("trials", []).insert(0, t))
     threading.Thread(target=run_trial_plan, args=(aid, tid), daemon=True).start()
@@ -16229,7 +16229,7 @@ def asset_trial_redo(aid: str, tid: str, body: TrialRedoIn):
         if t is None:
             raise HTTPException(404, "هذه التجربة غير موجودة")
         if t["status"] in ("planning", "working") or not t.get("plan"):
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         t.update(status="planning" if note else "working", step="🧠 يعدّل الخطة على ملاحظتك" if note else "يبدأ", error=None, review=None)
     clip_update(aid, fn)
     def job():
@@ -16255,7 +16255,7 @@ def asset_trial_patch(aid: str, tid: str, body: TrialPatchIn):
         if t is None:
             raise HTTPException(404, "هذه التجربة غير موجودة")
         if t["status"] in ("planning", "working"):
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if body.plan is not None:
             t["plan"] = lab.clean_trial_plan({**(t.get("plan") or {}), **body.plan})
         if body.model in TRIAL_MODELS:
@@ -16413,7 +16413,7 @@ def asset_trial_delete(aid: str, tid: str):
     def fn(a):
         t = next((x for x in a.get("trials") or [] if x["id"] == tid), None)
         if t and t["status"] in ("planning", "working"):
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         a["trials"] = [x for x in a.get("trials") or [] if x["id"] != tid]
     d = clip_update(aid, fn)
     shutil.rmtree(trial_dir(aid, tid), ignore_errors=True)
@@ -16583,9 +16583,9 @@ def film_create(body: FilmIn):
     """🎞️ فيديو جديد: البرنامج يكتب سيناريو على مقاس الموصلات التي اخترتها (رخيص). الرسم والتوليد ينتظرون موافقتك."""
     conns = film_conns(body.connectors)
     if not conns:
-        raise HTTPException(400, "اختر كونيكتور واحد على الأقل من المكتبة")
+        raise HTTPException(400, "اختر موصلًا واحدًا على الأقل من المكتبة")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     client = active_client() or {}
     fid = uuid.uuid4().hex[:10]
     film_dir(fid).mkdir(parents=True, exist_ok=True)
@@ -16596,7 +16596,7 @@ def film_create(body: FilmIn):
          "ratio": body.ratio if body.ratio in az.ASPECTS else "9:16",
          "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
-         "status": "planning", "step": "يكتب السيناريو", "error": None, "plan": None, "files": {}, "created_at": now()}
+         "status": "planning", "step": "جارٍ كتابة السيناريو", "error": None, "plan": None, "files": {}, "created_at": now()}
     with FILM_LOCK:
         film_save(fid, d)
     threading.Thread(target=run_film_plan, args=(fid,), daemon=True).start()
@@ -16648,7 +16648,7 @@ def film_patch(fid: str, body: FilmPatchIn):
     """تعديل السيناريو (النص والأوصاف والأطوال، والموصل الذي بين كل مشهدين) أو النموذج."""
     def fn(d):
         if body.plan is not None and d.get("status") == "planning":
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if body.name is not None and body.name.strip():
             d["name"] = body.name.strip()[:120]
         if body.brief is not None:
@@ -16689,7 +16689,7 @@ def film_patch(fid: str, body: FilmPatchIn):
 def film_start(fid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in FILM_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if status != "planning" and not (d.get("plan") or {}).get("scenes"):
             raise HTTPException(400, "السيناريو ما زال مخلصش")
         d.update(status=status, step=step, error=None)
@@ -16701,7 +16701,7 @@ def film_start(fid: str, status: str, step: str, target, *args) -> dict:
 @app.post("/api/films/{fid}/replan")
 def film_replan(fid: str):
     """✍️ سيناريو جديد من أولًا (الفريمات والفيديوهات القديمة تُحذف)."""
-    return film_start(fid, "planning", "يكتب السيناريو", run_film_plan)
+    return film_start(fid, "planning", "جارٍ كتابة السيناريو", run_film_plan)
 
 
 class FilmFrameIn(BaseModel):
@@ -16952,7 +16952,7 @@ def film_link_redo(fid: str, i: int, body: FilmRedoIn):
     d = film_load(fid)
     links = (d.get("plan") or {}).get("links") or []
     if not 0 <= i < len(links) or not links[i].get("plan"):
-        raise HTTPException(400, "هذا الموصل ما زال ليس له خطة")
+        raise HTTPException(400, "هذا الموصل ليس له خطة بعد")
     note = body.note.strip()[:1000]
     return film_start(fid, "working", "🧠 يعدّل الخطة على ملاحظتك" if note else "يبدأ", run_film_link_redo, i, note)
 
@@ -16998,10 +16998,10 @@ def film_run(fid: str, body: FilmRunIn):
             raise HTTPException(400, "ارسم فريمات هذا المشهد أولًا")
     elif only:
         if not 0 <= only[1] < len(f["links"]) or not d["plan"]["links"][only[1]].get("plan"):
-            raise HTTPException(400, "هذا الموصل ما زال ليس له خطة")
+            raise HTTPException(400, "هذا الموصل ليس له خطة بعد")
     else:
         if any(not (x.get("a") and x.get("b")) for x in f["scenes"]):
-            raise HTTPException(400, "ارسم الفريمات أولًا")
+            raise HTTPException(400, "ارسم الإطارات أولًا")
         if any(not l.get("plan") for l in d["plan"]["links"]):
             raise HTTPException(400, "فيه كونيكتور ما زال ليس له خطة")
     return film_start(fid, "working", "يبدأ", run_film_gen, only)
@@ -17159,7 +17159,7 @@ def film_script_apply(fid: str):
     """✨ النص عُدّل: النموذج يقرر كل مشهد تغيّر يُعدّل كيف (النص فقط، ولا رسم من جديد)، ويرسم."""
     d = film_load(fid)
     if not any(film_stale(d, i) for i in range(len((d.get("plan") or {}).get("scenes") or []))):
-        raise HTTPException(400, "لا يوجد مشاهد تغيّر النص الخاص بها بعد ما رُسمت")
+        raise HTTPException(400, "لا توجد مشاهد تغيّر نصها بعد رسمها")
     return film_start(fid, "drawing", "✨ يقرأ التعديلات", run_film_script_apply)
 
 
@@ -17216,7 +17216,7 @@ def film_script_rewrite(fid: str, body: FilmRewriteIn):
     """✍️ تعديل النص بالكلام (أقصر، خطاف أقوى...). يغيّر التعليق الصوتي والنص الذي على الشاشة فقط."""
     d = film_load(fid)
     if d.get("status") == "planning" or not (d.get("plan") or {}).get("scenes"):
-        raise HTTPException(400, "انتظر عندما السيناريو ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي السيناريو")
     if not body.instruction.strip():
         raise HTTPException(400, "اكتب تريد تعدّل ماذا")
     p = d["plan"]
@@ -17251,7 +17251,7 @@ def film_voice_tts(fid: str, body: FilmTtsIn):
     if not any((s.get("voice") or "").strip() for s in (d.get("plan") or {}).get("scenes") or []):
         raise HTTPException(400, "اكتب جمل التعليق الصوتي في النص أولًا")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     return film_start(fid, "voicing", "🎙️ يولّد التعليق الصوتي", run_film_tts, body.voice_id.strip()[:80] or "Arabic_FriendlyGuy", body.force)
 
 
@@ -17295,9 +17295,9 @@ def film_voice_upload(fid: str, file: UploadFile | None = File(default=None)):
     بدون ملف = يقطّع الملف الذي رُفع من قبل آخر (بعد ما عدّلت النص مثلًا)."""
     d = film_load(fid)
     if not (d.get("plan") or {}).get("scenes"):
-        raise HTTPException(400, "انتظر عندما السيناريو ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي السيناريو")
     if d.get("status") in FILM_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     if file is not None and file.filename:
         name = save_audio_upload(file, film_dir(fid), "full")
     elif (d.get("voice") or {}).get("full"):
@@ -17427,7 +17427,7 @@ def film_raw(fid: str):
     d = film_load(fid)
     f = film_files(d)
     if not any(x.get("video") for x in f["scenes"]) and not any(x.get("segs") for x in f["links"]):
-        raise HTTPException(400, "ما زال لا يوجد أي جزء وُلّدت")
+        raise HTTPException(400, "لم يُولَّد أي جزء بعد")
     prev = d.get("status")
     return film_start(fid, "working", "▶️ يجمّع الخام", run_film_raw, prev)
 
@@ -17450,7 +17450,7 @@ def run_film_raw(fid: str, prev: str) -> None:
                 else:
                     skipped.append(f"الموصل {i + 1}")
         if not parts:
-            raise HTTPException(400, "ما زال لا يوجد أي جزء وُلّدت")
+            raise HTTPException(400, "لم يُولَّد أي جزء بعد")
         W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
         chain_clips(parts, folder / "raw.mp4", W, H)
         def fn(x):
@@ -17469,10 +17469,10 @@ def film_to_editor(fid: str):
     d = film_load(fid)
     p, folder = d.get("plan") or {}, film_dir(fid)
     if d.get("status") in FILM_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     f = film_files(d)
     if not p.get("scenes") or not (folder / "sc1_a.png").exists():
-        raise HTTPException(400, "ارسم الفريمات أولًا")
+        raise HTTPException(400, "ارسم الإطارات أولًا")
     W, H = RATIO_VIDEO.get(d.get("ratio"), RATIO_VIDEO["9:16"])
     label = d.get("name") or "فيديو"
     # اللي اتولد بيتنقل؛ المشهد اللي لسه ملوش حركة بيدخل صورة أوله ثابتة على طوله، والكونيكتور اللي لسه متولدش بيتشال
@@ -17553,7 +17553,7 @@ def film_to_editor(fid: str):
 def film_voice_delete(fid: str):
     def fn(x):
         if x.get("status") in FILM_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         v = x.get("voice") or {}
         for ln in v.get("lines") or []:
             if ln:
@@ -17570,7 +17570,7 @@ def film_voice_delete(fid: str):
 def film_delete(fid: str):
     d = film_load(fid)
     if d.get("status") in FILM_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     shutil.rmtree(film_dir(fid), ignore_errors=True)
     return {"ok": True}
 
@@ -17611,9 +17611,9 @@ def lab_schema(lid: str):
     """🗺️ النموذج يشاهد الفيديو كله ويُخرج مخططه (رخيص)."""
     d = lab_load(lid)
     if (d.get("schema") or {}).get("status") == "working":
-        raise HTTPException(400, "يُخرج المخطط بالفعل")
+        raise HTTPException(400, "استخراج المخطط جارٍ بالفعل")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     run = uuid.uuid4().hex[:8]
     lab_update(lid, lambda x: x.update(schema={**(x.get("schema") or {}), "status": "working", "error": None, "run": run}))
     threading.Thread(target=run_lab_schema, args=(lid, run), daemon=True).start()
@@ -17660,9 +17660,9 @@ def lab_typo(lid: str):
     """🔤 يُخرج التايبوجرافي من الفيديو: كل لحظة النص تحوّل فيها لكلمات/أشكال/أيقونات، والأسلوب، والأيقونات كستيكرات شفافة."""
     d = lab_load(lid)
     if (d.get("typo") or {}).get("status") == "working":
-        raise HTTPException(400, "يُخرج التايبوجرافي بالفعل")
+        raise HTTPException(400, "استخراج التايبوجرافي جارٍ بالفعل")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     run = uuid.uuid4().hex[:8]
     lab_update(lid, lambda x: x.update(typo={**(x.get("typo") or {}), "status": "working", "error": None, "run": run, "step": "يشاهد الفيديو"}))
     threading.Thread(target=run_lab_typo, args=(lid, run), daemon=True).start()
@@ -17815,7 +17815,7 @@ TPL_LOCK = threading.Lock()
 def tpl_load(tid: str) -> dict:
     f = TPL_DIR / Path(tid).name / "tpl.json"
     if not f.exists():
-        raise HTTPException(404, "هذا التيمبليت غير موجود")
+        raise HTTPException(404, "هذا القالب غير موجود")
     return json.loads(f.read_text(encoding="utf-8"))
 
 
@@ -17850,7 +17850,7 @@ def lab_schema_template(lid: str, body: TplIn):
     d = lab_load(lid)
     data = (d.get("schema") or {}).get("data")
     if not data:
-        raise HTTPException(400, "طلّع المخطط أولًا")
+        raise HTTPException(400, "استخرج المخطط أولًا")
     tid = uuid.uuid4().hex[:10]
     folder = TPL_DIR / tid
     folder.mkdir(parents=True, exist_ok=True)
@@ -18096,7 +18096,7 @@ def tvideo_create(body: TvIn):
     """📝 فيديو جديد من تيمبليت: النموذج يملأ خانات كل جزء بمحتوى العميل (رخيص)."""
     t = tpl_load(body.template)
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     client = active_client() or {}
     vid = uuid.uuid4().hex[:10]
     tv_dir(vid).mkdir(parents=True, exist_ok=True)
@@ -18108,7 +18108,7 @@ def tvideo_create(body: TvIn):
          "image_model": body.image_model if body.image_model in TV_IMAGE_MODELS else "nano2",
          "model": body.model if body.model in TRIAL_MODELS else VDEF,
          "resolution": body.resolution if body.resolution in ("480p", "720p") else "480p",
-         "status": "filling", "step": "يملأ الخانات بمحتوى العميل", "error": None, "fill": None, "sheets": {}, "panels": {}, "segs": {},
+         "status": "filling", "step": "جارٍ ملء الخانات بمحتوى العميل", "error": None, "fill": None, "sheets": {}, "panels": {}, "segs": {},
          "created_at": now()}
     if body.section == "templates":
         lang = body.lang if body.lang in dub.DIALECTS else "ar-eg-cairo"
@@ -18185,7 +18185,7 @@ def tvideo_patch(vid: str, body: TvPatchIn):
             d["image_model"] = body.image_model
         if body.ratio in az.ASPECTS and body.ratio != d.get("ratio"):
             if d.get("status") in TV_BUSY:
-                raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+                raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
             d["ratio"] = body.ratio   # الشيتات واللوحات القديمة بمقاس تاني: لازم تترسم تاني
             d.update(sheets={}, panels={}, segs={}, final=None, status="filled" if d.get("fill") else d.get("status"))
             if d.get("mode") == "ad":
@@ -18196,7 +18196,7 @@ def tvideo_patch(vid: str, body: TvPatchIn):
             d["resolution"] = body.resolution
         if body.fill is not None and d.get("fill"):
             if d.get("status") in TV_BUSY:
-                raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+                raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
             old = d["fill"]
             new = lab.clean_fill({**old, **body.fill}, len(d["schema"]["beats"]))
             for i, (a, b) in enumerate(zip(old["beats"], new["beats"])):
@@ -18211,7 +18211,7 @@ def tvideo_patch(vid: str, body: TvPatchIn):
 def tv_start(vid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in TV_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if not d.get("fill"):
             raise HTTPException(400, "الخانات ما زال ما اتملتش")
         d.update(status=status, step=step, error=None)
@@ -18244,14 +18244,14 @@ def tvideo_refill(vid: str):
     if tv_load(vid).get("mode") == "scenes":
         def fn(d):
             if d.get("status") in TV_BUSY:
-                raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+                raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
             d.update(status="filling", step="✍️ يكتب النص من جديد", error=None, scene_files={}, final=None)
         tv_update(vid, fn)
         threading.Thread(target=run_tv_scenes_script, args=(vid,), daemon=True).start()
         return tv_to_dict(vid, tv_load(vid))
     if tv_load(vid).get("section") == "templates":   # قسم القوالب: السكريبت والفويس أوفر من الأول
         return tv_start(vid, "filling", "✍️ يكتب النص من جديد", run_tv_script)
-    return tv_start(vid, "filling", "يملأ الخانات بمحتوى العميل", run_tv_fill)
+    return tv_start(vid, "filling", "جارٍ ملء الخانات بمحتوى العميل", run_tv_fill)
 
 
 def tv_slice(vid: str, k: int, manual: list | None = None) -> None:
@@ -18320,11 +18320,11 @@ def tvideo_sheet_slice(vid: str, k: int, body: TvSliceIn):
     """✂️ يقطّع الورقة مرة أخرى: بالمربعات التي أنت ظبطتها بنفسك، أو يبحث عن اللوحات من جديد."""
     d = tv_load(vid)
     if not 0 <= k < len(tv_sheets(d)):
-        raise HTTPException(404, "هذا الورقة غير موجود")
+        raise HTTPException(404, "هذه الورقة غير موجودة")
     if not ((d.get("sheets") or {}).get(str(k)) or {}).get("file"):
         raise HTTPException(400, "ارسم أو ارفع الورقة أولًا")
     if d.get("status") in TV_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     n = len(tv_sheets(d)[k])
     boxes = body.boxes
     if boxes is not None:
@@ -18343,7 +18343,7 @@ def tvideo_sheet_draw(vid: str, k: int):
     """🖼️ يرسم هذا الورقة (كل اللوحات في صورة واحدة) ويقطّعه."""
     d = tv_load(vid)
     if not 0 <= k < len(tv_sheets(d)):
-        raise HTTPException(404, "هذا الورقة غير موجود")
+        raise HTTPException(404, "هذه الورقة غير موجودة")
     return tv_start(vid, "sheeting", f"🖼️ يرسم الورقة {k + 1}", run_tv_sheet, k)
 
 
@@ -18386,9 +18386,9 @@ def tvideo_sheet_upload(vid: str, k: int, file: UploadFile = File(...)):
     """⬆ ورقة عملته في ChatGPT بالبرومبت: يُقطّع خانات."""
     d = tv_load(vid)
     if not 0 <= k < len(tv_sheets(d)):
-        raise HTTPException(404, "هذا الورقة غير موجود")
+        raise HTTPException(404, "هذه الورقة غير موجودة")
     if d.get("status") in TV_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), f"sheet{k + 1}")
     def fn(x):
         old = (x.setdefault("sheets", {}).get(str(k)) or {}).get("file")
@@ -18522,7 +18522,7 @@ def tvideo_run(vid: str, body: TvRunIn):
         raise HTTPException(404, "هذا الجزء غير موجود")
     miss = [j + 1 for j in need if not ((d.get("panels") or {}).get(str(j)) or {}).get("cell")]
     if miss:
-        raise HTTPException(400, f"هذه اللوحات ما زال ما اتعملتش: {', '.join(map(str, miss))}")
+        raise HTTPException(400, f"هذه اللوحات لم تُصنع بعد: {', '.join(map(str, miss))}")
     return tv_start(vid, "working", "🎬 يبدأ", run_tv_gen, body.i)
 
 
@@ -18688,7 +18688,7 @@ def tvideo_to_editor(vid: str):
     elif once:   # الفيديو اللي اتولّد مرة واحدة بيتنقل حتة واحدة زي ما هو
         ready = [(0, {"t0": 0, "t1": probe_duration(folder / d["final"]), "file": d["final"]})]
     if not ready:
-        raise HTTPException(400, "ما زال لا يوجد أي جزء وُلّد")
+        raise HTTPException(400, "لم يُولَّد أي جزء بعد")
     W, H = RATIO_VIDEO.get(d["ratio"], RATIO_VIDEO["9:16"])
     label = d.get("name") or "فيديو"
     with closing(db()) as conn, conn:
@@ -18727,7 +18727,7 @@ def tvideo_to_editor(vid: str):
 def tvideo_delete(vid: str):
     d = tv_load(vid)
     if d.get("status") in TV_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     shutil.rmtree(tv_dir(vid), ignore_errors=True)
     return {"ok": True}
 
@@ -18864,7 +18864,7 @@ def typo_idle(d: dict) -> str:
 def typo_start(pid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in TYPO_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         d.update(status=status, step=step, error=None)
     typo_update(pid, fn)
     threading.Thread(target=target, args=(pid, *args), daemon=True).start()
@@ -19054,7 +19054,7 @@ def typo_sticker_draw(body: StickerDrawIn):
     if not body.desc.strip():
         raise HTTPException(400, "اكتب وصف الأيقونة")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     st = typo_style(body.style) if body.style else {}
     return sticker_dict(sticker_draw(body.desc.strip(), body.name or body.desc, st.get("icon_style", ""), "drawn", style=body.style or ""))
 
@@ -19064,7 +19064,7 @@ def typo_sticker_clean(sid: str):
     """✨ ستيكر متقصوص من فيديو وفيه حتت من أشياء أخرى: يُرسم نضيف تلقائيًا (ستيكر جديد جنبه)."""
     s = next((x for x in stickers_load() if x["id"] == sid), None)
     if not s:
-        raise HTTPException(404, "هذا الستيكر غير موجود")
+        raise HTTPException(404, "هذا الملصق غير موجود")
     flat = TMP_DIR / f"flat_{sid}.png"
     from PIL import Image
     im = Image.open(TYPO_STK / s["file"]).convert("RGBA")
@@ -19487,7 +19487,7 @@ def typo_clean_blocks(blocks: list, d: dict) -> list[dict]:
 def typo_delete(pid: str):
     d = typo_load(pid)
     if d.get("status") in TYPO_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     shutil.rmtree(TYPO_PROJ / Path(pid).name, ignore_errors=True)
     return {"ok": True}
 
@@ -19497,7 +19497,7 @@ def typo_source(pid: str, file: UploadFile = File(...)):
     """🎙️/🎬 صوت أو فيديو: النص يتفرّغ بتوقيته، والفيديو يمكن يصبح الخلفية والصوت الخاص به هو صوت الفيديو."""
     d = typo_load(pid)
     if d.get("status") in TYPO_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     folder = TYPO_PROJ / pid
     ext = Path(file.filename or "").suffix.lower()
     kind = "video" if ext in VIDEO_EXTENSIONS else "audio"
@@ -19506,7 +19506,7 @@ def typo_source(pid: str, file: UploadFile = File(...)):
     dur = info.duration
     if dur > 180:
         (folder / name).unlink(missing_ok=True)
-        raise HTTPException(400, "الملف أطول من 3 دقايق. قصّه أولًا")
+        raise HTTPException(400, "الملف أطول من 3 دقائق. قصّه أولًا")
     old = (d.get("source") or {}).get("file")
     if old and old != name:
         (folder / old).unlink(missing_ok=True)
@@ -19517,7 +19517,7 @@ def typo_source(pid: str, file: UploadFile = File(...)):
         if kind == "video" and not typo_style(x.get("style")).get("audio_only"):   # ستايل «الصوت بس» (Hairline): الفيديو صوته بس، والخلفية ألوان الستايل
             x["bg"] = {**(x.get("bg") or {}), "kind": "source"}
     typo_update(pid, fn)
-    return typo_start(pid, "transcribing", "🎧 يسمع النص ويكتبه بتوقيته", run_typo_transcribe)
+    return typo_start(pid, "transcribing", "🎧 جارٍ الاستماع للكلام ويكتبه بتوقيته", run_typo_transcribe)
 
 
 def run_typo_transcribe(pid: str) -> None:
@@ -19614,7 +19614,7 @@ class StockPickIn(BaseModel):
 def typo_bg_stock(pid: str, body: StockPickIn):
     """صورة أو فيديو من المكتبة ← خلفية التايبوجرافي (تتنزّل على الخادم، ومعها اسم المصوّر)."""
     if not stock.allowed_url(body.file):
-        raise HTTPException(400, "هذا الرابط غير من مكتبة الصور")
+        raise HTTPException(400, "هذا الرابط ليس من مكتبة الصور")
     folder = TYPO_PROJ / Path(pid).name
     d = typo_load(pid)
     kind = "video" if body.kind == "video" else "image"
@@ -19622,7 +19622,7 @@ def typo_bg_stock(pid: str, body: StockPickIn):
     limit = 300 * 1024 * 1024
     if not brain_fetch(body.file, folder / name, limit) or (folder / name).stat().st_size >= limit:
         (folder / name).unlink(missing_ok=True)
-        raise HTTPException(502, "تعذّر ذلك أنزّل هذا الملف من المكتبة، جرّب واحد آخر")
+        raise HTTPException(502, "تعذّر تنزيل هذا الملف من المكتبة، جرّب ملفًا آخر")
     old = (d.get("bg") or {}).get("file")
     if old and old != name:
         (folder / old).unlink(missing_ok=True)
@@ -19756,14 +19756,14 @@ def typo_bg_auto(pid: str, body: TypoBgAutoIn):
                             else "مكتبة الصور غير متاحة الآن. جرّب مرة أخرى بعد قليل")
     d = typo_load(pid)
     if d.get("status") in TYPO_BUSY:
-        raise HTTPException(400, "انتظر العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     if not d.get("words"):
         raise HTTPException(400, "اكتب النص أولًا")
     try:
         wallet.need(2, "اختيار الخلفيات")
     except wallet.NoCredits as exc:
         raise HTTPException(402, str(exc)) from None
-    typo_set(pid, status="bgauto", step="يقسّم النص لمقاطع", error=None)
+    typo_set(pid, status="bgauto", step="جارٍ تقسيم النص إلى مقاطع", error=None)
     threading.Thread(target=run_typo_bgauto, args=(pid, "photo" if body.kind == "photo" else "video"), daemon=True).start()
     return typo_to_dict(pid, typo_load(pid))
 
@@ -19777,7 +19777,7 @@ def typo_plan(pid: str, body: TypoPlanIn):
     """🧠 النموذج يقسم النص على حركات ويختار الأيقونات."""
     d = typo_load(pid)
     if not d.get("words"):
-        raise HTTPException(400, "لا يوجد نص ما زال: اكتبه أو ارفع صوت/فيديو")
+        raise HTTPException(400, "لا يوجد نص بعد: اكتبه أو ارفع صوتًا/فيديو")
     if body.brief is not None:
         typo_set(pid, brief=body.brief[:1000])
     return typo_start(pid, "planning", "🧠 يوزّع النص على الحركات", run_typo_plan)
@@ -19968,7 +19968,7 @@ def run_typo_scene(pid: str) -> None:
 def typo_draw_icons(pid: str):
     """🎨 يرسم الأيقونات التي في الخطة ومش في المكتبة (نحو 0.03$ للواحدة)."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     if not typo_to_dict(pid, typo_load(pid))["missing_icons"]:
         raise HTTPException(400, "كل الأيقونات موجودة في المكتبة")
     return typo_start(pid, "drawing", "🎨 يرسم الأيقونات", run_typo_icons)
@@ -20245,7 +20245,7 @@ def montage_source(tid: str, segments, voice, music, keep: bool = False) -> None
 def run_montage_typo(tid: str, segments, voice, music) -> None:
     try:
         montage_source(tid, segments, voice, music)
-        typo_set(tid, step="🎧 يسمع النص ويكتبه بتوقيته")
+        typo_set(tid, step="🎧 جارٍ الاستماع للكلام ويكتبه بتوقيته")
         run_typo_transcribe(tid)
         if typo_load(tid).get("status") == "failed":
             return
@@ -20277,7 +20277,7 @@ def typo_sfx_wav(tid: str) -> Path | None:
 def typo_clicks(pid: str):
     f = typo_sfx_wav(pid)
     if not f:
-        raise HTTPException(404, "لا يوجد كليكات")
+        raise HTTPException(404, "لا توجد نقرات")
     return FileResponse(f, media_type="audio/wav")
 
 
@@ -20391,7 +20391,7 @@ def typo_track(pid: str, body: TypoTrackIn):
     d = typo_load(pid)
     src = d.get("source") or {}
     if src.get("kind") != "video" or (d.get("bg") or {}).get("kind") != "source":
-        raise HTTPException(400, "التراك يشتغل عندما الخلفية هي الفيديو الذي رفعته")
+        raise HTTPException(400, "التتبع يعمل عندما تكون الخلفية هي الفيديو الذي رفعته")
     lst = d.get("fx" if body.fx else "blocks") or []
     if not 0 <= body.block < len(lst):
         raise HTTPException(400, "اختر اللقطة مرة أخرى")
@@ -20477,7 +20477,7 @@ def typo_regions(pid: str, t: float):
     d = typo_load(pid)
     src = d.get("source") or {}
     if src.get("kind") != "video" or not src.get("file"):
-        raise HTTPException(400, "التراك يشتغل على الفيديو الذي رفعته")
+        raise HTTPException(400, "التتبع يعمل على الفيديو الذي رفعته")
     fi = int(round(t * TYPO_FPS))
     key = (pid, src["file"], fi, d.get("ratio"))
     if key in TYPO_REGIONS:
@@ -20700,7 +20700,7 @@ def typo_bgx_ai(pid: str, body: SceneBgIn):
     if not (body.prompt or "").strip():
         raise HTTPException(400, "اكتب وصف للخلفية التي تريدها")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     d = typo_load(pid)
     if not (d.get("source") or {}).get("file"):
         raise HTTPException(400, "جهّز المشهد أولًا")
@@ -20783,7 +20783,7 @@ def typo_remove(pid: str, body: SceneRemoveIn):
     if not polys:
         raise HTTPException(400, "حدد الشيء الذي تريد تزيلها")
     if body.ai and not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     to_src = typo_frame_map(d)
     rid = uuid.uuid4().hex[:8]
     spec = {"id": rid, "t": round(body.t, 3), "name": body.name[:30] or "شيء", "ai": body.ai,
@@ -20795,7 +20795,7 @@ def typo_remove(pid: str, body: SceneRemoveIn):
 def typo_remove_ai(pid: str, rid: str):
     """✨ المكان الذي عمره ما ظهر يُملأ بالـ AI (صورة واحدة) بدل الملء التقريبي."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     d = typo_load(pid)
     r = next((x for x in d.get("removals") or [] if x["id"] == rid), None)
     if not r:
@@ -21284,7 +21284,7 @@ def dub_create(src: Path, name: str) -> dict:
         raise HTTPException(400, f"لا قادر أقرا هذا الفيديو: {exc}") from exc
     d = {"name": name[:120] or "دبلجة", "client_id": active_client_id(), "brief": "",
          "source": {"file": file, "duration": round(info.duration, 3), "w": info.width, "h": info.height},
-         "words": [], "lines": [], "bg": None, "targets": {}, "busy": True, "step": "🎧 يسمع النص", "error": None,
+         "words": [], "lines": [], "bg": None, "targets": {}, "busy": True, "step": "🎧 جارٍ الاستماع للكلام", "error": None,
          "created_at": now(), "updated_at": now()}
     (folder / "dub.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     threading.Thread(target=run_dub_transcribe, args=(did,), daemon=True).start()
@@ -21323,7 +21323,7 @@ def dub_get(did: str):
 def dub_delete(did: str):
     d = dub_load(did)
     if dub_busy(d):
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     shutil.rmtree(DUB_DIR / Path(did).name, ignore_errors=True)
     return {"ok": True}
 
@@ -21344,7 +21344,7 @@ def run_dub_transcribe(did: str) -> None:
         folder = DUB_DIR / did
         src = folder / d["source"]["file"]
         if not typo_has_audio(src):
-            raise RuntimeError("هذا الفيديو لا يحتوي صوت")
+            raise RuntimeError("هذا الفيديو لا يحتوي على صوت")
         audio = TMP_DIR / f"dub_{did}.m4a"
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "96k", str(audio)],
                        check=True, capture_output=True, timeout=300)
@@ -21373,7 +21373,7 @@ def dub_target(did: str, body: DubTargetIn):
         raise HTTPException(400, "هذه اللهجة غير موجودة")
     voice = body.voice if body.voice in dub.DIALECTS[body.dialect]["voices"] else dub.DIALECTS[body.dialect]["voices"][0]
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     if dub.DIALECTS[body.dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "اللهجات العربية تُقال بأصوات فصيح: أضف مفتاحه FASIH_API_KEY في متغيرات Railway أولًا")
 
@@ -21381,7 +21381,7 @@ def dub_target(did: str, body: DubTargetIn):
         if not d.get("lines"):
             raise HTTPException(400, "انتظر عندما النص يسمع أولًا")
         if dub_busy(d):
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if body.brief is not None:
             d["brief"] = body.brief[:600]
         old = d["targets"].get(body.dialect) or {}
@@ -21447,14 +21447,14 @@ def dub_render(did: str, dialect: str, body: DubRenderIn):
     if body.lipsync and body.lipsync not in dub.LIPSYNC:
         raise HTTPException(400, "نوع الليب سينك غير معروف")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
 
     def fn(d):
         t = d["targets"].get(dialect)
         if not t or not t.get("lines"):
             raise HTTPException(400, "اكتب النص باللهجة أولًا")
         if dub_busy(d):
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         t.update(busy=True, step="🎙️ يسجّل الجمل", error=None, lipsync=body.lipsync)
     d = dub_update(did, fn)
     caps = body.captions if body.captions in ("same", *CAPTION_LANGS) else ""
@@ -21882,7 +21882,7 @@ def tvideo_voice(vid: str, body: TvVoiceIn):
 
     def fn(x):
         if x.get("status") in TV_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if body.lang in dub.DIALECTS:
             x["lang"] = body.lang
         if body.voice in dub.DIALECTS[x["lang"]]["voices"]:
@@ -22097,7 +22097,7 @@ def scene_prompt(d: dict, i: int) -> str:
 def scenes_start(vid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in TV_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if d.get("mode") != "scenes" or not d.get("scenes"):
             raise HTTPException(400, "النص ما زال ما اتكتبش")
         d.update(status=status, step=step, error=None)
@@ -22402,7 +22402,7 @@ def ad_to_dict(vid: str, d: dict) -> dict:
 def ad_start(vid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in TV_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if d.get("mode") != "ad":
             raise HTTPException(400, "هذا غير فيديو إعلان")
         d.update(status=status, step=step, error=None)
@@ -22502,7 +22502,7 @@ def ad_upload(vid: str, slot: str, file: UploadFile = File(...)):
         raise HTTPException(404, "هذه الخانة غير موجودة")
     d = tv_load(vid)
     if d.get("status") in TV_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
     ad_put_file(vid, slot, name)
     return tv_to_dict(vid, tv_update(vid, lambda x: x.update(status=tv_idle(x))))
@@ -22952,7 +22952,7 @@ def still_to_dict(vid: str, d: dict) -> dict:
 def still_start(vid: str, status: str, step: str, target, *args) -> dict:
     def fn(d):
         if d.get("status") in TV_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         if d.get("mode") != "still":
             raise HTTPException(400, "هذا غير استوديو منتج")
         d.update(status=status, step=step, error=None)
@@ -22967,7 +22967,7 @@ def still_upload(vid: str, slot: str, file: UploadFile = File(...)):
         raise HTTPException(404, "هذه الخانة غير موجودة")
     d = tv_load(vid)
     if d.get("status") in TV_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     name = save_upload(file, IMAGE_EXTENSIONS, tv_dir(vid), slot)
 
     def fn(x):
@@ -23148,7 +23148,7 @@ def template_sample(tid: str):
     if d.get("sample_status") == "working":
         raise HTTPException(400, "العينة تُنشأ بالفعل")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     with TPL_LOCK:
         d = tpl_load(tid)
         d.update(sample_status="working", sample_error=None, sample_step="✍️ يُجهّز")
@@ -23836,7 +23836,7 @@ class FlowNewIn(BaseModel):
 def flow_new(body: FlowNewIn):
     """العميل داس على قالب: مشروع جديد والعقل يبدأ يقترح أفكار مباشرة."""
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     tpl = flow_template(body.template, body.name.strip()[:120], body.cat.strip()[:40], body.desc.strip()[:400])
     tpl = flow_tpl({"template": tpl})
     fid = uuid.uuid4().hex[:10]
@@ -24636,7 +24636,7 @@ VSAMPLE_TEXT = {"ar-eg-cairo": "أهلًا، أنا الصوت ده. لو عجب
 VSAMPLE_GULF = "هلا والله، هذا صوتي. إذا عجبك، أنا اللي بتكلم في الفيديو حقك."
 
 
-# ---------------------------------------------------------------- 🎧 مختبر الأصوات (لصاحب المنصة بس)
+# ---------------------------------------------------------------- 🎧 مختبر الأصوات (لمالك المنصة فقط)
 # نفس الجملة بكل مزوّد وكل لهجة جنب بعض + تقييم بالنجوم، والنتيجة النهائية متوسط كل مزوّد في كل لهجة.
 # وكلون صوت: نفس العينة بـ ElevenLabs و MiniMax. التجارب دي على حساب المنصة (مش بتتخصم من نقط حد).
 VLAB_DIR = DATA_DIR / "voicelab"
@@ -24693,7 +24693,7 @@ def vlab_support(dialect: str) -> dict:
 
 def vlab_owner() -> None:
     if not wallet.free():
-        raise HTTPException(403, "مختبر الأصوات لصاحب المنصة بس")
+        raise HTTPException(403, "مختبر الأصوات لمالك المنصة فقط")
 
 
 def vlab_ready() -> dict:
@@ -25579,7 +25579,7 @@ def gens_info():
 
 def gen_new(kind: str, prompt: str, **extra) -> tuple[str, dict]:
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. ضعه من ⚙️ الإعدادات")
     gid = uuid.uuid4().hex[:12]
     item = {"kind": kind, "prompt": prompt, "status": "working", "step": "في الطابور", "error": None, "file": None,
             "client_id": active_client_id(), "created_at": now(), "updated_at": now(), **extra}
@@ -26242,7 +26242,7 @@ def run_style_revise(sid: str, note: str) -> None:
 def style_start(sid: str, target, *args) -> None:
     def fn(d):
         if d.get("status") in STYLE_BUSY:
-            raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+            raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
         d.update(status="planning" if target is run_style else "coding", step="⏳ يبدأ", error=None)
     style_update(sid, fn)
     threading.Thread(target=target, args=(sid, *args), daemon=True).start()
@@ -26319,7 +26319,7 @@ def style_retry(sid: str):
 def style_delete(sid: str):
     d = style_load(sid)
     if d.get("status") in STYLE_BUSY:
-        raise HTTPException(400, "انتظر عندما العمل الذي يعمل ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
     shutil.rmtree(STYLE_DIR / Path(sid).name, ignore_errors=True)
     return {"ok": True}
 
@@ -27884,7 +27884,7 @@ def hk_voice(hid: str, body: HkNoteIn):
     if not d.get("story"):
         raise HTTPException(400, "انتظر عندما الحكاية تُكتب")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     vid = body.voice_id if body.voice_id in AR_VOICES else d["inputs"]["voice_id"]
     hk_update(hid, lambda x: x["inputs"].update(voice_id=vid))
     return hk_job(hid, "voice", run_hk_voice, vid)
@@ -28263,7 +28263,7 @@ def twin_clip_new(tid: str, method: str = Form("video"), quality: str = Form("")
     if f"{method}:{quality}" not in TWIN_COST:
         raise HTTPException(400, "اختيار غير معروف")
     if not (atlas.api_key() or atlas.mock_mode()):
-        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     cid = uuid.uuid4().hex[:8]
     name = save_audio_upload(audio, twin_dir(tid), f"say_{cid}")
     item = {"id": cid, "method": method, "quality": quality, "text": text.strip()[:2000], "audio": name, "status": "queued",
@@ -28304,7 +28304,7 @@ def twin_clip_to_typo(tid: str, cid: str):
         x["ratio"] = "9:16" if info.height >= info.width else "16:9"
         x.update(words=[], blocks=[], final=None, scene=None, bg={**(x.get("bg") or {}), "kind": "source"})
     typo_update(pid, fn)
-    return typo_start(pid, "transcribing", "🎧 يسمع النص ويكتبه بتوقيته", run_typo_transcribe)
+    return typo_start(pid, "transcribing", "🎧 جارٍ الاستماع للكلام ويكتبه بتوقيته", run_typo_transcribe)
 
 
 # ---------------------------------------------------------------- 📱 قالب «تصوير بالموبايل»: الفيديو ← المراجعة ← المونتاج الأوتوماتيك
@@ -29762,7 +29762,7 @@ AUTO_IMG_KNOWN = {"google/nano-banana-2": "nano2", "google/nano-banana-pro": "na
 AUTO_IMG_MOCK = [{"key": "google/nano-banana-2", "label": "Nano Banana 2 (تجريبي)", "t2i": "mock/nano2", "edit": "mock/nano2-edit", "refs": True, "max_refs": 8, "price": 0.045},
                  {"key": "mock/flux", "label": "Flux Schnell من النص فقط (تجريبي)", "t2i": "mock/flux", "edit": None, "refs": False, "max_refs": 0, "price": 0.01}]
 AUTO_VOICE_STD = {"model": "std", "label": "أصوات فصيح وElevenLabs (اللهجات العربية ولغات أخرى)", "mode": "std", "ref": None, "voices": [], "price": None}
-AUTO_VOICE_MOCK = [{"model": "mock/clone-tts", "label": "نص بصوت مرجع (تجريبي)", "mode": "tts", "ref": "reference_audio", "voice_field": None, "voices": [],
+AUTO_VOICE_MOCK = [{"model": "mock/clone-tts", "label": "نص بصوت مرجعي (تجريبي)", "mode": "tts", "ref": "reference_audio", "voice_field": None, "voices": [],
                     "text_field": "text", "price": 0.05},
                    {"model": "mock/music", "label": "موسيقى (تجريبي)", "mode": "music", "ref": None, "voice_field": None, "voices": [], "text_field": "prompt", "price": 0.15}]
 
@@ -31284,7 +31284,7 @@ def scene_generate(sid: str):
     if not atlas.mock_mode():
         wallet.need(est, "توليد لقطة المشهد")
     tid = uuid.uuid4().hex[:8]
-    take = {"id": tid, "status": "working", "step": f"✨ يولّد بـ {m['label']}", "model": m["model"], "model_label": m["label"], "draft": d["draft"],
+    take = {"id": tid, "status": "working", "step": f"✨ جارٍ التوليد بـ {m['label']}", "model": m["model"], "model_label": m["label"], "draft": d["draft"],
             "prompt": d.get("prompt") or "", "prompt_full": full, "refs": refs[:automate.MAX_REFS], "est": est, "at": now(), "error": None}
     d = scene_update(sid, lambda x: x.update(takes=[*(x.get("takes") or []), take][-20:]))
     threading.Thread(target=run_scene_take, args=(sid, tid), daemon=True).start()
