@@ -221,10 +221,15 @@ def silma_say(text: str, voice: str, model: str, dest: Path) -> Path:
 # الفيديو كله ← ElevenLabs بيترجم ويدبلج بصوت المتكلم نفسه (من غير اختيار لهجة). بيتحاسب على قد دقايق الفيديو.
 
 def eleven_dub_start(src: Path, target: str = "ar", source: str = "auto") -> str:
-    with httpx.Client(timeout=300) as c, src.open("rb") as f:
-        r = c.post(f"{EL_BASE}/dubbing", headers={"xi-api-key": eleven_key()},
-                   data={"target_lang": target, "source_lang": source, "num_speakers": "0", "watermark": "false"},
-                   files={"file": (src.name, f, "video/mp4" if src.suffix.lower() in (".mp4", ".mov", ".m4v") else "application/octet-stream")})
+    def send(watermark: str) -> httpx.Response:
+        with httpx.Client(timeout=300) as c, src.open("rb") as f:
+            return c.post(f"{EL_BASE}/dubbing", headers={"xi-api-key": eleven_key()},
+                          data={"target_lang": target, "source_lang": source, "num_speakers": "0", "watermark": watermark},
+                          files={"file": (src.name, f, "video/mp4" if src.suffix.lower() in (".mp4", ".mov", ".m4v") else "application/octet-stream")})
+    r = send("false")
+    # الباقة المجانية في ElevenLabs بتدبلج بس بعلامة مائية: للمقارنة ده كفاية، فبنعيد الطلب بالعلامة بدل ما يفشل
+    if r.status_code == 400 and "watermark" in r.text.lower():
+        r = send("true")
     if r.status_code >= 400:
         raise _fail(r, "ElevenLabs (الدبلجة)")
     return r.json()["dubbing_id"]
