@@ -11020,6 +11020,7 @@ def onboard_state():
             "reels": fieldpacks.field_reels(field), "field_media": [r for r in fieldpacks.field_reels(field) if field and (FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.jpg").exists()],
             "logo": bool(logo_path(bid)) if bid else False, "logo_asked": bool(b.get("logo_asked")),
             "job": job, "steps": steps, "first_done": bool(j.get("status") == "done"), "brand": first_brand_name(b),
+            "briefs": {r: tplbrief.brief(r, field, first_brand_name(b)) for r in fieldpacks.field_reels(field) if tplbrief.brief(r, field)},
             "about_ph": pack.get("about_ph") or "مثلًا: ماذا تبيع أو تقدم، وأين، وما الذي يميزك عن غيرك",
             "audience_ph": "العمر، والاهتمامات، وما الذي يبحث عنه", "score": brain_score(b), **fieldpacks.signup_options()}
 
@@ -11175,11 +11176,34 @@ def onboard_logo_pick(body: LogoPickIn):
     return {**onboard_state(), "colors": cols}
 
 
+import tplbrief  # noqa: E402
+
+
 class FirstGoIn(BaseModel):
     template: str
     name: str = ""
     about: str = ""
     audience: str = ""
+    facts: dict = {}   # 🧾 معطيات الإعلان اللي العميل ملاها (اسم الطبق، السعرين، المدة، الصورة…)
+
+
+@app.post("/api/onboard/photo")
+def onboard_photo(file: UploadFile = File(...)):
+    """📷 صورة المنتج لأول فيديو: من غير خلفية، وبتتحفظ في صور منتجات العلامة كمان (العقل يستخدمها بعد كده)."""
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    folder, tag = brain_dir(bid), uuid.uuid4().hex[:6]
+    src = save_upload(file, IMAGE_EXTENSIONS, folder, f"prod-src-{tag}")
+    cut = f"prod-{tag}.png"
+    try:
+        firstvid.cutout(folder / src, folder / cut)
+    except Exception:  # noqa: BLE001
+        (folder / src).unlink(missing_ok=True)
+        raise HTTPException(400, "هذا الملف ليس صورة سليمة، جرّب PNG أو JPG")
+    (folder / src).unlink(missing_ok=True)
+    update_brain(bid, lambda d: d.update(products=(d.get("products") or []) + [{"file": cut, "name": "صورة منتج", "added_at": now()}]))
+    return {"url": f"/media/ads/brains/{bid}/{cut}"}
 
 
 def first_job_set(bid: str, jid: str, **kw) -> None:
@@ -11234,15 +11258,18 @@ def first_gift(bid: str) -> int:
     return n
 
 
-def run_first(bid: str, jid: str, tpl: str, name: str, t0: float) -> None:
+def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | None = None) -> None:
     put = lambda **kw: first_job_set(bid, jid, **kw)  # noqa: E731
     done: list[str] = []
     step = lambda k: put(step=k, done=list(done))  # noqa: E731
     try:
         step("script")
-        f = flow_new(FlowNewIn(template=tpl, name=name, skip_ideas=False))
+        f = flow_new(FlowNewIn(template=tpl, name=name, skip_ideas=bool(facts)))
         fid = f["id"]
         put(fid=fid)
+        if facts:   # 🧾 الفكرة جاية من معطيات العميل: الأفكار والنص بيتبنوا عليها، والخانات دي مقفولة
+            flow_set_facts(fid, tpl, facts)
+            flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, tplbrief.prompt_text(tplbrief.apply(tpl, facts)[1])))
         d = first_wait(fid, lambda x: bool(x.get("ideas")), "اقتراح الفكرة", lambda: flow_job(fid, "ideas", lambda: flow_gen_ideas(fid)))
         flow_pick_idea(fid, FlowPickIn(id=d["ideas"][0]["id"]))
         d = first_wait(fid, lambda x: bool(x.get("scenarios")), "كتابة النص", lambda: flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid)))
@@ -11311,9 +11338,12 @@ def onboard_first_go(body: FirstGoIn):
         return onboard_state()
     reels = fieldpacks.field_reels((brain_row(bid) or {}).get("field") or "")
     tpl = body.template if body.template in reels or body.template.startswith("t-") else reels[0]
+    facts, errs = tplbrief.validate(tpl, body.facts or {})
+    if errs:
+        raise HTTPException(400, " · ".join(errs))
     jid = uuid.uuid4().hex[:8]
-    update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time(), "t0": t0}))
-    threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl, t0), daemon=True).start()
+    update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time(), "t0": t0, "facts": facts}))
+    threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl, t0, facts), daemon=True).start()
     return onboard_state()
 
 
@@ -23890,6 +23920,9 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     dl = dub.DIALECTS[lang]
     lang_label = dl.get("language") or dl["label"].split(" ", 1)[-1]
+    if d.get("locked"):   # 🧾 خانات معطيات العميل مقفولة: العقل مايكتبهاش، وبيتقاله يقول نفس الأرقام في الكلام
+        schema = {k: v for k, v in schema.items() if k not in d["locked"]}
+        idea_txt += tplbrief.prompt_text(d.get("facts_say") or {})
     if atlas.mock_mode():
         raw = fz.mock_scripts(schema, live["scenes"], 2)
     else:
@@ -23904,13 +23937,21 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     flow_update(fid, lambda x: x.update(lang=lang, script_lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
 
 
+def flow_set_facts(fid: str, tpl: str, facts: dict) -> None:
+    """🧾 معطيات العميل الحقيقية ← خانات مقفولة في المشروع (العقل والنص مايغيّروهاش، والفحص بعد الفيديو بيقارن بيها)."""
+    b = flow_brain(flow_load(fid)) or {}
+    params, say = tplbrief.apply(tpl, facts, tplbrief.currency(b.get("market", "")))
+    flow_update(fid, lambda d: d.update(facts=facts, locked=params, facts_say=say))
+
+
 def flow_motion_params(d: dict) -> dict:
-    """خانات القالب: الصور والألوان والاسم من عقل العلامة، والنص من النص المختار."""
+    """خانات القالب: الصور والألوان والاسم من عقل العلامة، والنص من النص المختار، ومعطيات العميل الحقيقية آخر حاجة (مقفولة)."""
     mid = d["template"]["id"]
     schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
     out = motion_brand_fill(schema, flow_brain(d))
     for row in (d.get("scenario") or {}).get("scenes") or []:
         out.update(fz.clean_params(schema, row.get("fields") or {}))
+    out.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema})
     return out
 
 
@@ -25331,15 +25372,54 @@ def flow_export(fid: str, body: FlowExportIn):
         raise HTTPException(400, "هذا القالب يرسم لمشروع آخر الآن، انتظر عندما ينتهي")
     schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
     params = {**(d.get("params") or {}), **{k: v for k, v in (body.params or {}).items() if k in schema}}
+    params.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema and k not in (body.params or {})})   # 🧾 معطيات العميل
+    params = brand_guard(schema, params, flow_brain(d))
     vt = d.get("vo_track") or {}
     vo_path = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None
     title = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or d["template"]["name"]
     before = motion_assets().get(mid, [])
     MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
     flow_update(fid, lambda x: x.update(params=params, stage="generate", output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
-    threading.Thread(target=run_motion_import, args=(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, params, f"🧭 {title}"),
-                     kwargs={"timing": vt.get("timing"), "vo": vo_path if vo_path and vo_path.exists() else None}, daemon=True).start()
+    def go():
+        p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
+        run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
+                          timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None)
+    threading.Thread(target=go, daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
+
+
+def brand_guard(schema: dict, params: dict, brain: dict | None) -> dict:
+    """🏷️ أمثلة القالب (اسم «بيت العطور» مثلًا) ماتطلعش في فيديو عميل: خانة اسم العلامة = اسمه أو فاضية."""
+    name = str((brain or {}).get("name") or "").strip()
+    name = "" if name in ("عميلي",) else name
+    for k, f in schema.items():
+        if f.get("role") == "brand" and (not params.get(k) or params.get(k) == f.get("def")):
+            params[k] = name
+    return params
+
+
+def flow_draw_missing(fid: str, mid: str, params: dict) -> dict:
+    """🎨 القالب فيه صورة منتج والعميل مارفعهاش: نرسم المنتج من اسمه بنفس ستايل القالب، وتتحفظ في صور منتجات العلامة."""
+    jobs = tplbrief.draw_jobs(mid, params)
+    if not jobs or atlas.mock_mode() or not atlas.api_key():
+        return params
+    d = flow_load(fid)
+    bid = d.get("client_id") or active_client_id()
+    folder = brain_dir(bid)
+    for slot, what, prompt in jobs:
+        try:
+            url = atlas.generate_image("nano2", prompt, "1080x1350", "standard")
+            raw, cut = folder / f"draw-src-{uuid.uuid4().hex[:6]}.png", f"draw-{uuid.uuid4().hex[:6]}.png"
+            atlas.download(url, raw)
+            firstvid.cutout(raw, folder / cut)
+            raw.unlink(missing_ok=True)
+            u = f"/media/ads/brains/{bid}/{cut}"
+            update_brain(bid, lambda b: b.update(products=(b.get("products") or []) + [{"file": cut, "name": f"رسمة: {what}"[:60], "added_at": now()}]))
+            params[slot] = u
+            flow_update(fid, lambda x: x.update(locked={**(x.get("locked") or {}), slot: u}))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[draw] {mid}/{slot}: {exc}", flush=True)   # الرسمة فشلت: القالب بيكمل من غير صورة (من غير منتج غلط)
+    return params
 
 
 @app.post("/api/flows/{fid}/generate")

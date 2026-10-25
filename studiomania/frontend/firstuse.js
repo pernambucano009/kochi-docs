@@ -42,6 +42,15 @@ const FirstUse = (() => {
 @keyframes fuSpin{to{transform:rotate(360deg)}}
 .fu-vid{display:block;width:auto;max-width:100%;height:min(50vh,460px);margin:0 auto 14px;border-radius:16px;background:#000;aspect-ratio:9/16}
 .fu-cols{display:flex;gap:6px;justify-content:center;margin:-4px 0 12px}.fu-cols i{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.fu-idea{margin:0 0 16px;padding:14px 16px;border-radius:16px;background:rgba(229,97,62,.08);font-size:14.5px;line-height:1.8}
+.fu-idea b{display:block;font-size:12.5px;color:#E5613E;margin-bottom:4px}
+.fu-f input{width:100%;box-sizing:border-box;padding:10px 13px;border-radius:12px;border:1.5px solid rgba(0,0,0,.12);background:var(--ui-dlg-field,#F7F7F5);color:inherit;font:inherit;font-size:14px;outline:0}
+.fu-f input:focus{border-color:#E5613E}:root[data-nh-theme="dark"] .fu-f input{border-color:rgba(255,255,255,.14)}
+.fu-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fu-photo{display:flex;align-items:center;gap:12px;padding:10px;border:1.5px dashed rgba(229,97,62,.5);border-radius:14px;cursor:pointer}
+.fu-photo img{width:56px;height:56px;object-fit:contain;border-radius:10px;background:repeating-conic-gradient(#e9e9e9 0 25%,#fff 0 50%) 0 0/12px 12px}
+.fu-chips{display:flex;flex-wrap:wrap;gap:8px}.fu-chips label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--ui-dlg-field,#F7F7F5);cursor:pointer;font-size:13.5px}
+.fu-chips input{width:auto}
 @media (prefers-reduced-motion:reduce){.fu-steps li.on span{animation:none}}`;
   const st = document.createElement("style");
   st.textContent = css;
@@ -235,7 +244,57 @@ const FirstUse = (() => {
     setTimeout(tick, 2500);
   }
 
-  // 🎬 أول فيديو: قالب من قوالب المجال ← سؤالان ← الفيديو يتعمل لوحده
+  // 🧾 فكرة الإعلان بكلام بسيط («سنصنع لك إعلانًا عن طبق من قائمة مطعمكم…») ثم المعطيات الحقيقية اللي هتتحط في القالب
+  function factField(q) {
+    const id = `fuq-${q.key}`, req = q.req ? "" : ' <small style="display:inline;opacity:.6">(اختياري)</small>';
+    const hint = q.hint ? `<small>${esc(q.hint)}</small>` : "";
+    const show = q.show_if ? ` data-show="${esc(q.show_if[0])}" data-in="${esc(q.show_if[1].join(","))}"` : "";
+    if (q.kind === "choice") return `<label class="fu-f"${show}><span>${esc(q.label)}</span><select id="${id}" data-k="${esc(q.key)}">${q.opts.map(([v, t]) => `<option value="${esc(v)}"${v === q.value ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>${hint}</label>`;
+    if (q.kind === "multi") return `<div class="fu-f"${show}><span>${esc(q.label)}</span><div class="fu-chips" data-k="${esc(q.key)}" data-multi>${q.opts.map(([v, t]) => `<label><input type="checkbox" value="${esc(v)}">${esc(t)}</label>`).join("")}</div>${hint}</div>`;
+    if (q.kind === "image") return `<div class="fu-f"${show}><span>${esc(q.label)}${req}</span><label class="fu-photo"><img alt="" hidden><b>📷 ارفع صورة</b><input type="file" accept="image/*" hidden data-k="${esc(q.key)}" data-img></label>${hint}</div>`;
+    if (q.kind === "lines" || q.kind === "textarea") return `<label class="fu-f"${show}><span>${esc(q.label)}${req}</span><textarea id="${id}" rows="${q.kind === "lines" ? 4 : 2}" dir="auto" data-k="${esc(q.key)}" placeholder="${esc(q.ph || "")}"></textarea>${hint}</label>`;
+    return `<label class="fu-f"${show}><span>${esc(q.label)}${req}</span><input id="${id}" ${q.kind === "num" ? 'inputmode="decimal"' : ""} dir="auto" data-k="${esc(q.key)}" placeholder="${esc(q.ph || "")}"${q.max ? ` maxlength="${q.max * 2}"` : ""}>${hint}</label>`;
+  }
+  async function askFacts(tpl) {
+    const br = state.briefs?.[tpl.id];
+    const about = !String(state.about || "").trim() ? `<label class="fu-f"><span>ما الذي تقدمه؟ <small style="display:inline;opacity:.6">(سطر واحد)</small></span><textarea id="fuA" rows="2" dir="auto" placeholder="${esc(state.about_ph)}"></textarea></label>` : "";
+    const body = br ? `<div class="fu-idea"><b>فكرة الإعلان</b>${esc(br.idea)}</div>${br.ask.map(factField).join("")}${about}`
+      : `<label class="fu-f"><span>ما الذي تقدمه؟</span><textarea id="fuA" rows="3" dir="auto" placeholder="${esc(state.about_ph)}">${esc(state.about)}</textarea></label>`;
+    const p = form("أول فيديو لك", br ? "اكتب المعطيات الحقيقية فقط، ونحن نكتب الإعلان والصوت حولها." : "سؤال واحد، والباقي يتعلمه العقل منك مع كل مشروع.", body, "اصنع الفيديو", async (b) => {
+      const facts = {};
+      b.querySelectorAll("[data-k]").forEach((el) => {
+        if (el.closest("[data-show]")?.hidden) return;
+        if (el.dataset.multi != null) facts[el.dataset.k] = [...el.querySelectorAll("input:checked")].map((x) => x.value);
+        else if (el.dataset.img != null) { if (el.dataset.url) facts[el.dataset.k] = el.dataset.url; }
+        else facts[el.dataset.k] = el.value;
+      });
+      const a = b.querySelector("#fuA")?.value || state.about || "";
+      if (!br && !a.trim()) throw new Error("اكتب ما الذي تقدمه في جملة أو جملتين");
+      return api("/api/onboard/first/go", { method: "POST", ...jsonBody({ template: tpl.id, name: tpl.name, about: a, audience: state.audience || "", facts }) });
+    });
+    const b = form.last;
+    b.querySelector(".ui-dlg-box").classList.add("fu-wide");
+    // خانة بتظهر حسب اختيار تاني (المدة تظهر بس لو فيه عدّاد)
+    const sync = () => b.querySelectorAll("[data-show]").forEach((el) => {
+      const v = b.querySelector(`[data-k="${el.dataset.show}"]`)?.value || "";
+      el.hidden = !el.dataset.in.split(",").includes(v);
+    });
+    b.addEventListener("change", sync); sync();
+    // الصورة بتترفع على طول وبتتشال خلفيتها
+    b.querySelectorAll("[data-img]").forEach((inp) => inp.addEventListener("change", async () => {
+      const file = inp.files?.[0]; if (!file) return;
+      const box = inp.closest(".fu-photo"), lab = box.querySelector("b");
+      lab.textContent = "جارٍ الرفع…";
+      try {
+        const fd = new FormData(); fd.append("file", file);
+        const r = await api("/api/onboard/photo", { method: "POST", body: fd });
+        inp.dataset.url = r.url; const im = box.querySelector("img"); im.src = r.url; im.hidden = false; lab.textContent = "✓ غيّر الصورة";
+      } catch (e) { lab.textContent = "📷 ارفع صورة"; toast(e.message, true); }
+    }));
+    return p;
+  }
+
+  // 🎬 أول فيديو: قالب من قوالب المجال ← فكرة الإعلان ومعطياته ← الفيديو يتعمل لوحده
   async function startFirst() {
     const s = state || (await load());
     if (!s) return;
@@ -244,15 +303,7 @@ const FirstUse = (() => {
     if (!state.logo && !state.logo_asked) await askLogo();
     const tpl = await pickTemplate();
     if (!tpl) return;
-    const r = await form("أول فيديو لك", "سؤالان فقط، والباقي يتعلمه العقل منك مع كل مشروع.",
-      `<label class="fu-f"><span>ما الذي تقدمه؟</span><textarea id="fuA" rows="3" dir="auto" placeholder="${esc(state.about_ph)}">${esc(state.about)}</textarea>
-        <small>ماذا تبيع أو تقدم، وأين، وما الذي يميزك.</small></label>
-       <label class="fu-f"><span>من عميلك المثالي؟</span><textarea id="fuB" rows="3" dir="auto" placeholder="${esc(state.audience_ph)}">${esc(state.audience)}</textarea>
-        <small>${state.field ? "كتبنا اقتراحًا من مجالك، عدّله ليناسبك." : "العمر، والاهتمامات، وما الذي يبحث عنه."}</small></label>`,
-      "اصنع الفيديو", async (b) => {
-        if (!b.querySelector("#fuA").value.trim()) throw new Error("اكتب ما الذي تقدمه في جملة أو جملتين");
-        return api("/api/onboard/first/go", { method: "POST", ...jsonBody({ template: tpl.id, name: tpl.name, about: b.querySelector("#fuA").value, audience: b.querySelector("#fuB").value }) });
-      });
+    const r = await askFacts(tpl);
     if (!r) return;
     state = r;
     refresh();
