@@ -3,7 +3,7 @@
 // #19 Logo reveal (عنصر: ظهور لوجو من شظايا) — any logo image or brand name. 10 s, 90 BPM (beat .667 s). The logo is cut into shards; the camera starts
 // deep inside them (unreadable shapes), pulls back faster each bar, the logo lands on beat 11 (7.33 s) and holds a bar.
 const BPM = 90, B = 60 / BPM, LAND = 11 * B;
-const G1 = "الشعار والكلام", GC = "الألوان";
+const G1 = "الشعار والنص", GC = "الألوان";
 const P = M.params({
   logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G1, hint: "الأفضل صورة PNG شفافة: تتفتت شظايا وتعود الكاميرا حتى تتجمع." },
   name: { label: "اسم العلامة (إن لم يوجد شعار)", kind: "text", role: "brand", def: "STUDIOMANIA", group: G1, max: 16, hint: "إن لم يوجد شعار، فالاسم نفسه هو ما يتفتت شظايا." },

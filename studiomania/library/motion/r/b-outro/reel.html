@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// 🎬 أوترو البراند (من «عقل البراند ← الأوترو»): آخر ٤ ثواني بدعوة واضحة. الكلام والحسابات بتيجي من العقل.
+// 🎬 أوترو البراند (من «عقل البراند ← الخاتمة»): آخر ٤ ثواني بدعوة واضحة. الكلام والحسابات بتيجي من العقل.
 const PR = M.params({
   style: { label: "الشكل", kind: "select", def: "cta", options: [["cta", "دعوة لفعل"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
   bgk: { label: "الخلفية", kind: "select", def: "dark", options: [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]] },
@@ -16,7 +16,7 @@ const PR = M.params({
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
   fBody: { label: "خط النص", kind: "font", def: "tajawal" },
 });
-M.meta({ story: "خاتمة قصيرة للعلامة بدعوة واضحة.", scenes: [{ name: "الأوترو", t0: 0, t1: 4, about: "الشعار والدعوة" }] });
+M.meta({ story: "خاتمة قصيرة للعلامة بدعوة واضحة.", scenes: [{ name: "الخاتمة", t0: 0, t1: 4, about: "الشعار والدعوة" }] });
 const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
 const W = SZ[0], H = SZ[1], DUR = 4, S = Math.min(W, H) / 1080;
 const BG = PR.style === "tagline" ? PR.c1 : PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";

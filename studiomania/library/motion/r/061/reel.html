@@ -5,7 +5,7 @@
 // 4–6 the token block morphs: chip → speech bubble → bulb → circle · 6–8 the circle becomes a 3D sphere of tokens turning
 // 8–9.5 data: next-token probabilities, the winner lands on each beat · 9.5–10 end title, back to the single block.
 // No frames, no corner labels, no timecodes. Palette: warm paper, ink, coral, sage. One typeface (Inter).
-const G1 = "١ · الكلمة والجملة", G2 = "٢ · الكورة والاختيارات", G3 = "٣ · النهاية", GC = "الألوان";
+const G1 = "١ · الكلمة والجملة", G2 = "٢ · الكرة والخيارات", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
   hello: { label: "الكلمة الأولى", kind: "text", def: "hello", group: G1, max: 10, hint: "كلمة تنقسم إلى قطع صغيرة." },
   sentence: { label: "الجملة (تظهر كلمة كلمة)", kind: "text", def: "I think in tiny pieces, one at a time.", group: G1, max: 44, hint: "تظهر كلمة كلمة." },

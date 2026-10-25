@@ -4,7 +4,7 @@
 // Arrangement: intro (bars 1–4) · build (5–8, snare roll tightening) · DROP on the downbeat of bar 9 (strongest) · outro (bars 15–17).
 // Two colours: black + acid yellow. Kick → the big disc punches; snare → the bars slam down; wobble → the wide shape stretches with the LFO.
 const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
-const G1 = "١ · البداية والتجهيز", G2 = "٢ · الدروب", G3 = "٣ · النهاية", GH = "الكلام الصغير في الركن", GC = "الألوان";
+const G1 = "١ · البداية والتجهيز", G2 = "٢ · الذروة", G3 = "٣ · النهاية", GH = "النص الصغير في الركن", GC = "الألوان";
 const PR = M.params({
   intro: { label: "كلمة البداية", kind: "text", def: "BASS", group: G1, max: 8 },
   build: { label: "٣ كلمات قبل ذروة الإيقاع", kind: "lines", def: ["WAIT", "FOR", "IT"], group: G1, max: 8, hint: "٣ كلمات قبل ذروة الإيقاع، والطبلة تتسارع." },
