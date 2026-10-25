@@ -137,7 +137,13 @@ const NH = (() => {
   const sideIc = (id) => (GLKEY[id] ? `<span class="nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon));
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">
       <span class="nh-sic">${sideIc(id)}</span><b class="nh-sname">${esc(T[id].ar)}</b>${tipOf(id, META[id]())}</div>`;
-  const cta = () => `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
+  // 🟠 زرار برتقالي واحد بس: «اصنع أول فيديو» لحد ما العميل يبدأ أول مشروع، وبعدها «ابدأ مشروعًا جديدًا»
+  const firstNeeded = () => !KOCHI && D.loaded && !D.work.length && !(D.drafts || []).length && typeof FirstUse !== "undefined";
+  const cta = () => firstNeeded()
+    ? `<div class="nh-tile nh-cta nh-gen" data-first tabindex="0" role="button" aria-label="اصنع أول فيديو">
+      <div class="nh-head"><div class="nh-name"><span class="latin en-k">First video</span><b>🎬 اصنع أول فيديو</b></div>${gi("create")}</div>
+      <span class="nh-tip" role="tooltip"><b>اصنع أول فيديو</b><span>سؤالان فقط، وأول فيديو على حسابنا.</span></span></div>`
+    : `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
       <div class="nh-head"><div class="nh-name"><span class="latin en-k">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
   function contHTML() {
@@ -284,8 +290,7 @@ const NH = (() => {
   function homeTitle(icon) {
     const b = D.brand, pct = b?.knowledge?.score ?? brainPct(b), name = String(b?.name || "").trim();
     // 🎬 عميل جديد لم يبدأ أي مشروع: زر «اصنع أول فيديو» تحت العنوان (سؤالان ثم قالب موشن رخيص من مجاله)
-    const first = !KOCHI && D.loaded && !D.work.length && !(D.drafts || []).length && typeof FirstUse !== "undefined"
-      ? `<button type="button" class="nh-first" data-first>🎬 اصنع أول فيديو</button><small class="nh-first-note">سؤالان فقط، ونقاطك المجانية تكفيه</small>` : "";
+    const first = "";   // الزرار البرتقالي الوحيد تحت (cta)
     return pct < 30 || !name || name === "عميلي"
       ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو</div>${first}`
       : `${icon}<h1 class="nh-ttl">${esc(name)}</h1><div class="ar">استوديو المحتوى والفيديو</div>${first}`;

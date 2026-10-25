@@ -24210,6 +24210,7 @@ def flow_voice_options(fid: str):
     dialects = [{"id": k, "label": v["label"], "group": v["group"]} for k, v in dub.DIALECTS.items()]
     rows = (d.get("scenario") or {}).get("scenes") or []
     say = "\n".join(str(r.get("say") or "").strip() for r in rows if str(r.get("say") or "").strip())
+    say = say or "ا" * 420   # النص لسه مش جاهز: تقدير لفيديو ٣٠ ثانية، عشان الرقم يظهر على الزرار دايمًا
     voices = {k: [{"id": x, "label": dub.VOICES[x]["label"], "gender": dub.VOICES[x].get("gender") or "", "pts": wallet.credits(voice_usd(x, say)),
                    "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")}
                   for x in v["voices"]] for k, v in dub.DIALECTS.items()}
@@ -24851,20 +24852,24 @@ def voicelab_del(rid: str):
 
 class VoiceSampleIn(BaseModel):
     voice: str
+    lang: str = ""
 
 
 @app.post("/api/voice-sample")
 def voice_sample(body: VoiceSampleIn):
+    """🔊 عيّنة لكل صوت عربي (فصيح ومنصت وElevenLabs)، بجملة قصيرة بلهجته. بتتعمل مرة واحدة على حساب المنصة وتتحفظ."""
     v = dub.VOICES.get(body.voice)
-    if not v or v.get("provider") not in ("fasih", "munsit") or v.get("hidden"):
+    if not v or v.get("provider") not in ("fasih", "munsit", "eleven", "eleven_direct") or v.get("hidden"):
         raise HTTPException(400, "العينة متاحة للأصوات العربية فقط")
-    dest = VSAMPLE_DIR / f"{Path(body.voice.replace(':', '_')).name}.{'wav' if v['provider'] == 'munsit' else 'mp3'}"
+    dia = v.get("dialect") or (body.lang if body.lang in dub.DIALECTS else "ar-sa-najdi")
+    tag = "" if v.get("dialect") else f"-{dia}"
+    dest = VSAMPLE_DIR / f"{Path(body.voice.replace(':', '_')).name}{tag}.{'wav' if v['provider'] == 'munsit' else 'mp3'}"
     if not dest.exists():
         if atlas.mock_mode():
             raise HTTPException(400, "العينات غير متاحة في وضع التجربة")
         try:
-            ar_speak(v, VSAMPLE_TEXT.get(v["dialect"], VSAMPLE_GULF), dest)
-        except fasih.FasihError as e:
+            ar_speak(v, VSAMPLE_TEXT.get(dia, VSAMPLE_GULF), dest)
+        except (fasih.FasihError, voicelab.LabError, atlas.AtlasError) as e:
             dest.unlink(missing_ok=True)
             raise HTTPException(400, str(e)) from e
     return {"url": f"/media/vsamples/{dest.name}?v={int(dest.stat().st_mtime)}"}

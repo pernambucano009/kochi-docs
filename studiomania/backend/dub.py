@@ -49,7 +49,7 @@ for code, label, where, base, stable in AR:
     vs = []
     for g, name in (("male", "عمر (رجل)"), ("female", "ليلى (امرأة)")):
         v = f"{base}-{g}-2"
-        VOICES[v] = {"label": name + ("" if stable else " · تجريبي"), "provider": "fasih", "voice": v, "dialect": code,
+        VOICES[v] = {"label": name + ("" if stable else " · تجريبي"), "provider": "fasih", "voice": v, "dialect": code, "preview": not stable,
                      "gender": g, "per_1k": 0.0, "per_min": FASIH_PER_MIN}
         # المشاريع القديمة اللي اتحفظ فيها الصوت القديم «-1» بتتقال بالصوت الـ HD اللي زيه
         VOICES[f"{base}-{g}-1"] = {**VOICES[v], "hidden": True}
@@ -70,9 +70,10 @@ def merge_fasih(voices: list[dict]) -> int:
         lab = (f"🎨 {name} (صوتك الخاص)" if x.get("custom") else
                f"{name} ({'امرأة' if g == 'female' else 'رجل'})" + (" · تجريبي" if x.get("status") == "preview" else ""))
         if vid in VOICES and not VOICES[vid].get("hidden"):
-            VOICES[vid]["label"] = lab
+            VOICES[vid].update(label=lab, raw_name=name, preview=x.get("status") == "preview", custom=bool(x.get("custom")))
         else:
-            VOICES[vid] = {"label": lab, "provider": "fasih", "voice": vid, "dialect": dia, "gender": g, "per_1k": 0.0,
+            VOICES[vid] = {"label": lab, "provider": "fasih", "voice": vid, "dialect": dia, "gender": g, "per_1k": 0.0, "raw_name": name,
+                           "preview": x.get("status") == "preview", "custom": bool(x.get("custom")),
                            "per_min": FASIH_PER_MIN, "sample": x.get("sampleUrl") or ""}
         if vid not in DIALECTS[dia]["voices"]:
             # الصوت الخاص بيبقى أول اختيار في لهجته
@@ -92,6 +93,8 @@ def munsit_dialect(x: dict) -> str | None:
     txt = " ".join(str(x.get(k) or "") for k in ("voice_id", "id", "description", "dialect", "accent")).lower() + " " + " ".join(map(str, x.get("languages") or [])).lower()
     if any(w in txt for w in ("fusha", "msa", "formal", "modern standard")) and not any(h in txt for h, _ in MUNSIT_HINTS):
         return None
+    if any(w in txt for w in ("egypt", "masri", "cairo", "levant", "syria", "leban", "iraq", "morocc", "sudan")):
+        return None   # منصت للخليجي بس: الأصوات بلهجات تانية ماتظهرش تحت النجدي ولا الخليجي
     return next((d for h, d in MUNSIT_HINTS if h in txt), "ar-gulf")
 
 
@@ -106,12 +109,13 @@ def merge_munsit(voices: list[dict]) -> int:
         g = "female" if str(x.get("gender") or "").lower().startswith(("f", "w")) else "male"
         name = x.get("name") or vid
         VOICES[key] = {"label": f"{name} ({'امرأة' if g == 'female' else 'رجل'})", "provider": "munsit", "voice": vid, "dialect": dia, "gender": g,
-                       "per_1k": MUNSIT_PER_1K}
+                       "per_1k": MUNSIT_PER_1K, "raw_name": name}
         if key not in DIALECTS[dia]["voices"]:
             # أصوات منصت قبل أصوات فصيح في لهجتها (بالترتيب اللي جت بيه)
             at = sum(1 for v in DIALECTS[dia]["voices"] if VOICES.get(v, {}).get("provider") == "munsit")
             DIALECTS[dia]["voices"].insert(at, key)
             added += 1
+    apply_approved()
     return added
 
 
@@ -155,7 +159,63 @@ def apply_approved() -> None:
             if prov in ("eleven", "eleven_direct"):
                 vs += [k for k, v in VOICES.items() if v.get("provider") == prov and not v.get("hidden") and k not in vs]
         rank = lambda v: want.index(VOICES.get(v, {}).get("provider")) if VOICES.get(v, {}).get("provider") in want else len(want)  # noqa: E731
-        d["voices"] = sorted(vs, key=rank)
+        vs = sorted(vs, key=rank)
+        # اللهجة المعتمدة بتعرض أصوات المزوّدين المعتمدين بس (وصوت العميل الخاص)، ولو مفيش منهم ولا صوت بنسيب الباقي
+        ok = [v for v in vs if VOICES.get(v, {}).get("provider") in want or VOICES.get(v, {}).get("custom")]
+        d["voices"] = ok or vs
+    tidy_labels()
+
+
+# 🏷️ أسماء الأصوات: عربية وموحّدة «الاسم (رجل/امرأة)»، من غير أسماء المزوّد الإنجليزي ولا «رجل (رجل)»، ومن غير تكرار جوه اللهجة
+POOL = {"male": ["عمر", "خالد", "سامي", "زيد", "يوسف", "ماجد", "طارق", "حمد", "ناصر", "بدر", "راشد", "سعد", "مازن", "هاني", "وليد", "جاسم"],
+        "female": ["ليلى", "هالة", "سارة", "لمى", "دانة", "هند", "منى", "جود", "رنا", "شهد", "مها", "هدى", "لينا", "عبير", "أمل", "سلمى"]}
+LATIN_NAMES = {"turki": "تركي", "fahad": "فهد", "fahd": "فهد", "noura": "نورة", "nora": "نورة", "sara": "سارة", "sarah": "سارة", "ahmed": "أحمد",
+               "ahmad": "أحمد", "mohamed": "محمد", "mohammed": "محمد", "muhammad": "محمد", "khalid": "خالد", "khaled": "خالد", "omar": "عمر", "ali": "علي",
+               "faisal": "فيصل", "abdullah": "عبدالله", "reem": "ريم", "rim": "ريم", "layla": "ليلى", "laila": "ليلى", "hala": "هالة", "sami": "سامي",
+               "zaid": "زيد", "zayd": "زيد", "yousef": "يوسف", "youssef": "يوسف", "maha": "مها", "huda": "هدى", "salem": "سالم", "saad": "سعد",
+               "nasser": "ناصر", "hamad": "حمد", "majed": "ماجد", "majid": "ماجد", "mona": "منى", "dana": "دانة", "lama": "لمى", "rana": "رنا",
+               "hind": "هند", "noor": "نور", "nour": "نور", "badr": "بدر", "rashed": "راشد", "rashid": "راشد", "sultan": "سلطان", "abdulaziz": "عبدالعزيز"}
+# أصوات ElevenLabs الأربعة: أسماء عربية ثابتة (متتكررش في أي لهجة)
+ELEVEN_AR = {"eleven_liam": "فيصل", "eleven_jessica": "نورة", "eleven_charlie": "سلطان", "eleven_bella": "ريم"}
+GENERIC = {"رجل", "امرأة", "إمرأة", "ست", "صوت", "male", "female", "man", "woman", "voice"}
+
+
+def _base_name(v: dict) -> str | None:
+    """اسم عربي من اسم الصوت الأصلي، أو None لو الاسم عام أو إنجليزي مش معروف."""
+    import re
+    raw = str(v.get("raw_name") or "")
+    raw = re.sub(r"[\(（].*?[\)）]", "", raw)                      # (رجل) (صوتك الخاص)…
+    raw = re.split(r"\s+[-–—|·]\s+|_", raw)[0].strip()              # «Turki - Najdi» ← Turki
+    raw = re.sub(r"[🎨·]", "", raw).replace("تجريبي", "").strip()
+    if not raw or raw.lower() in GENERIC:
+        return None
+    if re.search(r"[\u0600-\u06FF]", raw):
+        return raw
+    w = raw.split()[0].lower()
+    return LATIN_NAMES.get(w)
+
+
+def tidy_labels() -> None:
+    for vid, ar in ELEVEN_AR.items():
+        if vid in VOICES:
+            g = "female" if vid in ("eleven_jessica", "eleven_bella") else "male"
+            VOICES[vid].update(gender=g, label=f"{ar} ({'امرأة' if g == 'female' else 'رجل'})")
+    fixed = set(ELEVEN_AR.values())
+    for dia, d in DIALECTS.items():
+        if d["group"] != "ar":
+            continue
+        used = set(fixed)
+        for vid in d["voices"]:
+            v = VOICES.get(vid)
+            if not v or vid in ELEVEN_AR or v.get("custom"):
+                continue
+            v.setdefault("raw_name", v.get("label") or "")
+            g = v.get("gender") or "male"
+            name = _base_name(v)
+            if not name or name in used:
+                name = next((n for n in POOL[g] if n not in used), name or POOL[g][0])
+            used.add(name)
+            v["label"] = f"{name} ({'امرأة' if g == 'female' else 'رجل'})" + (" · تجريبي" if v.get("preview") else "")
 
 
 apply_approved()

@@ -55,6 +55,7 @@ const Flow = (() => {
     try {
       S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "" }) });
       try { localStorage.setItem("studiomania.flow", S.d.id); } catch { /* غير مهم */ }
+      if (typeof NH !== "undefined") NH?.refresh?.();
       render(); poll();
     } catch (err) { toast(err.message, true); close(); }
   }
@@ -72,6 +73,7 @@ const Flow = (() => {
     S.el.hidden = true;
     S.el.innerHTML = "";
     S.d = null;
+    if (typeof NH !== "undefined") NH?.refresh?.();   // «قيد العمل» يعرض المشروع اللي لسه سايبه
   }
 
   // ---------------------------------------------------------------- مزامنة مع السيرفر
@@ -461,9 +463,9 @@ const Flow = (() => {
         ${!o.fasih && o.dialects.find((x) => x.id === v.lang)?.group === "ar" ? `<div class="flw-empty bad">الأصوات العربية غير متاحة الآن، وفريقنا يعمل على إصلاحها.</div>` : ""}
         <h3 class="flw-h3">الصوت</h3><div class="flw-voices">${voices.map((x) => `<div class="flw-voice${x.id === v.voice ? " on" : ""}">
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
-          ${o.voices[v.lang] && o.fasih && /^ar-/.test(x.id) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
+          ${o.voices[v.lang] && o.fasih && /^ar-/.test(v.lang) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
       ${isCode(d) ? failed("vo") : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد ←${costTag(voices.find((x) => x.id === v.voice)?.pts, o.balance)}` : "أكمل ←"}</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد ←${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل ←"}</button></div>`;
   }
   async function loadVoice() {
     if (S.vLoading) return;
@@ -477,7 +479,7 @@ const Flow = (() => {
     let url = cached;
     if (!url) {
       S.vplay = id; render();
-      try { url = (await api("/api/voice-sample", { method: "POST", ...J({ voice: id }) })).url; } catch (err) { toast(err.message, true); }
+      try { url = (await api("/api/voice-sample", { method: "POST", ...J({ voice: id, lang: S.vo.lang }) })).url; } catch (err) { toast(err.message, true); }
       S.vplay = null; render();
       if (!url) return;
       const it = (S.vopts.voices[S.vo.lang] || []).find((x) => x.id === id); if (it) it.sample = url;
@@ -619,7 +621,7 @@ const Flow = (() => {
         ${mo.plain ? `<button type="button" class="flw-link" data-automont>↩︎ استعد المونتاج التلقائي</button>` : `<button type="button" class="flw-link" data-plain>✕ بدون مونتاج</button>`}
         <button type="button" class="flw-btn" data-myedit>✏️ هعمل المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
-        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر آخر" : "✓ موافق، صدّر الفيديو"}</button></div>
+        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر آخر" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button></div>
       ${rp.broll && !mo.plain ? `<p class="muted">✏️ إذا ستعمل المونتاج بنفسك: لقطات الـ B-roll طبقات أعلى الفيديو، تزيل أي واحدة أو تبدّلها بفيديو أو صورة من جهازك.</p>` : ""}
       ${tyBusy ? `<p class="muted">التصدير ينتظر التايبوجرافي ينتهي لكي النص يظهر أعلى الفيديو.</p>` : ""}
       ${mo.plain ? "" : camBench(d)}`;
