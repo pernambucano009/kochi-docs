@@ -271,6 +271,7 @@ $("langToggle").onclick = () => I18N.setLang(I18N.lang === "en" ? "ar" : "en");
 // ---------- 💰 رصيد Atlas: بيتحدث كل دقيقة، والصرف بيتحسب من نزول الرصيد ----------
 const money = { last: null };
 async function loadMoney() {
+  if (document.documentElement.dataset.role && document.documentElement.dataset.role !== "admin") return;   // 🔒 رصيد Atlas للأدمن بس، حتى لو الـ CSS ماتحمّلش
   try {
     money.last = await api("/api/atlas/money");
     $("moneyBtn").hidden = false;

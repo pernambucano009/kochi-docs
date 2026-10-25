@@ -47,7 +47,7 @@ $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("err").hidden = true;
   if (setup && $("pw").value !== $("pw2").value) {
-    $("err").textContent = "الباسوردين غير مثل بعض";
+    $("err").textContent = "كلمتا المرور غير متطابقتين";
     $("err").hidden = false;
     return;
   }

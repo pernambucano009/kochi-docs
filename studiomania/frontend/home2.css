@@ -3036,7 +3036,11 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 }
 
 /* ⏳ لحد ما بيانات الحساب تتحمّل: العنوان والزرار البرتقالي واسم العلامة مستخبيين (مكانهم محجوز، فمفيش قفزة) */
-#nh.nh-wait .nh-ttl, #nh.nh-wait .nh-ttl ~ .ar, #nh.nh-wait .nh-cta .nh-name, .nh-bar.nh-wait #nhClient { visibility: hidden; }
+#nh.nh-wait .nh-ttl, #nh.nh-wait .nh-ttl ~ .ar, #nh.nh-wait .nh-cta > *, .nh-bar.nh-wait #nhClient { visibility: hidden; }
+/* لحد ما بيانات الحساب توصل: الزرار البرتقالي مكانه بينبض بهدوء بدل ما يظهر بحالة عامة («ابدأ مشروعًا جديدًا») وبعدين يتغيّر */
+#nh.nh-wait .nh-cta { animation: nh-wait-pulse 1.1s ease-in-out infinite alternate; }
+@keyframes nh-wait-pulse { from { opacity: .45; } to { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) { #nh.nh-wait .nh-cta { animation: none; opacity: .6; } }
 #nh .nh-ttl, #nh .nh-ttl ~ .ar, #nh .nh-cta .nh-name { transition: opacity .25s; }
 
 /* ➡️ أي تسلسل خطوات (الفكرة ← النص ← الصوت…، مسار الصفحة، خطوات الأوتوبايلوت والكاروسيل والإعلانات) بيمشي من الشمال لليمين

@@ -11119,8 +11119,16 @@ def first_colors_apply(bid: str, path: Path) -> list[str]:
     return cols
 
 
+FIRST_OUTRO_LOCK = threading.Lock()
+
+
 def first_outro(bid: str, force: bool = False) -> Path | None:
     """أوترو العلامة من اللوجو (أو اسمها). مابيلمسش أوترو رفعه العميل بنفسه."""
+    with FIRST_OUTRO_LOCK:   # نافذة الشعار بتشغّله في الخلفية، وأول فيديو ممكن يطلبه في نفس الوقت
+        return _first_outro(bid, force)
+
+
+def _first_outro(bid: str, force: bool = False) -> Path | None:
     b = brain_row(bid) or {}
     if b.get("outro_file") and not b.get("outro_auto") and not force:
         return brand_video("outro", bid)
@@ -11193,11 +11201,16 @@ def onboard_logo_pick(body: LogoPickIn):
     else:
         update_brain(bid, lambda d: d.update(logo_asked=True))
         cols = []
+    # الأوترو بيتعمل في الخلفية: نافذة الشعار تتقفل فورًا (كانت بتفضل ثانيتين فوق الصفحة وتاكل أول ضغطة)
+    threading.Thread(target=first_outro_bg, args=(bid,), daemon=True).start()
+    return {**onboard_state(), "colors": cols}
+
+
+def first_outro_bg(bid: str) -> None:
     try:
         first_outro(bid)
     except Exception:  # noqa: BLE001  الأوترو إضافة: لو ماتعملش، أول فيديو بيتعمل من غيره
         pass
-    return {**onboard_state(), "colors": cols}
 
 
 import tplbrief  # noqa: E402

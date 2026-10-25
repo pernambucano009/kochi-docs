@@ -121,7 +121,7 @@ const ACTIONS = {
     $("body").innerHTML = `<div class="au-big">📬</div><p class="au-ok">إذا كان لهذا البريد حساب، فقد أرسلنا إليه رابطًا. افتح بريدك، وانظر في مجلد Spam أيضًا.</p>${devLink(d.dev_link)}<div class="au-links"><a href="/login">رجوع للدخول</a></div>`;
   },
   reset: async () => {
-    if ($("pw").value !== $("pw2").value) throw new Error("الباسوردين غير مثل بعض");
+    if ($("pw").value !== $("pw2").value) throw new Error("كلمتا المرور غير متطابقتين");
     await post("/api/auth/reset", { token: Q.get("token"), password: $("pw").value }); location.replace("/");
   },
   setup: async () => {

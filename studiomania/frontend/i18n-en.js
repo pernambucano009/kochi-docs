@@ -12791,5 +12791,6 @@ window.I18N_EN = {
   "تعذّر إنشاء السلسلة": "Couldn't create the sequence",
   "لم يُنشر هذا المنشور على هذه المنصة بعد": "This post hasn't been published on this platform yet",
   "يجب أن يتكون الكاروسيل من 2 إلى 10 صور": "A carousel must have 2 to 10 images",
-  "الإعلانات غير مفعّلة في اشتراكك بعد. تواصل مع الدعم لتفعيلها، وبعدها يعمل كل شيء من هنا.": "Ads aren't enabled on your plan yet. Contact support to enable them, and then everything works from here."
+  "الإعلانات غير مفعّلة في اشتراكك بعد. تواصل مع الدعم لتفعيلها، وبعدها يعمل كل شيء من هنا.": "Ads aren't enabled on your plan yet. Contact support to enable them, and then everything works from here.",
+  "كلمتا المرور غير متطابقتين": "The passwords don't match"
 };

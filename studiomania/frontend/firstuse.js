@@ -141,12 +141,13 @@ const FirstUse = (() => {
       let pick = "cut";
       const done = async (choice) => {
         ok.disabled = true; q(".ui-dlg-no").disabled = true;
+        if (choice === "skip") { b.remove(); resolve(); }   // «لاحقًا» بتقفل على طول، والحفظ في الخلفية
         try {
           const r = await api("/api/onboard/logo/pick", { method: "POST", ...jsonBody({ pick: choice }) });
           state = r; refresh();
           if (choice !== "skip" && r.colors?.length) toast("أضفنا الشعار وألوانه إلى عقل العلامة");
         } catch (e) { toast(e.message, true); }
-        b.remove(); resolve();
+        if (b.isConnected) { b.remove(); resolve(); }
       };
       const send = async (file) => {
         if (!file) return;

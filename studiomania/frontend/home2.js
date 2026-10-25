@@ -379,6 +379,11 @@ const NH = (() => {
   document.getElementById("nhLang").textContent = I18N.lang === "en" ? "ع" : "EN";
   document.getElementById("nhLang").setAttribute("aria-label", I18N.lang === "en" ? "العربية" : "English");
   document.getElementById("nhLang").onclick = () => document.getElementById("langToggle").click();
+  // 🔒 العميل: لا زر الإنجليزي ولا شريحة رصيد Atlas (بتتشال من الصفحة نفسها، مش بس بتستخبى بالـ CSS)
+  if (root.dataset.role && root.dataset.role !== "admin") {
+    document.getElementById("nhLang")?.remove();
+    ["stageMoney", "moneyBtn"].forEach((id) => document.getElementById(id)?.style.setProperty("display", "none", "important"));
+  }
   // 👤 الحساب: بيوري الإيميل، ومنه تسجيل الخروج
   document.getElementById("nhAcct").onclick = async () => {
     let who = "";
@@ -634,6 +639,7 @@ const NH = (() => {
   // صفحة واحدة لكل مدخل: لو الصفحة دي موجودة قبل كده في التسلسل بنرجع لها بدل ما التسلسل يطول (أ ← ب ← أ ← ب…)
   window.NHNav = (key) => {
     if (!T[key] || !zoom?.page) return;
+    if (!T[key].page) return T[key].go ? showStep(T[key].go) : undefined;   // مدخل لشاشة (مش صفحة): مايكسرش الصفحة
     if (pGrid.dataset.key === key && pTitle.dataset.key === key) return;
     const i = pStack.findIndex((s) => s.key === key && s.tkey === key);
     if (i >= 0) { pStack.length = i + 1; swapPage(key, true); return renderBar(); }
@@ -800,7 +806,10 @@ const NH = (() => {
         const own = pageTile(first) === tile, hk = T[tile.dataset.id]?.page || first;
         if (!zoom?.page) { openPage(tile, own ? first : hk); await idle(); if (!own) { window.NHNav(first); await idle(); } }
         else window.NHNav(first);
-        for (const k of parts.slice(1)) if (T[k]) { window.NHNav(k); await idle(); }
+        for (const k of parts.slice(1)) {
+          if (T[k]?.page) { window.NHNav(k); await idle(); }
+          else if (T[k]?.go) { showStep(T[k].go); await idle(); break; }   // «انشر وجدول» شاشة مش صفحة (#publish/pubpost ← #7)
+        }
         return;
       }
       if (document.querySelector(`.view[data-view="${VIEW_OF[first] || first}"]`)) showStep(first);
@@ -886,17 +895,23 @@ const NH = (() => {
   // Esc بيقفل النافذة المفتوحة بس (كل نافذة بتقفل نفسها)، ومبيرجّعش من الصفحة عشان ما يضيّعش الشغل
 
   // ---------- الداتا الحقيقية ----------
+  // ⏱️ الحاجات اللي مش بتغيّر العنوان ولا الزرار البرتقالي (حالة النشر، المنشورات، الأصوات…) مابتأخرش الهوم:
+  // لو اتأخرت أكتر من ثانيتين بناخد آخر قيمة عندنا، وبنحدّث تاني لما توصل (أول مرة لعميل جديد خدمة النشر بتاخد ثواني)
+  let late = false, lateTries = 0;
+  const soft = (p, old) => Promise.race([p, new Promise((r) => setTimeout(() => { late = true; r(old); }, 2000))]);
   async function refresh() {
+    late = false;
     const [folders, publisher, posts, coaches, voices, music, brains, cats, projects, flows, tvs, typos, dubs, scenes] = await Promise.all([
-      KOCHI ? shellFolders(true) : [], api("/api/publisher").catch(() => null), api("/api/posts").catch(() => []), api("/api/coaches").catch(() => []),
-      api("/api/audio?kind=voice").catch(() => []), api("/api/audio?kind=music").catch(() => []), api("/api/ad-brains").catch(() => []),
+      KOCHI ? shellFolders(true) : [], soft(api("/api/publisher").catch(() => null), D.publisher ?? null), soft(api("/api/posts").catch(() => []), D.posts || []),
+      soft(api("/api/coaches").catch(() => []), D.coaches || []),
+      soft(api("/api/audio?kind=voice").catch(() => []), []), soft(api("/api/audio?kind=music").catch(() => []), []), api("/api/ad-brains").catch(() => []),
       D.cats.length ? D.cats : api("/api/style-cats").catch(() => []),
       KOCHI ? [] : api("/api/projects").catch(() => []),
       KOCHI ? [] : api("/api/flows").catch(() => []), KOCHI ? [] : api("/api/tvideos").catch(() => []),
       KOCHI ? [] : api("/api/typo").catch(() => []), KOCHI ? { items: [] } : api("/api/dub").catch(() => ({ items: [] })),
       KOCHI ? [] : api("/api/scenes").catch(() => []),
     ]);
-    if (!KOCHI) D.pilot = await api("/api/pilot").catch(() => null);
+    if (!KOCHI) D.pilot = await soft(api("/api/pilot").catch(() => null), D.pilot ?? null);
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب متوقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
     const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد", voice: "الصوت", panel: "لوحة التحكم", shoot: "التصوير", review: "المراجعة", montage: "المونتاج", output: "التصدير", story: "القصة", scenes: "المشاهد" };
     D.drafts = [
@@ -916,7 +931,7 @@ const NH = (() => {
     ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     D.loaded = true;
-    Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length, music: music.length, money: window.money?.last || D.money,
+    Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length || D.voices || 0, music: music.length || D.music || 0, money: window.money?.last || D.money,
       brand: brains.find((b) => b.id === clientx?.active) || brains[0] || null });
     renderTiles();
     if (window.I18N?.lang !== "en" && !KOCHI) slots[live].innerHTML = stageHTML(shown);   // العنوان بيتحدّث لما العقل يتحمّل
@@ -924,6 +939,7 @@ const NH = (() => {
     const bk = JSON.stringify([clientx?.active || "", D.brand?.id || "", (D.brand?.logos || []).map((l) => l.file || l.url || l).join(","), D.brand?.palette || "", D.brand?.name || ""]);
     if (bk !== lastBrandKey) { GL?.brand?.(); lastBrandKey = bk; }
     if (!KOCHI && typeof FirstUse !== "undefined") FirstUse.check();
+    if (late && lateTries++ < 3) setTimeout(refresh, 2500);   // اللي اتأخر بيتكمّل لوحده (٣ مرات بالكتير)
   }
   let lastBrandKey = null;
   // ⏳ أول فتحة: الهوم مايظهرش بحالة عامة («ابدأ من هنا»، «العميل») قبل ما بيانات الحساب ومسار أول استخدام يتحمّلوا
