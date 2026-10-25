@@ -47,7 +47,7 @@ const VoiceLab = (() => {
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
     return `${exp}<table class="vl-table"><thead><tr><th>اللهجة</th><th>الترتيب (متوسط النجوم · عدد التقييمات)</th></tr></thead><tbody>${Object.entries(groups).map(([d, xs]) =>
-      `<tr><td>${esc(d === "clone" ? "🧬 كلون الصوت" : d === "dub" ? "🌍 دبلجة فيديو" : S.d.dialects[d] || d)}${S.d.approved?.[d] ? `<br><small class="vl-ok">✅ معتمد: ${esc((S.d.labels || S.d.providers)[S.d.approved[d]] || S.d.approved[d])}</small>` : ""}</td><td>${xs.map((r, k) => `<span class="vl-rank${k === 0 ? " best" : ""}">${k === 0 ? "🏆 " : ""}${esc((S.d.labels || S.d.providers)[r.provider] || r.provider)} <b>${r.avg}</b><small>(${r.n})</small></span>`).join("")}</td></tr>`).join("")}</tbody></table>`;
+      `<tr><td>${esc(d === "clone" ? "🧬 كلون الصوت" : d === "dub" ? "🌍 دبلجة فيديو" : S.d.dialects[d] || d)}${S.d.approved?.[d] ? `<br><small class="vl-ok">✅ معتمد: ${[].concat(S.d.approved[d]).map((p) => esc((S.d.labels || S.d.providers)[p] || p)).join(" و")}</small>` : ""}</td><td>${xs.map((r, k) => `<span class="vl-rank${k === 0 ? " best" : ""}">${k === 0 ? "🏆 " : ""}${esc((S.d.labels || S.d.providers)[r.provider] || r.provider)} <b>${r.avg}</b><small>(${r.n})</small></span>`).join("")}</td></tr>`).join("")}</tbody></table>`;
   }
   function render() {
     if (!S.el || !S.d) return;

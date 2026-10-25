@@ -20851,7 +20851,12 @@ import munsit  # noqa: E402
 
 
 def ar_speak(v: dict, text: str, dest: Path) -> Path:
-    """صوت عربي جاهز: منصت للخليجي (إذا صوته من منصت)، وفصيح للباقي."""
+    """صوت عربي جاهز: منصت للخليجي (إذا صوته من منصت)، وElevenLabs (المباشر أو عن طريق Atlas) لو معتمد في اللهجة، وفصيح للباقي."""
+    if v["provider"] == "eleven_direct":
+        return voicelab.eleven_say(text, v["voice"], dest)
+    if v["provider"] == "eleven":
+        atlas.download(atlas.run_model("Audio", {"model": "elevenlabs/v3/text-to-speech", "text": text, "voice": v["voice"]}, "التعليق الصوتي", max_seconds=300, interval=2), dest)
+        return dest
     if v["provider"] == "munsit":
         try:
             return munsit.speak(text, v["voice"], dest)
@@ -20874,6 +20879,8 @@ def fasih_sync() -> None:
             dub.merge_fasih(fasih.catalog())
             dub.merge_fasih(fasih.custom_voices())   # 🎨 الصوت الخاص المتصمم في حساب فصيح
             dub.merge_munsit(munsit.catalog())       # 🗣️ أصوات منصت الخليجية (لو المفتاح متسجل)
+            if voicelab.eleven_key():                # 🎙️ ElevenLabs المباشر (معتمد في الفصحى)
+                dub.merge_eleven_direct(voicelab.eleven_voices())
             dub.apply_approved()                     # ✅ المزوّد المعتمد لكل لهجة يظل أول اختيار
         finally:
             _FASIH_SYNC["running"] = False
@@ -21220,7 +21227,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
             else:
                 raw = work / f"l{i:03d}.src"
                 v = dub.VOICES[t["voice"]]
-                if v["provider"] in ("fasih", "munsit"):
+                if v["provider"] in ("fasih", "munsit", "eleven_direct"):
                     ar_speak(v, texts[i], raw)
                 else:
                     atlas.download(atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2), raw)
@@ -21434,7 +21441,7 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     wallet.need(cost, "التعليق الصوتي")
     raw = out.with_suffix(".src")
     v = dub.VOICES[voice]
-    if v["provider"] in ("fasih", "munsit"):
+    if v["provider"] in ("fasih", "munsit", "eleven_direct"):
         ar_speak(v, text, raw)
     else:
         atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "التعليق الصوتي", max_seconds=300, interval=2), raw)
@@ -24524,7 +24531,7 @@ def voicelab_get():
             "dialects": {k: v["label"] for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
             "samples": vlab_texts(), "defaults": {k: VLAB_TEXT.get(k, "") for k in dub.DIALECTS if dub.DIALECTS[k]["group"] == "ar"},
             "support": {k: vlab_support(k) for k, v in dub.DIALECTS.items() if v["group"] == "ar"},
-            "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"])), "approved": dict(dub.APPROVED)}
+            "runs": [vlab_out(d) for d in runs[:30]], "table": sorted(table, key=lambda r: (r["dialect"], -r["avg"])), "approved": {k: v for k, v in dub.APPROVED.items()}}
 
 
 class VLabIn(BaseModel):

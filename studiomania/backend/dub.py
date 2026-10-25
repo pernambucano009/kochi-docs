@@ -117,20 +117,45 @@ def merge_munsit(voices: list[dict]) -> int:
 
 # ✅ المزوّد المعتمد لكل لهجة بعد تقييم صاحب المنصة في مختبر الأصوات (ومعه أهل اللهجة):
 # أصواته تصبح أول اختيار في لهجتها في كل البرنامج (التعليق الصوتي، الدبلجة، القوالب، الأفاتار). أي لهجة تُعتمد تُضاف هنا.
-APPROVED: dict[str, str] = {
-    "ar-sd": "fasih",   # السوداني: فصيح (تقييم ٢٤ أكتوبر ٢٠٢٦)
-    "ar-eg-cairo": "fasih",   # المصري: فصيح (تقييم ٢٤ أكتوبر ٢٠٢٦)
+APPROVED: dict[str, list[str]] = {   # بأسماء مزوّدي مختبر الأصوات، بالترتيب
+    "ar-sd": ["fasih"],                 # السوداني (٢٤ أكتوبر ٢٠٢٦)
+    "ar-eg-cairo": ["fasih"],           # المصري (٢٤ أكتوبر ٢٠٢٦)
+    "ar-msa": ["fasih", "eleven"],      # الفصحى: فصيح وElevenLabs المباشر (٢٥ أكتوبر ٢٠٢٦)
+    "ar-sa-najdi": ["eleven_atlas"],    # السعودي: ElevenLabs عن طريق Atlas (٢٥ أكتوبر ٢٠٢٦)
+    "ar-sa-hijazi": ["eleven_atlas"],
 }
+LAB2DUB = {"eleven_atlas": "eleven", "eleven": "eleven_direct"}   # اسم المزوّد في المختبر ← اسمه في الأصوات
+ELEVEN_DIRECT_PER_1K = 0.30   # ElevenLabs مباشرة (eleven_v3) تقريبًا بالألف حرف
+
+
+def merge_eleven_direct(voices: list[dict]) -> int:
+    """أصوات ElevenLabs الجاهزة من الحساب المباشر (راجل وست) للهجات اللي معتمد فيها ElevenLabs المباشر."""
+    premade = [v for v in voices or [] if v.get("cat") == "premade"] or list(voices or [])
+    pick = [v for g in ("male", "female") for v in [next((x for x in premade if x.get("gender") == g), None)] if v]
+    added = 0
+    for x in pick:
+        key = f"elevend:{x['id']}"
+        g = x.get("gender") or "male"
+        VOICES[key] = {"label": f"{x.get('name') or 'صوت'} ({'امرأة' if g == 'female' else 'رجل'})", "provider": "eleven_direct", "voice": x["id"],
+                       "gender": g, "per_1k": ELEVEN_DIRECT_PER_1K}
+        added += 1
+    apply_approved()
+    return added
 
 
 def apply_approved() -> None:
-    """أصوات المزوّد المعتمد أولًا في لهجتها (بنفس ترتيبها)، والباقي بعدها."""
-    for dia, prov in APPROVED.items():
+    """أصوات المزوّدين المعتمدين أولًا في لهجتها (بترتيب الاعتماد)، والباقي بعدها. ElevenLabs بيتضاف للهجة لو معتمد فيها."""
+    for dia, provs in APPROVED.items():
         d = DIALECTS.get(dia)
         if not d:
             continue
-        vs = d["voices"]
-        d["voices"] = [v for v in vs if VOICES.get(v, {}).get("provider") == prov] + [v for v in vs if VOICES.get(v, {}).get("provider") != prov]
+        want = [LAB2DUB.get(p, p) for p in provs]
+        vs = list(d["voices"])
+        for prov in want:
+            if prov in ("eleven", "eleven_direct"):
+                vs += [k for k, v in VOICES.items() if v.get("provider") == prov and not v.get("hidden") and k not in vs]
+        rank = lambda v: want.index(VOICES.get(v, {}).get("provider")) if VOICES.get(v, {}).get("provider") in want else len(want)  # noqa: E731
+        d["voices"] = sorted(vs, key=rank)
 
 
 apply_approved()
