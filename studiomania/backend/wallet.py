@@ -93,6 +93,16 @@ def gift(n: int, what: str, ref: str = "") -> int:
     return n
 
 
+def spent_since(t0: float) -> int:
+    """صافي اللي اتصرف من وقت t0 (الخصم ناقص اللي رجع)، عشان هدية أول فيديو ترجّع كل اللي اتخصم فيه بالظبط."""
+    if free():
+        return 0
+    with closing(_db()) as c:
+        r = c.execute("SELECT COALESCE(SUM(delta), 0) AS d FROM ledger WHERE workspace=? AND at>=? AND kind IN ('use', 'refund')",
+                      (TENANT, t0)).fetchone()
+    return max(0, -int(r["d"] or 0))
+
+
 # ---------------------------------------------------------------- 🔒 الحجز الموحّد: النقاط تتحجز قبل العملية، وترجع لو فشلت
 # reserve() بتخصم التقدير فورًا (فعمليتين في نفس الوقت مايصرفوش أكتر من الرصيد)، refund() بترجّعه لو العملية فشلت،
 # settle() بتظبط الفرق لو التكلفة الحقيقية طلعت أقل. covered(): جوه الحتة دي الخصم بيتعمل صراحةً، فالخصم التلقائي مايتكررش.

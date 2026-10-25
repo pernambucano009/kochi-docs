@@ -27,10 +27,10 @@ const FirstUse = (() => {
 .fu-opt i{display:grid;place-items:center;height:150px;border-radius:12px;font-style:normal;background:#fff}
 .fu-opt i.chk{background:repeating-conic-gradient(#e9e9e9 0 25%,#fff 0 50%) 0 0/18px 18px}
 .fu-opt img{max-width:88%;max-height:130px;object-fit:contain}
-.fu-tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px;margin:0 0 14px}
+.fu-tpls{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:0 0 14px}.fu-tpls .fu-tpl{flex:0 1 calc((100% - 48px) / 5);min-width:96px}
 .fu-tpl{border:2px solid transparent;border-radius:16px;overflow:hidden;padding:0;background:var(--ui-dlg-field,#F7F7F5);cursor:pointer;font:inherit;color:inherit;text-align:start;transition:border-color .2s,transform .2s}
 .fu-tpl:hover{transform:translateY(-2px)}.fu-tpl.on{border-color:#E5613E}
-.fu-tpl img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#ddd}
+.fu-tpl img,.fu-tpl video{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#ddd;pointer-events:none}
 .fu-tpl b{display:block;padding:8px 10px 2px;font-size:13.5px;font-weight:500}.fu-tpl small{display:block;padding:0 10px 9px;font-size:11.5px;color:#E5613E}
 .fu-steps{list-style:none;margin:6px 0 16px;padding:0;display:grid;gap:10px}
 .fu-steps li{display:flex;align-items:center;gap:12px;font-size:14.5px;opacity:.45;transition:opacity .3s}
@@ -40,7 +40,7 @@ const FirstUse = (() => {
 .fu-steps li.on span{border:2px solid #E5613E;border-top-color:transparent;background:none;animation:fuSpin .8s linear infinite}
 .fu-steps li em{font-style:normal;font-size:12.5px;opacity:.7;margin-inline-start:auto}
 @keyframes fuSpin{to{transform:rotate(360deg)}}
-.fu-vid{display:block;width:min(260px,100%);margin:0 auto 14px;border-radius:16px;background:#000;aspect-ratio:9/16}
+.fu-vid{display:block;width:auto;max-width:100%;height:min(50vh,460px);margin:0 auto 14px;border-radius:16px;background:#000;aspect-ratio:9/16}
 .fu-cols{display:flex;gap:6px;justify-content:center;margin:-4px 0 12px}.fu-cols i{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
 @media (prefers-reduced-motion:reduce){.fu-steps li.on span{animation:none}}`;
   const st = document.createElement("style");
@@ -168,11 +168,12 @@ const FirstUse = (() => {
     const list = typeof Gallery !== "undefined" ? Gallery.list() : [];
     // غلاف كل قالب من مجال العميل نفسه (لو موجود)، وإلا الغلاف العام
     const items = (state.reels || [state.first]).map((id) => ({ id, name: (list.find((x) => x.id === id) || {}).name || id,
-      cover: (state.field_media || []).includes(id) ? `/gallery/f/${state.field}/${id}.jpg` : `/gallery/${id}.jpg?v=2` }));
+      cover: (state.field_media || []).includes(id) ? `/gallery/f/${state.field}/${id}.jpg` : `/gallery/${id}.jpg?v=2`,
+      video: (state.field_media || []).includes(id) ? `/gallery/f/${state.field}/${id}.mp4` : `/gallery/${id}.mp4` }));
     return new Promise((resolve) => {
       let cur = items[0];
       const b = dialog(`<h3>اختر شكل أول فيديو</h3><p class="fu-sub">قوالب مناسبة لمجالك. كلها تُصنع بالصوت والحركة فقط، وأول فيديو على حسابنا.</p>
-        <div class="fu-tpls">${items.map((x, i) => `<button type="button" class="fu-tpl${i ? "" : " on"}" data-t="${esc(x.id)}"><img src="${esc(x.cover)}" alt="" loading="lazy"><b>${esc(x.name)}</b>${i ? "" : "<small>المقترح لمجالك</small>"}</button>`).join("")}</div>
+        <div class="fu-tpls">${items.map((x, i) => `<button type="button" class="fu-tpl${i ? "" : " on"}" data-t="${esc(x.id)}"><video src="${esc(x.video)}" poster="${esc(x.cover)}" muted loop playsinline autoplay preload="metadata" aria-hidden="true"></video><b>${esc(x.name)}</b>${i ? "" : "<small>المقترح لمجالك</small>"}</button>`).join("")}</div>
         <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok">التالي</button><button type="button" class="ui-dlg-no">لاحقًا</button></div>`);
       b.querySelector(".fu-tpls").onclick = (e) => {
         const t = e.target.closest(".fu-tpl"); if (!t) return;

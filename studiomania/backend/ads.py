@@ -142,7 +142,7 @@ BRAND_LEVELS = {
 
 
 def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
-    """توجيهات التطبيق على العلامة الذي اخترها المستخدم + الإعلانات التي فاتت لكي ميكررهاش."""
+    """توجيهات التطبيق على العلامة التي اخترها المستخدم + الإعلانات التي فاتت لكي ميكررهاش."""
     s = settings or {}
     lines = []
     if s.get("direction"):
@@ -170,7 +170,7 @@ def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
 
 
 def who(brand: dict | None, brain: dict | None) -> dict:
-    """العلامة الذي نعمل له الإعلان: اسمه وسوقه ولغته وقواعده (من ملف العميل)."""
+    """العلامة التي نعمل له الإعلان: اسمه وسوقه ولغته وقواعده (من ملف العميل)."""
     b, c = brand or {}, brain or {}
     return {"name": c.get("name") or b.get("name") or "العلامة", "market": c.get("market") or b.get("market") or "",
             "language": c.get("language") or b.get("language") or "", "modest": bool(c.get("modest") or b.get("modest"))}
@@ -211,7 +211,7 @@ def adapt_messages(brand: dict, analysis: dict, audio: dict, settings: dict, sty
         f"أنت كريتيف دايركتور لبراند «{name}». " + intro
         + (f"ملف العميل (المنتج وهويته وأصوله الحقيقية، التزم به بالضبط):\n{brain_text(brain)}\n{_rivals(brain)}"
            "أي شاشة تطبيق أو شعار أو صورة منتج في الإعلان يجب تكون من هذه الأصول (اكتب اسمها في asset)، "
-           "ومتخترعش شاشات أو لوجوهات أخرى. ألوان العلامة الذي في ملف العميل ثابتة في الشعار والشاشات، "
+           "ومتخترعش شاشات أو لوجوهات أخرى. ألوان العلامة التي في ملف العميل ثابتة في الشعار والشاشات، "
            "وألوان الإعلان نفسه حسب «التطبيق على العلامة» أسفل.\n\n" if brain else
            f"عن «{name}»: {brand.get('about', '')}\nالجمهور: {brand.get('audience', '')}\n"
            f"ألوان العلامة: {brand.get('colors', '')}\n\n")
@@ -489,7 +489,7 @@ def frame_prompt(h: dict, shot: dict, ref_comps: list[dict] | None = None, n_sty
 
 
 def frame_edit_prompt(h: dict, note: str, ref_comps: list[dict], n_extra: int = 0) -> str:
-    """تعديل صورة الستوري بورد بطلب المستخدم: الصورة 1 هي الحالية، وبعدها الصور الذي بعتها، وبعدها أصول العلامة."""
+    """تعديل صورة الستوري بورد بطلب المستخدم: الصورة 1 هي الحالية، وبعدها الصور التي بعتها، وبعدها أصول العلامة."""
     extra = (f"\nImages 2-{n_extra + 1} are reference images the director attached for this change: use them for exactly "
              "what the change asks (the look of a person, object, outfit, place, pose or style), not as a new layout."
              if n_extra else "")
@@ -608,7 +608,7 @@ def scene_components_messages(scenes: list[dict]) -> list[dict]:
 
 
 def merge_scene_components(scenes: list[dict], data: dict) -> int:
-    """يضع مكونات كل مشهد داخل المشهد نفسه. يعود عدد المشاهد الذي اتفصّصت."""
+    """يضع مكونات كل مشهد داخل المشهد نفسه. يعود عدد المشاهد التي اتفصّصت."""
     by_n = {}
     for x in (data or {}).get("scenes") or []:
         if isinstance(x, dict) and str(x.get("n", "")).strip().isdigit():

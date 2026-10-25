@@ -107,6 +107,13 @@ const PlansView = (() => {
 :is(#nh, body) .pv-cont .more { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--pv-fill); font-size: 16px; color: var(--pv-sub); transition: rotate .25s var(--pv-ease), background .2s; }
 :is(#nh, body) .pv-cont.open .more { rotate: 45deg; }
 :is(#nh, body) .pv-cont:not(.open) .sep, :is(#nh, body) .pv-cont:not(.open) .tp { display: none; }
+:is(#nh, body) .pv-low { position: relative; flex-direction: column; align-items: center; gap: 8px; }
+:is(#nh, body) .pv-hist-b { height: 30px; padding: 0 12px; border-radius: 99px; font-size: 12.5px; color: var(--pv-sub); background: var(--pv-fill); }
+:is(#nh, body) .pv-hist { width: min(420px, 100%); max-height: 240px; overflow-y: auto; padding: 8px 14px; border-radius: 18px; background: var(--pv-card); box-shadow: var(--pv-cont); }
+:is(#nh, body) .pv-hist li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 12.5px; border-bottom: 1px solid var(--pv-line); }
+:is(#nh, body) .pv-hist li:last-child { border-bottom: 0; }
+:is(#nh, body) .pv-hist .d { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; flex: none; } :is(#nh, body) .pv-hist .d.plus { color: var(--pv-acc); }
+:is(#nh, body) .pv-hist small { color: var(--pv-muted); display: block; font-size: 11px; }
 :is(#nh, body) .pv-cont .how { font-size: 11.5px; color: var(--pv-muted); padding-inline: 6px; }
 @media (max-width: 1100px) { :is(#nh, body) .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
 /* التابلت: الكروت الأربعة صفّين بدل ما تتقطع */
@@ -207,6 +214,13 @@ const PlansView = (() => {
       return `<div class="pv-cont${S.tops ? " open" : ""}"><svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="trk"/><circle cx="20" cy="20" r="16" class="val" style="stroke-dasharray:${pct} 100.5"/></svg>
         <b class="ttl" title="نقاط الباقة ${n(c.plan_credits)} · نقاط زيادة ${n(c.topup_credits)}"><span class="num">${n(c.total)}</span> نقطة</b><span class="sep"></span>${tops}<button class="more" data-pvmore aria-label="زوّد نقاط">+</button></div>`;
     }
+    // 🧾 سجل النقاط: كل خصم وكل رجوع وكل هدية بسطر، عشان العميل يعرف الرقم جه منين
+    const KIND = { gift: "هدية", refund: "رجوع", use: "", plan: "الباقة", topup: "شحن", trial: "التجربة" };
+    function hist() {
+      if (guest || d.owner || !(d.history || []).length) return "";
+      const rows = d.history.map((h) => `<li><span>${KIND[h.kind] ? `<b>${esc(KIND[h.kind])}</b> · ` : ""}${esc(h.note || "")}<small>${fmtD(h.at)}</small></span><bdi class="d${h.delta > 0 ? " plus" : ""}" dir="ltr">${h.delta > 0 ? "+" : "-"}${n(Math.abs(h.delta))}</bdi></li>`).join("");
+      return `<button class="pv-hist-b" data-pvhist aria-expanded="${!!S.hist}">${S.hist ? "إخفاء سجل النقاط" : "سجل النقاط"}</button>${S.hist ? `<ul class="pv-hist">${rows}</ul>` : ""}`;
+    }
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
         <div class="pv-mid">
@@ -219,7 +233,7 @@ const PlansView = (() => {
             </div>
           </div>
         </div>
-        <div class="pv-low">${bottom()}</div></div>`;
+        <div class="pv-low">${bottom()}${hist()}</div></div>`;
     }
     const pv = () => el.querySelector(".pv");
     let shut;
@@ -243,6 +257,7 @@ const PlansView = (() => {
         S.pick = key; render(); return pv().classList.add("open");
       }
       if (q("[data-pvpay]")) { const b = q("[data-pvpay]"); return pay("plan", b.dataset.plan, b.dataset.pvpay); }
+      if (q("[data-pvhist]")) { S.hist = !S.hist; const o2 = S.open; render(); return o2 && pv().classList.add("open"); }
       if (q("[data-pvmore]")) { S.tops = !S.tops; S.top = null; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
       const t = q("[data-pvtop]");
       if (t) {

@@ -6,7 +6,10 @@
 const Flow = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   // 💳 التكلفة جنب زرار الصرف: «نحو N نقطة · رصيدك M» (والرصيد مش ظاهر لصاحب البرنامج)
-  const costTag = (pts, bal) => pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · نقاطك ${Number(bal).toLocaleString("en-US")}` : ""}</small>` : "";
+  const costTag = (pts, bal) => {
+    if (bal != null && window.ME?.credits) bal = window.ME.credits.total;   // نفس الرقم اللي في الهوم و«باقتي ونقاطي»
+    return pts ? `<small class="flw-cost${bal != null && bal < pts ? " low" : ""}">نحو ${Number(pts).toLocaleString("en-US")} نقطة${bal != null ? ` · نقاطك <span data-credits>${Number(bal).toLocaleString("en-US")}</span>` : ""}</small>` : "";
+  };
   // 🗣️ اللهجة: سطر واحد «اللهجة: سعودي نجدي · تغيير» في خطوة النص وخطوة الصوت، والقايمة الكاملة بتفتح بس لما تضغط «تغيير»
   function dialLine(cur, key, off = false) {
     const all = S.vopts?.dialects || [];
@@ -263,18 +266,21 @@ const Flow = (() => {
   function mineRow(d) {
     const list = S.trendsFor === d.id ? S.mine || [] : [];
     if (!list.length) return "";
-    return `<div class="flw-trend flw-mine"><b>💡 أفكارك الذي في مجلد الأفكار (${list.length}). تستخدم واحدة منهم؟</b>
+    return `<div class="flw-trend flw-mine"><b>💡 أفكارك التي في مجلد الأفكار (${list.length}). تستخدم واحدة منها؟</b>
       <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
+  // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
+  const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
+  const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
   function stIdea(d) {
     const loading = d.busy === "ideas";
-    return `<h2>اختر فكرة للبوست</h2><p class="flw-sub">العقل اقترح أفكار على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرهم، أو اكتب فكرتك.</p>
+    return `<h2>اختر فكرة للبوست</h2><p class="flw-sub">العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك.</p>${costNote(d)}
       ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو الخاص بي، على الرفع مباشرة</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
-      ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (ضع الماوس ترى له)</p>` : ""}
+      ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (ضع المؤشر عليها لترى السبب)</p>` : ""}
       ${trendRow(d)}${mineRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${loading ? working("العقل يفكّر في أفكار على القالب…") : failed("idea")}
-      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد أفكار عن ماذا؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح</button></div>` : `
-        <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكار أخرى</button>
+      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد أفكارًا عن ماذا؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح${writeCost(d, "ideas")}</button></div>` : `
+        <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكارًا أخرى${writeCost(d, "ideas")}</button>
         <button type="button" class="flw-link" data-hint>🎯 وجّه العقل</button>`}
         <button type="button" class="flw-link" data-own>✍️ اكتب فكرتك</button></div>`;
   }
@@ -346,11 +352,11 @@ const Flow = (() => {
     const loading = d.busy === "scenarios";
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
     const skipS = isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو الخاص بي، على الرفع مباشرة</button></div>` : "";
-    return `${picked("idea")}<h2>اختر السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps}${isPhone(d) ? "" : ` — <button type="button" class="flw-link" data-go="format">غيّر النوع</button>`}</p>${skipS}
+    return `${picked("idea")}<h2>اختر السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps}${isPhone(d) ? "" : ` — <button type="button" class="flw-link" data-go="format">غيّر النوع</button>`}</p>${costNote(d)}${skipS}
       ${tipBox(d.guide?.scen)}${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
       ${loading ? working("العقل يكتب السيناريوهات…") : failed("scen")}
-      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد السيناريو يصبح كيف؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
-        <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سيناريوهات أخرى</button>
+      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="كيف تريد السيناريو؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح${writeCost(d, "scenarios")}</button></div>` : `
+        <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح سيناريوهات أخرى${writeCost(d, "scenarios")}</button>
         <button type="button" class="flw-link" data-hint>🎯 وجّه العقل</button>`}
         <button type="button" class="flw-link" data-own>✍️ اكتب السيناريو بنفسك</button></div>`;
   }
@@ -406,12 +412,12 @@ const Flow = (() => {
     if (!S.vopts) loadVoice();
     const cur = d.lang || S.vopts?.pick?.lang;
     return `${picked("idea")}<h2>النص على مشاهد القالب</h2>
-      <p class="flw-sub">لكل مشهد جملة تعليق صوتي والنص الذي يظهر فيه. المشهد يأخذ طول جملته، فاجعل الجمل قريبة من طول المشهد (بجانب كل جملة ستأخذ قدر ماذا).</p>
+      <p class="flw-sub">لكل مشهد جملة تعليق صوتي والنص الذي يظهر فيه. المشهد يأخذ طول جملته، فاجعل الجمل قريبة من طول المشهد (بجانب كل جملة مدتها المتوقعة).</p>${costNote(d)}
       ${dialLine(cur, "slang", loading)}
       ${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scriptCard(s, ml)).join("")}</div>
       ${loading ? working("العقل يكتب النص على مشاهد القالب…") : failed("scen")}
-      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد النص يصبح كيف؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح</button></div>` : `
-        <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح نصوص أخرى</button>
+      <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="كيف تريد النص؟ (اختياري)"><button type="button" class="flw-btn" data-more="scen">اقترح${writeCost(d, "scenarios")}</button></div>` : `
+        <button type="button" class="flw-btn" data-more="scen" ${loading ? "disabled" : ""}>💡 اقترح نصوصًا أخرى${writeCost(d, "scenarios")}</button>
         <button type="button" class="flw-link" data-hint>🎯 وجّه العقل</button>`}</div>`;
   }
   // 🎛️ لوحة التحكم: طول كل مشهد على قد الصوت، والفويس أوفر، وزرار يفتح لوحة القالب نفسها (المعاينة والخانات)
@@ -432,7 +438,7 @@ const Flow = (() => {
     const opts = S.castOpts;
     if (!opts) { loadCast(); return `${picked("scenario")}${working("بجيب الشخصيات…")}`; }
     S.cast ??= (d.cast || []).map((c) => c.id);
-    return `${picked("scenario")}<h2>من أبطال المنشور؟</h2><p class="flw-sub">اختر من شخصيات العلامة الذي في العقل (يمكنك تختار أكثر من واحدة أو ولا واحدة).</p>
+    return `${picked("scenario")}<h2>من أبطال المنشور؟</h2><p class="flw-sub">اختر من شخصيات العلامة التي في العقل (يمكنك تختار أكثر من واحدة أو ولا واحدة).</p>
       ${opts.length ? `<div class="flw-cast">${opts.map((o) => `<button type="button" class="flw-person${S.cast.includes(o.id) ? " on" : ""}" data-person="${esc(o.id)}">
         <img src="${esc(o.image_url)}" alt="" loading="lazy"><b>${esc(o.name)}</b>${o.about ? `<small>${esc(o.about.slice(0, 70))}</small>` : ""}</button>`).join("")}</div>`
         : `<div class="flw-empty">لا يوجد بعد شخصيات في العقل. أضفها من «الشخصيات» أو من عقل العلامة، أو أكمل بدون أبطال.</div>`}

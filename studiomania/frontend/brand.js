@@ -61,7 +61,7 @@ const BrandPage = (() => {
         { f: "rule+", t: "قاعدة جديدة", type: "rule-new" },
       ] },
       { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
-        { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["", "نعم"], ["0", "لا"]] },
+        { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
         { f: "cta", t: "الدعوة (CTA)", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
@@ -137,9 +137,11 @@ const BrandPage = (() => {
       default: return false;
     }
   }
+  // الشعار على الفيديو شغّال من الأول (أي قيمة غير «0» معناها نعم)، فمايظهرش كأنه خانة فاضية
+  const pickRaw = (b, l) => (l.f === "logo_on" ? (String(b?.logo_on ?? "") === "0" ? "0" : "1") : String(b?.[l.f] || ""));
   const leafValue = (b, l) => {
     if (l.type === "text") return filled(b, l) ? String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim() : "";
-    if (l.type === "pick") return l.opts.find(([v]) => v === String(b?.[l.f] || ""))?.[1] || "";
+    if (l.type === "pick") return l.opts.find(([v]) => v === pickRaw(b, l))?.[1] || "";
     if (l.type === "imgs") return (b?.[l.f] || []).length ? `${(b[l.f]).length} صورة` : "";
     if (l.type === "palette") return hexes(b?.palette).join(" ");
     if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "يعمل" : "موجود ومغلق") : "";
@@ -182,7 +184,7 @@ const BrandPage = (() => {
       <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <div class="bm-dropall" aria-hidden="true"><b>ارمي هنا</b><small>العقل سيقرأ الملف ويضع كل معلومة في مكانها</small></div>
-      <p class="bm-hint"><i class="bm-lg o"></i> ممتلئة · <i class="bm-lg e"></i> ما زال ناقصة · <i class="bm-lg b"></i> معلومات وقواعد ثابتة · <i class="bm-lg g"></i> اقتراحات وأسئلة مستنياك · اضغط على العقل تبدّل العلامة</p>`;
+      <p class="bm-hint"><i class="bm-lg o"></i> ممتلئة · <i class="bm-lg e"></i> لم تُملأ بعد · <i class="bm-lg b"></i> معلومات وقواعد ثابتة · <i class="bm-lg g"></i> اقتراحات وأسئلة مستنياك · اضغط على العقل تبدّل العلامة</p>`;
   }
   // الخريطة ليها عالم خاص بيها بمسافات واسعة ثابتة (المخ في 0,0)، والشاشة بتتفرّج عليه بزوم وسحب.
   // كده الفروع عمرها ما تدخل في بعض مهما الشاشة صغرت: الخريطة بتبعد شوية، وتقدر تقرّب بالعجلة أو الأزرار
@@ -343,7 +345,7 @@ const BrandPage = (() => {
     const side = (S.byId?.[n.from]?.x ?? 0) + 0 > n.x ? "l" : "r";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>${lab ? `<span class="bm-lab ${side}">${esc(short(lab))}</span>` : ""}
-      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح داخل</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">ما زال ناقصة</small>`}</span></button>`;
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 فيه اقتراح داخل</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لم تُملأ بعد</small>`}</span></button>`;
   }
   // أول ٣ كلمات (بحد أقصى ٢٢ حرف) وبعدين «…»
   function short(t) {
@@ -689,7 +691,7 @@ const BrandPage = (() => {
           <div class="bm-acts"><button class="bm-pill" data-audadd>＋ جمهور</button>${A.length ? `<button class="bm-go" data-audsave>احفظ</button>` : ""}<button class="bm-pill" data-audx ${b?.audiences_busy ? "disabled" : ""}>✨ استخلصهم من الوصف</button></div>`;
       }
       case "rule-new": return head + `<p class="bm-note">أي شيء يجب تتراعى في كل عمل للعلامة: النص والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: بدون مزيكا · واضغط Enter");
-      case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${String(b?.[l.f] || "") === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
+      case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${pickRaw(b, l) === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
         const hs = hexes(b?.palette);
         return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · اضغط تزيله"></button>`).join("")}
@@ -715,7 +717,7 @@ const BrandPage = (() => {
           + `<div class="bm-acts"><button class="bm-go" data-tdone="${x.id}" data-v="${x.done ? "" : "1"}">${x.done ? "↩︎ ما زال لم تُنشأ" : "✓ أُنشئت"}</button><button class="bm-pill" data-tdel="${x.id}">أزلها</button></div>`
           + (srcName(x.source) ? `<p class="bm-note">من تحليل «${esc(srcName(x.source))}»</p>` : "");
       }
-      case "social-go": return head + `<p class="bm-note">ضع رابط حساب العلامة على إنستجرام أو تيك توك، والعقل يحلل المنشورات والفيديوهات ويكتب هنا النقاط الذي يجب تتشتغل.</p>
+      case "social-go": return head + `<p class="bm-note">ضع رابط حساب العلامة على إنستجرام أو تيك توك، والعقل يحلل المنشورات والفيديوهات ويكتب هنا النقاط التي يجب تتشتغل.</p>
         <button class="bm-go" data-socialgo>📱 حلّل حساب</button>`;
       case "pending": {
         const p = l.p, from = srcName(p.source);

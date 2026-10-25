@@ -62,12 +62,12 @@ function twBody(t) {
       <label class="btn primary">📸 صوّر أو ارفع صورة المكان<input type="file" accept="image/*" capture="environment" data-twup="background" hidden></label></div>`);
   const c = t.cost || {}, sec = (key) => `≈ ${Math.max(1, Math.round((c[key] || 0) * 3 / 0.01))} نقطة/ث`;
   const make = `<div class="panel tw-step tw-make"><div class="tw-mh"><i class="num">5</i><b>🎥 أنشئ فيديو بالأفاتار</b></div>
-    <p class="hint">قل النص الجديد بصوتك (سجّله هنا أو ارفعه)، والبرنامج يركّبه على شفايفك في فيديو القراية، أو يخلّي صورتك تتكلم.
+    <p class="hint">قل النص الجديد بصوتك (سجّله هنا أو ارفعه)، والبرنامج يركّبه على شفتيك في فيديو القراءة، أو يجعل صورتك تتكلم.
       استنساخ الصوت (تكتب النص وهو يُقال بصوتك) سيُضاف عندما نوصّل خدمة الاستنساخ.</p>
     <form class="tw-form" data-twmake>
-      <label>الشكل <select name="method"><option value="video" ${r.video ? "" : "disabled"}>🎬 فيديو القراية الخاص بك (الأدق)</option><option value="photo" ${r.photo ? "" : "disabled"} ${!r.video && r.photo ? "selected" : ""}>📷 من صورتك القدامية</option></select></label>
+      <label>الشكل <select name="method"><option value="video" ${r.video ? "" : "disabled"}>🎬 فيديو القراءة الخاص بك (الأدق)</option><option value="photo" ${r.photo ? "" : "disabled"} ${!r.video && r.photo ? "selected" : ""}>📷 من صورتك الأمامية</option></select></label>
       <label>الجودة <select name="quality" data-twq>
-        <optgroup label="فيديو القراية"><option value="veed">عادي · ${sec("video:veed")}</option><option value="sync">احترافي · ${sec("video:sync")}</option></optgroup>
+        <optgroup label="فيديو القراءة"><option value="veed">عادي · ${sec("video:veed")}</option><option value="sync">احترافي · ${sec("video:sync")}</option></optgroup>
         <optgroup label="الصورة"><option value="std">عادي · ${sec("photo:std")}</option><option value="pro">عالي · ${sec("photo:pro")}</option></optgroup></select></label>
       <label class="wide">ستقول ماذا؟ (اختياري، للتذكير) <textarea name="text" rows="2" dir="auto" placeholder="اكتب النص لكي تقراه وأنت تسجّل"></textarea></label>
       <div class="row wrap wide"><button type="button" class="btn" data-twmic="say">${tw.rec?.kind === "say" ? "⏹ أوقف" : "🎙️ سجّل النص"}</button>
@@ -76,7 +76,7 @@ function twBody(t) {
       <button class="btn primary wide" ${tw.say && (r.video || r.photo) ? "" : "disabled"}>🚀 أنشئ الفيديو</button></form>
     <ul class="tw-clips">${[...(t.clips || [])].reverse().map((x) => `<li class="${x.status}">
       ${x.url ? `<video src="${x.url}" controls playsinline preload="metadata"></video>` : `<span class="tw-ph">${x.status === "failed" ? "⚠️" : "⏳"}</span>`}
-      <div><b dir="auto">${twe(x.text || (x.method === "video" ? "على فيديو القراية" : "من الصورة"))}</b>
+      <div><b dir="auto">${twe(x.text || (x.method === "video" ? "على فيديو القراءة" : "من الصورة"))}</b>
         <small class="${x.status === "failed" ? "err" : "muted"}">${x.status === "done" ? `✓ جاهز · ${twSec(x.duration)}${x.credits ? ` · ${x.credits} نقطة` : ""}` : twe(x.error || x.step || "")}</small>
         <span class="row">${x.status === "done" ? `<button type="button" class="btn sm primary" data-twtypo="${x.id}">🔤 نص متحرك فوقه (تايبوجرافي)</button><a class="btn sm" href="${x.url}" download>⬇</a>` : ""}
           <button type="button" class="btn sm" data-twdelc="${x.id}">🗑</button></span></div></li>`).join("")}</ul></div>`;

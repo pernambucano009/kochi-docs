@@ -8,7 +8,7 @@ const PROCESS = [];
 const STEP_INFO = {
   0: { num: "01", title: "المشاريع", en: "Projects" },
   1: { num: "02", title: "التقطيع", en: "Cut" },
-  2: { num: "03", title: "التوليد بـ Seedance", en: "Generate" },
+  2: { num: "03", title: "التوليد", en: "Generate" },
   6: { num: "04", title: "المونتاج", en: "Montage" },
   7: { num: "05", title: "النشر", en: "Publish" },
   4: { num: "", title: "مكتبة الشخصيات", en: "Characters" },

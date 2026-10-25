@@ -22,13 +22,27 @@ function toast(msg, isError = false) {
 }
 
 // 🚪 الحساب (لو البرنامج شغال ورا البوابة): الإيميل والباقة والنقط
+// 💳 الرصيد رقم واحد في كل الشاشات: أي مكان بيعرضه بيحط <span data-credits>، والرقم بيتحدّث بعد أي عملية وكل ٣٠ ثانية
 window.ME = null;
-window.MEP = fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((m) => {
-  window.ME = m;
+function showCredits(m) {
   const el = document.getElementById("setPlan");
   if (m && el) el.textContent = `${m.email} · باقتك: ${{ trial: "تجربة مجانية", starter: "بداية", pro: "محترف", agency: "وكالات", owner: "صاحب البرنامج" }[m.plan] || m.plan} · رصيدك ${m.credits.total.toLocaleString("en-US")} نقطة`;
-  return m;
-});
+  if (m && m.credits) document.querySelectorAll("[data-credits]").forEach((x) => { x.textContent = m.credits.total.toLocaleString("en-US"); });
+  if (m) document.dispatchEvent(new CustomEvent("credits", { detail: m.credits }));
+}
+function refreshMe() {
+  window.MEP = fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((m) => {
+    if (m) window.ME = m;
+    showCredits(m);
+    return m;
+  });
+  return window.MEP;
+}
+refreshMe();
+let meT;
+const meSoon = () => { clearTimeout(meT); meT = setTimeout(refreshMe, 1200); };
+setInterval(() => { if (!document.hidden && window.ME && window.ME.credits) refreshMe(); }, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && window.ME) refreshMe(); });
 
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
@@ -37,6 +51,7 @@ async function api(path, opts = {}) {
     throw new Error("يجب تسجيل الدخول");
   }
   const data = await res.json().catch(() => ({}));
+  if (window.ME && window.ME.credits && (opts.method || "GET") !== "GET") meSoon();   // عملية ممكن تكون صرفت نقاط: الرقم يتحدّث
   if (res.status === 402) noCredits(data.detail);
   if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
   return data;

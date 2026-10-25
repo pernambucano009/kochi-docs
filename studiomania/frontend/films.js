@@ -39,15 +39,15 @@ function filmHome() {
   const cs = filmx.conns;
   return `<div class="car-head"><h2>🎞️ فيديو بالكونيكتورز</h2></div>
     <section class="panel lab-sec fm-new">
-      <p class="hint">البرنامج يقرأ ملف العميل والموصلات الذي في المكتبة، ويكتب سيناريو كل مشهد فيه ينتهي في المكان الذي الموصل يبدأ منه،
+      <p class="hint">البرنامج يقرأ ملف العميل والموصلات التي في المكتبة، ويكتب سيناريو كل مشهد فيه ينتهي في المكان الذي الموصل يبدأ منه،
         والمشهد الذي بعده يبدأ مكان ما الموصل يوصل. كتابة السيناريو مجانًا تقريبًا، والرسم والتوليد ينتظرون موافقتك.</p>
       <label>الفيديو عن ماذا؟ <textarea rows="3" data-fmbrief placeholder="مثلًا: فيديو ٢٠ ثانية عن أهم ٣ مميزات في التطبيق: المدرب الشخصي، متابعة التمرين، والنتائج. الختام: حمّل التطبيق"></textarea></label>
-      <div><b>🔗 الموصلات الذي ستُطبّق</b> <small class="muted">(${filmx.pick.size} من ${cs.length})</small>
+      <div><b>🔗 الموصلات التي ستُطبّق</b> <small class="muted">(${filmx.pick.size} من ${cs.length})</small>
         ${cs.length ? `<div class="fm-conns">${cs.map((a) => `<label class="fm-conn ${filmx.pick.has(a.id) ? "on" : ""}">
             <input type="checkbox" data-fmpick="${a.id}" ${filmx.pick.has(a.id) ? "checked" : ""}>
             <video src="${a.url}" poster="${a.thumb_url}" preload="none" muted loop playsinline></video>
             <small data-no-i18n>${le(a.name)}</small></label>`).join("")}</div>`
-          : `<p class="muted">لا يوجد موصلات في المكتبة. فكّك فيديو في المعمل، واقبل ✅ الموصلات الذي تعجبك.</p>`}</div>
+          : `<p class="muted">لا يوجد موصلات في المكتبة. فكّك فيديو في المعمل، واقبل ✅ الموصلات التي تعجبك.</p>`}</div>
       <div class="row wrap">
         <label>عدد المشاهد <select data-fmn><option value="0">تلقائي (على قدر الموصلات)</option>${[2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}">${n}</option>`).join("")}</select></label>
         <label>المقاس <select data-fmratio><option value="9:16">9:16 (ريلز)</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label>
@@ -82,7 +82,7 @@ function fmFix(f, i) {
       ${(f.ref_files || []).map((r) => chip(`u:${r.file}`, r.url, `📎 ${r.name}`, r.file)).join("")}
       <label class="btn sm fm-up">📎 ارفع صورة<input type="file" accept="image/*" data-fmup="${i}" hidden></label>
     </div>
-    <small class="muted">علّم على الصورة الصحيح (الشعار مثلًا) واكتب الملاحظة، ثم اضغط ↻ على الفريم الذي تريد تصلّحه. الصور الذي معلّم عليها تُرسل للنموذج ويستخدمها كما هي بالضبط.</small>
+    <small class="muted">علّم على الصورة الصحيح (الشعار مثلًا) واكتب الملاحظة، ثم اضغط ↻ على الفريم الذي تريد تصلّحه. الصور التي معلّم عليها تُرسل للنموذج ويستخدمها كما هي بالضبط.</small>
   </details>`;
 }
 

@@ -703,7 +703,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const cfresh = e.target.closest("[data-connfresh]");
   if (cfresh) {
-    if (!(await uiConfirm("تحذف كل الموصلات الذي التُقطت في هذا الفيديو (حتى الذي قبلتها أو رفضتها) ويبحث من أولًا؟ ما في المكتبة يظل فيها."))) return;
+    if (!(await uiConfirm("تحذف كل الموصلات التي التُقطت في هذا الفيديو (حتى الذي قبلتها أو رفضتها) ويبحث من أولًا؟ ما في المكتبة يظل فيها."))) return;
     return busyButton(cfresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=connectors&fresh=true`, { method: "POST" });
       labx.xfilter = "";

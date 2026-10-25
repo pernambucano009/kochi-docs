@@ -738,7 +738,7 @@ def change_password(body: ChangePasswordIn, request: Request):
     if not auth.check_password(body.current):
         raise HTTPException(400, "كلمة المرور الحالية غير صحيحة")
     if len(body.new) < 8:
-        raise HTTPException(400, "كلمة المرور الجديد يجب يكون 8 حروف أو أرقام على الأقل")
+        raise HTTPException(400, "يجب أن تكون كلمة المرور الجديدة 8 حروف أو أرقام على الأقل")
     auth.set_password(body.new)
     return session_response(request)
 
@@ -4882,7 +4882,7 @@ def build_plan(bid: str) -> dict:
     else:
         wallet.need(wallet.credits(wallet.est(chars=30000)), "خطة المحتوى")
         extra = "\n\n".join(x for x in (algo.plan_goal(brain), fz.prefs_text(brain), algo.batch_text(brain),
-                                           "\n".join(f"- {i['name']} ({i['date']})" for i in ((brain.get("seasons") or {}).get("items") or [])[:20])) if x)
+                                           "\n".join(f"- {i['name']} ({i['date']})" for i in fz.fit_seasons(((brain.get("seasons") or {}).get("items") or []), brain.get("market", ""))[:20])) if x)
         msgs = algo.strategy_messages(az.brain_text(brain), rivals.insight_text(brain), extra[:3500])
         try:
             raw = az.parse_json(atlas.chat(msgs, carousel_settings()["text_model"], temperature=0.6, max_tokens=9000, json_mode=True, timeout=300), "خطة المحتوى")
@@ -5044,7 +5044,7 @@ def run_month(bid: str, per_day: int, times: list[str], code_tpls: list[dict]) -
         else:
             usd = wallet.est(chars=60000)
             wallet.need(wallet.credits(usd), "خطة الشهر")
-            seasons = "\n".join(f"- {i['name']} ({i['date']})" for i in ((b.get("seasons") or {}).get("items") or [])[:20])
+            seasons = "\n".join(f"- {i['name']} ({i['date']})" for i in fz.fit_seasons(((b.get("seasons") or {}).get("items") or []), b.get("market", ""))[:20])
             trends = "\n".join(f"- {t.get('title')}" for t in ((b.get("trends") or {}).get("items") or [])[:12] if t.get("title"))
             extra = "\n\n".join(x for x in (algo.batch_text(b), rivals.insight_text(b), f"المواسم:\n{seasons}" if seasons else "",
                                              f"الترندات في المجال الآن:\n{trends}" if trends else "") if x)[:4000]
@@ -9099,7 +9099,7 @@ def shot_prompt(s: dict, character: str) -> str:
 
 
 def seedance_ref(path: Path) -> Path:
-    """Seedance يرفض الصور الذي ضلعها أقل من 300 أو أكثر من 6000 بكسل، أو نسبتها (العرض÷الطول) برة 0.4–2.5.
+    """Seedance يرفض الصور التي ضلعها أقل من 300 أو أكثر من 6000 بكسل، أو نسبتها (العرض÷الطول) برة 0.4–2.5.
     نعمل نسخة متظبطة (JPG): هوامش للصور الطويلة أو العريضة جدًا (بدون ما نقص منها)، ثم تكبير أو تصغير."""
     probe = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True, timeout=30).stderr
     m = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", probe)
@@ -11202,11 +11202,13 @@ def first_wait(fid: str, ok, what: str, retry=None, limit: float = 900) -> dict:
     raise HTTPException(400, f"{what} أخذ وقتًا أطول من اللازم")
 
 
-def run_first(bid: str, jid: str, tpl: str, name: str) -> None:
+FIRST_GIFT_MAX = 300   # سقف هدية أول فيديو (أكبر من تكلفته بكتير، عشان أي توليد تاني في نفس الوقت مايبقاش مجاني)
+
+
+def run_first(bid: str, jid: str, tpl: str, name: str, t0: float) -> None:
     put = lambda **kw: first_job_set(bid, jid, **kw)  # noqa: E731
     done: list[str] = []
     step = lambda k: put(step=k, done=list(done))  # noqa: E731
-    bal0 = wallet.balance()
     try:
         step("script")
         f = flow_new(FlowNewIn(template=tpl, name=name))
@@ -11251,7 +11253,8 @@ def run_first(bid: str, jid: str, tpl: str, name: str) -> None:
         title = ((flow_load(fid).get("idea") or {}).get("title") or name)[:80]
         ex = pilot_export_file(final, f"🎬 أول فيديو: {title}")
         done.append("brand")
-        cost = max(0, (bal0 or 0) - (wallet.balance() or 0)) if bal0 is not None else 0
+        # 🎁 كل اللي اتخصم من أول «اصنع أول فيديو» (ومنه قراءة الوصف) بيرجع في سطر واحد «هدية» في سجل النقاط
+        cost = min(wallet.spent_since(t0), FIRST_GIFT_MAX)
         if cost:
             wallet.gift(cost, "🎁 أول فيديو مجانًا", jid)
         with closing(db()) as conn:
@@ -11270,6 +11273,7 @@ def onboard_first_go(body: FirstGoIn):
     bid = active_client_id()
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
+    t0 = time.time() - 1
     if body.about.strip():
         onboard_first(FirstIn(about=body.about, audience=body.audience))
     j = (brain_row(bid) or {}).get("first_job") or {}
@@ -11279,7 +11283,7 @@ def onboard_first_go(body: FirstGoIn):
     tpl = body.template if body.template in reels or body.template.startswith("t-") else reels[0]
     jid = uuid.uuid4().hex[:8]
     update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time()}))
-    threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl), daemon=True).start()
+    threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl, t0), daemon=True).start()
     return onboard_state()
 
 
@@ -11945,7 +11949,7 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
         raise HTTPException(400, "ارمي ملف أو ضع رابط أو اكتب شيء")
     # 💳 قبل ما نبدأ: الرصيد لازم يكفي التقدير (تحليل الحساب أغلى من قراية ملف)
     try:
-        wallet.need(sum(wallet.credits(wallet.est(scrape=3, chars=40000, images=20, stt_min=3)) if x["kind"] == "social" else 3 for x in new), "قراية المصادر")
+        wallet.need(sum(wallet.credits(wallet.est(scrape=3, chars=40000, images=20, stt_min=3)) if x["kind"] == "social" else 3 for x in new), "قراءة المصادر")
     except wallet.NoCredits as e:
         raise HTTPException(402, str(e)) from e
     for s in new:
@@ -12155,10 +12159,10 @@ def run_brain_source(bid: str, sid: str) -> None:
             parts = [{"type": "text", "text": brainsrc.extract_prompt(az.brain_text(b), s["name"], s.get("note", ""), text, len(imgs))}]
             for im in imgs[:8]:
                 parts.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
-            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000), "قراية المصدر")
+            out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 16000), "قراءة المصدر")
         items = brainsrc.to_pending(out, b, sid)
         # 💳 الخصم بعد ما القراية تنجح: الكلام اللي دخل الموديل والصور ودقايق التفريغ
-        cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits(wallet.est(chars=len(text) + 6000, images=min(8, len(imgs)), stt_min=stt / 60)), f"العقل: قراية «{s['name']}»", sid)
+        cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits(wallet.est(chars=len(text) + 6000, images=min(8, len(imgs)), stt_min=stt / 60)), f"العقل: قراءة «{s['name']}»", sid)
         def fn(d):
             d.setdefault("pending", []).extend(items)
             for x in d.get("sources") or []:
@@ -12469,7 +12473,7 @@ def brain_assets(brain: dict | None, kinds: tuple[str, ...]) -> list[dict]:
 
 def apply_brain(aid: str, sids: list[str] | None = None, use_model: bool = True) -> int:
     """يضع الأصول الحقيقية من ملف العميل مكان مكونات اللقطات: الشاشات للـ ui، الشعار للـ logo، وصورة المنتج للمنتج.
-    الصور الذي أنت رافعها بنفسك متتلمسش. يعود عدد المكونات التي اتطبّق عليها."""
+    الصور التي أنت رافعها بنفسك متتلمسش. يعود عدد المكونات التي اتطبّق عليها."""
     with closing(db()) as conn:
         _, d = ad_row(conn, aid)
     p = d.get("prod")
@@ -16425,7 +16429,7 @@ def film_link_cost(d: dict, i: int) -> float:
 
 
 def film_costs(d: dict) -> dict:
-    """ثمن الفريمات التي ما زال لم تُرسم، وثمن الفيديو (المشاهد والموصلات الذي ما زال لم تُولّد)."""
+    """ثمن الفريمات التي ما زال لم تُرسم، وثمن الفيديو (المشاهد والموصلات التي ما زال لم تُولّد)."""
     p = d.get("plan") or {}
     if not p.get("scenes"):
         return {"frames": 0, "video": 0}
@@ -16514,7 +16518,7 @@ class FilmIn(BaseModel):
 
 @app.post("/api/films")
 def film_create(body: FilmIn):
-    """🎞️ فيديو جديد: البرنامج يكتب سيناريو على مقاس الموصلات الذي اخترتها (رخيص). الرسم والتوليد ينتظرون موافقتك."""
+    """🎞️ فيديو جديد: البرنامج يكتب سيناريو على مقاس الموصلات التي اخترتها (رخيص). الرسم والتوليد ينتظرون موافقتك."""
     conns = film_conns(body.connectors)
     if not conns:
         raise HTTPException(400, "اختر كونيكتور واحد على الأقل من المكتبة")
@@ -16543,7 +16547,7 @@ def run_film_plan(fid: str) -> None:
         conns = film_conns(d["connectors"])
         brain = brain_row(d.get("client_id") or "") or active_client()
         if not conns:
-            raise HTTPException(400, "الموصلات الذي اخترتها حُذفت من المكتبة")
+            raise HTTPException(400, "الموصلات التي اخترتها حُذفت من المكتبة")
         if atlas.mock_mode():
             raw = lab.mock_film_plan(conns, d["n_scenes"], (brain or {}).get("name") or "العلامة")
         else:
@@ -16747,7 +16751,7 @@ def film_plan_link(fid: str, i: int, note: str = "") -> None:
 
 def film_draw(fid: str, only: tuple | None, note: str, extra: list | None) -> set:
     """يرسم الفريمات. أول المشهد من الوصف (ومعه أصل العميل والمشهد الذي قبله كستايل)، وآخره تعديل على أوله.
-    يعود أرقام المشاهد الذي رُسمت."""
+    يعود أرقام المشاهد التي رُسمت."""
     d = film_load(fid)
     p, folder = d["plan"], film_dir(fid)
     brain = brain_row(d.get("client_id") or "") or active_client()
@@ -16839,7 +16843,7 @@ def film_next_job(fid: str, finish: bool = False) -> tuple | None:
 
 
 def run_film_frames(fid: str, only: tuple | None, note: str, extra: list | None = None) -> None:
-    """الرسم، وبعده أي تعديلات اتطلبت وهو يعمل (بالدور)، ثم خطط الموصلات الذي فريماتها تغيّرت."""
+    """الرسم، وبعده أي تعديلات اتطلبت وهو يعمل (بالدور)، ثم خطط الموصلات التي فريماتها تغيّرت."""
     try:
         folder, job = film_dir(fid), (only, note, extra)
         while job:
@@ -21848,7 +21852,7 @@ SCENE_NEG = "readable text, gibberish letters, Chinese characters, kanji, words,
 
 
 def scene_cfg_for(t: dict) -> dict:
-    """كل القوالب بقت بطريقة المشاهد: القوالب الذي اتطلّعت من فيديو (أو الجاهزة القديمة) يتعملها مفتاح أسلوب وبرومتات مشاهد
+    """كل القوالب بقت بطريقة المشاهد: القوالب التي اتطلّعت من فيديو (أو الجاهزة القديمة) يتعملها مفتاح أسلوب وبرومتات مشاهد
     من الـ Style DNA الخاص بها، وشكل النبضات الخاص بها يصبح إيقاع المشاهد."""
     if t.get("scene"):
         return t["scene"]
@@ -23412,6 +23416,9 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     out["knowledge"] = fz.knowledge(brain)
     out["brand_name"] = (brain or {}).get("name") or ""
     out["algo_mode"] = algo.mode_on(brain)
+    # 💳 تكلفة كتابة العقل قبل ما تتصرف (الأفكار والسيناريو بيتحسبوا بحجم الكلام): بتظهر جنب زراير الاقتراح
+    gate = 2 if out["algo_mode"] else 1
+    out["costs"] = {"ideas": wallet.credits(wallet.est(chars=24000)) * gate, "scenarios": wallet.credits(wallet.est(chars=40000)) * gate}
     out["guide"] = flow_guide(d["template"])
     if d["template"].get("kind") == "motion":   # قالب كود: مشاهده بأطوالها الأصلية، والفويس أوفر لو اتعمل
         try:
@@ -23642,7 +23649,7 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
             break
     items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:3] if gate else items
     if not items:
-        raise HTTPException(400, "كل الأفكار الذي طلعت شبه أشياء استخدمتها أو حفظتها من قبل. جرّب «وجّه العقل» بموضوع مختلف" if repeats else "العقل مرجعش أفكار، جرّب مرة أخرى")
+        raise HTTPException(400, "كل الأفكار التي طلعت شبه أشياء استخدمتها أو حفظتها من قبل. جرّب «وجّه العقل» بموضوع مختلف" if repeats else "العقل مرجعش أفكار، جرّب مرة أخرى")
     flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items, ideas_dropped=dropped[:6], ideas_repeats=len(repeats)))
 
 
@@ -25654,7 +25661,8 @@ def run_brain_seasons(bid: str) -> None:
             raw = fz.mock_seasons(today)
         else:
             raw = flow_llm(fz.seasons_messages(b.get("market", ""), b.get("audience", ""), b.get("domain", ""), today), "المواسم")
-        data = {**fz.clean_seasons(raw), "for": f"{b.get('market', '')}|{b.get('audience', '')}", "made_at": now()}
+        data = fz.clean_seasons(raw)
+        data = {**data, "items": fz.fit_seasons(data["items"], b.get("market", "")), "for": f"{b.get('market', '')}|{b.get('audience', '')}", "made_at": now()}
         note = seasons_note(data)
 
         def fn(d):
@@ -25723,7 +25731,7 @@ def brain_seasons():
         start_brain_seasons(b["id"])
     job = SEASON_JOBS.get(b["id"]) or ""
     today = datetime.now().strftime("%Y-%m-%d")
-    items = [i for i in s.get("items") or [] if (i.get("end") or i["date"]) >= today]
+    items = fz.fit_seasons([i for i in s.get("items") or [] if (i.get("end") or i["date"]) >= today], b.get("market", ""))
     return {**s, "items": items, "status": "working" if job == "working" else "failed" if job.startswith("error") else "idle",
             "error": job[6:] if job.startswith("error") else None, "market": b.get("market", ""), "audience": b.get("audience", "")}
 
@@ -28049,7 +28057,7 @@ def run_twin_clip(tid: str, cid: str) -> None:
         wallet.need(cost, "فيديو بالأفاتار")
         dest = folder / f"clip_{cid}.mp4"
         if c["method"] == "video":
-            twin_clip_set(tid, cid, status="working", step="يُجهّز فيديو القراية على قدر النص")
+            twin_clip_set(tid, cid, status="working", step="يُجهّز فيديو القراءة على قدر النص")
             base = folder / f"base_{cid}.mp4"
             twin_base_video(folder / d["video"]["file"], dur, base)
             twin_clip_set(tid, cid, step="👄 يركّب النص على شفايفك (يأخذ كم دقيقة)")
@@ -28090,7 +28098,7 @@ def twin_clip_new(tid: str, method: str = Form("video"), quality: str = Form("")
     d = twin_load(tid)
     r = twin.ready(d)
     if method == "video" and not r["video"]:
-        raise HTTPException(400, "سجّل فيديو القراية أولًا")
+        raise HTTPException(400, "سجّل فيديو القراءة أولًا")
     if method == "photo" and not r["photo"]:
         raise HTTPException(400, "ارفع صورة أمام الكاميرا أولًا")
     quality = quality or ("veed" if method == "video" else "pro")
@@ -28948,7 +28956,7 @@ def lib_audio_link(bid: str, f: dict, kind: str) -> None:
 
 
 def lib_ready(bid: str) -> dict:
-    """قبل ما المكتبة تُعرض: المجلدات الأساسية، والتعليقات والموسيقى الذي رُفعت من مكان آخر تتجاب هنا (مرة واحدة).
+    """قبل ما المكتبة تُعرض: المجلدات الأساسية، والتعليقات والموسيقى التي رُفعت من مكان آخر تتجاب هنا (مرة واحدة).
     المكتبة المشتركة (SHARED_LIB) تأخذ صوت كل العلامات للأنواع المتشاركة، ومكتبة العلامة تأخذ الخاص به للأنواع الذي غير متشاركة."""
     shared = bid == SHARED_LIB
     kinds = sorted((share_keys() & {"voice", "music"}) if shared else ({"voice", "music"} - share_keys()))
@@ -31536,7 +31544,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             threading.Thread(target=run_automation, args=(rid, run["id"], bid, port), daemon=True).start()
             return put(phase="custom", run_id=run["id"], note="القالب المخصص يعمل")
         if kind == "avatar" and not pilot_twin(s):
-            raise HTTPException(400, "لا يوجد أفاتار جاهز في «الأفاتار». سجّل فيديو القراية أو صورة قدامية أولًا")
+            raise HTTPException(400, "لا يوجد أفاتار جاهز في «الأفاتار». سجّل فيديو القراءة أو صورة أمامية أولًا")
         pre = j.get("preset") or {}
         f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea"))))
         flow_update(f["id"], lambda x: x.update(pilot=jid))

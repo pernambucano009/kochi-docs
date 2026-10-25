@@ -309,7 +309,7 @@ const AutoPage = (() => {
     }
     const l = n.l, cls = l.type === "action" ? "act" : n.on ? "full" : "empty";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
-      <i>${l.type === "action" ? "⇅" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b>${l.val ? `<small>${esc(l.val)}</small>` : l.type === "action" ? "" : `<small class="miss">ما زال ناقصة</small>`}</span></button>`;
+      <i>${l.type === "action" ? "⇅" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b>${l.val ? `<small>${esc(l.val)}</small>` : l.type === "action" ? "" : `<small class="miss">لم تُملأ بعد</small>`}</span></button>`;
   }
   function draw() {
     const w = S.el;
@@ -490,7 +490,7 @@ const AutoPage = (() => {
     if (n.kind === "branch") {
       const v = M.verbs[n.s.verb], ls = leavesOf(n.s).filter((l) => l.type !== "action");
       return `<div class="bm-ch"><span class="latin en-k">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}.</p>
-        ${ls.map((l) => `<section class="am-sec${l.miss ? " miss" : ""}" data-sec="${esc(l.f)}"><p class="am-st"><b>${esc(l.t)}</b>${l.miss ? `<small>ما زال ناقصة</small>` : ""}</p>${leafBody(n.s, l)}</section>`).join("")}
+        ${ls.map((l) => `<section class="am-sec${l.miss ? " miss" : ""}" data-sec="${esc(l.f)}"><p class="am-st"><b>${esc(l.t)}</b>${l.miss ? `<small>لم تُملأ بعد</small>` : ""}</p>${leafBody(n.s, l)}</section>`).join("")}
         ${M.fixed.includes(n.s.verb) ? `<p class="bm-note">هذه من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» يأتي مع «قطّع الفيديو»، وإذا شلت التقطيع يُزال معه.</p>` : `<section class="am-sec"><p class="am-st"><b>رتّبها أو أزلها</b></p>${moveActs(n.s)}</section>`}`;
     }
     const s = n.s, l = n.l;
@@ -555,7 +555,7 @@ const AutoPage = (() => {
     if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وأزل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">إذا سبته فارغ: قطع متساوية، والقطع يُدفع لأقرب سكوت لكي لا يقطع في نص كلمة. إذا كتبت: العقل يسمع النص ويقطّع على حسب طلبك (يُخصم على قدر طول الفيديو).</p>`;
     if (l.f === "model") {
       const cur = genModel(o)?.model;
-      return head + `<p class="bm-note">كل نموذج يأخذ شيء مختلفة، والنقاط الذي حوالين الخطوة تتغيّر على حسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
+      return head + `<p class="bm-note">كل نموذج يأخذ شيء مختلفة، والنقاط التي حوالين الخطوة تتغيّر على حسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
         const xs = genList(o).filter((m) => m.mode === mode);
         return xs.length ? `<p class="am-gh">${esc(t)}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`]), cur) : "";
       }).join("");
@@ -597,7 +597,7 @@ const AutoPage = (() => {
   const RULES_PH = { gen: "مثلًا: بدون نصوص على الشاشة، ألوان العلامة، الشخصية دائمًا لابسة أبيض", genvid: "مثلًا: بدون نصوص على الشاشة، إضاءة دافية، حركة كاميرا هادية", genimg: "مثلًا: خلفية فاتحة، بدون أشخاص، أسلوب مينيمال",
     pull: "مثلًا: قبل وبعد فقط، بدون صور فيها وشوش", music: "مثلًا: هادية، بدون نص", voice: "مثلًا: صوت سارة فقط" };
   const RULES_NOTE = { gen: "تُضاف للبرومبت كل مرة.", genvid: "تُضاف للبرومبت كل مرة.", genimg: "تُضاف للوصف كل مرة.", split: "يختار الفيديو الذي يطابقها من الإشارة.",
-    pull: "يختار من الإشارة الملفات التي تطابقها بالمعنى. وإذا من الستوك: تُضاف لكلمة البحث.", music: "يختار من الإشارة الذي يطابقها. وإذا من الستوك: تُضاف لكلمة البحث.",
+    pull: "يختار من الإشارة الملفات التي تطابقها بالمعنى. وإذا من الستوك: تُضاف لكلمة البحث.", music: "يختار من الإشارة التي يطابقها. وإذا من الستوك: تُضاف لكلمة البحث.",
     voice: "يختار من الإشارة التسجيل الذي يطابقها.", intro: "يختار الفيديو الذي يطابقها.", outro: "يختار الفيديو الذي يطابقها." };
   // «جمّع»: كل مخرج ممكن (القطعة الأصلية أو بعد «ولّد») زرار، واللي بتختاره بيتحط في الترتيب
   function mergeCard(s) {

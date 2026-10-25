@@ -45,7 +45,7 @@ const NH = (() => {
     create: KOCHI ? { en: "New Project", ar: "مشروع جديد", icon: "create", go: "0", desc: "الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر، خطوة خطوة." }
       : { en: "Create", ar: "ابدأ مشروعًا جديدًا", icon: "create", page: "create", desc: "كل أنواع العمل من هنا: اختر النوع، والخطوات تسير معك حتى التصدير." },
     brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاته وستايله. أي عمل يُنشأ يبني عليه." },
-    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى الذي تستخدمها في أي عمل." },
+    assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى التي تستخدمها في أي عمل." },
     // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل العلامة)
     dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، صوت جديد، وتظبيط البُق." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
@@ -75,7 +75,7 @@ const NH = (() => {
     wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل متوافق عليها، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
     plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الزيادة." },
     adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشور أو أنشئ إعلان جديد بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
-    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كم منشور في اليوم، في أحسن أوقات، من القوالب الذي تختارها. يعمل تلقائيًا أو ينتظر موافقتك." },
+    pilot: { en: "Autopilot", ar: "الأوتوبايلوت", icon: "pulse", page: "pilot", desc: "كم منشور في اليوم، في أحسن أوقات، من القوالب التي تختارها. يعمل تلقائيًا أو ينتظر موافقتك." },
     auto: { en: "Custom Template", ar: "القالب المخصص", icon: "film", page: "auto", desc: "خطوات ترتّبها بنفسك (اسحب، ضع، قطّع، صدّر) من مكتبة العقل، وكل تشغيل فيديو جديد." },
     brainlib: { en: "Content Library", ar: "مكتبة المحتويات", icon: "film", page: "brainlib", desc: "الخلفيات والأماكن، والتعليقات الصوتية، والموسيقى، والكوميكس، ومجلداتك. كل ملف يمكنك تشير إليه في القالب المخصص." },
     comics: { en: "Comics", ar: "مكتبة الكوميكس", icon: "megaphone", page: "comics", desc: "كوميكس حقيقية بسياق كل واحد، لكي توضع في مكانها الصحيح." },
@@ -134,7 +134,7 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} منشور متجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
-    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num">${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
+    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
   };
   // الرئيسية بسيطة: كل قسم أيقونة واسمه بس، والشرح والحالة بيظهروا في فقاعة لما تقف بالماوس عليه
@@ -192,16 +192,16 @@ const NH = (() => {
   bar.id = "nhBar";
   bar.className = "nh-top nh-bar";
   bar.innerHTML = `<div class="nh-bar-r">
-      <div class="nh-logo" aria-label="SimsimKit"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</div>
-      <button class="nh-goback" id="nhGoBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
+      <div class="nh-logo" aria-hidden="true"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</div>
+      <button class="nh-goback" id="nhGoBack" aria-label="رجوع" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
       <nav class="nh-crumbs" id="nhCrumbs" aria-label="موقعك" hidden></nav>
     </div>
     <div class="nh-tools" id="nhTools">
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
-      <button class="nh-chip latin nh-langb" id="nhLang">EN</button>
-      <button class="nh-chip" id="nhClient" title="العميل الذي قيد العمل"><i id="nhClientAv"></i><span id="nhClientName" data-no-i18n></span></button>
+      <button class="nh-chip latin nh-langb" id="nhLang" aria-label="English">EN</button>
+      <button class="nh-chip" id="nhClient" title="العلامة التي تعمل عليها" aria-label="العلامة التي تعمل عليها"><i id="nhClientAv" aria-hidden="true"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-chip nh-acct" id="nhAcct" title="حسابك" aria-label="حسابك"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></button>
-      <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
+      <button class="nh-switch" id="nhTheme" aria-label="تبديل الوضع الفاتح والغامق"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
   // 📱 على الشاشات الضيقة الشريط بيتكسر لسطرين: الزيادة دي بتنزّل محتوى الصفحة (زي أقسام العجلة) تحته بدل ما يركب عليه
@@ -265,6 +265,7 @@ const NH = (() => {
     const c = clientx?.cur;
     document.getElementById("nhClientAv").innerHTML = brandMark();
     document.getElementById("nhClientName").textContent = c?.name || "العميل";
+    document.getElementById("nhClient").setAttribute("aria-label", `العلامة التي تعمل عليها: ${c?.name || "—"}`);
   }
 
   // ---------- السنيك ----------
@@ -363,6 +364,7 @@ const NH = (() => {
   const sync = () => {
     root.dataset.nhTheme = mode();
     document.getElementById("nhMode").textContent = window.I18N?.lang === "en" ? (mode() === "dark" ? "Dark" : "Light") : (mode() === "dark" ? "غامق" : "فاتح");
+    document.getElementById("nhTheme").setAttribute("aria-label", window.I18N?.lang === "en" ? "Switch light / dark mode" : "تبديل الوضع الفاتح والغامق");
     GL?.theme(mode() === "dark");
   };
   sync();
@@ -375,6 +377,7 @@ const NH = (() => {
   });
   document.getElementById("nhClient").onclick = () => document.getElementById("clientBtn").click();
   document.getElementById("nhLang").textContent = I18N.lang === "en" ? "ع" : "EN";
+  document.getElementById("nhLang").setAttribute("aria-label", I18N.lang === "en" ? "العربية" : "English");
   document.getElementById("nhLang").onclick = () => document.getElementById("langToggle").click();
   // 👤 الحساب: بيوري الإيميل، ومنه تسجيل الخروج
   document.getElementById("nhAcct").onclick = async () => {
@@ -729,15 +732,23 @@ const NH = (() => {
     else if (was && !reduce.matches) $("stageBody").animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: EASE });
     renderBar();
   };
+  // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
+  const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", wacamp: "publish" };
+  const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {
     const out = [{ label: "الرئيسية", lv: "home" }];
     if (zoom?.page) {
-      pStack.forEach((s, i) => out.push({ label: T[s.tkey]?.ar || "", lv: "page", i }));
-      out.push({ label: T[pTitle.dataset.key]?.ar || "", lv: "page", i: pStack.length });
+      const cur = pTitle.dataset.key, par = PAGE_PARENT[cur];
+      if (par && T[par]) out.push({ label: T[par].ar, lv: "pagekey", key: par });
+      out.push({ label: T[cur]?.ar || "", lv: "pagekey", key: cur });
       const sub = MODS[pGrid.dataset.key]?.sub?.();
       if (sub) out.push({ label: sub, lv: "sub" });
     }
-    if (stageOpen()) stageTrail.forEach((st, i) => out.push({ label: STEP_INFO[st]?.title || "", lv: "stage", i }));
+    if (stageOpen() && stageTrail.length) {
+      const cur = stageTrail[stageTrail.length - 1], par = STAGE_PARENT[cur];
+      if (par && STEP_INFO[par]) out.push({ label: STEP_INFO[par].title, lv: "stagekey", key: par });
+      out.push({ label: STEP_INFO[cur]?.title || "", lv: "stagekey", key: cur });
+    }
     return out;
   }
   function renderBar() {
@@ -814,11 +825,11 @@ const NH = (() => {
     if (busy) return;
     const c = document.getElementById("nhCrumbs")._list?.[k];
     if (!c) return;
-    if (c.lv === "stage") return showStep(stageTrail[c.i]);
+    if (c.lv === "stagekey") return showStep(c.key);
     if (stageOpen()) await closeStage();
     if (c.lv === "home") { if (zoom?.page) await closePage(true); return; }
-    if (c.lv === "page" && c.i === pStack.length) { MODS[pGrid.dataset.key]?.back?.(); return renderBar(); }
-    if (c.lv === "page" && c.i < pStack.length) { pStack.length = c.i + 1; swapPage(pStack[c.i].key, true); renderBar(); }
+    if (c.lv === "pagekey" && c.key === pTitle.dataset.key) { MODS[pGrid.dataset.key]?.back?.(); return renderBar(); }
+    if (c.lv === "pagekey") { window.NHNav(c.key); renderBar(); }
   }
   document.getElementById("nhGoBack").onclick = goBack;
   document.getElementById("nhCrumbs").addEventListener("click", (e) => { const b = e.target.closest("[data-crumb]"); if (b) goCrumb(+b.dataset.crumb); });
