@@ -1185,7 +1185,7 @@ const BrandPage = (() => {
       const sdel = t.closest("[data-sdel]");
       if (sdel) { if ((await uiConfirm("تزيل هذا المصدر واقتراحاته الذي ما زال تنتظر؟"))) save(() => bAPI(`/sources/${sdel.dataset.sdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-seasons]")) {
-        try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ العقل يجلب المواسم… ستُحدّث هنا بعد قليلًا"); } catch (err) { return toast(err.message, true); }
+        try { await bAPI("/seasons", { method: "POST" }); toast("🗓️ العقل يجلب المواسم… ستُحدّث هنا بعد قليل"); } catch (err) { return toast(err.message, true); }
         const id = S.id; setTimeout(() => { if (S.id === id) save(() => bAPI("")); }, 15000);
         return;
       }

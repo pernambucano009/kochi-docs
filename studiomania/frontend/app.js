@@ -34,7 +34,7 @@ async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   if (res.status === 401 && !path.startsWith("/api/auth/")) {
     location.href = "/login";
-    throw new Error("يجب تسجّل دخول");
+    throw new Error("يجب تسجيل الدخول");
   }
   const data = await res.json().catch(() => ({}));
   if (res.status === 402) noCredits(data.detail);

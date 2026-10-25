@@ -633,7 +633,7 @@ async def require_login(request: Request, call_next):
             )
         return response
     if path.startswith("/api/"):
-        return JSONResponse({"detail": "يجب تسجّل دخول"}, status_code=401)
+        return JSONResponse({"detail": "يجب تسجيل الدخول"}, status_code=401)
     if path.rstrip("/") == "/kochi":
         return kochi_page()
     return RedirectResponse("/login")
@@ -704,7 +704,7 @@ def auth_setup(body: PasswordIn, request: Request):
     if not auth.needs_setup():
         raise HTTPException(400, "كلمة المرور متعمل من قبل")
     if len(body.password) < 8:
-        raise HTTPException(400, "كلمة المرور يجب يكون 8 حروف أو أرقام على الأقل")
+        raise HTTPException(400, "يجب أن تتكون كلمة المرور من 8 أحرف أو أرقام على الأقل")
     auth.set_password(body.password)
     return session_response(request)
 
@@ -736,7 +736,7 @@ def change_password(body: ChangePasswordIn, request: Request):
     if auth.env_password():
         raise HTTPException(400, "كلمة المرور متحدد من إعدادات الخادم (APP_PASSWORD)، غيّره من هناك")
     if not auth.check_password(body.current):
-        raise HTTPException(400, "كلمة المرور الحالي خطأ")
+        raise HTTPException(400, "كلمة المرور الحالية غير صحيحة")
     if len(body.new) < 8:
         raise HTTPException(400, "كلمة المرور الجديد يجب يكون 8 حروف أو أرقام على الأقل")
     auth.set_password(body.new)
@@ -10739,7 +10739,7 @@ def help_chat(body: HelpIn):
         except (atlas.AtlasError, httpx.HTTPError) as exc:
             print(f"[help] {model}: {str(exc)[:160]}", flush=True)
             continue
-    raise HTTPException(502, "المساعد غير متاح الآن. جرّب بعد قليلًا، أو أرسل المشكلة للدعم")
+    raise HTTPException(502, "المساعد غير متاح الآن. جرّب بعد قليل، أو أرسل المشكلة للدعم")
 
 
 class TicketIn(BaseModel):
@@ -11937,7 +11937,7 @@ def add_brain_source(bid: str, url: str = Form(""), text: str = Form(""), note: 
             raise HTTPException(400, "اكتب يوزر الحساب أو لينكه")
         if not atlas.mock_mode() and not rivals.live():   # من غير المفتاح: نقول على طول بدل ما يتسجل مصدر فاشل
             raise HTTPException(503, rivals.missing_msg() if os.environ.get("TENANT_ROLE") != "customer"
-                                else "تحليل الحسابات غير متاح الآن. جرّب مرة أخرى بعد قليلًا")
+                                else "تحليل الحسابات غير متاح الآن. جرّب مرة أخرى بعد قليل")
         new.append({"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle})
     if not new:
         raise HTTPException(400, "ارمي ملف أو ضع رابط أو اكتب شيء")
@@ -12022,7 +12022,7 @@ def run_brain_social(bid: str, sid: str) -> None:
     if atlas.mock_mode() or not rivals.live():
         if not atlas.mock_mode():
             raise ValueError(rivals.missing_msg() if os.environ.get("TENANT_ROLE") != "customer"
-                             else "تحليل الحسابات غير متاح الآن. جرّب مرة أخرى بعد قليلًا")
+                             else "تحليل الحسابات غير متاح الآن. جرّب مرة أخرى بعد قليل")
         prof, items = brainsocial.mock_posts(plat, handle)
     else:
         prof, items = brainsocial.profile(plat, handle), brainsocial.posts(plat, handle)
@@ -19523,7 +19523,7 @@ def stock_search(q: str = "", kind: str = "video", orient: str = "portrait", pag
     """🔎 صور وفيديوهات حقيقية للخلفية (غير متولّدة)."""
     if not stock.live():
         raise HTTPException(503, "مفتاح Pexels غير مسجل. ضعه من الإعدادات ← المفاتيح والرصيد" if TENANT_ROLE != "customer"
-                            else "مكتبة الصور غير متاحة الآن. جرّب مرة أخرى بعد قليلًا")
+                            else "مكتبة الصور غير متاحة الآن. جرّب مرة أخرى بعد قليل")
     try:
         en = stock_query_en(q)
         res = stock.search(en, "photo" if kind == "photo" else "video", orient, page)
@@ -19685,7 +19685,7 @@ def typo_bg_auto(pid: str, body: TypoBgAutoIn):
     """✨ البرنامج يختار الخلفيات تلقائيًا على حسب النص."""
     if not stock.live():
         raise HTTPException(503, "مفتاح Pexels غير مسجل. ضعه من الإعدادات ← المفاتيح والرصيد" if TENANT_ROLE != "customer"
-                            else "مكتبة الصور غير متاحة الآن. جرّب مرة أخرى بعد قليلًا")
+                            else "مكتبة الصور غير متاحة الآن. جرّب مرة أخرى بعد قليل")
     d = typo_load(pid)
     if d.get("status") in TYPO_BUSY:
         raise HTTPException(400, "انتظر العمل الذي يعمل ينتهي")
@@ -23560,7 +23560,7 @@ def flow_llm(messages: list[dict], what: str) -> dict:
             return out
         except (atlas.AtlasError, httpx.HTTPError, ValueError) as exc:
             errors.append(f"{model.split('/')[-1]}: {str(exc)[:90]}")
-    raise HTTPException(400, "العقل لم يستطع يرد الآن، جرّب مرة أخرى. (" + " | ".join(errors) + ")")
+    raise HTTPException(400, "تعذّر رد العقل الآن، حاول مرة أخرى. (" + " | ".join(errors) + ")")
 
 
 def flow_brand(brain: dict | None, query: str) -> str:
@@ -28762,7 +28762,7 @@ def flow_cambench(fid: str, body: CamBenchIn):
     if atlas.mock_mode() and not cands:
         cands = [m for m in CAM_MOCK if not body.models or m["model"] in body.models]
     if not cands:
-        raise HTTPException(400, "لم أجد على Atlas نماذج تعدّل الفيديو. جرّب مرة أخرى بعد قليلًا")
+        raise HTTPException(400, "لم أجد على Atlas نماذج تعدّل الفيديو. جرّب مرة أخرى بعد قليل")
     a = float(sh.get("start") or 0)
     b = float(sh["end"]) if sh.get("end") is not None else a + CAM_TRY_SEC
     dur = round(max(2.0, min(CAM_TRY_SEC, b - a)), 2)

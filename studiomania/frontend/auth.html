@@ -148,7 +148,7 @@ async function render() {
   if (Q.get("err") === "google") err("الدخول بجوجل لم يكتمل، جرّب مرة أخرى");
   if (v === "verify") {
     $("dev").innerHTML = devLink(sessionStorage.getItem("devlink"));
-    if (sessionStorage.getItem("mailfail")) err("البريد الإلكتروني لم يستطع يُرسل الآن. اضغط «أرسله مرة أخرى» أيضًا قليلًا");
+    if (sessionStorage.getItem("mailfail")) err("تعذّر إرسال البريد الإلكتروني الآن. اضغط «أرسله مرة أخرى» بعد قليل");
     $("resend").onclick = async () => { try { const d = await post("/api/auth/resend"); if (d.verified) return location.replace("/"); $("dev").innerHTML = `<p class="au-ok">أُرسل مرة أخرى ✓</p>${devLink(d.dev_link)}`; } catch (e) { err(e.message); } };
     $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
   }

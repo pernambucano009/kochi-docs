@@ -167,13 +167,13 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def norm_email(e: str) -> str:
     e = (e or "").strip().lower()
     if not EMAIL_RE.match(e) or len(e) > 200:
-        raise HTTPException(400, "البريد الإلكتروني غير مظبوط")
+        raise HTTPException(400, "البريد الإلكتروني غير صحيح")
     return e
 
 
 def check_pw(p: str) -> None:
     if len(p or "") < 8:
-        raise HTTPException(400, "كلمة المرور يجب يكون 8 حروف أو أرقام على الأقل")
+        raise HTTPException(400, "يجب أن تتكون كلمة المرور من 8 أحرف أو أرقام على الأقل")
 
 
 # محاولات الدخول الغلط: ١٠ في ١٥ دقيقة لكل إيميل / IP
@@ -186,7 +186,7 @@ def throttle(*keys: str) -> None:
         lst = [t for t in _fails.get(k, []) if now - t < 900]
         _fails[k] = lst
         if len(lst) >= 10:
-            raise HTTPException(429, "محاولات كثير خطأ. انتظر ربع ساعة وجرّب مرة أخرى")
+            raise HTTPException(429, "محاولات خاطئة كثيرة. انتظر ربع ساعة ثم حاول مرة أخرى")
 
 
 def failed(*keys: str) -> None:
@@ -320,7 +320,7 @@ def _spawn(wid: str) -> Tenant:
     deadline = time.time() + 90
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise HTTPException(503, "البرنامج لم يستطع يفتح، جرّب مرة أخرى بعد قليلًا")
+            raise HTTPException(503, "تعذّر فتح البرنامج، حاول مرة أخرى بعد قليل")
         try:
             if httpx.get(f"http://127.0.0.1:{port}/health", timeout=2).status_code == 200:
                 return Tenant(wid, port, proc)
@@ -328,7 +328,7 @@ def _spawn(wid: str) -> Tenant:
             pass
         time.sleep(0.4)
     proc.kill()
-    raise HTTPException(503, "البرنامج تأخر في الفتح، جرّب مرة أخرى")
+    raise HTTPException(503, "تأخر فتح البرنامج، حاول مرة أخرى")
 
 
 async def ensure(wid: str) -> Tenant:
@@ -595,7 +595,7 @@ def app_token(request: Request):
     """📱 توكن الجلسة لمشغّل الفيديو في التطبيق (الفيديوهات محتاجة دخول، والمشغّل مابيشيلش الكوكي)."""
     u = current_user(request)
     if not u or not u["verified"]:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     return {"token": make_session(u)}
 
 
@@ -603,7 +603,7 @@ def app_token(request: Request):
 def me(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     return me_dict(u)
 
 
@@ -618,14 +618,14 @@ class SetupIn(BaseModel):
 def owner_setup(body: SetupIn, request: Request):
     """أول مرة: حساب صاحب البرنامج (الأدمن)، ومساحته هي البيانات القديمة كما هي."""
     if not needs_owner_setup():
-        raise HTTPException(400, "حساب الأدمن متعمل من قبل")
+        raise HTTPException(400, "حساب الأدمن موجود بالفعل")
     want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
     email = norm_email(body.email)
     if want and email != want:
-        raise HTTPException(403, "هذا البريد الإلكتروني غير هو بريد إلكتروني الأدمن المتسجل في الخادم")
+        raise HTTPException(403, "هذا البريد الإلكتروني ليس بريد الأدمن المسجّل على الخادم. استخدم البريد المحدد للأدمن")
     if old_password_set() and not old_password_ok(body.old_password):
         failed(client_ip(request))
-        raise HTTPException(401, "كلمة المرور القديم الخاص بالبرنامج خطأ")
+        raise HTTPException(401, "كلمة المرور القديمة للبرنامج غير صحيحة")
     check_pw(body.password)
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
@@ -680,7 +680,7 @@ SKIP_VERIFY = os.environ.get("SKIP_EMAIL_VERIFY") == "1"
 if SKIP_VERIFY:   # الحسابات اللي اتعملت قبل ما المتغير يتحط كمان
     with closing(db()) as _c, _c:
         _c.execute("UPDATE users SET verified=1 WHERE verified=0")
-MAIL_FAIL = "البريد الإلكتروني لم يستطع يُرسل الآن. جرّب أيضًا قليلًا، وإذا فضلت المشكلة كلّمنا"
+MAIL_FAIL = "تعذّر إرسال البريد الإلكتروني الآن. حاول مرة أخرى بعد قليل، وإن استمرت المشكلة تواصل معنا"
 
 
 def send_verify(u: sqlite3.Row, request: Request) -> tuple[bool, str | None]:
@@ -699,11 +699,11 @@ def send_verify(u: sqlite3.Row, request: Request) -> tuple[bool, str | None]:
 def signup(body: SignupIn, request: Request):
     throttle(client_ip(request))
     if needs_owner_setup():
-        raise HTTPException(400, "البرنامج ما زال يُجهّز")
+        raise HTTPException(400, "البرنامج قيد التجهيز")
     email = norm_email(body.email)
     check_pw(body.password)
     if user_by("email", email):
-        raise HTTPException(400, "هذا البريد الإلكتروني لديه حساب. ادخل به أو استخدم «نسيت كلمة المرور»")
+        raise HTTPException(400, "يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول به أو استخدم «نسيت كلمة المرور»")
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
     save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], body.name.strip()[:80])
     uid = uuid.uuid4().hex[:12]
@@ -731,7 +731,7 @@ def login(body: LoginIn, request: Request):
     if not u or not pw_ok(body.password, u["pw"]):
         failed(email, client_ip(request))
         time.sleep(0.8)
-        raise HTTPException(401, "البريد الإلكتروني أو كلمة المرور خطأ")
+        raise HTTPException(401, "البريد الإلكتروني أو كلمة المرور غير صحيحة")
     with closing(db()) as c, c:
         c.execute("UPDATE users SET last_login=?, verified=MAX(verified, ?) WHERE id=?", (time.time(), int(SKIP_VERIFY), u["id"]))
     return with_session(JSONResponse({"ok": True, "verify": not (u["verified"] or SKIP_VERIFY)}), u, request)
@@ -748,7 +748,7 @@ def logout():
 def resend(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     if u["verified"]:
         return {"ok": True, "verified": True}
     throttle("resend:" + u["id"])
@@ -764,7 +764,7 @@ def verify(token: str, request: Request):
     with closing(db()) as c, c:
         r = c.execute("SELECT * FROM tokens WHERE token=? AND kind='verify'", (token,)).fetchone()
         if not r or r["expires"] < time.time():
-            raise HTTPException(400, "هذا الرابط خلص أو اتستخدم من قبل. ادخل واطلب رابط جديد")
+            raise HTTPException(400, "انتهت صلاحية هذا الرابط أو استُخدم من قبل. سجّل الدخول واطلب رابطًا جديدًا")
         c.execute("UPDATE users SET verified=1 WHERE id=?", (r["user_id"],))
         c.execute("DELETE FROM tokens WHERE token=?", (token,))
     return with_session(JSONResponse({"ok": True}), user_by("id", r["user_id"]), request)
@@ -804,7 +804,7 @@ def reset(body: ResetIn, request: Request):
     with closing(db()) as c, c:
         r = c.execute("SELECT * FROM tokens WHERE token=? AND kind='reset'", (body.token,)).fetchone()
         if not r or r["expires"] < time.time():
-            raise HTTPException(400, "هذا الرابط خلص أو اتستخدم من قبل. اطلب رابط جديد")
+            raise HTTPException(400, "انتهت صلاحية هذا الرابط أو استُخدم من قبل. اطلب رابطًا جديدًا")
         # تغيير الباسورد من الإيميل = الإيميل اتأكد كمان
         c.execute("UPDATE users SET pw=?, verified=1 WHERE id=?", (pw_hash(body.password), r["user_id"]))
         c.execute("DELETE FROM tokens WHERE user_id=? AND kind='reset'", (r["user_id"],))
@@ -820,9 +820,9 @@ class ChangePwIn(BaseModel):
 def change_pw(body: ChangePwIn, request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     if u["pw"] and not pw_ok(body.current, u["pw"]):
-        raise HTTPException(400, "كلمة المرور الحالي خطأ")
+        raise HTTPException(400, "كلمة المرور الحالية غير صحيحة")
     check_pw(body.new)
     with closing(db()) as c, c:
         c.execute("UPDATE users SET pw=? WHERE id=?", (pw_hash(body.new), u["id"]))
@@ -835,7 +835,7 @@ def change_pw(body: ChangePwIn, request: Request):
 def google_start(request: Request):
     cid = os.environ.get("GOOGLE_CLIENT_ID")
     if not cid:
-        raise HTTPException(404, "الدخول بجوجل غير متفعّل")
+        raise HTTPException(404, "الدخول بجوجل غير مفعّل")
     state = secrets.token_urlsafe(16)
     q = urlencode({"client_id": cid, "redirect_uri": f"{base_url(request)}/auth/google/callback", "response_type": "code",
                    "scope": "openid email profile", "state": state, "prompt": "select_account"})
@@ -1019,9 +1019,9 @@ threading.Thread(target=expirer, daemon=True).start()
 def customer_user(request: Request) -> sqlite3.Row:
     u = current_user(request)
     if not u or not u["verified"]:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     if u["workspace"] == OWNER:
-        raise HTTPException(400, "حساب صاحب البرنامج لا يحتاج اشتراك")
+        raise HTTPException(400, "حساب صاحب البرنامج لا يحتاج إلى اشتراك")
     return u
 
 
@@ -1038,7 +1038,7 @@ def billing_page(request: Request, ok: str = "", err: str = ""):
 def billing_state(request: Request):
     u = current_user(request)
     if not u:
-        raise HTTPException(401, "يجب تسجّل دخول")
+        raise HTTPException(401, "يجب تسجيل الدخول")
     w = workspace(u["workspace"])
     with closing(db()) as c:
         hist = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? ORDER BY at DESC LIMIT 30",
@@ -1107,14 +1107,14 @@ def cancel_sub(request: Request):
     u = customer_user(request)
     w = workspace(u["workspace"])
     if not w or not w["sub_id"]:
-        raise HTTPException(400, "لا يوجد اشتراك يعمل")
+        raise HTTPException(400, "لا يوجد اشتراك فعّال")
     try:
         if w["provider"] == "paypal":
             nxt = payments.paypal_sub(w["sub_id"]).get("next")
             payments.paypal_cancel(w["sub_id"])
             end_subscription(u["workspace"], _iso(nxt))
         else:
-            raise HTTPException(400, "لا يوجد اشتراك PayPal يعمل")
+            raise HTTPException(400, "لا يوجد اشتراك PayPal فعّال")
     except payments.PayError as e:
         raise HTTPException(502, str(e))
     return {"ok": True}
@@ -1368,7 +1368,7 @@ async def proxy(path: str, request: Request):
     u_pub = False
     if not u:
         if url_path.startswith("/api/") and url_path not in PUBLIC_FILES or url_path.startswith("/media/"):
-            return JSONResponse({"detail": "يجب تسجّل دخول"}, status_code=401)
+            return JSONResponse({"detail": "يجب تسجيل الدخول"}, status_code=401)
         if url_path in PUBLIC_FILES:
             u_pub = True   # صفحة الأسعار: بتتقرا من نسخة صاحب البرنامج
         else:

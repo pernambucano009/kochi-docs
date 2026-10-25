@@ -210,7 +210,7 @@ def delete_template(account_id: str, name: str) -> None:
 
 
 def mock_review() -> None:
-    """في التجربة: القالب يتوافق عليه بعد قليلًا مثل واتساب."""
+    """في التجربة: القالب يتوافق عليه بعد قليل مثل واتساب."""
     for t in _M["templates"]:
         if t["status"] == "PENDING":
             t["status"] = "APPROVED"

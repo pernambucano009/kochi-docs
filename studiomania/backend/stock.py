@@ -46,7 +46,7 @@ def _get(path: str, params: dict) -> dict:
     if r.status_code in (401, 403):
         raise StockError("مفتاح Pexels لا يعمل، راجعه في الإعدادات")
     if r.status_code == 429:
-        raise StockError("وصلنا للحد الخاص بـ مكتبة الصور في هذه الساعة، جرّب بعد قليلًا")
+        raise StockError("وصلنا للحد الخاص بـ مكتبة الصور في هذه الساعة، جرّب بعد قليل")
     if r.status_code >= 400:
         raise StockError(f"مكتبة الصور رجّعت خطأ ({r.status_code})")
     data = r.json()
@@ -125,7 +125,7 @@ def music_search(q: str) -> list[dict]:
     except httpx.HTTPError as exc:
         raise StockError("مكتبة الموسيقى لا ترد الآن، جرّب مرة أخرى") from exc
     if r.status_code == 429:
-        raise StockError("وصلنا للحد الخاص بـ مكتبة الموسيقى الآن، جرّب بعد قليلًا")
+        raise StockError("وصلنا للحد الخاص بـ مكتبة الموسيقى الآن، جرّب بعد قليل")
     if r.status_code >= 400:
         raise StockError(f"مكتبة الموسيقى رجّعت خطأ ({r.status_code})")
     out = []
