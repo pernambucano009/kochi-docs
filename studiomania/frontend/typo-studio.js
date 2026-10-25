@@ -332,7 +332,7 @@
   P.k_redword = function (b, t, k, th) {
     const { w, h } = this.doc;
     const ws = this.words(b);
-    // كلمة واحدة: اللي مكتوبة في البلوك، ولو مفيش: الكلمة اللي بتتقال دلوقتي
+    // كلمة واحدة: اللي مكتوبة في البلوك، ولو مفيش: الكلمة اللي بتتقال الآن
     const one = String(b.text || "").trim();
     const cur = one && one.split(/\s+/).length <= 2 ? { w: one, t0: b.t0 } : [...ws].reverse().find((x) => t >= x.t0) || ws[0];
     if (!cur) return "";
@@ -381,7 +381,7 @@
   // =====================================================================
   // الدفعة التانية من عناصر الفيديوهات المرجعية
   //   poster  بوستر أحمر مالي الشاشة بكلام أسود مضغوط (14، 16)
-  //   stack   كومة كلام مايلة أبيض صغير وأحمر كبير، في الناحية الفاضية جنب الشخص (11، 12)
+  //   stack   كومة كلام مائلة أبيض صغير وأحمر كبير، في الناحية الفاضية جنب الشخص (11، 12)
   //   push    كلمة بتزق اللي قبلها (10)
   //   crt     كلام منوّر ضبابي بحواف أحمر وأزرق وجلتش على كل كلمة (19)
   //   ransom  حروف مقصوصة من مجلات، كل حرف بلون وخط (10)
@@ -1491,7 +1491,7 @@
   //   duotone  الفيديو أزرق بنقط والشخص سيلويت، كلام كريمي عملاق وراه، وكلام أحمر بيتكتب تحت وأشرطة ألوان صغيرة
   //   label    كلمة حمرا كبيرة مضغوطة وتاج أزرق بيتكتب فوقها، وتفاصيل صغيرة (نقط وخطوط وبرواز)
   //   mirror   كلمة مضغوطة غامقة وانعكاسها تحتها باهت
-  //   banners  شرايط مايلة بتتحرك عكس بعض فيها الكلمة متكررة
+  //   banners  شرايط مائلة بتتحرك عكس بعض فيها الكلمة متكررة
   //   tiles    كروت صور مدوّرة (من الفيديو) وكارت أحمر في النص فيه الكلمة متكررة فوق بعض
   //   bubble   فقاعة كلام حمرا فيها الكلمة، وكلمة كبيرة كريمي وكلمة صغيرة سودا
   //   band     شريط أزرق مايل ورا كلمة كريمي عملاقة، وكلمة صغيرة سودا بتعدّي عليها
@@ -1789,7 +1789,7 @@
   //   film      برواز فيلم (أركان وعلامات وباركود) والكلام بيدخل بموشن بلير
   //   ghost     الكلمة المهمة عملاقة باهتة ومغبّشة ورا، والكلام واضح صغير فوقها
   //   notify    إشعارات موبايل بتنزل فوق بعض
-  //   dialog    رسالة نظام قديمة (ويندوز) والماوس بيدوس «تمام»
+  //   dialog    رسالة نظام قديمة (ويندوز) والماوس بيدوس «حسنًا»
   //   pills     زراير لامعة بتطلع والماوس بيدوس عليها
   //   steps     كروت مرقّمة 01 و02 و03
   //   scribble  دايرة حمرا بالقلم حوالين الكلمة المهمة وكلام آلة كاتبة تحتها
@@ -1913,13 +1913,13 @@
         background:rgba(246,246,248,.9);border-radius:${(sz * 1.1).toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${(sz * 1.2).toFixed(1)}px rgba(0,0,0,.22);display:flex;align-items:center;gap:${(sz * 0.6).toFixed(1)}px;padding:0 ${(sz * 0.7).toFixed(1)}px">
         <div style="flex:none;width:${(sz * 2.2).toFixed(1)}px;height:${(sz * 2.2).toFixed(1)}px;border-radius:${(sz * 0.55).toFixed(1)}px;background:linear-gradient(160deg,${c0},${c1});display:flex;align-items:center;justify-content:center">
           <svg width="${(sz * 1.2).toFixed(0)}" height="${(sz * 1.2).toFixed(0)}" viewBox="0 0 24 24"><path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17.5H4A1.5 1.5 0 0 1 2.5 16V7A1.5 1.5 0 0 1 4 5.5z" fill="#fff"/></svg></div>
-        <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;font:400 ${(sz * 0.62).toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#8a8a90"><span>${ar ? "رسالة" : "Message"}</span><span>${ar ? "دلوقتي" : "now"}</span></div>
+        <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;font:400 ${(sz * 0.62).toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#8a8a90"><span>${ar ? "رسالة" : "Message"}</span><span>${ar ? "الآن" : "now"}</span></div>
           <div style="font:700 ${sz.toFixed(1)}px ${famOf(s)};color:#111;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(s)}</div></div></div>`;
     });
     return html;
   };
 
-  // ---------- dialog: رسالة نظام قديمة والماوس بيدوس «تمام»
+  // ---------- dialog: رسالة نظام قديمة والماوس بيدوس «حسنًا»
   P.k_dialog = function (b, t, k, th, bi) {
     const { w, h } = this.doc;
     const mn = Math.min(w, h);
@@ -1931,7 +1931,7 @@
     const msg = it.filter((x) => t >= x.t0).map((x) => this.text(x.w)).join(" ");
     const cy = this.blockSolid(b) ? Math.min(h * 0.72, this.belowHead(b, fs * 5)) : h * 0.5;
     const bev = (inset) => `border:${(fs * 0.08).toFixed(1)}px solid;border-color:${inset ? "#404040 #fff #fff #404040" : "#fff #404040 #404040 #fff"}`;
-    // الماوس بيروح على «تمام» في آخر البلوك وبيدوس
+    // الماوس بيروح على «حسنًا» في آخر البلوك وبيدوس
     const tc = seg(t, b.t1 - 0.7, b.t1 - 0.25), press = t > b.t1 - 0.25 && t < b.t1 - 0.05;
     let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:#2F8A88"></div>`;
     html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - dw) / 2).toFixed(1)}px;top:${cy.toFixed(1)}px;width:${dw.toFixed(1)}px;transform:translateY(-50%) scale(${p.toFixed(3)});background:#C3C3C3;${bev(false)};box-shadow:${(fs * 0.25).toFixed(0)}px ${(fs * 0.25).toFixed(0)}px 0 rgba(0,0,0,.35)">
@@ -1940,7 +1940,7 @@
       <div style="display:flex;gap:${(fs * 0.6).toFixed(1)}px;align-items:flex-start;padding:${(fs * 0.7).toFixed(1)}px ${(fs * 0.7).toFixed(1)}px ${(fs * 0.4).toFixed(1)}px">
         <svg width="${(fs * 1.6).toFixed(0)}" height="${(fs * 1.6).toFixed(0)}" viewBox="0 0 24 24" style="flex:none"><path d="M12 2.5 23 21.5H1z" fill="#FFD21F" stroke="#111" stroke-width="1"/><rect x="11" y="9" width="2" height="7" fill="#111"/><rect x="11" y="17.5" width="2" height="2" fill="#111"/></svg>
         <div style="flex:1;font:400 ${(ar ? fs * 0.85 : fs * 1.15).toFixed(1)}px ${PIXEL(ar ? "ع" : "a")};color:#111;line-height:1.15;min-height:${(fs * 2.4).toFixed(0)}px">${esc(msg)}<span style="opacity:${(Math.floor(t * 2.5) % 2).toFixed(0)}">_</span></div></div>
-      <div style="display:flex;justify-content:center;gap:${(fs * 0.6).toFixed(1)}px;padding:0 0 ${(fs * 0.6).toFixed(1)}px">${[ar ? "تمام" : "OK", ar ? "إلغاء" : "Cancel"].map((s, i) =>
+      <div style="display:flex;justify-content:center;gap:${(fs * 0.6).toFixed(1)}px;padding:0 0 ${(fs * 0.6).toFixed(1)}px">${[ar ? "حسنًا" : "OK", ar ? "إلغاء" : "Cancel"].map((s, i) =>
         `<span style="min-width:${(fs * 3.4).toFixed(0)}px;text-align:center;${bev(i === 0 && press)};background:#C3C3C3;font:400 ${(fs * 0.75).toFixed(1)}px ${famOf(s)};padding:${(fs * 0.12).toFixed(1)}px 0;color:#111;${i === 0 ? `outline:1px dotted #111;outline-offset:-${(fs * 0.22).toFixed(0)}px` : ""}">${s}</span>`).join("")}</div></div>`;
     if (tc > 0) {
       const tx = ar ? w / 2 + fs * 2.2 : w / 2 - fs * 1.6, ty = cy + fs * 1.9;
@@ -2118,13 +2118,13 @@
     let html = onVideo(this) ? "" : `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,#1d1f24,#060607 70%)"></div>`;
     // عنوان فوق المربع (زي «What will you build next?») في نص المرات
     if (bi % 2 === 1) {
-      const q = ar ? "هتعمل إيه النهارده؟" : "What will you build next?", hz = sz * 1.5;
+      const q = ar ? "ماذا ستفعل اليوم؟" : "What will you build next?", hz = sz * 1.5;
       html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(cy - sz * 6.2).toFixed(1)}px;text-align:center;white-space:nowrap;font:600 ${hz.toFixed(1)}px ${famOf(q)};letter-spacing:-0.03em;color:${onVideo(this) ? "#fff" : "#F2F2F2"};opacity:${p.toFixed(3)};${shadow(this)}">${q}</div>`;
     }
     html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - bw) / 2).toFixed(1)}px;top:${cy.toFixed(1)}px;width:${bw.toFixed(1)}px;box-sizing:border-box;transform:translateY(calc(-50% + ${((1 - p) * sz * 2).toFixed(1)}px));opacity:${p.toFixed(3)};
       background:rgba(24,24,27,.9);border:${Math.max(1, sz * 0.05).toFixed(1)}px solid ${acc}88;border-radius:${(sz * 1.1).toFixed(1)}px;padding:${(sz * 0.8).toFixed(1)}px ${(sz * 0.9).toFixed(1)}px ${(sz * 0.6).toFixed(1)}px;
       box-shadow:0 0 ${(sz * 1.6).toFixed(0)}px ${acc}55,inset 0 0 ${(sz * 0.8).toFixed(0)}px ${acc}22">
-      <div style="font:500 ${sz.toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#EDEDED;line-height:1.35;min-height:${(sz * 2.7).toFixed(0)}px">${txt ? esc(txt) : `<span style="color:#77777d">${ar ? "اكتب أي حاجة…" : "Ask anything…"}</span>`}<span style="display:inline-block;width:${(sz * 0.08).toFixed(1)}px;height:${(sz * 1.05).toFixed(1)}px;background:${acc};vertical-align:-0.15em;margin:0 ${(sz * 0.08).toFixed(1)}px;opacity:${done ? 0 : Math.floor(t * 3) % 2}"></span></div>
+      <div style="font:500 ${sz.toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#EDEDED;line-height:1.35;min-height:${(sz * 2.7).toFixed(0)}px">${txt ? esc(txt) : `<span style="color:#77777d">${ar ? "اكتب أي شيء…" : "Ask anything…"}</span>`}<span style="display:inline-block;width:${(sz * 0.08).toFixed(1)}px;height:${(sz * 1.05).toFixed(1)}px;background:${acc};vertical-align:-0.15em;margin:0 ${(sz * 0.08).toFixed(1)}px;opacity:${done ? 0 : Math.floor(t * 3) % 2}"></span></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:${(sz * 0.5).toFixed(1)}px">
         <span style="width:${(sz * 1.5).toFixed(0)}px;height:${(sz * 1.5).toFixed(0)}px;border-radius:50%;border:1px solid #444;color:#aaa;display:flex;align-items:center;justify-content:center;font:400 ${sz.toFixed(0)}px 'TY Outfit'">+</span>
         <span style="width:${(sz * 1.7).toFixed(0)}px;height:${(sz * 1.7).toFixed(0)}px;border-radius:50%;background:${acc};display:flex;align-items:center;justify-content:center;transform:scale(${pulse.toFixed(3)})">
@@ -2527,7 +2527,7 @@
     [/success|win|grow|launch|rocket|نجاح|نجح|كسب|نمو|اطلاق/i, "🚀"], [/\bsee\b|\blook|watch|\beyes?\b|شوف|بص|عين|اتفرج/i, "👀"], [/phone|mobile|app|موبايل|تليفون|تطبيق/i, "📱"],
     [/video|film|movie|camera|فيديو|فيلم|كاميرا|تصوير/i, "🎬"], [/music|song|sound|موسيق|اغني|أغني|صوت/i, "🎵"], [/food|eat|hungry|popcorn|أكل|اكل|جعان/i, "🍿"],
     [/work|job|office|business|شغل|وظيف|بيزنس/i, "💼"], [/gym|fit|muscle|strong|workout|جيم|تمرين|عضل|قوي/i, "💪"], [/sleep|tired|نوم|نام|تعبان/i, "😴"],
-    [/star|best|top|نجم|أحسن|احسن|أفضل/i, "⭐"], [/why|how|what|question|ليه|ازاي|إزاي|سؤال/i, "🤔"], [/yes|right|correct|done|تمام|صح|خلاص/i, "✅"],
+    [/star|best|top|نجم|أحسن|احسن|أفضل/i, "⭐"], [/why|how|what|question|ليه|ازاي|إزاي|سؤال/i, "🤔"], [/yes|right|correct|done|حسنًا|صح|خلاص/i, "✅"],
     [/wrong|never|mistake|غلط|أبدا|ابدا|خطأ/i, "❌"], [/water|drink|مية|ماء|اشرب/i, "💧"], [/world|global|travel|عالم|سفر|دول/i, "🌍"], [/gift|free|bonus|هدي|مجان|ببلاش/i, "🎁"],
     [/baby|kid|child|طفل|عيال|بيبي/i, "👶"], [/animal|tiger|lion|wild|حيوان|نمر|أسد|اسد/i, "🐯"], [/shock|wow|crazy|omg|صدم|مجنون|يا نهار/i, "🤯"]];
   const emojiOf = (s) => (EMOJI.find(([re]) => re.test(s)) || [])[1];
@@ -2656,7 +2656,7 @@
           return `<span style="opacity:${e.toFixed(3)};${hot ? `color:${acc}` : ""}">${esc(this.text(x.w))}</span>`;
         }).join(" ")}</div>`).join("")}
         <div style="margin-top:${(wh * 0.05).toFixed(0)}px;display:flex;gap:${(ww * 0.03).toFixed(0)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.3).toFixed(3)}">
-          <span style="padding:${(ww * 0.018).toFixed(0)}px ${(ww * 0.05).toFixed(0)}px;border-radius:999px;background:${acc};color:#fff;font:700 ${(ww * 0.032).toFixed(1)}px ${ff}">${ar ? "ابدأ دلوقتي" : "Get started"}</span>
+          <span style="padding:${(ww * 0.018).toFixed(0)}px ${(ww * 0.05).toFixed(0)}px;border-radius:999px;background:${acc};color:#fff;font:700 ${(ww * 0.032).toFixed(1)}px ${ff}">${ar ? "ابدأ الآن" : "Get started"}</span>
           <span style="padding:${(ww * 0.018).toFixed(0)}px ${(ww * 0.05).toFixed(0)}px;border-radius:999px;border:1px solid #C4C7CC;color:#202124;font:600 ${(ww * 0.032).toFixed(1)}px ${ff}">${ar ? "اعرف أكتر" : "Learn more"}</span></div>
         ${[0.9, 0.7, 0.8].map((q) => `<i style="display:block;width:${(q * 100).toFixed(0)}%;height:${(ww * 0.018).toFixed(0)}px;border-radius:4px;background:#ECEDF0;margin-top:${(wh * 0.04).toFixed(0)}px"></i>`).join("")}</div></div>`;
     void words;
@@ -2776,7 +2776,7 @@
 
   // =====================================================================
   // 🎞️ ترانزيشنز أول البلوك (b.trans): بتتعمل بعد fitFrame عشان القياس مايتلخبطش بالزووم والإزاحة
-  //   whip سحبة سريعة بموشن بلير · zoom زووم داخل · glitch جلتش ألوان · flash فلاش أبيض · iris دايرة بتفتح
+  //   whip سحبة سريعة بموشن بلير · zoom زووم داخل · glitch جلتش ألوان · flash وميض أبيض · iris دايرة بتفتح
   //   leak تسريب نور برتقاني · burn حرق فيلم · rise طالع من تحت
   // =====================================================================
   const TRANS_DUR = { whip: 0.28, zoom: 0.32, glitch: 0.3, flash: 0.25, iris: 0.4, leak: 0.7, burn: 0.6, rise: 0.35, wipe: 0.45, blur: 0.4, pop: 0.35, slab: 0.6, bars: 0.5, orb: 0.55 };
@@ -2792,7 +2792,7 @@
     wrap.style.cssText = "position:absolute;inset:0";
     let over = "";
     const dir = bi % 2 ? -1 : 1;
-    // على خلفية مصمتة (مش فوق فيديو) الشفافية بتبيّن لون المسرح الفاضي (فلاش أبيض)، فبنكتفي بالحركة والبلير
+    // على خلفية مصمتة (مش فوق فيديو) الشفافية بتبيّن لون المسرح الفاضي (وميض أبيض)، فبنكتفي بالحركة والبلير
     const fadeOK = !!this.doc.transparent;
     if (tr === "whip") { wrap.style.transform = `translateX(${(dir * inv * w * 0.7).toFixed(1)}px) skewX(${(dir * -inv * 18).toFixed(1)}deg)`; wrap.style.filter = `blur(${(inv * mn * 0.025).toFixed(1)}px)`; }
     else if (tr === "zoom") { wrap.style.transform = `scale(${lerp(1.7, 1, e).toFixed(4)})`; wrap.style.filter = `blur(${(inv * mn * 0.02).toFixed(1)}px)`; if (fadeOK) wrap.style.opacity = clamp(q * 3).toFixed(3); }
@@ -3838,7 +3838,7 @@
   //   dragdrop   صور بتطير لجوه مربع الكتابة وعليها أسامي
   //   lineup     أسامي كبيرة فوق بعض والحالي منوّر برتقاني وجنبه صورة
   //   isomap     خريطة أيزومتريك برتقاني بمربعات عليها أسامي
-  //   stickers   كلمة عملاقة وحواليها تاجات مايلة بحدود
+  //   stickers   كلمة عملاقة وحواليها تاجات مائلة بحدود
   // =====================================================================
   P.k_titlecard = function (b, t, k, th, bi) {
     const { w, h } = this.doc;
@@ -4048,7 +4048,7 @@
     return html;
   };
 
-  // ---------- stickers: كلمة عملاقة وحواليها تاجات مايلة
+  // ---------- stickers: كلمة عملاقة وحواليها تاجات مائلة
   P.k_stickers = function (b, t, k, th, bi) {
     const { w, h } = this.doc;
     const mn = Math.min(w, h);
@@ -4217,7 +4217,7 @@
           <span style="display:block;font:400 ${(sz * 0.6).toFixed(1)}px ${ff};color:#888">${ar ? "شحن مجاني · متاح" : "Free shipping · in stock"}</span></span>
           <span dir="ltr" style="font:600 ${sz.toFixed(1)}px 'TY Outfit';color:#111">$${prices[i % 4]}.00</span>
           <span style="flex:none;width:${(sz * 0.9).toFixed(0)}px;height:${(sz * 0.9).toFixed(0)}px;border-radius:50%;border:2px solid ${on ? "#C0322D" : "#BBB"};box-sizing:border-box;display:flex;align-items:center;justify-content:center">${on ? `<i style="width:55%;height:55%;border-radius:50%;background:#C0322D"></i>` : ""}</span></div>`; }).join("")}
-      <div style="margin-top:${(sz * 0.8).toFixed(1)}px;text-align:center;background:#C0322D;color:#fff;font:700 ${(sz * 0.85).toFixed(1)}px ${ff};padding:${(sz * 0.45).toFixed(1)}px;border-radius:${(sz * 0.3).toFixed(1)}px">${ar ? "اطلب دلوقتي" : "PRE-ORDER"}</div></div>`;
+      <div style="margin-top:${(sz * 0.8).toFixed(1)}px;text-align:center;background:#C0322D;color:#fff;font:700 ${(sz * 0.85).toFixed(1)}px ${ff};padding:${(sz * 0.45).toFixed(1)}px;border-radius:${(sz * 0.3).toFixed(1)}px">${ar ? "اطلب الآن" : "PRE-ORDER"}</div></div>`;
     return html;
   };
 
@@ -4278,7 +4278,7 @@
         <div style="display:flex;align-items:center;gap:${(sz * 0.4).toFixed(1)}px"><span style="width:${(sz * 1.2).toFixed(0)}px;height:${(sz * 1.2).toFixed(0)}px;border-radius:50%;background:#3B4BE8;color:#fff;display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.6).toFixed(0)}px ${famOf(site)}">${esc([...site][0] || "S")}</span>
           <span><span style="display:block;font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(site)};color:#202124">${esc(site)}</span><span dir="ltr" style="display:block;font:400 ${(sz * 0.6).toFixed(1)}px 'TY Outfit';color:#5F6368">https://www.${esc(slug)}</span></span></div>
         <div style="font:500 ${(sz * 1.1).toFixed(1)}px ${ff};color:#1A0DAB;margin-top:${(sz * 0.4).toFixed(1)}px;line-height:1.3">${esc(shown)}</div>
-        <div style="font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#4D5156;line-height:1.5;margin-top:${(sz * 0.3).toFixed(1)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.4).toFixed(3)}">${esc(ar ? `${title}. اعرف كل حاجة عن ${site} واحجز دلوقتي وابدأ النهارده.` : `${title}. Learn everything about ${site}, book online and get started today.`)}</div></div>`;
+        <div style="font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#4D5156;line-height:1.5;margin-top:${(sz * 0.3).toFixed(1)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.4).toFixed(3)}">${esc(ar ? `${title}. اعرف كل حاجة عن ${site} واحجز الآن وابدأ النهارده.` : `${title}. Learn everything about ${site}, book online and get started today.`)}</div></div>`;
     void fi;
     return html;
   };
@@ -4666,7 +4666,7 @@
     const x = (w - cw) / 2, y = h * 0.32;
     const nums = it.map((q) => q.w.match(/[0-9٠-٩]+/)).filter(Boolean).map((m) => parseInt(m[0].replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)), 10));
     const sub = nums[0] ?? 162, ship = 15, tax = 7.4;
-    const label = it.filter((q) => !/[0-9٠-٩]/.test(q.w)).map((q) => this.text(q.w)).join(" ") || (ar ? "ادفع دلوقتي" : "Proceed to checkout");
+    const label = it.filter((q) => !/[0-9٠-٩]/.test(q.w)).map((q) => this.text(q.w)).join(" ") || (ar ? "ادفع الآن" : "Proceed to checkout");
     const rows = [[ar ? "المجموع" : "Subtotal", sub], [ar ? "الضريبة" : "Tax", tax], [ar ? "الشحن" : "Shipping", ship]];
     const cnt = eOut(seg(t, b.t0 + 0.2, b.t0 + 0.9));
     const lastT = it[it.length - 1].t0;
@@ -6874,7 +6874,7 @@
       y += bold ? lhB : lhL; });
     return html;
   };
-  // ======== r13 «بكرة» — لستة كلام مايلة بتلف زي بكرة الاختيار، الكلمة الحالية بيضا حادة بسهم، والباقي باهت ومتغبّش وبيلف دايري ========
+  // ======== r13 «بكرة» — لستة كلام مائلة بتلف زي بكرة الاختيار، الكلمة الحالية بيضا حادة بسهم، والباقي باهت ومتغبّش وبيلف دايري ========
   P.k_drumpicker = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), n = it.length;
@@ -7083,7 +7083,7 @@
       <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "right" : "left"}:${(-off).toFixed(1)}px;top:${(y - z * 0.6).toFixed(1)}px;white-space:nowrap;font:${font};isolation:isolate">${words.slice(0, fi).join(" ")}${fi ? " " : ""}<span style="position:relative;display:inline-block">${words.slice(fi).join(" ")}${ring && mp > 0 ? `<svg style="position:absolute;left:50%;top:50%;overflow:visible;filter:drop-shadow(0 0 ${(z * 0.25).toFixed(0)}px rgba(230,162,30,.6))" width="1" height="1"><ellipse cx="0" cy="0" rx="${(fw * 0.62 + z * 0.5).toFixed(1)}" ry="${(z * 0.85).toFixed(1)}" fill="none" stroke="${GOLD}" stroke-width="${(z * 0.06).toFixed(1)}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - mp * 1.04).toFixed(3)}" transform="rotate(-4)"/></svg>` : ""}</span></div>`;
     return html;
   };
-  // ---------- objectquote: رمز كبير (ساعة رملية…) مايل على قد المعنى، وجنبه سطور سيريف مايلة صغيرة، وآخر كلمة دهبي عملاقة فوق الرمز
+  // ---------- objectquote: رمز كبير (ساعة رملية…) مايل على قد المعنى، وجنبه سطور سيريف مائلة صغيرة، وآخر كلمة دهبي عملاقة فوق الرمز
   P.k_objectquote = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), J = (a) => a.map((x) => this.text(x.w)).join(" "), all = J(it), ar = AR.test(all);
@@ -7136,7 +7136,7 @@
     html += capTop(this, cap, t, words[0]?.t0 ?? b.t0, w, h, mn, false);
     return html;
   };
-  // ---------- glosscards: كروت كبسولة كحلي لامعة بتدخل مايلة 3D واحدة فوق التانية، كل كارت فيه جزء من الكلام
+  // ---------- glosscards: كروت كبسولة كحلي لامعة بتدخل مائلة 3D واحدة فوق التانية، كل كارت فيه جزء من الكلام
   P.k_glosscards = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), per = it.length > 6 ? 3 : 2, cards = [];
@@ -7163,7 +7163,7 @@
     if (on) html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${(pool + mn * 0.06).toFixed(1)}px;text-align:center;line-height:.95;${blurIn(t, P.main.t0 - 0.05, 0.5)}"><div style="font:500 ${(z * 0.2).toFixed(1)}px ${famOf(small)};color:#fff">${esc(small)}</div><div style="font:700 ${z.toFixed(1)}px ${ff};color:#fff;letter-spacing:-0.01em;white-space:nowrap">${esc(main)}</div></div>`;
     return html;
   };
-  // ---------- tasklens: قايمة مهام مايلة 3D بتتعلّم واحدة واحدة، وعدسة مكبّرة دايرة بتعدّي عليها، وكابشن فوق
+  // ---------- tasklens: قايمة مهام مائلة 3D بتتعلّم واحدة واحدة، وعدسة مكبّرة دايرة بتعدّي عليها، وكابشن فوق
   P.k_tasklens = function (b, t, k, th, bi) {
     const P = figParts(this, { ...b, focus: b.focus >= 0 ? b.focus : Math.min(2, this.items(b).length - 1) }); if (!P.it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), cap = P.J(P.it.slice(0, P.fi + 1)), ar = AR.test(cap);
@@ -7485,7 +7485,7 @@
       ${sub ? `<div dir="${this.dir(sub)}" style="position:absolute;left:0;right:0;top:${(cy + ph * 0.75).toFixed(1)}px;text-align:center;font:500 ${(z * 0.62).toFixed(1)}px ${famOf(sub)};color:#F4EBD8">${esc(typed(sub, t, P.tail[0].t0 - 0.05, 22))}</div>` : ""}`;
   };
   // ======== r28 «واجهة طايرة» — ساعة كبيرة شفافة فوق، شباك ملفات إزاز بفولدرات زرقا بتظهر، وحيطة كروت مقوّسة حوالين المشاهد بتلف ========
-  // ---------- holoclock: ساعة رقمية كبيرة مايلة شفافة وتحتها التاريخ وأيقونات حالة، وتحتها شباك ملفات إزاز فيه فولدرات زرقا بأسامي الكلام بتطلع واحد واحد
+  // ---------- holoclock: ساعة رقمية كبيرة مائلة شفافة وتحتها التاريخ وأيقونات حالة، وتحتها شباك ملفات إزاز فيه فولدرات زرقا بأسامي الكلام بتطلع واحد واحد
   P.k_holoclock = function (b, t, k, th, bi) {
     const it = this.items(b);
     const { w, h } = this.doc, mn = Math.min(w, h), ar = AR.test(it.map((x) => this.text(x.w)).join(" "));
@@ -7516,7 +7516,7 @@
     return `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(0,0,0,.35)" : "radial-gradient(ellipse at 50% 40%,#2A2622,#0C0B0A 75%)"}"></div>${cards}`;
   };
   // ======== r29 «تحليل براند» — جرنال مايل والكاميرا بتمشي على جملة متعلّمة بماركر أصفر، حلقات نور بيضا على كحلي، وخط موجة بيشيل حاجات ========
-  // ---------- newsscan: صفحة جرنال مايلة مليانة سطور باهتة والكاميرا بتقرب وتمشي، وجملة الكلام وسطها تقيلة والماركر الأصفر بيمسح عليها
+  // ---------- newsscan: صفحة جرنال مائلة مليانة سطور باهتة والكاميرا بتقرب وتمشي، وجملة الكلام وسطها تقيلة والماركر الأصفر بيمسح عليها
   P.k_newsscan = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ar = AR.test(s), sf = serifOf(s);
@@ -7558,7 +7558,7 @@
         <div dir="${this.dir(s)}" style="position:absolute;left:${(xx - w * 0.3).toFixed(1)}px;width:${(w * 0.6).toFixed(1)}px;top:${(yy + (up ? -mn * 0.24 : mn * 0.13)).toFixed(1)}px;text-align:center;font:400 ${(mn * 0.035 * this.ts).toFixed(1)}px ${famOf(s)};color:#E6E6EE;white-space:nowrap">- ${esc(s)} -</div>`; });
     return html;
   };
-  // ======== r30 «قوس كروت» — كروت عرض أحمر/أسود/أبيض مايلة على قوس كبير وبتتزحلق عليه، كل كارت تصميم مختلف وعليه كلمة ========
+  // ======== r30 «قوس كروت» — كروت عرض أحمر/أسود/أبيض مائلة على قوس كبير وبتتزحلق عليه، كل كارت تصميم مختلف وعليه كلمة ========
   P.k_cardarc = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), n = it.length, slide = (t - b.t0) * 0.35 + eOut(seg(t, b.t0, b.t0 + 0.8)) * 0.6;
@@ -7960,7 +7960,7 @@
       html += `<div style="position:absolute;left:${(x - (vert ? cw * 0.75 : cw * 0.5)).toFixed(1)}px;top:${(y - ch * (vert ? 0.62 : 0.66)).toFixed(1)}px;font:500 ${(mn * 0.014).toFixed(1)}px 'TY Mono';color:${vert ? "rgba(255,255,255,.5)" : "#888"};letter-spacing:.1em">DAY ${ii + 1}</div>`; }
     return html;
   };
-  // ======== r43 «قبل وبعد 2» — اسم أصفر منوّر بخط تقيل وتحته كلمة سيريف مايلة متداخلة، الكلمة متكررة عمود (المتكررين كونتور أصفر والنص أبيض)، وكلمة طولية عملاقة على طرف الكادر ========
+  // ======== r43 «قبل وبعد 2» — اسم أصفر منوّر بخط تقيل وتحته كلمة سيريف مائلة متداخلة، الكلمة متكررة عمود (المتكررين كونتور أصفر والنص أبيض)، وكلمة طولية عملاقة على طرف الكادر ========
   const YEL43 = "#FFE14D";
   // ---------- namescript: كلمة صغيرة فوق، والاسم/الكلمة المهمة (focus) أصفر تقيل منوّر، والكلمة اللي بعدها سيريف مايل رفيع متداخل تحته
   P.k_namescript = function (b, t, k, th, bi) {
@@ -7997,11 +7997,11 @@
     if (cap) html += `<div dir="${this.dir(cap)}" style="position:absolute;${side === "left" ? "right" : "left"}:${(w * 0.06).toFixed(1)}px;left:${side === "left" ? (w * 0.3).toFixed(1) + "px" : "auto"};bottom:${(h * 0.12).toFixed(1)}px;text-align:center;font:600 ${(mn * 0.04 * this.ts).toFixed(1)}px ${famOf(cap)};color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)">${esc(cap)}</div>`;
     return html;
   };
-  // ======== r44 «وثائقي قديم» — ورق فاتح بحبيبات VHS: كلمة سيريف مايلة لوحدها، سطر بيتكتب وآخر كلمة بتتحدد بالأزرق بمقابض، شريط ورق مقطوع عليه كلام، ورادار غامق بتاجات زرقا ========
+  // ======== r44 «وثائقي قديم» — ورق فاتح بحبيبات VHS: كلمة سيريف مائلة لوحدها، سطر بيتكتب وآخر كلمة بتتحدد بالأزرق بمقابض، شريط ورق مقطوع عليه كلام، ورادار غامق بتاجات زرقا ========
   const VHS = (w, h, t) => { const r = rng(Math.floor(t * 24)); let g = ""; for (let i = 0; i < 6; i++) g += `<i style="position:absolute;left:0;right:0;top:${(r() * h).toFixed(0)}px;height:${(r() * 2 + 1).toFixed(0)}px;background:rgba(255,255,255,${(r() * 0.06).toFixed(3)})"></i>`;
     return `<div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.035) 0 2px,transparent 2px 4px);pointer-events:none"></div>${g}`; };
   const PAPER44 = `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,#ECECEA,#D8D8D5 90%)"></div>`;
-  // ---------- serifsolo: ورق فاتح بحبيبات وكلمة سيريف مايلة واحدة في النص بتتبدّل مع الكلام (بتطلع من بلير)، والسنين بتتقلب لو فيه أرقام
+  // ---------- serifsolo: ورق فاتح بحبيبات وكلمة سيريف مائلة واحدة في النص بتتبدّل مع الكلام (بتطلع من بلير)، والسنين بتتقلب لو فيه أرقام
   P.k_serifsolo = function (b, t, k, th, bi) {
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h);

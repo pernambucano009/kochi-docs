@@ -114,13 +114,13 @@ deleteSelected = function () {
     const fx = JSON.parse(JSON.stringify(mtx.cur.fx || []));
     fx.splice(mt.sel.i, 1);
     mt.sel = null;
-    return mtFxSave(fx, "🗑️ العنصر أُزيل");
+    return mtFxSave(fx, "🗑️ أُزيل العنصر");
   }
   if (mt.sel?.kind !== "typo") return _mtDelete();
   const i = mt.sel.i, blocks = JSON.parse(JSON.stringify(mtx.cur.blocks));
   blocks.splice(i, 1);
   mt.sel = null;
-  mtTypoSave(blocks, "🗑️ التايبوجرافي أُزيلت من هذا الجزء");
+  mtTypoSave(blocks, "🗑️ أُزيلت التايبوجرافي من هذا الجزء");
 };
 $("tlDelete").onclick = $("edDelete").onclick = () => deleteSelected();
 
@@ -133,9 +133,9 @@ function mtClickTrack() {
   const el = $("trkClick");
   if (!el) return;
   const url = mtClickUrl();
-  if (!url) { el.innerHTML = `<div class="tl-empty-track">كليكات التايبوجرافي تظهر هنا</div>`; return; }
+  if (!url) { el.innerHTML = `<div class="tl-empty-track">نقرات التايبوجرافي تظهر هنا</div>`; return; }
   const dur = mtx.doc.duration;
-  el.innerHTML = `<div class="tl-audio click ${mtClickOn() ? "" : "off"}" style="left:0;width:${dur * mt.pps}px" title="كليكات التايبوجرافي (العلو من تبويب 🔤)"><canvas></canvas><span class="nm">🔊 كليكات ${mtClickOn() ? `${Math.round(mtClickVol() * 100)}٪` : "(مغلقة)"}</span></div>`;
+  el.innerHTML = `<div class="tl-audio click ${mtClickOn() ? "" : "off"}" style="left:0;width:${dur * mt.pps}px" title="نقرات التايبوجرافي (المستوى من تبويب 🔤)"><canvas></canvas><span class="nm">🔊 نقرات ${mtClickOn() ? `${Math.round(mtClickVol() * 100)}٪` : "(مطفأة)"}</span></div>`;
   drawWave(el.querySelector("canvas"), url, 0, dur, mtClickOn() ? "#ffb86b" : "#6b7180", mtClickOn() ? mtClickVol() : 0.3);
 }
 let mtClickEl = null;
@@ -156,7 +156,7 @@ function mtTypoTrack() {
   const el = $("trkTypo");
   if (!el || !mt.project) return;
   if (!mtx.id || !mtx.doc?.blocks?.length) {
-    el.innerHTML = `<div class="tl-empty-track">${mtx.cur?.busy ? `⏳ ${escapeHtml(mtx.cur.step || "يشتغل")}` : "لا يوجد تايبوجرافي: اضغط «🧠 وزّع التايبوجرافي» من تبويب 🔤"}</div>`;
+    el.innerHTML = `<div class="tl-empty-track">${mtx.cur?.busy ? `⏳ ${escapeHtml(mtx.cur.step || "مفعّل")}` : "لا يوجد تايبوجرافي: اضغط «🧠 وزّع التايبوجرافي» من تبويب 🔤"}</div>`;
     return;
   }
   el.innerHTML = mtx.doc.blocks.map((b, i) => {
@@ -164,7 +164,7 @@ function mtTypoTrack() {
     const label = (TY_KINDS[b.kind] || b.kind).replace(/^[⭐🎬\s]+/, "");
     const txt = (b.words || []).map((w) => w.w).join(" ");
     return `<div class="tl-typo ${sel ? "selected" : ""}" data-ty="${i}" title="${escapeHtml(txt)}" style="left:${b.t0 * mt.pps}px;width:${Math.max(4, (b.t1 - b.t0) * mt.pps)}px">
-      ${b.trans ? `<span class="tr" title="ترانزيشن">◆</span>` : ""}<b>${escapeHtml(label)}</b><span dir="auto">${escapeHtml(txt)}</span>
+      ${b.trans ? `<span class="tr" title="انتقال">◆</span>` : ""}<b>${escapeHtml(label)}</b><span dir="auto">${escapeHtml(txt)}</span>
       <i class="h l" data-h="l"></i><i class="h r" data-h="r"></i></div>`;
   }).join("");
 }
@@ -238,8 +238,8 @@ function mtTypoPoll() {
         if (cur.blocks?.length || cur.fx?.length) await mtTypoDoc();
         if (cur.status === "failed") toast(`🔤 ${cur.error || "حصلت مشكلة"}`, true);
         else if (/^(🪄|🧽|✨|🎥)/u.test(was)) { /* المشهد: التبويب الخاص به يقول خلص */ }
-        else if (was.includes("🎯")) toast("🎯 لقيت الشيء وتابعتها: شغّل الفيديو وانظر الحدود الصفرا");
-        else if (cur.blocks?.length) toast("🔤 التايبوجرافي وُزّعت على المونتاج");
+        else if (was.includes("🎯")) toast("🎯 وُجد الشيء وجرى تتبعه: شغّل الفيديو وانظر إلى الحدود الصفراء");
+        else if (cur.blocks?.length) toast("🔤 وُزّعت التايبوجرافي على المونتاج");
         syncPreview();
       }
       renderTimeline();
@@ -256,15 +256,15 @@ function mtTypoPaneRender() {
   const d = mt.project.data, c = mtx.cur, busy = !!c?.busy;
   const stale = c?.source?.duration && Math.abs(c.source.duration - totalLength()) > 0.25;
   let h = `<div class="mt-typo-row">
-    <p class="hint">النص الذي في المونتاج يُسمع ويتوزّع على عناصر التايبوجرافي، ويظهر في خط «🔤 تايبوجرافي» أسفل. اضغط على أي لقطة في الخط لكي تغيّر عنصرها أو الترانزيشن، والأدوات تظهر على المعاينة (اسحب، كبّر، لفّ، أركان، خلف الشخص، تراك).</p>
-    ${busy ? `<p><span class="spin-inline"></span> ${escapeHtml(c.step || "يشتغل…")}</p>` : ""}
+    <p class="hint">يُستمع إلى كلام المونتاج ويُوزَّع على عناصر التايبوجرافي، ويظهر في خط «🔤 تايبوجرافي» في الأسفل. اضغط على أي لقطة في الخط لتغيير عنصرها أو الانتقال، وتظهر الأدوات على المعاينة (سحب، تكبير، تدوير، أركان، خلف الشخص، تتبع).</p>
+    ${busy ? `<p><span class="spin-inline"></span> ${escapeHtml(c.step || "جارٍ العمل…")}</p>` : ""}
     ${c?.status === "failed" ? `<p class="err">⚠️ ${escapeHtml(c.error || "")}</p>` : ""}
-    ${stale && !busy ? `<p class="hint">⚠️ المونتاج تغيّر بعد ما وُزّعت التايبوجرافي (الطول مختلف): وزّعها من جديد لكي المواعيد تُضبط.</p>` : ""}
+    ${stale && !busy ? `<p class="hint">⚠️ تغيّر المونتاج بعد توزيع التايبوجرافي (الطول مختلف): وزّعها من جديد لتُضبط التوقيتات.</p>` : ""}
     <input type="text" id="mtTypoBrief" placeholder="عن الفيديو (اختياري): من يتكلم ولمين وماذا الإحساس" value="${escapeHtml(c?.brief || "")}">
     <div class="row wrap"><button class="btn primary sm" id="mtTypoPlan" ${busy || !d.clips.length ? "disabled" : ""}>🧠 ${c?.blocks?.length ? "وزّع من جديد" : "وزّع التايبوجرافي"}</button>
-      ${c ? `<label class="check"><input type="checkbox" id="mtTypoOn" ${mtTypoOn() ? "checked" : ""}> اظهرها في المعاينة والتصدير</label>` : ""}
+      ${c ? `<label class="check"><input type="checkbox" id="mtTypoOn" ${mtTypoOn() ? "checked" : ""}> أظهرها في المعاينة والتصدير</label>` : ""}
       ${c ? `<button class="btn sm" id="mtTypoOpen" title="المحرر الكامل: الأسلوب والأيقونات والعلامات">✏️ المحرر الكامل</button>` : ""}</div>
-    ${c?.blocks?.length ? `<div class="row wrap"><label class="check"><input type="checkbox" id="mtClickOn" ${mtClickOn() ? "checked" : ""}> 🔊 كليكات التايبوجرافي</label>
+    ${c?.blocks?.length ? `<div class="row wrap"><label class="check"><input type="checkbox" id="mtClickOn" ${mtClickOn() ? "checked" : ""}> 🔊 نقرات التايبوجرافي</label>
       <label>العلو <b>${Math.round(mtClickVol() * 100)}٪</b> <input type="range" id="mtClickVol" min="0" max="200" step="5" value="${Math.round(mtClickVol() * 100)}" ${mtClickOn() ? "" : "disabled"}></label></div>` : ""}
   </div>`;
   const i = mt.sel?.kind === "typo" ? mt.sel.i : -1, b = mtx.doc?.blocks?.[i], r = mtx.cur?.blocks?.[i];
@@ -273,10 +273,10 @@ function mtTypoPaneRender() {
     const studio = window.TypoEngine?.STUDIO?.has(r.kind);
     h += `<div class="mt-typo-row"><h3>لقطة ${i + 1} <small class="muted" dir="auto">«${escapeHtml(txt)}»</small></h3>
       <label>العنصر <select id="mtTyKind">${Object.entries(TY_KINDS).map(([k, l]) => `<option value="${k}" ${k === r.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-      ${studio ? `<label>🎞️ الترانزيشن <select id="mtTyTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (r.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
-      <div><b>✏️ النص</b> <small class="muted">اضغط على أي كلمة وصلّحها إذا سُمعت خطأ (توقيتها يظل كما هو)</small>
+      ${studio ? `<label>🎞️ الانتقال <select id="mtTyTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (r.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
+      <div><b>✏️ النص</b> <small class="muted">اضغط على أي كلمة وصحّحها إن سُمعت خطأً (يبقى توقيتها كما هو)</small>
         <div class="wd-row" dir="auto">${(mtx.cur.words || []).slice(r.from, r.to + 1).map((w, j) => `<input class="wd" data-wi="${r.from + j}" value="${escapeHtml(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false">`).join("")}</div></div>
-      <details class="wd-more"><summary>اكتب النص الذي يظهر بنفسك (بدل ما قيل)</summary>
+      <details class="wd-more"><summary>اكتب النص الظاهر بنفسك (بدلًا مما قيل)</summary>
         <input id="mtTyText" value="${escapeHtml(r.text || "")}" placeholder="${escapeHtml(txt)}" dir="auto"></details>
       <div class="row wrap"><button class="btn sm" id="mtTyPrev">→ ما قبلها</button><button class="btn sm" id="mtTyNext">ما بعدها →</button>
         <button class="btn sm danger" id="mtTyDel">🗑 أزلها</button></div></div>`;
@@ -288,7 +288,7 @@ function mtTypoPaneRender() {
 $("mtTypoPane").addEventListener("click", async (e) => {
   const t = e.target;
   if (t.id === "mtTypoPlan") {
-    if (mtx.cur?.blocks?.length && !(await uiConfirm("توزّع التايبوجرافي من جديد؟ التعديلات التي عملتها عليها ستُستبدل."))) return;
+    if (mtx.cur?.blocks?.length && !(await uiConfirm("أتوزّع التايبوجرافي من جديد؟ ستُستبدل التعديلات التي أجريتها عليها."))) return;
     await saveProject();
     try {
       const res = await api(`/api/projects/${mt.project.id}/typo`, { method: "POST", ...jsonBody({ brief: $("mtTypoBrief")?.value || "" }) });
@@ -297,7 +297,7 @@ $("mtTypoPane").addEventListener("click", async (e) => {
       mtx.eng = null; $("pvTypoStage").innerHTML = "";
       scheduleSave();
       mtTypoPaneRender(); renderTimeline(); mtTypoPoll();
-      toast("🧠 يُجهّز المونتاج ويسمع النص… هذه تأخذ دقيقة أو اثنان");
+      toast("🧠 جارٍ تجهيز المونتاج والاستماع للكلام… يستغرق ذلك دقيقة أو دقيقتين");
     } catch (err) { toast(err.message, true); }
     return;
   }
@@ -330,7 +330,7 @@ $("mtTypoPane").addEventListener("change", async (e) => {
     words[Number(t.dataset.wi)] = v;
     try {
       mtx.cur = await api(`/api/typo/${mtx.id}`, { method: "PATCH", ...jsonBody({ words }) });
-      await mtTypoDoc(); renderTimeline(); toast("✏️ الكلمة أُصلحت");
+      await mtTypoDoc(); renderTimeline(); toast("✏️ صُحّحت الكلمة");
     } catch (err) { toast(err.message, true); }
     return;
   }
@@ -385,7 +385,7 @@ async function mtFxAdd(kind, text) {
   const fx = JSON.parse(JSON.stringify(mtx.cur.fx || []));
   const t0 = Math.round(mt.t * 100) / 100;
   fx.push({ id: `fx${Date.now().toString(36)}`, t0, t1: t0 + 2.5, kind: kind || FX_DEFAULT, text: text || "اكتب هنا", theme: "dark" });
-  await mtFxSave(fx, "✨ العنصر أُضيف عند المؤشر");
+  await mtFxSave(fx, "✨ أُضيف العنصر عند المؤشر");
   const i = (mtx.cur.fx || []).findIndex((q) => Math.abs(q.t0 - t0) < 0.01);
   if (i >= 0) { mt.sel = { kind: "fx", i }; showTab("typo"); renderTimeline(); mtTypoPaneRender(); syncPreview(); }
 }
@@ -394,7 +394,7 @@ function mtFxTrack() {
   const el = $("trkFx");
   if (!el || !mt.project) return;
   const fx = mtx.cur?.fx || [];
-  if (!fx.length) { el.innerHTML = `<div class="tl-empty-track">اضغط ＋ لكي تضع عنصر في أي وقت (اسمك، QR، رقم، شعار…)</div>`; return; }
+  if (!fx.length) { el.innerHTML = `<div class="tl-empty-track">اضغط ＋ لوضع عنصر في أي وقت (اسمك، QR، رقم، شعار…)</div>`; return; }
   // العناصر اللي بتتراكب بتنزل صف تحت التاني
   const lanes = [];
   const lane = fx.map((q) => { let k = 0; while ((lanes[k] ?? -1) > q.t0 + 0.001) k++; lanes[k] = q.t1; return k; });
@@ -443,18 +443,18 @@ function mtFxPaneHtml() {
   const kinds = Object.entries(TY_KINDS).filter(([k]) => window.TypoEngine?.STUDIO?.has(k));
   const i = mt.sel?.kind === "fx" ? mt.sel.i : -1, q = mtx.cur?.fx?.[i];
   let h = `<div class="mt-typo-row fx-box"><h3>✨ العناصر الحرة</h3>
-    <p class="hint">عنصر يظهر في أي وقت تختاره حتى إذا غير مربوط بكلام متقال، مثل اسمك في أولًا، أو QR في الآخر، أو رقم مهم. يظهر أعلى التايبوجرافي.</p>
+    <p class="hint">عنصر يظهر في أي وقت تختاره حتى إن لم يرتبط بكلام منطوق، مثل اسمك في البداية، أو QR في النهاية، أو رقم مهم. يظهر فوق التايبوجرافي.</p>
     <div class="row wrap"><select id="fxNewKind">${kinds.map(([k, l]) => `<option value="${k}" ${k === FX_DEFAULT ? "selected" : ""}>${l}</option>`).join("")}</select>
       <input id="fxNewText" placeholder="النص الذي فيه" dir="auto">
       <button class="btn sm primary" id="fxAdd">＋ أضف عند المؤشر</button></div></div>`;
   if (q) {
     h += `<div class="mt-typo-row fx-box"><h3>عنصر ${i + 1} <small class="muted" dir="ltr">${fmtTC(q.t0)} ← ${fmtTC(q.t1)}</small></h3>
       <label>العنصر <select id="fxKind">${kinds.map(([k, l]) => `<option value="${k}" ${k === q.kind ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-      <label>🎞️ الترانزيشن <select id="fxTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (q.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>🎞️ الانتقال <select id="fxTrans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (q.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>النص <input id="fxText" value="${escapeHtml(q.text)}" dir="auto"></label>
       <div class="row wrap"><button class="btn sm" id="fxHere">⇤ يبدأ عند المؤشر</button><button class="btn sm" id="fxDup">⧉ كرّر</button>
         <button class="btn sm danger" id="fxDel">🗑 أزله</button></div>
-      <p class="hint">اسحبه في خط «✨ عناصر» لكي تغيّر وقته، ومن طرفه لكي تطوّله أو تقصّره. والأدوات على المعاينة تحرّكه وتلفّه.</p></div>`;
+      <p class="hint">اسحبه في خط «✨ عناصر» لتغيير وقته، ومن طرفه لإطالته أو تقصيره. وأدوات المعاينة تحرّكه وتدوّره.</p></div>`;
   }
   return h;
 }
@@ -465,7 +465,7 @@ $("mtTypoPane").addEventListener("click", (e) => {
   if (i < 0 || !mtx.cur?.fx?.[i]) return;
   const fx = JSON.parse(JSON.stringify(mtx.cur.fx)), q = fx[i];
   if (t.id === "fxDel") return deleteSelected();
-  if (t.id === "fxDup") { const len = q.t1 - q.t0; fx.push({ ...q, id: `fx${Date.now().toString(36)}`, t0: q.t1, t1: q.t1 + len }); return mtFxSave(fx, "⧉ تكرر بعده"); }
+  if (t.id === "fxDup") { const len = q.t1 - q.t0; fx.push({ ...q, id: `fx${Date.now().toString(36)}`, t0: q.t1, t1: q.t1 + len }); return mtFxSave(fx, "⧉ كرّره بعده"); }
   if (t.id === "fxHere") { const len = q.t1 - q.t0; q.t0 = Math.round(mt.t * 100) / 100; q.t1 = q.t0 + len; return mtFxSave(fx); }
 });
 
@@ -478,9 +478,9 @@ $("mtTypoPane").addEventListener("change", (e) => {
 });
 
 // ---------- ◆ ترانزيشنز بين لقطات الفيديو: معيّن بين كل قطعتين، تدوس عليه وتختار
-const MT_TRANS = [["", "بدون", "✂️"], ["fade", "تلاشي", "◐"], ["fadeblack", "سواد", "●"], ["fadewhite", "فلاش أبيض", "○"], ["dissolve", "ذوبان", "░"],
-  ["slideleft", "زحلقة", "⇠"], ["smoothleft", "زحلقة ناعمة", "↜"], ["slideup", "لفوق", "⇡"], ["wipeleft", "مسحة", "▤"], ["circleopen", "دائرة تفتح", "◎"],
-  ["radial", "عقارب", "◔"], ["zoomin", "زووم", "⊕"], ["pixelize", "بكسلات", "▦"], ["hblur", "ضباب", "≋"], ["squeezeh", "عصرة", "⇔"], ["diagtl", "مايلة", "◩"]];
+const MT_TRANS = [["", "بدون", "✂️"], ["fade", "تلاشي", "◐"], ["fadeblack", "سواد", "●"], ["fadewhite", "وميض أبيض", "○"], ["dissolve", "ذوبان", "░"],
+  ["slideleft", "انزلاق", "⇠"], ["smoothleft", "انزلاق ناعم", "↜"], ["slideup", "لفوق", "⇡"], ["wipeleft", "مسحة", "▤"], ["circleopen", "دائرة تنفتح", "◎"],
+  ["radial", "عقارب الساعة", "◔"], ["zoomin", "زووم", "⊕"], ["pixelize", "بكسلات", "▦"], ["hblur", "ضباب", "≋"], ["squeezeh", "ضغطة", "⇔"], ["diagtl", "مائلة", "◩"]];
 const mtTransName = (k) => (MT_TRANS.find((x) => x[0] === k) || [k, k])[1];
 
 function mtTransMarks() {
@@ -495,7 +495,7 @@ function mtTransMarks() {
     el.type = "button";
     el.className = `tl-trans ${tr?.type ? "on" : ""}`;
     el.dataset.ci = it.i;
-    el.title = tr?.type ? `ترانزيشن: ${mtTransName(tr.type)} (${(tr.dur || 0.5).toFixed(1)}ث)` : "أضف ترانزيشن بين اللقطتين";
+    el.title = tr?.type ? `انتقال: ${mtTransName(tr.type)} (${(tr.dur || 0.5).toFixed(1)}ث)` : "أضف انتقالًا بين اللقطتين";
     el.style.left = `${it.t0 * mt.pps}px`;
     el.innerHTML = `<i></i>`;
     tv.appendChild(el);
@@ -510,10 +510,10 @@ function mtTransPop(ci, anchor) {
   const cur = c.trans?.type || "", dur = c.trans?.dur || 0.5;
   const pop = document.createElement("div");
   pop.className = "tr-pop";
-  pop.innerHTML = `<div class="tr-head"><b>◆ الترانزيشن</b><button type="button" class="tr-x" data-trx>✕</button></div>
+  pop.innerHTML = `<div class="tr-head"><b>◆ الانتقال</b><button type="button" class="tr-x" data-trx>✕</button></div>
     <div class="tr-grid">${MT_TRANS.map(([k, l, ic]) => `<button type="button" class="tr-opt ${k === cur ? "on" : ""}" data-trk="${k}"><span class="tr-ic tr-${k || "cut"}">${ic}</span>${l}</button>`).join("")}</div>
     <label class="tr-dur">المدة <b>${dur.toFixed(1)}ث</b><input type="range" min="0.2" max="1.5" step="0.1" value="${dur}" data-trd ${cur ? "" : "disabled"}></label>
-    <small class="muted">الطول الكلي للفيديو لا يتغيّر، والترانزيشن يصبح في نص اللقطتين. المعاينة هنا تقريبية، والتصدير يعمله بالضبط.</small>`;
+    <small class="muted">لا يتغيّر طول الفيديو الكلي، ويقع الانتقال في منتصف اللقطتين. المعاينة هنا تقريبية، والتصدير ينفّذه بدقة.</small>`;
   document.body.appendChild(pop);
   const r = anchor.getBoundingClientRect();
   const pw = 330;
