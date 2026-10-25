@@ -5,17 +5,17 @@
 const G1 = "١ · التقديم", G2 = "٢ · المطاردة والشنطة", G3 = "٣ · اسم العرض", GC = "الألوان", GS = "الشكل العام";
 const PR = M.params({
   presents: { label: "الكلام الأول", kind: "text", def: "تقدّم", group: G1, max: 10, hint: "زي تترات الأفلام: «تقدّم» أو «بالاشتراك مع»." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو البلد", group: G1, max: 16, hint: "بيظهر كبير في الأول وصغير في الآخر." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو البلد", group: G1, max: 16, hint: "بيظهر كبير في الأول وصغير في الآخر." },
   starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت", group: G2, max: 16, hint: "هزار التترات: العميل هو البطل." },
   code: { label: "جوه الشنطة", kind: "text", def: "كود: صيف٤٠", group: G2, max: 14, hint: "الشنطة بتتفتح على السر: كود خصم أو هدية." },
   title: { label: "اسم العرض", kind: "text", role: "product", def: "العرض السري", group: G3, max: 14 },
   date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩", group: G3, max: 28, hint: "إمتى العرض يبدأ أو يخلص." },
   ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714", group: GC, hint: "السيلويت والضلّ: لازم يفضل غامق." },
-  cream: { label: "الورق", kind: "color", def: "#efe4c9", group: GC, hint: "لون الكلام الفاتح: لازم يفضل فاتح." },
+  cream: { label: "الورق", kind: "color", def: "#efe4c9", group: GC, hint: "لون النص الفاتح: لازم يفضل فاتح." },
   hot: { label: "اللون السخن", kind: "color", role: "accent", def: "#d23a22", group: GC },
   warm: { label: "اللون الدافي", kind: "color", def: "#e2a52a", group: GC },
   fHead: { label: "خط التترات", kind: "font", def: "lalezar", group: GS },
-  fText: { label: "خط الكلام الصغير", kind: "font", def: "changa", group: GS },
+  fText: { label: "خط النص الصغير", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "مقدمة أفلام جاسوسية من الستينيات بورق مقصوص بأربعة ألوان سادة: ظل رجل بقبعة وربطة عنق حمراء يجري خلف حقيبة، والكلام هو المباني والأسطح، والنحاسيات تقطع المشاهد، وفي النهاية تُفتح الحقيبة على العرض السري.",

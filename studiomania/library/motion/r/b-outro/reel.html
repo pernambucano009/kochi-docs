@@ -5,18 +5,18 @@ const PR = M.params({
   style: { label: "الشكل", kind: "select", def: "cta", options: [["cta", "دعوة لفعل"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
   bgk: { label: "الخلفية", kind: "select", def: "dark", options: [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]] },
   ratio: { label: "المقاس", kind: "select", def: "9:16", options: [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]] },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "براند", max: 18 },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "" },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "براند", max: 18 },
   tag: { label: "الشعار", kind: "text", role: "tagline", def: "", max: 40 },
   cta: { label: "الدعوة", kind: "text", role: "cta", def: "اطلب الآن", max: 24 },
   handle: { label: "الحساب", kind: "text", role: "handle", def: "", max: 30 },
   link: { label: "الموقع أو الرقم", kind: "text", def: "", max: 40 },
   c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e8a54b" },
-  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#c9862f" },
+  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#c9862f" },
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
-  fBody: { label: "خط الكلام", kind: "font", def: "tajawal" },
+  fBody: { label: "خط النص", kind: "font", def: "tajawal" },
 });
-M.meta({ story: "خاتمة قصيرة للعلامة بدعوة واضحة.", scenes: [{ name: "الأوترو", t0: 0, t1: 4, about: "اللوجو والدعوة" }] });
+M.meta({ story: "خاتمة قصيرة للعلامة بدعوة واضحة.", scenes: [{ name: "الأوترو", t0: 0, t1: 4, about: "الشعار والدعوة" }] });
 const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
 const W = SZ[0], H = SZ[1], DUR = 4, S = Math.min(W, H) / 1080;
 const BG = PR.style === "tagline" ? PR.c1 : PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";
@@ -67,7 +67,7 @@ M.reel({
       if (!rows.length) text(PR.cta, mid + 60 * S, "TJ", 56 * S, SUB, up(.7, 1.2));
     } else if (st === "follow") {
       const k = seg(t, 0, .7); logo(mid - 200 * S, k);
-      // جرس صغير بيرن جنب اللوجو
+      // جرس صغير بيرن جنب الشعار
       const b = up(.6, .9), ring = Math.sin(t * 18) * Math.exp(-Math.max(0, t - .9) * 3) * .35;
       if (b > 0) { x.save(); x.globalAlpha = b; x.translate(CX + LS * .62, mid - 200 * S - LS * .42); x.rotate(ring); x.fillStyle = PR.c1; x.beginPath(); x.arc(0, 0, 38 * S, 0, Math.PI * 2); x.fill();
         x.strokeStyle = "#fff"; x.lineWidth = 5 * S; x.beginPath(); x.moveTo(-13 * S, 10 * S); x.quadraticCurveTo(-13 * S, -16 * S, 0, -16 * S); x.quadraticCurveTo(13 * S, -16 * S, 13 * S, 10 * S); x.closePath(); x.stroke(); x.restore(); }

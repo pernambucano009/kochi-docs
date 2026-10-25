@@ -4,28 +4,28 @@
 // Through-line: the red ring (the O of the logo). Problem → what we do → 3 steps → proof → name.
 const G1 = "١ · المشكلة", G2 = "٢ · إحنا بنعمل إيه", G3 = "٣ · الخطوات", G4 = "٤ · المميزات", G5 = "٥ · الاسم والدعوة", GC = "الألوان";
 const PR = M.params({
-  prob1: { label: "المشكلة (السطر الأول)", kind: "text", def: "كل يوم محتاج", group: G1, max: 16, hint: "المشكلة اللي عميلك عايشها، على سطرين." },
-  prob1hl: { label: "الكلمة الملوّنة", kind: "text", def: "فيديو", group: G1, max: 10, hint: "كلمة واحدة بتتلوّن في آخر السطر الأول." },
-  prob2: { label: "المشكلة (السطر التاني)", kind: "text", def: "والمونتير", group: G1, max: 16 },
+  prob1: { label: "المشكلة (السطر الأول)", kind: "text", def: "كل يوم محتاج", group: G1, max: 16, hint: "المشكلة التي يعيشها عميلك، على سطرين." },
+  prob1hl: { label: "الكلمة الملوّنة", kind: "text", def: "فيديو", group: G1, max: 10, hint: "كلمة واحدة تتلوّن في نهاية السطر الأول." },
+  prob2: { label: "المشكلة (السطر الثاني)", kind: "text", def: "والمونتير", group: G1, max: 16 },
   prob2hl: { label: "آخر السطر (ملوّن)", kind: "text", def: "مش فاضي.", group: G1, max: 12 },
-  name: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديومانيا", group: G2, max: 16 },
-  what: { label: "بيعمل إيه", kind: "text", role: "about", def: "بيعمل فيديوهات البراند بتاعك", group: G2, max: 32, hint: "البراند بيعمل إيه في جملة." },
+  name: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديومانيا", group: G2, max: 16 },
+  what: { label: "ماذا تقدّم", kind: "text", role: "about", def: "بيعمل فيديوهات البراند بتاعك", group: G2, max: 32, hint: "ماذا تقدّم العلامة في جملة." },
   what2: { label: "وبعدها (ملوّن)", kind: "text", def: "من الفكرة لحد النشر.", group: G2, max: 28 },
   stepsTitle: { label: "عنوان الخطوات", kind: "text", def: "٣ خطوات بس", group: G3, max: 16 },
-  steps: { label: "الخطوات (٣، كل واحدة في سطر)", kind: "lines", def: ["اكتب فكرتك", "اختار الستايل", "استلم الفيديو"], group: G3, max: 16, hint: "٣ خطوات بالظبط، كل خطوة كلمتين." },
+  steps: { label: "الخطوات (٣، كل خطوة في سطر)", kind: "lines", def: ["اكتب فكرتك", "اختار الستايل", "استلم الفيديو"], group: G3, max: 16, hint: "٣ خطوات بالضبط، كل خطوة كلمتان." },
   kindsTitle: { label: "عنوان المميزات", kind: "text", def: "أنواع شغل", group: G4, max: 14 },
   kindsTitle2: { label: "وبعده", kind: "text", def: "في مكان واحد.", group: G4, max: 16 },
-  kinds: { label: "المميزات أو الخدمات (لحد ٨، كل واحدة في سطر)", kind: "lines", def: ["ريلز", "فيلم", "مسلسل", "كاروسيل", "إعلان", "تايبوجرافي", "دبلجة", "مونتاج"], group: G4, max: 12, hint: "لحد ٨ حاجات، كلمة أو اتنين لكل واحدة." },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "", group: G5 },
+  kinds: { label: "المميزات أو الخدمات (حتى ٨، كل واحدة في سطر)", kind: "lines", def: ["ريلز", "فيلم", "مسلسل", "كاروسيل", "إعلان", "تايبوجرافي", "دبلجة", "مونتاج"], group: G4, max: 12, hint: "حتى ٨ عناصر، كلمة أو كلمتان لكل عنصر." },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G5 },
   tagline: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "استوديو المحتوى والفيديو", group: G5, max: 32 },
-  cta: { label: "الدعوة (CTA)", kind: "text", role: "cta", def: "ابدأ أول فيديو النهارده", group: G5, max: 30, hint: "الجملة اللي بتقول للعميل يعمل إيه دلوقتي." },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121214", group: GC },
-  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f", group: GC, hint: "لون الدايرة اللي ماشية في الفيديو كله والكلام الملوّن." },
+  cta: { label: "الدعوة (CTA)", kind: "text", role: "cta", def: "ابدأ أول فيديو النهارده", group: G5, max: 30, hint: "الجملة التي تخبر العميل بما يفعله الآن." },
+  ink: { label: "لون النص", kind: "color", role: "ink", def: "#121214", group: GC },
+  accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f", group: GC, hint: "لون الدائرة التي تتحرك طوال الفيديو والنص الملوّن." },
   bg: { label: "الخلفية", kind: "color", role: "bg", def: "#ffffff", group: GC },
 });
 M.meta({
   story: "شرح العلامة في ٣٠ ثانية على ٥ مشاهد، كل مشهد ٦ ثوانٍ، ودائرة ملوّنة تتحرك طوال الفيديو: المشكلة، وماذا نقدّم، و٣ خطوات، والمميزات، ثم الاسم والدعوة.",
-  scenes: [{ name: G1, t0: 0, t1: 6, about: "المشكلة" }, { name: G2, t0: 6, t1: 12, about: "البراند بيعمل إيه" }, { name: G3, t0: 12, t1: 18, about: "٣ خطوات" }, { name: G4, t0: 18, t1: 24, about: "المميزات أو الخدمات" }, { name: G5, t0: 24, t1: 30, about: "الاسم والدعوة" }],
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "المشكلة" }, { name: G2, t0: 6, t1: 12, about: "ماذا تقدّم العلامة" }, { name: G3, t0: 12, t1: 18, about: "٣ خطوات" }, { name: G4, t0: 18, t1: 24, about: "المميزات أو الخدمات" }, { name: G5, t0: 24, t1: 30, about: "الاسم والدعوة" }],
   tips: ["القصة: مشكلة ← حل ← كيف ← ماذا أيضًا ← تواصل معنا.", "كل سطر قصير: الكلام يتحرك بسرعة.", "مناسب للصفحة الرئيسية للعلامة أو لأول إعلان."],
 });
 const B = .5, INK = PR.ink, PAPER = PR.bg, RED = PR.accent, GREY = "#8a8a90";
@@ -69,7 +69,7 @@ M.reel({
     const bigN = M.el("div", "", `position:absolute;left:0;top:0;font:${F(330)};color:${RED};line-height:1;width:300px;text-align:center;`, "", cam);
     const s4 = [w(PR.kindsTitle, 96, INK, "AX", 800, 700), w(PR.kindsTitle2, 96, GREY, "AX", 800, 700)];
     // scene 5: logo
-    // اللوجو: الصورة لو موجودة، وإلا اسم البراند
+    // الشعار: الصورة لو موجودة، وإلا اسم العلامة
     const img = await M.img(PR.logo);
     let logo, LW, LH;
     if (img) {

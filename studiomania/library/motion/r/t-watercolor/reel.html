@@ -9,7 +9,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "شاي بالنعناع", group: G3, max: 16, hint: "اسم المنتج بخط كلاسيكي كبير تحت الرسمة." },
   sub: { label: "السطر اللي تحته", kind: "text", def: "كوباية دافية تبدأ بيها يومك", group: G3, max: 30, hint: "إحساس، مش مواصفات: «كوباية دافية تبدأ بيها يومك»." },
   stamp: { label: "الختم", kind: "text", def: "طبيعي تمامًا", group: G3, max: 14, hint: "ختم أحمر صغير بكلمتين: طبيعي، صنع يدوي، من غير إضافات." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت الشاي", group: G3, max: 18 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "بيت الشاي", group: G3, max: 18 },
   cup: { label: "لون الكوباية", kind: "color", def: "#3f7f93", group: G1, hint: "ألوان مية هادية: أزرق، تركواز، أخضر زيتي. الألوان الصارخة مش بتليق على الستايل." },
   leaf: { label: "لون الورق الأخضر", kind: "color", def: "#5f9a4a", group: G1 },
   accent: { label: "لون الختم", kind: "color", role: "accent", def: "#c8442a", group: GS, hint: "الختم بس: أحمر طوبي أو لون البراند." },
@@ -191,7 +191,7 @@ M.reel({
       x.restore();
     }
     hand(PR.sub, 540, 490, M.fit(PR.sub, "RQ", 880, 60, 30, "700"), cubic(seg(t, 8.4, 9.6)));
-    // اسم البراند تحت + خط رفيع
+    // اسم العلامة تحت + خط رفيع
     const bk = smooth(seg(t, 9.6, 10.4));
     if (bk > 0) {
       x.save(); x.globalAlpha = bk; x.fillStyle = rgba(INK, .85); x.font = "500 38px TJ"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1790 + (1 - bk) * 14);

@@ -4,8 +4,8 @@
 // صفحات دليل البراند (الألوان والخط واللوجو) في شبكة، وفي الآخر مطر من رمز البراند بيملا الشاشة والاسم فوقه. 1080×1920، 9 ثواني، 120 BPM.
 const G1 = "١ · العلامة والاسم", G2 = "٢ · كروت البوستات", G3 = "٣ · الحرف والدليل", G4 = "٤ · المطر والختام", GS = "الشكل العام";
 const PR = M.params({
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ذَيل", group: G1, max: 12, hint: "اسم قصير (كلمة). أول حرف منه بيبقى العلامة لو مفيش لوجو، وبيتحوّل بخطوط مختلفة في المشهد ٣." },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "علامة اللوجو لوحدها (من غير الاسم)، فاتحة ومن غير خلفية: بتظهر جوه دايرة بلون البراند." } },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ذَيل", group: G1, max: 12, hint: "اسم قصير (كلمة). أول حرف منه بيبقى العلامة لو مفيش لوجو، وبيتحوّل بخطوط مختلفة في المشهد ٣." },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "علامة الشعار لوحدها (من غير الاسم)، فاتحة ومن غير خلفية: بتظهر جوه دايرة بلون البراند." } },
   words: { label: "كلام كروت البوستات (سطر لكل كارت)", kind: "lines", def: ["اقعد!", "استنى!", "تعالى؟", "العب!", "نام!", "يلا!"], group: G2,
     hint: "٥–٨ كلمات قصيرة جدًا (كلمة لكل كارت) بصوت البراند. زي عناوين بوستاتك." },
   img1: { label: "صورة ١ للكروت", kind: "image", role: "product_img1", def: "", group: G2, img: { ratio: "4:5", cut: false, tip: "صور من بوستاتك أو منتجاتك (بتتقص في نص الكارت)." } },
@@ -13,7 +13,7 @@ const PR = M.params({
   img3: { label: "صورة ٣ للكروت", kind: "image", role: "product_img3", def: "", group: G2, img: { ratio: "4:5", cut: false } },
   shape: { label: "رمز البراند", kind: "select", def: "عضمة", options: [["عضمة", "🦴 عضمة"], ["نجمة", "⭐ نجمة"], ["قلب", "❤️ قلب"], ["دايرة", "⚪ دايرة"], ["ورقة", "🍃 ورقة شجر"]], group: G4,
     hint: "الشكل اللي بيمطر ويملا الشاشة في الآخر (وبيظهر في الكروت لو مفيش صور). اختار اللي يناسب مجالك." },
-  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك", group: G4, max: 26, hint: "وعد البراند في سطر (بيظهر تحت الاسم في الآخر)." },
+  tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك", group: G4, max: 26, hint: "وعد البراند في سطر (بيظهر تحت الاسم في النهاية)." },
   accent: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a12", group: GS, hint: "لون واحد قوي: بيملا الشاشة كتير، فلازم يكون لون البراند الأساسي." },
   ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e", group: GS, hint: "خلفية الحرف والدليل وكروت غامقة." },
   paper: { label: "اللون الفاتح", kind: "color", def: "#f4f4f4", group: GS, hint: "الأبيض بتاع البراند (أوف وايت أو كريمي)." },
@@ -53,9 +53,9 @@ M.reel({
       const sz = M.fit(String(s), fam, maxW, size, 24, w); x.font = `${w} ${sz}px ${fam}`; x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
       x.direction = M.isAr(s) ? "rtl" : "ltr"; x.fillText(String(s), cx, cy); return sz;
     };
-    const mark = (cx, cy, size, col, bgc) => {   // علامة البراند: اللوجو أو أول حرف في دايرة
+    const mark = (cx, cy, size, col, bgc) => {   // علامة البراند: الشعار أو أول حرف في دايرة
       const lg = imgs[3];
-      x.fillStyle = col; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill();   // دايرة بلون البراند ورا اللوجو علشان يبان على أي خلفية
+      x.fillStyle = col; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill();   // دايرة بلون البراند ورا الشعار علشان يبان على أي خلفية
       if (lg) { const k = Math.min(size * .66 / lg.width, size * .66 / lg.height); x.drawImage(lg, cx - lg.width * k / 2, cy - lg.height * k / 2, lg.width * k, lg.height * k); return; }
       txt([...String(PR.brand).replace(/[ً-ْ]/g, "")][0] || "B", cx, cy + size * .04, size * .62, bgc, "HD", "800", size);
     };

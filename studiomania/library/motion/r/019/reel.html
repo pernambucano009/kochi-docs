@@ -3,18 +3,18 @@
 // #19 Logo reveal (عنصر: ظهور لوجو من شظايا) — any logo image or brand name. 10 s, 90 BPM (beat .667 s). The logo is cut into shards; the camera starts
 // deep inside them (unreadable shapes), pulls back faster each bar, the logo lands on beat 11 (7.33 s) and holds a bar.
 const BPM = 90, B = 60 / BPM, LAND = 11 * B;
-const G1 = "اللوجو والكلام", GC = "الألوان";
+const G1 = "الشعار والكلام", GC = "الألوان";
 const P = M.params({
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "", group: G1, hint: "صورة PNG شفافة أحسن: بتتقطع شظايا والكاميرا بترجع لحد ما تتجمع." },
-  name: { label: "اسم البراند (لو مفيش لوجو)", kind: "text", role: "brand", def: "STUDIOMANIA", group: G1, max: 16, hint: "لو مفيش لوجو، الاسم نفسه هو اللي بيتقطع شظايا." },
-  tagline: { label: "الجملة تحت اللوجو", kind: "text", role: "tagline", def: "", group: G1, max: 40, hint: "سطر صغير بيظهر تحت اللوجو بعد ما يتجمع (فاضي = مفيش)." },
-  ink: { label: "لون اللوجو", kind: "color", role: "ink", def: "#141416", group: GC, hint: "لون الاسم لو مفيش لوجو." },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G1, hint: "الأفضل صورة PNG شفافة: تتفتت شظايا وتعود الكاميرا حتى تتجمع." },
+  name: { label: "اسم العلامة (إن لم يوجد شعار)", kind: "text", role: "brand", def: "STUDIOMANIA", group: G1, max: 16, hint: "إن لم يوجد شعار، فالاسم نفسه هو ما يتفتت شظايا." },
+  tagline: { label: "الجملة تحت الشعار", kind: "text", role: "tagline", def: "", group: G1, max: 40, hint: "سطر صغير يظهر تحت الشعار بعد أن يتجمع (فارغ = لا شيء)." },
+  ink: { label: "لون الشعار", kind: "color", role: "ink", def: "#141416", group: GC, hint: "لون الاسم إن لم يوجد شعار." },
   accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f", group: GC, hint: "لون الشظايا المميزة." },
   bg: { label: "الخلفية", kind: "color", role: "bg", def: "#ffffff", group: GC },
 });
 M.meta({
   story: "ظهور الشعار من شظايا: الشعار مقطّع إلى قطع، والكاميرا تبدأ من داخل الشظايا (أشكال غير مفهومة) ثم تبتعد أسرع مع كل مقطع موسيقي، حتى يتجمّع الشعار على الإيقاع ويثبت.",
-  scenes: [{ name: G1, t0: 0, t1: 10, about: "الشظايا بتتجمع لحد ما اللوجو يبان (حوالي الثانية ٧)" }],
+  scenes: [{ name: G1, t0: 0, t1: 10, about: "الشظايا بتتجمع لحد ما الشعار يبان (حوالي الثانية ٧)" }],
   tips: ["أفضل مع شعار بسيط بلونين أو ثلاثة.", "يصلح بداية أو نهاية لأي فيديو.", "الخلفية الفاتحة مع شعار غامق تبدو أنظف."],
 });
 const INK = P.ink, RED = P.accent, BG = P.bg;
@@ -23,7 +23,7 @@ M.reel({
   fonts: { JO: "Jost.ttf", J8: ["TY-Outfit-800.ttf", "800"] },
   async init(M) {
     const c = M.canvas(1920, 1080); const x = c.getContext("2d");
-    // اللوجو (صورة) أو اسم البراند (كلام) بيترسم مرة في كانفاس لوحده، وبعدين بيتكسر شظايا
+    // الشعار (صورة) أو اسم العلامة (كلام) بيترسم مرة في كانفاس لوحده، وبعدين بيتكسر شظايا
     const img = await M.img(P.logo);
     let L, LW, LH;
     if (img) {

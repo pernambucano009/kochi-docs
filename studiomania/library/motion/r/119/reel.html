@@ -6,12 +6,12 @@
 // 6–8 frames stack into depth (2D→3D) · 8–9.5 a small dashboard: kinds of work, two languages · 9.5–10 end title → the dot.
 const G1 = "١ · من فكرة", G2 = "٢ · الخطوات والأشكال", G3 = "٣ · الأرقام والنهاية", GC = "الألوان";
 const PR = M.params({
-  start: { label: "الكلمة الأولى", kind: "text", def: "فكرة", group: G1, max: 8, hint: "كلمة واحدة بتطلع من نقطة." },
+  start: { label: "الكلمة الأولى", kind: "text", def: "فكرة", group: G1, max: 8, hint: "كلمة واحدة تخرج من نقطة." },
   from: { label: "كلمة صغيرة فوقها", kind: "text", def: "من", group: G1, max: 10 },
   steps: { label: "٤ خطوات", kind: "lines", def: ["سكريبت", "صوت", "مشاهد", "مونتاج"], group: G2, max: 10, hint: "٤ خطوات، كلمة لكل خطوة على الإيقاع." },
   shapes: { label: "٣ كلمات تحت الأشكال", kind: "lines", def: ["تشغيل", "ستوديومانيا", "ريلز"], group: G2, max: 10, hint: "٣ كلمات تحت الأشكال." },
   stats: { label: "٣ أرقام (الرقم | الكلمة)", kind: "lines", def: ["٨ | أنواع شغل", "٢ | لغة", "١ | استوديو"], group: G3, max: 14, hint: "٣ سطور: الرقم | الكلمة." },
-  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "ستوديومانيا", group: G3, max: 16 },
+  name: { label: "الاسم في النهاية", kind: "text", role: "brand", def: "ستوديومانيا", group: G3, max: 16 },
   tagline: { label: "تحت الاسم", kind: "text", role: "tagline", def: "من فكرة لريل", group: G3, max: 30 },
   ink: { label: "الخلفية", kind: "color", role: "dark", def: "#0f0f11", group: GC, hint: "الخلفية الغامقة." },
   red: { label: "اللون المميز", kind: "color", role: "accent", def: "#e8402f", group: GC },

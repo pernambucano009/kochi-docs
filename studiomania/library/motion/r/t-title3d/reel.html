@@ -5,9 +5,9 @@
 const K1 = "١ · العنوان المجسّم", K2 = "٢ · التفاصيل", KS = "الشكل العام";
 const PR = M.params({
   l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم", group: K1, max: 8, hint: "كلمة واحدة تقيلة (الحروف بارزة ولها عمق، فالكلمة القصيرة بتطلع أضخم)." },
-  l2: { label: "السطر التاني", kind: "text", def: "الجديد", group: K1, max: 8, hint: "كلمة تانية بتكمّل الأولى (أو سيبه فاضي لسطر واحد)." },
+  l2: { label: "السطر الثاني", kind: "text", def: "الجديد", group: K1, max: 8, hint: "كلمة تانية بتكمّل الأولى (أو سيبه فاضي لسطر واحد)." },
   sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل", group: K2, max: 28, hint: "الميعاد أو التفاصيل." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قناة حكاية", group: K2, max: 16 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "قناة حكاية", group: K2, max: 16 },
   face: { label: "لون وش الحروف", kind: "color", role: "accent", def: "#ffd36b", group: KS, hint: "لون فاتح لامع (دهبي، فضي، أبيض)." },
   side: { label: "لون جنب الحروف", kind: "color", def: "#b0461f", group: KS, hint: "أغمق بكتير من الوش علشان العمق يبان." },
   bg: { label: "لون الخلفية", kind: "color", role: "dark", def: "#140a24", group: KS, hint: "غامق جدًا زي تترات الأفلام." },

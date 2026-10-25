@@ -4,7 +4,7 @@
 // بينوّر بس لما الشمس تعدّي من وراه (شريط نور بيمشي)، وبيرمي نسخة ملونة على أرضية الحجر مع أشعة وتراب. 1080×1920، 12 ثانية.
 const G1 = "١ · الشباك والنور", G2 = "٢ · الكلام", GS = "الشكل العام";
 const PR = M.params({
-  ribbon: { label: "الكلام على الشريط", kind: "text", role: "brand", def: "إضاءة نور", group: G2, max: 16, hint: "بيظهر على شريط جوه الزجاج لما النور يكمل: اسم البراند أو كلمتين." },
+  ribbon: { label: "الكلام على الشريط", kind: "text", role: "brand", def: "إضاءة نور", group: G2, max: 16, hint: "بيظهر على شريط جوه الزجاج لما النور يكمل: اسم العلامة أو كلمتين." },
   tag: { label: "المحفور تحت", kind: "text", def: "النور بيغيّر كل حاجة", group: G2, max: 28, hint: "جملة محفورة في الحجر تحت الشباك." },
   sky: { label: "لون السما", kind: "color", def: "#2a5db0", group: G1, hint: "لون أغلب قطع الزجاج: أزرق أو أخضر غامق بيبان أحلى." },
   sun: { label: "لون الشمس", kind: "color", role: "accent", def: "#f2b134", group: G1, hint: "لون الشمس اللي في النص والنور اللي بيقع على الأرض." },
@@ -44,7 +44,7 @@ M.reel({
     const P = [];
     for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const a = V[j][i], b = V[j][i + 1], cc = V[j + 1][i + 1], d = V[j + 1][i]; const tris = (i + j) % 2 ? [[a, b, cc], [a, cc, d]] : [[a, b, d], [b, cc, d]];
       tris.forEach((tr) => { const mx = (tr[0][0] + tr[1][0] + tr[2][0]) / 3, my = (tr[0][1] + tr[1][1] + tr[2][1]) / 3; if (!inWin(mx, my)) return; const base = pic(mx, my), dv = 1 + (R() - .5) * .2; P.push({ pts: tr, mx, my, col: base.map((v) => Math.min(255, v * dv)), ang: R() * Math.PI, ph: R() * 6 }); }); }
-    // الحيطة الحجر (مرة واحدة)
+    // الجدار الحجر (مرة واحدة)
     const wall = document.createElement("canvas"); wall.width = W; wall.height = H; const w = wall.getContext("2d");
     w.fillStyle = "#4a443c"; w.fillRect(0, 0, W, H);
     for (let y = 0, r = 0; y < 1500; y += 90, r++) for (let xx = (r % 2) * -70; xx < W; xx += 140) { const v = 70 + R() * 18; w.fillStyle = `rgb(${v},${v - 6},${v - 14})`; w.fillRect(xx + 4, y + 4, 132, 82); }

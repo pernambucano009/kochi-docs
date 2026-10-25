@@ -7,12 +7,12 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "صيف ملوّن", group: G2, max: 12, hint: "كلمتين بالكتير: بيتطبع كبير على لوحين حبر مش راكبين على بعض بالظبط." },
   sub: { label: "السطر اللي تحته", kind: "text", def: "تخفيضات على كل التشكيلة", group: G2, max: 26, hint: "العرض أو الخبر." },
   strip: { label: "الشريط اللي تحت", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين", group: G3, max: 34, hint: "المعاد ومكان الطلب، بنقطة في النص بين الحاجتين." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "دراجة", group: G3, max: 16 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "دراجة", group: G3, max: 16 },
   ink1: { label: "حبر ١ (الأساسي)", kind: "color", role: "accent", def: "#0078BF", group: G1, hint: "أحبار الريزو الحقيقية: أزرق، وردي فلورسنت، أصفر. لما بيتراكبوا بيعملوا ألوان تالتة." },
   ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0", group: G1 },
   ink3: { label: "حبر ٣", kind: "color", def: "#FFE800", group: G1 },
   fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
-  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+  fText: { label: "خط النص", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "طباعة ريزوغراف بثلاثة أحبار شفافة فوق بعضها على ورق دافئ: كل لون لوح منفصل، ونقاط طباعة، والألواح تصل بمسحة البكرة، والدراجة تسير على التل، والعنوان يُطبع على لوحين.",

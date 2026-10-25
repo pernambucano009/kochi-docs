@@ -9,7 +9,7 @@ const PR = M.params({
   name: { label: "الاسم", kind: "text", def: "م. سارة عادل", group: G2, max: 20, hint: "اسم المتكلم زي ما بيحب يتكتب (باللقب لو مهم)." },
   role: { label: "الوظيفة", kind: "text", def: "مؤسسة ستوديو تصميم", group: G2, max: 28, hint: "الوظيفة أو الإنجاز اللي بيخلي الناس تسمعله." },
   quote: { label: "الجملة في الستايل التالت", kind: "text", def: "البراند هو الإحساس اللي بتسيبه", group: G3, max: 34, hint: "أقوى جملة قالها في الحلقة." },
-  logo: { label: "اللوجو في الكبسولة", kind: "image", role: "logo", def: "", group: G3,
+  logo: { label: "الشعار في الكبسولة", kind: "image", role: "logo", def: "", group: G3,
     img: { ratio: "1:1", cut: false, tip: "لوجو مربع أو صورة المتكلم. لو مفيش بيظهر أول حرف من الاسم." }, hint: "بيتحط في الدايرة جنب الاسم." },
   showCount: { label: "إظهار «ستايل ١ من ٣»", kind: "toggle", def: false, group: GS, hint: "رقم الستايل تحت. سيبه مقفول في الفيديو اللي هتنشره، ودوره لو بتعرض الستايلات." },
   styleW: { label: "كلمة «ستايل»", kind: "text", def: "ستايل", group: GS, max: 10 },

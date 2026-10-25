@@ -7,16 +7,16 @@
 // 22–28 strongest: SUNDAY lands letter by letter, one per beat · 28–30 end title → the question again (frame one).
 const G1 = "١ · السؤال", G2 = "٢ · عجلة الأيام", G3 = "٣ · اليوم", GC = "الألوان";
 const PR = M.params({
-  date: { label: "التاريخ (سنة-شهر-يوم)", kind: "text", def: "2026-10-11", group: G1, max: 10, hint: "اكتبها كده: 2026-10-11 — اسم اليوم بيطلع لوحده." },
+  date: { label: "التاريخ (سنة-شهر-يوم)", kind: "text", def: "2026-10-11", group: G1, max: 10, hint: "اكتبه هكذا: 2026-10-11 — ويظهر اسم اليوم تلقائيًا." },
   q1: { label: "السؤال (سطر ١)", kind: "text", def: "WHAT DAY", group: G1, max: 12 },
   q2: { label: "السؤال (سطر ٢)", kind: "text", def: "IS IT?", group: G1, max: 12 },
   spin: { label: "تحت عجلة الأيام", kind: "text", def: "SPIN THE WEEK", group: G2, max: 18 },
   strong: { label: "جملة مع اسم اليوم", kind: "text", def: "ALL DAY. ALL OF IT.", group: G3, max: 24 },
-  final: { label: "الجملة في الآخر ({day} = اسم اليوم)", kind: "text", def: "IT'S {day}.", group: G3, max: 20, hint: "{day} بيتبدّل باسم اليوم." },
+  final: { label: "الجملة الأخيرة ({day} = اسم اليوم)", kind: "text", def: "IT'S {day}.", group: G3, max: 20, hint: "{day} يُستبدل باسم اليوم." },
   cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f4efe4", group: GC },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#141414", group: GC },
+  ink: { label: "لون النص", kind: "color", role: "ink", def: "#141414", group: GC },
   ora: { label: "اللون المميز", kind: "color", role: "accent", def: "#ff6b2b", group: GC },
-  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2d5bff", group: GC },
+  blue: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#2d5bff", group: GC },
 });
 M.meta({
   story: "إعلان عن موعد: «الأسبوع آلة حظ واليوم هو الجائزة الكبرى». أسماء الأيام تدور على بكرة ثم تهدأ، ونقاط تصبح تقويمًا وساعة، ومكعب أيام يتدحرج، وتقويم الشهر واليوم مُعلَّم، وشمس فوق الأسبوع، واسم اليوم ينزل حرفًا حرفًا.",

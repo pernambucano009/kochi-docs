@@ -4,15 +4,15 @@
 // شخصية «سيل» بألوان مسطحة وضل حاد وخط ملوّن على سكوتر بخطوط سرعة، لمعة فانوس، عنوان منوّر من ورا، وشريط فيديو على شاشة قديمة.
 const G1 = "١ · المدينة", G2 = "٢ · العنوان", G3 = "٣ · الشريط", GS = "الشكل العام";
 const PR = M.params({
-  sign1: { label: "يافطة نيون ١", kind: "text", def: "قهوة", group: G1, max: 8, hint: "كلمة على يافطة نيون في المدينة: نوع المحل." },
-  sign2: { label: "يافطة نيون ٢", kind: "text", def: "٢٤ ساعة", group: G1, max: 8, hint: "معلومة تانية: المواعيد أو العرض." },
-  title: { label: "العنوان", kind: "text", role: "product", def: "طريق الليل", group: G2, max: 12, hint: "عنوان شبه أفلام الأنمي: كلمتين بإحساس، بيتنوّر من ورا." },
+  sign1: { label: "لافتة نيون ١", kind: "text", def: "قهوة", group: G1, max: 8, hint: "كلمة على لافتة نيون في المدينة: نوع المحل." },
+  sign2: { label: "لافتة نيون ٢", kind: "text", def: "٢٤ ساعة", group: G1, max: 8, hint: "معلومة ثانية: المواعيد أو العرض." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "طريق الليل", group: G2, max: 12, hint: "عنوان يشبه أفلام الأنمي: كلمتان بإحساس، يضيء من الخلف." },
   sub: { label: "تحت العنوان", kind: "text", def: "مفتوحين لحد الفجر", group: G2, max: 22 },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه نيون", group: G2, max: 16 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "كافيه نيون", group: G2, max: 16 },
   play: { label: "كلمة الشريط", kind: "text", def: "PLAY ▶", group: G3, max: 10, hint: "الكتابة على شاشة الفيديو القديمة." },
-  accent: { label: "لون البطلة", kind: "color", role: "accent", def: "#ff3d6e", group: GS, hint: "لون جاكيت البطلة والنيون: وردي أو سماوي نيون." },
+  accent: { label: "لون البطلة", kind: "color", role: "accent", def: "#ff3d6e", group: GS, hint: "لون سترة البطلة والنيون: وردي أو سماوي نيون." },
   fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
-  fText: { label: "خط الكلام", kind: "font", def: "changa", group: GS },
+  fText: { label: "خط النص", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "أنمي الثمانينيات: مدينة ليلًا بسماء متدرجة ونوافذ مضيئة ونيون وأرض مبتلة، وبطلة على دراجة بخطوط سرعة، ولمعة فانوس، وعنوان مضاء من الخلف، وشريط فيديو على شاشة قديمة.",

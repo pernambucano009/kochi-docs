@@ -7,13 +7,13 @@ const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
 const G1 = "١ · البداية والتجهيز", G2 = "٢ · الدروب", G3 = "٣ · النهاية", GH = "الكلام الصغير في الركن", GC = "الألوان";
 const PR = M.params({
   intro: { label: "كلمة البداية", kind: "text", def: "BASS", group: G1, max: 8 },
-  build: { label: "٣ كلمات قبل الدروب", kind: "lines", def: ["WAIT", "FOR", "IT"], group: G1, max: 8, hint: "٣ كلمات قبل الدروب، والسنير بيسرّع." },
-  drop: { label: "كلمة الدروب (أقوى لحظة)", kind: "text", role: "brand", def: "DROP", group: G2, max: 8, hint: "أقوى لحظة في الفيديو." },
+  build: { label: "٣ كلمات قبل ذروة الإيقاع", kind: "lines", def: ["WAIT", "FOR", "IT"], group: G1, max: 8, hint: "٣ كلمات قبل ذروة الإيقاع، والطبلة تتسارع." },
+  drop: { label: "كلمة الذروة (أقوى لحظة)", kind: "text", role: "brand", def: "DROP", group: G2, max: 8, hint: "أقوى لحظة في الفيديو." },
   outro: { label: "كلمة النهاية", kind: "text", def: "OUT", group: G3, max: 8 },
-  barWord: { label: "كلمة المازورة", kind: "text", def: "BAR", group: GH, max: 6 },
-  phases: { label: "أسامي المراحل (٤)", kind: "lines", def: ["INTRO", "BUILD", "DROP", "OUTRO"], group: GH, max: 8, hint: "٤ كلمات للمراحل: البداية، التجهيز، الدروب، النهاية." },
-  corner: { label: "كلام صغير في الركن (فاضي = مفيش)", kind: "text", def: "140 BPM", group: GH, max: 14, hint: "فاضي = مفيش كلام في الركن خالص." },
-  yel: { label: "اللون المنوّر", kind: "color", role: "accent", def: "#e9ff3b", group: GC },
+  barWord: { label: "كلمة المقياس", kind: "text", def: "BAR", group: GH, max: 6 },
+  phases: { label: "أسماء المراحل (٤)", kind: "lines", def: ["INTRO", "BUILD", "DROP", "OUTRO"], group: GH, max: 8, hint: "٤ كلمات للمراحل: البداية، التجهيز، الذروة، النهاية." },
+  corner: { label: "نص صغير في الركن (فارغ = لا شيء)", kind: "text", def: "140 BPM", group: GH, max: 14, hint: "فارغ = لا نص في الركن إطلاقًا." },
+  yel: { label: "اللون المضيء", kind: "color", role: "accent", def: "#e9ff3b", group: GC },
   blk: { label: "اللون الغامق", kind: "color", role: "dark", def: "#0b0b0b", group: GC },
 });
 M.meta({

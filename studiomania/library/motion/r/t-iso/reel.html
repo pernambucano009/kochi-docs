@@ -8,7 +8,7 @@ const PR = M.params({
   steps: { label: "الخطوات (٤ سطور)", kind: "lines", def: ["اطلب", "بنجهّز", "بنوصّل", "وصل"], group: G2, max: 10,
     hint: "٤ كلمات بالترتيب ده: الطلب (الموبايل)، التجهيز (السير)، التوصيل (العربية)، الوصول (الباب). كلمة واحدة لكل خطوة." },
   end: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "توصيل في نفس اليوم", group: G3, max: 24, hint: "الوعد: سرعة أو ضمان أو سعر توصيل." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "شنطة", group: G3, max: 18 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "شنطة", group: G3, max: 18 },
   accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff6b2c", group: GS, hint: "اللون الوحيد في الرسم (الكرتونة وعلامة الصح): لون البراند لو قوي." },
   fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },
   fText: { label: "خط الخطوات", kind: "font", def: "plex4", group: GS },
@@ -84,7 +84,7 @@ M.reel({
     box(vu + 3, vd, .3, 1.1, 1.6, 1.3);
     poly([P(vu + 4.1, vd + .2, .9), P(vu + 4.1, vd + 1.4, .9), P(vu + 4.1, vd + 1.4, 1.45), P(vu + 4.1, vd + .2, 1.45)], "#fff", null);
     wheel(vu + .7, vd + 1.6); wheel(vu + 3.5, vd + 1.6);
-    // اسم البراند على جنب العربية
+    // اسم العلامة على جنب العربية
     { const [cx, cy] = P(vu + 1.5, vd + 1.6, 1.25); x.save(); x.setTransform(CS, .5, 0, 1, cx, cy); x.fillStyle = A; x.font = "700 50px PB"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 0, 16); x.restore(); }
     if (t > 5.0 && t < 8.2) { for (let k = 0; k < 4; k++) { const [px, py] = P(vu - .4 - k * .5, vd + .8 + (k % 2) * .4, .5 + (k % 2) * .4); x.strokeStyle = `rgba(255,255,255,${.5 - k * .1})`; x.lineWidth = 2; x.beginPath(); x.moveTo(px, py); x.lineTo(px - 40, py - 22); x.stroke(); } }
     if (show && t >= 8.2) pkg();

@@ -4,13 +4,13 @@
 // (كل ما الحتة أنور الحرف أتقل)، والبخار حروف بتتحرك. خطوط المسح والتوهج والرعشة الخفيفة بتاعة الشاشات القديمة. 1080×1920، 12 ثانية.
 const G1 = "١ · الأوامر", G2 = "٢ · العنوان", GS = "الشكل العام";
 const PR = M.params({
-  l1: { label: "السطر الأول", kind: "text", def: "تشغيل برنامج الصبح", group: G1, max: 24, hint: "أول أمر بيتكتب حرف حرف على الشاشة." },
-  l2: { label: "السطر التاني", kind: "text", def: "بنحضّر فنجانك…", group: G1, max: 24, hint: "بيظهر وشريط التحميل ماشي." },
-  l3: { label: "السطر التالت", kind: "text", def: "تم. بالهنا والشفا", group: G1, max: 24, hint: "بعد ما الفنجان يتطبع بالحروف." },
+  l1: { label: "السطر الأول", kind: "text", def: "تشغيل برنامج الصبح", group: G1, max: 24, hint: "أول أمر يُكتب حرفًا حرفًا على الشاشة." },
+  l2: { label: "السطر الثاني", kind: "text", def: "بنحضّر فنجانك…", group: G1, max: 24, hint: "يظهر أثناء تقدّم شريط التحميل." },
+  l3: { label: "السطر الثالث", kind: "text", def: "تم. بالهنا والشفا", group: G1, max: 24, hint: "بعد أن يُطبع الفنجان بالحروف." },
   title: { label: "العنوان", kind: "text", role: "product", def: "صباحك أسرع", group: G2, max: 16 },
   sub: { label: "تحت العنوان", kind: "text", def: "اطلب قهوتك في دقيقة", group: G2, max: 28 },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "كافيه بت", group: G2, max: 16 },
-  color: { label: "لون الشاشة", kind: "color", role: "accent", def: "#ff9a10", group: GS, hint: "كهرماني أو أخضر فسفوري زي الشاشات القديمة." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "كافيه بت", group: G2, max: 16 },
+  color: { label: "لون الشاشة", kind: "color", role: "accent", def: "#ff9a10", group: GS, hint: "كهرماني أو أخضر فسفوري مثل الشاشات القديمة." },
   fHead: { label: "خط العنوان", kind: "font", def: "plex", group: GS },
   fText: { label: "خط الأوامر", kind: "font", def: "plex4", group: GS },
 });

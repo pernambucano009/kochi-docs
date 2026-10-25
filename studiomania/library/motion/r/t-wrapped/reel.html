@@ -14,12 +14,12 @@ const PR = M.params({
   s3b: { label: "شريحة ٣ تحت", kind: "text", def: "جنيه", group: K2, max: 12 },
   s4: { label: "شريحة ٤", kind: "text", def: "إنت من أوفى عملائنا", group: K2, max: 24, hint: "جملة بتحسّس العميل إنه مميز." },
   outro: { label: "الشكر", kind: "text", def: "شكرًا… نكمل السنة الجاية سوا", group: K3, max: 32 },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "قهوة الركن", group: K3, max: 16 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "قهوة الركن", group: K3, max: 16 },
   pal: { label: "ألوان الشرايح", kind: "select", def: "pop", options: [["pop", "صريحة (زي ملخصات آخر السنة)"], ["brand", "ألوان البراند"], ["calm", "هادية (باستيل)"]], group: KS, hint: "«ألوان البراند» بتستخدم اللونين اللي تحت." },
   accent: { label: "لون البراند ١", kind: "color", role: "accent", def: "#6c3bff", group: KS },
   accent2: { label: "لون البراند ٢", kind: "color", role: "accent2", def: "#c6ff3d", group: KS },
   fHead: { label: "خط الأرقام والعناوين", kind: "font", def: "lalezar", group: KS },
-  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: KS },
+  fBody: { label: "خط النص", kind: "font", def: "changa", group: KS },
 });
 M.meta({
   story: "ملخص السنة للعميل: شرائح سريعة على الإيقاع، كل شريحة رقم أو معلومة عنه تدخل بمسحة مائلة وأشكال تقفز، وفي النهاية شكر واسم العلامة.",

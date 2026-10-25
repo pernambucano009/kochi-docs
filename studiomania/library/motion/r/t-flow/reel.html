@@ -8,7 +8,7 @@ const PR = M.params({
   steps: { label: "الخطوات (اسم|وصف في كل سطر)", kind: "lines", def: ["ارفع ملفك|صورة أو PDF", "بنحلّله|في ثواني", "بنظبطه|حسب البراند بتاعك", "يوصلك جاهز|على الإيميل"], group: G2, max: 32,
     hint: "من ٣ لـ ٥ سطور، كل سطر: اسم الخطوة|وصف قصير (زي «ارفع ملفك|صورة أو PDF»). الاسم فعل بكلمتين، والوصف بيطمّن (سرعة، سهولة)." },
   result: { label: "النتيجة", kind: "text", def: "١٠ دقايق بدل يوم كامل", group: G3, max: 26, hint: "الفرق اللي العميل هيحسه: وقت أو فلوس أو مجهود، بمقارنة لو ينفع." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "سهل", group: G3, max: 18 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "سهل", group: G3, max: 18 },
   accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#6c5cff", group: GS, hint: "الخطوط والنقط وكارت النتيجة: لون البراند." },
   paper: { label: "لون الخلفية", kind: "color", def: "#f6f5fb", group: GS, hint: "فاتح أو غامق، الكلام بيغيّر لونه لوحده علشان يتقري." },
   fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },

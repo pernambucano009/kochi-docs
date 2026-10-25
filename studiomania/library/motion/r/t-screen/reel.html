@@ -7,7 +7,7 @@ const PR = M.params({
   name: { label: "الاسم الكبير", kind: "text", role: "product", def: "سيوة", group: G2, max: 8, hint: "كلمة واحدة كبيرة: المكان أو المنتج." },
   num: { label: "الرقم", kind: "text", def: "٠٧", group: G2, max: 3, hint: "رقم صغير بلون التمييز: رقم الرحلة أو الإصدار." },
   stats: { label: "سطر البيانات", kind: "text", def: "٣ أيام · ٢ ليالي · من ٤٥٠٠ جنيه", group: G2, max: 36, hint: "المعلومات المهمة مفصولة بـ « · »." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "رحلات الواحة", group: G2, max: 16, hint: "بيتلزق على ورقة في الآخر." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "رحلات الواحة", group: G2, max: 16, hint: "بيتلزق على ورقة في الآخر." },
   i1: { label: "حبر السما الفاتح", kind: "color", def: "#f6d7a7", group: GI },
   i2: { label: "حبر السما الغامق", kind: "color", def: "#eba26a", group: GI },
   i3: { label: "حبر الكثبان", kind: "color", def: "#c9724a", group: GI },
@@ -93,7 +93,7 @@ M.reel({
       x.fillStyle = "#333"; x.fillRect(PX - 40, y - 10, PW + 80, 16); x.fillStyle = "#8b6b46"; x.fillRect(PX - 40, y - 70, PW + 80, 60); x.fillStyle = "rgba(255,255,255,.15)"; x.fillRect(PX - 40, y - 70, PW + 80, 10);
       x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(PX - 40, y + 32, PW + 80, 18);
     }
-    // اسم البراند على ورقة لاصقة برّه البوستر
+    // اسم العلامة على ورقة لاصقة برّه البوستر
     x.setTransform(1, 0, 0, 1, 0, 0);
     const bk = expo(seg(t, 10.2, 10.8)); if (bk > 0) { x.save(); x.translate(540, 1780); x.rotate(.03); x.scale(bk, bk); x.fillStyle = "#fff8e8"; x.fillRect(-230, -55, 460, 110); x.fillStyle = "rgba(255,255,255,.6)"; x.fillRect(-60, -70, 120, 30); x.fillStyle = PR.i5; x.font = `700 ${M.fit(PR.brand, "CH", 420, 50, 24, "700")}px CH`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 0, 4); x.restore(); }
   },

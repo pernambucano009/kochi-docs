@@ -7,19 +7,19 @@
 // 14–15 end title "OUT OF FRAME" → modules snap back: the still poster of frame one.
 const G1 = "١ · البوستر", G2 = "٢ · معلومات الحدث", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  header: { label: "اسم الحدث فوق البوستر", kind: "text", role: "brand", def: "POSTER CLUB", group: G1, max: 18 },
-  issue: { label: "الرقم جنبه", kind: "text", def: "NO. 07", group: G1, max: 8 },
-  big: { label: "الكلمة الكبيرة (بتخرج من البرواز)", kind: "text", def: "BREAK", group: G1, max: 7, hint: "كلمة واحدة كبيرة: حروفها بتخرج من البرواز." },
-  info: { label: "معلومات الحدث (٣ سطور: العنوان | القيمة)", kind: "lines", def: ["WHAT | Poster Club", "WHEN | Fri 20:00", "WHERE | Hall 3"], group: G2, max: 24, hint: "٣ سطور: العنوان | القيمة (إيه، إمتى، فين)." },
+  header: { label: "اسم الحدث فوق الملصق", kind: "text", role: "brand", def: "POSTER CLUB", group: G1, max: 18 },
+  issue: { label: "الرقم بجانبه", kind: "text", def: "NO. 07", group: G1, max: 8 },
+  big: { label: "الكلمة الكبيرة (تخرج من الإطار)", kind: "text", def: "BREAK", group: G1, max: 7, hint: "كلمة واحدة كبيرة: تخرج حروفها من الإطار." },
+  info: { label: "معلومات الحدث (٣ سطور: العنوان | القيمة)", kind: "lines", def: ["WHAT | Poster Club", "WHEN | Fri 20:00", "WHERE | Hall 3"], group: G2, max: 24, hint: "٣ سطور: العنوان | القيمة (ماذا، متى، أين)." },
   seatsLabel: { label: "عنوان العدد", kind: "text", def: "SEATS", group: G2, max: 10 },
   seats: { label: "المحجوز", kind: "text", def: "240", group: G2, max: 5 },
   total: { label: "من", kind: "text", def: "300", group: G2, max: 5 },
   end1: { label: "النهاية (سطر ١)", kind: "text", def: "OUT OF", group: G3, max: 8 },
   end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", def: "FRAME.", group: G3, max: 8 },
-  cream: { label: "لون البوستر", kind: "color", role: "bg", def: "#f1ebde", group: GC },
+  cream: { label: "لون الملصق", kind: "color", role: "bg", def: "#f1ebde", group: GC },
   red: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2321f", group: GC },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#121212", group: GC },
-  wall: { label: "الحيطة", kind: "color", role: "dark", def: "#2a2a2c", group: GC },
+  ink: { label: "لون النص", kind: "color", role: "ink", def: "#121212", group: GC },
+  wall: { label: "الجدار", kind: "color", role: "dark", def: "#2a2a2c", group: GC },
 });
 M.meta({
   story: "ملصق فعالية يكسر الإطار: ملصق سويسري ثابت، حروفه تخرج من الإطار، والدائرة الحمراء تدفع الحافة وتتحول إلى أشكال، والملصق ينفصل عن الجدار ثلاثي الأبعاد وعلى ظهره معلومات الفعالية، والوحدات تطير على الإيقاع وتعود.",

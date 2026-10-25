@@ -13,11 +13,11 @@ const PR = M.params({
   f2: { label: "ميزة ٢ (رقم|كلام)", kind: "text", def: "360|درجة صوت", group: G2, max: 24 },
   f3: { label: "ميزة ٣ (رقم|كلام)", kind: "text", def: "5|دقايق شحن سريع", group: G2, max: 24 },
   product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض", group: G3, max: 14, hint: "بيظهر كبير في كارت تحت المجسم." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نبض أوديو", group: G3, max: 20 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "نبض أوديو", group: G3, max: 20 },
   hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8", group: GS, hint: "لون النور: سماوي أو أخضر نعناعي بيدّي إحساس الهولوجرام." },
   accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff8a3d", group: GS, hint: "الأرقام لما تتثبت: لون دافي عكس لون الهولوجرام علشان يبان." },
   fTitle: { label: "خط الاسم", kind: "font", def: "plex", group: GS },
-  fText: { label: "خط الكلام", kind: "font", def: "plex4", group: GS },
+  fText: { label: "خط النص", kind: "font", def: "plex4", group: GS },
 });
 M.meta({
   story: "المنتج مجسّم من خطوط ضوء فوق قاعدة إسقاط: مسح يبنيه من الأسفل إلى الأعلى، ثم يدور ويتفكك، و٣ أرقام تعدّ وتتلوّن عند ثباتها، وواجهة تقنية بزوايا ومساطر، وفي النهاية الاسم في بطاقة.",
@@ -90,7 +90,7 @@ M.reel({
       X(p.el, ax, ay); const v = Math.round(p.target * cubic(seg(t, k0, k0 + 1))); p.num.textContent = ar(v); p.num.style.color = t > k0 + 1 ? PR.accent : "#e6fff8";
       if (k > 0 && off > 0) { x.strokeStyle = `rgba(${hr},${hg},${hb},${.7 * k * off})`; x.lineWidth = 2; x.beginPath(); x.moveTo(ax < 540 ? ax + 330 : ax, ay + 60); x.lineTo(pt[0], pt[1]); x.stroke(); x.fillStyle = PR.hue; x.beginPath(); x.arc(pt[0], pt[1], 6, 0, Math.PI * 2); x.fill(); }
     });
-    // لوح الاسم في الآخر
+    // لوح الاسم في النهاية
     const tk = expo(seg(t, 9.8, 10.4)); op(C.title, tk); C.title.style.transform = `translateY(${200 + (1 - tk) * 30}px)`;
     // خطوط مسح أفقية خفيفة على الكل
     x.fillStyle = "rgba(0,0,0,.18)"; for (let y = 0; y < H; y += 4) x.fillRect(0, y, W, 1);

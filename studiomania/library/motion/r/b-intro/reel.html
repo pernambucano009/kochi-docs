@@ -3,33 +3,33 @@
 // 🎬 إنترو البراند (من «عقل البراند ← الإنترو»): لوجو العميل واسمه وألوانه في ٣ ثواني، بأكتر من حركة يختار منها.
 // لو مفيش لوجو: مربع بلون البراند وأول حرف من الاسم. المقاس على حسب الاختيار (٩:١٦ / ١:١ / ١٦:٩).
 const PR = M.params({
-  style: { label: "الحركة", kind: "select", def: "assemble", options: [["assemble", "تجميع اللوجو"], ["shine", "لمعة فاخرة"], ["letters", "الاسم يتكتب"],
+  style: { label: "الحركة", kind: "select", def: "assemble", options: [["assemble", "تجميع الشعار"], ["shine", "لمعة فاخرة"], ["letters", "الاسم يتكتب"],
     ["wipe", "ستارة لونية"], ["pulse", "نبضة على الإيقاع"], ["glitch", "تشويش رقمي"], ["flip", "قلبة ثلاثية الأبعاد"]] },
   bgk: { label: "الخلفية", kind: "select", def: "dark", options: [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون البراند"]] },
   ratio: { label: "المقاس", kind: "select", def: "9:16", options: [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]] },
   textk: { label: "النص", kind: "select", def: "name", options: [["name", "الاسم"], ["tag", "الاسم والشعار"], ["none", "بدون"]] },
-  logo: { label: "اللوجو", kind: "image", role: "logo", def: "" },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "براند", max: 18 },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "" },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "براند", max: 18 },
   tag: { label: "الشعار", kind: "text", role: "tagline", def: "", max: 40 },
   c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e8a54b" },
-  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#c9862f" },
+  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#c9862f" },
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar" },
   fBody: { label: "خط الشعار", kind: "font", def: "tajawal" },
 });
-M.meta({ story: "مقدمة قصيرة للعلامة: الشعار والاسم بحركة واحدة.", scenes: [{ name: "الإنترو", t0: 0, t1: 3, about: "اللوجو والاسم" }] });
+M.meta({ story: "مقدمة قصيرة للعلامة: الشعار والاسم بحركة واحدة.", scenes: [{ name: "الإنترو", t0: 0, t1: 3, about: "الشعار والاسم" }] });
 const SZ = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080] }[PR.ratio] || [1080, 1920];
 const W = SZ[0], H = SZ[1], DUR = 3, S = Math.min(W, H) / 1080;
 const BG = PR.bgk === "light" ? "#f6f4ef" : PR.bgk === "brand" ? PR.c1 : "#141311";
 const INK = PR.bgk === "light" ? "#1d1b18" : "#ffffff";
 const TXT = PR.textk === "none" ? "" : PR.brand, TAG = PR.textk === "tag" ? PR.tag : "";
-const CX = W / 2, CY = H / 2 - (TXT ? 90 * S : 0), LS = 300 * S;   // مكان وحجم اللوجو
+const CX = W / 2, CY = H / 2 - (TXT ? 90 * S : 0), LS = 300 * S;   // مكان وحجم الشعار
 
 M.reel({
   W, H, DUR, bg: BG,
   async init(M) {
     await Promise.all([M.font("LZ", PR.fHead), M.font("TJ", PR.fBody)]);
     const lg = await M.img(PR.logo), c = M.canvas(W, H);
-    // اللوجو مرسوم مرة واحدة في كانفاس لوحده (مربع LS×LS)، علشان الحركات تقطّعه وتلمّعه
+    // الشعار مرسوم مرة واحدة في كانفاس لوحده (مربع LS×LS)، علشان الحركات تقطّعه وتلمّعه
     const L = document.createElement("canvas"); L.width = L.height = Math.ceil(LS); const lx = L.getContext("2d");
     if (lg) {
       if (PR.bgk !== "light") { lx.fillStyle = "#fff"; rr(lx, 0, 0, LS, LS, LS * .22); lx.fill(); }
@@ -50,14 +50,14 @@ M.reel({
     const logo = (a = 1, sc = 1, rot = 0, dx = 0) => { if (a <= 0) return; x.save(); x.globalAlpha *= a; x.translate(CX + dx, CY); x.rotate(rot); x.scale(sc, sc); x.drawImage(L, -LS / 2, -LS / 2, LS, LS); x.restore(); };
     const st = PR.style;
     if (st === "assemble") {
-      // ٣ حتت من اللوجو جايين من بعيد بزوايا مختلفة، ويتركبوا
+      // ٣ حتت من الشعار جايين من بعيد بزوايا مختلفة، ويتركبوا
       const P = [[-1, -1, -.7, 0, 0, LS / 2, LS / 2], [1, -.6, .5, LS / 2, 0, LS / 2, LS / 2], [0, 1.2, 0, 0, LS / 2, LS, LS / 2]];
       P.forEach(([ox, oy, r, sx, sy, sw, sh], i) => {
         const k = springO(clamp((t - .05 - i * .14) / .75), 9, .62), f = 1 - k;
         x.save(); x.globalAlpha *= clamp(k * 3); x.translate(CX - LS / 2 + sx + sw / 2 + ox * 520 * S * f, CY - LS / 2 + sy + sh / 2 + oy * 620 * S * f); x.rotate(r * f * 2);
         x.drawImage(L, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); x.restore();
       });
-      logo(io(seg(t, 1.1, 1.3)));   // بعد ما يتركبوا: اللوجو كامل فوقهم (من غير خطوط بين الحتت)
+      logo(io(seg(t, 1.1, 1.3)));   // بعد ما يتركبوا: الشعار كامل فوقهم (من غير خطوط بين الحتت)
     } else if (st === "shine") {
       const k = io(seg(t, 0, .7)); logo(k, .86 + .14 * k);
       const s = seg(t, .75, 1.65);
@@ -87,7 +87,7 @@ M.reel({
       const k = io(seg(t, 0, 1.1)), c = Math.cos(Math.PI * (1 - k));
       x.save(); x.globalAlpha *= clamp(k * 2.5); x.translate(CX, CY); x.scale(Math.abs(c) * (.6 + .4 * k), .6 + .4 * k); x.drawImage(L, -LS / 2, -LS / 2, LS, LS); x.restore();
     }
-    // الاسم والشعار تحت اللوجو
+    // الاسم والشعار تحت الشعار
     if (TXT) {
       const y = CY + LS / 2 + 150 * S, fs = M.fit(TXT, "LZ", W * .82, 150 * S, 50 * S);
       x.save(); x.fillStyle = INK; x.font = `${fs}px LZ`; x.textAlign = "center"; x.direction = M.isAr(TXT) ? "rtl" : "ltr";

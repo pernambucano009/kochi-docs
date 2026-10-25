@@ -6,8 +6,8 @@ const K1 = "١ · الكارت وكلمة الشكر", K2 = "٢ · الرسال�
 const PR = M.params({
   word: { label: "كلمة الشكر", kind: "text", role: "product", def: "شكرًا", group: K1, max: 8, hint: "كلمة واحدة بتترسم بالقلم (شكرًا، ممتنين، كل سنة وانت طيب)." },
   msg: { label: "الرسالة (سطرين)", kind: "lines", def: ["إنك كنت معانا السنة دي", "كل طلب منك كان حكاية بنفتخر بيها"], group: K2, hint: "سطرين بالكتير، شخصيين ودافيين (مش بيع)." },
-  from: { label: "من مين", kind: "text", def: "فريق", group: K2, max: 10, hint: "قبل اسم البراند في التوقيع (فريق، عيلة، كل اللي في)." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ورد الحديقة", group: K3, max: 16, hint: "بيتكتب في التوقيع وعلى ختم الشمع." },
+  from: { label: "من مين", kind: "text", def: "فريق", group: K2, max: 10, hint: "قبل اسم العلامة في التوقيع (فريق، عيلة، كل اللي في)." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ورد الحديقة", group: K3, max: 16, hint: "بيتكتب في التوقيع وعلى ختم الشمع." },
   ink: { label: "لون الحبر", kind: "color", def: "#1f3a5f", group: KS, hint: "كحلي أو بني غامق (ألوان حبر حقيقية)." },
   seal: { label: "لون الختم", kind: "color", role: "accent", def: "#a4161a", group: KS, hint: "لون الشمع: أحمر نبيتي أو لون البراند الغامق." },
   fWord: { label: "خط كلمة الشكر والتوقيع", kind: "font", def: "ruqaa", group: KS, hint: "خط إيد (رقعة، أميري، Caveat للإنجليزي)." },

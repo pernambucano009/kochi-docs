@@ -7,20 +7,20 @@
 // 14–15 end title → back to the lone cursor.
 const G1 = "١ · السؤال والجملة", G2 = "٢ · المهارات والرقم", G3 = "٣ · الشغل", G4 = "٤ · الختم والاسم", GC = "الألوان";
 const PR = M.params({
-  hook: { label: "السؤال في الأول", kind: "text", def: "HIRE ME?", group: G1, max: 10, hint: "الكيرسر بيكتبه في الأول." },
-  line: { label: "جملة من ٤ كلمات", kind: "text", def: "I MAKE THINGS MOVE", group: G1, max: 24, hint: "٤ كلمات بالظبط بيتحركوا." },
-  skills: { label: "المهارات أو المميزات (٦، كل واحدة في سطر)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT"], group: G2, max: 14, hint: "٦ مهارات أو مميزات: بيلفوا في دايرة 3D." },
+  hook: { label: "السؤال في البداية", kind: "text", def: "HIRE ME?", group: G1, max: 10, hint: "يكتبه المؤشر في البداية." },
+  line: { label: "جملة من ٤ كلمات", kind: "text", def: "I MAKE THINGS MOVE", group: G1, max: 24, hint: "٤ كلمات بالضبط تتحرك." },
+  skills: { label: "المهارات أو المميزات (٦، كل واحدة في سطر)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT"], group: G2, max: 14, hint: "٦ مهارات أو مميزات: تدور في دائرة ثلاثية الأبعاد." },
   stat: { label: "الرقم الكبير", kind: "text", def: "85%", group: G2, max: 6 },
   statLabel: { label: "تحت الرقم", kind: "text", def: "average across six skills", group: G2, max: 20 },
-  projects: { label: "الشغل أو الإنجازات (٤)", kind: "lines", def: ["Brand film", "App launch", "Title seq.", "Data story"], group: G3, max: 20, hint: "٤ شغلانات أو إنجازات على خط زمني." },
+  projects: { label: "الأعمال أو الإنجازات (٤)", kind: "lines", def: ["Brand film", "App launch", "Title seq.", "Data story"], group: G3, max: 20, hint: "٤ أعمال أو إنجازات على خط زمني." },
   range: { label: "الفترة", kind: "text", def: "2019 — 2026", group: G3, max: 14 },
-  tags: { label: "كلمات الشبكة (لحد ١٢)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT", "DESIGN", "MOTION", "STORY", "COLOR", "RIG", "FX"], group: G4, max: 12, hint: "لحد ١٢ كلمة بتترص في شبكة." },
+  tags: { label: "كلمات الشبكة (حتى ١٢)", kind: "lines", def: ["TYPE", "3D", "CODE", "SOUND", "UI", "EDIT", "DESIGN", "MOTION", "STORY", "COLOR", "RIG", "FX"], group: G4, max: 12, hint: "حتى ١٢ كلمة تُرصّ في شبكة." },
   stamp: { label: "الختم", kind: "text", def: "HIRED.", group: G4, max: 8 },
-  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "Your Name", group: G4, max: 18 },
+  name: { label: "الاسم في النهاية", kind: "text", role: "brand", def: "Your Name", group: G4, max: 18 },
   role: { label: "تحت الاسم", kind: "text", role: "tagline", def: "motion designer · available now", group: G4, max: 26 },
   ink: { label: "الخلفية الغامقة", kind: "color", role: "dark", def: "#0f0f12", group: GC },
   lime: { label: "اللون المميز", kind: "color", role: "accent", def: "#c6ff3d", group: GC },
-  cob: { label: "اللون التاني", kind: "color", role: "accent2", def: "#3d5afe", group: GC },
+  cob: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#3d5afe", group: GC },
 });
 M.meta({
   story: "تعريف شخصي في ١٥ ثانية: «سيرة ذاتية تتحرك وحدها». مؤشر يكتب كل مشهد: السؤال، وجملة متحركة، وعلامات المهارات، وبطاقات في دائرة ثلاثية الأبعاد، ورادار المهارات، وخط زمني للعمل، وشبكة وختم، ثم الاسم.",

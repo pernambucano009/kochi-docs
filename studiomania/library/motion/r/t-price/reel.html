@@ -21,11 +21,11 @@ const PR = M.params({
   mins: { label: "المدة بالدقائق", kind: "number", def: 0, min: 0, max: 4320, step: 5, unit: " دقيقة", group: G3, hint: "إذا كُتبت، العدّاد يبدأ منها بالضبط (30 = نصف ساعة) بدل الساعات." },
   uH: { label: "كلمة «ساعة»", kind: "text", def: "ساعة", group: G3, max: 6 }, uM: { label: "كلمة «دقيقة»", kind: "text", def: "دقيقة", group: G3, max: 6 }, uS: { label: "كلمة «ثانية»", kind: "text", def: "ثانية", group: G3, max: 6 },
   cta: { label: "الزرار", kind: "text", def: "اطلب الآن", group: G4, max: 14, hint: "فعل واضح بكلمتين: اطلب دلوقتي، احجز، اشتري." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "بيت العطور", group: G4, max: 20, hint: "بيظهر صغير تحت الزرار." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "بيت العطور", group: G4, max: 20, hint: "بيظهر صغير تحت الزرار." },
   color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff3d2e", group: GS, hint: "خلفية الفيديو كله: لون قوي ومشبّع (أحمر، برتقالي، بنفسجي) علشان إحساس العرض." },
-  color2: { label: "اللون التاني", kind: "color", def: "#ffd23f", group: GS, hint: "السعر الجديد وشطب القديم: لون فاتح بيبان قوي على الأساسي (أصفر، أبيض)." },
+  color2: { label: "اللون الثاني", kind: "color", def: "#ffd23f", group: GS, hint: "السعر الجديد وشطب القديم: لون فاتح بيبان قوي على الأساسي (أصفر، أبيض)." },
   fHead: { label: "خط الأرقام والعناوين", kind: "font", def: "lalezar", group: GS, hint: "خط إعلاني تقيل للهوك والأسعار." },
-  fBody: { label: "خط الكلام", kind: "font", def: "changa", group: GS, hint: "اسم المنتج والعملة والسطور الصغيرة." },
+  fBody: { label: "خط النص", kind: "font", def: "changa", group: GS, hint: "اسم المنتج والعملة والسطور الصغيرة." },
 });
 M.meta({
   story: "إعلان عرض سعر على الإيقاع: خطاف قوي، والمنتج يظهر، والسعر القديم يُشطب والجديد يعدّ تنازليًا ويضرب مع قصاصات احتفال، وملصق التوفير، وعد تنازلي، وزر الطلب.",

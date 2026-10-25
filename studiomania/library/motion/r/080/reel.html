@@ -7,12 +7,12 @@
 // · 12–15 end title: the knob is the period of FULL STOP.  One typeface (Inter Tight 800). Palette: cream, red, black (+ white).
 const G1 = "١ · الكلمات والنقطة", G2 = "٢ · الأشكال والشارت", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  words: { label: "٦ كلمات ورا بعض (النقطة جنبهم)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"], group: G1, max: 10, hint: "٦ كلمات ورا بعض، والنقطة بتبقى آخر كل واحدة." },
-  stat: { label: "الرقم على الشارت", kind: "text", def: "+411%", group: G2, max: 6, hint: "الرقم على الشارت." },
-  end: { label: "الكلمة في الآخر (النقطة جنبها)", kind: "text", role: "brand", def: "FULL STOP", group: G3, max: 12 },
+  words: { label: "٦ كلمات متتالية (والنقطة بجانبها)", kind: "lines", def: ["MOTION", "DESIGN", "MADE", "OF", "ONE", "DOT"], group: G1, max: 10, hint: "٦ كلمات متتالية، والنقطة في نهاية كل كلمة." },
+  stat: { label: "الرقم على الرسم البياني", kind: "text", def: "+411%", group: G2, max: 6, hint: "الرقم على الرسم البياني." },
+  end: { label: "الكلمة الأخيرة (والنقطة بجانبها)", kind: "text", role: "brand", def: "FULL STOP", group: G3, max: 12 },
   cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f1ece2", group: GC },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#111111", group: GC },
-  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f", group: GC, hint: "لون النقطة اللي ماشية في الفيديو كله." },
+  ink: { label: "لون النص", kind: "color", role: "ink", def: "#111111", group: GC },
+  red: { label: "لون النقطة", kind: "color", role: "accent", def: "#ff3b2f", group: GC, hint: "لون النقطة التي تتحرك طوال الفيديو." },
 });
 M.meta({
   story: "كل شيء من نقطة: النقطة لا تغادر الشاشة وكل مشهد مصنوع منها. تصبح نقطة آخر كلمة تتغير، ثم تنتفخ وتصبح أشكالًا، وتنقلب كعملة وتصبح كرة تتدحرج، والأرض تصبح رسمًا بيانيًا، وفي النهاية تعود نقطة الكلمة الأخيرة.",

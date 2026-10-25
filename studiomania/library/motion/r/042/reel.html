@@ -6,18 +6,18 @@
 // 12–14 strongest: the thread is pulled straight, one word per beat · 14–15 "JUST START." → back to the single dot.
 const G1 = "١ · التردد", G2 = "٢ · الأفكار والموبايل", G3 = "٣ · ابدأ", GC = "الألوان";
 const PR = M.params({
-  hm: { label: "٣ كلمات تردد في الأول", kind: "lines", def: ["HM.", "WAIT.", "BUT—"], group: G1, max: 8, hint: "٣ كلمات تردد قصيرة." },
-  whatif: { label: "٤ أفكار بتلف (أول واحدة كبيرة)", kind: "lines", def: ["WHAT IF", "THEY SAW?", "I'M WRONG?", "IT'S TOO LATE?"], group: G1, max: 14, hint: "٤ أفكار بتلف في دوامة، أول واحدة كبيرة." },
-  shapes: { label: "أسامي الأشكال (٣)", kind: "lines", def: ["SPIRAL", "SCRIBBLE", "KNOT"], group: G2, max: 10 },
-  msgs: { label: "رسايل الموبايل (٦)", kind: "lines", def: ["Did they read it?", "Read 10:41", "Typing…", "…stopped typing", "Should I say sorry?", "Rewrite it (draft 7)"], group: G2, max: 24, hint: "٦ رسايل على شاشة الموبايل." },
-  meter: { label: "تحت العدّاد ({h} = الساعات)", kind: "text", def: "{h} h thinking · 0 h doing", group: G2, max: 30, hint: "{h} بيتبدّل بعدد الساعات." },
-  beats: { label: "٤ كلمات على الإيقاع", kind: "lines", def: ["STOP.", "BREATHE.", "DECIDE.", "GO."], group: G3, max: 10, hint: "٤ كلمات على الإيقاع والخيط بيتشد." },
+  hm: { label: "٣ كلمات تتردد في البداية", kind: "lines", def: ["HM.", "WAIT.", "BUT—"], group: G1, max: 8, hint: "٣ كلمات قصيرة تتردد." },
+  whatif: { label: "٤ أفكار تدور (الأولى كبيرة)", kind: "lines", def: ["WHAT IF", "THEY SAW?", "I'M WRONG?", "IT'S TOO LATE?"], group: G1, max: 14, hint: "٤ أفكار تدور في دوامة، الأولى كبيرة." },
+  shapes: { label: "أسماء الأشكال (٣)", kind: "lines", def: ["SPIRAL", "SCRIBBLE", "KNOT"], group: G2, max: 10 },
+  msgs: { label: "رسائل الجوال (٦)", kind: "lines", def: ["Did they read it?", "Read 10:41", "Typing…", "…stopped typing", "Should I say sorry?", "Rewrite it (draft 7)"], group: G2, max: 24, hint: "٦ رسائل على شاشة الجوال." },
+  meter: { label: "تحت العدّاد ({h} = الساعات)", kind: "text", def: "{h} h thinking · 0 h doing", group: G2, max: 30, hint: "{h} يُستبدل بعدد الساعات." },
+  beats: { label: "٤ كلمات على الإيقاع", kind: "lines", def: ["STOP.", "BREATHE.", "DECIDE.", "GO."], group: G3, max: 10, hint: "٤ كلمات على الإيقاع والخيط يُشد." },
   end1: { label: "النهاية (سطر ١)", kind: "text", def: "JUST", group: G3, max: 8 },
   end2: { label: "النهاية (سطر ٢، ملوّن)", kind: "text", role: "cta", def: "START.", group: G3, max: 8 },
   paper: { label: "الخلفية", kind: "color", role: "bg", def: "#f2efe8", group: GC },
   ink: { label: "الغامق", kind: "color", role: "ink", def: "#121214", group: GC },
   vio: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#6b4cff", group: GC },
-  yel: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
+  yel: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
 });
 M.meta({
   story: "كفى تفكيرًا: فكرة واحدة = خيط واحد لا يتوقف عن الالتفاف. نقطة تدور، و«ماذا لو» تلتف إلى الداخل بنهاية جديدة مع كل إيقاع، والدوامة تصبح عقدة وكرة خيط ثلاثية الأبعاد، وهاتفًا مليئًا بالتردد، ثم يُشد الخيط مستقيمًا كلمة كلمة حتى «ابدأ».",

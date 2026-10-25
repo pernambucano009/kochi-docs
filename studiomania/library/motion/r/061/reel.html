@@ -7,16 +7,16 @@
 // No frames, no corner labels, no timecodes. Palette: warm paper, ink, coral, sage. One typeface (Inter).
 const G1 = "١ · الكلمة والجملة", G2 = "٢ · الكورة والاختيارات", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  hello: { label: "الكلمة الأولى", kind: "text", def: "hello", group: G1, max: 10, hint: "كلمة بتتقسم حتت صغيرة." },
-  sentence: { label: "الجملة (بتظهر كلمة كلمة)", kind: "text", def: "I think in tiny pieces, one at a time.", group: G1, max: 44, hint: "بتظهر كلمة كلمة." },
-  cloud: { label: "كلمات الكورة (كل كلمة في سطر)", kind: "lines", def: ["why", "how", "draft", "code", "plan", "poem", "fix", "idea", "test", "map", "sum", "ask", "yes", "data", "song", "list"], group: G2, max: 8, hint: "كلمات قصيرة بتكوّن كورة 3D بتلف." },
+  hello: { label: "الكلمة الأولى", kind: "text", def: "hello", group: G1, max: 10, hint: "كلمة تنقسم إلى قطع صغيرة." },
+  sentence: { label: "الجملة (تظهر كلمة كلمة)", kind: "text", def: "I think in tiny pieces, one at a time.", group: G1, max: 44, hint: "تظهر كلمة كلمة." },
+  cloud: { label: "كلمات الكرة (كل كلمة في سطر)", kind: "lines", def: ["why", "how", "draft", "code", "plan", "poem", "fix", "idea", "test", "map", "sum", "ask", "yes", "data", "song", "list"], group: G2, max: 8, hint: "كلمات قصيرة تكوّن كرة ثلاثية الأبعاد تدور." },
   question: { label: "سؤال الاختيارات", kind: "text", def: "I can help you", group: G2, max: 20 },
-  options: { label: "٣ اختيارات (الاختيار | النسبة)", kind: "lines", def: ["help | 62", "think | 21", "write | 17"], group: G2, max: 14, hint: "٣ اختيارات: الاختيار | النسبة." },
-  ending: { label: "الجملة في الآخر", kind: "text", role: "brand", def: "Hi, I'm Nour.", group: G3, max: 24 },
+  options: { label: "٣ خيارات (الخيار | النسبة)", kind: "lines", def: ["help | 62", "think | 21", "write | 17"], group: G2, max: 14, hint: "٣ خيارات: الخيار | النسبة." },
+  ending: { label: "الجملة الأخيرة", kind: "text", role: "brand", def: "Hi, I'm Nour.", group: G3, max: 24 },
   paper: { label: "الخلفية", kind: "color", role: "bg", def: "#f3efe8", group: GC },
-  ink: { label: "لون الكلام", kind: "color", role: "ink", def: "#1b1a17", group: GC },
+  ink: { label: "لون النص", kind: "color", role: "ink", def: "#1b1a17", group: GC },
   coral: { label: "اللون المميز", kind: "color", role: "accent", def: "#e2674a", group: GC },
-  sage: { label: "اللون التاني", kind: "color", role: "accent2", def: "#7d9b84", group: GC },
+  sage: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#7d9b84", group: GC },
 });
 M.meta({
   story: "تعريف بكلمات تُبنى: «كل ما أقوله قطعة قطعة». كتلة واحدة تومض وتقسم الكلمة الأولى إلى قطع، والقطع تتجمع في جملة، والكتلة تتحول إلى فقاعة ومصباح ودائرة، وكرة ثلاثية الأبعاد من الكلمات، واختيارات بنسب، والفائز يسقط على الإيقاع.",

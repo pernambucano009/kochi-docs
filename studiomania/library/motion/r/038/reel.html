@@ -5,16 +5,16 @@
 // 8–10 the cube unfolds into a bar chart · 10–14 an accordion of panels carrying one word (strongest at 12–14) · 14–15 end title, back to a blank sheet.
 const G1 = "١ · لوحة الكلمات", G2 = "٢ · الأكورديون", G3 = "٣ · النهاية", GC = "الألوان";
 const PR = M.params({
-  words: { label: "٧ كلمات بتتقلب (لوحة مطار)", kind: "lines", def: ["EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."], group: G1, max: 8, hint: "٧ كلمات بتتقلب زي لوحة المطار." },
+  words: { label: "٧ كلمات تتقلب (لوحة مطار)", kind: "lines", def: ["EVERY", "IDEA", "STARTS", "AS", "ONE", "FLAT", "SHEET."], group: G1, max: 8, hint: "٧ كلمات تتقلب مثل لوحة المطار." },
   big: { label: "الكلمة الكبيرة على الأكورديون", kind: "text", role: "brand", def: "FOLD", group: G2, max: 6, hint: "كلمة قصيرة على ألواح الأكورديون." },
-  end: { label: "العنوان في الآخر", kind: "text", role: "brand", def: "FOLD.", group: G3, max: 8 },
+  end: { label: "العنوان في النهاية", kind: "text", role: "brand", def: "FOLD.", group: G3, max: 8 },
   endSub: { label: "تحت العنوان", kind: "text", role: "tagline", def: "A STUDIO OF PAPER MOTION", group: G3, max: 30 },
-  labels: { label: "عناوين صغيرة فوق (٥، فاضي = مفيش)", kind: "lines", def: ["01 — FLAP", "02 — FOLD", "03 — DEPTH", "04 — DATA", "05 — ACCORDION"], group: G1, max: 18, hint: "٥ عناوين صغيرة فوق كل مشهد (فاضي = مفيش)." },
+  labels: { label: "عناوين صغيرة في الأعلى (٥، فارغ = لا شيء)", kind: "lines", def: ["01 — FLAP", "02 — FOLD", "03 — DEPTH", "04 — DATA", "05 — ACCORDION"], group: G1, max: 18, hint: "٥ عناوين صغيرة فوق كل مشهد (فارغ = لا شيء)." },
   paper: { label: "الورق", kind: "color", role: "bg", def: "#f6f4ef", group: GC },
   bg: { label: "الخلفية", kind: "color", def: "#d8d4cb", group: GC },
   ink: { label: "الغامق", kind: "color", role: "ink", def: "#141416", group: GC },
   red: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#e63b2e", group: GC },
-  blue: { label: "اللون التاني", kind: "color", role: "accent2", def: "#2f4bff", group: GC },
+  blue: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#2f4bff", group: GC },
 });
 M.meta({
   story: "عرض أعمال بورق يُطوى: «كل شيء ورقة واحدة». كلمات تتقلب على بطاقة تُطوى، فتصبح البطاقة طائر كركي، وشبكة مكعب تنغلق ثلاثية الأبعاد، والمكعب ينفرد رسمًا بيانيًا، وأكورديون ألواح عليه كلمة، وفي النهاية ورقة فارغة.",

@@ -9,7 +9,7 @@ const PR = M.params({
   l1: { label: "السطر ١", kind: "text", def: "أقل كلام.", group: G2, max: 14, hint: "٣ سطور قصيرة بنقطة في الآخر. التالت بس هو اللي بيفضل، فخليه أقواهم." },
   l2: { label: "السطر ٢", kind: "text", def: "أوضح فكرة.", group: G2, max: 14 },
   l3: { label: "السطر ٣ (اللي بيفضل)", kind: "text", def: "أقوى براند.", group: G2, max: 14 },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "ستوديو أثر", group: G3, max: 14 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو أثر", group: G3, max: 14 },
   tag: { label: "تحت الاسم", kind: "text", role: "tagline", def: "تصميم هويات · القاهرة", group: G3, max: 26, hint: "الشغلانة والمدينة." },
   signal: { label: "لون الإشارة", kind: "color", role: "accent", def: "#E30613", group: GS, hint: "اللون الوحيد في الفيديو (الدايرة): أحمر سويسري أو لون البراند لو قوي." },
   fHead: { label: "خط السطور", kind: "font", def: "plex", group: GS, hint: "خط نضيف من غير زخرفة يليق على الشبكة." },
@@ -68,7 +68,7 @@ M.reel({
       if (ck > 0 && col < 1) { x.fillStyle = "#111"; const yy = 760 + i * 150 + 74; x.fillRect(W - MX - (W - 2 * MX) * ck, yy, (W - 2 * MX) * ck, 2); }
       C.lines[i].w.style.transform = `scaleY(${1 - col})`;
     });
-    // السطر التالت بيطلع لمكان الأول (على البيت)
+    // السطر الثالث بيطلع لمكان الأول (على البيت)
     const up = snap(t, 15); C.lines[2].w.style.transform = `translateY(${-300 * up}px)`;
     // البلوكات السودا تحت: كل بلوك بيكبر بطوله وبيرسى على بيت
     const bars = [[0, 1290, 2, 70, 8], [2, 1290, 1, 210, 8.5], [3, 1380, 3, 70, 9], [0, 1390, 1, 110, 9.5], [1, 1480, 2, 40, 10], [4, 1290, 2, 130, 10.5], [3, 1470, 1, 60, 11]];

@@ -8,11 +8,11 @@ const PR = M.params({
   cover: { label: "غلاف البودكاست", kind: "image", role: "logo", def: "", group: K1, img: { ratio: "1:1", cut: false, tip: "غلاف البودكاست المربع. لو مفيش بيظهر غلاف ملوّن بمايك." } },
   ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "الحلقة ١٢ · إزاي تبدأ مشروعك", group: K1, max: 32 },
   lines: { label: "الجمل (كل سطر جملة)", kind: "lines", def: ["أول خطوة مش إنك تبقى جاهز", "أول خطوة إنك تبدأ بالموجود", "والباقي بيتعلّم وانت ماشي"], group: K2,
-    hint: "أقوى ٣ جمل في الحلقة بالكلام زي ما اتقال (كل جملة ٥–٧ كلمات، بتطلع كلمة كلمة في ٢٫٨ ثانية)." },
-  cta: { label: "الجملة الأخيرة", kind: "text", def: "اسمع الحلقة كاملة", group: K3, max: 20, hint: "فين يسمعوها (سبوتيفاي، يوتيوب، اللينك)." },
+    hint: "أقوى ٣ جمل في الحلقة كما قيلت (كل جملة ٥–٧ كلمات، تظهر كلمة كلمة في ٢٫٨ ثانية)." },
+  cta: { label: "الجملة الأخيرة", kind: "text", def: "اسمع الحلقة كاملة", group: K3, max: 20, hint: "أين يستمعون إليها (سبوتيفاي، يوتيوب، الرابط)." },
   color: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff5a36", group: KS, hint: "الكلمة الحالية والموجة والغلاف." },
-  bg: { label: "لون الخلفية", kind: "color", def: "#171320", group: KS, hint: "غامق علشان الكلام يبان." },
-  fHead: { label: "خط الكلام", kind: "font", def: "plex", group: KS },
+  bg: { label: "لون الخلفية", kind: "color", def: "#171320", group: KS, hint: "غامق ليظهر النص بوضوح." },
+  fHead: { label: "خط النص", kind: "font", def: "plex", group: KS },
   fBody: { label: "خط السطور الصغيرة", kind: "font", def: "plex4", group: KS },
 });
 M.meta({

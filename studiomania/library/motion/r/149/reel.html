@@ -7,14 +7,14 @@
 // One typeface (Gabarito 800). Palette: electric blue, yellow, black + white. Camera: one slow push-in.
 const G1 = "١ · الرقم", G2 = "٢ · العين", G3 = "٣ · الشكر", GC = "الألوان";
 const P = M.params({
-  number: { label: "الرقم", kind: "text", def: "100", group: G1, max: 5, hint: "عدد المتابعين أو العملاء: النقط بتكوّن الرقم ده." },
+  number: { label: "الرقم", kind: "text", def: "100", group: G1, max: 5, hint: "عدد المتابعين أو العملاء: تكوّن النقاط هذا الرقم." },
   top: { label: "كلمة فوق الرقم", kind: "text", def: "FIRST", group: G1, max: 10 },
   bottom: { label: "كلمة تحت الرقم", kind: "text", def: "USERS", group: G1, max: 10 },
-  line: { label: "جملة مع العين", kind: "text", def: "YOU SEE IT FIRST", group: G2, max: 22, hint: "جملة بتظهر مع العين." },
-  thanks: { label: "الشكر في الآخر", kind: "text", def: "THANK YOU", group: G3, max: 14 },
-  handle: { label: "اسم الحساب أو البراند", kind: "text", role: "handle", def: "@EYEZONBOT", group: G3, max: 20, hint: "اسم الحساب أو البراند تحت الشكر." },
+  line: { label: "جملة مع العين", kind: "text", def: "YOU SEE IT FIRST", group: G2, max: 22, hint: "جملة تظهر مع العين." },
+  thanks: { label: "الشكر في النهاية", kind: "text", def: "THANK YOU", group: G3, max: 14 },
+  handle: { label: "اسم الحساب أو العلامة", kind: "text", role: "handle", def: "@EYEZONBOT", group: G3, max: 20, hint: "اسم الحساب أو العلامة تحت الشكر." },
   c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#3d7bff", group: GC },
-  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
+  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ffd23f", group: GC },
   bg: { label: "الخلفية", kind: "color", role: "dark", def: "#000000", group: GC },
 });
 M.meta({

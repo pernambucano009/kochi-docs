@@ -6,18 +6,18 @@
 // Palette: cobalt, tangerine, cream + black/white. One typeface (Gabarito).
 const G1 = "١ · الختم والكلام", G2 = "٢ · الأسامي", G3 = "٣ · الدليل والرقم", G4 = "٤ · النهاية", GC = "الألوان";
 const PR = M.params({
-  hook: { label: "٤ كلمات في الأول (الختم بيطبعها)", kind: "lines", def: ["FOUNDERS", "NEED", "BRANDS", "THAT"], group: G1, max: 10, hint: "٤ كلمات الختم بيطبعها واحدة واحدة." },
-  column: { label: "كلمات العمود (كل كلمة في سطر، اللي عليها * ملوّنة)", kind: "lines", def: ["THAT", "MOVE", "AS", "*FAST", "AS", "THEY", "DO", "."], group: G1, max: 14, hint: "كل كلمة في سطر، واللي قبلها * بتتلوّن." },
-  marks: { label: "٦ أسامي (عملاء أو منتجات)", kind: "lines", def: ["NORTH", "ORBIT", "PEAK", "ARCADE", "PLUS", "LEAF"], group: G2, max: 14, hint: "٦ أسامي عملاء أو منتجات: بتتحول لعلامات وكروت." },
-  marksLabel: { label: "عنوان الأسامي", kind: "text", def: "CLIENT MARKS", group: G2, max: 20 },
-  guide: { label: "عنوان صفحة الدليل", kind: "text", def: "BRAND GUIDE — NORTHBOUND", group: G3, max: 20, hint: "عنوان صفحة دليل البراند." },
+  hook: { label: "٤ كلمات في البداية (يطبعها الختم)", kind: "lines", def: ["FOUNDERS", "NEED", "BRANDS", "THAT"], group: G1, max: 10, hint: "٤ كلمات يطبعها الختم واحدة تلو الأخرى." },
+  column: { label: "كلمات العمود (كل كلمة في سطر، وما عليها * ملوّن)", kind: "lines", def: ["THAT", "MOVE", "AS", "*FAST", "AS", "THEY", "DO", "."], group: G1, max: 14, hint: "كل كلمة في سطر، وما يسبقه * يتلوّن." },
+  marks: { label: "٦ أسماء (عملاء أو منتجات)", kind: "lines", def: ["NORTH", "ORBIT", "PEAK", "ARCADE", "PLUS", "LEAF"], group: G2, max: 14, hint: "٦ أسماء عملاء أو منتجات: تتحول إلى علامات وبطاقات." },
+  marksLabel: { label: "عنوان الأسماء", kind: "text", def: "CLIENT MARKS", group: G2, max: 20 },
+  guide: { label: "عنوان صفحة الدليل", kind: "text", def: "BRAND GUIDE — NORTHBOUND", group: G3, max: 20, hint: "عنوان صفحة دليل العلامة." },
   font: { label: "اسم الخط في الدليل", kind: "text", def: "Gabarito 800", group: G3, max: 16 },
   stat: { label: "الرقم", kind: "text", def: "42", group: G3, max: 6, hint: "رقم قوي: عدد عملاء أو مشاريع." },
   statLabel: { label: "بعد الرقم", kind: "text", def: "brands launched", group: G3, max: 20 },
-  name: { label: "الاسم في الآخر", kind: "text", role: "brand", def: "NORTHBOUND®", group: G4, max: 16 },
+  name: { label: "الاسم في النهاية", kind: "text", role: "brand", def: "NORTHBOUND®", group: G4, max: 16 },
   tagline: { label: "تحت الاسم", kind: "text", role: "tagline", def: "Brands for founders.", group: G4, max: 30 },
   cob: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#2440ff", group: GC, hint: "لون الختم الأساسي." },
-  tan: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ff6a2b", group: GC },
+  tan: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ff6a2b", group: GC },
   cream: { label: "الخلفية", kind: "color", role: "bg", def: "#f3eee4", group: GC },
   ink: { label: "الغامق", kind: "color", role: "ink", def: "#101014", group: GC },
 });

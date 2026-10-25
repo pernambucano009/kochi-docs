@@ -4,12 +4,12 @@
 // بدايرة بتكبر، الاسم بيظهر من ورا قناع، الجملة تحت، واللوجو بيلف لفة أخيرة. 1080×1920، 12 ثانية.
 const G1 = "١ · العلامة", G2 = "٢ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  logo: { label: "اللوجو بتاعك (اختياري)", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "لوجو أبيض أو فاتح من غير خلفية (بيظهر على لون البراند). لو مفيش، الوردة المرسومة هي العلامة." },
+  logo: { label: "الشعار بتاعك (اختياري)", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "لوجو أبيض أو فاتح من غير خلفية (بيظهر على لون البراند). لو مفيش، الوردة المرسومة هي العلامة." },
     hint: "لو حطيته: الوردة بتتفتح وبعدين بتتحول للوجو بتاعك لما الخلفية تتقلب." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "زهرة", group: G2, max: 12, hint: "الاسم بس (كلمة أو كلمتين): بيظهر كبير من ورا قناع." },
-  tag: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "ورد طازة لكل مناسبة", group: G2, max: 28, hint: "البراند بيعمل إيه في ٣–٥ كلمات." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "زهرة", group: G2, max: 12, hint: "الاسم بس (كلمة أو كلمتين): بيظهر كبير من ورا قناع." },
+  tag: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "ورد طازة لكل مناسبة", group: G2, max: 28, hint: "ماذا تقدّم العلامة في ٣–٥ كلمات." },
   c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "النقطة والبتلات، وبعدين الشاشة كلها بتتقلب له." },
-  c2: { label: "اللون التاني", kind: "color", role: "accent2", def: "#ffb347", group: GS, hint: "البتلات التانية والنقط: لون فاتح مكمّل." },
+  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ffb347", group: GS, hint: "البتلات التانية والنقط: لون فاتح مكمّل." },
   bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec", group: GS, hint: "فاتح جدًا (أول ٤ ثواني)." },
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar", group: GS },
   fBody: { label: "خط الجملة", kind: "font", def: "tajawal", group: GS },
@@ -27,7 +27,7 @@ M.reel({
   seek(t, C, M) {
     const { x, lg } = C, { seg, cubicIO, clamp, springO, expo, smooth } = M, io = (k) => cubicIO(clamp(k));
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
-    // الخلفية بتتقلب للون البراند بدايرة بتكبر من نص اللوجو
+    // الخلفية بتتقلب للون البراند بدايرة بتكبر من نص الشعار
     const fl = io(seg(t, 4.2, 5.2)), dark = fl > .5;
     if (fl > 0) { x.fillStyle = PR.c1; x.beginPath(); x.arc(CX, CY, 2300 * fl, 0, Math.PI * 2); x.fill(); }
     const ink = fl > 0 ? "#fff" : PR.c1, ink2 = fl > 0 ? "#fff" : PR.c2;

@@ -7,11 +7,11 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "طازة من البحر", group: G2, max: 14, hint: "بيتكتب في خانة العنوان الطولية زي اللوحات اليابانية." },
   sub: { label: "تحت العنوان", kind: "text", def: "سمك اليوم… على سفرتك الليلة", group: G2, max: 30 },
   seal: { label: "حرف الختم", kind: "text", def: "م", group: G2, max: 2, hint: "حرف واحد في الختم الأحمر." },
-  brand: { label: "اسم البراند", kind: "text", role: "brand", def: "مطعم الموجة", group: G2, max: 16 },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مطعم الموجة", group: G2, max: 16 },
   sky: { label: "لون السما والمية", kind: "color", def: "#1f3f78", group: G1, hint: "أزرق بروسي (الأزرق الياباني التقليدي) أو كحلي." },
   red: { label: "اللون الأحمر", kind: "color", role: "accent", def: "#c8402c", group: GS, hint: "الشمس والختم." },
   fTitle: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
-  fText: { label: "خط الكلام", kind: "font", def: "amiri", group: GS },
+  fText: { label: "خط النص", kind: "font", def: "amiri", group: GS },
 });
 M.meta({
   story: "طباعة خشبية يابانية على ورق واشي بإطار: كل لون يُطبع من لوح منفصل ولا يطابق الخط تمامًا، وسماء متدرجة، وجبل وموج بخطوط متوازية، وقارب، وشمس حمراء، والعنوان في خانة بختم.",
@@ -94,7 +94,7 @@ M.reel({
     }
     const sk = seg(t, 6.6, 6.8);
     if (sk > 0) { x.save(); x.translate(910, 760); x.scale(1.3 - .3 * sk, 1.3 - .3 * sk); x.globalAlpha = sk; x.fillStyle = PR.red; x.fillRect(-48, -48, 96, 96); x.globalCompositeOperation = "destination-out"; x.font = "700 70px RQ"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(PR.seal, 0, 6); x.lineWidth = 3; x.strokeRect(-38, -38, 76, 76); x.restore(); }
-    // سطر تحت اللوحة + اسم البراند
+    // سطر تحت اللوحة + اسم العلامة
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over";
     const lk = smooth(seg(t, 7.4, 8.2)); if (lk > 0) { x.globalAlpha = lk; x.fillStyle = KEY; x.font = "700 46px AM"; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.sub, 540, 1845 - 26 * 0); x.globalAlpha = 1; }
     const bk = smooth(seg(t, 10.4, 11.2)); if (bk > 0) { x.fillStyle = "rgba(29,27,26,.85)"; x.globalAlpha = bk; x.fillRect(340, 40, 400, 74); x.fillStyle = PAPER; x.font = "700 44px AM"; x.textAlign = "center"; x.fillText(PR.brand, 540, 92); x.globalAlpha = 1; }
