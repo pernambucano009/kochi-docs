@@ -78,6 +78,11 @@ def main():
         b = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
         ap = b.new_page()
         arts = {k: art_png(k, ap) for k in ART}
+        # 📸 لو فيه صورة حقيقية الشكل (photos.py بـ Atlas) تبقى هي، والرسمة احتياطي
+        for k in ART:
+            ph = HERE / "photos" / f"{k}.png"
+            if ph.exists():
+                arts[k] = "data:image/png;base64," + base64.b64encode(ph.read_bytes()).decode()
         ap.close()
         for field, tpls in S.items():
             for tpl, params in tpls.items():
