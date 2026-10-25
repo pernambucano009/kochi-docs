@@ -161,8 +161,13 @@ def account_list(refresh: bool = False) -> list[dict]:
     with _client(30) as c:
         data = _check(c.get(f"{BASE_URL}/accounts", params=params), "قراءة الحسابات")
     items = data.get("accounts", data.get("data", [])) if isinstance(data, dict) else data
-    if prof:   # لو Zernio رجّع حسابات بروفايلات تانية، بنشيلها
-        items = [a for a in items or [] if _pid(a) in (None, prof)] if any(_pid(a) for a in items or []) else items
+    if prof:
+        # 🔒 كل عميل يشوف حسابات البروفايل بتاعه بس. الحساب اللي مش معروف بروفايله مايظهرش (لو Zernio تجاهل الفلتر
+        # ورجّع كل الحسابات، حسابات صاحب البرنامج الشخصية ماتوصلش لأي عميل)
+        dropped = [a for a in items or [] if _pid(a) != prof]
+        items = [a for a in items or [] if _pid(a) == prof]
+        if dropped and not os.environ.get("ZERNIO_PROFILE_ID"):
+            print(f"[publisher] {len(dropped)} account(s) outside profile {prof} hidden", flush=True)
     reverse = {remote: ours for ours, (remote, _) in PLATFORMS.items()}
     out = []
     for a in items or []:

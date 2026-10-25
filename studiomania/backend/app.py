@@ -4025,7 +4025,7 @@ def delete_post(post_id: str):
             publisher.cancel(row["remote_id"])
         except (publisher.PublishError, httpx.HTTPError) as exc:
             if row["status"] == "scheduled":
-                raise HTTPException(400, f"تعذّر ذلك ألغيه عند خدمة النشر: {exc}") from exc
+                raise HTTPException(400, f"تعذّر إلغاؤه عند خدمة النشر: {exc}") from exc
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
     return {"ok": True}
@@ -4089,7 +4089,7 @@ def adopt_remote_post(body: AdoptIn):
     """منشور متجدول عند Zernio ومش هنا: نضيفه للقايمة لكي تتابعه وتلغيه من هنا."""
     post = next((p for p in _remote_orphans() if p["id"] == body.remote_id), None)
     if post is None:
-        raise HTTPException(404, "هذا المنشور غير لاقيه عند خدمة النشر، أو موجود في القائمة بالفعل")
+        raise HTTPException(404, "لم نجد هذا المنشور عند خدمة النشر، أو أنه موجود في القائمة بالفعل")
     try:
         when = datetime.fromisoformat(str(post["scheduled_for"]).replace("Z", "+00:00")).astimezone(timezone.utc)
     except ValueError:
@@ -4108,11 +4108,11 @@ def adopt_remote_post(body: AdoptIn):
 @app.post("/api/posts/remote/{remote_id}/cancel")
 def cancel_remote_post(remote_id: str):
     if not any(p["id"] == remote_id for p in _remote_orphans()):
-        raise HTTPException(404, "هذا المنشور غير لاقيه عند خدمة النشر، أو موجود في القائمة بالفعل")
+        raise HTTPException(404, "لم نجد هذا المنشور عند خدمة النشر، أو أنه موجود في القائمة بالفعل")
     try:
         publisher.cancel(remote_id)
     except (publisher.PublishError, httpx.HTTPError) as exc:
-        raise HTTPException(400, f"تعذّر ذلك ألغيه عند خدمة النشر: {exc}") from exc
+        raise HTTPException(400, f"تعذّر إلغاؤه عند خدمة النشر: {exc}") from exc
     return {"ok": True}
 
 

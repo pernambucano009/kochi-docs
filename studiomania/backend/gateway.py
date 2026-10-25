@@ -511,6 +511,8 @@ _http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10), limits=httpx.
 @app.on_event("startup")
 async def _start():
     threading.Thread(target=reaper, daemon=True).start()
+    if STAGING:   # 🔒 التجريبي: صاحب البرنامج ياخد بروفايل نشر لوحده قبل ما أي نسخة تقوم
+        threading.Thread(target=_remember_owner_profile, daemon=True).start()
 
 
 @app.on_event("shutdown")
@@ -636,9 +638,13 @@ def owner_setup(body: SetupIn, request: Request):
     return with_session(JSONResponse({"ok": True}), user_by("id", uid), request)
 
 
+STAGING = os.environ.get("STAGING") == "1"
+
+
 def _remember_owner_profile() -> None:
-    """بروفايل Zernio الخاص بـ صاحب البرنامج (أول بروفايل موجود) لكي حسابات العملاء متظهرش لديه."""
-    if kv_get("zernio_owner_profile"):
+    """بروفايل Zernio الخاص بـ صاحب البرنامج (أول بروفايل موجود) لكي حسابات العملاء متظهرش لديه.
+    🔒 النسخة التجريبية ليها بروفايل لوحدها («staging-owner»): حسابات السوشيال الحقيقية بتاعة صاحب البرنامج ماتظهرش فيها."""
+    if kv_get("zernio_owner_profile") and (not STAGING or kv_get("zernio_owner_profile_kind") == "staging"):
         return
     try:
         env = {**os.environ, **owner_keys()}
@@ -648,7 +654,15 @@ def _remember_owner_profile() -> None:
         base = os.environ.get("ZERNIO_BASE_URL", "https://zernio.com/api/v1")
         data = httpx.get(f"{base}/profiles", headers={"Authorization": f"Bearer {key}"}, timeout=20).json()
         items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
-        if items:
+        if STAGING:
+            hit = next((x for x in items or [] if x.get("name") == "staging-owner"), None)
+            if not hit:
+                hit = httpx.post(f"{base}/profiles", headers={"Authorization": f"Bearer {key}"}, json={"name": "staging-owner"}, timeout=20).json()
+                hit = hit.get("profile", hit) if isinstance(hit, dict) else {}
+            if hit.get("_id") or hit.get("id"):
+                kv_set("zernio_owner_profile", hit.get("_id") or hit.get("id"))
+                kv_set("zernio_owner_profile_kind", "staging")
+        elif items:
             kv_set("zernio_owner_profile", items[0].get("_id") or items[0].get("id"))
     except (httpx.HTTPError, ValueError, AttributeError):
         pass
