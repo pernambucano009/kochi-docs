@@ -53,6 +53,9 @@ const PlansView = (() => {
 :is(#nh, body) .pv-wrap { display: grid; justify-items: center; gap: 26px; opacity: 0; transform: scale(.72); filter: blur(4px); pointer-events: none;
   transition: transform .6s var(--pv-ease), opacity .45s var(--pv-ease) .08s, filter .45s .08s; transform-origin: 50% 30%; }
 :is(#nh, body) .pv.open .pv-wrap { opacity: 1; transform: none; filter: none; pointer-events: auto; }
+/* التفاصيل وهي مقفولة مابتاخدش مساحة، فالأسعار تفضل في نص الشاشة */
+:is(#nh, body) .pv-stack { position: relative; }
+:is(#nh, body) .pv:not(.open) .pv-wrap { position: absolute; top: 0; inset-inline: 0; }
 :is(#nh, body) .pv-seg { justify-self: end; display: inline-flex; gap: 2px; padding: 2px; margin-bottom: -10px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--pv-line); }
 :is(#nh, body) .pv-seg button { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 11px; border-radius: 999px; font-size: 11.5px; color: var(--pv-muted); transition: background .2s, color .2s; }
 :is(#nh, body) .pv-seg button:hover { color: var(--pv-ink); } :is(#nh, body) .pv-seg button.on { background: var(--pv-fill); color: var(--pv-ink); }
@@ -213,7 +216,7 @@ const PlansView = (() => {
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
         <div class="pv-mid">
-          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "أغلق التفاصيل" : "تفاصيل الباقات"}</span><i aria-hidden="true"></i></button>
+          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "إخفاء" : "التفاصيل"}</span><i aria-hidden="true"></i></button>
           <div class="pv-stack">
             <div class="pv-row">${plans.map(small).join("")}</div>
             <div class="pv-wrap" aria-hidden="${!S.open}">
@@ -226,8 +229,8 @@ const PlansView = (() => {
     }
     const pv = () => el.querySelector(".pv");
     let shut;
-    const zoom = (on) => { clearTimeout(shut); S.open = on; if (!on) S.pick = null; pv().classList.toggle("open", on); el.querySelector("[data-pvcap]").setAttribute("aria-expanded", on);
-      el.querySelector("[data-pvcapt]").textContent = on ? "أغلق التفاصيل" : "تفاصيل الباقات";
+    const zoom = (on) => { clearTimeout(shut); if (on && !S.open) S.openedAt = Date.now(); S.open = on; if (!on) S.pick = null; pv().classList.toggle("open", on); el.querySelector("[data-pvcap]").setAttribute("aria-expanded", on);
+      el.querySelector("[data-pvcapt]").textContent = on ? "إخفاء" : "التفاصيل";
       el.querySelector(".pv-wrap").setAttribute("aria-hidden", !on); };
     const pay = async (kind, key, prov) => {
       if (!o.pay) return;
@@ -236,7 +239,7 @@ const PlansView = (() => {
     };
     el.addEventListener("click", (e) => {
       const q = (s) => e.target.closest(s);
-      if (q("[data-pvcap]")) return zoom(!S.open);
+      if (q("[data-pvcap]")) return S.open && Date.now() - (S.openedAt || 0) < 700 ? null : zoom(!S.open);   // الضغطة اللي بعد الهوفر على طول ماتقفلهاش
       if (q("[data-pvopen]")) return zoom(true);
       if (q("[data-pvcyc]")) { S.cyc = q("[data-pvcyc]").dataset.pvcyc; S.pick = null; render(); return pv().classList.add("open"); }
       if (q("[data-pvbuy]")) return o.signup?.(q("[data-pvbuy]").dataset.pvbuy, S.cyc);
@@ -257,6 +260,17 @@ const PlansView = (() => {
       }
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open && el.isConnected) zoom(false); });
+    // 🖱️ الوقوف على «التفاصيل» يفتحها على طول، والخروج من منطقة الباقات يقفلها بعد لحظة (الضغط شغال كمان، وعلى الجوال بالضغط بس)
+    if (matchMedia("(hover: hover)").matches) {
+      el.addEventListener("mouseover", (e) => {
+        if (e.target.closest?.("[data-pvcap]") && !S.open) zoom(true);
+        if (e.target.closest?.(".pv-mid")) clearTimeout(shut);
+      });
+      el.addEventListener("mouseout", (e) => {
+        if (!S.open || !e.target.closest?.(".pv-mid") || e.relatedTarget?.closest?.(".pv-mid")) return;
+        clearTimeout(shut); shut = setTimeout(() => { if (S.open && !S.busy) zoom(false); }, 700);
+      });
+    }
     render();
   }
   return { mount };
