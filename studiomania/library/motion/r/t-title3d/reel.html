@@ -4,14 +4,14 @@
 // فاتجاه العمق بيتغير، ولمعة نور بتعدّي على وش الحروف، وأشعة نور ورا. زي تترات الأفلام والمسلسلات. 1080×1920، 12 ثانية.
 const K1 = "١ · العنوان المجسّم", K2 = "٢ · التفاصيل", KS = "الشكل العام";
 const PR = M.params({
-  l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم", group: K1, max: 8, hint: "كلمة واحدة تقيلة (الحروف بارزة ولها عمق، فالكلمة القصيرة بتطلع أضخم)." },
-  l2: { label: "السطر الثاني", kind: "text", def: "الجديد", group: K1, max: 8, hint: "كلمة تانية بتكمّل الأولى (أو سيبه فاضي لسطر واحد)." },
-  sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل", group: K2, max: 28, hint: "الميعاد أو التفاصيل." },
+  l1: { label: "السطر الأول", kind: "text", role: "product", def: "الموسم", group: K1, max: 8, hint: "كلمة واحدة ثقيلة (الحروف بارزة ولها عمق، فالكلمة القصيرة تبدو أضخم)." },
+  l2: { label: "السطر الثاني", kind: "text", def: "الجديد", group: K1, max: 8, hint: "كلمة ثانية تكمل الأولى (أو اتركه فارغًا لسطر واحد)." },
+  sub: { label: "تحت العنوان", kind: "text", def: "أول حلقة الجمعة ٩ بالليل", group: K2, max: 28, hint: "الموعد أو التفاصيل." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "قناة حكاية", group: K2, max: 16 },
-  face: { label: "لون وش الحروف", kind: "color", role: "accent", def: "#ffd36b", group: KS, hint: "لون فاتح لامع (دهبي، فضي، أبيض)." },
-  side: { label: "لون جنب الحروف", kind: "color", def: "#b0461f", group: KS, hint: "أغمق بكتير من الوش علشان العمق يبان." },
-  bg: { label: "لون الخلفية", kind: "color", role: "dark", def: "#140a24", group: KS, hint: "غامق جدًا زي تترات الأفلام." },
-  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: KS, hint: "خط تقيل جدًا علشان العمق يبان (لاله‌زار، الإسكندرية، Anton)." },
+  face: { label: "لون وجه الحروف", kind: "color", role: "accent", def: "#ffd36b", group: KS, hint: "لون فاتح لامع (ذهبي، فضي، أبيض)." },
+  side: { label: "لون جوانب الحروف", kind: "color", def: "#b0461f", group: KS, hint: "أغمق بكثير من الوجه ليظهر العمق." },
+  bg: { label: "لون الخلفية", kind: "color", role: "dark", def: "#140a24", group: KS, hint: "غامق جدًا مثل شارات الأفلام." },
+  fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: KS, hint: "خط ثقيل جدًا ليظهر العمق (لاله‌زار، الإسكندرية، Anton)." },
   fBody: { label: "خط السطور", kind: "font", def: "plex", group: KS },
 });
 M.meta({

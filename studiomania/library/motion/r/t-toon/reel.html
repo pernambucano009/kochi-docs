@@ -4,13 +4,13 @@
 // مذيعة (جسمها ثابت، الإيدين والعيون بس اللي بتتحرك) بتشرح المنتج في ٣ خطوات، ونجوم وأشكال «أتوميك». 1080×1920، 12 ثانية.
 const G1 = "١ · المنتج", G2 = "٢ · الخطوات", G3 = "٣ · النهاية", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح", group: G1, max: 14, hint: "المذيعة بتقدّمه في الأول." },
-  s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة", group: G2, max: 14, hint: "إزاي تستخدم المنتج في ٣ خطوات سهلة." },
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح", group: G1, max: 14, hint: "تقدّمه المذيعة في البداية." },
+  s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة", group: G2, max: 14, hint: "كيف تستخدم المنتج في ٣ خطوات سهلة." },
   s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزر", group: G2, max: 14 },
   s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع", group: G2, max: 14 },
   end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!", group: G3, max: 12 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "بيتي للأجهزة", group: G3, max: 16 },
-  product: { label: "لون المنتج", kind: "color", role: "accent", def: "#2bb3a8", group: G1, hint: "لون المنتج المرسوم جنب المذيعة." },
+  product: { label: "لون المنتج", kind: "color", role: "accent", def: "#2bb3a8", group: G1, hint: "لون المنتج المرسوم بجانب المذيعة." },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
   fText: { label: "خط العلامة", kind: "font", def: "changa", group: GS },
 });

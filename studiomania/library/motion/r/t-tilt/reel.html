@@ -4,10 +4,10 @@
 // ألوان مشبّعة، عربيات وناس بتتحرك متقطع (زي الفاصل الزمني)، والناس بتتجمع عند الفرع الجديد. 1080×1920، 12 ثانية.
 const G1 = "١ · المدينة", G2 = "٢ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "افتتاح فرعنا الجديد", group: G2, max: 22, hint: "الخبر: افتتاح، فرع جديد، حدث. بيظهر بعد ما الناس تتجمع عند المحل." },
-  sub: { label: "تحت العنوان", kind: "text", def: "الجمعة الجاية · الساعة ١٠ الصبح", group: G2, max: 32, hint: "الميعاد والمكان: يوم + ساعة، أو اسم الحي." },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "كافيه الركن", group: G2, max: 18, hint: "بيظهر في كبسولة بلون الفرع تحت." },
-  accent: { label: "لون الفرع", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "لون سقف المحل وناسه: لون البراند علشان العين تروحله على طول." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "افتتاح فرعنا الجديد", group: G2, max: 22, hint: "الخبر: افتتاح، فرع جديد، حدث. يظهر بعد تجمّع الناس عند المحل." },
+  sub: { label: "تحت العنوان", kind: "text", def: "الجمعة الجاية · الساعة ١٠ الصبح", group: G2, max: 32, hint: "الموعد والمكان: يوم + ساعة، أو اسم الحي." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "كافيه الركن", group: G2, max: 18, hint: "يظهر في كبسولة بلون الفرع في الأسفل." },
+  accent: { label: "لون الفرع", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "لون سقف المحل وناسه: لون العلامة لتتجه إليه العين مباشرة." },
   fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
   fText: { label: "خط النص", kind: "font", def: "changa", group: GS },
 });

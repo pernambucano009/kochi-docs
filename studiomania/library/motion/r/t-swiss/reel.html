@@ -4,15 +4,15 @@
 // (من غير نطّ)، الدخول بالمسح مش بالبهتان، والحذف بقطعة سكينة… والدايرة الحمرا هي الاستثناء: بتتحرك حرّة برّه الشبكة. 12 ثانية.
 const G1 = "١ · الرقم", G2 = "٢ · السطور", G3 = "٣ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  num: { label: "الرقم الكبير", kind: "text", def: "01", group: G1, max: 3, hint: "رقم ضخم (رقم الإصدار أو العدد أو السنة)، بالأرقام اللاتيني أحلى في الستايل ده." },
+  num: { label: "الرقم الكبير", kind: "text", def: "01", group: G1, max: 3, hint: "رقم ضخم (رقم الإصدار أو العدد أو السنة)، والأرقام اللاتينية أجمل في هذا الأسلوب." },
   note: { label: "ملاحظة صغيرة", kind: "text", def: "إصدار ٣ · ٢٠٢٦", group: G1, max: 22, hint: "معلومة صغيرة تحت الرقم." },
-  l1: { label: "السطر ١", kind: "text", def: "أقل كلام.", group: G2, max: 14, hint: "٣ سطور قصيرة بنقطة في الآخر. التالت بس هو اللي بيفضل، فخليه أقواهم." },
+  l1: { label: "السطر ١", kind: "text", def: "أقل كلام.", group: G2, max: 14, hint: "٣ سطور قصيرة بنقطة في النهاية. يبقى الثالث فقط، فاجعله أقواها." },
   l2: { label: "السطر ٢", kind: "text", def: "أوضح فكرة.", group: G2, max: 14 },
-  l3: { label: "السطر ٣ (اللي بيفضل)", kind: "text", def: "أقوى براند.", group: G2, max: 14 },
+  l3: { label: "السطر ٣ (الذي يبقى)", kind: "text", def: "أقوى براند.", group: G2, max: 14 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو أثر", group: G3, max: 14 },
-  tag: { label: "تحت الاسم", kind: "text", role: "tagline", def: "تصميم هويات · القاهرة", group: G3, max: 26, hint: "الشغلانة والمدينة." },
-  signal: { label: "لون الإشارة", kind: "color", role: "accent", def: "#E30613", group: GS, hint: "اللون الوحيد في الفيديو (الدايرة): أحمر سويسري أو لون البراند لو قوي." },
-  fHead: { label: "خط السطور", kind: "font", def: "plex", group: GS, hint: "خط نضيف من غير زخرفة يليق على الشبكة." },
+  tag: { label: "تحت الاسم", kind: "text", role: "tagline", def: "تصميم هويات · القاهرة", group: G3, max: 26, hint: "المهنة والمدينة." },
+  signal: { label: "لون الإشارة", kind: "color", role: "accent", def: "#E30613", group: GS, hint: "اللون الوحيد في الفيديو (الدائرة): أحمر سويسري أو لون العلامة إن كان قويًا." },
+  fHead: { label: "خط السطور", kind: "font", def: "plex", group: GS, hint: "خط نظيف بلا زخرفة يليق بالشبكة." },
   fText: { label: "خط الملاحظات", kind: "font", def: "plex4", group: GS },
 });
 M.meta({

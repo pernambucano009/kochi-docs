@@ -5,10 +5,10 @@
 const G1 = "١ · الطباعة", G2 = "٢ · العنوان", G3 = "٣ · الشريط", GS = "الشكل العام";
 const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "صيف ملوّن", group: G2, max: 12, hint: "كلمتان على الأكثر: يُطبع كبيرًا على لوحين حبر غير متطابقين تمامًا." },
-  sub: { label: "السطر اللي تحته", kind: "text", def: "تخفيضات على كل التشكيلة", group: G2, max: 26, hint: "العرض أو الخبر." },
-  strip: { label: "الشريط اللي تحت", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين", group: G3, max: 34, hint: "المعاد ومكان الطلب، بنقطة في النص بين الحاجتين." },
+  sub: { label: "السطر الذي تحته", kind: "text", def: "تخفيضات على كل التشكيلة", group: G2, max: 26, hint: "العرض أو الخبر." },
+  strip: { label: "الشريط السفلي", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين", group: G3, max: 34, hint: "الموعد ومكان الطلب، بنقطة في المنتصف بينهما." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "دراجة", group: G3, max: 16 },
-  ink1: { label: "حبر ١ (الأساسي)", kind: "color", role: "accent", def: "#0078BF", group: G1, hint: "أحبار الريزو الحقيقية: أزرق، وردي فلورسنت، أصفر. لما بيتراكبوا بيعملوا ألوان تالتة." },
+  ink1: { label: "حبر ١ (الأساسي)", kind: "color", role: "accent", def: "#0078BF", group: G1, hint: "أحبار الريزو الحقيقية: أزرق، وردي فسفوري، أصفر. حين تتراكب تكوّن ألوانًا ثالثة." },
   ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0", group: G1 },
   ink3: { label: "حبر ٣", kind: "color", def: "#FFE800", group: G1 },
   fHead: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
@@ -104,7 +104,7 @@ M.reel({
     }
     const sk = seg(t, 4.0, 4.2);
     if (sk > 0) { bl.save(); bl.font = `700 ${M.fit(PR.sub, "CH", 900, 74, 30, "700")}px CH`; bl.textAlign = "center"; bl.direction = "rtl"; bl.fillStyle = INKS[0]; bl.fillText(PR.sub, 540, 470 + 30 * (1 - springO(sk * .5, 16, .55))); bl.restore(); }
-    // الشريط اللي تحت: شريط ورق (من غير حبر في كل الألواح) والكلام بالأزرق
+    // الشريط السفلي: شريط ورق (من غير حبر في كل الألواح) والكلام بالأزرق
     const bk = seg(t, 6.0, 6.4);
     if (bk > 0) {
       const w = 900 * cubic(bk), y0 = 1700;

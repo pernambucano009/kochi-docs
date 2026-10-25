@@ -5,10 +5,10 @@
 const G1 = "١ · لوح الفرن", G2 = "٢ · لوح الرغيف", G3 = "٣ · لوح العنوان", GS = "الشكل العام";
 const PR = M.params({
   line1: { label: "جملة اللوحة الأولى", kind: "text", def: "كل يوم قبل الفجر", group: G1, max: 24, hint: "تحت لوح الفرن والنار." },
-  line2: { label: "جملة اللوحة التانية", kind: "text", def: "بإيدينا… رغيف رغيف", group: G2, max: 24, hint: "تحت لوح الرغيف." },
-  title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة", group: G3, max: 12, hint: "بيتحفر في اللوح التالت." },
+  line2: { label: "جملة اللوحة الثانية", kind: "text", def: "بإيدينا… رغيف رغيف", group: G2, max: 24, hint: "تحت لوح الرغيف." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة", group: G3, max: 12, hint: "يُحفر في اللوحة الثالثة." },
   sub: { label: "تحت العنوان", kind: "text", def: "نفس النار من ١٩٦٠", group: G3, max: 24 },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مخبز الأمانة", group: G3, max: 16, hint: "أول حرف منه بيتطبع ختم صغير في الركن." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مخبز الأمانة", group: G3, max: 16, hint: "يُطبع أول حرف منه ختمًا صغيرًا في الركن." },
   fire: { label: "لون النار", kind: "color", role: "accent", def: "#e8562a", group: GS, hint: "اللون الوحيد غير الأبيض والأسود." },
   fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
   fText: { label: "خط الجمل", kind: "font", def: "amiri", group: GS },

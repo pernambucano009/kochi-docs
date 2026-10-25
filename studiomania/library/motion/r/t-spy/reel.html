@@ -4,17 +4,17 @@
 // الكلام هو المباني والأسطح، النحاس بيقطع المشاهد، وفي الآخر الشنطة بتتفتح على «العرض السري». 1080×1920، 12 ثانية.
 const G1 = "١ · التقديم", G2 = "٢ · المطاردة والشنطة", G3 = "٣ · اسم العرض", GC = "الألوان", GS = "الشكل العام";
 const PR = M.params({
-  presents: { label: "الكلام الأول", kind: "text", def: "تقدّم", group: G1, max: 10, hint: "زي تترات الأفلام: «تقدّم» أو «بالاشتراك مع»." },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو البلد", group: G1, max: 16, hint: "بيظهر كبير في الأول وصغير في الآخر." },
-  starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت", group: G2, max: 16, hint: "هزار التترات: العميل هو البطل." },
-  code: { label: "جوه الشنطة", kind: "text", def: "كود: صيف٤٠", group: G2, max: 14, hint: "الشنطة بتتفتح على السر: كود خصم أو هدية." },
+  presents: { label: "النص الأول", kind: "text", def: "تقدّم", group: G1, max: 10, hint: "مثل شارات الأفلام: «تقدّم» أو «بالاشتراك مع»." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو البلد", group: G1, max: 16, hint: "يظهر كبيرًا في البداية وصغيرًا في النهاية." },
+  starring: { label: "سطر البطولة", kind: "text", def: "بطولة: إنت", group: G2, max: 16, hint: "طرافة الشارات: العميل هو البطل." },
+  code: { label: "داخل الحقيبة", kind: "text", def: "كود: صيف٤٠", group: G2, max: 14, hint: "تنفتح الحقيبة على السر: رمز خصم أو هدية." },
   title: { label: "اسم العرض", kind: "text", role: "product", def: "العرض السري", group: G3, max: 14 },
-  date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩", group: G3, max: 28, hint: "إمتى العرض يبدأ أو يخلص." },
-  ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714", group: GC, hint: "السيلويت والضلّ: لازم يفضل غامق." },
-  cream: { label: "الورق", kind: "color", def: "#efe4c9", group: GC, hint: "لون النص الفاتح: لازم يفضل فاتح." },
-  hot: { label: "اللون السخن", kind: "color", role: "accent", def: "#d23a22", group: GC },
-  warm: { label: "اللون الدافي", kind: "color", def: "#e2a52a", group: GC },
-  fHead: { label: "خط التترات", kind: "font", def: "lalezar", group: GS },
+  date: { label: "التاريخ", kind: "text", def: "الخميس الجاي الساعة ٩", group: G3, max: 28, hint: "متى يبدأ العرض أو ينتهي." },
+  ink: { label: "الحبر الغامق", kind: "color", def: "#1b1714", group: GC, hint: "الظلال والخيالات: يجب أن تبقى غامقة." },
+  cream: { label: "الورق", kind: "color", def: "#efe4c9", group: GC, hint: "لون النص الفاتح: يجب أن يبقى فاتحًا." },
+  hot: { label: "اللون الحار", kind: "color", role: "accent", def: "#d23a22", group: GC },
+  warm: { label: "اللون الدافئ", kind: "color", def: "#e2a52a", group: GC },
+  fHead: { label: "خط الشارات", kind: "font", def: "lalezar", group: GS },
   fText: { label: "خط النص الصغير", kind: "font", def: "changa", group: GS },
 });
 M.meta({

@@ -1,22 +1,22 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// قالب «مقدمة ونهاية لقناة»: افتتاحية سريعة بأشكال بتتجمع وتعمل لوجو القناة واسمها، بعدها كارت عنوان الحلقة، وفي الآخر شاشة النهاية:
+// قالب «مقدمة ونهاية لقناة»: افتتاحية سريعة بأشكال بتتجمع وتعمل شعار القناة واسمها، بعدها كارت عنوان الحلقة، وفي الآخر شاشة النهاية:
 // فيديوهين مقترحين، صورة القناة، وزرار اشتراك بيتضغط والجرس بيرن. 1080×1920، 12 ثانية.
 const K1 = "١ · افتتاحية القناة", K2 = "٢ · عنوان الحلقة", K3 = "٣ · شاشة النهاية", KS = "الشكل العام";
 const PR = M.params({
-  channel: { label: "اسم القناة", kind: "text", role: "brand", def: "مطبخ سلمى", group: K1, max: 14, hint: "بيظهر كبير في الافتتاحية وصغير تحت الفيديوهات." },
-  logo: { label: "لوجو القناة", kind: "image", role: "logo", def: "", group: K1, img: { ratio: "1:1", cut: true, tip: "علامة القناة فاتحة من غير خلفية (بتظهر جوه دايرة بلون القناة). لو مفيش بتظهر معلقة مرسومة." } },
-  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "كيكة البرتقال في ١٠ دقايق", group: K2, max: 28, hint: "نفس عنوان الفيديو على يوتيوب (فيه وعد أو رقم)." },
+  channel: { label: "اسم القناة", kind: "text", role: "brand", def: "مطبخ سلمى", group: K1, max: 14, hint: "يظهر كبيرًا في الافتتاحية وصغيرًا تحت الفيديوهات." },
+  logo: { label: "شعار القناة", kind: "image", role: "logo", def: "", group: K1, img: { ratio: "1:1", cut: true, tip: "علامة القناة فاتحة من غير خلفية (بتظهر جوه دايرة بلون القناة). لو مفيش بتظهر معلقة مرسومة." } },
+  ep: { label: "عنوان الحلقة", kind: "text", role: "product", def: "كيكة البرتقال في ١٠ دقايق", group: K2, max: 28, hint: "عنوان الفيديو نفسه على يوتيوب (فيه وعد أو رقم)." },
   epno: { label: "رقم الحلقة", kind: "text", def: "الحلقة ٢٤", group: K2, max: 12 },
   more: { label: "عنوان شاشة النهاية", kind: "text", def: "شوف كمان", group: K3, max: 12 },
-  v1: { label: "الفيديو المقترح ١", kind: "text", def: "أسهل عيش في البيت", group: K3, max: 22, hint: "عنوان فيديو حقيقي على القناة (أكتر واحد اتشاف)." },
-  th1: { label: "ثامبنيل الفيديو ١", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
+  v1: { label: "الفيديو المقترح ١", kind: "text", def: "أسهل عيش في البيت", group: K3, max: 22, hint: "عنوان فيديو حقيقي على القناة (الأكثر مشاهدة)." },
+  th1: { label: "الصورة المصغّرة للفيديو ١", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
   v2: { label: "الفيديو المقترح ٢", kind: "text", def: "٥ أكلات للسحور", group: K3, max: 22 },
-  th2: { label: "ثامبنيل الفيديو ٢", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
+  th2: { label: "الصورة المصغّرة للفيديو ٢", kind: "image", def: "", group: K3, img: { ratio: "16:9", cut: false, tip: "صورة الثامبنيل الحقيقية للفيديو (عرضي). لو مفيش بيظهر مستطيل ملوّن بزرار تشغيل." } },
   sub: { label: "زر الاشتراك", kind: "text", def: "اشترك", group: K3, max: 8 },
   subd: { label: "الزر بعد الضغط", kind: "text", def: "مشترك", group: K3, max: 8 },
   c1: { label: "لون القناة", kind: "color", role: "accent", def: "#ff7a1a", group: KS, hint: "لون هوية القناة (الأشكال والتمييز)." },
-  c2: { label: "اللون الثاني", kind: "color", role: "dark", def: "#2d1b4e", group: KS, hint: "الخلفية: غامق." },
+  c2: { label: "اللون الثاني", kind: "color", role: "dark", def: "#2d1b4e", group: KS, hint: "الخلفية: غامقة." },
   fHead: { label: "خط اسم القناة", kind: "font", def: "lalezar", group: KS },
   fBody: { label: "خط العناوين", kind: "font", def: "plex", group: KS },
 });
@@ -36,7 +36,7 @@ M.reel({
     const logo = (cx, cy, s, k) => { // لوجو: دايرة + معلقة + بخار
       x.save(); x.translate(cx, cy); x.scale(s, s);
       x.fillStyle = A; x.beginPath(); x.arc(0, 0, 150 * springO(clamp(k / .6), 12, .5), 0, Math.PI * 2); x.fill();
-      if (lgI) { const q = springO(clamp((k - .25) / .6), 12, .5), z = 210 * q / Math.max(lgI.width, lgI.height); x.drawImage(lgI, -lgI.width * z / 2, -lgI.height * z / 2, lgI.width * z, lgI.height * z); x.restore(); return; }   // لوجو القناة بدل المعلقة
+      if (lgI) { const q = springO(clamp((k - .25) / .6), 12, .5), z = 210 * q / Math.max(lgI.width, lgI.height); x.drawImage(lgI, -lgI.width * z / 2, -lgI.height * z / 2, lgI.width * z, lgI.height * z); x.restore(); return; }   // شعار القناة بدل المعلقة
       const k2 = springO(clamp((k - .25) / .6), 12, .5); x.fillStyle = "#fff"; x.save(); x.rotate(-.5 + (1 - k2) * 2); x.beginPath(); x.ellipse(0, -30, 44 * k2, 58 * k2, 0, 0, Math.PI * 2); x.fill(); x.fillRect(-10 * k2, 20, 20 * k2, 110 * k2); x.restore();
       x.strokeStyle = "#fff"; x.lineWidth = 10; x.lineCap = "round"; for (let i = 0; i < 3; i++) { const k3 = clamp((k - .4 - i * .08) / .4); if (k3 <= 0) continue; x.beginPath(); for (let j = 0; j <= 10 * k3; j++) { const u = j / 10; x.lineTo(60 + i * 26 + Math.sin(u * 6 + t * 4) * 8, -60 - u * 120); } x.stroke(); }
       x.restore(); };
