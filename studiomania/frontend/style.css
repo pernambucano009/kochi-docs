@@ -3175,3 +3175,9 @@ html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }
 /* 🌐 زرار اللغة لصاحب المنصة فقط لحد ما الترجمة الإنجليزية تكتمل (يظهر بعد ما نعرف نوع الحساب، فمش بيظهر ويختفي) */
 :root:not([data-role="admin"]) #nhLang, :root:not([data-role="admin"]) #langToggle, :root:not([data-role="admin"]) .admin-lang, :root:not([data-role="admin"]) .admin-lang-t { display: none !important; }
 :root[data-role="admin"] .cust-lang-t { display: none; }
+/* 🎧 مختبر الأصوات: الزرار البرتقالي بحجمه (مش ممدود على عرض النافذة)، ولما تقف عليه مابيطلّعش شريط تمرير فالنافذة ماتتهزش */
+.vl-box{overflow-x:hidden}
+.vl-body>.btn{align-self:flex-start}
+.vl-box :is(.btn.primary,.ui-dlg-ok):hover:not(:disabled){transform:none}
+/* 🌐 الإنجليزي: النوافذ اللي كانت مجبورة يمين لشمال (مختبر الأصوات، قايمة السكتات، المساعد) بتتقلب شمال ليمين عشان النقط والترتيب */
+html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}

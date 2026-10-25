@@ -42,7 +42,8 @@
   pats.sort((a, b) => b.staticLen - a.staticLen); // الأدق أولًا: «{0} من {1} قطعة وُلّدت» قبل «{0} من {1}: {2}»
 
   const fill = (p, vals) => p.en.replace(/\{(\d)\}/g, (_, i) => t(vals[p.order.indexOf(+i)] ?? ""));
-  const cache = new Map();
+  const cache = new Map(), miss = new Set();
+  I18N.misses = () => [...miss];
   function t(s) {
     if (!s || !AR.test(s)) return s;
     const hit = cache.get(s);
@@ -66,10 +67,11 @@
     }
     if (out === undefined) {
       // جملة متركّبة من كذا حتة: بنترجم كل حتة نعرفها جواها
+      if (miss.size < 3000) miss.add(n);   // 🔎 جمل مش في القاموس (I18N.misses()): أداة الجرد بتجمعها من الشاشات
       out = n;
       for (const [a, e] of frags) if (out.includes(a)) out = out.split(a).join(e);
       for (const p of pats) if (p.loose && AR.test(out)) out = out.replace(p.loose, (...m) => fill(p, m.slice(1, 1 + p.order.length)));
-      out = out.replace(/،/g, ",").replace(/؟/g, "?").replace(/«|»/g, '"');
+      out = out.replace(/،/g, ",").replace(/؟/g, "?").replace(/«|»/g, '"').replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
     }
     out = lead + out + trail;
     if (cache.size < 8000) cache.set(s, out);
