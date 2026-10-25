@@ -14,7 +14,7 @@ const PR = M.params({
 });
 M.meta({
   story: "عالم مكعبات بلاستيكية على مكتب خشبي، مصوّر عن قرب بأسلوب الإيقاف الحركي: المحل يُبنى قطعة قطعة، واللافتة تُركَّب، وشخصية مبنية من المكعبات تمشي نحو الباب، ثم العنوان والعلامة على قطعة صفراء.",
-  scenes: [{ name: G1, t0: 0, t1: 10, about: "المحل بيتبني والشخصية ماشية" }, { name: G2, t0: 10, t1: 12, about: "العنوان والبراند" }],
+  scenes: [{ name: G1, t0: 0, t1: 10, about: "المحل يُبنى والشخصية تمشي" }, { name: G2, t0: 10, t1: 12, about: "العنوان والعلامة" }],
   tips: ["مناسب للمحلات الجديدة والافتتاحات وألعاب الأطفال والبدايات.", "الفكرة: شيء يُبنى خطوة خطوة.", "اللافتة كلمة واحدة لتظهر على المكعبات."],
 });
 const W = 1080, H = 1920, DUR = 12, A = 44, BV = 25.4, HZ = 31, OX = 540, OY = 640;
@@ -73,7 +73,7 @@ M.reel({
     // كلام اللافتة على الطوبة البيضا
     const sp = C.L.find((p) => p[7] === "sign"); if (tq > sp.t + .25) { const [cx, cy] = P(6, 9, 2.8); x.save(); x.translate(cx, cy); x.transform(1, BV / A, 0, 1, 0, 0); x.fillStyle = "#222"; x.font = `${M.fit(PR.sign, "LZ", 200, 48, 22)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.sign, 0, 0); x.restore(); }
     x.setTransform(1, 0, 0, 1, 0, 0);
-    // العنوان والبراند (كروت طوب مسطحة)
+    // العنوان والعلامة (كروت طوب مسطحة)
     const tk = expo(seg(t, 10.0, 10.6));
     if (tk > 0) { x.save(); x.globalAlpha = tk; x.fillStyle = "rgba(255,255,255,.92)"; x.beginPath(); x.roundRect(70, 110, 940, 220, 30); x.fill(); x.fillStyle = "#1d1d1b"; x.font = `${M.fit(PR.title, "LZ", 880, 100, 44)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.title, 540, 220); x.restore(); }
     const bk = expo(seg(t, 10.8, 11.4)); if (bk > 0) { x.save(); x.globalAlpha = bk; x.fillStyle = "#f6c428"; x.beginPath(); x.roundRect(290, 1700, 500, 120, 20); x.fill(); x.fillStyle = "rgba(0,0,0,.2)"; for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(370 + k * 115, 1700, 30, 12, 0, 0, Math.PI * 2); x.fill(); } x.fillStyle = "#1d1d1b"; x.font = `700 ${M.fit(PR.brand, "CH", 440, 54, 24, "700")}px CH`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1765); x.restore(); }

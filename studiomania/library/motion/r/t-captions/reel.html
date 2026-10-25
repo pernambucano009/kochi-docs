@@ -10,8 +10,8 @@ const PR = M.params({
   handle: { label: "اسم الحساب", kind: "text", role: "handle", def: "@ندى_سكين", group: K2, max: 18 },
   product: { label: "اسم المنتج", kind: "text", role: "product", def: "سيروم ندى", group: K2, max: 14, hint: "يُكتب على الزجاجة المرسومة (إن لم توجد صورة)." },
   sub: { label: "بجانب اسم المنتج في الأسفل", kind: "text", def: "جربته بنفسي", group: K2, max: 16, hint: "مثل وصف المنشور (جرّبته بنفسي، مراجعة صريحة)." },
-  img: { label: "صورة المنتج", kind: "image", role: "product_img1", def: "", group: K2, img: { ratio: "3:4", cut: true, tip: "PNG من غير خلفية، المنتج واقف. لو مفيش بتظهر زجاجة مرسومة." } },
-  bgimg: { label: "صورة الخلفية (اختياري)", kind: "image", def: "", group: KS, img: { ratio: "9:16", cut: false, tip: "صورة طولي هادية وفيها مساحة (حمام، ترابيزة، طبيعة). بتتغمق شوية علشان الكلام يبان." } },
+  img: { label: "صورة المنتج", kind: "image", role: "product_img1", def: "", group: K2, img: { ratio: "3:4", cut: true, tip: "PNG بلا خلفية، والمنتج واقف. إن لم يوجد تظهر زجاجة مرسومة." } },
+  bgimg: { label: "صورة الخلفية (اختياري)", kind: "image", def: "", group: KS, img: { ratio: "9:16", cut: false, tip: "صورة طولية هادئة فيها مساحة (حمّام، طاولة، طبيعة). تُعتَّم قليلًا ليظهر النص." } },
   color: { label: "لون الكلمة المهمة", kind: "color", role: "accent", def: "#ffd23f", group: KS, hint: "لون فاتح وقوي (أصفر، أخضر فسفوري) ليظهر على أي خلفية." },
   bottle: { label: "لون الزجاجة", kind: "color", def: "#f08aa8", group: KS },
   fHead: { label: "خط التعليق النصي", kind: "font", def: "lalezar", group: KS, hint: "خط ثقيل جدًا مثل تعليقات تيك توك (لاله‌زار، الإسكندرية، Anton)." },
@@ -19,7 +19,7 @@ const PR = M.params({
 });
 M.meta({
   story: "فيديو منتج بتعليقات على طريقة تيك توك: خطاف في الأعلى داخل صندوق أبيض، والكلام يظهر كلمتين أو ثلاثًا بحروف ثقيلة والكلمة المهمة ملوّنة وتقفز، وأزرار التفاعل على الجانب والقلب ينبض.",
-  scenes: [{ name: K1, t0: 0, t1: 1.6, about: "المنتج والهوك" }, { name: K2, t0: 1.6, t1: 12, about: "سطور الكابشن ورا بعض" }],
+  scenes: [{ name: K1, t0: 0, t1: 1.6, about: "المنتج والخطاف" }, { name: K2, t0: 1.6, t1: 12, about: "سطور التعليق النصي متتالية" }],
   tips: ["كل سطر لقطة: أقل كلام ممكن.", "كلمة مهمة واحدة في كل سطر أو سطرين.", "صورة منتج حقيقية بلا خلفية تصنع فرقًا كبيرًا."],
 });
 const W = 1080, H = 1920, DUR = 12, S0 = 1.6, SD = 1.45;

@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// #121 (عنصر: كلمات على الدروب) UK dubstep at 140 BPM, 30 s, written in code; every visual move is computed from the same note schedule as the audio.
+// #121 (عنصر: كلمات على الذروة) UK dubstep at 140 BPM, 30 s, written in code; every visual move is computed from the same note schedule as the audio.
 // Arrangement: intro (bars 1–4) · build (5–8, snare roll tightening) · DROP on the downbeat of bar 9 (strongest) · outro (bars 15–17).
 // Two colours: black + acid yellow. Kick → the big disc punches; snare → the bars slam down; wobble → the wide shape stretches with the LFO.
 const BPM = 140, BEAT = 60 / BPM, BAR = BEAT * 4, DUR = 30;
@@ -18,7 +18,7 @@ const PR = M.params({
 });
 M.meta({
   story: "كلمات على لحظة الذروة: موسيقى مكتوبة بالكود بسرعة ١٤٠ نبضة في الدقيقة، وكل حركة محسوبة من جدول النوتات نفسه: الطبلة الكبيرة تضرب الدائرة الكبيرة، والسنير يُنزل الشرائط، والصوت المتموج يمط الشكل العريض. بداية، ثم تمهيد، ثم الذروة، ثم النهاية.",
-  scenes: [{ name: G1, t0: 0, t1: 13.7, about: "البداية والتجهيز" }, { name: G2, t0: 13.7, t1: 24, about: "الدروب" }, { name: G3, t0: 24, t1: 30, about: "النهاية" }],
+  scenes: [{ name: G1, t0: 0, t1: 13.7, about: "البداية والتجهيز" }, { name: G2, t0: 13.7, t1: 24, about: "الذروة" }, { name: G3, t0: 24, t1: 30, about: "النهاية" }],
   tips: ["مناسب لإعلانات الحفلات والمنتجات الشبابية.", "كل خانة كلمة واحدة: الخط ضخم.", "كلمة الذروة هي اسم العلامة أو العرض."],
 });
 const YEL = PR.yel, BLK = PR.blk, BW = [0, 1, 2].map((i) => PR.build[i] ?? "");
