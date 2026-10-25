@@ -4,7 +4,7 @@
 
 const msc = { id: null, doc: null, timer: null, ui: null, pick: false, sel: [], reg: null, regTimer: null, hover: null, built: "", pc: new Map(), lastStep: "" };
 const SC_FPS = 30;
-const SC_KINDS = [["off", "الأصلية"], ["blur", "🌫️ تغبيش"], ["color", "🎨 لون"], ["image", "🖼️ صورة"], ["video", "🎞️ فيديو"], ["ai", "✨ بالـ AI"]];
+const SC_KINDS = [["off", "الأصلية"], ["blur", "🌫️ تمويه"], ["color", "🎨 لون"], ["image", "🖼️ صورة"], ["video", "🎞️ فيديو"], ["ai", "✨ بالذكاء الاصطناعي"]];
 
 async function mscLoad() {
   const id = mt.project?.data.typo_id || null;
@@ -153,7 +153,7 @@ function mscPickDraw() {
     const xs = r.poly.map((p) => p[0] * W), ys = r.poly.map((p) => p[1] * H), lx = Math.min(...xs), ly = Math.max(14, Math.min(...ys) - 6);
     h += `<rect x="${lx}" y="${ly - 14}" width="${12 + r.name.length * 7}" height="17" rx="6" fill="#FACC15"/><text x="${lx + 6}" y="${ly - 2}" font-size="10.5" font-weight="700" fill="#1a1a1a" font-family="system-ui">${escapeHtml(r.name)}</text>`;
   }
-  if (msc.reg?.loading) h += `<text x="${W / 2}" y="22" text-anchor="middle" font-size="12" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke" font-family="system-ui">⏳ يتعرف على ما في الفريم…</text>`;
+  if (msc.reg?.loading) h += `<text x="${W / 2}" y="22" text-anchor="middle" font-size="12" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke" font-family="system-ui">⏳ جارٍ التعرف على ما في الإطار…</text>`;
   svg.innerHTML = h;
 }
 $("scPick").addEventListener("pointermove", (e) => {
@@ -168,7 +168,7 @@ $("scPick").addEventListener("pointerleave", () => { msc.hover = null; mscPickDr
 $("scPick").addEventListener("click", (e) => {
   pause();
   const r = msc.hover;
-  if (!r) { toast("مرّر على الشيء حتى ما حدودها تضيء بالأصفر، ثم اضغط"); return; }
+  if (!r) { toast("مرّر على الشيء حتى تضيء حدوده بالأصفر، ثم اضغط"); return; }
   const j = msc.sel.findIndex((s) => s.key === r.key);
   if (j >= 0) msc.sel.splice(j, 1);
   else {
@@ -186,49 +186,49 @@ function mscPane() {
   const ready = d?.ready?.source && d.ready.person && d.ready.camera;
   const stale = d?.duration && Math.abs(d.duration - totalLength()) > 0.25;
   let h = `<div class="mt-typo-row">`;
-  if (busy) h += `<p><span class="spin-inline"></span> ${escapeHtml(d.step || "يشتغل…")}</p>`;
+  if (busy) h += `<p><span class="spin-inline"></span> ${escapeHtml(d.step || "جارٍ العمل…")}</p>`;
   if (d?.status === "failed" && d.error) h += `<p class="err">⚠️ ${escapeHtml(d.error)}</p>`;
   if (!ready) {
-    h += `<p class="hint">لكي تغيّر الخلفية خلف الشخص أو تزيل شيء من الفيديو، البرنامج يحتاج يفصل الشخص عن الخلفية في المونتاج كله ويحسب حركة الكاميرا. هذا يُنشأ مرة واحدة (دقيقة أو اثنان، مجانًا).</p>
+    h += `<p class="hint">لتغيير الخلفية خلف الشخص أو إزالة شيء من الفيديو، يحتاج البرنامج إلى فصل الشخص عن الخلفية في المونتاج كله وحساب حركة الكاميرا. يُنجز ذلك مرة واحدة (دقيقة أو دقيقتان، مجانًا).</p>
       <button class="btn primary sm" id="scPrep" ${busy || !mt.project.data.clips.length ? "disabled" : ""}>🪄 جهّز المشهد</button></div>`;
     el.innerHTML = h;
     return;
   }
-  if (stale && !busy) h += `<p class="hint">⚠️ المونتاج تغيّر بعد ما المشهد جُهّز (الطول مختلف): جهّزه من جديد لكي الخلفية تركب صحيح. <button class="btn sm" id="scPrep">🪄 جهّز من جديد</button></p>`;
+  if (stale && !busy) h += `<p class="hint">⚠️ تغيّر المونتاج بعد تجهيز المشهد (الطول مختلف): جهّزه من جديد لتُركَّب الخلفية بشكل صحيح. <button class="btn sm" id="scPrep">🪄 جهّز من جديد</button></p>`;
   const g = d.bgx, ui = msc.ui || g.kind;
   h += `<h3>🖼️ الخلفية خلف الشخص</h3>
     <div class="sc-chips">${SC_KINDS.map(([k, l]) => `<button class="sc-chip ${ui === k ? "on" : ""}" data-bgk="${k}" ${busy ? "disabled" : ""}>${l}</button>`).join("")}</div>`;
-  if (ui === "blur") h += `<label>قدر ماذا متغبّشة <b>${Math.round(g.blur)}</b><input type="range" id="scBlur" min="4" max="60" step="1" value="${g.blur}"></label>`;
+  if (ui === "blur") h += `<label>درجة التمويه <b>${Math.round(g.blur)}</b><input type="range" id="scBlur" min="4" max="60" step="1" value="${g.blur}"></label>`;
   if (ui === "color") h += `<label>اللون <input type="color" id="scColor" value="${g.color}"></label>`;
   if (ui === "image" || ui === "video") {
     const has = g.kind === ui && g.url;
     h += `<div class="row wrap"><label class="btn sm">⬆️ ${has ? "غيّر" : "ارفع"} ${ui === "image" ? "صورة" : "فيديو"}<input type="file" id="scFile" accept="${ui === "image" ? "image/*" : "video/*"}" hidden></label>
-      ${has && ui === "image" ? `<img src="${g.url}" alt="" class="sc-thumb">` : ""}${has && ui === "video" ? `<span class="muted">✓ الفيديو متركّب (يدور إذا أقصر)</span>` : ""}</div>`;
+      ${has && ui === "image" ? `<img src="${g.url}" alt="" class="sc-thumb">` : ""}${has && ui === "video" ? `<span class="muted">✓ رُكّب الفيديو (يتكرر إن كان أقصر)</span>` : ""}</div>`;
   }
   if (ui === "ai") {
-    h += `<p class="hint">اكتب المكان الذي تريده. البرنامج يأخذ فريم من الفيديو لكي الخلفية تظهر بنفس زاوية الكاميرا والإضاءة.</p>
-      <textarea id="scPrompt" rows="2" placeholder="مثلًا: مكتب حديث فيه مكتبة خشب وإضاءة دافية وزرع">${escapeHtml(g.prompt || "")}</textarea>
+    h += `<p class="hint">اكتب المكان الذي تريده. يأخذ البرنامج إطارًا من الفيديو لتظهر الخلفية بزاوية الكاميرا والإضاءة نفسيهما.</p>
+      <textarea id="scPrompt" rows="2" placeholder="مثلًا: مكتب حديث فيه مكتبة خشبية وإضاءة دافئة ونباتات">${escapeHtml(g.prompt || "")}</textarea>
       <div class="row wrap"><button class="btn primary sm" id="scAi" ${busy ? "disabled" : ""}>✨ أنشئ الخلفية</button><small class="muted">صورة واحدة، نحو $0.05</small></div>
       ${g.kind === "image" && g.url && g.prompt ? `<img src="${g.url}" alt="" class="sc-thumb">` : ""}`;
   }
   if (g.kind !== "off") {
     h += `<label>تغميق الخلفية <b>${Math.round(g.dim * 100)}٪</b><input type="range" id="scDim" min="0" max="70" step="5" value="${Math.round(g.dim * 100)}"></label>
-      ${g.kind === "image" || g.kind === "video" ? `<label class="check"><input type="checkbox" id="scFollow" ${g.follow ? "checked" : ""}> تتحرك مع الكاميرا (إذا الكاميرا تهتز أو تدور)</label>` : ""}
-      <div><b>اللقطات</b> <small class="muted">الخلفية تتغير في اللقطات التي فيها الشخص؛ اضغط على أي لقطة تقفلها أو تفتحها</small>
-      <div class="sc-chips">${d.shots.map((s, j) => `<button class="sc-chip sm ${s[2] ? "on" : ""}" data-shot="${j}" title="من ${(s[0] / SC_FPS).toFixed(1)}ث لـ ${((s[1] + 1) / SC_FPS).toFixed(1)}ث">${s[2] ? "✓" : "✕"} ${j + 1}</button>`).join("")}</div></div>`;
+      ${g.kind === "image" || g.kind === "video" ? `<label class="check"><input type="checkbox" id="scFollow" ${g.follow ? "checked" : ""}> تتحرك مع الكاميرا (إن كانت الكاميرا تهتز أو تدور)</label>` : ""}
+      <div><b>اللقطات</b> <small class="muted">تتغير الخلفية في اللقطات التي فيها الشخص؛ اضغط على أي لقطة لتطفئها أو تشغّلها</small>
+      <div class="sc-chips">${d.shots.map((s, j) => `<button class="sc-chip sm ${s[2] ? "on" : ""}" data-shot="${j}" title="من ${(s[0] / SC_FPS).toFixed(1)}ث إلى ${((s[1] + 1) / SC_FPS).toFixed(1)}ث">${s[2] ? "✓" : "✕"} ${j + 1}</button>`).join("")}</div></div>`;
   }
-  h += `</div><div class="mt-typo-row"><h3>🧽 أزل شيء من الفيديو</h3>`;
-  if (!msc.pick) h += `<p class="hint">أوقف على الفريم الذي فيه الشيء، واضغط «اختر من المعاينة». مرّر عليها حتى ما تضيء واضغط. إذا الشيء متقسّمة على كذا جزء، اخترهم كلهم.</p>
+  h += `</div><div class="mt-typo-row"><h3>🧽 أزل شيئًا من الفيديو</h3>`;
+  if (!msc.pick) h += `<p class="hint">توقف عند الإطار الذي فيه الشيء، واضغط «اختر من المعاينة». مرّر عليه حتى يضيء واضغط. إن كان الشيء مقسّمًا إلى عدة أجزاء فاخترها كلها.</p>
     <button class="btn sm" id="scPickBtn" ${busy ? "disabled" : ""}>🎯 اختر من المعاينة</button>`;
-  else h += `<p class="hint">مرّر على الشيء حتى ما تضيء بالأصفر واضغط عليها (يمكنك تختار كذا جزء من نفس الفريم). ما اخترته يصبح بالأحمر.</p>
+  else h += `<p class="hint">مرّر على الشيء حتى يضيء بالأصفر واضغط عليه (يمكنك اختيار عدة أجزاء من الإطار نفسه). يصبح ما اخترته بالأحمر.</p>
     <div class="row wrap"><button class="btn primary sm" id="scRemove" ${msc.sel.length && !busy ? "" : "disabled"}>🧽 أزل ${msc.sel.length ? `(${msc.sel.length})` : ""}</button>
       <button class="btn sm" id="scPickOff">إلغاء</button></div>`;
   if (d.removals.length) {
     h += `<div class="sc-list">${d.removals.map((r) => {
       const ok = r.holes < 0.03;
-      return `<div class="sc-item"><b>🧽 ${escapeHtml(r.name)}</b> <span class="muted">من ${(r.f0 / SC_FPS).toFixed(1)}ث لـ ${((r.f1 + 1) / SC_FPS).toFixed(1)}ث</span>
-        <div class="muted">${ok ? "✓ المكان امتلأ من الفريمات الأخرى" : r.ai ? `✨ امتلأ بالـ AI (${Math.round(r.holes * 100)}٪ عمره ما ظهر)` : `⚠️ ${Math.round(r.holes * 100)}٪ من المكان عمره ما ظهر في الفيديو، وامتلأ تقريبي`}</div>
-        <div class="row wrap"><button class="btn sm" data-rmgo="${r.id}">▶︎ اذهب له</button>
+      return `<div class="sc-item"><b>🧽 ${escapeHtml(r.name)}</b> <span class="muted">من ${(r.f0 / SC_FPS).toFixed(1)}ث إلى ${((r.f1 + 1) / SC_FPS).toFixed(1)}ث</span>
+        <div class="muted">${ok ? "✓ مُلئ المكان من الإطارات الأخرى" : r.ai ? `✨ مُلئ بالذكاء الاصطناعي (${Math.round(r.holes * 100)}٪ لم يظهر قط)` : `⚠️ ${Math.round(r.holes * 100)}٪ من المكان لم يظهر قط في الفيديو، ومُلئ تقريبيًا`}</div>
+        <div class="row wrap"><button class="btn sm" data-rmgo="${r.id}">▶︎ انتقل إليه</button>
           ${!ok && !r.ai ? `<button class="btn sm primary" data-rmai="${r.id}" ${busy ? "disabled" : ""}>✨ املاه بالـ AI (نحو $0.05)</button>` : ""}
           <button class="btn sm danger" data-rmdel="${r.id}" ${busy ? "disabled" : ""}>🗑</button></div></div>`;
     }).join("")}</div>`;
@@ -258,15 +258,15 @@ $("mtScenePane").addEventListener("click", async (e) => {
       if (mtx.id !== res.id) mtTypoLoad();
       msc.doc = { ...(msc.doc || {}), busy: true, step: res.step, ready: msc.doc?.ready || {} };
       mscPane(); mscPoll();
-      toast("🪄 يفصل الشخص عن الخلفية ويحسب حركة الكاميرا… دقيقة أو اثنان");
+      toast("🪄 جارٍ فصل الشخص عن الخلفية وحساب حركة الكاميرا… دقيقة أو دقيقتان");
     } catch (err) { toast(err.message, true); }
     return;
   }
   if (t.dataset.bgk) {
     const k = t.dataset.bgk;
     msc.ui = k;
-    if (k === "off" || k === "blur" || k === "color") return mscBg({ kind: k }, k === "off" ? "الخلفية رجعت الأصلية" : "🖼️ الخلفية تغيّرت");
-    if ((k === "image" || k === "video") && msc.doc.bgx.url && /\.(mp4)$/.test(msc.doc.bgx.url.split("?")[0]) === (k === "video")) return mscBg({ kind: k }, "🖼️ الخلفية تغيّرت");
+    if (k === "off" || k === "blur" || k === "color") return mscBg({ kind: k }, k === "off" ? "عادت الخلفية الأصلية" : "🖼️ تغيّرت الخلفية");
+    if ((k === "image" || k === "video") && msc.doc.bgx.url && /\.(mp4)$/.test(msc.doc.bgx.url.split("?")[0]) === (k === "video")) return mscBg({ kind: k }, "🖼️ تغيّرت الخلفية");
     mscPane();
     return;
   }
@@ -278,7 +278,7 @@ $("mtScenePane").addEventListener("click", async (e) => {
   if (t.id === "scAi") {
     const prompt = $("scPrompt").value.trim();
     if (!prompt) { toast("اكتب المكان الذي تريده أولًا", true); return; }
-    try { await mscAfter(await api(`/api/typo/${msc.id}/bgx/ai`, { method: "POST", ...jsonBody({ prompt }) })); toast("✨ يعمل الخلفية… نص دقيقة تقريبًا"); }
+    try { await mscAfter(await api(`/api/typo/${msc.id}/bgx/ai`, { method: "POST", ...jsonBody({ prompt }) })); toast("✨ جارٍ صنع الخلفية… نصف دقيقة تقريبًا"); }
     catch (err) { toast(err.message, true); }
     return;
   }
@@ -291,18 +291,18 @@ $("mtScenePane").addEventListener("click", async (e) => {
     try {
       await mscAfter(await api(`/api/typo/${msc.id}/remove`, { method: "POST", ...jsonBody({ t: sel[0].t, polys: sel.map((s) => s.poly), name: names.length === 1 ? names[0] : "شيء" }) }));
       msc.pick = false; msc.sel = []; mscPickDraw(); mscPane();
-      toast("🧽 يتابع الشيء طول اللقطة ويملأ مكانها…");
+      toast("🧽 جارٍ تتبع الشيء طوال اللقطة وملء مكانه…");
     } catch (err) { toast(err.message, true); }
     return;
   }
   if (t.dataset.rmgo) { const r = msc.doc.removals.find((x) => x.id === t.dataset.rmgo); if (r) { pause(); seek(r.t ?? r.f0 / SC_FPS); } return; }
   if (t.dataset.rmai) {
-    try { await mscAfter(await api(`/api/typo/${msc.id}/remove/${t.dataset.rmai}/ai`, { method: "POST" })); toast("✨ الـ AI يرسم ما خلف الشيء…"); }
+    try { await mscAfter(await api(`/api/typo/${msc.id}/remove/${t.dataset.rmai}/ai`, { method: "POST" })); toast("✨ يرسم الذكاء الاصطناعي ما خلف الشيء…"); }
     catch (err) { toast(err.message, true); }
     return;
   }
   if (t.dataset.rmdel) {
-    try { await mscAfter(await api(`/api/typo/${msc.id}/remove/${t.dataset.rmdel}`, { method: "DELETE" }), "🗑️ الشيء رجعت كما كانت"); }
+    try { await mscAfter(await api(`/api/typo/${msc.id}/remove/${t.dataset.rmdel}`, { method: "DELETE" }), "🗑️ عاد الشيء كما كان"); }
     catch (err) { toast(err.message, true); }
   }
 });
@@ -316,8 +316,8 @@ $("mtScenePane").addEventListener("change", async (e) => {
   if (t.id === "scFile" && t.files?.[0]) {
     const fd = new FormData();
     fd.append("file", t.files[0]);
-    toast("⬆️ يرفع الخلفية…");
-    try { await mscAfter(await api(`/api/typo/${msc.id}/bgx/file`, { method: "POST", body: fd }), "🖼️ الخلفية تغيّرت"); }
+    toast("⬆️ جارٍ رفع الخلفية…");
+    try { await mscAfter(await api(`/api/typo/${msc.id}/bgx/file`, { method: "POST", body: fd }), "🖼️ تغيّرت الخلفية"); }
     catch (err) { toast(err.message, true); }
   }
 });
@@ -339,7 +339,7 @@ function mscPoll() {
       const was = msc.lastStep || "";
       msc.lastStep = "";
       if (doc.status === "failed") toast(`🪄 ${doc.error || "حصلت مشكلة"}`, true);
-      else if (was.includes("🧽") || was.includes("خلف الشيء")) toast("🧽 الشيء أُزيلت: شغّل الفيديو وانظر");
+      else if (was.includes("🧽") || was.includes("خلف الشيء")) toast("🧽 أُزيل الشيء: شغّل الفيديو وانظر");
       else if (was.includes("الخلفية")) toast("✨ الخلفية الجديدة جاهزة");
       else toast("🪄 المشهد جاهز: اختر الخلفية التي تحبها");
       syncPreview();
