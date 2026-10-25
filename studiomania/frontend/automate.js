@@ -33,34 +33,34 @@ const AutoPage = (() => {
   // ---------- الخطوات ← فروع ونقط ----------
   function leavesOf(s) {
     const o = s.opts, M = S.meta, stk = s.src?.mode === "stock", src = s.src ? (stk ? s.src.label : `@${s.src.label || (s.src.mode === "folder" ? "المكتبة" : "")}`) : "";
-    const srcLeaf = { f: "src", t: "منين", val: src ? `${src}${s.found != null ? ` · ${AR_N(s.found)} ملف` : ""}` : "", miss: !s.src || (!stk && !s.found) };
+    const srcLeaf = { f: "src", t: "من أين", val: src ? `${src}${s.found != null ? ` · ${AR_N(s.found)} ملف` : ""}` : "", miss: !s.src || (!stk && !s.found) };
     const L = {
       pull: o.type === "audio"
-        ? [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "role", t: "يوضع كيف", val: M.roles?.[o.role] || "" },
-          ...(o.role === "voice" ? [] : [{ f: "volume", t: "علو الصوت", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت النص", val: o.duck ? "نعم" : "لا" }]),
+        ? [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "role", t: "طريقة الوضع", val: M.roles?.[o.role] || "" },
+          ...(o.role === "voice" ? [] : [{ f: "volume", t: "علو الصوت", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "تنخفض وقت الكلام", val: o.duck ? "نعم" : "لا" }]),
           { f: "order", t: "أي ملف", val: M.orders[o.order] }]
         : [{ f: "type", t: "النوع", val: KIND_T[o.type] }, srcLeaf, { f: "count", t: "العدد", val: AR_N(o.count) }, { f: "order", t: "الترتيب", val: M.orders[o.order] },
           { f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }],
       intro: [srcLeaf], outro: [srcLeaf],
-      voice: [srcLeaf, { f: "fit", t: "الفيديو على قدر التعليق", val: o.fit ? "نعم" : "لا" }, { f: "order", t: "أي تسجيل", val: M.orders[o.order] }],
-      music: [srcLeaf, { f: "volume", t: "علو الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت النص", val: o.duck ? "نعم" : "لا" }, { f: "order", t: "أي موسيقى", val: M.orders[o.order] }],
+      voice: [srcLeaf, { f: "fit", t: "الفيديو بطول التعليق", val: o.fit ? "نعم" : "لا" }, { f: "order", t: "أي تسجيل", val: M.orders[o.order] }],
+      music: [srcLeaf, { f: "volume", t: "مستوى الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "تنخفض وقت الكلام", val: o.duck ? "نعم" : "لا" }, { f: "order", t: "أي موسيقى", val: M.orders[o.order] }],
       cut: [{ f: "max", t: "أقصى طول للقطة", val: `${AR_N(o.max)} ث` }, { f: "trans", t: "الانتقال", val: M.trans[o.trans] }],
       caption: [{ f: "on", t: "التعليق النصي", val: o.on ? "يعمل" : "مغلق" }],
-      montage: [{ f: "silence", t: "إزالة السكتات", val: M.silence?.[o.silence] || "" }, { f: "logo", t: "مكان اللوجو", val: M.logo_pos?.[o.logo]?.[0] || "" },
-        ...(o.logo === "off" ? [] : [{ f: "logo_size", t: "حجم اللوجو", val: `${AR_N(o.logo_size)}٪` }]),
-        { f: "duck_pct", t: "توطية الموسيقى وقت الراوي", val: o.duck_pct ? `${AR_N(o.duck_pct)}٪` : "لا" }, { f: "cap_style", t: "شكل الكابشن", val: M.cap_styles?.[o.cap_style] || "" },
-        { f: "b_intro", t: "إنترو البراند", val: o.b_intro ? "نعم" : "لا" }, { f: "b_outro", t: "أوترو البراند", val: o.b_outro ? "نعم" : "لا" },
+      montage: [{ f: "silence", t: "إزالة السكتات", val: M.silence?.[o.silence] || "" }, { f: "logo", t: "مكان الشعار", val: M.logo_pos?.[o.logo]?.[0] || "" },
+        ...(o.logo === "off" ? [] : [{ f: "logo_size", t: "حجم الشعار", val: `${AR_N(o.logo_size)}٪` }]),
+        { f: "duck_pct", t: "خفض الموسيقى وقت الراوي", val: o.duck_pct ? `${AR_N(o.duck_pct)}٪` : "لا" }, { f: "cap_style", t: "شكل التعليق النصي", val: M.cap_styles?.[o.cap_style] || "" },
+        { f: "b_intro", t: "مقدمة العلامة", val: o.b_intro ? "نعم" : "لا" }, { f: "b_outro", t: "خاتمة العلامة", val: o.b_outro ? "نعم" : "لا" },
         { f: "denoise", t: "تنقية صوت الكلام", val: o.denoise ? "نعم" : "لا" }],
       export: [{ f: "ratio", t: "المقاس", val: o.ratio }],
       split: [{ ...srcLeaf, t: "الفيديو", val: src ? `${src}${s.video ? ` · ${AR_N(Math.round(s.video.dur))} ث` : s.found != null ? ` · ${AR_N(s.found)} فيديو` : ""}` : "" },
         { f: "max", t: "أقصى طول للقطعة", val: `${AR_N(o.max)} ث${s.pieces ? ` · ${AR_N(s.pieces)} قطع` : ""}` },
-        { f: "note", t: "يحتاج ماذا في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أي فيديو", val: M.orders[o.order] }],
+        { f: "note", t: "ما المطلوب في التقطيع", val: (o.note || "").slice(0, 40) || "قطع متساوية عند السكوت" }, { f: "order", t: "أي فيديو", val: M.orders[o.order] }],
       gen: genLeaves(o), genvid: genLeaves(o), genimg: imgLeaves(o), genvoice: voiceLeaves(o),
-      frames: [{ ...srcLeaf, t: "الفيديو" }, { f: "want", t: "تريد أي فريمات", val: (o.want || "").slice(0, 40), miss: !(o.want || "").trim() },
-        { f: "out", t: "يطلّعها كيف", val: M.frame_out?.[o.out] || "" }, { f: "count", t: "أقصى عدد", val: AR_N(o.count) },
+      frames: [{ ...srcLeaf, t: "الفيديو" }, { f: "want", t: "أي إطارات تريد", val: (o.want || "").slice(0, 40), miss: !(o.want || "").trim() },
+        { f: "out", t: "طريقة الإخراج", val: M.frame_out?.[o.out] || "" }, { f: "count", t: "أقصى عدد", val: AR_N(o.count) },
         ...(o.out === "clips" ? [] : [{ f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }]), { f: "order", t: "أي فيديو", val: M.orders[o.order] }],
-      merge: [{ f: "items", t: "ماذا الذي يتجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بالترتيب الخاص بك` : "آخر شيء في كل مسار" }],
-      publish: [{ f: "when", t: "متى", val: M.when[o.when] }, { f: "platforms", t: "على أين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
+      merge: [{ f: "items", t: "ما الذي يُجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بترتيبك` : "آخر شيء في كل مسار" }],
+      publish: [{ f: "when", t: "متى", val: M.when[o.when] }, { f: "platforms", t: "إلى أين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
         { f: "caption", t: "التعليق النصي", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
     }[s.verb] || [];
     if ((M.rules_verbs || []).includes(s.verb)) L.push({ f: "rules", t: "قواعدي", val: (o.rules || "").slice(0, 40) });
@@ -75,9 +75,9 @@ const AutoPage = (() => {
     const m = genModel(o), mode = genMode(o), refs = o.refs || [];
     const L = [{ f: "model", t: "النموذج", val: m ? `${m.label} · ${S.meta.gen_modes?.[mode] || ""}` : "الافتراضي" },
       { f: "prompt", t: "الوصف", val: (o.prompt || "").slice(0, 40), miss: mode !== "lipsync" && !(o.prompt || "").trim() }];
-    const frame0 = o.main ? "" : "أول فريم من القطعة";
+    const frame0 = o.main ? "" : "أول إطار من القطعة";
     if (mode === "image" || mode === "startend") L.push({ f: "start", t: "صورة البداية", val: o.start?.label || refs[0]?.label || frame0, miss: o.main && !o.start && !refs.length });
-    if (mode === "avatar") L.push({ f: "start", t: "صورة التي يتكلم", val: o.start?.label || refs[0]?.label || frame0, miss: o.main && !o.start && !refs.length });
+    if (mode === "avatar") L.push({ f: "start", t: "صورة المتكلم", val: o.start?.label || refs[0]?.label || frame0, miss: o.main && !o.start && !refs.length });
     if (mode === "avatar" || mode === "lipsync") L.push({ f: "audio", t: "الصوت", val: o.audio?.label || (mode === "avatar" && !o.main ? "صوت القطعة نفسها" : ""), miss: (mode === "lipsync" || o.main) && !o.audio });
     if (mode === "startend") L.push({ f: "end", t: "صورة النهاية", val: o.end?.label || refs[1]?.label || "", miss: !o.end && refs.length < 2 });
     if (mode === "refs" || mode === "video") L.push({ f: "refs", t: mode === "refs" ? "المراجع (شخصيات وخلفيات وصور)" : "مراجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "",
@@ -90,9 +90,9 @@ const AutoPage = (() => {
   const imgModel = (o) => (S.meta.img_models || []).find((m) => m.key === o.model) || (S.meta.img_models || [])[0] || null;
   function imgLeaves(o) {
     const m = imgModel(o), refs = o.refs || [];
-    const L = [{ f: "model", t: "النموذج", val: m ? `${m.label} · ${m.refs ? `يقبل حتى ${AR_N(m.max_refs)} صور مرجع` : "من الوصف فقط"}` : "الافتراضي" },
+    const L = [{ f: "model", t: "النموذج", val: m ? `${m.label} · ${m.refs ? `يقبل حتى ${AR_N(m.max_refs)} صور مرجعية` : "من الوصف فقط"}` : "الافتراضي" },
       { f: "prompt", t: "الوصف", val: (o.prompt || "").slice(0, 40), miss: !(o.prompt || "").trim() }];
-    if (m?.refs) L.push({ f: "refs", t: "صور المرجع (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "" });
+    if (m?.refs) L.push({ f: "refs", t: "الصور المرجعية (اختياري)", val: refs.length ? refs.map((r) => r.label).join("، ").slice(0, 40) : "" });
     L.push({ f: "count", t: "عدد الصور", val: AR_N(o.count) }, { f: "sec", t: "مدة الصورة في الفيديو", val: `${AR_N(o.sec)} ث` });
     return L;
   }
@@ -100,16 +100,16 @@ const AutoPage = (() => {
   const voModel = (o) => (S.meta.voice_models || []).find((m) => m.model === o.model) || (S.meta.voice_models || [])[0] || { mode: "std", label: "" };
   function voiceLeaves(o) {
     const m = voModel(o), M = S.meta, music = m.mode === "music";
-    const L = [{ f: "model", t: "النموذج", val: `${m.label}${m.ref ? " · يقبل صوت مرجع" : ""}` },
+    const L = [{ f: "model", t: "النموذج", val: `${m.label}${m.ref ? " · يقبل صوتًا مرجعيًا" : ""}` },
       { f: "text", t: music ? "وصف الموسيقى" : "النص", val: (o.text || "").slice(0, 40), miss: !(o.text || "").trim() }];
     if (m.mode === "std") {
       const lang = M.dialects?.[o.lang] ? o.lang : (M.brand_lang || "ar-msa"), vs = M.dialects?.[lang]?.voices || [];
       L.push({ f: "lang", t: "اللهجة / اللغة", val: M.dialects?.[lang]?.label || "" }, { f: "voice", t: "الصوت", val: M.voices?.[vs.includes(o.voice) ? o.voice : vs[0]] || "" });
     } else if ((m.voices || []).length) L.push({ f: "voice", t: "الصوت", val: (m.voices.includes(o.voice) ? o.voice : m.voices[0]) || "" });
-    if (m.ref) L.push({ f: "ref", t: "صوت مرجع (اختياري)", val: o.ref?.label || "" });
-    if (music) L.push({ f: "lyrics", t: "كلمات الأغنية (اختياري)", val: (o.lyrics || "").slice(0, 40) || "موسيقى بدون نص" },
-      { f: "volume", t: "علو الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "توطى وقت النص", val: o.duck ? "نعم" : "لا" });
-    else L.push({ f: "fit", t: "الفيديو على قدر الصوت", val: o.fit ? "نعم" : "لا" });
+    if (m.ref) L.push({ f: "ref", t: "صوت مرجعي (اختياري)", val: o.ref?.label || "" });
+    if (music) L.push({ f: "lyrics", t: "كلمات الأغنية (اختياري)", val: (o.lyrics || "").slice(0, 40) || "موسيقى بلا كلمات" },
+      { f: "volume", t: "مستوى الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "تنخفض وقت الكلام", val: o.duck ? "نعم" : "لا" });
+    else L.push({ f: "fit", t: "الفيديو بطول الصوت", val: o.fit ? "نعم" : "لا" });
     return L;
   }
   // اللي ينفع يتمنشن: الشخصيات، الأفاتار، الخلفيات، والفولدرات والملفات من مكتبة المحتويات
@@ -122,29 +122,29 @@ const AutoPage = (() => {
   const refFind = (key) => (S.refs || []).find((r) => refKey(r) === key);
   const refThumb = (r) => (r.thumb ? `<img src="${esc(r.thumb)}" alt="">` : `<span>${r.kind === "folder" ? "📁" : r.kind === "file" ? "🎬" : "✦"}</span>`);
   function refList(q, chosen, f) {
-    if (!S.refs) { loadRefs(); return `<p class="bm-note">يجلب الشخصيات والخلفيات والملفات…</p>`; }
+    if (!S.refs) { loadRefs(); return `<p class="bm-note">جارٍ جلب الشخصيات والخلفيات والملفات…</p>`; }
     const nq = String(q || "").trim().toLowerCase(), on = new Set(chosen.map(refKey));
     const list = S.refs.filter((r) => !nq || `${r.label} ${r.sub}`.toLowerCase().includes(nq)).slice(0, 40);
     const groups = f === "audio" || f === "ref" ? [["audio", "🎙️ الأصوات (الشخصيات، صوتك، التعليقات والموسيقى)"]]
       : [["char", "🧑‍🎤 الشخصيات"], ["twin", "🪞 الأفاتار"], ["bg", "🏞️ الخلفيات والأماكن"], ["folder", "📁 مجلدات"], ["file", "🖼️ صور وفيديوهات"], ["export", "📤 فيديوهات جاهزة"]];
     return groups.map(([k, t]) => { const xs = list.filter((r) => r.kind === k); return xs.length ? `<p class="am-gh">${t}</p><div class="am-files">${xs.map((r) =>
       `<button class="am-file${on.has(refKey(r)) ? " on" : ""}" data-refpick="${esc(f)}" data-ref="${esc(refKey(r))}" title="${esc(r.sub)}">${refThumb(r)}<small>${esc(r.label)}</small></button>`).join("")}</div>` : ""; }).join("")
-      || `<p class="bm-note">لا شيء هذا بالاسم. أضف شخصيات من «الشخصيات والأفاتار» وخلفيات وملفات من «مكتبة المحتويات».</p>`;
+      || `<p class="bm-note">لا شيء بهذا الاسم. أضف شخصيات من «الشخصيات والأفاتار» وخلفيات وملفات من «مكتبة المحتويات».</p>`;
   }
   function refsCard(s, f) {
     const o = s.opts, mode = genMode(o), one = f !== "refs", chosen = one ? (o[f] ? [o[f]] : []) : (o.refs || []);
-    const note = s.verb === "genimg" ? { refs: `هذه الصور تُرسل للنموذج كمرجع (حتى ${AR_N(imgModel(o)?.max_refs || 4)}): شخصية لكي شكلها يظل ثابت، أو خلفية، أو أي صورة من المكتبة. أو اكتب @ في الوصف.` }[f]
-      : s.verb === "genvoice" ? { ref: "النموذج يقلّد هذا الصوت: صوت شخصية، صوت أفاتار، أو تعليق من المكتبة." }[f] : { refs: mode === "refs" ? `النموذج يعمل الفيديو من هذه المراجع (حتى ${AR_N(S.meta.max_refs || 6)}). اختر شخصية أو خلفية أو صورة، أو اكتب @ في الوصف.` : "إذا النموذج يقبل صور مرجع، تُرسل معه القطعة (مثلًا الشخصية لكي شكلها يظل ثابت).",
-      start: mode === "avatar" ? "صورة الشخص الذي سيتكلم (شخصية، أفاتار، أو أي صورة). الافتراضي: أول فريم من القطعة." : "الصورة التي الفيديو سيبدأ منها. الافتراضي: أول فريم من القطعة.",
-      end: "الصورة التي الفيديو سينتهي عليها.",
-      audio: mode === "avatar" ? "الصوت الذي الشخص سيقوله (صوت شخصية، صوت أفاتار، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. الفيديو يظهر على قدر الصوت." : "الصوت الذي الشفايف ستُضبط عليه." }[f];
+    const note = s.verb === "genimg" ? { refs: `تُرسل هذه الصور إلى النموذج مرجعًا (حتى ${AR_N(imgModel(o)?.max_refs || 4)}): شخصية ليبقى شكلها ثابتًا، أو خلفية، أو أي صورة من المكتبة. أو اكتب @ في الوصف.` }[f]
+      : s.verb === "genvoice" ? { ref: "يقلّد النموذج هذا الصوت: صوت شخصية، أو صوت أفاتار، أو تعليق من المكتبة." }[f] : { refs: mode === "refs" ? `يصنع النموذج الفيديو من هذه المراجع (حتى ${AR_N(S.meta.max_refs || 6)}). اختر شخصية أو خلفية أو صورة، أو اكتب @ في الوصف.` : "إن كان النموذج يقبل صورًا مرجعية، فتُرسل معه القطعة (مثلًا الشخصية ليبقى شكلها ثابتًا).",
+      start: mode === "avatar" ? "صورة الشخص الذي سيتكلم (شخصية، أو أفاتار، أو أي صورة). الافتراضي: أول إطار من القطعة." : "الصورة التي سيبدأ منها الفيديو. الافتراضي: أول إطار من القطعة.",
+      end: "الصورة التي سينتهي عندها الفيديو.",
+      audio: mode === "avatar" ? "الصوت الذي سيقوله الشخص (صوت شخصية، أو صوت أفاتار، أو تعليق من المكتبة). الافتراضي: صوت القطعة نفسها. يأتي الفيديو بطول الصوت." : "الصوت الذي ستُضبط عليه الشفاه." }[f];
     if (s.verb !== "gen" && s.verb !== "genvid") return `<p class="bm-note">${note || ""}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="أزله">✕</button></span>`).join("")}</div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 ابحث بالاسم">${esc(S.refQ || "")}</div>
       <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
     return `<p class="bm-note">${note}</p>
       ${chosen.length ? `<div class="am-chosen">${chosen.map((r) => `<span class="am-chip">${refThumb(r)}<b>${esc(r.label)}</b><button data-refrm="${esc(f)}|${esc(refKey(r))}" title="أزله">✕</button></span>`).join("")}</div>` : ""}
-      ${f === "start" && !o.main ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول فريم من القطعة</button></div>` : ""}
+      ${f === "start" && !o.main ? `<div class="bm-pills"><button class="bm-pill${o.start?.kind === "frame" || !o.start ? " on" : ""}" data-refset="start|frame|">🎞️ أول إطار من القطعة</button></div>` : ""}
       ${f === "audio" && mode === "avatar" && !o.main ? `<div class="bm-pills"><button class="bm-pill${o.audio?.kind === "piece_audio" || !o.audio ? " on" : ""}" data-refset="audio|piece_audio|">🎞️ صوت القطعة نفسها</button></div>` : ""}
       <div class="bm-write" contenteditable="plaintext-only" data-k="refq" data-ph="🔎 ابحث بالاسم">${esc(S.refQ || "")}</div>
       <div data-reflist>${refList(S.refQ, chosen, f)}</div>`;
@@ -167,13 +167,13 @@ const AutoPage = (() => {
     el.innerText = txt;   // إذا فيه حفظ للكتابة ما زال ينتظر، يحفظ نفس النص
     const it = { kind: r.kind, id: r.id, label: r.label, thumb: r.thumb };
     if (s.verb === "genimg") {
-      if (r.kind === "audio") return toast("«ولّد صورة» يأخذ صور فقط كمرجع", true);
-      if (!imgModel(s.opts)?.refs) toast("هذا النموذج لا يقبل صور مرجع، فالاسم سيُكتب فقط. اختر نموذج يقبل مراجع إذا تريدها تُرسل");
+      if (r.kind === "audio") return toast("«ولّد صورة» يقبل الصور فقط مرجعًا", true);
+      if (!imgModel(s.opts)?.refs) toast("هذا النموذج لا يقبل صورًا مرجعية، فسيُكتب الاسم فقط. اختر نموذجًا يقبل المراجع إن أردت إرسالها");
       const max = imgModel(s.opts)?.max_refs || 4;
       return saveSteps(mapStep(s.id, (x) => { const cur = x.opts.refs || []; return { ...x, opts: { ...x.opts, prompt: txt, refs: cur.some((y) => refKey(y) === key) ? cur : [...cur, it].slice(0, max) } }; }));
     }
     if (r.kind === "audio") {
-      if (!["avatar", "lipsync"].includes(genMode(s.opts))) toast("الصوت يتستخدم مع نماذج الأفاتار والليب سينك فقط. غيّر النموذج لكي يُرسل");
+      if (!["avatar", "lipsync"].includes(genMode(s.opts))) toast("يُستخدم الصوت مع نماذج الأفاتار ومزامنة الشفاه فقط. غيّر النموذج ليُرسل");
       return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, prompt: txt, audio: it } })));
     }
     return saveSteps(mapStep(s.id, (x) => {
@@ -277,30 +277,30 @@ const AutoPage = (() => {
   function skeleton() {
     return `<canvas class="bm-dots" aria-hidden="true"></canvas>
       <div class="bm-world"><svg class="bm-lines" aria-hidden="true"></svg><div class="bm-nodes"></div></div>
-      <div class="bm-zoom"><button data-zoom="1" aria-label="قرّب">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="بعّد">−</button></div>
+      <div class="bm-zoom"><button data-zoom="1" aria-label="تكبير">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="تصغير">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ صِف القالب بكلامك (كتابة أو صوت)</button>
         <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وتعليق نصي، وانتظر موافقتي قبل النشر"></div>
-          <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><button class="bm-pill" data-recphone data-nofx>📱 سجّل من موبايلك</button><span class="am-recst"></span>
+          <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><button class="bm-pill" data-recphone data-nofx>📱 سجّل من جوالك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ افهم ما قلته</button><button class="bm-pill" data-undo hidden>↩ استعد كما كان</button></div>
           <div class="am-clip" hidden></div>
           <div class="am-plan" hidden></div>
           <p class="bm-note am-say"></p></div></div>
-      <p class="bm-hint">الخطوات من الشمال لليمين · اضغط على أي نقطة تغيّرها · «قطّع الفيديو» يفتح مسار لكل قطعة، و«جمّع» يلمّهم · «+» خطوة جديدة · «▶» على الشمال يشغّل القالب</p>`;
+      <p class="bm-hint">الخطوات من اليسار إلى اليمين · اضغط على أي نقطة لتغييرها · «قطّع الفيديو» يفتح مسارًا لكل قطعة، و«جمّع» يضمّها · «+» خطوة جديدة · «▶» على اليسار يشغّل القالب</p>`;
   }
   function nodeHTML(n) {
     const r = S.rec;
     if (n.kind === "run") {
       const last = (r.runs || [])[0];
-      const st = r.busy ? esc(last?.step || "يعمل…") : last?.status === "failed" ? "آخر تشغيل فشل" : last?.status === "done" ? "آخر فيديو جاهز ✓" : "اضغط تشغّل";
-      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل القالب، وغيّر اسمه أو بدّله"><i>▶</i><b>${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
+      const st = r.busy ? esc(last?.step || "جارٍ العمل…") : last?.status === "failed" ? "فشل آخر تشغيل" : last?.status === "done" ? "آخر فيديو جاهز ✓" : "اضغط للتشغيل";
+      return `<button class="bm-n bm-quiz am-start${r.busy ? " busy" : ""}" data-n="run" title="شغّل القالب، أو غيّر اسمه أو بدّله"><i>▶</i><b>${esc(r.name)}</b><small>${r.saved ? "" : "مسودة · "}${st}</small></button>`;
     }
     if (n.kind === "add") return `<button class="bm-n bm-add" data-n="add" title="أضف خطوة (فعل + إشارة)"><i>+</i><b>خطوة جديدة</b></button>`;
     if (n.kind === "ladd") return `<button class="bm-n bm-add am-ladd" data-n="${n.id}" title="أضف خطوة في مسار هذه القطعة"><i>+</i><b>في هذا المسار</b></button>`;
     if (n.kind === "piece") {
       const sp = n.sp, span = (sp.spans || [])[n.li], one = !sp.pieces && lanesOf(sp).length === 1;
       return `<button class="bm-n bm-branch am-piece${S.open?.id === n.id ? " on" : ""}" data-n="${n.id}" title="مسار هذه القطعة">
-        <span class="bm-bic">${svg(IC.piece)}</span><b>${one ? "كل قطعة" : `قطعة ${AR_N(n.li + 1)}`}</b><small class="num">${span ? `${AR_N(span[0].toFixed(1))}–${AR_N(span[1].toFixed(1))} ث` : sp.pieces ? "" : "العدد يتعرف وقت التشغيل"}</small></button>`;
+        <span class="bm-bic">${svg(IC.piece)}</span><b>${one ? "كل قطعة" : `قطعة ${AR_N(n.li + 1)}`}</b><small class="num">${span ? `${AR_N(span[0].toFixed(1))}–${AR_N(span[1].toFixed(1))} ث` : sp.pieces ? "" : "يُعرف العدد وقت التشغيل"}</small></button>`;
     }
     if (n.kind === "branch") {
       const v = S.meta.verbs[n.s.verb];
@@ -432,29 +432,29 @@ const AutoPage = (() => {
   const pills = (key, opts, cur) => `<div class="bm-pills">${opts.map(([v, t]) => `<button class="bm-pill${String(cur) === String(v) ? " on" : ""}" data-set="${esc(key)}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>`;
   function srcCard(s) {
     const v = S.meta.verbs[s.verb], L = S.lib;
-    if (!L) { loadLib(); return `<p class="bm-note">يجلب المكتبة…</p>`; }
+    if (!L) { loadLib(); return `<p class="bm-note">جارٍ جلب المكتبة…</p>`; }
     const want = s.verb === "pull" ? (s.opts.type === "any" ? ["image", "video"] : [s.opts.type]) : v.accept;
     const music = want.includes("audio") && (s.verb === "music" || (s.verb === "pull" && s.opts.role !== "voice"));
     const stockOk = want.includes("audio") ? music : S.meta.stock_pexels;
-    const stockBox = !(want.includes("audio") && !music) ? `<p class="am-gh">🌐 من الستوك أونلاين</p>
-      <p class="bm-note">${want.includes("audio") ? "موسيقى مسموح استخدامها في الإعلانات والمنشورات، باسم صاحبها." : "صور وفيديوهات حقيقية من Pexels، مجانًا."} اكتب ما تريده (عربي أو إنجليزي)، وكل تشغيل يجلب شيء جديدة ويحفظها في المكتبة في «🌐 من الستوك».</p>
+    const stockBox = !(want.includes("audio") && !music) ? `<p class="am-gh">🌐 من المكتبة المجانية</p>
+      <p class="bm-note">${want.includes("audio") ? "موسيقى مسموح استخدامها في الإعلانات والمنشورات، باسم صاحبها." : "صور وفيديوهات حقيقية من مكتبة مجانية."} اكتب ما تريده (بالعربية أو الإنجليزية)، وكل تشغيل يجلب شيئًا جديدًا ويحفظه في المكتبة في «🌐 من المكتبة المجانية».</p>
       ${stockOk ? `<div class="bm-write" contenteditable="plaintext-only" data-k="stockq" data-ph="مثلًا: قهوة الصبح، أشخاص تضحك في مكتب، lofi chill…">${esc(S.stockQ ?? (s.src?.mode === "stock" ? s.src.q : ""))}</div>
-      <div class="bm-acts"><button class="bm-go" data-src="stock">${s.src?.mode === "stock" ? "✓ " : ""}اجلب من الستوك</button></div>` : `<p class="bm-note">الستوك غير متاح الآن.</p>`}
+      <div class="bm-acts"><button class="bm-go" data-src="stock">${s.src?.mode === "stock" ? "✓ " : ""}اجلب من المكتبة المجانية</button></div>` : `<p class="bm-note">المكتبة المجانية غير متاحة الآن.</p>`}
       <p class="am-gh">📁 من المكتبة</p>` : "";
     const kids = (pid, depth = 0) => L.folders.filter((f) => (f.parent || null) === (pid || null)).map((f) =>
       `<button class="bm-pill${s.src?.mode === "folder" && s.src.id === f.id ? " on" : ""}" data-src="folder" data-id="${f.id}" data-label="${esc(f.path)}" style="margin-inline-start:${depth * 14}px">📁 ${esc(f.name)} <small class="num">${f.count}</small></button>${kids(f.id, depth + 1)}`).join("");
     const q = S.srcQ || "", files = L.files.filter((f) => want.includes(f.kind) && (!q || `${f.name} ${f.desc} ${(f.tags || []).join(" ")} ${f.path}`.includes(q))).slice(0, 30);
-    return `${stockBox}<p class="bm-note">اختر مجلد (سيأخذ مما جواه أيضًا)، أو ملف بعينه، أو اكتب كلمة يبحث بها بالمعنى.</p>
+    return `${stockBox}<p class="bm-note">اختر مجلدًا (وسيأخذ مما بداخله أيضًا)، أو ملفًا بعينه، أو اكتب كلمة يبحث بمعناها.</p>
       <div class="bm-pills am-tree"><button class="bm-pill${s.src?.mode === "folder" && !s.src.id ? " on" : ""}" data-src="folder" data-id="" data-label="المكتبة كلها">📁 المكتبة كلها</button>${kids(null)}</div>
       <div class="bm-write" contenteditable="plaintext-only" data-k="srcq" data-ph="🔎 ابحث بالمعنى: قبل التبييض، ابتسامة، العيادة…">${esc(q)}</div>
-      <div class="bm-acts"><button class="bm-go" data-src="search">استخدم هذا البحث كمنشن</button></div>
+      <div class="bm-acts"><button class="bm-go" data-src="search">استخدم هذا البحث إشارةً</button></div>
       <div class="am-files">${files.map((f) => `<button class="am-file${s.src?.mode === "file" && s.src.id === f.id ? " on" : ""}" data-src="file" data-id="${f.id}" data-label="${esc([f.path, f.name].filter(Boolean).join("/"))}">
-        ${f.thumb ? `<img src="${esc(f.thumb)}" alt="">` : `<span>${f.kind === "audio" ? "🎙️" : "🎬"}</span>`}<small>${esc(f.name)}</small></button>`).join("") || `<p class="bm-note">لا يوجد ${want.map((k) => S.lib.kinds[k]).join(" أو ")} هنا. ارفع في «📁 مكتبة العقل».</p>`}</div>`;
+        ${f.thumb ? `<img src="${esc(f.thumb)}" alt="">` : `<span>${f.kind === "audio" ? "🎙️" : "🎬"}</span>`}<small>${esc(f.name)}</small></button>`).join("") || `<p class="bm-note">لا يوجد ${want.map((k) => S.lib.kinds[k]).join(" أو ")} هنا. ارفعها في «📁 مكتبة العقل».</p>`}</div>`;
   }
   function cardHTML(n) {
     const r = S.rec, M = S.meta;
     if (n.kind === "add") {
-      return `<div class="bm-ch"><span class="latin en-k">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختر الفعل، والخطوة توضع آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختر الإشارة من نقطة «منين».</p>
+      return `<div class="bm-ch"><span class="latin en-k">ADD STEP</span><b>خطوة جديدة</b></div><p class="bm-note">اختر الفعل، وستوضع الخطوة في آخر الخطوات (قبل «صدّر» و«انشر»). بعدها اختر الإشارة من نقطة «من أين».</p>
         <div class="am-verbs">${Object.entries(M.verbs).filter(([k]) => !M.fixed.includes(k) && !M.lane_verbs.includes(k) && k !== "merge" && !(k === "split" && r.steps.some((x) => x.verb === "split"))).map(([k, v]) => `<button class="am-verb" data-addverb="${k}">${svg(IC[k], 18)}<b>${esc(v.t)}</b><small>${esc(v.desc)}</small></button>`).join("")}</div>`;
     }
     if (n.kind === "ladd") {
@@ -464,22 +464,22 @@ const AutoPage = (() => {
     if (n.kind === "piece") {
       const sp = n.sp, L = lanesOf(sp), span = (sp.spans || [])[n.li];
       return `<div class="bm-ch"><span class="latin en-k">PIECE ${n.li + 1}</span><b>${!sp.pieces && L.length === 1 ? "كل قطعة" : `القطعة ${AR_N(n.li + 1)}`}</b></div>
-        <p class="bm-note">${span ? `من ${AR_N(span[0].toFixed(1))} لـ ${AR_N(span[1].toFixed(1))} ثانية في «${esc(sp.video?.name || "")}». ` : ""}${sp.pieces
-          ? `الفيديو سيُقطّع لـ ${AR_N(sp.pieces)} قطع، وكل قطعة لها مسار تلقائيًا. ضع في هذا المسار ما تريده يحدث هذه للقطعة («+» في آخر المسار).`
-          : "عدد القطع يتعرف وقت التشغيل (على قدر طول الفيديو الذي سيُختار). القطع الزيادة عن المسارات التي هنا تسير مثل آخر مسار."}</p>
+        <p class="bm-note">${span ? `من ${AR_N(span[0].toFixed(1))} إلى ${AR_N(span[1].toFixed(1))} ثانية في «${esc(sp.video?.name || "")}». ` : ""}${sp.pieces
+          ? `سيُقطَّع الفيديو إلى ${AR_N(sp.pieces)} قطع، ولكل قطعة مسار تلقائيًا. ضع في هذا المسار ما تريد حدوثه لهذه القطعة («+» في آخر المسار).`
+          : "يُعرف عدد القطع وقت التشغيل (بحسب طول الفيديو المختار). القطع الزائدة على المسارات الموجودة هنا تتبع آخر مسار."}</p>
         <div class="bm-acts">${L.length > 1 ? `<button class="bm-pill" data-lanecopy="${n.li}">⇊ نفس هذا المسار لكل القطع</button>` : ""}
-          ${!sp.pieces ? `<button class="bm-pill" data-laneplus>＋ مسار لقطعة أيضًا</button>${L.length > 1 ? `<button class="bm-pill" data-lanerm="${n.li}">🗑 أزل هذا المسار</button>` : ""}` : ""}</div>`;
+          ${!sp.pieces ? `<button class="bm-pill" data-laneplus>＋ مسار لقطعة أخرى</button>${L.length > 1 ? `<button class="bm-pill" data-lanerm="${n.li}">🗑 أزل هذا المسار</button>` : ""}` : ""}</div>`;
     }
     if (n.kind === "run") {
       const runs = r.runs || [];
       return `<div class="bm-ch"><span class="latin en-k">START</span><b>ابدأ</b></div>
         ${editable("@name", r.name, "اسم القالب")}
-        <p class="bm-note">يسير على الخطوات من الشمال لليمين: يعمل الفيديو، ويصدّره، وينشره (أو يستناك توافق).${r.est ? ` التكلفة نحو <b class="num">${AR_N(r.est)}</b> نقطة (كتابة النص للكابشن).` : " بدون تكلفة نقاط."}</p>
-        <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ يعمل…" : "▶ شغّل القالب"}</button></div>
+        <p class="bm-note">ينفّذ الخطوات من اليسار إلى اليمين: يصنع الفيديو، ويصدّره، وينشره (أو ينتظر موافقتك).${r.est ? ` التكلفة نحو <b class="num">${AR_N(r.est)}</b> نقطة (كتابة نص التعليق).` : " بلا تكلفة نقاط."}</p>
+        <div class="bm-acts"><button class="bm-go" data-run ${r.busy ? "disabled" : ""}>${r.busy ? "⏳ جارٍ العمل…" : "▶ شغّل القالب"}</button></div>
         <div class="am-save">${r.saved
           ? `<span class="am-tag ok">💾 محفوظ باسم «${esc(r.name)}»</span>`
-          : `<span class="am-tag">مسودة (ما زال لم يُحفظ)</span><button class="bm-pill" data-saverec>💾 احفظ القالب باسم</button>`}</div>
-        <p class="bm-note">${r.saved ? "يظهر في الأوتوبايلوت كقالب تختاره مع باقي القوالب." : "احفظه باسم يميّزه، وبعدها يظهر في الأوتوبايلوت كقالب تختاره."}</p>
+          : `<span class="am-tag">مسودة (لم يُحفظ بعد)</span><button class="bm-pill" data-saverec>💾 احفظ القالب باسم</button>`}</div>
+        <p class="bm-note">${r.saved ? "يظهر في الأوتوبايلوت قالبًا تختاره مع باقي القوالب." : "احفظه باسم يميّزه، وبعدها يظهر في الأوتوبايلوت قالبًا تختاره."}</p>
         <div class="bm-pills">${S.list.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-pick="${x.id}">${x.saved ? "" : "✎ "}${esc(x.name)}</button>`).join("")}
           <button class="bm-pill" data-new>＋ قالب جديد</button><button class="bm-pill" data-delrec>🗑 احذف هذا</button></div>
         ${runs.map((x) => `<div class="am-run ${x.status}"><b>${x.status === "done" ? "✓" : x.status === "failed" ? "⚠️" : "⏳"} ${esc(new Date(x.at).toLocaleString("ar-EG-u-nu-latn", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</b>
@@ -491,7 +491,7 @@ const AutoPage = (() => {
       const v = M.verbs[n.s.verb], ls = leavesOf(n.s).filter((l) => l.type !== "action");
       return `<div class="bm-ch"><span class="latin en-k">${n.i == null ? "LANE STEP" : `STEP ${n.i + 1}`}</span><b>${esc(v.t)}</b></div><p class="bm-note">${esc(v.desc)}.</p>
         ${ls.map((l) => `<section class="am-sec${l.miss ? " miss" : ""}" data-sec="${esc(l.f)}"><p class="am-st"><b>${esc(l.t)}</b>${l.miss ? `<small>لم تُملأ بعد</small>` : ""}</p>${leafBody(n.s, l)}</section>`).join("")}
-        ${M.fixed.includes(n.s.verb) ? `<p class="bm-note">هذه من آخر خطوتين ثابتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» يأتي مع «قطّع الفيديو»، وإذا شلت التقطيع يُزال معه.</p>` : `<section class="am-sec"><p class="am-st"><b>رتّبها أو أزلها</b></p>${moveActs(n.s)}</section>`}`;
+        ${M.fixed.includes(n.s.verb) ? `<p class="bm-note">هذه من الخطوتين الثابتتين الأخيرتين (صدّر ثم انشر).</p>` : n.s.verb === "merge" ? `<p class="bm-note">«جمّع» يأتي مع «قطّع الفيديو»، وإن أزلت التقطيع يُزال معه.</p>` : `<section class="am-sec"><p class="am-st"><b>رتّبها أو أزلها</b></p>${moveActs(n.s)}</section>`}`;
     }
     const s = n.s, l = n.l;
     if (l.f === "move") return `<div class="bm-ch"><span class="latin">${esc(M.verbs[s.verb].t)}</span><b>${esc(l.t)}</b></div>` + moveActs(s);
@@ -499,37 +499,37 @@ const AutoPage = (() => {
   }
   function leafBody(s, l) {
     const M = S.meta, o = s.opts, head = "";
-    if (l.f === "rules") return editable("opt:rules", o.rules || "", RULES_PH[s.verb] || "اكتب قواعدك") + `<p class="bm-note">${RULES_NOTE[s.verb] || ""} يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
-    if (l.f === "role") return pills("role", Object.entries(M.roles || {}), o.role) + `<p class="bm-note">«تعليق صوتي»: الفيديو يظهر على قدر الصوت. «موسيقى»: توضع أسفل الفيديو.</p>`;
+    if (l.f === "rules") return editable("opt:rules", o.rules || "", RULES_PH[s.verb] || "اكتب قواعدك") + `<p class="bm-note">${RULES_NOTE[s.verb] || ""} يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
+    if (l.f === "role") return pills("role", Object.entries(M.roles || {}), o.role) + `<p class="bm-note">«تعليق صوتي»: يأتي الفيديو بطول الصوت. «موسيقى»: توضع تحت الفيديو.</p>`;
     if (l.f === "src") return head + srcCard(s);
     if (l.f === "type") return head + pills("type", [["image", "صور"], ["video", "فيديوهات"], ["any", "صور وفيديوهات"], ["audio", "صوت"]], o.type);
-    if (l.f === "order") return head + pills("order", Object.entries(M.orders), o.order) + `<p class="bm-note">«ما لا تستخدم» يأخذ الملفات التي ما زال لم تظهر في فيديو من قبل، وعندما المجلد ينتهي يبدأ من أولًا.</p>`;
+    if (l.f === "order") return head + pills("order", Object.entries(M.orders), o.order) + `<p class="bm-note">«غير المستخدم» يأخذ الملفات التي لم تظهر في فيديو من قبل، وعند انتهاء المجلد يبدأ من أوله.</p>`;
     if (l.f === "trans") return head + pills("trans", Object.entries(M.trans), o.trans);
     if (l.f === "ratio") return head + pills("ratio", M.ratios.map((x) => [x, x]), o.ratio);
-    if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«ينتظر موافقتي»: الفيديو يُصدّر ويستناك في صفحة النشر. «ينزل مباشرة»: ينزل على الحسابات التي ستختارها.</p>`;
+    if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«ينتظر موافقتي»: يُصدَّر الفيديو وينتظرك في صفحة النشر. «يُنشر مباشرة»: يُنشر على الحسابات التي ستختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
-    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "التعليق النصي الذي سينزل مع الفيديو (إذا فارغ: اسم القالب)") + `<p class="bm-note">يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
+    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "التعليق النصي الذي سيُنشر مع الفيديو (إن كان فارغًا: اسم القالب)") + `<p class="bm-note">يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
     if (l.f === "prompt" && (s.verb === "gen" || s.verb === "genvid")) {
-      const mode = genMode(o), PH = { video: "مثلًا: نفس المشهد فقط بستايل أنمي، ألوان دافية", refs: "مثلًا: @سارة ماشية في @المكتب وتشاور على الشاشة", image: "مثلًا: الكاميرا تقرّب ببطء والأشخاص تتحرك",
-        startend: "مثلًا: الكاميرا تدور من البداية للنهاية", text: "اكتب الفيديو كله: المكان، الأشخاص، الحركة، الإضاءة",
-        avatar: "مثلًا: @سارة تتكلم بحماس وتشاور بإيدها", lipsync: "اختياري" };
-      const NOTE = { avatar: "النموذج يخلّي الشخص الذي في الصورة يتكلم بالصوت الذي تختاره.", lipsync: "النموذج يضبط شفايف الذي في القطعة على الصوت الذي تختاره (الوصف غير ضروري).",
-        video: "النموذج يأخذ القطعة نفسها ويعمل منها فيديو جديد هذا بالبرومبت.", refs: "النموذج يعمل فيديو جديد من المراجع الذي منشنتها.", image: "النموذج يبدأ من صورة البداية ويحرّكها على حسب الوصف.",
-        startend: "النموذج يعمل الحركة من صورة البداية لصورة النهاية.", text: "النموذج يعمل الفيديو من النص فقط، بدون القطعة." };
+      const mode = genMode(o), PH = { video: "مثلًا: المشهد نفسه بأسلوب الأنمي، بألوان دافئة", refs: "مثلًا: @سارة تمشي في @المكتب وتشير إلى الشاشة", image: "مثلًا: الكاميرا تقترب ببطء والأشخاص يتحركون",
+        startend: "مثلًا: الكاميرا تدور من البداية إلى النهاية", text: "صِف الفيديو كله: المكان، الأشخاص، الحركة، الإضاءة",
+        avatar: "مثلًا: @سارة تتكلم بحماس وتشير بيدها", lipsync: "اختياري" };
+      const NOTE = { avatar: "يجعل النموذج الشخص الذي في الصورة يتكلم بالصوت الذي تختاره.", lipsync: "يضبط النموذج شفاه من في القطعة على الصوت الذي تختاره (الوصف غير ضروري).",
+        video: "يأخذ النموذج القطعة نفسها ويصنع منها فيديو جديدًا بهذا الموجّه.", refs: "يصنع النموذج فيديو جديدًا من المراجع التي أشرت إليها.", image: "يبدأ النموذج من صورة البداية ويحرّكها حسب الوصف.",
+        startend: "يصنع النموذج الحركة من صورة البداية إلى صورة النهاية.", text: "يصنع النموذج الفيديو من النص فقط، دون القطعة." };
       if (!S.refs) loadRefs();
       return head + editable("opt:prompt", o.prompt || "", PH[mode]) + `<div class="am-ment" data-ment hidden></div>`
-        + `<p class="bm-note">${NOTE[mode]} اكتب <b>@</b> لكي تشير إلى شخصية أو خلفية أو صورة أو مجلد (تُرسل للنموذج كمرجع). يُحفظ تلقائيًا عندما تقف عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله نحو <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
+        + `<p class="bm-note">${NOTE[mode]} اكتب <b>@</b> للإشارة إلى شخصية أو خلفية أو صورة أو مجلد (تُرسل إلى النموذج مرجعًا). يُحفظ تلقائيًا عند توقفك عن الكتابة.${S.rec.est ? ` تكلفة التشغيل كله نحو <b class="num">${AR_N(S.rec.est)}</b> نقطة.` : ""}</p>`;
     }
     if (l.f === "prompt" && s.verb === "genimg") {
       const m = imgModel(o);
       if (!S.refs) loadRefs();
-      return head + editable("opt:prompt", o.prompt || "", m?.refs ? "مثلًا: @سارة ماسكة المنتج في @العيادة، إضاءة ناعمة، تصوير احترافي" : "مثلًا: كوب قهوة على طاولة خشب بجانب نافذة، ضوء الصبح")
-        + `<div class="am-ment" data-ment hidden></div><p class="bm-note">${m?.refs ? "اكتب <b>@</b> لكي تشير إلى شخصية أو خلفية أو صورة من المكتبة، وتُرسل للنموذج كصورة مرجع." : "هذا النموذج يرسم من الوصف فقط (لا يقبل صور مرجع)."} الصور تدخل الفيديو بالترتيب، وتُحفظ في «مكتبة المحتويات ← الصور ← ✨ وُلّد بالنموذج المخصص». يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
+      return head + editable("opt:prompt", o.prompt || "", m?.refs ? "مثلًا: @سارة تمسك المنتج في @العيادة، إضاءة ناعمة، تصوير احترافي" : "مثلًا: كوب قهوة على طاولة خشبية بجانب نافذة، ضوء الصباح")
+        + `<div class="am-ment" data-ment hidden></div><p class="bm-note">${m?.refs ? "اكتب <b>@</b> للإشارة إلى شخصية أو خلفية أو صورة من المكتبة، وتُرسل إلى النموذج صورةً مرجعية." : "يرسم هذا النموذج من الوصف فقط (لا يقبل صورًا مرجعية)."} تدخل الصور الفيديو بالترتيب، وتُحفظ في «مكتبة المحتويات ← الصور ← ✨ وُلّد بالنموذج المخصص». يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
     }
     if ((l.f === "text" || l.f === "lyrics") && s.verb === "genvoice") {
       const m = voModel(o), music = m.mode === "music";
-      return head + editable(`opt:${l.f}`, o[l.f] || "", l.f === "lyrics" ? "[Verse] ... [Chorus] ..." : music ? "مثلًا: موسيقى هادية بيانو ودرامز خفيفة، مود متفائل" : "اكتب النص الذي تريده يُقال بالضبط")
-        + `<p class="bm-note">${l.f === "lyrics" ? "إذا فارغة تظهر موسيقى بدون نص." : music ? "الموسيقى توضع أسفل الفيديو، وتُحفظ في «الموسيقى» في المكتبة." : "التعليق يوضع على الفيديو، ويُحفظ في «التعليقات الصوتية» في المكتبة."} يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
+      return head + editable(`opt:${l.f}`, o[l.f] || "", l.f === "lyrics" ? "[Verse] ... [Chorus] ..." : music ? "مثلًا: موسيقى هادئة ببيانو وإيقاع خفيف، بأجواء متفائلة" : "اكتب النص الذي تريد أن يُقال حرفيًا")
+        + `<p class="bm-note">${l.f === "lyrics" ? "إن تُركت فارغة تأتي الموسيقى بلا كلمات." : music ? "توضع الموسيقى تحت الفيديو، وتُحفظ في «الموسيقى» في المكتبة." : "يوضع التعليق على الفيديو، ويُحفظ في «التعليقات الصوتية» في المكتبة."} يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
     }
     if (l.f === "lang" && s.verb === "genvoice") {
       const D = Object.entries(M.dialects || {}), cur = M.dialects?.[o.lang] ? o.lang : (M.brand_lang || "ar-msa");
@@ -542,29 +542,29 @@ const AutoPage = (() => {
     }
     if (l.f === "model" && s.verb === "genimg") {
       const ms = M.img_models || [], cur = imgModel(o)?.key;
-      return head + `<p class="bm-note">النماذج التي تقبل صور مرجع يظهرلها «صور المرجع». السعر لكل صورة.</p>`
-        + `<p class="am-gh">تقبل صور مرجع</p>` + pills("model", ms.filter((m) => m.refs).map((m) => [m.key, `${m.label} · $${m.price}`]), cur)
+      return head + `<p class="bm-note">النماذج التي تقبل صورًا مرجعية تظهر لها «الصور المرجعية». السعر لكل صورة.</p>`
+        + `<p class="am-gh">تقبل صورًا مرجعية</p>` + pills("model", ms.filter((m) => m.refs).map((m) => [m.key, `${m.label} · $${m.price}`]), cur)
         + (ms.some((m) => !m.refs) ? `<p class="am-gh">من الوصف فقط</p>` + pills("model", ms.filter((m) => !m.refs).map((m) => [m.key, `${m.label} · $${m.price}`]), cur) : "");
     }
     if (l.f === "model" && s.verb === "genvoice") {
-      const ms = M.voice_models || [], cur = voModel(o).model, G = [["std", "🎙️ أصوات جاهزة بكل اللهجات"], ["tts", "🗣️ نماذج نص على Atlas"], ["music", "🎵 موسيقى"]];
-      return head + `<p class="bm-note">النماذج التي تقبل صوت مرجع يظهرلها «صوت مرجع» تشير إلى فيه صوت شخصية أو صوتك أو تعليق من المكتبة.</p>`
-        + G.map(([mode, t]) => { const xs = ms.filter((m) => m.mode === mode); return xs.length ? `<p class="am-gh">${t}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.ref ? " · يقبل صوت مرجع" : ""}${m.price ? ` · $${m.price}` : ""}`]), cur) : ""; }).join("");
+      const ms = M.voice_models || [], cur = voModel(o).model, G = [["std", "🎙️ أصوات جاهزة بكل اللهجات"], ["tts", "🗣️ نماذج تحويل النص إلى كلام"], ["music", "🎵 موسيقى"]];
+      return head + `<p class="bm-note">النماذج التي تقبل صوتًا مرجعيًا تظهر لها «صوت مرجعي» تشير فيه إلى صوت شخصية أو صوتك أو تعليق من المكتبة.</p>`
+        + G.map(([mode, t]) => { const xs = ms.filter((m) => m.mode === mode); return xs.length ? `<p class="am-gh">${t}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.ref ? " · يقبل صوتًا مرجعيًا" : ""}${m.price ? ` · $${m.price}` : ""}`]), cur) : ""; }).join("");
     }
     if (["refs", "start", "end", "audio", "ref"].includes(l.f)) return head + refsCard(s, l.f);
-    if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند آخر كل جملة، وأزل أول ٣ ثواني، ومن غير السكوت الطويل") + `<p class="bm-note">إذا سبته فارغ: قطع متساوية، والقطع يُدفع لأقرب سكوت لكي لا يقطع في نص كلمة. إذا كتبت: العقل يسمع النص ويقطّع على حسب طلبك (يُخصم على قدر طول الفيديو).</p>`;
+    if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند نهاية كل جملة، وأزل أول ٣ ثوانٍ، ودون السكوت الطويل") + `<p class="bm-note">إن تركته فارغًا: قطع متساوية، ويُزاح القطع إلى أقرب سكوت كي لا يقطع في منتصف كلمة. إن كتبت: يستمع العقل إلى الكلام ويقطّع حسب طلبك (يُخصم بحسب طول الفيديو).</p>`;
     if (l.f === "model") {
       const cur = genModel(o)?.model;
-      return head + `<p class="bm-note">كل نموذج يأخذ شيء مختلفة، والنقاط التي حوالين الخطوة تتغيّر على حسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
+      return head + `<p class="bm-note">كل نموذج يأخذ مدخلات مختلفة، وتتغيّر النقاط حول الخطوة بحسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {
         const xs = genList(o).filter((m) => m.mode === mode);
         return xs.length ? `<p class="am-gh">${esc(t)}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.per_sec ? ` · $${m.per_sec}/ث` : ""}`]), cur) : "";
       }).join("");
     }
     if (l.f === "items") return head + mergeCard(s);
-    if (l.f === "want") return head + editable("opt:want", o.want || "", "مثلًا: الدكتور يبتسم للكاميرا، أو المنتج في يد حد، أو أي لقطة فيها البحر")
-      + `<p class="bm-note">نموذج رخيص يشاهد على فريم كل ثانية ويختار الذي فيه وصفك فقط، والباقي يُزال (فيديو دقيقة ≈ أقل من نقطة). ما يظهر يُحفظ في المكتبة في «🎯 فريمات مختارة». يُحفظ تلقائيًا عندما تقف عن الكتابة.</p>`;
-    if (l.f === "out") return head + pills("out", Object.entries(M.frame_out || {}), o.out) + `<p class="bm-note">«صور»: كل فريم صورة تظهر كم ثانية. «لقطات»: الثواني الذي فيها وصفك تُقص فيديوهات قصيرة.</p>`;
-    if (s.verb === "genvid" && l.f === "sec") return head + pills("sec", [[4, "٤ ث"], [5, "٥ ث"], [6, "٦ ث"], [8, "٨ ث"], [10, "١٠ ث"]], o.sec) + `<p class="bm-note">التكلفة على قدر الثواني.</p>`;
+    if (l.f === "want") return head + editable("opt:want", o.want || "", "مثلًا: الطبيب يبتسم للكاميرا، أو المنتج في يد أحدهم، أو أي لقطة فيها البحر")
+      + `<p class="bm-note">نموذج رخيص يشاهد إطارًا كل ثانية ويختار ما يطابق وصفك فقط، ويُزال الباقي (فيديو دقيقة ≈ أقل من نقطة). ما يُختار يُحفظ في المكتبة في «🎯 إطارات مختارة». يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
+    if (l.f === "out") return head + pills("out", Object.entries(M.frame_out || {}), o.out) + `<p class="bm-note">«صور»: كل إطار صورة تظهر بضع ثوانٍ. «لقطات»: الثواني التي فيها وصفك تُقص فيديوهات قصيرة.</p>`;
+    if (s.verb === "genvid" && l.f === "sec") return head + pills("sec", [[4, "٤ ث"], [5, "٥ ث"], [6, "٦ ث"], [8, "٨ ث"], [10, "١٠ ث"]], o.sec) + `<p class="bm-note">التكلفة بحسب الثواني.</p>`;
     if (s.verb === "genvid" && l.f === "count") return head + pills("count", [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"]], o.count);
     if (s.verb === "pull" && l.f === "volume") return head + pills("volume", [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]], o.volume);
     if (s.verb === "montage") return head + montCard(l.f, o);
@@ -572,10 +572,10 @@ const AutoPage = (() => {
     const NUM = { count: [[1, "١"], [2, "٢"], [3, "٣"], [4, "٤"], [6, "٦"], [8, "٨"], [12, "١٢"]], sec: [[1.5, "١.٥ ث"], [2, "٢ ث"], [2.5, "٢.٥ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"]],
       max: [[1.5, "١.٥ ث"], [2, "٢ ث"], [3, "٣ ث"], [4, "٤ ث"], [6, "٦ ث"], [10, "١٠ ث"]], volume: [[15, "١٥٪"], [25, "٢٥٪"], [35, "٣٥٪"], [50, "٥٠٪"], [70, "٧٠٪"], [100, "١٠٠٪"]] };
     if (s.verb === "split" && l.f === "max") return head + pills("max", [[5, "٥ ث"], [8, "٨ ث"], [10, "١٠ ث"], [12, "١٢ ث"], [15, "١٥ ث"], [20, "٢٠ ث"], [30, "٣٠ ث"], [60, "٦٠ ث"]], o.max)
-      + `<p class="bm-note">كل قطعة ستظهر أقل من (أو قدر) هذا الطول. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
+      + `<p class="bm-note">ستكون كل قطعة بهذا الطول أو أقل. فيديو ٤٠ ثانية على ١٥ = ٣ قطع = ٣ مسارات.</p>`;
     return head + pills(l.f, NUM[l.f] || [], o[l.f]);
   }
-  // 🎬 «مونتاج»: كل اختيار أزرار، ومعاينة صغيرة (مكان اللوجو وشكل الكابشن) بتتغير مع الاختيار
+  // 🎬 «مونتاج»: كل اختيار أزرار، ومعاينة صغيرة (مكان الشعار وشكل الكابشن) بتتغير مع الاختيار
   function montPrev(o) {
     const M = S.meta, pos = M.logo_pos?.[o.logo], look = M.cap_looks?.[o.cap_style];
     const logo = pos && o.logo !== "off" ? `<span class="mp-logo" style="width:${o.logo_size}%;left:calc((100% - ${o.logo_size}%) * ${pos[1] / 100});top:calc((100% - ${(o.logo_size * 0.5625).toFixed(2)}%) * ${pos[2] / 100})">${M.brand_logo ? `<img src="${esc(M.brand_logo)}" alt="">` : "LOGO"}</span>` : "";
@@ -586,18 +586,18 @@ const AutoPage = (() => {
   function montCard(f, o) {
     const M = S.meta, yes = [[true, "نعم"], [false, "لا"]];
     let body = "";
-    if (f === "silence") body = pills("silence", Object.entries(M.silence || {}), o.silence) + `<p class="bm-note">«خفيف»: الوقفات الطويلة بس. «متوسط»: أي وقفة أطول من نص ثانية. «قوي»: إيقاع سريع. بيشتغل على الفيديوهات اللي فيها كلام.</p>`;
-    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">الشعار من «عقل العلامة». الخانة التي في المنتصف = بدون شعار.</p>`;
+    if (f === "silence") body = pills("silence", Object.entries(M.silence || {}), o.silence) + `<p class="bm-note">«خفيف»: الوقفات الطويلة فقط. «متوسط»: أي وقفة أطول من نصف ثانية. «قوي»: إيقاع سريع. يعمل على الفيديوهات الناطقة.</p>`;
+    else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">الشعار من «عقل العلامة». الخانة الوسطى = بدون شعار.</p>`;
     else if (f === "logo_size") body = pills("logo_size", [[10, "صغير"], [14, "وسط"], [18, "عادي"], [24, "كبير"]], o.logo_size);
-    else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">الموسيقى بتوطى لوحدها وقت كلام الراوي، وترجع بعده.</p>`;
-    else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">الكابشن بيتكتب من التعليق الصوتي بتوقيته.</p>`;
-    else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل العلامة ← الإنترو والأوترو».</p>` : "");
+    else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">تنخفض الموسيقى تلقائيًا وقت كلام الراوي، وتعود بعده.</p>`;
+    else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">يُكتب التعليق النصي من التعليق الصوتي بتوقيته.</p>`;
+    else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل العلامة ← التسليم».</p>` : "");
     return body + (["logo", "logo_size", "cap_style"].includes(f) ? montPrev(o) : "");
   }
-  const RULES_PH = { gen: "مثلًا: بدون نصوص على الشاشة، ألوان العلامة، الشخصية دائمًا لابسة أبيض", genvid: "مثلًا: بدون نصوص على الشاشة، إضاءة دافية، حركة كاميرا هادية", genimg: "مثلًا: خلفية فاتحة، بدون أشخاص، أسلوب مينيمال",
-    pull: "مثلًا: قبل وبعد فقط، بدون صور فيها وشوش", music: "مثلًا: هادية، بدون نص", voice: "مثلًا: صوت سارة فقط" };
-  const RULES_NOTE = { gen: "تُضاف للبرومبت كل مرة.", genvid: "تُضاف للبرومبت كل مرة.", genimg: "تُضاف للوصف كل مرة.", split: "يختار الفيديو الذي يطابقها من الإشارة.",
-    pull: "يختار من الإشارة الملفات التي تطابقها بالمعنى. وإذا من الستوك: تُضاف لكلمة البحث.", music: "يختار من الإشارة التي يطابقها. وإذا من الستوك: تُضاف لكلمة البحث.",
+  const RULES_PH = { gen: "مثلًا: بدون نصوص على الشاشة، ألوان العلامة، الشخصية دائمًا ترتدي الأبيض", genvid: "مثلًا: بدون نصوص على الشاشة، إضاءة دافئة، حركة كاميرا هادئة", genimg: "مثلًا: خلفية فاتحة، بدون أشخاص، أسلوب بسيط",
+    pull: "مثلًا: قبل وبعد فقط، بدون صور فيها وجوه", music: "مثلًا: هادئة، بلا كلمات", voice: "مثلًا: صوت سارة فقط" };
+  const RULES_NOTE = { gen: "تُضاف إلى الموجّه كل مرة.", genvid: "تُضاف إلى الموجّه كل مرة.", genimg: "تُضاف إلى الوصف كل مرة.", split: "يختار الفيديو الذي يطابقها من الإشارة.",
+    pull: "يختار من الإشارة الملفات المطابقة بالمعنى. وإن كانت من المكتبة المجانية: تُضاف إلى كلمة البحث.", music: "يختار من الإشارة ما يطابقها. وإن كانت من المكتبة المجانية: تُضاف إلى كلمة البحث.",
     voice: "يختار من الإشارة التسجيل الذي يطابقها.", intro: "يختار الفيديو الذي يطابقها.", outro: "يختار الفيديو الذي يطابقها." };
   // «جمّع»: كل مخرج ممكن (القطعة الأصلية أو بعد «ولّد») زرار، واللي بتختاره بيتحط في الترتيب
   function mergeCard(s) {
@@ -606,17 +606,17 @@ const AutoPage = (() => {
     const L = lanesOf(sp), items = s.opts.items || [], one = !sp.pieces && L.length === 1;
     const name = (it) => { const pc = one ? "كل قطعة" : `القطعة ${AR_N(it.lane + 1)}`; if (it.node === "piece") return `${pc} (الأصلية)`; return `${pc} ← ولّد`; };
     const opts = L.flatMap((ln, li) => [{ lane: li, node: "piece" }, ...ln.filter((x) => x.verb === "gen").map((x) => ({ lane: li, node: x.id }))]);
-    return `<p class="bm-note">اختر المخرجات التي تُجمع في فيديو واحد، بالترتيب الذي تريده. إذا لم تختر شيء: آخر شيء في كل مسار، بالترتيب.</p>
+    return `<p class="bm-note">اختر المخرجات التي تُجمع في فيديو واحد، بالترتيب الذي تريده. إن لم تختر شيئًا: آخر عنصر في كل مسار، بالترتيب.</p>
       <div class="bm-pills">${opts.map((it) => `<button class="bm-pill" data-mitem="${it.lane}|${esc(it.node)}">＋ ${esc(name(it))}</button>`).join("")}</div>
       ${items.length ? `<ol class="am-order">${items.map((it, i) => `<li><span>${esc(name(it))}</span><button class="bm-pill" data-mmv="${i}|-1" ${i ? "" : "disabled"}>↑</button><button class="bm-pill" data-mmv="${i}|1" ${i < items.length - 1 ? "" : "disabled"}>↓</button><button class="bm-pill" data-mrm="${i}">✕</button></li>`).join("")}</ol>
-        <div class="bm-acts"><button class="bm-pill" data-mreset>أعدها للافتراضي</button></div>` : ""}`;
+        <div class="bm-acts"><button class="bm-pill" data-mreset>أعدها إلى الافتراضي</button></div>` : ""}`;
   }
   const editable = (k, val, ph) => `<div class="bm-write" contenteditable="plaintext-only" data-k="${k}" data-ph="${esc(ph || "اكتب هنا…")}">${esc(val)}</div>`;
   // حسابات النشر المربوطة (من صفحة النشر): كل حساب زرار يتعلّم
   function platCard(o) {
-    if (!S.pub) { if (!S.pubLoading) { S.pubLoading = true; api("/api/publisher").then((x) => { S.pub = x; refreshCard(); }).catch((err) => toast(err.message, true)).finally(() => (S.pubLoading = false)); } return `<p class="bm-note">يجلب حساباتك…</p>`; }
+    if (!S.pub) { if (!S.pubLoading) { S.pubLoading = true; api("/api/publisher").then((x) => { S.pub = x; refreshCard(); }).catch((err) => toast(err.message, true)).finally(() => (S.pubLoading = false)); } return `<p class="bm-note">جارٍ جلب حساباتك…</p>`; }
     const list = S.pub.account_list || [], on = new Set(o.platforms || []);
-    if (!list.length) return `<p class="bm-note">لا يوجد حسابات مربوطة. اربطها من صفحة النشر، ثم ارجع هنا.</p>`;
+    if (!list.length) return `<p class="bm-note">لا توجد حسابات مربوطة. اربطها من صفحة النشر، ثم عد إلى هنا.</p>`;
     return `<div class="bm-pills">${list.map((a) => { const key = `${a.platform}@${a.id}`; return `<button class="bm-pill${on.has(key) || on.has(a.platform) ? " on" : ""}" data-plat="${esc(key)}">${esc(S.pub.platforms[a.platform] || a.platform)} · ${esc(a.name || "")}</button>`; }).join("")}</div>`;
   }
   // الترتيب جوه خطوات العميل بس (صدّر وانشر ثابتين في الآخر)
@@ -678,7 +678,7 @@ const AutoPage = (() => {
     clearTimeout(S.timer);
     S.timer = setTimeout(async () => {
       if (!S.el?.isConnected) return;
-      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" }); if (!r.busy) toast("✓ القالب خلّص. التفاصيل في «ابدأ»"); } catch { /* الخادم يعيد التشغيل */ }
+      try { const r = await aAPI(); await setRec(r, { card: S.open?.id === "run" }); if (!r.busy) toast("✓ انتهى القالب. التفاصيل في «ابدأ»"); } catch { /* الخادم يعيد التشغيل */ }
     }, 2500);
   }
   async function loadLib() { if (S.libLoading) return; S.libLoading = true; try { S.lib = await api("/api/library"); refreshCard(); } catch (err) { toast(err.message, true); } S.libLoading = false; }
@@ -764,7 +764,7 @@ const AutoPage = (() => {
           S.list = await api("/api/automations"); S.id = r.id; storageSet("studiomania.auto", S.id); S.view = null; return setRec(r);
         }
         if (t.closest("[data-delrec]")) {
-          if (!(await uiConfirm(`تحذف قالب «${S.rec.name}»؟`))) return;
+          if (!(await uiConfirm(`أتحذف قالب «${S.rec.name}»؟`))) return;
           await aAPI("", { method: "DELETE" }); S.list = await api("/api/automations"); openCard(null); return start();
         }
         if ((b = t.closest("[data-addverb]"))) {
@@ -774,13 +774,13 @@ const AutoPage = (() => {
           openCard(null); await saveSteps(steps); const nn = S.byId[ns.id]; if (nn) openCard(nn); return;
         }
         if (t.closest("[data-saverec]")) {
-          const name = (await uiPrompt("اسم القالب (لكي تختاره لاحقًا في الأوتوبايلوت):", S.rec.name || "")); if (name == null || !name.trim()) return;
+          const name = (await uiPrompt("اسم القالب (لتختاره لاحقًا في الأوتوبايلوت):", S.rec.name || "")); if (name == null || !name.trim()) return;
           const r = await aAPI("", { method: "PATCH", ...jsonBody({ name: name.trim(), saved: true }) });
           S.list = await api("/api/automations"); toast(`💾 حُفظ «${r.name}»`); return setRec(r);
         }
         if ((b = t.closest("[data-active]"))) {
           const r = await aAPI("", { method: "PATCH", ...jsonBody({ active: b.dataset.active === "1" }) });
-          S.list = await api("/api/automations"); toast(r.active ? `⚡ «${r.name}» هو ما متفعّل للأوتوبايلوت` : "أُغلق التفعيل"); return setRec(r);
+          S.list = await api("/api/automations"); toast(r.active ? `⚡ «${r.name}» هو المفعّل للأوتوبايلوت` : "أُلغي التفعيل"); return setRec(r);
         }
         if ((b = t.closest("[data-laneadd]"))) {
           const li = Number(b.dataset.laneadd), verb = b.dataset.verb, ns = { id: newId(), verb, src: null, opts: { ...S.meta.verbs[verb].opts } };
@@ -797,7 +797,7 @@ const AutoPage = (() => {
           if (!text && !S.recBlob) return toast("اكتب أو سجّل ما تريده أولًا", true);
           const fd = new FormData(); fd.append("text", text); if (S.recBlob) fd.append("audio", S.recBlob, "describe.webm");
           fd.append("dry", "true");
-          const go = box.querySelector("[data-desc-go]"); go.disabled = true; go.textContent = S.recBlob ? "⏳ جارٍ الاستماع ويفهم…" : "⏳ يفهم…";
+          const go = box.querySelector("[data-desc-go]"); go.disabled = true; go.textContent = S.recBlob ? "⏳ جارٍ الاستماع والفهم…" : "⏳ جارٍ الفهم…";
           try { S.plan = await aAPI("/describe", { method: "POST", body: fd }); drawPlan(); }
           finally { go.disabled = false; go.textContent = "✨ افهم ما قلته"; }
           return;
@@ -806,7 +806,7 @@ const AutoPage = (() => {
           const box = S.el.querySelector(".am-desc"), r = await aAPI("/apply", { method: "POST", ...jsonBody({ steps: S.plan.steps }) });
           box.querySelector(".am-say").textContent = S.plan.say || ""; S.plan = null; drawPlan(); clipReset();
           box.querySelector('[data-k="desc"]').innerText = "";
-          box.querySelector("[data-undo]").hidden = false; openCard(null); S.view = null; await setRec(r); toast("✨ الخطوات أُنشئت. راجعها");
+          box.querySelector("[data-undo]").hidden = false; openCard(null); S.view = null; await setRec(r); toast("✨ أُنشئت الخطوات. راجعها");
           return;
         }
         if (t.closest("[data-plan-re]")) {   // افهم مرة أخرى من النص المكتوب (بدون ما يسمع التسجيل مرة أخرى)
@@ -814,7 +814,7 @@ const AutoPage = (() => {
           if (!heard) return toast("اكتب ما تريده", true);
           box.querySelector('[data-k="desc"]').innerText = heard; clipReset();
           const fd = new FormData(); fd.append("text", heard); fd.append("dry", "true");
-          const b2 = t.closest("[data-plan-re]"); b2.disabled = true; b2.textContent = "⏳ يفهم…";
+          const b2 = t.closest("[data-plan-re]"); b2.disabled = true; b2.textContent = "⏳ جارٍ الفهم…";
           try { S.plan = await aAPI("/describe", { method: "POST", body: fd }); } finally { drawPlan(); }
           return;
         }
@@ -858,7 +858,7 @@ const AutoPage = (() => {
           return saveSteps([...units.flat(), ...tail]);
         }
         if (t.closest("[data-rmstep]")) {
-          if (!(await uiConfirm(s.verb === "split" ? "تزيل التقطيع؟ المسارات و«جمّع» سيُزالون معه." : "تزيل هذه الخطوة؟"))) return;
+          if (!(await uiConfirm(s.verb === "split" ? "أتزيل التقطيع؟ ستُزال معه المسارات و«جمّع»." : "أتزيل هذه الخطوة؟"))) return;
           openCard(null);
           return saveSteps(mapStep(s.id, () => null).filter(Boolean).map((x) => (x.lanes ? { ...x, lanes: x.lanes.map((ln) => ln.filter(Boolean)) } : x)).filter((x) => !(s.verb === "split" && x.verb === "merge")));
         }
@@ -869,7 +869,7 @@ const AutoPage = (() => {
           if (f !== "refs") return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: it } })));
           const cur = s.opts.refs || [], has = cur.some((x) => refKey(x) === refKey(r));
           const maxR = s.verb === "genimg" ? imgModel(s.opts)?.max_refs || 4 : S.meta.max_refs || 6;
-          if (!has && cur.length >= maxR) return toast(`أقصى عدد ${maxR} مراجع هذا للنموذج`, true);
+          if (!has && cur.length >= maxR) return toast(`الحد الأقصى لهذا النموذج ${maxR} مراجع`, true);
           return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, refs: has ? cur.filter((y) => refKey(y) !== refKey(r)) : [...cur, it] } })));
         }
         if ((b = t.closest("[data-refset]"))) { const [f, kind] = b.dataset.refset.split("|"); return saveSteps(mapStep(s.id, (x) => ({ ...x, opts: { ...x.opts, [f]: { kind, id: "", label: "" } } }))); }
@@ -886,7 +886,7 @@ const AutoPage = (() => {
           const mode = b.dataset.src;
           const sq = mode === "stock" ? (S.stockQ ?? S.el.querySelector('[data-k="stockq"]')?.innerText ?? "").trim() : "";
           const src = mode === "search" ? (S.srcQ?.trim() ? { mode, q: S.srcQ.trim() } : null) : mode === "stock" ? (sq ? { mode, q: sq } : null) : { mode, id: b.dataset.id || null, label: b.dataset.label };
-          if (!src) return toast(mode === "stock" ? "اكتب تريد ماذا من الستوك أولًا" : "اكتب الكلمة التي سيبحث بها أولًا", true);
+          if (!src) return toast(mode === "stock" ? "اكتب ما تريده من المكتبة المجانية أولًا" : "اكتب الكلمة التي سيبحث بها أولًا", true);
           return saveSteps(mapStep(s.id, (x) => ({ ...x, src })));
         }
       } catch (err) { toast(err.message, true); }
@@ -939,7 +939,7 @@ const AutoPage = (() => {
         bars.forEach((b, i) => { b.style.transform = `scaleY(${(lv[i] / 22).toFixed(3)})`; });
         const sec = Math.floor((Date.now() - t0) / 1000);
         if (sec !== lastSec) { lastSec = sec; clock.textContent = `${AR_N(Math.floor(sec / 60))}:${AR_N(String(sec % 60).padStart(2, "0"))}`; }
-        const bad = Date.now() - t0 > 2500 && Date.now() - heardAt > 2500, h = bad ? "غير سامع صوت… قرّب من الميكروفون" : "لاقط صوتك ✓";
+        const bad = Date.now() - t0 > 2500 && Date.now() - heardAt > 2500, h = bad ? "لا يُسمع صوت… اقترب من الميكروفون" : "يلتقط صوتك ✓";
         if (h !== lastHint) { lastHint = h; hint.textContent = h; hint.classList.toggle("bad", bad); }
         requestAnimationFrame(draw);
       };
@@ -947,30 +947,30 @@ const AutoPage = (() => {
       mr.onstop = () => {
         stream.getTracks().forEach((x) => x.stop()); ac.close();
         S.recBlob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
-        btn.textContent = "🎙️ سجّل من أولًا"; st.textContent = "";
+        btn.textContent = "🎙️ سجّل من البداية"; st.textContent = "";
         const clip = box.querySelector(".am-clip");
         if (S.recUrl) URL.revokeObjectURL(S.recUrl);
         S.recUrl = URL.createObjectURL(S.recBlob);
-        clip.innerHTML = `<small>🎧 تسجيلك (<span class="num">${AR_N(Math.round((Date.now() - t0) / 1000))}</span> ث). اسمعه قبل ما تضغط «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 احذفه</button>`;
+        clip.innerHTML = `<small>🎧 تسجيلك (<span class="num">${AR_N(Math.round((Date.now() - t0) / 1000))}</span> ث). استمع إليه قبل ضغط «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 احذفه</button>`;
         clip.hidden = false;
       };
       mr.start(); S.rec_ = mr; btn.textContent = "⏹ أوقف التسجيل"; requestAnimationFrame(draw);
-    } catch { toast("تعذّر فتح الميكروفون. اسمح للمتصفح يستخدمه", true); }
+    } catch { toast("تعذّر فتح الميكروفون. اسمح للمتصفح باستخدامه", true); }
   }
   // 📱 الوصف بيتسجّل من تطبيق الموبايل، والتسجيل بيرجع هنا مكان تسجيل المتصفح بالظبط (تسمعه وبعدين «افهم»)
   async function recPhone() {
-    const x = await window.uiPhone?.({ kind: "voice", title: `اوصف القالب بصوتك · «${S.rec?.name || "قالب مخصص"}»`,
+    const x = await window.uiPhone?.({ kind: "voice", title: `صِف القالب بصوتك · «${S.rec?.name || "قالب مخصص"}»`,
       prompt: "صِف القالب بصوتك: ما الخطوات، وما الشكل الذي تريده. سنحوّل كلامك إلى خطوات في القالب." });
     if (!x?.audio_url) return;
     try {
       const r = await fetch(x.audio_url, { credentials: "same-origin" });
       if (!r.ok) throw new Error();
       S.recBlob = await r.blob();
-    } catch { return toast("ما قدرناش نجيب التسجيل، جرّب تاني", true); }
+    } catch { return toast("تعذّر جلب التسجيل، جرّب مرة أخرى", true); }
     const clip = S.el.querySelector(".am-clip");
     if (S.recUrl) URL.revokeObjectURL(S.recUrl);
     S.recUrl = URL.createObjectURL(S.recBlob);
-    clip.innerHTML = `<small>📱 تسجيلك من الموبايل. اسمعه قبل ما تضغط «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 احذفه</button>`;
+    clip.innerHTML = `<small>📱 تسجيلك من الجوال. استمع إليه قبل ضغط «افهم»:</small><audio controls src="${S.recUrl}"></audio><button class="bm-pill" data-clip-x>🗑 احذفه</button>`;
     clip.hidden = false;
   }
   function clipReset() {
@@ -988,8 +988,8 @@ const AutoPage = (() => {
     if (!p) { box.innerHTML = ""; return; }
     box.innerHTML = `<p class="am-gh">🎧 فهمت أنك تريد:</p>
       <div class="bm-write" contenteditable="plaintext-only" data-k="heard">${esc(p.heard || "")}</div>
-      <p class="bm-note">إذا فيه كلمة خطأ صلّحها هنا واضغط «افهم مرة أخرى».</p>
-      <p class="am-gh">🧩 هعمل هذه الخطوات بالترتيب:</p>
+      <p class="bm-note">إن كانت هناك كلمة خاطئة فصحّحها هنا واضغط «افهم مرة أخرى».</p>
+      <p class="am-gh">🧩 سأنفّذ هذه الخطوات بالترتيب:</p>
       <ol class="am-planl">${(p.plan || []).reduce((a, l) => { if (/^\s+↳/.test(l) && a.length) a[a.length - 1].push(l.replace(/^\s+↳\s*/, "↳ ")); else a.push([l]); return a; }, [])
         .map(([l, ...sub]) => `<li>${esc(l)}${sub.map((x) => `<small class="sub">${esc(x)}</small>`).join("")}</li>`).join("")}</ol>
       ${p.say ? `<p class="bm-note">${esc(p.say)}</p>` : ""}
