@@ -66,6 +66,17 @@
       }
     }
     if (out === undefined) {
+      // رقم + كلمة («0 فكرة» ← «0 ideas»)، ووقت («1:00 م» ← «1:00 PM»)، وأجزاء بينها « · » كل جزء معروف
+      let m2 = n.match(/^([\d٠-٩][\d٠-٩.,:]*)\s+(\S.*)$/);
+      if (m2 && /^(م|ص|مساءً|صباحًا)$/.test(m2[2])) out = m2[1] + (m2[2][0] === "م" ? " PM" : " AM");
+      else if (m2 && exact.has(m2[2])) out = m2[1] + " " + exact.get(m2[2]);
+      else if (n.includes(" · ")) {
+        const parts = n.split(" · "), tr = parts.map((p) => (exact.has(p) ? exact.get(p) : AR.test(p) ? null : p));
+        if (tr.every((x) => x != null)) out = tr.join(" · ");
+      }
+      if (out !== undefined) out = out.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+    }
+    if (out === undefined) {
       // جملة متركّبة من كذا حتة: بنترجم كل حتة نعرفها جواها
       if (miss.size < 3000) miss.add(n);   // 🔎 جمل مش في القاموس (I18N.misses()): أداة الجرد بتجمعها من الشاشات
       out = n;
