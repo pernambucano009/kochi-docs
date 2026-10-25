@@ -1,0 +1,27 @@
+# 🔒 اختبار العزل بين الحسابات: بيشتغل لوحده مع كل رفع للكود، ولو فيه تسريب العلامة بتبقى حمرا
+name: isolation
+on:
+  push:
+    paths: ["studiomania/backend/**", "studiomania/tests/**", ".github/workflows/isolation.yml"]
+  workflow_dispatch:
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: studiomania
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: studiomania/backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - run: python tests/isolation/run.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolation-report
+          path: studiomania/tests/isolation/last_report.json

@@ -26905,16 +26905,27 @@ CREATE TABLE IF NOT EXISTS comics (id TEXT PRIMARY KEY, source TEXT, source_id T
 CREATE VIRTUAL TABLE IF NOT EXISTS comics_fts USING fts5(id UNINDEXED, body, tokenize='unicode61 remove_diacritics 2');
 """)
     # عربي / أجنبي / الاتنين: عمود اتضاف بعدين، فالقديم بيتصنّف مرة واحدة من سياقه أو من لغة كلمة البحث
-    if "lang" not in {r[1] for r in conn.execute("PRAGMA table_info(comics)")}:
+    # 🔒 المكتبة مشتركة بين كل الحسابات: لو حسابين فتحوها أول مرة في نفس اللحظة، التاني يلاقي العمود اتضاف فيكمّل عادي
+    if "lang" not in {r[1] for r in conn.execute("PRAGMA table_info(comics)")} and add_col(conn, "comics", "lang TEXT"):
         with conn:
-            conn.execute("ALTER TABLE comics ADD COLUMN lang TEXT")
             for r in conn.execute("SELECT id, title, query, ctx FROM comics").fetchall():
                 conn.execute("UPDATE comics SET lang = ? WHERE id = ?", (comics.lang_group(json.loads(r["ctx"] or "{}"), r["title"], r["query"]), r["id"]))
     # «اعتمد الكوميك»: المعتمد مابيتمسحش (لا لوحده ولا بالجملة) غير لما الاعتماد يتشال
     if "approved" not in {r[1] for r in conn.execute("PRAGMA table_info(comics)")}:
-        with conn:
-            conn.execute("ALTER TABLE comics ADD COLUMN approved INT DEFAULT 0")
+        add_col(conn, "comics", "approved INT DEFAULT 0")
     return conn
+
+
+def add_col(conn: sqlite3.Connection, table: str, col: str) -> bool:
+    """يضيف العمود. لو حد سبقنا وأضافه بيرجع False من غير خطأ."""
+    try:
+        with conn:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
+        return True
+    except sqlite3.OperationalError as exc:
+        if "duplicate column" in str(exc):
+            return False
+        raise
 
 
 def comics_admin() -> None:
