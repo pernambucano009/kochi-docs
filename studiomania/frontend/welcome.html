@@ -487,14 +487,16 @@ const LP_STEPS = [
   ['توافق على الفكرة من جوالك', 'Approve the idea from your phone', 'يقترح الأفكار والسكريبت بلهجتك، وأنت تختار بضغطة أو تعدّل.', 'It suggests ideas and scripts in your dialect. Pick one with a tap, or edit it.'],
   ['الفيديو يُنشر في موعده', 'The video posts on time', 'القالب يصنع الفيديو بالصوت والترجمة، والأوتوبايلوت ينشره على حساباتك.', 'The template makes the video with voice and captions, and the autopilot posts it.']
 ];
-// أمثلة لكل مجال: قوالب المجال (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)
+// أمثلة لكل مجال: قوالب المجال (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)، بكلام وصور من المجال نفسه (gallery/f/<المجال>)
 const LP_FIELDS = [
-  ['مطاعم وكافيهات', 'Restaurants & cafés', [['t-price', 'كشف السعر', 'Price reveal'], ['t-chat', 'قصة شات', 'Chat story'], ['t-map', 'خريطة متحركة', 'Animated map']]],
-  ['عيادات وتجميل', 'Clinics & beauty', [['t-review', 'رأي عميل', 'Customer review'], ['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-flipcards', 'بطاقات تتقلب', 'Flip cards']]],
-  ['متاجر إلكترونية', 'Online stores', [['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-price', 'كشف السعر', 'Price reveal']]],
-  ['عقارات', 'Real estate', [['t-map', 'خريطة متحركة', 'Animated map'], ['t-chart', 'رسم بياني', 'Chart'], ['t-price', 'كشف السعر', 'Price reveal']]],
-  ['تعليم وكوتشينج', 'Education', [['t-board', 'سبورة', 'Whiteboard'], ['t-flow', 'خطوات', 'Steps'], ['t-show', 'برنامج مسابقات', 'Quiz show']]],
-  ['رياضة ولياقة', 'Fitness', [['t-pictogram', 'بطاقات بيكتوجرام', 'Pictogram cards'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-review', 'رأي عميل', 'Customer review']]]
+  ['مطاعم وكافيهات', 'Restaurants & cafés', [['t-price', 'كشف السعر', 'Price reveal'], ['t-chat', 'قصة شات', 'Chat story'], ['t-map', 'خريطة متحركة', 'Animated map']], 'food'],
+  ['عيادات وتجميل', 'Clinics & beauty', [['t-review', 'رأي عميل', 'Customer review'], ['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-flipcards', 'بطاقات تتقلب', 'Flip cards']], 'beauty'],
+  ['متاجر إلكترونية', 'Online stores', [['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-count', 'عد تنازلي', 'Countdown']], 'ecom'],
+  ['عقارات', 'Real estate', [['t-map', 'خريطة متحركة', 'Animated map'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-chart', 'رسم بياني', 'Chart']], 'realestate'],
+  ['تعليم وكوتشينج', 'Education', [['t-board', 'سبورة', 'Whiteboard'], ['t-flow', 'خطوات', 'Steps'], ['t-show', 'برنامج مسابقات', 'Quiz show']], 'edu'],
+  ['رياضة ولياقة', 'Fitness', [['t-pictogram', 'بطاقات بيكتوجرام', 'Pictogram cards'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-review', 'رأي عميل', 'Customer review']], 'fitness'],
+  ['خدمات منزلية', 'Home services', [['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-map', 'خريطة متحركة', 'Animated map']], 'home'],
+  ['محلات وتجزئة', 'Local shops', [['t-count', 'عد تنازلي', 'Countdown'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store']], 'shops']
 ];
 
 class Component {
@@ -657,7 +659,7 @@ class Component {
       stepNum: 'width:40px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;font:500 16px Jost,sans-serif;color:#E5613E;background:' + (d ? 'rgba(229,97,62,.14)' : '#FFF6F2'),
       fields: LP_FIELDS.map((f, i) => ({ name: ar ? f[0] : f[1], on: i === s.field ? 'true' : 'false', pick: () => this.setState({ field: i }),
         style: 'height:36px;padding:0 14px;border:0;border-radius:18px;cursor:pointer;font:400 13px ' + F + ';' + (i === s.field ? 'color:#FFFFFF;background:#E5613E;box-shadow:0 4px 14px rgba(229,97,62,.35)' : 'color:' + ink + ';background:' + solid + ';box-shadow:' + shadow) })),
-      samples: LP_FIELDS[s.field][2].map(([id, na, ne]) => ({ src: '/gallery/' + id + '.mp4', poster: '/gallery/' + id + '.jpg?v=2', name: ar ? na : ne,
+      samples: LP_FIELDS[s.field][2].map(([id, na, ne]) => ({ src: '/gallery/f/' + LP_FIELDS[s.field][3] + '/' + id + '.mp4', poster: '/gallery/f/' + LP_FIELDS[s.field][3] + '/' + id + '.jpg', name: ar ? na : ne,
         style: 'margin:0;border-radius:18px;overflow:hidden;background:' + card + ';box-shadow:' + shadow, capStyle: 'padding:10px 14px;font:500 13.5px ' + F + ';color:' + ink })),
       hintStyle: 'margin:2px 0 10px;font:400 12.5px/1.7 ' + F + ';color:' + muted,
       errStyle: 'margin:10px 0 0;font:400 13px/1.6 ' + F + ';color:#D9443A',

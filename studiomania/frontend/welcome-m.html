@@ -372,17 +372,20 @@
   const FIELDS = [
     ["food", "مطاعم وكافيهات", "Restaurants & cafés", ["t-price", "t-chat", "t-map"]],
     ["beauty", "عيادات وتجميل", "Clinics & beauty", ["t-review", "t-flow", "t-flipcards"]],
-    ["ecom", "متاجر إلكترونية", "Online stores", ["t-shopfloat", "t-count", "t-price"]],
-    ["realestate", "عقارات", "Real estate", ["t-map", "t-chart", "t-price"]],
+    ["ecom", "متاجر إلكترونية", "Online stores", ["t-shopfloat", "t-price", "t-count"]],
+    ["realestate", "عقارات", "Real estate", ["t-map", "t-price", "t-chart"]],
     ["edu", "تعليم وكوتشينج", "Education & coaching", ["t-board", "t-flow", "t-show"]],
     ["fitness", "رياضة ولياقة", "Sports & fitness", ["t-pictogram", "t-count", "t-review"]],
+    ["home", "خدمات منزلية ومقاولات", "Home services", ["t-flow", "t-price", "t-map"]],
+    ["shops", "محلات وتجزئة محلية", "Local shops", ["t-count", "t-price", "t-shopfloat"]],
   ];
   const TPL = { "t-price": ["كشف السعر", "Price reveal", "السعر القديم يُشطب والجديد يظهر بعدّاد وزر اطلب."], "t-chat": ["قصة شات", "Chat story", "محادثة بين العميل والمتجر تنتهي بتأكيد الطلب."],
     "t-map": ["خريطة متحركة", "Animated map", "دبابيس على الأحياء وطريق التوصيل يُرسم."], "t-review": ["رأي عميل", "Customer review", "اقتباس يظهر كلمة كلمة ونجوم تضيء."],
     "t-flow": ["خطوات الخدمة", "Service steps", "بطاقات الخطوات تظهر والخطوط بينها تُرسم."], "t-flipcards": ["بطاقات تتقلب", "Flip cards", "ثلاث رسائل، كل واحدة في بطاقة تتقلب."],
     "t-shopfloat": ["متجر بمنتجات طائرة", "Floating store", "بطاقات منتج بالسعر وزر «أضف للسلة»."], "t-count": ["عد تنازلي", "Countdown", "رقم يقلب حتى الصفر ثم يظهر العرض."],
     "t-chart": ["رسم بياني", "Chart", "أرقام تتحرك وتحكي القصة."], "t-board": ["سبورة", "Whiteboard", "شرح يُرسم أمامك على سبورة."],
-    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."] };
+    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."],
+    "t-versus": ["مقارنة", "Versus", "مقارنة بندًا ببند والفائز واضح."] };
   const ICONS = ["M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16", "M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z",
     "M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z", "M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5",
     "M4 12l16-8-6 16-3-7z M11 13l9-9", "M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M11 18h2"];
@@ -413,7 +416,7 @@
     $("fields").innerHTML = FIELDS.map((f, i) => `<button type="button" data-field="${i}" aria-pressed="${i === S.field}">${esc(en ? f[2] : f[1])}</button>`).join("");
     $("samples").innerHTML = FIELDS[S.field][3].map((id) => {
       const m = TPL[id] || [id, id, ""];
-      return `<figure class="card sample" style="margin:0"><video src="/gallery/${id}.mp4" poster="/gallery/${id}.jpg?v=2" muted loop playsinline preload="none" aria-label="${esc(en ? m[1] : m[0])}"></video>
+      return `<figure class="card sample" style="margin:0"><video src="/gallery/f/${FIELDS[S.field][0]}/${id}.mp4" poster="/gallery/f/${FIELDS[S.field][0]}/${id}.jpg" muted loop playsinline preload="none" aria-label="${esc(en ? m[1] : m[0])}"></video>
         <figcaption>${esc(en ? m[1] : m[0])}${en ? "" : `<small>${esc(m[2])}</small>`}</figcaption></figure>`;
     }).join("");
     watchVideos();

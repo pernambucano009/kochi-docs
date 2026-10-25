@@ -1363,7 +1363,7 @@ async def proxy(path: str, request: Request):
                                                         ".png": "image/png"}.get(f.suffix, "application/octet-stream"),
                             headers={"Cache-Control": "no-cache"})
         # 🌐 صفحة الهبوط: صور الموقع (site/) وعيّنات القوالب (gallery/: فيديو وغلاف) مفتوحة للزوار
-        if f.parent in (FRONTEND.resolve() / "site", FRONTEND.resolve() / "gallery") and f.suffix in (".webp", ".png", ".jpg", ".mp4") and f.is_file():
+        if (f.parent == FRONTEND.resolve() / "site" or FRONTEND.resolve() / "gallery" in f.parents) and f.suffix in (".webp", ".png", ".jpg", ".mp4") and f.is_file():
             return FileResponse(f, headers={"Cache-Control": "public, max-age=86400"})
     u_pub = False
     if not u:

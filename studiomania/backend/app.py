@@ -11009,7 +11009,8 @@ def onboard_state():
         job.update(status="failed", error="التشغيل توقف، جرّب مرة أخرى")
     steps = [{"key": k, "label": (f"{v} {dialect_phrase(b)}" if k == "script" else v)} for k, v in FIRST_STEPS]
     return {"need": need, "field": field, "first": fieldpacks.first_video(field), "about": b.get("about") or "", "audience": b.get("audience") or "",
-            "reels": fieldpacks.field_reels(field), "logo": bool(logo_path(bid)) if bid else False, "logo_asked": bool(b.get("logo_asked")),
+            "reels": fieldpacks.field_reels(field), "field_media": [r for r in fieldpacks.field_reels(field) if field and (FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.jpg").exists()],
+            "logo": bool(logo_path(bid)) if bid else False, "logo_asked": bool(b.get("logo_asked")),
             "job": job, "steps": steps, "first_done": bool(j.get("status") == "done"), "brand": first_brand_name(b),
             "about_ph": pack.get("about_ph") or "مثلًا: ماذا تبيع أو تقدم، وأين، وما الذي يميزك عن غيرك",
             "audience_ph": "العمر، والاهتمامات، وما الذي يبحث عنه", "score": brain_score(b), **fieldpacks.signup_options()}
@@ -17813,8 +17814,16 @@ def lab_ratio(d: dict, lid: str | None = None) -> str:
 
 @app.get("/api/tpl-niche")
 def tpl_niche():
-    """مجال العميل المختار: المعرض يعرض القوالب المناسبة له أولًا."""
-    return niches.detect(active_client())
+    """مجال العميل المختار: المعرض يعرض القوالب المناسبة له أولًا. وقوالب مجاله (من أسئلة البداية) ليها غلاف ومعاينة
+    بكلام وصور من نفس المجال (frontend/gallery/f/<المجال>/، بتتعمل بـ tools/fieldcovers/make.py)."""
+    c = active_client() or {}
+    out = dict(niches.detect(c) or {})
+    field = c.get("field") or ""
+    reels = fieldpacks.field_reels(field) if field in fieldpacks.FIELDS else []
+    media = FRONTEND_DIR / "gallery" / "f" / Path(field).name if field else None
+    out.update(field=field, field_name=(fieldpacks.FIELDS.get(field) or {}).get("name", ""), reels=reels,
+               field_media=[r for r in reels if media and (media / f"{r}.jpg").exists()])
+    return out
 
 
 @app.get("/api/templates")

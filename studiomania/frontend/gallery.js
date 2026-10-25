@@ -2,7 +2,7 @@
 // الفيديو بيشتغل للكارت اللي في النص، والدوسة عليه بتفتحه كبير. مولّدات الصوت والصور والفيديو زراير جوه كورة العجلة.
 const Gallery = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { items: [], cats: [], root: null, niche: { key: "", name: "" } };
+  const S = { items: [], cats: [], root: null, niche: { key: "", name: "" }, reels: [] };
   // التايبوجرافي قالب زي الباقي: فيديو العرض بتاعه مترسوم بمحرك الكلام المتحرك نفسه
   // 📱 الخط الأساسي: تصوير بالموبايل (أول قالب): الفكرة والسكريبت اختياريين ← الفيديو ← ملاحظات ← مونتاج أوتوماتيك
   const EXTRA = [{ id: "phone", name: "تصوير بالجوال", icon: "📱", sample_url: "/gallery/phone.mp4", cover_url: "/gallery/phone.jpg?v=3", cat: "ugc",
@@ -171,7 +171,17 @@ const Gallery = (() => {
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الصناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
     S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
+    // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
+    S.reels = niche?.reels || [];
+    const fm = niche?.field_media || [];
+    for (const x of EXTRA) {
+      if (x.base) Object.assign(x, x.base);
+      if (!fm.includes(x.id)) continue;
+      x.base = x.base || { cover_url: x.cover_url, sample_url: x.sample_url };
+      Object.assign(x, { cover_url: `/gallery/f/${niche.field}/${x.id}.jpg`, sample_url: `/gallery/f/${niche.field}/${x.id}.mp4` });
+    }
   }
+  const fieldMedia = (id) => EXTRA.find((x) => x.id === id && x.base) || null;
   const catName = (id) => S.cats.find((c) => c.id === id)?.ar || "أخرى";
   // 🎡 العجلة: مالية الصفحة. أسماء القوالب على قوس على الشمال، واسم القالب اللي السهم عليه في النص، والكروت عمودين على اليمين.
   // رول الماوس بيدّي العجلة دفعة فتجري وتهدى بالاحتكاك وتقف على أقرب قالب (فوق العجلة بتجري أكتر من فوق الكروت)، ومعاها تكّة سقاطة.
@@ -260,7 +270,8 @@ const Gallery = (() => {
   const NICHES = [["food", "المطاعم والكافيهات"], ["beauty", "التجميل والعيادات"], ["retail", "المتاجر والمنتجات"], ["realestate", "العقارات"], ["edu", "التعليم والكورسات"],
     ["fitness", "الرياضة واللياقة"], ["tech", "التقنية والتطبيقات"], ["travel", "السياحة والسفر"], ["services", "الشركات والخدمات"], ["creator", "صناع المحتوى"]];
   // «موصى به لمجالك» بس للقوالب المختارة للمجال ده فعلًا (مش اللي بتنفع لأي مجال)
-  const recFor = (x, key) => !!key && (FIT[x.id] || "").split(" ").includes(key);
+  const ri = (x) => { const i = (S.reels || []).indexOf(x.id); return i < 0 ? 99 : i; };   // ترتيب قوالب المجال: أولها المقترح
+  const recFor = (x, key) => (S.reels || []).includes(x.id) || (!!key && (FIT[x.id] || "").split(" ").includes(key));
   const GF = { q: "", type: "", niche: null };
   // 🎡 العجلة هي العرض الأساسي (هوية المنتج)، والشبكة بزرار «عرض الكل»
   S.view = "wheel";
@@ -274,7 +285,7 @@ const Gallery = (() => {
     const list = S.items.map((x, i) => [x, i]).filter(([x]) => (!GF.type || x.cat === GF.type)
       && (!q || [x.name, x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(q)))
       && (!GF.niche || recFor(x, GF.niche) || FIT[x.id] === "*"));
-    list.sort((a, b) => (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
+    list.sort((a, b) => (ri(a[0]) - ri(b[0])) || (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
     return list;
   }
   function ggCard([x, i]) {
@@ -370,7 +381,7 @@ const Gallery = (() => {
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
     // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
     // قوالب مجال العميل الأول (موصى به)، وبعدها الثابتين (الموبايل ← الأفاتار)، وبعدها المناسب لأي مجال، والباقي
-    list.sort((a, b) => (recFor(b[0], S.niche.key) - recFor(a[0], S.niche.key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
+    list.sort((a, b) => (ri(a[0]) - ri(b[0])) || (recFor(b[0], S.niche.key) - recFor(a[0], S.niche.key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
     if (!list.length) { box.innerHTML = `<div class="nh-empty">لا يوجد قوالب ما زال.</div>`; return; }
@@ -802,5 +813,5 @@ const Gallery = (() => {
     dubOut(); Gen.close?.(); SceneStudio.close?.();
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
-  return { mount, list: () => EXTRA, openEditor, start: (id) => { const x = EXTRA.find((t) => t.id === id); if (!x) return false; startTpl(x); return true; } };
+  return { mount, list: () => EXTRA, fieldMedia, openEditor, start: (id) => { const x = EXTRA.find((t) => t.id === id); if (!x) return false; startTpl(x); return true; } };
 })();

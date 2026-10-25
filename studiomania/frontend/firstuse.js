@@ -166,11 +166,13 @@ const FirstUse = (() => {
   // 🎬 قوالب المجال بأغلفتها: الأول هو المقترح
   function pickTemplate() {
     const list = typeof Gallery !== "undefined" ? Gallery.list() : [];
-    const items = (state.reels || [state.first]).map((id) => ({ id, name: (list.find((x) => x.id === id) || {}).name || id }));
+    // غلاف كل قالب من مجال العميل نفسه (لو موجود)، وإلا الغلاف العام
+    const items = (state.reels || [state.first]).map((id) => ({ id, name: (list.find((x) => x.id === id) || {}).name || id,
+      cover: (state.field_media || []).includes(id) ? `/gallery/f/${state.field}/${id}.jpg` : `/gallery/${id}.jpg?v=2` }));
     return new Promise((resolve) => {
       let cur = items[0];
       const b = dialog(`<h3>اختر شكل أول فيديو</h3><p class="fu-sub">قوالب مناسبة لمجالك. كلها تُصنع بالصوت والحركة فقط، وأول فيديو على حسابنا.</p>
-        <div class="fu-tpls">${items.map((x, i) => `<button type="button" class="fu-tpl${i ? "" : " on"}" data-t="${esc(x.id)}"><img src="/gallery/${esc(x.id)}.jpg?v=2" alt="" loading="lazy"><b>${esc(x.name)}</b>${i ? "" : "<small>المقترح لمجالك</small>"}</button>`).join("")}</div>
+        <div class="fu-tpls">${items.map((x, i) => `<button type="button" class="fu-tpl${i ? "" : " on"}" data-t="${esc(x.id)}"><img src="${esc(x.cover)}" alt="" loading="lazy"><b>${esc(x.name)}</b>${i ? "" : "<small>المقترح لمجالك</small>"}</button>`).join("")}</div>
         <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok">التالي</button><button type="button" class="ui-dlg-no">لاحقًا</button></div>`);
       b.querySelector(".fu-tpls").onclick = (e) => {
         const t = e.target.closest(".fu-tpl"); if (!t) return;
