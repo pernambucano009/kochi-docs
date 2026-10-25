@@ -601,7 +601,7 @@ const BrandPage = (() => {
     return `<div class="bm-qbar"><i style="width:${Math.round(100 * tq.done / Math.max(1, tq.total))}%"></i></div>
       <p class="bm-note">${left.length ? `فاضل ${left.length} من ${tq.total}. كل مهمة تتعلّم تلقائيًا أول ما تُنشأ.` : "خلصت كل المهام 🎉"}</p>
       <ul class="bm-tasks">${[...left, ...tq.items.filter((x) => x.done)].map((x) => `<li class="${x.done ? "ok" : ""}"><span class="bm-tck">${x.done ? "✓" : ""}</span>
-        <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">أنشئها ←</button>`}</li>`).join("")}</ul>`;
+        <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">أنشئها →</button>`}</li>`).join("")}</ul>`;
   }
   function quizHTML(b) {
     const tq = S.tqFor === b?.id ? S.tq : null, qn = S.quiz?.length || 0, qd = Math.min((b?.quiz_done || []).length, qn || 99);
@@ -625,7 +625,7 @@ const BrandPage = (() => {
     return head + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ متجاوب</small>` : ""}</div>` + bar
       + `<p class="bm-q">${esc(q.q)}</p>` + field
       + (q.multi ? `<p class="bm-note">كل شيء في سطر (Enter لسطر جديد).</p>` : "")
-      + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>→ السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطّي</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "خلّصت" : "التالي ←"}</button></div>
+      + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>→ السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطّي</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "خلّصت" : "التالي →"}</button></div>
       <p class="bm-note bm-qsave">إجابتك تُحفظ في العقل أول ما تضغط «التالي». يمكنك تخرج وتُكمل في أي وقت.</p>`;
   }
   async function quizStep(step, pick) {

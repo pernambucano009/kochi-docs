@@ -166,7 +166,7 @@ async function loadSetAccounts() {
   try {
     const p = await api("/api/publisher");
     $("setAccHint").innerHTML = p.service === "zernio"
-      ? `<a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر ←</a>`
+      ? `<a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر →</a>`
       : "خدمة النشر ما زال غير متصلة";
     // كل المنصات، وكل الحسابات المربوطة على كل منصة (الربط والفصل من صفحة النشر)
     list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {

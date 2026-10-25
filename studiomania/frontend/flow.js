@@ -292,7 +292,7 @@ const Flow = (() => {
     return `${picked("idea")}<h2>نوع المنشور</h2>
       <div class="flw-fmts">${Object.entries(FMT).map(([k, [ic, t, s]]) => `<button type="button" class="flw-fmt${f === k ? " on" : ""}" data-fmt="${k}"><i>${ic}</i><b>${t}</b><small>${s}</small></button>`).join("")}</div>
       ${f === "series" ? `<div class="flw-eps"><b>عدد الحلقات</b><div>${["auto", 2, 3, 4, 5, 6, 7, 8, 10].map((n) => `<button type="button" class="flw-chip${String(S.eps || d.episodes || "auto") === String(n) ? " on" : ""}" data-eps="${n}">${n === "auto" ? "✨ تلقائي (العقل يقرر)" : n}</button>`).join("")}</div></div>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setfmt ${d.busy ? "disabled" : ""}>أكمل للسيناريو ←</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setfmt ${d.busy ? "disabled" : ""}>أكمل للسيناريو →</button></div>`;
   }
 
   // ---------------------------------------------------------------- 3) السيناريو
@@ -443,7 +443,7 @@ const Flow = (() => {
       ${opts.length ? `<div class="flw-cast">${opts.map((o) => `<button type="button" class="flw-person${S.cast.includes(o.id) ? " on" : ""}" data-person="${esc(o.id)}">
         <img src="${esc(o.image_url)}" alt="" loading="lazy"><b>${esc(o.name)}</b>${o.about ? `<small>${esc(o.about.slice(0, 70))}</small>` : ""}</button>`).join("")}</div>`
         : `<div class="flw-empty">لا يوجد بعد شخصيات في العقل. أضفها من «الشخصيات» أو من عقل العلامة، أو أكمل بدون أبطال.</div>`}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setcast>${S.cast.length ? `أكمل بـ ${S.cast.length} ${S.cast.length === 1 ? "بطل" : "أبطال"}` : "أكمل بدون أبطال"} ←</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setcast>${S.cast.length ? `أكمل بـ ${S.cast.length} ${S.cast.length === 1 ? "بطل" : "أبطال"}` : "أكمل بدون أبطال"} →</button></div>`;
   }
   async function loadCast() {
     if (S.castLoading) return;
@@ -472,7 +472,7 @@ const Flow = (() => {
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
           ${o.voices[v.lang] && o.fasih && /^ar-/.test(v.lang) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
       ${isCode(d) ? failed("vo") : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد ←${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل ←"}</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد →${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل →"}</button></div>`;
   }
   async function loadVoice() {
     if (S.vLoading) return;
@@ -505,7 +505,7 @@ const Flow = (() => {
       <label class="flw-drop"><input type="file" id="flwFiles" accept="image/*,video/*" multiple hidden><i>⬆️</i><b>اضغط أو اسحب الملفات هنا</b><small class="muted">صور أو فيديوهات، حتى ١٠ مرة واحدة</small></label>
       ${(d.assets || []).length ? `<div class="flw-assets">${d.assets.map(assetTile).join("")}</div>` : ""}
       ${tplPanel(d)}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="generate">${(d.assets || []).length ? "أكمل" : "أكمل بدون ملفات"} ←</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="generate">${(d.assets || []).length ? "أكمل" : "أكمل بدون ملفات"} →</button></div>`;
   }
 
   // ---------------------------------------------------------------- 6) التوليد والنتيجة
@@ -546,7 +546,7 @@ const Flow = (() => {
       ${!isWork && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind ? `<div class="flw-done">
         ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "الكاروسيل أُنشئ بالسلايدز والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
-          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} ←</button>` : o.video_url ? `<a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل الفيديو</a>` : ""}
+          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل الفيديو</a>` : ""}
         <div class="flw-final"><b>عجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
         ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ماذا الذي لم يعجبك؟ (العقل سيتذكره)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
         <button type="button" class="flw-link" data-go="scenario">↩︎ جرّب سيناريو آخر</button></div>` : ""}`;

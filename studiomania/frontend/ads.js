@@ -651,7 +651,7 @@ function renderAdFlow() {
     n1.innerHTML = `<span class="muted">${adBusy ? "✍️ الاقتراح يُكتب من هذا التحليل..." : fresh ? "✅ الاقتراح متحدّث بآخر نسخة من التحليل والمكونات."
       : a.adaptation ? "⚠️ التحليل أو المكونات تغيّرون بعد ما الاقتراح كُتب." : "الخطوة القادمة: اقتراح للعميل مبني على المشاهد هذه والمكونات."}</span>
       <button class="btn primary" data-flow="adapt" ${anBusy || adBusy ? "disabled" : ""}>${adBusy ? "⏳ جارٍ الكتابة الاقتراح..."
-        : fresh ? "التالي: الاقتراح ←" : "التالي: اكتب الاقتراح من هذا التحليل ←"}</button>`;
+        : fresh ? "التالي: الاقتراح →" : "التالي: اكتب الاقتراح من هذا التحليل →"}</button>`;
   }
   const s1 = $("adAdaptStale");
   s1.hidden = !adaptStale(a) || adBusy;
@@ -665,8 +665,8 @@ function renderAdFlow() {
     n2.innerHTML = `<span class="muted">${fresh ? "✅ التنفيذ حسنًا على آخر نسخة من الاقتراح."
       : old ? "⚠️ هذا الاقتراح مبني على تحليل أقدم، فالموشن جرافيك الجديد غير فيه. سيُكتب من جديد بالموشن ثم يُؤخذ للتنفيذ."
       : a.prod ? "⚠️ الاقتراح تغيّر بعد ما التنفيذ بدأ." : "الخطوة القادمة: التنفيذ (ستوري بورد ← مكونات ← فيديو لكل لقطة)."}</span>
-      <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ ←"
-        : old ? "التالي: حدّث الاقتراح بالموشن وخذه للتنفيذ ←" : "التالي: خذ هذا الاقتراح للتنفيذ ←"}</button>`;
+      <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ →"
+        : old ? "التالي: حدّث الاقتراح بالموشن وخذه للتنفيذ →" : "التالي: خذ هذا الاقتراح للتنفيذ →"}</button>`;
   }
   const s2 = $("adProdStale"), hist = a.prod_history || [];
   const stale = prodStale(a);

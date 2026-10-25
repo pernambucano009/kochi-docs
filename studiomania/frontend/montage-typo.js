@@ -278,7 +278,7 @@ function mtTypoPaneRender() {
         <div class="wd-row" dir="auto">${(mtx.cur.words || []).slice(r.from, r.to + 1).map((w, j) => `<input class="wd" data-wi="${r.from + j}" value="${escapeHtml(w.w)}" size="${Math.max(2, [...w.w].length + 1)}" dir="auto" spellcheck="false">`).join("")}</div></div>
       <details class="wd-more"><summary>اكتب النص الذي يظهر بنفسك (بدل ما قيل)</summary>
         <input id="mtTyText" value="${escapeHtml(r.text || "")}" placeholder="${escapeHtml(txt)}" dir="auto"></details>
-      <div class="row wrap"><button class="btn sm" id="mtTyPrev">→ ما قبلها</button><button class="btn sm" id="mtTyNext">ما بعدها ←</button>
+      <div class="row wrap"><button class="btn sm" id="mtTyPrev">→ ما قبلها</button><button class="btn sm" id="mtTyNext">ما بعدها →</button>
         <button class="btn sm danger" id="mtTyDel">🗑 أزلها</button></div></div>`;
   }
   h += mtFxPaneHtml();
