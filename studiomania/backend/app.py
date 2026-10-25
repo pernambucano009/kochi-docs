@@ -23953,6 +23953,7 @@ def flow_motion_params(d: dict) -> dict:
     for row in (d.get("scenario") or {}).get("scenes") or []:
         out.update(fz.clean_params(schema, row.get("fields") or {}))
     out.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema})
+    out.update({k: v for k, v in tplbrief.auto_icons(mid, out).items() if k in schema and k not in (d.get("locked") or {})})   # رسمة كل خطوة من كلامها
     return out
 
 

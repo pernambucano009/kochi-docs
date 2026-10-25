@@ -140,8 +140,9 @@ BRIEFS: dict[str, dict] = {
     },
 }
 
-# الأنشطة اللي ليها رسمة متحركة في t-pictogram (عربي|English) — نفس الترتيب في القالب
-PICTOS = [["جري", "Running"], ["سباحة", "Swimming"], ["يوجا", "Yoga"], ["ملاكمة", "Boxing"], ["أثقال", "Weights"], ["دراجة", "Cycling"]]
+# الأنشطة اللي ليها رسمة متحركة في t-pictogram (عربي|English): القالب بيختار الحركة باسم النشاط
+PICTOS = [["جري", "Running"], ["سباحة", "Swimming"], ["يوجا", "Yoga"], ["ملاكمة", "Boxing"], ["أثقال", "Weights"], ["دراجة", "Cycling"],
+          ["مشي", "Walking"], ["قفز", "Jumping"], ["سكوات", "Squat"], ["تمدد", "Stretch"], ["زومبا", "Zumba"]]
 
 
 def brief(tpl: str, field: str = "", brand: str = "") -> dict | None:
@@ -322,4 +323,23 @@ def draw_jobs(tpl: str, params: dict) -> list[tuple[str, str, str]]:
         what = str(params.get(name) or "").strip()
         if what and not params.get(img):
             out.append((img, what, d["style"] + what))
+    return out
+
+
+# 🖍️ رسمة كل خطوة في السبورة (t-board) بتتختار من كلام الخطوة نفسها، مش ثابتة
+BOARD_ICONS = [("person", r"عميل|جمهور|ناس|شخص|نفسك|فريق|زبون|مريض|طالب|متدرب"), ("bulb", r"فكر|فكرة|اعرف|تعلم|اختار|اختر|خطط|خطة|افهم|ابتكر"),
+               ("chart", r"قيس|قياس|نتائج|نتيجة|طور|زود|نمو|مبيعات|أرقام|ارقام|حلل|تابع"), ("check", r"نفذ|ابدأ|احجز|اطلب|سجل|خلص|جهز|طبق|اعمل|استخدم"),
+               ("star", r"تميز|أفضل|افضل|جودة|نجاح|احترف|مميز|فاخر")]
+
+
+def auto_icons(tpl: str, params: dict) -> dict:
+    if tpl != "t-board":
+        return {}
+    out, used = {}, set()
+    for i in (1, 2, 3):
+        txt = str(params.get(f"step{i}") or "")
+        pick = next((k for k, pat in BOARD_ICONS if k not in used and re.search(pat, txt)), None)
+        pick = pick or next(k for k, _ in BOARD_ICONS if k not in used)
+        used.add(pick)
+        out[f"icon{i}"] = pick
     return out

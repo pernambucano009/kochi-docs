@@ -6,7 +6,7 @@ const K1 = "١ · الافتتاح", K2 = "٢ · البطاقات", K3 = "٣ · 
 const PR = M.params({
   head: { label: "عنوان الافتتاح", kind: "text", role: "product", def: "كلاسات الشهر", group: K1, max: 16, hint: "بيقول البطاقات دي عن إيه (الكلاسات، الخدمات، الأنشطة)." },
   items: { label: "البطاقات (سطر لكل بطاقة: عربي|English)", kind: "lines", def: ["جري|Running", "سباحة|Swimming", "يوجا|Yoga", "ملاكمة|Boxing", "أثقال|Weights", "دراجة|Cycling"], group: K2,
-    hint: "٦ بطاقات بالترتيب ده بالظبط: كل بطاقة ليها رسمة بتعمل الحركة دي (جري، سباحة، يوجا، ملاكمة، أثقال، دراجة). غيّر الاسم بس، أو الكلمة الإنجليزي." },
+    hint: "من ٢ إلى ٦ بطاقات بأي ترتيب: كل بطاقة لها رسمة تتحرك بالنشاط نفسه حسب اسمه (جري، سباحة، يوجا، ملاكمة، أثقال، دراجة، مشي، قفز، سكوات، تمدد، زومبا)." },
   brand: { label: "اسم البراند", kind: "text", role: "brand", def: "نادي الحركة", group: K3, max: 16 },
   cta: { label: "الجملة الأخيرة", kind: "text", def: "احجز مكانك من التطبيق", group: K3, max: 26 },
   c1: { label: "لون ١", kind: "color", role: "accent", def: "#e8412c", group: KS, hint: "البطاقات بتلف على التلات ألوان: ألوان صريحة زي الأولمبياد." },
@@ -32,7 +32,17 @@ const POSES = [
   [P(.15, 0, 1.2, 2.6, .5, 2.4, .35, 0, -.35, 0), P(.15, 0, 1.6, 1.6, .5, 2.4, .35, 0, -.35, 0)],                     // ملاكمة
   [P(0, 0, 1.7, 2.9, -1.7, -2.9, .45, -.1, -.45, .1), P(0, 0, 2.5, 2.9, -2.5, -2.9, .3, 0, -.3, 0)],                // أثقال
   [P(.7, 0, 1.3, 1.6, 1.1, 1.5, 1.4, -.2, .3, -1.4), P(.7, 0, 1.3, 1.6, 1.1, 1.5, .3, -1.4, 1.4, -.2)],              // دراجة
+  [P(.05, 0, .5, .3, -.5, -.3, .4, .1, -.4, -.1), P(.05, 0, -.5, -.3, .5, .3, -.4, -.1, .4, .1)],                      // مشي
+  [P(0, 0, 2.8, 3.0, -2.8, -3.0, .5, .5, -.5, -.5), P(0, 0, .3, .2, -.3, -.2, .1, .1, -.1, -.1)],                      // قفز
+  [P(.35, 0, 1.6, 1.6, 1.6, 1.6, 1.5, -.2, 1.5, -.2), P(0, 0, .2, .1, .2, .1, .1, 0, -.1, 0)],                          // سكوات
+  [P(.4, 0, 3.0, 3.1, -.6, -.3, .2, .2, -.2, -.2), P(-.4, 0, .6, .3, -3.0, -3.1, .2, .2, -.2, -.2)],                   // تمدد
+  [P(.2, 0, 2.4, 2.0, -1.0, -.4, .6, -.4, -.2, 0), P(-.2, 0, 1.0, .4, -2.4, -2.0, .2, 0, -.6, .4)],                   // رقص
 ];
+// 🏷️ الرسمة بتتختار باسم النشاط (مش بمكان البطاقة)، فلو العميل غيّر الترتيب أو الأسماء الحركة بتفضل مطابقة للكلام
+const POSE_OF = [[/جري|ركض|running|run/i, 0], [/سباح|swim/i, 1], [/يوج|yoga/i, 2], [/ملاكم|بوكس|كيك|box|kick/i, 3], [/أثقال|اثقال|حديد|weight|lift/i, 4],
+  [/دراج|عجل|سبين|cycl|bike|spin/i, 5], [/مشي|walk/i, 6], [/قفز|نط|jump|cardio|كارديو/i, 7], [/سكوات|squat|رجل|legs/i, 8], [/تمدد|إطال|اطال|stretch|بيلات|pilates/i, 9],
+  [/رقص|زومبا|dance|zumba/i, 10]];
+const poseIdx = (it, i) => { const s = `${it.a} ${it.b}`; const m = POSE_OF.find(([re]) => re.test(s)); return m ? m[1] : i % 6; };
 
 M.reel({
   W, H, DUR, bg: "#f4f1ea",
@@ -65,8 +75,8 @@ M.reel({
       const k = rise(seg(t, .1, .6)); x.save(); x.beginPath(); x.rect(0, 860, W, 260); x.clip(); x.fillStyle = "#141414"; x.font = `${M.fit(PR.head, "LZ", 920, 200, 80)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.head, 540, 1060 + k * 240); x.restore();
       x.fillStyle = cols[0]; x.fillRect(540 - 300 * io(seg(t, .3, .9)), 1120, 600 * io(seg(t, .3, .9)), 16);
     } else if (inCards) {
-      const it = IT[ci], ps = POSES[ci % POSES.length], u = .5 - .5 * Math.cos(t / BT * Math.PI), pose = ps[0].map((v, k) => v + (ps[1][k] - v) * u), bump = Math.exp(-((t % BT) / BT) * 5) * .03;
-      const pk = expo(seg(lt, .05, .35)); x.save(); x.translate(540, 1000); x.scale(pk * (1 + bump), pk * (1 + bump)); const J = fig(pose, 0, 120, 1), kind = ci % POSES.length;
+      const it = IT[ci], ps = POSES[poseIdx(it, ci)], u = .5 - .5 * Math.cos(t / BT * Math.PI), pose = ps[0].map((v, k) => v + (ps[1][k] - v) * u), bump = Math.exp(-((t % BT) / BT) * 5) * .03;
+      const pk = expo(seg(lt, .05, .35)); x.save(); x.translate(540, 1000); x.scale(pk * (1 + bump), pk * (1 + bump)); const J = fig(pose, 0, 120, 1), kind = poseIdx(it, ci);
       x.lineWidth = 26; if (kind === 4) { const mx = (J.h1[0] + J.h2[0]) / 2, my = (J.h1[1] + J.h2[1]) / 2; x.beginPath(); x.moveTo(mx - 300, my); x.lineTo(mx + 300, my); x.stroke(); for (const d of [-1, 1]) { x.beginPath(); x.roundRect(mx + d * 300 - 30, my - 80, 60, 160, 20); x.fill(); } }
       if (kind === 1) { x.lineWidth = 16; for (let w = 0; w < 3; w++) { x.beginPath(); for (let k = 0; k <= 24; k++) { const px = -380 + k * 32, py = 250 + w * 60 + Math.sin(k * .8 + t * 6 + w) * 14; k ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke(); } }
       if (kind === 5) { x.lineWidth = 18; for (const [wx] of [[-230], [230]]) { x.beginPath(); x.arc(wx, 300, 110, 0, Math.PI * 2); x.stroke(); } x.beginPath(); x.moveTo(-230, 300); x.lineTo(0, 140); x.lineTo(230, 300); x.stroke(); }
@@ -81,7 +91,7 @@ M.reel({
     } else { // الخاتمة
       const k = rise(seg(t, T0 + n * CD + .05, T0 + n * CD + .5)); x.save(); x.beginPath(); x.rect(0, 860, W, 290); x.clip(); x.fillStyle = "#fff"; x.font = `${M.fit(PR.brand, "LZ", 920, 230, 90)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, 1080 + k * 290); x.restore();
       const ck = io(seg(t, T0 + n * CD + .5, T0 + n * CD + 1)); x.globalAlpha = ck; x.fillStyle = cols[0]; x.beginPath(); x.roundRect(170, 1220, 740, 120, 60); x.fill(); x.fillStyle = "#fff"; x.font = `700 ${M.fit(PR.cta, "PB", 640, 54, 28, "700")}px PB`; x.textAlign = "center"; x.fillText(PR.cta, 540, 1298); x.globalAlpha = 1;
-      for (let k = 0; k < 6; k++) { const ps = POSES[k], u = .5 - .5 * Math.cos(t / BT * Math.PI); x.save(); x.translate(130 + k * 164, 1640); x.scale(.28, .28); fig(ps[0].map((v, j) => v + (ps[1][j] - v) * u), 0, 0, 1); x.restore(); }
+      for (let k = 0; k < Math.min(6, IT.length); k++) { const ps = POSES[poseIdx(IT[k], k)], u = .5 - .5 * Math.cos(t / BT * Math.PI); x.save(); x.translate(130 + k * 164, 1640); x.scale(.28, .28); fig(ps[0].map((v, j) => v + (ps[1][j] - v) * u), 0, 0, 1); x.restore(); }
     }
   },
   sound(A) {
