@@ -569,7 +569,7 @@ for _p in AUTH_PAGES:
     app.add_api_route(_p, lambda: page("auth.html"), methods=["GET"], include_in_schema=False)
 
 # الصفحات العامة (الرئيسية والشروط والخصوصية والاسترجاع): مفتوحة لأي حد، وبوابات الدفع بتراجعها
-SITE_PAGES = {"/welcome": "welcome.html", "/terms": "terms.html", "/privacy": "privacy.html", "/refund": "refund.html", "/go": "go.html"}
+SITE_PAGES = {"/welcome": "welcome.html", "/m": "welcome-m.html", "/terms": "terms.html", "/privacy": "privacy.html", "/refund": "refund.html", "/go": "go.html"}
 for _p, _f in SITE_PAGES.items():
     for _u in (_p, _p + ".html"):
         app.add_api_route(_u, (lambda f=_f: page(f)), methods=["GET"], include_in_schema=False)

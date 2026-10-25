@@ -11,516 +11,844 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&family=Alexandria:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@400;500&display=swap">
 <script>
-  // نفس اختيار الوضع (فاتح/غامق) واللغة اللي في البرنامج
+  // 📱 الجوال ليه نسخة بتتسكرول (/m)، والكمبيوتر والتابلت الشاشات اللي بتتبدّل في النص
+  if (innerWidth <= 760) location.replace("/m" + location.hash);
   try {
     const t = localStorage.getItem("studiomania.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     document.documentElement.dataset.nhTheme = t;
-    if (localStorage.getItem("studiomania.site.lang") === "en") { document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; }
+    document.documentElement.style.background = t === "dark" ? "#0C0C0E" : "#FFFFFF";
   } catch { }
 </script>
 <style>
-  /* 🌐 صفحة الهبوط: صفحة واحدة بتتسكرول (الهيرو ← كيف يعمل ← أمثلة لمجالك ← المميزات ← الأسعار ← الأسئلة ← الفوتر)،
-     بنفس هوية البرنامج (الجيلي فيش الزجاجي، الزرار البرتقالي، فاتح/غامق). الأسعار من نفس مصدر أسعار البرنامج (/api/pricing). */
-  :root { --bg: #FAFAF8; --ink: #181718; --muted: #6B6B67; --accent: #E5613E; --card: #FFFFFF; --soft: #F3F2EF; --tint: #FFF6F2;
-    --sh: 0 4px 18px rgba(24, 23, 24, .08); --track: #E3E2DE; --ar: "Alexandria", "Readex Pro", sans-serif; --lat: "Jost", "Futura", system-ui, sans-serif; color-scheme: light; }
-  :root[data-nh-theme="dark"] { --bg: #0C0C0E; --ink: #F1F1F3; --muted: #A3A3AB; --accent: #F0754F; --card: #1C1C1F; --soft: #17171A; --tint: rgba(240, 117, 79, .12);
-    --sh: 0 4px 18px rgba(0, 0, 0, .4); --track: #3D3C3D; color-scheme: dark; }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 var(--ar); -webkit-font-smoothing: antialiased; transition: background .6s; }
-  :root[lang="en"] body { font-family: var(--lat), var(--ar); }
-  a { color: inherit; text-decoration: none; }
-  button { font: inherit; color: inherit; }
-  img, video { max-width: 100%; }
-  .wrap { width: min(1120px, calc(100% - 32px)); margin-inline: auto; }
+/* 🌐 صفحة الهبوط: نفس التصميم الأول بالظبط (مسرح 1440×810، القائمة على الشمال، الجيلي فيش في النص، وكل زرار بيظهّر شاشته في النص) */
 
-  /* الشريط */
-  .bar { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 78%, transparent); }
-  .bar .wrap { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .logo { display: flex; align-items: center; gap: .55em; direction: ltr; font: 500 15px var(--lat); letter-spacing: .32em; }
-  .logo img { height: 26px; width: auto; }
-  .lm-d { display: none; } :root[data-nh-theme="dark"] .lm-l { display: none; } :root[data-nh-theme="dark"] .lm-d { display: inline; }
-  .tools { display: flex; align-items: center; gap: 10px; }
-  .chip { height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: var(--card); box-shadow: var(--sh); cursor: pointer; display: inline-flex; align-items: center; white-space: nowrap;
-    font-size: 14px; transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
-  .chip:hover { transform: translateY(-2px); }
-  .chip.lang { font: 400 13px var(--lat); letter-spacing: .16em; padding: 0 16px; }
-  .sw { display: flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; padding: 0 4px; font-size: 13px; }
-  .sw .track { width: 42px; height: 24px; border-radius: 99px; background: var(--track); position: relative; }
-  .sw .knob { position: absolute; top: 3px; inset-inline-start: 21px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .2); transition: inset-inline-start .45s cubic-bezier(.65, 0, .35, 1); }
-  :root[data-nh-theme="dark"] .sw .knob { inset-inline-start: 3px; }
-  .menu-b { display: none; width: 42px; padding: 0; justify-content: center; }
+body{margin:0}
+/* نفس تحويل اللايت والدارك اللي في البرنامج (home2.css): موجة نور مايلة بتمسح الشاشة في 1.1 ثانية */
+:root.nh-wipe::view-transition-old(root){animation:none}
+:root.nh-wipe::view-transition-new(root){animation:nh-wipe 1.1s cubic-bezier(.5,0,.3,1) both;mix-blend-mode:normal;-webkit-mask-image:linear-gradient(112deg,transparent 0 44%,rgba(0,0,0,.35) 50%,#000 56% 100%);mask-image:linear-gradient(112deg,transparent 0 44%,rgba(0,0,0,.35) 50%,#000 56% 100%);-webkit-mask-size:310% 100%;mask-size:310% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+@keyframes nh-wipe{from{-webkit-mask-position:0% 0;mask-position:0% 0}to{-webkit-mask-position:100% 0;mask-position:100% 0}}
 
-  /* القائمة: روابط للأقسام (على الشمال في الديسكتوب) */
-  .side { position: fixed; inset-inline-end: max(16px, calc((100vw - 1320px) / 2)); top: 50%; translate: 0 -50%; z-index: 20; display: flex; flex-direction: column; gap: 4px; }
-  .side a { padding: 8px 14px; border-radius: 12px; font-size: 14px; color: var(--muted); transition: color .3s, background .3s; }
-  .side a:hover { color: var(--accent); }
-  .side a.on { color: var(--ink); background: var(--card); box-shadow: var(--sh); }
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+input{font:inherit}
+.lp-nav button{transition:color .3s,letter-spacing .5s cubic-bezier(.65,0,.35,1),transform .32s cubic-bezier(.2,.8,.2,1)}.lp-nav button:hover{color:#E5613E}
+.lp-nav .lat:hover{letter-spacing:.36em}
+@keyframes lpFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.lp-jf{animation:lpFloat 7s ease-in-out infinite}
 
-  /* الهيرو: العنوان والجملة والزرار أول حاجة، والجيلي فيش خلفية */
-  .hero { position: relative; padding: 56px 0 24px; overflow: hidden; }
-  .hero .wrap { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 40px; align-items: center; }
-  .hero h1 { margin: 0; font: 600 clamp(34px, 5vw, 58px)/1.25 var(--ar); }
-  :root[lang="en"] .hero h1 { font-family: var(--lat); font-weight: 500; letter-spacing: -.01em; }
-  .hero .lead { margin: 18px 0 0; font-size: clamp(16px, 1.6vw, 19px); line-height: 1.85; color: var(--muted); max-width: 560px; }
-  .ctas { display: flex; align-items: center; gap: 18px; margin-top: 28px; flex-wrap: wrap; }
-  .go { position: relative; isolation: isolate; overflow: hidden; height: 54px; padding: 0 34px; border: 0; border-radius: 27px; cursor: pointer; color: #fff; font-size: 17px; font-weight: 500;
-    background: linear-gradient(180deg, #F48A62 0%, #E5613E 55%, #D44E2C 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 0 0 1px rgba(229, 97, 62, .28), 0 8px 22px -6px rgba(229, 97, 62, .65), 0 0 24px rgba(240, 117, 79, .32);
-    transition: transform .32s cubic-bezier(.2, .8, .2, 1), filter .3s; }
-  .go::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .45) 48%, transparent 66%) no-repeat;
-    background-size: 220% 100%; background-position: 130% 0; transition: background-position .75s ease; }
-  .go:hover { transform: translateY(-3px) scale(1.04); filter: brightness(1.06); } .go:hover::after { background-position: -30% 0; }
-  .go.sm { height: 46px; padding: 0 24px; font-size: 15px; }
-  .ghost { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; font-size: 15px; color: var(--ink); }
-  .ghost:hover { color: var(--accent); }
-  .note { margin: 12px 0 0; font-size: 13.5px; color: var(--muted); }
-  .jf { position: relative; justify-self: center; width: min(420px, 90%); aspect-ratio: 560 / 778; pointer-events: none; }
-  .jf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 1.2s ease; opacity: 0; }
-  .jf-float { position: absolute; inset: 0; animation: float 7s ease-in-out infinite; }
-  .jf .l { opacity: 1; } :root[data-nh-theme="dark"] .jf .l { opacity: 0; } :root[data-nh-theme="dark"] .jf .d { opacity: 1; }
-  .lit .jf .l, .lit .jf .d { opacity: 0 !important; } .lit .jf .ll { opacity: 1; } :root[data-nh-theme="dark"] .lit .jf .ll { opacity: 0; } :root[data-nh-theme="dark"] .lit .jf .dl { opacity: 1; }
-  .lit .jf-float { animation: float 7s ease-in-out infinite, litup 1.6s cubic-bezier(.3, 0, .2, 1) both; }
-  .glow { position: absolute; z-index: 1; inset-inline-start: 6%; top: 10%; width: 520px; height: 520px; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 1.2s;
-    background: radial-gradient(circle, rgba(126, 178, 240, .35), transparent 65%); }
-  .lit .glow { opacity: 1; }
-  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
-  @keyframes litup { 0% { filter: brightness(1); } 30% { filter: brightness(1.45) saturate(1.3); } 100% { filter: brightness(1); } }
+/* نفس «البروز» اللي في البرنامج (fx.js): بيطلع لفوق ويكبر 1.06 */
+.lp-btn{position:relative;transition:transform .32s cubic-bezier(.2,.8,.2,1),color .3s,background .3s}
+.lp-btn:hover,.lp-btn:focus-visible{transform:translateY(-3px) scale(1.06);z-index:2}
+.lp-btn:active{transform:scale(.98);transition-duration:.12s}
+/* الكروت: نفس بروز مربعات الرئيسية بهدوء */
+.lp-card{position:relative;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+.lp-card:hover{transform:translateY(-3px) scale(1.03);z-index:2}
+.lp-gb-l:hover{background:#181718 !important;color:#FFFFFF !important}.lp-gb-d:hover{background:#F1F1F3 !important;color:#0C0C0E !important}
+.lp-link{transition:color .3s}.lp-link:hover{color:#E5613E}
+/* كارت الفيديو في أول شاشة */
+.lp-vid{transition:transform .32s cubic-bezier(.2,.8,.2,1),border-color .3s}
+.lp-vid:hover{transform:translateY(-3px) scale(1.02);border-color:#E5613E !important}
+.lp-foot a{transition:color .3s}.lp-foot a:hover{color:#E5613E}
 
-  /* الفيديو */
-  .demo { margin-top: 8px; }
-  .vid { position: relative; border-radius: 26px; overflow: hidden; background: var(--soft); box-shadow: var(--sh); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 28px; padding: 26px; }
-  .vid video { width: 100%; max-height: 460px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 18px; background: #000; justify-self: center; max-width: 280px; }
-  .vid h2 { margin: 0; }
-  .vid p { color: var(--muted); }
+/* نفس «الثعبان» اللي بيلف حوالين الزراير والمربعات في البرنامج (home2.css) */
+.nh-snake{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;opacity:0;transition:opacity .5s ease;z-index:3}
+.nh-snake rect{fill:none;stroke:currentColor;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.nh-snake .s1{stroke-width:1.4;stroke-dasharray:36 964;animation:nhS1 3.2s linear infinite;filter:drop-shadow(0 0 3px currentColor)}
+.nh-snake .s2{stroke-width:1.2;stroke-dasharray:130 870;opacity:.38;animation:nhS2 3.2s linear infinite}
+.nh-snake .s3{stroke-width:1;stroke-dasharray:300 700;opacity:.13;animation:nhS3 3.2s linear infinite}
+.lp-btn:hover>.nh-snake,.lp-btn:focus-visible>.nh-snake,.lp-card:hover>.nh-snake{opacity:1}
+@keyframes nhS1{from{stroke-dashoffset:0}to{stroke-dashoffset:-1000}}
+@keyframes nhS2{from{stroke-dashoffset:94}to{stroke-dashoffset:-906}}
+@keyframes nhS3{from{stroke-dashoffset:264}to{stroke-dashoffset:-736}}
 
-  /* الأقسام */
-  section.sec { padding: 72px 0 0; }
-  .sec h2, .vid h2 { font: 600 clamp(24px, 3vw, 34px)/1.35 var(--ar); margin: 0 0 8px; }
-  :root[lang="en"] .sec h2, :root[lang="en"] .vid h2 { font-family: var(--lat); font-weight: 500; }
-  .sec .sub { margin: 0 0 26px; color: var(--muted); font-size: 16px; }
-  .card { background: var(--card); box-shadow: var(--sh); border-radius: 22px; }
-  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-  .step { padding: 22px; }
-  .step .n { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; background: var(--tint); color: var(--accent); font: 500 15px var(--lat); }
-  .step h3, .feat h3 { margin: 14px 0 6px; font-size: 17px; font-weight: 600; }
-  .step p, .feat p { margin: 0; color: var(--muted); font-size: 14.5px; }
+/* الزرار البرتقالي المنوّر */
+.sk-go{position:relative;isolation:isolate;overflow:hidden;border:0;cursor:pointer;color:#FFFFFF;background:linear-gradient(180deg,#F48A62 0%,#E5613E 55%,#D44E2C 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 24px rgba(240,117,79,.32);animation:skGlow 3.2s ease-in-out infinite}
+.sk-go::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,transparent 66%) no-repeat;background-size:220% 100%;background-position:130% 0;transition:background-position .75s ease}
+.sk-go:hover{filter:brightness(1.06);color:#FFFFFF}.sk-go:hover::after{background-position:-30% 0}
+.sk-go .nh-snake rect{stroke:#FFFFFF}
+@keyframes skGlow{0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 0 0 1px rgba(229,97,62,.28),0 8px 22px -6px rgba(229,97,62,.65),0 0 18px rgba(240,117,79,.26)}50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 0 0 1px rgba(229,97,62,.4),0 10px 26px -6px rgba(229,97,62,.75),0 0 32px rgba(240,117,79,.45)}}
 
-  .fields { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-  .fields button { height: 38px; padding: 0 16px; border: 0; border-radius: 19px; cursor: pointer; background: var(--card); box-shadow: var(--sh); font-size: 14px; transition: background .3s, color .3s; }
-  .fields button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-  .samples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  .sample { overflow: hidden; padding: 0; }
-  .sample video { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: var(--soft); }
-  .sample figcaption { padding: 12px 16px 14px; font-size: 14px; }
-  .sample figcaption small { display: block; color: var(--muted); font-size: 12.5px; }
-  .s-note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+/* الجيلي فيش بينوّر لما تدوس «ابدأ مجانًا» */
+@keyframes lpLit{0%{filter:brightness(1);transform:scale(1)}30%{filter:brightness(1.45) saturate(1.3);transform:scale(1.035)}100%{filter:brightness(1);transform:scale(1)}}
+.lp-lit{animation:lpLit 1.6s cubic-bezier(.3,0,.2,1) both}
+@keyframes lpSpread{0%{opacity:0;transform:scale(.25)}25%{opacity:1}100%{opacity:0;transform:scale(2.6)}}
+.lp-spread{animation:lpSpread 1.8s cubic-bezier(.2,.7,.2,1) both}
+@keyframes lpIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.lp-in{animation:lpIn .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes lpPop{0%{opacity:0;transform:translateY(26px) scale(.94);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
+.lp-pop{animation:lpPop .9s cubic-bezier(.16,1,.3,1) both}
 
-  .feats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-  .feat { padding: 22px; }
-  .ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; background: var(--tint); }
-  .ic svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.lp-field{width:100%;height:46px;box-sizing:border-box;border-radius:14px;padding:0 16px;outline:none;transition:box-shadow .25s,border-color .25s}
+.lp-field:focus{border-color:#E5613E !important;box-shadow:0 0 0 4px rgba(229,97,62,.14)}
+@media (prefers-reduced-motion: reduce){.lp-jf,.sk-go,.nh-snake rect,.lp-lit,.lp-spread,.lp-in,.lp-pop{animation:none}.lp-btn,.lp-card,.lp-vid,.lp-navb{transform:none !important}}
 
-  .phead { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 26px; }
-  .phead .sub { margin: 0; }
-  .cyc { display: flex; gap: 4px; padding: 4px; border-radius: 24px; background: var(--card); box-shadow: var(--sh); }
-  .cyc button { height: 38px; padding: 0 16px; border: 0; border-radius: 19px; background: none; cursor: pointer; font-size: 14px; }
-  .cyc button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-  .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
-  .plan { padding: 26px; display: flex; flex-direction: column; }
-  .plan.pop { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .plan .top { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
-  .plan h3 { margin: 0; font-size: 19px; font-weight: 600; }
-  .badge { font-size: 12px; padding: 5px 11px; border-radius: 99px; background: var(--accent); color: #fff; }
-  .price { margin: 18px 0 0; display: flex; align-items: baseline; gap: 6px; }
-  .price b { font: 400 42px var(--lat); letter-spacing: -.01em; }
-  .price span, .usd { color: var(--muted); font-size: 13.5px; }
-  .usd { margin: 2px 0 0; font-family: var(--lat); }
-  .plan ul { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; flex: 1; align-content: start; }
-  .plan li { display: flex; gap: 8px; font-size: 14.5px; }
-  .plan li svg { flex: none; width: 16px; height: 16px; margin-top: 5px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .plan .btn { margin-top: 22px; height: 48px; border-radius: 24px; border: 0; cursor: pointer; font-size: 15px; font-weight: 500; background: var(--soft); width: 100%; }
-  .plan .btn.go { padding: 0; color: #fff; background: linear-gradient(180deg, #F48A62 0%, #E5613E 55%, #D44E2C 100%); }
-  .p-note { margin: 16px 0 0; text-align: center; color: var(--muted); font-size: 13.5px; }
-  .p-note a { color: var(--accent); }
-
-  .faq { display: grid; gap: 10px; max-width: 860px; }
-  .q { overflow: hidden; }
-  .q button { width: 100%; min-height: 58px; padding: 0 22px; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: start; font-size: 15.5px; font-weight: 500; }
-  .q button svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; transition: rotate .3s; }
-  .q[open] { outline: 1.5px solid var(--accent); outline-offset: -1.5px; }
-  .q[open] button svg { rotate: 45deg; }
-  .q p { margin: 0; padding: 0 22px 18px; color: var(--muted); font-size: 14.5px; line-height: 1.9; }
-
-  .final { margin: 80px 0 0; padding: 40px 28px; text-align: center; }
-  .final h2 { margin: 0 0 8px; }
-  .final .note { margin-top: 12px; }
-
-  footer { margin-top: 72px; padding: 34px 0 40px; background: var(--soft); font-size: 13px; color: var(--muted); line-height: 1.9; }
-  footer .wrap { display: grid; gap: 14px; }
-  footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
-  footer a:hover { color: var(--accent); }
-  footer .logo { color: var(--ink); font-size: 13px; }
-  footer .logo img { height: 22px; }
-  footer p { margin: 0; }
-
-  .sheet { position: fixed; inset: 0; z-index: 40; background: rgba(15, 15, 20, .4); display: none; }
-  .sheet.on { display: block; }
-  .sheet nav { position: absolute; top: 12px; inset-inline: 12px; padding: 12px; border-radius: 22px; background: var(--card); box-shadow: var(--sh); display: grid; gap: 2px; }
-  .sheet nav a { padding: 12px 14px; border-radius: 12px; font-size: 16px; } .sheet nav a:hover { background: var(--soft); }
-
-  /* التابلت */
-  @media (max-width: 1240px) { .side { display: none; } }
-  @media (max-width: 960px) {
-    .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .plans { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
-    .vid { grid-template-columns: minmax(0, 1fr); }
-  }
-  /* الموبايل: نفس ترتيب لوحة الموبايل */
-  @media (max-width: 760px) {
-    .bar .wrap { height: 60px; }
-    .bar .signin, .bar .sw .t { display: none; }
-    .menu-b { display: inline-flex; }
-    .hero { padding-top: 18px; }
-    .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-    .ctas { margin-top: 20px; } .ctas .go { width: 100%; }
-    .ctas .ghost { display: none; }
-    .note { text-align: center; width: 100%; }
-    .jf { width: 230px; margin-top: -4px; }
-    .steps, .samples { grid-template-columns: minmax(0, 1fr); }
-    .samples { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-    .sample figcaption { padding: 8px 10px 10px; font-size: 12.5px; } .sample figcaption small { display: none; }
-    section.sec { padding-top: 48px; }
-    .feats { gap: 10px; } .feat { padding: 16px; } .feat p { font-size: 13px; }
-    .vid { padding: 16px; }
-  }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .jf-float, .lit .jf-float { animation: none; } .go, .chip { transition: none; } }
+html,body{height:100%;overflow:hidden}
+body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
+#lp-stage{position:absolute;top:0;left:0;width:1440px;height:810px;transform-origin:0 0}
 </style>
 </head>
 <body>
-<header class="bar">
-  <div class="wrap">
-    <a class="logo" href="#top" aria-label="SimsimKit"><img class="lm-l" src="/logo-mark-light.png" alt=""><img class="lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</a>
-    <div class="tools">
-      <button class="chip lang" id="lang" type="button"></button>
-      <a class="chip signin" href="/login" data-t="signin"></a>
-      <button class="sw" id="sw" type="button"><span class="track"><span class="knob"></span></span><span class="t" id="swT"></span></button>
-      <button class="chip menu-b" id="menu" type="button" data-ta="menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<div id="lp-stage"></div>
+<template id="lp-tpl">
+<div style="{{rootStyle}}">
+  <div style="{{litGlow}}"></div>
+  <sc-if value="{{flash}}" hint-placeholder-val="{{ false }}">
+    <div data-k="spread" class="lp-spread" style="{{spreadStyle}}"></div>
+  </sc-if>
+  <div style="{{jellyWrap}}">
+    <div class="lp-jf" style="position: absolute; inset: 0">
+      <div class="{{litClass}}" style="position: absolute; inset: 0">
+        <img src="/site/jf-light.webp" alt="Glass jellyfish" style="{{imgLight}}">
+        <img src="/site/jf-light-lit.webp" alt="" style="{{imgLightLit}}">
+        <img src="/site/jf-dark.webp" alt="" style="{{imgDark}}">
+        <img src="/site/jf-dark-lit.webp" alt="" style="{{imgDarkLit}}">
+      </div>
     </div>
   </div>
-</header>
-<nav class="side" id="side" data-ta="navAria"></nav>
-<div class="sheet" id="sheet"><nav id="sheetNav"></nav></div>
 
-<main id="top">
-  <section class="hero" id="hero">
-    <div class="glow" aria-hidden="true"></div>
-    <div class="wrap">
-      <div>
-        <h1 data-t="heroTitle"></h1>
-        <p class="lead" data-t="heroLead"></p>
-        <div class="ctas">
-          <button class="go" type="button" data-start data-t="start"></button>
-          <a class="ghost" href="#demo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l5.5-3.5z"/></svg><span data-t="demo"></span></a>
+  <header dir="rtl" style="position: absolute; top: 22px; left: 48px; right: 48px; height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px; z-index: 5; font: 14px/1.5 {{barFont}}">
+    <div style="display: flex; align-items: center; gap: 22px; min-width: 0">
+      <button type="button" data-on-click="{{goHome}}" aria-label="SimsimKit" style="display: flex; align-items: center; direction: ltr; border: 0; background: transparent; cursor: pointer; padding: 0; color: inherit; font: 500 15px Jost, Futura, sans-serif; letter-spacing: .32em">
+        <img src="{{markSrc}}" alt="" style="height: 1.75em; width: auto; margin-right: .55em; flex: none">SIMSIMKIT</button>
+      <button type="button" class="{{gobackCls}}" data-on-click="{{goBack}}" aria-hidden="{{isHome}}" tabindex="{{backTab}}" style="{{gobackStyle}}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="{{gobackInner}}"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span style="{{gobackInner}}">{{t.back}}</span></button>
+      <nav aria-label="{{t.crumbsAria}}" style="{{crumbsStyle}}">
+        <button type="button" class="lp-crumb" data-on-click="{{goHome}}" style="{{crumbStyle}}">{{t.home}}</button>
+        <i style="{{crumbSep}}">‹</i>
+        <b style="{{crumbOn}}">{{crumbName}}</b>
+      </nav>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <button type="button" class="lp-btn" data-on-click="{{toggleLang}}" aria-label="{{t.langAria}}" style="{{chipLang}}">
+        <svg class="nh-snake" viewBox="0 0 76 44" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="74" height="42" rx="21" pathLength="1000"/><rect class="s2" x="1" y="1" width="74" height="42" rx="21" pathLength="1000"/><rect class="s1" x="1" y="1" width="74" height="42" rx="21" pathLength="1000"/></svg>{{t.langBtn}}</button>
+      <button type="button" class="lp-btn" data-on-click="{{goLogin}}" style="{{chipSignin}}">
+        <svg class="nh-snake" viewBox="0 0 132 44" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="130" height="42" rx="21" pathLength="1000"/><rect class="s2" x="1" y="1" width="130" height="42" rx="21" pathLength="1000"/><rect class="s1" x="1" y="1" width="130" height="42" rx="21" pathLength="1000"/></svg>{{t.signin}}</button>
+      <button type="button" data-on-click="{{toggleTheme}}" aria-pressed="{{dark}}" aria-label="{{t.themeAria}}" style="{{themeBtn}}">
+        <span style="{{trackStyle}}"><span style="{{knobStyle}}"></span></span><span style="direction: ltr">{{themeLabel}}</span></button>
+    </div>
+  </header>
+
+  <nav class="lp-nav" aria-label="Main">
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="4">
+      <button type="button" class="{{n.cls}}" data-on-click="{{n.go}}" aria-current="{{n.current}}" style="{{n.style}}">
+        <svg class="nh-snake" viewBox="0 0 200 60" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="198" height="58" rx="14" pathLength="1000"/><rect class="s2" x="1" y="1" width="198" height="58" rx="14" pathLength="1000"/><rect class="s1" x="1" y="1" width="198" height="58" rx="14" pathLength="1000"/></svg>{{n.label}}<span style="{{n.lineStyle}}"></span></button>
+    </sc-for>
+  </nav>
+
+  <!-- ===== الرئيسية: العنوان والجملة والزرار ومكان الفيديو ===== -->
+  <sc-if value="{{isHome}}" hint-placeholder-val="{{ true }}">
+    <section data-k="home" class="lp-in" dir="{{dir}}" style="{{heroStyle}}">
+      <h1 style="{{heroTitle}}">{{t.heroTitle}}</h1>
+      <p style="{{heroLead}}">{{t.heroLead}}</p>
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 24px; flex-wrap: wrap">
+        <button type="button" class="sk-go lp-btn" data-on-click="{{startFree}}" style="{{ctaStyle}}">
+          <svg class="nh-snake" viewBox="0 0 230 54" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="228" height="52" rx="26" pathLength="1000"/><rect class="s2" x="1" y="1" width="228" height="52" rx="26" pathLength="1000"/><rect class="s1" x="1" y="1" width="228" height="52" rx="26" pathLength="1000"/></svg>{{t.start}}</button>
+        <button type="button" class="lp-btn lp-link" data-on-click="{{goDemo}}" style="{{demoBtn}}">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l5.5-3.5z"/></svg>{{t.demo}}</button>
+      </div>
+      <p style="{{heroNote}}">{{t.heroNote}}</p>
+      <button type="button" class="lp-vid" data-on-click="{{goDemo}}" aria-label="{{t.demoTitle}}" style="{{vidCard}}">
+        <span style="{{vidPlay}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="#E5613E" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg></span>
+        <span style="{{vidCap}}">{{t.vidCap}}</span>
+      </button>
+    </section>
+  </sc-if>
+
+  <!-- ===== العرض: مكان فيديو الديمو ===== -->
+  <sc-if value="{{isDemo}}" hint-placeholder-val="{{ false }}">
+    <section data-k="demo" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <h1 style="{{h1Style}}">{{t.demoTitle}}</h1>
+      <p style="{{leadStyle}}">{{t.demoLead}}</p>
+      <div style="{{demoBox}}"><video src="/gallery/t-brandreveal.mp4" poster="/gallery/t-brandreveal.jpg" controls playsinline preload="none" style="height:100%;max-width:100%;border-radius:18px;background:#000"></video></div>
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 16px; flex-wrap: wrap">
+        <button type="button" class="sk-go lp-btn" data-on-click="{{startFree}}" style="{{ctaSmall}}">
+          <svg class="nh-snake" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/></svg>{{t.start}}</button>
+        <span style="{{heroNoteInline}}">{{t.heroNote}}</span>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== كيف يعمل: ٣ خطوات ===== -->
+  <sc-if value="{{isHow}}" hint-placeholder-val="{{ false }}">
+    <section data-k="how" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <h1 style="{{h1Style}}">{{t.hTitle}}</h1>
+      <p style="{{leadStyle}}">{{t.hLead}}</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 240px); gap: 20px; margin-top: 30px">
+        <sc-for list="{{steps}}" as="c" hint-placeholder-count="3">
+          <article class="lp-card" style="{{c.style}}">
+            <svg class="nh-snake" viewBox="0 0 240 230" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="238" height="228" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="238" height="228" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="238" height="228" rx="22" pathLength="1000"/></svg>
+            <span style="{{stepNum}}">{{c.n}}</span>
+            <h2 style="{{c.titleStyle}}">{{c.title}}</h2>
+            <p style="{{c.textStyle}}">{{c.text}}</p>
+          </article>
+        </sc-for>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 26px; flex-wrap: wrap">
+        <button type="button" class="sk-go lp-btn" data-on-click="{{startFree}}" style="{{ctaSmall}}">
+          <svg class="nh-snake" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/></svg>{{t.start}}</button>
+        <span style="{{heroNoteInline}}">{{t.heroNote}}</span>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== أمثلة لمجالك ===== -->
+  <sc-if value="{{isExamples}}" hint-placeholder-val="{{ false }}">
+    <section data-k="examples" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <h1 style="{{h1Style}}">{{t.exTitle}}</h1>
+      <p style="{{leadStyle}}">{{t.exLead}}</p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px">
+        <sc-for list="{{fields}}" as="f" hint-placeholder-count="6">
+          <button type="button" class="lp-btn" data-on-click="{{f.pick}}" aria-pressed="{{f.on}}" style="{{f.style}}">{{f.name}}</button>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 225px); gap: 20px; margin-top: 18px">
+        <sc-for list="{{samples}}" as="x" hint-placeholder-count="3">
+          <figure class="lp-card" style="{{x.style}}">
+            <video src="{{x.src}}" poster="{{x.poster}}" muted loop playsinline autoplay preload="metadata" style="display:block;width:100%;height:330px;object-fit:cover;border-radius:18px 18px 0 0;background:center/cover no-repeat url({{x.poster}})"></video>
+            <figcaption style="{{x.capStyle}}">{{x.name}}</figcaption>
+          </figure>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== المميزات ===== -->
+  <sc-if value="{{isFeatures}}" hint-placeholder-val="{{ false }}">
+    <section data-k="features" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <h1 style="{{h1Style}}">{{t.fTitle}}</h1>
+      <p style="{{leadStyle}}">{{t.fLead}}</p>
+      <div style="display: grid; grid-template-columns: repeat(3, 240px); gap: 20px; margin-top: 30px">
+        <sc-for list="{{feats}}" as="c" hint-placeholder-count="6">
+          <article class="lp-card" style="{{c.style}}">
+            <svg class="nh-snake" viewBox="0 0 240 180" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="238" height="178" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="238" height="178" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="238" height="178" rx="22" pathLength="1000"/></svg>
+            <span style="{{iconWrap}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{c.icon}}"/></svg></span>
+            <h2 style="{{c.titleStyle}}">{{c.title}}</h2>
+            <p style="{{c.textStyle}}">{{c.text}}</p>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
+
+  <!-- ===== الأسعار ===== -->
+  <sc-if value="{{isPrices}}" hint-placeholder-val="{{ false }}">
+    <section data-k="prices" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 20px">
+        <div>
+          <h1 style="{{h1Style}}">{{t.pTitle}}</h1>
+          <p style="{{leadStyle}}">{{t.pLead}}</p>
         </div>
-        <p class="note" data-t="heroNote"></p>
+        <div style="{{periodWrap}}">
+          <button type="button" class="lp-btn" data-on-click="{{pickMonthly}}" aria-pressed="{{monthly}}" style="{{monthlyStyle}}">{{t.monthly}}</button>
+          <button type="button" class="lp-btn" data-on-click="{{pickYearly}}" aria-pressed="{{yearly}}" style="{{yearlyStyle}}">{{t.yearly}}</button>
+        </div>
       </div>
-      <div class="jf" aria-hidden="true"><div class="jf-float">
-        <img class="l" src="/site/jf-light.webp" alt="" width="560" height="778" fetchpriority="high">
-        <img class="ll" src="/site/jf-light-lit.webp" alt="" width="560" height="778" loading="lazy">
-        <img class="d" src="/site/jf-dark.webp" alt="" width="560" height="778" loading="lazy">
-        <img class="dl" src="/site/jf-dark-lit.webp" alt="" width="560" height="778" loading="lazy">
-      </div></div>
-    </div>
-  </section>
-
-  <div class="wrap demo" id="demo">
-    <div class="vid">
-      <video src="/gallery/t-brandreveal.mp4" poster="/gallery/t-brandreveal.jpg" muted loop playsinline preload="none" controls></video>
-      <div>
-        <h2 data-t="demoTitle"></h2>
-        <p data-t="demoLead"></p>
-        <button class="go sm" type="button" data-start data-t="start"></button>
+      <div style="display: grid; grid-template-columns: repeat(3, 240px); gap: 20px; margin-top: 26px">
+        <sc-for list="{{plans}}" as="p" hint-placeholder-count="3">
+          <article class="lp-card" style="{{p.style}}">
+            <svg class="nh-snake" viewBox="0 0 240 410" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="238" height="408" rx="24" pathLength="1000"/><rect class="s2" x="1" y="1" width="238" height="408" rx="24" pathLength="1000"/><rect class="s1" x="1" y="1" width="238" height="408" rx="24" pathLength="1000"/></svg>
+            <div style="display: flex; align-items: center; justify-content: space-between; min-height: 26px">
+              <h2 style="{{p.nameStyle}}">{{p.name}}</h2>
+              <sc-if value="{{p.popular}}" hint-placeholder-val="{{ false }}">
+                <span style="{{p.badgeStyle}}">{{p.badge}}</span>
+              </sc-if>
+            </div>
+            <p style="margin: 18px 0 0; display: flex; align-items: baseline; gap: 6px"><span style="font: 400 40px Jost, sans-serif; letter-spacing: -.01em">{{p.price}}</span><span style="{{p.unitStyle}}">{{p.unit}}</span></p>
+            <p style="{{p.usdStyle}}">{{p.usd}}</p>
+            <ul style="list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+              <sc-for list="{{p.feats}}" as="f" hint-placeholder-count="4">
+                <li style="{{p.featStyle}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E5613E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{f.t}}</li>
+              </sc-for>
+            </ul>
+            <button type="button" class="{{p.btnClass}}" data-on-click="{{startFree}}" style="{{p.btnStyle}}">
+              <svg class="nh-snake" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/></svg>{{p.cta}}</button>
+          </article>
+        </sc-for>
       </div>
-    </div>
-  </div>
+      <p style="{{noteStyle}}">{{t.pNote}}</p>
+    </section>
+  </sc-if>
 
-  <section class="sec" id="how"><div class="wrap">
-    <h2 data-t="howTitle"></h2><p class="sub" data-t="howLead"></p>
-    <div class="steps" id="steps"></div>
-  </div></section>
+  <!-- ===== الأسئلة ===== -->
+  <sc-if value="{{isFaq}}" hint-placeholder-val="{{ false }}">
+    <section data-k="faq" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
+      <h1 style="{{h1Style}}">{{t.qTitle}}</h1>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 24px">
+        <sc-for list="{{qs}}" as="q" hint-placeholder-count="7">
+          <div class="lp-card" style="{{q.style}}">
+            <svg class="nh-snake" viewBox="0 0 760 52" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="758" height="50" rx="18" pathLength="1000"/><rect class="s2" x="1" y="1" width="758" height="50" rx="18" pathLength="1000"/><rect class="s1" x="1" y="1" width="758" height="50" rx="18" pathLength="1000"/></svg>
+            <button type="button" data-on-click="{{q.toggle}}" aria-expanded="{{q.open}}" style="{{q.btnStyle}}">{{q.q}}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="{{q.iconStyle}}"><path d="M12 5v14M5 12h14"/></svg></button>
+            <sc-if value="{{q.open}}" hint-placeholder-val="{{ false }}">
+              <p style="{{q.aStyle}}">{{q.a}}</p>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-if>
 
-  <section class="sec" id="examples"><div class="wrap">
-    <h2 data-t="exTitle"></h2><p class="sub" data-t="exLead"></p>
-    <div class="fields" id="fields" role="group"></div>
-    <div class="samples" id="samples"></div>
-    <p class="s-note" data-t="exNote"></p>
-  </div></section>
+  <!-- ===== التسجيل / الدخول ===== -->
+  <sc-if value="{{isSignup}}" hint-placeholder-val="{{ false }}">
+    <form data-k="signup" class="lp-pop" dir="{{dir}}" data-on-submit="{{submit}}" style="{{formStyle}}">
+      <h1 style="{{formTitle}}">{{t.sTitle}}</h1>
+      <p style="{{formLead}}">{{t.sLead}}</p>
+      <sc-if value="{{step1}}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px">
+        <button type="button" class="lp-btn" data-on-click="{{goGoogle}}" style="{{socialStyle}}">
+          <svg class="nh-snake" viewBox="0 0 176 48" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/><rect class="s2" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/><rect class="s1" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.3h5.9a5 5 0 0 1-2.2 3.3v2.8h3.6c2.1-1.9 3.3-4.8 3.3-8.1z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.8c-1 .7-2.2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7H2.1a11 11 0 0 0 0 10z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7l3.7 2.9C6.7 7.3 9.1 5.4 12 5.4z"/></svg>Google</button>
+        <button type="button" class="lp-btn" data-on-click="{{goApple}}" style="{{socialStyle}}">
+          <svg class="nh-snake" viewBox="0 0 176 48" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/><rect class="s2" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/><rect class="s1" x="1" y="1" width="174" height="46" rx="14" pathLength="1000"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7a4.6 4.6 0 0 0-3.6-1.9c-1.5-.2-3 .9-3.7.9-.8 0-2-.9-3.2-.9a4.8 4.8 0 0 0-4.1 2.5c-1.8 3-.5 7.5 1.3 10 .8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4a10 10 0 0 0 1.4-2.8 4.3 4.3 0 0 1-2.7-4.2zM14 5.4a4.2 4.2 0 0 0 1-3.1 4.4 4.4 0 0 0-2.9 1.5 4 4 0 0 0-1 3c1.1.1 2.2-.6 2.9-1.4z"/></svg>Apple</button>
+      </div>
+      <div style="{{orStyle}}"><span style="{{orLine}}"></span>{{t.or}}<span style="{{orLine}}"></span></div>
+      <sc-if value="{{isRegister}}" hint-placeholder-val="{{ true }}">
+        <label data-k="name" style="{{labelStyle}}">{{t.name}}<input class="lp-field" type="text" name="name" autocomplete="name" style="{{fieldStyle}}"></label>
+      </sc-if>
+      <label style="{{labelStyle}}">{{t.email}}<input class="lp-field" type="email" name="email" autocomplete="email" dir="ltr" style="{{fieldStyle}}"></label>
+      <label style="{{labelStyle}}">{{t.password}}
+        <span style="position: relative; display: block">
+          <input class="lp-field" type="{{pwType}}" name="password" autocomplete="{{pwAuto}}" dir="ltr" style="{{fieldStyle}}">
+          <button type="button" data-on-click="{{togglePw}}" aria-label="{{t.showPw}}" aria-pressed="{{showPw}}" style="{{eyeStyle}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="{{eyeSlash}}"/></svg>
+          </button>
+        </span>
+      </label>
+      </sc-if>
+      <sc-if value="{{step2}}" hint-placeholder-val="{{ false }}">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 18px">
+          <label style="{{labelStyle}}">{{t.country}}<select class="lp-field" name="country" data-fill="country" style="{{fieldStyle}}"></select></label>
+          <label style="{{labelStyle}}">{{t.dialect}}<select class="lp-field" name="dialect" data-fill="dialect" style="{{fieldStyle}}"></select></label>
+          <label style="{{labelStyle}}">{{t.field}}<select class="lp-field" name="field" data-fill="field" style="{{fieldStyle}}"></select></label>
+          <label style="{{labelStyle}}">{{t.goal}}<select class="lp-field" name="goal" data-fill="goal" style="{{fieldStyle}}"></select></label>
+        </div>
+        <p style="{{hintStyle}}">{{t.step2Hint}}</p>
+      </sc-if>
+      <sc-if value="{{err}}" hint-placeholder-val="{{ false }}"><p data-k="err" role="alert" style="{{errStyle}}">{{err}}</p></sc-if>
+      <button type="submit" class="sk-go lp-btn" style="{{submitStyle}}">
+        <svg class="nh-snake" viewBox="0 0 364 50" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/><rect class="s2" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/><rect class="s1" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/></svg>{{t.submit}}</button>
+      <p style="{{switchStyle}}">{{t.switchQ}} <button type="button" class="lp-link" data-on-click="{{switchMode}}" style="{{switchBtn}}">{{t.switchA}}</button></p>
+    </form>
+  </sc-if>
 
-  <section class="sec" id="features"><div class="wrap">
-    <h2 data-t="fTitle"></h2><p class="sub" data-t="fLead"></p>
-    <div class="feats" id="feats"></div>
-  </div></section>
+  <!-- ===== الفوتر: بيانات الشركة والروابط القانونية والتواصل ===== -->
+  <footer class="lp-foot" dir="{{dir}}" style="{{footStyle}}">
+    <span style="{{footLegal}}">{{t.footLegal}}</span>
+    <nav aria-label="{{t.footNavAria}}" style="display: flex; align-items: center; gap: 18px; flex: none">
+      <a href="https://simsimkit.com/terms" style="{{footLink}}">{{t.terms}}</a>
+      <a href="https://simsimkit.com/privacy" style="{{footLink}}">{{t.privacy}}</a>
+      <a href="https://simsimkit.com/refund" style="{{footLink}}">{{t.refund}}</a>
+      <a href="mailto:islam@simsimkit.com" style="{{footLink}}">islam@simsimkit.com</a>
+      <a href="https://wa.me/966560053050" style="{{footLink}}">{{t.whatsapp}}</a>
+    </nav>
+  </footer>
+</div>
 
-  <section class="sec" id="prices"><div class="wrap">
-    <div class="phead">
-      <div><h2 data-t="pTitle"></h2><p class="sub" data-t="pLead"></p></div>
-      <div class="cyc" id="cyc"><button type="button" data-cyc="month" aria-pressed="true" data-t="monthly"></button><button type="button" data-cyc="year" aria-pressed="false" data-t="yearly"></button></div>
-    </div>
-    <div class="plans" id="plans"></div>
-    <p class="p-note"><span data-t="pNote"></span> <a href="/pricing" data-t="pAll"></a></p>
-  </div></section>
-
-  <section class="sec" id="faq"><div class="wrap">
-    <h2 data-t="qTitle"></h2>
-    <div class="faq" id="faqList"></div>
-    <div class="card final">
-      <h2 data-t="finalTitle"></h2>
-      <button class="go" type="button" data-start data-t="start"></button>
-      <p class="note" data-t="heroNote"></p>
-    </div>
-  </div></section>
-</main>
-
-<footer>
-  <div class="wrap">
-    <a class="logo" href="#top" aria-label="SimsimKit"><img class="lm-l" src="/logo-mark-light.png" alt=""><img class="lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</a>
-    <nav data-ta="footAria"><a href="/terms" data-t="terms"></a><a href="/privacy" data-t="privacy"></a><a href="/refund" data-t="refund"></a><a href="/pricing" data-t="pricing"></a></nav>
-    <p><a href="mailto:islam@simsimkit.com" dir="ltr">islam@simsimkit.com</a> · <a href="https://wa.me/966560053050" data-t="whatsapp"></a></p>
-    <p data-t="company"></p>
-    <p data-t="vat"></p>
-  </div>
-</footer>
-
+</template>
 <script>
-(() => {
-  const T = {
-    ar: {
-      signin: "تسجيل الدخول", lang: "EN", langAria: "Switch to English", menu: "القائمة", navAria: "أقسام الصفحة", footAria: "روابط الصفحة", light: "فاتح", dark: "غامق",
-      nav: [["how", "كيف يعمل"], ["examples", "أمثلة"], ["features", "المميزات"], ["prices", "الأسعار"], ["faq", "الأسئلة"]],
-      heroTitle: "محتوى كل يوم، من غير فريق",
-      heroLead: "سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.",
-      start: "ابدأ مجانًا", demo: "شاهد مثالًا", heroNote: "300 نقطة مجانًا للتجربة · بدون بطاقة",
-      demoTitle: "من فكرة إلى فيديو جاهز للنشر", demoLead: "هذا الفيديو صُنع بقالب من قوالب سمسمكيت: تكتب فكرتك، والعقل يكتب النص بلهجتك، والقالب يصنع الفيديو بالصوت والترجمة.",
-      howTitle: "كيف يعمل؟", howLead: "ثلاث خطوات، والباقي علينا.",
-      steps: [["العقل يتعلّم علامتك", "تجيب على أسئلة قصيرة عن مجالك ولهجتك وجمهورك، فيبدأ العقل من بروفايل مجالك بدل الصفر."],
-        ["توافق على الفكرة من جوالك", "يقترح الأفكار والسكريبت بلهجتك، وأنت تختار بضغطة أو تعدّل."],
-        ["الفيديو يُنشر في موعده", "القالب يصنع الفيديو بالصوت والترجمة، والأوتوبايلوت ينشره على حساباتك."]],
-      exTitle: "أمثلة لمجالك", exLead: "اختر مجالك وشاهد القوالب التي تناسبه.",
-      exNote: "عيّنات من قوالب سمسمكيت. بعد التسجيل تُصنع بأفكار علامتك ولهجتك.",
-      fTitle: "كل ما تحتاجه في مكان واحد", fLead: "عقل يعرف علامتك، وقوالب تصنع الفيديو، والأوتوبايلوت ينشر في موعده.",
-      feats: [["عقل العلامة", "يتعلّم علامتك ولهجتك وجمهورك، فتخرج كل فكرة وكل سكريبت بصوتك."], ["أكثر من 110 قوالب", "موشن جرافيك، ذكاء اصطناعي، إعلانات، كاروسيل، وتصوير بالجوال."],
-        ["الأوتوبايلوت", "حتى 6 منشورات يوميًا وفق خطة شهرية، وأنت توافق بضغطة."], ["دبلجة بـ 17 لهجة", "الفيديو نفسه بالنجدية والحجازية والخليجية والمصرية، وبـ 11 لغة."],
-        ["النشر على 13 منصة", "تيك توك وإنستجرام ويوتيوب وX وغيرها، من جدولة واحدة."], ["تطبيق الجوال", "صوّر مع الملقّن، وسجّل أفكارك بصوتك، ووافق من أي مكان."]],
-      pTitle: "باقات بسيطة، وتبدأ مجانًا", pLead: "ادفع شهريًا أو سنويًا، وألغِ متى شئت.", monthly: "شهري", yearly: "سنوي · شهران مجانًا",
-      perMonth: "ر.س / شهر", perYear: "ر.س / سنة", popular: "الأكثر طلبًا", choose: "اختر الباقة", choosePop: "ابدأ بباقة {0}",
-      credits: "{0} نقطة شهريًا", accounts: "{0} حسابات تواصل", accounts2: "حسابا تواصل", accountsMax: "{0} حسابات (حتى {1})", autoOn: "الأوتوبايلوت والخطة الشهرية",
-      autoAdd: "الأوتوبايلوت إضافة بـ {0} ر.س", allTpl: "كل القوالب والدبلجة", mobile: "تطبيق الجوال والموافقات", perClient: "عقل منفصل لكل عميل", topup: "شحن النقاط بضعف القيمة",
-      pNote: "كل حساب جديد يبدأ بـ 300 نقطة مجانًا للتجربة.", pAll: "كل تفاصيل الباقات والنقاط الإضافية", pFail: "الأسعار لا تُحمّل الآن. افتح صفحة الأسعار.",
-      qTitle: "أسئلة تتكرر",
-      faq: [["ماذا يفعل سمسمكيت بالضبط؟", "يصنع محتواك من الفكرة حتى النشر: عقل يعرف علامتك، وقوالب تُخرج الفيديو، والأوتوبايلوت ينشر في المواعيد التي تختارها."],
-        ["هل يجب أن أصوّر نفسي؟", "لا. هناك قوالب كاملة بلا تصوير، وأفاتار بوجهك وصوتك. وإن أردت التصوير، ففي تطبيق الجوال ملقّن، وتعيد اللقطة التي لم تعجبك فقط."],
-        ["هل يدعم اللهجة السعودية؟", "نعم: النجدية والحجازية والخليجية العامة، وإجمالًا 17 لهجة عربية و11 لغة، في الكتابة والصوت والدبلجة."],
-        ["ما هي النقاط؟", "في كل باقة نقاط شهرية تُصرف على التوليد. ترى تكلفة العملية قبل أن تبدأها، وإذا فشلت العملية من جهتنا تعود إليك النقاط."],
-        ["هل أستطيع الإلغاء في أي وقت؟", "نعم، من صفحة «باقتي» قبل التجديد. ولأول اشتراك استرداد كامل خلال 7 أيام، إن لم تستخدم أكثر من 10٪ من نقاط الباقة."],
-        ["على أي منصات ينشر؟", "تيك توك، إنستجرام، يوتيوب شورتس، فيسبوك، X، لينكدإن، ثريدز، بنترست، وغيرها، كلها من جدولة واحدة."],
-        ["هل يناسب الوكالات؟", "نعم. في باقة «وكالات» عقل منفصل لكل عميل، وخطة وموافقات لكل عميل، وحتى 25 حساب تواصل."]],
-      finalTitle: "جاهز تبدأ؟", terms: "الشروط", privacy: "الخصوصية", refund: "الاسترجاع", pricing: "الأسعار", whatsapp: "واتساب 0560053050",
-      company: "© 2026 سمسمكيت · شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد 7054472456 · مكة المكرمة، حي العوالي، شارع الوميض، مبنى 3305، الرقم الفرعي 8268، الرمز البريدي 24373 (العنوان المختصر MDAB3305)",
-      vat: "الأسعار بالريال السعودي شاملة، ويتم الدفع بما يعادلها.",
-    },
-    en: {
-      signin: "Sign in", lang: "ع", langAria: "التبديل إلى العربية", menu: "Menu", navAria: "Page sections", footAria: "Page links", light: "Light", dark: "Dark",
-      nav: [["how", "How it works"], ["examples", "Examples"], ["features", "Features"], ["prices", "Prices"], ["faq", "FAQ"]],
-      heroTitle: "Daily content, no team needed",
-      heroLead: "SimsimKit learns your brand and dialect, writes the idea and the script, makes the video and posts it on time. You approve from your phone.",
-      start: "Start free", demo: "See an example", heroNote: "300 free credits to try. No card needed.",
-      demoTitle: "From an idea to a video ready to post", demoLead: "This video was made with one of SimsimKit's templates: you write your idea, the brain writes the script in your dialect, and the template makes the video with voice and captions.",
-      howTitle: "How it works", howLead: "Three steps. We handle the rest.",
-      steps: [["The brain learns your brand", "Answer a few short questions about your field, dialect and audience. The brain starts from your field's profile, not from zero."],
-        ["Approve the idea from your phone", "It suggests ideas and scripts in your dialect. Pick one with a tap, or edit it."],
-        ["The video posts on time", "The template makes the video with voice and captions, and the autopilot posts it to your accounts."]],
-      exTitle: "Examples for your field", exLead: "Pick your field and see the templates that fit it.",
-      exNote: "Samples from SimsimKit templates. After you sign up, they are made with your brand's ideas and dialect.",
-      fTitle: "Everything in one place", fLead: "A brain that knows your brand, templates that make the video, and an autopilot that posts on time.",
-      feats: [["Brand brain", "Learns your brand, tone and audience, so every idea and script sounds like you."], ["110+ templates", "Motion graphics, AI video, ads, carousels and phone shoots."],
-        ["Autopilot", "Up to 6 posts a day from a monthly plan. You approve with one tap."], ["Dubbing in 17 dialects", "The same video in Najdi, Hijazi, Gulf or Egyptian, plus 11 languages."],
-        ["Posts to 13 platforms", "TikTok, Instagram, YouTube, X and more, from one schedule."], ["Mobile app", "Shoot with the teleprompter, capture ideas by voice, approve from anywhere."]],
-      pTitle: "Simple plans. Start free.", pLead: "Pay monthly or yearly, cancel anytime.", monthly: "Monthly", yearly: "Yearly · 2 months free",
-      perMonth: "SAR / mo", perYear: "SAR / yr", popular: "Most popular", choose: "Choose plan", choosePop: "Start with {0}",
-      credits: "{0} credits a month", accounts: "{0} social accounts", accounts2: "2 social accounts", accountsMax: "{0} accounts (up to {1})", autoOn: "Autopilot and monthly plan",
-      autoAdd: "Autopilot add-on, {0} SAR", allTpl: "All templates and dubbing", mobile: "Mobile app and approvals", perClient: "A separate brain per client", topup: "Top-ups at double credits",
-      pNote: "Every new account starts with 300 free trial credits.", pAll: "Full plan details and extra credits", pFail: "Prices are not loading right now. Open the pricing page.",
-      qTitle: "Questions we get",
-      faq: [["What exactly does SimsimKit do?", "It makes your content from idea to post: a brain that knows your brand, templates that produce the video, and an autopilot that posts on your schedule."],
-        ["Do I have to film myself?", "No. There are full templates with no filming, and an avatar with your face and voice. If you want to film, the mobile app has a teleprompter and you only redo the take you did not like."],
-        ["Does it support Saudi dialects?", "Yes: Najdi, Hijazi and general Gulf. In total 17 Arabic dialects and 11 languages, across writing, voice and dubbing."],
-        ["What are credits?", "Every plan includes monthly credits spent on generation. You see the cost of a job before you start it, and if a job fails on our side the credits go back to your balance."],
-        ["Can I cancel anytime?", "Yes, from the My Plan page before renewal. Your first subscription has a full refund within 7 days if you used no more than 10% of its credits."],
-        ["Which platforms does it post to?", "TikTok, Instagram, YouTube Shorts, Facebook, X, LinkedIn, Threads, Pinterest and more, all from one schedule."],
-        ["Is it built for agencies?", "Yes. The Agency plan gives every client their own brain, plan and approvals, with up to 25 social accounts."]],
-      finalTitle: "Ready to start?", terms: "Terms", privacy: "Privacy", refund: "Refunds", pricing: "Pricing", whatsapp: "WhatsApp +966 56 005 3050",
-      company: "© 2026 SimsimKit · GeekZone Company (LLC) · Unified No. 7054472456 · Building 3305, Al Wamid St, Al Awali, Makkah 24373-8268, Saudi Arabia",
-      vat: "Prices are in Saudi riyals, taxes included. You pay the equivalent amount.",
-    },
-  };
-  // أمثلة لكل مجال: قوالب المجال الرخيصة (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)
-  const FIELDS = [
-    ["food", "مطاعم وكافيهات", "Restaurants & cafés", ["t-price", "t-chat", "t-map"]],
-    ["beauty", "عيادات وتجميل", "Clinics & beauty", ["t-review", "t-flow", "t-flipcards"]],
-    ["ecom", "متاجر إلكترونية", "Online stores", ["t-shopfloat", "t-count", "t-price"]],
-    ["realestate", "عقارات", "Real estate", ["t-map", "t-chart", "t-price"]],
-    ["edu", "تعليم وكوتشينج", "Education & coaching", ["t-board", "t-flow", "t-show"]],
-    ["fitness", "رياضة ولياقة", "Sports & fitness", ["t-pictogram", "t-count", "t-review"]],
-  ];
-  const TPL = { "t-price": ["كشف السعر", "Price reveal", "السعر القديم يُشطب والجديد يظهر بعدّاد وزر اطلب."], "t-chat": ["قصة شات", "Chat story", "محادثة بين العميل والمتجر تنتهي بتأكيد الطلب."],
-    "t-map": ["خريطة متحركة", "Animated map", "دبابيس على الأحياء وطريق التوصيل يُرسم."], "t-review": ["رأي عميل", "Customer review", "اقتباس يظهر كلمة كلمة ونجوم تضيء."],
-    "t-flow": ["خطوات الخدمة", "Service steps", "بطاقات الخطوات تظهر والخطوط بينها تُرسم."], "t-flipcards": ["بطاقات تتقلب", "Flip cards", "ثلاث رسائل، كل واحدة في بطاقة تتقلب."],
-    "t-shopfloat": ["متجر بمنتجات طائرة", "Floating store", "بطاقات منتج بالسعر وزر «أضف للسلة»."], "t-count": ["عد تنازلي", "Countdown", "رقم يقلب حتى الصفر ثم يظهر العرض."],
-    "t-chart": ["رسم بياني", "Chart", "أرقام تتحرك وتحكي القصة."], "t-board": ["سبورة", "Whiteboard", "شرح يُرسم أمامك على سبورة."],
-    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."] };
-  const ICONS = ["M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16", "M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z",
-    "M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z", "M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5",
-    "M4 12l16-8-6 16-3-7z M11 13l9-9", "M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M11 18h2"];
-  const CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
-  const root = document.documentElement, $ = (id) => document.getElementById(id);
-  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  const fmt = (s, ...a) => s.replace(/\{(\d)\}/g, (_, i) => a[i]);
-  const S = { lang: root.lang === "en" ? "en" : "ar", field: 0, cyc: "month", pricing: null };
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+// ⚙️ مشغّل صغير لقالب التصميم: {{…}} و<sc-for> و<sc-if> وdata-on-click. مع كل تغيير الشكل بيتبني من جديد ويتقارن بالموجود
+// (العناصر نفسها بتفضل، فالانتقالات زي نور الجيلي فيش وتحويل الوضع بتشتغل، والمكتوب في الحقول مابيضيعش).
+// كل شاشة ليها data-k، فلما الشاشة تتغير عنصرها بيتبدّل وأنيميشن الدخول بيشتغل.
+const LPR = (() => {
+  const RX = /\{\{([^}]+)\}\}/g;
+  const val = (scope, expr) => { let v = scope; for (const k of expr.trim().split(".")) v = v == null ? undefined : v[k]; return v; };
+  const interp = (str, scope) => { const m = str.match(/^\{\{([^}]+)\}\}$/); if (m) return val(scope, m[1]); return str.replace(RX, (_, e) => { const v = val(scope, e); return v == null ? "" : String(v); }); };
+  const bare = (s) => s.replace(/[{}]/g, "").trim();
+  function build(src, scope, parent) {
+    for (const n of src.childNodes) {
+      if (n.nodeType === 3 && /^\s*\n\s*$/.test(n.nodeValue)) continue;   // مسافات التنسيق بين السطور مالهاش لازمة
+      if (n.nodeType === 3) { parent.appendChild(document.createTextNode(n.nodeValue.includes("{{") ? String(interp(n.nodeValue, scope) ?? "") : n.nodeValue)); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = n.localName;
+      if (tag === "sc-for") { const as = n.getAttribute("as"); for (const it of val(scope, bare(n.getAttribute("list"))) || []) build(n, { ...scope, [as]: it }, parent); continue; }
+      if (tag === "sc-if") { if (val(scope, bare(n.getAttribute("value")))) build(n, scope, parent); continue; }
+      const el = n.cloneNode(false);
+      for (const a of [...el.attributes]) {
+        const nm = a.name;
+        if (nm.startsWith("hint-")) { el.removeAttribute(nm); continue; }
+        if (nm.startsWith("data-on-")) { const fn = val(scope, bare(a.value)); el.removeAttribute(nm); if (typeof fn === "function") (el.__on || (el.__on = {}))[nm.slice(8)] = fn; continue; }
+        if (a.value.includes("{{")) {
+          const v = interp(a.value, scope);
+          if ((v === false || v == null) && !nm.startsWith("aria-")) el.removeAttribute(nm);
+          else el.setAttribute(nm, v === true ? "true" : v === false ? "false" : String(v));
+        }
+      }
+      build(n, scope, el);
+      parent.appendChild(el);
+    }
+  }
+  const same = (a, b) => a.nodeType === b.nodeType && (a.nodeType !== 1 || (a.localName === b.localName && a.getAttribute("data-k") === b.getAttribute("data-k")
+    && (a.localName !== "input" || a.getAttribute("name") === b.getAttribute("name"))));
+  const key = (n) => (n.nodeType === 1 ? n.getAttribute("data-k") : null);
+  function morph(a, b) {
+    for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+    for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+    a.__on = b.__on;
+    // العناصر اللي بتظهر وتختفي ليها data-k، فظهورها مابيزحزحش اللي بعدها (الجيلي فيش يفضل هو هو ونوره يتنقل بهدوء)
+    const ac = [...a.childNodes], bc = [...b.childNodes];
+    const nk = new Set(bc.map(key).filter(Boolean)), ok = new Set(ac.map(key).filter(Boolean));
+    let j = 0;
+    for (const y of bc) {
+      while (j < ac.length && key(ac[j]) && !nk.has(key(ac[j]))) ac[j++].remove();
+      const x = ac[j];
+      if (!x) { a.appendChild(y); continue; }
+      if (key(y) && !ok.has(key(y))) { a.insertBefore(y, x); continue; }
+      j++;
+      if (!same(x, y)) a.replaceChild(y, x);
+      else if (x.nodeType === 1) morph(x, y);
+      else if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue;
+    }
+    for (; j < ac.length; j++) ac[j].remove();
+  }
+  // الأحداث كلها من عنصر واحد فوق: بيدوّر على أقرب عنصر عليه الحدث ده
+  function listen(root, types) {
+    for (const t of types) root.addEventListener(t, (e) => {
+      for (let el = e.target; el && el !== root.parentNode; el = el.parentNode) {
+        const fn = el.__on && el.__on[t];
+        if (fn) { fn(e, el); return; }
+      }
+    });
+  }
+  return { build, morph, listen };
+})();
 
-  function render() {
-    const t = T[S.lang], en = S.lang === "en";
-    root.lang = S.lang; root.dir = en ? "ltr" : "rtl";
-    document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = t[el.dataset.t] ?? ""; });
-    document.querySelectorAll("[data-ta]").forEach((el) => el.setAttribute("aria-label", t[el.dataset.ta] ?? ""));
-    $("lang").textContent = t.lang; $("lang").setAttribute("aria-label", t.langAria);
-    $("swT").textContent = root.dataset.nhTheme === "dark" ? t.dark : t.light;
-    const links = t.nav.map(([id, n]) => `<a href="#${id}" data-sec="${id}">${esc(n)}</a>`).join("");
-    $("side").innerHTML = links; $("sheetNav").innerHTML = links;
-    $("steps").innerHTML = t.steps.map(([h, p], i) => `<article class="card step"><span class="n">${i + 1}</span><h3>${esc(h)}</h3><p>${esc(p)}</p></article>`).join("");
-    $("feats").innerHTML = t.feats.map(([h, p], i) => `<article class="card feat"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[i]}"/></svg></span><h3>${esc(h)}</h3><p>${esc(p)}</p></article>`).join("");
-    $("faqList").innerHTML = t.faq.map(([q, a], i) => `<div class="card q"${i === 0 ? " open" : ""}><button type="button" aria-expanded="${i === 0}">${esc(q)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><p${i === 0 ? "" : " hidden"}>${esc(a)}</p></div>`).join("");
-    $("fields").setAttribute("aria-label", t.exTitle);
-    renderFields(); renderPlans(); spy();
-  }
-  function renderFields() {
-    const en = S.lang === "en";
-    $("fields").innerHTML = FIELDS.map((f, i) => `<button type="button" data-field="${i}" aria-pressed="${i === S.field}">${esc(en ? f[2] : f[1])}</button>`).join("");
-    $("samples").innerHTML = FIELDS[S.field][3].map((id) => {
-      const m = TPL[id] || [id, id, ""];
-      return `<figure class="card sample" style="margin:0"><video src="/gallery/${id}.mp4" poster="/gallery/${id}.jpg?v=2" muted loop playsinline preload="none" aria-label="${esc(en ? m[1] : m[0])}"></video>
-        <figcaption>${esc(en ? m[1] : m[0])}${en ? "" : `<small>${esc(m[2])}</small>`}</figcaption></figure>`;
-    }).join("");
-    watchVideos();
-  }
-  // الأسعار من نفس مصدر البرنامج: السعر بالدولار × 3.76 ريال (نفس صفحة الأسعار و«باقتي ونقاطي»)، والسنوي = عدد شهور السنة في القواعد
-  function renderPlans() {
-    const t = T[S.lang], d = S.pricing;
-    $("cyc").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.cyc === S.cyc));
-    if (!d) { $("plans").innerHTML = S.pricingFailed ? `<p class="p-note">${esc(t.pFail)}</p>` : ""; return; }
-    const SAR = 3.76, sar = (v) => Math.round(v * SAR), months = (d.rules && d.rules.yearly_months) || 10, en = S.lang === "en";
-    const autoAdd = (d.addons || []).find((a) => a.key === "autopilot");
-    const n = (v) => Number(v).toLocaleString("en-US");
-    $("plans").innerHTML = (d.plans || []).filter((p) => p.price > 0).map((p) => {
-      const name = en ? p.name_en || p.name : p.name;
-      const feats = [fmt(t.credits, n(p.credits)),
-        p.max_accounts ? fmt(t.accountsMax, p.accounts, p.max_accounts) : p.accounts === 2 ? t.accounts2 : fmt(t.accounts, p.accounts)];
-      if (p.autopilot) feats.push(t.autoOn); else feats.push(t.allTpl, ...(autoAdd && (autoAdd.for || []).includes(p.key) ? [fmt(t.autoAdd, sar(autoAdd.price))] : []));
-      if (p.max_accounts) feats.push(t.perClient); else if (p.autopilot) feats.push(t.mobile);
-      if (p.topup_bonus) feats.push(t.topup);
-      const price = S.cyc === "year" ? sar(p.price * months) : sar(p.price);
-      const usd = S.cyc === "year" ? p.price * months : p.price;
-      return `<article class="card plan${p.popular ? " pop" : ""}"><div class="top"><h3>${esc(name)}</h3>${p.popular ? `<span class="badge">${esc(t.popular)}</span>` : ""}</div>
-        <p class="price"><b>${n(price)}</b><span>${esc(S.cyc === "year" ? t.perYear : t.perMonth)}</span></p><p class="usd">≈ $${n(usd)}</p>
-        <ul>${[...new Set(feats)].map((f) => `<li>${CHECK}<span>${esc(f)}</span></li>`).join("")}</ul>
-        <a class="btn${p.popular ? " go" : ""}" style="display:grid;place-items:center" href="/signup?plan=${encodeURIComponent(p.key)}&cycle=${S.cyc}">${esc(p.popular ? fmt(t.choosePop, name) : t.choose)}</a></article>`;
-    }).join("");
-  }
-  // الفيديوهات: تشتغل لما تظهر على الشاشة بس، وتقف لما تختفي (مفيش تحميل في الخلفية)
-  let io;
-  function watchVideos() {
-    io = io || new IntersectionObserver((es) => es.forEach((e) => {
-      const v = e.target;
-      if (e.isIntersecting && !reduce.matches) { v.preload = "auto"; v.play().catch(() => {}); } else v.pause();
-    }), { threshold: .45 });
-    document.querySelectorAll(".sample video").forEach((v) => io.observe(v));
-  }
-  // القائمة: القسم اللي على الشاشة متعلّم
-  let so;
-  function spy() {
-    so?.disconnect();
-    so = new IntersectionObserver((es) => es.forEach((e) => {
-      if (!e.isIntersecting) return;
-      document.querySelectorAll("#side a").forEach((a) => a.classList.toggle("on", a.dataset.sec === e.target.id));
-    }), { rootMargin: "-40% 0px -55% 0px" });
-    T[S.lang].nav.forEach(([id]) => { const el = $(id); if (el) so.observe(el); });
-  }
 
-  // ✨ «ابدأ مجانًا»: الجيلي فيش ينوّر مع صوت هادي، والتسجيل يفتح بعدها (قرار صاحب المنتج). مع «تقليل الحركة» يفتح فورًا بلا صوت.
-  let ac;
-  function chime() {
+const LP_TEXT = {
+  ar: {
+    signin: 'تسجيل الدخول', back: 'رجوع', crumbsAria: 'موقعك', langBtn: 'EN', langAria: 'Switch to English', themeAria: 'تبديل الوضع', light: 'فاتح', dark: 'غامق',
+    nav: ['الرئيسية', 'كيف يعمل', 'أمثلة', 'المميزات', 'الأسعار', 'الأسئلة'], home: 'الرئيسية',
+    demo: 'شاهد مثالًا', start: 'ابدأ مجانًا',
+    heroTitle: 'محتوى كل يوم، من غير فريق',
+    heroLead: 'سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.',
+    heroNote: '300 نقطة مجانًا للتجربة · بدون بطاقة',
+    demoTitle: 'من فكرة إلى فيديو جاهز للنشر', demoLead: 'هذا الفيديو صُنع بقالب من قوالب سمسمكيت: تكتب فكرتك، والعقل يكتب النص بلهجتك، والقالب يصنع الفيديو.', vidCap: 'شاهد مثالًا',
+    hTitle: 'كيف يعمل؟', hLead: 'ثلاث خطوات، والباقي علينا.', exTitle: 'أمثلة لمجالك', exLead: 'اختر مجالك وشاهد القوالب التي تناسبه.',
+    country: 'بلدك', dialect: 'لهجة المحتوى', field: 'مجال نشاطك', goal: 'هدفك من المحتوى', next: 'التالي', step2Hint: 'نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، ويمكنك تغيير اللهجة لاحقًا.', soon: 'الدخول بأبل قريبًا', gsoon: 'الدخول بجوجل قريبًا',
+    screens: { how: 'كيف يعمل', examples: 'أمثلة', features: 'المميزات', prices: 'الأسعار', faq: 'الأسئلة', demo: 'مثال', signup: 'إنشاء حساب', login: 'تسجيل الدخول' },
+    fTitle: 'كل ما تحتاجه في مكان واحد', fLead: 'عقل يعرف علامتك، وقوالب تصنع الفيديو، والأوتوبايلوت ينشر في موعده.',
+    pTitle: 'باقات بسيطة، وتبدأ مجانًا', pLead: 'ادفع شهريًا أو سنويًا، وألغِ متى شئت.', monthly: 'شهري', yearly: 'سنوي · شهران مجانًا',
+    pNote: 'كل حساب جديد يبدأ بـ 300 نقطة مجانًا للتجربة.', perMonth: 'ر.س / شهر', perYear: 'ر.س / سنة', popular: 'الأكثر طلبًا', choose: 'اختر الباقة', startPro: 'ابدأ بباقة محترف',
+    qTitle: 'أسئلة تتكرر',
+    sTitleR: 'أنشئ حسابك', sLeadR: '300 نقطة مجانًا للتجربة، من غير بطاقة.', sTitleL: 'أهلًا بعودتك', sLeadL: 'سجّل الدخول لتكمل من حيث توقفت.',
+    or: 'أو بالبريد', name: 'الاسم', email: 'البريد الإلكتروني', password: 'كلمة المرور', showPw: 'إظهار كلمة المرور',
+    submitR: 'إنشاء الحساب', submitL: 'تسجيل الدخول', switchQR: 'لديك حساب؟', switchAR: 'سجّل الدخول', switchQL: 'ليس لديك حساب؟', switchAL: 'أنشئ حسابًا',
+    footLegal: '© 2026 سمسمكيت · شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد 7054472456 · مكة المكرمة', footNavAria: 'روابط الصفحة',
+    terms: 'الشروط', privacy: 'الخصوصية', refund: 'الاسترجاع', whatsapp: 'واتساب 0560053050'
+  },
+  en: {
+    signin: 'SIGN IN', back: 'Back', crumbsAria: 'You are here', langBtn: 'ع', langAria: 'التبديل إلى العربية', themeAria: 'Switch theme', light: 'LIGHT', dark: 'DARK',
+    nav: ['HOME', 'HOW', 'EXAMPLES', 'FEATURES', 'PRICES', 'FAQ'], home: 'Home',
+    demo: 'SEE AN EXAMPLE', start: 'START FREE',
+    heroTitle: 'Daily content, no team needed',
+    heroLead: 'SimsimKit learns your brand and dialect, writes the idea and the script, makes the video and posts it on time. You approve from your phone.',
+    heroNote: '300 free credits to try. No card needed.',
+    demoTitle: 'From an idea to a video ready to post', demoLead: 'This video was made with a SimsimKit template: you write your idea, the brain writes the script in your dialect, and the template makes the video.', vidCap: 'See an example',
+    hTitle: 'How it works', hLead: 'Three steps. We handle the rest.', exTitle: 'Examples for your field', exLead: 'Pick your field and see the templates that fit it.',
+    country: 'Country', dialect: 'Content dialect', field: 'Your field', goal: 'Your goal', next: 'Next', step2Hint: 'We prepare your brand brain, ideas and a monthly plan from your field. You can change the dialect later.', soon: 'Sign in with Apple is coming soon', gsoon: 'Sign in with Google is coming soon',
+    screens: { how: 'How it works', examples: 'Examples', features: 'Features', prices: 'Prices', faq: 'FAQ', demo: 'Example', signup: 'Sign up', login: 'Sign in' },
+    fTitle: 'Everything in one place', fLead: 'A brain that knows your brand, templates that make the video, and an autopilot that posts on time.',
+    pTitle: 'Simple plans. Start free.', pLead: 'Pay monthly or yearly, cancel anytime.', monthly: 'Monthly', yearly: 'Yearly · 2 months free',
+    pNote: 'Every new account starts with 300 free trial credits.', perMonth: 'SAR / mo', perYear: 'SAR / yr', popular: 'Most popular', choose: 'Choose plan', startPro: 'Start with Pro',
+    qTitle: 'Questions we get',
+    sTitleR: 'Create your account', sLeadR: '300 free trial credits. No card needed.', sTitleL: 'Welcome back', sLeadL: 'Sign in to pick up where you left off.',
+    or: 'or with email', name: 'Name', email: 'Email', password: 'Password', showPw: 'Show password',
+    submitR: 'Create account', submitL: 'Sign in', switchQR: 'Already have an account?', switchAR: 'Sign in', switchQL: 'New here?', switchAL: 'Create an account',
+    footLegal: '© 2026 SimsimKit · GeekZone Company (LLC) · Unified No. 7054472456 · Makkah, Saudi Arabia', footNavAria: 'Page links',
+    terms: 'Terms', privacy: 'Privacy', refund: 'Refunds', whatsapp: 'WhatsApp +966 56 005 3050'
+  }
+};
+const LP_FEATS = [
+  ['عقل العلامة', 'Brand brain', 'يتعلّم علامتك ولهجتك وجمهورك، فتخرج كل فكرة وكل سكريبت بصوتك.', 'Learns your brand, tone and audience, so every idea and script sounds like you.', 'M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16'],
+  ['أكثر من 110 قوالب', '110+ templates', 'موشن جرافيك، ذكاء اصطناعي، إعلانات، كاروسيل، وتصوير بالجوال.', 'Motion graphics, AI video, ads, carousels and phone shoots.', 'M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z'],
+  ['الأوتوبايلوت', 'Autopilot', 'حتى 6 منشورات يوميًا وفق خطة شهرية، وأنت توافق بضغطة.', 'Up to 6 posts a day from a monthly plan. You approve with one tap.', 'M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z'],
+  ['دبلجة بـ 17 لهجة', 'Dubbing in 17 dialects', 'الفيديو نفسه بالنجدية والحجازية والخليجية والمصرية، وبـ 11 لغة.', 'The same video in Najdi, Hijazi, Gulf or Egyptian, plus 11 languages.', 'M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5'],
+  ['النشر على 13 منصة', 'Posts to 13 platforms', 'تيك توك وإنستجرام ويوتيوب وX وغيرها، من جدولة واحدة.', 'TikTok, Instagram, YouTube, X and more, from one schedule.', 'M4 12l16-8-6 16-3-7z M11 13l9-9'],
+  ['تطبيق الجوال', 'Mobile app', 'صوّر مع الملقّن، وسجّل أفكارك بصوتك، ووافق من أي مكان.', 'Shoot with the teleprompter, capture ideas by voice, approve from anywhere.', 'M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M11 18h2']
+];
+const LP_PLANS = [
+  { ar: 'بداية', en: 'Starter', sar: 109, usd: 29, fa: ['1,000 نقطة شهريًا', 'حسابا تواصل', 'كل القوالب والدبلجة', 'الأوتوبايلوت إضافة بـ 56 ر.س'], fe: ['1,000 credits a month', '2 social accounts', 'All templates and dubbing', 'Autopilot add-on, 56 SAR'] },
+  { ar: 'محترف', en: 'Pro', sar: 297, usd: 79, popular: true, fa: ['3,500 نقطة شهريًا', '4 حسابات تواصل', 'الأوتوبايلوت والخطة الشهرية', 'تطبيق الجوال والموافقات'], fe: ['3,500 credits a month', '4 social accounts', 'Autopilot and monthly plan', 'Mobile app and approvals'] },
+  { ar: 'وكالات', en: 'Agency', sar: 748, usd: 199, fa: ['30,000 نقطة شهريًا', '10 حسابات (حتى 25)', 'عقل منفصل لكل عميل', 'شحن النقاط بضعف القيمة'], fe: ['30,000 credits a month', '10 accounts (up to 25)', 'A separate brain per client', 'Top-ups at double credits'] }
+];
+const LP_FAQ = [
+  ['ماذا يفعل سمسمكيت بالضبط؟', 'يصنع محتواك من الفكرة حتى النشر: عقل يعرف علامتك، وقوالب تُخرج الفيديو، والأوتوبايلوت ينشر في المواعيد التي تختارها.', 'What exactly does SimsimKit do?', 'It makes your content from idea to post: a brain that knows your brand, templates that produce the video, and an autopilot that posts on your schedule.'],
+  ['هل يجب أن أصوّر نفسي؟', 'لا. هناك قوالب كاملة بلا تصوير، وأفاتار بوجهك وصوتك. وإن أردت التصوير، ففي تطبيق الجوال ملقّن، وتعيد اللقطة التي لم تعجبك فقط.', 'Do I have to film myself?', 'No. There are full templates with no filming, and an avatar with your face and voice. If you want to film, the mobile app has a teleprompter and you only redo the take you did not like.'],
+  ['هل يدعم اللهجة السعودية؟', 'نعم: النجدية والحجازية والخليجية العامة، وإجمالًا 17 لهجة عربية و11 لغة، في الكتابة والصوت والدبلجة.', 'Does it support Saudi dialects?', 'Yes: Najdi, Hijazi and general Gulf. In total 17 Arabic dialects and 11 languages, across writing, voice and dubbing.'],
+  ['ما هي النقاط؟', 'في كل باقة نقاط شهرية تُصرف على التوليد. ترى تكلفة أي عملية قبل أن تبدأها، وإذا فشلت العملية من جهتنا تعود إليك النقاط.', 'What are credits?', 'Every plan includes monthly credits spent on generation. You see the cost of a job before you start it, and if a job fails on our side the credits go back to your balance.'],
+  ['هل أستطيع الإلغاء في أي وقت؟', 'نعم، من صفحة «باقتي» قبل التجديد. ولأول اشتراك استرداد كامل خلال 7 أيام، إن لم تستخدم أكثر من 10٪ من نقاط الباقة.', 'Can I cancel anytime?', 'Yes, from the My Plan page before renewal. Your first subscription has a full refund within 7 days if you used no more than 10% of its credits.'],
+  ['على أي منصات ينشر؟', 'تيك توك، إنستجرام، يوتيوب شورتس، فيسبوك، X، لينكدإن، ثريدز، بنترست، وغيرها، كلها من جدولة واحدة.', 'Which platforms does it post to?', 'TikTok, Instagram, YouTube Shorts, Facebook, X, LinkedIn, Threads, Pinterest and more, all from one schedule.'],
+  ['هل يناسب الوكالات؟', 'نعم. في باقة «وكالات» عقل منفصل لكل عميل، وخطة وموافقات لكل عميل، وحتى 25 حساب تواصل.', 'Is it built for agencies?', 'Yes. The Agency plan gives every client their own brain, plan and approvals, with up to 25 social accounts.']
+];
+const LP_SCREENS = ['home', 'how', 'examples', 'features', 'prices', 'faq'];
+const LP_STEPS = [
+  ['العقل يتعلّم علامتك', 'The brain learns your brand', 'تجيب على أسئلة قصيرة عن مجالك ولهجتك وجمهورك، فيبدأ العقل من بروفايل مجالك بدل الصفر.', 'Answer a few short questions about your field, dialect and audience. The brain starts from your field, not from zero.'],
+  ['توافق على الفكرة من جوالك', 'Approve the idea from your phone', 'يقترح الأفكار والسكريبت بلهجتك، وأنت تختار بضغطة أو تعدّل.', 'It suggests ideas and scripts in your dialect. Pick one with a tap, or edit it.'],
+  ['الفيديو يُنشر في موعده', 'The video posts on time', 'القالب يصنع الفيديو بالصوت والترجمة، والأوتوبايلوت ينشره على حساباتك.', 'The template makes the video with voice and captions, and the autopilot posts it.']
+];
+// أمثلة لكل مجال: قوالب المجال (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)
+const LP_FIELDS = [
+  ['مطاعم وكافيهات', 'Restaurants & cafés', [['t-price', 'كشف السعر', 'Price reveal'], ['t-chat', 'قصة شات', 'Chat story'], ['t-map', 'خريطة متحركة', 'Animated map']]],
+  ['عيادات وتجميل', 'Clinics & beauty', [['t-review', 'رأي عميل', 'Customer review'], ['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-flipcards', 'بطاقات تتقلب', 'Flip cards']]],
+  ['متاجر إلكترونية', 'Online stores', [['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-price', 'كشف السعر', 'Price reveal']]],
+  ['عقارات', 'Real estate', [['t-map', 'خريطة متحركة', 'Animated map'], ['t-chart', 'رسم بياني', 'Chart'], ['t-price', 'كشف السعر', 'Price reveal']]],
+  ['تعليم وكوتشينج', 'Education', [['t-board', 'سبورة', 'Whiteboard'], ['t-flow', 'خطوات', 'Steps'], ['t-show', 'برنامج مسابقات', 'Quiz show']]],
+  ['رياضة ولياقة', 'Fitness', [['t-pictogram', 'بطاقات بيكتوجرام', 'Pictogram cards'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-review', 'رأي عميل', 'Customer review']]]
+];
+
+class Component {
+  constructor(p) {
+    this.props = p || {};
+    const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    const h = (location.hash || '').slice(1), scr0 = LP_SCREENS.includes(h) || h === 'demo' ? h : h === 'signup' || h === 'login' ? 'signup' : 'home';
+    this.state = { dark: (ls('studiomania.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark', lang: ls('studiomania.site.lang') === 'en' ? 'en' : null,
+      screen: scr0, hist: [], lit: false, flash: false, still: false, yearly: false, open: 0, showPw: false, mode: h === 'login' ? 'login' : 'register',
+      field: 0, step: 1, err: '', reg: {}, busy: false };
+  }
+  componentWillUnmount() { clearTimeout(this._t1); clearTimeout(this._t2); }
+  go(screen, extra, fromHash) {
+    if (screen === this.state.screen && !extra) return;
+    const off = screen !== 'signup' ? { lit: false, flash: false } : {};
+    this.setState(Object.assign({ screen, err: '', hist: this.state.hist.concat(this.state.screen) }, off, extra || {}));
+    // 🔗 رابط لكل شاشة (#features …)، والرجوع في المتصفح بيرجع للشاشة اللي قبلها
+    if (!fromHash) { const want = screen === 'home' ? '' : '#' + (screen === 'signup' && this.state.mode === 'login' ? 'login' : screen); if (location.hash !== want) history.pushState(null, '', want || location.pathname); }
+  }
+  back() {
+    const h = this.state.hist.slice();
+    const screen = h.length ? h.pop() : 'home';
+    clearTimeout(this._t1); clearTimeout(this._t2);
+    this.setState({ screen, hist: h, lit: screen === 'signup' && this.state.lit, flash: false });
+  }
+  // صوت طبيعي: كحتة عود كبريت (احتكاك خشن قصير) وبعدها نفَس الاشتعال وطقطقة خفيفة. مولّد بالكود من غير ملفات
+  chime() {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      ac = ac || new AC();
-      if (ac.state === "suspended") ac.resume();
-      const t0 = ac.currentTime + .02, out = ac.createGain();
-      out.gain.value = .22; out.connect(ac.destination);
-      const noise = (sec) => { const len = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(1, len, ac.sampleRate), ch = b.getChannelData(0); for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1; const s = ac.createBufferSource(); s.buffer = b; return s; };
-      const filt = (type, f, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
-      const s1 = noise(.32), hp = filt("highpass", 1400), bp = filt("bandpass", 3600, .9), g1 = ac.createGain();
-      g1.gain.setValueAtTime(0, t0);
-      for (let k = 0; k < 36; k++) { const x = k / 36, env = Math.min(1, x / .25) * Math.pow(1 - x, 1.4); g1.gain.setValueAtTime(env * (.25 + Math.random() * .75) * .9, t0 + k * .0075); }
-      g1.gain.setValueAtTime(0, t0 + .28);
-      s1.connect(hp); hp.connect(bp); bp.connect(g1); g1.connect(out); s1.start(t0); s1.stop(t0 + .32);
-      for (let i = 0; i < 20; i++) {
-        const at = t0 + .2 + Math.pow(Math.random(), 1.6) * 1.2, len = .004 + Math.random() * .01, c = noise(len + .004), b2 = filt("bandpass", 1500 + Math.random() * 3500, .8 + Math.random() * 1.5), g = ac.createGain();
-        g.gain.setValueAtTime(.15 + Math.random() * .3, at); g.gain.exponentialRampToValueAtTime(.001, at + len);
-        c.connect(b2); b2.connect(g); g.connect(out); c.start(at); c.stop(at + len + .004);
+      const ac = this._ac || (this._ac = new AC());
+      if (ac.state === 'suspended') ac.resume();
+      const t = ac.currentTime + 0.02, out = ac.createGain();
+      out.gain.value = 0.55; out.connect(ac.destination);
+      const noise = (sec) => {
+        const len = Math.floor(ac.sampleRate * sec), buf = ac.createBuffer(1, len, ac.sampleRate), ch = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+        const src = ac.createBufferSource(); src.buffer = buf; return src;
+      };
+      const filter = (type, f, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+      // 1) الكحتة: حبيبات احتكاك عشوائية بتعلى وتهدى في ربع ثانية
+      const s1 = noise(0.32), hp1 = filter('highpass', 1400), bp1 = filter('bandpass', 3600, 0.9), g1 = ac.createGain();
+      g1.gain.setValueAtTime(0, t);
+      for (let k = 0; k < 36; k++) {
+        const x = k / 36, env = Math.min(1, x / 0.25) * Math.pow(1 - x, 1.4);
+        g1.gain.setValueAtTime(env * (0.25 + Math.random() * 0.75) * 0.9, t + k * 0.0075);
       }
-    } catch { /* الصوت إضافة */ }
+      g1.gain.setValueAtTime(0, t + 0.28);
+      s1.connect(hp1); hp1.connect(bp1); bp1.connect(g1); g1.connect(out); s1.start(t); s1.stop(t + 0.32);
+      // 2) طقطقة الحرق (زي البلاستيك وهو بيولّع): فرقعات صغيرة متفرقة، كتير في الأول وبتقل مع الوقت
+      for (let i = 0; i < 26; i++) {
+        const at = t + 0.2 + Math.pow(Math.random(), 1.6) * 1.3, len = 0.004 + Math.random() * 0.01;
+        const c = noise(len + 0.004), bp = filter('bandpass', 1500 + Math.random() * 3500, 0.8 + Math.random() * 1.5), g = ac.createGain();
+        g.gain.setValueAtTime(0.18 + Math.random() * 0.4, at); g.gain.exponentialRampToValueAtTime(0.001, at + len);
+        c.connect(bp); bp.connect(g); g.connect(out); c.start(at); c.stop(at + len + 0.004);
+      }
+    } catch (e) { /* الصوت إضافة، لو المتصفح منعه نكمّل عادي */ }
   }
-  let starting = false;
-  function start() {
-    const url = "/signup";
-    if (reduce.matches) return location.assign(url);
-    if (starting) return;
-    starting = true;
-    chime();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    $("hero").classList.add("lit");
-    setTimeout(() => location.assign(url), 1900);
-  }
+  renderVals() {
+    const s = this.state, d = s.dark;
+    const lang = s.lang || this.props.startLang || 'ar', ar = lang === 'ar', T = LP_TEXT[lang];
+    const arF = "'" + (this.props.arFont || 'Alexandria') + "', 'Readex Pro', sans-serif";
+    const F = ar ? arF : 'Jost, Futura, sans-serif';
+    const ls = (em) => (ar ? '0' : em);
+    const ink = d ? '#F1F1F3' : '#181718', muted = d ? '#A3A3AB' : '#6B6B67';
+    const card = d ? 'rgba(28,28,31,.82)' : 'rgba(255,255,255,.86)';
+    const shadow = d ? '0 4px 18px rgba(0,0,0,.4)' : '0 4px 18px rgba(24,23,24,.08)';
+    const solid = d ? '#1C1C1F' : '#FFFFFF';
+    const still = s.still ? 'transition:none;' : '';
+    const scr = s.screen, home = scr === 'home', reg = s.mode === 'register';
+    const act = LP_SCREENS.indexOf(scr);
+    const lit = s.lit;
+    // بعد ما الجيلي فيش ينوّر: الأسود يبقى رمادي غامق جدًا، والأبيض ياخد لمسة زرقا خفيفة
+    const bg = d ? (lit ? '#17171A' : '#0C0C0E') : (lit ? '#F2F7FC' : '#FFFFFF');
+    const tops = [186, 280, 374, 468, 562, 656];
+    const nav = T.nav.map((label, i) => {
+      const on = i === act;
+      return {
+        label, current: on ? 'page' : 'false', cls: 'lp-btn lp-navb ' + (ar ? 'ar' : 'lat'),
+        go: () => (i === 0 ? this.go('home') : this.go(LP_SCREENS[i])),
+        style: 'position:absolute;top:' + (tops[i] - 10) + 'px;left:' + (on ? 82 : 54) + 'px;display:flex;flex-direction:column;align-items:flex-start;gap:' + (ar ? 14 : 20) + 'px;border:0;border-radius:14px;background:transparent;cursor:pointer;padding:10px 16px;min-height:44px;transform-origin:left center;font-family:' + F + ';font-weight:400;letter-spacing:' + ls('.3em') + ';' + (on ? 'font-size:' + (ar ? 26 : 28) + 'px' : 'font-size:' + (ar ? 18 : 19) + 'px'),
+        lineStyle: on ? 'display:block;width:94px;height:1.5px;background:linear-gradient(90deg,' + ink + ',' + (d ? 'rgba(241,241,243,0)' : 'rgba(24,23,24,0)') + ')' : 'display:none'
+      };
+    });
+    const screenName = scr === 'signup' ? T.screens[reg ? 'signup' : 'login'] : (T.screens[scr] || T.home);
+    const prev = s.hist.length ? s.hist[s.hist.length - 1] : 'home';
 
-  document.addEventListener("click", (e) => {
-    const t = e.target;
-    if (t.closest("[data-start]")) { e.preventDefault(); return start(); }
-    const f = t.closest("[data-field]");
-    if (f) { S.field = +f.dataset.field; return renderFields(); }
-    const c = t.closest("[data-cyc]");
-    if (c) { S.cyc = c.dataset.cyc; return renderPlans(); }
-    const q = t.closest(".q > button");
-    if (q) { const box = q.parentElement, open = !box.hasAttribute("open"); box.toggleAttribute("open", open); q.setAttribute("aria-expanded", open); box.querySelector("p").hidden = !open; return; }
-    if (t.closest("#menu")) return $("sheet").classList.add("on");
-    if (t.closest("#sheet")) $("sheet").classList.remove("on");
-    if (t.closest("#lang")) { S.lang = S.lang === "en" ? "ar" : "en"; try { localStorage.setItem("studiomania.site.lang", S.lang); } catch { } return render(); }
-    if (t.closest("#sw")) {
-      const next = root.dataset.nhTheme === "dark" ? "light" : "dark";
-      const apply = () => { root.dataset.nhTheme = next; $("swT").textContent = T[S.lang][next]; };
-      try { localStorage.setItem("studiomania.theme", next); } catch { }
-      document.startViewTransition && !reduce.matches ? document.startViewTransition(apply) : apply();
+    const feats = LP_FEATS.map((f) => ({
+      title: ar ? f[0] : f[1], text: ar ? f[2] : f[3], icon: f[4],
+      style: 'margin:0;padding:22px 20px;border-radius:22px;height:180px;box-sizing:border-box;color:' + ink + ';background:' + card + ';backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:' + shadow,
+      titleStyle: 'margin:14px 0 6px;font:500 16px ' + F,
+      textStyle: 'margin:0;font:400 13.5px/1.75 ' + F + ';color:' + muted
+    }));
+    const fmt = (n) => n.toLocaleString('en-US');
+    const y = s.yearly;
+    // 💳 الأسعار من نفس مصدر البرنامج (/api/pricing): بالريال (الدولار × 3.76)، والسنوي = عدد شهور السنة في القواعد
+    const PR = this.pricing, months = (PR && PR.rules && PR.rules.yearly_months) || 10;
+    const sar = (u) => Math.round(u * 3.76);
+    const addon = PR && (PR.addons || []).find((a) => a.key === 'autopilot');
+    const SRC = PR ? (PR.plans || []).filter((p) => p.price > 0).map((p) => {
+      const fa = [fmt(p.credits) + ' نقطة شهريًا', p.max_accounts ? p.accounts + ' حسابات (حتى ' + p.max_accounts + ')' : p.accounts === 2 ? 'حسابا تواصل' : p.accounts + ' حسابات تواصل'];
+      const fe = [fmt(p.credits) + ' credits a month', p.max_accounts ? p.accounts + ' accounts (up to ' + p.max_accounts + ')' : p.accounts + ' social accounts'];
+      if (p.autopilot) { fa.push('الأوتوبايلوت والخطة الشهرية'); fe.push('Autopilot and monthly plan'); } else { fa.push('كل القوالب والدبلجة'); fe.push('All templates and dubbing'); if (addon && (addon.for || []).includes(p.key)) { fa.push('الأوتوبايلوت إضافة بـ ' + sar(addon.price) + ' ر.س'); fe.push('Autopilot add-on, ' + sar(addon.price) + ' SAR'); } }
+      if (p.max_accounts) { fa.push('عقل منفصل لكل عميل'); fe.push('A separate brain per client'); } else if (p.autopilot) { fa.push('تطبيق الجوال والموافقات'); fe.push('Mobile app and approvals'); }
+      if (p.topup_bonus) { fa.push('شحن النقاط بضعف القيمة'); fe.push('Top-ups at double credits'); }
+      return { key: p.key, ar: p.name, en: p.name_en || p.name, sar: sar(p.price), usd: p.price, popular: !!p.popular, fa, fe };
+    }) : LP_PLANS;
+    const plans = SRC.map((p) => {
+      const pop = !!p.popular;
+      return {
+        name: ar ? p.ar : p.en, popular: pop, badge: T.popular,
+        price: fmt(y ? sar(p.usd * months) : p.sar), unit: y ? T.perYear : T.perMonth,
+        usd: '≈ $' + fmt(y ? p.usd * months : p.usd), planKey: p.key,
+        feats: (ar ? p.fa : p.fe).map((t) => ({ t })),
+        cta: pop ? T.startPro : T.choose,
+        btnClass: pop ? 'sk-go lp-btn' : 'lp-btn',
+        style: 'margin:0;padding:22px 20px 20px;border-radius:24px;height:410px;box-sizing:border-box;display:flex;flex-direction:column;color:' + ink + ';background:' + card + ';backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:' + shadow + (pop ? ';outline:2px solid #E5613E;outline-offset:-2px' : ''),
+        nameStyle: 'margin:0;font:500 18px ' + F + ';letter-spacing:' + ls('.04em'),
+        badgeStyle: 'font:400 11.5px ' + F + ';padding:5px 10px;border-radius:99px;color:#FFFFFF;background:#E5613E;box-shadow:0 4px 14px rgba(229,97,62,.35)',
+        unitStyle: 'font:400 13px ' + F + ';color:' + muted,
+        usdStyle: 'margin:2px 0 0;font:400 12.5px Jost,sans-serif;color:' + muted,
+        featStyle: 'display:flex;gap:8px;font:400 13.5px/1.6 ' + F,
+        btnStyle: 'margin-top:auto;width:200px;height:46px;border-radius:23px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font:500 14px ' + F + ';letter-spacing:' + ls('.06em') + ';' + (pop ? '' : 'color:' + ink + ';background:' + (d ? 'rgba(255,255,255,.08)' : '#F3F2EF'))
+      };
+    });
+    const seg = (on) => 'height:36px;padding:0 16px;border-radius:18px;border:0;cursor:pointer;font:400 13px ' + F + ';' + (on ? 'color:#FFFFFF;background:#E5613E;box-shadow:0 4px 14px rgba(229,97,62,.35)' : 'color:' + ink + ';background:transparent');
+    const qs = LP_FAQ.map((it, i) => {
+      const open = i === s.open;
+      return {
+        q: ar ? it[0] : it[2], a: ar ? it[1] : it[3], open,
+        toggle: () => this.setState({ open: open ? -1 : i }),
+        style: 'border-radius:18px;color:' + ink + ';background:' + card + ';backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:' + shadow + (open ? ';outline:1.5px solid #E5613E;outline-offset:-1.5px' : ''),
+        btnStyle: 'width:100%;min-height:52px;padding:0 20px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:start;font:500 15px ' + F,
+        iconStyle: 'flex:none;transition:transform .3s;color:#E5613E;transform:rotate(' + (open ? 45 : 0) + 'deg)',
+        aStyle: 'margin:0;padding:0 20px 18px;font:400 14px/1.85 ' + F + ';color:' + muted
+      };
+    });
+    const chip = 'height:44px;border-radius:22px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:0;color:' + ink + ';background:' + solid + ';box-shadow:' + shadow + ';';
+    const fieldBorder = d ? 'rgba(255,255,255,.12)' : 'rgba(24,23,24,.1)';
+    const jellyOp = home ? 1 : (d ? 0.3 : 0.2);
+    const placeholderBg = d ? 'rgba(255,255,255,.05)' : '#F3F2EF';
+    const dashed = d ? 'rgba(229,97,62,.55)' : 'rgba(229,97,62,.45)';
+
+    return {
+      dark: d, dir: ar ? 'rtl' : 'ltr', t: {
+        signin: T.signin, langBtn: T.langBtn, langAria: T.langAria, themeAria: T.themeAria, back: T.back, crumbsAria: T.crumbsAria,
+        home: T.home, demo: T.demo, start: T.start,
+        heroTitle: T.heroTitle, heroLead: T.heroLead, heroNote: T.heroNote, demoTitle: T.demoTitle, demoLead: T.demoLead, vidCap: T.vidCap,
+        fTitle: T.fTitle, fLead: T.fLead, pTitle: T.pTitle, pLead: T.pLead, monthly: T.monthly, yearly: T.yearly, pNote: T.pNote, qTitle: T.qTitle,
+        sTitle: reg ? T.sTitleR : T.sTitleL, sLead: reg ? T.sLeadR : T.sLeadL, or: T.or, name: T.name, email: T.email, password: T.password, showPw: T.showPw,
+        submit: reg ? (s.step === 1 ? T.next : T.submitR) : T.submitL, switchQ: reg ? T.switchQR : T.switchQL, switchA: reg ? T.switchAR : T.switchAL,
+        footLegal: T.footLegal, footNavAria: T.footNavAria, terms: T.terms, privacy: T.privacy, refund: T.refund, whatsapp: T.whatsapp,
+        hTitle: T.hTitle, hLead: T.hLead, exTitle: T.exTitle, exLead: T.exLead, country: T.country, dialect: T.dialect, field: T.field, goal: T.goal, step2Hint: T.step2Hint
+      },
+      isHow: scr === 'how', isExamples: scr === 'examples',
+      step1: !reg || s.step === 1, step2: reg && s.step === 2, err: s.err,
+      steps: LP_STEPS.map((x, i) => ({ n: i + 1, title: ar ? x[0] : x[1], text: ar ? x[2] : x[3],
+        style: 'margin:0;padding:22px 20px;border-radius:22px;height:230px;box-sizing:border-box;color:' + ink + ';background:' + card + ';backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:' + shadow,
+        titleStyle: 'margin:16px 0 6px;font:500 16px ' + F, textStyle: 'margin:0;font:400 13.5px/1.75 ' + F + ';color:' + muted })),
+      stepNum: 'width:40px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;font:500 16px Jost,sans-serif;color:#E5613E;background:' + (d ? 'rgba(229,97,62,.14)' : '#FFF6F2'),
+      fields: LP_FIELDS.map((f, i) => ({ name: ar ? f[0] : f[1], on: i === s.field ? 'true' : 'false', pick: () => this.setState({ field: i }),
+        style: 'height:36px;padding:0 14px;border:0;border-radius:18px;cursor:pointer;font:400 13px ' + F + ';' + (i === s.field ? 'color:#FFFFFF;background:#E5613E;box-shadow:0 4px 14px rgba(229,97,62,.35)' : 'color:' + ink + ';background:' + solid + ';box-shadow:' + shadow) })),
+      samples: LP_FIELDS[s.field][2].map(([id, na, ne]) => ({ src: '/gallery/' + id + '.mp4', poster: '/gallery/' + id + '.jpg?v=2', name: ar ? na : ne,
+        style: 'margin:0;border-radius:18px;overflow:hidden;background:' + card + ';box-shadow:' + shadow, capStyle: 'padding:10px 14px;font:500 13.5px ' + F + ';color:' + ink })),
+      hintStyle: 'margin:2px 0 10px;font:400 12.5px/1.7 ' + F + ';color:' + muted,
+      errStyle: 'margin:10px 0 0;font:400 13px/1.6 ' + F + ';color:#D9443A',
+      goGoogle: () => { if (this.auth && this.auth.google) location.href = '/auth/google'; else this.setState({ err: T.gsoon }); },
+      goApple: () => this.setState({ err: T.soon }),
+      nav, feats, plans, qs, screenName,
+      flash: s.flash, litClass: s.flash ? 'lp-lit' : '',
+      isHome: home, isInner: !home, isDemo: scr === 'demo', isFeatures: scr === 'features', isPrices: scr === 'prices', isFaq: scr === 'faq', isSignup: scr === 'signup', isRegister: reg,
+      monthly: !y, yearly: y, showPw: s.showPw,
+      markSrc: d ? '/logo-mark-dark.png' : '/logo-mark-light.png',
+      rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;color:' + ink + ';background:' + bg + ';' + (still || 'transition:background-color 1.6s ease;'),
+      litGlow: 'position:absolute;left:548px;top:44%;width:1200px;height:1200px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;' + (still || 'transition:opacity 1.6s ease;') + 'opacity:' + (lit ? (home ? 1 : 0.7) : (d ? 0.6 : 0)) + ';background:' + (d ? (lit ? 'radial-gradient(circle,rgba(255,226,160,.20) 0%,rgba(255,200,120,.06) 30%,rgba(23,23,26,0) 58%)' : 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)') : 'radial-gradient(circle,rgba(90,200,255,.20) 0%,rgba(120,190,255,.07) 32%,rgba(242,247,252,0) 60%)'),
+      spreadStyle: 'position:absolute;left:548px;top:38%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(255,232,170,.32) 0%,rgba(255,232,170,0) 62%)' : 'radial-gradient(circle,rgba(80,200,255,.30) 0%,rgba(80,200,255,0) 62%)'),
+      jellyWrap: 'position:absolute;left:300px;top:60px;width:497px;height:690px;pointer-events:none;' + (still || 'transition:opacity .7s ease;') + 'opacity:' + jellyOp,
+      imgLight: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && !lit ? 1 : 0),
+      imgLightLit: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (!d && lit ? 1 : 0),
+      imgDark: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (d && !lit ? 1 : 0),
+      imgDarkLit: 'position:absolute;inset:0;width:100%;height:100%;' + (still || 'transition:opacity 1.2s ease;') + 'opacity:' + (d && lit ? 1 : 0),
+      chipSignin: chip + 'width:132px;font:400 ' + (ar ? 14 : 12) + 'px ' + F + ';letter-spacing:' + ls('.2em'),
+      chipLang: chip + 'width:76px;font:400 ' + (ar ? 12 : 15) + 'px ' + (ar ? 'Jost,sans-serif' : arF) + ';letter-spacing:' + (ar ? '.2em' : '0'),
+      trackStyle: 'position:relative;display:block;width:44px;height:24px;border-radius:99px;background:' + (d ? '#3D3C3D' : '#E3E2DE'),
+      knobStyle: 'position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:left .45s cubic-bezier(.2,.8,.2,1);left:' + (d ? 23 : 3) + 'px',
+      themeLabel: d ? T.dark : T.light,
+      barFont: F,
+      // زرار «رجوع» زي البرنامج: في الرئيسية بيفضل مكانه فاضي
+      gobackStyle: 'flex:none;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 20px 0 16px;border-radius:22px;box-sizing:border-box;cursor:pointer;border:1.5px solid ' + ink + ';color:' + ink + ';background:' + solid + ';font:500 14px ' + F + ';box-shadow:0 4px 18px rgba(24,23,24,.08);transition:background .2s,color .2s' + (home ? ';pointer-events:none;visibility:hidden' : ''),
+      gobackCls: d ? 'lp-gb-d' : 'lp-gb-l',
+      gobackInner: home ? 'visibility:hidden' : '',
+      backTab: home ? -1 : 0,
+      crumbName: home ? '' : screenName,
+      crumbsStyle: 'display:flex;align-items:center;gap:8px;min-width:0;font-size:13.5px;white-space:nowrap' + (home ? ';visibility:hidden' : ''),
+      themeBtn: 'display:flex;align-items:center;gap:10px;border:0;background:transparent;cursor:pointer;padding:0;min-height:44px;color:inherit;' + (ar ? 'font:400 13px ' + F + ';letter-spacing:0' : 'font:400 11px Jost,sans-serif;letter-spacing:.2em;text-transform:uppercase'),
+      // أول شاشة: العنوان والجملة والزرار على اليمين، والجيلي فيش على الشمال
+      heroStyle: 'position:absolute;top:150px;right:62px;width:560px;z-index:3;display:flex;flex-direction:column;align-items:flex-start',
+      heroTitle: 'margin:0;font:600 ' + (ar ? 44 : 46) + 'px/1.25 ' + F + ';letter-spacing:' + ls('-.01em') + ';color:' + ink,
+      heroLead: 'margin:16px 0 0;max-width:520px;font:400 ' + (ar ? 17 : 17) + 'px/1.8 ' + F + ';color:' + muted,
+      heroNote: 'margin:14px 0 0;font:400 13px ' + F + ';color:' + muted,
+      heroNoteInline: 'font:400 13px ' + F + ';color:' + muted,
+      ctaStyle: 'width:230px;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:center;font:500 ' + (ar ? 17 : 14) + 'px ' + F + ';letter-spacing:' + ls('.2em') + ';white-space:nowrap',
+      ctaSmall: 'width:200px;height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;font:500 ' + (ar ? 15 : 13) + 'px ' + F + ';letter-spacing:' + ls('.16em') + ';white-space:nowrap',
+      demoBtn: 'height:54px;padding:0 6px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;gap:10px;font:400 ' + (ar ? 16 : 14) + 'px ' + F + ';letter-spacing:' + ls('.16em') + ';color:' + ink,
+      vidCard: 'margin-top:22px;width:400px;height:200px;box-sizing:border-box;border-radius:20px;border:1.5px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(24,23,24,.06)') + ';background:center 30%/cover no-repeat url(/gallery/t-brandreveal.jpg),' + placeholderBg + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0;color:' + muted + ';font:400 13px ' + F,
+      vidPlay: 'width:60px;height:60px;border-radius:30px;display:flex;align-items:center;justify-content:center;background:' + solid + ';box-shadow:' + shadow,
+      vidCap: 'font:400 13px ' + F + ';color:' + muted,
+      demoBox: 'margin:22px auto 0;width:680px;height:382px;box-sizing:border-box;padding:10px;border-radius:24px;border:1.5px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(24,23,24,.06)') + ';background:' + placeholderBg + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:' + muted,
+      demoPlay: 'width:84px;height:84px;border-radius:42px;display:flex;align-items:center;justify-content:center;background:' + solid + ';box-shadow:' + shadow,
+      demoCap: 'font:400 14px ' + F + ';color:' + muted,
+      crumbStyle: 'display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:10px;border:0;cursor:pointer;font:400 13.5px ' + F + ';color:' + muted + ';background:' + (d ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.045)'),
+      crumbSep: 'font-style:normal;opacity:.6;color:' + muted,
+      crumbOn: 'display:inline-flex;align-items:center;height:30px;min-width:72px;box-sizing:border-box;padding:0 12px;border-radius:10px;font:500 13.5px ' + F + ';color:' + ink + ';background:' + (d ? 'rgba(255,255,255,.05)' : 'rgba(20,20,22,.045)'),
+      panelStyle: 'position:absolute;top:150px;left:340px;width:760px;z-index:3',
+      h1Style: 'margin:0;font:400 ' + (ar ? 32 : 34) + 'px/1.3 ' + F + ';letter-spacing:' + ls('.01em'),
+      leadStyle: 'margin:8px 0 0;font:400 15px/1.8 ' + F + ';color:' + muted,
+      iconWrap: 'width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:' + (d ? 'rgba(229,97,62,.14)' : '#FFF6F2'),
+      periodWrap: 'display:flex;gap:4px;padding:4px;border-radius:22px;flex:none;background:' + solid + ';box-shadow:' + shadow,
+      monthlyStyle: seg(!y), yearlyStyle: seg(y),
+      noteStyle: 'margin:16px 0 0;font:400 13px ' + F + ';color:' + muted + ';text-align:center',
+      formStyle: 'position:absolute;top:142px;left:518px;width:420px;box-sizing:border-box;padding:28px;border-radius:28px;z-index:3;color:' + ink + ';background:' + card + ';backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:' + (d ? '0 18px 50px rgba(0,0,0,.5)' : '0 18px 50px rgba(24,23,24,.1)'),
+      formTitle: 'margin:0;font:400 28px/1.3 ' + F + ';letter-spacing:' + ls('.01em'),
+      formLead: 'margin:6px 0 0;font:400 14px/1.7 ' + F + ';color:' + muted,
+      socialStyle: 'height:48px;border-radius:14px;border:1px solid ' + fieldBorder + ';cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font:500 14px Jost,sans-serif;color:' + ink + ';background:' + solid,
+      orStyle: 'display:flex;align-items:center;gap:12px;margin:18px 0 14px;font:400 12.5px ' + F + ';color:' + muted,
+      orLine: 'flex:1;height:1px;background:' + fieldBorder,
+      labelStyle: 'display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font:400 13px ' + F + ';color:' + muted,
+      fieldStyle: 'border:1px solid ' + fieldBorder + ';color:' + ink + ';background:' + (d ? 'rgba(255,255,255,.05)' : '#F3F2EF') + ';font:400 15px ' + F,
+      pwType: s.showPw ? 'text' : 'password', pwAuto: reg ? 'new-password' : 'current-password',
+      eyeStyle: 'position:absolute;top:1px;right:1px;width:44px;height:44px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:' + muted,
+      eyeSlash: s.showPw ? '' : 'M4 4l16 16',
+      submitStyle: 'width:364px;height:50px;margin-top:8px;border-radius:25px;display:flex;align-items:center;justify-content:center;font:500 15px ' + F + ';letter-spacing:' + ls('.08em'),
+      switchStyle: 'margin:14px 0 0;text-align:center;font:400 13px ' + F + ';color:' + muted,
+      switchBtn: 'border:0;background:none;cursor:pointer;padding:0;min-height:32px;font:500 13px ' + F + ';color:#E5613E',
+      // الفوتر: سطر واحد في آخر كل شاشة
+      footStyle: 'position:absolute;left:340px;right:48px;bottom:0;height:54px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid ' + fieldBorder + ';font:400 12px ' + F + ';color:' + muted + ';z-index:4',
+      footLegal: 'font:400 12px ' + F + ';color:' + muted + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+      footLink: 'font:400 12px ' + F + ';color:' + muted + ';white-space:nowrap',
+
+      goHome: () => this.go('home'),
+      goBack: () => this.back(),
+      goDemo: () => this.go('demo'),
+      goLogin: () => (this.state.screen === 'signup' ? this.setState({ mode: 'login', err: '', step: 1 }) : this.go('signup', { mode: 'login', step: 1 })),
+      startFree: () => {
+        if (this.state.screen === 'signup') return;
+        if (!reduceMo()) this.chime();
+        if (this.state.screen !== 'home') this.go('home');
+        this.setState({ lit: true, flash: true });
+        clearTimeout(this._t1); clearTimeout(this._t2);
+        this._t1 = setTimeout(() => this.setState({ flash: false }), 1800);
+        this._t2 = setTimeout(() => this.go('signup', { mode: 'register', step: 1 }), reduceMo() ? 0 : 1900);
+      },
+      toggleLang: () => { const l = ar ? 'en' : 'ar'; try { localStorage.setItem('studiomania.site.lang', l); } catch { /* */ } this.setState({ lang: l }); },
+      togglePw: () => this.setState({ showPw: !this.state.showPw }),
+      switchMode: () => this.setState({ mode: reg ? 'login' : 'register', step: 1, err: '' }),
+      submit: (e, el) => { e.preventDefault(); this.submit(el); },
+      pickMonthly: () => this.setState({ yearly: false }),
+      pickYearly: () => this.setState({ yearly: true }),
+      // نفس تحويل البرنامج بالظبط: لقطة للشكل الجديد بتتكشف بموجة مايلة
+      toggleTheme: () => {
+        const flip = () => new Promise((done) => { try { localStorage.setItem('studiomania.theme', d ? 'light' : 'dark'); } catch { /* */ } this.setState({ dark: !d, still: true }); done(); });   // الرسم هنا فوري، فالتحويل يبدأ على طول
+        const root = document.documentElement;
+        const end = () => this.setState({ still: false });
+        if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { flip().then(() => requestAnimationFrame(end)); return; }
+        root.classList.add('nh-wipe');
+        document.startViewTransition(flip).finished.finally(() => { root.classList.remove('nh-wipe'); end(); });
+      }
+    };
+  }
+}
+
+// 🔌 ربط التصميم بالبرنامج: الرسم، والتسجيل على خطوتين (الحساب ← البلد واللهجة والمجال والهدف)، والدخول، وتكبير المسرح على قد الشاشة
+const reduceMo = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+Object.assign(Component.prototype, {
+  setState(p) { Object.assign(this.state, p); this.render(); },
+  render() {
+    const v = this.renderVals(), frag = document.createDocumentFragment(), root = this.root;
+    LPR.build(this.tpl.content, v, frag);
+    if (root.firstElementChild) LPR.morph(root.firstElementChild, frag.firstElementChild); else root.appendChild(frag);
+    const R = document.documentElement;
+    R.lang = v.dir === 'rtl' ? 'ar' : 'en'; R.dir = v.dir; R.dataset.nhTheme = v.dark ? 'dark' : 'light';
+    document.body.style.backgroundColor = root.firstElementChild.style.backgroundColor;
+    root.querySelectorAll('video').forEach((x) => { x.muted = x.hasAttribute('muted'); });
+    this.fill();
+  },
+  // القوائم من نفس مصدر البرنامج؛ البلد بيتخمّن من توقيت الجهاز، واللهجة بتمشي مع البلد، والهدف مع المجال
+  fill() {
+    const A = this.auth || {}, q = (n) => this.root.querySelector('select[data-fill="' + n + '"]');
+    const c = q('country');
+    if (!c || c.options.length) return;
+    const opt = (s, list, cur, lab) => { s.innerHTML = ''; for (const o of list || []) { const e = new Option(lab ? lab(o) : o.name, o.id); if (o.id === cur) e.selected = true; s.add(e); } };
+    const TZ = { Riyadh: 'SA', Dubai: 'AE', Kuwait: 'KW', Qatar: 'QA', Bahrain: 'BH', Muscat: 'OM', Cairo: 'EG', Amman: 'JO', Beirut: 'LB', Baghdad: 'IQ' };
+    let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop(); } catch { /* */ }
+    const c0 = TZ[tz] && (A.regions || []).some((r) => r.id === TZ[tz]) ? TZ[tz] : 'SA';
+    const dia = (id) => ((A.regions || []).find((r) => r.id === id) || {}).dialect || 'ar-msa';
+    const fields = A.fields || [], f0 = (fields[0] || {}).id;
+    opt(c, A.regions, c0);
+    opt(q('dialect'), A.dialects, dia(c0));
+    opt(q('field'), fields, f0);
+    opt(q('goal'), A.goals, (fields[0] || {}).goal);
+    c.onchange = () => { q('dialect').value = dia(c.value); };
+    q('field').onchange = () => { q('goal').value = (fields.find((f) => f.id === q('field').value) || {}).goal || 'sales'; };
+  },
+  async submit(form) {
+    const s = this.state, ar = (s.lang || 'ar') === 'ar', g = (n) => ((form.elements[n] || {}).value || '').trim();
+    const E = (a, e) => this.setState({ err: ar ? a : e, busy: false });
+    if (s.busy) return;
+    const post = async (url, body) => {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || (ar ? 'حدث خطأ، حاول مرة أخرى' : 'Something went wrong, try again'));
+      return d;
+    };
+    if (s.mode === 'register' && s.step === 1) {
+      const reg = { name: g('name'), email: g('email'), password: (form.elements.password || {}).value || '' };
+      if (!/^\S+@\S+\.\S+$/.test(reg.email)) return E('اكتب بريدًا إلكترونيًا صحيحًا', 'Enter a valid email');
+      if (reg.password.length < 8) return E('كلمة المرور 8 أحرف على الأقل', 'Password must be at least 8 characters');
+      return this.setState({ reg, step: 2, err: '' });
     }
-  });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("sheet").classList.remove("on"); });
-  document.querySelector("#demo video").addEventListener("play", (e) => { e.target.muted = false; }, { once: true });
+    this.setState({ busy: true, err: '' });
+    try {
+      if (s.mode === 'register') {
+        const d = await post('/api/auth/signup', { ...s.reg, country: g('country'), dialect: g('dialect'), field: g('field'), goal: g('goal') });
+        sessionStorage.setItem('devlink', d.dev_link || ''); sessionStorage.setItem('mailfail', d.mail_failed ? '1' : '');
+        location.replace('/verify');
+      } else {
+        const d = await post('/api/auth/login', { email: g('email'), password: (form.elements.password || {}).value || '' });
+        location.replace(d.verify ? '/verify' : '/');
+      }
+    } catch (e) { this.setState({ err: e.message, busy: false }); }
+  }
+});
 
-  render();
-  fetch("/api/pricing").then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => { S.pricing = d; renderPlans(); })
-    .catch(() => { S.pricingFailed = true; renderPlans(); });
+(() => {
+  const stage = document.getElementById('lp-stage'), C = new Component({});
+  C.root = stage; C.tpl = document.getElementById('lp-tpl');
+  LPR.listen(stage, ['click', 'submit']);
+  // المسرح 1440×810 بيكبر ويصغر على قد الشاشة، ويفضل في النص
+  const fit = () => {
+    const k = Math.min(innerWidth / 1440, innerHeight / 810);
+    stage.style.transform = 'translate(' + Math.round((innerWidth - 1440 * k) / 2) + 'px,' + Math.round((innerHeight - 810 * k) / 2) + 'px) scale(' + k + ')';
+  };
+  addEventListener('resize', fit); fit();
+  addEventListener('popstate', () => {
+    const h = location.hash.slice(1), scr = LP_SCREENS.includes(h) || h === 'demo' ? h : h === 'signup' || h === 'login' ? 'signup' : 'home';
+    C.go(scr, scr === 'signup' ? { mode: h === 'login' ? 'login' : 'register', step: 1 } : null, true);
+  });
+  C.render();
+  const j = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  Promise.all([j('/api/auth/state'), j('/api/pricing')]).then(([a, p]) => {
+    C.auth = a; C.pricing = p; C.render();
+  });
 })();
+
 </script>
 </body>
 </html>
