@@ -1,6 +1,6 @@
 // 🛫 الأوتوبايلوت (المربع الرابع في الرئيسية): كام بوست في اليوم، في أحسن أوقات، من القوالب اللي تختارها بالتبادل.
 // يا إما يعمل كل حاجة لوحده، يا إما يقف عند الخطوات اللي تختارها لحد ما توافق. قالب الموبايل بيستناك تصوّر بالسكريبت.
-// الطابور تحت على الشمال: كل ميعاد جاي وحالته، والموافقة والتصوير من جوه الطابور نفسه. الشغل نفسه على السيرفر (/api/pilot).
+// قائمة الانتظار تحت على الشمال: كل ميعاد جاي وحالته، والموافقة والتصوير من جوه قائمة الانتظار نفسه. الشغل نفسه على السيرفر (/api/pilot).
 const PilotPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const CSS = `
@@ -155,17 +155,17 @@ const PilotPage = (() => {
         <div class="ap-cnt"><button type="button" data-cnt="-1" aria-label="أقل">−</button><span class="n num" data-n></span><button type="button" data-cnt="1" aria-label="أكثر">+</button></div>
         <small>منشور في اليوم <span data-fee></span></small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
-        <div class="ap-leg"><span><em></em>اخترناه في أحسن وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط تزوّد موعد · اسحب النقطة تغيّره · اضغط عليها تزيلها</span></div></section></div>
+        <div class="ap-leg"><span><em></em>اخترناه في أفضل وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط لإضافة موعد · اسحب النقطة لتغييره · اضغط عليها لإزالته</span></div></section></div>
       <section class="ap-sec"><span class="lat">Templates</span>
-        <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالدور من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
+        <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالتناوب من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
         <div class="ap-plan" data-plan></div>
         <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
-        <small data-tplsub>يختار منهم بالتبادل لكي المحتوى لا يتكرر</small></section>
+        <small data-tplsub>يختار منها بالتناوب حتى لا يتكرر المحتوى</small></section>
       <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل شيء تلقائيًا</button><button type="button" data-mode="approve">أوافق على هذه الخطوات</button></div>
         <div class="ap-steps" data-steps></div></section>
     </main>
     <div class="ap-dock" data-dock><div class="ap-q" data-q></div>
-      <button type="button" class="ap-cap" data-cap><span>الطابور</span><span class="n" data-qn hidden></span><small data-qsub></small></button></div>`;
+      <button type="button" class="ap-cap" data-cap><span>قائمة الانتظار</span><span class="n" data-qn hidden></span><small data-qsub></small></button></div>`;
   const q = (s) => S.root.querySelector(s);
   function draw() { drawHead(); drawDay(); drawSrc(); drawTpls(); drawMode(); drawQ(); }
   // 🗓️ المصدر: بالدور من القوالب، أو خطة الشهر (كل بوست في ميعاده بفكرته وقالبه، من صفحة «خطة المحتوى»)
@@ -174,30 +174,30 @@ const PilotPage = (() => {
     const plan = fromPlan(), m = S.mo?.month, left = (m?.items || []).filter((x) => !x.job).length;
     q("[data-srcs]").querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("on", b.dataset.src === (plan ? "plan" : "rotate")));
     q("[data-plan]").innerHTML = plan
-      ? `<span>حسنًا على خطة الشهر: <b class="num">${left}</b> منشور فاضل، كل واحد في موعده بفكرته وقالبه.</span><button type="button" data-openplan>افتح الخطة</button>`
+      ? `<span>يسير على خطة الشهر: <b class="num">${left}</b> منشورًا متبقيًا، كل منها في موعده بفكرته وقالبه.</span><button type="button" data-openplan>افتح الخطة</button>`
       : m?.items?.length ? `<span>لديك خطة شهر فيها <b class="num">${m.items.length}</b> منشور${m.status === "applied" ? "" : " تنتظر موافقتك"}.</span><button type="button" data-openplan>راجعها</button>`
-      : S.mo && !S.mo.ready ? `<span>خطة الشهر تُنشأ عندما العقل يفهمك ${S.mo.need}٪ (الآن ${S.mo.score}٪).</span>` : "";
+      : S.mo && !S.mo.ready ? `<span>تُنشأ خطة الشهر عندما يفهمك العقل بنسبة ${S.mo.need}٪ (الآن ${S.mo.score}٪).</span>` : "";
     q("[data-tpls]").classList.toggle("dim", plan);
     q("[data-more]").classList.toggle("dim", plan);
-    q("[data-tplsub]").textContent = plan ? "القوالب تأتي من الخطة، والموافقات أسفل كما هي" : "يختار منهم بالتبادل لكي المحتوى لا يتكرر";
+    q("[data-tplsub]").textContent = plan ? "القوالب تأتي من الخطة، والموافقات في الأسفل كما هي" : "يختار منها بالتناوب حتى لا يتكرر المحتوى";
   }
   async function setSrc(src) {
     if ((src === "plan") === fromPlan()) return;
     if (src === "plan" && !S.mo?.month?.items?.length) {
-      toast(S.mo?.ready ? "أنشئ خطة الشهر أولًا من صفحة خطة المحتوى" : `خطة الشهر تُنشأ عندما العقل يفهمك ${S.mo?.need ?? 55}٪`, true);
+      toast(S.mo?.ready ? "أنشئ خطة الشهر أولًا من صفحة خطة المحتوى" : `تُنشأ خطة الشهر عندما يفهمك العقل بنسبة ${S.mo?.need ?? 55}٪`, true);
       return openPlan();
     }
     try {
       const r = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: src === "plan" }) });
       S.d = r.pilot; S.mo = r; draw();
-      toast(src === "plan" ? "✅ الأوتوبايلوت حسنًا على خطة الشهر" : "الأوتوبايلوت أعد يختار من القوالب بالدور");
+      toast(src === "plan" ? "✅ الأوتوبايلوت يسير على خطة الشهر" : "عاد الأوتوبايلوت إلى الاختيار من القوالب بالتناوب");
     } catch (err) { toast(err.message, true); }
   }
   function openPlan() { window.RV_FOCUS = "plan-only"; window.NHNav?.("plan"); }
   function drawHead() {
     const s = S.d.settings, nx = S.d.upcoming?.[0];
     q("[data-on]").classList.toggle("on", !!s.on);
-    q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length && s.source !== "plan" ? "يعمل · اختر قالب واحد على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
+    q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length && s.source !== "plan" ? "يعمل · اختر قالبًا واحدًا على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
   }
   function drawDay() {
     const pct = (h) => (h / 24) * 100, s = S.d.settings;
@@ -211,8 +211,8 @@ const PilotPage = (() => {
     const d = S.d, twin = d.twins.find((t) => t.ready);
     const names = d.settings.names || {};
     return [
-      { id: "phone", n: "تصوير بالجوال", k: "قالب", tag: ["cam", "📱 يحتاج تصوّر بنفسك"] },
-      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "يحتاج أفاتار جاهز"], off: !twin },
+      { id: "phone", n: "تصوير بالجوال", k: "قالب", tag: ["cam", "📱 يحتاج إلى أن تصوّر بنفسك"] },
+      { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "يحتاج إلى أفاتار جاهز"], off: !twin },
       ...d.custom.map((c) => ({ id: c.id, n: c.name, k: "قالب مخصص" })),
       { id: "carousel", n: "كاروسيل", k: "قالب", tag: ["", "🖼️ صور على إنستجرام"] },
       ...d.settings.templates.filter((t) => t.startsWith("t-")).map((t) => ({ id: t, n: names[t] || codeTpls().find((x) => x.id === t)?.name || t, k: "قالب" })),
@@ -226,27 +226,27 @@ const PilotPage = (() => {
       + `<button type="button" class="ap-md new" data-newauto><b>+ قالب مخصص</b><small>بخطواتك أنت</small></button>`;
     const box = q("[data-more]");
     box.classList.toggle("on", S.more);
-    if (S.more) box.innerHTML = codeTpls().map((x) => `<button type="button" class="${on.has(x.id) ? "on" : ""}" data-code="${esc(x.id)}">${on.has(x.id) ? "✓ " : ""}${esc(x.name)}</button>`).join("") || `<span class="ap-none">لا يوجد قوالب أخرى</span>`;
+    if (S.more) box.innerHTML = codeTpls().map((x) => `<button type="button" class="${on.has(x.id) ? "on" : ""}" data-code="${esc(x.id)}">${on.has(x.id) ? "✓ " : ""}${esc(x.name)}</button>`).join("") || `<span class="ap-none">لا توجد قوالب أخرى</span>`;
   }
   function drawMode() {
     const s = S.d.settings, cam = s.templates.includes("phone");
     q("[data-modes]").querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === s.mode));
     q("[data-steps]").innerHTML = s.mode === "approve"
       ? STEP_N.map(([k, n], i) => `${i ? "<i>←</i>" : ""}<button type="button" data-step="${k}" class="${s.steps.includes(k) ? "on" : ""}">${s.steps.includes(k) ? "✓ " : ""}${n}</button>`).join("")
-      : `<small style="font-size:12.5px;color:var(--nh-muted)">يختار الفكرة ويكتب النص ويعمل الفيديو وينشر بدون ما يرجعلك${cam ? " · قالب الجوال سيستناك تصوّر" : ""}</small>`;
+      : `<small style="font-size:12.5px;color:var(--nh-muted)">يختار الفكرة ويكتب النص ويصنع الفيديو وينشر دون الرجوع إليك${cam ? " · قالب الجوال سينتظر أن تصوّر" : ""}</small>`;
   }
   // صور الكاروسيل صف واحد بيتسحب بالعرض
   const imgs = (j) => (j.images || []).length ? `<div class="ap-imgs">${j.images.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div>` : "";
-  const ST = { run: "يعمل", wait: "مستنيك", cam: "ينتظر تصويرك", done: "جُدول", failed: "توقف", stopped: "توقف" };
+  const ST = { run: "يعمل", wait: "بانتظارك", cam: "ينتظر تصويرك", done: "جُدول", failed: "توقف", stopped: "توقف" };
   function jobHTML(j) {
     const head = `<div class="ap-qh"><div class="tx">${esc(j.title || j.name)}<small>${esc(when(j.at))} · ${esc(j.name)}${j.note && j.status === "run" ? ` · ${esc(j.note)}` : ""}</small></div>
       <span class="st ${j.status}">${ST[j.status] || ""}</span></div>`;
     let body = "";
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
-        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نص"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نصًا"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage" && j.kind === "carousel") {
-      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم السلايدات</button></div>`;
+      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم الشرائح</button></div>`;
     } else if (j.status === "wait" && j.gate === "video" && j.kind === "carousel") {
       body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage") {
@@ -262,7 +262,7 @@ const PilotPage = (() => {
     } else if (j.status === "done" && (j.images || []).length) {
       body = imgs(j);
     } else if (j.status === "done" && j.video_url) {
-      body = `<div class="ap-acts"><a href="${esc(j.video_url)}" target="_blank" rel="noopener">انظر الفيديو</a></div>`;
+      body = `<div class="ap-acts"><a href="${esc(j.video_url)}" target="_blank" rel="noopener">شاهد الفيديو</a></div>`;
     }
     return `<div class="ap-qi">${head}${body}</div>`;
   }
@@ -270,9 +270,9 @@ const PilotPage = (() => {
     const jobs = S.d.jobs, w = S.d.waiting;
     const n = q("[data-qn]");
     n.textContent = w; n.hidden = !w;
-    q("[data-qsub]").textContent = w ? "ينتظرون منك شيء" : jobs.length ? `${jobs.length} منشور` : "";
+    q("[data-qsub]").textContent = w ? "بانتظار إجراء منك" : jobs.length ? `${jobs.length} منشور` : "";
     if (S.root.querySelector(".ap-q input[type=file]:focus")) return;
-    q("[data-q]").innerHTML = jobs.map(jobHTML).join("") || `<div class="ap-none">${S.d.settings.on ? "أول موعد قادم سيظهر هنا" : "شغّل الأوتوبايلوت والمواعيد ستظهر هنا"}</div>`;
+    q("[data-q]").innerHTML = jobs.map(jobHTML).join("") || `<div class="ap-none">${S.d.settings.on ? "أول موعد قادم سيظهر هنا" : "شغّل الأوتوبايلوت وستظهر المواعيد هنا"}</div>`;
     q("[data-dock]").classList.toggle("open", S.open);
   }
 
@@ -294,7 +294,7 @@ const PilotPage = (() => {
     day.addEventListener("pointerdown", (e) => {
       const pt = e.target.closest("[data-pt]"), r = day.getBoundingClientRect(), s = S.d.settings;
       if (pt) { S.drag = { i: +pt.dataset.pt, x: e.clientX, moved: false }; pt.setPointerCapture(e.pointerId); return; }
-      if (s.times.length >= 6) return toast("أقصى 6 منشورات في اليوم");
+      if (s.times.length >= 6) return toast("6 منشورات في اليوم كحد أقصى");
       const h = Math.max(0, Math.min(23.5, Math.round(((e.clientX - r.left) / r.width) * 48) / 2));
       if (s.times.some((t) => t.t === tOf(h))) return;
       s.times.push({ t: tOf(h), mine: true });
@@ -314,7 +314,7 @@ const PilotPage = (() => {
       const g = S.drag; if (!g) return;
       S.drag = null;
       const s = S.d.settings;
-      if (!g.moved) { if (s.times.length > 1) s.times.splice(g.i, 1); else return toast("يجب موعد واحد على الأقل"); }
+      if (!g.moved) { if (s.times.length > 1) s.times.splice(g.i, 1); else return toast("يجب تحديد موعد واحد على الأقل"); }
       s.times.sort((a, b) => hOf(a.t) - hOf(b.t));
       drawDay(); saveTimes();
     });
@@ -322,8 +322,8 @@ const PilotPage = (() => {
       const inp = e.target.closest("[data-cam]");
       if (!inp?.files?.[0]) return;
       const fd = new FormData(); fd.append("file", inp.files[0]);
-      toast("يرفع الفيديو…");
-      await act(`${inp.dataset.cam}/footage`, { method: "POST", body: fd }, "✓ الفيديو وصل، ويُكمل المراجعة والمونتاج تلقائيًا");
+      toast("جارٍ رفع الفيديو…");
+      await act(`${inp.dataset.cam}/footage`, { method: "POST", body: fd }, "✓ وصل الفيديو، وتكتمل المراجعة والمونتاج تلقائيًا");
     });
     S.root.addEventListener("click", (e) => {
       const b = e.target.closest("button, a"); const d = b?.dataset || {};
@@ -333,11 +333,11 @@ const PilotPage = (() => {
         const j = S.d.jobs.find((x) => x.id === d.phone);
         return window.uiPhone?.({ kind: "shoot", jid: d.phone, title: `صوّر «${j?.title || "فيديو الأوتوبايلوت"}» بالملقّن` }).then((x) => x && refresh());
       }
-      if ("on" in d) return save({ on: !s.on }, !s.on ? "الأوتوبايلوت اشتغل" : "الأوتوبايلوت أُغلق، ولا يوجد شيء جديدة ستبدأ تلقائيًا");
+      if ("on" in d) return save({ on: !s.on }, !s.on ? "بدأ الأوتوبايلوت العمل" : "أُوقف الأوتوبايلوت، ولن يبدأ شيء جديد تلقائيًا");
       if (d.cnt) { const n = Math.max(1, Math.min(6, s.times.length + +d.cnt)); s.times = autoTimes(n); drawDay(); return saveTimes(); }
       if (d.tpl) {
         const m = tplList().find((x) => x.id === d.tpl);
-        if (m?.off) return toast("أنشئ أفاتار أولًا من «الأفاتار» (فيديو قراية أو صورة قدامية)");
+        if (m?.off) return toast("أنشئ أفاتار أولًا من «الأفاتار» (فيديو قراءة أو صورة أمامية)");
         const set = new Set(s.templates); set.has(d.tpl) ? set.delete(d.tpl) : set.add(d.tpl);
         return save({ templates: [...set] });
       }
@@ -353,10 +353,10 @@ const PilotPage = (() => {
       if ("openplan" in d) return openPlan();
       if (d.step) { const st = new Set(s.steps); st.has(d.step) ? st.delete(d.step) : st.add(d.step); return save({ steps: STEP_N.map(([k]) => k).filter((k) => st.has(k)) }); }
       if ("cap" in d) { S.open = !S.open; return drawQ(); }
-      if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اعتُمد، ويُكمل الخطوة القادمة");
+      if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اعتُمد، وتكتمل الخطوة التالية");
       if (d.ok) return act(`${d.ok}/ok`, { method: "POST", ...jsonBody({}) }, "✓ اعتُمد");
-      if (d.stop) return act(`${d.stop}/stop`, null, "هذا الموعد أُزيل");
-      if (d.retry) return act(`${d.retry}/retry`, null, "يحاول مرة أخرى");
+      if (d.stop) return act(`${d.stop}/stop`, null, "أُزيل هذا الموعد");
+      if (d.retry) return act(`${d.retry}/retry`, null, "يُعيد المحاولة");
       if (d.del) return act(d.del, { method: "DELETE" });
       if (d.edit) { storageSet(projectKey("free"), d.edit); return showStep("6f"); }
     });

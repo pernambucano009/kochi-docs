@@ -4,7 +4,7 @@ const pub = { exports: [], posts: [], platforms: {}, accounts: {}, service: null
 const PLATFORMS_KEY = "studiomania.platforms";
 const POST_STATUS = {
   scheduled: ["متجدول", "scheduled"],
-  sending: ["يُرسل للنشر...", "active"],
+  sending: ["جارٍ الإرسال للنشر…", "active"],
   publishing: ["جارٍ النشر...", "active"],
   published: ["نُشر", "published"],
   failed: ["فشل", "failed"],
@@ -24,7 +24,7 @@ async function initPublish() {
   alert.hidden = info.service === "mock" || (info.service === "zernio" && !info.accounts_error);
   alert.className = "alert " + (info.service === "zernio" && !info.accounts_error ? "info" : "warn");
   if (!info.service) {
-    alert.innerHTML = `⚠️ خدمة النشر ما زال غير متصلة. يمكنك تجدول المنشورات عادي، وأول ما تتوصّل البرنامج سيبعتهم تلقائيًا.`;
+    alert.innerHTML = `⚠️ خدمة النشر غير متصلة بعد. يمكنك جدولة المنشورات كالمعتاد، وفور اتصالها سيرسلها البرنامج تلقائيًا.`;
   } else if (info.accounts_error) {
     alert.textContent = `⚠️ ${info.accounts_error}`;
   }
@@ -214,7 +214,7 @@ function renderAccounts() {
     <div class="pa-more"><small class="muted">${pub.all.length ? "اربط منصة أخرى:" : "اربط أول حساب:"}</small>
       ${plats.filter(([k]) => !pub.all.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
         ? `<span class="pa-chip soon" title="${escapeHtml(pub.soon[k])}">${pLogo(k, "sm")}${escapeHtml(label)} <em>قريبًا</em></span>`
-        : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسايل</em>` : ""}</button>`).join("")}</div>`;
+        : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسائل</em>` : ""}</button>`).join("")}</div>`;
 }
 
 // ---------- 🔗 الربط كله من جوه البرنامج ----------
@@ -235,14 +235,14 @@ const paRefresh = (info) => { setAcc(info); pub.accounts = info.accounts || {}; 
 // المنصات اللي من غير تسجيل دخول: فورم عندنا
 const PA_FORMS = {
   bluesky: { t: "اربط بلوسكاي", fields: [["identifier", "اسم الحساب أو البريد الإلكتروني", "you.bsky.social", "ltr"], ["password", "كلمة مرور التطبيق (App Password)", "xxxx-xxxx-xxxx-xxxx", "ltr"]],
-    help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ كلمة المرور الذي يظهر وضعه هنا (غير كلمة مرور حسابك العادي).", url: "/api/publisher/connect/bluesky" },
-  whatsapp: { t: "اربط واتساب بيزنس", fields: [["token", "Access Token (دايم، من System User)", "EAAG…", "ltr"], ["waba", "WhatsApp Business Account ID", "1234567890", "ltr"],
-      ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "PIN التحقق بخطوتين (إذا مفعّله)", "6 أرقام", "ltr"]],
-    help: `واتساب هنا للرسايل والرد على العملاء (الإنبوكس والرسائل الجماعية بقوالب متوافق عليها)، غير لنشر الفيديوهات.
-يحتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، غير تطبيق واتساب بيزنس العادي على الجوال.
-<ol><li>من business.facebook.com أنشئ أو اختر WhatsApp Business Account، وأضف رقم غير مسجّل على واتساب عادي.</li>
-<li>من Business Settings ← System Users أنشئ System User واديله صلاحيات whatsapp_business_management و whatsapp_business_messaging.</li>
-<li>أنشئ له Access Token دايم.</li><li>من WhatsApp Manager ← Phone Numbers ستجد الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
+    help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ كلمة المرور التي تظهر وضعها هنا (وهي غير كلمة مرور حسابك العادية).", url: "/api/publisher/connect/bluesky" },
+  whatsapp: { t: "اربط واتساب للأعمال", fields: [["token", "Access Token (دائم، من System User)", "EAAG…", "ltr"], ["waba", "WhatsApp Business Account ID", "1234567890", "ltr"],
+      ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "رمز التحقق بخطوتين (إن كان مفعّلًا)", "6 أرقام", "ltr"]],
+    help: `واتساب هنا للرسائل والرد على العملاء (الإنبوكس والرسائل الجماعية بقوالب متوافق عليها)، غير لنشر الفيديوهات.
+يحتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، وهو غير تطبيق واتساب للأعمال العادي على الجوال.
+<ol><li>من business.facebook.com أنشئ أو اختر WhatsApp Business Account، وأضف رقمًا غير مسجّل على واتساب العادي.</li>
+<li>من Business Settings ← System Users أنشئ System User وامنحه صلاحيتي whatsapp_business_management و whatsapp_business_messaging.</li>
+<li>أنشئ له Access Token دائمًا.</li><li>من WhatsApp Manager ← Phone Numbers ستجد الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
 };
 async function paForm(k) {
   if (k === "telegram") return paTelegram();
@@ -254,7 +254,7 @@ async function paForm(k) {
   m.el.querySelector("[data-pa-go]").onclick = async (e) => {
     const body = {};
     m.el.querySelectorAll("[data-paf]").forEach((i) => (body[i.dataset.paf] = i.value.trim()));
-    e.target.disabled = true; e.target.textContent = "⏳ يربط…";
+    e.target.disabled = true; e.target.textContent = "⏳ جارٍ الربط…";
     try { paRefresh(await api(F.url, { method: "POST", ...jsonBody(body) })); m.close(); toast("✅ رُبط"); }
     catch (err) { toast(err.message, true); e.target.disabled = false; e.target.textContent = "اربط"; }
   };
@@ -263,19 +263,19 @@ async function paForm(k) {
 async function paTelegram() {
   let r;
   try { r = await api("/api/publisher/connect/telegram", { method: "POST" }); } catch (err) { return toast(err.message, true); }
-  const m = paModal(`<p class="ui-dlg-msg"><b>اربط قناة أو جروب تيليجرام</b></p>
-    <ol class="pa-help"><li>أضف <b dir="ltr">@${escapeHtml(r.bot || "")}</b> أدمن في القناة أو الجروب.</li>
-      <li>أرسل للبوت هذه الرسالة (فيها الكود واسم القناة): <code dir="ltr" class="pa-code">${escapeHtml(r.code || "")} @قناتك</code></li>
-      <li>انتظر هنا، أول ما يتربط سيظهر تلقائيًا.</li></ol>
-    <p class="pa-wait">⏳ ينتظر الربط… <small>(الكود يعمل ${Math.round((r.expires_in || 900) / 60)} دقيقة)</small></p>
+  const m = paModal(`<p class="ui-dlg-msg"><b>اربط قناة أو مجموعة تيليجرام</b></p>
+    <ol class="pa-help"><li>أضف <b dir="ltr">@${escapeHtml(r.bot || "")}</b> مشرفًا في القناة أو المجموعة.</li>
+      <li>أرسل إلى البوت هذه الرسالة (فيها الرمز واسم القناة): <code dir="ltr" class="pa-code">${escapeHtml(r.code || "")} @قناتك</code></li>
+      <li>انتظر هنا، وفور الربط سيظهر تلقائيًا.</li></ol>
+    <p class="pa-wait">⏳ بانتظار الربط… <small>(الرمز صالح ${Math.round((r.expires_in || 900) / 60)} دقيقة)</small></p>
     <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>أغلق</button></div>`);
   const tick = async () => {
     if (!m.el.isConnected) return;
     try {
       const st = await api(`/api/publisher/connect/telegram/${encodeURIComponent(r.code)}`);
-      if (st.status === "connected") { m.close(); toast("✅ تيليجرام رُبط"); return paRefresh(await api("/api/publisher")); }
-      if (st.status === "expired") { m.el.querySelector(".pa-wait").textContent = "⌛ الكود خلص. أغلق وابدأ مرة أخرى."; return; }
-    } catch { /* يحاول مرة أخرى */ }
+      if (st.status === "connected") { m.close(); toast("✅ رُبط تيليجرام"); return paRefresh(await api("/api/publisher")); }
+      if (st.status === "expired") { m.el.querySelector(".pa-wait").textContent = "⌛ انتهت صلاحية الرمز. أغلق وابدأ مرة أخرى."; return; }
+    } catch { /* يُعيد المحاولة */ }
     setTimeout(tick, 3000);
   };
   setTimeout(tick, 3000);
@@ -287,14 +287,14 @@ async function connectReturn() {
   const params = Object.fromEntries(q.entries());
   history.replaceState(null, "", location.pathname + location.hash);   // الرابط لا يظل فيه بيانات الربط
   if (params.error) return toast(`⚠️ الربط لم يكتمل: ${params.error_message || params.error}`, true);
-  if (params.connected) { toast("✅ الحساب رُبط"); return paRefresh(await api("/api/publisher")); }
+  if (params.connected) { toast("✅ رُبط الحساب"); return paRefresh(await api("/api/publisher")); }
   let r;
   try { r = await api("/api/publisher/connect/pending", { method: "POST", ...jsonBody({ params }) }); } catch (err) { return toast(err.message, true); }
-  const WHAT = { facebook: "الصفحة", instagram: "حساب إنستجرام", linkedin: "الحساب", googlebusiness: "المكان", pinterest: "البورد" };
+  const WHAT = { facebook: "الصفحة", instagram: "حساب إنستجرام", linkedin: "الحساب", googlebusiness: "المكان", pinterest: "اللوحة" };
   const opts = [...(r.personal ? [{ id: "personal", name: "حسابي الشخصي", sub: "تنشر باسمك أنت" }] : []), ...r.options];
   const m = paModal(`<p class="ui-dlg-msg"><b>اختر ${WHAT[r.platform] || ""} ما ستنشر عليه في ${escapeHtml(r.label)}</b></p>
     <div class="pa-opts">${opts.map((o) => `<button type="button" class="pa-opt" data-paopt="${escapeHtml(o.id)}">${o.img ? `<img src="${escapeHtml(o.img)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((o.name || "?").slice(0, 1))}</i>`}
-      <span><b dir="auto">${escapeHtml(o.name)}</b>${o.sub ? `<small dir="auto">${escapeHtml(o.sub)}</small>` : ""}</span></button>`).join("") || `<p class="muted">لا شيء تتختار. تأكد أنك مدير على الصفحة أو المكان، وابدأ الربط مرة أخرى.</p>`}</div>
+      <span><b dir="auto">${escapeHtml(o.name)}</b>${o.sub ? `<small dir="auto">${escapeHtml(o.sub)}</small>` : ""}</span></button>`).join("") || `<p class="muted">لا يوجد ما يُختار. تأكد أنك مدير للصفحة أو المكان، وابدأ الربط مرة أخرى.</p>`}</div>
     <div class="ui-dlg-acts"><button type="button" class="ui-dlg-no" data-pa-close>إلغاء</button></div>`);
   m.el.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-paopt]");
@@ -308,7 +308,7 @@ async function connectReturn() {
 document.addEventListener("click", async (e) => {
   const add = e.target.closest("[data-paadd]"), del = e.target.closest("[data-padel]");
   if (!add && !del) return;
-  if (pub.service === "mock" && !(add && ["bluesky", "telegram", "whatsapp"].includes(add.dataset.paadd))) return toast("هذا وضع تجريبي: الربط الحقيقي يشتغل عندما خدمة النشر تتوصّل", true);
+  if (pub.service === "mock" && !(add && ["bluesky", "telegram", "whatsapp"].includes(add.dataset.paadd))) return toast("هذا وضع تجريبي: يعمل الربط الحقيقي عند اتصال خدمة النشر", true);
   try {
     if (add) {
       const k = add.dataset.paadd;
@@ -317,7 +317,7 @@ document.addEventListener("click", async (e) => {
       if (r.form) return paForm(r.form);
       // تسجيل الدخول على المنصة نفسها في نفس الصفحة، وبعدها بيرجع هنا على طول (ولو محتاج يختار صفحة بيختار عندنا)
       location.assign(r.url);
-    } else if ((await uiConfirm(`تفصل حساب «${del.dataset.paname}»؟ المنشورات المتجدولة عليه لن تنزل.`))) {
+    } else if ((await uiConfirm(`هل تفصل حساب «${del.dataset.paname}»؟ لن تُنشر المنشورات المجدولة عليه.`))) {
       const info = await api(`/api/publisher/accounts/${encodeURIComponent(del.dataset.padel)}`, { method: "DELETE" });
       setAcc(info);
       pub.accounts = info.accounts || {};
@@ -400,7 +400,7 @@ async function algoPack(force) {
   const id = pub.videoId, note = $("pubAlgo");
   if (!id) return force && toast("اختر فيديو من المجلد أولًا", true);
   if (!force && $("postCaption").value.trim()) return;
-  if (force) { note.hidden = false; note.textContent = "⏳ جارٍ الكتابة التعليق النصي…"; }
+  if (force) { note.hidden = false; note.textContent = "⏳ جارٍ كتابة التعليق النصي…"; }
   try {
     const pl = checkedPlatforms().map(platOf)[0] || "";
     const r = await api("/api/algo/post-pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ export_id: id, platform: pl }) });
@@ -411,7 +411,7 @@ async function algoPack(force) {
     setCover(r.cover_ms);
     pub.notAi = !r.ai;
     note.hidden = false;
-    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + هاشتاجات المجال) · الغلاف ${r.cover_hook ? "على فريم الخطاف" : "قبل الآخر بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل براحتك.`;
+    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + وسوم المجال) · الغلاف ${r.cover_hook ? "على إطار الخطاف" : "قبل النهاية بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل كما تشاء.`;
     renderPostExtras();
   } catch (err) {
     note.hidden = !force;
@@ -500,13 +500,13 @@ async function dmFlowLoad() {
   try { dmFlowD = await api("/api/dm/flow"); } catch { return; }
   $("dmAsk").value = dmFlowD.ask; $("dmNudge").value = dmFlowD.nudge; $("dmYes").value = dmFlowD.yes.join("، ");
   if (!pub.editing) $("dmGate").checked = dmFlowD.on;
-  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم الرابط · ${dmFlowD.nudged} ينتظرون يعملون فولو` : "";
+  $("dmFlowStat").textContent = dmFlowD.hook_error ? `⚠️ ${dmFlowD.hook_error}` : dmFlowD.gates ? `${dmFlowD.sent} وصلهم الرابط · ${dmFlowD.nudged} بانتظار المتابعة` : "";
 }
 $("dmFlowSave").addEventListener("click", async () => {
   try {
     dmFlowD = await api("/api/dm/flow", { method: "POST", ...jsonBody({ on: $("dmGate").checked, ask: $("dmAsk").value, nudge: $("dmNudge").value,
       yes: $("dmYes").value.split(/[,،]/).map((x) => x.trim()).filter(Boolean) }) });
-    toast("✅ السيناريو حُفظ للعلامة");
+    toast("✅ حُفظ السيناريو للعلامة");
   } catch (err) { toast(err.message, true); }
 });
 async function dmFill() {
@@ -540,9 +540,9 @@ $("dmCta").addEventListener("click", () => {
   const w = $("dmWords").value.split(/[,،]/)[0]?.trim();
   if (!w) return toast("اكتب الكلمة أولًا", true);
   const tt = [...$("postPlatforms").querySelectorAll("input:checked")].some((i) => platOf(i.value) === "tiktok");
-  const lines = [`💬 اكتب «${w}» في تعليق ويوصلك على الخاص`];
-  if (tt && dmDef?.number) lines.push(`📩 على تيك توك: أرسل «${w}» على الواتساب ${dmDef.number}`);
-  else if (tt) lines.push(`📩 على تيك توك: ابعتلنا «${w}» في رسالة`);
+  const lines = [`💬 اكتب «${w}» في تعليق ليصلك في الخاص`];
+  if (tt && dmDef?.number) lines.push(`📩 على تيك توك: أرسل «${w}» على واتساب ${dmDef.number}`);
+  else if (tt) lines.push(`📩 على تيك توك: أرسل لنا «${w}» في رسالة`);
   const c = $("postCaption");
   c.value = `${c.value.trim()}\n\n${lines.join("\n")}`.trim();
   c.dispatchEvent(new Event("input", { bubbles: true }));
@@ -768,16 +768,16 @@ async function loadRemoteOrphans(verbose = false) {
   try {
     const list = await api("/api/posts/remote");
     box.hidden = !list.length;
-    if (verbose && !list.length) toast("✅ كل المنشورات المتجدولة موجودة هنا");
+    if (verbose && !list.length) toast("✅ كل المنشورات المجدولة موجودة هنا");
     const when = (iso) => (iso ? new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "");
-    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ فيه ${list.length} منشور متجدول على حساباتك ومش في القائمة هنا</p>` + list.map((o) => `
+    box.innerHTML = list.length ? `<p class="orphans-title">⚠️ يوجد ${list.length} منشور مجدول على حساباتك وليس في القائمة هنا</p>` + list.map((o) => `
       <div class="orphan" data-rid="${escapeHtml(o.id)}">
         ${o.media_url ? lightVideo(escapeHtml(o.media_url), "muted") : ""}
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
           <span>${o.platforms.map(tLabel).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
         <span class="acts"><button class="btn sm" data-oact="adopt">＋ أضفه للقايمة</button>
-          <button class="btn sm danger" data-oact="cancel">✕ الغيه</button></span>
+          <button class="btn sm danger" data-oact="cancel">✕ ألغِه</button></span>
       </div>`).join("") : "";
   } catch (err) {
     if (verbose) toast(err.message, true);
@@ -793,7 +793,7 @@ $("remoteOrphans").addEventListener("click", async (e) => {
       await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
       toast("✅ المنشور أُضيف للقايمة");
     } else {
-      if (!(await uiConfirm("تلغي هذا المنشور؟ لن يُنشر."))) return;
+      if (!(await uiConfirm("هل تلغي هذا المنشور؟ لن يُنشر."))) return;
       await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
       toast("✅ أُلغي");
     }
@@ -858,8 +858,8 @@ function dmCheck(cap, pl) {
   const spoken = pub.spoken?.id === pub.videoId ? pub.spoken.word : "", inCap = dmDetect(cap), word = inCap || spoken;
   if (!word) return [];
   const where = inCap ? "في التعليق النصي" : "في آخر الفيديو";
-  if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يشتغل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على الواتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
-  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: ما سيعلّق سيوصله رسالة على الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير متفعّل`, tip: "من غيره الذي سيعلّق لن يوصله شيء، وده يضيّع العميل", act: "dm", word }];
+  if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يعمل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على واتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
+  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: من يعلّق تصله رسالة في الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير مفعّل`, tip: "بدونه لن يصل شيء لمن يعلّق، وهذا يُضيّع العميل", act: "dm", word }];
 }
 function pubChecks() {
   const cap = $("postCaption").value.trim(), first = cap.split("\n").find((l) => l.trim()) || "";
@@ -867,27 +867,27 @@ function pubChecks() {
   const fw = first.replace(/#[\p{L}\p{N}_]+/gu, "").trim().split(/\s+/).filter(Boolean).length;
   const pl = checkedPlatforms(), visual = pl.some((v) => ["instagram", "tiktok"].includes(platOf(v)));
   return [
-    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، غير «أهلًا بيكم»)", tip: "آخر شيء يقرؤها قبل ما يسكرول: اترك سؤال مفتوح أو أكمل وعد الفيديو" },
+    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، وليس «أهلًا بكم»)", tip: "آخر ما يقرؤه قبل أن يمرّر: اترك سؤالًا مفتوحًا أو أكمل وعد الفيديو" },
     { ok: PC_CTA.test(cap), t: "فيه دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
-    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (الآن ${tags.length})`, tip: "الهاشتاج تأثيره ضعيف؛ ٣–٥ محددين كفاية" },
-    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "يودّون الفيديو لناس غير مهتمة فوقت المشاهدة يقل" },
-    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "الغلاف متختار بنفسك (فريم مثير)", tip: "فرصة خطاف زيادة في البروفايل", act: "cover" }] : []),
+    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ وسوم من المجال (الآن ${tags.length})`, tip: "تأثير الوسوم ضعيف؛ ٣–٥ محددة تكفي" },
+    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "توصل الفيديو لأشخاص غير مهتمين فيقل وقت المشاهدة" },
+    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "اخترت الغلاف بنفسك (إطار مثير)", tip: "فرصة خطاف إضافية في الملف الشخصي", act: "cover" }] : []),
     ...dmCheck(cap, pl),
-    { ok: PC_AI.test(cap) || !!pub.notAi, t: "إذا الفيديو معمول بالذكاء الصناعي معلّم عليه", tip: "لا يوجد عقاب، والمنصة يمكن تزيله إذا لم تحدد", act: "ai" },
-    { ok: null, t: "الترجمة في نص الشاشة ومش مستخبية أسفل التعليق النصي والأزرار", tip: "تأكد من الفيديو نفسه" },
-    { ok: null, t: "بعد النشر: رد على أول ٣٠ تعليق", tip: "النقاش في التعليقات يطوّل وقت المشاهدة" },
+    { ok: PC_AI.test(cap) || !!pub.notAi, t: "إذا كان الفيديو مصنوعًا بالذكاء الاصطناعي فهو معلَّم", tip: "لا عقوبة، وقد تحذفه المنصة إذا لم تحدد", act: "ai" },
+    { ok: null, t: "الترجمة في وسط الشاشة وليست مخفية تحت التعليق النصي والأزرار", tip: "تأكد من الفيديو نفسه" },
+    { ok: null, t: "بعد النشر: رد على أول ٣٠ تعليقًا", tip: "النقاش في التعليقات يطوّل وقت المشاهدة" },
   ];
 }
 function renderPubCheck() {
   const box = $("pubCheck");
   if (!box) return;
   const list = pubChecks(), scored = list.filter((c) => c.ok !== null), n = scored.filter((c) => c.ok).length;
-  box.innerHTML = `<div class="pc-head"><b>✅ قبل ما تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
-      <button type="button" class="btn sm" id="pcReview" title="النموذج يقيّم التعليق النصي بقواعد الخوارزميات ويقترح واحد أحسن">📡 افحص التعليق النصي</button></div>
+  box.innerHTML = `<div class="pc-head"><b>✅ قبل أن تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
+      <button type="button" class="btn sm" id="pcReview" title="يقيّم النموذج التعليق النصي بقواعد الخوارزميات ويقترح أفضل منه">📡 افحص التعليق النصي</button></div>
     <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
       ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختر الغلاف</button>` : ""}
       ${c.act === "dm" && !c.ok ? `<button type="button" class="btn xs" data-pc="dm" data-word="${escapeHtml(c.word)}">💬 فعّله</button>` : ""}
-      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم أنه AI</button><button type="button" class="btn xs" data-pc="notai">غير AI</button>` : ""}</li>`).join("")}</ul>
+      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم أنه AI</button><button type="button" class="btn xs" data-pc="notai">ليس AI</button>` : ""}</li>`).join("")}</ul>
     <div id="pcOut"></div>`;
 }
 $("postCaption").addEventListener("input", renderPubCheck);
@@ -909,7 +909,7 @@ $("postPlatforms").addEventListener("change", renderPubCheck);
 $("pubCheck").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-pc]");
   if (b?.dataset.pc === "cover") { pub.showCover = true; $("coverOn").checked = true; $("coverOn").dispatchEvent(new Event("change")); return; }
-  if (b?.dataset.pc === "ai") { const c = $("postCaption"); c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}🤖 الفيديو معمول بالذكاء الصناعي`; return renderPubCheck(); }
+  if (b?.dataset.pc === "ai") { const c = $("postCaption"); c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}🤖 الفيديو مصنوع بالذكاء الاصطناعي`; return renderPubCheck(); }
   if (b?.dataset.pc === "notai") { pub.notAi = true; return renderPubCheck(); }
   if (b?.dataset.pc === "dm") {
     $("dmOn").checked = true; await dmFill(); $("dmWords").value = b.dataset.word;
@@ -921,7 +921,7 @@ $("pubCheck").addEventListener("click", async (e) => {
   const cap = $("postCaption").value.trim();
   if (cap.length < 8) return toast("اكتب التعليق النصي أولًا", true);
   const out = $("pcOut");
-  out.innerHTML = `<p class="muted">⏳ يفحص…</p>`;
+  out.innerHTML = `<p class="muted">⏳ جارٍ الفحص…</p>`;
   try {
     const pl = checkedPlatforms().map(platOf)[0] || "";
     const r = await api("/api/algo/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cap, kind: "caption", platform: pl }) });
