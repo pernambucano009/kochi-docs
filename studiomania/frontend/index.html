@@ -90,7 +90,7 @@
                 <input type="text" id="newFolderName" placeholder="اسم المشروع (هو اسم الفيديو النهائي)" required>
                 <button class="btn primary sm" type="submit">＋ مشروع جديد</button>
               </form>
-              <button class="btn primary wide ap-open" id="autopilotOpen" type="button"><span class="emo">🤖</span> أوتوبايلوت: جهّز كذا مشروع تلقائيًا</button>
+              <button class="btn primary wide ap-open" id="autopilotOpen" type="button"><span class="emo">🤖</span> الأوتوبايلوت: جهّز عدة مشاريع تلقائيًا</button>
               <button class="btn wide ap-open" id="foldersPurgeOpen" type="button"><span class="emo">🗑️</span> احذف مشاريع قديمة</button>
               <label class="btn wide folder-up" id="folderDrop"><span class="emo">📂</span> ارفع مجلدات (أو اسحبها هنا)
                 <input type="file" id="folderUpload" webkitdirectory directory multiple hidden></label>
@@ -351,7 +351,7 @@
                   <button class="ic" id="tpNext" title="فريم لقدّام (→)">|▶︎</button>
                   <button class="ic" id="tpEnd" title="للآخر (End)">⏭</button>
                   <button class="ic" id="tpLoop" title="تشغيل متكرر (L)">🔁</button>
-                  <button class="ic" id="tpFull" title="المعاينة على الشاشة كلها (F)">⛶</button>
+                  <button class="ic" id="tpFull" title="المعاينة بملء الشاشة (F)">⛶</button>
                   <span class="spacer"></span>
                   <span class="tc muted" id="totalLabel"></span>
                 </div>
@@ -380,7 +380,7 @@
                   <button class="btn sm" id="binFavOnly" title="المفضلة فقط"><span class="emo">☆</span> المفضلة</button>
                 </div>
                 <label class="check"><input type="checkbox" id="binCoachOnly" checked> الشخصية المختارة فقط</label>
-                <div class="replace-bar" id="replaceBar" hidden>🔁 اختر الفيديو الذي سيوضع مكان القطعة <b id="replaceWhich"></b> (التعديلات تظل كما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
+                <div class="replace-bar" id="replaceBar" hidden>🔁 اختر الفيديو الذي سيوضع مكان القطعة <b id="replaceWhich"></b> (تبقى التعديلات كما هي) <button class="btn sm" id="replaceCancel">إلغاء</button></div>
                 <div class="bin-grid" id="binGrid"></div>
                 <p class="empty" id="binEmpty" hidden>لا يوجد فيديوهات مولَّدة جاهزة. ولّد من <a href="#" data-goto="2">الخطوة 2</a>.</p>
                 <p class="hint">اضغط ＋ أو اسحب الفيديو للتايم لاين.</p>
@@ -394,9 +394,9 @@
                     <h3 dir="rtl" id="editorLabel"></h3>
                     <p class="clip-times" dir="rtl" id="clipTimes"></p>
                     <div class="kf-bar" dir="rtl" id="kfBar">
-                      <button class="btn sm" id="kfPrev" title="الكي فريم الذي قبل">◀︎</button>
-                      <button class="btn sm" id="kfToggle" title="أضف أو أزل كي فريم عند المؤشر: الحجم والمكان والزاوية يتحركون تلقائيًا بين الكي فريمز">◇ كي فريم</button>
-                      <button class="btn sm" id="kfNext" title="الكي فريم الذي بعد">▶︎</button>
+                      <button class="btn sm" id="kfPrev" title="الإطار المفتاحي السابق">◀︎</button>
+                      <button class="btn sm" id="kfToggle" title="أضف أو أزل إطارًا مفتاحيًا عند المؤشر: يتحرك الحجم والمكان والزاوية تلقائيًا بين الإطارات المفتاحية">◇ كي فريم</button>
+                      <button class="btn sm" id="kfNext" title="الإطار المفتاحي التالي">▶︎</button>
                       <span class="muted" id="kfInfo"></span>
                       <button class="btn sm" id="kfClear" hidden>أزل الكل</button>
                     </div>
@@ -412,7 +412,7 @@
                       <input type="range" dir="ltr" id="fxSpeed" min="-200" max="200" step="1" title="من 0.25x لـ 4x">
                       <label class="check"><input type="checkbox" id="fxReverse"> ⏪ شغّل بالعكس <span class="muted" id="revNote"></span></label>
                       <h4>📐 اللف والمحاذاة <b id="angleVal"></b></h4>
-                      <input type="range" dir="ltr" id="fxAngle" min="-180" max="180" step="1" title="لف بأي زاوية · نقرتان يرجّعه صفر">
+                      <input type="range" dir="ltr" id="fxAngle" min="-180" max="180" step="1" title="دوّر بأي زاوية · نقرتان تعيده إلى الصفر">
                       <div class="chips" id="fxAlign">
                         <button class="chip" data-align="l" title="على الشمال">⇤</button><button class="chip" data-align="ch" title="في النص بالعرض">↔</button><button class="chip" data-align="r" title="على اليمين">⇥</button>
                         <button class="chip" data-align="t" title="أعلى">⤒</button><button class="chip" data-align="cv" title="في النص بالطول">↕</button><button class="chip" data-align="b" title="أسفل">⤓</button>
@@ -453,9 +453,9 @@
                     <div class="row wrap" dir="rtl">
                       <button class="btn sm" id="edSplit"><span class="emo">✂</span> قسّم عند المؤشر</button>
                       <button class="btn sm" id="edDup">⧉ كرّر</button>
-                      <button class="btn sm" id="edDisable" title="القطعة تظل مكانها فقط لا تظهر في الفيديو (ومكانها يصبح فارغ)">⊘ عطّل</button>
-                      <button class="btn sm" id="edToOver" title="القطعة تصبح طبقة أعلى الفيديو في نفس وقتها (صورة داخل صورة)">⤴ اجعلها طبقة</button>
-                      <button class="btn sm" id="edReplace" title="بدّل الفيديو بفيديو آخر من المكتبة، والقص والتأثيرات والحركة يظلون كما هم"><span class="emo">🔁</span> استبدل</button>
+                      <button class="btn sm" id="edDisable" title="تبقى القطعة في مكانها لكنها لا تظهر في الفيديو (ويصبح مكانها فارغًا)">⊘ عطّل</button>
+                      <button class="btn sm" id="edToOver" title="تصبح القطعة طبقة فوق الفيديو في وقتها نفسه (صورة داخل صورة)">⤴ اجعلها طبقة</button>
+                      <button class="btn sm" id="edReplace" title="استبدل الفيديو بفيديو آخر من المكتبة، ويبقى القص والتأثيرات والحركة كما هي"><span class="emo">🔁</span> استبدل</button>
                       <button class="btn sm" id="edReset">↺ استعد الإعدادات</button>
                       <button class="btn sm danger" id="edDelete"><span class="emo">🗑</span> احذف</button>
                     </div>
@@ -470,7 +470,7 @@
                   <div class="row wrap"><button class="btn primary sm" id="txAdd">＋ أضف نص عند المؤشر</button></div>
                   <h3 class="pane-h"><span class="emo">🎨</span> أساليب جاهزة</h3>
                   <div class="tx-presets" id="txPresets"></div>
-                  <p class="hint" id="txNone">اضغط على أسلوب أو «أضف نص»، أو اختر نص من التايم لاين أو من المعاينة.</p>
+                  <p class="hint" id="txNone">اضغط على أسلوب أو «أضف نصًا»، أو اختر نصًا من الخط الزمني أو من المعاينة.</p>
                   <div class="tx-editor" id="txEditor" hidden>
                     <p class="muted" id="txTimes"></p>
                     <textarea id="txText" rows="2" dir="auto" placeholder="اكتب النص… (Enter = سطر جديد)"></textarea>
@@ -507,7 +507,7 @@
                       <button class="btn sm" id="txDup">⧉ كرّر بعده</button>
                       <button class="btn sm danger" id="txDelete"><span class="emo">🗑</span> احذف</button>
                     </div>
-                    <p class="hint">💡 حرّك النص بالسحب على المعاينة، وعجلة الماوس تكبّر وتصغّر، والمقبض الذي أعلى يدور. نقرتان تكتب.</p>
+                    <p class="hint">💡 حرّك النص بالسحب على المعاينة، وعجلة الفأرة تكبّر وتصغّر، والمقبض العلوي يدوّر. نقرتان للكتابة.</p>
                   </div>
                 </div>
 
@@ -515,10 +515,10 @@
                   <div class="row wrap">
                     <label class="btn primary sm">⬆ أضف صورة<input type="file" id="ovImage" accept="image/*" hidden></label>
                   </div>
-                  <p class="hint" id="ovNone">أضف فيديو كطبقة بزرار ⧉ على أي فيديو في المكتبة، أو ارفع صورة (PNG شفافة تنفع ستيكر أو شعار). ويمكنك تحوّل أي قطعة من التراك الأساسي لطبقة من تبويب 🎞️ القطعة.</p>
+                  <p class="hint" id="ovNone">أضف فيديو طبقةً بزر ⧉ على أي فيديو في المكتبة، أو ارفع صورة (PNG شفافة تصلح ملصقًا أو شعارًا). ويمكنك تحويل أي قطعة من المسار الأساسي إلى طبقة من تبويب 🎞️ القطعة.</p>
                   <div class="ov-editor" id="ovEditor" hidden>
                     <p class="muted" id="ovName"></p>
-                    <p class="hint" id="ovBroll" hidden>🪄 هذه لقطة B-roll البرنامج ضعها تلقائي. أزلها إذا لم تعجبك، أو بدّلها بفيديو أو صورة من جهازك (بنفس المكان والمدة).</p>
+                    <p class="hint" id="ovBroll" hidden>🪄 هذه لقطة B-roll وضعها البرنامج تلقائيًا. أزلها إذا لم تعجبك، أو استبدلها بفيديو أو صورة من جهازك (بالمكان والمدة نفسيهما).</p>
                     <label class="field slider-field">الحجم <b id="ovWVal"></b><input type="range" id="ovW" min="3" max="200" step="1" dir="ltr"></label>
                     <label class="field slider-field">شمال ⟷ يمين<input type="range" id="ovX" min="-50" max="150" step="1" dir="ltr"></label>
                     <label class="field slider-field">أعلى ⟷ أسفل<input type="range" id="ovY" min="-50" max="150" step="1" dir="ltr"></label>
@@ -544,10 +544,10 @@
                       <button class="btn sm" id="ovFlip">↔ اقلب</button>
                       <button class="btn sm" id="ovSplit"><span class="emo">✂</span> قسّم</button>
                       <button class="btn sm" id="ovToMain">⤵ أعدها للتراك الأساسي</button>
-                      <label class="btn sm">🔁 بدّلها بفيديو أو صورة<input type="file" id="ovReplace" accept="video/*,image/*" hidden></label>
+                      <label class="btn sm">🔁 استبدلها بفيديو أو صورة<input type="file" id="ovReplace" accept="video/*,image/*" hidden></label>
                       <button class="btn sm danger" id="ovDelete"><span class="emo">🗑</span> احذف</button>
                     </div>
-                    <p class="hint">💡 حرّك الطبقة بالسحب على المعاينة، والمربع الذي في الركن يكبّر، والدائرة التي أعلى تدور.</p>
+                    <p class="hint">💡 حرّك الطبقة بالسحب على المعاينة، والمربع في الركن يكبّر، والدائرة العلوية تدوّر.</p>
                   </div>
                 </div>
 
@@ -564,8 +564,8 @@
               <label class="field slider-field">صوت الأوترو <b id="outroVolVal"></b><input type="range" id="mOutroVol" min="0" max="200" step="5" dir="ltr"></label>
               <h3 class="pane-h"><span class="emo">🏷️</span> الإنترو والأوترو</h3>
               <label class="check"><input type="checkbox" id="mCharIntro"> إنترو الشخصية قبل الفيديو <span class="muted" id="charIntroInfo"></span></label>
-              <label class="check"><input type="checkbox" id="mBrandIntro"> إنترو العلامة في أولًا <span class="muted" id="brandIntroInfo"></span></label>
-              <label class="check"><input type="checkbox" id="mBrandOutro"> أوترو العلامة في الآخر <span class="muted" id="brandOutroInfo"></span></label>
+              <label class="check"><input type="checkbox" id="mBrandIntro"> مقدمة العلامة في البداية <span class="muted" id="brandIntroInfo"></span></label>
+              <label class="check"><input type="checkbox" id="mBrandOutro"> خاتمة العلامة في النهاية <span class="muted" id="brandOutroInfo"></span></label>
 
               <h3 class="pane-h" id="secVoice"><span class="emo">🎙️</span> التعليق الصوتي</h3>
               <div class="voice-sync" id="voiceSync" hidden></div>
@@ -573,7 +573,7 @@
                 <label class="btn sm" title="ارفع ملف تعليق صوتي من جهازك، ويوضع في المونتاج مباشرة (ويُحفظ في مكتبة الصوت)">⬆ ارفع<input type="file" data-audio-up="voice" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.amr,.caf,.aif,.aiff,.wma,.3gp,.webm,.mp4,.mov" hidden></label></div>
               <details class="tts-box" id="ttsBox">
                 <summary>🗣️ اكتب نص ويتحوّل لصوت</summary>
-                <textarea id="ttsText" rows="3" dir="auto" placeholder="اكتب الجملة التي تريدها تُقال…"></textarea>
+                <textarea id="ttsText" rows="3" dir="auto" placeholder="اكتب الجملة التي تريد أن تُقال…"></textarea>
                 <div class="row wrap"><select id="ttsVoice"></select>
                   <button class="btn sm primary" id="ttsGo"><span class="emo">🗣️</span> حوّل لصوت</button>
                   <span class="muted" id="ttsCost"></span></div>
@@ -588,24 +588,24 @@
                 <input type="search" id="sfxSearch" placeholder="🔍 ابحث عن مؤثر" dir="auto">
                 <div class="sfx-grid" id="sfxGrid"></div>
                 <div class="row wrap">
-                  <label class="field" title="أي صوت من المكتبة (تعليق أو موسيقى) يوضع في تراك الأصوات عند المؤشر"><select id="sndFromLib"></select></label>
-                  <label class="btn sm" title="ارفع مؤثر صوتي من جهازك ويُحفظ في المكتبة">⬆ ارفع مؤثر<input type="file" id="sfxUpload" accept="audio/*,.wav,.mp3,.m4a,.ogg" hidden></label>
-                  <button class="btn sm" id="micRec" title="سجّل بصوتك من الميكروفون ويوضع عند المؤشر"><span class="emo">🎙️</span> سجّل</button>
+                  <label class="field" title="أي صوت من المكتبة (تعليق أو موسيقى) يوضع في مسار الأصوات عند المؤشر"><select id="sndFromLib"></select></label>
+                  <label class="btn sm" title="ارفع مؤثرًا صوتيًا من جهازك ليُحفظ في المكتبة">⬆ ارفع مؤثر<input type="file" id="sfxUpload" accept="audio/*,.wav,.mp3,.m4a,.ogg" hidden></label>
+                  <button class="btn sm" id="micRec" title="سجّل بصوتك من الميكروفون ليوضع عند المؤشر"><span class="emo">🎙️</span> سجّل</button>
                   <span class="muted" id="micInfo"></span>
                 </div>
               </div>
               <h3 class="pane-h" id="secMix"><span class="emo">🎚️</span> اضبط الصوت كله</h3>
-              <label class="check" title="الموسيقى توطى تلقائيًا وقت ما فيه نص، وتعود تعلى بعده"><input type="checkbox" id="mixDuckOn"> توطية الموسيقى وقت النص</label>
+              <label class="check" title="تنخفض الموسيقى تلقائيًا أثناء الكلام، وترتفع بعده"><input type="checkbox" id="mixDuckOn"> توطية الموسيقى وقت النص</label>
               <label class="field slider-field" id="mixDuckRow">قدر ماذا <b id="mixDuckVal"></b><input type="range" id="mixDuck" min="10" max="100" step="5" dir="ltr"></label>
-              <label class="check" title="يزيل الزنّة والوجه ويخلي النص أوضح"><input type="checkbox" id="mixEnhance"> تنضيف صوت التعليق</label>
-              <label class="check" title="الفيديو يظهر بنفس العلو المناسب للسوشيال (‎-14 LUFS)"><input type="checkbox" id="mixNormalize"> توحيد علو الصوت</label>
-              <label class="check" title="صوت «ووش» خفيف مع كل انتقال بين فيديوهين، يربط اللقطتين"><input type="checkbox" id="mixWhoosh"> 💨 «ووش» مع الانتقالات</label>
-              <label class="check" title="عندما فيديو واحد متقطّع خلف بعضه، كل قطعة أخرى تقرّب قليلًا لكي العين لا تملّ"><input type="checkbox" id="mixPunch"> 🔍 تقريب خفيف على القطع</label>
-              <p class="hint">التنضيف والتوطية وتوحيد العلو والووش والتقريب يظهرون في الفيديو المتصدّر.</p>
+              <label class="check" title="يزيل الطنين والضوضاء ويجعل الكلام أوضح"><input type="checkbox" id="mixEnhance"> تنضيف صوت التعليق</label>
+              <label class="check" title="يخرج الفيديو بمستوى الصوت المناسب للتواصل الاجتماعي (‎-14 LUFS)"><input type="checkbox" id="mixNormalize"> توحيد علو الصوت</label>
+              <label class="check" title="صوت «ووش» خفيف مع كل انتقال بين فيديوهين يربط اللقطتين"><input type="checkbox" id="mixWhoosh"> 💨 «ووش» مع الانتقالات</label>
+              <label class="check" title="عندما يُقطَّع فيديو واحد إلى قطع متتالية، تُقرَّب كل قطعة ثانية قليلًا حتى لا تملّ العين"><input type="checkbox" id="mixPunch"> 🔍 تقريب خفيف على القطع</label>
+              <p class="hint">التنظيف وخفض الموسيقى وتوحيد مستوى الصوت والووش والتقريب تظهر في الفيديو المُصدَّر.</p>
 
               <h3 class="pane-h"><span class="emo">✨</span> ترتيب كوتشي التلقائي</h3>
-              <button class="btn wide" id="kochiLayoutBtn" title="الخطاف في أولًا، وباقي الجمل بمسافات على الفيديو، وآخر جملة مع الأوترو"><span class="emo">✨</span> رتّب التعليق والموسيقى</button>
-              <p class="hint">يقطّع التعليق جمل ويوزّعها: الخطاف في أول الفيديو، وآخر جملة مع الأوترو (وصوت الأوترو يُغلق). الموسيقى تبدأ بعد أول جملة بفريمين، وتوطى لـ 20% وقت النص.</p>
+              <button class="btn wide" id="kochiLayoutBtn" title="الخطاف في البداية، وباقي الجمل موزعة على الفيديو، وآخر جملة مع الأوترو"><span class="emo">✨</span> رتّب التعليق والموسيقى</button>
+              <p class="hint">يقطّع التعليق إلى جمل ويوزّعها: الخطاف في أول الفيديو، وآخر جملة مع الأوترو (ويُكتم صوت الأوترو). تبدأ الموسيقى بعد أول جملة بإطارين، وتنخفض إلى 20% أثناء الكلام.</p>
 
               <h3 class="pane-h" id="secMusic"><span class="emo">🎵</span> الموسيقى</h3>
               <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
@@ -666,9 +666,9 @@
                 <div class="pane" data-pane="export" hidden>
                   <h3 class="pane-h"><span class="emo">🖼️</span> مقاس الكادر</h3>
                   <div class="chips" id="cvRatio"></div>
-                  <p class="hint" id="cvNote" hidden>💡 التايبوجرافي معمولة على 9:16، فتتصغّر لكي تظهر كلها داخل الكادر. والمشهد (تغيير الخلفية) يشتغل على 9:16 فقط.</p>
+                  <p class="hint" id="cvNote" hidden>💡 التايبوجرافي مصممة بمقاس 9:16، فتُصغَّر لتظهر كاملة داخل الإطار. والمشهد (تغيير الخلفية) يعمل بمقاس 9:16 فقط.</p>
                   <h3 class="pane-h"><span class="emo">🎨</span> لون الخلفية</h3>
-                  <p class="hint">يظهر عندما الصورة لا تُملأ الكادر (عندما تصغّرها أو تلفّها أو تختار «كامل + أسود»).</p>
+                  <p class="hint">يظهر عندما لا تملأ الصورة الإطار (عندما تصغّرها أو تدوّرها أو تختار «كامل + أسود»).</p>
                   <div class="swatches" id="cvBg"></div>
                   <h3 class="pane-h"><span class="emo">⚙️</span> إعدادات التصدير</h3>
                   <div class="ex-grid">
@@ -683,12 +683,12 @@
               <div id="renderResult" hidden>
                 <video id="resultVideo" controls playsinline></video>
                 <div class="row"><a class="btn sm" id="resultDownload" download>⬇ تحميل</a>
-                <button class="btn sm" id="resultDub" title="نفس الفيديو بلهجة أو لغة أخرى">🌍 دبلجه</button>
+                <button class="btn sm" id="resultDub" title="الفيديو نفسه بلهجة أو لغة أخرى">🌍 دبلجة</button>
                 <span class="muted">حُفظ في مجلد الفيديوهات الجاهزة</span></div>
               </div>
               <div class="row wrap gap-top">
                 <button class="btn sm" id="exAudio" title="التعليق والموسيقى والمؤثرات وصوت الفيديوهات في ملف MP3"><span class="emo">🎧</span> صدّر الصوت فقط (MP3)</button>
-                <a class="btn sm" id="exAudioLink" hidden download>⬇ حمّل الصوت</a>
+                <a class="btn sm" id="exAudioLink" hidden download>⬇ نزّل الصوت</a>
               </div>
                 </div>
               </section>
@@ -706,8 +706,8 @@
                 <button class="ic" id="tlDelLeft" title="احذف ما قبل المؤشر في القطعة المختارة (Q)">⇤✂</button>
                 <button class="ic" id="tlDelRight" title="احذف ما بعد المؤشر في القطعة المختارة (W)">✂⇥</button>
                 <button class="ic" id="tlMarker" title="علامة عند المؤشر (M)">🚩</button>
-                <button class="ic" id="tlBeat" title="🎵 كل قطعة تنتهي على دقة في المزيكا، والقطع يسرع في آخر ثلث (مثل ريلز الأعمال)">🎵 على الإيقاع</button>
-                <button class="ic" id="tlSilence" title="✂️ شيل السكتات بضغطة (خفيف/متوسط/قوي) أو علّمها للمراجعة">✂️ السكتات</button>
+                <button class="ic" id="tlBeat" title="🎵 تنتهي كل قطعة على نبضة في الموسيقى، ويتسارع القطع في الثلث الأخير (مثل ريلز الأعمال)">🎵 على الإيقاع</button>
+                <button class="ic" id="tlSilence" title="✂️ أزل السكتات بضغطة (خفيف/متوسط/قوي) أو علّمها للمراجعة">✂️ السكتات</button>
                 <span class="sep"></span>
                 <button class="ic" id="tlPrevFrame" title="فريم لورا (←)">◀︎|</button>
                 <button class="ic" id="tlNextFrame" title="فريم لقدّام (→)">|▶︎</button>
@@ -729,8 +729,8 @@
                   <div class="h-text" id="hText">🔠 نصوص</div>
                   <div class="h-caps">✍️ تعليق نصي</div>
                   <div class="h-typo">🔤 تايبوجرافي</div>
-                  <div class="h-fx">✨ عناصر <button class="ic" id="fxAddQuick" title="أضف عنصر عند المؤشر">＋</button></div>
-                  <div class="h-click">🔊 كليك</div>
+                  <div class="h-fx">✨ عناصر <button class="ic" id="fxAddQuick" title="أضف عنصرًا عند المؤشر">＋</button></div>
+                  <div class="h-click">🔊 نقرة</div>
                 </div>
                 <div class="tl-scroll" id="tlScroll">
                   <div class="tl-canvas" id="tlCanvas">
@@ -751,7 +751,7 @@
                   </div>
                 </div>
               </div>
-              <p class="tl-keys" dir="rtl">Space تشغيل · ← → فريم فريم (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Q/W احذف قبل/بعد المؤشر · M علامة · L تكرار · F شاشة كاملة · Ctrl+Shift+C/V نسخ/لصق الإعدادات · كليك يمين = قائمة · Ctrl+Z رجوع · Ctrl + عجلة الماوس زووم · Ctrl + ضغطة أو اسحب مربع = اختيار كذا قطعة · Ctrl+A الكل</p>
+              <p class="tl-keys" dir="rtl">Space تشغيل · ← → إطار إطار (Shift = ثانية) · S قسّم · B أداة القطع · V اختيار · Delete حذف · Q/W احذف قبل/بعد المؤشر · M علامة · L تكرار · F ملء الشاشة · Ctrl+Shift+C/V نسخ/لصق الإعدادات · زر الفأرة الأيمن = قائمة · Ctrl+Z تراجع · Ctrl + عجلة الفأرة تكبير · Ctrl + نقرة أو اسحب مربعًا = اختيار عدة قطع · Ctrl+A الكل</p>
             </section>
           </div>
         </main>
@@ -784,29 +784,29 @@
                 <div class="post-video" id="postVideo"><span class="muted">اختر فيديو من المجلد (اضغط «جدول»)</span></div>
                 <label class="field">التعليق النصي
                   <textarea id="postCaption" rows="4" placeholder="النص الذي سينزل مع الفيديو، والهاشتاجات"></textarea></label>
-                <div class="loc-row"><button type="button" class="btn sm" id="algoCaption" title="⚡ وضع الخوارزمية: خطاف آخر + دعوة خطة المحتوى + هاشتاجات المجال، والغلاف على فريم الخطاف، وعلامة AI إذا الفيديو متولد"><span class="emo">⚡</span> تعليق نصي الخوارزمية</button> <button type="button" class="btn sm" id="brandCaption" title="التعليق النصي الافتراضي من عقل العلامة (مع الـ CTA والرابط)"><span class="emo">✨</span> تعليق نصي العلامة</button> <button type="button" class="btn sm" data-humanize="#postCaption" title="يزيل العبارات المعلّبة والحروف المخفية التي تبيّن أن النص متولد، بدون ما يغيّر المعنى"><span class="emo">🧹</span> أزل نَفَس الذكاء الاصطناعي</button> <button type="button" class="btn sm" id="addRiyadh" title="المنصات لا تأخذ مكان المنشور من هنا، فنكتبه في التعليق النصي"><span class="emo">📍</span> أضف «الرياض» للكابشن</button>
+                <div class="loc-row"><button type="button" class="btn sm" id="algoCaption" title="⚡ وضع الخوارزمية: خطاف آخر + دعوة خطة المحتوى + وسوم المجال، والغلاف من إطار الخطاف، وعلامة AI إذا كان الفيديو مولّدًا"><span class="emo">⚡</span> تعليق نصي الخوارزمية</button> <button type="button" class="btn sm" id="brandCaption" title="التعليق النصي الافتراضي من عقل العلامة (مع الـ CTA والرابط)"><span class="emo">✨</span> تعليق نصي العلامة</button> <button type="button" class="btn sm" data-humanize="#postCaption" title="يزيل العبارات المعلّبة والحروف المخفية التي تكشف أن النص مولّد، دون تغيير المعنى"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button> <button type="button" class="btn sm" id="addRiyadh" title="المنصات لا تأخذ موقع المنشور من هنا، فنكتبه في التعليق النصي"><span class="emo">📍</span> أضف «الرياض» للكابشن</button>
                   <button type="button" class="btn sm opt-chip" id="igOptsChip" hidden>تاج الكوتش + كولاب</button>
                   <button type="button" class="btn sm opt-chip" id="coverChip" hidden>الغلاف</button></div>
 
                 <p class="hint pub-algo" id="pubAlgo" hidden></p>
                 <div class="pub-check" id="pubCheck"></div>
                 <div class="post-extra dm-opts" id="dmOpts">
-                  <label class="check"><input type="checkbox" id="dmOn"> 💬 <b>علّق بكلمة</b>: ما يكتب الكلمة في التعليق يوصله رسالة على الخاص تلقائيًا</label>
-                  <p class="hint" id="dmAuto" hidden>✅ فُعّل تلقائيًا لأن التعليق النصي فيه دعوة «علّق بكلمة». الرسالة جاهزة، ويمكنك تعدّلها.</p>
+                  <label class="check"><input type="checkbox" id="dmOn"> 💬 <b>علّق بكلمة</b>: من يكتب الكلمة في التعليق تصله رسالة في الخاص تلقائيًا</label>
+                  <p class="hint" id="dmAuto" hidden>✅ فُعّل تلقائيًا لأن التعليق النصي فيه دعوة «علّق بكلمة». الرسالة جاهزة، ويمكنك تعديلها.</p>
                   <div id="dmBox" hidden>
-                    <label class="field">الكلمة (أو كذا كلمة بفاصلة) <input type="text" id="dmWords" placeholder="مثلًا: تريد"></label>
-                    <label class="field">الرسالة التي ستوصله على الخاص <textarea id="dmMessage" rows="3" placeholder="رابط، عرض، هدية، أو رابط الواتساب"></textarea></label>
-                    <label class="field">الرد على التعليق نفسه (اختياري) <input type="text" id="dmReply" placeholder="بعتنالك رسالة على الخاص 💬"></label>
-                    <label class="check"><input type="checkbox" id="dmGate" checked> 🔒 اسأله أولًا «عامل فولو؟» والرابط يوصله عندما يقول «نعم»</label>
+                    <label class="field">الكلمة (أو عدة كلمات بفاصلة) <input type="text" id="dmWords" placeholder="مثلًا: أريد"></label>
+                    <label class="field">الرسالة التي ستصله في الخاص <textarea id="dmMessage" rows="3" placeholder="رابط، عرض، هدية، أو رابط الواتساب"></textarea></label>
+                    <label class="field">الرد على التعليق نفسه (اختياري) <input type="text" id="dmReply" placeholder="أرسلنا لك رسالة في الخاص 💬"></label>
+                    <label class="check"><input type="checkbox" id="dmGate" checked> 🔒 اسأله أولًا «هل تتابعنا؟» ويصله الرابط عندما يقول «نعم»</label>
                     <details class="dm-flow" id="dmFlow"><summary>⚙️ سيناريو الرد</summary>
-                      <ol class="dm-steps"><li>يعلّق بالكلمة ← يوصله السؤال:<textarea id="dmAsk" rows="2"></textarea></li>
-                        <li>يرد بكلمة من هؤلاء ← يوصله الذي أعلى (الرسالة):<input type="text" id="dmYes" placeholder="نعم، تم، عملت…"></li>
-                        <li>يرد بأي شيء أخرى ← يوصله:<textarea id="dmNudge" rows="2"></textarea>وعندما يرسل «تم» يوصله الذي طلبه.</li></ol>
+                      <ol class="dm-steps"><li>يعلّق بالكلمة ← يصله السؤال:<textarea id="dmAsk" rows="2"></textarea></li>
+                        <li>يرد بكلمة من هذه ← تصله الرسالة أعلاه:<input type="text" id="dmYes" placeholder="نعم، تم، فعلت…"></li>
+                        <li>يرد بأي شيء آخر ← يصله:<textarea id="dmNudge" rows="2"></textarea>وعندما يرسل «تم» يصله ما طلبه.</li></ol>
                       <div class="loc-row"><button type="button" class="btn sm" id="dmFlowSave">💾 احفظ السيناريو للعلامة</button><span class="muted" id="dmFlowStat"></span></div>
-                      <p class="hint">لا نتأكد من الفولو بجد، نصدّق إجابته. هذا السيناريو يُحفظ للعلامة ويشتغل على كل المنشورات.</p>
+                      <p class="hint">لا نتحقق من المتابعة فعلًا، بل نصدّق إجابته. يُحفظ هذا السيناريو للعلامة ويعمل على كل المنشورات.</p>
                     </details>
-                    <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> أضف الدعوة للكابشن</button></div>
-                    <p class="hint" id="dmHint">يشتغل على إنستجرام وفيسبوك أول ما المنشور يُنشر. تيك توك لا يسمح بالرد التلقائي في منطقتنا، فالدعوة في تيك توك تصبح «أرسل الكلمة على الواتساب».</p>
+                    <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> أضف الدعوة إلى التعليق النصي</button></div>
+                    <p class="hint" id="dmHint">يعمل على إنستجرام وفيسبوك فور نشر المنشور. تيك توك لا يسمح بالرد التلقائي في منطقتنا، فتصبح الدعوة في تيك توك «أرسل الكلمة على واتساب».</p>
                   </div>
                 </div>
 
@@ -850,7 +850,7 @@
                 <button type="button" data-v="week"><span class="emo">📅</span> أسبوع</button>
                 <button type="button" data-v="month"><span class="emo">🗓️</span> شهر</button>
               </div>
-        <button class="btn sm" id="syncZernio" title="يرى إذا فيه منشورات متجدولة على حساباتك ومش في القائمة هنا"><span class="emo">🔄</span> قارن مع حساباتك</button>
+        <button class="btn sm" id="syncZernio" title="يتحقق من وجود منشورات مجدولة على حساباتك وليست في القائمة هنا"><span class="emo">🔄</span> قارن مع حساباتك</button>
               <select id="postFilter">
                 <option value="upcoming">القادمة</option>
                 <option value="all">الكل</option>
@@ -974,7 +974,7 @@
                 <p class="hint">راجع كل كلمة هنا قبل الرسم: هذا النص هو ما سيُكتب على الصور بالحرف. يمكنك تعدّل بنفسك.</p>
                 <div class="car-slides-edit" id="carPlan"></div>
                 <label class="field">التعليق النصي <textarea id="carCaption" rows="3"></textarea></label>
-                <button type="button" class="btn sm" data-humanize="#carCaption"><span class="emo">🧹</span> أزل نَفَس الذكاء الاصطناعي</button>
+                <button type="button" class="btn sm" data-humanize="#carCaption"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button>
                 <label class="field">الهاشتاجات <input type="text" id="carTags" dir="auto"></label>
                 <div class="row"><button class="btn primary" id="carToOverview"><span class="emo">🖼️</span> ارسم الشكل العام</button></div>
               </section>
@@ -1017,7 +1017,7 @@
                   <label class="check"><input type="checkbox" id="carPubTt" checked> تيك توك</label>
                 </div>
                 <label class="field">التعليق النصي <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
-                <button type="button" class="btn sm" data-humanize="#carPubCaption"><span class="emo">🧹</span> أزل نَفَس الذكاء الاصطناعي</button>
+                <button type="button" class="btn sm" data-humanize="#carPubCaption"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button>
                 <div class="car-pub-tags">
                   <label class="field">تاج على إنستجرام (حساب الشخصية وأي حد آخر، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
                   <label id="carPubSlideWrap">التاج على سلايد <select id="carPubSlide"></select></label>
@@ -1224,11 +1224,11 @@
               <label class="btn primary ad-up">＋ فيديو من جهازك<input type="file" id="dbUpload" accept="video/*" hidden></label>
               <button type="button" class="btn" id="dbFromExport"><span class="emo">🎬</span> من الفيديوهات الجاهزة</button>
               <ul class="ad-list" id="dbExports" hidden></ul>
-              <p class="hint">النص يُسمع ويتحوّل لأي لهجة عربية (مصري، نجدي، حجازي، خليجي، شامي، مغربي…) أو لغة أجنبية، ويمكنك تعدّله قبل الصوت. كل جملة تُقال في وقتها، والموسيقى تظل، والليب سينك اختياري. النسخة تنزل في الفيديوهات الجاهزة للنشر.</p>
+              <p class="hint">يُستمع إلى النص ويُحوَّل إلى أي لهجة عربية (مصري، نجدي، حجازي، خليجي، شامي، مغربي…) أو لغة أجنبية، ويمكنك تعديله قبل الصوت. كل جملة تُقال في وقتها، وتبقى الموسيقى، ومزامنة الشفاه اختيارية. وتظهر النسخة في الفيديوهات الجاهزة للنشر.</p>
               <ul class="ad-list" id="dbList"></ul>
             </aside>
             <section class="car-main" id="dbMain" hidden></section>
-            <div class="panel muted" id="dbEmpty">ارفع فيديو أو اختر واحد من الفيديوهات الجاهزة لكي تدبلجه.</div>
+            <div class="panel muted" id="dbEmpty">ارفع فيديو أو اختر واحدًا من الفيديوهات الجاهزة لدبلجته.</div>
           </div>
         </main>
 
@@ -1239,8 +1239,8 @@
               <button type="button" class="btn primary ad-up" id="tyNew">＋ فيديو تايبوجرافي جديد</button>
               <p class="hint">النص يتحوّل لموشن جرافيك: كلمات تُكتب وتتبعتر وتُجمع، وحروف تُستبدل بأيقونات. من نص تكتبه، أو صوت، أو فيديو متصوّر (النص يتركب فوقه).</p>
               <ul class="ad-list" id="tyList"></ul>
-              <a class="btn lab-libbtn" href="/typo-gallery.html" target="_blank" rel="noopener"><span class="emo">🎨</span> معرض العناصر (انظر كل الحركات تعمل)</a>
-              <button type="button" class="btn lab-libbtn" id="tyStkBtn"><span class="emo">🧩</span> مكتبة الستيكرات <span class="muted" id="tyStkCount"></span></button>
+              <a class="btn lab-libbtn" href="/typo-gallery.html" target="_blank" rel="noopener"><span class="emo">🎨</span> معرض العناصر (شاهد كل الحركات)</a>
+              <button type="button" class="btn lab-libbtn" id="tyStkBtn"><span class="emo">🧩</span> مكتبة الملصقات <span class="muted" id="tyStkCount"></span></button>
               <p class="hint">الأيقونات والصور الشفافة التي النص يتحوّل لها. تأتي من «🔤 التايبوجرافي» في معمل التفكيك، أو ترفعها، أو تُرسم بالوصف.</p>
               <button type="button" class="btn lab-libbtn" id="tySfxBtn"><span class="emo">🔊</span> الأصوات الرسمية <span class="muted" id="tySfxCount"></span></button>
               <p class="hint">كليك على كل كلمة أو عنصر يظهر أو يختفي، وصوت كيبورد على كتابة الرسائل فقط.</p>
@@ -1390,7 +1390,7 @@
 
               <section class="panel ad-sec" data-sec="prod" hidden>
                 <div id="adProdStart" class="ad-prod-start" hidden>
-                  <p>التنفيذ يسير بالترتيب: <b>رأس الإعلان</b> (الأسلوب والكونسبت) ← <b>ستوري بورد</b> لكل لقطة ← <b>مكونات</b> كل لقطة (شخصيات، خلفيات، عناصر موشن جرافيك) وصورة لكل مكون ← <b>فيديو</b> كل لقطة بـ Seedance من الستوري بورد والمكونات ← <b>المونتاج</b>.</p>
+                  <p>التنفيذ يسير بالترتيب: <b>رأس الإعلان</b> (الأسلوب والفكرة) → <b>ستوري بورد</b> لكل لقطة → <b>مكونات</b> كل لقطة (شخصيات، خلفيات، عناصر موشن جرافيك) وصورة لكل مكوّن → <b>فيديو</b> كل لقطة من الستوري بورد والمكوّنات → <b>المونتاج</b>.</p>
                   <button class="btn primary" id="adProdGo"><span class="emo">🎬</span> ابدأ التنفيذ من الاقتراح</button>
                 </div>
                 <div class="ad-stale" id="adProdStale" hidden></div>
@@ -1495,7 +1495,7 @@
                     <label class="field">الاسم <input type="text" data-bn="name"></label>
                     <label class="field">نوع المنتج
                       <select data-bf="type"><option value="app">📱 تطبيق جوال</option><option value="physical">📦 منتج ملموس</option><option value="service">🤝 خدمة</option></select></label>
-                    <label class="field">المجال (النيش) <input type="text" data-bf="domain" placeholder="مثلًا: لياقة، مطاعم، عقارات"></label>
+                    <label class="field">المجال <input type="text" data-bf="domain" placeholder="مثلًا: لياقة، مطاعم، عقارات"></label>
                   </div>
                   <label class="field">عن المنتج <textarea rows="2" data-bf="about"></textarea></label>
                   <label class="field">الجمهور <textarea rows="2" data-bf="audience"></textarea></label>
@@ -1542,12 +1542,12 @@
                   </div>
 
                   <div data-bpane="style" hidden>
-                    <p class="hint">اختر الأساليب التي العلامة يشتغل بها (واحد أو أكثر). ما عليه ⭐ هو الافتراضي في صفحة «أنشئ»، والباقي يظهر في أولًا قبل كل الأساليب.</p>
+                    <p class="hint">اختر الأساليب التي تعمل بها العلامة (واحد أو أكثر). ما عليه ⭐ هو الافتراضي في صفحة «أنشئ»، والباقي يظهر أولًا قبل بقية الأساليب.</p>
                     <div class="brain-styles" id="brainStyles"></div>
                   </div>
 
                   <div data-bpane="rules" hidden>
-                    <p class="hint">اكتب بكلامك أي قاعدة يجب تتراعى في كل شيء البرنامج يعملها هذا للعلامة: النصوص، الصور، الفيديوهات، والصوت. مثلًا: «البنات محجبات ولبسهم واسع»، «بدون مزيكا»، «بدون وعود مبالغ فيها».</p>
+                    <p class="hint">اكتب بكلامك أي قاعدة يجب مراعاتها في كل ما يصنعه البرنامج لهذه العلامة: النصوص والصور والفيديوهات والصوت. مثلًا: «الفتيات محجبات وملابسهن واسعة»، «بدون موسيقى»، «بدون وعود مبالغ فيها».</p>
                     <label class="field">قواعد المحتوى <textarea rows="8" data-bf="rules" placeholder="اكتب القواعد هنا، كل قاعدة في سطر"></textarea></label>
                   </div>
 
@@ -1557,8 +1557,8 @@
                     </div>
                     <div class="brain-vids">
                       <div class="brain-vid" data-bvid="intro">
-                        <h3 class="pane-h"><span class="emo">🎬</span> إنترو العلامة</h3>
-                        <p class="hint">يوضع في أول كل فيديو إذا متفعّل.</p>
+                        <h3 class="pane-h"><span class="emo">🎬</span> مقدمة العلامة</h3>
+                        <p class="hint">يوضع في أول كل فيديو إذا كان مفعّلًا.</p>
                         <div class="brain-vid-box"></div>
                         <div class="row wrap">
                           <label class="btn sm primary">⬆ ارفع فيديو<input type="file" accept="video/*" data-bvup="intro" hidden></label>
@@ -1567,8 +1567,8 @@
                         </div>
                       </div>
                       <div class="brain-vid" data-bvid="outro">
-                        <h3 class="pane-h"><span class="emo">🏁</span> أوترو العلامة</h3>
-                        <p class="hint">يوضع في آخر كل فيديو إذا متفعّل (بعد أوترو الشخصية إذا فيه).</p>
+                        <h3 class="pane-h"><span class="emo">🏁</span> خاتمة العلامة</h3>
+                        <p class="hint">يوضع في آخر كل فيديو إذا كان مفعّلًا (بعد خاتمة الشخصية إن وُجدت).</p>
                         <div class="brain-vid-box"></div>
                         <div class="row wrap">
                           <label class="btn sm primary">⬆ ارفع فيديو<input type="file" accept="video/*" data-bvup="outro" hidden></label>
@@ -1577,11 +1577,11 @@
                         </div>
                       </div>
                     </div>
-                    <p class="hint">يمكنك تزيل الإنترو أو الأوترو من أي مشروع تلقائيًا من المونتاج.</p>
-                    <label class="field">الـ CTA الافتراضي <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق الآن"></label>
+                    <p class="hint">يمكنك إزالة المقدمة أو الخاتمة من أي مشروع من المونتاج.</p>
+                    <label class="field">الدعوة الافتراضية (CTA) <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق الآن"></label>
                     <label class="field">الرابط <input type="text" data-bf="link" dir="ltr" placeholder="https://..."></label>
                     <label class="field">التعليق النصي الافتراضي <textarea rows="4" data-bf="caption" placeholder="{caption}&#10;&#10;{cta} 👇&#10;{link}&#10;#هاشتاج"></textarea></label>
-                    <p class="hint">{caption} = تعليق نصي الفيديو نفسه · {cta} = الـ CTA · {link} = الرابط. هذا التعليق النصي يوضع تلقائيًا وقت النشر.</p>
+                    <p class="hint">{caption} = التعليق النصي للفيديو نفسه · {cta} = الدعوة · {link} = الرابط. يوضع هذا التعليق النصي تلقائيًا وقت النشر.</p>
                   </div>
                 </div>
               </div>
@@ -1604,27 +1604,27 @@
                 <span><small>رصيد Atlas</small><b id="setCreditVal"></b><small id="setCreditSpent"></small></span>
               </div>
               <form id="keysForm">
-                <label class="field" title="للتوليد بـ Seedance">مفتاح Atlas
+                <label class="field" title="لتوليد الفيديو">مفتاح Atlas
                   <input type="password" id="atlasKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="atlasState"></p>
-                <label class="field" title="للنشر على السوشيال ميديا">مفتاح Zernio
+                <label class="field" title="للنشر على التواصل الاجتماعي">مفتاح Zernio
                   <input type="password" id="zernioKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="zernioState"></p>
-                <label class="field" title="لتحليل حسابات السوشيال في عقل العلامة و«نبض المجال»">مفتاح ScrapeCreators
+                <label class="field" title="لتحليل حسابات التواصل الاجتماعي في عقل العلامة و«نبض المجال»">مفتاح ScrapeCreators
                   <input type="password" id="scrapeKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="scrapeState"></p>
-                <label class="field" title="صور وفيديوهات حقيقية (غير متولّدة) لخلفيات التايبوجرافي">مفتاح Pexels
+                <label class="field" title="صور وفيديوهات حقيقية (غير مولّدة) لخلفيات التايبوجرافي">مفتاح Pexels
                   <input type="password" id="pexelsKey" autocomplete="off" placeholder="الصق المفتاح هنا"></label>
                 <p class="hint" id="pexelsState"></p>
-                <details class="keys-more"><summary>🔑 باقي مفاتيح المنصة (الأصوات، الدفع، البريد الإلكتروني، الدخول بجوجل)</summary><div id="keysMore"></div></details>
+                <details class="keys-more"><summary>🔑 بقية مفاتيح المنصة (الأصوات، الدفع، البريد الإلكتروني، الدخول بجوجل)</summary><div id="keysMore"></div></details>
                 <button class="btn primary" type="submit" title="المفاتيح تُحفظ على الخادم الخاص بك فقط. إذا سبت الخانة فارغة المفتاح القديم يظل كما هو.">حفظ المفاتيح</button>
               </form>
             </section>
             <section class="panel set-card admin-only">
               <div class="set-k">PROVIDERS</div><h2>💳 رصيد المنصات</h2>
-              <p class="hint">كل منصة نأخذ منها خدمة ورصيدها. إذا الرصيد قل عن الحد يوصلك جرس وبريد إلكتروني، ويتشيّك تلقائيًا كل نص ساعة.</p>
+              <p class="hint">كل منصة نأخذ منها خدمة ورصيدها. إذا قلّ الرصيد عن الحد يصلك تنبيه وبريد إلكتروني، ويُفحص تلقائيًا كل نصف ساعة.</p>
               <div class="prov-list" id="provList"><p class="hint">جارٍ التحميل…</p></div>
-              <div class="row wrap"><button type="button" class="btn sm" id="provRefresh">↻ شيّك الآن</button><span class="hint" id="provAt"></span></div>
+              <div class="row wrap"><button type="button" class="btn sm" id="provRefresh">↻ افحص الآن</button><span class="hint" id="provAt"></span></div>
             </section>
             <section class="panel set-card admin-only">
               <div class="set-k">BACKUP</div><h2>🗄️ النسخة الاحتياطية</h2>
@@ -1633,7 +1633,7 @@
             </section>
             <section class="panel set-card">
               <div class="set-k">PLANS &amp; CREDITS</div><h2>الباقات والأسعار</h2>
-              <p class="hint" id="setPlan">الاشتراكات، والإضافات، والنقاط الزيادة، وكل شيء بكام نقطة.</p>
+              <p class="hint" id="setPlan">الاشتراكات، والإضافات، والنقاط الإضافية، وتكلفة كل شيء بالنقاط.</p>
               <div class="row wrap"><button class="btn primary" type="button" onclick="document.getElementById('stagePlans').click()">💳 باقتي ونقاطي</button></div>
             </section>
             <section class="panel set-card settings studio-only">
@@ -1668,12 +1668,12 @@
             </section>
             <section class="panel set-card admin-only set-wide">
               <div class="set-k">MONTHLY BILLS</div><h2>💸 فواتيري الشهرية</h2>
-              <p class="hint">كل خدمة بتدفعلها والمنصة شغالة بيها. عدّل المبلغ ونوع الدفع، والمجموع بيتحسب لوحده (السنوي بيتقسم على ١٢).</p>
+              <p class="hint">كل خدمة تدفع لها وتعمل بها المنصة. عدّل المبلغ ونوع الدفع، ويُحسب المجموع تلقائيًا (السنوي يُقسم على ١٢).</p>
               <div id="expBox"><p class="hint">جارٍ التحميل…</p></div>
             </section>
             <section class="panel set-card admin-only">
               <div class="set-k">VOICE LAB</div><h2>🎧 مختبر الأصوات</h2>
-              <p class="hint">نفس الجملة بفصيح ومنصت وElevenLabs وMiniMax وSILMA في كل لهجة جنب بعض، وتقييم بالنجوم، وكلون صوت بين ElevenLabs وMiniMax. النتيجة النهائية بتطلع لوحدها.</p>
+              <p class="hint">الجملة نفسها بكل محركات الأصوات وبكل لهجة جنبًا إلى جنب، مع تقييم بالنجوم، ونسخ الصوت بين المحركات. وتظهر النتيجة النهائية تلقائيًا.</p>
               <div class="row wrap"><button type="button" class="btn primary" id="openVoiceLab">🎧 افتح المختبر</button></div>
             </section>
             <section class="panel set-card settings">
@@ -1749,7 +1749,7 @@
       <label class="field">مكان الشعار <input type="text" data-b="logo_rule"></label>
       <label class="field">السوق <input type="text" data-b="market" placeholder="مثلًا: السعودية والخليج، أو مصر"></label>
       <label class="field">اللغة واللهجة <input type="text" data-b="language" placeholder="مثلًا: اللهجة السعودية البيضاء، أو العامية المصرية"></label>
-      <label class="field">قواعد المحتوى (تُطبّق على كل النصوص والصور والفيديوهات والصوت) <textarea rows="4" data-b="rules" placeholder="مثلًا: البنات محجبات، بدون مزيكا"></textarea></label>
+      <label class="field">قواعد المحتوى (تُطبّق على كل النصوص والصور والفيديوهات والصوت) <textarea rows="4" data-b="rules" placeholder="مثلًا: الفتيات محجبات، بدون موسيقى"></textarea></label>
     </div>
     <div>
       <div class="field">الشعار <div class="brand-logo" id="brandLogo"></div><span class="hint">أول شعار في ملف العميل (وهو نفسه شعار المونتاج).</span></div>
