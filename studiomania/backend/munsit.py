@@ -90,10 +90,10 @@ def speak(text: str, voice_id: str, dest: Path, stability: float = 0.5) -> Path:
                 time.sleep(2 * (attempt + 1))
                 continue
             if r.status_code != 200:
-                raise _err(r, "صوت منصت")
+                raise _err(r, "الأصوات الخليجية")
             data = r.content
             if "json" in (r.headers.get("content-type") or ""):
-                raise _err(r, "صوت منصت")
+                raise _err(r, "الأصوات الخليجية")
             if len(data) < 200:
                 raise MunsitError("ملف الصوت من منصت جه فاضي")
             if data[:4] == b"RIFF" or data[:3] == b"ID3" or data[:2] == b"\xff\xfb":

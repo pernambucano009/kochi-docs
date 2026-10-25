@@ -215,5 +215,5 @@ def spend(n: int, what: str, ref: str = ""):
         with covered():
             yield h
     except BaseException:
-        refund(h, why="العملية فشلت")
+        refund(h, why="فشلت العملية")
         raise

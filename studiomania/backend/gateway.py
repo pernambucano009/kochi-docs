@@ -620,11 +620,11 @@ class SetupIn(BaseModel):
 def owner_setup(body: SetupIn, request: Request):
     """أول مرة: حساب صاحب البرنامج (الأدمن)، ومساحته هي البيانات القديمة كما هي."""
     if not needs_owner_setup():
-        raise HTTPException(400, "حساب الأدمن موجود بالفعل")
+        raise HTTPException(400, "حساب المشرف موجود بالفعل")
     want = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
     email = norm_email(body.email)
     if want and email != want:
-        raise HTTPException(403, "هذا البريد الإلكتروني ليس بريد الأدمن المسجّل على الخادم. استخدم البريد المحدد للأدمن")
+        raise HTTPException(403, "هذا البريد ليس بريد المشرف المسجّل على الخادم. استخدم البريد المحدد للمشرف")
     if old_password_set() and not old_password_ok(body.old_password):
         failed(client_ip(request))
         raise HTTPException(401, "كلمة المرور القديمة للبرنامج غير صحيحة")
@@ -1035,7 +1035,7 @@ def customer_user(request: Request) -> sqlite3.Row:
     if not u or not u["verified"]:
         raise HTTPException(401, "يجب تسجيل الدخول")
     if u["workspace"] == OWNER:
-        raise HTTPException(400, "حساب صاحب البرنامج لا يحتاج إلى اشتراك")
+        raise HTTPException(400, "حساب مالك البرنامج لا يحتاج إلى اشتراك")
     return u
 
 
@@ -1085,7 +1085,7 @@ def checkout(body: CheckoutIn, request: Request):
         if body.kind == "topup":
             t = next((x for x in cfg["topups"] if x["key"] == body.topup), None)
             if not t:
-                raise HTTPException(400, "باقة هذه النقاط غير موجودة")
+                raise HTTPException(400, "باقة النقاط هذه غير موجودة")
             name = f"SimsimKit · {t['credits']:,} نقطة"
             if body.provider == "paypal":
                 url = payments.paypal_order(t["price"], f"{wid}|topup|{t['key']}", name,
@@ -1198,7 +1198,7 @@ async def paypal_hook(request: Request):
 def admin(request: Request) -> sqlite3.Row:
     u = current_user(request)
     if not u or u["role"] != "admin":
-        raise HTTPException(403, "للأدمن فقط")
+        raise HTTPException(403, "للمشرف فقط")
     return u
 
 
@@ -1393,7 +1393,7 @@ async def proxy(path: str, request: Request):
         if url_path in PUBLIC_FILES:
             u_pub = True
         elif url_path.startswith("/api/"):
-            return JSONResponse({"detail": "أكّد إيميلك أولًا"}, status_code=403)
+            return JSONResponse({"detail": "أكّد بريدك الإلكتروني أولًا"}, status_code=403)
         else:
             return RedirectResponse("/verify")
     if u and u["verified"] and url_path in ("/pricing", "/pricing.html"):
@@ -1418,7 +1418,7 @@ async def proxy(path: str, request: Request):
         r = await _http.send(req, stream=True)
     except httpx.HTTPError:
         _tenants.pop(t.wid, None)
-        return JSONResponse({"detail": "البرنامج يعيد التشغيل، جرّب مرة أخرى أيضًا ثانية"}, status_code=503)
+        return JSONResponse({"detail": "البرنامج يعيد التشغيل، جرّب مرة أخرى بعد ثوانٍ"}, status_code=503)
     out_headers = [(k, v) for k, v in r.headers.multi_items() if k.lower() not in HOP and k.lower() != "set-cookie"]
     resp = StreamingResponse(r.aiter_raw(), status_code=r.status_code, background=BackgroundTask(r.aclose))
     resp.raw_headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in out_headers]

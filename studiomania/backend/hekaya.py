@@ -440,7 +440,7 @@ def mock_story(i: dict) -> dict:
         sc += [{"text": "كل ما شفته هذا أُنشئ بالكود" if ar else "Everything you saw was made in code", "visual": "", "motion": "", "big": False, "keys": [], "end": "card"},
                {"text": f"اكتب {i.get('keyword') or 'حكاية'} في التعليق" if ar else f"Comment {i.get('keyword') or 'story'}", "visual": "", "motion": "", "big": False,
                 "keys": [], "end": "cta"}]
-    return {"title": "الصاروخ الورق" if ar else "The Paper Rocket", "cast": [{"name": "fox", "label": "يبو", "look": "orange blob body, cream belly, triangle ears, bushy tail"}],
+    return {"title": "الصاروخ الورقي" if ar else "The Paper Rocket", "cast": [{"name": "fox", "label": "يبو", "look": "orange blob body, cream belly, triangle ears, bushy tail"}],
             "scenes": sc, "music": {"mood": "playful", "bpm": 118}}
 
 

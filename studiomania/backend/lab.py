@@ -483,7 +483,7 @@ def mock_components(d: dict) -> dict:
                       "tags": ["ماوس", "سحب"],
                       "controls": [{"label": "لون المؤشر", "type": "color", "target": els[0]["name"], "value": "#3CFF6B"},
                                    {"label": "اسم الملف", "type": "text", "target": els[-1]["name"], "value": "علي"},
-                                   {"label": "الملف يروح أين", "type": "choice", "target": "السلة", "value": "سلة المهملات",
+                                   {"label": "وجهة الملف", "type": "choice", "target": "السلة", "value": "سلة المهملات",
                                     "options": ["سلة المهملات", "مجلد"]}]})
     return {"components": comps}
 
@@ -713,8 +713,8 @@ def clean_trial_plan(data: dict, max_keys: int = 2) -> dict:
 def mock_trial_plan() -> dict:
     return {"adapted": "١. زووم ناعم على العنصر الذي اتداس\n٢. الخلفية تتحول للمشهد الجديد", "anchors": ["النص المكتوب"],
             "keyframes": [{"label": "النص: الخلفية تتحول", "prompt": "Halfway state: background morphing into the next scene."}],
-            "segments": [{"label": "زووم وبداية التحوّل", "prompt": "Slow zoom in, background starts morphing.", "seconds": 1.5},
-                         {"label": "التحوّل يُكمل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
+            "segments": [{"label": "تكبير وبداية التحوّل", "prompt": "Slow zoom in, background starts morphing.", "seconds": 1.5},
+                         {"label": "يكتمل التحوّل", "prompt": "Background finishes morphing into the final frame.", "seconds": 1.5}]}
 
 
 # ------------------------------------------------------------ 🎞️ فيديو مبني على الكونيكتورز
@@ -930,7 +930,7 @@ def mock_schema(d: dict) -> dict:
     n = max(2, min(5, int(dur // 2)))
     step = dur / n
     roles = ["hook", "feature", "feature", "proof", "cta"]
-    return {"title": "جوال في النص والكاميرا ماشية", "summary": "جوال ثابت في النص والكاميرا تدخل داخل الشاشات", "beat_sec": 0.5,
+    return {"title": "جوال في المنتصف والكاميرا تتحرك", "summary": "جوال ثابت في النص والكاميرا تدخل داخل الشاشات", "beat_sec": 0.5,
             "style": "Clean 3D render, soft studio light, pastel background.", "palette": "teal, cream", "spine": "A phone at center.",
             "camera": "Always pushing in slowly.", "text_style": "Bold sans headline in the top third.", "music": "بيت خفيف",
             "beats": [{"t0": round(i * step, 2), "t1": round((i + 1) * step, 2), "role": roles[min(i, 4)], "what": f"جزء {i + 1}",
@@ -1005,7 +1005,7 @@ def clean_fill(data: dict, n: int) -> dict:
 
 def mock_fill(schema: dict, brand: str) -> dict:
     n = len(schema["beats"])
-    return {"title": f"{brand} على التيمبليت", "world": "Pastel 3D studio, a teal phone at center.",
+    return {"title": f"{brand} على القالب", "world": "Pastel 3D studio, a teal phone at center.",
             "panels": [{"desc": f"Panel {i + 1}: the phone at center showing screen {i + 1}.", "asset": ""} for i in range(n + 1)],
             "beats": [{"motion": "Slow push in.", "text": f"{brand} {i + 1}", "voice": f"جملة {i + 1}"} for i in range(n)]}
 
@@ -1212,7 +1212,7 @@ def panel_sharpen_prompt(desc: str, text_mode: str, text: str, note: str = "", p
 # ------------------------------------------------------------ تجارب من غير Atlas
 
 def mock_audio(duration: float, marks: list[dict]) -> dict:
-    sfx = [{"t": m["t"], "dur": 0.2, "label": "كليك تجريبي", "category": "click", "what": "تجربة"} for m in marks[:6]]
+    sfx = [{"t": m["t"], "dur": 0.2, "label": "نقرة تجريبية", "category": "click", "what": "تجربة"} for m in marks[:6]]
     return {"music": [{"start": 0.0, "end": round(duration, 2), "description": "بيت إلكتروني خفيف", "mood": "حماسي"}],
             "speech": [{"start": 0.3, "end": min(duration, 1.8), "speaker": "راوي", "text": "نص تجريبي"}], "sfx": sfx}
 
@@ -1232,7 +1232,7 @@ def mock_elements(shot: dict, sfx: list[dict]) -> dict:
                                        "detail": "حركة سريعة", "sfx": sfx[0]["id"] if sfx else None}]},
                          {"id": "e2", "name": "ملف صورة: علي", "type": "file", "description": "أيقونة صورة", "first_t": s, "last_t": e,
                           "box": [0.03, 0.38, 0.08, 0.1], "actions": [{"t0": (s + e) / 2, "t1": e, "action": "drag", "from": [0.05, 0.4],
-                                                                       "to": [0.92, 0.8], "detail": "يتسحب للسلة"}]}]}
+                                                                       "to": [0.92, 0.8], "detail": "يُسحب إلى السلة"}]}]}
 
 
 def to_json(d: dict) -> str:
@@ -1244,7 +1244,7 @@ def to_json(d: dict) -> str:
 VEDIT_MODELS = {
     "gemini": {"model": "google/gemini-omni-1.1-flash/video-edit", "label": "Gemini Omni 1.1 (الأدق في الحفاظ على الحركة)", "per_sec": 0.107},
     "flux": {"model": "black-forest-labs/flux-3/edit-video", "label": "FLUX 3 (أرخص، يغيّر التوقيت أحيانًا)", "per_sec": 0.03},
-    "kling": {"model": "kwaivgi/kling-video-o3-std/video-edit", "label": "Kling O3 (ضعيف في النص العربية)", "per_sec": 0.107},
+    "kling": {"model": "kwaivgi/kling-video-o3-std/video-edit", "label": "Kling O3 (ضعيف في النص العربي)", "per_sec": 0.107},
 }
 
 VEDIT_FORMAT = """{"prompt": "the full English edit instruction"}"""

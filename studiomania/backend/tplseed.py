@@ -160,7 +160,7 @@ BUILTIN = {
         "voice_tone": "elegant, slow, almost whispered",
         "sample": "أجواء مقهى قديم في وسط البلد: الزبونة بتبص من النضارة فتلاقي المقهى، والكاميرا تدخل وترجع ليها",
         "schema": {
-            "title": "لوحة آرت ديكو بزووم ليس له آخر", "summary": "رسم فلات بألوان قليلة، الشخصية بالكاد تتحرك، والكاميرا تدخل في تفصيلة وتظهر منها لنفس اللقطة الأولى (لوب).",
+            "title": "لوحة آرت ديكو بتكبير لا ينتهي", "summary": "رسم فلات بألوان قليلة، الشخصية بالكاد تتحرك، والكاميرا تدخل في تفصيلة وتظهر منها لنفس اللقطة الأولى (لوب).",
             "beat_sec": 0.0, "loop": True,
             "style": "Flat vector art-deco poster illustration, mid-century travel-poster feel: crisp geometric shapes, no outlines, hard-edged two-tone shadows, "
                      "subtle paper grain, living-illustration animation (slow blinks, breathing, a curl of steam), never cartoon bouncy.",
@@ -235,7 +235,7 @@ BUILTIN = {
         "voice_tone": "clear, confident explainer, friendly",
         "sample": "صاحب ورشة كان بيخسر زباين علشان مفيش تقييمات، ومن التطبيق بقى بيجمعها وبيكسب ثقة",
         "schema": {
-            "title": "كولاج أبيض وأسود بدايرة حمراء", "summary": "شخص حقيقي أبيض وأسود مقصوص مثل الستيكر، دائرة لون خلف، شخبطة بالأحمر، جوال وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
+            "title": "كولاج أبيض وأسود بدائرة حمراء", "summary": "شخص حقيقي أبيض وأسود مقصوص مثل الستيكر، دائرة لون خلف، شخبطة بالأحمر، جوال وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
             "beat_sec": 2.0,
             "style": "Mixed-media paper collage: black-and-white photographic cut-out people with a thin white sticker border, a big flat crimson circle behind them, "
                      "cream handmade paper with fibers, hand-drawn crimson marker arrows/circles/loops that draw themselves, tape strips, a wax seal, torn paper scraps.",
@@ -263,7 +263,7 @@ BUILTIN = {
         "voice_tone": "light, modern, few words",
         "sample": "ساعة ذكية بـ ٣ أشكال: رياضة (برتقالي)، سفر (أزرق)، ستايل (بمبي)",
         "schema": {
-            "title": "المنتج يفرقع لعالمه", "summary": "رندر ثري هذه ناعم: المنتج طاير ولافف، يتفكك لسحابة أشياء من نفس عالمه، ويعود يتجمع بلون آخر.",
+            "title": "المنتج ينفجر إلى عالمه", "summary": "رندر ثري هذه ناعم: المنتج طاير ولافف، يتفكك لسحابة أشياء من نفس عالمه، ويعود يتجمع بلون آخر.",
             "beat_sec": 0.0,
             "style": "Soft pastel 3D product render: the product floats and rotates in a dreamy blurred room, then explodes into a floating cloud of themed props "
                      "(matching its use) that hang in the air and collapse back into the next color version; glossy clay-like props, soft global illumination.",
@@ -288,7 +288,7 @@ BUILTIN = {
         "voice_tone": "friendly, direct, a little playful",
         "sample": "مصمم جرافيك بيعرّف نفسه ويعرض شغله (مجلات، هويات، تغليف) ويقول «ابعتلي تصميم»",
         "schema": {
-            "title": "بروموشن فريلانسر: «يحتاج هذه الحباية؟»", "summary": "خطاف بحباية ثري هذه، الشخص مقصوص يقول هاي، مجلد يُفتح بأعماله، كل نوع عمل بموك أب، حيطة سبوت لايت، ودعوة رسالة.",
+            "title": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "summary": "خطاف بحباية ثري هذه، الشخص مقصوص يقول هاي، مجلد يُفتح بأعماله، كل نوع عمل بموك أب، حيطة سبوت لايت، ودعوة رسالة.",
             "beat_sec": 0.0,
             "style": "Clean 3D motion-graphics promo on a light grey grid wall with diagonal window-light shadows: glossy 3D capsule pill, a real person photo cut-out, "
                      "a 3D blue folder opening with work samples, realistic mockups (magazine spreads, business cards, snack packaging with flying pieces), "

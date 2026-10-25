@@ -94,7 +94,7 @@ def eleven_clone(sample: Path, name: str) -> str:
         r = c.post(f"{EL_BASE}/voices/add", headers={"xi-api-key": eleven_key()}, data={"name": name[:60]},
                    files={"files": (sample.name, f, "audio/mpeg")})
     if r.status_code >= 400:
-        raise _fail(r, "ElevenLabs (الكلون يحتاج اشتراك Starter على الأقل)")
+        raise _fail(r, "ElevenLabs (الاستنساخ يحتاج إلى اشتراك Starter على الأقل)")
     return r.json()["voice_id"]
 
 
@@ -157,7 +157,7 @@ def minimax_clone(sample: Path) -> str:
         vid = "sk" + uuid.uuid4().hex[:14]
         r = c.post(f"{MM_BASE}/voice_clone", headers=_mm_headers(), json={"file_id": fid, "voice_id": vid})
     if r.status_code >= 400:
-        raise _fail(r, "MiniMax (الكلون)")
+        raise _fail(r, "MiniMax (الاستنساخ)")
     if (r.json().get("base_resp") or {}).get("status_code") not in (0, None):
         raise LabError(f"MiniMax: {(r.json().get('base_resp') or {}).get('status_msg')}")
     return vid
