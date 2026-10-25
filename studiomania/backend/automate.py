@@ -94,7 +94,7 @@ def clean_src(raw) -> dict | None:
         return {"mode": "file", "id": str(raw["id"])[:20], "label": str(raw.get("label") or "")[:200]}
     if mode == "stock" and str(raw.get("q") or "").strip():
         q = str(raw["q"]).strip()[:120]
-        return {"mode": "stock", "q": q, "label": f"🌐 ستوك: {q}"}
+        return {"mode": "stock", "q": q, "label": f"🌐 مكتبة مجانية: {q}"}
     if mode == "search" and str(raw.get("q") or "").strip():
         return {"mode": "search", "q": str(raw["q"]).strip()[:120], "label": str(raw["q"]).strip()[:120]}
     return None
@@ -373,11 +373,11 @@ def mock_describe(text: str, current: list[dict]) -> dict:
     if re.search(r"كابشن|caption", t):
         steps.append(new_step("caption"))
     if not steps:
-        return {"steps": current, "say": "مافهمتش أعمل ماذا بالضبط. قل مثلًا: «قطّع الفيديو لقطع ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم».", "changed": False}
+        return {"steps": current, "say": "لم أفهم المطلوب بالضبط. قل مثلًا: «قطّع الفيديو إلى قطع من ١٥ ثانية، وولّد كل قطعة بأسلوب كرتوني، ثم اجمعها».", "changed": False}
     pub = next((x for x in current if x.get("verb") == "publish"), None)
     if pub is not None:
         steps.append(pub)
-    return {"steps": steps, "say": f"عملت {len(steps)} خطوة من كلامك. راجعها وعدّل الذي تريده.", "changed": True}
+    return {"steps": steps, "say": f"أنشأت {len(steps)} خطوة من كلامك. راجعها وعدّل ما تريد.", "changed": True}
 
 
 def pick(files: list[dict], n: int, order: str, used: dict[str, int], rnd: random.Random) -> tuple[list[dict], bool]:

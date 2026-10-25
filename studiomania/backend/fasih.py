@@ -167,7 +167,7 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
                 time.sleep(2 * (attempt + 1))
                 continue
             if r.status_code not in (200, 201, 202):
-                raise _err(r, "صوت فصيح")
+                raise _err(r, "الأصوات العربية")
             job = r.json().get("jobId")
             break
         if not job:
@@ -185,7 +185,7 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
                     raise FasihError("فصيح مش بيرد على متابعة الصوت")
                 continue
             if r.status_code != 200:
-                raise _err(r, "متابعة صوت فصيح")
+                raise _err(r, "متابعة الأصوات العربية")
             j = r.json().get("job") or {}
             st = j.get("status")
             if st == "completed" and j.get("audio_url"):

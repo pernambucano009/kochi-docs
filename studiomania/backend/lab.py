@@ -286,7 +286,7 @@ ELEMENTS_FORMAT = """{
   "scene_type": "live_action | screen_recording | motion_graphics | mixed",
   "summary": "اللقطة في جملة",
   "motion_graphics": true,
-  "mg_reason": "له فيها أو لا تحتوي موشن جرافيك ينفع يُؤخذ (جملة قصيرة)",
+  "mg_reason": "له فيها أو لا تحتوي على رسوم متحركة ينفع يُؤخذ (جملة قصيرة)",
   "background": {"name": "اسم الخلفية", "description": "شكلها بالتفصيل"},
   "elements": [
     {"id": "e1", "name": "اسم العنصر (مثلًا: مؤشر ماوس أخضر)",

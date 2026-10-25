@@ -232,8 +232,8 @@ GUIDES = {
 CHARS_PER_SEC = 14.0      # كلام عربي عامي مريح تقريبًا
 MAX_LINE = 9.0            # أطول جملة (ثواني) قبل ما تتقسم
 LIPSYNC = {
-    "sync": {"label": "ليب سينك احترافي (أجود وأغلى)", "model": "sync/lipsync-v3", "per_sec": 0.22},
-    "veed": {"label": "ليب سينك عادي", "model": "veed/lipsync", "per_sec": 0.013},
+    "sync": {"label": "مزامنة شفاه احترافية (أجود وأغلى)", "model": "sync/lipsync-v3", "per_sec": 0.22},
+    "veed": {"label": "مزامنة شفاه عادية", "model": "veed/lipsync", "per_sec": 0.013},
 }
 
 

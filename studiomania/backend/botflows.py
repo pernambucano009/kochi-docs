@@ -32,12 +32,12 @@ RECIPES = {
                   "platforms": ("instagram", "facebook", "whatsapp"), "fields": ("message",)},
 }
 DEFAULTS = {
-    "comment": {"keywords": "برنامج", "message": "أهلًا 👋 ده اللينك اللي طلبته:", "link_title": "افتح اللينك"},
-    "keyword": {"keywords": "سعر, اشتراك", "message": "أهلًا 👋 دي كل التفاصيل:", "link_title": "التفاصيل"},
-    "story": {"message": "شكرًا إنك شاركتنا في الستوري 🙏 ده هدية بسيطة ليك:", "link_title": "الهدية"},
+    "comment": {"keywords": "برنامج", "message": "أهلًا 👋 هذا الرابط الذي طلبته:", "link_title": "افتح اللينك"},
+    "keyword": {"keywords": "سعر, اشتراك", "message": "أهلًا 👋 هذه كل التفاصيل:", "link_title": "التفاصيل"},
+    "story": {"message": "شكرًا لمشاركتنا في قصتك 🙏 هذه هدية بسيطة لك:", "link_title": "الهدية"},
     "qualify": {"keywords": "ابدأ", "q1": "إيه هدفك؟", "a1": "خسارة وزن, بناء عضل, لياقة عامة", "q2": "مستواك إيه؟", "a2": "مبتدئ, متوسط, محترف",
-                "message": "تمام، شكرًا! حد من الفريق هيكلمك دلوقتي 🙌"},
-    "assistant": {"message": "أهلًا 👋 أنا المساعد الآلي، اسألني أي حاجة."},
+                "message": "حسنًا، شكرًا! سيتواصل معك أحد أفراد الفريق الآن 🙌"},
+    "assistant": {"message": "أهلًا 👋 أنا المساعد الآلي، اسألني عن أي شيء."},
 }
 
 
@@ -118,8 +118,8 @@ def _ai_loop(g: G, platform: str, start: str, bot_key: str, handle: str | None =
     g.link(wait, end, "timeout")
     cond = g.add("condition", {"rules": [{"id": "human", "variable": "ai.body.handoff", "operator": "is_true"}]}, "محتاج إنسان؟")
     g.link(hook, cond, "success")
-    g.link(hook, g.add("handoff", {"note": "البوت ماقدرش يرد"}, "حوّل للفريق"), "error")
-    g.link(cond, g.add("handoff", {"note": "العميل طلب حد من الفريق"}, "حوّل للفريق"), "human")
+    g.link(hook, g.add("handoff", {"note": "لم يتمكن البوت من الرد"}, "حوّل للفريق"), "error")
+    g.link(cond, g.add("handoff", {"note": "طلب العميل أحدًا من الفريق"}, "حوّل للفريق"), "human")
     say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "ابعت الرد")
     g.link(cond, say, "default")
     g.link(say, wait)
@@ -172,10 +172,10 @@ def build(recipe: str, platform: str, o: dict, bot_key: str) -> dict:
         hook = g.add("webhook", {"url": ai_url(bot_key), "method": "POST", "headers": {"content-type": "application/json"}, "saveAs": "ai",
                                  "bodyTemplate": '{"text": "{{lastMessage}}", "name": "{{contact.name}}", "platform": "' + platform + '"}'}, "رد من عقل العلامة")
         g.link(trig, hook)
-        g.link(hook, g.add("handoff", {"note": "البوت ماقدرش يرد"}, "حوّل للفريق"), "error")
+        g.link(hook, g.add("handoff", {"note": "لم يتمكن البوت من الرد"}, "حوّل للفريق"), "error")
         cond = g.add("condition", {"rules": [{"id": "human", "variable": "ai.body.handoff", "operator": "is_true"}]}, "محتاج إنسان؟")
         g.link(hook, cond, "success")
-        g.link(cond, g.add("handoff", {"note": "العميل طلب حد من الفريق"}, "حوّل للفريق"), "human")
+        g.link(cond, g.add("handoff", {"note": "طلب العميل أحدًا من الفريق"}, "حوّل للفريق"), "human")
         say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "ابعت الرد")
         g.link(cond, say, "default")
         _ai_loop(g, platform, say, bot_key)

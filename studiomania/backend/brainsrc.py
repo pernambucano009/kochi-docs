@@ -298,7 +298,7 @@ def learn(d: dict, fb: dict, repeat: int = 3) -> list[dict]:
         same = [x for x in d.get("feedback") or [] if x.get("rating") == "bad" and x.get("note") and similar(x["note"], fb["note"])]
         already = any(p.get("kind") == "rule" and p.get("source") == "feedback" and similar(p.get("value", ""), fb["note"]) for p in d.get("pending") or [])
         if len(same) + 1 >= repeat and not already:   # + التقييم الجديد نفسه
-            out.append({"kind": "rule", "value": f"تجنّب: {fb['note']}"[:600], "why": f"هذه الملاحظة اتكررت {len(same) + 1} مرات في تقييماتك"})
+            out.append({"kind": "rule", "value": f"تجنّب: {fb['note']}"[:600], "why": f"تكررت هذه الملاحظة {len(same) + 1} مرات في تقييماتك"})
     for it in out:
         it.update(id=uuid.uuid4().hex[:10], source="feedback")
     return out

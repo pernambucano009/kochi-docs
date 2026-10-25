@@ -21,7 +21,7 @@ DEFAULTS = {
     "plans": [
         {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0,
          "autopilot": False, "once": True,
-         "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة فقط (لكي الحساب في Zernio يُحسب علينا)"},
+         "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة فقط"},
         {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False},
         {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "popular": True},
         # 🏆 أعلى باقة: النقطة فيها أرخص بحوالي ٧٠٪ من «محترف» (٣٠ ألف نقطة)، وتكفي ٩٠ بوست في الشهر بالأوتوبايلوت
