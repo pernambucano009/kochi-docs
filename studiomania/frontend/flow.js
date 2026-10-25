@@ -31,7 +31,7 @@ const Flow = (() => {
   const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
   const isPhone = (d) => d?.template?.kind === "phone";
   const steps = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
-  const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور خلف بعض تتقلب"], series: ["📺", "مسلسل", "كذا حلقة بنفس الأبطال"] };
+  const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
 
@@ -54,7 +54,7 @@ const Flow = (() => {
     shell();
     Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null });
     S.el.hidden = false;
-    S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكار…</p></div></div>`;
+    S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكارًا…</p></div></div>`;
     try {
       S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
       try { localStorage.setItem("studiomania.flow", S.d.id); } catch { /* غير مهم */ }
@@ -113,7 +113,7 @@ const Flow = (() => {
   function meter(k) {
     if (!k) return "";
     const r = 15, c = 2 * Math.PI * r;
-    return `<button type="button" class="flw-meter" data-why title="العقل فاهمك قدر ماذا (اضغط ترى الشروط)">
+    return `<button type="button" class="flw-meter" data-why title="كم يعرفك العقل (اضغط لترى الشروط)">
       <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="${r}" class="bg"/><circle cx="18" cy="18" r="${r}" class="fg" stroke-dasharray="${(k.score / 100) * c} ${c}"/></svg>
       <span><b class="num">${k.score}٪</b><small>${esc(k.level)}</small></span></button>`;
   }
@@ -126,7 +126,7 @@ const Flow = (() => {
   }
   function rateBtns(stage, id) {
     const v = (S.d.ratings || {})[`${stage}:${id || "final"}`] || 0;
-    return `<span class="flw-rate"><button type="button" class="${v === 1 ? "on" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === 1 ? 0 : 1}" title="عجبني">👍</button>
+    return `<span class="flw-rate"><button type="button" class="${v === 1 ? "on" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === 1 ? 0 : 1}" title="أعجبني">👍</button>
       <button type="button" class="${v === -1 ? "on bad" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === -1 ? 0 : -1}" title="غير يعجبني">👎</button></span>`;
   }
   const working = (t) => `<div class="flw-work"><span class="flw-spin"></span><p>${t} <small class="muted" data-secs></small></p></div>`;
@@ -136,7 +136,7 @@ const Flow = (() => {
     const log = S.d[stage === "idea" ? "idea_chat" : "scen_chat"] || [];
     return `<div class="flw-chat">
       ${log.length ? `<div class="flw-log">${log.slice(-8).map((m) => `<p class="${m.role}">${esc(m.content)}</p>`).join("")}</div>` : ""}
-      <div class="flw-chatrow"><input data-chatin="${stage}" placeholder="${stage === "idea" ? "مثلًا: اجعلها أجرأ، أو ركّز على السعر…" : "مثلًا: الخطاف أقوى، أو قلل النص…"}" ${S.d.busy ? "disabled" : ""}>
+      <div class="flw-chatrow"><input data-chatin="${stage}" placeholder="${stage === "idea" ? "مثلًا: اجعلها أجرأ، أو ركّز على السعر…" : "مثلًا: خطاف أقوى، أو نص أقل…"}" ${S.d.busy ? "disabled" : ""}>
         <button type="button" class="flw-btn" data-send="${stage}" ${S.d.busy ? "disabled" : ""}>أرسل</button></div></div>`;
   }
   // الاختيار اللي فات (بيظهر فوق الخطوة الجاية): تقدر تتناقش فيه أو ترجع تغيّره
@@ -163,12 +163,12 @@ const Flow = (() => {
     const looks = g.looks.map((x) => [x.id, x.label]), lens = g.lens.map((n) => [n, `${n} ثانية`]);
     const ratios = g.ratios.map((r) => [r, { "9:16": "📱 طولي 9:16", "1:1": "⬜ مربع 1:1", "16:9": "🖥️ عرضي 16:9" }[r] || r]);
     return `<div class="flw-tpanel"><h3 class="flw-h3">🧭 إعدادات القالب</h3>
-      ${g.refs.length ? `<div class="flw-refs"><small>الصور الذي هذا القالب تحتاجها: ارفع كل واحدة في خانتها وستتسمّى تلقائيًا.</small>
+      ${g.refs.length ? `<div class="flw-refs"><small>الصور التي يحتاجها هذا القالب: ارفع كل صورة في خانتها وستُسمّى تلقائيًا.</small>
         ${g.refs.map((r) => { const key = refKey(r.name), has = (d.assets || []).some((a) => a.name === key); return `<div class="flw-ref${has ? " ok" : ""}"><i>${has ? "✅" : "🖼️"}</i><div><b>${esc(r.name)}</b>
           <span class="num latin">${esc(r.ratio)}</span><small class="muted">${esc(r.why)}</small></div>
           <label class="flw-link">${has ? "↻ غيّر" : "⬆️ ارفع"}<input type="file" accept="image/*" hidden data-refup="${esc(key)}"></label></div>`; }).join("")}</div>` : ""}
       ${row("شكل الأسلوب", looks, "data-tlook", ts.look || looks[0]?.[0] || "")}
-      ${row("طول الفيديو", lens, "data-tlen", ts.length)}${!g.lens.length && g.len ? `<small class="muted">⏱️ طوله ${g.len} ثانية (ثابت هذا للقالب)</small>` : ""}
+      ${row("طول الفيديو", lens, "data-tlen", ts.length)}${!g.lens.length && g.len ? `<small class="muted">⏱️ طوله ${g.len} ثانية (ثابت في هذا القالب)</small>` : ""}
       ${row("مقاس الفيديو", ratios, "data-tratio", ts.ratio || "9:16")}</div>`;
   }
   const refKey = (n) => n.trim().replace(/\s+/g, "_");
@@ -183,28 +183,28 @@ const Flow = (() => {
     if (S.edit === it.id) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
       ${it.aud ? `<small class="flw-aud">👥 ${esc(it.aud)}</small>` : ""}<p class="flw-idea">${esc(it.idea)}</p>${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}
-      ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (خطافات أخرى، وكيف ماشية على القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
+      ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (خطافات أخرى، وكيف تناسب القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختر هذه الفكرة</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div></article>`;
   }
-  // 🔖 احفظها لبعدين: بتروح مكتبة «محفوظاتك» ومابتتقترحش تاني لحد ما تستخدمها
+  // 🔖 احفظها لوقت لاحق: بتروح مكتبة «محفوظاتك» ومابتتقترحش تاني لحد ما تستخدمها
   function laterBtn(kind, id) {
     const on = (S.d?.saved_ids || []).includes(id);
-    return `<button type="button" class="flw-link" data-later="${kind}:${esc(id)}" ${on ? "disabled" : ""}>${on ? "🔖 حُفظت لبعدين" : "🔖 احفظها لبعدين"}</button>`;
+    return `<button type="button" class="flw-link" data-later="${kind}:${esc(id)}" ${on ? "disabled" : ""}>${on ? "🔖 حُفظت لوقت لاحق" : "🔖 احفظها لوقت لاحق"}</button>`;
   }
   // مكتبة «لبعدين» + ملاحظة لو شلنا اقتراحات شبه اللي اتستخدم قبل كده
   function savedBox(kind, d) {
     const n = kind === "idea" ? d.ideas_repeats : d.scen_repeats;
-    const note = n ? `<p class="flw-algo-note">🔁 شلنا ${n} ${kind === "idea" ? "أفكار" : "اقتراحات"} شبه أشياء استخدمتها من قبل، وجبنا غيرها.</p>` : "";
-    if (!S.savedOpen) return `${note}<div class="flw-saved"><button type="button" class="flw-link" data-savedopen>🔖 محفوظاتك لبعدين</button></div>`;
+    const note = n ? `<p class="flw-algo-note">🔁 أزلنا ${n} ${kind === "idea" ? "أفكار" : "اقتراحات"} تشبه ما استخدمته من قبل، وجئنا بغيرها.</p>` : "";
+    if (!S.savedOpen) return `${note}<div class="flw-saved"><button type="button" class="flw-link" data-savedopen>🔖 محفوظاتك</button></div>`;
     const items = S.saved;
     const row = (x) => `<li><div><b>${x.kind === "idea" ? "💡" : x.kind === "trend" ? "📈" : "🎬"} ${esc(x.title || "بدون عنوان")}</b>
         <small class="muted">${x.kind === "idea" ? "فكرة" : x.kind === "trend" ? "ترند (الأفكار ستُبنى عليه)" : `سيناريو${x.idea_title ? ` لفكرة «${esc(x.idea_title)}»` : ""} · قالب «${esc(x.template?.name || "")}»`}</small>
         ${x.hook ? `<p class="flw-hook">«${esc(x.hook)}»</p>` : ""}${x.text ? `<p>${esc(x.text)}</p>` : ""}</div>
-      <div class="flw-acts">${x.here ? `<button type="button" class="flw-btn pri" data-usesaved="${esc(x.id)}" ${S.d.busy ? "disabled" : ""}>استخدمها هنا</button>` : `<small class="muted">تنفع في قالبها فقط</small>`}
+      <div class="flw-acts">${x.here ? `<button type="button" class="flw-btn pri" data-usesaved="${esc(x.id)}" ${S.d.busy ? "disabled" : ""}>استخدمها هنا</button>` : `<small class="muted">تصلح لقالبها فقط</small>`}
         <button type="button" class="flw-link" data-delsaved="${esc(x.id)}">✕ أزلها</button></div></li>`;
-    return `${note}<div class="flw-saved open"><div class="flw-ch"><b>🔖 محفوظاتك لبعدين</b><button type="button" class="flw-link" data-savedopen>إخفاء</button></div>
-      ${items == null ? working("يجلب المحفوظات…") : items.length ? `<ul>${items.map(row).join("")}</ul>` : `<p class="muted">لا يوجد بعد. أي فكرة أو سيناريو يعجبك ولن تستخدمه الآن، اضغط «🔖 احفظها لبعدين».</p>`}</div>`;
+    return `${note}<div class="flw-saved open"><div class="flw-ch"><b>🔖 محفوظاتك</b><button type="button" class="flw-link" data-savedopen>إخفاء</button></div>
+      ${items == null ? working("جارٍ جلب المحفوظات…") : items.length ? `<ul>${items.map(row).join("")}</ul>` : `<p class="muted">لا يوجد شيء بعد. إذا أعجبتك فكرة أو سيناريو ولن تستخدمه الآن، اضغط «🔖 احفظها لوقت لاحق».</p>`}</div>`;
   }
   // ٣ هوكات بدرجات (من قوالب مختلفة): الأعلى هو المختار، والعميل يقدر يبدّل بدوسة
   function hooksRow(it) {
@@ -216,7 +216,7 @@ const Flow = (() => {
   function algoTags(it) {
     const h = it.heat;
     if (!h && !it.ring && !it.bucket) return "";
-    const names = { h: "فضول الخطاف", e: "لا يوجد ركود", a: "نتيجة في الآخر", t: "relatable", r: "تتكرر" };
+    const names = { h: "فضول الخطاف", e: "لا يوجد ركود", a: "نتيجة في النهاية", t: "relatable", r: "تتكرر" };
     const tip = h ? Object.entries(names).map(([k, t]) => `${t}: ${h[k] ?? "—"}`).join(" · ") : "";
     return `<div class="flw-algo">${h?.avg != null ? `<span class="heat ${h.avg >= 8 ? "hi" : ""}" title="${esc(tip)}">🔥 HEAT ${h.avg}</span>` : ""}
       ${it.ring ? `<span title="دائرة الجمهور (١ الأضيق)">🎯 دائرة ${it.ring}</span>` : ""}${it.bucket ? `<span>🗂 ${esc(it.bucket)}</span>` : ""}</div>`;
@@ -225,14 +225,14 @@ const Flow = (() => {
   function packRow(p) {
     if (!p) return "";
     const row = (ic, t, v) => (v ? `<div><span>${ic} ${t}</span><b>${esc(v)}</b></div>` : "");
-    return `<div class="flw-pack" title="الخطاف التلاتي: يجب التلاتة يقولون نفس المعنى">${row("📝", "على الشاشة", p.screen)}${row("👁", "ما يُرى", p.visual)}${row("🎙", "ما يُقال", p.spoken)}
+    return `<div class="flw-pack" title="الخطاف الثلاثي: يجب أن تقول الثلاثة المعنى نفسه">${row("📝", "على الشاشة", p.screen)}${row("👁", "ما يُرى", p.visual)}${row("🎙", "ما يُقال", p.spoken)}
       ${row("🔒", `بعد الخطاف${p.lockin_method ? ` (${esc(p.lockin_method)})` : ""}`, p.lockin)}</div>`;
   }
   function ideaForm(it = {}) {
     return `<form class="flw-card flw-form" data-ideaform="${esc(it.id || "")}">
       <label>العنوان <input name="title" value="${esc(it.title || "")}" placeholder="عنوان قصير للفكرة"></label>
-      <label>الخطاف (أول جملة تشد) <input name="hook" value="${esc(it.hook || "")}"></label>
-      <label>الفكرة <textarea name="idea" rows="3" placeholder="احكي الفكرة في سطرين">${esc(it.idea || "")}</textarea></label>
+      <label>الخطاف (أول جملة تشدّ الانتباه) <input name="hook" value="${esc(it.hook || "")}"></label>
+      <label>الفكرة <textarea name="idea" rows="3" placeholder="اكتب الفكرة في سطرين">${esc(it.idea || "")}</textarea></label>
       <div class="flw-acts"><button class="flw-btn pri">اختر هذه</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
   }
   function seasonsRow() {
@@ -259,14 +259,14 @@ const Flow = (() => {
     }
     if (d.trend?.title) return `<div class="flw-trend on"><b>📈 هذه الأفكار مبنية على الترند «${esc(d.trend.title)}»</b></div>`;
     if (!list.length) return "";
-    return `<div class="flw-trend"><b>📈 لديك ${list.length === 1 ? "ترند محفوظ" : `${list.length} ترند محفوظين`} لبعدين. تبني الفكرة عليه؟</b>
+    return `<div class="flw-trend"><b>📈 لديك ${list.length === 1 ? "ترند محفوظ" : `${list.length} ترندات محفوظة`}. هل تبني الفكرة عليه؟</b>
       <div class="flw-acts">${list.slice(0, 3).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc(x.text || "")}" ${d.busy ? "disabled" : ""}>استخدم «${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
   // 💡 أفكارك من «فولدر الأفكار» (مكتبة محتويات البراند): بتظهر هنا لو حابب تستخدم واحدة
   function mineRow(d) {
     const list = S.trendsFor === d.id ? S.mine || [] : [];
     if (!list.length) return "";
-    return `<div class="flw-trend flw-mine"><b>💡 أفكارك التي في مجلد الأفكار (${list.length}). تستخدم واحدة منها؟</b>
+    return `<div class="flw-trend flw-mine"><b>💡 أفكارك في مجلد الأفكار (${list.length}). هل تستخدم واحدة منها؟</b>
       <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
@@ -274,12 +274,12 @@ const Flow = (() => {
   const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
   function stIdea(d) {
     const loading = d.busy === "ideas";
-    return `<h2>اختر فكرة للبوست</h2><p class="flw-sub">${(d.ideas || []).length ? "العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك." : "اطلب من العقل أفكارًا على قدر العلامة والقالب، أو اكتب فكرتك أنت."}</p>${costNote(d)}
-      ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو الخاص بي، على الرفع مباشرة</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
-      ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (ضع المؤشر عليها لترى السبب)</p>` : ""}
+    return `<h2>اختر فكرة للمنشور</h2><p class="flw-sub">${(d.ideas || []).length ? "العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك." : "اطلب من العقل أفكارًا على قدر العلامة والقالب، أو اكتب فكرتك أنت."}</p>${costNote(d)}
+      ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ لديّ الفيديو، انتقل إلى الرفع مباشرة</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
+      ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية أزال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاء بغيرها (ضع المؤشر عليها لترى السبب)</p>` : ""}
       ${trendRow(d)}${mineRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
       ${!(d.ideas || []).length && !loading && !d.error ? `<div class="flw-acts"><button type="button" class="flw-btn pri big" data-more="idea">💡 اقترح أفكارًا${writeCost(d, "ideas")}</button></div>` : ""}
-      ${loading ? working("العقل يفكّر في أفكار على القالب…") : failed("idea")}
+      ${loading ? working("العقل يفكّر في أفكار للقالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد أفكارًا عن ماذا؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح${writeCost(d, "ideas")}</button></div>` : `
         ${(d.ideas || []).length ? `<button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكارًا أخرى${writeCost(d, "ideas")}</button>` : ""}
         <button type="button" class="flw-link" data-hint>🎯 وجّه العقل</button>`}
@@ -292,7 +292,7 @@ const Flow = (() => {
     return `${picked("idea")}<h2>نوع المنشور</h2>
       <div class="flw-fmts">${Object.entries(FMT).map(([k, [ic, t, s]]) => `<button type="button" class="flw-fmt${f === k ? " on" : ""}" data-fmt="${k}"><i>${ic}</i><b>${t}</b><small>${s}</small></button>`).join("")}</div>
       ${f === "series" ? `<div class="flw-eps"><b>عدد الحلقات</b><div>${["auto", 2, 3, 4, 5, 6, 7, 8, 10].map((n) => `<button type="button" class="flw-chip${String(S.eps || d.episodes || "auto") === String(n) ? " on" : ""}" data-eps="${n}">${n === "auto" ? "✨ تلقائي (العقل يقرر)" : n}</button>`).join("")}</div></div>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setfmt ${d.busy ? "disabled" : ""}>أكمل للسيناريو →</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setfmt ${d.busy ? "disabled" : ""}>أكمل إلى السيناريو →</button></div>`;
   }
 
   // ---------------------------------------------------------------- 3) السيناريو
@@ -307,7 +307,7 @@ const Flow = (() => {
     carousel: [["heading", "العنوان"], ["text", "النص"], ["visual", "الصورة"]],
     series: [["title", "اسم الحلقة"], ["beats", "الأحداث (سطر لكل حدث)"], ["voice", "جمل الصوت (سطر لكل جملة)"]],
   };
-  const ROWS = { reel: ["beats", "المشهد"], carousel: ["slides", "السلايد"], series: ["episodes", "الحلقة"] };
+  const ROWS = { reel: ["beats", "المشهد"], carousel: ["slides", "الشريحة"], series: ["episodes", "الحلقة"] };
   function rowHTML(r, fmt, i) {
     const cell = ([k, l]) => fmt === "series" && k !== "title"
       ? `<label>${l}<textarea data-k="${k}" rows="2" dir="auto">${esc((r[k] || []).join("\n"))}</textarea></label>`
@@ -339,7 +339,7 @@ const Flow = (() => {
   // ⚡ السيناريو اتفحص بالـ ١٥ بند واتصلّح قبل ما يظهر: درجته واللي اتغيّر
   function scenAlgo(a) {
     if (!a || a.score == null) return "";
-    return `<details class="flw-scal"><summary><span class="heat ${a.score >= 85 ? "hi" : ""}">⚡ ${a.score}/100</span> ${a.fixes.length ? `أُصلح فيه ${a.fixes.length} ${a.fixes.length === 1 ? "شيء" : "أشياء"}` : "فُحص ولا أحتاج تصليح"}</summary>
+    return `<details class="flw-scal"><summary><span class="heat ${a.score >= 85 ? "hi" : ""}">⚡ ${a.score}/100</span> ${a.fixes.length ? `أُصلح فيه ${a.fixes.length} ${a.fixes.length === 1 ? "شيء" : "أشياء"}` : "فُحص ولا يحتاج إلى تصحيح"}</summary>
       ${a.fixes.length ? `<ul>${a.fixes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</details>`;
   }
   function scenCard(sc, fmt) {
@@ -352,7 +352,7 @@ const Flow = (() => {
   function stScenario(d) {
     const loading = d.busy === "scenarios";
     const eps = d.format === "series" ? ` · ${d.episodes === "auto" ? "عدد الحلقات تلقائي" : `${d.episodes} حلقات`}` : "";
-    const skipS = isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو الخاص بي، على الرفع مباشرة</button></div>` : "";
+    const skipS = isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ لديّ الفيديو، انتقل إلى الرفع مباشرة</button></div>` : "";
     return `${picked("idea")}<h2>اختر السيناريو</h2><p class="flw-sub">${FMT[d.format]?.[0] || ""} ${FMT[d.format]?.[1] || ""}${eps}${isPhone(d) ? "" : ` — <button type="button" class="flw-link" data-go="format">غيّر النوع</button>`}</p>${costNote(d)}${skipS}
       ${tipBox(d.guide?.scen)}${savedBox("scenario", d)}<div class="flw-cards wide">${(d.scenarios || []).map((s) => scenCard(s, d.format)).join("")}${S.own ? scenForm({}, d.format) : ""}</div>
       ${loading ? working("العقل يكتب السيناريوهات…") : failed("scen")}
@@ -369,7 +369,7 @@ const Flow = (() => {
     if (!say) return `<small class="flw-sec muted">بدون نص</small>`;
     const L = scn.t1 - scn.t0, need = sec(say, ml.cps), over = need > L * ml.max_stretch;
     return `<small class="flw-sec ${over ? "bad" : need > L ? "warn" : ""}" title="طول المشهد الأصلي ${L.toFixed(1)} ثانية">
-      ⏱ <span class="num">${need}</span> ث من <span class="num">${L.toFixed(1)}</span>${over ? " · طويلة: المشهد سيقف ثابت قليلًا، قصّرها" : need > L ? " · المشهد سيُبطئ قليلًا" : ""}</small>`;
+      ⏱ <span class="num">${need}</span> ث من <span class="num">${L.toFixed(1)}</span>${over ? " · طويلة: سيتوقف المشهد قليلًا، فقصّرها" : need > L ? " · المشهد سيُبطئ قليلًا" : ""}</small>`;
   }
   const fieldVal = (v) => (Array.isArray(v) ? v.join(" · ") : String(v ?? ""));
   function scriptBody(sc, ml) {
@@ -426,7 +426,7 @@ const Flow = (() => {
     const ml = d.mlive || { scenes: [] }, vt = d.vo_track, t = vt?.timing;
     const rows = ml.scenes.map((s, i) => { const L = s.t1 - s.t0, n = t ? t[i] : L; return `<li><b>${esc(s.name)}</b><span class="num">${L.toFixed(1)}</span>${t ? ` ← <span class="num ${n > L * (ml.max_stretch || 1.5) ? "warn" : ""}">${n.toFixed(1)}</span>` : ""} ث</li>`; }).join("");
     return `${picked("scenario")}<h2>لوحة التحكم</h2>
-      <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب ترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
+      <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب لترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
       ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn big" data-panel>🎛️ افتح لوحة القالب</button>
@@ -437,12 +437,12 @@ const Flow = (() => {
   // ---------------------------------------------------------------- 4) الأبطال
   function stCast(d) {
     const opts = S.castOpts;
-    if (!opts) { loadCast(); return `${picked("scenario")}${working("بجيب الشخصيات…")}`; }
+    if (!opts) { loadCast(); return `${picked("scenario")}${working("جارٍ جلب الشخصيات…")}`; }
     S.cast ??= (d.cast || []).map((c) => c.id);
-    return `${picked("scenario")}<h2>من أبطال المنشور؟</h2><p class="flw-sub">اختر من شخصيات العلامة التي في العقل (يمكنك تختار أكثر من واحدة أو ولا واحدة).</p>
+    return `${picked("scenario")}<h2>من أبطال المنشور؟</h2><p class="flw-sub">اختر من شخصيات العلامة في العقل (يمكنك اختيار أكثر من واحدة أو لا شيء).</p>
       ${opts.length ? `<div class="flw-cast">${opts.map((o) => `<button type="button" class="flw-person${S.cast.includes(o.id) ? " on" : ""}" data-person="${esc(o.id)}">
         <img src="${esc(o.image_url)}" alt="" loading="lazy"><b>${esc(o.name)}</b>${o.about ? `<small>${esc(o.about.slice(0, 70))}</small>` : ""}</button>`).join("")}</div>`
-        : `<div class="flw-empty">لا يوجد بعد شخصيات في العقل. أضفها من «الشخصيات» أو من عقل العلامة، أو أكمل بدون أبطال.</div>`}
+        : `<div class="flw-empty">لا توجد شخصيات في العقل بعد. أضفها من «الشخصيات» أو من عقل العلامة، أو أكمل بدون أبطال.</div>`}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setcast>${S.cast.length ? `أكمل بـ ${S.cast.length} ${S.cast.length === 1 ? "بطل" : "أبطال"}` : "أكمل بدون أبطال"} →</button></div>`;
   }
   async function loadCast() {
@@ -455,9 +455,9 @@ const Flow = (() => {
 
   // ---------------------------------------------------------------- 🎙️ الصوت: مين بيتكلم، وبأي لهجة، وبأي صوت
   function stVoice(d) {
-    if (d.busy === "vo") return `${picked("scenario")}${working("يسجّل التعليق الصوتي كله مرة واحدة، ويسمعه لكي يعرف كل جملة تبدأ وتنتهي أين ويضبط المشاهد عليها…")}`;
+    if (d.busy === "vo") return `${picked("scenario")}${working("يسجّل التعليق الصوتي كله مرة واحدة، ثم يستمع إليه ليعرف بداية كل جملة ونهايتها ويضبط المشاهد عليها…")}`;
     const o = S.vopts;
-    if (!o) { loadVoice(); return `${picked("scenario")}${working("بجيب الأصوات…")}`; }
+    if (!o) { loadVoice(); return `${picked("scenario")}${working("جارٍ جلب الأصوات…")}`; }
     S.vo ??= { ...o.pick };
     const v = S.vo, on = v.speaker !== "none";
     const voices = o.voices[v.lang] || [];
@@ -501,8 +501,8 @@ const Flow = (() => {
       <button type="button" class="flw-x" data-adel="${esc(a.file)}" title="احذف">✕</button></div>`;
   }
   function stAssets(d) {
-    return `${picked("scenario")}<h2>ارفع ملفاتك</h2><p class="flw-sub">صور منتج، شعار، لقطات… كل ملف له اسم، ويمكنك تعمل له إشارة <b class="latin">@اسمه</b> في الوصف لكي العقل يستخدمه في المكان الصحيح.</p>
-      <label class="flw-drop"><input type="file" id="flwFiles" accept="image/*,video/*" multiple hidden><i>⬆️</i><b>اضغط أو اسحب الملفات هنا</b><small class="muted">صور أو فيديوهات، حتى ١٠ مرة واحدة</small></label>
+    return `${picked("scenario")}<h2>ارفع ملفاتك</h2><p class="flw-sub">صور منتج، شعار، لقطات… لكل ملف اسم، ويمكنك الإشارة إليه <b class="latin">@اسمه</b> في الوصف ليستخدمه العقل في المكان الصحيح.</p>
+      <label class="flw-drop"><input type="file" id="flwFiles" accept="image/*,video/*" multiple hidden><i>⬆️</i><b>اضغط أو اسحب الملفات هنا</b><small class="muted">صور أو فيديوهات، حتى ١٠ في المرة الواحدة</small></label>
       ${(d.assets || []).length ? `<div class="flw-assets">${d.assets.map(assetTile).join("")}</div>` : ""}
       ${tplPanel(d)}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="generate">${(d.assets || []).length ? "أكمل" : "أكمل بدون ملفات"} →</button></div>`;
@@ -514,7 +514,7 @@ const Flow = (() => {
       return `<h2>جاهز للتوليد</h2>${d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
         <div class="flw-sum"><div><small>القالب</small><b>${esc(d.template.name)}</b></div><div><small>الفكرة</small><b>${esc(d.idea?.title || "")}</b></div>
           <div><small>النص</small><b>${esc(d.scenario?.title || "")}</b></div></div>
-        <p class="muted">النص سيوضع في التايبوجرافي، وسناك تختار الشكل والصوت وتصدّر الفيديو.</p>
+        <p class="muted">سيوضع النص في التايبوجرافي، وهناك تختار الشكل والصوت وتصدّر الفيديو.</p>
         <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-gen ${d.busy ? "disabled" : ""}>🚀 ولّد</button></div>`;
     }
     const fmt = FMT[d.format] || FMT.reel;
@@ -524,8 +524,8 @@ const Flow = (() => {
         <div><small>الفكرة</small><b>${esc(d.idea?.title || "")}</b></div><div><small>السيناريو</small><b>${esc(d.scenario?.title || "")}</b></div>
         <div><small>الأبطال</small><b>${(d.cast || []).map((c) => esc(c.name)).join("، ") || "—"}</b></div><div><small>الملفات</small><b>${(d.assets || []).length || "—"}</b></div></div>
       <label class="flw-prompt"><b>توجيهات للتوليد (اختياري)</b>
-        <textarea id="flwPrompt" rows="4" dir="auto" placeholder="مثلًا: افتح بـ @${esc(d.assets?.[0]?.name || "المنتج")} قريب، والألوان دافية، والختام بالعرض">${esc(d.prompt || "")}</textarea></label>
-      ${(d.assets || []).length ? `<div class="flw-ment"><small class="muted">اضغط لكي تعمل إشارة:</small>${d.assets.map((a) => `<button type="button" class="flw-chip" data-ment="${esc(a.name)}">@${esc(a.name)}</button>`).join("")}</div>` : ""}
+        <textarea id="flwPrompt" rows="4" dir="auto" placeholder="مثلًا: افتتح بـ @${esc(d.assets?.[0]?.name || "المنتج")} من قريب، بألوان دافئة، واختم بالعرض">${esc(d.prompt || "")}</textarea></label>
+      ${(d.assets || []).length ? `<div class="flw-ment"><small class="muted">اضغط للإشارة:</small>${d.assets.map((a) => `<button type="button" class="flw-chip" data-ment="${esc(a.name)}">@${esc(a.name)}</button>`).join("")}</div>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-gen ${d.busy ? "disabled" : ""}>🚀 ولّد</button></div>`;
   }
   // 🔎 مراجعة القالب: الكلام المنطوق ↔ الأسعار والوقت والصورة على الشاشة (اللي اتصلح لوحده، واللي محتاج منك نظرة)
@@ -539,16 +539,16 @@ const Flow = (() => {
     const isWork = o.status === "working" || d.busy === "generate";
     const pct = o.progress ? ` ${Math.round(o.progress * 100)}٪` : "";
     const rated = (d.ratings || {})["output:final"];
-    return `<h2>${isWork ? "جارٍ التوليد…" : o.status === "failed" ? "التوليد توقف" : "خلص! 🎉"}</h2>
+    return `<h2>${isWork ? "جارٍ التوليد…" : o.status === "failed" ? "توقف التوليد" : "اكتمل! 🎉"}</h2>
       ${isWork ? working(`العقل يبني ${OUT[o.kind] ? `في ${OUT[o.kind]}` : "المنشور"}${pct}`) : ""}
       ${o.status === "failed" || d.error ? `<div class="flw-empty bad">⚠️ ${esc(o.error || d.error || "")}</div>` : ""}
       ${o.video_url ? `<video class="flw-out" src="${esc(o.video_url)}" controls playsinline autoplay loop></video>` : ""}
       ${!isWork && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind ? `<div class="flw-done">
-        ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "الكاروسيل أُنشئ بالسلايدز والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
+        ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "أُنشئ الكاروسيل بالشرائح والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
           <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل الفيديو</a>` : ""}
-        <div class="flw-final"><b>عجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
-        ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ماذا الذي لم يعجبك؟ (العقل سيتذكره)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
+        <div class="flw-final"><b>هل أعجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
+        ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ما الذي لم يعجبك؟ (سيتذكره العقل)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
         <button type="button" class="flw-link" data-go="scenario">↩︎ جرّب سيناريو آخر</button></div>` : ""}`;
   }
 
@@ -557,26 +557,26 @@ const Flow = (() => {
   function libBox(role) {
     if (S.lib?.role !== role) return "";
     const items = S.lib.items;
-    return `<div class="flw-lib">${items == null ? working("يجلب فيديوهاتك…") : items.length ? items.map((x) => `<button type="button" class="flw-libit" data-libpick="${esc(x.gen_id)}">
-      <video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><small>${esc(x.name)}</small></button>`).join("") : `<p class="muted">لا يوجد بعد فيديوهات مرفوعة.</p>`}</div>`;
+    return `<div class="flw-lib">${items == null ? working("جارٍ جلب فيديوهاتك…") : items.length ? items.map((x) => `<button type="button" class="flw-libit" data-libpick="${esc(x.gen_id)}">
+      <video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><small>${esc(x.name)}</small></button>`).join("") : `<p class="muted">لا توجد فيديوهات مرفوعة بعد.</p>`}</div>`;
   }
   function stShoot(d) {
     const f = d.footage || {}, mn = f.main, sc = d.scenario;
     const beats = (sc?.beats || []).map((b, i) => `<li><b class="num">${i + 1}</b><span dir="auto">${esc(b.say || b.text || "")}</span>${b.visual ? `<small class="muted">🎥 ${esc(b.visual)}</small>` : ""}</li>`).join("");
-    return `<h2>الفيديو</h2><p class="flw-sub">صوّر نفسك بالجوال وأنت تتكلم (طولي، والضوء قدامك)، وارفعه. لقطات الـ B-roll البرنامج يعملها تلقائيًا في المونتاج.</p>
+    return `<h2>الفيديو</h2><p class="flw-sub">صوّر نفسك بالجوال وأنت تتكلم (طوليًا، والضوء أمامك)، وارفعه. يصنع البرنامج لقطات الـ B-roll تلقائيًا في المونتاج.</p>
       ${beats ? `<details class="flw-shotlist" open><summary>📝 النص الذي ستقوله</summary><ol>${beats}</ol></details>` : ""}
       <div class="flw-ph">
         <section><h3>🎙️ الفيديو (أنت تتكلم)</h3>
           ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video>
             <small class="muted">${esc(mn.name)} · ${secs(mn.duration)} · ${mn.w}×${mn.h}${mn.audio ? "" : " · ⚠️ بدون صوت"}</small>
             <button type="button" class="flw-link" data-fdel="${esc(mn.gen_id)}">بدّله</button></div>`
-          : `<div class="flw-acts">${beats ? `<button type="button" class="flw-btn pri" data-phone>📱 صوّر من موبايلك بالملقّن</button>` : ""}<label class="flw-btn ${beats ? "" : "pri"}">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
+          : `<div class="flw-acts">${beats ? `<button type="button" class="flw-btn pri" data-phone>📱 صوّر من جوالك بالملقّن</button>` : ""}<label class="flw-btn ${beats ? "" : "pri"}">⬆ ارفع فيديو جديد<input type="file" accept="video/*" data-phup="main" hidden></label>
               <button type="button" class="flw-btn" data-lib="main">☁️ أو اختر مما رفعته من قبل</button></div>${libBox("main")}`}
           ${(f.broll || []).length ? `<div class="flw-broll">${f.broll.map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="أزلها">✕</button></figure>`).join("")}</div>` : ""}</section>
         ${castBox(d)}</div>
       ${d.busy === "upload" ? working("جارٍ الرفع…") : failed("shoot")}
-      ${mn ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ على المونتاج مباشرة</button>
-        <button type="button" class="flw-btn pri big" data-phreview ${d.busy ? "disabled" : ""}>🔎 راجع الفيديو وقولّي أحسّن ماذا</button></div>` : ""}`;
+      ${mn ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ إلى المونتاج مباشرة</button>
+        <button type="button" class="flw-btn pri big" data-phreview ${d.busy ? "disabled" : ""}>🔎 راجع الفيديو واقترح التحسينات</button></div>` : ""}`;
   }
   // 🪞 مين في الفيديو وصوّر فين: عشان لقطات الـ B-roll اللي فيها الشخص تطلع بنفس الوش ونفس المكان
   function castBox(d) {
@@ -591,53 +591,53 @@ const Flow = (() => {
     }
     const tw = twins.find((t) => t.id === cast?.twin);
     const bgs = tw?.backgrounds || [];
-    const auto = `<p class="muted">🪄 الـ B-roll تلقائي: اللقطات التي يجب تظهر فيها تُنشأ بالأفاتار${tw ? " في نفس المكان" : ""}، واللي ليس ضروريًا تأتي من فيديوهات ستوك حقيقية. وفي المونتاج يمكنك تزيل أي لقطة أو تبدّلها بفيديو من جهازك.</p>`;
-    if (S.twins === null) return `<section><h3>🪞 من في الفيديو؟</h3>${working("يجلب الأفاتار…")}</section>`;
-    if (!twins.length) return `<section><h3>🪞 من في الفيديو؟</h3><p class="muted">إذا عملت أفاتار في «🪞 الأفاتار» (فيديو وصور من كذا اتجاه)، البرنامج يستطيع يعمل لقطات B-roll به. من غيرها سيستخدم فيديوهات ستوك فقط.</p>
+    const auto = `<p class="muted">🪄 الـ B-roll تلقائي: اللقطات التي يجب أن تظهر فيها تُنشأ بالأفاتار${tw ? " في المكان نفسه" : ""}، والباقي من فيديوهات ستوك حقيقية. وفي المونتاج يمكنك إزالة أي لقطة أو استبدالها بفيديو من جهازك.</p>`;
+    if (S.twins === null) return `<section><h3>🪞 من في الفيديو؟</h3>${working("جارٍ جلب الأفاتار…")}</section>`;
+    if (!twins.length) return `<section><h3>🪞 من في الفيديو؟</h3><p class="muted">إذا أنشأت أفاتار في «🪞 الأفاتار» (فيديو وصور من عدة اتجاهات)، يستطيع البرنامج صنع لقطات B-roll به، وبدونه سيستخدم فيديوهات ستوك فقط.</p>
       <button type="button" class="flw-link" data-gotwin>🪞 أنشئ أفاتار</button>${auto}</section>`;
     return `<section><h3>🪞 من في الفيديو؟</h3>
       <label class="flw-csel"><select data-casttwin><option value="">بدون أفاتار (ستوك فقط)</option>
         ${twins.map((t) => `<option value="${esc(t.id)}" ${cast?.twin === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
-      ${tw ? `<h4>🏠 صوّرت أين؟</h4><div class="flw-bgs">
+      ${tw ? `<h4>🏠 أين صوّرت؟</h4><div class="flw-bgs">
         <button type="button" class="flw-bgit ${!cast.bg ? "on" : ""}" data-castbg=""><span>🎬</span><small>مثل الفيديو نفسه</small></button>
         ${bgs.map((b) => `<button type="button" class="flw-bgit ${cast.bg === b.id ? "on" : ""}" data-castbg="${esc(b.id)}"><img src="${esc(b.url)}" alt=""><small>${esc(b.name || "مكان")}</small></button>`).join("")}
-        <button type="button" class="flw-bgit add" data-gotwin><span>＋</span><small>أضف مكان</small></button></div>` : ""}
+        <button type="button" class="flw-bgit add" data-gotwin><span>＋</span><small>أضف مكانًا</small></button></div>` : ""}
       ${auto}</section>`;
   }
   function stReview(d) {
     const r = d.review;
-    if (d.busy === "review" || !r) return `<h2>الملاحظات</h2>${d.busy === "review" ? working("البرنامج يشاهد الفيديو ويسمع النص ويقارنه بقواعد الخوارزميات…") : failed("review")}`;
+    if (d.busy === "review" || !r) return `<h2>الملاحظات</h2>${d.busy === "review" ? working("البرنامج يشاهد الفيديو ويستمع إلى النص ويقارنه بقواعد الخوارزميات…") : failed("review")}`;
     const mt = r.metrics || {}, note = (n) => `<li class="${n.level}"><div><b>${n.level === "must" ? "🔴" : "🟡"} ${esc(n.title)}</b>${n.t != null ? `<button type="button" class="flw-chip num" data-seek="${n.t}">⏱ ${secs(n.t)}</button>` : ""}</div>
       ${n.why ? `<p>${esc(n.why)}</p>` : ""}${n.fix ? `<p class="flw-fix">✅ ${esc(n.fix)}</p>` : ""}</li>`;
-    return `<h2>الملاحظات</h2><p class="flw-sub">هذه ملاحظات على الفيديو كما هو، على قواعد الخوارزميات التي لدينا. إذا ستنفذها، صوّر مرة أخرى وارفع. وإذا كفاية هكذا، أكمل للمونتاج.</p>
+    return `<h2>الملاحظات</h2><p class="flw-sub">هذه ملاحظات على الفيديو كما هو، وفق قواعد الخوارزميات لدينا. إذا أردت تنفيذها، صوّر مرة أخرى وارفع، وإذا كان كافيًا هكذا، أكمل إلى المونتاج.</p>
       <div class="flw-rev"><div class="flw-score">${r.score != null ? `<b class="num">${r.score}</b><small>من 100</small>` : ""}</div><div><p>${esc(r.summary || "")}</p>
         <small class="muted">${{ comedy: "😂 كوميدي", educational: "📚 تعليمي", story: "📖 حكاية", sales: "🛒 بيع" }[r.tone] ? `${{ comedy: "😂 كوميدي", educational: "📚 تعليمي", story: "📖 حكاية", sales: "🛒 بيع" }[r.tone]} · ` : ""}⏱ ${secs(mt.dur)} · ${mt.w}×${mt.h}${mt.wpm ? ` · ${mt.wpm} كلمة/دقيقة` : ""}${mt.first_word != null ? ` · أول كلمة بعد ${mt.first_word} ث` : ""}</small></div></div>
       <video class="flw-rv" src="${esc(d.footage?.main?.url || "")}" controls playsinline preload="metadata"></video>
-      <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>لا يوجد ملاحظات مهمة 👌</b></li>`}</ul>
+      <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>لا توجد ملاحظات مهمة 👌</b></li>`}</ul>
       ${(r.broll || []).length ? `<h3>🎥 لقطات B-roll تقوّي النص</h3><ul class="flw-bsug">${r.broll.map((b) => `<li>${esc(b.what)}${b.at ? ` <small class="muted">(${esc(b.at)})</small>` : ""}</li>`).join("")}</ul>` : ""}
-      <div class="flw-acts end"><label class="flw-csel">🎭 كوميكس <select data-comics><option value="auto" ${(S.comics || "auto") === "auto" ? "selected" : ""}>إذا الفيديو كوميدي</option><option value="on" ${S.comics === "on" ? "selected" : ""}>دائمًا</option><option value="off" ${S.comics === "off" ? "selected" : ""}>لا</option></select></label><button type="button" class="flw-btn" data-reshoot>🎬 سنفّذها وأعيد التصوير</button>
-        <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>⏭ أكمل للمونتاج التلقائي</button></div>`;
+      <div class="flw-acts end"><label class="flw-csel">🎭 كوميكس <select data-comics><option value="auto" ${(S.comics || "auto") === "auto" ? "selected" : ""}>إذا كان الفيديو كوميديًا</option><option value="on" ${S.comics === "on" ? "selected" : ""}>دائمًا</option><option value="off" ${S.comics === "off" ? "selected" : ""}>لا</option></select></label><button type="button" class="flw-btn" data-reshoot>🎬 سأنفّذها وأعيد التصوير</button>
+        <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>⏭ أكمل إلى المونتاج التلقائي</button></div>`;
   }
   function stMontage(d) {
     const mo = d.montage, ms = S.mstate || {};
-    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("يقص السكتات، ويغيّر زاوية الكاميرا كل لقطة، ويضبط الألوان، ويختار ويعمل لقطات الـ B-roll، ويضع التايبوجرافي… (لقطات الأفاتار يمكن تأخذ كم دقيقة)") : failed("montage")}`;
+    if (d.busy === "montage" || !mo) return `<h2>المونتاج</h2>${d.busy === "montage" ? working("يقص السكتات، ويغيّر زاوية الكاميرا في كل لقطة، ويضبط الألوان، ويختار لقطات الـ B-roll ويصنعها، ويضع التايبوجرافي… (قد تأخذ لقطات الأفاتار بضع دقائق)") : failed("montage")}`;
     const rp = mo.report || {}, pj = ms.project || {}, ty = ms.typo;
     const rendering = pj.render_status === "rendering", done = pj.export_url && !rendering;
     const tyBusy = ty?.busy;
     return `<h2>${mo.plain ? "الفيديو بدون مونتاج" : "المونتاج التلقائي جاهز"}</h2>
-      ${mo.plain ? `<p class="flw-sub">الفيديو كما هو، فقط على مقاس الريلز.</p>` : `<ul class="flw-mrep">
-        <li>✂️ أُزيل <b class="num">${rp.cut || 0}</b> ثانية سكوت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، من الجنب…)</li>
-        <li>🎨 الألوان ضُبطت تلقائي</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بالأفاتار (في نفس المكان)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية أعلى النص</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll أعلى النص</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 لم أجد كوميكس في المكتبة تناسب هذا النص</li>` : ""}
+      ${mo.plain ? `<p class="flw-sub">الفيديو كما هو، بمقاس الريلز فقط.</p>` : `<ul class="flw-mrep">
+        <li>✂️ أُزيل <b class="num">${rp.cut || 0}</b> ثانية صمت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، جانبية…)</li>
+        <li>🎨 ضُبطت الألوان تلقائيًا</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بالأفاتار (في المكان نفسه)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية فوق النص</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق النص</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 لم أجد كوميكس في المكتبة تناسب هذا النص</li>` : ""}
         <li>🔤 التايبوجرافي: ${!rp.typo ? "لا يوجد نص مسموع" : tyBusy ? `⏳ ${esc(ty.step || "جارٍ الإنشاء")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
       ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
-      ${rendering ? working(`يصدّر الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
+      ${rendering ? working(`جارٍ تصدير الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
       <div class="flw-acts end">
         ${mo.plain ? `<button type="button" class="flw-link" data-automont>↩︎ استعد المونتاج التلقائي</button>` : `<button type="button" class="flw-link" data-plain>✕ بدون مونتاج</button>`}
-        <button type="button" class="flw-btn" data-myedit>✏️ هعمل المونتاج بنفسي</button>
+        <button type="button" class="flw-btn" data-myedit>✏️ سأعمل المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
-        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر آخر" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button></div>
-      ${rp.broll && !mo.plain ? `<p class="muted">✏️ إذا ستعمل المونتاج بنفسك: لقطات الـ B-roll طبقات أعلى الفيديو، تزيل أي واحدة أو تبدّلها بفيديو أو صورة من جهازك.</p>` : ""}
-      ${tyBusy ? `<p class="muted">التصدير ينتظر التايبوجرافي ينتهي لكي النص يظهر أعلى الفيديو.</p>` : ""}
+        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر نسخة أخرى" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button></div>
+      ${rp.broll && !mo.plain ? `<p class="muted">✏️ إذا أردت عمل المونتاج بنفسك: لقطات الـ B-roll طبقات فوق الفيديو، يمكنك إزالة أي منها أو استبدالها بفيديو أو صورة من جهازك.</p>` : ""}
+      ${tyBusy ? `<p class="muted">التصدير ينتظر انتهاء التايبوجرافي ليظهر النص فوق الفيديو.</p>` : ""}
       ${mo.plain ? "" : camBench(d)}`;
   }
   // 🎥 تجربة زاوية كاميرا حقيقية: لقطة ٥ ثواني على كل موديل ممكن يغيّر مكان الكاميرا، والنتايج جنب بعض
@@ -645,22 +645,22 @@ const Flow = (() => {
   function camBench(d) {
     const cm = S.cam, cb = d.cambench, shots = (S.mstate || {}).shots || [];
     if (!S.camOpen) return `<div class="flw-cam"><button type="button" class="flw-link" data-camopen>🎥 جرّب زاوية كاميرا حقيقية (تجربة)</button></div>`;
-    if (!cm) return `<div class="flw-cam">${working("يبحث عن النماذج التي على Atlas…")}</div>`;
+    if (!cm) return `<div class="flw-cam">${working("جارٍ البحث عن النماذج المتاحة…")}</div>`;
     const sec = cm.seconds || 5;
     const runs = (cb?.runs || []).map((r) => `<figure class="${r.status}">${r.file ? `<video src="/media/ads/flows/${esc(d.id)}/${esc(r.file)}" controls loop playsinline></video>` : `<span class="flw-ph">${r.status === "failed" ? "⚠️" : "⏳"}</span>`}
-      <figcaption><b>${esc(r.label)}</b><small class="${r.status === "failed" ? "err" : "muted"}">${r.status === "done" ? `✓${r.credits ? ` · ${r.credits} نقطة` : ""}` : r.status === "failed" ? esc(r.error || "فشل") : "يُنشأ (يمكن يأخذ كم دقيقة)"}</small></figcaption></figure>`).join("");
+      <figcaption><b>${esc(r.label)}</b><small class="${r.status === "failed" ? "err" : "muted"}">${r.status === "done" ? `✓${r.credits ? ` · ${r.credits} نقطة` : ""}` : r.status === "failed" ? esc(r.error || "فشل") : "يُنشأ (قد يأخذ بضع دقائق)"}</small></figcaption></figure>`).join("");
     return `<div class="flw-cam"><h3>🎥 زاوية كاميرا حقيقية (تجربة)</h3>
-      <p class="flw-sub">نرسل ${sec} ثواني من لقطة لكل نموذج على Atlas يمكن يصوّر نفس المشهد من مكان آخر، وترى النتائج بجانب بعض وتقرر أي ينفع.</p>
-      ${cm.models.length ? "" : `<p class="flw-empty bad">لم أجد نماذج تعديل فيديو في كتالوج Atlas.</p>`}
+      <p class="flw-sub">نرسل ${sec} ثوانٍ من اللقطة إلى كل نموذج يستطيع تصوير المشهد نفسه من مكان آخر، وترى النتائج جنبًا إلى جنب وتقرر أيها يناسب.</p>
+      ${cm.models.length ? "" : `<p class="flw-empty bad">لم أجد نماذج تعديل فيديو متاحة.</p>`}
       <div class="flw-camf"><label>اللقطة <select data-camshot>${shots.map((x) => `<option value="${x.i}" ${S.camShot == x.i ? "selected" : ""}>${x.i + 1} · ${esc(CAMNAME[x.cam] || x.cam || "")} · ${secs(x.start)}</option>`).join("")}</select></label>
         <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
-        <label title="صور الشخص من كذا اتجاه تخلّي النموذج لا يخمّن شكله من الزاوية الجديدة">📷 صور الشخص <select data-camtwin><option value="">بدون صور</option>
+        <label title="صور الشخص من عدة اتجاهات تمنع النموذج من تخمين شكله من الزاوية الجديدة">📷 صور الشخص <select data-camtwin><option value="">بدون صور</option>
           ${(S.camTwins || []).filter((t) => t.ready?.photos).map((t) => `<option value="${esc(t.id)}" ${S.camTwin === t.id || (!S.camTwin && S.camTwin !== "" && t === S.camTwins.find((x) => x.ready?.photos)) ? "selected" : ""}>${esc(t.name)} (${t.ready.photos} صورة)</option>`).join("")}</select></label></div>
-      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 إذا عملت أفاتار في «🪞 الأفاتار» وصوّرت صورك من كذا اتجاه، يمكنك تبعتها مع اللقطة والوجه من الزاوية الجديدة سيظهر أدق.</p>`}
+      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 إذا أنشأت أفاتار في «🪞 الأفاتار» وصوّرت صورك من عدة اتجاهات، يمكنك إرسالها مع اللقطة ليظهر الوجه أدق من الزاوية الجديدة.</p>`}
       <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
         ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر غير معروف"}</small></label>`).join("")}</div>
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على النماذج المختارة</button>
-        <small class="muted">يُخصم من نقاطك على قدر النماذج التي اشتغلت فقط.</small></div>
+        <small class="muted">يُخصم من نقاطك بقدر النماذج التي عملت فقط.</small></div>
       ${cb ? `<h4>اللقطة ${cb.shot + 1} · ${esc(cb.angle_ar)}${cb.photos ? ` · 📷 ومعها ${cb.photos} صور للشخص` : " · بدون صور للشخص"}</h4><div class="flw-camr"><figure><video src="/media/ads/flows/${esc(d.id)}/${esc(cb.src)}" controls loop playsinline></video><figcaption><b>الأصل</b></figcaption></figure>${runs}</div>` : ""}</div>`;
   }
   // نتايج تجربة الكاميرا: بنحدّث لحد ما كل الموديلات تخلص
@@ -725,7 +725,7 @@ const Flow = (() => {
       const n = Math.round((Date.now() - S.busyFrom) / 1000);
       const cur = S.el?.querySelector("[data-secs]");
       if (!cur) return clearInterval(S.tickT);
-      cur.textContent = n < 3 ? "" : n < 45 ? `${n} ثانية` : `${n} ثانية · يأخذ وقت أكثر من العادي، إذا تأخر جدًا العقل سيجرّب نموذج أسرع تلقائيًا`;
+      cur.textContent = n < 3 ? "" : n < 45 ? `${n} ثانية` : `${n} ثانية · يأخذ وقتًا أطول من المعتاد، وإذا تأخر كثيرًا سيجرّب العقل نموذجًا أسرع تلقائيًا`;
     };
     up();
     S.tickT = setInterval(up, 1000);
@@ -779,12 +779,12 @@ const Flow = (() => {
     if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
     if (q("[data-gotwin]")) { S.twins = undefined; close(); return showStep("16"); }
     if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto" }).then(poll); }
-    if (q("[data-plain]")) { if (!(await uiConfirm("تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
+    if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {
       const pid = S.d.montage?.project_id;
-      try { await api(`/api/projects/${pid}/render`, { method: "POST" }); toast("⏳ جارٍ التصدير الفيديو…"); } catch (err) { return toast(err.message, true); }
+      try { await api(`/api/projects/${pid}/render`, { method: "POST" }); toast("⏳ جارٍ تصدير الفيديو…"); } catch (err) { return toast(err.message, true); }
       return mpoll();
     }
     if (q("[data-camopen]")) {
@@ -798,7 +798,7 @@ const Flow = (() => {
     if (q("[data-camgo]")) {
       const el = S.el;
       const models = [...el.querySelectorAll("[data-cammodel]:checked")].map((x) => x.value);
-      if (!models.length) return toast("اختر نموذج واحد على الأقل", true);
+      if (!models.length) return toast("اختر نموذجًا واحدًا على الأقل", true);
       S.camSel = models;
       S.camShot = +(el.querySelector("[data-camshot]")?.value || 0);
       S.camAngle = el.querySelector("[data-camangle]")?.value || "side";
@@ -847,7 +847,7 @@ const Flow = (() => {
       return call("/ideas", { hint: `أفكار لمناسبة «${s.name}» (${s.date}${s.countries?.length ? ` — ${s.countries.join("، ")}` : ""}). زاوية مقترحة: ${s.angle || ""}`, more: true });
     }
     if ((b = q("[data-hook]"))) return call("/hook", { idea_id: b.dataset.hook, hook: b.dataset.text });
-    if ((b = q("[data-later]"))) { const [kind, id] = b.dataset.later.split(":"); if (await call("/save-later", { kind, id })) { toast("🔖 حُفظت في «محفوظاتك لبعدين»"); S.saved = null; if (S.savedOpen) loadSaved(); } return; }
+    if ((b = q("[data-later]"))) { const [kind, id] = b.dataset.later.split(":"); if (await call("/save-later", { kind, id })) { toast("🔖 حُفظت في «محفوظاتك»"); S.saved = null; if (S.savedOpen) loadSaved(); } return; }
     if (q("[data-savedopen]")) { S.savedOpen = !S.savedOpen; render(); if (S.savedOpen) loadSaved(); return; }
     if ((b = q("[data-usesaved]"))) { reset(); S.savedOpen = false; S.saved = null; return call(`/use-saved/${b.dataset.usesaved}`).then(poll); }
     if ((b = q("[data-delsaved]"))) { try { S.saved = await api(`/api/flows/${S.d.id}/saved/${b.dataset.delsaved}`, { method: "DELETE" }); render(); } catch (err) { toast(err.message, true); } return; }
@@ -892,7 +892,7 @@ const Flow = (() => {
       const r = S.el.querySelector("#flwWhy")?.value.trim();
       if (!r) return;
       await api(`/api/flows/${S.d.id}/rate`, { method: "POST", ...J({ stage: "output", value: 0 }) });
-      if (await call("/rate", { stage: "output", value: -1, reason: r })) toast("📝 العقل سيتذكر هذا");
+      if (await call("/rate", { stage: "output", value: -1, reason: r })) toast("📝 سيتذكر العقل هذا");
       return;
     }
     if (q("[data-openout]")) return openOutput(S.d.output);
@@ -927,7 +927,7 @@ const Flow = (() => {
     if (!files?.length) return;
     const fd = new FormData();
     [...files].forEach((f) => fd.append("files", f));
-    toast("⬆️ يرفع…");
+    toast("⬆️ جارٍ الرفع…");
     if (await call("/assets", fd)) toast("✅ رُفع");
   }
   document.addEventListener("submit", (e) => {
