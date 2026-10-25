@@ -19,7 +19,7 @@ const VoiceLab = (() => {
     if (S.el && S.d.runs.some((r) => r.status === "working")) S.timer = setTimeout(load, 2000);
   }
   function runHTML(r) {
-    const head = r.kind === "clone" ? `🧬 كلون · ${esc(S.d.dialects[r.dialect] || "")}` : r.kind === "dub" ? "🌍 دبلجة فيديو" : esc(S.d.dialects[r.dialect] || r.dialect);
+    const head = r.kind === "clone" ? `🧬 استنساخ · ${esc(S.d.dialects[r.dialect] || "")}` : r.kind === "dub" ? "🌍 دبلجة فيديو" : esc(S.d.dialects[r.dialect] || r.dialect);
     return `<article class="vl-run" data-run="${esc(r.id)}"><header><b>${head}</b><small>${esc(r.text)}</small>
       ${r.sample ? `<audio controls preload="metadata" src="/media/voicelab/${esc(r.id)}/${esc(r.sample)}" title="العينة الأصلية"></audio>` : ""}
       ${r.clips.some((c) => c.status === "failed" && !c.skip) && r.status !== "working" ? `<button type="button" class="btn sm" data-retry="${esc(r.id)}" title="إعادة توليد الأصوات التي فشلت فقط">🔁 أعد ما فشل</button>` : ""}
@@ -43,26 +43,26 @@ const VoiceLab = (() => {
   }
   function tableHTML() {
     const rows = S.d.table, exp = expHTML();
-    if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الكلون»، وستظهر النتيجة هنا: متوسط كل مزوّد في كل لهجة.</p>`;
+    if (!rows.length) return `${exp}<p class="hint">قيّم الأصوات بالنجوم واكتب ملاحظاتك في «المقارنة» و«الاستنساخ»، وستظهر النتيجة هنا: متوسط كل مزوّد في كل لهجة.</p>`;
     const groups = {};
     rows.forEach((r) => (groups[r.dialect] ||= []).push(r));
     return `${exp}<table class="vl-table"><thead><tr><th>اللهجة</th><th>الترتيب (متوسط النجوم · عدد التقييمات)</th></tr></thead><tbody>${Object.entries(groups).map(([d, xs]) =>
-      `<tr><td>${esc(d === "clone" ? "🧬 كلون الصوت" : d === "dub" ? "🌍 دبلجة فيديو" : S.d.dialects[d] || d)}${S.d.approved?.[d] ? `<br><small class="vl-ok">✅ معتمد: ${[].concat(S.d.approved[d]).map((p) => esc((S.d.labels || S.d.providers)[p] || p)).join(" و")}</small>` : ""}</td><td>${xs.map((r, k) => `<span class="vl-rank${k === 0 ? " best" : ""}">${k === 0 ? "🏆 " : ""}${esc((S.d.labels || S.d.providers)[r.provider] || r.provider)} <b>${r.avg}</b><small>(${r.n})</small></span>`).join("")}</td></tr>`).join("")}</tbody></table>`;
+      `<tr><td>${esc(d === "clone" ? "🧬 استنساخ الصوت" : d === "dub" ? "🌍 دبلجة فيديو" : S.d.dialects[d] || d)}${S.d.approved?.[d] ? `<br><small class="vl-ok">✅ معتمد: ${[].concat(S.d.approved[d]).map((p) => esc((S.d.labels || S.d.providers)[p] || p)).join(" و")}</small>` : ""}</td><td>${xs.map((r, k) => `<span class="vl-rank${k === 0 ? " best" : ""}">${k === 0 ? "🏆 " : ""}${esc((S.d.labels || S.d.providers)[r.provider] || r.provider)} <b>${r.avg}</b><small>(${r.n})</small></span>`).join("")}</td></tr>`).join("")}</tbody></table>`;
   }
   function render() {
     if (!S.el || !S.d) return;
     const D = S.d, P = Object.entries(D.providers);
-    const tabs = [["cmp", "مقارنة اللهجات"], ["clone", "كلون الصوت"], ["dub", "الدبلجة"], ["res", "النتيجة"]];
+    const tabs = [["cmp", "مقارنة اللهجات"], ["clone", "استنساخ الصوت"], ["dub", "الدبلجة"], ["res", "النتيجة"]];
     const body = S.tab === "res" ? tableHTML() : S.tab === "dub" ? `
       <p class="hint">ارفع فيديو قصيرًا (حتى ٥ دقائق). سيدبلجه ElevenLabs إلى العربية بصوت المتحدث نفسه، وفي الوقت نفسه تُنشأ نسخة في «الترجمة والدبلجة» تكملها بالأصوات العربية باللهجة التي تختارها. قيّم الاثنين هنا بالنجوم.${D.ready.eleven ? "" : " يحتاج مفتاح ElevenLabs المباشر بصلاحية Dubbing في «المفاتيح»."}</p>
       <label class="field">الفيديو <input type="file" accept="video/*" id="vlDubFile"></label>
       <button type="button" class="btn primary" id="vlDubGo">🌍 ابدأ المقارنة</button>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>` : S.tab === "clone" ? `
-      <p class="hint">ارفع عينة صوت واضحة (من ٣٠ ثانية إلى دقيقة كلام دون موسيقى). سننشئ منها نسخة صوتية في ElevenLabs و MiniMax، ويقولان الجملة نفسها.${!D.ready.eleven || !D.ready.minimax ? " يحتاج مفتاحي ElevenLabs و MiniMax المباشرين في «المفاتيح» (الكلون في ElevenLabs يحتاج اشتراك Starter على الأقل)." : ""}</p>
+      <p class="hint">ارفع عينة صوت واضحة (من ٣٠ ثانية إلى دقيقة كلام دون موسيقى). سننشئ منها نسخة صوتية في ElevenLabs و MiniMax، ويقولان الجملة نفسها.${!D.ready.eleven || !D.ready.minimax ? " يحتاج مفتاحي ElevenLabs و MiniMax المباشرين في «المفاتيح» (الاستنساخ في ElevenLabs يحتاج اشتراك Starter على الأقل)." : ""}</p>
       <label class="field">العينة <input type="file" accept="audio/*,video/*" id="vlSample"></label>
       <label class="field">اللهجة <select id="vlCloneDia">${Object.entries(D.dialects).map(([k, v]) => `<option value="${k}"${k === S.dialect ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
       <label class="field">الجملة التي سيقولونها <textarea id="vlCloneText" rows="2">${esc(S.text)}</textarea></label>
-      <button type="button" class="btn primary" id="vlCloneGo">🧬 أنشئ الكلون وقارن</button>
+      <button type="button" class="btn primary" id="vlCloneGo">🧬 أنشئ الاستنساخ وقارن</button>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>` : `
 ${S.review ? reviewHTML() : `
       <p class="hint">لكل لهجة قطعة. راجعها وعدّلها إن أردت، وكل مزوّد يقولها بصوتين. المزوّد الذي لا يدعم اللهجة يظهر مقفلًا فيها. استمع وقيّم بالنجوم، والنتيجة النهائية في تبويب «النتيجة».</p>
@@ -98,7 +98,7 @@ ${S.review ? reviewHTML() : `
   function reviewHTML() {
     const D = S.d, ks = Object.keys(D.dialects);
     const n = ks.reduce((a, k) => a + (S.provs.some((p) => supports(k, p)) ? 1 : 0), 0);
-    return `<div class="vl-review"><div class="row wrap"><button type="button" class="btn ghost" id="vlReviewBack">→ رجوع</button>
+    return `<div class="vl-review"><div class="row wrap"><button type="button" class="btn ghost" id="vlReviewBack">← رجوع</button>
         <p class="hint" style="margin:0">راجع قطعة كل لهجة وعدّلها أو اتركها كما هي. المزوّدون المختارون: ${S.provs.map((p) => esc(D.providers[p])).join("، ") || "لا أحد"}. المزوّد الذي لا يدعم لهجة لن يُجرَّب فيها.</p></div>
       ${ks.map((k) => `<section class="vl-rv">${textBox(k, 4)}<div class="vl-pills vl-mini">${Object.entries(D.providers).filter(([p]) => S.provs.includes(p)).map(([p, v]) => `<span class="${supports(k, p) ? "on" : "off"}">${supports(k, p) ? "" : "🔒 "}${esc(v)}</span>`).join("")}</div></section>`).join("")}
       <div class="row wrap"><button type="button" class="btn primary" id="vlAll">🌍 قارن كل اللهجات (${n} لهجة)</button></div></div>`;
@@ -242,7 +242,7 @@ ${S.review ? reviewHTML() : `
         if (!f) return toast("اختر ملف العينة أولًا", true);
         const fd = new FormData();
         fd.append("file", f); fd.append("text", S.el.querySelector("#vlCloneText").value.trim()); fd.append("dialect", S.el.querySelector("#vlCloneDia").value);
-        toast("⏳ جارٍ رفع العينة وإنشاء الكلون…");
+        toast("⏳ جارٍ رفع العينة وإنشاء الاستنساخ…");
         await api("/api/voicelab/clone", { method: "POST", body: fd });
         return load();
       }

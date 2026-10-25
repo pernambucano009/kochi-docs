@@ -11,7 +11,7 @@ const ComicsPage = (() => {
     const st = S.st, s = st.state || {}, run = !!s.running, open = S.items.find((c) => c.id === S.open);
     if (open && st.admin && !S.sel) return editor(open);
     if (!S.drawer || !st.admin) return "";
-    return `<aside class="pk-drawer" aria-label="اجمع كوميكس"><div class="pk-dh"><h2>اجمع كوميكس</h2>${pkIb("close", "إغلاق", "data-cmdx", "sm")}</div>
+    return `<aside class="pk-drawer" aria-label="اجمع قصصًا مصوّرة"><div class="pk-dh"><h2>اجمع قصصًا مصوّرة</h2>${pkIb("close", "إغلاق", "data-cmdx", "sm")}</div>
       ${run ? `<div class="pk-busy">⏳ ${esc(s.step || "جارٍ العمل…")} · ${s.progress || 0}% · أُضيف ${s.added || 0} ${pkIb("close", "أوقف", "data-cmstop", "sm")}</div>` : ""}
       ${s.last_error ? `<p class="pk-err">⚠️ ${esc(s.last_error)}</p>` : ""}
       <label class="pk-f">كلمات إضافية (كلمة في كل سطر)<textarea rows="4" data-cmq placeholder="اسم فيلم كوميدي&#10;عبارة مشهورة"></textarea></label>
@@ -67,7 +67,7 @@ const ComicsPage = (() => {
           ${S.searchOn || S.q ? `<input type="search" class="pk-q" data-cmsearch placeholder="ابحث بالإحساس أو الموقف أو العبارة" value="${esc(S.q)}" aria-label="بحث">` : pkIb("search", "ابحث بالإحساس أو الموقف", "data-cmsearchon")}
           ${st.admin ? `<label class="pk-ib" data-tip="أضف ملفات" aria-label="أضف ملفات">${pkIc("upload")}<input type="file" multiple accept="image/*,video/*,.gif" data-cmfiles hidden></label>` : ""}
           ${st.admin ? `<span class="pk-wrapm">${pkIb("more", "خيارات", "data-cmmenu")}${menu()}</span>` : ""}
-          ${st.admin ? pkIb("plus", "اجمع كوميكس تلقائيًا", "data-cmdo", "blk") : ""}
+          ${st.admin ? pkIb("plus", "اجمع قصصًا مصوّرة تلقائيًا", "data-cmdo", "blk") : ""}
         </div>
       </div>
       <div class="pk-chips">${grp}<span class="pk-sep"></span>${stc("ready", "الجاهز", st.ready)}${stc("new", "تنتظر السياق", st.pending)}${stc("hidden", "المخفي", st.hidden)}<span class="pk-sep"></span>${langs}</div>
@@ -112,7 +112,7 @@ const ComicsPage = (() => {
       if (e.target.matches("[data-cmfiles]") && e.target.files.length) {
         const fd = new FormData();
         [...e.target.files].forEach((f) => fd.append("files", f));
-        toast("⬆ يرفع…");
+        toast("⬆ جارٍ الرفع…");
         try { const r = await api("/api/comics/import", { method: "POST", body: fd }); toast(`✅ أُضيف ${r.added}`); await refresh(); render(); poll(); } catch (err) { toast(err.message, true); }
       }
     });
@@ -133,7 +133,7 @@ const ComicsPage = (() => {
         if (q("[data-cmdx]")) { S.drawer = false; return render(); }
         if (q("[data-cmst]")) { S.status = q("[data-cmst]").dataset.cmst; S.open = null; await load(); return render(); }
         if (S.menu && !q(".pk-menu")) { S.menu = false; render(); }
-        if (q("[data-cmstop]")) { await api("/api/comics/harvest/stop", { method: "POST" }); return toast("سيقف بعد الخطوة التي تعمل"); }
+        if (q("[data-cmstop]")) { await api("/api/comics/harvest/stop", { method: "POST" }); return toast("سيتوقف بعد الخطوة الجارية"); }
         if (q("[data-cmtag]")) { S.st = await api("/api/comics/tag", { method: "POST" }); render(); return poll(); }
         if (q("[data-cmurl]")) {
           const fd = new FormData(); fd.append("urls", w.querySelector("[data-cmurls]").value);
@@ -153,21 +153,21 @@ const ComicsPage = (() => {
           toast(value ? `✅ اعتُمد ${r.changed}` : `أُزيل الاعتماد من ${r.changed}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmseldel]")) {
-          if (!(await uiConfirm(`تحذف ${S.sel.size} كوميك؟ المسح نهائي.`))) return;
+          if (!(await uiConfirm(`أتحذف ${S.sel.size} كوميك؟ الحذف نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody({ ids: [...S.sel] }) });
           toast(`🗑 حُذف ${r.deleted}`); S.sel = null; S.st = r; await load(); return render();
         }
         if (q("[data-cmdelall]") || q("[data-cmdelevery]")) {
           const every = !!q("[data-cmdelevery]");
-          if (!(await uiConfirm(every ? "تحذف كل المكتبة ما عدا المعتمد؟ المسح نهائي." : `تحذف الظاهر (${S.total}) ما عدا المعتمد؟ المسح نهائي.`))) return;
+          if (!(await uiConfirm(every ? "أتحذف المكتبة كلها عدا المعتمد؟ الحذف نهائي." : `أتحذف الظاهر (${S.total}) عدا المعتمد؟ الحذف نهائي.`))) return;
           const r = await api("/api/comics/delete", { method: "POST", ...jsonBody(every ? { all: true } : { all: true, ...flt }) });
-          toast(`🗑 حُذف ${r.deleted}${r.kept_approved ? ` · فضل ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
+          toast(`🗑 حُذف ${r.deleted}${r.kept_approved ? ` · بقي ${r.kept_approved} معتمد` : ""}`); S.st = r; await load(); return render();
         }
         if (q("[data-cmclose]")) { S.open = null; return render(); }
         const it = q(".cm-item");
         if (it && S.sel) {
           const id = it.dataset.cid;
-          if (S.items.find((c) => c.id === id)?.approved) return toast("هذا معتمد: أزل الاعتماد أولًا لكي يمكنك تعلّم عليه للمسح", true);
+          if (S.items.find((c) => c.id === id)?.approved) return toast("هذا معتمد: أزل الاعتماد أولًا لتتمكن من تحديده للحذف", true);
           S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); return render();
         }
         if (it && S.st.admin) { S.open = it.dataset.cid; S.drawer = false; return render(); }
@@ -184,7 +184,7 @@ const ComicsPage = (() => {
           S.items = S.items.filter((c) => c.id !== r.id); S.open = null; await refresh(); return render();
         }
         if (q("[data-cmdel]")) {
-          if (!(await uiConfirm("تحذف هذا الكوميك؟"))) return;
+          if (!(await uiConfirm("أتحذف هذا الكوميك؟"))) return;
           await api(`/api/comics/${cur.id}`, { method: "DELETE" }); S.items = S.items.filter((c) => c.id !== cur.id); S.open = null; await refresh(); return render();
         }
       } catch (err) { toast(err.message, true); }

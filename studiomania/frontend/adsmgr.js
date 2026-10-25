@@ -24,8 +24,8 @@ const AdsMgrPage = (() => {
         : `<button class="pk-chip" data-amcon="${p}" ${needSocial ? `disabled title="اربط حساب ${esc(label)} للنشر أولًا من صفحة النشر"` : ""}>اربط</button>`}</label>`;
     };
     return `${(d.ad_accounts || []).map((a) => `<div class="pk-li"><b>${esc(platName(a.platform))}</b><small>${esc(a.name)} · <span dir="ltr">${esc(a.ad_account)} · ${esc(a.currency)}</span></small></div>`).join("")}
-      ${btn("facebook", "ميتا (فيسبوك وإنستجرام)")}${btn("tiktok", "تيك توك")}${btn("google", "جوجل ويوتيوب")}${btn("linkedin", "لينكدإن")}${btn("pinterest", "بنترست")}${btn("x", "X")}
-      <p class="pk-note">ميتا ولينكدإن ونترست تستخدم ربط النشر نفسه. تيك توك وX وجوجل تطلب تسجيل الدخول على المنصة ثم تعود إلى هنا.</p>`;
+      ${btn("facebook", "ميتا (فيسبوك وإنستغرام)")}${btn("tiktok", "تيك توك")}${btn("google", "جوجل ويوتيوب")}${btn("linkedin", "لينكدإن")}${btn("pinterest", "بنترست")}${btn("x", "X")}
+      <p class="pk-note">ميتا ولينكدإن وبنترست تستخدم ربط النشر نفسه. تيك توك وX وجوجل تطلب تسجيل الدخول على المنصة ثم تعود إلى هنا.</p>`;
   }
   // 🎯 الاستهداف: البلوك نفسه في الترويج والإعلان الجديد
   function target(p) {
@@ -130,7 +130,7 @@ const AdsMgrPage = (() => {
       ${kind === "lookalike" ? `<label class="pk-f">من جمهور<select data-amf="source">${list.filter((x) => x.type !== "lookalike").map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("") || `<option value="">أنشئ جمهور زوار أو عملاء أولًا</option>`}</select></label>
           <div class="pk-row2"><label class="pk-f">الدولة<input type="text" maxlength="2" dir="ltr" data-amf="country" value="${esc(val("country", S.d.recipe?.countries?.[0] || "SA"))}"></label>
           <label class="pk-f">الحجم<select data-amf="ratio">${[1, 2, 3, 5, 10].map((r) => `<option value="${r / 100}" ${+val("ratio", 0.01) === r / 100 ? "selected" : ""}>${r}٪ ${r === 1 ? "(الأقرب)" : ""}</option>`).join("")}</select></label></div>` : ""}
-      ${kind === "customer_list" ? `<p class="pk-note">بعد إنشائه، ارفع ملف CSV فيه بريد أو رقم كل عميل (بمفتاح الدولة، مثل +966…). يجب أن يكونون عملاءك فعلًا وقد وافقوا على التواصل، وتُشفَّر البيانات قبل وصولها إلى ميتا.</p>` : ""}
+      ${kind === "customer_list" ? `<p class="pk-note">بعد إنشائه، ارفع ملف CSV فيه بريد كل عميل أو رقمه (بمفتاح الدولة، مثل +966…). يجب أن يكونوا عملاءك فعلًا وقد وافقوا على التواصل، وتُشفَّر البيانات قبل وصولها إلى ميتا.</p>` : ""}
       <div class="pk-dacts"><button class="nb-btn fs-go" data-amaudnew ${S.busy ? "disabled" : ""}>أنشئ الجمهور</button></div>
       <input type="file" accept=".csv,text/csv" hidden data-amfile>`;
   }
@@ -143,7 +143,7 @@ const AdsMgrPage = (() => {
     const w = S.el;
     if (!w || !S.d) return;
     const d = S.d, ok = d.ready && (d.ad_accounts || []).length;
-    w.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub">${d.mock ? `<span>وضع تجربة: أرقام تجريبية</span>` : ""}${d.recipe?.summary ? `<span data-tip="${esc(d.recipe.summary.slice(0, 90))}">الاستهداف من وصفة الاستهداف</span>` : ""}</div>
+    w.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub">${d.mock ? `<span>وضع تجريبي: أرقام تجريبية</span>` : ""}${d.recipe?.summary ? `<span data-tip="${esc(d.recipe.summary.slice(0, 90))}">الاستهداف من وصفة الاستهداف</span>` : ""}</div>
         <div class="pk-acts">${d.ready ? pkIb("link", "حسابات الإعلانات", 'data-amdw="acc"') : ""}${ok ? pkIb("users", "الجماهير المخصصة", 'data-amdw="aud"') + pkIb("trend", "روّج منشورًا", 'data-amdw="boost"') + pkIb("plus", "إعلان جديد بوصفة الاستهداف", 'data-amdw="create"', "blk") : ""}</div></div>
       ${!d.ready ? `<p class="pk-err">خدمة الإعلانات غير متصلة بعد. تواصل مع الدعم.</p>` : d.error ? `<p class="pk-err">⚠️ ${esc(d.error)}</p>` : ""}
       ${d.ready ? listView() : ""}${drawer()}</div>`;
@@ -154,7 +154,7 @@ const AdsMgrPage = (() => {
       const r = await api(`/api/ads/${encodeURIComponent(id)}/analytics`), box = S.el.querySelector(`[data-adid="${CSS.escape(id)}"] [data-amstatbox]`);
       if (!box) return;
       const bd = r.breakdowns || {};
-      box.innerHTML = Object.keys(bd).length ? Object.entries(bd).map(([k, rows]) => `<p><b>${esc({ age: "السن", gender: "النوع", country: "البلد" }[k] || k)}:</b> ${(rows || []).slice(0, 6).map((x) => `${esc(x.key || x.value || x.age || x.gender || x.country || "")} <span class="num">${fmt(x.spend ?? x.impressions)}</span>`).join(" · ")}</p>`).join("") : "لا توجد تفاصيل بعد.";
+      box.innerHTML = Object.keys(bd).length ? Object.entries(bd).map(([k, rows]) => `<p><b>${esc({ age: "العمر", gender: "النوع", country: "البلد" }[k] || k)}:</b> ${(rows || []).slice(0, 6).map((x) => `${esc(x.key || x.value || x.age || x.gender || x.country || "")} <span class="num">${fmt(x.spend ?? x.impressions)}</span>`).join(" · ")}</p>`).join("") : "لا توجد تفاصيل بعد.";
     } catch (err) { toast(err.message, true); }
   }
   const tgBody = () => ({ age_min: +S.t.age_min, age_max: +S.t.age_max, countries: S.t.countries, interests: S.t.interests });

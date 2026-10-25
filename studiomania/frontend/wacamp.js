@@ -15,7 +15,7 @@ const WaCampPage = (() => {
 
   function linkDw() {
     const d = S.d;
-    return `<p class="pk-note">ضعه في السيرة والإعلانات والمحل وعلى المنتج. من يضغط أو يصوّر يفتح محادثة معك والكلمة مكتوبة، فيكون هو من بدأ، وهذه موافقة.</p>
+    return `<p class="pk-note">ضعه في النبذة والإعلانات والمحل وعلى المنتج. من يضغط أو يصوّر يفتح محادثة معك والكلمة مكتوبة، فيكون هو من بدأ، وهذه موافقة.</p>
       <label class="pk-f">رقم الواتساب<input type="tel" dir="ltr" data-waf="number" value="${esc(val("number", d.number))}" placeholder="+966501234567"></label>
       ${f("keyword", "الكلمة التي تُكتب تلقائيًا", val("keyword", d.keyword))}
       <div class="pk-dacts"><button class="nb-btn" data-wanum>احفظ</button></div>
@@ -29,7 +29,7 @@ const WaCampPage = (() => {
     const list = (d.automations || []).map((a) => `<div class="pk-li"><b>${esc(a.name)}</b><span class="pk-pills">${a.keywords.map((k) => `<span class="pk-pill">${esc(k)}</span>`).join("")}</span>
         <span class="am-st ${a.active ? "ok" : ""}">${a.active ? "يعمل" : "متوقف"}</span>${a.stats?.sent != null ? `<small>أُرسل ${a.stats.sent}</small>` : ""}
         <span class="pk-acts">${pkIb(a.active ? "close" : "play", a.active ? "أوقف" : "شغّل", `data-waatog="${esc(a.id)}" data-on="${a.active ? 0 : 1}"`, "sm")}${pkIb("trash", "احذف", `data-waadel="${esc(a.id)}"`, "sm")}</span></div>`).join("");
-    if (!posts.length) return `<p class="pk-note">لا توجد منشورات نُشرت من البرنامج على إنستجرام أو فيسبوك بعد.</p>${list}`;
+    if (!posts.length) return `<p class="pk-note">لا توجد منشورات نُشرت من البرنامج على إنستغرام أو فيسبوك بعد.</p>${list}`;
     const p = posts.find((x) => x.id === val("apost")) || posts[0], pl = p.platforms.includes(val("aplat")) ? val("aplat") : p.platforms[0];
     S.f.apost = p.id; S.f.aplat = pl;
     return `<p class="pk-note">من يكتب الكلمة في التعليق تصله رسالة فيها رابط الواتساب.</p>
@@ -54,7 +54,7 @@ const WaCampPage = (() => {
         <span class="am-st ${st[1]}">${esc(st[0])}</span><small>${esc(d.categories[t.category] || t.category)}</small><span class="pk-acts">${pkIb("trash", "احذف", `data-watdel="${esc(t.name)}"`, "sm")}</span>
         <small class="am-full">${esc(t.body)}</small>${t.reason ? `<small class="pk-err">${esc(t.reason)}</small>` : ""}</div>`; }).join("") || `<p class="pk-note">لا توجد رسائل بعد.</p>`}
       <b class="pk-h3">رسالة جديدة</b><p class="pk-note">يراجعها واتساب (من دقائق إلى ٢٤ ساعة) قبل إرسالها.</p>
-      <div class="pk-row2">${f("tgoal", "عن ماذا الرسالة؟", val("tgoal"), 'placeholder="مثلًا: عرض نهاية الأسبوع"')}${pkIb("spark", S.busy === "draft" ? "جارٍ الكتابة…" : "اكتبها لي", `data-wadraft ${S.busy ? "disabled" : ""}`, "sm")}</div>
+      <div class="pk-row2">${f("tgoal", "عمّ الرسالة؟", val("tgoal"), 'placeholder="مثلًا: عرض نهاية الأسبوع"')}${pkIb("spark", S.busy === "draft" ? "جارٍ الكتابة…" : "اكتبها لي", `data-wadraft ${S.busy ? "disabled" : ""}`, "sm")}</div>
       <div class="pk-row2"><label class="pk-f">النوع<select data-waf="tcat">${Object.entries(d.categories).map(([k, t]) => `<option value="${k}" ${k === cat ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
         <label class="pk-f">اللغة<select data-waf="tlang">${Object.entries(d.langs).map(([k, t]) => `<option value="${k}" ${k === val("tlang", "ar") ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label></div>
       ${f("tname", "اسم داخلي (بالإنجليزية)", val("tname"), 'dir="ltr" placeholder="weekend_offer"')}
@@ -70,14 +70,14 @@ const WaCampPage = (() => {
       ${val(`${key}:${i + 1}`) && val(`${key}:${i + 1}`) !== "name" ? `<input type="text" data-wavartxt="${key}:${i + 1}" value="${esc(val(`${key}:${i + 1}`) === "custom" ? "" : val(`${key}:${i + 1}`))}">` : ""}</label>`).join("");
   }
   const varsBody = (name, key) => { const t = approved().find((x) => x.name === name), o = {}; for (let i = 1; i <= (t?.vars || 0); i++) { const v = val(`${key}:${i}`, "name"); o[i] = v === "custom" ? "" : v; } return o; };
-  const needTpl = () => `<p class="pk-note">تحتاج رسالة واحدة على الأقل معتمدة من واتساب.</p><button class="pk-chip" data-wadw="tpl">الرسائل المعتمدة</button>`;
+  const needTpl = () => `<p class="pk-note">تحتاج إلى رسالة واحدة على الأقل معتمدة من واتساب.</p><button class="pk-chip" data-wadw="tpl">الرسائل المعتمدة</button>`;
   const tagSel = (k, all) => `<select data-waf="${k}"><option value="">${all}</option>${(S.d.contacts.tags || []).map((t) => `<option ${t === val(k) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
   function bcDw() {
     const ok = approved();
     if (!ok.length) return needTpl();
     const tp = ok.some((t) => t.name === val("btpl")) ? val("btpl") : ok[0].name;
     S.f.btpl = tp;
-    return `<p class="pk-note">للمشتركين فقط، ولا تصل لمن ألغى اشتراكه.</p>
+    return `<p class="pk-note">للمشتركين فقط، ولا تصل إلى من ألغى اشتراكه.</p>
       <label class="pk-f">الرسالة<select data-waf="btpl">${ok.map((t) => `<option value="${esc(t.name)}" ${t.name === tp ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
       <label class="pk-f">إلى${tagSel("btag", `كل المشتركين (${S.d.contacts.subscribed})`)}</label>
       ${f("bname", "اسم الحملة", val("bname"), 'placeholder="عرض نهاية الأسبوع"')}${varsFor(tp, "b")}
@@ -127,12 +127,12 @@ const WaCampPage = (() => {
     const segs = [["camp", "الحملات"], ["seq", "سلاسل المتابعة"], ["people", "المشتركون"]].map(([k, t]) => `<button class="pk-chip${S.seg === k ? " on" : ""}" data-waseg="${k}">${t}</button>`).join("");
     const src = (k, ic, t, tip) => `<button class="wa-src" data-wadw="${k}" data-tip="${tip}"><i>${pkIc(ic, 16)}</i>${t}</button>`;
     const body = !d.ready ? `<p class="pk-err">خدمة الرسائل غير متصلة بعد. تواصل مع الدعم.</p>`
-      : !d.account ? `<div class="pk-hero"><span class="pk-big">${pkIc("msg", 40)}</span><h2>اربط واتساب بيزنس</h2><p>اربطه من صفحة النشر (اربط حسابًا ← واتساب بيزنس)، ثم عُد إلى هنا لجمع الموافقات وإرسال الحملات.</p></div>`
+      : !d.account ? `<div class="pk-hero"><span class="pk-big">${pkIc("msg", 40)}</span><h2>اربط واتساب بيزنس</h2><p>اربطه من صفحة النشر (اربط حسابًا ← واتساب للأعمال)، ثم عُد إلى هنا لجمع الموافقات وإرسال الحملات.</p></div>`
       : `<div class="pk-top"><div class="pk-kpis"><div><b class="num">${c.subscribed}</b><span>مشترك وافق على الرسائل</span></div><div><b class="num">${c.total - c.subscribed}</b><span>ألغوا الاشتراك</span></div><div><b class="num">${approved().length}</b><span>رسالة معتمدة</span></div></div>
           <div class="wa-srcs">${src("link", "link", "رابط", "رابط يشاركه العميل ليشترك")}${src("link", "qr", "رمز QR", "يُطبع في المحل أو على المنتج")}${src("auto", "chat", "كلمة في التعليقات", "من يكتبها في التعليق يصله رابط الاشتراك")}</div></div>
         <div class="pk-chips">${segs}</div><div class="wa-rows">${{ camp: rowsCamp, seq: rowsSeq, people: rowsPeople }[S.seg]()}</div>`;
     const dw = S.dw && d.account ? `<aside class="pk-drawer" aria-label="${DW[S.dw]}"><div class="pk-dh"><h2>${DW[S.dw]}</h2>${pkIb("close", "إغلاق", "data-wadx", "sm")}</div>${{ link: linkDw, auto: autoDw, add: addDw, tpl: tplDw, bc: bcDw, seq: seqDw }[S.dw]()}</aside>` : "";
-    w.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub">${d.mock ? `<span>وضع تجربة: بيانات تجريبية</span>` : ""}${d.account ? `<span data-tip="كل رسالة تسويقية فيها «${esc(d.stop)}»، ومن يلغي لا يصله شيء بعدها">للموافقين فقط 🔒</span>` : ""}${d.account && d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
+    w.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub">${d.mock ? `<span>وضع تجريبي: بيانات تجريبية</span>` : ""}${d.account ? `<span data-tip="كل رسالة تسويقية فيها «${esc(d.stop)}»، ومن يلغي لا يصله شيء بعدها">للموافقين فقط 🔒</span>` : ""}${d.account && d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         ${d.account ? `<div class="pk-acts">${pkIb("users", "أضف عملاء وافقوا", 'data-wadw="add"')}${pkIb("msg", "الرسائل المعتمدة من واتساب", 'data-wadw="tpl"')}${pkIb("plus", S.seg === "seq" ? "سلسلة متابعة جديدة" : "حملة جديدة", `data-wadw="${S.seg === "seq" ? "seq" : "bc"}"`, "blk")}</div>` : ""}</div>
       ${body}${dw}</div>`;
   }
