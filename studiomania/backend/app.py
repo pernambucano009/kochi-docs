@@ -11012,7 +11012,7 @@ def onboard_state():
                 j = (brain_row(bid) or {}).get("first_job") or j
         except Exception as exc:  # noqa: BLE001
             print(f"[first-gift] {bid}: {exc}", flush=True)
-    job = {k: j.get(k) for k in ("status", "step", "done", "progress", "video_url", "export_id", "title", "error", "tpl", "cost")} if j else None
+    job = {k: j.get(k) for k in ("status", "step", "done", "progress", "video_url", "export_id", "title", "error", "tpl", "cost", "qa")} if j else None
     if job and job["status"] == "run" and time.time() - (j.get("at") or 0) > 3600:   # السيرفر اتقفل في النص
         job.update(status="failed", error="التشغيل توقف، جرّب مرة أخرى")
     steps = [{"key": k, "label": (f"{v} {dialect_phrase(b)}" if k == "script" else v)} for k, v in FIRST_STEPS]
@@ -11177,6 +11177,7 @@ def onboard_logo_pick(body: LogoPickIn):
 
 
 import tplbrief  # noqa: E402
+import videoqa  # noqa: E402
 
 
 class FirstGoIn(BaseModel):
@@ -11312,7 +11313,7 @@ def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | 
         with closing(db()) as conn:
             r = conn.execute("SELECT filename FROM exports WHERE id = ?", (ex,)).fetchone()
         put(status="done", step=None, done=list(done), export_id=ex, video_url=f"/media/exports/{r['filename']}" if r else None,
-            title=title, cost=0, finished_at=now(), finished_ts=time.time())
+            title=title, cost=0, finished_at=now(), finished_ts=time.time(), qa=flow_load(fid).get("qa"))
         # 🎁 كل اللي اتخصم لحد هنا بيرجع في سطر واحد «هدية» في سجل النقاط (ولو فشل هنا، بيتسجل مع أول فتحة جاية)
         try:
             first_gift(bid)
@@ -23997,7 +23998,8 @@ def flow_make_vo(fid: str) -> None:
         old = (x.get("vo_track") or {}).get("file")
         if old and old != out.name:
             (folder / old).unlink(missing_ok=True)
-        x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard)}, stage="panel")
+        x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard),
+                           "heard_text": " ".join(str(w.get("w") or "") for w in heard)[:4000], "said_text": " ".join(says)[:4000]}, stage="panel")
     flow_update(fid, fin)
 
 
@@ -25382,10 +25384,40 @@ def flow_export(fid: str, body: FlowExportIn):
     flow_update(fid, lambda x: x.update(params=params, stage="generate", output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
     def go():
         p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
+        p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
         run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
                           timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None)
     threading.Thread(target=go, daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
+
+
+def flow_qa(fid: str, mid: str, params: dict) -> dict:
+    """🔎 مراجعة القالب قبل الرسم: اللي اتقال فعلًا في التعليق الصوتي (من تفريغه) مقابل خانات القالب (الأسعار والدقايق والاسم)،
+    وصورة المنتج مقابل اسمه. اللي ينفع يتصلح في الخانات بيتصلح، والباقي بيتكتب ملاحظة تظهر للعميل مع الفيديو."""
+    d = flow_load(fid)
+    vt = d.get("vo_track") or {}
+    spoken = vt.get("heard_text") or vt.get("said_text") or " ".join(str(r.get("say") or "") for r in (d.get("scenario") or {}).get("scenes") or [])
+    issues = videoqa.check(mid, params, spoken, d.get("facts") or {})
+    params = videoqa.apply_fixes(params, issues)
+    img_slot = next((s for s, n in (tplbrief.DRAW.get(mid) or {}).get("slots", []) if params.get(s)), None)
+    name = params.get(dict((tplbrief.DRAW.get(mid) or {}).get("slots", [])).get(img_slot, ""), "") if img_slot else ""
+    if img_slot and name and not atlas.mock_mode():
+        try:
+            path = next(((root() / params[img_slot][len(pre):]).resolve() for pre, root in MEDIA_ROOTS.items() if params[img_slot].startswith(pre)), None)
+            if path and path.is_file():
+                meter = {"usd": 0.0}
+                raw = ad_json(ad_media_chat([{"role": "user", "content": [{"type": "text", "text": videoqa.image_prompt(name)},
+                                                                         {"type": "image_url", "image_url": {"url": data_url(model_image(path, 512), "image/jpeg")}}]}],
+                                            600, meter=meter), "فحص صورة المنتج")
+                wallet.charge(wallet.credits((meter["usd"] or 0.002)), "مراجعة الفيديو: صورة المنتج", fid)
+                if raw.get("match") is False:
+                    issues.append({"what": "صورة المنتج", "detail": f"الصورة تُظهر «{raw.get('shows', '')}» وليس «{name}»", "fix": {}})
+        except Exception as exc:  # noqa: BLE001
+            print(f"[qa] image {fid}: {exc}", flush=True)
+    report = {"at": now(), "issues": [{"what": i["what"], "detail": i["detail"], "fixed": bool(i.get("fix"))} for i in issues],
+              "ok": not [i for i in issues if not i.get("fix")]}
+    flow_update(fid, lambda x: x.update(qa=report))
+    return params
 
 
 def brand_guard(schema: dict, params: dict, brain: dict | None) -> dict:

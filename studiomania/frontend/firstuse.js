@@ -51,6 +51,8 @@ const FirstUse = (() => {
 .fu-photo img{width:56px;height:56px;object-fit:contain;border-radius:10px;background:repeating-conic-gradient(#e9e9e9 0 25%,#fff 0 50%) 0 0/12px 12px}
 .fu-chips{display:flex;flex-wrap:wrap;gap:8px}.fu-chips label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:var(--ui-dlg-field,#F7F7F5);cursor:pointer;font-size:13.5px}
 .fu-chips input{width:auto}
+.fu-qa{display:grid;gap:4px;margin:0 0 12px;padding:10px 14px;border-radius:14px;background:rgba(46,160,90,.1);font-size:13px;line-height:1.7}
+.fu-qa.warn{background:rgba(229,97,62,.1)}.fu-qa b{font-size:13.5px}
 @media (prefers-reduced-motion:reduce){.fu-steps li.on span{animation:none}}`;
   const st = document.createElement("style");
   st.textContent = css;
@@ -195,6 +197,12 @@ const FirstUse = (() => {
     });
   }
 
+  // 🔎 نتيجة مراجعة الفيديو: الكلام المنطوق ↔ الأسعار والوقت والصورة اللي على الشاشة
+  const qaHTML = (qa) => {
+    if (!qa) return "";
+    const fixed = (qa.issues || []).filter((i) => i.fixed), open = (qa.issues || []).filter((i) => !i.fixed);
+    return `<div class="fu-qa${open.length ? " warn" : ""}"><b>${open.length ? "⚠️ ملاحظات المراجعة" : "✓ راجعنا الفيديو: الكلام يطابق ما على الشاشة"}</b>${[...open, ...fixed].map((i) => `<span>${i.fixed ? "✓ " : "• "}${esc(i.detail)}</span>`).join("")}</div>`;
+  };
   // ✓ الخطوات وهي بتخلص، وفي الآخر الفيديو نفسه
   let watching = null;
   function watch(open = true) {
@@ -215,7 +223,7 @@ const FirstUse = (() => {
       if (j.status === "done") {
         b.querySelector("h3").textContent = "أول فيديو جاهز 🎉";
         b.querySelector(".fu-sub").textContent = "موجود في «الفيديوهات الجاهزة». شاهده وانشره، أو ابدأ مشروعًا جديدًا.";
-        out.innerHTML = `<video class="fu-vid" src="${esc(j.video_url)}" controls playsinline autoplay></video>`;
+        out.innerHTML = `<video class="fu-vid" src="${esc(j.video_url)}" controls playsinline autoplay></video>${qaHTML(j.qa)}`;
         b.querySelector(".ui-dlg-acts").innerHTML = `<button type="button" class="ui-dlg-ok" data-go="pub">انشره الآن</button><button type="button" class="ui-dlg-no" data-go="new">ابدأ مشروعًا جديدًا</button>`;
         b.querySelector(".ui-dlg-acts").onclick = (e) => {
           const g = e.target.closest("[data-go]")?.dataset.go; if (!g) return;

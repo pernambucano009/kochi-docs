@@ -528,6 +528,12 @@ const Flow = (() => {
       ${(d.assets || []).length ? `<div class="flw-ment"><small class="muted">اضغط لكي تعمل إشارة:</small>${d.assets.map((a) => `<button type="button" class="flw-chip" data-ment="${esc(a.name)}">@${esc(a.name)}</button>`).join("")}</div>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-gen ${d.busy ? "disabled" : ""}>🚀 ولّد</button></div>`;
   }
+  // 🔎 مراجعة القالب: الكلام المنطوق ↔ الأسعار والوقت والصورة على الشاشة (اللي اتصلح لوحده، واللي محتاج منك نظرة)
+  function qaBox(qa) {
+    const open = (qa.issues || []).filter((i) => !i.fixed), fixed = (qa.issues || []).filter((i) => i.fixed);
+    return `<div class="flw-trend${open.length ? "" : " flw-mine"}"><b>${open.length ? "⚠️ ملاحظات مراجعة الفيديو" : "✓ راجعنا الفيديو: الكلام يطابق ما على الشاشة"}</b>
+      ${[...open, ...fixed].map((i) => `<small class="${i.fixed ? "muted" : ""}">${i.fixed ? "✓ " : "• "}${esc(i.detail)}</small>`).join("<br>")}</div>`;
+  }
   function stDone(d) {
     const o = d.output || {};
     const isWork = o.status === "working" || d.busy === "generate";
@@ -537,6 +543,7 @@ const Flow = (() => {
       ${isWork ? working(`العقل يبني ${OUT[o.kind] ? `في ${OUT[o.kind]}` : "المنشور"}${pct}`) : ""}
       ${o.status === "failed" || d.error ? `<div class="flw-empty bad">⚠️ ${esc(o.error || d.error || "")}</div>` : ""}
       ${o.video_url ? `<video class="flw-out" src="${esc(o.video_url)}" controls playsinline autoplay loop></video>` : ""}
+      ${!isWork && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind ? `<div class="flw-done">
         ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "الكاروسيل أُنشئ بالسلايدز والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
           <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} ←</button>` : o.video_url ? `<a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل الفيديو</a>` : ""}
