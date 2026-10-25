@@ -6,14 +6,14 @@ const BotsPage = (() => {
   const PL = { instagram: "إنستجرام", facebook: "فيسبوك", whatsapp: "واتساب" };
   const ST = { active: ["يعمل", "ok"], paused: ["متوقف", "wait"], draft: ["مسودة", "wait"] };
   const FIELD = {
-    keywords: ["الكلمات اللي تشغّله (افصل بفاصلة)", "text", "مثلًا: برنامج, سعر"],
-    post: ["على بوست معيّن (اختياري، رقم البوست)", "text", "سيبه فاضي لكل البوستات"],
-    message: ["الرسالة اللي هتوصله", "area", ""],
-    link_title: ["اسم زرار اللينك", "text", "مثلًا: سجّل هنا"],
-    link: ["اللينك", "url", "https://…"],
-    q1: ["السؤال الأول", "text", ""], a1: ["اختياراته (افصل بفاصلة)", "text", ""],
-    q2: ["السؤال التاني", "text", ""], a2: ["اختياراته (افصل بفاصلة)", "text", ""],
-    ai: ["يكمّل الكلام بالذكاء الصناعي من عقل العلامة لو العميل رد", "check", ""],
+    keywords: ["الكلمات التي تشغّله (افصل بينها بفاصلة)", "text", "مثلًا: برنامج, سعر"],
+    post: ["على منشور معيّن (اختياري، رقم المنشور)", "text", "اتركه فارغًا لكل المنشورات"],
+    message: ["الرسالة التي ستصله", "area", ""],
+    link_title: ["اسم زر الرابط", "text", "مثلًا: سجّل هنا"],
+    link: ["الرابط", "url", "https://…"],
+    q1: ["السؤال الأول", "text", ""], a1: ["خياراته (افصل بينها بفاصلة)", "text", ""],
+    q2: ["السؤال الثاني", "text", ""], a2: ["خياراته (افصل بينها بفاصلة)", "text", ""],
+    ai: ["يكمل المحادثة بالذكاء الاصطناعي من عقل العلامة إن ردّ العميل", "check", ""],
   };
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="botWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const val = (k) => S.f[k] ?? S.d.defaults[S.recipe]?.[k] ?? "";
@@ -26,16 +26,16 @@ const BotsPage = (() => {
   }
   function formHTML() {
     const R = S.d.recipes, r = R[S.recipe];
-    if (!r) return `<b class="pk-h3">بوت جديد</b><p class="pk-note">اختار نوع البوت:</p><div class="bot-recipes">${Object.entries(R).map(([k, x]) =>
+    if (!r) return `<b class="pk-h3">بوت جديد</b><p class="pk-note">اختر نوع البوت:</p><div class="bot-recipes">${Object.entries(R).map(([k, x]) =>
       `<button type="button" class="bot-recipe" data-brecipe="${k}"><b>${esc(x.t)}</b><small>${esc(x.desc)}</small><span>${x.platforms.map((p) => PL[p]).join(" · ")}</span></button>`).join("")}</div>`;
     const accs = S.d.accounts.filter((a) => r.platforms.includes(a.platform));
     if (!S.f.account || !accs.some((a) => a.id === S.f.account)) S.f.account = accs[0]?.id || "";
-    return `<div class="bot-formhead"><b class="pk-h3">${esc(r.t)}</b>${pkIb("close", "رجوع للأنواع", "data-bback", "sm")}</div><p class="pk-note">${esc(r.desc)}</p>
+    return `<div class="bot-formhead"><b class="pk-h3">${esc(r.t)}</b>${pkIb("close", "عودة إلى الأنواع", "data-bback", "sm")}</div><p class="pk-note">${esc(r.desc)}</p>
       ${accs.length ? `<label class="pk-f">على حساب<select data-bf="account">${accs.map((a) => `<option value="${esc(a.id)}" ${a.id === S.f.account ? "selected" : ""}>${PL[a.platform]} · ${esc(a.name || a.username)}</option>`).join("")}</select></label>`
         : `<p class="pk-err">لا يوجد حساب ${r.platforms.map((p) => PL[p]).join(" أو ")} مربوط. اربطه من صفحة النشر أولًا.</p>`}
       <label class="pk-f">اسم البوت<input type="text" data-bf="name" value="${esc(S.f.name ?? r.t)}"></label>
       ${r.fields.map(field).join("")}
-      ${S.recipe === "assistant" || S.f.ai ? `<p class="pk-note">الرد الذكي بيقرا من عقل العلامة (الهوية والمعرفة والقواعد)، وكل رد بيتخصم بنقطة تقريبًا. لو العميل طلب حد من الفريق أو سأل حاجة مش في العقل، المحادثة بتتحوّل لصندوق الرسايل.</p>` : ""}
+      ${S.recipe === "assistant" || S.f.ai ? `<p class="pk-note">يقرأ الرد الذكي من عقل العلامة (الهوية والمعرفة والقواعد)، ويُخصم كل رد بنقطة تقريبًا. إن طلب العميل أحدًا من الفريق أو سأل عن شيء غير موجود في العقل، تُحوَّل المحادثة إلى صندوق الرسائل.</p>` : ""}
       <div class="pk-dacts"><button class="nb-btn fs-go" data-bgo ${S.busy || !accs.length ? "disabled" : ""}>${S.busy ? "جارٍ التشغيل…" : "🤖 شغّل البوت"}</button></div>`;
   }
   function render() {
@@ -43,10 +43,10 @@ const BotsPage = (() => {
     if (!d.live) { S.el.innerHTML = `<div class="nh-empty">${esc(d.note)}</div>`; return; }
     S.el.innerHTML = `<div class="bot-grid"><section class="bot-list"><b class="pk-h3">بوتاتك</b>
       ${d.bots.map((b) => { const st = ST[b.status] || [b.status, ""]; return `<div class="pk-li"><b>${esc(b.name)}</b><small>${PL[b.platform] || esc(b.platform)} · ${esc(b.account)}</small>
-        <span class="am-st ${st[1]}">${st[0]}</span><small>بدأ ${b.started} · خلص ${b.completed}${b.exited ? ` · اتحوّل ${b.exited}` : ""}</small>
+        <span class="am-st ${st[1]}">${st[0]}</span><small>بدأ ${b.started} · انتهى ${b.completed}${b.exited ? ` · حُوّل ${b.exited}` : ""}</small>
         <span class="pk-acts">${pkIb(b.status === "active" ? "close" : "play", b.status === "active" ? "أوقف" : "شغّل", `data-btog="${esc(b.id)}" data-on="${b.status === "active" ? 0 : 1}"`, "sm")}${pkIb("trash", "احذف", `data-bdel="${esc(b.id)}"`, "sm")}</span></div>`; }).join("")
         || `<p class="pk-note">لا توجد بوتات بعد. اختر نوعًا من اليمين وشغّله في دقيقة.</p>`}
-      <p class="pk-note">المحادثات اللي البوت بيحوّلها للفريق بتظهر في «صندوق الرسايل».</p></section>
+      <p class="pk-note">المحادثات التي يحوّلها البوت إلى الفريق تظهر في «صندوق الرسائل».</p></section>
       <section class="bot-form">${formHTML()}</section></div>`;
   }
   async function run(fn) {
@@ -62,14 +62,14 @@ const BotsPage = (() => {
       if (q("[data-brecipe]")) { S.recipe = q("[data-brecipe]").dataset.brecipe; S.f = {}; return render(); }
       if (q("[data-bback]")) { S.recipe = ""; return render(); }
       if (q("[data-btog]")) { const b = q("[data-btog]"); return run(async () => { S.d = await api(`/api/bots/${encodeURIComponent(b.dataset.btog)}/state`, { method: "POST", ...jsonBody({ on: b.dataset.on === "1" }) }); }); }
-      if (q("[data-bdel]")) { if (await uiConfirm("تحذف البوت ده نهائيًا؟")) run(async () => { S.d = await api(`/api/bots/${encodeURIComponent(q("[data-bdel]").dataset.bdel)}`, { method: "DELETE" }); }); return; }
+      if (q("[data-bdel]")) { if (await uiConfirm("أتحذف هذا البوت نهائيًا؟")) run(async () => { S.d = await api(`/api/bots/${encodeURIComponent(q("[data-bdel]").dataset.bdel)}`, { method: "DELETE" }); }); return; }
       if (q("[data-bgo]")) {
         const r = S.d.recipes[S.recipe], opts = {};
         r.fields.forEach((k) => { opts[k] = k === "ai" ? !!S.f.ai : val(k); });
         return run(async () => {
           S.d = await api("/api/bots", { method: "POST", ...jsonBody({ recipe: S.recipe, account: S.f.account, name: S.f.name ?? r.t, opts }) });
           S.recipe = ""; S.f = {};
-          toast("✓ البوت اشتغل");
+          toast("✓ بدأ البوت العمل");
         });
       }
     });

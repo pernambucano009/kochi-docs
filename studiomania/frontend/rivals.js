@@ -39,9 +39,9 @@ const RivalsPage = (() => {
     const where = [b.domain, b.market, b.audience].filter(Boolean).join(" · ");
     const hd = `<div class="rv-r rv-hd"><span></span><span>الحساب</span><span>المتوسط</span><span>الأعلى</span><span>آخر ٣٠ يومًا</span><span></span></div>`;
     return `<div class="pk-top"><div class="pk-sub"><span><b class="num">${d.approved}</b> منافس معتمد</span>${d.pending ? `<span><b class="num">${d.pending}</b> ينتظر موافقتك</span>` : ""}
-          ${d.found_at || d.updated_at ? `<span>آخر تحديث ${ago(d.found_at || d.updated_at)}</span>` : ""}${d.live ? "" : `<span>وضع تجربة: حسابات تجريبية</span>`}
+          ${d.found_at || d.updated_at ? `<span>آخر تحديث ${ago(d.found_at || d.updated_at)}</span>` : ""}${d.live ? "" : `<span>وضع تجريبي: حسابات تجريبية</span>`}
           ${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "جارٍ العمل…")}</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
-        <div class="pk-acts"><label class="rv-mode" data-tip="${d.algo_mode ? "القواعد خطوات إجبارية في صناعة كل فيديو" : "القواعد نصائح فقط"}"><input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}>وضع الخوارزمية</label>
+        <div class="pk-acts"><label class="rv-mode" data-tip="${d.algo_mode ? "القواعد خطوات إلزامية في صناعة كل فيديو" : "القواعد نصائح فقط"}"><input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}>وضع الخوارزمية</label>
           ${pkIb("search", "اقترح منافسين آخرين", `data-rvfind ${busy ? "disabled" : ""}`)}${d.approved ? pkIb("refresh", "حدّث الأرقام", `data-rvall ${busy ? "disabled" : ""}`) : ""}
           ${pkIb("trend", "حلّل آخر ١٠ فيديوهات لك", 'data-rvdw="batch"')}${pkIb("plus", "أضف منافسًا بنفسك", 'data-rvdw="add"', "blk")}</div></div>
       ${pend.length ? `<div class="rv-sec"><span class="pk-lbl">مقترحون${where ? ` حسب: ${esc(where)}` : ""}</span><span class="pk-acts"><button class="pk-chip" data-rvokall>وافق على الكل</button><button class="pk-chip" data-rvnoall>ارفض الكل</button></span></div>
@@ -64,11 +64,11 @@ const RivalsPage = (() => {
     if (!d) return `<div class="pk-empty">جارٍ التحميل…</div>`;
     const c = d.calc, a = d.analysis, handle = B.handle || d.handle, plat = B.platform || d.platform;
     const by = { leads: "العملاء", follows: "المتابعين", views: "المشاهدات" };
-    const head = `<p class="pk-note">نقارن الفيديوهات ببعضها لا بالأرقام المجردة: ما حقق ٥ أضعاف وسيط الدفعة فائز، و١٠ أضعاف ذهبي.${d.live ? "" : " (وضع تجربة: أرقام تجريبية)"}</p>
+    const head = `<p class="pk-note">نقارن الفيديوهات ببعضها لا بالأرقام المجردة: ما حقق ٥ أضعاف وسيط الدفعة فائز، و١٠ أضعاف ذهبي.${d.live ? "" : " (وضع تجريبي: أرقام تجريبية)"}</p>
       <div class="pk-row2"><input type="text" class="pk-q" data-btin placeholder="@حساب العلامة" dir="ltr" value="${esc(handle)}">
         <select data-btpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}" ${k === plat ? "selected" : ""}>${t}</option>`).join("")}</select>
         ${pkIb("download", B.busy === "fetch" ? "جارٍ الجلب…" : "اجلب آخر ١٠", `data-btfetch ${B.busy ? "disabled" : ""}`, "sm")}</div>`;
-    if (!c) return head + `<p class="pk-note">أن كانت لديك أرقام العملاء أو المتابعين التي جلبها كل فيديو، فاكتبها بجانبه: يقدّمها التحليل على المشاهدات.</p>`;
+    if (!c) return head + `<p class="pk-note">إن كانت لديك أرقام العملاء أو المتابعين التي جلبها كل فيديو، فاكتبها بجانبه: يقدّمها التحليل على المشاهدات.</p>`;
     const rows = c.rows.map((r, i) => `<div class="bt-row ${r.tier}">
         <span class="bt-x num">${r.x != null ? "×" + r.x : "—"}${TIER[r.tier] ? " " + TIER[r.tier] : ""}</span>
         <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" class="bt-cap"><b>${i + 1}.</b> ${esc((r.caption || "").slice(0, 90) || "—")}<small>${fmt(r.views)} مشاهدة · ${ago(r.ts)}</small></a>
@@ -123,7 +123,7 @@ const RivalsPage = (() => {
     const angles = (a.angles || []).filter((x) => !cur || !x.persona || x.persona === cur.name || x.persona.includes(cur.name) || cur.name.includes(x.persona));
     return top + pills + (cur ? `<div class="au-who"><div><span class="pk-lbl">من هو</span><p>${esc(cur.who || "—")}</p></div><div><span class="pk-lbl">ما يزعجه</span><p>${esc(cur.pain || "—")}</p></div>
         <div><span class="pk-lbl">${cur.hook ? "جملة تشدّه" : "ما يريده"}</span><p class="${cur.hook ? "au-hook" : ""}">${cur.hook ? `«${esc(cur.hook)}»` : esc(cur.want || "—")}</p></div></div>` : "")
-      + `<div class="au-plats">${plat("ميتا (فيسبوك وإنستجرام)", "meta", kv("العمر والنوع", `<span class="num">${age}</span>`) + kv("الأماكن", tags(m.locations)) + kv("الاهتمامات", tags(m.interests)))}
+      + `<div class="au-plats">${plat("ميتا (فيسبوك وإنستجرام)", "meta", kv("العمر والجنس", `<span class="num">${age}</span>`) + kv("الأماكن", tags(m.locations)) + kv("الاهتمامات", tags(m.interests)))}
         ${plat("جوجل ويوتيوب", "google", kv("كلمات البحث", tags(g.keywords)) + kv("كلمات مستبعدة", tags(g.negative)))}
         ${plat("تيك توك", "tiktok", kv("الاهتمامات", tags(t.tt_interests)) + kv("الوسوم", tags(t.tt_hashtags, "#")))}</div>
       ${angles.length ? `<div class="au-ang"><span class="pk-lbl">زوايا إعلانية لهذا الجمهور</span>${angles.slice(0, 3).map((x) => `<div class="pk-li"><b>${esc(x.angle)}</b><small>${esc(x.text)}${x.cta ? ` · ${esc(x.cta)}` : ""}</small><span class="pk-acts">${pkIb("copy", "انسخ", `data-aucp="angle.${a.angles.indexOf(x)}"`, "sm")}</span></div>`).join("")}</div>` : ""}
@@ -173,11 +173,11 @@ const RivalsPage = (() => {
     const title = items.length ? `خطة ${MON[first.getMonth()]}` : "خطة الشهر";
     const top = `<div class="pk-top"><div class="pk-sub"><b class="pl-title">${title}</b>${ring(d.score, d.need)}
           ${kinds.length ? `<span class="pl-leg">${kinds.map((k) => `<span><i style="background:${KIND_C[k] || "#999"}"></i>${esc(d.kinds[k] || k)}</span>`).join("")}</span>` : ""}
-          ${busy ? `<span class="pk-busy">⏳ تُبنى الخطة… (دقيقة أو اثنتان)</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
+          ${busy ? `<span class="pk-busy">⏳ تُبنى الخطة… (دقيقة أو دقيقتان)</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         <div class="pk-acts">${pkIb("spark", "الاستراتيجية التي تُبنى عليها الخطة", 'data-rvdw="strategy"')}${stepper}${pkIb("refresh", m ? "أعد بناء الخطة" : "ابنِ خطة الشهر", `data-momake ${busy || !d.ready ? "disabled" : ""}`)}
           ${m ? applied ? `<button class="pk-chip" data-mopilot>افتح الأوتوبايلوت</button><button class="pk-chip" data-moapply="0">أوقف التطبيق</button>` : `<button class="nb-btn fs-go" data-moapply="1">اعتمد الخطة للأوتوبايلوت</button>` : ""}</div></div>`;
     if (!items.length) return top + `<div class="pk-hero"><span class="pk-big">${pkIc("target", 40)}</span><h2>${d.ready ? "ابنِ خطة الشهر" : "العقل يحتاج أن يفهمك أكثر"}</h2>
-        <p>${d.ready ? "كل يوم بعدد منشوراته، وكل منشور بشكله وقالبه وفكرته وخطافه. راجعها ثم اعتمدها لتنزل على الأوتوبايلوت." : `تُبنى الخطة عندما يفهمك العقل بنسبة ${d.need}٪ مع الشروط الأساسية. اضغط على العدّاد لترى ما ينقص.`}</p>
+        <p>${d.ready ? "كل يوم بعدد منشوراته، وكل منشور بشكله وقالبه وفكرته وخطافه. راجعها ثم اعتمدها لتنتقل إلى الأوتوبايلوت." : `تُبنى الخطة عندما يفهمك العقل بنسبة ${d.need}٪ مع الشروط الأساسية. اضغط على العدّاد لترى ما ينقص.`}</p>
         ${d.ready ? `<button class="nb-btn fs-go" data-momake ${busy ? "disabled" : ""}>ابنِ خطة الشهر</button>` : ""}</div>`;
     // التقويم: من أول يوم في الشهر لحد آخر يوم فيه بوست
     const y = first.getFullYear(), mo = first.getMonth(), lead = new Date(y, mo, 1).getDay(), last = new Date(y, mo + 1, 0).getDate();
@@ -225,7 +225,7 @@ const RivalsPage = (() => {
       ${sec("التميّز", `${st.words.length ? `<div class="pk-pills">${st.words.map((w) => `<span class="pk-pill">${esc(w)}</span>`).join("")}</div>` : ""}${st.signature ? `<p class="pk-note">${esc(st.signature)}</p>` : ""}
         ${Object.entries(st.white_space).filter(([, v]) => v).map(([k, v]) => `<div class="pk-li"><b>الفراغ في ${esc(AX[k] || k)}</b><small>${esc(v)}</small></div>`).join("")}`)}
       ${sec("من مشاهد إلى عميل", `<div class="pk-li"><b>كلمة التعليق</b><small>${esc(st.funnel.keyword || "—")}</small></div><div class="pk-li"><b>الهدية</b><small>${esc(st.funnel.magnet)}</small></div><div class="pk-li"><b>العرض</b><small>${esc(st.funnel.offer)}</small></div>`)}
-      ${sec("الإيقاع والمنصة", `${st.cadence ? `<p class="pk-note">${esc(st.cadence)}</p>` : ""}${st.platform ? `<p class="pk-note">المنصة الأساسية: ${esc(st.platform)}</p>` : ""}${st.profile.bio ? `<p class="pk-note">السيرة: ${esc(st.profile.bio)}</p>` : ""}`)}
+      ${sec("الإيقاع والمنصة", `${st.cadence ? `<p class="pk-note">${esc(st.cadence)}</p>` : ""}${st.platform ? `<p class="pk-note">المنصة الأساسية: ${esc(st.platform)}</p>` : ""}${st.profile.bio ? `<p class="pk-note">النبذة: ${esc(st.profile.bio)}</p>` : ""}`)}
       ${sec("نبتعد عن", st.avoid.length ? `<ul class="pl-list">${li(st.avoid)}</ul>` : "")}`;
   }
   async function moLoad() {
@@ -275,7 +275,7 @@ const RivalsPage = (() => {
       if (e.target.matches("[data-btpl]")) S.bt.platform = e.target.value;
       if (e.target.matches("[data-rvmode]")) {
         api("/api/algo/mode", { method: "POST", ...jsonBody({ on: e.target.checked }) })
-          .then((x) => { S.d.algo_mode = x.on; render(); toast(x.on ? "✓ وضع الخوارزمية يعمل" : "أُوقف وضع الخوارزمية"); }).catch((err) => toast(err.message, true));
+          .then((x) => { S.d.algo_mode = x.on; render(); toast(x.on ? "✓ وضع الخوارزمية مفعّل" : "أُوقف وضع الخوارزمية"); }).catch((err) => toast(err.message, true));
       }
       if (e.target.matches("[data-btm]")) {
         const row = S.el.querySelectorAll(`[data-btm="${CSS.escape(e.target.dataset.btm)}"]`), val = (k) => { const x = [...row].find((i) => i.dataset.k === k)?.value; return x === "" || x == null ? null : +x; };
@@ -321,7 +321,7 @@ const RivalsPage = (() => {
       if (q("[data-mopilot]")) return window.NHNav?.("pilot");
       const ap = q("[data-moapply]");
       if (ap) {
-        try { S.mo.d = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: ap.dataset.moapply === "1" }) }); toast(ap.dataset.moapply === "1" ? "✓ نزلت الخطة على الأوتوبايلوت" : "عاد الأوتوبايلوت للاختيار من القوالب بالدور"); }
+        try { S.mo.d = await api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: ap.dataset.moapply === "1" }) }); toast(ap.dataset.moapply === "1" ? "✓ انتقلت الخطة إلى الأوتوبايلوت" : "عاد الأوتوبايلوت إلى الاختيار من القوالب بالتناوب"); }
         catch (err) { toast(err.message, true); }
         return render();
       }

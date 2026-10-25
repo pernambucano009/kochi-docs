@@ -21,13 +21,13 @@ function twRender() {
   const el = $("twMain");
   if (!el) return;
   const side = `<aside class="panel tw-side"><div class="panel-head"><h2>🪞 الأفاتار</h2></div>
-    <p class="hint">أفاتار لأي شخص: أنت، أو حد آخر معك إذنه. يُنشأ من تسجيلات حقيقية له (وشّه وحركته ولبسه وصوته)، لكي تعمل به فيديوهات بكلام جديد. يمكنك تعمل أكثر من أفاتار.</p>
+    <p class="hint">أفاتار لأي شخص: أنت، أو شخص آخر لديك إذنه. يُنشأ من تسجيلات حقيقية له (وجهه وحركته وملابسه وصوته)، لتصنع به فيديوهات بكلام جديد. يمكنك إنشاء أكثر من أفاتار.</p>
     <ul class="ad-list">${tw.list.map((t) => `<li class="${tw.cur?.id === t.id ? "on" : ""}" data-twopen="${t.id}"><b data-no-i18n>${twe(t.name)}</b>
       <small class="muted">${t.ready.video ? "🎬" : "○"} ${t.ready.photos}/${t.ready.angles} 📷 ${t.ready.voice ? "🎙️" : "○"}</small></li>`).join("") || `<li class="muted">لا يوجد بعد</li>`}</ul>
     <form class="tw-new" data-twnew><input name="name" placeholder="اسم الشخص" required maxlength="80">
-      <label class="tw-consent"><input type="checkbox" name="consent" required> هذا أنا، أو معي إذن صريح من الشخص إننا نعمل نسخة منه</label>
+      <label class="tw-consent"><input type="checkbox" name="consent" required> هذا أنا، أو لدي إذن صريح من الشخص بإنشاء نسخة منه</label>
       <button class="btn primary sm">＋ أفاتار جديد</button></form></aside>`;
-  setHTML(el, `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">أنشئ أفاتار جديد من الشمال، وسنمشي معك خطوة خطوة.</p></div>`}</section></div>`);
+  setHTML(el, `<div class="car-layout">${side}<section class="tw-body">${tw.cur ? twBody(tw.cur) : `<div class="panel"><p class="muted">أنشئ أفاتارًا جديدًا من اليسار، وسنرافقك خطوة خطوة.</p></div>`}</section></div>`);
 }
 
 function twTips(k) { return `<ul class="tw-tips">${(tw.kit?.tips?.[k] || []).map((x) => `<li>${twe(x)}</li>`).join("")}</ul>`; }
@@ -36,27 +36,27 @@ function twBody(t) {
   const k = tw.kit || {}, r = t.ready;
   const step = (n, done, title, body) => `<details class="panel tw-step${done ? " done" : ""}" ${done ? "" : "open"}><summary><i class="num">${done ? "✓" : n}</i><b>${title}</b></summary>${body}</details>`;
   const video = step(1, r.video, "🎬 فيديو وأنت تقرأ النص", `
-    <p class="hint">هذا أهم تسجيل: نركّب عليه أي نص جديد لاحقًا، فالوجه والحركة واللبس والمكان يصبحون الخاصة بك أنت بالضبط.</p>${twTips("video")}
+    <p class="hint">هذا أهم تسجيل: نركّب عليه أي نص جديد لاحقًا، فيكون الوجه والحركة والملابس والمكان لك أنت بالضبط.</p>${twTips("video")}
     <div class="tw-script" dir="auto">${(k.video_script || []).map((l) => `<p class="${/^\(/.test(l) ? "muted" : ""}">${twe(l)}</p>`).join("")}</div>
-    <div class="row wrap"><button type="button" class="btn primary" data-twcam="video">📹 سجّل بالكاميرا (النص يتحرك قدامك)</button>
+    <div class="row wrap"><button type="button" class="btn primary" data-twcam="video">📹 سجّل بالكاميرا (يتحرك النص أمامك)</button>
       <label class="btn">⬆ ارفع فيديو<input type="file" accept="video/*" data-twup="video" hidden></label></div>
     ${t.video_url ? `<video class="tw-vid" src="${t.video_url}" controls playsinline preload="metadata"></video><small class="muted">⏱ ${twSec(t.video.duration)} · ${t.video.w}×${t.video.h}</small>` : ""}`);
   const have = Object.fromEntries((t.photos || []).map((p) => [p.angle, p]));
-  const photos = step(2, r.photos >= 3 && r.photo, `📷 صور من كذا اتجاه <small class="muted num">${r.photos}/${r.angles}</small>`, `
-    <p class="hint">صورة القدام إجبارية (نعمل منها فيديو إذا لا يوجد فيديو قراية)، والباقي يخلّي النسخة أدق.</p>${twTips("photos")}
+  const photos = step(2, r.photos >= 3 && r.photo, `📷 صور من عدة اتجاهات <small class="muted num">${r.photos}/${r.angles}</small>`, `
+    <p class="hint">الصورة الأمامية إلزامية (نصنع منها فيديو إن لم يوجد فيديو قراءة)، والباقي يجعل النسخة أدق.</p>${twTips("photos")}
     <div class="tw-angles">${(k.angles || []).map((a) => `<div class="tw-angle${have[a.id] ? " on" : ""}">
       ${have[a.id] ? `<img src="${have[a.id].url}" alt=""><button type="button" class="tw-x" data-twdelph="${a.id}" title="أزلها">✕</button>` : `<span class="tw-ph">📷</span>`}
       <b>${twe(a.label)}</b><span class="row"><button type="button" class="btn sm" data-twcam="photo:${a.id}">📸</button>
       <label class="btn sm">⬆<input type="file" accept="image/*" data-twup="photo:${a.id}" hidden></label></span></div>`).join("")}</div>`);
   const voice = step(3, r.voice, "🎙️ صوتك تلقائيًا", `
-    <p class="hint">تسجيل نضيف لصوتك في مكان هادي. يُحفظ لكي استنساخ صوتك (قريب)، ويمكنك تستخدمه كمرجع.</p>${twTips("voice")}
+    <p class="hint">تسجيل نظيف لصوتك في مكان هادئ. يُحفظ لاستنساخ صوتك (قريبًا)، ويمكنك استخدامه مرجعًا.</p>${twTips("voice")}
     <div class="tw-script" dir="auto">${(k.voice_script || []).map((l) => `<p>${twe(l)}</p>`).join("")}</div>
     <div class="row wrap"><button type="button" class="btn primary" data-twmic="voice">${tw.rec?.kind === "voice" ? "⏹ أوقف واحفظ" : "🎙️ سجّل"}</button>
       <label class="btn">⬆ ارفع تسجيل<input type="file" accept="audio/*" data-twup="voice" hidden></label>
       ${tw.rec?.kind === "voice" ? `<b class="tw-live num" data-twt>0:00</b>` : ""}</div>
     ${t.voice_url ? `<audio src="${t.voice_url}" controls preload="metadata"></audio><small class="muted">⏱ ${twSec(t.voice.duration)}</small>` : ""}`);
   const places = step(4, r.backgrounds > 0, `🏠 أماكن التصوير <small class="muted num">${r.backgrounds || 0}</small>`, `
-    <p class="hint">صوّر المكان الذي تصوّر فيه فيديوهاتك وهو فارغ. عندما تصوّر فيديو وتقول «صوّرت هنا»، لقطات الـ B-roll ما البرنامج يعملها بيك تظهر في نفس المكان.</p>${twTips("backgrounds")}
+    <p class="hint">صوّر المكان الذي تصوّر فيه فيديوهاتك وهو فارغ. عندما تصوّر فيديو وتختار «صوّرت هنا»، تظهر اللقطات المساندة التي يصنعها البرنامج لك في المكان نفسه.</p>${twTips("backgrounds")}
     <div class="tw-angles">${(t.backgrounds || []).map((b) => `<div class="tw-angle on"><img src="${b.url}" alt=""><button type="button" class="tw-x" data-twdelbg="${twe(b.id)}" title="أزلها">✕</button><b>${twe(b.name)}</b></div>`).join("")}</div>
     <div class="row wrap"><input class="input" data-twbgname placeholder="اسم المكان (المكتب، المطبخ…)" maxlength="60">
       <label class="btn primary">📸 صوّر أو ارفع صورة المكان<input type="file" accept="image/*" capture="environment" data-twup="background" hidden></label></div>`);
@@ -69,7 +69,7 @@ function twBody(t) {
       <label>الجودة <select name="quality" data-twq>
         <optgroup label="فيديو القراءة"><option value="veed">عادي · ${sec("video:veed")}</option><option value="sync">احترافي · ${sec("video:sync")}</option></optgroup>
         <optgroup label="الصورة"><option value="std">عادي · ${sec("photo:std")}</option><option value="pro">عالي · ${sec("photo:pro")}</option></optgroup></select></label>
-      <label class="wide">ستقول ماذا؟ (اختياري، للتذكير) <textarea name="text" rows="2" dir="auto" placeholder="اكتب النص لكي تقراه وأنت تسجّل"></textarea></label>
+      <label class="wide">ماذا ستقول؟ (اختياري، للتذكير) <textarea name="text" rows="2" dir="auto" placeholder="اكتب النص لتقرأه وأنت تسجّل"></textarea></label>
       <div class="row wrap wide"><button type="button" class="btn" data-twmic="say">${tw.rec?.kind === "say" ? "⏹ أوقف" : "🎙️ سجّل النص"}</button>
         <label class="btn">⬆ ارفع صوت<input type="file" accept="audio/*,video/*" data-twsay hidden></label>
         ${tw.rec?.kind === "say" ? `<b class="tw-live num" data-twt>0:00</b>` : tw.say ? `<audio src="${tw.say.url}" controls></audio><small class="muted">${twe(tw.say.name)}</small>` : ""}</div>
@@ -98,7 +98,7 @@ async function twSend(path, form, what) {
   tw.list = await api(TW());
   twRender();
   twPoll();
-  toast(`✓ ${what} حُفظ`);
+  toast(`✓ حُفظ ${what}`);
 }
 function twFile(blob, name) { return new File([blob], name, { type: blob.type }); }
 
@@ -112,7 +112,7 @@ async function twMic(kind) {
   }
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } }); }
-  catch { return toast("المتصفح غير سامح بالمايك. اسمح به من بجانب الرابط", true); }
+  catch { return toast("المتصفح لا يسمح بالميكروفون. اسمح به من جانب شريط العنوان", true); }
   const parts = [], mr = new MediaRecorder(stream), t0 = Date.now();
   mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
   mr.onstop = async () => {
@@ -136,7 +136,7 @@ async function twCam(mode) {
   const isVideo = mode === "video";
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: "user" }, audio: isVideo });
-  } catch { return toast("المتصفح غير سامح بالكاميرا. اسمح بها من بجانب الرابط", true); }
+  } catch { return toast("المتصفح لا يسمح بالكاميرا. اسمح بها من جانب شريط العنوان", true); }
   const angle = isVideo ? null : mode.split(":")[1];
   const label = angle ? (tw.kit.angles.find((a) => a.id === angle)?.label || "") : "";
   const ov = Object.assign(document.createElement("div"), { className: "tw-cam" });
@@ -192,7 +192,7 @@ $("twMain")?.addEventListener("click", async (e) => {
   if (mic) return twMic(mic.dataset.twmic);
   try {
     if (t.closest("[data-twdel]")) {
-      if (!(await uiConfirm(`تحذف نسخة «${v.name}» بكل تسجيلاتها وفيديوهاتها؟`))) return;
+      if (!(await uiConfirm(`أتحذف نسخة «${v.name}» بكل تسجيلاتها وفيديوهاتها؟`))) return;
       await api(TW(`/${v.id}`), { method: "DELETE" }); tw.cur = null; return twInit();
     }
     const dp = t.closest("[data-twdelph]");
@@ -204,7 +204,7 @@ $("twMain")?.addEventListener("click", async (e) => {
     const ty = t.closest("[data-twtypo]");
     if (ty) {
       const p = await api(TW(`/${v.id}/clips/${ty.dataset.twtypo}/typo`), { method: "POST" });
-      toast("🔤 أُرسل للتايبوجرافي، والنص يُكتب بتوقيته");
+      toast("🔤 أُرسل إلى التايبوجرافي، ويُكتب النص بتوقيته");
       storageSet("studiomania.typo", p.id);
       if (typeof tyx !== "undefined") tyx.cur = null;
       return showStep("12");
@@ -242,7 +242,7 @@ $("twMain")?.addEventListener("submit", async (e) => {
       tw.cur = await api(TW(`/${tw.cur.id}/clips`), { method: "POST", body: f });
       tw.say = null;
       twRender(); twPoll();
-      toast("⏳ الفيديو يُنشأ، سيظهر أسفل عندما ينتهي");
+      toast("⏳ يُنشأ الفيديو، وسيظهر في الأسفل عند انتهائه");
     }
   } catch (err) { toast(err.message, true); }
 });
