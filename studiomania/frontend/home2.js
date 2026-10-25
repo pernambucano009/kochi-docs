@@ -733,7 +733,8 @@ const NH = (() => {
     renderBar();
   };
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
-  const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", wacamp: "publish" };
+  const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", wacamp: "publish", bots: "publish",
+    coaches: "brand", twin: "brand", brainlib: "brand", auto: "brand", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {
     const out = [{ label: "الرئيسية", lv: "home" }];
@@ -773,7 +774,8 @@ const NH = (() => {
   let popping = false, navReady = false;
   function navHash() {
     if (stageOpen() && stageTrail.length) return "#" + stageTrail[stageTrail.length - 1];
-    if (zoom?.page && pGrid.dataset.key) return "#" + [...pStack.map((x) => x.key), pGrid.dataset.key].join("/");
+    // الرابط بيقول الصفحة دي فين في البرنامج (#publish/audience)، مش الطريق اللي مشيته لحد هنا
+    if (zoom?.page && pGrid.dataset.key) { const k = pGrid.dataset.key, par = PAGE_PARENT[k]; return "#" + (par ? `${par}/${k}` : k); }
     return "#home";
   }
   function syncHash() {
@@ -782,7 +784,9 @@ const NH = (() => {
     if (location.hash !== h) history[location.hash ? "pushState" : "replaceState"](null, "", h);
   }
   const pageTile = (key) => Object.keys(T).map((id) => T[id].page === key && bento.querySelector(`.nh-tile[data-id="${id}"]`)).find(Boolean);
-  function isPageHash(h) { const k = String(h || "").replace(/^#/, "").split("/")[0]; return !!k && !!pageTile(k); }
+  // صفحة من غير مربع في الرئيسية (#plans، #rivals): بتتفتح من مربع القسم اللي هي جواه، أو من أول مربع
+  const hostTile = (key) => pageTile(key) || pageTile(PAGE_PARENT[key]) || ["brand", "publish", "pilot", "settings"].map(pageTile).find(Boolean);
+  function isPageHash(h) { const k = String(h || "").replace(/^#/, "").split("/")[0]; return !!k && (!!pageTile(k) || !!T[k]?.page); }
   const idle = async () => { for (let i = 0; i < 60 && (busy || zoom?.anims?.some?.((a) => a.playState === "running")); i++) await new Promise((r) => setTimeout(r, 60)); };
   async function goHash(h) {
     const parts = String(h || "").replace(/^#/, "").split("/").filter(Boolean), first = parts[0] || "home";
@@ -790,10 +794,11 @@ const NH = (() => {
     try {
       await idle();
       if (first === "home") { if (stageOpen()) await closeStage(); await idle(); if (zoom?.page) await closePage(true); return; }
-      const tile = pageTile(first);
+      const tile = pageTile(first) || (T[first]?.page && hostTile(first));
       if (tile) {
         if (stageOpen()) { await closeStage(); await idle(); }
-        if (!zoom?.page) { openPage(tile, first); await idle(); }
+        const own = pageTile(first) === tile, hk = T[tile.dataset.id]?.page || first;
+        if (!zoom?.page) { openPage(tile, own ? first : hk); await idle(); if (!own) { window.NHNav(first); await idle(); } }
         else window.NHNav(first);
         for (const k of parts.slice(1)) if (T[k]) { window.NHNav(k); await idle(); }
         return;

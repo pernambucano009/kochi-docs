@@ -90,8 +90,25 @@ def _check(resp: httpx.Response, what: str):
         data = resp.text[:200]
     if resp.status_code >= 400:
         detail = data.get("error") or data.get("message") if isinstance(data, dict) else data
-        raise PublishError(f"{what}: HTTP {resp.status_code}: {str(detail or data)[:300]}")
+        raw = f"{what}: HTTP {resp.status_code}: {str(detail or data)[:300]}"
+        if os.environ.get("TENANT_ROLE") != "customer":
+            raise PublishError(raw)
+        # العميل مايشوفش رسالة المزوّد الخام: رسالة مفهومة، والخام في اللوج
+        print(f"[publisher] {raw}", flush=True)
+        raise PublishError(f"{what}: {friendly_status(resp.status_code)}")
     return data
+
+
+def friendly_status(code: int) -> str:
+    if code in (400, 422):
+        return "بعض البيانات المطلوبة ناقصة أو غير صحيحة. راجع الحقول وحاول مجددًا"
+    if code in (401, 403):
+        return "الحساب المربوط يحتاج إعادة ربط من «حساباتك»"
+    if code == 404:
+        return "العنصر غير موجود لدى المنصة"
+    if code == 429:
+        return "طلبات كثيرة في وقت قصير. حاول بعد دقيقة"
+    return "المنصة لا تستجيب الآن. حاول بعد قليل"
 
 
 # ---------------------------------------------------------------- 🔒 كل عميل ليه بروفايل لوحده عند Zernio
@@ -119,7 +136,7 @@ def tenant_profile() -> str | None:
         items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
         hit = next((x for x in items or [] if x.get("name") == name), None)
         if not hit:
-            hit = _check(c.post(f"{BASE_URL}/profiles", json={"name": name}), "عمل بروفايل")
+            hit = _check(c.post(f"{BASE_URL}/profiles", json={"name": name}), "إنشاء ملف تعريف")
             hit = hit.get("profile", hit) if isinstance(hit, dict) else {}
     _profile_id = hit.get("_id") or hit.get("id")
     return _profile_id
@@ -229,7 +246,7 @@ def default_profile() -> str:
         items = data.get("profiles", data.get("data", [])) if isinstance(data, dict) else data
         if items:
             return items[0].get("_id") or items[0].get("id")
-        made = _check(c.post(f"{BASE_URL}/profiles", json={"name": "SimsimKit"}), "عمل بروفايل")
+        made = _check(c.post(f"{BASE_URL}/profiles", json={"name": "SimsimKit"}), "إنشاء ملف تعريف")
     made = made.get("profile", made) if isinstance(made, dict) else {}
     return made.get("_id") or made.get("id")
 
@@ -530,7 +547,7 @@ def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_n
     ig = [t for t in (targets or []) if split_target(t)[0] == "instagram"] or ["instagram"]
     ig_targets = resolve_targets(ig)
     if not 2 <= len(images) <= 10:
-        raise PublishError("الكاروسيل يجب يكون من 2 لـ 10 صور")
+        raise PublishError("يجب أن يتكون الكاروسيل من 2 إلى 10 صور")
     opts = options or {}
     urls = [upload_file(p) for p in images]
     data = {}

@@ -7,10 +7,11 @@ const PilotPage = (() => {
 #nh .ap { --ap-sub: #6B6A66; --ap-card: var(--card, #fff); --ap-field: var(--field, #F3F2EF); --ap-line: rgba(24, 23, 24, .1); --ap-track: #E3E2DE;
   --ap-soft: rgba(229, 97, 62, .1); --ap-sh: 0 4px 24px rgba(24, 23, 24, .06); --ap-chip: 0 4px 18px rgba(24, 23, 24, .08); --ap-pop: cubic-bezier(.2, .8, .2, 1);
   position: relative; min-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); color: var(--nh-ink); }
-:root[data-nh-theme="dark"] #nh .ap { --ap-sub: #A3A29E; --ap-field: #2A292A; --ap-line: rgba(255, 255, 255, .1); --ap-track: #3D3C3D; --ap-soft: rgba(240, 117, 79, .14);
+:root[data-nh-theme="dark"] #nh .ap { --ap-acc-ink: #F7A07F; --ap-sub: #A3A29E; --ap-field: #2A292A; --ap-line: rgba(255, 255, 255, .1); --ap-track: #3D3C3D; --ap-soft: rgba(240, 117, 79, .14);
   --ap-sh: 0 4px 24px rgba(0, 0, 0, .28); --ap-chip: 0 4px 18px rgba(0, 0, 0, .35); }
 #nh .ap :where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 #nh .ap .lat { font: 400 11px var(--nh-latin); letter-spacing: .3em; text-transform: uppercase; direction: ltr; unicode-bidi: isolate; color: var(--nh-muted); }
+#nh .ap .ap-lbl { font-size: 12.5px; font-weight: 600; color: var(--nh-muted); }
 #nh .ap .num { font-family: var(--nh-latin); font-weight: 300; direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 #nh .ap-top { display: flex; align-items: center; gap: 12px; }
 #nh .ap-tg { position: relative; width: 44px; height: 24px; border-radius: 99px; background: var(--ap-track); transition: background .3s; flex: none; }
@@ -47,7 +48,7 @@ const PilotPage = (() => {
 #nh .ap-md.on { box-shadow: inset 0 0 0 1.5px var(--nh-accent), var(--ap-sh); }
 #nh .ap-md.on::after { content: "✓"; position: absolute; top: -6px; left: -6px; box-shadow: 0 0 0 3px var(--nh-bg); width: 18px; height: 18px; border-radius: 50%; background: var(--nh-accent); color: #fff; font-size: 11px; display: grid; place-items: center; }
 #nh .ap-md .tag { font-size: 10.5px; padding: 1px 8px; border-radius: 99px; background: var(--ap-field); color: var(--ap-sub); margin-top: 4px; }
-#nh .ap-md .tag.cam { background: var(--ap-soft); color: var(--nh-accent); }
+#nh .ap-md .tag.cam { background: var(--ap-soft); color: var(--ap-acc-ink, #A93A17); }
 #nh .ap-md.off { opacity: .55; }
 #nh .ap-md.new { background: none; box-shadow: inset 0 0 0 1.5px var(--ap-line); justify-items: center; align-content: center; color: var(--ap-sub); }
 #nh .ap-md.new b { font-weight: 400; }
@@ -64,7 +65,7 @@ const PilotPage = (() => {
 #nh .ap-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 #nh .ap-sec.ap-modes { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; }
 #nh .ap-steps button { height: 30px; padding: 0 12px; border-radius: 999px; background: var(--ap-field); font-size: 12px; color: var(--ap-sub); }
-#nh .ap-steps button.on { background: var(--ap-soft); color: var(--nh-accent); }
+#nh .ap-steps button.on { background: var(--ap-soft); color: var(--ap-acc-ink, #A93A17); }
 #nh .ap-steps i { font-style: normal; color: var(--ap-track); align-self: center; }
 #nh .ap-dock { position: fixed; bottom: 24px; inset-inline-end: 28px; z-index: 6; display: grid; justify-items: end; gap: 10px; }
 #nh .ap-cap { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; border-radius: 22px; background: var(--ap-card); box-shadow: var(--ap-chip); font-size: 13px; transition: translate .32s var(--ap-pop); }
@@ -149,14 +150,14 @@ const PilotPage = (() => {
     try { S.d = await api("/api/pilot"); drawQ(); drawHead(); } catch { /* اللفة القادمة */ }
   }
   const shell = () => `
-    <header class="ap-top"><span class="lat">Autopilot</span><button type="button" class="ap-tg" data-on aria-label="الأوتوبايلوت"></button><span class="ap-st" data-st></span></header>
+    <header class="ap-top"><span class="ap-lbl">الأوتوبايلوت</span><button type="button" class="ap-tg" data-on aria-label="الأوتوبايلوت"></button><span class="ap-st" data-st></span></header>
     <main class="ap-main">
-      <div class="ap-row"><section class="ap-sec"><span class="lat">Posts per day</span>
+      <div class="ap-row"><section class="ap-sec"><span class="ap-lbl">منشورات في اليوم</span>
         <div class="ap-cnt"><button type="button" data-cnt="-1" aria-label="أقل">−</button><span class="n num" data-n></span><button type="button" data-cnt="1" aria-label="أكثر">+</button></div>
         <small>منشور في اليوم <span data-fee></span></small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
         <div class="ap-leg"><span><em></em>اخترناه في أفضل وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط لإضافة موعد · اسحب النقطة لتغييره · اضغط عليها لإزالته</span></div></section></div>
-      <section class="ap-sec"><span class="lat">Templates</span>
+      <section class="ap-sec"><span class="ap-lbl">القوالب</span>
         <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالتناوب من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
         <div class="ap-plan" data-plan></div>
         <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>

@@ -9,7 +9,11 @@ const RivalsPage = (() => {
   const PL = { tiktok: "TikTok", instagram: "Instagram" };
   const ago = (ts) => { if (!ts) return ""; const d = Math.round((Date.now() / 1000 - ts) / 86400); return d <= 0 ? "اليوم" : d === 1 ? "أمس" : `منذ ${d} يومًا`; };
   const profile = (r) => (r.platform === "tiktok" ? `https://www.tiktok.com/@${r.handle}` : `https://www.instagram.com/${r.handle}`);
-  const NEED_OK = "وافق على منافس واحد على الأقل في صفحة «منافسوك» لتُصنع الوصفة تلقائيًا.";
+  const NEED_OK = "وافق على منافس واحد على الأقل في صفحة «منافسوك»، ثم اضغط «حدّث من تعليقات المنافسين» لتُصنع الوصفة.";
+  // 💳 تكلفة الأزرار اللي بتصرف بتتكتب عليها قبل الضغط (مفيش حاجة بتتخصم لوحدها)
+  let COST = null;
+  api("/api/auto-costs").then((c) => { COST = c; if (S.el) render(); }).catch(() => {});
+  const ct = (k) => (COST?.[k] ? ` · نحو ${COST[k]} نقطة` : "");
   const drawer = (t, body, wide) => `<aside class="pk-drawer${wide ? " wide" : ""}" aria-label="${esc(t)}"><div class="pk-dh"><h2>${esc(t)}</h2>${pkIb("close", "إغلاق", "data-rvdx", "sm")}</div>${body}</aside>`;
 
   // ================= 🏆 منافسوك =================
@@ -42,7 +46,7 @@ const RivalsPage = (() => {
           ${d.found_at || d.updated_at ? `<span>آخر تحديث ${ago(d.found_at || d.updated_at)}</span>` : ""}${d.live ? "" : `<span>وضع تجريبي: حسابات تجريبية</span>`}
           ${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "جارٍ العمل…")}</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         <div class="pk-acts"><label class="rv-mode" data-tip="${d.algo_mode ? "القواعد خطوات إلزامية في صناعة كل فيديو" : "القواعد نصائح فقط"}"><input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}>وضع الخوارزمية</label>
-          ${pkIb("search", "اقترح منافسين آخرين", `data-rvfind ${busy ? "disabled" : ""}`)}${d.approved ? pkIb("refresh", "حدّث الأرقام", `data-rvall ${busy ? "disabled" : ""}`) : ""}
+          ${pkIb("search", `اقترح منافسين آخرين${ct("rivals_discover")}`, `data-rvfind ${busy ? "disabled" : ""}`)}${d.approved ? pkIb("refresh", `حدّث الأرقام${ct("rivals_refresh")}`, `data-rvall ${busy ? "disabled" : ""}`) : ""}
           ${pkIb("trend", "حلّل آخر ١٠ فيديوهات لك", 'data-rvdw="batch"')}${pkIb("plus", "أضف منافسًا بنفسك", 'data-rvdw="add"', "blk")}</div></div>
       ${pend.length ? `<div class="rv-sec"><span class="pk-lbl">مقترحون${where ? ` حسب: ${esc(where)}` : ""}</span><span class="pk-acts"><button class="pk-chip" data-rvokall>وافق على الكل</button><button class="pk-chip" data-rvnoall>ارفض الكل</button></span></div>
         <div class="rv-rows">${hd}${pend.map(row).join("")}</div>` : ""}
@@ -108,8 +112,8 @@ const RivalsPage = (() => {
     const d = S.d, a = d.audience || {}, busy = d.status === "working", has = (a.personas || []).length || (a.meta?.interests || []).length;
     const L = auds(), i = Math.min(S.au, Math.max(0, L.length - 1)), cur = L[i];
     const top = `<div class="pk-top"><div class="pk-sub">${has && d.approved ? `<span>صُنعت ${ago(a.at)} من ${a.rivals || d.approved} منافس${a.comments ? ` و${a.comments} تعليق` : ""}</span>` : ""}${a.budget ? `<span data-tip="${esc(a.budget.slice(0, 120))}">الميزانية المقترحة</span>` : ""}
-        ${busy || d.brief_due ? `<span class="pk-busy">⏳ ${busy ? esc(d.step || "…") : "تُصنع الوصفة تلقائيًا…"}</span>` : ""}</div>
-      <div class="pk-acts">${d.approved ? pkIb("refresh", "حدّث من تعليقات المنافسين", `data-augo ${busy ? "disabled" : ""}`) : ""}${has ? pkIb("copy", "انسخ الوصفة كلها", 'data-aucp="all"') : ""}
+        ${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "…")}</span>` : d.brief_due ? `<span class="pk-note">تغيّر المنافسون المعتمدون: حدّث الوصفة${ct("rivals_brief")}</span>` : ""}</div>
+      <div class="pk-acts">${d.approved ? pkIb("refresh", `حدّث من تعليقات المنافسين${ct("rivals_brief")}`, `data-augo ${busy ? "disabled" : ""}`) : ""}${has ? pkIb("copy", "انسخ الوصفة كلها", 'data-aucp="all"') : ""}
         ${has && d.approved ? `<button class="nb-btn fs-go" data-auads>أنشئ إعلانًا لهذا الجمهور</button>` : ""}</div></div>`;
     if (!d.approved) return top + `<div class="pk-hero"><span class="pk-big">${pkIc("target", 40)}</span><h2>تحتاج منافسًا معتمدًا</h2><p>${NEED_OK}</p>${d.pending ? `<button class="nb-btn fs-go" data-rvgo>راجع الاقتراحات (${d.pending})</button>` : ""}</div>`;
     const pills = L.length ? `<div class="au-sel"><span class="pk-lbl">${d.audiences?.length ? `استخلص العقل ${L.length === 1 ? "جمهورًا واحدًا" : `${L.length} جماهير`} من وصف علامتك` : "الشرائح من نص جمهور المنافسين"}</span>
@@ -174,11 +178,11 @@ const RivalsPage = (() => {
     const top = `<div class="pk-top"><div class="pk-sub"><b class="pl-title">${title}</b>${ring(d.score, d.need)}
           ${kinds.length ? `<span class="pl-leg">${kinds.map((k) => `<span><i style="background:${KIND_C[k] || "#999"}"></i>${esc(d.kinds[k] || k)}</span>`).join("")}</span>` : ""}
           ${busy ? `<span class="pk-busy">⏳ تُبنى الخطة… (دقيقة أو دقيقتان)</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
-        <div class="pk-acts">${pkIb("spark", "الاستراتيجية التي تُبنى عليها الخطة", 'data-rvdw="strategy"')}${stepper}${pkIb("refresh", m ? "أعد بناء الخطة" : "ابنِ خطة الشهر", `data-momake ${busy || !d.ready ? "disabled" : ""}`)}
+        <div class="pk-acts">${pkIb("spark", "الاستراتيجية التي تُبنى عليها الخطة", 'data-rvdw="strategy"')}${stepper}${pkIb("refresh", `${m ? "أعد بناء الخطة" : "ابنِ خطة الشهر"}${ct("month")}`, `data-momake ${busy || !d.ready ? "disabled" : ""}`)}
           ${m ? applied ? `<button class="pk-chip" data-mopilot>افتح الأوتوبايلوت</button><button class="pk-chip" data-moapply="0">أوقف التطبيق</button>` : `<button class="nb-btn fs-go" data-moapply="1">اعتمد الخطة للأوتوبايلوت</button>` : ""}</div></div>`;
     if (!items.length) return top + `<div class="pk-hero"><span class="pk-big">${pkIc("target", 40)}</span><h2>${d.ready ? "ابنِ خطة الشهر" : "العقل يحتاج أن يفهمك أكثر"}</h2>
         <p>${d.ready ? "كل يوم بعدد منشوراته، وكل منشور بشكله وقالبه وفكرته وخطافه. راجعها ثم اعتمدها لتنتقل إلى الأوتوبايلوت." : `تُبنى الخطة عندما يفهمك العقل بنسبة ${d.need}٪ مع الشروط الأساسية. اضغط على العدّاد لترى ما ينقص.`}</p>
-        ${d.ready ? `<button class="nb-btn fs-go" data-momake ${busy ? "disabled" : ""}>ابنِ خطة الشهر</button>` : ""}</div>`;
+        ${d.ready ? `<button class="nb-btn fs-go" data-momake ${busy ? "disabled" : ""}>ابنِ خطة الشهر${ct("month")}</button>` : ""}</div>`;
     // التقويم: من أول يوم في الشهر لحد آخر يوم فيه بوست
     const y = first.getFullYear(), mo = first.getMonth(), lead = new Date(y, mo, 1).getDay(), last = new Date(y, mo + 1, 0).getDate();
     const key = (n) => `${y}-${String(mo + 1).padStart(2, "0")}-${String(n).padStart(2, "0")}`;
@@ -210,10 +214,10 @@ const RivalsPage = (() => {
     const P = S.pl, st = P.d?.strategy, G = P.d?.games || {}, AX = P.d?.axes || {}, pl = P.d?.plan;
     if (!P.d) return `<div class="pk-empty">جارٍ التحميل…</div>`;
     const fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
-    const cnt = pl ? `<p class="pk-note"><b class="num">${pl.count}</b> معلومة يبني منها العقل خطتك${pl.status === "working" ? " · ⏳ تُبنى الآن…" : fresh && pl.has ? ` · ${fresh} جديدة ستدخل في التحديث القادم` : ""}. تُحدّث تلقائيًا كلما عرف العقل شيئًا جديدًا عنك.</p>
-      ${st && pl.status !== "working" ? `<button class="pk-chip" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "جارٍ التحديث…" : "حدّثها الآن"}</button>` : ""}${pl.error ? `<p class="pk-err">⚠️ ${esc(pl.error)}</p>` : ""}` : "";
+    const cnt = pl ? `<p class="pk-note"><b class="num">${pl.count}</b> معلومة يبني منها العقل خطتك${pl.status === "working" ? " · ⏳ تُبنى الآن…" : fresh && pl.has ? ` · ${fresh} جديدة لم تدخل فيها بعد` : ""}. حدّثها بضغطة كلما عرف العقل شيئًا جديدًا عنك.</p>
+      ${st && pl.status !== "working" ? `<button class="pk-chip" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "جارٍ التحديث…" : `حدّثها الآن${ct("plan")}`}</button>` : !st && pl.status !== "working" && pl.ready && pl.count >= pl.min ? `<button class="pk-chip" data-plgo ${P.busy ? "disabled" : ""}>${P.busy ? "جارٍ البناء…" : `ابنِ الاستراتيجية${ct("plan")}`}</button>` : ""}${pl.error ? `<p class="pk-err">⚠️ ${esc(pl.error)}</p>` : ""}` : "";
     if (!st) return cnt + `<p class="pk-note">تحدد لعبتك (شهرة أم بيع)، وجملة التموضع، والشخص الذي تخاطبه، ودوائر الجمهور، والمواضيع والأشكال، وأسبوعًا بخلطة ٣-٢-١، وآراءك المختلفة، والفراغ الذي تركه المنافسون.</p>
-      ${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="pk-note">ستُبنى تلقائيًا عندما يعرف العقل ${pl.min} معلومات على الأقل (منها «المجال» أو «عن العلامة»).</p>` : ""}`;
+      ${pl && pl.status !== "working" && (pl.count < pl.min || !pl.ready) ? `<p class="pk-note">يمكن بناؤها عندما يعرف العقل ${pl.min} معلومات على الأقل (منها «المجال» أو «عن العلامة»).</p>` : ""}`;
     const li = (a) => a.map((x) => `<li>${esc(x)}</li>`).join("");
     const sec = (t, h) => (h ? `<span class="pk-lbl">${t}</span>${h}` : "");
     return `<span class="pl-game">${esc(G[st.game.key] || "")}</span><p class="pl-state">${esc(st.statement)}</p><p class="pk-note">${esc(st.game.why)}</p>

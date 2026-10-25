@@ -613,6 +613,12 @@ GATEWAY_SECRET = os.environ.get("GATEWAY_SECRET") or ""
 TENANT_ROLE = os.environ.get("TENANT_ROLE") or "admin"
 
 
+def auto_paid() -> bool:
+    """🔒 أي شغل بيصرف نقاط مابيشتغلش لوحده: كل خصم قبله زرار واضح مكتوب عليه تكلفته (الترند، المواسم، المنافسين، الخطة، فحص النشر).
+    في وضع التجربة بس (من غير خصم أصلًا) بيفضل تلقائي."""
+    return atlas.mock_mode()
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
@@ -4936,6 +4942,8 @@ def brain_ready(b: dict | None) -> bool:
 
 def plan_maybe(bid: str) -> None:
     """الخطة تُنشأ من جديد تلقائيًا عندما يتجمع معلومات جديدة كفاية أو شيء أساسية تتغير."""
+    if not auto_paid():
+        return
     b = brain_row(bid) or {}
     if PLAN_BUSY.get(bid) == "working" or not brain_ready(b) or not algo.plan_should(b, len(algo.plan_inputs(b))):
         return
@@ -4954,6 +4962,21 @@ def brain_plan(bid: str):
         PLAN_BUSY.pop(bid, None)
     plan_maybe(bid)
     return plan_out(bid)
+
+
+@app.get("/api/auto-costs")
+def auto_costs():
+    """💳 تكلفة الأزرار اللي كانت بتشتغل لوحدها، علشان تتكتب على الزرار قبل الضغط."""
+    c = wallet.credits
+    ok: list = []
+    try:
+        ok = rivals.approved((brain_row(rivals_client()) or {}).get("competitors") or {})
+    except HTTPException:
+        pass
+    search = c(wallet.est(scrape=6 * len(rivals.PLATFORMS), chars=12000))
+    return {"plan": c(wallet.est(chars=30000)), "month": c(wallet.est(chars=60000)), "trends": search, "seasons": c(wallet.est(chars=9000)), "rivals_discover": search,
+            "rivals_refresh": c(wallet.est(scrape=max(1, len(ok)) * len(rivals.PLATFORMS))), "rivals_brief": rivals_brief_cost(ok) if ok else 0,
+            "review": c(wallet.est(chars=9400)), "spoken": c(wallet.est(stt_min=20 / 60))}
 
 
 @app.post("/api/strategy")
@@ -5621,7 +5644,7 @@ def rivals_get():
     c = rivals_state(bid)
     if c.get("status") == "working" and bid not in RIVALS_BUSY:   # السيرفر اتعمله ريستارت والشغل وقف
         rivals_set(bid, status="failed", step=None, error="توقف العمل، وسيُستكمل تلقائيًا في المرة القادمة")
-    else:
+    elif auto_paid():
         rivals_auto(bid)
     return rivals_out(bid)
 
@@ -11260,6 +11283,13 @@ def first_gift(bid: str) -> int:
     return n
 
 
+def first_gift_safe(bid: str) -> None:
+    try:
+        first_gift(bid)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[first-gift] {bid}: {exc}", flush=True)
+
+
 def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | None = None) -> None:
     put = lambda **kw: first_job_set(bid, jid, **kw)  # noqa: E731
     done: list[str] = []
@@ -11320,6 +11350,8 @@ def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | 
             first_gift(bid)
         except Exception as exc:  # noqa: BLE001
             print(f"[first-gift] {bid}: {exc}", flush=True)
+        for later in (20, 75):   # الخصومات اللي بتتسوّى بعد الاكتمال بثواني بتدخل في نفس الهدية من غير ما العميل يفتح البرنامج تاني
+            threading.Timer(later, first_gift_safe, args=(bid,)).start()
         notify("first", "ok", "🎬 أول فيديو جاهز", title, "", ex)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:300]
@@ -25854,7 +25886,8 @@ def seasons_if_changed(bid: str, old: dict, new: dict) -> None:
     """🗓️ البلد أو الجمهور تغيّرون (من أي مكان: كتابة، كويز، أو اقتراح اعتُمد عليه): العقل يجلب المواسم من جديد تلقائيًا."""
     if (old.get("market"), old.get("audience")) != (new.get("market"), new.get("audience")) and (new.get("market") or new.get("audience")):
         SEASON_JOBS.pop(bid, None)
-        start_brain_seasons(bid)
+        if auto_paid():
+            start_brain_seasons(bid)
 
 
 def start_brain_seasons(bid: str) -> None:
@@ -25885,7 +25918,7 @@ def brain_seasons():
         return {"items": [], "status": "idle"}
     s = b.get("seasons") or {}
     key = f"{b.get('market', '')}|{b.get('audience', '')}"
-    if (not s or s.get("for") != key) and (b.get("market") or b.get("audience")) and SEASON_JOBS.get(b["id"]) is None:
+    if auto_paid() and (not s or s.get("for") != key) and (b.get("market") or b.get("audience")) and SEASON_JOBS.get(b["id"]) is None:
         start_brain_seasons(b["id"])
     job = SEASON_JOBS.get(b["id"]) or ""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -30983,7 +31016,7 @@ def brain_trends(bid: str):
     if b is None:
         raise HTTPException(404, "هذا العميل غير موجود")
     t = b.get("trends") or {}
-    if (b.get("market") or b.get("domain")) and time.time() - float(t.get("checked_at") or 0) > trends.EVERY:
+    if auto_paid() and (b.get("market") or b.get("domain")) and time.time() - float(t.get("checked_at") or 0) > trends.EVERY:
         start_trends(bid)
     return trends_out(bid)
 

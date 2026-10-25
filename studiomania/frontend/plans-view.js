@@ -4,14 +4,14 @@
 // PlansView.mount(el, data, { pay(kind, key, provider, cycle), signup(plan), toast(msg, bad) })
 const PlansView = (() => {
   const CSS = `
-:is(#nh, body) .pv { --pv-ink: var(--nh-ink, #181718); --pv-sub: #6B6A66; --pv-muted: var(--nh-muted, #8C8C88); --pv-acc: var(--nh-accent, #E5613E);
+:is(#nh, body) .pv { --pv-ink: var(--nh-ink, var(--text, #181718)); --pv-sub: #6B6A66; --pv-muted: var(--nh-muted, var(--muted, #6B6B67)); --pv-acc: var(--nh-accent, var(--accent));
   --pv-card: var(--card, #fff); --pv-field: var(--field, #F3F2EF); --pv-field-hi: #EBEAE6; --pv-fill: rgba(20, 20, 22, .045); --pv-line: rgba(24, 23, 24, .08);
   --pv-track: #E3E2DE; --pv-soft: rgba(229, 97, 62, .1); --pv-tip: #181718; --pv-tip-ink: #fff; --pv-tip-sub: rgba(255, 255, 255, .78); --pv-tip-m: #F6B29E;
   --pv-sh: 0 4px 24px rgba(24, 23, 24, .06); --pv-sh-hi: 0 16px 34px -18px rgba(24, 23, 24, .3); --pv-cont: 0 6px 24px rgba(24, 23, 24, .07);
   --pv-ease: cubic-bezier(.65, 0, .35, 1); --pv-pop: cubic-bezier(.2, .8, .2, 1);
   position: relative; min-height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; color: var(--pv-ink); font-family: var(--nh-arabic, "Jost", "Alexandria", sans-serif); }
 :root[data-nh-theme="dark"] :is(#nh, body) .pv { --pv-sub: #A3A29E; --pv-field: #2A292A; --pv-field-hi: #343334; --pv-fill: rgba(255, 255, 255, .05); --pv-line: rgba(255, 255, 255, .08);
-  --pv-track: #3D3C3D; --pv-soft: rgba(240, 117, 79, .14); --pv-tip: #F1F1F3; --pv-tip-ink: #141416; --pv-tip-sub: rgba(20, 20, 22, .72); --pv-tip-m: #C2482E;
+  --pv-track: #3D3C3D; --pv-soft: rgba(240, 117, 79, .14); --pv-tip: #F1F1F3; --pv-tip-ink: #141416; --pv-tip-sub: rgba(20, 20, 22, .72); --pv-tip-m: #A93A1F;
   --pv-sh: 0 4px 24px rgba(0, 0, 0, .28); --pv-sh-hi: 0 16px 34px -18px rgba(0, 0, 0, .7); --pv-cont: 0 6px 24px rgba(0, 0, 0, .35); }
 :is(#nh, body) .pv :where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 :is(#nh, body) .pv a { color: inherit; text-decoration: none; }

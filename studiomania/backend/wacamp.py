@@ -40,7 +40,7 @@ def ready() -> None:
 
 def _check(resp: httpx.Response, what: str):
     if resp.status_code == 403 and ("add-on" in resp.text.lower() or "inbox" in resp.text.lower()):
-        raise WaError("حملات واتساب ما زال غير متفعّلة في اشتراكك. كلّم الدعم يفعّلها.")
+        raise WaError("حملات واتساب غير مفعّلة في اشتراكك بعد. تواصل مع الدعم لتفعيلها.")
     try:
         return publisher._check(resp, what)
     except publisher.PublishError as exc:
@@ -75,7 +75,7 @@ def wa_link(number: str, text: str) -> str:
 
 # ---------------------------------------------------------------- 🧪 وضع التجربة
 _M: dict = {"contacts": [], "templates": [{"name": "welcome_offer", "language": "ar", "category": "MARKETING", "status": "APPROVED",
-                                         "body": "أهلًا {{1}}! لدينا عرض جديد اليوم، تحب تعرف التفاصيل؟", "footer": STOP_FOOTER, "vars": 1}],
+                                         "body": "أهلًا {{1}}! لدينا عرض جديد اليوم، هل تودّ معرفة التفاصيل؟", "footer": STOP_FOOTER, "vars": 1}],
             "broadcasts": [], "sequences": [], "automations": []}
 
 
@@ -124,7 +124,7 @@ def add_contacts(bid: str, account_id: str, people: list[dict], tags: list[str],
         seen.add(ph)
         good.append({"name": str(p.get("name") or ph)[:80], "platformIdentifier": ph, "tags": [bt, *tags], "customFields": {"optin_source": source[:40]}})
     if not good:
-        raise WaError("لا يوجد أرقام صحيحة. الرقم يجب يكون بكود الدولة، مثلًا +966501234567")
+        raise WaError("لا توجد أرقام صحيحة. يجب أن يبدأ الرقم بكود الدولة، مثل +966501234567")
     if mock():
         have = {c["phone"] for c in _M["contacts"]}
         new = [g for g in good if g["platformIdentifier"] not in have]
@@ -154,7 +154,7 @@ def delete_contact(contact_id: str) -> None:
     if mock():
         _M["contacts"][:] = [c for c in _M["contacts"] if c["id"] != contact_id]
         return
-    _req("DELETE", f"/contacts/{contact_id}", "مسح المشترك")
+    _req("DELETE", f"/contacts/{contact_id}", "حذف المشترك")
 
 
 # ---------------------------------------------------------------- 📝 القوالب (بتتراجع من واتساب)
@@ -187,7 +187,7 @@ def create_template(account_id: str, name: str, category: str, language: str, bo
         raise WaError("اكتب نص الرسالة")
     nums = sorted({int(n) for n in re.findall(r"\{\{(\d+)\}\}", body)})
     if nums and nums != list(range(1, len(nums) + 1)):
-        raise WaError("المتغيرات يجب تصبح {{1}} و{{2}} بالترتيب")
+        raise WaError("يجب أن تكون المتغيرات {{1}} و{{2}} بالترتيب")
     comps = [{"type": "body", "text": body, **({"example": {"body_text": [[example_name] + ["مثال"] * (len(nums) - 1)]}} if nums else {})}]
     if category == "MARKETING":
         comps.append({"type": "footer", "text": STOP_FOOTER})
@@ -198,7 +198,7 @@ def create_template(account_id: str, name: str, category: str, language: str, bo
         t = {"name": name, "language": language, "category": category, "status": "PENDING", "body": body, "footer": STOP_FOOTER if category == "MARKETING" else "", "vars": len(nums)}
         _M["templates"].append(t)
         return t
-    _req("POST", "/whatsapp/templates", "عمل القالب", body={"accountId": account_id, "name": name, "category": category, "language": language, "components": comps})
+    _req("POST", "/whatsapp/templates", "إنشاء القالب", body={"accountId": account_id, "name": name, "category": category, "language": language, "components": comps})
     return {"name": name, "status": "PENDING"}
 
 
@@ -206,7 +206,7 @@ def delete_template(account_id: str, name: str) -> None:
     if mock():
         _M["templates"][:] = [t for t in _M["templates"] if t["name"] != name]
         return
-    _req("DELETE", f"/whatsapp/templates/{name}", "مسح القالب", {"accountId": account_id})
+    _req("DELETE", f"/whatsapp/templates/{name}", "حذف القالب", {"accountId": account_id})
 
 
 def mock_review() -> None:
@@ -235,18 +235,18 @@ def broadcast(account_id: str, name: str, template: str, language: str, vars_: d
                        "read": 0 if when else int(len(contact_ids) * .6), "failed": 0}, "at": time.time()}
         _M["broadcasts"].append(b)
         return b
-    d = _req("POST", "/broadcasts", "عمل الحملة", body={"profileId": publisher.tenant_profile() or publisher.default_profile(), "accountId": account_id,
+    d = _req("POST", "/broadcasts", "إنشاء الحملة", body={"profileId": publisher.tenant_profile() or publisher.default_profile(), "accountId": account_id,
                                                        "platform": "whatsapp", "name": name[:100], "template": _tpl_payload(template, language, vars_)})
     bc = (d.get("broadcast") or d) if isinstance(d, dict) else {}
     bid = str(bc.get("_id") or bc.get("id") or "")
     if not bid:
-        raise WaError("الحملة ما اتعملتش")
+        raise WaError("تعذّر إنشاء الحملة")
     for i in range(0, len(contact_ids), 500):
         _req("POST", f"/broadcasts/{bid}/recipients", "إضافة الأشخاص للحملة", body={"contactIds": contact_ids[i:i + 500]})
     if when:
         _req("POST", f"/broadcasts/{bid}/schedule", "جدولة الحملة", body={"scheduledAt": when})
     else:
-        _req("POST", f"/broadcasts/{bid}/send", "بعت الحملة", body={})
+        _req("POST", f"/broadcasts/{bid}/send", "إرسال الحملة", body={})
     return {"id": bid, "name": name}
 
 
@@ -286,12 +286,12 @@ def sequence(account_id: str, name: str, steps: list[dict], language: str) -> di
         q = {"id": f"msq-{uuid.uuid4().hex[:6]}", "name": name, "status": "active", "steps": len(body_steps), "enrolled": 0, "at": time.time()}
         _M["sequences"].append(q)
         return q
-    d = _req("POST", "/sequences", "عمل السلسلة", body={"profileId": publisher.tenant_profile() or publisher.default_profile(), "accountId": account_id,
+    d = _req("POST", "/sequences", "إنشاء السلسلة", body={"profileId": publisher.tenant_profile() or publisher.default_profile(), "accountId": account_id,
                                                        "platform": "whatsapp", "name": name[:100], "exitOnReply": True, "exitOnUnsubscribe": True, "steps": body_steps})
     sq = (d.get("sequence") or d) if isinstance(d, dict) else {}
     sid = str(sq.get("_id") or sq.get("id") or "")
     if not sid:
-        raise WaError("السلسلة ما اتعملتش")
+        raise WaError("تعذّر إنشاء السلسلة")
     _req("POST", f"/sequences/{sid}/activate", "تشغيل السلسلة", body={})
     return {"id": sid, "name": name}
 
@@ -341,7 +341,7 @@ def platform_post_id(remote_id: str, platform: str) -> str:
     for p in post.get("platforms") or []:
         if isinstance(p, dict) and str(p.get("platform")).lower() == remote and p.get("platformPostId"):
             return str(p["platformPostId"])
-    raise WaError("هذا المنشور ما زال ما اتنشرش على هذه المنصة")
+    raise WaError("لم يُنشر هذا المنشور على هذه المنصة بعد")
 
 
 def comment_automation(account_id: str, post_pid: str, name: str, keywords: list[str], dm: str, reply: str) -> dict:
@@ -355,7 +355,7 @@ def comment_automation(account_id: str, post_pid: str, name: str, keywords: list
         a = {"id": f"mca-{uuid.uuid4().hex[:6]}", "name": name, "keywords": body["keywords"], "active": True, "stats": {"sent": 0}, "at": time.time()}
         _M["automations"].append(a)
         return a
-    d = _req("POST", "/comment-automations", "عمل الرد التلقائي", body=body)
+    d = _req("POST", "/comment-automations", "إنشاء الرد التلقائي", body=body)
     a = (d.get("automation") or d) if isinstance(d, dict) else {}
     return {"id": str(a.get("_id") or a.get("id") or ""), "name": name}
 
@@ -363,7 +363,7 @@ def comment_automation(account_id: str, post_pid: str, name: str, keywords: list
 def automations(ids: set[str]) -> list[dict]:
     if mock():
         return [a for a in _M["automations"] if a["id"] in ids]
-    data = _req("GET", "/comment-automations", "قراءة الردود التلقائي", {"profileId": publisher.tenant_profile()})
+    data = _req("GET", "/comment-automations", "قراءة الردود التلقائية", {"profileId": publisher.tenant_profile()})
     out = []
     for a in publisher._pick(data, "automations"):
         if isinstance(a, dict) and str(a.get("_id") or a.get("id")) in ids:
@@ -385,7 +385,7 @@ def delete_automation(aid: str) -> None:
     if mock():
         _M["automations"][:] = [a for a in _M["automations"] if a["id"] != aid]
         return
-    _req("DELETE", f"/comment-automations/{aid}", "مسح الرد التلقائي")
+    _req("DELETE", f"/comment-automations/{aid}", "حذف الرد التلقائي")
 
 
 def tpl_messages(brand: str, aud: dict, goal: str, category: str) -> list[dict]:

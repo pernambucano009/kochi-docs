@@ -113,7 +113,7 @@ function renderProviders(d) {
     return `<div class="prov ${st[1]}" data-prov="${p.key}"><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.what)}</small>${top}</div>
       <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
       <span class="prov-st">${st[0]}</span>
-      ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني تحت <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
+      ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني عند أقل من <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
       ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}</div>`;
   }).join("");
   $("provAt").textContent = d.checked ? `آخر فحص ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";

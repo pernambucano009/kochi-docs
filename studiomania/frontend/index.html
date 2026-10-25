@@ -770,7 +770,7 @@
             <section class="panel pub-ready">
               <div class="pub-k">READY VIDEOS</div>
               <div class="panel-head"><h2>الفيديوهات الجاهزة <span class="muted" id="readyCount"></span></h2>
-                <label class="btn primary sm">＋ رفع فيديو من عندي
+                <label class="btn primary sm">＋ ارفع فيديو من جهازك
                   <input type="file" id="readyUpload" accept="video/*,.mkv" multiple hidden></label></div>
               <div id="readyUploads"></div>
               <div class="ready-grid" id="readyGrid"></div>
@@ -950,7 +950,7 @@
                     <div class="car-assets" id="carCoaches"></div>
                     <span class="hint" id="carCoachNote"></span>
                   </div>
-                  <div class="car-setup-title">الدعوة في آخر سلايد (CTA)</div>
+                  <div class="car-setup-title">الدعوة في آخر شريحة</div>
                   <div class="car-cta">
                     <select id="carCta"></select>
                     <input type="text" id="carCtaKeyword" placeholder="الكلمة التي يكتبونها (مثلًا: جدول)" hidden>
@@ -1323,7 +1323,7 @@
                         <option value="كوميدي ذكي من الحياة اليومية">كوميدي ذكي</option>
                         <option value="هادي وملهم">هادي وملهم</option>
                         <option value="فاخر وسينمائي">فاخر وسينمائي</option>
-                        <option value="واقعي UGC كأنه متصوّر بالجوال">واقعي (UGC بالجوال)</option>
+                        <option value="واقعي UGC كأنه متصوّر بالجوال">واقعي (مصوّر بالجوال)</option>
                         <option value="عاطفي ودرامي">عاطفي ودرامي</option>
                         <option value="تعليمي سريع ومباشر">تعليمي سريع</option>
                       </select></label>
@@ -1578,7 +1578,7 @@
                       </div>
                     </div>
                     <p class="hint">يمكنك إزالة المقدمة أو الخاتمة من أي مشروع من المونتاج.</p>
-                    <label class="field">الدعوة الافتراضية (CTA) <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق الآن"></label>
+                    <label class="field">الدعوة الافتراضية <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق الآن"></label>
                     <label class="field">الرابط <input type="text" data-bf="link" dir="ltr" placeholder="https://..."></label>
                     <label class="field">التعليق النصي الافتراضي <textarea rows="4" data-bf="caption" placeholder="{caption}&#10;&#10;{cta} 👇&#10;{link}&#10;#هاشتاج"></textarea></label>
                     <p class="hint">{caption} = التعليق النصي للفيديو نفسه · {cta} = الدعوة · {link} = الرابط. يوضع هذا التعليق النصي تلقائيًا وقت النشر.</p>
@@ -1663,7 +1663,7 @@
               <div class="row wrap"><button class="btn sm" id="cleanTmp"><span class="emo">🧹</span> احذف الملفات المؤقتة</button>
                 <button class="btn sm" id="showLog">اعرض سجل آخر تصدير</button><button class="btn sm" id="copyLog" hidden><span class="emo">📋</span> انسخه</button></div>
               <pre class="render-log" id="renderLog" dir="ltr" hidden></pre>
-              <p class="hint">الملفات المؤقتة هي صور التايم لاين وبقايا التصدير، وتُنشأ مرة أخرى تلقائيًا. لكي تفضّي مساحة أكثر اضغط 🗑️ بجانب القسم الذي تريد تحذف فيديوهاته كلها مرة واحدة (ما يعمل الآن يظل).</p>
+              <p class="hint">الملفات المؤقتة هي صور التايم لاين وبقايا التصدير، وتُنشأ مرة أخرى تلقائيًا. لتوفير مساحة أكبر اضغط 🗑️ بجانب القسم الذي تريد حذف فيديوهاته كلها دفعة واحدة (ما يعمل الآن يظل).</p>
               <p class="hint" id="sysInfo"></p>
             </section>
             <section class="panel set-card admin-only set-wide">
@@ -1753,7 +1753,7 @@
     </div>
     <div>
       <div class="field">الشعار <div class="brand-logo" id="brandLogo"></div><span class="hint">أول شعار في ملف العميل (وهو نفسه شعار المونتاج).</span></div>
-      <div class="field">أنواع الدعوة (CTA)
+      <div class="field">أنواع الدعوة لاتخاذ إجراء
         <div class="cta-list" id="ctaList"></div>
         <div class="row"><button type="button" class="btn sm" id="ctaAdd">＋ دعوة جديدة</button><button type="button" class="btn sm" id="ctaReset">↺ استعد الأصلي</button></div>
         <span class="hint">في النص: {keyword} = الكلمة التي يكتبونها، {reward} = سيأخذون ماذا، {coach} = اسم الشخصية.</span></div>

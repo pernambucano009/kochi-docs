@@ -1284,7 +1284,24 @@ HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", 
 # هيدرز البوابة بس هي اللي تحطها: لو الزائر بعتها بنفسه بتتشال
 SPOOF = ("x-gateway-secret", "x-user-", "x-forwarded-", "x-real-ip", "forwarded")
 MAX_BODY = int(float(os.environ.get("MAX_UPLOAD_MB") or 2048) * 1024 * 1024)
-SEC_HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "referrer-policy": "strict-origin-when-cross-origin"}
+CSP = "; ".join((
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' data: blob: https:",
+    "connect-src 'self' https: wss: data: blob:",
+    "frame-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https:",
+))
+SEC_HEADERS = {"x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "referrer-policy": "strict-origin-when-cross-origin",
+               "strict-transport-security": "max-age=31536000; includeSubDomains", "content-security-policy": CSP,
+               "permissions-policy": "camera=(self), microphone=(self), geolocation=(), payment=(self)"}
 
 
 class SecurityMiddleware:

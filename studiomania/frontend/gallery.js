@@ -18,7 +18,7 @@ const Gallery = (() => {
     { id: "custom", name: "قالب مخصص", icon: "🧩", cat: "other", pin: 3,
     desc: "رتّب خطواتك بنفسك (اسحب من المكتبة، قطّع، ولّد، صدّر)، وكل تشغيل يُخرج فيديو جديدًا، ويظهر في الأوتوبايلوت قالبًا تختاره." },
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
-    { id: "hairline", name: "Hairline: خط رفيع على أسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
+    { id: "hairline", name: "خطوط رفيعة على الأسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
     desc: "سجّل صوتك، ويكتب البرنامج كلامك بخط رفيع على الأسود، ويرسم بجانبه رسومات أيزومترية تناسب النص (حاسوب، قفل، مال…)، وإن لم توجد رسمة جاهزة يرسم واحدة." },
     { id: "typo", name: "تايبوجرافي", icon: "🔤", sample_url: "/gallery/typo.mp4", cover_url: "/gallery/typo.jpg", cat: "motion",
     desc: "نص يتحرك على الإيقاع من صوتك أو نصك، بأكثر من 300 حركة جاهزة." },

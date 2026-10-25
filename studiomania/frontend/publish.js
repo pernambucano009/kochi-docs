@@ -99,7 +99,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       const cap = $("postCaption").value.trim();
       if (!pub.editing && (!cap || cap === pub.autoCaption)) $("postCaption").value = pub.autoCaption = ex.name;
       $("postCaption").focus();
-      pcAuto();   // الفحص قبل النشر يشتغل تلقائيًا
+      renderPubCheck();
     }
     if (btn.dataset.act === "rename") {
       const name = (await uiPrompt("الاسم الجديد:", ex.name));
@@ -411,7 +411,7 @@ async function algoPack(force) {
     setCover(r.cover_ms);
     pub.notAi = !r.ai;
     note.hidden = false;
-    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + وسوم المجال) · الغلاف ${r.cover_hook ? "على إطار الخطاف" : "قبل النهاية بثانيتين"}${r.ai ? " · 🤖 علامة AI" : ""}. عدّل كما تشاء.`;
+    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + وسوم المجال) · الغلاف ${r.cover_hook ? "على إطار الخطاف" : "قبل النهاية بثانيتين"}${r.ai ? " · 🤖 علامة الذكاء الاصطناعي" : ""}. عدّل كما تشاء.`;
     renderPostExtras();
   } catch (err) {
     note.hidden = !force;
@@ -854,9 +854,9 @@ function dmSpokenLoad() {
     .catch(() => { pub.spoken = { id, word: "" }; }).finally(() => { pub.spokenBusy = null; renderPubCheck(); });
 }
 function dmCheck(cap, pl) {
-  dmSpokenLoad();
   const spoken = pub.spoken?.id === pub.videoId ? pub.spoken.word : "", inCap = dmDetect(cap), word = inCap || spoken;
-  if (!word) return [];
+  if (!word) return pub.videoId && pub.spoken?.id !== pub.videoId
+    ? [{ ok: null, t: "هل يقول الفيديو في آخره «علّق بكلمة…»؟", tip: "نستمع لآخر ٢٠ ثانية لنتأكد أن الرد التلقائي مفعّل", act: "spoken" }] : [];
   const where = inCap ? "في التعليق النصي" : "في آخر الفيديو";
   if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يعمل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على واتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
   return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: من يعلّق تصله رسالة في الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير مفعّل`, tip: "بدونه لن يصل شيء لمن يعلّق، وهذا يُضيّع العميل", act: "dm", word }];
@@ -868,7 +868,7 @@ function pubChecks() {
   const pl = checkedPlatforms(), visual = pl.some((v) => ["instagram", "tiktok"].includes(platOf(v)));
   return [
     { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، وليس «أهلًا بكم»)", tip: "آخر ما يقرؤه قبل أن يمرّر: اترك سؤالًا مفتوحًا أو أكمل وعد الفيديو" },
-    { ok: PC_CTA.test(cap), t: "فيه دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
+    { ok: PC_CTA.test(cap), t: "توجد دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
     { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ وسوم من المجال (الآن ${tags.length})`, tip: "تأثير الوسوم ضعيف؛ ٣–٥ محددة تكفي" },
     { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "توصل الفيديو لأشخاص غير مهتمين فيقل وقت المشاهدة" },
     ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "اخترت الغلاف بنفسك (إطار مثير)", tip: "فرصة خطاف إضافية في الملف الشخصي", act: "cover" }] : []),
@@ -878,32 +878,24 @@ function pubChecks() {
     { ok: null, t: "بعد النشر: رد على أول ٣٠ تعليقًا", tip: "النقاش في التعليقات يطوّل وقت المشاهدة" },
   ];
 }
+// 💳 الفحص بالنموذج وسماع آخر الفيديو بيصرفوا نقاط: بيشتغلوا بضغطة بس، والتكلفة مكتوبة على الزرار
+let PC_COST = null;
+api("/api/auto-costs").then((c) => { PC_COST = c; renderPubCheck(); }).catch(() => {});
+const pcCost = (k) => (PC_COST?.[k] ? ` · نحو ${PC_COST[k]} نقطة` : "");
 function renderPubCheck() {
   const box = $("pubCheck");
   if (!box) return;
   const list = pubChecks(), scored = list.filter((c) => c.ok !== null), n = scored.filter((c) => c.ok).length;
   box.innerHTML = `<div class="pc-head"><b>✅ قبل أن تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
-      <button type="button" class="btn sm" id="pcReview" title="يقيّم النموذج التعليق النصي بقواعد الخوارزميات ويقترح أفضل منه">📡 افحص التعليق النصي</button></div>
+      <button type="button" class="btn sm" id="pcReview" title="يقيّم النموذج التعليق النصي بقواعد الخوارزميات ويقترح أفضل منه">📡 افحص التعليق النصي${pcCost("review")}</button></div>
     <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
       ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختر الغلاف</button>` : ""}
       ${c.act === "dm" && !c.ok ? `<button type="button" class="btn xs" data-pc="dm" data-word="${escapeHtml(c.word)}">💬 فعّله</button>` : ""}
-      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم أنه AI</button><button type="button" class="btn xs" data-pc="notai">ليس AI</button>` : ""}</li>`).join("")}</ul>
+      ${c.act === "spoken" ? `<button type="button" class="btn xs" data-pc="spoken" ${pub.spokenBusy ? "disabled" : ""}>${pub.spokenBusy ? "⏳ جارٍ الاستماع…" : `🎧 استمع لآخر الفيديو${pcCost("spoken")}`}</button>` : ""}
+      ${c.act === "ai" && !c.ok ? `<button type="button" class="btn xs" data-pc="ai">🤖 علّم أنه مصنوع بالذكاء الاصطناعي</button><button type="button" class="btn xs" data-pc="notai">ليس مصنوعًا بالذكاء الاصطناعي</button>` : ""}</li>`).join("")}</ul>
     <div id="pcOut"></div>`;
 }
 $("postCaption").addEventListener("input", renderPubCheck);
-// 📡 «افحص قبل النشر» بقى أوتوماتيك: لما الكابشن يقف عن التغيير شوية بيتفحص بقواعد الخوارزميات لوحده (مرة لكل كابشن)
-let pcAutoT = 0, pcAutoLast = "";
-function pcAuto() {
-  clearTimeout(pcAutoT);
-  pcAutoT = setTimeout(() => {
-    const cap = $("postCaption").value.trim();
-    if (cap.length < 20 || cap === pcAutoLast || !pub.videoId) return;
-    pcAutoLast = cap;
-    $("pcReview")?.click();
-  }, 2500);
-}
-$("postCaption").addEventListener("input", pcAuto);
-$("postCaption").addEventListener("change", pcAuto);
 $("coverOn").addEventListener("change", renderPubCheck);
 $("postPlatforms").addEventListener("change", renderPubCheck);
 $("pubCheck").addEventListener("click", async (e) => {
@@ -911,6 +903,7 @@ $("pubCheck").addEventListener("click", async (e) => {
   if (b?.dataset.pc === "cover") { pub.showCover = true; $("coverOn").checked = true; $("coverOn").dispatchEvent(new Event("change")); return; }
   if (b?.dataset.pc === "ai") { const c = $("postCaption"); c.value = `${c.value.trimEnd()}${c.value.trim() ? "\n\n" : ""}🤖 الفيديو مصنوع بالذكاء الاصطناعي`; return renderPubCheck(); }
   if (b?.dataset.pc === "notai") { pub.notAi = true; return renderPubCheck(); }
+  if (b?.dataset.pc === "spoken") { dmSpokenLoad(); return renderPubCheck(); }
   if (b?.dataset.pc === "dm") {
     $("dmOn").checked = true; await dmFill(); $("dmWords").value = b.dataset.word;
     $("dmOpts").scrollIntoView({ behavior: "smooth", block: "center" }); return renderPubCheck();

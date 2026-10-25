@@ -28,7 +28,7 @@ GOALS_BY = {"x": {"engagement", "traffic", "awareness", "video_views"}, "pintere
 MIN_BUDGET = {"tiktok": 20, "pinterest": 5}   # بالدولار، والباقي ١
 CTAS = {"LEARN_MORE": "اعرف أكثر", "SHOP_NOW": "اشتري الآن", "SIGN_UP": "سجّل", "CONTACT_US": "كلّمنا", "GET_OFFER": "خذ العرض",
         "GET_QUOTE": "اطلب عرض سعر", "SUBSCRIBE": "اشترك", "WATCH_MORE": "شاهد أكثر", "DOWNLOAD": "نزّل", "BOOK_TRAVEL": "احجز"}
-ADDON_MSG = "الإعلانات ما زال غير متفعّلة في اشتراكك. كلّم الدعم يفعّلها، وبعدها كل شيء ستشتغل من هنا."
+ADDON_MSG = "الإعلانات غير مفعّلة في اشتراكك بعد. تواصل مع الدعم لتفعيلها، وبعدها يعمل كل شيء من هنا."
 # أسامي البلاد زي ما الوصفة بتكتبها ← الكود اللي المنصات بتفهمه
 COUNTRIES = {"السعودية": "SA", "المملكة": "SA", "مصر": "EG", "الإمارات": "AE", "الامارات": "AE", "الكويت": "KW", "قطر": "QA", "البحرين": "BH",
              "عمان": "OM", "عُمان": "OM", "الأردن": "JO", "الاردن": "JO", "لبنان": "LB", "العراق": "IQ", "المغرب": "MA", "الجزائر": "DZ",
@@ -201,7 +201,16 @@ def targeting(t: dict) -> dict:
 
 
 # ---------------------------------------------------------------- الإعلانات
+def need_fields(**f) -> None:
+    """الخدمة بترفض أي حقل فاضي برسالة خام: نقول للعميل بالظبط إيه الناقص قبل ما نبعت."""
+    names = {"account_id": "الحساب", "ad_account": "حساب الإعلانات", "post_id": "المنشور", "headline": "العنوان", "body_text": "نص الإعلان", "name": "اسم الإعلان"}
+    miss = [names[k] for k, v in f.items() if not str(v or "").strip()]
+    if miss:
+        raise AdsError("أكمل قبل المتابعة: " + "، ".join(miss))
+
+
 def boost(post_id: str, account_id: str, ad_account: str, platform: str, name: str, goal: str, budget: float, days: int, currency: str, tg: dict) -> dict:
+    need_fields(post_id=post_id, account_id=account_id, ad_account=ad_account, name=name)
     check_budget(platform, budget)
     body = {"postId": post_id, "accountId": account_id, "adAccountId": ad_account, "name": name[:120], "goal": goal,
             "budget": {"amount": budget, "type": "daily"}, "currency": currency, "targeting": targeting(tg)}
@@ -217,6 +226,7 @@ def boost(post_id: str, account_id: str, ad_account: str, platform: str, name: s
 def create(account_id: str, ad_account: str, platform: str, name: str, goal: str, budget: float, days: int, currency: str, tg: dict,
            headline: str, body_text: str, link: str, media_url: str, cta: str, keywords: list[str] | None = None,
            more_headlines: list[str] | None = None, more_bodies: list[str] | None = None) -> dict:
+    need_fields(account_id=account_id, ad_account=ad_account, name=name, headline=headline)
     check_budget(platform, budget)
     t = targeting(tg)
     body = {"accountId": account_id, "adAccountId": ad_account, "name": name[:120], "goal": goal, "budgetAmount": budget, "budgetType": "daily",
@@ -238,7 +248,7 @@ def create(account_id: str, ad_account: str, platform: str, name: str, goal: str
         body["schedule"] = {"startDate": time.strftime("%Y-%m-%d"), "endDate": time.strftime("%Y-%m-%d", time.gmtime(time.time() + days * 86400))}
     if mock():
         return _mock_ad("create", platform, name, budget, {"goal": goal, "headline": headline, "targeting": t, "days": days})
-    data = _send("POST", "/ads/create", body, "عمل الإعلان")
+    data = _send("POST", "/ads/create", body, "إنشاء الإعلان")
     ad = (data.get("ad") or data) if isinstance(data, dict) else {}
     return {"id": str(ad.get("_id") or ad.get("id") or ad.get("adId") or ""), "name": name, "platform": platform}
 

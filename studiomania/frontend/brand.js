@@ -5,6 +5,10 @@
 const BrandPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { id: null, brains: [], cats: null, el: null, poll: null, open: null, raf: 0, nodes: [], t0: performance.now() };
+  // 💳 تكلفة الأزرار اللي بتصرف بتتكتب عليها قبل الضغط (الترند والمواسم والخطة مابيشتغلوش لوحدهم)
+  let COST = null;
+  api("/api/auto-costs").then((c) => { COST = c; }).catch(() => {});
+  const ct = (k) => (COST?.[k] ? ` · نحو ${COST[k]} نقطة` : "");
   const cur = () => S.brains.find((b) => b.id === S.id) || null;
   const bAPI = (path, opts) => api(`/api/ad-brains/${S.id}${path}`, opts);
   // الستايلات: الجاهزة (من السيرفر) + ستايلات البراند اللي المخ استنبطها («+ إضافة ستايل»)
@@ -64,7 +68,7 @@ const BrandPage = (() => {
         { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
-        { f: "cta", t: "الدعوة لاتخاذ إجراء (CTA)", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
+        { f: "cta", t: "الدعوة لاتخاذ إجراء", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "التعليق النصي الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
@@ -115,7 +119,7 @@ const BrandPage = (() => {
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
   const FIELD_T = { niche: "النيتش", about: "عن العلامة", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
-    palette: "الألوان", cta: "الدعوة لاتخاذ إجراء (CTA)", link: "الرابط", caption: "التعليق النصي الافتراضي" };
+    palette: "الألوان", cta: "الدعوة لاتخاذ إجراء", link: "الرابط", caption: "التعليق النصي الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
@@ -312,17 +316,17 @@ const BrandPage = (() => {
     if (n.kind === "trends") {
       if (b && S.trFor !== b.id && S.trLoading !== b.id) loadTrends(b);
       const tr = S.trFor === b?.id ? S.tr : null, nw = tr?.new || 0;
-      return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند الرائج الآن في سوقك (يُحدَّث تلقائيًا)">
+      return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند الرائج الآن في سوقك (حدّثه بضغطة)">
         <span class="bm-trbox">${svg(IC.trends, 18)}<b>الترند</b>${nw ? `<em class="num">${nw}</em>` : ""}</span>
         <small>${tr?.status === "working" ? "جارٍ البحث…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
     }
     if (n.kind === "plan") {
       if (b && S.plFor !== b.id && S.plLoading !== b.id) loadPlan(b);
       const pl = S.plFor === b?.id ? S.pl : null, fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
-      return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="تُبنى خطة المحتوى تلقائيًا من كل ما عرفه العقل عنك">
+      return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="تُبنى خطة المحتوى بضغطة من كل ما عرفه العقل عنك">
         <span class="bm-trbox">🧭<b>خطة المحتوى</b><em class="num">${pl ? pl.count : "…"}</em></span>
-        <small>${!pl ? "" : pl.status === "working" ? "تُبنى الآن…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `تحتاج معلومات أكثر (${pl.count}/${pl.min})` : "ستُبنى تلقائيًا")
-          : fresh ? `+${fresh} معلومة جديدة ستُضاف إليها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
+        <small>${!pl ? "" : pl.status === "working" ? "تُبنى الآن…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `تحتاج معلومات أكثر (${pl.count}/${pl.min})` : "جاهزة للبناء")
+          : fresh ? `+${fresh} معلومة جديدة: حدّثها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
     }
     if (n.kind === "add") {
       const reading = (b?.sources || []).some((s) => s.status === "working");
@@ -553,8 +557,8 @@ const BrandPage = (() => {
       <div class="bm-acts"><button class="bm-go" data-trnow="${esc(x.id)}">✨ استخدمه في منشور الآن</button>
         <button class="bm-pill" data-trsave="${esc(x.id)}" ${x.saved ? "disabled" : ""}>${x.saved ? "🔖 محفوظ" : "🔖 احفظه لاحقًا"}</button>
         <button class="bm-pill" data-trdel="${esc(x.id)}" title="احذفه من القائمة">✕</button></div></li>`;
-    return head + `<p class="bm-note">الرائج الآن في ${esc(tr.market || "سوقك")} ومجالك. يُحدَّث تلقائيًا، ويبقى الترند هنا حتى تحذفه.${tr.live ? "" : " (وضع تجريبي: ترندات تجريبية حتى يُضبط مفتاح مصدر البيانات)"}</p>
-      <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ جارٍ البحث…" : "🔄 ابحث الآن"}</button>
+    return head + `<p class="bm-note">الرائج الآن في ${esc(tr.market || "سوقك")} ومجالك. حدّثه بزر «ابحث الآن»، ويبقى الترند هنا حتى تحذفه.${tr.live ? "" : " (وضع تجريبي: ترندات تجريبية حتى يُضبط مفتاح مصدر البيانات)"}</p>
+      <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ جارٍ البحث…" : `🔄 ابحث الآن${ct("trends")}`}</button>
         ${ago != null ? `<small class="bm-note">آخر تحديث منذ ${ago < 1 ? "أقل من ساعة" : `${ago} ساعة`}</small>` : ""}</div>
       ${tr.error ? `<p class="bm-note bad">⚠️ ${esc(tr.error)}</p>` : ""}
       ${(tr.items || []).length ? `<ul class="bm-trs">${tr.items.map(row).join("")}</ul>` : `<p class="bm-note">لا توجد ترندات بعد.${tr.market ? "" : " اكتب «السوق» و«المجال» في الهوية ليبدأ البحث."}</p>`}`;
@@ -749,8 +753,8 @@ const BrandPage = (() => {
         + `<div class="bm-sub"><small>العنوان</small>${editable(`note:t:${l.i}`, l.note.title, "العنوان")}</div>`
         + `<div class="bm-sub"><small>الملخص (سطر واحد يظهر عند الوقوف على النقطة)</small>${editable(`note:s:${l.i}`, l.note.summary || "", "سطر واحد")}</div>`
         + `<div class="bm-sub"><small>التفاصيل (النص الذي يقرؤه العقل)</small>${editable(`note:b:${l.i}`, l.note.body, "التفاصيل")}</div>`
-        + (l.note.quiz === "seasons_ai" ? `<p class="bm-note">جلب العقل هذه المواسم تلقائيًا من «السوق» و«الجمهور» في الهوية (الأعياد الرسمية والإسلامية ورمضان والمواسم المحلية)، وتتجدد تلقائيًا عند تغييرهما.</p>
-          <div class="bm-acts"><button class="bm-pill" data-seasons>🔄 اجلب المواسم من جديد</button></div>` : "")
+        + (l.note.quiz === "seasons_ai" ? `<p class="bm-note">جلب العقل هذه المواسم تلقائيًا من «السوق» و«الجمهور» في الهوية (الأعياد الرسمية والإسلامية ورمضان والمواسم المحلية)، ويمكنك جلبها من جديد عند تغييرهما.</p>
+          <div class="bm-acts"><button class="bm-pill" data-seasons>🔄 اجلب المواسم من جديد${ct("seasons")}</button></div>` : "")
         + `<button class="bm-link bad" data-ndel="${l.i}">🗑 احذف هذه المعلومة من العقل (إن كانت خاطئة أو لا حاجة إليها)</button>`;
       case "action": return head + `<p class="bm-note">ينظر البرنامج إلى الشعار وصور العلامة ويكتب السمة والأسلوب وشكل الشعار تلقائيًا.</p>
         <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "جارٍ الاستنباط…" : "ابدأ الاستنباط"}</button>`;
