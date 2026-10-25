@@ -4289,7 +4289,7 @@ def dm_flow_set(body: DmFlowIn):
 # ---------------------------------------------------------------- 💸 مصاريف المنصة الشهرية (لمالك المنصة فقط)
 # كل اشتراك أو خدمة بتدفعلها: المبلغ، شهري ولا سنوي ولا على قد الاستخدام، ويوم التجديد. المجموع الشهري بيتحسب لوحده.
 EXPENSES_F = DATA_DIR / "expenses.json"
-EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "على قد الاستخدام", "free": "مجاني"}
+EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب الاستخدام", "free": "مجاني"}
 EXPENSE_PRESET = [
     {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
     {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد النطاق"},

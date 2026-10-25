@@ -305,7 +305,7 @@ function expRender(d) {
       <input type="text" data-ek="note" value="${esc(r.note)}" aria-label="ملاحظة">
       <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`).join("")}
     </div>
-    <div class="exp-sum"><b>الشهري: $${Number(Exp.monthly || 0).toFixed(2)}</b><span>على قد الاستخدام (آخر شحن): $${Number(Exp.usage || 0).toFixed(2)}</span></div>
+    <div class="exp-sum"><b>الشهري: $${Number(Exp.monthly || 0).toFixed(2)}</b><span>حسب الاستخدام (آخر شحن): $${Number(Exp.usage || 0).toFixed(2)}</span></div>
     <div class="row wrap"><button type="button" class="btn sm" id="expAdd">+ خدمة</button><button type="button" class="btn primary sm" id="expSave">حفظ</button></div>`;
 }
 function expRead() {
