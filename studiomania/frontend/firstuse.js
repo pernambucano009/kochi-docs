@@ -51,6 +51,7 @@ const FirstUse = (() => {
   const refresh = () => { if (typeof NH !== "undefined") NH?.refresh?.(); };
   async function load() {
     try { state = await api("/api/onboard"); } catch { state = null; }
+    if (state?.job?.status === "done" && typeof refreshMe === "function") refreshMe();   // هدية أول فيديو بتظهر في الرصيد على طول
     refresh();
     return state;
   }

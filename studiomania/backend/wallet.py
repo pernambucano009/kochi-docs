@@ -93,14 +93,32 @@ def gift(n: int, what: str, ref: str = "") -> int:
     return n
 
 
-def spent_since(t0: float) -> int:
-    """صافي اللي اتصرف من وقت t0 (الخصم ناقص اللي رجع)، عشان هدية أول فيديو ترجّع كل اللي اتخصم فيه بالظبط."""
+def spent_between(t0: float, t1: float | None = None) -> int:
+    """صافي اللي اتصرف بين t0 وt1 (الخصم ناقص اللي رجع)، عشان هدية أول فيديو ترجّع كل اللي اتخصم بالظبط."""
     if free():
         return 0
     with closing(_db()) as c:
-        r = c.execute("SELECT COALESCE(SUM(delta), 0) AS d FROM ledger WHERE workspace=? AND at>=? AND kind IN ('use', 'refund')",
-                      (TENANT, t0)).fetchone()
+        r = c.execute("SELECT COALESCE(SUM(delta), 0) AS d FROM ledger WHERE workspace=? AND at>=? AND at<=? AND kind IN ('use', 'refund')",
+                      (TENANT, t0, t1 or time.time() + 1)).fetchone()
     return max(0, -int(r["d"] or 0))
+
+
+def first_at() -> float | None:
+    """أول حركة في سجل الحساب (نقاط التجربة وقت التسجيل)."""
+    if free():
+        return None
+    with closing(_db()) as c:
+        r = c.execute("SELECT MIN(at) AS a FROM ledger WHERE workspace=?", (TENANT,)).fetchone()
+    return float(r["a"]) if r and r["a"] else None
+
+
+def gifted(ref: str) -> int:
+    """كام نقطة هدية اتسجلت قبل كده بالمرجع ده (عشان الهدية ماتتكررش)."""
+    if free():
+        return 0
+    with closing(_db()) as c:
+        r = c.execute("SELECT COALESCE(SUM(delta), 0) AS d FROM ledger WHERE workspace=? AND kind='gift' AND ref=?", (TENANT, ref[:60])).fetchone()
+    return int(r["d"] or 0)
 
 
 # ---------------------------------------------------------------- 🔒 الحجز الموحّد: النقاط تتحجز قبل العملية، وترجع لو فشلت

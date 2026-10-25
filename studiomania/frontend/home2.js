@@ -737,7 +737,8 @@ const NH = (() => {
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {
     const out = [{ label: "الرئيسية", lv: "home" }];
-    if (zoom?.page) {
+    // قسم مفتوح فوق صفحة (الإعدادات فوق «باقتي ونقاطي» مثلًا): انت دلوقتي في القسم، فالصفحة اللي تحته مش جزء من المسار
+    if (zoom?.page && !(stageOpen() && stageTrail.length)) {
       const cur = pTitle.dataset.key, par = PAGE_PARENT[cur];
       if (par && T[par]) out.push({ label: T[par].ar, lv: "pagekey", key: par });
       out.push({ label: T[cur]?.ar || "", lv: "pagekey", key: cur });
@@ -920,7 +921,16 @@ const NH = (() => {
     if (!KOCHI && typeof FirstUse !== "undefined") FirstUse.check();
   }
   let lastBrandKey = null;
-  refresh();
+  // ⏳ أول فتحة: الهوم مايظهرش بحالة عامة («ابدأ من هنا»، «العميل») قبل ما بيانات الحساب ومسار أول استخدام يتحمّلوا
+  host.classList.add("nh-wait"); bar.classList.add("nh-wait");
+  const unwait = () => { host.classList.remove("nh-wait"); bar.classList.remove("nh-wait"); };
+  setTimeout(unwait, 6000);   // أمان: لو حاجة اتأخرت مانسيبش الصفحة فاضية
+  refresh().then(async () => {
+    for (let i = 0; i < 30 && typeof FirstUse !== "undefined" && !FirstUse.state(); i++) await new Promise((r) => setTimeout(r, 100));
+    renderTiles();
+    if (window.I18N?.lang !== "en" && !KOCHI) slots[live].innerHTML = stageHTML(shown);
+    unwait();
+  }, unwait);
   setInterval(() => { if (!document.hidden && window.money?.last) { D.money = money.last; if (!zoom) renderTiles(); } }, 60000);
 
   // لما القسم يتقفل: الكاميرا بترجع لورا للرئيسية

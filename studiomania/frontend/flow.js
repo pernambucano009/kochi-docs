@@ -56,7 +56,7 @@ const Flow = (() => {
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكار…</p></div></div>`;
     try {
-      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "" }) });
+      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
       try { localStorage.setItem("studiomania.flow", S.d.id); } catch { /* غير مهم */ }
       if (typeof NH !== "undefined") NH?.refresh?.();
       render(); poll();
@@ -274,13 +274,14 @@ const Flow = (() => {
   const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
   function stIdea(d) {
     const loading = d.busy === "ideas";
-    return `<h2>اختر فكرة للبوست</h2><p class="flw-sub">العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك.</p>${costNote(d)}
+    return `<h2>اختر فكرة للبوست</h2><p class="flw-sub">${(d.ideas || []).length ? "العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك." : "اطلب من العقل أفكارًا على قدر العلامة والقالب، أو اكتب فكرتك أنت."}</p>${costNote(d)}
       ${isPhone(d) ? `<div class="flw-skip"><button type="button" class="flw-btn" data-skipshoot>⏭ عندي الفيديو الخاص بي، على الرفع مباشرة</button></div>` : ""}${tipBox(d.guide?.idea)}${seasonsRow()}
       ${d.algo_mode && (d.ideas_dropped || []).length ? `<p class="flw-algo-note" title="${esc(d.ideas_dropped.map((x) => `«${x.title}»: ${x.why_out}`).join("\n"))}">⚡ وضع الخوارزمية شال ${d.ideas_dropped.length} ${d.ideas_dropped.length === 1 ? "فكرة ضعيفة" : "أفكار ضعيفة"} وجاب غيرها (ضع المؤشر عليها لترى السبب)</p>` : ""}
       ${trendRow(d)}${mineRow(d)}${savedBox("idea", d)}<div class="flw-cards">${(d.ideas || []).map(ideaCard).join("")}${S.own ? ideaForm() : ""}</div>
+      ${!(d.ideas || []).length && !loading && !d.error ? `<div class="flw-acts"><button type="button" class="flw-btn pri big" data-more="idea">💡 اقترح أفكارًا${writeCost(d, "ideas")}</button></div>` : ""}
       ${loading ? working("العقل يفكّر في أفكار على القالب…") : failed("idea")}
       <div class="flw-more">${S.hint ? `<div class="flw-chatrow"><input id="flwHint" placeholder="تريد أفكارًا عن ماذا؟ (اختياري)"><button type="button" class="flw-btn" data-more="idea">اقترح${writeCost(d, "ideas")}</button></div>` : `
-        <button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكارًا أخرى${writeCost(d, "ideas")}</button>
+        ${(d.ideas || []).length ? `<button type="button" class="flw-btn" data-more="idea" ${loading ? "disabled" : ""}>💡 اقترح أفكارًا أخرى${writeCost(d, "ideas")}</button>` : ""}
         <button type="button" class="flw-link" data-hint>🎯 وجّه العقل</button>`}
         <button type="button" class="flw-link" data-own>✍️ اكتب فكرتك</button></div>`;
   }

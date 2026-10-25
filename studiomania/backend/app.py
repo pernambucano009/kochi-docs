@@ -11006,6 +11006,12 @@ def onboard_state():
     pack = fieldpacks.FIELDS.get(field) or {}
     need = bool(b) and not b.get("onboarded") and not str(b.get("domain") or "").strip() and brain_score(b) < 30
     j = b.get("first_job") or {}
+    if j.get("status") == "done" and bid:   # 🎁 الهدية لسه ماتسجلتش (أو اتصرف حاجة بعد الحساب): تتسجل دلوقتي
+        try:
+            if first_gift(bid):
+                j = (brain_row(bid) or {}).get("first_job") or j
+        except Exception as exc:  # noqa: BLE001
+            print(f"[first-gift] {bid}: {exc}", flush=True)
     job = {k: j.get(k) for k in ("status", "step", "done", "progress", "video_url", "export_id", "title", "error", "tpl", "cost")} if j else None
     if job and job["status"] == "run" and time.time() - (j.get("at") or 0) > 3600:   # السيرفر اتقفل في النص
         job.update(status="failed", error="التشغيل توقف، جرّب مرة أخرى")
@@ -11205,13 +11211,36 @@ def first_wait(fid: str, ok, what: str, retry=None, limit: float = 900) -> dict:
 FIRST_GIFT_MAX = 300   # سقف هدية أول فيديو (أكبر من تكلفته بكتير، عشان أي توليد تاني في نفس الوقت مايبقاش مجاني)
 
 
+def first_gift(bid: str) -> int:
+    """🎁 أول فيديو مجاني فعلًا: كل اللي اتصرف من فتح الحساب لحد ما أول فيديو خلص (قراءة العلامة، الترند، الأفكار، النص، الصوت…)
+    بيرجع في سطر واحد «أول فيديو مجانًا». بتتنادى لما الفيديو يخلص، وتاني مع كل فتحة للبرنامج لو الهدية لسه ماتسجلتش (من غير تكرار)."""
+    j = (brain_row(bid) or {}).get("first_job") or {}
+    if j.get("status") != "done" or wallet.free():
+        return 0
+    ref = f"first:{j.get('id')}"
+    fin = j.get("finished_ts")
+    if not fin and j.get("finished_at"):   # أول فيديو خلص قبل التحديث ده: وقت الاكتمال مكتوب كنص
+        try:
+            fin = datetime.fromisoformat(j["finished_at"]).timestamp()
+        except ValueError:
+            fin = None
+    end = float(fin or j.get("at") or time.time()) + 20   # الخصم اللي بيتسجل بعد الاكتمال بثواني (تسوية التقدير)
+    start = min(x for x in (wallet.first_at(), j.get("t0"), j.get("at")) if x)
+    due = min(wallet.spent_between(start, end), FIRST_GIFT_MAX) - wallet.gifted(ref) - wallet.gifted(str(j.get("id") or "-"))   # (النسخة القديمة كانت بتسجلها بالـ id بس)
+    if due <= 0:
+        return 0
+    n = wallet.gift(due, "🎁 أول فيديو مجانًا", ref)
+    first_job_set(bid, j["id"], cost=(j.get("cost") or 0) + n)
+    return n
+
+
 def run_first(bid: str, jid: str, tpl: str, name: str, t0: float) -> None:
     put = lambda **kw: first_job_set(bid, jid, **kw)  # noqa: E731
     done: list[str] = []
     step = lambda k: put(step=k, done=list(done))  # noqa: E731
     try:
         step("script")
-        f = flow_new(FlowNewIn(template=tpl, name=name))
+        f = flow_new(FlowNewIn(template=tpl, name=name, skip_ideas=False))
         fid = f["id"]
         put(fid=fid)
         d = first_wait(fid, lambda x: bool(x.get("ideas")), "اقتراح الفكرة", lambda: flow_job(fid, "ideas", lambda: flow_gen_ideas(fid)))
@@ -11253,14 +11282,15 @@ def run_first(bid: str, jid: str, tpl: str, name: str, t0: float) -> None:
         title = ((flow_load(fid).get("idea") or {}).get("title") or name)[:80]
         ex = pilot_export_file(final, f"🎬 أول فيديو: {title}")
         done.append("brand")
-        # 🎁 كل اللي اتخصم من أول «اصنع أول فيديو» (ومنه قراءة الوصف) بيرجع في سطر واحد «هدية» في سجل النقاط
-        cost = min(wallet.spent_since(t0), FIRST_GIFT_MAX)
-        if cost:
-            wallet.gift(cost, "🎁 أول فيديو مجانًا", jid)
         with closing(db()) as conn:
             r = conn.execute("SELECT filename FROM exports WHERE id = ?", (ex,)).fetchone()
         put(status="done", step=None, done=list(done), export_id=ex, video_url=f"/media/exports/{r['filename']}" if r else None,
-            title=title, cost=cost, finished_at=now())
+            title=title, cost=0, finished_at=now(), finished_ts=time.time())
+        # 🎁 كل اللي اتخصم لحد هنا بيرجع في سطر واحد «هدية» في سجل النقاط (ولو فشل هنا، بيتسجل مع أول فتحة جاية)
+        try:
+            first_gift(bid)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[first-gift] {bid}: {exc}", flush=True)
         notify("first", "ok", "🎬 أول فيديو جاهز", title, "", ex)
     except Exception as exc:  # noqa: BLE001
         msg = str(getattr(exc, "detail", None) or exc)[:300]
@@ -11282,7 +11312,7 @@ def onboard_first_go(body: FirstGoIn):
     reels = fieldpacks.field_reels((brain_row(bid) or {}).get("field") or "")
     tpl = body.template if body.template in reels or body.template.startswith("t-") else reels[0]
     jid = uuid.uuid4().hex[:8]
-    update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time()}))
+    update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time(), "t0": t0}))
     threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl, t0), daemon=True).start()
     return onboard_state()
 
@@ -23418,7 +23448,10 @@ def flow_to_dict(fid: str, d: dict) -> dict:
     out["algo_mode"] = algo.mode_on(brain)
     # 💳 تكلفة كتابة العقل قبل ما تتصرف (الأفكار والسيناريو بيتحسبوا بحجم الكلام): بتظهر جنب زراير الاقتراح
     gate = 2 if out["algo_mode"] else 1
-    out["costs"] = {"ideas": wallet.credits(wallet.est(chars=24000)) * gate, "scenarios": wallet.credits(wallet.est(chars=40000)) * gate}
+    seen = json.loads(auth.get_setting("flow_costs") or "{}")   # آخر تكلفة حقيقية، وإلا تقدير بحجم الكلام
+    mode = "algo" if out["algo_mode"] else "std"
+    out["costs"] = {"ideas": seen.get(f"ideas:{mode}") or wallet.credits(wallet.est(chars=24000)) * gate,
+                    "scenarios": seen.get(f"scenarios:{mode}") or wallet.credits(wallet.est(chars=40000)) * gate}
     out["guide"] = flow_guide(d["template"])
     if d["template"].get("kind") == "motion":   # قالب كود: مشاهده بأطوالها الأصلية، والفويس أوفر لو اتعمل
         try:
@@ -23577,11 +23610,22 @@ def flow_brand(brain: dict | None, query: str) -> str:
     return brain_rivals(az.brain_text(brain, query)[:7000], brain)
 
 
+def flow_cost_key(fid: str, what: str) -> str:
+    return f"{what}:{'algo' if algo.mode_on(flow_brain(flow_load(fid))) else 'std'}"
+
+
 def flow_job(fid: str, what: str, fn) -> None:
-    """عمل في الخلفية: busy يتعلّم، وإذا حصل خطأ يُكتب."""
+    """عمل في الخلفية: busy يتعلّم، وإذا حصل خطأ يُكتب. الأفكار والسيناريو: تكلفتهم الحقيقية بتتسجل، فالرقم اللي بيظهر قبل الضغط هو نفس اللي بيتخصم."""
     def run():
         try:
+            t0 = time.time()
             fn()
+            if what in ("ideas", "scenarios") and not wallet.free():
+                spent = wallet.spent_between(t0)
+                if spent:
+                    costs = json.loads(auth.get_setting("flow_costs") or "{}")
+                    costs[flow_cost_key(fid, what)] = spent
+                    auth.set_setting("flow_costs", json.dumps(costs))
             flow_update(fid, lambda d: d.update(busy=None, error=None))
         except Exception as exc:  # noqa: BLE001
             msg = str(getattr(exc, "detail", None) or exc)[:300]

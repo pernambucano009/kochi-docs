@@ -181,7 +181,7 @@ const PlansView = (() => {
         <b class="nm">${esc(p.name)}</b>
         <span class="pr">${p.price ? `<span class="num">${sar(moP(p))}</span><small>ر.س / شهر</small>` : `<span class="free">مجانًا</span>`}</span>
         ${act}
-        <span class="pv-tip"><b>${esc(p.name)}</b><span>${credLine(p)}<br>${adds(p, plans[i - 1]).slice(0, 3).map(esc).join("<br>")}</span>${tipM ? `<span class="m">${esc(tipM)}</span>` : ""}</span></div>`;
+        <span class="pv-tip"><b>${esc(p.name)}</b><span>${credLine(p)}<br>${adds(p, plans[i - 1]).map(esc).join("<br>")}</span>${tipM ? `<span class="m">${esc(tipM)}</span>` : ""}</span></div>`;
     }
     function big(p, i) {
       const s = state(p, i), yr = S.cyc === "year" && p.price;

@@ -3034,3 +3034,7 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
   #nh .nh-wh-info { gap: 12px; }
   #nh .nh-wh-title { font-size: clamp(26px, min(3vw, 6vh), 48px); }
 }
+
+/* ⏳ لحد ما بيانات الحساب تتحمّل: العنوان والزرار البرتقالي واسم العلامة مستخبيين (مكانهم محجوز، فمفيش قفزة) */
+#nh.nh-wait .nh-ttl, #nh.nh-wait .nh-ttl ~ .ar, #nh.nh-wait .nh-cta .nh-name, .nh-bar.nh-wait #nhClient { visibility: hidden; }
+#nh .nh-ttl, #nh .nh-ttl ~ .ar, #nh .nh-cta .nh-name { transition: opacity .25s; }
