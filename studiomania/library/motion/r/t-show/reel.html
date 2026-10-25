@@ -2,7 +2,7 @@
 <script>
 // قالب «برنامج مسابقات»: كل حاجة على إيقاع واحد سريع (١٤٠)، كل ظهور = صوت. ألوان حلويات سادة بخط تخين وضل صلب، متسابقين لعب
 // بيتنطّوا على البيت، سؤال و٣ إجابات، جرس، «صح!»، لوحة نقط، والجايزة في الآخر. 1080×1920، 12 ثانية.
-const K1 = "١ · الفقرة والمتسابقين", K2 = "٢ · السؤال والإجابات", K3 = "٣ · الجايزة", KS = "الشكل العام";
+const K1 = "١ · الفقرة والمتسابقين", K2 = "٢ · السؤال والإجابات", K3 = "٣ · الجائزة", KS = "الشكل العام";
 const PR = M.params({
   show: { label: "اسم الفقرة", kind: "text", def: "مين يكسب؟", group: K1, max: 12, hint: "اسم مسابقة قصير ومرح." },
   p1: { label: "المتسابق ١", kind: "text", def: "سارة", group: K1, max: 8, hint: "أسماء قصيرة (كلمة)." },
@@ -12,8 +12,8 @@ const PR = M.params({
   a2: { label: "إجابة ب", kind: "text", def: "تروح بنفسك", group: K2, max: 12 },
   a3: { label: "إجابة ج (الصح)", kind: "text", def: "من التطبيق", group: K2, max: 12, hint: "الإجابة الصح دايمًا التالتة: منتجك." },
   right: { label: "كلمة الإجابة الصح", kind: "text", def: "صح!", group: K2, max: 6 },
-  prizeT: { label: "عنوان الجايزة", kind: "text", def: "الجايزة", group: K3, max: 8 },
-  prize: { label: "الجايزة", kind: "text", role: "product", def: "توصيل مجاني لأول طلب", group: K3, max: 26, hint: "عرض حقيقي للي يتفاعل (كوبون، شحن مجاني)." },
+  prizeT: { label: "عنوان الجائزة", kind: "text", def: "الجائزة", group: K3, max: 8 },
+  prize: { label: "الجائزة", kind: "text", role: "product", def: "توصيل مجاني لأول طلب", group: K3, max: 26, hint: "عرض حقيقي للي يتفاعل (كوبون، شحن مجاني)." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "طلباتي", group: K3, max: 14 },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: KS, hint: "خط تخين مرح." },
   fBody: { label: "خط النص", kind: "font", def: "changa", group: KS },
@@ -79,7 +79,7 @@ M.reel({
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + .2, d = 380 + 80 * ((t - at(14)) % .4); x.fillStyle = INK; x.save(); x.translate(540 + Math.cos(a) * d, 620 + Math.sin(a) * d); x.rotate(a); x.fillRect(-30, -6, 60, 12); x.restore(); }
       const score = Math.min(100, Math.round(100 * seg(t, at(15), at(17)))); sticker(rr(540, 1060, 520, 170, 30), INK, 0, 6); x.fillStyle = "#ffd23f"; x.font = "110px LZ"; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "ltr"; x.fillText(String(score).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).padStart(3, "٠"), 540, 1066);
     }
-    // ٤) الجايزة + البراند
+    // ٤) الجائزة + البراند
     if (beat >= 20) {
       const k = pop(20); x.save(); x.translate(540, 420); x.scale(k, k); sticker(rr(0, 0, 640, 150, 75), CANDY.pink, 12, 8); big(PR.prizeT, 0, 6, 100); x.restore();
       const k2 = pop(21); x.save(); x.translate(540, 720); x.scale(k2, k2); x.rotate(.02); sticker(rr(0, 0, 920, 300, 40), "#fff6e0", 16, 10); x.fillStyle = INK; x.font = `${M.fit(PR.prize, "LZ", 840, 110, 50)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.prize, 0, 10); x.restore();

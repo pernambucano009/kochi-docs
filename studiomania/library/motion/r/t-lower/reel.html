@@ -1,21 +1,21 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
-// قالب «شريط الاسم»: تلات ستايلات لشريط اسم المتكلم (لور ثيرد) على مشهد مقابلة بخلفية بوكيه وضيف مرسوم كظل:
+// قالب «شريط الاسم»: تلات ستايلات لشريط اسم المتحدث (لور ثيرد) على مشهد مقابلة بخلفية بوكيه وضيف مرسوم كظل:
 // شريط بيتسحب بخط، كارت أبيض بخط ملوّن بيتمسح، وكبسولة باللوجو. وفوق شارة الموضوع. 1080×1920، 12 ثانية.
 const G1 = "١ · الشريط الأول", G2 = "٢ · الكارت", G3 = "٣ · الكبسولة والجملة", GS = "الشكل العام";
 const PR = M.params({
-  topic: { label: "الموضوع", kind: "text", role: "product", def: "إزاي تبني براند من الصفر", group: G1, max: 30, hint: "شارة فوق بتقول الحلقة عن إيه." },
+  topic: { label: "الموضوع", kind: "text", role: "product", def: "إزاي تبني براند من الصفر", group: G1, max: 30, hint: "شارة في الأعلى توضح موضوع الحلقة." },
   show: { label: "اسم البرنامج", kind: "text", def: "بودكاست صنعة", group: G1, max: 20, hint: "اسم البودكاست أو البرنامج أو الحساب." },
-  name: { label: "الاسم", kind: "text", def: "م. سارة عادل", group: G2, max: 20, hint: "اسم المتكلم زي ما بيحب يتكتب (باللقب لو مهم)." },
-  role: { label: "الوظيفة", kind: "text", def: "مؤسسة ستوديو تصميم", group: G2, max: 28, hint: "الوظيفة أو الإنجاز اللي بيخلي الناس تسمعله." },
-  quote: { label: "الجملة في الستايل التالت", kind: "text", def: "البراند هو الإحساس اللي بتسيبه", group: G3, max: 34, hint: "أقوى جملة قالها في الحلقة." },
+  name: { label: "الاسم", kind: "text", def: "م. سارة عادل", group: G2, max: 20, hint: "اسم المتحدث كما يحب أن يُكتب (باللقب إن كان مهمًا)." },
+  role: { label: "الوظيفة", kind: "text", def: "مؤسسة ستوديو تصميم", group: G2, max: 28, hint: "الوظيفة أو الإنجاز الذي يجعل الناس تستمع إليه." },
+  quote: { label: "الجملة في الأسلوب الثالث", kind: "text", def: "البراند هو الإحساس اللي بتسيبه", group: G3, max: 34, hint: "أقوى جملة قالها في الحلقة." },
   logo: { label: "الشعار في الكبسولة", kind: "image", role: "logo", def: "", group: G3,
-    img: { ratio: "1:1", cut: false, tip: "لوجو مربع أو صورة المتكلم. لو مفيش بيظهر أول حرف من الاسم." }, hint: "بيتحط في الدايرة جنب الاسم." },
-  showCount: { label: "إظهار «ستايل ١ من ٣»", kind: "toggle", def: false, group: GS, hint: "رقم الستايل تحت. سيبه مقفول في الفيديو اللي هتنشره، ودوره لو بتعرض الستايلات." },
-  styleW: { label: "كلمة «ستايل»", kind: "text", def: "ستايل", group: GS, max: 10 },
+    img: { ratio: "1:1", cut: false, tip: "لوجو مربع أو صورة المتكلم. لو مفيش بيظهر أول حرف من الاسم." }, hint: "يوضع في الدائرة بجانب الاسم." },
+  showCount: { label: "إظهار «أسلوب ١ من ٣»", kind: "toggle", def: false, group: GS, hint: "رقم الأسلوب في الأسفل. اتركه مطفأً في الفيديو الذي ستنشره، وشغّله إن كنت تعرض الأساليب." },
+  styleW: { label: "كلمة «أسلوب»", kind: "text", def: "ستايل", group: GS, max: 10 },
   ofW: { label: "كلمة «من»", kind: "text", def: "من", group: GS, max: 6 },
-  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ffcc00", group: GS, hint: "الخطوط والكبسولة: لون قوي بيبان على المشهد." },
-  bg: { label: "لون المشهد", kind: "color", def: "#24304a", group: GS, hint: "خلفية المقابلة: لون غامق هادي." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ffcc00", group: GS, hint: "الخطوط والكبسولة: لون قوي يظهر على المشهد." },
+  bg: { label: "لون المشهد", kind: "color", def: "#24304a", group: GS, hint: "خلفية المقابلة: لون غامق هادئ." },
   fHead: { label: "خط الاسم", kind: "font", def: "plex", group: GS },
   fText: { label: "خط الوظيفة", kind: "font", def: "plex4", group: GS },
 });

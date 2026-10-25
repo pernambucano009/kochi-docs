@@ -4,18 +4,18 @@
 // (الطلب في الطريق، الدفع تم، الخريطة)، وبعدين بتنفجر وتملى الشاشة باسم المنتج. حركات سبرنج ناعمة. 1080×1920، 12 ثانية.
 const G0 = "١ · الشاشة الرئيسية", G1 = "٢ · الودجت الأول", G2 = "٣ · الودجت التاني", G3 = "٤ · الودجت التالت", G4 = "٥ · اسم المنتج", GS = "الشكل العام";
 const PR = M.params({
-  w1: { label: "ودجت ١ (العنوان)", kind: "text", def: "طلبك في الطريق", group: G1, max: 16, hint: "أول حاجة العميل بيشوفها من منتجك وهو شغال (حالة، تقدّم)." },
-  w1b: { label: "ودجت ١ (الوقت/الرقم)", kind: "text", def: "٧ دقايق", group: G1, max: 9, hint: "رقم قصير جنب العنوان بلون التمييز." },
-  c1: { label: "تعليق ١", kind: "text", def: "تتابع طلبك لحظة بلحظة", group: G1, max: 26, hint: "الفايدة في جملة (مش وصف الشاشة)." },
-  w2: { label: "ودجت ٢", kind: "text", def: "اتدفع ١٢٠ جنيه", group: G2, max: 18, hint: "لحظة نجاح بعلامة صح (دفع، حجز، تأكيد)." },
+  w1: { label: "أداة ١ (العنوان)", kind: "text", def: "طلبك في الطريق", group: G1, max: 16, hint: "أول ما يراه العميل من منتجك وهو يعمل (حالة، تقدّم)." },
+  w1b: { label: "أداة ١ (الوقت/الرقم)", kind: "text", def: "٧ دقايق", group: G1, max: 9, hint: "رقم قصير بجانب العنوان بلون التمييز." },
+  c1: { label: "تعليق ١", kind: "text", def: "تتابع طلبك لحظة بلحظة", group: G1, max: 26, hint: "الفائدة في جملة (لا وصف الشاشة)." },
+  w2: { label: "أداة ٢", kind: "text", def: "اتدفع ١٢٠ جنيه", group: G2, max: 18, hint: "لحظة نجاح بعلامة صح (دفع، حجز، تأكيد)." },
   c2: { label: "تعليق ٢", kind: "text", def: "تدفع في ثانية", group: G2, max: 26 },
-  w3: { label: "ودجت ٣ (فوق الخريطة)", kind: "text", def: "المندوب قرّب منك", group: G3, max: 20, hint: "الودجت الكبير بخريطة ونقطة بتتحرك (توصيل، تتبع، مكان)." },
+  w3: { label: "أداة ٣ (فوق الخريطة)", kind: "text", def: "المندوب قرّب منك", group: G3, max: 20, hint: "الأداة الكبيرة بخريطة ونقطة تتحرك (توصيل، تتبع، مكان)." },
   c3: { label: "تعليق ٣", kind: "text", def: "وتعرف المندوب فين بالظبط", group: G3, max: 26 },
-  title: { label: "اسم المنتج", kind: "text", role: "product", def: "توصيلة", group: G4, max: 14, hint: "بيظهر كبير لما الكبسولة تملى الشاشة." },
+  title: { label: "اسم المنتج", kind: "text", role: "product", def: "توصيلة", group: G4, max: 14, hint: "يظهر كبيرًا حين تملأ الكبسولة الشاشة." },
   tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "كل حاجة… في لمحة", group: G4, max: 24, hint: "الوعد في ٣ كلمات." },
-  clock: { label: "الساعة على الشاشة", kind: "text", def: "9:41", group: G0, max: 5, hint: "الوقت اللي فوق (٩:٤١ هي ساعة الإعلانات المشهورة)." },
-  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#34d399", group: GS, hint: "لون الودجتس والنقطة: لون فاتح بيبان على الأسود (أخضر، أصفر، سماوي)." },
-  bg1: { label: "لون الخلفية ١", kind: "color", def: "#1e1b4b", group: GS, hint: "الخلفية متدرّجة بين اللونين دول: غامقين." },
+  clock: { label: "الساعة على الشاشة", kind: "text", def: "9:41", group: G0, max: 5, hint: "الوقت في الأعلى (٩:٤١ هو وقت الإعلانات الشهير)." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#34d399", group: GS, hint: "لون الأدوات والنقطة: لون فاتح يظهر على الأسود (أخضر، أصفر، سماوي)." },
+  bg1: { label: "لون الخلفية ١", kind: "color", def: "#1e1b4b", group: GS, hint: "الخلفية متدرّجة بين هذين اللونين: غامقين." },
   bg2: { label: "لون الخلفية ٢", kind: "color", def: "#3b2a6b", group: GS },
   fHead: { label: "خط النص", kind: "font", def: "plex", group: GS },
   fBody: { label: "خط السطر الأخير", kind: "font", def: "plex4", group: GS },
@@ -57,7 +57,7 @@ M.reel({
       x.fillRect(888, 118, 64, 36); x.fillRect(930, 104, 22, 50); x.beginPath(); x.arc(898, 160, 11, 0, Math.PI * 2); x.arc(942, 160, 11, 0, Math.PI * 2); x.fill();
       x.fillStyle = "#fff"; x.font = "700 44px PB"; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.w1, 830, 125); x.fillStyle = A; x.font = "700 40px PB"; x.textAlign = "left"; x.fillText(PR.w1b, 110, 125);
       x.fillStyle = "rgba(255,255,255,.18)"; x.beginPath(); x.roundRect(110, 162, 720, 12, 6); x.fill(); x.fillStyle = A; x.beginPath(); x.roundRect(830 - 720 * (.2 + .5 * io(seg(t, 1.5, 3.2))), 162, 720 * (.2 + .5 * io(seg(t, 1.5, 3.2))), 12, 6); x.fill(); x.globalAlpha = 1; }
-    // ودجت ٢: الدفع
+    // أداة ٢: الدفع
     let c2 = cin(3.7, 5.4); if (c2 > 0) { x.globalAlpha = c2; const ck = springO(clamp((t - 3.8) / .5), 14, .5); x.save(); x.translate(860, 118); x.scale(ck, ck); x.fillStyle = A; x.beginPath(); x.arc(0, 0, 40, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#000"; x.lineWidth = 9; x.lineCap = "round"; x.beginPath(); x.moveTo(-16, 0); x.lineTo(-4, 12); x.lineTo(18, -12); x.stroke(); x.restore();
       x.fillStyle = "#fff"; x.font = "700 44px PB"; x.textAlign = "right"; x.direction = "rtl"; x.fillText(PR.w2, 790, 134); x.globalAlpha = 1; }
     // ودجت ٣: خريطة

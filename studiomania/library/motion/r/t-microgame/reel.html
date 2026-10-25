@@ -1,22 +1,22 @@
 <!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
 <script>
 // قالب «ألعاب سريعة»: فيلم ألعاب صغيرة ورا بعض: أمر بكلمة واحدة بيتصرخ، ثانيتين تلاتة، حركة واحدة، ونتيجة. كل لعبة بستايل رسم مختلف
-// (نيون مسطح، بكسل، رسم بالقلم، ورق مقصوص) والإيقاع بيسرع كل مرة، وفي الآخر المنتج هو الجايزة. 1080×1920، 12 ثانية.
-const G1 = "١ · الألعاب", G2 = "٢ · الجايزة", GS = "الشكل العام";
+// (نيون مسطح، بكسل، رسم بالقلم، ورق مقصوص) والإيقاع بيسرع كل مرة، وفي الآخر المنتج هو الجائزة. 1080×1920، 12 ثانية.
+const G1 = "١ · الألعاب", G2 = "٢ · الجائزة", GS = "الشكل العام";
 const PR = M.params({
-  g1: { label: "أمر اللعبة ١ (نيون)", kind: "text", def: "اضغط!", group: G1, max: 8, hint: "فعل أمر واحد بعلامة تعجب بيتصرخ على الشاشة. كل لعبة أقصر من اللي قبلها." },
+  g1: { label: "أمر اللعبة ١ (نيون)", kind: "text", def: "اضغط!", group: G1, max: 8, hint: "فعل أمر واحد بعلامة تعجب يُصرخ على الشاشة. كل لعبة أقصر من التي قبلها." },
   g2: { label: "أمر اللعبة ٢ (بكسل)", kind: "text", def: "اصطاد!", group: G1, max: 8 },
   g3: { label: "أمر اللعبة ٣ (رسم بالقلم)", kind: "text", def: "صب!", group: G1, max: 8 },
-  g4: { label: "أمر اللعبة ٤ (ورق مقصوص)", kind: "text", def: "افتح!", group: G1, max: 8, hint: "اللعبة الأخيرة بتفتح علبة جايزة فيها المنتج." },
-  gameW: { label: "كلمة «لعبة»", kind: "text", def: "لعبة", group: G1, max: 8, hint: "بتظهر فوق مع رقم اللعبة." },
-  faster: { label: "بين الألعاب", kind: "text", def: "أسرع!", group: G1, max: 8, hint: "بتخبط على الشاشة الصفرا بين كل لعبة والتانية." },
-  ok: { label: "بعد كل لعبة", kind: "text", def: "تمام!", group: G1, max: 8, hint: "النجمة اللي بتطلع لما اللعبة تخلص." },
-  prize: { label: "صورة الجايزة", kind: "image", role: "product_img1", def: "", group: G2,
-    img: { ratio: "1:1", cut: true, tip: "المنتج من غير خلفية، مالي المربع. لو مفيش بيظهر اسم العلامة في الدايرة." }, hint: "بتطلع من العلبة في اللعبة الأخيرة." },
-  win: { label: "جملة الفوز", kind: "text", def: "كسبت!", group: G2, max: 10, hint: "كلمة كبيرة بتخبط في الآخر." },
+  g4: { label: "أمر اللعبة ٤ (ورق مقصوص)", kind: "text", def: "افتح!", group: G1, max: 8, hint: "اللعبة الأخيرة تفتح صندوق جائزة فيه المنتج." },
+  gameW: { label: "كلمة «لعبة»", kind: "text", def: "لعبة", group: G1, max: 8, hint: "تظهر في الأعلى مع رقم اللعبة." },
+  faster: { label: "بين الألعاب", kind: "text", def: "أسرع!", group: G1, max: 8, hint: "تضرب على الشاشة الصفراء بين كل لعبة وأخرى." },
+  ok: { label: "بعد كل لعبة", kind: "text", def: "تمام!", group: G1, max: 8, hint: "النجمة التي تظهر حين تنتهي اللعبة." },
+  prize: { label: "صورة الجائزة", kind: "image", role: "product_img1", def: "", group: G2,
+    img: { ratio: "1:1", cut: true, tip: "المنتج من غير خلفية، مالي المربع. لو مفيش بيظهر اسم العلامة في الدايرة." }, hint: "تخرج من الصندوق في اللعبة الأخيرة." },
+  win: { label: "جملة الفوز", kind: "text", def: "كسبت!", group: G2, max: 10, hint: "كلمة كبيرة تضرب في النهاية." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "لعبة اليوم", group: G2, max: 16 },
-  title: { label: "جملة الآخر", kind: "text", role: "product", def: "كل يوم تحدي جديد", group: G2, max: 26, hint: "الدعوة: «العب كل يوم»، «جرب حظك»، أو العرض." },
-  fHead: { label: "خط الأوامر", kind: "font", def: "lalezar", group: GS, hint: "خط تقيل إعلاني علشان الأوامر تتقري في ثانية." },
+  title: { label: "الجملة الختامية", kind: "text", role: "product", def: "كل يوم تحدي جديد", group: G2, max: 26, hint: "الدعوة: «العب كل يوم»، «جرّب حظك»، أو العرض." },
+  fHead: { label: "خط الأوامر", kind: "font", def: "lalezar", group: GS, hint: "خط إعلاني ثقيل لتُقرأ الأوامر في ثانية." },
 });
 M.meta({
   story: "ألعاب صغيرة متتالية: أمر بكلمة واحدة يُصرخ، وحركة واحدة، ونتيجة. كل لعبة بأسلوب رسم مختلف (نيون، بكسل، قلم، ورق مقصوص) والإيقاع يتسارع، وفي النهاية المنتج هو الجائزة.",
@@ -78,7 +78,7 @@ M.reel({
         x.restore(); }
       x.restore();
       cmd(PR.g4, "#fff", "#ff2e63"); winTag("#ffd23f");
-    } else { // الجايزة
+    } else { // الجائزة
       x.fillStyle = "#111"; x.fillRect(0, 0, W, H); const lt2 = t - 8.8;
       for (let i = 0; i < 16; i++) { x.fillStyle = ["#ff2e7e", "#fcd000", "#00f0ff", "#ff4f81"][i % 4]; x.save(); x.translate(540, 900); x.rotate(i / 16 * Math.PI * 2 + lt2 * .4); x.globalAlpha = .25; x.beginPath(); x.moveTo(0, 0); x.lineTo(-90, -1400); x.lineTo(90, -1400); x.fill(); x.restore(); } x.globalAlpha = 1;
       const k = springO(lt2 / .7, 10, .5); x.save(); x.translate(540, 900); x.scale(k, k); x.fillStyle = "#fcd000"; x.font = `${M.fit(PR.win, "LZ", 900, 300, 120)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.lineWidth = 30; x.lineJoin = "round"; x.strokeStyle = "#ff2e7e"; x.strokeText(PR.win, 0, 0); x.fillText(PR.win, 0, 0); x.restore();

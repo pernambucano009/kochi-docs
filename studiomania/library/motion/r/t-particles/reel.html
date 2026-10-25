@@ -4,12 +4,12 @@
 // كل نقطة بتتحرك بدالة في الوقت بس، فأي فريم بيطلع زي ما هو. 1080×1920، 12 ثانية.
 const K1 = "١ · المجرة والكلمة", K2 = "٢ · اسم العلامة", KS = "الشكل العام";
 const PR = M.params({
-  title: { label: "الكلمة الأولى", kind: "text", role: "product", def: "قريبًا جدًا", group: K1, max: 12, hint: "النقط بتكتبها: كلمة أو اتنين بالكتير (قريبًا، الإطلاق، مفاجأة)." },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مدار", group: K2, max: 10, hint: "كلمة واحدة: النقط بتكتبها وكل ما كانت أقصر كل ما بانت أوضح." },
-  sub: { label: "تحت الاسم", kind: "text", def: "تطبيق جديد · أول نوفمبر", group: K2, max: 28, hint: "إيه وإمتى (منتج جديد · التاريخ)." },
-  c1: { label: "اللون الأول", kind: "color", role: "accent", def: "#5ee7ff", group: KS, hint: "النقط بتتدرّج بين اللونين على أسود: ألوان نيون فاتحة." },
+  title: { label: "الكلمة الأولى", kind: "text", role: "product", def: "قريبًا جدًا", group: K1, max: 12, hint: "تكتبها النقاط: كلمة أو كلمتان على الأكثر (قريبًا، الإطلاق، مفاجأة)." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مدار", group: K2, max: 10, hint: "كلمة واحدة: تكتبها النقاط، وكلما قصرت كانت أوضح." },
+  sub: { label: "تحت الاسم", kind: "text", def: "تطبيق جديد · أول نوفمبر", group: K2, max: 28, hint: "ماذا ومتى (منتج جديد · التاريخ)." },
+  c1: { label: "اللون الأول", kind: "color", role: "accent", def: "#5ee7ff", group: KS, hint: "تتدرّج النقاط بين اللونين على الأسود: ألوان نيون فاتحة." },
   c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#b36bff", group: KS },
-  fHead: { label: "خط النص اللي النقط بتكتبه", kind: "font", def: "lalezar", group: KS, hint: "الخطوط التقيلة بتطلع أوضح بالنقط." },
+  fHead: { label: "خط النص الذي تكتبه النقاط", kind: "font", def: "lalezar", group: KS, hint: "الخطوط الثقيلة أوضح بالنقاط." },
   fBody: { label: "خط السطر الأخير", kind: "font", def: "plex4", group: KS },
 });
 M.meta({

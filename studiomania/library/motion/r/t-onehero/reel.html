@@ -4,14 +4,14 @@
 // بتقع في قمع (اختار)، بتعدّي من بوابة ألوان تتلوّن (خصّص)، بتتنطط على سوستة وتقع في علبة (اتغلّف)، والعلبة تمشي على السير (وصل). 1080×1920، 12 ثانية.
 const G1 = "١ · العنوان", G2 = "٢ · الخطوات", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "رحلة طلبك", group: G1, max: 16, hint: "اسم الرحلة اللي الكورة هتمشيها." },
-  s1: { label: "خطوة ١ (القمع)", kind: "text", def: "اختار", group: G2, max: 10, hint: "كلمة واحدة لكل خطوة، بتظهر عند كل محطة: الكورة بتقع في قمع." },
-  s2: { label: "خطوة ٢ (بوابة الألوان)", kind: "text", def: "خصّص", group: G2, max: 10, hint: "الكورة بتعدّي من بوابة وتتلوّن بلون التمييز." },
-  s3: { label: "خطوة ٣ (السوستة والعلبة)", kind: "text", def: "بنغلّفه", group: G2, max: 10 },
+  title: { label: "العنوان", kind: "text", role: "product", def: "رحلة طلبك", group: G1, max: 16, hint: "اسم الرحلة التي ستقطعها الكرة." },
+  s1: { label: "خطوة ١ (القمع)", kind: "text", def: "اختار", group: G2, max: 10, hint: "كلمة واحدة لكل خطوة، تظهر عند كل محطة: تسقط الكرة في قمع." },
+  s2: { label: "خطوة ٢ (بوابة الألوان)", kind: "text", def: "خصّص", group: G2, max: 10, hint: "تعبر الكرة بوابة وتتلوّن بلون التمييز." },
+  s3: { label: "خطوة ٣ (النابض والصندوق)", kind: "text", def: "بنغلّفه", group: G2, max: 10 },
   s4: { label: "خطوة ٤ (السير)", kind: "text", def: "يوصلك", group: G2, max: 10 },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "صندوق", group: G3, max: 16, hint: "بيتكتب على العلبة وفي الآخر." },
-  accent: { label: "لون الكرة بعد التخصيص", kind: "color", role: "accent", def: "#ff4d6d", group: GS, hint: "لون البراند: الكورة بتاخده لما تعدّي من البوابة." },
-  bg: { label: "لون الخلفية", kind: "color", def: "#fff4e0", group: GS, hint: "فاتح وهادي علشان الكورة والمحطات تبان." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "صندوق", group: G3, max: 16, hint: "يُكتب على الصندوق وفي النهاية." },
+  accent: { label: "لون الكرة بعد التخصيص", kind: "color", role: "accent", def: "#ff4d6d", group: GS, hint: "لون العلامة: تأخذه الكرة حين تعبر البوابة." },
+  bg: { label: "لون الخلفية", kind: "color", def: "#fff4e0", group: GS, hint: "فاتح وهادئ لتظهر الكرة والمحطات." },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
   fText: { label: "خط الخطوات", kind: "font", def: "plex", group: GS },
 });

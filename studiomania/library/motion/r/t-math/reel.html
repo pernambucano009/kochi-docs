@@ -4,20 +4,20 @@
 // المحاور بتترسم، منحنيين (عادي ومركّب) بيتسابقوا ونقطة بتمشي برقمها، والفرق بينهم بيتعلّم. ستايل فيديوهات الشرح الهادية. 1080×1920، 12 ثانية.
 const G1 = "١ · العنوان والمعادلة", G2 = "٢ · المنحنيات", G3 = "٣ · الختام", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "سحر الفايدة المركّبة", group: G1, max: 22, hint: "اسم الفكرة اللي هتشرحها. بيترسم بخطه الأول وبعدين يتملي." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "سحر الفايدة المركّبة", group: G1, max: 22, hint: "اسم الفكرة التي ستشرحها. يُرسم بخطه أولًا ثم يُملأ." },
   lP: { label: "اسم الرمز P", kind: "text", def: "المبلغ", group: G1, max: 10 },
   lR: { label: "اسم الرمز r", kind: "text", def: "النسبة", group: G1, max: 10 },
-  lN: { label: "اسم الرمز n", kind: "text", def: "السنين", group: G1, max: 10, hint: "كل رمز في المعادلة بيتلوّن ويتكتب تحته اسمه بالعربي." },
-  p: { label: "المبلغ في الأول", kind: "number", def: 1000, min: 1, max: 100000000, step: 100, group: G2, hint: "الرقم اللي المنحنيين بيبدأوا منه." },
-  rate: { label: "النسبة في السنة", kind: "number", def: 10, min: 1, max: 100, step: 1, unit: "٪", group: G2, hint: "كل ما النسبة أعلى كل ما الفرق بين المنحنيين أكبر." },
-  years: { label: "عدد السنين", kind: "number", def: 20, min: 2, max: 60, step: 1, group: G2 },
+  lN: { label: "اسم الرمز n", kind: "text", def: "السنين", group: G1, max: 10, hint: "يتلوّن كل رمز في المعادلة ويُكتب تحته اسمه بالعربية." },
+  p: { label: "المبلغ في البداية", kind: "number", def: 1000, min: 1, max: 100000000, step: 100, group: G2, hint: "الرقم الذي يبدأ منه المنحنيان." },
+  rate: { label: "النسبة السنوية", kind: "number", def: 10, min: 1, max: 100, step: 1, unit: "٪", group: G2, hint: "كلما ارتفعت النسبة زاد الفرق بين المنحنيين." },
+  years: { label: "عدد السنوات", kind: "number", def: 20, min: 2, max: 60, step: 1, group: G2 },
   axisX: { label: "اسم المحور الأفقي", kind: "text", def: "السنين", group: G2, max: 10 },
   axisY: { label: "اسم المحور الرأسي", kind: "text", def: "الفلوس", group: G2, max: 10 },
-  gap: { label: "جملة الفرق", kind: "text", def: "الفرق ده كله فايدة على الفايدة", group: G2, max: 32, hint: "بتشرح المساحة اللي بين المنحنيين في الآخر." },
-  end: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "ابدأ بدري… والوقت يشتغل لك", group: G3, max: 30, hint: "النصيحة أو الدعوة اللي طالعة من الشرح." },
+  gap: { label: "جملة الفرق", kind: "text", def: "الفرق ده كله فايدة على الفايدة", group: G2, max: 32, hint: "تشرح المساحة بين المنحنيين في النهاية." },
+  end: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "ابدأ بدري… والوقت يشتغل لك", group: G3, max: 30, hint: "النصيحة أو الدعوة المستخلصة من الشرح." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "محفظتي", group: G3, max: 18 },
-  accent: { label: "لون المنحنى", kind: "color", role: "accent", def: "#58c4dd", group: GS, hint: "المنحنى المركّب والنسبة: لون فاتح بيبان على الخلفية الغامقة." },
-  fHead: { label: "خط العربي", kind: "font", def: "plex", group: GS, hint: "العنوان والجمل. المعادلة نفسها بخط سيريف ثابت." },
+  accent: { label: "لون المنحنى", kind: "color", role: "accent", def: "#58c4dd", group: GS, hint: "المنحنى المركّب والنسبة: لون فاتح يظهر على الخلفية الغامقة." },
+  fHead: { label: "الخط العربي", kind: "font", def: "plex", group: GS, hint: "العنوان والجمل. المعادلة نفسها بخط سيريف ثابت." },
 });
 M.meta({
   story: "شرح رياضي هادئ: العنوان يُرسم، والمعادلة تظهر رمزًا رمزًا وكل رمز بلونه واسمه، والمحاور تُرسم، ومنحنيان (بسيط ومركّب) يتسابقان ونقطة تتحرك برقمها، والفرق بينهما يُعلَّم.",

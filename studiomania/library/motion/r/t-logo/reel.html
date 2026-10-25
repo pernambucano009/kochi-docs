@@ -4,13 +4,13 @@
 // بدايرة بتكبر، الاسم بيظهر من ورا قناع، الجملة تحت، واللوجو بيلف لفة أخيرة. 1080×1920، 12 ثانية.
 const G1 = "١ · العلامة", G2 = "٢ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  logo: { label: "الشعار بتاعك (اختياري)", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "لوجو أبيض أو فاتح من غير خلفية (بيظهر على لون البراند). لو مفيش، الوردة المرسومة هي العلامة." },
-    hint: "لو حطيته: الوردة بتتفتح وبعدين بتتحول للوجو بتاعك لما الخلفية تتقلب." },
-  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "زهرة", group: G2, max: 12, hint: "الاسم بس (كلمة أو كلمتين): بيظهر كبير من ورا قناع." },
+  logo: { label: "شعارك (اختياري)", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "لوجو أبيض أو فاتح من غير خلفية (بيظهر على لون البراند). لو مفيش، الوردة المرسومة هي العلامة." },
+    hint: "إن أضفته: تتفتح الوردة ثم تتحول إلى شعارك حين تنقلب الخلفية." },
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "زهرة", group: G2, max: 12, hint: "الاسم فقط (كلمة أو كلمتان): يظهر كبيرًا من خلف قناع." },
   tag: { label: "الجملة تحت الاسم", kind: "text", role: "tagline", def: "ورد طازة لكل مناسبة", group: G2, max: 28, hint: "ماذا تقدّم العلامة في ٣–٥ كلمات." },
-  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "النقطة والبتلات، وبعدين الشاشة كلها بتتقلب له." },
-  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ffb347", group: GS, hint: "البتلات التانية والنقط: لون فاتح مكمّل." },
-  bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec", group: GS, hint: "فاتح جدًا (أول ٤ ثواني)." },
+  c1: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#ff4f6d", group: GS, hint: "النقطة والبتلات، ثم تنقلب الشاشة كلها إليه." },
+  c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#ffb347", group: GS, hint: "البتلات الثانية والنقاط: لون فاتح مكمّل." },
+  bg: { label: "لون الخلفية", kind: "color", def: "#fff6ec", group: GS, hint: "فاتح جدًا (أول ٤ ثوانٍ)." },
   fHead: { label: "خط الاسم", kind: "font", def: "lalezar", group: GS },
   fBody: { label: "خط الجملة", kind: "font", def: "tajawal", group: GS },
 });
