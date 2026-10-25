@@ -225,8 +225,8 @@ def clean_ctx(raw: dict) -> dict:
             "reaction": str(raw.get("reaction") or "").strip().lower() if str(raw.get("reaction") or "").strip().lower() in REACTIONS else ""}
 
 
-# الكوميك عربي صرف، ولا أجنبي صرف، ولا ينفع الاتنين
-LANGS = {"ar": "عربي", "en": "أجنبي", "both": "ينفع الاتنين"}
+# الكوميك عربي صرف، ولا أجنبي صرف، ولا يصلح للاثنين
+LANGS = {"ar": "عربي", "en": "أجنبي", "both": "يصلح للاثنين"}
 _AR = re.compile(r"[\u0600-\u06FF]")
 
 

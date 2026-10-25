@@ -27,11 +27,11 @@ PROVIDERS = {
                    "url": "https://developer.audioshake.ai"},
     "fasih": {"name": "فصيح", "what": "الأصوات العربية", "unit": "", "api": False, "default_min": 0, "url": "https://www.fasihtts.com"},
     "munsit": {"name": "منصت", "what": "الأصوات الخليجي", "unit": "", "api": False, "default_min": 0, "url": "https://munsit.com"},
-    "eleven": {"name": "ElevenLabs", "what": "الأصوات والكلون والدبلجة (المفتاح المباشر)", "unit": "حرف", "api": True, "default_min": 10000,
+    "eleven": {"name": "ElevenLabs", "what": "الأصوات والاستنساخ والدبلجة (المفتاح المباشر)", "unit": "حرف", "api": True, "default_min": 10000,
                "url": "https://elevenlabs.io/app/subscription"},
-    "minimax": {"name": "MiniMax", "what": "الأصوات والكلون (المفتاح المباشر)", "unit": "", "api": False, "default_min": 0,
+    "minimax": {"name": "MiniMax", "what": "الأصوات والاستنساخ (المفتاح المباشر)", "unit": "", "api": False, "default_min": 0,
                 "url": "https://platform.minimax.io/user-center/payment/balance"},
-    "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودي", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
+    "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودية", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
     "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0, "url": "https://zernio.com"},
 }
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|top.?up|رصيد", re.I)
