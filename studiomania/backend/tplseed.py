@@ -19,9 +19,9 @@ BUILTIN = {
     "sk-paper": {
         "name": "تكريم ورقي عتيق", "icon": "📜", "uses": "تكريم، ذكرى سنوية، ملخص إنجازات", "transition": "dissolve",
         "voice_tone": "warm, grateful, slow and proud",
-        "sample": "تكريم مدرب رياضي بعد ١٠ سنين: أول فصل، أول بطولة، ١٠٠٠ متدرب، وشكرًا في الآخر",
+        "sample": "تكريم مدرب رياضي بعد ١٠ سنوات: أول حصة، أول بطولة، ١٠٠٠ متدرب، وشكر في النهاية",
         "schema": {
-            "title": "تكريم ورقي عتيق", "summary": "كولاج أرشيفي على ورق كريمي: صور مقصوصة مثل الستيكر، خط يد ونجوم، وبطاقة شكر في الآخر.",
+            "title": "تكريم ورقي عتيق", "summary": "كولاج أرشيفي على ورق كريمي: صور مقصوصة مثل الملصقات، وخط يد ونجوم، وبطاقة شكر في النهاية.",
             "beat_sec": 0.0,
             "style": "Archival scrapbook collage on aged cream ruled paper: cut-out photos with a white sticker border and colored rings, "
                      "hand-drawn ink stars and underlines, stencil/typewriter headings, soft paper grain, gentle drop shadows, flat top light.",
@@ -46,9 +46,9 @@ BUILTIN = {
         },
     },
     "sk-archive": {
-        "name": "الأرشيف الحركي", "icon": "🗞️", "uses": "سيرة حياة، قصة تحفيزية، «فشل وبعدين نجاح»", "transition": "hblur",
+        "name": "الأرشيف الحركي", "icon": "🗞️", "uses": "سيرة حياة، قصة ملهمة، «فشل ثم نجاح»", "transition": "hblur",
         "voice_tone": "calm, reflective storyteller, low and steady",
-        "sample": "قصة متدرب: بدأ بوزن زيادة، فشل مرتين، وبعدين قرر يكمل ونجح",
+        "sample": "قصة متدرب: بدأ بوزن زائد، وفشل مرتين، ثم قرر أن يكمل فنجح",
         "schema": {
             "title": "الأرشيف الحركي", "summary": "أبيض وأسود بالكامل: صور مقصوصة على ورق رسالة مكتوبة على آلة كاتبة، ونص كبير يتحرك.",
             "beat_sec": 0.0,
@@ -74,11 +74,11 @@ BUILTIN = {
         },
     },
     "sk-engraved": {
-        "name": "تحريري محفور", "icon": "🖋️", "uses": "محتوى تعليمي أو تسويقي: نصايح، شرح فكرة، إعلان منتج", "transition": "wipeleft",
+        "name": "تحريري محفور", "icon": "🖋️", "uses": "محتوى تعليمي أو تسويقي: نصائح، شرح فكرة، إعلان منتج", "transition": "wipeleft",
         "voice_tone": "confident, clear teacher, punchy",
-        "sample": "بطّل تتمرن كل يوم من غير راحة، وابدأ تنظم أيام الراحة: العضلة بتكبر وانت مرتاح",
+        "sample": "توقف عن التمرين كل يوم بلا راحة، وابدأ بتنظيم أيام الراحة: العضلة تنمو وأنت مرتاح",
         "schema": {
-            "title": "تحريري محفور", "summary": "أبيض وأسود على ورق خشن برسومات محفورة مثل الكتب القديمة، وشعار بازل يتفك ويتركب.",
+            "title": "تحريري محفور", "summary": "أبيض وأسود على ورق خشن برسومات محفورة مثل الكتب القديمة، وشعار على شكل أحجية يتفكك ويتركب.",
             "beat_sec": 0.0,
             "style": "Black-and-white editorial engraving on rough light paper: copperplate-style engraved illustrations like old books, "
                      "a jigsaw-puzzle emblem that breaks apart and reassembles, sharp arrows used as transitions.",
@@ -100,11 +100,11 @@ BUILTIN = {
         },
     },
     "sk-glass": {
-        "name": "زجاجي ثلاثي الأبعاد", "icon": "🧊", "uses": "بزنس، تسويق، نمو وأرقام", "transition": "fadewhite",
+        "name": "زجاجي ثلاثي الأبعاد", "icon": "🧊", "uses": "أعمال، تسويق، نمو وأرقام", "transition": "fadewhite",
         "voice_tone": "premium, assured, slightly dramatic",
-        "sample": "نادي رياضي كبر من ٥٠ مشترك لـ ٥٠٠٠ في سنتين: إزاي القرار الصح غيّر كل حاجة",
+        "sample": "نادٍ رياضي نما من ٥٠ مشتركًا إلى ٥٠٠٠ في سنتين: كيف غيّر القرار الصحيح كل شيء",
         "schema": {
-            "title": "زجاجي ثلاثي الأبعاد", "summary": "رندر ثلاثي الأبعاد فخم: ألواح زجاج شفافة متكدسة، رقم ضخم يظهر، وفلاش أبيض في النص.",
+            "title": "زجاجي ثلاثي الأبعاد", "summary": "رندر ثلاثي الأبعاد فاخر: ألواح زجاج شفافة متراصة، ورقم ضخم يظهر، وومضة بيضاء في المنتصف.",
             "beat_sec": 0.0,
             "style": "Premium dark 3D render: stacked translucent frosted-glass panels with soft refraction, a huge counting number, "
                      "studio rim light, shallow depth; mid-video a white flash flips the scene from black to white.",
@@ -129,9 +129,9 @@ BUILTIN = {
     "sk-glitch": {
         "name": "الغليتش الأبيض", "icon": "⚡", "uses": "إعلانات أدوات وتطبيقات، خصوصًا أدوات الذكاء الاصطناعي", "transition": "pixelize",
         "voice_tone": "upbeat, modern tech presenter",
-        "sample": "تطبيق تمارين بالذكاء الاصطناعي: بيعملك جدول، بيعدّ التكرارات، بيظبط الأكل، جربه النهارده",
+        "sample": "تطبيق تمارين بالذكاء الاصطناعي: يصنع لك جدولًا، ويعدّ التكرارات، وينظّم أكلك، جرّبه اليوم",
         "schema": {
-            "title": "الغليتش الأبيض", "summary": "أبيض ورمادي نضيف، عناصر ثلاثية الأبعاد ناعمة مثل الصلصال، ولمسة غليتش أحمر-سماوي على الحواف.",
+            "title": "الغليتش الأبيض", "summary": "أبيض ورمادي نظيف، وعناصر ثلاثية الأبعاد ناعمة مثل الصلصال، ولمسة تشويش أحمر وسماوي على الحواف.",
             "beat_sec": 0.0,
             "style": "Clean white and light-grey tech ad: soft matte clay-like 3D objects, gentle studio light, a subtle red-cyan chromatic glitch "
                      "on the edges of every element as the visual signature.",
@@ -156,11 +156,11 @@ BUILTIN = {
     },
     # ---------------------------------------------------------------- 🎞️ من مراجع العميل (دفعتين، ١٠ فيديوهات): كل قالب = ستايل + إيقاع + أجزاء
     "sk-decoloop": {
-        "name": "لوحة آرت ديكو بزووم مالوش آخر", "icon": "🎭", "uses": "بوستر متحرك للبراند، أجواء، إعلان مكان (مطعم، فندق، مسرح، معرض)", "transition": "cut",
+        "name": "لوحة آرت ديكو بتكبير لا ينتهي", "icon": "🎭", "uses": "ملصق متحرك للعلامة، أجواء، إعلان مكان (مطعم، فندق، مسرح، معرض)", "transition": "cut",
         "voice_tone": "elegant, slow, almost whispered",
-        "sample": "أجواء مقهى قديم في وسط البلد: الزبونة بتبص من النضارة فتلاقي المقهى، والكاميرا تدخل وترجع ليها",
+        "sample": "أجواء مقهى قديم في وسط المدينة: الزبونة تنظر عبر نظارتها فترى المقهى، والكاميرا تدخل ثم تعود إليها",
         "schema": {
-            "title": "لوحة آرت ديكو بتكبير لا ينتهي", "summary": "رسم فلات بألوان قليلة، الشخصية بالكاد تتحرك، والكاميرا تدخل في تفصيلة وتظهر منها لنفس اللقطة الأولى (لوب).",
+            "title": "لوحة آرت ديكو بتكبير لا ينتهي", "summary": "رسم مسطح بألوان قليلة، والشخصية بالكاد تتحرك، والكاميرا تدخل في تفصيلة وتخرج منها إلى اللقطة الأولى نفسها (حلقة).",
             "beat_sec": 0.0, "loop": True,
             "style": "Flat vector art-deco poster illustration, mid-century travel-poster feel: crisp geometric shapes, no outlines, hard-edged two-tone shadows, "
                      "subtle paper grain, living-illustration animation (slow blinks, breathing, a curl of steam), never cartoon bouncy.",
@@ -181,11 +181,11 @@ BUILTIN = {
         },
     },
     "sk-morphpaint": {
-        "name": "لوحات تحريرية بتتحول", "icon": "🖌️", "uses": "فكرة نفسية أو اجتماعية، رسالة توعية، قصة إحساس (من غير كلام كتير)", "transition": "cut",
+        "name": "لوحات تحريرية تتحول", "icon": "🖌️", "uses": "فكرة نفسية أو اجتماعية، رسالة توعية، قصة مشاعر (بقليل من الكلام)", "transition": "cut",
         "voice_tone": "intimate, quiet, honest inner voice",
-        "sample": "الضغط اللي البنات بتحس بيه من التعليقات على شكلها، وإزاي بتتعلم تحب نفسها",
+        "sample": "الضغط الذي تشعر به الفتيات من التعليقات على مظهرهن، وكيف يتعلمن حب أنفسهن",
         "schema": {
-            "title": "لوحات تحريرية تتحول", "summary": "رسومات مجلة مرسومة بإيد، كل مشهد استعارة للفكرة، وكل مشهد يذوب في ما بعده بدون قطع، والآخر يعود للأول.",
+            "title": "لوحات تحريرية تتحول", "summary": "رسومات مجلة مرسومة باليد، وكل مشهد استعارة للفكرة، وكل مشهد يذوب في الذي يليه دون قطع، والأخير يعود إلى الأول.",
             "beat_sec": 0.0, "loop": True,
             "style": "Contemporary editorial illustration, gouache and colored pencil on paper, pale porcelain skin with rosy cheeks, muted flat backgrounds, "
                      "surreal visual metaphors (objects growing out of the head, clothes turning into bones, notes piling up), continuous morph between scenes.",
@@ -210,9 +210,9 @@ BUILTIN = {
     "sk-cutcollage": {
         "name": "كولاج صور مقصوصة على ورق", "icon": "✂️", "uses": "إعلان خدمة أو مدينة أو مشروع عقاري، كلمة واحدة كبيرة لكل مشهد", "transition": "slideup",
         "voice_tone": "upbeat, short punchy words",
-        "sample": "شركة تصميم: «حركة» ← «تصميم» ← «براند»، كل كلمة على عالم مقصوص مختلف",
+        "sample": "شركة تصميم: «حركة» ← «تصميم» ← «علامة»، كل كلمة على عالم مقصوص مختلف",
         "schema": {
-            "title": "كولاج صور مقصوصة على ورق", "summary": "صور حقيقية مقصوصة (يوت، شجر، منارة) على ورق كرافت ملون بخدوش، العناصر تنزل وتتركب، وكلمة كبيرة في النص.",
+            "title": "كولاج صور مقصوصة على ورق", "summary": "صور حقيقية مقصوصة (يخت، أشجار، منارة) على ورق كرافت ملون بخدوش، والعناصر تنزل وتتركب، وكلمة كبيرة في المنتصف.",
             "beat_sec": 0.0,
             "style": "Photo-collage stop-motion: real photographic cut-outs (houses, trees, landmarks) with crisp edges on scratched craft-paper color fields, "
                      "a torn-paper street strip, objects drop in and settle with a little bounce, one circular window holding a moving real scene (waves, clouds).",
@@ -231,11 +231,11 @@ BUILTIN = {
         },
     },
     "sk-redcollage": {
-        "name": "كولاج أبيض وأسود بدايرة حمرا", "icon": "🔴", "uses": "شرح منتج أو خدمة (تطبيق، SaaS، خدمة عملاء) بقصة صاحب شغل", "transition": "cut",
+        "name": "كولاج أبيض وأسود بدائرة حمراء", "icon": "🔴", "uses": "شرح منتج أو خدمة (تطبيق، SaaS، خدمة عملاء) بقصة صاحب عمل", "transition": "cut",
         "voice_tone": "clear, confident explainer, friendly",
-        "sample": "صاحب ورشة كان بيخسر زباين علشان مفيش تقييمات، ومن التطبيق بقى بيجمعها وبيكسب ثقة",
+        "sample": "صاحب ورشة كان يخسر الزبائن لعدم وجود تقييمات، وبالتطبيق صار يجمعها ويكسب الثقة",
         "schema": {
-            "title": "كولاج أبيض وأسود بدائرة حمراء", "summary": "شخص حقيقي أبيض وأسود مقصوص مثل الستيكر، دائرة لون خلف، شخبطة بالأحمر، جوال وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
+            "title": "كولاج أبيض وأسود بدائرة حمراء", "summary": "شخص حقيقي بالأبيض والأسود مقصوص مثل الملصق، ودائرة ملونة خلفه، وخربشة بالأحمر، وجوال وختم شمع؛ قطع كل ثانيتين على الإيقاع.",
             "beat_sec": 2.0,
             "style": "Mixed-media paper collage: black-and-white photographic cut-out people with a thin white sticker border, a big flat crimson circle behind them, "
                      "cream handmade paper with fibers, hand-drawn crimson marker arrows/circles/loops that draw themselves, tape strips, a wax seal, torn paper scraps.",
@@ -259,11 +259,11 @@ BUILTIN = {
         },
     },
     "sk-burst": {
-        "name": "المنتج بيفرقع لعالمه", "icon": "💥", "uses": "منتج ليه أكتر من لون/استخدام (ساعة، شنطة، سماعة، علبة): كل نسخة ليها عالم", "transition": "cut",
+        "name": "المنتج ينفجر إلى عالمه", "icon": "💥", "uses": "منتج له أكثر من لون أو استخدام (ساعة، حقيبة، سماعة، علبة): لكل نسخة عالمها", "transition": "cut",
         "voice_tone": "light, modern, few words",
-        "sample": "ساعة ذكية بـ ٣ أشكال: رياضة (برتقالي)، سفر (أزرق)، ستايل (بمبي)",
+        "sample": "ساعة ذكية بثلاثة أشكال: رياضة (برتقالي)، سفر (أزرق)، أناقة (وردي)",
         "schema": {
-            "title": "المنتج ينفجر إلى عالمه", "summary": "رندر ثري هذه ناعم: المنتج طاير ولافف، يتفكك لسحابة أشياء من نفس عالمه، ويعود يتجمع بلون آخر.",
+            "title": "المنتج ينفجر إلى عالمه", "summary": "رندر ثلاثي الأبعاد ناعم: المنتج يطفو ويدور، ويتفكك إلى سحابة أشياء من عالمه نفسه، ثم يتجمع من جديد بلون آخر.",
             "beat_sec": 0.0,
             "style": "Soft pastel 3D product render: the product floats and rotates in a dreamy blurred room, then explodes into a floating cloud of themed props "
                      "(matching its use) that hang in the air and collapse back into the next color version; glossy clay-like props, soft global illumination.",
@@ -284,11 +284,11 @@ BUILTIN = {
         },
     },
     "sk-pillpromo": {
-        "name": "بروموشن فريلانسر: «محتاج الحباية دي؟»", "icon": "💊", "uses": "مصمم أو مونتير أو أي فريلانسر بيعرض نفسه وشغله ويختم بدعوة رسالة", "transition": "zoomin",
+        "name": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "icon": "💊", "uses": "مصمم أو محرر فيديو أو أي مستقل يعرّف بنفسه وأعماله ويختم بدعوة للمراسلة", "transition": "zoomin",
         "voice_tone": "friendly, direct, a little playful",
-        "sample": "مصمم جرافيك بيعرّف نفسه ويعرض شغله (مجلات، هويات، تغليف) ويقول «ابعتلي تصميم»",
+        "sample": "مصمم جرافيك يعرّف بنفسه ويعرض أعماله (مجلات، هويات، تغليف) ويقول «راسلني لتصميمك»",
         "schema": {
-            "title": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "summary": "خطاف بحباية ثري هذه، الشخص مقصوص يقول هاي، مجلد يُفتح بأعماله، كل نوع عمل بموك أب، حيطة سبوت لايت، ودعوة رسالة.",
+            "title": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "summary": "خطاف بحبة ثلاثية الأبعاد، وشخص مقصوص يلقي التحية، ومجلد يُفتح على أعماله، وكل نوع عمل بنموذج عرض، وجدار تحت الإضاءة، ودعوة للمراسلة.",
             "beat_sec": 0.0,
             "style": "Clean 3D motion-graphics promo on a light grey grid wall with diagonal window-light shadows: glossy 3D capsule pill, a real person photo cut-out, "
                      "a 3D blue folder opening with work samples, realistic mockups (magazine spreads, business cards, snack packaging with flying pieces), "
@@ -322,9 +322,9 @@ BUILTIN = {
 
 SCENES = {
     "sk-vox": {
-        "name": "كولاج تحريري (Vox)", "icon": "📰", "uses": "فيديوهات شرح بالمعلومات: ليه وإزاي، أرقام، قصة موضوع", "transition": "cut",
+        "name": "كولاج تحريري (Vox)", "icon": "📰", "uses": "فيديوهات شرح بالمعلومات: لماذا وكيف، أرقام، قصة موضوع", "transition": "cut",
         "voice_tone": "curious, precise, a little wry documentary narrator; explains, never hypes",
-        "sample": "ليه الأكل اللي بيترمي مشكلة مواصلات أكتر ما هي مشكلة مطبخ",
+        "sample": "لماذا الطعام المهدر مشكلة نقل أكثر منه مشكلة مطبخ",
         "allow_label": False,
         "tokens": "editorial mixed-media collage, archival photo cutouts with rough white paper borders, flat bold color fields, halftone dots and paper grain, "
                   "torn paper edges and tape strips, hand-drawn black marker circles and arrows, snappy motion-graphics animation, non-photorealistic, no live-action",
@@ -345,9 +345,9 @@ SCENES = {
                   "parallax between collage layers; something always moves but only one thing is loud at a time",
     },
     "sk-diorama": {
-        "name": "ديوراما ورقي وثائقي", "icon": "🗞️", "uses": "فيديوهات وثائقية درامية: فلوس، اقتصاد، سلطة، تحقيقات", "transition": "cut",
+        "name": "ديوراما ورقية وثائقية", "icon": "🗞️", "uses": "فيديوهات وثائقية درامية: المال، الاقتصاد، السلطة، التحقيقات", "transition": "cut",
         "voice_tone": "serious, cinematic documentary narrator, measured and tense",
-        "sample": "إزاي شركة واحدة بقت مسيطرة على سوق المكملات الغذائية في كام سنة",
+        "sample": "كيف سيطرت شركة واحدة على سوق المكملات الغذائية في بضع سنوات",
         "allow_label": True,
         "tokens": "cinematic vintage paper diorama, aged sepia newsprint world, monochrome halftone print, monochrome archival cutout figures with black "
                   "censor bars over their eyes, single burnt-orange accent, distressed letterpress, warm tungsten light, macro tilt-shift shallow depth of "
@@ -370,9 +370,9 @@ SCENES = {
     # ---------------------------------------------------------------- من skill «claymation»: ٤ أشكال صلصال، كل شكل ليه بلوك ستايل ثابت
     # (variant رابع عنصر فيه = بلوك الستايل بتاع الشكل ده، وبيتحط في أول برومت مفتاح الستايل وكل مشهد)
     "sk-clay": {
-        "name": "صلصال ستوب موشن", "icon": "🧱", "uses": "إعلانات وفيديوهات شرح لطيفة بفويس أوفر: منتجات، روتين يومي، قصص قصيرة", "transition": "cut",
+        "name": "صلصال بالتحريك المتقطع", "icon": "🧱", "uses": "إعلانات وفيديوهات شرح لطيفة بتعليق صوتي: منتجات، روتين يومي، قصص قصيرة", "transition": "cut",
         "voice_tone": "warm, playful, friendly narrator with a light smile in the voice; simple and clear",
-        "sample": "إزاي فنجان قهوة الصبح بيبدأ رحلته من حبة بن صغيرة لحد إيدك",
+        "sample": "كيف يبدأ فنجان قهوة الصباح رحلته من حبة بن صغيرة حتى يصل إلى يدك",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج إعلانات وفيديوهات قصيرة بستايل الصلصال (ستوب موشن): دافي وخفيف الدم وبسيط، كل مشهد فكرة واحدة واضحة بتتشاف.\n"
                   "شكل السكريبت: أول مشهد لقطة بتشد (موقف أو سؤال) من غير مقدمة ← المشكلة أو الفكرة ← المنتج/الحل بيظهر ← بيشتغل قدامنا ← "
@@ -420,9 +420,9 @@ SCENES = {
     },
     # ---------------------------------------------------------------- من skill «paper-animation» + «motion-design» (المشهد بيتجمّع من الورق)
     "sk-papercut": {
-        "name": "عالم ورق ستوب موشن", "icon": "✂️", "uses": "إعلانات منتجات دافية، فيديوهات شرح وقصص، ومشاهد بتتجمع حتة حتة من الورق", "transition": "cut",
+        "name": "عالم ورقي بالتحريك المتقطع", "icon": "✂️", "uses": "إعلانات منتجات دافئة، فيديوهات شرح وقصص، ومشاهد تتجمع قطعة قطعة من الورق", "transition": "cut",
         "voice_tone": "warm storyteller narrator, gentle and curious, like reading a beautiful picture book",
-        "sample": "حكاية زرعة صغيرة على شباك بيت في مدينة زحمة",
+        "sample": "حكاية نبتة صغيرة على نافذة بيت في مدينة مزدحمة",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل عالم الورق (ستوب موشن): حكاية دافية بتتحكي صورة بصورة، كل مشهد فكرة واحدة بتتشاف.\n"
                   "شكل السكريبت: أول مشهد صورة بتشد من غير مقدمة ← الحكاية أو المشكلة ← الحل/المنتج ← بيشتغل قدامنا ← النتيجة ← "
@@ -480,9 +480,9 @@ SCENES = {
     },
     # ---------------------------------------------------------------- الدفعة التاسعة: ستايلات مولّدة جديدة (نفس شكل الصلصال والورق)
     "sk-felt": {
-        "name": "عالم صوف وخيط (فِلت)", "icon": "🧶", "uses": "إعلانات أطفال ومنتجات بيت دافية، قصص قصيرة لطيفة، ومحتوى موسمي", "transition": "cut",
+        "name": "عالم صوف وخيط (فِلت)", "icon": "🧶", "uses": "إعلانات أطفال ومنتجات منزلية دافئة، قصص قصيرة لطيفة، ومحتوى موسمي", "transition": "cut",
         "voice_tone": "soft, cozy, gentle narrator, like a bedtime story",
-        "sample": "بطانية صغيرة بتدفّي بيت كامل في ليلة شتا",
+        "sample": "بطانية صغيرة تدفئ بيتًا كاملًا في ليلة شتاء",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل عرايس الصوف والفِلت (ستوب موشن): دافي وناعم وطفولي، كل مشهد فكرة واحدة بتتشاف.\n"
                   "شكل السكريبت: صورة دافية بتشد من أول ثانية ← المشكلة الصغيرة ← المنتج/الحل ← بيشتغل قدامنا ← الإحساس بعده ← جملة ختام حنينة.\n",
@@ -511,9 +511,9 @@ SCENES = {
                  "Non CGI. Animation must start at the first frame.",
     },
     "sk-anime": {
-        "name": "أنيمي مرسوم باليد", "icon": "🌸", "uses": "إعلانات فيها حكاية وإحساس، لحظات يومية حلوة، ومنتجات للشباب", "transition": "cut",
+        "name": "أنيمي مرسوم باليد", "icon": "🌸", "uses": "إعلانات فيها حكاية ومشاعر، لحظات يومية جميلة، ومنتجات للشباب", "transition": "cut",
         "voice_tone": "gentle, nostalgic, emotional narrator",
-        "sample": "بنت بتذاكر بالليل وكوباية شاي هي اللي مكمّلة معاها",
+        "sample": "فتاة تذاكر ليلًا وكوب الشاي رفيقها حتى النهاية",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل الأنيمي المرسوم باليد: لحظات يومية بسيطة فيها إحساس، سما ونور حلو، وتفاصيل صغيرة.\n"
                   "شكل السكريبت: لقطة جو بتشد ← الشخصية في موقف ← المنتج بيدخل في اللحظة ← الإحساس بيتغير ← لقطة واسعة حلوة ← جملة ختام.\n",
@@ -542,9 +542,9 @@ SCENES = {
                  "Animation must start at the first frame.",
     },
     "sk-watercolor": {
-        "name": "ألوان مية متحركة", "icon": "🎨", "uses": "إعلانات هادية وراقية، قصص براندات، مناسبات وتهاني", "transition": "dissolve",
+        "name": "ألوان مائية متحركة", "icon": "🎨", "uses": "إعلانات هادئة وراقية، قصص علامات تجارية، مناسبات وتهانٍ", "transition": "dissolve",
         "voice_tone": "calm, poetic, warm narrator",
-        "sample": "رحلة وردة من البذرة لحد ما تبقى في بوكيه عروسة",
+        "sample": "رحلة وردة من البذرة حتى تصبح في باقة عروس",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل ألوان المية: شاعري وهادي، الألوان بتنزل على الورق وتكوّن المشهد.\n"
                   "شكل السكريبت: بقعة لون بتتفتح لمشهد ← الحكاية ← المنتج ← اللحظة الحلوة ← المشهد بيذوب في ورق أبيض ← جملة ختام.\n",
@@ -572,7 +572,7 @@ SCENES = {
     "sk-miniature": {
         "name": "عالم مصغّر (تيلت شيفت)", "icon": "🔍", "uses": "إعلانات خدمات ومدن وتوصيل، فعاليات، ومشاريع على أرض الواقع", "transition": "cut",
         "voice_tone": "upbeat, curious, playful narrator",
-        "sample": "يوم في حياة عربية توصيل صغيرة ماشية في المدينة",
+        "sample": "يوم في حياة سيارة توصيل صغيرة تجوب المدينة",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل العالم المصغّر (تيلت شيفت): الدنيا شكلها لعب صغيرة، مرح وسريع وواضح.\n"
                   "شكل السكريبت: لقطة من فوق للمدينة الصغيرة ← الحركة اليومية ← المنتج/الخدمة بتظهر ← بتشتغل ← النتيجة ← جملة ختام.\n",
@@ -598,9 +598,9 @@ SCENES = {
                  "Animation must start at the first frame.",
     },
     "sk-noir": {
-        "name": "فيلم أبيض وأسود (نوار)", "icon": "🕵️", "uses": "إعلانات غموض وتشويق، عطور وساعات، تيزر لإطلاق منتج", "transition": "cut",
+        "name": "فيلم أبيض وأسود (نوار)", "icon": "🕵️", "uses": "إعلانات غموض وتشويق، عطور وساعات، إعلان تشويقي لإطلاق منتج", "transition": "cut",
         "voice_tone": "low, slow, mysterious detective narrator",
-        "sample": "تحقيق في اختفاء آخر قطعة من الكيكة في المحل",
+        "sample": "تحقيق في اختفاء آخر قطعة من الكعكة في المحل",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل أفلام النوار الأبيض والأسود: غموض وظلال وراوي بصوت واطي، وفي الآخر المفاجأة.\n"
                   "شكل السكريبت: لقطة غامضة ← سؤال/لغز ← خيوط ودلايل ← المنتج هو الحل ← لحظة كشف بالنور ← جملة ختام قوية.\n",
@@ -625,9 +625,9 @@ SCENES = {
                  "Animation must start at the first frame.",
     },
     "sk-lowpoly": {
-        "name": "عالم 3D بأشكال بسيطة (لو بولي)", "icon": "🔺", "uses": "شرح تطبيقات وخدمات، إعلانات ألعاب، وفيديوهات تقنية مبهجة", "transition": "cut",
+        "name": "عالم ثلاثي الأبعاد بأشكال بسيطة (لو بولي)", "icon": "🔺", "uses": "شرح تطبيقات وخدمات، إعلانات ألعاب، وفيديوهات تقنية مبهجة", "transition": "cut",
         "voice_tone": "bright, friendly, energetic narrator",
-        "sample": "جزيرة صغيرة بتكبر وتتطور كل ما تستخدم التطبيق أكتر",
+        "sample": "جزيرة صغيرة تكبر وتتطور كلما استخدمت التطبيق أكثر",
         "allow_label": False,
         "writer": "إنت كاتب ومخرج فيديوهات قصيرة بستايل الـ 3D البسيط بالأشكال المضلّعة (لو بولي): مبهج وواضح، كل حاجة شبه اللعبة.\n"
                   "شكل السكريبت: لقطة للعالم الصغير ← المشكلة ← المنتج/التطبيق يظهر ← العالم بيتغير ويكبر ← النتيجة ← جملة ختام.\n",
@@ -871,35 +871,35 @@ SCENES = {
 
 ADS = {
     "sk-ugc": {
-        "name": "UGC ريفيو بالموبايل", "icon": "📱", "kind": "ugc", "hero": "person", "needs_product": True,
-        "uses": "ريفيو منتج ١٥ ثانية: حد حقيقي ماسك الموبايل وبيتكلم عن المنتج (تيك توك وريلز)",
+        "name": "مراجعة بالجوال", "icon": "📱", "kind": "ugc", "hero": "person", "needs_product": True,
+        "uses": "مراجعة منتج في ١٥ ثانية: شخص حقيقي يمسك الجوال ويتحدث عن المنتج (تيك توك وريلز)",
         "voice_tone": "casual, warm, real creator talking to a friend",
-        "sample": "ريفيو سريع لسيروم فيتامين سي من حد جربه أسبوعين",
+        "sample": "مراجعة سريعة لسيروم فيتامين سي من شخص جرّبه أسبوعين",
     },
     "sk-cinema-ad": {
         "name": "إعلان سينمائي باللقطات", "icon": "🎬", "kind": "cinema", "hero": "person", "needs_product": True,
-        "uses": "إعلان تلفزيوني/سوشيال متصوّر: لقطات بتوقيتها، المنتج بطل، وكارت أخير باسم البراند",
+        "uses": "إعلان تلفزيوني أو للتواصل الاجتماعي مصوَّر: لقطات بتوقيتها، والمنتج هو البطل، وبطاقة أخيرة باسم العلامة",
         "voice_tone": "calm, confident commercial voiceover, few words",
-        "sample": "إعلان قهوة باردة: واحدة بتجري الصبح، تتعب فوق التل، تشرب وتكمّل",
+        "sample": "إعلان قهوة باردة: فتاة تركض صباحًا، تتعب فوق التل، تشرب ثم تكمل",
     },
     # skeleton = راوي + هيكل عظمي ثابت بيتصاعد (يوم ١ ← يوم ٣٦٥) · talking = شخصية أنيميشن بتتكلم بصوتها · song = أغنية والفيديو ماشي عليها
     "sk-skeleton": {
-        "name": "إيه اللي يحصل لو…؟ (هيكل عظمي)", "icon": "💀", "kind": "skeleton", "hero": "plate", "needs_product": False,
-        "uses": "إعلان بيتصاعد: هيكل عظمي كرتون بيعيش رحلة يوم ١ ← يوم ٣٠ ← يوم ٣٦٥ وراوي بيحكي (فضول وانتصار أو كارثة)",
+        "name": "ماذا يحدث لو…؟ (هيكل عظمي)", "icon": "💀", "kind": "skeleton", "hero": "plate", "needs_product": False,
+        "uses": "إعلان متصاعد: هيكل عظمي كرتوني يعيش رحلة يوم ١ ← يوم ٣٠ ← يوم ٣٦٥ وراوٍ يحكي (فضول ثم انتصار أو كارثة)",
         "voice_tone": "calm, dramatic documentary narrator",
-        "sample": "إيه اللي يحصل لو شربت مية كفاية كل يوم لمدة سنة؟",
+        "sample": "ماذا يحدث لو شربت ما يكفي من الماء كل يوم لمدة سنة؟",
     },
     "sk-talking": {
-        "name": "المنتج بيتكلم (أنيميشن)", "icon": "🗣️", "kind": "talking", "hero": "plate", "needs_product": True,
-        "uses": "شخصية أنيميشن (المنتج نفسه أو مكوّن أو حيوان) بتكلم الكاميرا: «أنا X، بعمل Y، فـ Z بيحصلك»",
+        "name": "المنتج يتكلم (أنيميشن)", "icon": "🗣️", "kind": "talking", "hero": "plate", "needs_product": True,
+        "uses": "شخصية أنيميشن (المنتج نفسه أو مكوّن أو حيوان) تتحدث إلى الكاميرا: «أنا X، أفعل Y، فيحدث لك Z»",
         "voice_tone": "expressive animated character voice",
-        "sample": "علبة كريم بتعرّف نفسها وبتشرح ليه بتحمي بشرة البيبي",
+        "sample": "علبة كريم تعرّف بنفسها وتشرح لماذا تحمي بشرة الطفل",
     },
     "sk-song": {
-        "name": "إعلان أغنية (ميوزك فيديو)", "icon": "🎵", "kind": "song", "hero": "plate", "needs_product": False,
-        "uses": "أغنية حقيقية بتحكي نتيجة العميل، وفيديو أنيميشن ماشي عليها والبطل بيغني في الهوك والكورس",
+        "name": "إعلان بأغنية (فيديو موسيقي)", "icon": "🎵", "kind": "song", "hero": "plate", "needs_product": False,
+        "uses": "أغنية حقيقية تحكي نتيجة العميل، وفيديو أنيميشن على إيقاعها والبطل يغني في الخطاف واللازمة",
         "voice_tone": "sung",
-        "sample": "أغنية خفيفة عن إن الشاي ده بيصحّيك من غير ما يتعبك",
+        "sample": "أغنية خفيفة عن شاي يوقظك دون أن يرهقك",
     },
 }
 
@@ -907,9 +907,9 @@ ADS = {
 # ---------------------------------------------------------------- 📦 استوديو المنتج (صور ثابتة): من skills «studio-shot» و«product-visuals» و«ad-generator»
 STILLS = {
     "sk-studio-shot": {"name": "صورة استوديو للمنتج", "icon": "📸", "kind": "studio",
-                       "uses": "أي صورة للمنتج (حتى لو من الموبايل) ← صورة استوديو نضيفة على خلفية بلون واحد", "sample": ""},
-    "sk-product-scene": {"name": "المنتج جوه مشهد", "icon": "🏞️", "kind": "scene",
-                         "uses": "حط المنتج في أي مشهد عاجبك (صورة من بنترست أو إعلان شفته): نسخ اللقطة أو بنائها حوالين المنتج", "sample": ""},
-    "sk-static-ads": {"name": "إعلانات ثابتة (٤٠ قالب)", "icon": "🖼️", "kind": "adgen",
-                      "uses": "٤٠ شكل إعلان صورة مجرّبين: عروض، آراء، مقارنات، قبل وبعد، نوتس، بوست-إت… بألوان وكلام البراند", "sample": ""},
+                       "uses": "أي صورة للمنتج (حتى لو من الجوال) ← صورة استوديو نظيفة على خلفية بلون واحد", "sample": ""},
+    "sk-product-scene": {"name": "المنتج داخل مشهد", "icon": "🏞️", "kind": "scene",
+                         "uses": "ضع المنتج في أي مشهد يعجبك (صورة من بنترست أو إعلان رأيته): نسخ اللقطة أو بناؤها حول المنتج", "sample": ""},
+    "sk-static-ads": {"name": "إعلانات ثابتة (٤٠ قالبًا)", "icon": "🖼️", "kind": "adgen",
+                      "uses": "٤٠ شكلًا مجرّبًا لإعلانات الصور: عروض، آراء، مقارنات، قبل وبعد، ملاحظات، أوراق لاصقة… بألوان العلامة وكلامها", "sample": ""},
 }
