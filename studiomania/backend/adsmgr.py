@@ -54,7 +54,7 @@ def _check(resp: httpx.Response, what: str):
     if resp.status_code == 403 and "add-on" in resp.text.lower():
         raise AdsError(ADDON_MSG)
     if resp.status_code == 422 and "ads connection" in resp.text.lower():
-        raise AdsError("يجب تربط حساب الإعلانات هذه للمنصة أولًا (من «اربط حساب إعلانات»)")
+        raise AdsError("اربط حساب الإعلانات بهذه المنصة أولًا (من «اربط حساب إعلانات»)")
     try:
         return publisher._check(resp, what)
     except publisher.PublishError as exc:
@@ -132,7 +132,9 @@ def ad_accounts() -> list[dict]:
     """حسابات الإعلانات المربوطة (مثلًا حساب ميتا act_123) ومعها حساب النشر الذي تُنشأ منه."""
     if mock():
         return _M["accounts"]
-    prof = publisher.tenant_profile()
+    prof = publisher.default_profile()   # صاحب البرنامج من غير بروفايل محدد: أول بروفايل عنده (الطلب لازم فيه profileId)
+    if not prof:
+        return []
     data = _get("/ads/accounts", {"profileId": prof}, "قراءة حسابات الإعلانات")
     items = publisher._pick(data, "accounts")
     return [x for x in (_norm_account(a) for a in items) if x]   # الطلب نفسه متفلتر ببروفايل العميل
