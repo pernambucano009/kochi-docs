@@ -246,7 +246,7 @@ const Gallery = (() => {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريب</small></span>`;
     return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
-      <div class="nh-wc-h"><b>${esc(x.name)}</b><i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
+      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
   function labLines(name) {
@@ -262,10 +262,10 @@ const Gallery = (() => {
   // «موصى به لمجالك» بس للقوالب المختارة للمجال ده فعلًا (مش اللي بتنفع لأي مجال)
   const recFor = (x, key) => !!key && (FIT[x.id] || "").split(" ").includes(key);
   const GF = { q: "", type: "", niche: null };
-  try { S.view = localStorage.getItem("studiomania.galview") || "grid"; } catch { S.view = "grid"; }
+  // 🎡 العجلة هي العرض الأساسي (هوية المنتج)، والشبكة بزرار «عرض الكل»
+  S.view = "wheel";
   function setView(v) {
     S.view = v;
-    try { localStorage.setItem("studiomania.galview", v); } catch { /* */ }
     dubOut(); Gen.close?.(); SceneStudio.close?.();
     render();
   }
@@ -302,7 +302,7 @@ const Gallery = (() => {
         <div class="gg-bar"><input type="search" class="gg-q" placeholder="🔎 ابحث عن قالب بالاسم أو الوصف…" value="${esc(GF.q)}">
           <select class="gg-niche" aria-label="المجال"><option value="">كل المجالات</option>${NICHES.map(([k, n]) => `<option value="${k}"${k === key ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
           <span class="gg-count muted"></span>
-          <button type="button" class="btn sm gg-view" data-gview="wheel" title="اعرض القوالب على العجلة">🎡 العجلة</button></div>
+          <button type="button" class="btn sm gg-view" data-gview="wheel" title="ارجع للعجلة">🎡 رجوع للعجلة</button></div>
         <div class="gg-types"><button type="button" class="gg-type${GF.type ? "" : " on"}" data-gtype="">الكل</button>${types.map(([id, n]) => `<button type="button" class="gg-type${GF.type === id ? " on" : ""}" data-gtype="${esc(id)}">${esc(n)}</button>`).join("")}</div>
         <div class="gg-grid"></div></div>
       <section class="gg-panel" hidden></section></div>`;
@@ -369,14 +369,15 @@ const Gallery = (() => {
     const list = S.items.map((x, i) => [x, i]);
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
     // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
-    list.sort((a, b) => ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
+    // قوالب مجال العميل الأول (موصى به)، وبعدها الثابتين (الموبايل ← الأفاتار)، وبعدها المناسب لأي مجال، والباقي
+    list.sort((a, b) => (recFor(b[0], S.niche.key) - recFor(a[0], S.niche.key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
     if (!list.length) { box.innerHTML = `<div class="nh-empty">لا يوجد قوالب ما زال.</div>`; return; }
     box.innerHTML = `<div class="nh-wh" dir="ltr">
       <div class="nh-wh-wheel"><div class="nh-wh-3d">
         <svg class="nh-wh-l nh-wh-back" aria-hidden="true"></svg>
-        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span>${labLines(x.name)}</span>`).join("")}</div>
+        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span class="mk${recFor(x, S.niche.key) ? " rec" : ""}"><i></i></span>`).join("")}</div>
         <svg class="nh-wh-l nh-wh-ring" aria-hidden="true"></svg>
         <svg class="nh-wh-l nh-wh-ball" aria-hidden="true"></svg>
         <i class="nh-wh-l nh-wh-ptr" aria-hidden="true"></i>
@@ -384,14 +385,17 @@ const Gallery = (() => {
       </div></div>
       <section class="nh-wh-info" dir="rtl" aria-live="polite">
         ${catsHTML("nh-wh-mcats")}
+        <div class="nh-wh-find"><input type="search" class="nh-wh-q" placeholder="🔎 ابحث عن قالب… والعجلة تلف إليه" aria-label="ابحث عن قالب">
+          <button type="button" class="nh-wh-all" data-gview="grid">▦ عرض الكل</button></div>
+        <ol class="nh-wh-names" aria-label="القوالب"></ol>
         <div class="nh-wh-eye"><span class="num"></span><span>·</span><span class="cat"></span></div>
         <h2 class="nh-wh-title"><span></span></h2><p class="nh-wh-desc"></p>
-        <button type="button" class="nh-wh-go">ابدأ هذا بالقالب <span aria-hidden="true">←</span></button>
+        <button type="button" class="nh-wh-go">ابدأ بهذا القالب <span aria-hidden="true">←</span></button>
         <div class="nh-wh-foot"><span><kbd>رول الماوس</kbd> أعلى العجلة يجري أسرع</span><span><kbd>↑</kbd> <kbd>↓</kbd> قالب قالب</span></div>
       </section>
       <div class="nh-wh-cards"><div class="nh-wh-track">${list.map(([x], k) => card(x, k)).join("")}</div></div>
       <section class="nh-wh-panel" dir="rtl" hidden></section>
-      <aside class="nh-wh-side"><button type="button" class="nh-wh-snd" data-gview="grid" title="اعرض القوالب شبكة بالبحث والفلاتر"><span>▦ الشبكة</span></button><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
+      <aside class="nh-wh-side"><span class="nh-wh-dots" aria-hidden="true">${"<i></i>".repeat(12)}</span>
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت يعمل" : "شغّل الصوت"}</span></button></aside>
     </div>`;
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
@@ -527,6 +531,21 @@ const Gallery = (() => {
     el.addEventListener("click", (e) => { const b = e.target.closest("[data-cat2]"); if (b) catGo(+b.dataset.cat2); });
     el.querySelector(".nh-wh-snd:not([data-gview])").addEventListener("click", () => setSound(!sndOn));
     el.querySelector("[data-gview]").addEventListener("click", () => setView("grid"));
+    el.addEventListener("click", (e) => { const n = e.target.closest("[data-wsnap]"); if (n) { const k = +n.dataset.wsnap; return k === W.shown ? preview(S.items[W.list[k][1]]) : snapTo(k); } });
+    // 🔎 البحث: أول قالب اسمه (أو وصفه) فيه الكلمة، والعجلة تلف له لوحدها
+    const q = el.querySelector(".nh-wh-q");
+    q.addEventListener("input", () => {
+      const v = q.value.trim().toLowerCase();
+      q.classList.remove("miss");
+      if (!v) return;
+      const hit = (f) => W.list.findIndex(([x]) => f(String(x.name || "").toLowerCase()) );
+      let k = hit((n) => n.startsWith(v));
+      if (k < 0) k = hit((n) => n.includes(v));
+      if (k < 0) k = W.list.findIndex(([x]) => [x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(v)));
+      if (k < 0) return q.classList.add("miss");
+      W.mode = "snap"; W.target = k;
+    });
+    q.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter" && !q.classList.contains("miss") && q.value.trim()) startTpl(S.items[W.list[W.shown][1]]); });
   }
   // دوسة على القالب اللي في النص بتفتحه، وعلى أي قالب تاني بتلف العجلة عليه
   function tap(k) { if (k === W.shown && Math.abs(W.vel) < 1) preview(S.items[W.list[k][1]]); else snapTo(k); }
@@ -536,6 +555,12 @@ const Gallery = (() => {
     const N = W.list.length;
     el.querySelectorAll(".nh-wh-dots i").forEach((d, j) => d.classList.toggle("on", j === Math.round(k / Math.max(1, N - 1) * 11)));
     el.querySelector(".nh-wh-eye .num").textContent = pad(k + 1) + " / " + pad(N);
+    // القايمة اللي جنب العجلة: الأسماء أفقية حوالين القالب الحالي، والموصى به عليه وسم
+    const nl = el.querySelector(".nh-wh-names");
+    if (nl) {
+      const from = Math.max(0, Math.min(N - 7, k - 3));
+      nl.innerHTML = W.list.slice(from, from + 7).map(([y], j) => `<li><button type="button" class="${from + j === k ? "on" : ""}" data-wsnap="${from + j}">${esc(y.name)}${recFor(y, S.niche.key) ? `<em>موصى به</em>` : ""}</button></li>`).join("");
+    }
     clearTimeout(W.swapT);
     W.swapT = setTimeout(() => {   // الاسم يتغيّر عندما العجلة تهدى قليلًا (غير مع كل تكّة)
       const ti = el.querySelector(".nh-wh-title"); ti.innerHTML = ""; const s = document.createElement("span"); s.textContent = x.name; ti.appendChild(s);

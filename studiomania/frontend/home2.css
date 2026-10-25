@@ -3002,3 +3002,24 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 /* 🧭 «أكمل العقل» شاشة أساسية لحد ٣٠٪: الكارت في النص وأكبر */
 #nh .bm-wiz .bm-card { left: 50%; top: 50%; translate: -50% -50%; transform: none; width: min(560px, calc(100% - 24px)); max-height: min(82%, 640px); }
 #nh .bm-wiz .bm-card .bm-q { font-size: 19px; }
+
+/* 🎡 العجلة رجعت العرض الأساسي: القوس علامات بتتحرك بس، والأسماء أفقية في قايمة جنبها، وبحث بيلف العجلة، وموصى به أولًا */
+#nh .nh-wh-labs span.mk { width: 22px; height: 14px; display: grid; align-items: center; }
+#nh .nh-wh-labs span.mk i { display: block; width: 18px; height: 3px; border-radius: 3px; background: var(--nh-muted); opacity: .55; }
+#nh .nh-wh-labs span.mk.on i { width: 22px; background: var(--nh-ink); opacity: 1; }
+#nh .nh-wh-labs span.mk.rec i { background: var(--nh-accent); opacity: .9; }
+#nh .nh-wh-find { display: flex; gap: 8px; align-items: center; pointer-events: auto; max-width: 460px; }
+#nh .nh-wh-q { flex: 1; min-width: 0; height: 42px; padding: 0 16px; border-radius: 21px; border: 1.5px solid transparent; background: var(--nh-card, #fff); color: var(--nh-ink);
+  box-shadow: 0 4px 18px rgba(24, 23, 24, .08); font: 400 14px var(--nh-arabic); outline: none; transition: border-color .2s; }
+#nh .nh-wh-q:focus { border-color: var(--nh-accent); }
+#nh .nh-wh-q.miss { border-color: #e0533d; }
+#nh .nh-wh-all { height: 42px; padding: 0 16px; border-radius: 21px; background: var(--nh-card, #fff); box-shadow: 0 4px 18px rgba(24, 23, 24, .08); font: 500 13px var(--nh-arabic); white-space: nowrap; }
+#nh .nh-wh-all:hover { color: var(--nh-accent); }
+#nh .nh-wh-names { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; pointer-events: auto; max-width: 460px; }
+#nh .nh-wh-names button { width: 100%; display: flex; align-items: center; gap: 8px; text-align: start; padding: 5px 12px; border-radius: 10px; font: 400 14px/1.4 var(--nh-arabic); color: var(--nh-muted);
+  transition: color .2s, background .2s; }
+#nh .nh-wh-names button:hover { color: var(--nh-ink); }
+#nh .nh-wh-names button.on { color: var(--nh-ink); font-weight: 600; background: var(--nh-card, #fff); box-shadow: 0 4px 18px rgba(24, 23, 24, .06); }
+#nh .nh-wh-names em, #nh .nh-wc-rec { font-style: normal; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; background: rgba(229, 97, 62, .12); color: var(--nh-accent); white-space: nowrap; }
+#nh .nh-wc-h { gap: 8px; }
+@media (max-width: 720px) { #nh .nh-wh-names { display: none; } #nh .nh-wh-find { max-width: none; } }
