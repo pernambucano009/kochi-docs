@@ -138,11 +138,15 @@ const NH = (() => {
   const side = (id) => `<div class="nh-tile nh-side" data-id="${id}" tabindex="0" role="button" aria-label="${esc(T[id].ar)}">
       <span class="nh-sic">${sideIc(id)}</span><b class="nh-sname">${esc(T[id].ar)}</b>${tipOf(id, META[id]())}</div>`;
   // 🟠 زرار برتقالي واحد بس: «اصنع أول فيديو» لحد ما العميل يبدأ أول مشروع، وبعدها «ابدأ مشروعًا جديدًا»
-  const firstNeeded = () => !KOCHI && D.loaded && !D.work.length && !(D.drafts || []).length && typeof FirstUse !== "undefined";
+  // بعد أول فيديو (أو لو العميل بدأ مشاريع بنفسه) الزرار بيبقى «ابدأ مشروعًا جديدًا»، وأثناء تجهيزه بيفتح خطواته
+  const fu = () => (typeof FirstUse !== "undefined" ? FirstUse.state() : null);
+  const firstRun = () => fu()?.job?.status === "run";
+  const firstNeeded = () => !KOCHI && D.loaded && typeof FirstUse !== "undefined" && !fu()?.first_done
+    && (firstRun() || (!D.work.length && !(D.drafts || []).length));
   const cta = () => firstNeeded()
-    ? `<div class="nh-tile nh-cta nh-gen" data-first tabindex="0" role="button" aria-label="اصنع أول فيديو">
-      <div class="nh-head"><div class="nh-name"><span class="latin en-k">First video</span><b>🎬 اصنع أول فيديو</b></div>${gi("create")}</div>
-      <span class="nh-tip" role="tooltip"><b>اصنع أول فيديو</b><span>سؤالان فقط، وأول فيديو على حسابنا.</span></span></div>`
+    ? `<div class="nh-tile nh-cta nh-gen" data-first tabindex="0" role="button" aria-label="${firstRun() ? "أول فيديو قيد التجهيز" : "اصنع أول فيديو"}">
+      <div class="nh-head"><div class="nh-name"><span class="latin en-k">First video</span><b>${firstRun() ? "⏳ أول فيديو قيد التجهيز" : "🎬 اصنع أول فيديو"}</b></div>${gi("create")}</div>
+      <span class="nh-tip" role="tooltip"><b>اصنع أول فيديو</b><span>${firstRun() ? "اضغط لترى خطواته." : "اختر قالبًا وأجب عن سؤالين، وأول فيديو على حسابنا."}</span></span></div>`
     : `<div class="nh-tile nh-cta nh-gen" data-id="create" tabindex="0" role="button" aria-label="ابدأ مشروعًا جديدًا">
       <div class="nh-head"><div class="nh-name"><span class="latin en-k">Create</span><b>ابدأ مشروعًا جديدًا</b></div>${gi("create")}</div>${tipOf("create")}</div>`;
   // «كمّل من مكان ما وقفت» (بقى مكان «شغّال عليه»): الزرار كله بيفتح كل المشاريع، والتشغيل اللي جنبه بيكمّل آخر مشروع على طول
@@ -195,6 +199,12 @@ const NH = (() => {
       <button class="nh-switch" id="nhTheme" aria-label="Switch theme"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
+  // 📱 على الشاشات الضيقة الشريط بيتكسر لسطرين: الزيادة دي بتنزّل محتوى الصفحة (زي أقسام العجلة) تحته بدل ما يركب عليه
+  const barX = () => { const r = bar.getBoundingClientRect(); let b = r.bottom; bar.querySelectorAll("*").forEach((e) => { const x = e.getBoundingClientRect(); if (x.height && x.height < 80) b = Math.max(b, x.bottom); }); document.documentElement.style.setProperty("--nh-bar-x", `${Math.max(0, Math.round(b - 66))}px`); };
+  if (typeof ResizeObserver !== "undefined") { const ro = new ResizeObserver(barX); ro.observe(bar); bar.querySelectorAll(".nh-tools, .nh-bar-r").forEach((e) => ro.observe(e)); }
+  addEventListener("resize", barX);
+  addEventListener("load", barX);
+  setTimeout(barX, 600);
   // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
   ["stageMoney", "stagePlans", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
   // عنوان الصفحة المفتوحة: في نفس الركن اللي المربع كان فيه في الرئيسية (الإعدادات تحت شمال ← عنوانها تحت شمال)

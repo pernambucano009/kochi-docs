@@ -11003,7 +11003,14 @@ def onboard_state():
     field = b.get("field") or ""
     pack = fieldpacks.FIELDS.get(field) or {}
     need = bool(b) and not b.get("onboarded") and not str(b.get("domain") or "").strip() and brain_score(b) < 30
+    j = b.get("first_job") or {}
+    job = {k: j.get(k) for k in ("status", "step", "done", "progress", "video_url", "export_id", "title", "error", "tpl", "cost")} if j else None
+    if job and job["status"] == "run" and time.time() - (j.get("at") or 0) > 3600:   # السيرفر اتقفل في النص
+        job.update(status="failed", error="التشغيل توقف، جرّب مرة أخرى")
+    steps = [{"key": k, "label": (f"{v} {dialect_phrase(b)}" if k == "script" else v)} for k, v in FIRST_STEPS]
     return {"need": need, "field": field, "first": fieldpacks.first_video(field), "about": b.get("about") or "", "audience": b.get("audience") or "",
+            "reels": fieldpacks.field_reels(field), "logo": bool(logo_path(bid)) if bid else False, "logo_asked": bool(b.get("logo_asked")),
+            "job": job, "steps": steps, "first_done": bool(j.get("status") == "done"), "brand": first_brand_name(b),
             "about_ph": pack.get("about_ph") or "مثلًا: ماذا تبيع أو تقدم، وأين، وما الذي يميزك عن غيرك",
             "audience_ph": "العمر، والاهتمامات، وما الذي يبحث عنه", "score": brain_score(b), **fieldpacks.signup_options()}
 
@@ -11042,6 +11049,234 @@ def onboard_first(body: FirstIn):
     old = brain_row(bid) or {}
     update_brain(bid, fn)
     seasons_if_changed(bid, old, brain_row(bid) or {})
+    return onboard_state()
+
+
+# ---------------------------------------------------------------- 🎬 أول فيديو: اللوجو ← الألوان ← الأوترو ← فيديو كامل مجانًا
+# اللوجو اختياري: بنشيل خلفيته على الجهاز (من غير نقاط) والعميل بيختار الأصلي أو اللي من غير خلفية.
+# ألوانه بتروح لفرع «الشكل» في العقل، والأوترو بيتعمل منه (أو من اسم العلامة). وأول فيديو بيتعمل كله لوحده بخطوات ظاهرة،
+# واللوجو في ركنه والأوترو في آخره، ونقاطه بترجع للعميل هدية.
+import firstvid  # noqa: E402
+
+FIRST_STEPS = (("script", "نكتب النص"), ("voice", "نسجّل الصوت"), ("draw", "نرسم الفيديو"), ("brand", "نضع اللوجو والأوترو"))
+FIRST_FONT = FONTS_DIR / "SM-Tajawal.ttf"
+
+
+def dialect_phrase(b: dict) -> str:
+    return fieldpacks.dialect_phrase(dialect.code(b or {}, brand_settings().get("language") or ""))
+
+
+def first_brand_name(b: dict) -> str:
+    n = str(b.get("name") or "").strip()
+    return "" if n in ("", "علامتي", "علامتك", "عميلي", "عميل جديد", "علامة جديدة") else n[:40]
+
+
+def first_colors_apply(bid: str, path: Path) -> list[str]:
+    """ألوان اللوجو ← فرع «الشكل» في العقل (لو العميل ماكتبش ألوانه بنفسه)."""
+    cols = firstvid.palette(path)
+    if not cols:
+        return []
+    names = ("الأساسي", "الثانوي", "المساعد")
+    txt = "، ".join(f"{c} ({names[i]})" for i, c in enumerate(cols))
+    def fn(d):
+        if not str(d.get("palette") or "").strip() or "palette" not in (d.get("edited") or []):
+            d["palette"] = txt
+    update_brain(bid, fn)
+    return cols
+
+
+def first_outro(bid: str, force: bool = False) -> Path | None:
+    """أوترو العلامة من اللوجو (أو اسمها). مابيلمسش أوترو رفعه العميل بنفسه."""
+    b = brain_row(bid) or {}
+    if b.get("outro_file") and not b.get("outro_auto") and not force:
+        return brand_video("outro", bid)
+    logo = logo_path(bid)
+    name = first_brand_name(b)
+    if not logo and not name:
+        return None
+    cols = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
+    dest = brain_dir(bid) / f"brand-outro-auto-{uuid.uuid4().hex[:6]}.mp4"
+    firstvid.outro(ffmpeg_exe(), dest, logo, name, cols, FIRST_FONT)
+    def fn(d):
+        old = d.get("outro_file")
+        if old and d.get("outro_auto"):
+            (brain_dir(bid) / old).unlink(missing_ok=True)
+        d.update(outro_file=dest.name, outro_on="1", outro_auto=True)
+    update_brain(bid, fn)
+    return dest
+
+
+@app.post("/api/onboard/logo")
+def onboard_logo(file: UploadFile = File(...)):
+    """🖼️ اللوجو: الأصلي + نسخة من غير خلفية، والعميل يختار."""
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    folder, tag = brain_dir(bid), uuid.uuid4().hex[:6]
+    src = save_upload(file, IMAGE_EXTENSIONS, folder, f"logo-src-{tag}")
+    cut = f"logo-cut-{tag}.png"
+    try:
+        r = firstvid.cutout(folder / src, folder / cut)
+    except Exception:  # noqa: BLE001
+        (folder / src).unlink(missing_ok=True)
+        raise HTTPException(400, "هذا الملف ليس صورة سليمة، جرّب PNG أو JPG")
+    def fn(d):
+        for k in ("src", "cut"):
+            old = (d.get("logo_try") or {}).get(k)
+            if old:
+                (folder / old).unlink(missing_ok=True)
+        d["logo_try"] = {"src": src, "cut": cut, "already": r["already"]}
+    update_brain(bid, fn)
+    base = f"/media/ads/brains/{bid}"
+    return {"src_url": f"{base}/{src}", "cut_url": f"{base}/{cut}", "already": r["already"]}
+
+
+class LogoPickIn(BaseModel):
+    pick: str = "cut"   # cut = من غير خلفية، src = الأصلي، skip = بدون لوجو دلوقتي
+
+
+@app.post("/api/onboard/logo/pick")
+def onboard_logo_pick(body: LogoPickIn):
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    b = brain_row(bid) or {}
+    t = b.get("logo_try") or {}
+    folder = brain_dir(bid)
+    if body.pick in ("cut", "src") and t.get(body.pick) and (folder / t[body.pick]).exists():
+        keep = t[body.pick]
+        name = f"logo-{uuid.uuid4().hex[:6]}{Path(keep).suffix}"
+        (folder / keep).rename(folder / name)
+        def fn(d):
+            other = (d.get("logo_try") or {}).get("src" if body.pick == "cut" else "cut")
+            if other:
+                (folder / other).unlink(missing_ok=True)
+            d.pop("logo_try", None)
+            d["logos"] = [{"file": name, "name": "الشعار", "description": ""}] + [a for a in d.get("logos") or [] if a.get("name") != "الشعار"]
+            d.update(logo_on="1", logo_asked=True)
+        update_brain(bid, fn)
+        cols = first_colors_apply(bid, folder / name)
+    else:
+        update_brain(bid, lambda d: d.update(logo_asked=True))
+        cols = []
+    try:
+        first_outro(bid)
+    except Exception:  # noqa: BLE001  الأوترو إضافة: لو ماتعملش، أول فيديو بيتعمل من غيره
+        pass
+    return {**onboard_state(), "colors": cols}
+
+
+class FirstGoIn(BaseModel):
+    template: str
+    name: str = ""
+    about: str = ""
+    audience: str = ""
+
+
+def first_job_set(bid: str, jid: str, **kw) -> None:
+    def fn(d):
+        j = d.get("first_job") or {}
+        if j.get("id") == jid:
+            j.update(kw)
+            d["first_job"] = j
+    update_brain(bid, fn)
+
+
+def first_wait(fid: str, ok, what: str, retry=None, limit: float = 900) -> dict:
+    """يستنى خطوة المسار لحد ما تخلص (ومحاولة تانية لو وقفت)."""
+    t0, tried = time.time(), False
+    while time.time() - t0 < limit:
+        d = flow_load(fid)
+        if ok(d):
+            return d
+        if d.get("error") or flow_stale(d):
+            if tried or not retry:
+                raise HTTPException(400, d.get("error") or f"{what} توقف")
+            tried = True
+            flow_update(fid, lambda x: x.update(error=None, busy=None))
+            retry()
+        time.sleep(2)
+    raise HTTPException(400, f"{what} أخذ وقتًا أطول من اللازم")
+
+
+def run_first(bid: str, jid: str, tpl: str, name: str) -> None:
+    put = lambda **kw: first_job_set(bid, jid, **kw)  # noqa: E731
+    done: list[str] = []
+    step = lambda k: put(step=k, done=list(done))  # noqa: E731
+    bal0 = wallet.balance()
+    try:
+        step("script")
+        f = flow_new(FlowNewIn(template=tpl, name=name))
+        fid = f["id"]
+        put(fid=fid)
+        d = first_wait(fid, lambda x: bool(x.get("ideas")), "اقتراح الفكرة", lambda: flow_job(fid, "ideas", lambda: flow_gen_ideas(fid)))
+        flow_pick_idea(fid, FlowPickIn(id=d["ideas"][0]["id"]))
+        d = first_wait(fid, lambda x: bool(x.get("scenarios")), "كتابة النص", lambda: flow_job(fid, "scenarios", lambda: flow_gen_scenarios(fid)))
+        flow_pick_scenario(fid, FlowPickIn(id=d["scenarios"][0]["id"]))
+        done.append("script")
+        step("voice")
+        d = flow_load(fid)
+        lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+        voice = FlowVoiceIn(speaker="narrator", lang=lang, voice=dub.DIALECTS[lang]["voices"][0])
+        flow_voice(fid, voice)
+        first_wait(fid, lambda x: bool((x.get("vo_track") or {}).get("file")), "تسجيل الصوت", lambda: flow_voice(fid, voice))
+        done.append("voice")
+        step("draw")
+        flow_export(fid, FlowExportIn())
+        t0 = time.time()
+        while True:
+            o = flow_to_dict(fid, flow_load(fid)).get("output") or {}
+            if o.get("status") == "failed":
+                raise HTTPException(400, o.get("error") or "رسم الفيديو توقف")
+            if o.get("status") == "done" and o.get("asset"):
+                break
+            if time.time() - t0 > 1500:
+                raise HTTPException(400, "رسم الفيديو أخذ وقتًا أطول من اللازم")
+            put(progress=round((o.get("progress") or 0) * 100))
+            time.sleep(3)
+        done.append("draw")
+        step("brand")
+        src = ASSETS_DIR / Path(o["asset"]).name / "clip.mp4"
+        outro_p = brand_video("outro", bid)
+        if not outro_p:
+            try:
+                outro_p = first_outro(bid)
+            except Exception:  # noqa: BLE001
+                outro_p = None
+        final = FLOWS_DIR / Path(fid).name / "first_final.mp4"
+        firstvid.brand_finish(ffmpeg_exe(), src, final, logo_path(bid) if (brain_row(bid) or {}).get("logo_on") != "0" else None, outro_p)
+        title = ((flow_load(fid).get("idea") or {}).get("title") or name)[:80]
+        ex = pilot_export_file(final, f"🎬 أول فيديو: {title}")
+        done.append("brand")
+        cost = max(0, (bal0 or 0) - (wallet.balance() or 0)) if bal0 is not None else 0
+        if cost:
+            wallet.gift(cost, "🎁 أول فيديو مجانًا", jid)
+        with closing(db()) as conn:
+            r = conn.execute("SELECT filename FROM exports WHERE id = ?", (ex,)).fetchone()
+        put(status="done", step=None, done=list(done), export_id=ex, video_url=f"/media/exports/{r['filename']}" if r else None,
+            title=title, cost=cost, finished_at=now())
+        notify("first", "ok", "🎬 أول فيديو جاهز", title, "", ex)
+    except Exception as exc:  # noqa: BLE001
+        msg = str(getattr(exc, "detail", None) or exc)[:300]
+        put(status="failed", error=msg)
+
+
+@app.post("/api/onboard/first/go")
+def onboard_first_go(body: FirstGoIn):
+    """🎬 بعد السؤالين: أول فيديو بيتعمل كله لوحده (النص ← الصوت ← الرسم ← اللوجو والأوترو)."""
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    if body.about.strip():
+        onboard_first(FirstIn(about=body.about, audience=body.audience))
+    j = (brain_row(bid) or {}).get("first_job") or {}
+    if j.get("status") == "run" and time.time() - (j.get("at") or 0) < 3600:
+        return onboard_state()
+    reels = fieldpacks.field_reels((brain_row(bid) or {}).get("field") or "")
+    tpl = body.template if body.template in reels or body.template.startswith("t-") else reels[0]
+    jid = uuid.uuid4().hex[:8]
+    update_brain(bid, lambda d: d.update(first_job={"id": jid, "tpl": tpl, "status": "run", "step": "script", "done": [], "at": time.time()}))
+    threading.Thread(target=run_first, args=(bid, jid, tpl, body.name.strip()[:80] or tpl), daemon=True).start()
     return onboard_state()
 
 

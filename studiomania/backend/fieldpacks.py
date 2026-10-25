@@ -309,6 +309,25 @@ def onboard_dict(country: str, dial: str, field: str = "", goal: str = "", brand
             "field": field if field in FIELDS or field == "other" else "", "goal": goal if goal in GOAL_BY else "", "brand": brand.strip()[:80]}
 
 
+DIALECT_PHRASE = {"ar-sa-najdi": "باللهجة النجدية", "ar-sa-hijazi": "باللهجة الحجازية", "ar-gulf": "باللهجة الخليجية", "ar-ae": "باللهجة الإماراتية",
+                  "ar-kw": "باللهجة الكويتية", "ar-qa": "باللهجة القطرية", "ar-bh": "باللهجة البحرينية", "ar-om": "باللهجة العمانية",
+                  "ar-eg-cairo": "باللهجة المصرية", "ar-levant": "باللهجة الشامية", "ar-iq": "باللهجة العراقية", "ar-sd": "باللهجة السودانية",
+                  "ar-ma": "باللهجة المغربية", "ar-dz": "باللهجة الجزائرية", "ar-tn": "باللهجة التونسية", "ar-msa": "بالفصحى", "en": "بالإنجليزية"}
+
+
+def dialect_phrase(code: str) -> str:
+    """«نكتب النص باللهجة النجدية»: اسم اللهجة في جملة خطوات أول فيديو."""
+    return DIALECT_PHRASE.get(code) or next((v for k, v in DIALECT_PHRASE.items() if code.startswith(k)), "بلهجتك")
+
+
+def field_reels(field: str) -> list[str]:
+    """قوالب المجال اللي بتظهر في «اصنع أول فيديو» (أولها المقترح)."""
+    p = FIELDS.get(field) or {}
+    out = list(p.get("reels") or [])
+    first = p.get("first") or "t-review"
+    return [first] + [r for r in out if r != first] if out else [first, "t-flow", "t-price", "t-chat", "t-count"]
+
+
 def first_video(field: str) -> str:
     """أول قالب مقترح: قالب موشن بالكود والصوت فقط (رخيص)."""
     return (FIELDS.get(field) or {}).get("first") or "t-review"

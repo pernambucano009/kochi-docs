@@ -2350,7 +2350,8 @@ label.dim { opacity: .4; }
   #nh .nh-wh-mcats .nh-wh-cat { position: static; --wh-gen-ink: var(--nh-ink); padding: 6px 10px; transform: none !important; opacity: 1 !important; }
   #nh .nh-wh-mcats .nh-wh-cat small { display: none; }
   #nh .nh-wh-mcats .nh-wh-cat.on { background: var(--nh-ink); color: var(--nh-bg); }
-  #nh .nh-wh-panel { left: 0 !important; right: 0; top: 170px; padding: 0 12px 20px; }
+  #nh .nh-wh-panel { left: 0 !important; right: 0; top: calc(170px + var(--nh-bar-x, 0px)); padding: 0 12px 20px; }
+  #nh .nh-wh-info { padding-top: calc(14px + var(--nh-bar-x, 0px)); }
   #nh .nh-wh.panel-on .nh-wh-info { visibility: visible; }
   #nh .nh-wh.panel-on .nh-wh-info > :not(.nh-wh-mcats) { visibility: hidden; }
 }

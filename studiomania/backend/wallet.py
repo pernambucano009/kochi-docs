@@ -81,6 +81,18 @@ def charge(n: int, what: str, ref: str = "") -> int:
     return plan + top
 
 
+def gift(n: int, what: str, ref: str = "") -> int:
+    """🎁 نقاط هدية ترجع للباقة (مثل أول فيديو: بيتحسب عادي وبعدها نقاطه ترجع)."""
+    n = int(math.ceil(n))
+    if n <= 0 or free():
+        return 0
+    with closing(_db()) as c, c:
+        c.execute("UPDATE wallet SET plan_credits=plan_credits+?, updated_at=? WHERE workspace=?", (n, time.time(), TENANT))
+        c.execute("INSERT INTO ledger (id, workspace, delta, kind, note, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (uuid.uuid4().hex, TENANT, n, "gift", what[:120], ref[:60], time.time()))
+    return n
+
+
 # ---------------------------------------------------------------- 🔒 الحجز الموحّد: النقاط تتحجز قبل العملية، وترجع لو فشلت
 # reserve() بتخصم التقدير فورًا (فعمليتين في نفس الوقت مايصرفوش أكتر من الرصيد)، refund() بترجّعه لو العملية فشلت،
 # settle() بتظبط الفرق لو التكلفة الحقيقية طلعت أقل. covered(): جوه الحتة دي الخصم بيتعمل صراحةً، فالخصم التلقائي مايتكررش.
