@@ -95,6 +95,11 @@ const NH = (() => {
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
     inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox" };
+  // 📤 أيقونات أقسام النشر (خط بسيط): نفس الأيقونة في مربعات صفحة النشر وفي عنوان صفحة كل قسم لما تدخله
+  const PUB_IC = { pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
+    audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
+    // فقاعة واتساب مستديرة بذيل تحت على الشمال، وجواها سماعة تليفون
+    wacamp: "M12 3.5a8.5 8.5 0 0 0-7.3 12.8L3.5 20.5l4.3-1.1A8.5 8.5 0 1 0 12 3.5z M9.3 8.3c.4-.5 1.1-.5 1.4 0l.7 1.3c.2.3.1.7-.1 1l-.5.5c.5 1 1.3 1.8 2.3 2.3l.5-.5c.3-.2.7-.3 1-.1l1.3.7c.5.3.5 1 0 1.4-.7.6-1.7.8-2.6.4-1.9-.8-3.4-2.3-4.2-4.2-.4-.9-.2-1.9.4-2.6z" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
   const head = (id) => `<div class="nh-head"><div class="nh-name"><span class="latin en-k">${T[id].en}</span><b>${T[id].ar}</b></div>${GLKEY[id] ? `<span class="gi nh-glt">${glImg(GLKEY[id])}</span>` : iconOf(T[id].icon)}</div>`;
   const dots = (n, at) => `<div class="nh-dots">${Array.from({ length: n }, (_, i) => `<i class="${i < at ? "done" : i === at ? "now" : ""}"></i>`).join("")}</div>`;
@@ -294,7 +299,7 @@ const NH = (() => {
     }
     const t = T[key];
     if (window.I18N?.lang !== "en") return homeTitle(big(t.icon));
-    return `${big(t.icon)}<h1 class="latin">${t.en}</h1><div class="ar">${esc(t.ar)}</div>`;   // الاسم فقط، والشرح في فقاعة القسم
+    return `${big(t.icon)}<h1 class="latin">${t.en}</h1>`;   // الاسم مرة واحدة (السطر العربي كان بيتترجم لنفس الاسم بالإنجليزي فيتكرر)، والشرح في فقاعة القسم
   }
   // 🏠 عنوان الرئيسية ثابت (مش بيتغير مع القسم اللي الماوس عليه): «ابدأ من هنا» لحد ما العقل يفهمك ٣٠٪، وبعدها اسم العلامة
   function homeTitle(icon) {
@@ -489,7 +494,7 @@ const NH = (() => {
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=10" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=10" alt="" loading="lazy">`; }
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=11" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=11" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
@@ -506,8 +511,7 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       const sub = { pubpost: up ? `${up} منشور متجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
         audience: "من سيشتري، وكيف تصل إليه", wacamp: "رسائل لمشتركينك" };
-      const ic = { pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
-        audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z", wacamp: "M4.5 19.5l1.2-3.6A8 8 0 1 1 8.6 18.6z M9 9.5c.3 2.3 2.2 4.2 4.5 4.5" };
+      const ic = PUB_IC;
       return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
         <span class="bl-fi"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${ic[id]}"/></svg></span><b>${esc(T[id].ar)}</b><small>${esc(sub[id])}</small></button>`).join("")}</div></div>`;
     },
@@ -515,7 +519,9 @@ const NH = (() => {
   };
   // شغّال عليه (من البروتوتايب): دوّر، وفلتر بالحالة، وكل مشروع كارت بأيقونة قسمه وحالته
   const PJ_ICON = { series: "series", ads: "publish", free: "film" };
-  const PJ_AV = { series: "س", ads: "إ", free: "م" };   // دائرة صغيرة بأول حرف من القسم (مسلسل / إعلان / مونتاج حر)
+  const PJ_AV = { series: "س", ads: "إ", free: "م" };
+  // مشروع لسه مالوش صورة (مشهد لم يُولّد، دبلجة، تايبوجرافي): أيقونة قسمه الزجاج على الخلفية الفاتحة بدل مربع غامق فاضي
+  const DRAFT_IC = { scene: "film", dub: "voices", typo: "create", tv: "reel", flow: "create" };   // دائرة صغيرة بأول حرف من القسم (مسلسل / إعلان / مونتاج حر)
   const PJ_ART = ["linear-gradient(160deg, #4A4542, #24211F)", "linear-gradient(160deg, #57514C, #2B2724)", "linear-gradient(160deg, #46403C, #1E1B19)", "linear-gradient(160deg, #3A3836, #181718)", "linear-gradient(160deg, #4F5A63, #22282D)", "linear-gradient(160deg, #5A4F48, #2A2420)"];
   const pjState = (p) => p.render_status === "rendering" ? ["run", `يُصدّر${p.render_progress != null ? ` · ${Math.round(p.render_progress)}%` : ""}`]
     : p.render_status === "done" ? ["done", "صُدّر"] : p.render_status === "failed" ? ["fail", "التصدير توقف"] : ["run", "في المونتاج"];
@@ -525,7 +531,7 @@ const NH = (() => {
     const dcards = drafts.map((x, i) => {
       const when = x.updated_at ? new Date(x.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
       return `<article class="nh-line nh-pj-card" data-draft="${x.kind}:${esc(x.id)}" data-st="run" data-q="${esc(String(x.name).toLowerCase())}" tabindex="0" role="button">
-        <div class="nh-pj-art" style="background:${x.thumb ? `center/cover no-repeat url('${esc(x.thumb)}'), ` : ""}${PJ_ART[i % PJ_ART.length]}"></div>
+        <div class="nh-pj-art" style="${x.thumb ? `background:center/cover no-repeat url('${esc(x.thumb)}'), ${PJ_ART[i % PJ_ART.length]}` : ""}">${x.thumb ? "" : glImg(DRAFT_IC[x.kind] || "progress")}</div>
         <div class="nh-pj-name"><span class="nh-pj-av s-tpl">ق</span><b>${esc(x.name)}</b></div>
         <small class="st-run">${esc(x.sec)} · ${esc(x.step)}${when ? ` · ${when}` : ""}</small></article>`;
     }).join("");
@@ -534,7 +540,7 @@ const NH = (() => {
       const when = p.updated_at ? new Date(p.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
       const pct = p.render_status === "rendering" && p.render_progress != null ? Math.round(p.render_progress) : null;
       return `<article class="nh-line nh-pj-card" data-proj="${esc(p.id)}" data-st="${k}" data-q="${esc(p.name.toLowerCase())}" tabindex="0" role="button">
-        <div class="nh-pj-art" style="background:${p.cover_url ? `center/cover no-repeat url('${esc(p.cover_url)}'), ` : ""}${PJ_ART[(p.id.charCodeAt(0) + p.id.charCodeAt(1)) % PJ_ART.length]}">${pct != null ? `<span class="nh-pj-bar"><i style="width:${pct}%"></i></span>` : ""}</div>
+        <div class="nh-pj-art" style="${p.cover_url ? `background:center/cover no-repeat url('${esc(p.cover_url)}'), ${PJ_ART[(p.id.charCodeAt(0) + p.id.charCodeAt(1)) % PJ_ART.length]}` : ""}">${p.cover_url ? "" : glImg(GLKEY[PJ_ICON[p.section]] || "film")}${pct != null ? `<span class="nh-pj-bar"><i style="width:${pct}%"></i></span>` : ""}</div>
         <div class="nh-pj-name"><span class="nh-pj-av s-${esc(p.section)}">${PJ_AV[p.section] || "م"}</span><b>${esc(p.name)}</b></div>
         <small class="st-${k}">${esc(SEC[p.section]?.[0] || "")} · ${label}${when ? ` · ${when}` : ""}</small></article>`;
     }).join("");
@@ -566,7 +572,9 @@ const NH = (() => {
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
-  const titleHTML = (t, key) => `<div class="nh-name"><span class="latin en-k">${t.en}</span><b>${esc(t.ar)}</b></div><span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`;
+  const titleHTML = (t, key) => `<div class="nh-name"><span class="latin en-k">${t.en}</span><b>${esc(t.ar)}</b></div>${PUB_IC[key]
+    ? `<span class="bl-fi nh-pub-ti"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${PUB_IC[key]}"/></svg></span>`
+    : `<span class="gi nh-glt">${glImg(GLKEY[key] || GLKEY[t.icon] || "create")}</span>`}`;
   const backLabel = () => { document.getElementById("nhBackT").textContent = pStack.length ? "رجوع" : "الرئيسية"; };
   // الأصول: تابات بالأيقونات الزجاج بين الشخصيات والتعليق الصوتي والموسيقى، والشخصيات أول واحدة
   const AS_TABS = [["coaches", "characters", "الشخصيات"], ["voice", "voices", "التعليق الصوتي"], ["music", "music", "الموسيقى"]];
@@ -883,7 +891,7 @@ const NH = (() => {
         sec: `قالب «${v.template_name || ""}»`, step: v.status === "failed" ? "توقف" : "ما زال يُنشأ", updated_at: v.updated_at, thumb: v.thumb })),
       // تايبوجرافي لسه ما اتصدّرش، ودبلجة لسه مفيهاش ولا لغة جاهزة
       ...typos.filter((t) => !t.done).map((t) => ({ kind: "typo", id: t.id, name: t.name || "تايبوجرافي", sec: "تايبوجرافي",
-        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "لم يُصدّر بعد", updated_at: t.updated_at })),
+        step: t.busy ? "يشتغل الآن" : t.status === "failed" ? "توقف" : "لم يُصدّر بعد", updated_at: t.updated_at, thumb: t.thumb || "/gallery/typo.jpg" })),
       ...(dubs.items || []).filter((x) => !x.done).map((x) => ({ kind: "dub", id: x.id, name: x.name || "دبلجة", sec: "ترجمة ودبلجة",
         step: x.busy ? "يشتغل الآن" : "لا يوجد بعد لغة جاهزة", updated_at: x.updated_at })),
       ...scenes.filter((x) => x.busy || !x.takes).map((x) => ({ kind: "scene", id: x.id, name: x.name || "مشهد", sec: "استوديو المشهد",

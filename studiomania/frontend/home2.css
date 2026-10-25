@@ -2488,6 +2488,9 @@ label.dim { opacity: .4; }
 /* 💳 باقتي ونقاطي: الشكل في plans-view.js. الصفحة شاشة واحدة من غير عنوان كبير (الاسم في المسار اللي فوق) */
 #nh .nh-pgrid[data-key="plans"] { display: block; min-height: 0; height: 100%; overflow: auto; }
 #nh .nh-page:has(.nh-pgrid[data-key="plans"]) .nh-ptitle { visibility: hidden; }
+/* المحتوى (والكروت المستخبية جوّه) أطول من الصفحة، فالتوسيط كان بيزق زرار «تفاصيل الباقات» لفوق برّه المساحة الظاهرة.
+   safe: لو أطول من المساحة يبدأ من فوق بدل ما يتقص */
+#nh .bq-wrap .pv-mid { align-content: safe center; }
 body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .bq-wrap { min-height: 100%; height: 100%; }
 #nh .bq-wrap > .pv { height: 100%; }

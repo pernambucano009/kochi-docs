@@ -4046,7 +4046,7 @@ def _remote_orphans() -> list[dict]:
 
 @app.get("/api/posts/published")
 def published_posts():
-    """ما نُشر: من Zernio (بلينك المنشور على كل منصة)، وإذا لا يوجد Zernio من القائمة هنا."""
+    """ما نُشر: منشورات العلامة المختارة بس (اللي اتعملت من البرنامج)، ولينك كل منصة من Zernio، وإذا لا يوجد Zernio من القائمة هنا."""
     with closing(db()) as conn:
         local = [post_to_dict(r) for r in conn.execute(POSTS_QUERY + " WHERE p.status = 'published' AND own(p.client_id) ORDER BY p.published_at DESC")]
     if publisher.service_name() != "zernio":
@@ -4064,6 +4064,8 @@ def published_posts():
     out = []
     for r in remote:
         ours = by_remote.get(r["id"])
+        if not ours:   # منشور مش من البرنامج ده أو من علامة تانية (نفس حساب خدمة النشر بيشيل منشورات ناس تانية): مايظهرش هنا
+            continue
         out.append({
             "id": r["id"], "content": r["content"], "media_url": r["media_url"] or (ours or {}).get("export_url"),
             "published_at": r["published_at"] or next((x["published_at"] for x in r["platforms"] if x.get("published_at")), None) or r["scheduled_for"],
