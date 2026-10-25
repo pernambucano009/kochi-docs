@@ -1,8 +1,8 @@
 // StudioMania — الإعدادات والخروج
 
 // باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
-const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجي"], ["eleven", "مفتاح ElevenLabs", "الأصوات وكلون الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات وكلون الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات عربي فصحى وسعودي"], ["recraft", "مفتاح Recraft", "اللوجو والرسومات الفيكتور"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
-  ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "إيميلات تأكيد الحساب"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "إيميلات تأكيد الحساب"],
+const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجية"], ["eleven", "مفتاح ElevenLabs", "الأصوات واستنساخ الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات واستنساخ الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات بالفصحى والسعودية"], ["recraft", "مفتاح Recraft", "الشعار والرسومات المتجهية"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
+  ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "رسائل تأكيد الحساب بالبريد"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "رسائل تأكيد الحساب بالبريد"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"]];
 
@@ -74,49 +74,49 @@ viewHooks["settings"] = () => { loadSettings(); markLook(); loadSetAccounts(); l
 function renderBackup(b) {
   const box = $("bkBox");
   if (!box) return;
-  const last = b.last?.at ? `${new Date(b.last.at * 1000).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${(b.last.size / 1048576).toFixed(1)} ميجا · ${b.last.files} ملف` : "ما زال لم تُنشأ";
-  box.innerHTML = !b.google ? `<p class="hint">⚠️ يحتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في Railway أولًا (نفس الخاصين بالدخول بجوجل).</p>`
-    : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">ستسجّل دخول بإيميل الشركة. البرنامج يرى الملفات التي هو عملها فقط.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}`
+  const last = b.last?.at ? `${new Date(b.last.at * 1000).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${(b.last.size / 1048576).toFixed(1)} ميجا · ${b.last.files} ملف` : "لم تُنشأ بعد";
+  box.innerHTML = !b.google ? `<p class="hint">⚠️ يلزم ضبط GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في Railway أولًا (وهما نفسهما المستخدمان للدخول بجوجل).</p>`
+    : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">ستسجّل الدخول ببريد الشركة. لا يرى البرنامج إلا الملفات التي أنشأها هو.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}`
     : `<p>✅ مربوط بـ <b dir="ltr">${escapeHtml(b.email || "جوجل درايف")}</b></p>
        <p class="hint">آخر نسخة: ${escapeHtml(last)}${b.busy ? " · ⏳ تُنشأ الآن" : ""}</p>
        ${b.error ? `<p class="hint bad">⚠️ آخر محاولة فشلت: ${escapeHtml(b.error)}</p>` : ""}
        <div class="row wrap"><button type="button" class="btn sm primary" id="bkRun" ${b.busy ? "disabled" : ""}>أنشئ نسخة الآن</button>
-         <button type="button" class="btn sm" id="bkOff">افصل الدرايف</button></div>`;
+         <button type="button" class="btn sm" id="bkOff">افصل درايف</button></div>`;
 }
 async function loadBackup() {
   const box = $("bkBox");
   if (!box) return;
   try { renderBackup(await api("/api/platform/backup")); }
-  catch { box.innerHTML = `<p class="hint">النسخة الاحتياطية تشتغل على الخادم فقط (من خلال البوابة).</p>`; }
+  catch { box.innerHTML = `<p class="hint">النسخة الاحتياطية تعمل على الخادم فقط (عبر البوابة).</p>`; }
 }
 $("bkBox")?.addEventListener("click", async (e) => {
   if (e.target.closest("#bkRun")) {
-    e.target.disabled = true; e.target.textContent = "⏳ جارٍ العمل النسخة…";
-    try { renderBackup(await api("/api/platform/backup", { method: "POST" })); toast("✅ النسخة رُفعت على الدرايف"); } catch (err) { toast(err.message, true); loadBackup(); }
+    e.target.disabled = true; e.target.textContent = "⏳ جارٍ إنشاء النسخة…";
+    try { renderBackup(await api("/api/platform/backup", { method: "POST" })); toast("✅ رُفعت النسخة إلى درايف"); } catch (err) { toast(err.message, true); loadBackup(); }
   }
-  if (e.target.closest("#bkOff") && (await uiConfirm("تفصل جوجل درايف؟ النسخ اليومية ستقف."))) {
+  if (e.target.closest("#bkOff") && (await uiConfirm("أتفصل جوجل درايف؟ ستتوقف النسخ اليومية."))) {
     try { renderBackup(await api("/api/platform/backup/disconnect", { method: "POST" })); } catch (err) { toast(err.message, true); }
   }
 });
 
 // ---------- 💳 رصيد المنصات (للأدمن): الرصيد وحد التنبيه لكل منصة ----------
-const PROV_ST = { ok: ["✓ حسنًا", "ok"], low: ["🟠 قرّب ينتهي", "low"], bad: ["🔴 خلص / فيه مشكلة", "bad"], unknown: ["—", ""] };
+const PROV_ST = { ok: ["✓ سليم", "ok"], low: ["🟠 أوشك على النفاد", "low"], bad: ["🔴 نفد / توجد مشكلة", "bad"], unknown: ["—", ""] };
 function renderProviders(d) {
   const box = $("provList");
   if (!box) return;
   box.innerHTML = d.items.map((p) => {
     const st = PROV_ST[p.state] || PROV_ST.unknown;
-    const bal = p.balance == null ? (p.api ? (p.error ? `<small class="bad">${escapeHtml(p.error)}</small>` : "—") : "<small>ليس لها عداد، نعرف من أول طلب يفشل</small>")
+    const bal = p.balance == null ? (p.api ? (p.error ? `<small class="bad">${escapeHtml(p.error)}</small>` : "—") : "<small>ليس لها عدّاد، ونعرف عند فشل أول طلب</small>")
       : `<b class="num">${p.unit === "$" ? "$" : ""}${Number(p.balance).toLocaleString("en-US", { maximumFractionDigits: 2 })}</b> ${p.unit !== "$" ? escapeHtml(p.unit) : ""}`;
     // رابط صفحة الشحن جنب اسم كل منصة: يفتح في تاب جديد
     const top = p.url ? `<a class="prov-top" href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer" title="افتح صفحة الشحن في ${escapeHtml(p.name)}">اشحن الرصيد ↗</a>` : "";
     return `<div class="prov ${st[1]}" data-prov="${p.key}"><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.what)}</small>${top}</div>
       <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
       <span class="prov-st">${st[0]}</span>
-      ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني أسفل <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
+      ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني تحت <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
       ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}</div>`;
   }).join("");
-  $("provAt").textContent = d.checked ? `آخر تشييك ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
+  $("provAt").textContent = d.checked ? `آخر فحص ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
 }
 async function loadProviders() {
   if (!$("provList")) return;
@@ -130,13 +130,13 @@ $("provRefresh")?.addEventListener("click", async () => {
 $("provList")?.addEventListener("change", async (e) => {
   const k = e.target.dataset.provmin;
   if (!k) return;
-  try { renderProviders(await api("/api/admin/providers/min", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, min: +e.target.value || 0 }) })); toast("✅ حد التنبيه حُفظ"); }
+  try { renderProviders(await api("/api/admin/providers/min", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, min: +e.target.value || 0 }) })); toast("✅ حُفظ حد التنبيه"); }
   catch (err) { toast(err.message, true); }
 });
 $("provList")?.addEventListener("click", async (e) => {
   const k = e.target.closest("[data-provclear]")?.dataset.provclear;
   if (!k) return;
-  try { renderProviders(await api(`/api/admin/providers/${k}/clear`, { method: "POST" })); toast("✅ سُجّل أنه شُحن"); } catch (err) { toast(err.message, true); }
+  try { renderProviders(await api(`/api/admin/providers/${k}/clear`, { method: "POST" })); toast("✅ سُجّل الشحن"); } catch (err) { toast(err.message, true); }
 });
 
 // ---------- شغل كوتشي القديم: اتنقل لبرنامج كوتشي لوحده، فبيتمسح من هنا بدوسة (بعد ما تتأكد إنه وصل هناك) ----------
@@ -147,12 +147,12 @@ async function loadKochiOld() {
   if (n) $("kochiOldInfo").textContent = `${k.folders} مشروع · ${k.videos} فيديو خام · ${k.projects} مونتاج`;
 }
 $("kochiOldWipe").onclick = async () => {
-  if (!(await uiConfirm("تأكدت أن كل عمل كوتشي وصل لبرنامج كوتشي الجديد؟\n\nسيُحذف من سمسم كيت: مشاريع كوتشي بفيديوهاتها الخام وقطعها والفيديوهات المولّدة والمونتاج والفيديوهات التي صُدّرت منها (إلا الذي عليها منشور ما زال متجدول).\nالشخصيات والتعليق الصوتي والموسيقى يظلون.\n\nهذا المسح لا يصلح يترجع."))) return;
+  if (!(await uiConfirm("هل تأكدت أن كل عمل كوتشي وصل إلى برنامج كوتشي الجديد؟\n\nسيُحذف من سمسم كيت: مشاريع كوتشي بفيديوهاتها الخام وقطعها والفيديوهات المولّدة والمونتاج والفيديوهات المصدّرة منها (عدا ما عليه منشور مجدول).\nتبقى الشخصيات والتعليق الصوتي والموسيقى.\n\nلا يمكن التراجع عن هذا الحذف."))) return;
   const btn = $("kochiOldWipe");
   btn.disabled = true;
   try {
     const r = await api("/api/admin/kochi-cleanup", { method: "POST" });
-    toast(`✅ حُذف عمل كوتشي القديم · فضي ${fmtMb(r.freed_mb)}${r.kept ? ` · فضل ${r.kept} عليه منشور متجدول` : ""}`);
+    toast(`✅ حُذف عمل كوتشي القديم · تحرّر ${fmtMb(r.freed_mb)}${r.kept ? ` · بقي ${r.kept} عليه منشور مجدول` : ""}`);
     loadKochiOld();
     loadStorage();
   } catch (err) { toast(err.message, true); }
@@ -167,7 +167,7 @@ async function loadSetAccounts() {
     const p = await api("/api/publisher");
     $("setAccHint").innerHTML = p.service === "zernio"
       ? `<a href="#7" data-goto="7">اربط أو افصل حسابات من صفحة النشر →</a>`
-      : "خدمة النشر ما زال غير متصلة";
+      : "خدمة النشر غير متصلة بعد";
     // كل المنصات، وكل الحسابات المربوطة على كل منصة (الربط والفصل من صفحة النشر)
     list.innerHTML = Object.entries(p.platforms).map(([k, label]) => {
       const accs = (p.account_list || []).filter((a) => a.platform === k);
@@ -219,11 +219,11 @@ const STORAGE_LABELS = {
 };
 // الأقسام اللي ينفع تتمسح كلها مرة واحدة، واللي بيتمسح فيها بالظبط
 const WIPE_INFO = {
-  lab: ["🗑️ احذف كل فيديوهات التفكيك", "كل الفيديوهات التي في معمل التفكيك ستُحذف هي وتقسيمها. الأساليب والستيكرات التي حُفظت في المكتبة تظل."],
-  typo: ["🗑️ احذف كل فيديوهات التايبوجرافي", "كل مشاريع التايبوجرافي ستُحذف (الفيديوهات والصوت والتحليل). الأساليب والستيكرات والأصوات تظل."],
-  refs: ["🗑️ احذف كل الأرشيف", "كل الملفات التي في أرشيف المراجع ستُحذف."],
-  raw: ["🗑️ احذف كل الفيديوهات الخام", "كل الفيديوهات الخام وقطعها ستُحذف، والمشاريع الذي معمولة منها لن تجدها."],
-  exports: ["🗑️ احذف كل الفيديوهات الجاهزة", "كل الفيديوهات الجاهزة ستُحذف، ما عدا الذي عليها منشورات متجدولة."],
+  lab: ["🗑️ احذف كل فيديوهات التفكيك", "ستُحذف كل فيديوهات معمل التفكيك مع تقسيمها. تبقى الأساليب والملصقات المحفوظة في المكتبة."],
+  typo: ["🗑️ احذف كل فيديوهات التايبوجرافي", "ستُحذف كل مشاريع التايبوجرافي (الفيديوهات والصوت والتحليل). تبقى الأساليب والملصقات والأصوات."],
+  refs: ["🗑️ احذف كل الأرشيف", "ستُحذف كل ملفات أرشيف المراجع."],
+  raw: ["🗑️ احذف كل الفيديوهات الخام", "ستُحذف كل الفيديوهات الخام وقطعها، ولن تجد المشاريع المصنوعة منها."],
+  exports: ["🗑️ احذف كل الفيديوهات الجاهزة", "ستُحذف كل الفيديوهات الجاهزة، عدا ما عليه منشورات مجدولة."],
 };
 async function loadStorage() {
   try {
@@ -248,11 +248,11 @@ $("storageInfo").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-wipe]");
   if (!b) return;
   const [label, what] = WIPE_INFO[b.dataset.wipe];
-  if (!(await uiConfirm(`${label} (${b.dataset.n})؟\n\n${what}\n\nهذا المسح لا يصلح يترجع.`))) return;
+  if (!(await uiConfirm(`${label} (${b.dataset.n})؟\n\n${what}\n\nلا يمكن التراجع عن هذا الحذف.`))) return;
   b.disabled = true;
   try {
     const r = await api(`/api/storage/wipe/${b.dataset.wipe}`, { method: "POST" });
-    toast(`✅ حُذف ${r.deleted}${r.kept ? ` · ${r.kept} يعملون الآن فضلوا` : ""} · فضي ${fmtMb(r.freed_mb)}`);
+    toast(`✅ حُذف ${r.deleted}${r.kept ? ` · بقي ${r.kept} قيد العمل الآن` : ""} · تحرّر ${fmtMb(r.freed_mb)}`);
   } catch (err) {
     toast(err.message, true);
   }
@@ -320,7 +320,7 @@ $("expBox")?.addEventListener("click", async (e) => {
   if (del) { expRead(); Exp.rows.splice(+del.dataset.edel, 1); return expRender(); }
   if (e.target.closest("#expSave")) {
     expRead();
-    try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ اتحفظت الفواتير"); } catch (err) { toast(err.message, true); }
+    try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ حُفظت الفواتير"); } catch (err) { toast(err.message, true); }
   }
 });
 api("/api/expenses").then(expRender).catch(() => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; });

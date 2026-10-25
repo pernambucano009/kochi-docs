@@ -29,23 +29,23 @@ const CharactersPage = (() => {
           <button class="nb-btn sm" data-cai ${S.aiBusy ? "disabled" : ""} title="صورة جديدة من «وصفها»">${S.aiBusy ? "⏳" : "✨ ارسمها من الوصف"}</button></div>
         <div class="ch-info">
           <div class="nb-row"><label class="nb-f"><span>الاسم</span><input type="text" data-cf="name" value="${libEsc(c.name)}"></label>
-            <button class="nb-btn sm danger" data-cremove>احذف الشخصية</button><button class="nb-btn sm" data-cclose>✕ قفل</button></div>
-          <label class="nb-f"><span>وصفها (الشكل، اللبس، الشخصية، طريقة النص)</span><textarea rows="3" data-cf="about" placeholder="مثلًا: بنت عشرينية محجبة، لبس رياضي واسع، تتكلم بحماس">${libEsc(c.about)}</textarea></label>
+            <button class="nb-btn sm danger" data-cremove>احذف الشخصية</button><button class="nb-btn sm" data-cclose>✕ إغلاق</button></div>
+          <label class="nb-f"><span>وصفها (الشكل، الملابس، الطباع، طريقة الكلام)</span><textarea rows="3" data-cf="about" placeholder="مثلًا: فتاة عشرينية محجبة، بملابس رياضية واسعة، تتكلم بحماس">${libEsc(c.about)}</textarea></label>
           <div class="nb-row"><label class="nb-f"><span>إنستجرام</span><input type="text" dir="ltr" data-cf="instagram" value="${libEsc(c.instagram || "")}" placeholder="@handle"></label>
             <label class="nb-f"><span>تيك توك</span><input type="text" dir="ltr" data-cf="tiktok" value="${libEsc(c.tiktok || "")}" placeholder="@handle"></label></div>
         </div>
       </div>
       <div class="ch-sec"><div class="nb-kh"><b>صور ورقة الملامح</b><span class="num">${c.sheet.length}</span>
         <label class="nb-btn sm">⬆ ارفع صور<input type="file" accept="image/*" multiple data-sheet hidden></label></div>
-        <p class="nb-hint">زوايا وتعبيرات مختلفة لنفس الشخصية، لكي التوليد يحافظ على شكلها.</p>
+        <p class="nb-hint">زوايا وتعبيرات مختلفة للشخصية نفسها، ليحافظ التوليد على شكلها.</p>
         <div class="nb-imgs">${c.sheet.map((x) => `<figure data-sfile="${libEsc(x.file)}"><img src="${libEsc(x.url)}" alt="" loading="lazy"><button class="nb-x" data-sdel title="احذف">✕</button></figure>`).join("") || `<div class="nb-none">لا يوجد صور ما زال</div>`}</div></div>
       <div class="ch-sec"><div class="nb-kh"><b>الصوت</b></div>
         <p class="nb-hint">عينة من صوت الشخصية (أي ملف صوت أو فيديو).</p>
-        <div class="nb-row">${c.voice_url ? `<audio src="${libEsc(c.voice_url)}" controls preload="metadata"></audio><button class="nb-btn sm danger" data-cdel="voice">أزله</button>` : `<span class="nb-none" style="flex:1">لا يوجد صوت ما زال</span>`}
-          <label class="nb-btn sm">⬆ ارفع صوت<input type="file" accept="audio/*,video/*" data-cfile="voice" hidden></label></div></div>
+        <div class="nb-row">${c.voice_url ? `<audio src="${libEsc(c.voice_url)}" controls preload="metadata"></audio><button class="nb-btn sm danger" data-cdel="voice">أزله</button>` : `<span class="nb-none" style="flex:1">لا يوجد صوت بعد</span>`}
+          <label class="nb-btn sm">⬆ ارفع صوتًا<input type="file" accept="audio/*,video/*" data-cfile="voice" hidden></label></div></div>
       ${talkSec(c)}
-      <div class="ch-sec"><p class="nb-hint">إذا الفيديو هذه للشخصية: إنترو الشخصية قبل الفيديو، وأوترو الشخصية بعده وقبل أوترو العلامة. يمكنك تزيلهم من أي مشروع في المونتاج.</p>
-        <div class="nb-vids">${vidBox(c, "intro", "إنترو الشخصية", "لا يوجد إنترو")}${vidBox(c, "outro", "أوترو الشخصية", "لا يوجد أوترو")}</div></div>
+      <div class="ch-sec"><p class="nb-hint">إن كان الفيديو لهذه الشخصية: تأتي مقدمتها قبل الفيديو، وخاتمتها بعده وقبل خاتمة العلامة. يمكنك إزالتهما من أي مشروع في المونتاج.</p>
+        <div class="nb-vids">${vidBox(c, "intro", "مقدمة الشخصية", "لا توجد مقدمة")}${vidBox(c, "outro", "خاتمة الشخصية", "لا يوجد أوترو")}</div></div>
     </section>`;
   }
 
@@ -63,14 +63,14 @@ const CharactersPage = (() => {
     const opt = (g) => langs.filter(([, v]) => v.group === g).map(([k, v]) => `<option value="${k}" ${k === lang ? "selected" : ""}>${libEsc(v.label)}</option>`).join("");
     const ST = { queued: "في الطابور", working: "يعمل", done: "جاهز", failed: "توقف" };
     return `<div class="ch-sec ch-talk"><div class="nb-kh"><b>🗣️ اجعلها تتكلم</b><span class="num">${c.talks.length}</span></div>
-      <p class="nb-hint">اكتب ما الشخصية ستقوله، واختر اللهجة والصوت. البرنامج يعمل الصوت أولًا، ثم يعمل فيديو والشخصية تقوله: البُق والوجه واليد ماشيين مع الصوت، والصورة كما هي. أو ارفع صوتك أنت.</p>
-      <textarea rows="3" data-tk="text" placeholder="مثلًا: أهلًا! أنا ${libEsc(c.name)}، واليوم هقولك على ٣ أشياء…">${libEsc(d.text || "")}</textarea>
+      <p class="nb-hint">اكتب ما ستقوله الشخصية، واختر اللهجة والصوت. يصنع البرنامج الصوت أولًا، ثم فيديو تقوله فيه الشخصية: الفم والوجه واليد تتحرك مع الصوت، والصورة كما هي. أو ارفع صوتك أنت.</p>
+      <textarea rows="3" data-tk="text" placeholder="مثلًا: أهلًا! أنا ${libEsc(c.name)}، واليوم سأخبرك بثلاثة أشياء…">${libEsc(d.text || "")}</textarea>
       <div class="nb-row">
         <label class="nb-f"><span>اللهجة / اللغة</span><select data-tk="lang"><optgroup label="عربي">${opt("ar")}</optgroup><optgroup label="لغات أخرى">${opt("foreign")}</optgroup></select></label>
         <label class="nb-f"><span>الصوت</span><select data-tk="voice">${voices.map((v) => `<option value="${v}" ${v === voice ? "selected" : ""}>${libEsc(A.voices?.[v] || v)}</option>`).join("")}</select></label>
         <label class="nb-f"><span>النموذج</span><select data-tk="model">${Object.entries(A.models || {}).map(([k, m]) => `<option value="${k}" ${k === model ? "selected" : ""}>${libEsc(m.label)} · $${m.per_sec}/ث</option>`).join("")}</select></label>
       </div>
-      <label class="nb-f"><span>الإحساس والحركة (اختياري)</span><input type="text" data-tk="prompt" value="${libEsc(d.prompt || "")}" placeholder="مثلًا: متحمس ويبتسم، ويشاور بإيده على الشاشة"></label>
+      <label class="nb-f"><span>الإحساس والحركة (اختياري)</span><input type="text" data-tk="prompt" value="${libEsc(d.prompt || "")}" placeholder="مثلًا: متحمس ويبتسم، ويشير بيده إلى الشاشة"></label>
       <div class="nb-row"><button class="nb-btn" data-talk>🎬 اجعلها تقول هذا النص</button>
         <label class="nb-btn sm">🎙️ أو ارفع صوتك<input type="file" accept="audio/*,video/*" data-tkaudio hidden></label>
         <small class="muted">${d.text ? `نحو ${secs} ثانية · ~$${(secs * per).toFixed(2)}` : ""}${!A.fasih ? " · اللهجات العربية غير متاحة الآن" : ""}</small></div>
@@ -90,20 +90,20 @@ const CharactersPage = (() => {
           <label class="nb-f"><span>اسم الشخصية</span><input type="text" id="chNewName" placeholder="مثلًا: سارة"></label>
           <label class="nb-btn">🖼️ اختر صورتها<input type="file" accept="image/*" id="chNewImg" hidden></label>
           <button class="nb-btn" data-cnewgo>حفظ</button><button class="nb-btn danger" data-cnewx>إلغاء</button></div>
-          <p class="nb-hint">بعد الحفظ يمكنك تضيف ورقة الملامح والصوت والإنترو والأوترو.</p></section>` : ""}
-      ${S.aiNew ? `<section class="nh-tile nh-panel nb-card ch-new"><div class="nb-kh"><b>✨ شخصية جديدة بالذكاء الصناعي</b></div>
+          <p class="nb-hint">بعد الحفظ يمكنك إضافة ورقة الملامح والصوت والمقدمة والخاتمة.</p></section>` : ""}
+      ${S.aiNew ? `<section class="nh-tile nh-panel nb-card ch-new"><div class="nb-kh"><b>✨ شخصية جديدة بالذكاء الاصطناعي</b></div>
           <div class="nb-row"><label class="nb-f"><span>الاسم</span><input type="text" id="chAiName" placeholder="مثلًا: سارة"></label>
             <label class="nb-f"><span>الشكل</span><select id="chAiStyle">${Object.entries(S.av?.styles || { real: "صورة حقيقية" }).map(([k, v]) => `<option value="${k}">${libEsc(v)}</option>`).join("")}</select></label></div>
-          <label class="nb-f"><span>صِفها (السن، الشكل، اللبس، المكان، الإحساس)</span><textarea rows="3" id="chAiDesc" placeholder="مثلًا: مدربة سعودية في التلاتينات، محجبة، لابسة تيشيرت رياضي أسود، في جيم منوّر، ابتسامة واثقة"></textarea></label>
-          <div class="nb-row"><button class="nb-btn" data-caigo ${S.aiBusy ? "disabled" : ""}>${S.aiBusy ? "⏳ ترسمها…" : "✨ ارسمها"}</button><button class="nb-btn danger" data-caix>إلغاء</button></div>
-          <p class="nb-hint">صورة نص جسم أمام الكاميرا، جاهزة تتكلم في «اجعلها تتكلم». إذا لم تعجبك ارسمها مرة أخرى من صفحتها.</p></section>` : ""}
+          <label class="nb-f"><span>صِفها (العمر، الشكل، الملابس، المكان، الإحساس)</span><textarea rows="3" id="chAiDesc" placeholder="مثلًا: مدربة سعودية في الثلاثينيات، محجبة، ترتدي قميصًا رياضيًا أسود، في نادٍ رياضي مضيء، بابتسامة واثقة"></textarea></label>
+          <div class="nb-row"><button class="nb-btn" data-caigo ${S.aiBusy ? "disabled" : ""}>${S.aiBusy ? "⏳ جارٍ الرسم…" : "✨ ارسمها"}</button><button class="nb-btn danger" data-caix>إلغاء</button></div>
+          <p class="nb-hint">صورة نصفية أمام الكاميرا، جاهزة للكلام في «اجعلها تتكلم». إن لم تعجبك فارسمها مرة أخرى من صفحتها.</p></section>` : ""}
       ${c ? detail(c) : `
       <div class="as-sh"><h2>الشخصيات <span>(${S.list.length})</span></h2></div>
       <div class="ch-grid as-grid">${S.list.map((x, i) => `<div class="ch-card as-card ${x.id === S.open ? "on" : ""}" data-cid="${x.id}" tabindex="0" role="button">
           <div class="as-art" style="${tint(i)}"><img src="${libEsc(x.image_url)}" alt="" loading="lazy"></div><b>${libEsc(x.name)}</b>
           <small dir="ltr">${x.instagram ? `@${libEsc(x.instagram)}` : x.tiktok ? `@${libEsc(x.tiktok)}` : ""}</small></div>`).join("")}
         <button type="button" class="as-new" data-cnew><span>＋</span>شخصية جديدة</button>
-        <button type="button" class="as-new ai" data-cainew><span>✨</span>أنشئها بالذكاء الصناعي</button></div>`}`;
+        <button type="button" class="as-new ai" data-cainew><span>✨</span>أنشئها بالذكاء الاصطناعي</button></div>`}`;
     window.NHBar?.();   // (التعليقات الصوتية مكانها في تبويب «التعليق الصوتي» غير هنا)
     if (S.adding) w.querySelector("#chNewName")?.focus();
   }
@@ -152,7 +152,7 @@ const CharactersPage = (() => {
       }
       if (t.closest("[data-talk]")) return talk();
       const tkd = t.closest("[data-tkdel]");
-      if (tkd) { if ((await uiConfirm("تحذف هذا الفيديو؟"))) save(() => api(`/api/coaches/${S.open}/talks/${tkd.dataset.tkdel}`, { method: "DELETE" })); return; }
+      if (tkd) { if ((await uiConfirm("أتحذف هذا الفيديو؟"))) save(() => api(`/api/coaches/${S.open}/talks/${tkd.dataset.tkdel}`, { method: "DELETE" })); return; }
       if (t.closest("[data-cnewgo]")) {
         const name = w.querySelector("#chNewName").value.trim(), img = w.querySelector("#chNewImg").files[0];
         if (!name) return toast("اكتب اسم الشخصية", true);
@@ -166,13 +166,13 @@ const CharactersPage = (() => {
       if (t.closest("[data-cclose]")) { S.open = null; return render(); }
       if (t.closest("[data-cremove]")) {
         const c = cur();
-        if (!c || !(await uiConfirm(`تحذف «${c.name}» بكل صورها وفيديوهاتها؟`))) return;
+        if (!c || !(await uiConfirm(`أتحذف «${c.name}» بكل صورها وفيديوهاتها؟`))) return;
         try { await api(`/api/coaches/${c.id}`, { method: "DELETE" }); S.list = S.list.filter((x) => x.id !== c.id); S.open = null; render(); }
         catch (err) { toast(err.message, true); }
         return;
       }
       const del = t.closest("[data-cdel]");
-      if (del) { if ((await uiConfirm("تزيله؟"))) patch({ [`remove_${del.dataset.cdel}`]: "true" }); return; }
+      if (del) { if ((await uiConfirm("أتزيله؟"))) patch({ [`remove_${del.dataset.cdel}`]: "true" }); return; }
       const sfig = t.closest("[data-sfile]");
       if (sfig && t.closest("[data-sdel]")) return save(() => api(`/api/coaches/${S.open}/sheet/${encodeURIComponent(sfig.dataset.sfile)}`, { method: "DELETE" }));
       const card = t.closest("[data-cid]");
@@ -216,8 +216,8 @@ const CharactersPage = (() => {
     form.append("model", d.model || "pro");
     form.append("prompt", d.prompt || "");
     if (file) form.append("audio", file);
-    else if (!(d.text || "").trim()) return toast("اكتب النص أولًا، أو ارفع صوت", true);
-    await save(() => api(`/api/coaches/${c.id}/talks`, { method: "POST", body: form }), "🎬 بدأت؛ ستجد الفيديو أسفل عندما ينتهي");
+    else if (!(d.text || "").trim()) return toast("اكتب النص أولًا، أو ارفع صوتًا", true);
+    await save(() => api(`/api/coaches/${c.id}/talks`, { method: "POST", body: form }), "🎬 بدأ؛ ستجد الفيديو في الأسفل عندما ينتهي");
     S.draft.text = "";
     render();
     poll();
@@ -274,7 +274,7 @@ function makeAudioPage(kind, noun, hint) {
         <input type="text" class="au-name" data-aname value="${libEsc(a.name)}">
         <span class="num au-dur">${libDur(a.duration)}</span>
         <button class="nb-btn sm danger" data-adel>احذف</button></div>`).join("")
-      || `<div class="nh-empty">${S.list.length ? "لا يوجد نتائج." : `لا يوجد بعد ${noun}. اسحب ملفات هنا أو اضغط «ارفع».`}</div>`;
+      || `<div class="nh-empty">${S.list.length ? "لا توجد نتائج." : `لا يوجد بعد ${noun}. اسحب ملفات هنا أو اضغط «ارفع».`}</div>`;
   }
   function render() {
     const w = S.el;
@@ -341,8 +341,8 @@ function makeAudioPage(kind, noun, hint) {
   }
   return { html, mount, close: () => { player.pause(); S.playing = null; } };
 }
-const VoicesPage = makeAudioPage("voice", "تسجيل", "تسجيلات التعليق الصوتي الذي تستخدمها في المشاريع والمونتاج. أي ملف صوت أو فيديو (نأخذ صوته).");
-const MusicPage = makeAudioPage("music", "تراك", "الموسيقى الذي توضع أسفل الفيديوهات في المونتاج.");
+const VoicesPage = makeAudioPage("voice", "تسجيل", "تسجيلات التعليق الصوتي التي تستخدمها في المشاريع والمونتاج. أي ملف صوت أو فيديو (نأخذ صوته).");
+const MusicPage = makeAudioPage("music", "مقطوعة", "الموسيقى التي توضع تحت الفيديوهات في المونتاج.");
 
 // 🔥 «اللي ماشي في مجالك»: بوستات من المجال بمشاهداتها ÷ متوسط حسابها، وليه الأعلى نجحوا، وأفكار بنفس الهيكل للبراند
 const ViralPage = (() => {
@@ -432,7 +432,7 @@ const StyleClonePage = (() => {
       ${p.video ? `<video class="sc-video" src="${p.video}" controls playsinline></video>
         <div class="nb-bar"><a class="nb-btn sm" href="${p.video}" download>⬇ نزّل</a>${p.review?.score ? `<span class="nb-state">تقييم المراجعة: ${p.review.score}/10</span>` : ""}</div>`
         : p.frames.length ? `<div class="sc-frames">${p.frames.map((u) => `<img src="${u}?v=${encodeURIComponent(p.updated_at || "")}" alt="">`).join("")}</div>` : ""}
-      ${p.video && !BUSY.includes(p.status) ? `<div class="nb-row"><label class="nb-f"><span>تريد تغيّر شيء؟</span><input type="text" data-snote placeholder="مثلًا: اجعل النص أكبر والنهاية أبطأ"></label>
+      ${p.video && !BUSY.includes(p.status) ? `<div class="nb-row"><label class="nb-f"><span>أتريد تغيير شيء؟</span><input type="text" data-snote placeholder="مثلًا: اجعل النص أكبر والنهاية أبطأ"></label>
         <button class="nb-btn" data-srev>✏️ عدّل</button></div>` : ""}
     </div>`;
   function render() {
@@ -440,13 +440,13 @@ const StyleClonePage = (() => {
     if (!w) return;
     w.innerHTML = `
       <div class="sc-new">
-        <p class="nb-hint">ارفع صورة أو فيديو مرجعي بالستايل الذي يعجبك، واكتب فكرتك. البرنامج يأخذ الأسلوب فقط (غير موضوع المرجع) ويرسم الأنيميشن بالكود فريم فريم، ومعه موسيقى ومؤثرات. الأساليب المرسومة (فلات، خطوط، ورق مقصوص، حبيبات طباعة) تظهر أحسن من الواقعي. يأخذ كذا دقيقة.</p>
+        <p class="nb-hint">ارفع صورة أو فيديو مرجعيًا بالأسلوب الذي يعجبك، واكتب فكرتك. يأخذ البرنامج الأسلوب فقط (لا موضوع المرجع) ويرسم الرسوم المتحركة بالكود إطارًا إطارًا، مع موسيقى ومؤثرات. الأساليب المرسومة (مسطّح، خطوط، ورق مقصوص، حبيبات طباعة) تظهر أفضل من الواقعية. يستغرق بضع دقائق.</p>
         <label class="nb-btn">🖼️ المراجع<input type="file" accept="image/*,video/*" multiple data-sfiles hidden></label> <span class="nb-state" data-sfcount></span>
-        <div class="nb-row"><label class="nb-f"><span>الفكرة</span><textarea rows="3" data-sidea placeholder="مثلًا: 3 أخطاء تُفسد الدايت، والحل في الآخر"></textarea></label></div>
+        <div class="nb-row"><label class="nb-f"><span>الفكرة</span><textarea rows="3" data-sidea placeholder="مثلًا: 3 أخطاء تُفسد الحمية، والحل في النهاية"></textarea></label></div>
         <div class="nb-row">
           <label class="nb-f"><span>المدة</span><select data-sdur><option>6</option><option selected>10</option><option>15</option><option>20</option></select></label>
           <label class="nb-f"><span>المقاس</span><select data-sratio><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label>
-          <label class="nb-f"><span>أداة الرسم</span><select data-sengine><option value="canvas">أشكال وخطوط بالكود</option><option value="brush">فُرش حقيقية (رصاص، فحم، حبر، ألوان مية)</option></select></label>
+          <label class="nb-f"><span>أداة الرسم</span><select data-sengine><option value="canvas">أشكال وخطوط بالكود</option><option value="brush">فُرش حقيقية (رصاص، فحم، حبر، ألوان مائية)</option></select></label>
           <button class="nb-btn" data-sgo ${S.busy ? "disabled" : ""}>🎨 ابدأ</button></div>
       </div>
       <div class="sc-list">${S.list.map(card).join("") || ""}</div>`;
@@ -471,7 +471,7 @@ const StyleClonePage = (() => {
         if (e.target.closest("[data-sgo]")) {
           const files = w.querySelector("[data-sfiles]").files;
           const idea = w.querySelector("[data-sidea]").value.trim();
-          if (!files.length) return toast("ارفع مرجع واحد على الأقل", true);
+          if (!files.length) return toast("ارفع مرجعًا واحدًا على الأقل", true);
           if (!idea) return toast("اكتب الفكرة", true);
           const form = new FormData();
           [...files].slice(0, 6).forEach((f) => form.append("files", f));
@@ -483,7 +483,7 @@ const StyleClonePage = (() => {
           try { const p = await api("/api/stylecl", { method: "POST", body: form }); S.list.unshift(p); } finally { S.busy = false; render(); }
           return poll();
         }
-        if (e.target.closest("[data-sdel]") && (await uiConfirm("تحذف هذا الفيديو؟"))) {
+        if (e.target.closest("[data-sdel]") && (await uiConfirm("أتحذف هذا الفيديو؟"))) {
           await api(`/api/stylecl/${sid}`, { method: "DELETE" }); S.list = S.list.filter((p) => p.id !== sid); return refreshList();
         }
         if (e.target.closest("[data-sretry]")) { const p = await api(`/api/stylecl/${sid}/retry`, { method: "POST" }); S.list = S.list.map((x) => x.id === sid ? p : x); refreshList(); return poll(); }

@@ -336,7 +336,7 @@ function renderBin() {
     && (!q || `${s.label} ${s.coach_name || ""}`.toLowerCase().includes(q)) && (!favOnly || favs.has(s.id)))
     .sort((a, b) => favs.has(b.id) - favs.has(a.id));
   $("binEmpty").hidden = list.length > 0;
-  $("binEmpty").textContent = q || favOnly ? "لا يوجد فيديوهات هذا بالبحث." : $("binEmpty").textContent;
+  $("binEmpty").textContent = q || favOnly ? "لا توجد فيديوهات تطابق البحث." : $("binEmpty").textContent;
   const rep = mt.replacing != null;
   $("replaceBar").hidden = !rep;
   if (rep) $("replaceWhich").textContent = `رقم ${mt.replacing + 1}`;
@@ -347,7 +347,7 @@ function renderBin() {
         ${lightVideo(s.url, "muted playsinline")}
         <button class="add" title="${rep ? "ضعه مكان القطعة" : "أضف عند المؤشر"}">${rep ? "🔁" : "＋"}</button>
         <button class="fav ${favs.has(s.id) ? "on" : ""}" title="مفضلة">${favs.has(s.id) ? "★" : "☆"}</button>
-        ${rep ? "" : `<button class="ovadd" title="أضفه طبقة أعلى الفيديو عند المؤشر">⧉</button>`}
+        ${rep ? "" : `<button class="ovadd" title="أضفه طبقة فوق الفيديو عند المؤشر">⧉</button>`}
         ${s.extra ? `<button class="del" title="احذف هذا الأوترو">✕</button>` : ""}
         <span class="tag">${escapeHtml(s.label)} · ${s.duration.toFixed(1)}ث</span>
       </div>`
@@ -393,7 +393,7 @@ $("edReplace").onclick = () => {
   mt.replacing = mt.sel.i;
   renderBin();
   $("binSearch").focus();
-  toast("اختر من المكتبة الفيديو الذي سيوضع مكانها");
+  toast("اختر من المكتبة الفيديو الذي سيحل محلها");
 };
 $("replaceCancel").onclick = () => { mt.replacing = null; renderBin(); };
 function replaceClip(i, genId) {
@@ -411,7 +411,7 @@ function replaceClip(i, genId) {
   mt.sel = { kind: "clip", i };
   changed();
   renderBin();
-  toast("استُبدل الفيديو والتعديلات كما هي");
+  toast("استُبدل الفيديو وبقيت التعديلات كما هي");
 }
 $("binGrid").addEventListener("click", async (e) => {
   const item = e.target.closest(".bin-item");
@@ -706,7 +706,7 @@ function renderTimeline() {
   drawPlayhead();
 }
 
-// ---------- قفل وإخفاء وكتم كل تراك (زي كاب كات) ----------
+// ---------- إغلاق وإخفاء وكتم كل مقطوعة (زي كاب كات) ----------
 const TRACKS = {
   video: { row: "trkVideo", head: "h-video", can: ["lock", "hide"] },
   voice: { row: "trkVoice", head: "h-voice", can: ["lock", "mute"] },
@@ -719,9 +719,9 @@ const TRACKS = {
   text: { row: "trkText", head: "h-text", can: ["lock", "hide"] },
   over: { row: "trkOver", head: "h-over", can: ["lock", "hide", "mute"] },
 };
-const FLAG_ICON = { lock: ["🔓", "🔒", "أغلق التراك (لا تستطيع تحرّك أو تحذف شيء فيه)", "افتح التراك"],
-  hide: ["👁", "🙈", "خبّي التراك من المعاينة والفيديو", "استعد التراك يظهر"],
-  mute: ["🔊", "🔇", "اكتم التراك", "استعد صوت التراك"] };
+const FLAG_ICON = { lock: ["🔓", "🔒", "اقفل المسار (لا يمكن تحريك أي شيء فيه أو حذفه)", "افتح قفل المسار"],
+  hide: ["👁", "🙈", "أخفِ المسار من المعاينة والفيديو", "أظهر المسار"],
+  mute: ["🔊", "🔇", "اكتم المسار", "أعد صوت المسار"] };
 function trackFlag(trk, flag) {
   const d = mt.project?.data;
   if (!d) return false;
@@ -781,7 +781,7 @@ const VOL_MAX = 2;
 function volLine(vol) {
   const pct = Math.round(vol * 100);
   return `<i class="vline ${pct === 0 ? "zero" : ""} ${vol > 1.4 ? "hi" : ""}" data-vol style="bottom:${(clamp(vol, 0, VOL_MAX) / VOL_MAX) * 100}%"
-    title="اسحب لفوق أو لتحت لكي تعلّي أو توطّي الصوت · نقرتان يرجّعه 100%"><em>${pct}%</em></i>`;
+    title="اسحب للأعلى أو للأسفل لرفع الصوت أو خفضه · نقرتان لإعادته إلى 100%"><em>${pct}%</em></i>`;
 }
 function volTarget(el) {
   const d = mt.project.data;
@@ -969,7 +969,7 @@ function splitPart(x, t) {
 }
 
 // target: قطعة صوت معيّنة (من أداة القطع)، وإلا بيقسم المختار أو الفيديو اللي عند المؤشر
-// الكي فريمز لجزء من القطعة [a, b] (بوقت القطعة): بنحط كي فريم محسوب على الطرفين ونشيل اللي برّه، والوقت يبدأ من a
+// الكي فريمز لجزء من القطعة [a, b] (بوقت القطعة): بنحط إطار مفتاحي محسوب على الطرفين ونشيل اللي برّه، والوقت يبدأ من a
 function kfWindow(c, a, b) {
   if (!hasKf(c)) return c.kf || null;
   const at = (t) => ({ t, ...transformNow({ ...c, kf: c.kf, _t: t }, t) });
@@ -1814,7 +1814,7 @@ function clipBox() {
     el = document.createElement("div");
     el.id = "pvBox";
     el.className = "pv-box";
-    el.innerHTML = `<i data-bh="nw"></i><i data-bh="ne"></i><i data-bh="sw"></i><i data-bh="se"></i><b data-bh="rot" title="اسحب لكي تدور · Shift = كل 15°"></b>`;
+    el.innerHTML = `<i data-bh="nw"></i><i data-bh="ne"></i><i data-bh="sw"></i><i data-bh="se"></i><b data-bh="rot" title="اسحب للتدوير · Shift = كل 15°"></b>`;
     $("previewFrame").closest(".ed-player").append(el);
     el.addEventListener("pointerdown", (e) => { if (e.target.closest("[data-bh]")) startClipDrag(e); });
   }
@@ -1907,7 +1907,7 @@ const ATTR_KEYS = ["zoom", "x", "y", "angle", "rotate", "flip_h", "flip_v", "fit
 function copyAttrs(c = selectedClip()) {
   if (!c) return toast("اختر قطعة فيديو أولًا", true);
   mt.attrs = JSON.parse(JSON.stringify(Object.fromEntries(ATTR_KEYS.map((k) => [k, c[k] ?? null]))));
-  toast("📋 نُسخت إعدادات القطعة · Ctrl+Shift+V تلصقها");
+  toast("📋 نُسخت إعدادات القطعة · Ctrl+Shift+V للصقها");
 }
 function applyAttrs(c) {
   const a = JSON.parse(JSON.stringify(mt.attrs));
@@ -1915,7 +1915,7 @@ function applyAttrs(c) {
   Object.assign(c, a);
 }
 function pasteAttrs(all = false) {
-  if (!mt.attrs) return toast("انسخ إعدادات قطعة أولًا (كليك يمين ← انسخ الإعدادات)", true);
+  if (!mt.attrs) return toast("انسخ إعدادات قطعة أولًا (زر الفأرة الأيمن ← انسخ الإعدادات)", true);
   const d = mt.project.data;
   const targets = all ? d.clips.filter((c) => !isOutroClip(c))
     : allSelected().filter((x) => x.kind === "clip").map((x) => d.clips[x.i]).filter(Boolean);
@@ -1923,7 +1923,7 @@ function pasteAttrs(all = false) {
   pushHistory();
   targets.forEach(applyAttrs);
   changed();
-  toast(`✓ أُلصقت على ${targets.length} قطعة`);
+  toast(`✓ لُصقت على ${targets.length} قطعة`);
 }
 // امسح الجزء اللي قبل أو بعد المؤشر من القطعة اللي تحته (أو المختارة)
 function deleteSide(side) {
@@ -1933,7 +1933,7 @@ function deleteSide(side) {
   if (!it) return toast("ضع المؤشر داخل قطعة فيديو", true);
   const at = snap(srcTimeAt(it, mt.t));
   const c = it.c;
-  if ((side === "left") !== !!it.rev ? at - c.start < MIN_CLIP : clipOut(c) - at < MIN_CLIP) return toast("لا يوجد أي فريم يُحذف", true);
+  if ((side === "left") !== !!it.rev ? at - c.start < MIN_CLIP : clipOut(c) - at < MIN_CLIP) return toast("لا يوجد إطار للحذف", true);
   pushHistory();
   const len = it.t1 - it.t0, cut = mt.t - it.t0;
   if (side === "left") {
@@ -1967,7 +1967,7 @@ $("tlMarker").onclick = addMarker;
 function renderMarkers() {
   const box = $("tlMarkers");
   if (!box || !mt.project) return;
-  box.innerHTML = markers().map((m, n) => `<i class="tl-mark" data-m="${n}" style="left:${m.t * mt.pps}px" title="${escapeHtml(m.label || "علامة")} · ${fmtTC(m.t)} · ضغطة تروحلها · نقرتان تكتب اسم · كليك يمين تحذفها"><em>${escapeHtml(m.label || "")}</em></i>`).join("");
+  box.innerHTML = markers().map((m, n) => `<i class="tl-mark" data-m="${n}" style="left:${m.t * mt.pps}px" title="${escapeHtml(m.label || "علامة")} · ${fmtTC(m.t)} · نقرة للانتقال إليها · نقرتان لتسميتها · الزر الأيمن لحذفها"><em>${escapeHtml(m.label || "")}</em></i>`).join("");
 }
 $("tlMarkers").addEventListener("pointerdown", (e) => {
   const el = e.target.closest(".tl-mark");
@@ -1991,13 +1991,13 @@ $("tlMarkers").addEventListener("dblclick", async (e) => {
 function toggleLoop() {
   mt.loop = !mt.loop;
   $("tpLoop").classList.toggle("on", mt.loop);
-  toast(mt.loop ? "🔁 التشغيل المتكرر يعمل" : "التشغيل المتكرر أُغلق");
+  toast(mt.loop ? "🔁 التكرار مفعّل" : "أُوقف التكرار");
 }
 $("tpLoop").onclick = toggleLoop;
 function toggleFull() {
   const el = $("previewFrame").closest(".ed-player");
   if (document.fullscreenElement) document.exitFullscreen?.();
-  else el.requestFullscreen?.().catch(() => toast("المتصفح غير سامح بالشاشة الكاملة", true));
+  else el.requestFullscreen?.().catch(() => toast("المتصفح لا يسمح بملء الشاشة", true));
 }
 $("tpFull").onclick = toggleFull;
 document.addEventListener("fullscreenchange", () => {
@@ -2058,7 +2058,7 @@ $("tlCanvas").addEventListener("contextmenu", (e) => {
   if (!clipEl && !audEl) return;
   e.preventDefault();
   const x = selOfEl(clipEl || audEl);
-  if (kindLocked(x.kind)) return toast("هذا التراك مغلق 🔒", true);
+  if (kindLocked(x.kind)) return toast("هذا المسار مقفل 🔒", true);
   if (!isSel(x)) selectItem(x);
   const c = clipEl ? mt.project.data.clips[x.i] : null;
   const k = (key) => `<kbd>${key}</kbd>`;
@@ -2071,7 +2071,7 @@ $("tlCanvas").addEventListener("contextmenu", (e) => {
     ["delLeft", "⇤ احذف ما قبل المؤشر", k("Q")],
     ["delRight", "⇥ احذف ما بعد المؤشر", k("W")],
     ["dup", "⧉ كرّر", ""],
-    ["kf", "◇ كي فريم عند المؤشر", ""],
+    ["kf", "◇ إطار مفتاحي عند المؤشر", ""],
     "-",
     ["replace", "🔁 استبدل الفيديو", ""],
     ["toOver", "⤴ اجعلها طبقة أعلى الفيديو", ""],
@@ -2174,7 +2174,7 @@ function renderInspector() {
   $("edDisable").textContent = c.disabled ? "✓ فعّل القطعة" : "⊘ عطّل";
 }
 
-// الحجم والمكان والزاوية: لو القطعة فيها كي فريمز، التعديل بيتحط في كي فريم عند المؤشر (زي كاب كات)
+// الحجم والمكان والزاوية: لو القطعة فيها إطارات مفتاحية، التعديل بيتحط في إطار مفتاحي عند المؤشر (زي كاب كات)
 const TKEYS = ["zoom", "x", "y", "angle"];
 function selItem() {
   return mt.sel?.kind === "clip" ? seq().items[mt.sel.i] : null;
@@ -2310,7 +2310,7 @@ $("clipFx").addEventListener("input", (e) => {
 // حركات الدخول والخروج
 $("fxAnimIn").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("");
 $("fxAnimOut").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("")
-  .replace("من اليمين", "لليمين").replace("من الشمال", "للشمال").replace("من أسفل", "لتحت").replace("من أعلى", "لفوق");
+  .replace("من اليمين", "لليمين").replace("من الشمال", "لليسار").replace("من أسفل", "للأسفل").replace("من أعلى", "لفوق");
 for (const [box, key, dur] of [["fxAnimIn", "anim_in", "fxAnimInDur"], ["fxAnimOut", "anim_out", "fxAnimOutDur"]]) {
   $(box).addEventListener("click", (e) => {
     const b = e.target.closest("[data-anim]");
@@ -2338,7 +2338,7 @@ $("fxEffectAmts").addEventListener("input", (e) => {
 $("kfToggle").onclick = fxInput(null, (c) => {
   const t = clipLocalT(c), cur = transformNow(c);
   if (!hasKf(c)) {
-    // أول كي فريم: بنحط واحد في أول القطعة وواحد عند المؤشر (بنفس القيم)، وبعدها أي تعديل بيتحط عند المؤشر
+    // أول إطار مفتاحي: بنحط واحد في أول القطعة وواحد عند المؤشر (بنفس القيم)، وبعدها أي تعديل بيتحط عند المؤشر
     const it = seq().items.find((x) => x.c === c), end = it ? it.t1 - it.t0 : t;
     const at = t > 0.05 ? t : end;
     c.kf = [{ t: 0, ...cur }, { t: Math.round(at * FPS) / FPS, ...cur }];
@@ -2393,8 +2393,8 @@ function renderFx(c) {
   }
   const kfOn = hasKf(c), here = kfOn && kfAt(c, clipLocalT(c)) >= 0;
   $("kfToggle").classList.toggle("on", here);
-  $("kfToggle").textContent = here ? "◆ أزل الكي فريم" : "◇ كي فريم";
-  $("kfInfo").textContent = kfOn ? `${c.kf.length} كي فريم` : "";
+  $("kfToggle").textContent = here ? "◆ أزل الإطار المفتاحي" : "◇ إطار مفتاحي";
+  $("kfInfo").textContent = kfOn ? `${c.kf.length} إطار مفتاحي` : "";
   $("kfClear").hidden = !kfOn;
   $("kfPrev").disabled = $("kfNext").disabled = !kfOn;
   $("speedVal").textContent = `${sp}x`;
@@ -2406,7 +2406,7 @@ function renderFx(c) {
   $("revNote").textContent = longSrc ? `(للقطع الأقصر من ${REV_MAX} ثانية فقط)` : "";
   document.querySelectorAll("#fxFit [data-fit]").forEach((b) => b.classList.toggle("on", b.dataset.fit === fit));
   document.querySelectorAll("#fxLooks [data-look]").forEach((b) => b.classList.toggle("on", b.dataset.look === (c.look || "")));
-  $("fxRotate").textContent = `⟳ لف 90°${c.rotate ? ` (${c.rotate}°)` : ""}`;
+  $("fxRotate").textContent = `⟳ تدوير 90°${c.rotate ? ` (${c.rotate}°)` : ""}`;
   $("fxFlipH").classList.toggle("on", !!c.flip_h);
   $("fxFlipV").classList.toggle("on", !!c.flip_v);
   ADJ.forEach(([k]) => {
@@ -2439,7 +2439,7 @@ $("ttsGo").onclick = async () => {
   const text = $("ttsText").value.trim();
   if (!text || !mt.project) return toast("اكتب النص أولًا", true);
   $("ttsGo").disabled = true;
-  $("ttsGo").textContent = "⏳ يحوّل…";
+  $("ttsGo").textContent = "⏳ جارٍ التحويل…";
   try {
     const a = await api("/api/montage/tts", { method: "POST", ...jsonBody({ text, voice_id: $("ttsVoice").value }) });
     mt.voices = await api("/api/audio?kind=voice");
@@ -2455,7 +2455,7 @@ $("ttsGo").onclick = async () => {
     $("ttsGo").textContent = "🗣️ حوّل لصوت";
   }
 };
-// صوت جديد: لو مفيش تعليق بيبقى هو التعليق، وإلا بيتحط في تراك صوت زيادة عند المؤشر
+// صوت جديد: لو مفيش تعليق بيبقى هو التعليق، وإلا بيتحط في مقطوعة صوت زيادة عند المؤشر
 function placeNewAudio(a) {
   const d = mt.project.data;
   pushHistory();
@@ -2470,7 +2470,7 @@ function placeNewAudio(a) {
   changed();
 }
 
-// ---------- تراك الأصوات الزيادة والمؤثرات ----------
+// ---------- مقطوعة الأصوات الزيادة والمؤثرات ----------
 const SND_LANE_H = 26;
 function renderSoundRow() {
   const parts = soundParts();
@@ -2478,7 +2478,7 @@ function renderSoundRow() {
   const h = Math.min(8, lanes) * SND_LANE_H + 4;
   $("trkSnd").style.height = $("hSnd").style.height = `${h}px`;
   if (!parts.length) {
-    $("trkSnd").innerHTML = `<div class="tl-empty-track">مؤثرات وأصوات زيادة: أضفها من تبويب 🔊 الصوت</div>`;
+    $("trkSnd").innerHTML = `<div class="tl-empty-track">مؤثرات وأصوات إضافية: أضفها من تبويب 🔊 الصوت</div>`;
     return;
   }
   $("trkSnd").innerHTML = parts.map((x) => {
@@ -2506,8 +2506,8 @@ function renderSfx() {
   const q = $("sfxSearch").value.trim().toLowerCase();
   const list = (mt.sfx || []).filter((x) => !q || x.name.toLowerCase().includes(q) || x.id.includes(q));
   $("sfxGrid").innerHTML = list.map((x) => `<div class="sfx-item" data-sfx="${x.id}" title="${escapeHtml(x.name)} · ${x.duration.toFixed(1)}ث">
-      <button class="play" data-play="${x.id}" title="اسمعه">▶</button><span dir="auto">${escapeHtml(x.name)}</span>
-      <button class="add" data-addsfx="${x.id}" title="أضفه عند المؤشر">＋</button></div>`).join("") || `<p class="muted">لا يوجد مؤثرات هذا بالاسم</p>`;
+      <button class="play" data-play="${x.id}" title="استمع">▶</button><span dir="auto">${escapeHtml(x.name)}</span>
+      <button class="add" data-addsfx="${x.id}" title="أضفه عند المؤشر">＋</button></div>`).join("") || `<p class="muted">لا توجد مؤثرات بهذا الاسم</p>`;
   $("sndFromLib").innerHTML = `<option value="">＋ صوت من المكتبة…</option>` +
     [...mt.voices.map((a) => [a, "🎙️"]), ...mt.music.map((a) => [a, "🎵"])].map(([a, ic]) => `<option value="${a.id}">${ic} ${escapeHtml(a.name)} (${fmtDuration(a.duration)})</option>`).join("");
 }
@@ -2522,7 +2522,7 @@ $("sfxGrid").addEventListener("click", (e) => {
     sfxPreview.play().catch(() => {});
   }
   if (ad && mt.project) {
-    if (kindLocked("snd")) return toast("تراك الأصوات مغلق 🔒", true);
+    if (kindLocked("snd")) return toast("مسار الأصوات مقفل 🔒", true);
     pushHistory();
     addSound(soundSource(ad.dataset.addsfx), mt.t);
     changed();
@@ -2560,7 +2560,7 @@ $("micRec").onclick = async () => {
   if (!navigator.mediaDevices?.getUserMedia) return toast("هذا المتصفح لا يدعم التسجيل", true);
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { return toast("يحتاج تسمح للبرنامج يستخدم الميكروفون", true); }
+  catch { return toast("اسمح للبرنامج باستخدام الميكروفون", true); }
   const chunks = [], t0 = mt.t, started = Date.now();
   rec = new MediaRecorder(stream);
   rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
@@ -2583,7 +2583,7 @@ $("micRec").onclick = async () => {
       mt.t = t0;
       placeNewAudio(a);
       $("micInfo").textContent = "";
-      toast("🎙️ التسجيل وُضع عند المؤشر");
+      toast("🎙️ وُضع التسجيل عند المؤشر");
     } catch (err) { $("micInfo").textContent = ""; toast(err.message, true); }
   };
   rec.start();
@@ -2618,7 +2618,7 @@ $("mixPunch").addEventListener("change", () => setMix({ punch: $("mixPunch").che
 
 // ---------- مقاس الكادر ولون الخلفية وإعدادات التصدير ----------
 const RATIOS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "3:4": [1080, 1440], "1:1": [1080, 1080], "16:9": [1920, 1080] };
-const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 منشور إنستا", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
+const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 منشور إنستغرام", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
 const BG_SWATCHES = ["#000000", "#ffffff", "#111827", "#1d3557", "#e63946", "#f4a261", "#2a9d8f", "#7b2cbf"];
 const EXPORT_RES = { 720: "720p", 1080: "1080p (Full HD)", 1440: "2K", 2160: "4K" };
 const EXPORT_Q = { small: "حجم صغير", normal: "عادي", high: "جودة عالية" };
@@ -2657,10 +2657,10 @@ function renderCanvasPane() {
   $("cvBg").innerHTML = BG_SWATCHES.map((c) => `<button class="sw ${c === bg ? "on" : ""}" data-bg="${c}" style="background:${c}" title="${c}"></button>`).join("") +
     `<label class="sw pick" title="لون آخر"><input type="color" id="cvBgPick" value="${bg}"></label>`;
   $("exRes").innerHTML = Object.entries(EXPORT_RES).map(([k, l]) => `<option value="${k}" ${Number(k) === ex.res ? "selected" : ""}>${l}</option>`).join("");
-  $("exFps").innerHTML = [24, 25, 30, 50, 60].map((f) => `<option value="${f}" ${f === ex.fps ? "selected" : ""}>${f} فريم/ث</option>`).join("");
+  $("exFps").innerHTML = [24, 25, 30, 50, 60].map((f) => `<option value="${f}" ${f === ex.fps ? "selected" : ""}>${f} إطار/ث</option>`).join("");
   $("exQuality").innerHTML = Object.entries(EXPORT_Q).map(([k, l]) => `<option value="${k}" ${k === ex.quality ? "selected" : ""}>${l}</option>`).join("");
   const [w, h] = RATIOS[r], k = ex.res / Math.min(w, h);
-  $("exInfo").textContent = `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2} · ${ex.fps} فريم · ${fmtTC(totalLength()).slice(0, 5)} · الحجم نحو ${sizeEstimate().toFixed(sizeEstimate() < 10 ? 1 : 0)} ميجا`;
+  $("exInfo").textContent = `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2} · ${ex.fps} إطار · ${fmtTC(totalLength()).slice(0, 5)} · الحجم نحو ${sizeEstimate().toFixed(sizeEstimate() < 10 ? 1 : 0)} ميجا`;
   $("cvNote").hidden = r === "9:16";
 }
 function setCanvas(patch) {
@@ -2688,7 +2688,7 @@ $("exAudio").onclick = async () => {
   if (!mt.project) return;
   await saveProject();
   $("exAudio").disabled = true;
-  $("exAudio").textContent = "⏳ جارٍ التجهيز الصوت…";
+  $("exAudio").textContent = "⏳ جارٍ تجهيز الصوت…";
   try {
     const r = await api(`/api/projects/${mt.project.id}/render-audio`, { method: "POST" });
     $("exAudioLink").href = r.url;
@@ -2710,7 +2710,7 @@ function renderPartProps() {
   $("partProps").hidden = !p;
   if (!p) return;
   const nm = mt.sel.kind === "snd" ? `«${soundSource(p.src)?.name || "صوت"}»` : mt.sel.kind === "voice" ? "التعليق" : "الموسيقى";
-  $("partLabel").textContent = `🎚️ قطعة ${nm} المختارة`;
+  $("partLabel").textContent = `🎚️ القطعة المختارة ${nm}`;
   $("pVol").value = Math.round((p.volume ?? 1) * 100);
   $("pVolVal").textContent = `${Math.round((p.volume ?? 1) * 100)}%`;
   $("pFadeIn").value = Math.round((p.fade_in || 0) * 100);
@@ -2747,12 +2747,12 @@ function renderSide() {
 
   $("mCharIntro").disabled = !coach?.intro_url;
   $("mCharIntro").checked = !!coach?.intro_url && d.char_intro !== false;
-  $("charIntroInfo").textContent = !coach ? "(لا يوجد شخصية)" : coach.intro_url ? `(${fmtDuration(coach.intro_duration)})` : "(هذه الشخصية ليس لها إنترو)";
+  $("charIntroInfo").textContent = !coach ? "(لا توجد شخصية)" : coach.intro_url ? `(${fmtDuration(coach.intro_duration)})` : "(هذه الشخصية ليس لها مقدمة)";
   for (const [k, id] of [["intro", "mBrandIntro"], ["outro", "mBrandOutro"]]) {
     const has = !!clientx.cur?.[`${k}_url`];
     $(id).disabled = !has;
     $(id).checked = has && d[`brand_${k}`] !== false;
-    $(`brand${k[0].toUpperCase()}${k.slice(1)}Info`).textContent = has ? "" : "(العلامة ليس له، أو مغلق من عقل العلامة)";
+    $(`brand${k[0].toUpperCase()}${k.slice(1)}Info`).textContent = has ? "" : "(ليس للعلامة مقدمة، أو هي مطفأة من عقل العلامة)";
   }
 
   $("mVoice").value = d.voice?.id || "";
@@ -2988,7 +2988,7 @@ async function kochiLayout(projectId, quiet = false) {
   const r = await api(`/api/projects/${projectId}/kochi-layout`, { method: "POST" });
   if (!quiet) {
     const s = r.report;
-    toast(!s.sentences ? "لا يوجد تعليق صوتي في هذا المشروع" : `✨ رُتّب: ${s.sentences} جملة${s.music ? " والموسيقى متقطّعة عليها" : ""}${s.overflow ? ` (التعليق أطول من الفيديو بـ ${s.overflow} ث)` : ""}`, !s.sentences);
+    toast(!s.sentences ? "لا يوجد تعليق صوتي في هذا المشروع" : `✨ رُتّب: ${s.sentences} جملة${s.music ? " والموسيقى مقطّعة عليه" : ""}${s.overflow ? ` (التعليق أطول من الفيديو بـ ${s.overflow} ث)` : ""}`, !s.sentences);
   }
   return r.project;
 }
@@ -3064,7 +3064,7 @@ function exportFileName(name) {
 $("renderBtn").onclick = async () => {
   pause();
   const pend = silPending().filter((m) => m.del).length;
-  if (pend && !(await uiConfirm(`ما زال فيه ${pend} جزء أحمر (سكتة/حشو) لم تراجعه. تصدّر بدون ما تزيلهم؟`))) return;
+  if (pend && !(await uiConfirm(`ما زالت هناك ${pend} أجزاء حمراء (سكتة/حشو) لم تراجعها. أتصدّر دون إزالتها؟`))) return;
   await saveProject();
   try {
     await api(`/api/projects/${mt.project.id}/render`, { method: "POST" });
@@ -3185,7 +3185,7 @@ async function algoPrep(force = false, minSec = 0) {
     texts().push({ text: r.hook, t0: 0, dur: 3, font: "SM Changa", size: 88, color: "#FFFFFF", x: 0.5, y: 0.22, angle: 0, scale: 1, opacity: 1, spacing: 0,
       stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false, color: "#000000" }, bold: true, italic: false,
       anim_in: { type: "pop", dur: 0.35 }, anim_out: { type: "fade", dur: 0.25 }, lane: freeTextLane(0, 3), algo: true });
-    toast("⚡ وُضع خطاف مكتوب على الشاشة أول ٣ ثواني (يمكنك تعدّله من تبويب النص)");
+    toast("⚡ وُضع خطاف مكتوب على الشاشة في أول ٣ ثوانٍ (يمكنك تعديله من تبويب النص)");
   }
   if (r.caps === "done" && d.voice && d.captions?.enabled === undefined) d.captions = { ...(d.captions || {}), enabled: true };
   renderAll();
@@ -3196,10 +3196,10 @@ function silMarksHtml(it) {
   const list = silPending().filter((m) => m.i === it.i);
   if (!list.length || it.rev) return "";
   const sp = it.speed || 1;
-  return list.map((m) => `<i class="tl-sil ${m.del ? "del" : "keep"}" data-mk="${m.id}" title="${m.kind === "filler" ? `حشو «${escapeHtml(m.text || "")}»` : m.kind === "repeat" ? `تكرار «${escapeHtml(m.text || "")}»` : m.kind === "end" ? "سكوت بعد النهاية" : m.kind === "start" ? "سكوت قبل البداية" : "سكتة"} ${(m.b - m.a).toFixed(1)}ث · ضغطة تسيبه/تزيله"
+  return list.map((m) => `<i class="tl-sil ${m.del ? "del" : "keep"}" data-mk="${m.id}" title="${m.kind === "filler" ? `حشو «${escapeHtml(m.text || "")}»` : m.kind === "repeat" ? `تكرار «${escapeHtml(m.text || "")}»` : m.kind === "end" ? "سكوت بعد النهاية" : m.kind === "start" ? "سكوت قبل البداية" : "سكتة"} ${(m.b - m.a).toFixed(1)}ث · انقر للإبقاء/الإزالة"
       style="left:${Math.max(0, (m.a - it.in) / sp) * mt.pps}px;width:${Math.max(2, (m.b - m.a) / sp * mt.pps)}px"></i>`).join("");
 }
-const SIL_KIND = { silence: "سكتة", start: "سكوت في أولًا", end: "سكوت في الآخر", filler: "حشو", repeat: "تكرار" };
+const SIL_KIND = { silence: "سكتة", start: "سكوت في البداية", end: "سكوت في النهاية", filler: "حشو", repeat: "تكرار" };
 function silTime(m) {
   const it = seq().items.find((x) => x.kind === "clip" && x.i === m.i);
   return it ? it.t0 + (m.a - it.in) / (it.speed || 1) : 0;
@@ -3210,13 +3210,13 @@ function renderSilReview() {
   if (!list.length) { box.hidden = true; return; }
   const dels = list.filter((m) => m.del), secs = dels.reduce((s, m) => s + (m.b - m.a), 0);
   box.hidden = false;
-  box.innerHTML = `<div class="sr-head"><b>⚡ لقيت ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} يمكن تُزال</b>
-      <span class="muted">الأحمر سيُزال (${secs.toFixed(1)} ثانية). اسمع كل واحد واضغط عليه إذا تريد تسيبه.</span>
+  box.innerHTML = `<div class="sr-head"><b>⚡ وُجد ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} يمكن إزالتها</b>
+      <span class="muted">سيُزال الأحمر (${secs.toFixed(1)} ثانية). استمع لكل جزء وانقر عليه إن أردت إبقاءه.</span>
       <button class="btn sm primary" id="srApply" ${dels.length ? "" : "disabled"}>✂️ احذف الأحمر (${dels.length})</button>
-      <button class="btn sm" id="srFillers" title="يكتب نص الفيديوهات ويبحث عن «أمم/نعم» والنص المتكرر (يُحسب من رصيد Atlas)">🔎 الحشو أيضًا</button>
-      <button class="btn sm" id="srDismiss">سيبهم كلهم</button></div>
+      <button class="btn sm" id="srFillers" title="يفرّغ كلام الفيديوهات ويبحث عن «أمم/نعم» والكلام المكرر (يُخصم من نقاطك)">🔎 الحشو أيضًا</button>
+      <button class="btn sm" id="srDismiss">أبقِها كلها</button></div>
     <div class="sr-list">${list.map((m) => `<div class="sr-row ${m.del ? "del" : "keep"}" data-mk="${m.id}">
-      <button class="ic" data-srplay="${m.id}" title="اسمعه">▶︎</button><span>${SIL_KIND[m.kind] || "سكتة"}${m.text ? ` «${escapeHtml(m.text)}»` : ""}</span>
+      <button class="ic" data-srplay="${m.id}" title="استمع">▶︎</button><span>${SIL_KIND[m.kind] || "سكتة"}${m.text ? ` «${escapeHtml(m.text)}»` : ""}</span>
       <small class="num">${fmtTC(silTime(m))} · ${(m.b - m.a).toFixed(1)}ث</small>
       <label class="check"><input type="checkbox" data-srdel="${m.id}" ${m.del ? "checked" : ""}> يُزال</label></div>`).join("")}</div>`;
 }
@@ -3254,7 +3254,7 @@ function silApply() {
   renderAll();
   renderSilReview();
   scheduleSave();
-  toast(`✂️ أُزيل ${n} ${n === 1 ? "جزء" : "أجزاء"} (${secs.toFixed(1)} ثانية). Ctrl+Z يرجّعهم`);
+  toast(`✂️ أُزيل ${n} ${n === 1 ? "جزء" : "أجزاء"} (${secs.toFixed(1)} ثانية). Ctrl+Z للتراجع`);
 }
 $("silReview").addEventListener("change", (e) => { const id = e.target.dataset?.srdel; if (id) silToggle(id, e.target.checked); });
 $("silReview").addEventListener("click", async (e) => {
@@ -3272,14 +3272,14 @@ $("silReview").addEventListener("click", async (e) => {
   if (e.target.closest("#srDismiss")) { silPending().forEach((m) => (m.done = true)); renderTimeline(); renderSilReview(); return scheduleSave(); }
   if (e.target.closest("#srFillers")) {
     const b = e.target.closest("#srFillers");
-    b.disabled = true; b.textContent = "⏳ جارٍ الاستماع النص…";
+    b.disabled = true; b.textContent = "⏳ جارٍ الاستماع للكلام…";
     await saveProject();
     try {
       const r = await api(`/api/projects/${mt.project.id}/fillers`, { method: "POST" });
       const have = new Set(silAll().map((m) => m.id));
       const add = r.marks.filter((m) => !have.has(m.id)).map((m) => ({ ...m, del: true, done: false }));
       mt.project.data.algo = { ...(mt.project.data.algo || {}), marks: [...silAll(), ...add] };
-      toast(add.length ? `🔎 لقيت ${add.length} حشو/تكرار` : "لا يوجد حشو واضح 👌");
+      toast(add.length ? `🔎 وُجد ${add.length} حشو/تكرار` : "لا يوجد حشو واضح 👌");
       renderTimeline(); renderSilReview(); scheduleSave();
     } catch (err) { toast(err.message, true); b.disabled = false; b.textContent = "🔎 الحشو أيضًا"; }
   }
@@ -3312,7 +3312,7 @@ function beatFit(beats, period) {
 }
 $("tlBeat").onclick = async () => {
   if (!mt.project?.data.clips.length) return toast("أضف فيديو أولًا", true);
-  if (!mt.project.data.music) return toast("ضع مزيكا في المشروع أولًا 🎵", true);
+  if (!mt.project.data.music) return toast("أضف موسيقى إلى المشروع أولًا 🎵", true);
   const b = $("tlBeat");
   b.disabled = true;
   try {
@@ -3325,12 +3325,12 @@ $("tlBeat").onclick = async () => {
     renderAll();
     renderSilReview();
     scheduleSave();
-    toast(`🎵 ${n} ${n === 1 ? "قطعة ضُبطت" : "قطع ضُبطوا"} على الإيقاع (دقة كل ${r.period} ثانية). Ctrl+Z يرجّعهم`);
+    toast(`🎵 ${n} ${n === 1 ? "قطعة ضُبطت" : "قطع ضُبطت"} على الإيقاع (نبضة كل ${r.period} ثانية). Ctrl+Z للتراجع`);
   } catch (err) { toast(err.message, true); }
   b.disabled = false;
 };
-// ✂️ إزالة السكتات بضغطة: تختار المستوى فتتشال على طول (Ctrl+Z يرجّعها)، أو «علّمها بس» للمراجعة واحدة واحدة
-const SIL_LEVELS = [["light", "خفيف", "السكتات الطويلة بس (أطول من ٠٫٨ ث)", 0.8], ["mid", "متوسط", "أي وقفة أطول من نص ثانية", 0.45],
+// ✂️ إزالة السكتات بضغطة: تختار المستوى فتتشال على طول (Ctrl+Z يرجّعها)، أو «علّمها فقط» للمراجعة واحدة واحدة
+const SIL_LEVELS = [["light", "خفيف", "السكتات الطويلة فقط (أطول من ٠٫٨ ث)", 0.8], ["mid", "متوسط", "أي وقفة أطول من نصف ثانية", 0.45],
   ["strong", "قوي", "إيقاع سريع: أي وقفة أطول من ٠٫٣ ث", 0.3]];
 function silMenuClose() { document.querySelector(".sil-menu")?.remove(); }
 async function silRun(minSec, review) {
@@ -3338,7 +3338,7 @@ async function silRun(minSec, review) {
   b.disabled = true;
   await algoPrep(true, minSec);
   b.disabled = false;
-  if (!silPending().length) return toast("لا يوجد سكتات واضحة في الفيديوهات التي بصوت 👌");
+  if (!silPending().length) return toast("لا توجد سكتات واضحة في الفيديوهات الناطقة 👌");
   if (!review) { silPending().forEach((m) => (m.del = m.kind !== "filler" && m.kind !== "repeat" ? true : m.del)); silApply(); }
 }
 $("tlSilence").onclick = (e) => {
@@ -3349,7 +3349,7 @@ $("tlSilence").onclick = (e) => {
   m.className = "sil-menu";
   m.setAttribute("role", "menu");
   m.innerHTML = `<b>إزالة السكتات</b>${SIL_LEVELS.map(([k, t, sub, v]) => `<button type="button" role="menuitem" data-sl="${v}"><span>${t}</span><small>${sub}</small></button>`).join("")}
-    <button type="button" role="menuitem" class="rv" data-sl="0.45" data-rv="1"><span>علّمها بس</span><small>أراجعها واحدة واحدة قبل الحذف</small></button>`;
+    <button type="button" role="menuitem" class="rv" data-sl="0.45" data-rv="1"><span>علّمها فقط</span><small>سأراجعها واحدة واحدة قبل الحذف</small></button>`;
   document.body.appendChild(m);
   m.style.top = `${Math.max(8, r.top - m.offsetHeight - 6)}px`;
   m.style.left = `${Math.min(innerWidth - m.offsetWidth - 8, Math.max(8, r.left))}px`;

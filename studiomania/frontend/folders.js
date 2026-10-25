@@ -443,7 +443,7 @@ function slotSelect(r, slot) {
 function coachOutroNote(r) {
   if (!r.coach || r.coach === "new") return "";
   const c = fol.coaches.find((x) => x.id === r.coach);
-  return c?.outro_url ? `<div class="muted">🎬 الأوترو: الخاص بـ${escapeHtml(c.name)}</div>` : `<div class="warn-text">⚠️ هذه الشخصية ليس لها أوترو</div>`;
+  return c?.outro_url ? `<div class="muted">🎬 الخاتمة: الخاصة بـ${escapeHtml(c.name)}</div>` : `<div class="warn-text">⚠️ هذه الشخصية ليس لها أوترو</div>`;
 }
 
 function renderFup() {
@@ -669,15 +669,15 @@ $("fupUpload").onclick = async () => {
 };
 
 
-// ---------- 🤖 أوتوبايلوت: كذا مشروع بيتجهزوا لوحدهم (تقطيع ← توليد ← مونتاج ← تصدير ← جدولة) ----------
-const AP_STEPS = { queued: "⏳ في الطابور", cutting: "✂️ يقطّع", generating: "✨ يولّد", montage: "🎞️ مونتاج", rendering: "🎬 يصدّر",
-  scheduling: "📅 يجدول", done: "✅ جُدول", failed: "⚠️ توقف", stopped: "⏹ توقف" };
+// ---------- 🤖 الأوتوبايلوت: كذا مشروع بيتجهزوا لوحدهم (تقطيع ← توليد ← مونتاج ← تصدير ← جدولة) ----------
+const AP_STEPS = { queued: "⏳ في الطابور", cutting: "✂️ جارٍ التقطيع", generating: "✨ جارٍ التوليد", montage: "🎞️ مونتاج", rendering: "🎬 جارٍ التصدير",
+  scheduling: "📅 جارٍ الجدولة", done: "✅ جُدول", failed: "⚠️ توقف", stopped: "⏹ توقف" };
 const AP_PLATFORMS = [["instagram", "إنستجرام"], ["tiktok", "تيك توك"], ["youtube", "يوتيوب شورتس"], ["facebook", "فيسبوك"], ["x", "X"]];
-const AP_DAYS = [[5, "السبت"], [6, "الأحد"], [0, "الاتنين"], [1, "التلات"], [2, "الأربع"], [3, "الخميس"], [4, "الجمعة"]];
+const AP_DAYS = [[5, "السبت"], [6, "الأحد"], [0, "الاثنين"], [1, "الثلاثاء"], [2, "الأربعاء"], [3, "الخميس"], [4, "الجمعة"]];
 const apLocal = (s) => new Date(`${s}+03:00`).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
 const apAgo = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
-  return m < 1 ? "ما زال حالًا" : m < 60 ? `من ${m} دقيقة` : `من ${Math.floor(m / 60)} ساعة و${m % 60} دقيقة`;
+  return m < 1 ? "الآن" : m < 60 ? `منذ ${m} دقيقة` : `منذ ${Math.floor(m / 60)} ساعة و${m % 60} دقيقة`;
 };
 const apFmt = (iso) => new Date(iso).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
@@ -698,9 +698,9 @@ async function openAutopilot() {
           <input type="datetime-local" class="ap-at" data-jat="${j.id}" value="${(j.at || "").slice(0, 16)}" title="غيّر موعد النشر">`}
         ${j.error ? `<br><span class="ap-err">${escapeHtml(j.error)}</span>` : ""}</span>
       <span class="ap-step ${j.step}">${AP_STEPS[j.step] || j.step}</span>
-      ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يُكمل من مكان ما توقف">▶ أكمل</button>` : ""}
+      ${["failed", "stopped"].includes(j.step) ? `<button class="btn sm primary" data-resume="${j.id}" title="يُكمل من حيث توقف">▶ أكمل</button>` : ""}
       ${["done", "failed", "stopped"].includes(j.step) ? `<button class="btn sm" data-del="${j.id}" title="أزله من القائمة">✕</button>` : `<button class="btn sm" data-stop="${j.id}">⏹</button>`}
-    </li>`).join("") || '<li class="off">لا يوجد بعد عمل</li>';
+    </li>`).join("") || '<li class="off">لا يوجد عمل بعد</li>';
   // التحديث كل شوية بيغيّر قايمة الشغل بس (من غير ما الصفحة تطلع لفوق)
   const drawJobs = () => {
     const ul = dlg.querySelector("[data-jobs]");
@@ -715,14 +715,14 @@ async function openAutopilot() {
     const atVals = Object.fromEntries([...dlg.querySelectorAll("[data-at]")].map((x) => [x.dataset.at, x.value]));
     const days = new Set(s.days || [0, 1, 2, 3, 4, 5, 6]);
     const y = dlg.scrollTop;
-    dlg.innerHTML = `<div class="panel-head"><h2>🤖 أوتوبايلوت</h2><button class="btn sm" data-x>قفل</button></div>
-      <p class="hint">كل مشروع يُقطّع لقطع أقل من 15 ثانية، ويُولّد، ويُنشأ له مونتاج كوتشي، ويُصدّر، ويتجدول بكولاب مع المدرب والغلاف قبل الآخر بثانيتين.<br>⚠️ التوليد يصرف من رصيد Atlas.</p>
+    dlg.innerHTML = `<div class="panel-head"><h2>🤖 الأوتوبايلوت</h2><button class="btn sm" data-x>إغلاق</button></div>
+      <p class="hint">يُقطَّع كل مشروع إلى قطع أقل من 15 ثانية، ويُولَّد، ويُنشأ له مونتاج كوتشي، ويُصدَّر، ويُجدول بمنشور مشترك مع المدرب والغلاف قبل النهاية بثانيتين.<br>⚠️ التوليد يُخصم من الرصيد.</p>
       <div class="ap-grid">
         <div>
           <h3>موعد النشر</h3>
           <div class="row wrap">
-            <label class="check"><input type="radio" name="apmode" data-mode="manual" ${man ? "checked" : ""}> أنا هحدد يوم وساعة كل فيديو</label>
-            <label class="check"><input type="radio" name="apmode" data-mode="auto" ${man ? "" : "checked"}> وزّعهم تلقائيًا على مواعيد ثابتة</label>
+            <label class="check"><input type="radio" name="apmode" data-mode="manual" ${man ? "checked" : ""}> سأحدد يوم كل فيديو وساعته</label>
+            <label class="check"><input type="radio" name="apmode" data-mode="auto" ${man ? "" : "checked"}> وزّعها تلقائيًا على مواعيد ثابتة</label>
           </div>
           ${man ? `<p class="hint">حدد اليوم والساعة بجانب كل مشروع (بتوقيت السعودية).</p>` : `
             <div class="ap-auto">
@@ -735,16 +735,16 @@ async function openAutopilot() {
             </div>`}
           <h3>المنصات</h3>
           <div class="row wrap">${AP_PLATFORMS.map(([k, n]) => `<label class="check"><input type="checkbox" data-plat="${k}" ${(s.platforms || []).includes(k) ? "checked" : ""}> ${n}</label>`).join("")}</div>
-          <h3>برومت التوليد</h3>
+          <h3>موجّه التوليد</h3>
           <select data-prompt><option value="">الأساسي (${escapeHtml(prompts[0]?.name || "—")})</option>${prompts.map((p) => `<option value="${p.id}" ${s.prompt_id === p.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`).join("")}</select>
           <h3>المشاريع الجاهزة <span class="muted">(فيديو + تعليق + شخصية)</span></h3>
           <ul class="ap-list">${fol.list.map((f) => {
             const ok = ready(f), on = b.has(f.id);
             return `<li class="${ok && !on ? "" : "off"}"><input type="checkbox" data-pick="${f.id}" ${ok && !on ? "" : "disabled"} ${picked.has(f.id) ? "checked" : ""}>
-              <span class="grow">📁 ${escapeHtml(f.name)}${f.exported ? ' <span class="muted">· صُدّر من قبل</span>' : ""}</span>
+              <span class="grow">📁 ${escapeHtml(f.name)}${f.exported ? ' <span class="muted">· صُدّر سابقًا</span>' : ""}</span>
               ${man && ok && !on ? `<input type="datetime-local" data-at="${f.id}" value="${atVals[f.id] || ""}" title="يوم وساعة النشر (بتوقيت السعودية)">` : ""}
               <span class="muted">${on ? "يعمل" : ok ? "" : "ناقص"}</span></li>`;
-          }).join("") || '<li class="off">لا يوجد مشاريع</li>'}</ul>
+          }).join("") || '<li class="off">لا توجد مشاريع</li>'}</ul>
           <div class="row gap-top"><button class="btn sm" data-all>اختر كل الجاهز</button><span class="spacer"></span><button class="btn primary" data-go>🚀 شغّل الأوتوبايلوت</button></div>
         </div>
         <div>
@@ -787,15 +787,15 @@ async function openAutopilot() {
       if (t.closest("[data-all]")) return dlg.querySelectorAll("[data-pick]:not(:disabled)").forEach((x) => (x.checked = true));
       if (t.closest("[data-go]")) {
         const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
-        if (!ids.length) return toast("اختر مشروع واحد على الأقل", true);
+        if (!ids.length) return toast("اختر مشروعًا واحدًا على الأقل", true);
         if (!st.settings.platforms?.length) return toast("اختر منصة واحدة على الأقل", true);
         const at = manual() ? Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""])) : {};
-        if (manual() && Object.values(at).some((v) => !v)) return toast("حدد يوم وساعة لكل مشروع مختار", true);
-        if (!(await uiConfirm(`سيُولّد ويُنشر ${ids.length} مشروع تلقائيًا، والتوليد يصرف من رصيد Atlas. نكمّل؟`))) return;
+        if (manual() && Object.values(at).some((v) => !v)) return toast("حدد يومًا وساعة لكل مشروع مختار", true);
+        if (!(await uiConfirm(`سيُولَّد ${ids.length} مشروع ويُنشر تلقائيًا، والتوليد يُخصم من الرصيد. أنكمل؟`))) return;
         await saveSettings();
         st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids, at }) });
         dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
-        toast(`🤖 ${ids.length} مشروع دخلوا الطابور`);
+        toast(`🤖 دخل ${ids.length} مشروع قائمة الانتظار`);
         return draw();
       }
       const stop = t.closest("[data-stop]"), del = t.closest("[data-del]"), res = t.closest("[data-resume]");
@@ -824,13 +824,13 @@ async function openFoldersPurge() {
   dlg.className = "bulk-dlg ap-dlg";
   const age = (f) => Math.floor((Date.now() - new Date(f.created_at)) / 864e5);
   const list = [...fol.list].sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
-  dlg.innerHTML = `<div class="panel-head"><h2>🗑️ احذف مشاريع قديمة</h2><button class="btn sm" data-x>قفل</button></div>
-    <p class="hint">يُحذف المشروع والفيديو الخام والقطع والفيديوهات المولّدة ومشروع المونتاج الخاص به. التعليق الصوتي والشخصيات يظلون في مكتباتهم.</p>
+  dlg.innerHTML = `<div class="panel-head"><h2>🗑️ احذف مشاريع قديمة</h2><button class="btn sm" data-x>إغلاق</button></div>
+    <p class="hint">يُحذف المشروع والفيديو الخام والقطع والفيديوهات المولّدة ومشروع المونتاج الخاص به. يبقى التعليق الصوتي والشخصيات في مكتباتها.</p>
     <div class="row wrap"><button class="btn sm" data-old="30">اختر الأقدم من شهر</button><button class="btn sm" data-old="7">الأقدم من أسبوع</button>
       <button class="btn sm" data-old="0">اختر الكل</button><button class="btn sm" data-none>أزل الاختيار</button></div>
     <ul class="ap-list gap-top">${list.map((f) => `<li><input type="checkbox" data-pick="${f.id}">
-      <span class="grow">📁 ${escapeHtml(f.name)} <small class="muted">· ${age(f) ? `من ${age(f)} يوم` : "اليوم"}${f.exported ? " · 🎬 صُدّر" : ""}</small></span></li>`).join("") || '<li class="off">لا يوجد مشاريع</li>'}</ul>
-    <label class="check gap-top"><input type="checkbox" data-exp> احذف أيضًا الفيديوهات النهائية التي صُدّرت <span class="muted">(ما عليها منشور متجدول تظل)</span></label>
+      <span class="grow">📁 ${escapeHtml(f.name)} <small class="muted">· ${age(f) ? `منذ ${age(f)} يوم` : "اليوم"}${f.exported ? " · 🎬 صُدّر" : ""}</small></span></li>`).join("") || '<li class="off">لا توجد مشاريع</li>'}</ul>
+    <label class="check gap-top"><input type="checkbox" data-exp> احذف أيضًا الفيديوهات النهائية المصدّرة <span class="muted">(ما عليه منشور مجدول يبقى)</span></label>
     <div class="row gap-top"><span class="muted" data-count></span><span class="spacer"></span><button class="btn danger" data-go>🗑️ احذف المختار</button></div>`;
   const count = () => { dlg.querySelector("[data-count]").textContent = `${dlg.querySelectorAll("[data-pick]:checked").length} مختار`; };
   dlg.addEventListener("change", count);
@@ -842,12 +842,12 @@ async function openFoldersPurge() {
     if (t.closest("[data-none]")) { dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false)); return count(); }
     if (t.closest("[data-go]")) {
       const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
-      if (!ids.length) return toast("اختر مشروع واحد على الأقل", true);
+      if (!ids.length) return toast("اختر مشروعًا واحدًا على الأقل", true);
       const exports = dlg.querySelector("[data-exp]").checked;
-      if (!(await uiConfirm(`سيُحذف ${ids.length} مشروع${exports ? " ومعهم الفيديوهات النهائية" : ""} ولن ينفع ترجّعهم. متأكد؟`))) return;
+      if (!(await uiConfirm(`سيُحذف ${ids.length} مشروع${exports ? " ومعها الفيديوهات النهائية" : ""} ولا يمكن استرجاعها. أمتأكد؟`))) return;
       try {
         const r = await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, exports }) });
-        toast(`🗑️ حُذف ${r.deleted} مشروع${r.kept_exports ? ` (${r.kept_exports} فيديو فضل لكي عليه منشور متجدول)` : ""}`);
+        toast(`🗑️ حُذف ${r.deleted} مشروع${r.kept_exports ? ` (${r.kept_exports} فيديو بقي لأن عليه منشورًا مجدولًا)` : ""}`);
         if (ids.includes(fol.current?.id)) fol.current = null;
         dlg.close();
       } catch (err) {
