@@ -4,20 +4,20 @@
 // حلقة بتخلص، آخر ٣ ثواني بتحمر وتنبض، وعند الصفر: فلاش ونور ويتكشف العرض والزرار واسم البراند. 1080×1920، 12 ثانية.
 const G1 = "١ · العداد", G2 = "٢ · الكشف", GS = "الشكل العام";
 const PR = M.params({
-  label: { label: "فوق العداد", kind: "text", def: "العرض الكبير بيبدأ بعد", group: G1, max: 26, hint: "بيقول الناس مستنيين إيه (العرض، الافتتاح، الإطلاق)." },
-  from: { label: "يعد من كام", kind: "number", def: 7, min: 3, max: 9, step: 1, unit: " ثواني", group: G1, hint: "كل رقم ثانية: ٥–٧ أحسن حاجة (أطول من كده الناس بتزهق)." },
-  reveal: { label: "جملة الكشف", kind: "text", role: "product", def: "العرض بدأ!", group: G2, max: 16, hint: "اللي بيطلع مع الفلاش عند الصفر: قصيرة وفيها حماس." },
+  label: { label: "فوق العدّاد", kind: "text", def: "العرض الكبير بيبدأ بعد", group: G1, max: 26, hint: "يوضح ما ينتظره الناس (العرض، الافتتاح، الإطلاق)." },
+  from: { label: "يعدّ من", kind: "number", def: 7, min: 3, max: 9, step: 1, unit: " ثواني", group: G1, hint: "كل رقم ثانية: ٥–٧ هو الأفضل (الأطول من ذلك يُملّ)." },
+  reveal: { label: "جملة الكشف", kind: "text", role: "product", def: "العرض بدأ!", group: G2, max: 16, hint: "ما يظهر مع الوميض عند الصفر: قصيرة ومتحمسة." },
   offer: { label: "العرض", kind: "text", def: "خصومات لحد النص على كل حاجة", group: G2, max: 34, hint: "العرض بالتفصيل في سطر (النسبة أو السعر أو الهدية)." },
-  cta: { label: "الزرار", kind: "text", def: "الحق دلوقتي", group: G2, max: 14 },
+  cta: { label: "الزر", kind: "text", def: "الحق دلوقتي", group: G2, max: 14 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "سوق البلد", group: G2, max: 20 },
-  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#5b2bff", group: GS, hint: "الخلفية والكروت: لون قوي." },
-  hot: { label: "لون آخر ثواني", kind: "color", def: "#ff2d55", group: GS, hint: "آخر ٣ ثواني الرقم بيحمر وينبض: لون إنذار (أحمر، برتقالي)." },
+  color: { label: "اللون الأساسي", kind: "color", role: "accent", def: "#5b2bff", group: GS, hint: "الخلفية والبطاقات: لون قوي." },
+  hot: { label: "لون الثواني الأخيرة", kind: "color", def: "#ff2d55", group: GS, hint: "في آخر ٣ ثوانٍ يحمرّ الرقم وينبض: لون إنذار (أحمر، برتقالي)." },
   fHead: { label: "خط الأرقام والكشف", kind: "font", def: "lalezar", group: GS },
   fBody: { label: "خط النص", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "عد تنازلي مثل لوحات المطارات: الرقم ينقلب حتى الصفر، وآخر ٣ ثوانٍ تحمرّ وتنبض، وعند الصفر وميض ويُكشف العرض والزر.",
-  scenes: [{ name: G1, t0: 0, t1: 7.6, about: "الأرقام بتقلب (طوله على حسب «يعد من كام»)" }, { name: G2, t0: 7.6, t1: 12, about: "الفلاش والعرض والزرار" }],
+  scenes: [{ name: G1, t0: 0, t1: 7.6, about: "الأرقام بتقلب (طوله على حسب «يعدّ من»)" }, { name: G2, t0: 7.6, t1: 12, about: "الفلاش والعرض والزرار" }],
   tips: ["يصلح قبل بث مباشر أو افتتاح أو عرض محدود.", "جملة الكشف قصيرة والتفاصيل في سطر العرض."],
 });
 const W = 1080, H = 1920, DUR = 12, T0 = .6;

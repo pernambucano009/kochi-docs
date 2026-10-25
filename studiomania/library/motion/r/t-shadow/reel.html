@@ -2,19 +2,19 @@
 <script>
 // قالب «خيال الظل»: عرايس جلد ملوّن شفاف على قماشة منوّرة بلمبة بتترعش من ورا. الراجل أبو طربوش بيدخل ماشي،
 // الجمل بيدخل من الناحية التانية، بيسلّموا على بعض، ويافطة العنوان بتنزل وحروفها مخرومة والنور طالع منها. 1080×1920، 12 ثانية.
-const G1 = "١ · العرايس", G2 = "٢ · اليافطة", G3 = "٣ · الكلام والبراند", GS = "الشكل العام";
+const G1 = "١ · العرايس", G2 = "٢ · اللافتة", G3 = "٣ · الكلام والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "حكايات زمان", group: G2, max: 12, hint: "حروفه بتتخرم في اليافطة والنور بيطلع منها: كلمتين كفاية." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "حكايات زمان", group: G2, max: 12, hint: "حروفه بتتخرم في اللافتة والنور بيطلع منها: كلمتين كفاية." },
   sub: { label: "تحت العنوان", kind: "text", def: "كل خميس في ساحة البيت", group: G3, max: 28, hint: "إمتى وفين." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مسرح الحارة", group: G3, max: 16 },
   robe: { label: "لون الجلابية", kind: "color", role: "accent", def: "#b3261e", group: G1, hint: "لون جلد عروسة الراجل أبو طربوش." },
-  banner: { label: "لون اليافطة", kind: "color", def: "#2f3d86", group: G2 },
-  fTitle: { label: "خط العنوان والبراند", kind: "font", def: "ruqaa", group: GS },
+  banner: { label: "لون اللافتة", kind: "color", def: "#2f3d86", group: G2 },
+  fTitle: { label: "خط العنوان والعلامة", kind: "font", def: "ruqaa", group: GS },
   fText: { label: "خط تحت العنوان", kind: "font", def: "lalezar", group: GS },
 });
 M.meta({
   story: "خيال الظل: دمى من جلد ملوّن شفاف على قماش مضاء بمصباح يرتعش من الخلف. رجل بطربوش يدخل ماشيًا، وجمل من الجهة الأخرى، يتبادلان التحية، ثم تنزل لافتة العنوان بحروف مثقوبة والضوء يخرج منها.",
-  scenes: [{ name: G1, t0: 0, t1: 6, about: "الراجل والجمل بيدخلوا ويسلّموا" }, { name: G2, t0: 6, t1: 8.8, about: "اليافطة بتنزل بالعنوان" }, { name: G3, t0: 8.8, t1: 12, about: "تحت العنوان والبراند" }],
+  scenes: [{ name: G1, t0: 0, t1: 6, about: "الراجل والجمل بيدخلوا ويسلّموا" }, { name: G2, t0: 6, t1: 8.8, about: "اللافتة بتنزل بالعنوان" }, { name: G3, t0: 8.8, t1: 12, about: "تحت العنوان والبراند" }],
   tips: ["مناسب للفعاليات والمسرح والحكايات والمطاعم الشعبية ورمضان.", "روح الحكايات القديمة: كلام بسيط ودافئ.", "العنوان القصير يبدو أوضح وهو مثقوب."],
 });
 const W = 1080, H = 1920, DUR = 12, CL = 70, CR = 1010, CT = 250, CB = 1480;
@@ -93,7 +93,7 @@ M.reel({
     const comp = (q, blur) => { x.save(); x.beginPath(); x.rect(CL, CT, CR - CL, CB - CT); x.clip(); x.globalCompositeOperation = "multiply"; x.filter = blur > .3 ? `blur(${blur.toFixed(1)}px)` : "none"; x.drawImage(q.canvas, 0, 0); x.restore(); };
     pa.setTransform(1, 0, 0, 1, 0, 0); pa.clearRect(0, 0, W, H); camel(pa, cxp, 1470, cph, nod); comp(pa, 9 * (1 - smooth(seg(t, 3.0, 4.2))));
     pb.setTransform(1, 0, 0, 1, 0, 0); pb.clearRect(0, 0, W, H); man(pb, mx, 1470, mph, bow, wave); comp(pb, 9 * (1 - smooth(seg(t, 1.2, 2.4))));
-    // اليافطة بحروف مخرومة
+    // اللافتة بحروف مخرومة
     const bk = seg(t, 7.4, 8.4);
     if (bk > 0) {
       const by = -260 + 800 * expo(bk), sw = Math.sin((t - 7.4) * 5) * .12 * Math.exp(-(t - 7.4) * 1.4);

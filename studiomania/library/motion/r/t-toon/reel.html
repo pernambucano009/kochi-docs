@@ -6,13 +6,13 @@ const G1 = "١ · المنتج", G2 = "٢ · الخطوات", G3 = "٣ · الن
 const PR = M.params({
   title: { label: "اسم المنتج", kind: "text", role: "product", def: "خلّاط الصباح", group: G1, max: 14, hint: "المذيعة بتقدّمه في الأول." },
   s1: { label: "الخطوة ١", kind: "text", def: "حط الفاكهة", group: G2, max: 14, hint: "إزاي تستخدم المنتج في ٣ خطوات سهلة." },
-  s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزرار", group: G2, max: 14 },
+  s2: { label: "الخطوة ٢", kind: "text", def: "دوس الزر", group: G2, max: 14 },
   s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع", group: G2, max: 14 },
   end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!", group: G3, max: 12 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "بيتي للأجهزة", group: G3, max: 16 },
   product: { label: "لون المنتج", kind: "color", role: "accent", def: "#2bb3a8", group: G1, hint: "لون المنتج المرسوم جنب المذيعة." },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
-  fText: { label: "خط البراند", kind: "font", def: "changa", group: GS },
+  fText: { label: "خط العلامة", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "إعلان رسوم متحركة من الخمسينيات بألوان مطبوعة مزاحة عن الخط وتهتز: مذيعة مبتسمة (اليدان والعينان فقط تتحركان) تقدّم المنتج وتشرحه في ٣ خطوات مرقّمة، مع نجوم وأشكال «ذرية»، وجملة النهاية والعلامة.",
@@ -86,7 +86,7 @@ M.reel({
     const blink = (tw % 40) < 2; [[-35, -650], [35, -655]].forEach(([ox, oy]) => { if (blink) { x.strokeStyle = INK; x.lineWidth = 4; x.beginPath(); x.moveTo(px + ox - 12, py + oy); x.lineTo(px + ox + 12, py + oy); x.stroke(); } else { x.fillStyle = INK; x.beginPath(); x.ellipse(px + ox + 4, py + oy, 9, 13, 0, 0, Math.PI * 2); x.fill(); } });
     x.strokeStyle = INK; x.lineWidth = 5; x.beginPath(); x.arc(px + 5, py - 590, 34, .3, Math.PI - .3); x.stroke();
     shape(ell(px - 52, py - 600, 18, 10), "#f2a38f", 44, 0);
-    // الإيد: بتشاور على المنتج (أو بتدوس الزرار في الخطوة ٢)
+    // الإيد: بتشاور على المنتج (أو بتدوس الزر في الخطوة ٢)
     const tgt = si === 2 && lt > .4 && lt < 1.2 ? [bx - 30, by - 85] : si === 0 ? [px + 180, py - 760 + Math.sin(t * 8) * 30] : [bx - 180, by - 330 + Math.sin(t * 2) * 10];
     const sh = [px + 70, py - 440], el = [(sh[0] + tgt[0]) / 2, Math.max(sh[1], tgt[1]) + 40];
     x.strokeStyle = "#e9573f"; x.lineWidth = 30; x.lineCap = "round"; x.beginPath(); x.moveTo(...sh); x.quadraticCurveTo(...el, ...tgt); x.stroke(); x.strokeStyle = INK; x.lineWidth = 3; x.stroke();

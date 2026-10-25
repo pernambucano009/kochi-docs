@@ -26,7 +26,7 @@ const PR = M.params({
   c3: { label: "لون الخلفية الفاتح", kind: "color", def: "#ece4d8", group: GS, hint: "فاتح ودافي (كريمي، بيج). ده ورا المنتجات." },
   fHead: { label: "خط العناوين", kind: "font", def: "alexandria", group: GS, hint: "خط عريض للجمل وأسماء المنتجات." },
   fBody: { label: "خط النص الصغير", kind: "font", def: "alexandria5", group: GS, hint: "خط عادي مقروء (اسم العلامة تحت المنتج والجملة الأخيرة)." },
-  cursor: { label: "الماوس اللي بيدوس الزرار", kind: "toggle", def: true, group: G3 },
+  cursor: { label: "الماوس اللي بيدوس الزر", kind: "toggle", def: true, group: G3 },
 });
 M.meta({
   story: "إعلان متجر هادئ وفاخر: يبدأ بإحساس (جملة)، ثم يعرض المنتجات عائمة على كتل بألوان العلامة، ويقترب من منتجين ببطاقات شراء حقيقية، ويختم بالشعار.",
@@ -132,7 +132,7 @@ M.reel({
         txt(nm, 540, 330, 104, G);
         x.globalAlpha = .7; txt(PR.brand, 540, 430, 40, G, "TX"); x.globalAlpha = 1;
         txt(pr, 540, 520, 64, A);
-        // الزرار: بيتداس بعد ثانية وربع ويتقلب أخضر
+        // الزر: بيتداس بعد ثانية وربع ويتقلب أخضر
         const tap = t - (t0 + 1.25), pressed = tap > 0, sc = pressed ? 1 - .08 * Math.exp(-tap * 8) * Math.sin(Math.min(Math.PI, tap * 14)) : 1;
         x.save(); x.translate(540, 1640); x.scale(sc, sc);
         x.fillStyle = pressed ? G : "#1b1b1b"; x.beginPath(); x.roundRect(-300, -72, 600, 144, 72); x.fill();

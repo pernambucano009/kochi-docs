@@ -4,18 +4,18 @@
 // بيلف، الغطا بيتفصل لفوق، أرقام بتعدّ وتتلوّن بلون التمييز لما تتثبت، وواجهة HUD بأركان ومساطر. 1080×1920، 12 ثانية.
 const G1 = "١ · المسح والمجسم", G2 = "٢ · المميزات", G3 = "٣ · الاسم", GS = "الشكل العام";
 const PR = M.params({
-  hudTop: { label: "الكلمة فوق على الشمال", kind: "text", def: "SUBJECT // SCAN", group: G1, max: 20, hint: "كلام الشاشة التقنية (HUD). الإنجليزي بيدي إحساس خيال علمي، وممكن تكتبه عربي." },
-  hudScan: { label: "كلمة المسح", kind: "text", def: "SCAN", group: G1, max: 10, hint: "بيظهر جنبها نسبة المسح بتعد لحد ١٠٠٪." },
+  hudTop: { label: "الكلمة أعلى اليسار", kind: "text", def: "SUBJECT // SCAN", group: G1, max: 20, hint: "نص الشاشة التقنية (HUD). الإنجليزية تعطي إحساس الخيال العلمي، ويمكنك كتابته بالعربية." },
+  hudScan: { label: "كلمة المسح", kind: "text", def: "SCAN", group: G1, max: 10, hint: "تظهر بجانبها نسبة المسح وهي تعدّ حتى ١٠٠٪." },
   hudExplode: { label: "وقت التفكيك", kind: "text", def: "MODE // EXPLODE", group: G1, max: 20 },
   hudLock: { label: "بعد التثبيت", kind: "text", def: "STATUS // LOCKED", group: G1, max: 20 },
-  f1: { label: "ميزة ١ (رقم|كلام)", kind: "text", def: "24|ساعة بطارية", group: G2, max: 24,
-    hint: "رقم|كلام (زي «24|ساعة بطارية»). الرقم بيعد ويتلوّن لما يتثبت، فلازم يكون رقم حقيقي ومهم." },
-  f2: { label: "ميزة ٢ (رقم|كلام)", kind: "text", def: "360|درجة صوت", group: G2, max: 24 },
-  f3: { label: "ميزة ٣ (رقم|كلام)", kind: "text", def: "5|دقايق شحن سريع", group: G2, max: 24 },
-  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض", group: G3, max: 14, hint: "بيظهر كبير في كارت تحت المجسم." },
+  f1: { label: "ميزة ١ (رقم|نص)", kind: "text", def: "24|ساعة بطارية", group: G2, max: 24,
+    hint: "رقم|نص (مثل «24|ساعة بطارية»). يعدّ الرقم ويتلوّن عند التثبيت، فيجب أن يكون رقمًا حقيقيًا ومهمًا." },
+  f2: { label: "ميزة ٢ (رقم|نص)", kind: "text", def: "360|درجة صوت", group: G2, max: 24 },
+  f3: { label: "ميزة ٣ (رقم|نص)", kind: "text", def: "5|دقايق شحن سريع", group: G2, max: 24 },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض", group: G3, max: 14, hint: "يظهر كبيرًا في بطاقة تحت المجسم." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "نبض أوديو", group: G3, max: 20 },
-  hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8", group: GS, hint: "لون النور: سماوي أو أخضر نعناعي بيدّي إحساس الهولوجرام." },
-  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff8a3d", group: GS, hint: "الأرقام لما تتثبت: لون دافي عكس لون الهولوجرام علشان يبان." },
+  hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8", group: GS, hint: "لون الضوء: السماوي أو الأخضر النعناعي يعطي إحساس الهولوجرام." },
+  accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff8a3d", group: GS, hint: "الأرقام عند تثبيتها: لون دافئ معاكس للون الهولوجرام ليظهر." },
   fTitle: { label: "خط الاسم", kind: "font", def: "plex", group: GS },
   fText: { label: "خط النص", kind: "font", def: "plex4", group: GS },
 });

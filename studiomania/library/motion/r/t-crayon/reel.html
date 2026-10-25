@@ -4,12 +4,12 @@
 // بتطلع برّه الخط شوية، كل خط بيرتعش (بيترسم تاني كل شوية)، وفي الآخر لون مية أزرق للسما والشمع بيرفضه. 1080×1920، 12 ثانية.
 const G1 = "١ · الرسمة", G2 = "٢ · العنوان والبراند", GS = "الشكل العام";
 const PR = M.params({
-  title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك", group: G2, max: 20, hint: "بيتكتب بالشمع فوق الرسمة: جملة فرحانة وقصيرة." },
+  title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك", group: G2, max: 20, hint: "يُكتب بالشمع فوق الرسمة: جملة مبهجة وقصيرة." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مكتبة ألوان", group: G2, max: 16 },
-  line: { label: "لون الخط", kind: "color", def: "#2d2a6e", group: G1, hint: "لون خطوط الرسم والكلام: خليه غامق علشان يبان على الورق." },
-  balloon: { label: "لون البالونة", kind: "color", role: "accent", def: "#e5423b", group: G1, hint: "البالونة اللي بتطير في الرسمة: لون براندك." },
+  line: { label: "لون الخط", kind: "color", def: "#2d2a6e", group: G1, hint: "لون خطوط الرسم والنص: اجعله غامقًا ليظهر على الورق." },
+  balloon: { label: "لون البالون", kind: "color", role: "accent", def: "#e5423b", group: G1, hint: "البالون الذي يطير في الرسمة: لون علامتك." },
   fTitle: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
-  fText: { label: "خط البراند", kind: "font", def: "changa", group: GS },
+  fText: { label: "خط العلامة", kind: "font", def: "changa", group: GS },
 });
 M.meta({
   story: "صفحة كتاب أطفال تُرسم أمامك بألوان شمعية على ورق خشن: بيت وشجرة وشمس وبالون، والتلوين خطوط ذهابًا وإيابًا تخرج عن الحدود، وكل خط يرتعش، وفي النهاية ألوان مائية زرقاء للسماء يصدّها الشمع، ثم يُكتب العنوان.",

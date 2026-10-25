@@ -18,10 +18,10 @@ const PR = M.params({
   lBy: { label: "كلمة «الرسّام»", kind: "text", def: "الرسّام", group: G3, max: 10 },
   lDate: { label: "كلمة «التاريخ»", kind: "text", def: "التاريخ", group: G3, max: 10 },
   date: { label: "التاريخ", kind: "text", def: "٢٠٢٦", group: G3, max: 10 },
-  stamp: { label: "الختم", kind: "text", def: "معتمد", group: G3, max: 8, hint: "كلمة واحدة بتخبط في الآخر: معتمد، أصلي، جديد." },
-  stampColor: { label: "لون الختم", kind: "color", role: "accent", def: "#e0343a", group: GS, hint: "اللون الوحيد غير الأبيض في الفيديو: أحمر أو لون البراند لو قوي." },
-  paper: { label: "لون الورقة", kind: "color", def: "#21468a", group: GS, hint: "أزرق المخططات التقليدي، أو كحلي/أخضر غامق. لازم غامق علشان الخطوط البيضا تبان." },
-  fHand: { label: "خط الكتابة", kind: "font", def: "ruqaa", group: GS, hint: "الملاحظات والاسم. الرقعة شبه خط المهندس بالقلم." },
+  stamp: { label: "الختم", kind: "text", def: "معتمد", group: G3, max: 8, hint: "كلمة واحدة تُختم في النهاية: معتمد، أصلي، جديد." },
+  stampColor: { label: "لون الختم", kind: "color", role: "accent", def: "#e0343a", group: GS, hint: "اللون الوحيد غير الأبيض في الفيديو: أحمر أو لون العلامة إن كان قويًا." },
+  paper: { label: "لون الورقة", kind: "color", def: "#21468a", group: GS, hint: "أزرق المخططات التقليدي، أو كحلي/أخضر غامق. يجب أن يكون غامقًا لتظهر الخطوط البيضاء." },
+  fHand: { label: "خط الكتابة", kind: "font", def: "ruqaa", group: GS, hint: "الملاحظات والاسم. خط الرقعة يشبه خط المهندس بالقلم." },
 });
 M.meta({
   story: "المنتج يُرسم بخطوط بيضاء على ورق أزرق بترتيب المهندس: الحدود والتفاصيل، والمقاسات بأسهمها، و٣ ملاحظات مرقّمة، وجدول المواصفات، والاسم كبير، وختم أحمر في النهاية.",
