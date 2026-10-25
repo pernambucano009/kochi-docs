@@ -8,13 +8,24 @@
 <meta property="og:title" content="سمسمكيت · محتوى كل يوم، من غير فريق">
 <meta property="og:description" content="عقل يعرف علامتك، وقوالب تصنع الفيديو بلهجتك، والأوتوبايلوت ينشره في موعده.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://simsimkit.com/">
+<meta property="og:image" content="https://simsimkit.com/site/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="سمسمكيت: محتوى كل يوم، من غير فريق">
+<meta property="og:locale" content="ar_SA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="سمسمكيت · محتوى كل يوم، من غير فريق">
+<meta name="twitter:description" content="عقل يعرف علامتك، وقوالب تصنع الفيديو بلهجتك، والأوتوبايلوت ينشره في موعده.">
+<meta name="twitter:image" content="https://simsimkit.com/site/og.jpg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500&family=Alexandria:wght@300;400;500;600&display=swap">
+<script src="/plan-items.js"></script>
 <script>
   // 🖥️ الكمبيوتر والتابلت ليهم التصميم الأول (/welcome)
-  if (innerWidth > 760) location.replace("/welcome" + location.hash);
+  if (innerWidth >= 1100) location.replace("/welcome" + location.hash);
   // نفس اختيار الوضع (فاتح/غامق) واللغة اللي في البرنامج
   try {
     const t = localStorage.getItem("studiomania.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -177,7 +188,7 @@
   @media (max-width: 1240px) { .side { display: none; } }
   @media (max-width: 960px) {
     .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .plans { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+    .plans { grid-template-columns: minmax(0, 1fr); max-width: 520px; margin-inline: auto; }
     .vid { grid-template-columns: minmax(0, 1fr); }
   }
   /* الموبايل: نفس ترتيب لوحة الموبايل */
@@ -318,7 +329,7 @@
         ["النشر على 13 منصة", "تيك توك وإنستجرام ويوتيوب وX وغيرها، من جدولة واحدة."], ["تطبيق الجوال", "صوّر مع الملقّن، وسجّل أفكارك بصوتك، ووافق من أي مكان."]],
       pTitle: "باقات بسيطة، وتبدأ مجانًا", pLead: "ادفع شهريًا أو سنويًا، وألغِ متى شئت.", monthly: "شهري", yearly: "سنوي · شهران مجانًا",
       perMonth: "ر.س / شهر", perYear: "ر.س / سنة", popular: "الأكثر طلبًا", choose: "اختر الباقة", choosePop: "ابدأ بباقة {0}",
-      credits: "{0} نقطة شهريًا", accounts: "{0} حسابات تواصل", accounts2: "حسابا تواصل", accountsMax: "{0} حسابات (حتى {1})", autoOn: "الأوتوبايلوت والخطة الشهرية",
+      credits: "{0} نقطة كل شهر", accounts: "{0} حسابات تواصل", accounts2: "حسابا تواصل", accountsMax: "{0} حسابات (حتى {1})", autoOn: "الأوتوبايلوت والخطة الشهرية",
       autoAdd: "الأوتوبايلوت إضافة بـ {0} ر.س", allTpl: "كل القوالب والدبلجة", mobile: "تطبيق الجوال والموافقات", perClient: "عقل منفصل لكل عميل", topup: "شحن النقاط بضعف القيمة",
       pNote: "كل حساب جديد يبدأ بـ 300 نقطة مجانًا للتجربة.", pAll: "كل تفاصيل الباقات والنقاط الإضافية", pFail: "الأسعار لا تُحمّل الآن. افتح صفحة الأسعار.",
       qTitle: "أسئلة تتكرر",
@@ -427,19 +438,18 @@
     $("cyc").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.cyc === S.cyc));
     if (!d) { $("plans").innerHTML = S.pricingFailed ? `<p class="p-note">${esc(t.pFail)}</p>` : ""; return; }
     const SAR = 3.76, sar = (v) => Math.round(v * SAR), months = (d.rules && d.rules.yearly_months) || 10, en = S.lang === "en";
-    const autoAdd = (d.addons || []).find((a) => a.key === "autopilot");
     const n = (v) => Number(v).toLocaleString("en-US");
-    $("plans").innerHTML = (d.plans || []).filter((p) => p.price > 0).map((p) => {
+    const all = d.plans || [];
+    $("plans").innerHTML = all.filter((p) => p.price > 0).map((p) => {
       const name = en ? p.name_en || p.name : p.name;
-      const feats = [fmt(t.credits, n(p.credits)),
-        p.max_accounts ? fmt(t.accountsMax, p.accounts, p.max_accounts) : p.accounts === 2 ? t.accounts2 : fmt(t.accounts, p.accounts)];
-      if (p.autopilot) feats.push(t.autoOn); else feats.push(t.allTpl, ...(autoAdd && (autoAdd.for || []).includes(p.key) ? [fmt(t.autoAdd, sar(autoAdd.price))] : []));
-      if (p.max_accounts) feats.push(t.perClient); else if (p.autopilot) feats.push(t.mobile);
-      if (p.topup_bonus) feats.push(t.topup);
+      // نفس بنود /pricing (plan-items.js): اللي بيزيد عن الباقة اللي قبلها
+      const prev = all[all.indexOf(p) - 1];
+      const feats = [fmt(t.credits, n(p.credits))].concat(PlanItems.adds(p, prev, d.addons, S.lang));
       const price = S.cyc === "year" ? sar(p.price * months) : sar(p.price);
       const usd = S.cyc === "year" ? p.price * months : p.price;
       return `<article class="card plan${p.popular ? " pop" : ""}"><div class="top"><h3>${esc(name)}</h3>${p.popular ? `<span class="badge">${esc(t.popular)}</span>` : ""}</div>
         <p class="price"><b>${n(price)}</b><span>${esc(S.cyc === "year" ? t.perYear : t.perMonth)}</span></p><p class="usd">≈ $${n(usd)}</p>
+        ${prev && prev.price > 0 ? `<p class="usd" style="margin-top:14px">${esc(en ? `Everything in ${prev.name_en || prev.name}, plus:` : `كل ما في «${prev.name}»، وأيضًا:`)}</p>` : ""}
         <ul>${[...new Set(feats)].map((f) => `<li>${CHECK}<span>${esc(f)}</span></li>`).join("")}</ul>
         <a class="btn${p.popular ? " go" : ""}" style="display:grid;place-items:center" href="/signup?plan=${encodeURIComponent(p.key)}&cycle=${S.cyc}">${esc(p.popular ? fmt(t.choosePop, name) : t.choose)}</a></article>`;
     }).join("");

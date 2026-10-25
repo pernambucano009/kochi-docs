@@ -9,7 +9,7 @@ const PlansPage = (() => {
       { key: "starter", name: "بداية", price: 29, credits: 1000, accounts: 2, autopilot: false },
       { key: "pro", name: "محترف", price: 79, credits: 3500, accounts: 4, autopilot: true, popular: true },
       { key: "agency", name: "وكالات", price: 199, credits: 30000, accounts: 10, autopilot: true, max_accounts: 25, topup_bonus: 2,
-        features: ["النقطة أرخص بحوالي ٧٠٪ من «محترف»", "تكفي ٩٠ منشور في الشهر بالأوتوبايلوت (٣ في اليوم)، فيديوهات أو كاروسيل", "النقاط الزيادة بنص السعر (ضعف النقاط في أي شحن)"] }],
+        features: ["النقطة أرخص بحوالي ٧٠٪ من «محترف»", "تكفي ٩٠ منشورًا شهريًا بالأوتوبايلوت", "شحن النقاط بضعف القيمة"] }],
     topups: [{ key: "t15", price: 15, credits: 1000 }, { key: "t35", price: 35, credits: 2500 }, { key: "t75", price: 75, credits: 6000 }],
     rules: { plan_credits_rollover: false, topup_valid_months: 12, yearly_months: 10 },
   };

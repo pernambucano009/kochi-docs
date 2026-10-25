@@ -61,6 +61,7 @@
   <p class="co">شركة جيكزون (ذات مسؤولية محدودة) · الرقم الوطني الموحد <span dir="ltr">7054472456</span> · مكة المكرمة، حي العوالي، شارع الوميض، مبنى 3305، الرقم الفرعي 8268، الرمز البريدي 24373 (العنوان المختصر MDAB3305) · جوال <a href="tel:+966560053050" dir="ltr">0560053050</a></p><p class="co">الأسعار بالريال السعودي شاملة، ويتم الدفع بما يعادلها.</p>
 </div>
 <div class="toast" id="toast"></div>
+<script src="/plan-items.js"></script>
 <script src="/plans-view.js"></script>
 <script>
   const root = document.documentElement, swT = document.getElementById("swT");
@@ -72,7 +73,7 @@
   };
   const toast = (m) => { const el = document.getElementById("toast"); el.textContent = m; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2600); };
   fetch("/api/pricing").then((r) => r.json()).then((d) => {
-    PlansView.mount(document.getElementById("pv"), { plans: d.plans, topups: d.topups, rules: d.rules, me: null }, {
+    PlansView.mount(document.getElementById("pv"), { plans: d.plans, addons: d.addons, topups: d.topups, rules: d.rules, me: null }, {
       toast, open: true,
       signup: (plan, cycle) => { location.href = `/signup${plan ? `?plan=${encodeURIComponent(plan)}&cycle=${cycle}` : ""}`; },
     });

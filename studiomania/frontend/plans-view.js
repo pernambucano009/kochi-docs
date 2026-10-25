@@ -136,21 +136,15 @@ const PlansView = (() => {
   const ORDER = ["trial", "starter", "pro", "agency"];
   const PLUS = `<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 
-  // اللي بيزيد في الباقة عن اللي قبلها (من بيانات الباقات نفسها، ومن «features» لو اتضافت في billing.json)
-  function adds(p, prev) {
-    const out = [];
-    if (!prev) out.push("كل الأدوات والقوالب", "عقل العلامة");
-    if (p.accounts && !(prev && prev.accounts)) out.push(p.accounts === 2 ? "حسابين سوشيال للنشر" : `${p.accounts} حسابات سوشيال للنشر`, "جدولة ونشر", "التعليقات والرسائل");
-    else if (prev && p.accounts > prev.accounts) out.push(`${p.accounts} حسابات سوشيال${p.max_accounts ? ` (حتى ${p.max_accounts})` : ""}`);
-    if (p.autopilot && !(prev && prev.autopilot)) out.push("أوتوبايلوت: يعمل وينشر تلقائيًا");
-    if (!p.accounts) out.push("بدون نشر");
-    return out.concat(p.features || []);
-  }
+  // اللي بيزيد في الباقة عن اللي قبلها: من plan-items.js، نفس المصدر اللي شاشة الأسعار في صفحة الهبوط بتقرا منه
+  let ADDONS = [];
+  const adds = (p, prev) => PlanItems.adds(p, prev, ADDONS, "ar");
   // الأسعار بتتعرض بالريال (الدولار × ٣.٧٦ مقرّب)، والدفع نفسه بيتم بما يعادلها
   const SAR = 3.76, sar = (v) => Math.round(v * SAR);
   const credLine = (p) => `<span class="num">${n(p.credits)}</span> نقطة ${p.once ? "مرة واحدة" : "كل شهر"}`;
 
   function mount(el, d, o = {}) {
+    ADDONS = d.addons || [];
     const S = { cyc: "month", open: !!o.open, pick: null, tops: false, top: null, busy: false };   // open: التفاصيل مفتوحة من الأول (صفحة الأسعار العامة)
     const plans = ORDER.map((k) => d.plans.find((p) => p.key === k)).filter(Boolean).concat(d.plans.filter((p) => !ORDER.includes(p.key)));
     const guest = !d.me, ym = +(d.rules?.yearly_months || 10);

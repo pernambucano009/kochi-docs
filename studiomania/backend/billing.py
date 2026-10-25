@@ -30,8 +30,11 @@ DEFAULTS = {
         {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True,
          "max_accounts": 25, "topup_bonus": 2,
          "features": ["النقطة أرخص بحوالي ٧٠٪ من «محترف»",
-                      "تكفي ٩٠ منشور في الشهر بالأوتوبايلوت (٣ في اليوم)، فيديوهات أو كاروسيل",
-                      "النقاط الزيادة بنص السعر (ضعف النقاط في أي شحن)"]},
+                      "تكفي ٩٠ منشورًا شهريًا بالأوتوبايلوت",
+                      "شحن النقاط بضعف القيمة"],
+         "features_en": ["Credits about 70% cheaper than Pro",
+                         "Covers 90 autopilot posts a month",
+                         "Top-ups at double credits"]},
     ],
     "addons": [
         {"key": "account", "name": "حساب سوشيال زيادة", "name_en": "Extra social account", "price": 10, "unit": "للحساب في الشهر"},
