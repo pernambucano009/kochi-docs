@@ -6,8 +6,14 @@ on:
   workflow_dispatch:
 jobs:
   audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # ubuntu-latest بقى 26.04، وأداة المتصفح (Playwright) لسه مابتشتغلش عليه: بنثبّت نسخة مدعومة
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # الشاشات متقسمة ٣ أجزاء بيشتغلوا مع بعض، فالفحص كله بيخلص في حوالي ٢٥ دقيقة بدل ساعة ونص
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [1, 2, 3]
     defaults:
       run:
         working-directory: studiomania
@@ -24,8 +30,10 @@ jobs:
       - run: pip install -r backend/requirements.txt
       - run: npm install --no-save playwright@1.56.1 && npx playwright install --with-deps chromium
       - run: node tests/i18n/audit.js
+        env:
+          CHUNK: ${{ matrix.chunk }}/3
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: i18n-report
-          path: studiomania/tests/i18n/report.json
+          name: i18n-report-${{ matrix.chunk }}
+          path: studiomania/tests/i18n/report-${{ matrix.chunk }}.json
