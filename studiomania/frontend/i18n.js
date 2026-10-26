@@ -42,10 +42,15 @@
   pats.sort((a, b) => b.staticLen - a.staticLen); // الأدق أولًا: «{0} من {1} قطعة وُلّدت» قبل «{0} من {1}: {2}»
 
   const fill = (p, vals) => p.en.replace(/\{(\d)\}/g, (_, i) => t(vals[p.order.indexOf(+i)] ?? ""));
-  const cache = new Map(), miss = new Set();
+  const cache = new Map(), miss = new Set(), seen = new Set();
   I18N.misses = () => [...miss];
+  // 🔎 وضع الفحص (tests/i18n): كل جملة عربي عدّت على الشاشة، عشان فحص العامية. للعملاء مش شغّال
+  let AUDIT = false;
+  try { AUDIT = localStorage.getItem("studiomania.i18n-audit") === "1"; } catch {}
+  I18N.seen = () => [...seen];
   function t(s) {
     if (!s || !AR.test(s)) return s;
+    if (AUDIT && seen.size < 50000) seen.add(norm(s));
     const hit = cache.get(s);
     if (hit !== undefined) return hit;
     const lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0];
@@ -63,6 +68,7 @@
       if (m && (m[1] || m[3])) {
         const core = exact.get(m[2]);
         if (core !== undefined) out = m[1] + core + m[3];
+        else if (m[1] && exact.has(n.slice(m[1].length))) out = m[1] + exact.get(n.slice(m[1].length));   // «＋ X (تويتر)»: القوس جزء من الكلمة
       }
     }
     if (out === undefined) {
@@ -89,6 +95,20 @@
     return out;
   }
   I18N.t = t;
+
+  // 📅 التواريخ والأرقام: أي تنسيق بالعربي (ar-EG…) بيطلع إنجليزي، عشان مايبانش «٢٦/١٠/٢٠٢٦، ١٢:٣٠ ص» في الإنجليزي
+  const enLoc = (l) => (typeof l === "string" && /^ar/i.test(l)) || (Array.isArray(l) && l.some((x) => /^ar/i.test(x))) ? "en-GB" : l;
+  for (const [C, fns] of [[Date, ["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]], [Number, ["toLocaleString"]]]) {
+    for (const f of fns) {
+      const orig = C.prototype[f];
+      C.prototype[f] = function (l, o) { return orig.call(this, enLoc(l), o); };
+    }
+  }
+  const _DTF = Intl.DateTimeFormat, _NF = Intl.NumberFormat;
+  Intl.DateTimeFormat = function (l, o) { return new _DTF(enLoc(l), o); };
+  Intl.DateTimeFormat.prototype = _DTF.prototype; Intl.DateTimeFormat.supportedLocalesOf = _DTF.supportedLocalesOf;
+  Intl.NumberFormat = function (l, o) { return new _NF(enLoc(l), o); };
+  Intl.NumberFormat.prototype = _NF.prototype; Intl.NumberFormat.supportedLocalesOf = _NF.supportedLocalesOf;
 
   const ATTRS = ["placeholder", "title", "aria-label"];
   const SKIP = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT"]);
