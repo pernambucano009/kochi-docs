@@ -3081,3 +3081,24 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 .pub-tabs { margin-left: auto; margin-right: 0; }
 [dir="ltr"] :is(.view[data-view="7"] .panel-head, .db-v2 .db-dh) { direction: rtl; }
 [dir="ltr"] :is(.view[data-view="7"] .panel-head, .db-v2 .db-dh) > * { direction: ltr; }
+
+/* 🎯 العملاء المستهدفون */
+:is(#nh) .ld-find { display: grid; gap: 10px; }
+:is(#nh) .ld-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+:is(#nh) .ld-in { flex: 1; min-width: 220px; height: 42px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--nh-line, rgba(24,23,24,.12)); background: transparent; color: inherit; font: inherit; padding: 0 14px; }
+:is(#nh) .ld-q { flex: 0 1 260px; height: 36px; }
+:is(#nh) .ld-warn { background: color-mix(in srgb, var(--nh-accent) 7%, transparent); border-radius: 12px; padding: 10px 12px; }
+:is(#nh) .ld-rows { display: flex; flex-direction: column; }
+:is(#nh) .ld-r { display: grid; grid-template-columns: 64px minmax(140px, 200px) minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--nh-line, rgba(24,23,24,.08)); font-size: 14px; }
+:is(#nh) .ld-r.done { opacity: .6; }
+:is(#nh) .ld-sc { display: grid; justify-items: center; border-radius: 12px; padding: 6px 0; }
+:is(#nh) .ld-sc b { font-size: 18px; font-weight: 600; } :is(#nh) .ld-sc small { font-size: 11px; }
+:is(#nh) .ld-sc.hot { background: color-mix(in srgb, #E5613E 16%, transparent); color: #C2451F; }
+:is(#nh) .ld-sc.warm { background: color-mix(in srgb, #E5A33E 16%, transparent); }
+:is(#nh) .ld-sc.cold { background: color-mix(in srgb, currentColor 6%, transparent); opacity: .75; }
+:is(#nh) .ld-who, :is(#nh) .ld-say { display: grid; gap: 3px; min-width: 0; }
+:is(#nh) .ld-who small, :is(#nh) .ld-say small { color: var(--nh-muted); font-size: 12px; }
+:is(#nh) .ld-say q { overflow-wrap: anywhere; }
+:is(#nh) .ld-note { margin-top: 4px; height: 30px; border-radius: 9px; border: 1px solid var(--nh-line, rgba(24,23,24,.1)); background: transparent; color: inherit; font: inherit; font-size: 12.5px; padding: 0 10px; }
+:is(#nh) .pk-ib.on { color: var(--nh-accent); }
+@media (max-width: 760px) { :is(#nh) .ld-r { grid-template-columns: 56px 1fr; } :is(#nh) .ld-r .ld-say, :is(#nh) .ld-r .pk-acts { grid-column: 1 / -1; } }

@@ -72,6 +72,7 @@ const NH = (() => {
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، تُبنى تلقائيًا من كل ما عرفه العقل عنك." },
     rivals: { en: "Your Competitors", ar: "منافسوك", icon: "megaphone", page: "rivals", desc: "البرنامج يقترح منافسين وأنت توافق، ومنهم نعرف ما ينجح لديهم ووصفة الاستهداف." },
     bots: { en: "Message Bots", ar: "بوتات الرسائل", icon: "megaphone", page: "bots", desc: "بوت يرد على التعليقات والرسائل والستوري تلقائيًا، يسأل ويفرز، ويحوّل إلى الفريق عند الحاجة." },
+    leads: { en: "Target Leads", ar: "العملاء المستهدفون", icon: "megaphone", page: "leads", desc: "ناس مهتمون بموضوعك من التعليقات على أكثر المنشورات انتشارًا فيه، مرتّبون حسب اهتمامهم، مع ملف تنزّله." },
     wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل معتمدة، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
     plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الإضافية." },
     adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشورًا أو أنشئ إعلانًا جديدًا بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
@@ -94,10 +95,12 @@ const NH = (() => {
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
-    inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox" };
+    inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox", leads: "audience" };
   // 📤 أيقونات أقسام النشر (خط بسيط): نفس الأيقونة في مربعات صفحة النشر وفي عنوان صفحة كل قسم لما تدخله
   const PUB_IC = { pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
     audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
+    // الهدف ونقطة في النص: ناس بعينهم مهتمين
+    leads: "M12 3a9 9 0 1 0 9 9 M12 7a5 5 0 1 0 5 5 M12 11a1 1 0 1 0 1 1 M15 9l5-5 M17 4h3v3",
     // فقاعة واتساب مستديرة بذيل تحت على الشمال، وجواها سماعة تليفون
     wacamp: "M12 3.5a8.5 8.5 0 0 0-7.3 12.8L3.5 20.5l4.3-1.1A8.5 8.5 0 1 0 12 3.5z M9.3 8.3c.4-.5 1.1-.5 1.4 0l.7 1.3c.2.3.1.7-.1 1l-.5.5c.5 1 1.3 1.8 2.3 2.3l.5-.5c.3-.2.7-.3 1-.1l1.3.7c.5.3.5 1 0 1.4-.7.6-1.7.8-2.6.4-1.9-.8-3.4-2.3-4.2-4.2-.4-.9-.2-1.9.4-2.6z" };
   const iconOf = (k) => (k === "brand" ? `<div class="nh-plate">${brandMark()}</div>` : gi(k));
@@ -518,9 +521,9 @@ const NH = (() => {
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       const sub = { pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
-        audience: "من سيشتري، وكيف تصل إليه", wacamp: "رسائل لمشتركينك" };
+        audience: "من سيشتري، وكيف تصل إليه", leads: "ناس مهتمون بموضوعك", wacamp: "رسائل لمشتركينك" };
       const ic = PUB_IC;
-      return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
+      return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "leads", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
         <span class="bl-fi"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${ic[id]}"/></svg></span><b>${esc(T[id].ar)}</b><small>${esc(sub[id])}</small></button>`).join("")}</div></div>`;
     },
     progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">لا توجد مشاريع بعد.</div>`}</div>`) : projectsBoard(),
@@ -576,7 +579,7 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل العلامة، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, bots: BotsPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, leads: LeadsPage, bots: BotsPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
   const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
@@ -739,7 +742,7 @@ const NH = (() => {
     renderBar();
   };
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
-  const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", wacamp: "publish", bots: "publish",
+  const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
     coaches: "brand", twin: "brand", brainlib: "brand", auto: "brand", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {

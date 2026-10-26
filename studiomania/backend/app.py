@@ -5654,6 +5654,138 @@ def rivals_client() -> str:
     return bid
 
 
+# ---------- 🎯 العملاء المستهدفون (leads.py): ناس مهتمين بموضوع، من تعليقات أكتر المنشورات انتشارًا فيه ----------
+import leads  # noqa: E402
+
+LEADS_BUSY: dict[str, str] = {}   # العلامة ← الخطوة الحالية
+LEADS_POSTS = 5                   # منشورات لكل منصة في كل بحث
+
+
+def leads_path(bid: str) -> Path:
+    return brain_dir(bid) / "leads.json"
+
+
+def leads_cost(n_plat: int, posts: int = LEADS_POSTS) -> int:
+    return wallet.credits(wallet.est(scrape=n_plat * (1 + posts), chars=n_plat * posts * 9000))
+
+
+def leads_out(bid: str) -> dict:
+    d = leads.load(leads_path(bid))
+    items = [{**x, "profile": leads.profile_url(x), "dm": leads.dm_url(x)} for x in d.get("items") or []]
+    job = LEADS_BUSY.get(bid) or ""
+    return {"items": items, "runs": (d.get("runs") or [])[-20:], "status": "working" if job and not job.startswith("error") else "failed" if job.startswith("error") else "idle",
+            "step": job if job and not job.startswith("error") else None, "error": job[6:] if job.startswith("error") else None,
+            "cost": {"one": leads_cost(1), "both": leads_cost(2)}, "live": rivals.live(),
+            "suggest": [x for x in [(brain_row(bid) or {}).get("domain"), (brain_row(bid) or {}).get("niche")] if x][:2]}
+
+
+def run_leads(bid: str, topic: str, platforms: list[str]) -> None:
+    b = brain_row(bid) or {}
+    own = {str((b.get("social") or {}).get("handle") or "").lower()}
+    found, new, calls, chars = 0, 0, 0, 0
+    try:
+        d = leads.load(leads_path(bid))
+        for plat in platforms:
+            LEADS_BUSY[bid] = f"يبحث في {'تيك توك' if plat == 'tiktok' else 'إنستغرام'} عن «{topic}»…"
+            if atlas.mock_mode() or not rivals.live():
+                if not atlas.mock_mode():
+                    raise ValueError(rivals.missing_msg() if TENANT_ROLE != "customer" else "البحث عن العملاء غير متاح الآن. جرّب مرة أخرى بعد قليل")
+                rows = leads.mock_rows(topic + plat)
+                new += leads.merge(d, plat, topic, {"url": "https://example.com/p", "handle": "example"}, rows)
+                found += len(rows)
+                continue
+            posts = sorted(rivals.search(plat, topic), key=lambda p: -(p.get("comments") or 0) - (p.get("views") or 0) / 1000)[:LEADS_POSTS]
+            calls += 1
+            for i, post in enumerate(posts):
+                LEADS_BUSY[bid] = f"يقرأ تعليقات المنشور {i + 1} من {len(posts)} على {'تيك توك' if plat == 'tiktok' else 'إنستغرام'}…"
+                rows = [r for r in leads.comments_full(plat, post["url"]) if r["handle"].lower() not in own | {post["handle"].lower()}]
+                calls += 1
+                if not rows:
+                    continue
+                msgs = leads.score_messages(topic, az.brain_text(b), rows)
+                chars += sum(len(m["content"]) for m in msgs) + 3000
+                try:
+                    sc = {int(x.get("i")): x for x in (az.parse_json(series_chat(msgs), "تقييم التعليقات").get("items") or []) if str(x.get("i", "")).isdigit()}
+                except Exception:   # noqa: BLE001
+                    sc = {}
+                for j, r in enumerate(rows):
+                    r["score"] = max(0, min(100, int((sc.get(j) or {}).get("score") or 0)))
+                    r["why"] = str((sc.get(j) or {}).get("why") or "")[:120]
+                new += leads.merge(d, plat, topic, post, rows)
+                found += len(rows)
+        d.setdefault("runs", []).append({"at": time.time(), "topic": topic, "platforms": platforms, "found": found, "new": new})
+        leads.save(leads_path(bid), d)
+        LEADS_BUSY.pop(bid, None)
+    except Exception as exc:  # noqa: BLE001
+        LEADS_BUSY[bid] = "error:" + str(getattr(exc, "detail", None) or exc)[:300]
+    finally:
+        if calls and not atlas.mock_mode():
+            wallet.charge(wallet.credits(wallet.est(scrape=calls, chars=chars)), f"العملاء المستهدفون: «{topic}»", bid)
+
+
+class LeadsFindIn(BaseModel):
+    topic: str
+    platforms: list[str] = ["instagram", "tiktok"]
+
+
+@app.get("/api/leads")
+def leads_get():
+    return leads_out(rivals_client())
+
+
+@app.post("/api/leads/find")
+def leads_find(body: LeadsFindIn):
+    bid = rivals_client()
+    topic = leads.clean_topic(body.topic)
+    plats = [p for p in body.platforms if p in ("instagram", "tiktok")] or ["instagram"]
+    if not topic:
+        raise HTTPException(400, "اكتب الموضوع أو الكلمة التي تبحث عن المهتمين بها")
+    if LEADS_BUSY.get(bid) and not LEADS_BUSY[bid].startswith("error"):
+        raise HTTPException(409, "ما زال البحث السابق يعمل، انتظر قليلًا")
+    if not atlas.mock_mode():
+        wallet.need(leads_cost(len(plats)), "البحث عن العملاء المستهدفين")
+    LEADS_BUSY[bid] = "يبدأ البحث…"
+    threading.Thread(target=run_leads, args=(bid, topic, plats), daemon=True).start()
+    return leads_out(bid)
+
+
+class LeadPatchIn(BaseModel):
+    contacted: bool | None = None
+    note: str | None = None
+
+
+@app.patch("/api/leads/{lid}")
+def leads_patch(lid: str, body: LeadPatchIn):
+    bid = rivals_client()
+    d = leads.load(leads_path(bid))
+    x = next((i for i in d.get("items") or [] if i["id"] == lid), None)
+    if not x:
+        raise HTTPException(404, "هذا الشخص غير موجود في القائمة")
+    if body.contacted is not None:
+        x["contacted"] = body.contacted
+        x["contacted_at"] = time.time() if body.contacted else None
+    if body.note is not None:
+        x["note"] = body.note.strip()[:1000]
+    leads.save(leads_path(bid), d)
+    return leads_out(bid)
+
+
+@app.delete("/api/leads/{lid}")
+def leads_delete(lid: str):
+    bid = rivals_client()
+    d = leads.load(leads_path(bid))
+    d["items"] = [i for i in d.get("items") or [] if i["id"] != lid]
+    leads.save(leads_path(bid), d)
+    return leads_out(bid)
+
+
+@app.get("/api/leads.csv")
+def leads_csv(min_score: int = 0):
+    bid = rivals_client()
+    items = [x for x in leads.load(leads_path(bid)).get("items") or [] if int(x.get("score") or 0) >= min_score]
+    return Response(leads.to_csv(items), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="leads.csv"'})
+
+
 @app.get("/api/rivals")
 def rivals_get():
     """«منافسوك»: الاقتراحات والتحديث والوصفة يحصلون تلقائيًا، وأنت توافق أو ترفض فقط."""
