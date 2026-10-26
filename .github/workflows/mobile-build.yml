@@ -5,6 +5,10 @@
 name: Mobile build
 
 on:
+  # البناء بيبدأ كمان لما ملف studiomania/mobile/build.json يتغيّر على الفرع (فيه المنصة والنوع)،
+  # لأن زرار Run workflow بيظهر بس للملفات اللي على الفرع الأساسي
+  push:
+    paths: ["studiomania/mobile/build.json"]
   workflow_dispatch:
     inputs:
       platform:
@@ -33,6 +37,11 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+      - id: req
+        run: |
+          P="${{ inputs.platform }}"; F="${{ inputs.profile }}"
+          if [ -z "$P" ]; then P=$(node -p "require('./build.json').platform"); F=$(node -p "require('./build.json').profile"); fi
+          echo "platform=$P" >> "$GITHUB_OUTPUT"; echo "profile=$F" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
+      - run: eas build --platform ${{ steps.req.outputs.platform }} --profile ${{ steps.req.outputs.profile }} --non-interactive --no-wait
