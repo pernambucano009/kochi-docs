@@ -175,6 +175,10 @@
       riser(t0, t1, g0 = .4) { const b = ctx.createBufferSource(); b.buffer = noise; b.loop = true; const fl = ctx.createBiquadFilter(); fl.type = "bandpass"; fl.Q.value = 2; fl.frequency.setValueAtTime(300, t0); fl.frequency.exponentialRampToValueAtTime(7000, t1); const g = ctx.createGain(); g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(g0, t1 - .02); g.gain.setValueAtTime(0, t1); b.connect(fl).connect(g).connect(out); b.start(t0); b.stop(t1 + .02); },
       whoosh(t0, d = .4, g0 = .25) { const b = ctx.createBufferSource(); b.buffer = noise; const fl = ctx.createBiquadFilter(); fl.type = "bandpass"; fl.Q.value = 1.5; fl.frequency.setValueAtTime(400, t0); fl.frequency.exponentialRampToValueAtTime(3500, t0 + d * .6); fl.frequency.exponentialRampToValueAtTime(800, t0 + d); const g = ctx.createGain(); g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(g0, t0 + d * .5); g.gain.exponentialRampToValueAtTime(.0001, t0 + d); b.connect(fl).connect(g).connect(out); b.start(t0); b.stop(t0 + d + .02); },
       click(t0, g0 = .2) { A.nz(t0, .02, "highpass", 3000, g0); },
+      // 🔊 أصوات الحركات (sfx.js): ظهور صغير، خبطة، انزلاق على قد طول الحركة. pan = يمين/شمال حسب مكانها في الشاشة
+      pop(t0, g0 = .1, pan = 0) { const o = A.tone(t0, 1150, .09, "sine", g0, .002, pan); o.frequency.setValueAtTime(1150, t0); o.frequency.exponentialRampToValueAtTime(560, t0 + .07); A.nz(t0, .015, "highpass", 5000, g0 * .5, .7, pan); },
+      thud(t0, g0 = .25, pan = 0) { const o = A.tone(t0, 95, .3, "sine", g0 * 1.4, .003, pan); o.frequency.setValueAtTime(95, t0); o.frequency.exponentialRampToValueAtTime(42, t0 + .25); A.nz(t0, .14, "lowpass", 900, g0 * .7, .7, pan); },
+      swish(t0, d = .35, g0 = .14, pan = 0) { const b = ctx.createBufferSource(); b.buffer = noise; const fl = ctx.createBiquadFilter(); fl.type = "bandpass"; fl.Q.value = 1.2; fl.frequency.setValueAtTime(600, t0); fl.frequency.exponentialRampToValueAtTime(4200, t0 + d * .45); fl.frequency.exponentialRampToValueAtTime(1100, t0 + d); const g = ctx.createGain(); g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(g0, t0 + d * .4); g.gain.exponentialRampToValueAtTime(.0001, t0 + d); const p = ctx.createStereoPanner(); p.pan.setValueAtTime(pan - .25 * Math.sign(pan || 1), t0); p.pan.linearRampToValueAtTime(pan, t0 + d); b.connect(fl).connect(g).connect(p).connect(out); b.start(t0, Math.random() * .5); b.stop(t0 + d + .02); },
       // a steady groove: kick each beat, hat on the off-beat, optional snare on 2/4
       groove(bpm, t0, t1, o = {}) { const B = 60 / bpm; for (let t = t0, k = 0; t < t1 - .01; t += B, k++) { if (o.kick !== false) A.kick(t, o.kg || .85); if (o.hat !== false) A.hat(t + B / 2, o.hg || .1); if (o.snare && k % 2 === 1) A.snare(t, o.sg || .3); } },
     };
@@ -221,10 +225,28 @@
   // الصوت بالوقت الجديد: كل دالة في A أول رقم فيها وقت بدايتها (والريزر كمان وقت نهايته)
   const warpA = (A, fwd) => {
     const B = Object.create(A);
-    ["kick", "nz", "hat", "snare", "clap", "hit", "tone", "pluck", "bass", "pad", "whoosh", "click"].forEach((k) => { if (A[k]) B[k] = (t0, ...rest) => A[k](fwd(t0), ...rest); });
+    ["kick", "nz", "hat", "snare", "clap", "hit", "tone", "pluck", "bass", "pad", "whoosh", "click", "pop", "thud", "swish"].forEach((k) => { if (A[k]) B[k] = (t0, ...rest) => A[k](fwd(t0), ...rest); });
     if (A.riser) B.riser = (t0, t1, ...rest) => A.riser(fwd(t0), Math.max(fwd(t0) + .05, fwd(t1)), ...rest);
     if (A.groove) B.groove = (bpm, t0, t1, ...rest) => A.groove(bpm, fwd(t0), fwd(t1), ...rest);
     return B;
+  };
+
+  // 🔊 أصوات الحركات: sfx.js جنب القالب (tools/motionsfx/make.py) فيه لحظات الحركة، وبتتحط تحت صوت القالب نفسه.
+  //   أي لحظة القالب حاطط عليها مؤثر بإيده (whoosh/hit/click/nz/riser) مابيتحطش عليها تاني. window.SFX_OFF = true يقفلها.
+  const loadSfx = () => window.SFX !== undefined || window.SFX_OFF ? Promise.resolve() : new Promise((res) => {
+    const s = document.createElement("script"); s.src = "sfx.js"; s.onload = s.onerror = () => res(); document.head.appendChild(s);
+  });
+  const withSfx = async (A, sound) => {
+    const hand = [], B = Object.create(A);
+    ["whoosh", "hit", "click", "nz"].forEach((k) => { B[k] = (t0, ...r) => { hand.push(t0); return A[k](t0, ...r); }; });
+    B.riser = (t0, t1, ...r) => { hand.push(t1); return A.riser(t0, t1, ...r); };
+    await sound(B);
+    const cues = Array.isArray(window.SFX) && !window.SFX_OFF ? window.SFX : [];
+    const k = (M.SFX_GAIN ?? 1) * (hand.length >= 12 ? .6 : 1);   // قالب صوته متصمم بالكامل: أصوات الحركات أهدى
+    cues.forEach(([t, kind, g, pan = 0, d = 0]) => {
+      if (hand.some((h) => Math.abs(h - t) < .15)) return;
+      if (kind === "swish") A.swish(t, d || .35, g * k, pan); else if (kind === "thud") A.thud(t, g * k, pan); else A.pop(t, g * k, pan);
+    });
   };
 
   // ---------- boot: a reel calls M.reel({W,H,DUR,fonts,init,seek,sound})
@@ -242,7 +264,7 @@
     let ctx = null;
     window.ready = (async () => { if (o.fonts) await M.fonts(o.fonts); ctx = await o.init(M); o.seek(0, ctx, M); })();
     window.seek = (t) => { if (ctx) o.seek(Math.min(at(t), o.DUR - 1e-4), ctx, M); };
-    window.soundtrack = () => M.track(DUR, (A) => o.sound(TM ? warpA(A, TM.fwd) : A, M));
+    window.soundtrack = async () => { await loadSfx(); return M.track(DUR, (A) => withSfx(TM ? warpA(A, TM.fwd) : A, (B) => o.sound(B, M))); };
   };
   window.M = M;
 })();
