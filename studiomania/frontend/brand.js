@@ -305,7 +305,7 @@ const BrandPage = (() => {
       return `<button class="bm-n bm-center" data-n="c" title="بدّل العلامة أو أنشئ علامة جديدة">
         <span class="bm-brain"><img class="ic-l" src="/icons3d/brand.webp?v=9" alt=""><img class="ic-d" src="/icons3d/brand_d.webp?v=9" alt=""></span>
         <b>${esc(b?.name || "علامة جديدة")}</b>${st}
-        ${b?.knowledge ? `<small class="bm-kn" data-know title="اضغط لرؤية الشروط">العقل يفهمك <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
+        ${b?.knowledge ? `<small class="bm-kn" data-know title="اضغط لرؤية الشروط">نسبة فهم العقل <span class="num">${b.knowledge.score}٪</span> · ${esc(b.knowledge.level)}</small>` : ""}</button>`;
     }
     if (n.kind === "quiz") {
       if (b && S.tqFor !== b.id && S.tqLoading !== b.id) loadTasks(b);
@@ -324,7 +324,7 @@ const BrandPage = (() => {
       if (b && S.plFor !== b.id && S.plLoading !== b.id) loadPlan(b);
       const pl = S.plFor === b?.id ? S.pl : null, fresh = pl ? Math.max(0, pl.count - pl.built_from) : 0;
       return `<button class="bm-n bm-plan${pl?.status === "working" ? " busy" : ""}" data-n="plan" title="تُبنى خطة المحتوى بضغطة من كل ما عرفه العقل عنك">
-        <span class="bm-trbox">🧭<b>خطة المحتوى</b><em class="num">${pl ? pl.count : "…"}</em></span>
+        <span class="bm-trbox">🧭<b>خطة المحتوى</b>${fresh && pl?.has ? `<em class="num">+${fresh}</em>` : ""}</span>
         <small>${!pl ? "" : pl.status === "working" ? "تُبنى الآن…" : !pl.has ? (pl.count < pl.min || !pl.ready ? `تحتاج معلومات أكثر (${pl.count}/${pl.min})` : "جاهزة للبناء")
           : fresh ? `+${fresh} معلومة جديدة: حدّثها` : `مبنية من ${pl.built_from} معلومة`}</small></button>`;
     }

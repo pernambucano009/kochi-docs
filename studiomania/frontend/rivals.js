@@ -163,7 +163,7 @@ const RivalsPage = (() => {
   function ring(score, need) {
     const r = 13, c = 2 * Math.PI * r;
     return `<button class="pl-ring" data-moknow data-tip="اضغط لترى ما ينقص (الخطة تحتاج ${need}٪)"><svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><circle cx="16" cy="16" r="${r}" fill="none" stroke="var(--nh-line, rgba(24,23,24,.1))" stroke-width="3"/>
-      <circle cx="16" cy="16" r="${r}" fill="none" stroke="var(--nh-accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(c * Math.min(100, score)) / 100} ${c}" transform="rotate(-90 16 16)"/></svg>العقل يفهمك <b class="num">${score}٪</b></button>`;
+      <circle cx="16" cy="16" r="${r}" fill="none" stroke="var(--nh-accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(c * Math.min(100, score)) / 100} ${c}" transform="rotate(-90 16 16)"/></svg>نسبة فهم العقل <b class="num">${score}٪</b></button>`;
   }
   function planView() {
     const M = S.mo, d = M.d;

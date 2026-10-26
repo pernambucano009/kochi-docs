@@ -122,7 +122,7 @@ const NH = (() => {
   const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "settings"];
   const META = {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
-    brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>العقل فاهمك <span class="num">${pct}%</span></span>`; },
+    brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>نسبة فهم العقل <span class="num">${pct}%</span></span>`; },
     assets: () => `<span>${D.coaches.length} شخصية · ${D.voices} تعليق · ${D.music} موسيقى</span>`,
     dubhub: () => `<span>الفيديو نفسه بلغة أو لهجة أخرى</span>`,
     pilot: () => `<span>${D.pilot?.settings?.on ? `يعمل · ${D.pilot.settings.times.length} منشور في اليوم${D.pilot.waiting ? ` · <em>${D.pilot.waiting} بانتظارك</em>` : ""}` : "مغلق"}</span>`,

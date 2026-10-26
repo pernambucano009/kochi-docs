@@ -77,7 +77,7 @@
     back.setAttribute("role", "dialog");
     back.setAttribute("aria-modal", "true");
     const fmt = (n) => (Math.round(n * 10) / 10).toString();
-    back.innerHTML = `<div class="ui-dlg-box ui-kn" dir="rtl"><h3>العقل فاهمك <span class="num">${k.score}٪</span> · ${esc(k.level)}</h3>
+    back.innerHTML = `<div class="ui-dlg-box ui-kn" dir="rtl"><h3>نسبة فهم العقل <span class="num">${k.score}٪</span> · ${esc(k.level)}</h3>
       <p class="sub">هذه النسبة مجموع نقاط الشروط أدناه: لكل شرط نقاط ثابتة تحصل عليها عند تحققه. من <b>${k.need}٪</b> ومع الشروط الأساسية (●) يصبح العقل فاهمًا لك وتُنشأ خطة المحتوى تلقائيًا.</p>
       <div class="bar"><i style="width:${Math.min(100, k.score)}%"></i><em style="inset-inline-start:${k.need}%"></em></div>
       <ul>${k.items.map((i) => `<li class="${i.done ? "ok" : ""}"><span class="ck">${i.done ? "✅" : "○"}</span>
