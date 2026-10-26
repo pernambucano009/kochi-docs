@@ -607,6 +607,25 @@ const BrandPage = (() => {
       <ul class="bm-tasks">${[...left, ...tq.items.filter((x) => x.done)].map((x) => `<li class="${x.done ? "ok" : ""}"><span class="bm-tck">${x.done ? "✓" : ""}</span>
         <span class="bm-ttx"><b>${esc(x.t)}</b><small>${esc(x.why)}</small></span>${x.done ? "" : `<button class="bm-pill" data-tgo="${esc(JSON.stringify(x.go))}">أنشئها →</button>`}</li>`).join("")}</ul>`;
   }
+  function startHTML(b) {
+    return `<div class="bm-qstart"><p class="bm-q">لنبدأ بعلامتك</p>
+      <p class="bm-note">اكتب اسم العلامة، أو ضع رابط حسابها على إنستغرام أو تيك توك وسيحلّله العقل: يستنبط الاسم والمجال والجمهور والمنتجات والأسلوب، فتجد أغلب الإجابات جاهزة لتعدّلها فقط. أو اكتب الاثنين.</p>
+      <label class="bm-lbl">اسم العلامة</label>${editable("@bname", DEFAULT_NAMES.has(String(b.name || "").trim()) ? "" : b.name, "مثلًا: مطبخ ستّي")}
+      <label class="bm-lbl">رابط الحساب (اختياري)</label>${editable("@blink", "", "instagram.com/… أو @اسم_الحساب", true)}
+      <p class="bm-note bm-cost">💳 تحليل الحساب يُخصم من نقاطك بقدر العمل المنجز فعلًا (عادةً بين ١٠ و٦٠ نقطة).</p>
+      <div class="bm-acts"><span></span><button class="bm-go" data-bstart>ابدأ →</button></div></div>`;
+  }
+  async function brandStart() {
+    const b = cur();
+    if (!b) return;
+    const name = S.el.querySelector('[data-k="@bname"]')?.innerText.trim() || "", link = S.el.querySelector('[data-k="@blink"]')?.innerText.trim() || "";
+    if (!name && !link) return toast("اكتب اسم العلامة أو رابط حسابها", true);
+    if (name && !(await save(() => bAPI("", { method: "PATCH", ...jsonBody({ name, fields: {} }) }), { card: false }))) return;
+    S.started = { ...(S.started || {}), [b.id]: true };
+    S.qaFor = null;
+    if (link) { const form = new FormData(); form.append("social", link); addSource(form); }
+    refreshCard();
+  }
   function quizHTML(b) {
     const tq = S.tqFor === b?.id ? S.tq : null, qn = S.quiz?.length || 0, qd = Math.min((b?.quiz_done || []).length, qn || 99);
     const tabs = `<div class="bm-pills bm-qtabs"><button class="bm-pill${S.qtab !== "t" ? " on" : ""}" data-qtab="q">🧩 الأسئلة <span class="num">${qd}/${qn || "…"}</span></button>
@@ -614,6 +633,10 @@ const BrandPage = (() => {
     const head = `<div class="bm-ch"><span class="latin en-k">COMPLETE THE BRAIN</span><b>أكمل العقل</b></div>
       <p class="bm-note">عند انتهاء الأسئلة والمهام يصبح لدى العقل كل ما يحتاجه ليعرفك.</p>${tabs}`;
     if (S.qtab === "t") return head + tasksHTML(b);
+    // 🏷️ علامة من غير اسم: أول خطوة اسمها أو رابط حسابها (والعقل يستنبط الاسم والإجابات من الحساب)
+    if (b && DEFAULT_NAMES.has(String(b.name || "").trim()) && !(S.started || {})[b.id] && S.qtab !== "t") return head + startHTML(b);
+    const anal = (b?.sources || []).find((x) => x.kind === "social" && x.status === "working");
+    if (anal) S.qaWait = true;
     if (!S.quiz || S.qaFor !== b?.id) { if (b && S.qaLoading !== b.id) { S.qaLoading = b.id; loadQA(b).finally(() => (S.qaLoading = null)); } return head + `<p class="bm-note">جارٍ تجهيز الأسئلة…</p>`; }
     const qs = S.quiz, total = qs.length, done = new Set(b.quiz_done || []);
     if (S.qi == null) { const i = qs.findIndex((q) => !done.has(q.id)); S.qi = i < 0 ? total : i; }
@@ -623,11 +646,13 @@ const BrandPage = (() => {
         <p class="bm-note">${done.size >= total ? "وُضعت كل إجابة في خانتها في العقل. يمكنك العودة لتعديل أي إجابة في أي وقت." : `أجبت عن ${done.size} من ${total}. يمكنك العودة إلى الأسئلة التي تخطّيتها في أي وقت.`}</p>
         <div class="bm-acts">${tq && tq.done < tq.total ? `<button class="bm-go" data-qtab="t">✅ أكمل المهام (بقي ${tq.total - tq.done})</button>` : ""}<button class="${tq && tq.done < tq.total ? "bm-pill" : "bm-go"}" data-qgo="0">راجع الإجابات</button>${done.size < total ? `<button class="bm-pill" data-qgo="first">أكمل الناقص</button>` : ""}</div>`;
     }
-    const q = qs[S.qi], val = S.qa?.[q.id] || "";
+    const q = qs[S.qi], sugg = !S.qa?.[q.id] && S.qa?._sugg?.[q.id], val = S.qa?.[q.id] || sugg || "";
     const field = q.opts ? `<div class="bm-pills">${q.opts.map(([v, t]) => `<button class="bm-pill${val === v ? " on" : ""}" data-qpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>`
       : `<div class="bm-write bm-qans${q.multi ? " multi" : ""}" contenteditable="plaintext-only" data-k="@quiz" data-ph="${esc(q.ph || "اكتب إجابتك…")}"${q.ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
-    return head + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ مُجاب</small>` : ""}</div>` + bar
+    const wait = anal ? `<p class="bm-note bm-qwait">⏳ نحلّل حساب <span dir="ltr">@${esc(anal.handle || "")}</span> الآن. عند الانتهاء تظهر الإجابات المقترحة في أسئلتها لتعدّلها أو تعتمدها.</p>` : "";
+    return head + wait + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ مُجاب</small>` : sugg ? `<small>✨ مقترحة من حسابك</small>` : ""}</div>` + bar
       + `<p class="bm-q">${esc(q.q)}</p>` + field
+      + (sugg ? `<p class="bm-note">استنبطها العقل من حسابك. عدّلها كما تريد، أو اضغط «التالي» لتعتمدها.</p>` : "")
       + (q.multi ? `<p class="bm-note">كل عنصر في سطر (Enter لسطر جديد).</p>` : "")
       + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>← السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطَّ</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "انتهيت" : "التالي →"}</button></div>
       <p class="bm-note bm-qsave">تُحفظ إجابتك في العقل فور ضغط «التالي». يمكنك الخروج والإكمال في أي وقت.</p>`;
@@ -841,7 +866,8 @@ const BrandPage = (() => {
     if (S.open && S.open.id !== n.id && !S.backing) S.hist = [...(S.hist || []), S.open.id].slice(-12);
     if (!S.open) S.hist = [];
     S.backing = false;
-    if (S.open?.id !== n.id) { S.cardSide = null; S.cardAt = null; }
+    const same = S.open?.id === n.id;
+    if (!same) { S.cardSide = null; S.cardAt = null; }
     S.open = { id: n.id, br: n.br?.k, n };
     const back = S.hist.length ? S.nodes.find((x) => x.id === S.hist[S.hist.length - 1]) : n.kind === "leaf" ? S.byId[n.br.k] : null;
     card.innerHTML = `<button class="bm-x" data-close aria-label="أغلق">✕</button>`
@@ -851,7 +877,9 @@ const BrandPage = (() => {
     markOpen();
     // يتحط في مكانه جنب النقطة الأول، وبعدين يظهر (الأنيميشن على الشفافية والحجم بس، مش على المكان)
     placeCard(toScreen([n.px, n.py]));
-    card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
+    // نفس الكارت بيتحدّث (السؤال اللي بعده مثلًا): من غير ما يختفي ويظهر تاني، المحتوى الجديد بس بيظهر بهدوء
+    if (!same) card.animate([{ opacity: 0, scale: .96 }, { opacity: 1, scale: 1 }], { duration: reduce.matches ? 1 : 240, easing: "cubic-bezier(.2,.8,.2,1)" });
+    else if (n.kind === "quiz" && !reduce.matches) card.querySelectorAll(".bm-q, .bm-qans, .bm-q + .bm-pills, .bm-qstart").forEach((x) => x.animate([{ opacity: .35, translate: "0 6px" }, { opacity: 1, translate: "0 0" }], { duration: 220, easing: "ease-out" }));
     const ed = card.querySelector(".bm-write");
     if (ed && n.kind === "leaf") { ed.focus(); placeCaret(ed); }
   }
@@ -912,7 +940,7 @@ const BrandPage = (() => {
       try {
         const b = await bAPI("");
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
-        if (!busy(b)) { clearInterval(S.poll); loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
+        if (!busy(b)) { clearInterval(S.poll); S.qaFor = null; loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
         layout();
         if (S.open?.id === "add") refreshCard();
       } catch { clearInterval(S.poll); }
@@ -1108,6 +1136,7 @@ const BrandPage = (() => {
       }
       if (t.closest("[data-close]")) return openCard(null);
       if (t.closest("[data-ibrec]")) return toggleRec();
+      if (t.closest("[data-bstart]")) return brandStart();
       if (t.closest("[data-qnext]")) return quizStep(1);
       const trb = t.closest("[data-trnow], [data-trsave]");
       if (trb) {
@@ -1246,10 +1275,12 @@ const BrandPage = (() => {
         if (!v) return;
         try {
           const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name: v, fields: {} }) });
-          S.brains.push(b); S.id = b.id; openCard(null); layout(); loadClients();
+          S.brains.push(b); S.id = b.id; await api("/api/clients/active", { method: "PUT", ...jsonBody({ id: b.id }) }).catch(() => {});
+          openCard(null); layout(); loadClients(); if (S.byId?.quiz) openCard(S.byId.quiz);
         } catch (err) { toast(err.message, true); }
         return;
       }
+      if (k === "@bname" || k === "@blink") { e.preventDefault(); return brandStart(); }
       if (k === "@quiz") { if (!el.classList.contains("multi")) { e.preventDefault(); quizStep(1); } return; }
       if (k === "@url" || k === "@text" || k === "@social") {
         e.preventDefault();

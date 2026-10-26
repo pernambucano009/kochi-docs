@@ -112,3 +112,33 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("lib_media", "ارفع صور وفيديوهات في مكتبة العقل", "المكتبة التي النموذج المخصص يسحب منها", ctx.get("lib_media", 0) > 0, {"page": "brainlib"}),
     ]
     return [{"id": i, "t": t, "why": w, "done": bool(d), "go": g} for i, t, w, d, g in items]
+
+
+# ✨ الاقتراح المستني (من تحليل الحساب أو أي مصدر) اللي بيجاوب على كل سؤال
+NOTE_SECTIONS = {"products": "products", "offer": "offers", "proof": "claims", "voice": "voice"}
+
+
+def answers(q: dict, p: dict) -> bool:
+    """الاقتراح ده بيجاوب على السؤال ده؟"""
+    to = q["to"]
+    if "field" in to or "pick" in to:
+        return p.get("kind") == "field" and p.get("field") == (to.get("field") or to.get("pick"))
+    if "rules" in to:
+        return p.get("kind") == "rule"
+    if q["id"] in NOTE_SECTIONS:
+        return p.get("kind") == "note" and p.get("section") == NOTE_SECTIONS[q["id"]]
+    return False
+
+
+def suggestions(brain: dict) -> dict[str, str]:
+    out = {}
+    pend = brain.get("pending") or []
+    for q in Q:
+        hits = [p for p in pend if answers(q, p)]
+        if not hits:
+            continue
+        if q["to"].get("rules") or q["id"] in NOTE_SECTIONS:
+            out[q["id"]] = "\n".join(str(p.get("value") or p.get("summary") or p.get("title") or "").strip() for p in hits if (p.get("value") or p.get("summary")))[:4000]
+        else:
+            out[q["id"]] = str(hits[-1].get("value") or "")[:4000]
+    return {k: v for k, v in out.items() if v}

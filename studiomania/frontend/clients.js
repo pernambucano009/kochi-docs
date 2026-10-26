@@ -13,15 +13,19 @@ async function loadClients() {
   const av = c?.logo ? `<img src="${c.logo}" alt="">` : escapeHtml((c?.name || "👤").trim().slice(0, 1).toUpperCase());
   $("clientAv").innerHTML = $("stageClientAv").innerHTML = av;
   $("stageClientName").textContent = c?.name || "";
+  const nh = document.getElementById("nhClientName");   // شريط الرئيسية: الاسم يتحدّث على طول (مثلًا بعد ما العقل يستنبطه من الحساب)
+  if (nh && c?.name) nh.textContent = c.name;
   document.querySelectorAll("[data-client-name]").forEach((el) => (el.textContent = c ? `«${c.name}»` : ""));
   renderClientList();
 }
 
 function renderClientList() {
-  $("clientList").innerHTML = clientx.list.map((c) => `<button type="button" class="client-card ${c.active ? "on" : ""}" data-client="${c.id}">
+  const many = clientx.list.length > 1;
+  $("clientList").innerHTML = clientx.list.map((c) => `<div class="client-row"><button type="button" class="client-card ${c.active ? "on" : ""}" data-client="${c.id}">
       <i class="client-av">${c.logo ? `<img src="${c.logo}" alt="">` : escapeHtml(c.name.trim().slice(0, 1).toUpperCase())}</i>
       <span><b data-no-i18n>${escapeHtml(c.name)}</b>${c.domain ? `<small class="muted" data-no-i18n>${escapeHtml(c.domain)}</small>` : ""}</span>
-      ${c.active ? `<small class="client-now">✓ قيد العمل</small>` : ""}</button>`).join("");
+      ${c.active ? `<small class="client-now">✓ قيد العمل</small>` : ""}</button>
+      ${many ? `<button type="button" class="client-del" data-cdel="${c.id}" title="احذف هذا العميل" aria-label="احذف هذا العميل">🗑</button>` : ""}</div>`).join("");
 }
 
 async function switchClient(id) {
@@ -41,16 +45,27 @@ function openClientProfile(id) {
 
 $("clientBtn").onclick = $("stageClient").onclick = () => { renderClientList(); $("clientDialog").showModal(); };
 $("clientClose").onclick = () => $("clientDialog").close();
-$("clientList").addEventListener("click", (e) => {
+$("clientList").addEventListener("click", async (e) => {
+  const del = e.target.closest("[data-cdel]");
+  if (del) {
+    const c = clientx.list.find((x) => x.id === del.dataset.cdel);
+    if (!c || !(await uiConfirm(`احذف «${c.name}» بكل عقله وصوره وملفاته؟ لا يمكن التراجع عن الحذف.`))) return;
+    try {
+      await api(`/api/ad-brains/${encodeURIComponent(c.id)}`, { method: "DELETE" });
+      if (c.id === clientx.active) return location.reload();   // كان العميل المختار: البرنامج يرجع للي بعده
+      await loadClients();
+      toast("🗑 حُذف العميل");
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
   const b = e.target.closest("[data-client]");
   if (b) switchClient(b.dataset.client);
 });
 $("clientEdit").onclick = () => openClientProfile();
+// عميل جديد: عقل جديد فاضي، وأول خطوة في العقل بتسأل اسمه أو رابط حسابه (والعقل يستنبط منه الباقي)
 $("clientNew").onclick = async () => {
-  const name = (await uiPrompt("اسم العميل الجديد؟"));
-  if (!name?.trim()) return;
   try {
-    const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name, fields: {} }) });
+    const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name: "", fields: {} }) });
     await api("/api/clients/active", { method: "PUT", ...jsonBody({ id: b.id }) });
     storageSet("studiomania.openClient", b.id);
     location.reload();

@@ -11883,6 +11883,9 @@ class BrainIn(BaseModel):
     fields: dict = {}
 
 
+PLACEHOLDER_NAMES = {"", "عميلي", "عميل جديد", "علامة جديدة", "علامتي", "My Brand", "New client"}   # أسماء البرنامج نفسه، مش اسم العلامة
+
+
 @app.post("/api/ad-brains")
 def create_brain(body: BrainIn):
     bid = uuid.uuid4().hex[:12]
@@ -12248,10 +12251,16 @@ def run_brain_social(bid: str, sid: str) -> None:
         if niche and not str(d.get("niche") or "").strip():
             d["niche"] = niche
         d["social"] = {"platform": plat, "handle": handle, "followers": prof.get("followers"), "stats": st, "at": now()}
+        d["social_name"] = str(prof.get("name") or handle)[:80]
         for x in d.get("sources") or []:
             if x["id"] == sid:
                 x.update(status="done", error=None, step=None, count=len(items_p) + len(todos), credits=cost)
     update_brain(bid, fn)
+    # 🏷️ علامة لسه من غير اسم (أو اسمها اسم الحساب): بتاخد الاسم اللي على الحساب، وتقدر تغيّره بعدين
+    cur_name = str((brain_row(bid) or {}).get("name") or "").strip()
+    if cur_name in PLACEHOLDER_NAMES or cur_name.lstrip("@").lower() == handle.lower():
+        with closing(db()) as conn, conn:
+            conn.execute("UPDATE ad_brains SET name = ? WHERE id = ?", (str(prof.get("name") or handle).strip()[:80], bid))
 
 
 def run_brain_source(bid: str, sid: str) -> None:
@@ -12444,6 +12453,8 @@ def brain_quiz_answer(bid: str, body: QuizIn):
         done = d.setdefault("quiz_done", [])
         if ans and q["id"] not in done:
             done.append(q["id"])
+        if ans:   # الإجابة بتحل محل الاقتراح المستني لنفس الخانة (مايفضلش نقطة منوّرة مالهاش لازمة)
+            d["pending"] = [p for p in d.get("pending") or [] if not brainquiz.answers(q, p)]
     old = brain_row(bid) or {}
     update_brain(bid, fn)
     new = brain_row(bid) or {}
@@ -12480,7 +12491,10 @@ def brain_quiz_answers(bid: str):
     b = brain_row(bid)
     if b is None:
         raise HTTPException(404, "هذا العميل غير موجود")
-    return {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q}
+    out = {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q}
+    # ✨ اللي العقل استنبطه (من تحليل الحساب أو أي مصدر) ولسه مستني موافقتك: بيظهر جاهز في السؤال بتاعه، تعدّله أو توافق بـ«التالي»
+    out["_sugg"] = {qid: v for qid, v in brainquiz.suggestions(b).items() if not out.get(qid)}
+    return out
 
 
 class NoteIn(BaseModel):

@@ -32,6 +32,8 @@
   (document.head || document.documentElement).appendChild(st);
   const DANGER = /(تمسح|امسح|حذف|تحذف|تشيل|شيل|مسح|delete|remove)/i;
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  // نافذة البرنامج (dialog) المفتوحة فوق كل حاجة: المربع لازم يتحط جواها، وإلا بيطلع تحتها مستخبي (زي «عميل جديد» جوه نافذة العملاء)
+  const host = () => [...document.querySelectorAll("dialog[open]")].filter((d) => d.matches(":modal")).pop() || document.body;
   let chain = Promise.resolve();   // إذا فُتح أكثر من مربع خلف بعض: واحد واحد
 
   function open(kind, msg, def, opts = {}) {
@@ -59,7 +61,7 @@
       if (nb) nb.onclick = no;
       back.addEventListener("mousedown", (e) => { if (e.target === back && kind !== "prompt") no(); });
       document.addEventListener("keydown", key, true);
-      document.body.appendChild(back);
+      host().appendChild(back);
       setTimeout(() => { if (input) { input.focus(); input.select(); } else back.querySelector(".ui-dlg-ok").focus(); }, 30);
     });
     const p = chain.then(run, run);
@@ -87,7 +89,7 @@
     back.querySelector(".ui-dlg-ok").onclick = done;
     back.addEventListener("mousedown", (e) => { if (e.target === back) done(); });
     document.addEventListener("keydown", key, true);
-    document.body.appendChild(back);
+    host().appendChild(back);
   };
   window.uiPrompt = (msg, def, opts) => open("prompt", msg, def, opts);
   window.uiAlert = (msg, opts) => open("alert", msg, null, opts);

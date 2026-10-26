@@ -1433,6 +1433,10 @@ a.pl-link:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }
   background: var(--surface); cursor: pointer; text-align: start; font: inherit; color: inherit; }
 .client-card:hover { border-color: var(--accent); }
 .client-card.on { border-color: var(--accent); background: var(--accent-soft); }
+.client-row { display: flex; gap: 6px; align-items: stretch; }
+.client-row .client-card { flex: 1; min-width: 0; }
+.client-del { flex: none; width: 40px; border-radius: 12px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: 15px; opacity: .55; transition: opacity .15s, border-color .15s; }
+.client-del:hover { opacity: 1; border-color: #D9443A; }
 .client-card .client-av { width: 40px; height: 40px; }
 .client-card > span { display: flex; flex-direction: column; flex: 1; }
 .client-now { color: var(--accent); font-weight: 600; }
