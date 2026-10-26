@@ -17,11 +17,11 @@ const IdeasPage = (() => {
     }
     const busy = x.status === "transcribing", pol = S.busy[x.id];
     return `<article class="id-card" data-iid="${esc(x.id)}">
-      <div class="id-h"><b>${esc(x.title || "فكرة")}</b><small class="muted">${x.polished ? "✨ منقّحة · " : ""}${x.used_at ? "✓ استُخدمت · " : ""}${ago(x.at)}</small></div>
+      <div class="id-h"><b>${esc(x.title || "فكرة")}</b><small class="muted">${x.polished ? `${I18N.t("✨ منقّحة")} · ` : ""}${x.used_at ? "✓ استُخدمت · " : ""}${ago(x.at)}</small></div>
       ${x.hook ? `<p class="id-hook">«${esc(x.hook)}»</p>` : ""}
       ${busy ? `<p class="muted">⏳ جارٍ تحويل الرسالة الصوتية إلى نص…</p>` : x.script ? "" : x.text ? `<p class="id-t">${esc(x.text)}</p>` : ""}
       ${x.script ? `<div class="id-script"><small class="muted">📝 النص</small><p>${esc(x.script)}</p></div>` : ""}
-      ${(x.sources || []).length ? `<div class="id-src"><small class="muted">📚 المصادر</small><ul>${x.sources.map((r) => `<li><b>${esc(r.label)}</b> ${esc(r.ref)}${r.where ? ` <small class="muted">· ${esc(r.where)}</small>` : ""}</li>`).join("")}</ul></div>` : ""}
+      ${(x.sources || []).length ? `<div class="id-src"><small class="muted">📚 المصادر</small><ul>${x.sources.map((r) => `<li><b>${esc(r.label)}</b> <span data-no-i18n>${esc(r.ref)}</span>${r.where ? ` <small class="muted" data-no-i18n>· ${esc(r.where)}</small>` : ""}</li>`).join("")}</ul></div>` : ""}
       ${x.script && x.dropped ? `<p class="muted id-drop">حذفنا ${x.dropped} مصدر لم نتمكن من التأكد من وجوده بهذا النص.</p>` : ""}
       ${x.audio_url ? `<audio src="${esc(x.audio_url)}" controls preload="metadata"></audio>` : ""}
       ${x.url ? `<a class="id-link" href="${esc(x.url)}" target="_blank" rel="noopener" dir="ltr">🔗 ${esc(x.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a>` : ""}

@@ -13386,5 +13386,12 @@ window.I18N_EN = {
   "⏳ جارٍ البدء…": "⏳ Starting…",
   "🔧 التفاصيل (للأدمن فقط)": "🔧 Details (admin only)",
   "ملفات": "files",
+  "✨ منقّحة": "✨ Polished",
+  "آية": "Verse",
+  "حديث": "Hadith",
+  "كتاب": "Book",
+  "دراسة": "Study",
+  "مرجع": "Reference",
+  "✓ استُخدمت": "✓ Used",
   "تعذّر فصل الموسيقى هذه المرة، فخرجت الدبلجة بدون موسيقى خلفية. يمكنك إعادتها لاحقًا، أو اختيار «الصوت الأصلي منخفضًا»": "The music couldn't be separated this time, so the dub came out without background music. You can redo it later, or pick “Original audio, low”."
 };
