@@ -13583,4 +13583,7 @@ window.I18N_EN = {
   "اكتب الرمز كاملًا (٦ أرقام)": "Enter the full code (6 digits)",
   "مفتاح Authentica": "Authentica key",
   "الدخول برقم الجوال (رمز برسالة نصية أو واتساب)": "Mobile sign-in (code by text message or WhatsApp)",
+  "جارٍ إرسال الرمز…": "Sending the code…",
+  "جارٍ التحقق…": "Verifying…",
+  "خدمة الرسائل لم ترد. حاول مرة أخرى بعد قليل": "The messaging service didn't respond. Try again shortly",
 };

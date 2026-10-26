@@ -81,16 +81,27 @@ def mark(phone: str, ip: str) -> None:
 
 
 # ---------------------------------------------------------------- Authentica
+def _log(path: str, msg: str, raw: str, status: int = 0) -> None:
+    """🚨 صندوق الأخطاء: السبب الحقيقي من شركة الرسائل (العميل بيشوف رسالة بسيطة بس)."""
+    try:
+        import issues
+        issues.record("sms", f"/api/auth/phone/{path}", msg, raw=raw[:1500], status=status)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _post(path: str, body: dict) -> dict:
     try:
         r = httpx.post(f"{BASE}/{path}", json=body, timeout=20,
                        headers={"X-Authorization": key(), "Accept": "application/json", "Content-Type": "application/json"})
         d = r.json() if r.content else {}
     except (httpx.HTTPError, ValueError) as exc:
+        _log(path, "خدمة الرسائل لم ترد", f"{type(exc).__name__}: {exc}")
         raise PhoneError("تعذّر إرسال الرمز الآن. حاول مرة أخرى بعد قليل") from exc
     if r.status_code == 429:
         raise PhoneError("طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى")
     if r.status_code >= 400:
+        _log(path, "خدمة الرسائل رفضت الطلب", f"{r.status_code} {r.text[:1200]}", r.status_code)
         raise PhoneError(f"خدمة الرسائل رفضت الطلب ({r.status_code}): {str(d.get('message') or d.get('errors') or '')[:160]}")
     return d if isinstance(d, dict) else {}
 
@@ -107,6 +118,7 @@ def send(phone: str, channel: str = "sms") -> str | None:
         body["template_id"] = int(os.environ["AUTHENTICA_TEMPLATE_ID"])
     d = _post("send-otp", body)
     if d.get("success") is False:
+        _log("send", "خدمة الرسائل لم ترسل الرمز", str(d)[:1200])
         raise PhoneError(str(d.get("message") or "تعذّر إرسال الرمز. حاول مرة أخرى")[:200])
     return None
 

@@ -64,17 +64,28 @@ const P = { phone: "", step: "num", wait: 0, timer: null, ch: "sms" };
 const phoneBox = () => !S.phone ? "" : `<div class="au-ph" id="ph">${phoneInner()}</div><div class="au-or">${S.google ? "أو" : "أو بالبريد الإلكتروني"}</div>`;
 const phoneInner = () => P.step === "num"
   ? `<label class="field">رقم جوالك <input type="tel" id="phNum" inputmode="tel" autocomplete="tel" placeholder="05XXXXXXXX" value="${P.phone}"></label>
-     <button type="button" class="btn primary wide" id="phSend">أرسل رمز الدخول</button>`
+     <button type="button" class="btn primary wide" id="phSend">أرسل رمز الدخول</button><p class="err" id="phErr" hidden></p>`
   : `<p class="muted">أرسلنا رمزًا من ٦ أرقام ${P.ch === "whatsapp" ? "على واتساب" : "برسالة نصية"} إلى <b dir="ltr">${P.phone}</b></p>
      <label class="field">رمز الدخول <input class="au-code" id="phCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></label>
      <div id="phDev"></div>
-     <button type="button" class="btn primary wide" id="phGo">ادخل</button>
+     <button type="button" class="btn primary wide" id="phGo">ادخل</button><p class="err" id="phErr" hidden></p>
      <div class="au-ph-meta"><span><button type="button" id="phAgain" disabled></button></span>
        <span><button type="button" id="phWa">${P.ch === "whatsapp" ? "أرسله برسالة نصية" : "أرسله على واتساب"}</button> · <a href="#" id="phBack">غيّر الرقم</a></span></div>`;
 function tick() {
   clearInterval(P.timer);
   const paint = () => { const b = $("phAgain"); if (!b) return clearInterval(P.timer); b.disabled = P.wait > 0; b.textContent = P.wait > 0 ? `أعد الإرسال بعد ${P.wait} ث` : "أعد إرسال الرمز"; if ($("phWa")) $("phWa").disabled = P.wait > 0; };
   paint(); P.timer = setInterval(() => { P.wait = Math.max(0, P.wait - 1); paint(); if (!P.wait) clearInterval(P.timer); }, 1000);
+}
+// خطأ الجوال بيظهر جوه مربع الجوال نفسه (مش تحت الصفحة)
+function phErr(m) { const e = $("phErr"); if (!e) return err(m); e.textContent = m || ""; e.hidden = !m; if (m) e.scrollIntoView({ block: "center", behavior: "smooth" }); }
+async function postT(url, body, ms = 30000) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}), signal: ac.signal });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب مرة أخرى");
+    return d;
+  } catch (x) { throw x.name === "AbortError" ? new Error("خدمة الرسائل لم ترد. حاول مرة أخرى بعد قليل") : x; } finally { clearTimeout(t); }
 }
 function phonePaint(dev) {
   $("ph").innerHTML = phoneInner();
@@ -92,21 +103,21 @@ function phonePaint(dev) {
   if ("OTPCredential" in window && P.ch === "sms") navigator.credentials.get({ otp: { transport: ["sms"] } }).then((o) => { if (o?.code && $("phCode")) { $("phCode").value = o.code; phoneVerify(); } }).catch(() => {});
 }
 async function phoneSend(ch) {
-  err(""); if (P.step === "num") P.phone = $("phNum").value.trim();
-  if (!P.phone) return err("اكتب رقم جوالك أولًا");
-  const b = $("phSend") || $("phAgain"); if (b) b.disabled = true;
-  try { const d = await post("/api/auth/phone/send", { phone: P.phone, channel: ch }); P.phone = d.phone; P.ch = d.channel; P.wait = d.wait; P.step = "code"; phonePaint(d.dev_code); }
-  catch (x) { err(x.message); if (b) b.disabled = false; }
+  err(""); phErr(""); if (P.step === "num") P.phone = $("phNum").value.trim();
+  if (!P.phone) return phErr("اكتب رقم جوالك أولًا");
+  const b = $("phSend") || $("phAgain"), label = b?.textContent; if (b) { b.disabled = true; b.textContent = "جارٍ إرسال الرمز…"; }
+  try { const d = await postT("/api/auth/phone/send", { phone: P.phone, channel: ch }); P.phone = d.phone; P.ch = d.channel; P.wait = d.wait; P.step = "code"; phonePaint(d.dev_code); }
+  catch (x) { if (b) { b.disabled = false; b.textContent = label; } phErr(x.message); }
 }
 let phBusy = false;
 async function phoneVerify() {
-  const code = $("phCode").value; if (phBusy) return; if (code.length < 6) return err("اكتب الرمز كاملًا (٦ أرقام)");
-  err(""); phBusy = true; $("phGo").disabled = true;
+  const code = $("phCode").value; if (phBusy) return; if (code.length < 6) return phErr("اكتب الرمز كاملًا (٦ أرقام)");
+  err(""); phErr(""); phBusy = true; $("phGo").disabled = true; $("phGo").textContent = "جارٍ التحقق…";
   try {
-    await post("/api/auth/phone/verify", { phone: P.phone, code, name: $("name")?.value || "", country: $("country")?.value || guessCountry(),
+    await postT("/api/auth/phone/verify", { phone: P.phone, code, name: $("name")?.value || "", country: $("country")?.value || guessCountry(),
       dialect: $("dialect")?.value || dialectOf(guessCountry()), field: $("field")?.value || "", goal: $("goal")?.value || "" });
     location.replace(next());
-  } catch (x) { err(x.message); $("phGo").disabled = false; $("phCode").select(); } finally { phBusy = false; }
+  } catch (x) { phErr(x.message); $("phGo").disabled = false; $("phGo").textContent = "ادخل"; $("phCode").select(); } finally { phBusy = false; }
 }
 const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (لا يوجد بريد إلكتروني متظبط): <a href="${l}">${l}</a></p>` : "";
 
