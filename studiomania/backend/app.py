@@ -24528,7 +24528,7 @@ def my_ideas_polish(iid: str):
     if not src:
         raise HTTPException(400, "الفكرة ما زالت فارغة")
     if atlas.mock_mode():
-        out = {"title": (raw.get("title") or "فكرة")[:50] + " (منقّحة)", "idea": "فكرة منظمة: " + raw.get("idea", ""), "hook": "أنت تعمل هذه الغلطة كل يوم؟"}
+        out = {"title": (raw.get("title") or "فكرة")[:50] + " (منقّحة)", "idea": "فكرة منظمة: " + raw.get("idea", ""), "hook": "هل تقع في هذا الخطأ كل يوم؟"}
     else:
         wallet.need(1, "تنقيح الفكرة")
         msgs = [{"role": "system", "content": "You are a short-form video content strategist. Rewrite the user's raw idea notes into one clear, "
@@ -24622,7 +24622,7 @@ def my_ideas_script(iid: str):
     if not src:
         raise HTTPException(400, "الفكرة ما زالت فارغة")
     if atlas.mock_mode():
-        out = {"title": (raw.get("title") or "فكرة")[:50], "hook": "انتظر قبل ما تقفل الفيديو",
+        out = {"title": (raw.get("title") or "فكرة")[:50], "hook": "انتظر قبل أن تغلق الفيديو",
                "script": f"{raw.get('idea', '')}\nوربنا قال: [[S1]]\nوده الذي تأكد في دراسة: [[S2]]",
                "sources": [{"id": "S1", "kind": "quran", "surah": 94, "ayah": 5, "ref": "الشرح 5", "quote": "", "where": "الصبر"},
                            {"id": "S2", "kind": "study", "ref": "دراسة تجريبية (2020)", "quote": "", "where": "تجربة"}]}

@@ -66,7 +66,8 @@
     if (out === undefined) {
       for (const p of pats) {
         const m = p.re.exec(n);
-        if (m && p.strict && m.slice(1).some((x) => AR.test(x))) continue;
+        // القاعدة العامة بتقبل كلام عربي بس لو هو نفسه بيتترجم كله («لـ عميلي» ← «for My client»)
+        if (m && p.strict && m.slice(1).some((x) => AR.test(x) && AR.test(t(x)))) continue;
         if (m) { out = fill(p, m.slice(1)); break; }
       }
     }
@@ -85,7 +86,7 @@
       if (m2 && /^(م|ص|مساءً|صباحًا)$/.test(m2[2])) out = m2[1] + (m2[2][0] === "م" ? " PM" : " AM");
       else if (m2 && exact.has(m2[2])) out = m2[1] + " " + exact.get(m2[2]);
       else if (n.includes(" · ")) {
-        const parts = n.split(" · "), tr = parts.map((p) => (exact.has(p) ? exact.get(p) : AR.test(p) ? null : p));
+        const parts = n.split(" · "), tr = parts.map((p) => { if (exact.has(p)) return exact.get(p); if (!AR.test(p)) return p; const x = t(p); return AR.test(x) ? null : x; });
         if (tr.every((x) => x != null)) out = tr.join(" · ");
       }
       if (out !== undefined) out = out.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
