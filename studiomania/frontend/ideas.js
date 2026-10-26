@@ -55,7 +55,7 @@ const IdeasPage = (() => {
   function poll() {
     clearTimeout(S.timer);
     if (!S.list.some((x) => x.status === "transcribing")) return;
-    S.timer = setTimeout(async () => { try { await load(); if (!S.edit) render(); } catch { /* */ } poll(); }, 3000);
+    S.timer = setTimeout(async () => { try { await load(); if (!S.edit) morphing(render); } catch { /* */ } poll(); }, 3000);
   }
   async function recToggle() {
     if (S.rec) { S.rec.mr.stop(); return; }

@@ -173,6 +173,7 @@ $("postsCal").addEventListener("click", (e) => {
     setWhen(when);
     // من صفحة المواعيد بيرجع للنشر والميعاد متحط في الفورم
     if (calPage()) showStep("7");
+    pubTab("new");
     setTimeout(() => $("postForm").scrollIntoView({ behavior: "smooth", block: "start" }), calPage() ? 0 : 400);
     toast(`📅 الموعد وُضع: ${calFull(when)} — اختر الفيديو وجدول`);
     return;

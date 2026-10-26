@@ -452,10 +452,10 @@ function tyPoll() {
       if (!tyx.cur.busy) {
         [tyx.list, tyx.stk] = await Promise.all([api(TY("")), api(TY("/stickers"))]);
         tyx.force = true;
-        tyRender();
+        morphing(tyRender);
         if (tyx.cur.status === "failed") toast(tyx.cur.error || "فشل", true);
         else if (was === "rendering") toast("🎬 الفيديو جاهز");
-      } else tyStatusOnly();
+      } else morphing(tyStatusOnly);
     } catch { /* الخادم يعيد التشغيل */ }
     tyPoll();
   }, 1500);

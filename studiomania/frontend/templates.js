@@ -123,9 +123,7 @@ function scheduleTplPoll() {
   tplx.timer = setTimeout(async () => {
     try {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`);
-      const playing = [...$("labTpl").querySelectorAll("video")].some((v) => !v.paused);
-      const typing = $("labTpl").contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
-      if (!playing && !typing) renderTpl();
+      morphing(renderTpl);
     } catch { /* الخادم يعيد التشغيل */ }
     scheduleTplPoll();
   }, 2500);

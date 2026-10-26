@@ -96,7 +96,7 @@ const Ref2PromptPage = (() => {
     try {
       S.d = await api(`/api/ref2p/${S.d.id}`);
       again = !!S.d.job || (await refreshGens());
-      render();
+      morphing(render);
     } catch {}
     if (again) S.timer = setTimeout(poll, 3000);
   }

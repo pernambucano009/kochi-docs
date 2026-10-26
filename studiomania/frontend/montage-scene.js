@@ -333,7 +333,7 @@ function mscPoll() {
       if (doc.busy) msc.lastStep = doc.step || msc.lastStep;
       msc.doc = doc;
       msc.built = "";
-      mscPane();
+      morphing(mscPane);
       if (doc.busy) { mscPoll(); return; }
       msc.ui = null;
       const was = msc.lastStep || "";

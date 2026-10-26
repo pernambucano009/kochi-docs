@@ -27,13 +27,11 @@ function scheduleAssetPoll() {
     try {
       if (!asx.cur) {
         [asx.list, asx.motion] = await Promise.all([api("/api/assets"), api("/api/motion-library")]);
-        if (!$("labLib").contains(document.activeElement)) renderLib();
+        morphing(renderLib);
         return scheduleAssetPoll();
       }
       asx.cur = await api(`/api/assets/${asx.cur.id}`);
-      const playing = [...$("labLib").querySelectorAll("video")].some((v) => !v.paused);
-      const typing = $("labLib").contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
-      if (!playing && !typing) renderLib();
+      morphing(renderLib);   // بيتحدّث في مكانه: الفيديو الشغّال والخانة اللي بتكتب فيها مابيتلمسوش
     } catch { /* الخادم يعيد التشغيل */ }
     scheduleAssetPoll();
   }, 2500);

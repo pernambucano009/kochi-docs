@@ -645,7 +645,7 @@ const Gallery = (() => {
     const fr = ((pos % 1) + 1) % 1, tg0 = gapsAt((G.rOut || G.R * .985) + G.R * .033);
     let html = "";
     for (let j = -16; j <= 16; j++) { const a = (j - fr) * STEP, r1 = (G.rOut || G.R * .985) + G.R * .033, r2 = (G.rOut || G.R * .985) + G.R * .01; if (tg0.some(([gs, ge]) => a > gs && a < ge)) continue; html += `<line x1="${G.cx + Math.cos(a) * r1}" y1="${G.cy + Math.sin(a) * r1}" x2="${G.cx + Math.cos(a) * r2}" y2="${G.cy + Math.sin(a) * r2}" stroke="var(--nh-ink)" stroke-opacity="${Math.max(0, .32 - Math.abs(j) * .018).toFixed(3)}" stroke-width="1.2"/>`; }
-    G.ticks.innerHTML = html;
+    if (G.ticks._tk !== html) { G.ticks._tk = html; G.ticks.innerHTML = html; }   // العجلة واقفة: مانرسمش التكّات من الأول كل فريم
     // العجلة الصغيرة: سبرنج ناعم للقسم، وكل اسم آخره لازق في حزوز الكورة من جوه
     C.vel += ((C.target - C.pos) * 120 - C.vel * 18) * dt; C.pos += C.vel * dt;
     if (Math.abs(C.target - C.pos) < .001 && Math.abs(C.vel) < .01) { C.pos = C.target; C.vel = 0; }
@@ -670,7 +670,7 @@ const Gallery = (() => {
       if (under(G.cx + c * r1, G.cy + s * r1) || under(G.cx + c * r2, G.cy + s * r2) || under(G.cx + c * (r1 + r2) / 2, G.cy + s * (r1 + r2) / 2)) continue;
       html += `<line x1="${G.cx + c * r1}" y1="${G.cy + s * r1}" x2="${G.cx + c * r2}" y2="${G.cy + s * r2}" stroke="var(--wh-knurl)" stroke-opacity="${(.12 + lit * .45).toFixed(3)}" stroke-width="2" stroke-linecap="round"/>`;
     }
-    G.knurl.innerHTML = html;
+    if (G.knurl._tk !== html) { G.knurl._tk = html; G.knurl.innerHTML = html; }
     const tg = Math.round(C.target);
     if (tg !== C.cur && C.pend !== tg && Math.abs(C.target - C.pos) < .25) { clearTimeout(C.setT); C.pend = tg; C.setT = setTimeout(() => { C.pend = null; setCat(Math.round(C.target)); }, 140); }
     W.raf = requestAnimationFrame(loop);

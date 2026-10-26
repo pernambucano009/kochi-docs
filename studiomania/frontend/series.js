@@ -1083,7 +1083,7 @@ function schedulePollSeries() {
       if (ser.ep?.id === fresh.id) {
         ser.ep = fresh;
         // من غير ما نمسح اللي بتكتبه دلوقتي
-        if (!document.activeElement?.closest('.view[data-view="9"] textarea, .view[data-view="9"] input')) renderSeries();
+        if (!document.activeElement?.closest('.view[data-view="9"] textarea, .view[data-view="9"] input')) morphing(renderSeries);
         else schedulePollSeries();
       }
     } catch { schedulePollSeries(); }

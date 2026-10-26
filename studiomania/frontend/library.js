@@ -232,7 +232,7 @@ const CharactersPage = (() => {
         const list = await api("/api/coaches");
         const typing = S.el.contains(document.activeElement) && document.activeElement.matches("input, textarea");
         S.list = list;
-        if (!typing && ![...S.el.querySelectorAll("video")].some((v) => !v.paused)) render();
+        morphing(render);
       } catch { /* يعيد المحاولة */ }
       poll();
     }, 4000);
@@ -451,7 +451,7 @@ const StyleClonePage = (() => {
       </div>
       <div class="sc-list">${S.list.map(card).join("") || ""}</div>`;
   }
-  const refreshList = () => { const l = S.el?.querySelector(".sc-list"); if (l) l.innerHTML = S.list.map(card).join(""); };
+  const refreshList = () => { const l = S.el?.querySelector(".sc-list"); if (l) setHTML(l, S.list.map(card).join("")); };
   async function poll() {
     clearTimeout(S.timer);
     if (!S.el?.isConnected) return;

@@ -87,7 +87,7 @@ function twPoll() {
   clearTimeout(tw.timer);
   if (!tw.cur?.busy || document.querySelector('.view[data-view="16"]')?.hidden) return;
   tw.timer = setTimeout(async () => {
-    try { tw.cur = await api(TW(`/${tw.cur.id}`)); if (!tw.cur.busy) tw.list = await api(TW()); twRender(); } catch { /* الخادم يعيد التشغيل */ }
+    try { tw.cur = await api(TW(`/${tw.cur.id}`)); if (!tw.cur.busy) tw.list = await api(TW()); morphing(twRender); } catch { /* الخادم يعيد التشغيل */ }
     twPoll();
   }, 4000);
 }

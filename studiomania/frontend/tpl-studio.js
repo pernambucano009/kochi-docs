@@ -112,7 +112,7 @@ function tsPoll() {
         const t = tsx.data.templates.find((x) => x.id === id);
         if (t && t.sample_status !== "working") toast(t.sample_status === "done" ? `🎞️ عينة «${t.name}» جاهزة` : `⚠️ عينة «${t.name}»: ${t.sample_error || "فشلت"}`, t.sample_status !== "done");
       }
-      if (!tplx.cur && !$("tsGallery").hidden && !$("tsGallery").contains(document.activeElement)) tsHome();
+      if (!tplx.cur && !$("tsGallery").hidden && !$("tsGallery").contains(document.activeElement)) morphing(tsHome);
     } catch { /* الخادم يعيد التشغيل */ }
     tsPoll();
   }, 4000);

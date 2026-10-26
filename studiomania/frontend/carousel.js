@@ -518,7 +518,7 @@ function schedulePoll() {
       const after = car.cur.slides.filter((s) => s.status === "done").length + (car.cur.overview.status === "done" ? 1 : 0);
       if (after !== before) loadCarList();
     } catch {}
-    renderCarousel();
+    morphing(renderCarousel);
   }, 3000);
 }
 

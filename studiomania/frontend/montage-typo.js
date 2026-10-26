@@ -242,8 +242,8 @@ function mtTypoPoll() {
         else if (cur.blocks?.length) toast("🔤 وُزّعت التايبوجرافي على المونتاج");
         syncPreview();
       }
-      renderTimeline();
-      mtTypoPaneRender();
+      morphing(renderTimeline);
+      morphing(mtTypoPaneRender);
       mtTypoPoll();
     } catch (err) { toast(err.message, true); }
   }, 2500);

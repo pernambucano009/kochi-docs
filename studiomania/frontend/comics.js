@@ -87,7 +87,7 @@ const ComicsPage = (() => {
     clearTimeout(S.timer);
     if (!S.st?.state?.running) return;
     S.timer = setTimeout(async () => {
-      try { await refresh(); if (!S.el.querySelector("[data-cmf]:focus, [data-cmq]:focus")) { if (!S.st.state.running) await load(); render(); } } catch {}
+      try { await refresh(); if (!S.el.querySelector("[data-cmf]:focus, [data-cmq]:focus")) { if (!S.st.state.running) await load(); morphing(render); } } catch {}
       poll();
     }, 4000);
   }

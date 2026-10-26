@@ -65,7 +65,7 @@ function scheduleLabPoll() {
       labx.cur = await api(`/api/lab/${labx.cur.id}`);
       labx.win = labWindows(labx.cur);
       if (!labx.cur.busy) { labx.list = await api("/api/lab"); labSetupStems(labx.cur); }
-      renderLab();
+      morphing(renderLab);
     } catch { /* الخادم يعيد التشغيل */ }
     scheduleLabPoll();
   }, 2500);

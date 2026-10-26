@@ -13240,5 +13240,7 @@ window.I18N_EN = {
   "يجب أن يتكون الكاروسيل من 2 إلى 10 صور": "A carousel must have 2 to 10 images",
   "الإعلانات غير مفعّلة في اشتراكك بعد. تواصل مع الدعم لتفعيلها، وبعدها يعمل كل شيء من هنا.": "Ads aren't enabled on your plan yet. Contact support to enable them, and then everything works from here.",
   "كلمتا المرور غير متطابقتين": "The passwords don't match",
-  "ترند": "trends"
+  "ترند": "trends",
+  "منشور جديد": "New post",
+  "⏳ جارٍ البدء…": "⏳ Starting…"
 };

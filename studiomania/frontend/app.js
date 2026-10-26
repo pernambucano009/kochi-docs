@@ -142,6 +142,42 @@ function morphNode(x, y) {
   morphKids(x, y);
 }
 
+// 🧊 تحديث في المكان لكل الشاشات: أي رسم بيحصل جوه morphing() (زي التحديث الدوري وإحنا بنستنى السيرفر)
+// كل «x.innerHTML = …» فيه بيمشي على setHTML: اللي اتغيّر بس هو اللي بيتغيّر، والفيديو الشغّال ومكانك
+// في الصفحة والخانة اللي بتكتب فيها واختياراتك بيفضلوا زي ما هم، بدل ما الشاشة تتبني من الأول.
+let MORPH = 0;
+function morphing(fn, ...args) {
+  MORPH++;
+  try { return fn(...args); } finally { MORPH--; }
+}
+(() => {
+  const d = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+  Object.defineProperty(Element.prototype, "innerHTML", {
+    configurable: true, enumerable: d.enumerable, get: d.get,
+    set(html) {
+      if (MORPH && !(this instanceof HTMLTemplateElement) && this.isConnected && typeof html === "string") return setHTML(this, html);
+      this._html = undefined;   // اتكتب بالطريقة العادية: المقارنة اللي بعدها تبدأ من جديد
+      d.set.call(this, html);
+    },
+  });
+  // العنصر بقى بيفضل هو هو، فالكود اللي بيربط زرار بعد الرسم كان هيربطه مرتين.
+  // نفس الحدث بنفس الكود على نفس العنصر = ربط واحد (الأحدث مكان القديم).
+  const add = EventTarget.prototype.addEventListener, rm = EventTarget.prototype.removeEventListener;
+  const seen = new WeakMap();
+  EventTarget.prototype.addEventListener = function (type, fn, opt) {
+    if (this instanceof Element && typeof fn === "function") {
+      const cap = typeof opt === "boolean" ? opt : !!opt?.capture;
+      const key = `${type}|${cap}|${fn}`;
+      let m = seen.get(this);
+      if (!m) seen.set(this, (m = new Map()));
+      const old = m.get(key);
+      if (old && old !== fn && MORPH) rm.call(this, type, old, cap);
+      m.set(key, fn);
+    }
+    return add.call(this, type, fn, opt);
+  };
+})();
+
 // نفس منطق السيرفر عشان الشاشة تتحدث فورًا
 function buildSegments(duration, cuts, skipped) {
   const points = [0, ...[...cuts].sort((a, b) => a - b), duration];

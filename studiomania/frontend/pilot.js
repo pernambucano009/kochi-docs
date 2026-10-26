@@ -147,7 +147,7 @@ const PilotPage = (() => {
   async function refresh() {
     if (!S.root?.isConnected) return clearInterval(S.timer);
     if (S.drag || document.hidden) return;
-    try { S.d = await api("/api/pilot"); drawQ(); drawHead(); } catch { /* اللفة القادمة */ }
+    try { S.d = await api("/api/pilot"); morphing(drawQ); morphing(drawHead); } catch { /* اللفة القادمة */ }
   }
   const shell = () => `
     <header class="ap-top"><span class="ap-lbl">الأوتوبايلوت</span><button type="button" class="ap-tg" data-on aria-label="الأوتوبايلوت"></button><span class="ap-st" data-st></span></header>

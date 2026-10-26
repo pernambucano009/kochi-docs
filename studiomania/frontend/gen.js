@@ -155,7 +155,7 @@ const Gen = (() => {
     if (!S.list.some((g) => g.status === "working")) return;
     S.timer = setTimeout(async () => {
       if (!S.el || S.el.hidden) return;
-      try { S.list = await api("/api/gens"); patchGrid(); } catch { /* يعيد المحاولة */ }
+      try { S.list = await api("/api/gens"); morphing(patchGrid); } catch { /* يعيد المحاولة */ }
       poll();
     }, 3000);
   }

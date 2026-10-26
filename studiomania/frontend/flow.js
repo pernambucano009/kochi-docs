@@ -91,7 +91,7 @@ const Flow = (() => {
         S.d = await api(`/api/flows/${S.d.id}`);
         if (S.d.error && was) toast(S.d.error, true);
         const typing = S.el.contains(document.activeElement) && document.activeElement.matches("input, textarea, select");
-        if (!typing || !busy()) render();
+        if (!typing || !busy()) morphing(render);
       } catch { /* الخادم يعيد التشغيل */ }
       poll();
     }, 1400);
@@ -668,14 +668,14 @@ const Flow = (() => {
     clearTimeout(S.ctimer);
     if (!S.d?.cambench?.runs?.some((r) => r.status === "working")) return;
     S.ctimer = setTimeout(async () => {
-      try { S.d = await api(`/api/flows/${S.d.id}`); render(); } catch { /* الخادم يعيد التشغيل */ }
+      try { S.d = await api(`/api/flows/${S.d.id}`); morphing(render); } catch { /* الخادم يعيد التشغيل */ }
       campoll();
     }, 5000);
   }
   async function mpoll() {
     clearTimeout(S.mtimer);
     if (!S.d || S.d.stage !== "montage" || !S.d.montage) return;
-    try { S.mstate = await api(`/api/flows/${S.d.id}/montage-state`); render(); } catch { /* الخادم يعيد التشغيل */ }
+    try { S.mstate = await api(`/api/flows/${S.d.id}/montage-state`); morphing(render); } catch { /* الخادم يعيد التشغيل */ }
     const ms = S.mstate || {};
     if (ms.typo?.busy || ms.project?.render_status === "rendering") S.mtimer = setTimeout(mpoll, 2500);
   }

@@ -127,8 +127,11 @@ async function main() {
       for (const e of [document.scrollingElement, ...document.querySelectorAll("*")]) {
         if (e && e.scrollHeight > e.clientHeight + 200 && (e === document.scrollingElement || /(auto|scroll)/.test(getComputedStyle(e).overflowY))) e.scrollTop = (e.scrollHeight - e.clientHeight) / 2;
       }
-      const M = window.__stab; Object.assign(M, { cls: 0, shifts: [], removed: 0, media: [], jumps: [], focus: [], input: performance.now() - 5000, t0: performance.now() });
+      // إحنا اللي نزلنا دلوقتي: نعتبرها لمسة، عشان مايتحسبش «التمرير اتلغى»
+      const M = window.__stab; Object.assign(M, { cls: 0, shifts: [], removed: 0, media: [], jumps: [], focus: [], input: performance.now(), t0: performance.now() });
     }).catch(() => {});
+    await page.waitForTimeout(1300);
+    await page.evaluate(() => Object.assign(window.__stab, { cls: 0, shifts: [], removed: 0, media: [], jumps: [], focus: [], t0: performance.now() })).catch(() => {});
     await page.waitForTimeout(IDLE_MS);
     const m = await page.evaluate(() => ({ ...window.__stab, secs: (performance.now() - window.__stab.t0) / 1000 })).catch(() => null);
     if (!m) return;

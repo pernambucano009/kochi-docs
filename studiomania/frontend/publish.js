@@ -10,6 +10,27 @@ const POST_STATUS = {
   failed: ["فشل", "failed"],
 };
 
+// تبويبات النشر بدل الكروت اللي ورا بعض: منشور جديد · المواعيد · ما نُشر · حساباتك
+function pubTab(t) {
+  const v = document.querySelector('.view[data-view="7"]');
+  t ||= storageGet("studiomania.pubtab") || "new";
+  v.dataset.pt = t;
+  document.querySelectorAll("#pubTabs [data-pt]").forEach((b) => b.setAttribute("aria-selected", b.dataset.pt === t));
+  storageSet("studiomania.pubtab", t);
+}
+$("pubTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pt]");
+  if (b) pubTab(b.dataset.pt);
+});
+pubTab();
+function pubTabCounts() {
+  const up = pub.posts.filter((p) => ["scheduled", "sending", "publishing", "failed"].includes(p.status)).length;
+  $("ptCalN").textContent = up || "";
+  const accs = pub.all || pub.list || [];
+  $("ptAccN").textContent = accs.some((a) => a.needs_reconnect) ? "!" : accs.length || "";
+  $("ptAccN").classList.toggle("bad", accs.some((a) => a.needs_reconnect));
+}
+
 async function initPublish() {
   const info = await api("/api/publisher");
   pub.platforms = info.platforms;
@@ -192,6 +213,7 @@ function tLabel(t) {
 function renderAccounts() {
   const box = $("pubAccounts");
   if (!box) return;
+  pubTabCounts();
   box.hidden = !pub.service;
   if (!pub.service) return;
   const plats = Object.entries(pub.platforms);
@@ -650,9 +672,11 @@ async function pubLoadPosts() {
     const was = before.get(p.id);
     if (p.status === "failed" && was && was !== "failed") toast(`✕ المنشور لم تُرسل: ${p.error || "فشل"}`, true);
   }
-  renderPosts();
-  renderReady();
-  if (typeof renderCal === "function") renderCal();
+  // بيتنادى كل شوية: التحديث في المكان (الفيديو اللي بتتفرج عليه في القائمة ما بيتحمّلش من الأول)
+  morphing(renderPosts);
+  morphing(renderReady);
+  pubTabCounts();
+  if (typeof renderCal === "function") morphing(renderCal);
   clearTimeout(pub.timer);
   // نحدّث كل شوية عشان نشوف البوستات اللي اتنشرت
   // لو فيه بوست جه ميعاده أو بيتنشر، نحدّث أسرع
@@ -734,6 +758,7 @@ function editPost(p) {
   renderReady();
   renderPostVideo();
   if (o.cover_ms != null) setCover(o.cover_ms);
+  pubTab("new");
   $("postForm").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 

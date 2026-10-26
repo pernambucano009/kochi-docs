@@ -3181,3 +3181,117 @@ html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }
 .vl-box :is(.btn.primary,.ui-dlg-ok):hover:not(:disabled){transform:none}
 /* 🌐 الإنجليزي: النوافذ اللي كانت مجبورة يمين لشمال (مختبر الأصوات، قايمة السكتات، المساعد) بتتقلب شمال ليمين عشان النقط والترتيب */
 html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
+
+/* ============ النشر بالتصميم الجديد: تبويبات بدل الكروت اللي ورا بعض، ومن غير كروت بيضا ============
+   «منشور جديد» ٣ أعمدة على قد الشاشة وكل عمود بيتمرر جوه نفسه، فالصفحة نفسها ما بتتمررش. */
+.pub-tabs { display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--field, #EFEEEB); width: max-content; max-width: 100%; overflow-x: auto; margin: 0 0 20px; scrollbar-width: none; }
+.pub-tabs::-webkit-scrollbar { display: none; }
+.pub-tabs button { flex: none; border: 0; background: none; border-radius: 999px; padding: 8px 18px; font: inherit; font-size: 13.5px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.pub-tabs button:hover { color: var(--text); }
+.pub-tabs button[aria-selected="true"] { background: var(--card, #fff); color: var(--text); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+.pub-tabs .pt-n:empty { display: none; }
+.pub-tabs .pt-n { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--line); color: var(--text); font-size: 11px; line-height: 18px; text-align: center; font-family: var(--display); }
+.pub-tabs .pt-n.bad { background: var(--accent); color: #fff; }
+.stage.cal-mode .pub-tabs { display: none; }
+/* كل تبويب بيظهر حاجته بس */
+.stage:not(.cal-mode) .view[data-view="7"]:not([data-pt="new"]) > .pub-grid,
+.stage:not(.cal-mode) .view[data-view="7"]:not([data-pt="cal"]) > .cal-panel,
+.stage:not(.cal-mode) .view[data-view="7"]:not([data-pt="done"]) > .pub-done,
+.stage:not(.cal-mode) .view[data-view="7"]:not([data-pt="acc"]) > .pub-accounts { display: none !important; }
+.stage:not(.cal-mode) .view[data-view="7"] > .gap-top { margin-top: 0; }
+/* من غير كروت بيضا: الأعمدة على الأرضية، وبينهم خط رفيع */
+:root:root .stage .view[data-view="7"] :is(.pub-where, .pub-ready, .pub-form, .cal-panel, .pub-done, .pub-accounts) { background: none !important; box-shadow: none !important; border: 0; border-radius: 0; }
+:root:root .stage .view[data-view="7"] :is(.cal-panel, .pub-done, .pub-accounts) { padding: 0; }
+.view[data-view="7"] .pub-k { display: none; }
+:root:root .stage .pub-grid { gap: 0; }
+:root:root .stage .pub-grid > section { padding: 4px 24px 8px; }
+.pub-grid > section + section { border-inline-start: 1px solid var(--line); }
+:root:root .stage .pub-where { padding-inline: 0 20px; }
+:root:root .stage .pub-form { padding-inline-end: 0; }
+/* حقول الفورم بقت على الأرضية، فلونها أفتح منها */
+:root:root .stage .view[data-view="7"] .pub-form :is(textarea, input[type=datetime-local], input[type=text]) { background: var(--card, #fff) !important; }
+:root:root .stage .view[data-view="7"] .pub-form .loc-row .btn { background: var(--card, #fff); }
+:root[data-nh-theme="dark"] .stage .view[data-view="7"] .pub-form :is(textarea, input[type=datetime-local], input[type=text]) { background: var(--surface-2, #2A292A) !important; }
+:root[data-nh-theme="dark"] .stage .view[data-view="7"] .pub-form .loc-row .btn { background: var(--field); }
+:root .stage .pub-where .platforms label.plat { background: var(--card, #fff) !important; }
+/* الإضافات (علّق بكلمة، إنستجرام، الغلاف) سطر خفيف بدل صندوق */
+.view[data-view="7"] .pub-form .post-extra { background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 0 0; }
+@media (min-width: 1201px) {
+  :root:root .stage .pub-grid { height: calc(100dvh - 290px); min-height: 460px; align-items: stretch; }
+  :root:root .stage .pub-grid > section { overflow-y: auto; min-height: 0; overscroll-behavior: contain; scrollbar-width: thin; }
+  .pub-form .row:has(#postSubmit) { position: sticky; bottom: 0; background: var(--page); padding: 10px 0 2px; margin-top: auto; }
+}
+@media (max-width: 1200px) { .pub-grid > section.pub-form { border-inline-start: 0; border-top: 1px solid var(--line); padding-top: 20px; } }
+@media (max-width: 800px) {
+  .pub-grid > section + section { border-inline-start: 0; border-top: 1px solid var(--line); }
+  :root:root .stage .pub-grid > section { padding: 18px 0; }
+  .pub-tabs { width: auto; }
+}
+/* المواعيد وما نُشر: قايمة على الأرضية، كل منشور سطر بخط رفيع بدل كارت */
+.view[data-view="7"] :is(.cal-panel, .pub-done) .panel-head { margin-bottom: 8px; }
+.view[data-view="7"] :is(.cal-panel, .pub-done) .panel-head h2 { font-size: 18px; font-weight: 500; }
+:root:root .stage .view[data-view="7"] :is(#postsList, #publishedList) > li { background: none; box-shadow: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 0; }
+/* حساباتك */
+:root:root .stage .view[data-view="7"] .pub-accounts .pa-plat { background: var(--card, #fff); box-shadow: none; }
+/* «قبل أن تنشر» جوه عمود الفورم الضيق: الكلام بيلف بدل ما يطلع برا العمود، ومن غير صندوق */
+.view[data-view="7"] .pub-check { background: none; padding: 12px 0 0; border-top: 1px solid var(--line); border-radius: 0; }
+.view[data-view="7"] .pub-check .pc-head { flex-wrap: wrap; }
+.view[data-view="7"] .pub-check .pc-head b { white-space: nowrap; }
+.view[data-view="7"] .pub-check li > span { flex: 1 1 160px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.view[data-view="7"] .pub-check .btn { white-space: normal; text-align: start; }
+@media (min-width: 1201px) { :root:root .stage .pub-grid > section { padding-top: 14px; } }
+.pub-tabs button::before, .pub-tabs button::after { display: none !important; }
+:root:root .stage .view[data-view="7"] .pub-form, .view[data-view="7"] #postForm, .view[data-view="7"] .pub-check, .view[data-view="7"] .pub-check :is(ul, li) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+@media (max-width: 800px) {
+  :root:root .stage .pub-where { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; text-align: start; gap: 10px; }
+  :root .stage .pub-where .platforms { grid-template-columns: repeat(auto-fill, 52px); width: 100%; }
+}
+
+/* ============ الدبلجة بالتصميم الجديد ============
+   فوق: «＋ فيديو من جهازك» و«من الفيديوهات الجاهزة» وجنبهم المشاريع شريط أفقي.
+   تحت: الفيديو الأصلي عمود صغير ثابت، وجنبه اللهجات والجمل بتتمرر جوه مكانها. من غير كروت بيضا. */
+.db-v2 .db-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; min-width: 0; }
+:root:root .stage .db-v2 .db-bar .ad-up { flex: none; padding: 11px 20px; font-size: 14px; }
+.db-v2 .db-bar #dbFromExport { flex: none; }
+.db-v2 .db-strip { flex: 1; min-width: 0; flex-direction: row; gap: 8px; overflow-x: auto; max-height: none; padding: 2px; scrollbar-width: thin; }
+.db-v2 .db-strip:empty { display: none; }
+.db-v2 .db-strip li { flex: none; max-width: 220px; padding: 6px 12px 6px 8px; border-radius: 999px; background: var(--card, #fff); box-shadow: 0 1px 4px rgba(0, 0, 0, .06); }
+.db-v2 .db-strip li.active { background: var(--ink, #181718); color: #fff; }
+.db-v2 .db-strip li.active small { color: rgba(255, 255, 255, .7); }
+:root[data-nh-theme="dark"] .db-v2 .db-strip li.active { background: #F2F1EE; color: #181718; }
+:root[data-nh-theme="dark"] .db-v2 .db-strip li.active small { color: #6B6A66; }
+.db-v2 .db-strip .ph { width: 30px; height: 30px; border-radius: 50%; background: var(--field, #EFEEEB); font-size: 15px; }
+.db-v2 .db-strip .nm { font-size: 13px; line-height: 1.3; }
+.db-v2 .db-strip .nm br { display: none; }
+.db-v2 .db-strip .nm small { display: inline; margin-inline-start: 8px; }
+.db-v2 .db-exports { max-height: 240px; margin: -8px 0 16px; padding: 8px; border-radius: 16px; background: var(--card, #fff); }
+.db-v2 .db-empty { padding: 60px 16px; text-align: center; color: var(--muted); max-width: 620px; margin: 0 auto; }
+.db-v2 .db-empty p:first-child { font-size: 17px; color: var(--text); margin: 0 0 10px; }
+.db-v2 .db-empty[hidden] { display: none; }
+/* المشروع */
+.db-v2 .db-main:not([hidden]) { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0 28px; align-content: start; }
+.db-v2 .db-main > * { grid-column: 2; min-width: 0; }
+.db-v2 .db-main > .db-head { grid-column: 1; grid-row: 1 / span 30; align-self: start; display: flex; flex-direction: column; gap: 12px; }
+:root:root .stage .db-v2 .db-main > .panel { background: none !important; box-shadow: none !important; border: 0; border-radius: 0; padding: 0; }
+.db-v2 .db-main > .db-add { padding-bottom: 14px !important; border-bottom: 1px solid var(--line) !important; margin-bottom: 14px; }
+.db-v2 .db-main > .db-dialect + .db-dialect { padding-top: 18px !important; margin-top: 18px; border-top: 1px solid var(--line) !important; }
+.db-v2 .db-src video { max-height: 420px; }
+.db-v2 .db-meta h2 { font-size: 18px; font-weight: 500; }
+.db-v2 .db-meta input { background: var(--card, #fff); }
+.db-v2 .db-line { background: var(--card, #fff); }
+.db-v2 .db-stat { margin: 4px 0 0; }
+@media (min-width: 901px) {
+  .db-v2 .db-main:not([hidden]) { height: calc(100dvh - 300px); min-height: 440px; grid-template-rows: auto; overflow: hidden; }
+  .db-v2 .db-main > .db-head { position: sticky; top: 0; }
+  /* العمود التاني هو اللي بيتمرر، مش الصفحة */
+  .db-v2 .db-main { grid-auto-rows: min-content; overflow-y: auto !important; overscroll-behavior: contain; }
+  .db-v2 .db-lines { max-height: 42vh; }
+}
+@media (max-width: 900px) {
+  .db-v2 .db-bar { flex-wrap: wrap; }
+  .db-v2 .db-strip { flex-basis: 100%; }
+  .db-v2 .db-main:not([hidden]) { grid-template-columns: 1fr; gap: 16px; }
+  .db-v2 .db-main > * , .db-v2 .db-main > .db-head { grid-column: 1; grid-row: auto; }
+  .db-v2 .db-src video { max-height: 300px; }
+}
+.db-v2 .db-strip .nm small { display: inline-block !important; margin-inline-start: 8px !important; }

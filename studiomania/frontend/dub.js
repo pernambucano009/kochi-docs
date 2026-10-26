@@ -1,7 +1,7 @@
 // StudioMania — 🌍 الدبلجة باللهجات العامية
 // فيديو ← الكلام بيتسمع ← يتحوّل للهجة (بتعدّله) ← صوت جاهز لكل جملة في مكانها + الموسيقى ← ليب سينك (اختياري) ← الفيديوهات الجاهزة للنشر.
 
-const dbx = { list: [], info: null, cur: null, timer: null };
+const dbx = { list: [], info: null, cur: null, timer: null, err: {}, sending: null };
 const DB_BG = { auto: "تلقائي", separate: "🎵 الموسيقى والمؤثرات من الأصل (يفصل الكلام)", low: "الصوت الأصلي منخفضًا في الخلفية", none: "بدون خلفية" };
 const dbe = (s) => escapeHtml(String(s ?? ""));
 const dbTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
@@ -31,7 +31,7 @@ async function dbOpen(id) {
 function dbRender() {
   setHTML($("dbList"), dbx.list.map((p) => `<li class="${dbx.cur?.id === p.id ? "active" : ""}" data-dbopen="${p.id}">
     <span class="ph">🌍</span><span class="nm" data-no-i18n>${dbe(p.name)}<br><small class="muted">${p.duration ? dbTime(p.duration) : ""} ${p.targets.map((k) => dbx.info?.dialects?.[k]?.label.split(" ")[0] || "").join(" ")} ${p.busy ? "⏳" : ""}</small></span></li>`).join("")
-    || `<li class="muted">لا يوجد بعد</li>`);
+    || "");
   $("dbMain").hidden = !dbx.cur;
   $("dbEmpty").hidden = !!dbx.cur;
   if (dbx.cur) dbRenderProj();
@@ -57,8 +57,10 @@ function dbRenderProj() {
     h += `<div class="panel db-dialect"><div class="db-dh"><h3>${dl.label}</h3>`;
     h += `<select data-dbvoice="${k}" ${t.busy ? "disabled" : ""}>${dl.voices.map((v) => `<option value="${v}" ${v === t.voice ? "selected" : ""}>🎙️ ${dbe(info.voices[v])}</option>`).join("")}</select>
       <button class="btn sm" data-dbadapt="${k}" ${t.busy || d.busy ? "disabled" : ""} title="يكتب النموذج النص من جديد (ستُحذف تعديلاتك)">↻ اكتبه من جديد</button></div>`;
-    if (t.busy && t.step) h += `<p><span class="spin-inline"></span> ${dbe(t.step)}</p>`;
-    if (t.error) h += `<p class="err">⚠️ ${dbe(t.error)}</p>`;
+    // الحالة والخطأ جنب زرار «أنشئ الدبلجة» نفسه (مش فوق بعيد عنه، ولا توست بيختفي)
+    const stat = (t.busy && t.step ? `<p class="db-stat"><span class="spin-inline"></span> ${dbe(t.step)}</p>` : "")
+      + (t.error || dbx.err[k] ? `<p class="err db-stat">⚠️ ${dbe(dbx.err[k] || t.error)}</p>` : "");
+    if (!t.lines?.length) h += stat;
     if (t.lines?.length) {
       h += `<p class="hint">صحّح أي جملة غير طبيعية. يجب أن تُقال كل جملة في وقتها (الرقم على اليسار)، فإن كانت طويلة فاختصرها.</p><div class="db-lines">`
         + d.lines.map((ln, i) => {
@@ -71,8 +73,8 @@ function dbRenderProj() {
       const lc = t.lip_cost || {};
       h += `<div class="db-opts"><label>🎵 الخلفية <select data-dbbg="${k}">${Object.entries(DB_BG).filter(([b]) => b !== "separate" || info.separate).map(([b, l]) => `<option value="${b}">${l}</option>`).join("")}</select></label>
         <label>🔤 التعليق النصي <select data-dbcap="${k}"><option value="">بدون تعليق نصي</option><option value="same">بنفس لغة الدبلجة</option>${Object.entries(info.caption_langs || {}).map(([c, l]) => `<option value="${c}">مترجم: ${dbe(l)}</option>`).join("")}</select></label>
-        <label>👄 مزامنة الشفاه <select data-dblip="${k}"><option value="">بدون (الصوت فقط)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)} · نحو $${lc[m]}</option>`).join("")}</select></label>
-        <button class="btn primary" data-dbrender="${k}" ${t.busy || d.busy ? "disabled" : ""}>🎙️ أنشئ الدبلجة <small>${(t.cost || {})[t.voice] ? `(الصوت نحو $${t.cost[t.voice]})` : ""}</small></button></div>`;
+        <label>👄 مزامنة الشفاه <select data-dblip="${k}"><option value="">بدون (الصوت فقط)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)} · ≈ $${lc[m]}</option>`).join("")}</select></label>
+        <button class="btn primary" data-dbrender="${k}" ${t.busy || d.busy || dbx.sending === k ? "disabled" : ""}>${dbx.sending === k ? "⏳ جارٍ البدء…" : "🎙️ أنشئ الدبلجة"} <small>${(t.cost || {})[t.voice] ? `(≈ $${t.cost[t.voice]})` : ""}</small></button></div>${stat}`;
     }
     if (t.video_url) {
       h += `<div class="db-out"><video src="${t.video_url}" controls playsinline preload="metadata"></video>
@@ -147,14 +149,19 @@ $("dbExports").addEventListener("click", async (e) => {
   } catch (err) { toast(err.message, true); }
 });
 
-async function dbAct(path, method, body, msg) {
+async function dbAct(path, method, body, msg, k) {
+  if (k) { dbx.err[k] = null; dbx.sending = k; dbRenderProj(); }
   try {
     const r = await api(`/api/dub/${dbx.cur.id}${path}`, { method, ...(body ? jsonBody(body) : {}) });
     dbx.cur = { ...r, info: dbx.info };
-    dbRenderProj();
     if (msg) toast(msg);
     dbPoll();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) {
+    if (k) dbx.err[k] = err.message;
+    toast(err.message, true);
+  }
+  dbx.sending = null;
+  dbRenderProj();
 }
 
 $("dbMain").addEventListener("click", async (e) => {
@@ -180,7 +187,7 @@ $("dbMain").addEventListener("click", async (e) => {
     const bg = document.querySelector(`[data-dbbg="${k}"]`).value;
     if (lip && !(await uiConfirm(`الليب سينك يتكلف نحو $${dbx.cur.targets[k].lip_cost[lip]} هذا للفيديو. تُكمل؟`))) return;
     const caps = document.querySelector(`[data-dbcap="${k}"]`)?.value || "";
-    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ جارٍ إنشاء الدبلجة…");
+    return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ جارٍ إنشاء الدبلجة…", k);
   }
 });
 

@@ -34,7 +34,7 @@ async function ntfPoll() {
     ntf.unread = d.unread;
     ntf.newest = d.items[0]?.created_at || ntf.newest || "";
     ntfBadge();
-    if (ntf.open) { ntfRender(); ntfPlace($("bellPanel"), ntf.anchor); }
+    if (ntf.open) { morphing(ntfRender); ntfPlace($("bellPanel"), ntf.anchor); }
     // الأقدم الأول، وبحد أقصى 3 رسايل عشان مايبقاش زحمة
     for (const x of fresh.slice(0, 3).reverse()) {
       toast(`${x.level === "bad" ? "✕" : "🔔"} ${x.title}`, x.level === "bad");

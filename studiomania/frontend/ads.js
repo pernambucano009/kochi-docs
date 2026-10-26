@@ -619,8 +619,8 @@ function scheduleAdPoll() {
         adx.cur = fresh;
         if (changed) adx.list = await api("/api/ads");
       }
-      renderAds();
-      if ($("adGalDialog").open) renderAdGallery();
+      morphing(renderAds);
+      if ($("adGalDialog").open) morphing(renderAdGallery);
     } catch { scheduleAdPoll(); }
   }, 3000);
 }

@@ -22,9 +22,7 @@ function scheduleFilmPoll() {
   filmx.timer = setTimeout(async () => {
     try {
       filmx.cur = await api(`/api/films/${filmx.cur.id}`);
-      const playing = [...$("labFilm").querySelectorAll("video")].some((v) => !v.paused);
-      const typing = $("labFilm").contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
-      if (!playing && !typing) renderFilm();
+      morphing(renderFilm);
     } catch { /* الخادم يعيد التشغيل */ }
     scheduleFilmPoll();
   }, 2500);

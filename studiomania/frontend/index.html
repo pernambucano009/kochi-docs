@@ -759,8 +759,13 @@
         <!-- الخطوة 7: فولدر الفيديوهات الجاهزة والنشر -->
         <main class="view" data-view="7" hidden>
           <div class="alert warn" id="publisherAlert" hidden></div>
+          <nav class="pub-tabs" id="pubTabs" role="tablist">
+            <button type="button" role="tab" data-pt="new">منشور جديد</button>
+            <button type="button" role="tab" data-pt="cal">المواعيد <span class="pt-n" id="ptCalN"></span></button>
+            <button type="button" role="tab" data-pt="done">ما نُشر</button>
+            <button type="button" role="tab" data-pt="acc">حساباتك <span class="pt-n" id="ptAccN"></span></button>
+          </nav>
           <section class="panel pub-accounts" id="pubAccounts" hidden></section>
-          <button class="btn inbox-link" type="button" data-goto="15"><svg><use href="#i-chat"/></svg> التعليقات والرسائل: رد عليهم من هنا</button>
           <div class="pub-grid">
             <section class="panel pub-where">
               <div class="pub-k">WHERE<br>TO POST</div><h2>أين سينزل؟</h2>
@@ -863,7 +868,7 @@
             <p class="empty" id="postsEmpty">لا يوجد منشورات هنا.</p>
           </section>
 
-          <section class="panel gap-top">
+          <section class="panel gap-top pub-done">
             <div class="panel-head"><h2><span class="emo">✅</span> ما نُشر <span class="muted" id="publishedCount"></span></h2>
               <button class="btn sm" id="publishedRefresh"><span class="emo">🔄</span> حدّث</button></div>
             <ul class="posts published-list" id="publishedList"></ul>
@@ -1217,18 +1222,18 @@
           <div class="ts-wrap"><div id="tsGallery"></div><div id="tsHost"></div></div>
         </main>
 
-        <main class="view" data-view="13" hidden>
-          <div class="car-layout">
-            <aside class="panel ad-side">
-              <div class="panel-head"><h2><span class="emo">🌍</span> الدبلجة</h2></div>
-              <label class="btn primary ad-up">＋ فيديو من جهازك<input type="file" id="dbUpload" accept="video/*" hidden></label>
-              <button type="button" class="btn" id="dbFromExport"><span class="emo">🎬</span> من الفيديوهات الجاهزة</button>
-              <ul class="ad-list" id="dbExports" hidden></ul>
-              <p class="hint">يُستمع إلى النص ويُحوَّل إلى أي لهجة عربية (مصري، نجدي، حجازي، خليجي، شامي، مغربي…) أو لغة أجنبية، ويمكنك تعديله قبل الصوت. كل جملة تُقال في وقتها، وتبقى الموسيقى، ومزامنة الشفاه اختيارية. وتظهر النسخة في الفيديوهات الجاهزة للنشر.</p>
-              <ul class="ad-list" id="dbList"></ul>
-            </aside>
-            <section class="car-main" id="dbMain" hidden></section>
-            <div class="panel muted" id="dbEmpty">ارفع فيديو أو اختر واحدًا من الفيديوهات الجاهزة لدبلجته.</div>
+        <main class="view db-v2" data-view="13" hidden>
+          <!-- الدبلجة بالتصميم الجديد: المشاريع شريط فوق، والمشروع تحته في مكان واحد من غير كروت -->
+          <div class="db-bar">
+            <label class="btn primary ad-up">＋ فيديو من جهازك<input type="file" id="dbUpload" accept="video/*" hidden></label>
+            <button type="button" class="btn" id="dbFromExport"><span class="emo">🎬</span> من الفيديوهات الجاهزة</button>
+            <ul class="ad-list db-strip" id="dbList"></ul>
+          </div>
+          <ul class="ad-list db-exports" id="dbExports" hidden></ul>
+          <section class="car-main db-main" id="dbMain" hidden></section>
+          <div class="db-empty" id="dbEmpty">
+            <p>ارفع فيديو أو اختر واحدًا من الفيديوهات الجاهزة لدبلجته.</p>
+            <p class="hint">يُستمع إلى النص ويُحوَّل إلى أي لهجة عربية (مصري، نجدي، حجازي، خليجي، شامي، مغربي…) أو لغة أجنبية، ويمكنك تعديله قبل الصوت. كل جملة تُقال في وقتها، وتبقى الموسيقى، ومزامنة الشفاه اختيارية. وتظهر النسخة في الفيديوهات الجاهزة للنشر.</p>
           </div>
         </main>
 

@@ -234,7 +234,7 @@ const RivalsPage = (() => {
   }
   async function moLoad() {
     try { S.mo.d = await api("/api/plan/month"); } catch (err) { return toast(err.message, true); }
-    if (S.only === "plan") render();
+    if (S.only === "plan") morphing(render);
     clearTimeout(S.moT);
     if (S.mo.d.status === "working") S.moT = setTimeout(moLoad, 4000);
   }
@@ -257,13 +257,13 @@ const RivalsPage = (() => {
   function planPoll() {
     clearTimeout(S.plT);
     if (S.pl.d?.plan?.status !== "working") return;
-    S.plT = setTimeout(async () => { try { S.pl.d = await api("/api/strategy"); render(); } catch {} planPoll(); }, 4000);
+    S.plT = setTimeout(async () => { try { S.pl.d = await api("/api/strategy"); morphing(render); } catch {} planPoll(); }, 4000);
   }
   function poll() {
     clearTimeout(S.timer);
     if (S.d?.status !== "working" && !S.d?.brief_due && !(S.d && !S.d.items.length && S.d.brain?.domain && S.d.status !== "failed")) return;
     S.timer = setTimeout(async () => {
-      try { S.d = await api("/api/rivals"); S.keep = true; render(); S.keep = false; } catch {}
+      try { S.d = await api("/api/rivals"); S.keep = true; morphing(render); S.keep = false; } catch {}
       poll();
     }, 2500);
   }
