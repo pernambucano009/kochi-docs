@@ -66,6 +66,18 @@
     return chars.map((c, i) => (i ? ZWJ : "") + c + (i < chars.length - 1 ? ZWJ : ""));
   }
 
+  // 🗣️ كلمات بتفرّق اللهجات عن بعض (كلمة كاملة). أقل من كلمتين = فصحى
+  const DIAL_MARKS = {
+    eg: "ده|دي|دول|كده|إزاي|ازاي|عايز|عايزة|عاوز|النهارده|دلوقتي|بتاع|بتاعك|امبارح|ليه|إيه|ايه|خالص|أوي|اوي|علشان|بقى",
+    sa: "وش|ابغى|أبغى|ابي|أبي|نبي|كذا|زين|مره|يبي|الحين|ترا|عاد|هالشي|وايد|شلون|ودك|يمديك|حيل|مب",
+    lev: "شو|هيك|كتير|منيح|هلأ|هلق|بدي|بدك|ليش|لسا|هون|هيدا|هيدي|كيفك|منشان|كرمال|شي",
+    iq: "شكو|ماكو|اكو|هواية|شلونك|اريد|أريد|هسه|هسة|چا|گلت|زين",
+    ma: "ديال|ديالي|ديالك|بزاف|دابا|غادي|بغيت|مزيان|كاين|واخا|شحال",
+    dz: "راني|راك|نتاع|تاع|برك|درك|ياسر|بزاف|واش|كيفاش|نديرو|ديرو|نهدر",
+    tn: "برشا|باش|متاع|متاعك|توا|ياسر|شنوة|علاش|نحب|بالحق|عسلامة|كان",
+    sd: "زول|شديد|ياخ|داير|كدا|ساي|قروش|ياهو|عديل",
+  };
+  const DIAL_RES = Object.fromEntries(Object.entries(DIAL_MARKS).map(([k, v]) => [k, new RegExp(`(?<![\\u0621-\\u064A])(${v})(?![\\u0621-\\u064A])`, "g")]));
   class TypoEngine {
     constructor(stage, doc) {
       this.stage = stage;
@@ -74,6 +86,7 @@
 
     set(doc) {
       this.doc = doc;
+      this._dial = undefined;
       this.style = { ...DEFAULT_STYLE, ...(doc.style || {}) };
       for (const k of ["light", "dark", "accent"]) this.style[k] = { ...DEFAULT_STYLE[k], ...((doc.style || {})[k] || {}) };
       const { w, h } = doc;
@@ -106,6 +119,16 @@
     text(s) {
       const c = this.style.case;
       return c === "upper" ? s.toUpperCase() : c === "lower" ? s.toLowerCase() : s;
+    }
+
+    // 🗣️ لهجة الفيديو (للكلام الثابت اللي جوه المشاهد: «النهارده»، «مش صح»…): من كلام السكريبت نفسه، وإلا doc.dialect
+    dialect() {
+      if (this._dial === undefined) {   // لهجة السكريبت الأول (العميل ممكن يكون وكالة بعملاء بلهجات مختلفة)، وإلا لهجة الحساب
+        const all = (this.doc.blocks || []).map((b) => b.text || (b.words || []).map((x) => x.w).join(" ")).join(" ");
+        const got = TypoEngine.dialOf(all);
+        this._dial = got !== "msa" ? got : TypoEngine.dialGroup(this.doc.dialect);
+      }
+      return this._dial;
     }
 
     words(b) {
@@ -687,5 +710,21 @@
   };
   TypoEngine.KINDS = ["pop", "type", "build", "icon", "letters", "scatter", "ring", "anchor"];
   TypoEngine.DEFAULT_STYLE = DEFAULT_STYLE;
+  // لهجة من النص: أعلى عدد كلمات مميزة (كلمتين على الأقل)، وإلا فصحى
+  TypoEngine.dialOf = (text) => {
+    const t = String(text || "").replace(/[\u064B-\u065F\u0670\u0640]/g, "");
+    let best = "msa", n = 1;
+    for (const [k, re] of Object.entries(DIAL_RES)) { const c = (t.match(re) || []).length; if (c > n) { best = k; n = c; } }
+    return best;
+  };
+  // كود لهجة البرنامج (ar-eg-cairo، ar-sa-najdi، ar-ae…) ← مجموعة الكلام الثابت
+  TypoEngine.dialGroup = (code) => {
+    const c = String(code || "");
+    if (/^ar-eg/.test(c)) return "eg";
+    if (/^ar-(sa|gulf|ae|kw|qa|bh|om)/.test(c)) return "sa";
+    if (/^ar-levant/.test(c)) return "lev";
+    for (const k of ["iq", "ma", "dz", "tn", "sd"]) if (c.startsWith("ar-" + k)) return k;
+    return "msa";
+  };
   window.TypoEngine = TypoEngine;
 })();

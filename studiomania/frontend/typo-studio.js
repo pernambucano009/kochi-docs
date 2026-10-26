@@ -1801,6 +1801,36 @@
   const PIXEL = (s) => (AR.test(s) ? "'TY PlexAr', 'SM Tajawal'" : "'TY Pixel', monospace");
   const TYPEW = (s) => (AR.test(s) ? "'SM Kufi', 'SM Tajawal'" : "'TY Type', monospace");
   const isAr = (it) => it.some((x) => AR.test(x.w));
+  // 🗣️ الكلام الثابت اللي جوه المشاهد بلهجة الفيديو (this.dialect() من typo-engine): لهجة مش موجودة هنا = فصحى
+  const DP = {
+    today: { eg: "النهارده", msa: "اليوم" },
+    week: { eg: "الأسبوع ده", sa: "هالأسبوع", lev: "هالجمعة", iq: "هالأسبوع", ma: "هاد السيمانة", dz: "هاد السمانة", tn: "الجمعة هاذي", sd: "الأسبوع ده", msa: "هذا الأسبوع" },
+    from: { eg: (a, b) => `النهارده من ${a} لـ ${b}`, sa: (a, b) => `اليوم من ${a} لين ${b}`, msa: (a, b) => `اليوم من ${a} إلى ${b}`,
+      lev: (a, b) => `اليوم من ${a} لـ ${b}`, iq: (a, b) => `اليوم من ${a} لـ ${b}`, ma: (a, b) => `اليوم من ${a} حتى ${b}`, dz: (a, b) => `اليوم من ${a} حتى ${b}`, tn: (a, b) => `اليوم من ${a} حتى ${b}`, sd: (a, b) => `الليلة من ${a} لـ ${b}` },
+    cta: { eg: (x) => `اعرف كل حاجة عن ${x} واحجز دلوقتي وابدأ النهارده.`, sa: (x) => `اعرف كل شي عن ${x} واحجز الحين وابدأ اليوم.`,
+      lev: (x) => `اعرف كل شي عن ${x} واحجز هلأ وابلش اليوم.`, iq: (x) => `اعرف كلشي عن ${x} واحجز هسه وابدي اليوم.`, ma: (x) => `عرف كلشي على ${x} وحجز دابا وبدا اليوم.`,
+      dz: (x) => `اعرف كلش على ${x} واحجز درك وابدا اليوم.`, tn: (x) => `اعرف كل شي على ${x} واحجز توا وابدا اليوم.`, sd: (x) => `اعرف كل حاجة عن ${x} واحجز هسي وابدأ الليلة.`,
+      msa: (x) => `تعرّف على كل شيء عن ${x} واحجز الآن وابدأ اليوم.` },
+    built: { eg: "اتعمل في دقايق ومتابع لوحده", sa: "انسوى في دقايق ويتابع نفسه", lev: "انعمل بدقايق وعم يتابع حالو", iq: "انسوى بدقايق ويتابع وحده",
+      ma: "تدار ف دقايق وكيتابع بوحدو", dz: "تدار في دقايق ويتابع وحدو", tn: "تعمل في دقايق ويتابع وحدو", sd: "اتعمل في دقايق وبتابع براهو", msa: "صُنع في دقائق ويُتابَع تلقائيًا" },
+    gen: { eg: "بيعمل صور…", sa: "يسوّي صور…", lev: "عم يعمل صور…", iq: "دا يسوّي صور…", ma: "كيدير التصاور…", dz: "راهو يدير تصاور…", tn: "قاعد يعمل تصاور…", sd: "بعمل صور…", msa: "يُنشئ الصور…" },
+    wrong: { eg: "مش صح", sa: "مو صح", lev: "مش صح", iq: "مو صح", ma: "ماشي صحيح", dz: "ماشي صحيح", tn: "موش صحيح", sd: "ما صاح", msa: "ليس صحيحًا" },
+    on: { eg: "شغّال", sa: "شغّال", lev: "شغّال", iq: "شغّال", ma: "خدّام", dz: "يخدم", tn: "يخدم", sd: "شغّال", msa: "يعمل" },
+    off: { eg: "مقفول", sa: "مقفل", lev: "مسكّر", iq: "مطفي", ma: "مسدود", dz: "مغلوق", tn: "مسكّر", sd: "مقفول", msa: "مغلق" },
+    filler: { eg: "الصبح الشوارع فاضية تقريبا والمحلات لسه قافلة والنور طالع على الحيطان والناس بتبدأ يومها على مهلها",
+      sa: "الصبح الشوارع شبه فاضية والمحلات للحين مسكّرة والنور طالع على الجدران والناس تبدأ يومها على راحتها",
+      lev: "الصبح الشوارع شبه فاضية والمحلات لسا مسكّرة والضو طالع عالحيطان والناس عم تبلش نهارها عمهلها",
+      msa: "في الصباح تكون الشوارع شبه خالية والمتاجر ما زالت مغلقة والضوء يسطع على الجدران والناس يبدؤون يومهم على مهل" },
+    story: { eg: ["كان من أوائل اللي اتكلموا عن الفكرة دي في السوق", "وبدأ يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إن المنافسة الحقيقية مش في المحل",
+        "وده اللي غيّر طريقة تفكير البراندات كلها", "ولحد النهارده الكتاب ده بيتدرّس في كل مكان", "وكل شركة كبيرة ماشية على نفس القاعدة"],
+      sa: ["كان من أوائل اللي تكلموا عن هالفكرة في السوق", "وبدأ يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إن المنافسة الحقيقية مو في المحل",
+        "وهذا اللي غيّر طريقة تفكير البراندات كلها", "وللحين هالكتاب ينْدرس في كل مكان", "وكل شركة كبيرة ماشية على نفس القاعدة"],
+      lev: ["كان من أوائل يلي حكوا عن هالفكرة بالسوق", "وبلّش يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إنو المنافسة الحقيقية مش بالمحل",
+        "وهاد يلي غيّر طريقة تفكير كل البراندات", "ولهلأ هالكتاب عم ينْدرس بكل مكان", "وكل شركة كبيرة ماشية عنفس القاعدة"],
+      msa: ["كان من أوائل من تحدثوا عن هذه الفكرة في السوق", "وبدأ يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إن المنافسة الحقيقية ليست في المتجر",
+        "وهذا ما غيّر طريقة تفكير العلامات التجارية كلها", "وحتى اليوم ما زال هذا الكتاب يُدرَّس في كل مكان", "وكل شركة كبيرة تسير على القاعدة نفسها"] },
+  };
+  P.dp = function (k, ...a) { const t = DP[k], v = t[this.dialect ? this.dialect() : "msa"] ?? (k === "today" ? DP.today.msa : t.msa); return typeof v === "function" ? v(...a) : v; };
   const focusOf = (b, it) => (b.focus >= 0 && b.focus < it.length ? b.focus : it.reduce((a, x, i) => (x.w.length > it[a].w.length ? i : a), 0));
   // سطور بالعرض: كل سطر div لوحده (عشان fitFrame يقدر يدخّله في الكادر)
   P.wrapItems = function (it, font, maxW) {
@@ -3309,7 +3339,7 @@
     const zoom = lerp(1, 1.12, seg(t, b.t0, b.t1));
     const sz = mn * 0.05 * this.ts;
     const pw = w * 0.92;
-    const filler = ar ? "الصبح الشوارع فاضية تقريبا والمحلات لسه قافلة والنور طالع على الحيطان والناس بتبدأ يومها على مهلها" : "morning the streets are almost empty storefronts still closed and the light climbs the walls while people start their day";
+    const filler = ar ? this.dp("filler") : "morning the streets are almost empty storefronts still closed and the light climbs the walls while people start their day";
     const fw = filler.split(" ");
     let html = `<div style="position:absolute;inset:0;background:#FFFFFF"></div>`;
     // شريط الأدوات والمسطرة
@@ -3349,7 +3379,7 @@
       const s = this.text(c.w);
       if (i === 0) {
         html += box(`<div style="display:flex;gap:${(sz * 0.6).toFixed(1)}px;align-items:center"><span dir="ltr" style="flex:none;width:${(sz * 2).toFixed(0)}px;height:${(sz * 2).toFixed(0)}px;border-radius:${(sz * 0.3).toFixed(0)}px;border:2px solid #1A73E8;color:#1A73E8;display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.9).toFixed(0)}px 'TY Outfit'">31</span>
-          <span><span style="display:block;font:700 ${sz.toFixed(1)}px ${ff};color:#111;white-space:nowrap">${esc(s)}</span><span style="display:block;font:500 ${(sz * 0.75).toFixed(1)}px ${ff};color:#1A73E8;border-${ar ? "right" : "left"}:3px solid #1A73E8;padding:0 ${(sz * 0.4).toFixed(1)}px;margin-top:${(sz * 0.3).toFixed(1)}px">${ar ? "النهارده من 4:00 لـ 5:30" : "Today from 4:00 to 5:30"}</span></span></div>`, c);
+          <span><span style="display:block;font:700 ${sz.toFixed(1)}px ${ff};color:#111;white-space:nowrap">${esc(s)}</span><span style="display:block;font:500 ${(sz * 0.75).toFixed(1)}px ${ff};color:#1A73E8;border-${ar ? "right" : "left"}:3px solid #1A73E8;padding:0 ${(sz * 0.4).toFixed(1)}px;margin-top:${(sz * 0.3).toFixed(1)}px">${ar ? this.dp("from", "4:00", "5:30") : "Today from 4:00 to 5:30"}</span></span></div>`, c);
         y += sz * 4.4;
       } else if (i === 1) {
         const nm = NAMES[L][bi % 4];
@@ -3527,7 +3557,7 @@
       background:#fff;border-radius:${(sz * 0.6).toFixed(1)}px;box-shadow:0 ${(sz * 0.3).toFixed(1)}px ${sz.toFixed(1)}px rgba(0,0,0,.16);padding:${(sz * 1.1).toFixed(1)}px">
       <div style="font:700 ${(sz * 1.25).toFixed(1)}px ${ff};color:${acc};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title || (ar ? "نظرة عامة" : "Overview"))}</div>
       <div dir="ltr" style="display:flex;gap:${(sz * 2).toFixed(1)}px;margin-top:${(sz * 0.6).toFixed(1)}px">${vals.map((v, i) => `<div><div style="font:700 ${(sz * 2.2).toFixed(1)}px 'TY Outfit';color:#111;letter-spacing:-0.04em">${Math.round(v * cnt).toLocaleString("en")}<span style="font-size:.4em;color:${i ? ORG : acc}"> ●</span></div>
-        <div style="font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#777">${ar ? ["الأسبوع ده", "النهارده"][i] : ["this week", "today"][i]}</div></div>`).join("")}</div>
+        <div style="font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(ar ? "ع" : "a")};color:#777">${ar ? [this.dp("week"), this.dp("today")][i] : ["this week", "today"][i]}</div></div>`).join("")}</div>
       <svg width="${cw.toFixed(0)}" height="${ch.toFixed(0)}" style="position:absolute;left:0;top:0;overflow:visible">
         ${[0, 1, 2, 3].map((q) => `<line x1="${gx.toFixed(0)}" x2="${(gx + gw).toFixed(0)}" y1="${(gy + (q / 3) * gh).toFixed(0)}" y2="${(gy + (q / 3) * gh).toFixed(0)}" stroke="#EEE"/>`).join("")}
         <path d="${area}" fill="${acc}" opacity="${(0.12 * ln).toFixed(3)}"/>
@@ -3652,7 +3682,7 @@
         ${dateMode ? `<span dir="ltr" style="flex:none;width:${(sz * 1.8).toFixed(0)}px;height:${(sz * 1.8).toFixed(0)}px;border-radius:${(sz * 0.4).toFixed(0)}px;background:${["#FFE1D6", "#E0E7FF", "#DCFCE7", "#FEF3C7"][i % 4]};display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.8).toFixed(0)}px 'TY Outfit';color:#333">${10 + i * 3}</span>` : ""}
         <span style="flex:1;min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 ${sz.toFixed(1)}px ${ff};color:#111">${esc(s)}</span>
           ${dateMode ? "" : `<span dir="ltr" style="display:block;font:500 ${(sz * 0.7).toFixed(1)}px 'TY Outfit';color:#888">${val} ${ar ? "مشاهدة" : "views"}</span>`}</span>
-        <span dir="ltr" style="flex:none;font:600 ${(sz * 0.75).toFixed(1)}px 'TY Outfit';color:${dateMode ? "#16A34A" : "#3B4BE8"}">${dateMode ? (ar ? "النهارده" : "today") : `${1 + (i % 4)}:${String(10 + ((i * 17) % 50)).padStart(2, "0")} avg`}</span></div>`;
+        <span dir="ltr" style="flex:none;font:600 ${(sz * 0.75).toFixed(1)}px 'TY Outfit';color:${dateMode ? "#16A34A" : "#3B4BE8"}">${dateMode ? (ar ? this.dp("today") : "today") : `${1 + (i % 4)}:${String(10 + ((i * 17) % 50)).padStart(2, "0")} avg`}</span></div>`;
     });
     return html;
   };
@@ -4278,7 +4308,7 @@
         <div style="display:flex;align-items:center;gap:${(sz * 0.4).toFixed(1)}px"><span style="width:${(sz * 1.2).toFixed(0)}px;height:${(sz * 1.2).toFixed(0)}px;border-radius:50%;background:#3B4BE8;color:#fff;display:flex;align-items:center;justify-content:center;font:700 ${(sz * 0.6).toFixed(0)}px ${famOf(site)}">${esc([...site][0] || "S")}</span>
           <span><span style="display:block;font:500 ${(sz * 0.7).toFixed(1)}px ${famOf(site)};color:#202124">${esc(site)}</span><span dir="ltr" style="display:block;font:400 ${(sz * 0.6).toFixed(1)}px 'TY Outfit';color:#5F6368">https://www.${esc(slug)}</span></span></div>
         <div style="font:500 ${(sz * 1.1).toFixed(1)}px ${ff};color:#1A0DAB;margin-top:${(sz * 0.4).toFixed(1)}px;line-height:1.3">${esc(shown)}</div>
-        <div style="font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#4D5156;line-height:1.5;margin-top:${(sz * 0.3).toFixed(1)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.4).toFixed(3)}">${esc(ar ? `${title}. اعرف كل حاجة عن ${site} واحجز الآن وابدأ النهارده.` : `${title}. Learn everything about ${site}, book online and get started today.`)}</div></div>`;
+        <div style="font:400 ${(sz * 0.7).toFixed(1)}px ${ff};color:#4D5156;line-height:1.5;margin-top:${(sz * 0.3).toFixed(1)}px;opacity:${seg(t, it[it.length - 1].t0, it[it.length - 1].t0 + 0.4).toFixed(3)}">${esc(ar ? `${title}. ${this.dp("cta", site)}` : `${title}. Learn everything about ${site}, book online and get started today.`)}</div></div>`;
     void fi;
     return html;
   };
@@ -4786,7 +4816,7 @@
     html += `<div data-free dir="ltr" style="position:absolute;${ar ? "right" : "left"}:${(-nz * 0.18).toFixed(0)}px;bottom:${(-nz * 0.12).toFixed(0)}px;font:600 ${nz.toFixed(0)}px 'TY Outfit';letter-spacing:-0.07em;line-height:1;color:${ink}">${cnt}</div>`;
     if (label) { const ff = famOf(label), z = fitSize(label, `600 {}px ${ff}`, w * 0.5, mn * 0.06 * this.ts);
       html += `<div dir="${this.dir(label)}" style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.55).toFixed(0)}px;white-space:nowrap;font:600 ${z.toFixed(1)}px ${ff};color:${ink};${shadow(this)}">${esc(label)}</div>
-        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.55 + z * 1.4).toFixed(0)}px;width:${(w * 0.4).toFixed(0)}px;font:400 ${(z * 0.45).toFixed(1)}px ${ff};color:${ink};opacity:.6;line-height:1.4">${ar ? "اتعمل في دقايق ومتابع لوحده" : "Built in minutes, tracked automatically"}</div>`; }
+        <div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;${ar ? "left" : "right"}:${(w * 0.08).toFixed(0)}px;top:${(h * 0.55 + z * 1.4).toFixed(0)}px;width:${(w * 0.4).toFixed(0)}px;font:400 ${(z * 0.45).toFixed(1)}px ${ff};color:${ink};opacity:.6;line-height:1.4">${ar ? this.dp("built") : "Built in minutes, tracked automatically"}</div>`; }
     return html;
   };
 
@@ -5425,7 +5455,7 @@
     const spin = ((t - b.t0) * 360) % 360;
     let html = `<div style="position:absolute;inset:0;background:${onVideo(this) ? "rgba(238,241,246,.93)" : "#EEF1F6"}"></div>`;
     html += `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:${((w - cw) / 2).toFixed(1)}px;width:${cw.toFixed(1)}px;top:${(cy - tw * 0.5 - fz * 4.6).toFixed(1)}px;font:400 ${fz.toFixed(1)}px ${ff};color:#1E1E1E;line-height:1.45">${esc(s)}
-      <div style="margin-top:${(fz * 0.7).toFixed(0)}px;color:#3B5BDB;font-size:.9em;display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${fz.toFixed(0)}" height="${fz.toFixed(0)}" viewBox="0 0 20 20" style="transform:rotate(${spin.toFixed(0)}deg)"><circle cx="10" cy="10" r="7" fill="none" stroke="#3B5BDB" stroke-width="2.5" stroke-dasharray="30 14"/></svg>${ar ? "بيعمل صور…" : "Generating images…"} <span dir="ltr">${done}/${total}</span></div></div>`;
+      <div style="margin-top:${(fz * 0.7).toFixed(0)}px;color:#3B5BDB;font-size:.9em;display:flex;align-items:center;gap:${(fz * 0.4).toFixed(0)}px"><svg width="${fz.toFixed(0)}" height="${fz.toFixed(0)}" viewBox="0 0 20 20" style="transform:rotate(${spin.toFixed(0)}deg)"><circle cx="10" cy="10" r="7" fill="none" stroke="#3B5BDB" stroke-width="2.5" stroke-dasharray="30 14"/></svg>${ar ? this.dp("gen") : "Generating images…"} <span dir="ltr">${done}/${total}</span></div></div>`;
     const G = ["#D9C7A8", "#8FB3C9", "#C9A27E", "#A8B89A", "#E2CDB5"];
     for (let i = 0; i < tn; i++) {
       const on = done > i * (total / tn);
@@ -6198,7 +6228,7 @@
     const ey = y + z * 1.25, ez = z * 0.5, st = eOut(seg(t, tx, tx + 0.25));
     if (eq) html += `<svg style="position:absolute;left:${(w / 2 - ez).toFixed(1)}px;top:${(ey).toFixed(1)}px" width="${(ez * 2).toFixed(0)}" height="${(ez * 1.2).toFixed(0)}" viewBox="0 0 20 12"><path d="M5 4h10M5 8h10" stroke="${FG.ink}" stroke-width="1.6"/><path d="M6 11 L14 1" stroke="${FG.red}" stroke-width="1.8" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${(1 - st).toFixed(3)}"/></svg>`;
     html += line(sb, ey + ez * 1.5);
-    html += figStamp(AR.test(J(it)) ? "مش صح" : "IT DOESN'T", w / 2, ey + ez * 1.5 + z * 1.9, t, tx + 0.2, mn * 0.026);
+    html += figStamp(AR.test(J(it)) ? this.dp("wrong") : "IT DOESN'T", w / 2, ey + ez * 1.5 + z * 1.9, t, tx + 0.2, mn * 0.026);
     return html;
   };
 
@@ -7414,7 +7444,7 @@
     const z = fitSize(title.toUpperCase(), `800 {}px ${ff}`, w * 0.86, mn * 0.07 * this.ts), y = h * 0.07;
     const st = rest.length === 1 ? this.text(rest[0].w) : "", desc = rest.length > 1 ? P.J(rest.filter((x) => t >= x.t0 - 0.05)) : "";
     const OFF = /^(off|مقفول|قافل|لا)$/i, ON = /^(on|شغال|مفتوح|أيوه|ايوه)$/i, flipT = b.t0 + (b.t1 - b.t0) * 0.5;
-    let state = st, col = LIME26; if (st && (OFF.test(st) || ON.test(st))) { const on = t >= flipT; state = ar ? (on ? "شغّال" : "مقفول") : on ? "ON" : "OFF"; col = on ? LIME26 : "#FF3B3B"; }
+    let state = st, col = LIME26; if (st && (OFF.test(st) || ON.test(st))) { const on = t >= flipT; state = ar ? this.dp(on ? "on" : "off") : on ? "ON" : "OFF"; col = on ? LIME26 : "#FF3B3B"; }
     return `<div dir="${ar ? "rtl" : "ltr"}" style="position:absolute;left:0;right:0;top:${y.toFixed(1)}px;text-align:center;line-height:1.15">
       <div style="font:800 ${z.toFixed(1)}px ${ff};color:${LIME26};text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.45),0 0 ${(z * 0.2).toFixed(0)}px rgba(182,242,58,.5);${blurIn(t, b.t0)}">${esc(title)}</div>
       ${state ? `<div style="font:800 ${(z * 1.05).toFixed(1)}px ${famOf(state)};color:${col};text-shadow:0 2px 10px rgba(0,0,0,.45);transform:scale(${lerp(1.3, 1, eOut(seg(t, Math.max(rest[0].t0, t >= flipT ? flipT : 0) - 0.05, Math.max(rest[0].t0, t >= flipT ? flipT : 0) + 0.2))).toFixed(3)})">${esc(state)}</div>` : ""}
@@ -7521,7 +7551,7 @@
     const it = this.items(b); if (!it.length) return "";
     const { w, h } = this.doc, mn = Math.min(w, h), s = it.map((x) => this.text(x.w)).join(" "), ar = AR.test(s), sf = serifOf(s);
     const z = mn * 0.075 * this.ts, lh = z * (ar ? 1.7 : 1.35), D = b.t1 - b.t0, zoom = lerp(1.1, 1.45, seg(t, b.t0, b.t1)), pan = lerp(w * 0.08, -w * 0.08, seg(t, b.t0, b.t1));
-    const FILL = ar ? ["كان من أوائل اللي اتكلموا عن الفكرة دي في السوق", "وبدأ يشرحها للناس وأصحاب المشاريع بطريقة بسيطة", "وقال إن المنافسة الحقيقية مش في المحل", "وده اللي غيّر طريقة تفكير البراندات كلها", "ولحد النهارده الكتاب ده بيتدرّس في كل مكان", "وكل شركة كبيرة ماشية على نفس القاعدة"]
+    const FILL = ar ? this.dp("story")
       : ["was an early voice of a revolutionary idea that reshaped", "the way founders and marketers think about competition", "and began distilling this idea into simple truths", "that resonated with entrepreneurs and marketers alike", "his best-known book fundamentally altered how brands", "are built and taught all over the world today"];
     const mid = 3, hp = eOut(seg(t, b.t0 + 0.4, b.t0 + Math.min(1.6, D * 0.6)));
     let rows = ""; for (let i = 0; i < 7; i++) { const isM = i === mid, txt = isM ? s : FILL[(i + bi) % FILL.length];

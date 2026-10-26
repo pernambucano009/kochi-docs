@@ -20364,6 +20364,8 @@ def typo_doc(pid: str, d: dict) -> dict:
             "duration": max(d.get("duration") or (blocks[-1]["t1"] if blocks else 1), *[q["t1"] for q in fx]) if fx else (d.get("duration") or (blocks[-1]["t1"] if blocks else 1)),
             "style": {**{k: st.get(k) for k in ("font", "case", "grain", "weight", "light", "dark", "accent")},
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
+            # 🗣️ لهجة العميل (من التسجيل): الكلام الثابت جوه المشاهد بيمشي عليها لو السكريبت نفسه مابيبيّنش لهجته
+            "dialect": d.get("dialect") or (onboard_load() or {}).get("dialect") or "",
             "transparent": kind != "theme", "blocks": blocks}
 
 
