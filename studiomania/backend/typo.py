@@ -907,7 +907,7 @@ BUILTIN_STYLES = {
         "kinds": {"slamword": 5, "scrawl": 1, "spikeburst": 1, "laserprompt": 1, "stackrepeat": 1},
     },
     "pro": {
-        "name": "⭐ احترافي (زي الفيديو المرجع)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
+        "name": "⭐ احترافي (مثل الفيديو المرجعي)", "font": "SM Tajawal", "case": "lower", "grain": 0.12, "weight": 700, "pro": True,
         "light": {"bg": "#ECEBE8", "ink": "#191716", "accent": "#E0261F"},
         "dark": {"bg": "#0C0808", "ink": "#F4F4F2", "accent": "#E0261F"},
         "accent": {"bg": "#E0AB1C", "ink": "#3B2408", "accent": "#191716"},

@@ -5833,7 +5833,7 @@ def ads_recipe(bid: str) -> dict:
             "angles": a.get("angles") or [], "budget": a.get("budget") or "", "summary": a.get("summary") or ""}
 
 
-@app.get("/api/ads")
+@app.get("/api/adsmgr")
 def ads_get():
     bid = rivals_client()
     service = publisher.service_name()
@@ -5865,7 +5865,7 @@ class AdsConnectIn(BaseModel):
     account_id: str = ""
 
 
-@app.post("/api/ads/connect")
+@app.post("/api/adsmgr/connect")
 def ads_connect(body: AdsConnectIn, request: Request):
     """ربط حساب الإعلانات للمنصة. إذا يحتاج تسجيل دخول يعود رابط على المنصة نفسها، وبعدها يعود لصفحة إعلاناتك."""
     rivals_client()
@@ -5875,7 +5875,7 @@ def ads_connect(body: AdsConnectIn, request: Request):
     return r if r.get("url") else ads_get()
 
 
-@app.get("/api/ads/interests")
+@app.get("/api/adsmgr/interests")
 def ads_interests(q: str, account_id: str):
     rivals_client()
     return ads_call(adsmgr.interests, q[:80], account_id)
@@ -5886,7 +5886,7 @@ class AdsTargetIn(BaseModel):
     platform: str
 
 
-@app.post("/api/ads/targeting")
+@app.post("/api/adsmgr/targeting")
 def ads_targeting(body: AdsTargetIn):
     """🎯 يحوّل الوصفة لاستهداف حقيقي على المنصة: كل اهتمام يتدوّر عليه ويُؤخذ أقرب واحد موجود فعلًا."""
     bid = rivals_client()
@@ -5904,7 +5904,7 @@ class AdsCopyIn(BaseModel):
     offer: str = ""
 
 
-@app.post("/api/ads/copy")
+@app.post("/api/adsmgr/copy")
 def ads_copy(body: AdsCopyIn):
     """✍️ يكتب نص الإعلان من الوصفة وزوايا المنافسين (عنوان ونص وبدائل)، بحدود المنصة."""
     bid = rivals_client()
@@ -5965,7 +5965,7 @@ def ads_check(body: AdsBase) -> None:
         raise HTTPException(400, "اختر بلدًا واحدًا على الأقل")
 
 
-@app.post("/api/ads/boost")
+@app.post("/api/adsmgr/boost")
 def ads_boost(body: AdsBoostIn):
     """🚀 ترويج منشور نُشر من البرنامج."""
     bid = rivals_client()
@@ -5993,7 +5993,7 @@ def ads_boost(body: AdsBoostIn):
     return ads_get()
 
 
-@app.post("/api/ads/create")
+@app.post("/api/adsmgr/create")
 def ads_create(body: AdsCreateIn):
     """✨ إعلان جديد من الصفر: عنوان ونص ورابط وصورة/فيديو من الفيديوهات الجاهزة."""
     bid = rivals_client()
@@ -6031,7 +6031,7 @@ class AdsPatchIn(BaseModel):
     budget: float | None = None
 
 
-@app.patch("/api/ads/{ad_id}")
+@app.patch("/api/adsmgr/{ad_id}")
 def ads_patch(ad_id: str, body: AdsPatchIn):
     bid = rivals_client()
     mine = ads_own(bid, ad_id)
@@ -6039,7 +6039,7 @@ def ads_patch(ad_id: str, body: AdsPatchIn):
     return ads_get()
 
 
-@app.delete("/api/ads/{ad_id}")
+@app.delete("/api/adsmgr/{ad_id}")
 def ads_delete(ad_id: str):
     bid = rivals_client()
     ads_own(bid, ad_id)
@@ -6047,7 +6047,7 @@ def ads_delete(ad_id: str):
     return ads_get()
 
 
-@app.get("/api/ads/{ad_id}/analytics")
+@app.get("/api/adsmgr/{ad_id}/analytics")
 def ads_analytics(ad_id: str):
     bid = rivals_client()
     ads_own(bid, ad_id)
@@ -10733,6 +10733,7 @@ class HelpIn(BaseModel):
     page: str = "home"
     q: str
     history: list = []
+    lang: str = "ar"   # لغة واجهة العميل: المساعد بيرد بيها
 
 
 @app.get("/api/help/pages")
@@ -10758,6 +10759,8 @@ def help_chat(body: HelpIn):
         return {"text": helpdesk.mock_reply(key, q) + "\n\n(المساعد الذكي غير مفعّل الآن، وهذا شرح ثابت للصفحة.)", "page": key}
     b = brain_row(active_client_id()) or {}
     msgs = helpdesk.messages(key, body.history, q, " · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k)))
+    if body.lang == "en":
+        msgs[0]["content"] += "\n\nThe customer uses the app in English: answer in clear, simple English, and quote button names in English."
     for model in HELP_MODELS:
         try:
             return {"text": atlas.chat(msgs, model, temperature=0.3, max_tokens=700, timeout=45).strip(), "page": key}

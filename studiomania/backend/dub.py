@@ -37,7 +37,7 @@ FOREIGN = [  # (المعرف، الاسم، اسم اللغة للموديل)
     ("hi", "🇮🇳 हिन्दी", "natural conversational Hindi"),
     ("id", "🇮🇩 Indonesia", "natural conversational Indonesian"),
     ("ru", "🇷🇺 Русский", "natural conversational Russian"),
-    ("ur", "🇵🇰 اردو", "natural conversational Urdu"),
+    ("ur", "🇵🇰 أردو", "natural conversational Urdu"),
 ]
 ELEVEN = {"eleven_liam": ("ليام (رجل)", "Liam"), "eleven_jessica": ("جيسيكا (امرأة)", "Jessica"),
           "eleven_charlie": ("تشارلي (رجل)", "Charlie"), "eleven_bella": ("بيلا (امرأة)", "Bella")}

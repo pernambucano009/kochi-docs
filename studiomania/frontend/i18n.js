@@ -32,7 +32,11 @@
       const body = parts.map((p) => (/^\{\d\}$/.test(p) ? "([\\s\\S]+?)" : esc(p))).join("");
       const order = [...k.matchAll(/\{(\d)\}/g)].map((m) => +m[1]);
       const staticLen = parts.filter((p) => !/^\{\d\}$/.test(p)).join("").trim().length;
-      pats.push({ re: new RegExp(`^${body}$`), loose: staticLen >= 8 ? new RegExp(body, "g") : null, order, en, staticLen });
+      // قواعد عامة أوي («{0}ث» للثواني، «{0} من {1}»، «من {0}»، «في {0}»…) ماتلقطش كلام عربي عادي:
+      // من غيرها «يبحث» كانت بتطلع «يبحs» و«من المطبخ» «of المطبخ». اللي مكانه فيها لازم يكون رقم أو كلام مش عربي
+      const words = parts.filter((p) => !/^\{\d\}$/.test(p)).join(" ").replace(/[^؀-ۿ]+/g, " ").trim();
+      const strict = !words || /^(ث|من|في|لـ|إلى|بعد|خلال|حتى|عن)( (ث|من))?$/.test(words);
+      pats.push({ re: new RegExp(`^${body}$`), loose: staticLen >= 8 ? new RegExp(body, "g") : null, order, en, staticLen, strict });
     } else {
       exact.set(k, en);
       if (k.length >= 6) frags.push([k, en]);
@@ -41,6 +45,9 @@
   frags.sort((a, b) => b[0].length - a[0].length);
   pats.sort((a, b) => b.staticLen - a.staticLen); // الأدق أولًا: «{0} من {1} قطعة وُلّدت» قبل «{0} من {1}: {2}»
 
+  const DT = { "السبت": "Saturday", "الأحد": "Sunday", "الاثنين": "Monday", "الإثنين": "Monday", "الثلاثاء": "Tuesday", "الأربعاء": "Wednesday", "الخميس": "Thursday", "الجمعة": "Friday",
+    "يناير": "January", "فبراير": "February", "مارس": "March", "أبريل": "April", "إبريل": "April", "مايو": "May", "يونيو": "June", "يوليو": "July", "أغسطس": "August",
+    "سبتمبر": "September", "أكتوبر": "October", "نوفمبر": "November", "ديسمبر": "December", "اليوم": "Today", "غدًا": "Tomorrow", "أمس": "Yesterday", "م": "PM", "ص": "AM" };
   const fill = (p, vals) => p.en.replace(/\{(\d)\}/g, (_, i) => t(vals[p.order.indexOf(+i)] ?? ""));
   const cache = new Map(), miss = new Set(), seen = new Set();
   I18N.misses = () => [...miss];
@@ -59,6 +66,7 @@
     if (out === undefined) {
       for (const p of pats) {
         const m = p.re.exec(n);
+        if (m && p.strict && m.slice(1).some((x) => AR.test(x))) continue;
         if (m) { out = fill(p, m.slice(1)); break; }
       }
     }
@@ -81,6 +89,13 @@
         if (tr.every((x) => x != null)) out = tr.join(" · ");
       }
       if (out !== undefined) out = out.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+    }
+    if (out === undefined) {
+      // تاريخ مكتوب بإيدينا («الأربعاء 28 أكتوبر · 1»، «اليوم 7:00 م»): أسماء الأيام والشهور بس
+      const toks = n.split(/(\s+|·|,|،|-|–)/);
+      if (toks.some((w) => DT[w]) && toks.every((w) => !AR.test(w) || DT[w])) {
+        out = toks.map((w) => DT[w] || w).join("").replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/،/g, ",");
+      }
     }
     if (out === undefined) {
       // جملة متركّبة من كذا حتة: بنترجم كل حتة نعرفها جواها

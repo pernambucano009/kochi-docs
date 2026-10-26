@@ -756,13 +756,13 @@ function tyRenderStk() {
     <div class="row wrap"><input type="text" data-stkdesc placeholder="وصف أيقونة جديدة (مثلًا: pixel art dumbbell)" data-no-i18n>
       <select data-stkstyle>${tyx.styles.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("")}</select>
       <button type="button" class="btn sm" data-stkdraw>🎨 ارسمها (~0.03$)</button></div>
-    <p class="hint">الستيكرات التي قُصّت من فيديو يمكن يصبح فيها حتت من أشياء جنبها: «✨ نضّفها» يرسمها تلقائيًا بنفس شكلها (نحو 0.03$).</p>
+    <p class="hint">الستيكرات المقصوصة من فيديو قد تظهر فيها أجزاء من أشياء بجانبها: «✨ نظّفها» يعيد رسمها تلقائيًا بالشكل نفسه (نحو 0.03$).</p>
     ${tyDictView()}
     <div class="ty-stk">${tyx.stk.map((s) => `<figure data-stk="${s.id}"><div class="ty-checker"><img src="${s.url}" alt=""></div>
       <input value="${tye(s.name)}" data-stkname data-no-i18n>
       <label class="ty-concept" title="معنى الأيقونة في القاموس: النص الذي يدل عليه يجلب هذه الأيقونة">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
       <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
-      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نضيفة بنفس شكلها">✨ نضّفها</button>` : ""}
+      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نضيفة بنفس شكلها">✨ نظّفها</button>` : ""}
         <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لا يوجد بعد ستيكرات</p>`}</div>`;
 }
 

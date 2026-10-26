@@ -151,7 +151,7 @@ const AdsMgrPage = (() => {
   }
   async function loadStats(id) {
     try {
-      const r = await api(`/api/ads/${encodeURIComponent(id)}/analytics`), box = S.el.querySelector(`[data-adid="${CSS.escape(id)}"] [data-amstatbox]`);
+      const r = await api(`/api/adsmgr/${encodeURIComponent(id)}/analytics`), box = S.el.querySelector(`[data-adid="${CSS.escape(id)}"] [data-amstatbox]`);
       if (!box) return;
       const bd = r.breakdowns || {};
       box.innerHTML = Object.keys(bd).length ? Object.entries(bd).map(([k, rows]) => `<p><b>${esc({ age: "العمر", gender: "النوع", country: "البلد" }[k] || k)}:</b> ${(rows || []).slice(0, 6).map((x) => `${esc(x.key || x.value || x.age || x.gender || x.country || "")} <span class="num">${fmt(x.spend ?? x.impressions)}</span>`).join(" · ")}</p>`).join("") : "لا توجد تفاصيل بعد.";
@@ -185,14 +185,14 @@ const AdsMgrPage = (() => {
       if (S.menu && !q(".pk-menu")) { S.menu = null; render(); }
       if (q("[data-amcon]")) {
         const p = q("[data-amcon]").dataset.amcon;
-        try { const r = await api("/api/ads/connect", { method: "POST", ...jsonBody({ platform: p }) }); if (r.url) { location.href = r.url; return; } S.d = r; render(); toast("✓ رُبط حساب الإعلانات"); }
+        try { const r = await api("/api/adsmgr/connect", { method: "POST", ...jsonBody({ platform: p }) }); if (r.url) { location.href = r.url; return; } S.d = r; render(); toast("✓ رُبط حساب الإعلانات"); }
         catch (err) { toast(err.message, true); }
         return;
       }
       if (q("[data-amfill]")) {
         const p = S.dw === "boost" ? S.f.platform : S.f.cplatform, acc = accOf(S.f.ad_account);
         return run("fill", async () => {
-          const r = await api("/api/ads/targeting", { method: "POST", ...jsonBody({ account_id: acc?.account || "", platform: p }) });
+          const r = await api("/api/adsmgr/targeting", { method: "POST", ...jsonBody({ account_id: acc?.account || "", platform: p }) });
           S.t = { age_min: r.age_min, age_max: r.age_max, countries: r.countries.length ? r.countries : S.t.countries, interests: r.interests };
           if (p === "google" && r.keywords?.length) S.f.keywords = r.keywords.join("\n");
           toast(`✓ أُضيف ${r.interests.length} اهتمامًا من ${r.asked.length} في الوصفة${r.countries.length ? "" : " · اختر الدولة بنفسك"}`);
@@ -204,7 +204,7 @@ const AdsMgrPage = (() => {
       if (q("[data-amsearch]")) {
         const v = w.querySelector("[data-amq]").value.trim(), acc = accOf(S.f.ad_account);
         if (!v) return;
-        try { S.hits = await api(`/api/ads/interests?q=${encodeURIComponent(v)}&account_id=${encodeURIComponent(acc?.account || "")}`); if (!S.hits.length) toast("لم أجد اهتمامًا بهذا الاسم", true); render(); }
+        try { S.hits = await api(`/api/adsmgr/interests?q=${encodeURIComponent(v)}&account_id=${encodeURIComponent(acc?.account || "")}`); if (!S.hits.length) toast("لم أجد اهتمامًا بهذا الاسم", true); render(); }
         catch (err) { toast(err.message, true); }
         return;
       }
@@ -212,7 +212,7 @@ const AdsMgrPage = (() => {
       if (q("[data-amalt]")) { S.f.headline = q("[data-amalt]").dataset.amalt; return render(); }
       if (q("[data-amcopy]")) {
         return run("copy", async () => {
-          const r = await api("/api/ads/copy", { method: "POST", ...jsonBody({ platform: S.f.cplatform, offer: S.f.offer || "" }) });
+          const r = await api("/api/adsmgr/copy", { method: "POST", ...jsonBody({ platform: S.f.cplatform, offer: S.f.offer || "" }) });
           Object.assign(S.f, { headline: r.headline, body: r.body, more_headlines: r.more_headlines, more_bodies: r.more_bodies, cta: r.cta });
         });
       }
@@ -221,24 +221,24 @@ const AdsMgrPage = (() => {
       if (q("[data-amboost]")) {
         const c = common();
         if (!(await confirmSpend(c))) return;
-        return run("go", async () => { S.d = await api("/api/ads/boost", { method: "POST", ...jsonBody({ ...c, platform: S.f.platform, post_id: S.f.post }) }); S.dw = null; toast("✓ أُنشئ الإعلان، وستراجعه المنصة ثم يبدأ"); });
+        return run("go", async () => { S.d = await api("/api/adsmgr/boost", { method: "POST", ...jsonBody({ ...c, platform: S.f.platform, post_id: S.f.post }) }); S.dw = null; toast("✓ أُنشئ الإعلان، وستراجعه المنصة ثم يبدأ"); });
       }
       if (q("[data-amcreate]")) {
         const c = common();
         if (!(await confirmSpend(c))) return;
         return run("go", async () => {
-          S.d = await api("/api/ads/create", { method: "POST", ...jsonBody({ ...c, platform: S.f.cplatform, headline: S.f.headline || "", body: S.f.body || "", link: S.f.link || "", export_id: S.f.export_id || "",
+          S.d = await api("/api/adsmgr/create", { method: "POST", ...jsonBody({ ...c, platform: S.f.cplatform, headline: S.f.headline || "", body: S.f.body || "", link: S.f.link || "", export_id: S.f.export_id || "",
             cta: S.f.cta || "LEARN_MORE", keywords: String(S.f.keywords ?? (S.d.recipe?.keywords || []).join("\n")).split("\n").map((x) => x.trim()).filter(Boolean), more_headlines: S.f.more_headlines || [], more_bodies: S.f.more_bodies || [] }) });
           S.dw = null; toast("✓ أُنشئ الإعلان، وستراجعه المنصة ثم يبدأ");
         });
       }
       const id = q("[data-adid]")?.dataset.adid;
       if (id) {
-        const patch = (b) => run("x", async () => { S.d = await api(`/api/ads/${encodeURIComponent(id)}`, { method: "PATCH", ...jsonBody(b) }); });
+        const patch = (b) => run("x", async () => { S.d = await api(`/api/adsmgr/${encodeURIComponent(id)}`, { method: "PATCH", ...jsonBody(b) }); });
         if (q("[data-ampause]")) return patch({ status: "paused" });
         if (q("[data-amresume]")) return patch({ status: "active" });
         if (q("[data-ambudget]")) { const v = await uiPrompt("الميزانية اليومية الجديدة:"); if (v && +v > 0) patch({ budget: +v }); return; }
-        if (q("[data-amcancel]")) { if (await uiConfirm("هل تلغي هذا الإعلان؟ لا يمكن التراجع.")) run("x", async () => { S.d = await api(`/api/ads/${encodeURIComponent(id)}`, { method: "DELETE" }); }); return; }
+        if (q("[data-amcancel]")) { if (await uiConfirm("هل تلغي هذا الإعلان؟ لا يمكن التراجع.")) run("x", async () => { S.d = await api(`/api/adsmgr/${encodeURIComponent(id)}`, { method: "DELETE" }); }); return; }
         if (q("[data-amstats]")) { S.menu = null; S.open = S.open === id ? null : id; return render(); }
       }
       const acc = (S.d.ad_accounts || []).find((a) => a.ad_account === S.audAcc);
@@ -272,7 +272,7 @@ const AdsMgrPage = (() => {
     S.el = w; S.aud = null; S.open = null;
     bind(w);
     try {
-      S.d = await api("/api/ads");
+      S.d = await api("/api/adsmgr");
       if (S.d.recipe?.age) S.t = { ...S.t, age_min: S.d.recipe.age[0], age_max: S.d.recipe.age[1], countries: S.d.recipe.countries || [] };
       render();
     } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }

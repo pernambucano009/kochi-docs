@@ -45,8 +45,8 @@ const Help = (() => {
     if (!box) return;
     box.hidden = !S.open;
     const k = pageKey();
-    box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : [{ role: "assistant", text: "أهلًا، أنا مساعد سمسم كيت. اسألني عن أي صفحة أو خطوة." }])
-      .map((m) => `<div class="hp-m ${m.role === "user" ? "me" : "ai"}">${esc(m.text)}</div>`).join("") + (S.busy ? `<div class="hp-m ai">…</div>` : "");
+    box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : [{ role: "assistant", text: I18N.t("أهلًا، أنا مساعد سمسم كيت. اسألني عن أي صفحة أو خطوة.") }])
+      .map((m) => `<div class="hp-m ${m.role === "user" ? "me" : "ai"}"${m.role === "user" ? "" : " data-no-i18n"}>${esc(m.text)}</div>`).join("") + (S.busy ? `<div class="hp-m ai">…</div>` : "");
     box.querySelector(".hp-sug").innerHTML = [`اشرح لي «${pageName(k)}»`, "كيف تُحسب النقاط؟", ...(S.msgs.some((m) => m.role === "assistant") ? ["أرسلها للدعم"] : [])]
       .map((t) => `<button type="button" data-hpq="${esc(t)}">${esc(t)}</button>`).join("");
     const log = box.querySelector(".hp-log"); log.scrollTop = log.scrollHeight;
@@ -58,7 +58,7 @@ const Help = (() => {
     if (q === "أرسلها للدعم") return ticket();
     S.msgs.push({ role: "user", text: q }); S.busy = true; draw();
     try {
-      const r = await api("/api/help/chat", { method: "POST", ...jsonBody({ page: pageKey(), q, history: S.msgs.slice(0, -1) }) });
+      const r = await api("/api/help/chat", { method: "POST", ...jsonBody({ page: pageKey(), q, history: S.msgs.slice(0, -1), lang: I18N.lang }) });
       S.msgs.push({ role: "assistant", text: r.text });
     } catch (err) { S.msgs.push({ role: "assistant", text: `⚠️ ${err.message}` }); }
     S.busy = false; draw();
@@ -67,7 +67,7 @@ const Help = (() => {
     const last = [...S.msgs].reverse().find((m) => m.role === "user")?.text || "";
     const text = await uiPrompt("اكتب المشكلة باختصار، وسنرد عليك:", last);
     if (text == null || !text.trim()) return;
-    try { await api("/api/help/ticket", { method: "POST", ...jsonBody({ page: pageKey(), text, history: S.msgs }) }); S.msgs.push({ role: "assistant", text: "✓ وصلت المشكلة للدعم، وسنرد عليك قريبًا." }); }
+    try { await api("/api/help/ticket", { method: "POST", ...jsonBody({ page: pageKey(), text, history: S.msgs }) }); S.msgs.push({ role: "assistant", text: I18N.t("✓ وصلت المشكلة للدعم، وسنرد عليك قريبًا.") }); }
     catch (err) { S.msgs.push({ role: "assistant", text: `⚠️ ${err.message}` }); }
     draw();
   }
