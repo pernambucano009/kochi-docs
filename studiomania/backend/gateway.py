@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -40,6 +41,7 @@ import billing
 import fieldpacks
 import mailer
 import payments
+import appauth
 import phoneauth
 
 BACKEND = Path(__file__).resolve().parent
@@ -97,6 +99,8 @@ with closing(db()) as _c, _c:
                        ("cycle", "TEXT"), ("refill_at", "REAL")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
+    if "apple_sub" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 🍎 الدخول بـ Apple من الآيفون
+        _c.execute("ALTER TABLE users ADD COLUMN apple_sub TEXT")
     if "phone" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 📱 الدخول برقم الجوال
         _c.execute("ALTER TABLE users ADD COLUMN phone TEXT")
         _c.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone ON users(phone)")
@@ -133,7 +137,7 @@ def _sign(payload: str) -> str:
 
 def _ver(u: sqlite3.Row) -> str:
     # تغيير الباسورد بيقفل كل الجلسات القديمة
-    return hashlib.sha256((u["pw"] or u["google_sub"] or u["phone"] or "").encode()).hexdigest()[:10]
+    return hashlib.sha256((u["pw"] or u["google_sub"] or u["apple_sub"] or u["phone"] or "").encode()).hexdigest()[:10]
 
 
 def make_session(u: sqlite3.Row) -> str:
@@ -142,7 +146,7 @@ def make_session(u: sqlite3.Row) -> str:
 
 
 def user_by(field: str, value: str) -> sqlite3.Row | None:
-    assert field in ("id", "email", "google_sub", "phone")
+    assert field in ("id", "email", "google_sub", "phone", "apple_sub")
     with closing(db()) as c:
         return c.execute(f"SELECT * FROM users WHERE {field}=?", (value,)).fetchone()
 
@@ -595,7 +599,7 @@ PHONE_MAIL = "@phone.simsimkit"   # حسابات الجوال من غير بري
 
 
 def real_email(u: sqlite3.Row) -> str:
-    return "" if u["email"].endswith(PHONE_MAIL) else u["email"]
+    return "" if u["email"].endswith((PHONE_MAIL, "@apple.simsimkit")) else u["email"]
 
 
 def me_dict(u: sqlite3.Row) -> dict:
@@ -927,10 +931,11 @@ def change_pw(body: ChangePwIn, request: Request):
 
 # ---------------------------------------------------------------- الدخول بجوجل
 
-def g_state_make() -> str:
+def g_state_make(app: str = "") -> str:
     """حالة موقّعة (بدل كوكي بس): متصفحات التطبيقات على الموبايل (واتساب، جيميل، إنستجرام…) ساعات بتفتح جوجل في نافذة تانية
     وبترجع من غير الكوكي، فالدخول كان بيفشل. التوقيع بالسر بيمنع أي حد يزوّرها، وصالحة ١٠ دقايق بس."""
-    raw = f"{int(time.time())}.{secrets.token_urlsafe(12)}"
+    # 📱 من تطبيق الجوال: بصمة سر التطبيق (PKCE) بتتشال جوه الحالة الموقّعة، عشان الكود يرجع للتطبيق ده بس
+    raw = f"{int(time.time())}.{secrets.token_urlsafe(12)}{'~' + app if app else ''}"
     return raw + "." + hmac.new(SECRET, raw.encode(), hashlib.sha256).hexdigest()[:32]
 
 
@@ -943,18 +948,30 @@ def g_state_ok(state: str) -> bool:
         return False
 
 
-def google_fail(why: str, raw: str = "") -> RedirectResponse:
+def g_state_app(state: str) -> str:
+    try:
+        return state.split(".")[1].split("~", 1)[1]
+    except (IndexError, AttributeError):
+        return ""
+
+
+APP_RETURN = "simsimkit://auth"
+
+
+def google_fail(why: str, raw: str = "", app: bool = False) -> RedirectResponse:
     """الدخول بجوجل فشل: السبب الحقيقي بيتسجل في صندوق الأخطاء، والعميل بيشوف رسالة بتقوله يعمل إيه."""
     issues.record("api", "GET /auth/google/callback", f"الدخول بجوجل فشل: {why}", raw[:2000], 400)
-    return RedirectResponse(f"/login?err=google&why={why}")
+    return RedirectResponse(f"{APP_RETURN}?err={why}" if app else f"/login?err=google&why={why}")
 
 
 @app.get("/auth/google")
-def google_start(request: Request):
+def google_start(request: Request, app: str = ""):
     cid = os.environ.get("GOOGLE_CLIENT_ID")
     if not cid:
         raise HTTPException(404, "الدخول بجوجل غير مفعّل")
-    state = g_state_make()
+    if app and not appauth.CHALLENGE_RE.match(app):
+        raise HTTPException(400, "طلب الدخول من التطبيق غير صحيح")
+    state = g_state_make(app)
     q = urlencode({"client_id": cid, "redirect_uri": f"{base_url(request)}/auth/google/callback", "response_type": "code",
                    "scope": "openid email profile", "state": state, "prompt": "select_account"})
     resp = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{q}")
@@ -965,22 +982,23 @@ def google_start(request: Request):
 @app.get("/auth/google/callback")
 def google_back(request: Request, code: str = "", state: str = "", error: str = ""):
     if error:   # العميل لغى، أو جوجل رفض (مثلًا التطبيق لسه في وضع الاختبار والإيميل مش متضاف)
-        return google_fail("cancel" if error == "access_denied" else "denied", f"error={error}")
+        return google_fail("cancel" if error == "access_denied" else "denied", f"error={error}", bool(g_state_ok(state) and g_state_app(state)))
     if not state or not (hmac.compare_digest(state, request.cookies.get("g_state") or "") or g_state_ok(state)):
         return google_fail("state", f"cookie={'yes' if request.cookies.get('g_state') else 'no'} ua={request.headers.get('user-agent', '')[:200]}")
+    app = bool(g_state_app(state))
     try:
         r = httpx.post("https://oauth2.googleapis.com/token", timeout=20, data={
             "code": code, "client_id": os.environ["GOOGLE_CLIENT_ID"], "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
             "redirect_uri": f"{base_url(request)}/auth/google/callback", "grant_type": "authorization_code"})
         body = r.json()
         if "id_token" not in body:   # غالبًا: السر غلط (invalid_client) أو الرابط مختلف (redirect_uri_mismatch)
-            return google_fail("token", f"{r.status_code} {json.dumps(body)[:600]} redirect_uri={base_url(request)}/auth/google/callback")
+            return google_fail("token", f"{r.status_code} {json.dumps(body)[:600]} redirect_uri={base_url(request)}/auth/google/callback", app)
         seg = body["id_token"].split(".")[1]
         info = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
     except (httpx.HTTPError, KeyError, ValueError, IndexError) as exc:
-        return google_fail("token", f"{type(exc).__name__}: {exc}")
+        return google_fail("token", f"{type(exc).__name__}: {exc}", app)
     if info.get("aud") != os.environ["GOOGLE_CLIENT_ID"] or not info.get("email_verified") or not info.get("email"):
-        return google_fail("email", f"aud_ok={info.get('aud') == os.environ['GOOGLE_CLIENT_ID']} verified={info.get('email_verified')}")
+        return google_fail("email", f"aud_ok={info.get('aud') == os.environ['GOOGLE_CLIENT_ID']} verified={info.get('email_verified')}", app)
     email, sub = info["email"].lower(), str(info["sub"])
     u = user_by("google_sub", sub) or user_by("email", email)
     if needs_owner_setup():
@@ -999,9 +1017,75 @@ def google_back(request: Request, code: str = "", state: str = "", error: str = 
                 c.execute("UPDATE users SET pw=NULL WHERE id=?", (u["id"],))
             c.execute("UPDATE users SET google_sub=?, verified=1, last_login=? WHERE id=?", (sub, time.time(), u["id"]))
         u = user_by("id", u["id"])
-    resp = with_session(RedirectResponse("/"), u, request)
+    if app:   # 📱 للتطبيق: كود مرة واحدة (دقيقتين) والتطبيق بيبدّله بجلسة بالسر بتاعه
+        code = secrets.token_urlsafe(24)
+        with closing(db()) as c, c:
+            c.execute("DELETE FROM tokens WHERE kind LIKE 'app:%' AND expires < ?", (time.time(),))
+            c.execute("INSERT INTO tokens (token, user_id, kind, expires) VALUES (?, ?, ?, ?)", (code, u["id"], "app:" + g_state_app(state), time.time() + 120))
+        resp = RedirectResponse(f"{APP_RETURN}?code={code}")
+    else:
+        resp = with_session(RedirectResponse("/"), u, request)
     resp.delete_cookie("g_state")
     return resp
+
+
+class AppExchangeIn(BaseModel):
+    code: str
+    verifier: str
+
+
+@app.post("/api/auth/app-exchange")
+def app_exchange(body: AppExchangeIn, request: Request):
+    """📱 التطبيق بيبدّل كود جوجل بجلسة: لازم السر اللي بصمته اتبعتت في الأول."""
+    throttle(client_ip(request))
+    with closing(db()) as c, c:
+        r = c.execute("SELECT * FROM tokens WHERE token=? AND kind LIKE 'app:%'", (body.code,)).fetchone()
+        if r:
+            c.execute("DELETE FROM tokens WHERE token=?", (body.code,))
+    if not r or r["expires"] < time.time() or not hmac.compare_digest(r["kind"][4:], appauth.challenge_of(body.verifier)):
+        failed(client_ip(request))
+        raise HTTPException(400, "انتهت مهلة الدخول. حاول مرة أخرى")
+    u = user_by("id", r["user_id"])
+    return with_session(JSONResponse({"ok": True, "token": make_session(u)}), u, request)
+
+
+class AppleIn(BaseModel):
+    identity_token: str
+    name: str = ""
+
+
+@app.post("/api/auth/apple")
+def apple_login(body: AppleIn, request: Request):
+    """🍎 الدخول بـ Apple من تطبيق الآيفون: بنتأكد من توقيع Apple، وبنلاقي الحساب أو نعمل واحد جديد."""
+    throttle(client_ip(request))
+    if needs_owner_setup():
+        raise HTTPException(400, "البرنامج قيد التجهيز")
+    try:
+        info = appauth.apple_verify(body.identity_token, appauth.apple_audiences())
+    except appauth.AuthError as exc:
+        failed(client_ip(request))
+        issues.record("api", "POST /api/auth/apple", f"الدخول بـ Apple فشل: {exc}", "", 400)
+        raise HTTPException(400, str(exc)) from exc
+    sub, email = info["sub"], info["email"] if info["email_verified"] else ""
+    u = user_by("apple_sub", sub) or (user_by("email", email) if email else None)
+    new = not u
+    if new:
+        name = body.name.strip()[:80]
+        wid = new_workspace(name or (email.split("@")[0] if email else "Apple"))
+        save_onboard(wid, "SA", "", "", "", name)
+        uid = uuid.uuid4().hex[:12]
+        with closing(db()) as c, c:
+            c.execute("INSERT INTO users (id, email, name, verified, role, workspace, apple_sub, created_at, last_login) VALUES (?, ?, ?, 1, 'customer', ?, ?, ?, ?)",
+                      (uid, email or f"{sub[:40]}@apple.simsimkit", name, wid, sub, time.time(), time.time()))
+        u = user_by("id", uid)
+    else:
+        with closing(db()) as c, c:
+            # نفس قاعدة جوجل: أول ربط بإيميل اتأكد منه، أي باسورد اتعمل قبل كده (ممكن من حد تاني) بيتشال
+            if not u["apple_sub"] and not u["google_sub"] and u["role"] != "admin":
+                c.execute("UPDATE users SET pw=NULL WHERE id=?", (u["id"],))
+            c.execute("UPDATE users SET apple_sub=?, verified=1, last_login=? WHERE id=?", (sub, time.time(), u["id"]))
+        u = user_by("id", u["id"])
+    return with_session(JSONResponse({"ok": True, "new": new, "token": make_session(u)}), u, request)
 
 
 
@@ -1221,6 +1305,50 @@ def checkout(body: CheckoutIn, request: Request):
         return {"url": url}
     except payments.PayError as e:
         raise HTTPException(502, str(e))
+
+
+class DeleteMeIn(BaseModel):
+    confirm: str = ""
+
+
+@app.post("/api/me/delete")
+def delete_me(body: DeleteMeIn, request: Request):
+    """🗑️ حذف الحساب نهائيًا (من التطبيق أو الموقع): الاشتراك بيتلغي، وكل ملفات المساحة بتتمسح.
+    سجل المدفوعات بيفضل (للحسابات والضرايب) من غير بيانات العميل."""
+    u = current_user(request)
+    if not u:
+        raise HTTPException(401, "يجب تسجيل الدخول")
+    if u["role"] == "admin" or u["workspace"] == OWNER:
+        raise HTTPException(400, "لا يمكن حذف حساب المشرف من هنا")
+    if body.confirm != "DELETE":
+        raise HTTPException(400, "أكّد الحذف أولًا")
+    wid, w = u["workspace"], workspace(u["workspace"])
+    if w and w["sub_id"] and w["provider"] == "paypal":
+        try:
+            payments.paypal_cancel(w["sub_id"])
+        except payments.PayError as exc:
+            issues.record("api", "POST /api/me/delete", "تعذّر إلغاء اشتراك PayPal أثناء حذف حساب", f"{wid}: {exc}", 502)
+    with closing(db()) as c, c:
+        c.execute("DELETE FROM tokens WHERE user_id=?", (u["id"],))
+        c.execute("DELETE FROM users WHERE id=?", (u["id"],))
+        last = not c.execute("SELECT 1 FROM users WHERE workspace=?", (wid,)).fetchone()
+        if last:
+            c.execute("DELETE FROM wallet WHERE workspace=?", (wid,))
+            c.execute("DELETE FROM workspaces WHERE id=?", (wid,))
+    if last:
+        t = _tenants.pop(wid, None)
+        if t:
+            t.proc.terminate()
+            try:
+                t.proc.wait(10)
+            except subprocess.TimeoutExpired:
+                t.proc.kill()
+        d = workspace_dir(wid)
+        if d != DATA_DIR and d.parent == TENANTS:
+            shutil.rmtree(d, ignore_errors=True)
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(COOKIE)
+    return resp
 
 
 @app.post("/api/billing/cancel")

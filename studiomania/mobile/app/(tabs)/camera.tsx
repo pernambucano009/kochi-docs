@@ -7,7 +7,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, logout } from "../../src/api";
+import { api, deleteAccount, logout } from "../../src/api";
 import { Icon, type IconName } from "../../src/icons";
 import { unregisterPush } from "../../src/push";
 import { shoot, toShoot, uploadShots, type Todo } from "../../src/shoot";
@@ -133,9 +133,20 @@ export default function Camera() {
   }
 
   function account() {
-    Alert.alert("حسابي", "نفس حسابك على simsimkit.com", [
+    Alert.alert("حسابي", "هو نفسه حسابك على simsimkit.com", [
       { text: "رجوع", style: "cancel" },
-      { text: "تسجيل الخروج", style: "destructive", onPress: async () => { await unregisterPush(); await logout().catch(() => null); router.replace("/welcome"); } },
+      { text: "تسجيل الخروج", onPress: async () => { await unregisterPush(); await logout(); router.replace("/welcome"); } },
+      { text: "حذف الحساب", style: "destructive", onPress: confirmDelete },
+    ]);
+  }
+  // 🗑️ حذف الحساب نهائيًا (Apple بتطلبه في أي تطبيق بيعمل حسابات): تأكيد صريح الأول
+  function confirmDelete() {
+    Alert.alert("حذف الحساب نهائيًا؟", "سيُحذف حسابك وكل مشاريعك وفيديوهاتك وأفكارك من التطبيق والموقع، ويُلغى اشتراكك إن وُجد. لا يمكن التراجع عن ذلك.", [
+      { text: "رجوع", style: "cancel" },
+      { text: "احذف حسابي", style: "destructive", onPress: async () => {
+        try { await unregisterPush(); await deleteAccount(); router.replace("/welcome"); Alert.alert("حُذف حسابك", "شكرًا لأنك جرّبت SimsimKit."); }
+        catch (e) { Alert.alert("تعذّر حذف الحساب", (e as Error).message); }
+      } },
     ]);
   }
 

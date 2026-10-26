@@ -69,7 +69,9 @@
           "isAccessMediaLocationEnabled": false,
           "photosPermission": "SimsimKit يفتح الاستوديو عشان تختار فيديو أو صورة لمشروعك."
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": false
