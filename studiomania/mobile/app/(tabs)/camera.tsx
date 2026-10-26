@@ -154,7 +154,10 @@ export default function Camera() {
 
   return (
     <View style={s.root}>
-      <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} mode={mode === "photo" ? "picture" : "video"} enableTorch={torch} mirror={facing === "front"} />
+      {/* الكاميرا جوه View اتجاهه LTR: التطبيق كله RTL، وده كان بيقلب صورة الكاميرا */}
+      <View style={[StyleSheet.absoluteFill, { direction: "ltr" }]}>
+        <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} mode={mode === "photo" ? "picture" : "video"} enableTorch={torch} mirror={facing === "front"} />
+      </View>
       <LinearGradient pointerEvents="none" colors={["rgba(0,0,0,.45)", "rgba(0,0,0,0)", "rgba(0,0,0,0)", "rgba(0,0,0,.65)"]} locations={[0, 0.22, 0.62, 1]} style={StyleSheet.absoluteFill} />
 
       <View style={[s.top, { top: ins.top + 10 }]}>

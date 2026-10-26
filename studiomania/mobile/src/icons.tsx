@@ -23,6 +23,23 @@ const D = {
 
 export type IconName = keyof typeof D;
 
+// أيقونات الشريط اللي تحت: مصمتة (مليانة) عشان تبان واضح على أي خلفية
+const SOLID = {
+  approvals: "M12 2.5a6.5 6.5 0 0 0-6.5 6.5c0 5.1-2.1 6.6-2.4 6.8a.8.8 0 0 0 .4 1.5h17a.8.8 0 0 0 .4-1.5c-.3-.2-2.4-1.7-2.4-6.8A6.5 6.5 0 0 0 12 2.5zM9.4 19a2.7 2.7 0 0 0 5.2 0z",
+  projects: "M3 6.5A2.5 2.5 0 0 1 5.5 4h3.6a2 2 0 0 1 1.4.6L12.1 6h6.4A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z",
+  ideas: "M12 2.5a6.8 6.8 0 0 0-4 12.3V17a1.5 1.5 0 0 0 1.5 1.5h5A1.5 1.5 0 0 0 16 17v-2.2a6.8 6.8 0 0 0-4-12.3zM9.5 20h5a1 1 0 0 1 0 2h-5a1 1 0 0 1 0-2z",
+  storage: "M7 19.5a5 5 0 0 1-.6-10A6.5 6.5 0 0 1 18.8 8a4.8 4.8 0 0 1-.6 11.5z",
+} as const;
+export type SolidName = keyof typeof SOLID;
+
+export function SolidIcon({ name, size = 24, color = "#181718" }: { name: SolidName; size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d={SOLID[name]} fill={color} />
+    </Svg>
+  );
+}
+
 export function Icon({ name, size = 18, color = "#FFFFFF", width = 1.7 }: { name: IconName; size?: number; color?: string; width?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round">

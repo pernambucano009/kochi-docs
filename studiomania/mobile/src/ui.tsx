@@ -30,15 +30,19 @@ export function GlowButton({ title, onPress, icon, style, textStyle, disabled }:
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress?.(); }}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress?.(); }}
       onPressIn={pop.onPressIn}
       onPressOut={pop.onPressOut}
     >
-      <Animated.View style={[styles.glowWrap, { transform: [{ scale: pop.scale }], shadowRadius, opacity: disabled ? 0.6 : 1 }, style]}>
-        <LinearGradient colors={GLOW} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
-        <View style={styles.glowShine} />
-        {icon}
-        {title ? <Text style={[styles.glowText, textStyle]}>{title}</Text> : null}
+      {/* الضغطة (scale) على العنصر اللي برّه بالـ native driver، والنبض (shadowRadius) على اللي جوه بالـ JS:
+          لو الاتنين على نفس العنصر التطبيق بيقع أول ما تدوس */}
+      <Animated.View style={[{ transform: [{ scale: pop.scale }], opacity: disabled ? 0.6 : 1 }, style]}>
+        <Animated.View style={[styles.glowWrap, { shadowRadius }]}>
+          <LinearGradient colors={GLOW} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+          <View style={styles.glowShine} />
+          {icon}
+          {title ? <Text style={[styles.glowText, textStyle]}>{title}</Text> : null}
+        </Animated.View>
       </Animated.View>
     </Pressable>
   );

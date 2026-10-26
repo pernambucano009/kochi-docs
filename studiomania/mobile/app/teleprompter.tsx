@@ -119,7 +119,10 @@ export default function Teleprompter() {
 
   return (
     <View style={s.root}>
-      <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} mode="video" mirror={facing === "front"} />
+      {/* الكاميرا جوه View اتجاهه LTR: التطبيق كله RTL، وده كان بيقلب صورة الكاميرا */}
+      <View style={[StyleSheet.absoluteFill, { direction: "ltr" }]}>
+        <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} mode="video" mirror={facing === "front"} />
+      </View>
       <LinearGradient pointerEvents="none" colors={["rgba(0,0,0,.6)", "rgba(0,0,0,.15)", "rgba(0,0,0,.1)", "rgba(0,0,0,.7)"]} locations={[0, 0.4, 0.6, 1]} style={StyleSheet.absoluteFill} />
 
       <View style={[s.top, { top: ins.top + 10 }]}>
