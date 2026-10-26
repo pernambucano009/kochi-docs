@@ -1,0 +1,38 @@
+# 📱 بناء تطبيق الجوال على Expo (EAS) بزرار من GitHub: Actions ← «Mobile build» ← Run workflow
+# محتاج سر واحد في الريبو: EXPO_TOKEN (من expo.dev ← Account settings ← Access tokens).
+# - preview + android: ملف APK يتثبّت على أي أندرويد للتجربة (الرابط بيظهر في expo.dev ← Builds)
+# - production: النسخة اللي بتترفع على Google Play و App Store (الآيفون محتاج حساب مطوّر Apple متربط على Expo)
+name: Mobile build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "android / ios / all"
+        default: android
+        required: true
+      profile:
+        description: "preview (تجربة) / production (المتاجر)"
+        default: preview
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studiomania/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studiomania/mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
