@@ -203,6 +203,8 @@ async function main() {
   console.log(`  ${inputs.length} خانة كتابة فيها كلام عربي من البرنامج`);
   console.log(`  ${dialect.length} جملة عربي فيها عامية`);
   console.log(`  ${report.errors.length} خطأ في الصفحة`);
+  // في GitHub مش بنقدر نفتح التقرير بسهولة، فالجمل نفسها بتتكتب في السجل
+  for (const [k, xs] of [["ناقص", missing], ["خانة", inputs], ["عامية", dialect]]) xs.slice(0, 40).forEach((x) => console.log(`   • ${k} ${x.screen}: ${x.text.slice(0, 160)}`));
   console.log("  التفاصيل: tests/i18n/report.json");
   fs.rmSync(data, { recursive: true, force: true });
   process.exit(missing.length || inputs.length || dialect.length ? 1 : 0);

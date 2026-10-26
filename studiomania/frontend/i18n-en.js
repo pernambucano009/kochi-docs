@@ -13385,5 +13385,6 @@ window.I18N_EN = {
   "منشور جديد": "New post",
   "⏳ جارٍ البدء…": "⏳ Starting…",
   "🔧 التفاصيل (للأدمن فقط)": "🔧 Details (admin only)",
+  "ملفات": "files",
   "تعذّر فصل الموسيقى هذه المرة، فخرجت الدبلجة بدون موسيقى خلفية. يمكنك إعادتها لاحقًا، أو اختيار «الصوت الأصلي منخفضًا»": "The music couldn't be separated this time, so the dub came out without background music. You can redo it later, or pick “Original audio, low”."
 };

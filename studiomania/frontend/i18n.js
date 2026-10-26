@@ -29,14 +29,23 @@
     const k = norm(ar);
     if (/\{\d\}/.test(k)) {
       const parts = k.split(/(\{\d\})/);
-      const body = parts.map((p) => (/^\{\d\}$/.test(p) ? "([\\s\\S]+?)" : esc(p))).join("");
+      // خانتين لازقين في بعض («{1}{2}»): التانية غالبًا إضافة اختيارية، فالأولى بتاخد الكلام كله والتانية ممكن تبقى فاضية.
+      // من غير كده الأولى كانت بتاخد حرف واحد وتقطع الكلمة («تايبوجرافي» ← «ت» + «ايبوجرافي»)
+      const body = parts.map((p, i) => (!/^\{\d\}$/.test(p) ? esc(p)
+        : parts[i + 1] === "" && /^\{\d\}$/.test(parts[i + 2] || "") ? "([\\s\\S]+)"
+          : parts[i - 1] === "" && /^\{\d\}$/.test(parts[i - 2] || "") ? "([\\s\\S]*?)"
+            : i === 1 && parts[0] === "" && parts[2] && !/^\s/.test(parts[2]) ? "([\\s\\S]*?)"   // «{0}آخر مشروع…»: البادئة اختيارية
+              : "([\\s\\S]+?)")).join("");
       const order = [...k.matchAll(/\{(\d)\}/g)].map((m) => +m[1]);
       const staticLen = parts.filter((p) => !/^\{\d\}$/.test(p)).join("").trim().length;
       // قواعد عامة أوي («{0}ث» للثواني، «{0} من {1}»، «من {0}»، «في {0}»…) ماتلقطش كلام عربي عادي:
       // من غيرها «يبحث» كانت بتطلع «يبحs» و«من المطبخ» «of المطبخ». اللي مكانه فيها لازم يكون رقم أو كلام مش عربي
       const words = parts.filter((p) => !/^\{\d\}$/.test(p)).join(" ").replace(/[^؀-ۿ]+/g, " ").trim();
       const strict = !words || /^(ث|من|في|لـ|إلى|بعد|خلال|حتى|عن)( (ث|من))?$/.test(words);
-      pats.push({ re: new RegExp(`^${body}$`), loose: staticLen >= 8 ? new RegExp(body, "g") : null, order, en, staticLen, strict });
+      // جوه جملة أطول: الخانة اللي في الآخر لازم تكمل لحد فاصل (· أو علامة أو آخر الجملة)، من غيرها كانت بتاخد حرف واحد
+      // («آخر مشروع: تايبوجرافي · …» كانت بتطلع «Last project: ت» وباقي الكلمة «ايبوجرافي»)
+      const tail = /\{\d\}$/.test(k) ? "(?=\\s·\\s|\\s*[،,.؟?!:]|$)" : "";
+      pats.push({ re: new RegExp(`^${body}$`), loose: staticLen >= 8 ? new RegExp(body + tail, "g") : null, order, en, staticLen, strict });
     } else {
       exact.set(k, en);
       if (k.length >= 6) frags.push([k, en]);
