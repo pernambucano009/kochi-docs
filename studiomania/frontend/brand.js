@@ -87,10 +87,6 @@ const BrandPage = (() => {
         { f: "pg", i: "bl:comics", page: "brainlib", t: "🎭 القصص المصوّرة", type: "page" },
         { f: "pg", i: "bl:exports", page: "brainlib", t: "📤 الفيديوهات الجاهزة", type: "page" },
       ] },
-      // 🤖 القالب المخصص: مؤقتًا لوحده لحد ما نحدد مكانه
-      { k: "tools", t: "القالب المخصص", en: "Custom Template", leaves: [
-        { f: "pg", i: "auto", page: "auto", t: "🤖 القالب المخصص", type: "page" },
-      ] },
       // 🏆 منافسينك: أعلى 5 في المجال والسوق، واللي بينجح عندهم، وتحليل آخر ١٠ فيديوهات ليك، وخطة المحتوى (كلهم صفحة واحدة بتابات)
       { k: "pulse", t: "منافسوك", en: "Competitors", leaves: [
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),

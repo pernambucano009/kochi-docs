@@ -743,7 +743,7 @@ const NH = (() => {
   };
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
   const PAGE_PARENT = { pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
-    coaches: "brand", twin: "brand", brainlib: "brand", auto: "brand", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
+    coaches: "brand", twin: "brand", brainlib: "brand", auto: "create", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {
     const out = [{ label: "الرئيسية", lv: "home" }];
