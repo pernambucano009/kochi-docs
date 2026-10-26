@@ -21295,6 +21295,22 @@ def dub_list():
     return {"items": out, **dub_info()}
 
 
+def video_upright(path: Path) -> bool:
+    """📱 فيديو الموبايل الطولي ساعات بيتخزن بالعرض ومعاه علامة «لفّه وانت بتعرضه». أي نسخ للصورة من غير إعادة ترميز
+    بيضيّع العلامة دي فالفيديو بيطلع 16:9. هنا بنلفّه مرة واحدة فعلًا ونشيل العلامة، فكل اللي بعده بيطلع بنفس الاتجاه."""
+    err = subprocess.run([ffmpeg_exe(), "-hide_banner", "-i", str(path)], capture_output=True, text=True).stderr
+    rot = re.search(r"rotation of (-?\d+(?:\.\d+)?) degrees|rotate\s*:\s*(-?\d+)", err)
+    if not rot or round(abs(float(rot.group(1) or rot.group(2)))) % 360 == 0:
+        return False
+    out = path.with_name(path.stem + "_up.mp4")
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-c:v", "libx264", "-preset", "veryfast",
+                    "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy", "-metadata:s:v:0", "rotate=0", "-movflags", "+faststart", str(out)],
+                   check=True, capture_output=True, timeout=1800)
+    out.replace(path)
+    _probe_cache.clear()
+    return True
+
+
 def dub_create(src: Path, name: str) -> dict:
     did = uuid.uuid4().hex[:10]
     folder = DUB_DIR / did
@@ -21302,6 +21318,7 @@ def dub_create(src: Path, name: str) -> dict:
     file = f"src{src.suffix.lower() or '.mp4'}"
     shutil.move(str(src), folder / file)
     try:
+        video_upright(folder / file)
         info = media_info(folder / file)
     except Exception as exc:  # noqa: BLE001
         shutil.rmtree(folder, ignore_errors=True)
@@ -21686,6 +21703,8 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
     step = lambda s: dub_update(did, lambda x: x["targets"][dialect].update(step=s))  # noqa: E731
     try:
         d = dub_load(did)
+        if video_upright(DUB_DIR / did / d["source"]["file"]):   # مشروع قديم اترفع قبل التصليح ده
+            print(f"[dub] {did}: source rotated upright", flush=True)
         t = d["targets"][dialect]
         if t.get("voice") not in dub.DIALECTS[dialect]["voices"]:
             t["voice"] = dub.DIALECTS[dialect]["voices"][0]
