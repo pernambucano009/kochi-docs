@@ -4946,7 +4946,7 @@ def plan_out(bid: str) -> dict:
             "ready": bool(b.get("domain") or b.get("about")), "score": brain_score(b), "need": PLAN_SCORE, "know": fz.knowledge(b)}
 
 
-PLAN_SCORE = 70   # (نفس flow.KNOW_READY) 🧠 الخطة مابتتعملش غير لما العقل يفهم العميل: النسبة دي + الشروط الأساسية (المجال، عن البراند، الجمهور)
+PLAN_SCORE = 60   # (نفس flow.KNOW_READY) 🧠 الخطة مابتتعملش غير لما العقل يفهم العميل: النسبة دي + الشروط الأساسية (المجال، عن البراند، الجمهور)
 
 
 def brain_score(b: dict | None) -> int:
