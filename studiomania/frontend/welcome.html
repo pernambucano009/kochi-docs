@@ -87,12 +87,18 @@ input{font:inherit}
 .lp-spread{animation:lpSpread 1.8s cubic-bezier(.2,.7,.2,1) both}
 @keyframes lpIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .lp-in{animation:lpIn .55s cubic-bezier(.2,.8,.2,1) both}
-@keyframes lpPop{0%{opacity:0;transform:translateY(26px) scale(.94);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
-.lp-pop{animation:lpPop .9s cubic-bezier(.16,1,.3,1) both}
+@keyframes lpPop{0%{opacity:0;transform:translateY(18px) scale(.97);filter:blur(8px)}70%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
+.lp-pop{animation:lpPop 1.25s cubic-bezier(.22,1,.36,1) both}
+/* لوحة التسجيل بتظهر بهدوء: الرئيسية بتختفي الأول بنعومة، وبعدين اللوحة، وجواها العنوان ثم الجملة ثم الباقي واحد ورا التاني */
+@keyframes lpOut{to{opacity:0;transform:translateY(-10px) scale(.985);filter:blur(6px)}}
+.lp-out{animation:lpOut .55s cubic-bezier(.4,0,.2,1) both !important;pointer-events:none}
+@keyframes lpRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.lp-pop>*{animation:lpRise .9s cubic-bezier(.22,1,.36,1) both}
+.lp-pop>:nth-child(1){animation-delay:.18s}.lp-pop>:nth-child(2){animation-delay:.28s}.lp-pop>:nth-child(n+3){animation-delay:.4s}
 
 .lp-field{width:100%;height:46px;box-sizing:border-box;border-radius:14px;padding:0 16px;outline:none;transition:box-shadow .25s,border-color .25s}
 .lp-field:focus{border-color:#E5613E !important;box-shadow:0 0 0 4px rgba(229,97,62,.14)}
-@media (prefers-reduced-motion: reduce){.lp-jf,.sk-go,.nh-snake rect,.lp-lit,.lp-spread,.lp-in,.lp-pop{animation:none}.lp-btn,.lp-card,.lp-vid,.lp-navb{transform:none !important}}
+@media (prefers-reduced-motion: reduce){.lp-jf,.sk-go,.nh-snake rect,.lp-lit,.lp-spread,.lp-in,.lp-pop,.lp-pop>*,.lp-out{animation:none}.lp-btn,.lp-card,.lp-vid,.lp-navb{transform:none !important}}
 
 html,body{height:100%;overflow:hidden}
 body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
@@ -149,7 +155,7 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
 
   <!-- ===== الرئيسية: العنوان والجملة والزرار ومكان الفيديو ===== -->
   <sc-if value="{{isHome}}" hint-placeholder-val="{{ true }}">
-    <section data-k="home" class="lp-in" dir="{{dir}}" style="{{heroStyle}}">
+    <section data-k="home" class="{{homeCls}}" dir="{{dir}}" style="{{heroStyle}}">
       <h1 style="{{heroTitle}}">{{t.heroTitle}}</h1>
       <p style="{{heroLead}}">{{t.heroLead}}</p>
       <div style="display: flex; align-items: center; gap: 18px; margin-top: 24px; flex-wrap: wrap">
@@ -524,10 +530,10 @@ class Component {
       screen: scr0, hist: [], lit: false, flash: false, still: false, yearly: false, open: 0, showPw: false, mode: h === 'login' ? 'login' : 'register',
       field: 0, step: 1, err: '', reg: {}, busy: false };
   }
-  componentWillUnmount() { clearTimeout(this._t1); clearTimeout(this._t2); }
+  componentWillUnmount() { clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._t3); }
   go(screen, extra, fromHash) {
     if (screen === this.state.screen && !extra) return;
-    const off = screen !== 'signup' ? { lit: false, flash: false } : {};
+    const off = screen !== 'signup' ? { lit: false, flash: false, leaving: false } : {};
     this.setState(Object.assign({ screen, err: '', hist: this.state.hist.concat(this.state.screen) }, off, extra || {}));
     // 🔗 رابط لكل شاشة (#features …)، والرجوع في المتصفح بيرجع للشاشة اللي قبلها
     if (!fromHash) { const want = screen === 'home' ? '' : '#' + (screen === 'signup' && this.state.mode === 'login' ? 'login' : screen); if (location.hash !== want) history.pushState(null, '', want || location.pathname); }
@@ -535,8 +541,8 @@ class Component {
   back() {
     const h = this.state.hist.slice();
     const screen = h.length ? h.pop() : 'home';
-    clearTimeout(this._t1); clearTimeout(this._t2);
-    this.setState({ screen, hist: h, lit: screen === 'signup' && this.state.lit, flash: false });
+    clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._t3);
+    this.setState({ screen, hist: h, lit: screen === 'signup' && this.state.lit, flash: false, leaving: false });
   }
   // صوت طبيعي: كحتة عود كبريت (احتكاك خشن قصير) وبعدها نفَس الاشتعال وطقطقة خفيفة. مولّد بالكود من غير ملفات
   chime() {
@@ -684,7 +690,7 @@ class Component {
       goGoogle: () => { if (this.auth && this.auth.google) location.href = '/auth/google'; else this.setState({ err: T.gsoon }); },
       goApple: () => this.setState({ err: T.soon }),
       nav, feats, plans, qs, screenName,
-      flash: s.flash, litClass: s.flash ? 'lp-lit' : '',
+      flash: s.flash, litClass: s.flash ? 'lp-lit' : '', homeCls: s.leaving ? 'lp-in lp-out' : 'lp-in',
       isHome: home, isInner: !home, isDemo: scr === 'demo', isFeatures: scr === 'features', isPrices: scr === 'prices', isFaq: scr === 'faq', isSignup: scr === 'signup', isRegister: reg,
       monthly: !y, yearly: y, showPw: s.showPw,
       markSrc: d ? '/logo-mark-dark.png' : '/logo-mark-light.png',
@@ -764,9 +770,10 @@ class Component {
         if (!reduceMo()) this.chime();
         if (this.state.screen !== 'home') this.go('home');
         this.setState({ lit: true, flash: true });
-        clearTimeout(this._t1); clearTimeout(this._t2);
+        clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._t3);
         this._t1 = setTimeout(() => this.setState({ flash: false }), 1800);
-        this._t2 = setTimeout(() => this.go('signup', { mode: 'register', step: 1 }), reduceMo() ? 0 : 1900);
+        this._t3 = setTimeout(() => this.setState({ leaving: true }), reduceMo() ? 0 : 1350);   // الرئيسية بتختفي بنعومة قبل اللوحة
+        this._t2 = setTimeout(() => this.go('signup', { mode: 'register', step: 1, leaving: false }), reduceMo() ? 0 : 1900);
       },
       toggleLang: () => { const l = ar ? 'en' : 'ar'; try { localStorage.setItem('studiomania.site.lang', l); } catch { /* */ } this.setState({ lang: l }); },
       togglePw: () => this.setState({ showPw: !this.state.showPw }),
