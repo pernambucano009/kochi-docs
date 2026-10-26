@@ -81,6 +81,8 @@ async function main() {
     const j = (b) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
     await fetch("/api/folders", j({ name: "Audit project" })).catch(() => {});
     const fd = new FormData(); fd.append("text", "Audit idea"); await fetch("/api/my-ideas", { method: "POST", body: fd }).catch(() => {});
+    // 🪞 أفاتار: خطواته ونصايح التصوير مابتظهرش غير جوه أفاتار معمول، فكانت بتفوت الفحص
+    await fetch("/api/twins", j({ name: "Audit avatar", consent: true })).catch(() => {});
   });
 
   const miss = new Map(), seen = new Map(), vals = new Map();   // الجملة ← أول شاشة ظهرت فيها

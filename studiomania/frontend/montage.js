@@ -2310,7 +2310,7 @@ $("clipFx").addEventListener("input", (e) => {
 // حركات الدخول والخروج
 $("fxAnimIn").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("");
 $("fxAnimOut").innerHTML = ANIMS.map(([k, l]) => `<button class="chip" data-anim="${k}">${l}</button>`).join("")
-  .replace("من اليمين", "لليمين").replace("من الشمال", "لليسار").replace("من أسفل", "للأسفل").replace("من أعلى", "لفوق");
+  .replace("من اليمين", "لليمين").replace("من الشمال", "لليسار").replace("من أسفل", "للأسفل").replace("من أعلى", "للأعلى");
 for (const [box, key, dur] of [["fxAnimIn", "anim_in", "fxAnimInDur"], ["fxAnimOut", "anim_out", "fxAnimOutDur"]]) {
   $(box).addEventListener("click", (e) => {
     const b = e.target.closest("[data-anim]");

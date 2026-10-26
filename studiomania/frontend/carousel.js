@@ -309,7 +309,7 @@ function renderPlan() {
         <details><summary>وصف الرسمة</summary><textarea data-k="visual" rows="2" dir="ltr">${escapeHtml(s.visual)}</textarea></details>
       </div>
       <div class="acts">
-        <button class="btn sm" data-act="up" title="لفوق" ${i ? "" : "disabled"}>▲</button>
+        <button class="btn sm" data-act="up" title="إلى الأعلى" ${i ? "" : "disabled"}>▲</button>
         <button class="btn sm danger" data-act="del" title="احذف السلايد">✕</button>
       </div>
     </div>`)

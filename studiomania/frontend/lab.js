@@ -474,7 +474,7 @@ function connEditForm(c) {
 function connTrRow(x = {}) {
   return `<div class="lab-xtr-row" data-xtr>
     <input type="number" step="0.05" value="${x.t0 ?? ""}" data-k="t0" title="من (ثانية)"><input type="number" step="0.05" value="${x.t1 ?? ""}" data-k="t1" title="لـ">
-    <input type="text" value="${le(x.from)}" data-k="from" placeholder="ماذا" data-no-i18n><span>←</span><input type="text" value="${le(x.to)}" data-k="to" placeholder="بقى ماذا" data-no-i18n>
+    <input type="text" value="${le(x.from)}" data-k="from" placeholder="ماذا" data-no-i18n><span>←</span><input type="text" value="${le(x.to)}" data-k="to" placeholder="يصبح ماذا" data-no-i18n>
     <input type="text" value="${le(x.how)}" data-k="how" placeholder="كيف (الحركة والنعومة)" class="grow" data-no-i18n>
     <button type="button" class="btn sm danger" data-xtrdel>✕</button></div>`;
 }

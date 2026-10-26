@@ -13592,4 +13592,9 @@ window.I18N_EN = {
   "مثلًا: أنا، أو سارة": "e.g. Me, or Sara",
   "احذف الأفاتار": "Delete avatar",
   "نسخة منك أو من شخص لديك إذنه، من تسجيلات حقيقية، لتصنع بها فيديوهات بكلام جديد.": "A copy of you, or of someone who gave you permission, made from real recordings, to create videos with new words.",
+  "إلى الأعلى": "Move up",
+  "للأعلى": "Move up",
+  "يصبح ماذا": "Becomes",
+  "أصبحت اللقطة رقم {0} ({1} → {2})": "Shot is now number {0} ({1} → {2})",
+  "🔁 اللقطات ضُبطت على الصوت الجديد. {0} لقطة أصبح الفيديو الخاص بها أقصر من وقتها ({1}): في المونتاج ستتبطّأ قليلًا وآخر فريم يقف، أو اضغط «🔄 واحد آخر» عليها يُولّد على الوقت الجديد.": "🔁 Shots were re-timed to the new voice-over. {0} shots now have a video shorter than their time ({1}): in the montage they'll slow down a little and hold the last frame, or press «🔄 Another» to generate one for the new length.",
 };

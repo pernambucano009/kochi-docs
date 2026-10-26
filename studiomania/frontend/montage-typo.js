@@ -479,7 +479,7 @@ $("mtTypoPane").addEventListener("change", (e) => {
 
 // ---------- ◆ ترانزيشنز بين لقطات الفيديو: معيّن بين كل قطعتين، تدوس عليه وتختار
 const MT_TRANS = [["", "بدون", "✂️"], ["fade", "تلاشي", "◐"], ["fadeblack", "سواد", "●"], ["fadewhite", "وميض أبيض", "○"], ["dissolve", "ذوبان", "░"],
-  ["slideleft", "انزلاق", "⇠"], ["smoothleft", "انزلاق ناعم", "↜"], ["slideup", "لفوق", "⇡"], ["wipeleft", "مسحة", "▤"], ["circleopen", "دائرة تنفتح", "◎"],
+  ["slideleft", "انزلاق", "⇠"], ["smoothleft", "انزلاق ناعم", "↜"], ["slideup", "للأعلى", "⇡"], ["wipeleft", "مسحة", "▤"], ["circleopen", "دائرة تنفتح", "◎"],
   ["radial", "عقارب الساعة", "◔"], ["zoomin", "زووم", "⊕"], ["pixelize", "بكسلات", "▦"], ["hblur", "ضباب", "≋"], ["squeezeh", "ضغطة", "⇔"], ["diagtl", "مائلة", "◩"]];
 const mtTransName = (k) => (MT_TRANS.find((x) => x[0] === k) || [k, k])[1];
 

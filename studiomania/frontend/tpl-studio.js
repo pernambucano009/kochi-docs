@@ -5,7 +5,7 @@
 
 const tsx = { data: null, pick: null, timer: null };
 const TS_TRANS = { cut: "قطع مباشر", fade: "تلاشي", fadeblack: "سواد", fadewhite: "فلاش أبيض", dissolve: "ذوبان", wipeleft: "مسحة", slideleft: "زحلقة",
-  smoothleft: "زحلقة ناعمة", circleopen: "دائرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "عصرة", diagtl: "مايلة", slideup: "لفوق" };
+  smoothleft: "زحلقة ناعمة", circleopen: "دائرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "عصرة", diagtl: "مايلة", slideup: "للأعلى" };
 const tse = (s) => escapeHtml(String(s ?? ""));
 
 viewHooks["14"] = tsInit;

@@ -440,7 +440,7 @@ function renderShotsTab() {
   const rt = ep.retimed;
   $("serRetimed").hidden = !rt;
   if (rt) $("serRetimed").textContent = rt.short.length
-    ? `🔁 اللقطات ضُبطت على الصوت الجديد. ${rt.short.length} لقطة الفيديو الخاص بها بقى أقصر من وقتها (${rt.short.join("، ")}): في المونتاج ستتبطّأ قليلًا وآخر فريم يقف، أو اضغط «🔄 واحد آخر» عليها يُولّد على الوقت الجديد.`
+    ? `🔁 اللقطات ضُبطت على الصوت الجديد. ${rt.short.length} لقطة أصبح الفيديو الخاص بها أقصر من وقتها (${rt.short.join("، ")}): في المونتاج ستتبطّأ قليلًا وآخر فريم يقف، أو اضغط «🔄 واحد آخر» عليها يُولّد على الوقت الجديد.`
     : "🔁 اللقطات ضُبطت على الصوت الجديد، وكل الفيديوهات مكفية وقتها.";
   if (rt?.added?.length) $("serRetimed").textContent += ` ➕ أُنشئت لقطات جديدة للجمل الذي ضفتها (${rt.added.join("، ")}): ارسم لها ستوري بورد واعتمدها وولّدها.`;
   // الكلام الجديد على اللقطات: من المسودة (لسه ما اتعتمدتش)، والجمل الجديدة بتظهر مكانها قبل ما تتسجل
@@ -684,7 +684,7 @@ async function moveShots(order, focusId) {
     const s = ser.ep.shots.find((x) => x.id === focusId);
     const card = document.querySelector(`[data-shot="${focusId}"]`);
     if (card) { card.scrollIntoView({ behavior: "smooth", block: "nearest" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1500); }
-    if (s) toast(`اللقطة بقت رقم ${s.n} (${serFmt(s.start)} → ${serFmt(s.end)})`);
+    if (s) toast(`أصبحت اللقطة رقم ${s.n} (${serFmt(s.start)} → ${serFmt(s.end)})`);
   } catch (err) { toast(err.message, true); }
 }
 // السحب: من علامة ⠿ في راس الكارت
