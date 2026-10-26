@@ -189,11 +189,12 @@ async function runBrand(browser, storage, brand) {
   });
 
   await step("اقتراح الخطوط ← قبوله", async () => {
-    const s = await j("POST", `/api/ad-brains/${bid}/suggest/typography`);
-    const v = s.value || (s.suggestion || {}).value;
-    if (!v) throw new Error("لا يوجد اقتراح: " + JSON.stringify(s).slice(0, 200));
-    await j("PATCH", `/api/ad-brains/${bid}`, { fields: { typography: v } });
-    return v;
+    // الاقتراح بيظهر جوه كارت الخانة (اقتراح منتظر)، والعميل يوافق عليه
+    const b = await j("POST", `/api/ad-brains/${bid}/suggest/typography`);
+    const p = (b.pending || []).find((x) => x.kind === "field" && x.field === "typography");
+    if (!p) throw new Error("لا يوجد اقتراح");
+    await j("POST", `/api/ad-brains/${bid}/pending/${p.id}/approve`, {});
+    return `${p.value} · ${p.why || ""}`;
   });
 
   await step("الخطة (الاستراتيجية)", async () => {

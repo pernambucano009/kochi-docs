@@ -113,7 +113,10 @@
       out = n;
       for (const [a, e] of frags) if (out.includes(a)) out = out.split(a).join(e);
       for (const p of pats) if (p.loose && AR.test(out)) out = out.replace(p.loose, (...m) => fill(p, m.slice(1, 1 + p.order.length)));
-      out = out.replace(/،/g, ",").replace(/؟/g, "?").replace(/«|»/g, '"').replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+      // 🔒 لو فضل فيها عربي: دي جملة مش بتاعتنا (محتوى العميل أو كلام الذكاء الاصطناعي)، فبنسيبها زي ما هي.
+      // الترجمة الجزئية كانت بتبوّظها كلمة كلمة («الposts التي…»، «Cairo والجيزة»)
+      if (AR.test(out.replace(/[٠-٩]/g, ""))) out = n;
+      else out = out.replace(/،/g, ",").replace(/؟/g, "?").replace(/«|»/g, '"').replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
     }
     out = lead + out + trail;
     if (cache.size < 8000) cache.set(s, out);
