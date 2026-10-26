@@ -2,6 +2,7 @@
 
 - الإرسال والتحقق من Authentica (AUTHENTICA_API_KEY من إعدادات الأدمن): هم اللي بيولّدوا الرمز ويتحققوا منه.
 - من غير مفتاح: الخاصية مقفولة، إلا في وضع التجربة (MAIL_DEV=1 أو STAGING=1) فالرمز بيتولّد هنا ويظهر على الشاشة.
+- ⏸️ مقفولة دلوقتي (متأجلة للخطة الجاية): بتشتغل بـ PHONE_LOGIN=1 بس.
 - الحماية من استنزاف الرصيد: أرقام دول معيّنة بس، ومهلة ٣٠ ثانية بين كل رمز، و٣ رموز لكل رقم في ربع ساعة، و٨ لكل جهاز في الساعة.
 """
 from __future__ import annotations
@@ -35,7 +36,8 @@ def dev() -> bool:
 
 
 def enabled() -> bool:
-    return bool(key()) or dev()
+    # ⏸️ متأجلة للخطة الجاية (أسعار الرسائل): مقفولة لحد ما PHONE_LOGIN=1، حتى لو المفتاح موجود
+    return os.environ.get("PHONE_LOGIN") == "1" and (bool(key()) or dev())
 
 
 def normalize(raw: str) -> str:
