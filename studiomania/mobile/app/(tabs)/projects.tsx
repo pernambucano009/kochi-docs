@@ -22,9 +22,9 @@ const STAGE: Record<string, string> = { idea: "الفكرة", scenario: "الن�
 function ago(at: string) {
   const h = (Date.now() - new Date(at).getTime()) / 3600000;
   if (!(h >= 0)) return "";
-  if (h < 1) return "من شوية";
-  if (h < 24) return `من ${Math.round(h)} ساعة`;
-  if (h < 48) return "امبارح";
+  if (h < 1) return "منذ قليل";
+  if (h < 24) return `منذ ${Math.round(h)} ساعة`;
+  if (h < 48) return "أمس";
   return new Date(at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
 }
 
@@ -54,7 +54,7 @@ export default function Projects() {
       const busy = p.render_status === "rendering";
       out.push({
         key: "p" + p.id, title: p.name || "مشروع", at: p.updated_at, cover: p.cover_url,
-        sub: busy ? `بيتصدّر${p.render_progress ? ` ${Math.round(p.render_progress)}٪` : "…"}` : e ? "الفيديو جاهز" : p.render_status === "failed" ? "التصدير وقف" : "في المونتاج",
+        sub: busy ? `جارٍ التصدير${p.render_progress ? ` ${Math.round(p.render_progress)}٪` : "…"}` : e ? "الفيديو جاهز" : p.render_status === "failed" ? "توقف التصدير" : "في المونتاج",
         state: e && !busy ? "done" : busy ? "busy" : "todo", video: e ? { id: e.id, name: e.name, url: e.url, download_url: e.download_url } : undefined,
       });
     }
@@ -62,7 +62,7 @@ export default function Projects() {
       const needs = shootIds.has(f.id);
       out.push({
         key: "f" + f.id, title: f.title || f.template?.name || "مشروع قالب", at: f.updated_at || "", cover: null, flowId: f.id,
-        sub: needs ? "📱 مستني تصويرك" : `${f.template?.name || "قالب"} · ${STAGE[f.stage || ""] || "شغّال"}`, state: needs ? "shoot" : "todo",
+        sub: needs ? "📱 بانتظار تصويرك" : `${f.template?.name || "قالب"} · ${STAGE[f.stage || ""] || "قيد العمل"}`, state: needs ? "shoot" : "todo",
       });
     }
     out.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
@@ -92,13 +92,13 @@ export default function Projects() {
       <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={[s.page, { paddingTop: ins.top + 18, paddingBottom: ins.bottom + 110 }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={ACCENT} />}>
         <T size={22} weight="medium">المشاريع</T>
-        <View style={s.chips}>{chip("all", "الكل")}{chip("busy", "شغّال عليها")}{chip("done", "خلصت")}</View>
+        <View style={s.chips}>{chip("all", "الكل")}{chip("busy", "قيد العمل")}{chip("done", "المكتملة")}</View>
 
         {rows === null ? <ActivityIndicator color={ACCENT} style={{ marginTop: 30 }} /> : null}
         {rows && !list.length ? (
           <Card style={{ gap: 6 }}>
-            <T size={14} weight="medium">{rows.length ? "مفيش مشاريع هنا" : "لسه مفيش مشاريع"}</T>
-            <T muted size={12.5}>ابدأ مشروع من الموقع أو صوّر من الكاميرا، وهيظهر هنا.</T>
+            <T size={14} weight="medium">{rows.length ? "لا توجد مشاريع هنا" : "لا توجد مشاريع بعد"}</T>
+            <T muted size={12.5}>ابدأ مشروعًا من الموقع أو صوّر من الكاميرا، وسيظهر هنا.</T>
           </Card>
         ) : null}
 
@@ -111,7 +111,7 @@ export default function Projects() {
                 )}
                 {r.state === "done" ? <View style={s.play}><Icon name="play" size={18} /></View> : null}
                 <View style={[s.badge, { backgroundColor: r.state === "done" ? t.okBg : r.state === "shoot" ? ACCENT : "rgba(12,12,14,.55)" }]}>
-                  <T size={10.5} style={{ color: r.state === "done" ? t.okInk : "#FFFFFF" }}>{r.state === "done" ? "جاهز" : r.state === "busy" ? "بيتصدّر" : r.state === "shoot" ? "صوّر" : "شغّال"}</T>
+                  <T size={10.5} style={{ color: r.state === "done" ? t.okInk : "#FFFFFF" }}>{r.state === "done" ? "جاهز" : r.state === "busy" ? "جارٍ التصدير" : r.state === "shoot" ? "صوّر" : "قيد العمل"}</T>
                 </View>
               </View>
               <T size={13} weight="medium" style={{ marginTop: 6 }}>{r.title}</T>

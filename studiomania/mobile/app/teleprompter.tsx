@@ -64,7 +64,7 @@ export default function Teleprompter() {
   if (!perm.granted || !mic.granted) {
     return (
       <View style={[s.root, s.pad]}>
-        <Text style={s.title}>محتاجين الكاميرا والمايك عشان تصوّر</Text>
+        <Text style={s.title}>نحتاج إلى الكاميرا والميكروفون للتصوير</Text>
         <GlowButton title="اسمح" onPress={async () => { await askPerm(); await askMic(); }} style={{ marginTop: 14 }} />
       </View>
     );
@@ -75,9 +75,9 @@ export default function Teleprompter() {
     return (
       <View style={[s.root, s.pad, { paddingTop: ins.top + 16 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="رجوع" onPress={() => router.back()} style={s.round}><Icon name="close" width={1.8} /></Pressable>
-        <Text style={[s.title, { marginTop: 18 }]}>اكتب النص اللي هتقوله</Text>
-        <Text style={s.hint}>كل سطر أو جملة هتبقى لقطة لوحدها، فلو غلطت في جملة تعيدها هي بس.</Text>
-        <TextInput value={draft} onChangeText={setDraft} multiline placeholder="مثلًا: القهوة دي غيّرت صباحي في أسبوع واحد…" placeholderTextColor="rgba(255,255,255,.35)" style={s.input} textAlignVertical="top" />
+        <Text style={[s.title, { marginTop: 18 }]}>اكتب النص الذي ستقوله</Text>
+        <Text style={s.hint}>كل سطر أو جملة ستكون لقطة مستقلة، فإن أخطأت في جملة تعيدها وحدها.</Text>
+        <TextInput value={draft} onChangeText={setDraft} multiline placeholder="مثلًا: هذه القهوة غيّرت صباحي في أسبوع واحد…" placeholderTextColor="rgba(255,255,255,.35)" style={s.input} textAlignVertical="top" />
         <GlowButton title="ابدأ التصوير" disabled={!draft.trim()} onPress={() => shoot.start({ kind: "free", id: "free", title: "تصوير حر" }, splitScript(draft))} style={{ marginTop: 16 }} />
       </View>
     );
@@ -111,7 +111,7 @@ export default function Teleprompter() {
     } catch (e) {
       anim.current?.stop();
       setRec(false);
-      Alert.alert("التسجيل وقف", (e as Error).message);
+      Alert.alert("توقف التسجيل", (e as Error).message);
     }
   }
 
@@ -138,7 +138,7 @@ export default function Teleprompter() {
         </Animated.View>
         <LinearGradient pointerEvents="none" colors={["rgba(12,12,14,0)", "rgba(12,12,14,.85)"]} style={s.fade} />
       </View>
-      <Text style={[s.hint, { position: "absolute", top: ins.top + 66 + BOX + 10, start: 20, end: 20 }]}>النص فيه الكلام المنطوق بس، من غير وقفات أو تعليمات</Text>
+      <Text style={[s.hint, { position: "absolute", top: ins.top + 66 + BOX + 10, start: 20, end: 20 }]}>يحتوي النص على الكلام المنطوق فقط، دون وقفات أو تعليمات</Text>
 
       {count > 0 ? <Text style={s.count}>{count}</Text> : null}
 

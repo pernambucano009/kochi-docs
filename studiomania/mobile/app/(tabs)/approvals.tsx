@@ -22,9 +22,9 @@ function when(at?: string) {
   if (!at) return "";
   const d = new Date(at), diff = (d.getTime() - Date.now()) / 60000;
   const time = d.toLocaleTimeString("ar-EG", { hour: "numeric", minute: "2-digit" });
-  if (diff > 0) return diff < 24 * 60 && d.getDate() === new Date().getDate() ? `يُنشر النهارده ${time}` : `يُنشر ${d.toLocaleDateString("ar-EG", { weekday: "long" })} ${time}`;
-  if (-diff < 60) return `من ${Math.max(1, Math.round(-diff))} دقيقة`;
-  if (-diff < 24 * 60) return `من ${Math.round(-diff / 60)} ساعة`;
+  if (diff > 0) return diff < 24 * 60 && d.getDate() === new Date().getDate() ? `يُنشر اليوم ${time}` : `يُنشر ${d.toLocaleDateString("ar-EG", { weekday: "long" })} ${time}`;
+  if (-diff < 60) return `منذ ${Math.max(1, Math.round(-diff))} دقيقة`;
+  if (-diff < 24 * 60) return `منذ ${Math.round(-diff / 60)} ساعة`;
   return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
 }
 
@@ -61,14 +61,14 @@ export default function Approvals() {
     try {
       const r = await api<{ jobs: Job[] }>(`/api/pilot/jobs/${j.id}/${path}`, body ? json(body) : { method: "POST" });
       setJobs(r.jobs || []);
-      if (done) Alert.alert("تمام ✓", done);
+      if (done) Alert.alert("تم ✓", done);
     } catch (e) {
-      Alert.alert("ما كملش", (e as Error).message);
+      Alert.alert("لم يكتمل", (e as Error).message);
     }
     setBusy("");
   }
 
-  const skip = (j: Job) => Alert.alert("تتخطّى الموعد ده؟", "مش هينزل فيديو في الميعاد ده، والأوتوبايلوت يكمّل في المواعيد اللي بعده.", [
+  const skip = (j: Job) => Alert.alert("هل تتخطى هذا الموعد؟", "لن يُنشر فيديو في هذا الموعد، ويكمل الأوتوبايلوت في المواعيد التالية.", [
     { text: "رجوع", style: "cancel" },
     { text: "تخطَّ", style: "destructive", onPress: () => act(j, "stop") },
   ]);
@@ -90,7 +90,7 @@ export default function Approvals() {
         <>
           {(j.script || []).length ? <T size={13.5} style={{ lineHeight: 22 }}>{(j.script || []).join("\n")}</T> : null}
           <View style={s.acts}>
-            <GlowButton title="صوّرها دلوقتي" onPress={() => film(j)} style={{ flex: 1 }} />
+            <GlowButton title="صوّرها الآن" onPress={() => film(j)} style={{ flex: 1 }} />
             <SoftButton title="تخطَّ" onPress={() => skip(j)} />
           </View>
         </>
@@ -100,7 +100,7 @@ export default function Approvals() {
       const pick = picks[j.id] || j.options?.[0]?.id || "";
       return (
         <>
-          <T muted size={12}>{j.gate === "idea" ? "اختار الفكرة اللي تعجبك" : "اختار السكريبت اللي يعجبك"}</T>
+          <T muted size={12}>{j.gate === "idea" ? "اختر الفكرة التي تعجبك" : "اختر السكريبت الذي يعجبك"}</T>
           {(j.options || []).map((o) => (
             <Pressable key={o.id} onPress={() => setPicks((p) => ({ ...p, [j.id]: o.id }))}
               style={[s.opt, { backgroundColor: t.field }, pick === o.id && { borderColor: ACCENT, backgroundColor: t.softAccent }]}>
@@ -117,7 +117,7 @@ export default function Approvals() {
     }
     if (j.gate === "montage" || j.gate === "video") {
       const carousel = j.kind === "carousel";
-      const okLabel = carousel ? (j.gate === "montage" ? "موافق، ارسم السلايدات" : "موافق، جدوله") : j.gate === "montage" ? "موافق، صدّره" : "انشر في ميعاده";
+      const okLabel = carousel ? (j.gate === "montage" ? "موافق، ارسم السلايدات" : "موافق، جدوِله") : j.gate === "montage" ? "موافق، صدّره" : "انشر في ميعاده";
       return (
         <>
           {j.video_url && headers.Authorization ? <Video uri={mediaUrl(j.video_url)} headers={headers} /> : null}
@@ -127,8 +127,8 @@ export default function Approvals() {
             </ScrollView>
           ) : null}
           <View style={s.acts}>
-            <GlowButton title={isBusy ? "…" : okLabel} disabled={isBusy} onPress={() => act(j, "ok", { pick: "" }, j.gate === "video" ? "الفيديو اتجدول وهينزل في ميعاده." : undefined)} style={{ flex: 1 }} />
-            {!carousel ? <SoftButton title="عدّل على الويب" onPress={() => Linking.openURL(API_BASE + "/")} /> : null}
+            <GlowButton title={isBusy ? "…" : okLabel} disabled={isBusy} onPress={() => act(j, "ok", { pick: "" }, j.gate === "video" ? "جُدول الفيديو وسيُنشر في موعده." : undefined)} style={{ flex: 1 }} />
+            {!carousel ? <SoftButton title="عدّل على الموقع" onPress={() => Linking.openURL(API_BASE + "/")} /> : null}
           </View>
           <SoftButton title="تخطَّ" onPress={() => skip(j)} style={{ alignSelf: "flex-start" }} />
         </>
@@ -142,21 +142,21 @@ export default function Approvals() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={ACCENT} />}>
       <View style={s.head}>
         <T size={22} weight="medium">الموافقات</T>
-        <T muted size={12.5}>{open.length ? `${open.length} مستني ردّك` : "مفيش حاجة مستنياك"}</T>
+        <T muted size={12.5}>{open.length ? `${open.length} بانتظار ردك` : "لا شيء بانتظارك"}</T>
       </View>
 
       {jobs === null ? <ActivityIndicator color={ACCENT} style={{ marginTop: 30 }} /> : null}
       {jobs && !all.length ? (
         <Card style={{ gap: 6 }}>
-          <T size={14} weight="medium">الأوتوبايلوت لسه مش شغال</T>
-          <T muted size={12.5}>شغّله من الموقع، وأي خطوة محتاجة موافقتك هتوصلك إشعار وتظهر هنا.</T>
+          <T size={14} weight="medium">الأوتوبايلوت غير مفعّل بعد</T>
+          <T muted size={12.5}>فعّله من الموقع، وأي خطوة تحتاج موافقتك سيصلك بها إشعار وتظهر هنا.</T>
         </Card>
       ) : null}
 
       {open.map((j) => (
         <Card key={j.id} style={[s.card, j.id === jid && { borderWidth: 2, borderColor: ACCENT }]}>
           <View style={s.cardTop}>
-            <View style={[s.tag, { backgroundColor: t.softAccent }]}><T size={11.5} style={{ color: ACCENT }}>{j.status === "cam" ? "مستني تصويرك" : LABEL[j.gate || ""] || "خطوة"}</T></View>
+            <View style={[s.tag, { backgroundColor: t.softAccent }]}><T size={11.5} style={{ color: ACCENT }}>{j.status === "cam" ? "بانتظار تصويرك" : LABEL[j.gate || ""] || "خطوة"}</T></View>
             <T muted size={11.5}>{[when(j.at), j.name].filter(Boolean).join(" · ")}</T>
           </View>
           <T size={15.5} weight="medium">{j.title || j.name || "فيديو الأوتوبايلوت"}</T>
@@ -164,17 +164,17 @@ export default function Approvals() {
         </Card>
       ))}
 
-      {rest.length ? <T weight="medium" size={14} style={{ marginTop: 8 }}>آخر الشغل</T> : null}
+      {rest.length ? <T weight="medium" size={14} style={{ marginTop: 8 }}>آخر الأعمال</T> : null}
       {rest.map((j) => (
         <Card key={j.id} style={{ gap: 6 }}>
           <View style={s.cardTop}>
             <T size={14} weight="medium" style={{ flex: 1 }}>{j.title || j.name || "فيديو"}</T>
             <View style={[s.tag, { backgroundColor: j.status === "done" ? t.okBg : t.field }]}>
-              <T size={11} style={{ color: j.status === "done" ? t.okInk : t.muted }}>{j.status === "done" ? "اتجدول ✓" : j.status === "failed" ? "وقف" : j.status === "stopped" ? "اتخطّى" : "شغال"}</T>
+              <T size={11} style={{ color: j.status === "done" ? t.okInk : t.muted }}>{j.status === "done" ? "جُدول ✓" : j.status === "failed" ? "توقف" : j.status === "stopped" ? "تُخطّي" : "قيد التنفيذ"}</T>
             </View>
           </View>
           <T muted size={12}>{[when(j.at), j.status === "run" ? j.note : "", j.status === "failed" ? j.error : ""].filter(Boolean).join(" · ")}</T>
-          {j.status === "failed" ? <SoftButton title={busy === j.id ? "…" : "جرّب تاني"} onPress={() => act(j, "retry")} style={{ alignSelf: "flex-start" }} /> : null}
+          {j.status === "failed" ? <SoftButton title={busy === j.id ? "…" : "حاول مرة أخرى"} onPress={() => act(j, "retry")} style={{ alignSelf: "flex-start" }} /> : null}
         </Card>
       ))}
     </ScrollView>

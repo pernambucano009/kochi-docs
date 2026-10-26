@@ -25,8 +25,8 @@ export default function Shots() {
   if (!sess) {
     return (
       <View style={[s.root, { justifyContent: "center", padding: 24 }]}>
-        <Text style={s.title}>مفيش لقطات دلوقتي</Text>
-        <GlowButton title="ارجع للكاميرا" onPress={() => router.replace("/camera")} style={{ marginTop: 14 }} />
+        <Text style={s.title}>لا توجد لقطات الآن</Text>
+        <GlowButton title="العودة إلى الكاميرا" onPress={() => router.replace("/camera")} style={{ marginTop: 14 }} />
       </View>
     );
   }
@@ -46,28 +46,28 @@ export default function Shots() {
     try {
       if (free) {
         const p = await MediaLibrary.requestPermissionsAsync(true);
-        if (!p.granted) throw new Error("محتاجين إذن الاستوديو عشان نحفظ اللقطات");
+        if (!p.granted) throw new Error("نحتاج إذن الوصول إلى الصور لحفظ اللقطات");
         for (const x of shots) if (x.uri) await MediaLibrary.saveToLibraryAsync(x.uri);
-        Alert.alert("اتحفظ ✓", `${done} لقطة اتحفظوا في الاستوديو بالترتيب.`);
+        Alert.alert("حُفظ ✓", `حُفظت ${done} لقطات في معرض الصور بالترتيب.`);
       } else {
         await uploadShots(sess!);
-        Alert.alert("وصل ✓", "اللقطات اترفعت واتلصقت بالترتيب في المشروع، والمراجعة والمونتاج بيكمّلوا لوحدهم.");
+        Alert.alert("وصل ✓", "رُفعت اللقطات ورُتّبت في المشروع، وتكتمل المراجعة والمونتاج تلقائيًا.");
       }
       shoot.clear();
       router.replace("/camera");
     } catch (e) {
-      Alert.alert("ما كملش", (e as Error).message + "\nاللقطات لسه معاك، جرّب تاني.");
+      Alert.alert("لم يكتمل", (e as Error).message + "\nما زالت اللقطات على جوالك، حاول مرة أخرى.");
     }
     setBusy(false);
   }
 
-  const okLabel = all ? (free ? "تمام، احفظهم في الاستوديو" : "تمام، ارفعهم للمشروع") : next >= 0 ? "تمام، اللقطة اللي بعدها" : "صوّر اللقطة الباقية";
+  const okLabel = all ? (free ? "حسنًا، احفظها في معرض الصور" : "حسنًا، ارفعها إلى المشروع") : next >= 0 ? "حسنًا، اللقطة التالية" : "صوّر اللقطة المتبقية";
   const ok = () => (all ? finish() : retake(next >= 0 ? next : shots.findIndex((x) => !x.uri)));
 
   return (
     <View style={[s.root, { paddingTop: ins.top + 10, paddingBottom: ins.bottom + 16 }]}>
       <View style={s.top}>
-        <Pressable accessibilityRole="button" accessibilityLabel="رجوع للكاميرا" disabled={busy} onPress={() => retake(i)} style={s.round}><Icon name="back" /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="العودة إلى الكاميرا" disabled={busy} onPress={() => retake(i)} style={s.round}><Icon name="back" /></Pressable>
         <View style={{ flex: 1 }}>
           <Text style={s.title} numberOfLines={1}>{sess.target.title}</Text>
           <Text style={s.sub}>{all ? "كل اللقطات جاهزة" : `${done} من ${shots.length} لقطات جاهزة`}</Text>
@@ -79,7 +79,7 @@ export default function Shots() {
           <Pressable key={k} onPress={() => setCur(k)} accessibilityRole="button" accessibilityState={{ selected: k === i }}
             style={[s.tile, x.uri ? s.tileDone : null, k === i ? s.tileCur : null]}>
             <Text style={s.tileName}>لقطة {k + 1} · {x.name}</Text>
-            <Text style={[s.tileState, x.uri ? { color: "#5FD1A4" } : null]}>{x.uri ? "✓ جاهزة" : "لسه"}</Text>
+            <Text style={[s.tileState, x.uri ? { color: "#5FD1A4" } : null]}>{x.uri ? "✓ جاهزة" : "لم تُصوّر"}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -92,9 +92,9 @@ export default function Shots() {
 
       <View style={s.acts}>
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => retake(i)} style={({ pressed }) => [s.soft, pressed && { transform: [{ scale: 1.05 }] }]}>
-          <Icon name="flip" size={16} /><Text style={s.softText}>{shot.uri ? "أعد اللقطة دي بس" : "صوّر اللقطة دي"}</Text>
+          <Icon name="flip" size={16} /><Text style={s.softText}>{shot.uri ? "أعد هذه اللقطة فقط" : "صوّر هذه اللقطة"}</Text>
         </Pressable>
-        {busy ? <View style={s.busy}><ActivityIndicator color={ACCENT} /><Text style={s.softText}>{free ? "بيحفظ…" : "بيرفع…"}</Text></View>
+        {busy ? <View style={s.busy}><ActivityIndicator color={ACCENT} /><Text style={s.softText}>{free ? "جارٍ الحفظ…" : "جارٍ الرفع…"}</Text></View>
           : <GlowButton title={okLabel} onPress={ok} disabled={!shot.uri && !all} style={{ flex: 1 }} />}
       </View>
     </View>

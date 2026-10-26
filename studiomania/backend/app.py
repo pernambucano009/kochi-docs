@@ -31739,9 +31739,9 @@ def pilot_job_set(jid: str, **kw) -> None:
 # 🔔 إشعارات تطبيق الموبايل (Expo push): كل موبايل داخل على الحساب بيسجّل توكنه، والأوتوبايلوت بيبعت لما يستناك
 PUSH_FILE = DATA_DIR / "push_tokens.json"
 PUSH_LOCK = threading.Lock()
-PUSH_TEXT = {"idea": ("فكرة جديدة لفيديو جاي", "اختار الفكرة اللي تعجبك"), "script": ("السكريبت جاهز", "راجعه واختار النسخة اللي تعجبك"),
-             "montage": ("المونتاج جاهز", "اتفرج عليه ووافق عشان يتصدّر"), "video": ("الفيديو جاهز قبل النشر", "اتفرج عليه ووافق عشان يتجدول"),
-             "shoot": ("📱 مستني تصويرك", "السكريبت جاهز على التيلي برومتر")}
+PUSH_TEXT = {"idea": ("فكرة جديدة لفيديو قادم", "اختر الفكرة التي تعجبك"), "script": ("السكريبت جاهز", "راجعه واختر النسخة التي تعجبك"),
+             "montage": ("المونتاج جاهز", "شاهده ووافق عليه ليُصدَّر"), "video": ("الفيديو جاهز قبل النشر", "شاهده ووافق عليه ليُجدول"),
+             "shoot": ("📱 بانتظار تصويرك", "السكريبت جاهز على التيلي برومتر")}
 
 
 def push_tokens() -> list[str]:
@@ -31770,7 +31770,7 @@ def push_send(title: str, body: str, data: dict) -> None:
 
 def pilot_push(j: dict) -> None:
     gate = "shoot" if j.get("status") == "cam" else j.get("gate") or ""
-    title, body = PUSH_TEXT.get(gate, ("الأوتوبايلوت مستنيك", "فيه خطوة مستنية موافقتك"))
+    title, body = PUSH_TEXT.get(gate, ("الأوتوبايلوت بانتظارك", "هناك خطوة بانتظار موافقتك"))
     name = j.get("title") or ""
     if not name and j.get("fid"):
         try:
@@ -31846,7 +31846,7 @@ def handoff_new(body: HandoffIn):
          "title": body.title.strip()[:120] or ("صوّر الفيديو بالنص" if body.kind == "shoot" else "سجّل بصوتك"),
          "prompt": body.prompt.strip()[:600], "status": "waiting", "created_at": now()}
     handoff_update(lambda hs: hs.append(h))
-    push_send("📱 كمّل على موبايلك", h["title"], {"kind": "handoff", "hid": h["id"]})
+    push_send("📱 أكمل على جوالك", h["title"], {"kind": "handoff", "hid": h["id"]})
     return handoff_dict(h)
 
 

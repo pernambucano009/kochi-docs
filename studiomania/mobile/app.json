@@ -40,15 +40,15 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SimsimKit يستخدم الكاميرا لتصوير لقطات مشاريعك.",
-          "microphonePermission": "SimsimKit يستخدم الميكروفون لتسجيل صوتك مع الفيديو.",
+          "cameraPermission": "يستخدم SimsimKit الكاميرا لتصوير لقطات مشاريعك.",
+          "microphonePermission": "يستخدم SimsimKit الميكروفون لتسجيل صوتك مع الفيديو.",
           "recordAudioAndroid": true
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "SimsimKit يستخدم الميكروفون لتسجيل أفكارك ووصف قوالبك بصوتك."
+          "microphonePermission": "يستخدم SimsimKit الميكروفون لتسجيل أفكارك ووصف قوالبك بصوتك."
         }
       ],
       "expo-notifications",
@@ -59,15 +59,15 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "SimsimKit يفتح الاستوديو عشان ترفع فيديو صوّرته قبل كده لمشروعك."
+          "photosPermission": "يفتح SimsimKit معرض الصور لترفع إلى مشروعك فيديو صوّرته من قبل."
         }
       ],
       [
         "expo-media-library",
         {
-          "savePhotosPermission": "SimsimKit يحفظ الصور والفيديوهات اللي بتصوّرها في الاستوديو بتاعك.",
+          "savePhotosPermission": "يحفظ SimsimKit الصور والفيديوهات التي تصوّرها في معرض الصور.",
           "isAccessMediaLocationEnabled": false,
-          "photosPermission": "SimsimKit يفتح الاستوديو عشان تختار فيديو أو صورة لمشروعك."
+          "photosPermission": "يفتح SimsimKit معرض الصور لتختار فيديو أو صورة لمشروعك."
         }
       ],
       "expo-web-browser",

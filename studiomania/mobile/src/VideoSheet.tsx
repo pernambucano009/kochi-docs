@@ -1,4 +1,4 @@
-// مشغّل فيديو بيطلع من تحت (للفيديوهات النهائية والمشاريع)، ومعاه «احفظ في الاستوديو»
+// مشغّل فيديو بيطلع من تحت (للفيديوهات النهائية والمشاريع)، ومعاه «احفظ في معرض الصور»
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -29,13 +29,13 @@ export function VideoSheet({ video, onClose }: { video: SheetVideo | null; onClo
     setSaving(true);
     try {
       const p = await MediaLibrary.requestPermissionsAsync(true);
-      if (!p.granted) throw new Error("محتاجين إذن الاستوديو عشان نحفظ الفيديو");
+      if (!p.granted) throw new Error("نحتاج إذن الوصول إلى الصور لحفظ الفيديو");
       const dest = new File(Paths.cache, `simsimkit_${video.id}.mp4`);
       const f = await File.downloadFileAsync(mediaUrl(video.download_url || video.url), dest, { headers, idempotent: true });
       await MediaLibrary.saveToLibraryAsync(f.uri);
-      Alert.alert("اتحفظ ✓", "الفيديو في الاستوديو بتاعك، تقدر تنشره من أي تطبيق.");
+      Alert.alert("حُفظ ✓", "الفيديو في معرض الصور، ويمكنك نشره من أي تطبيق.");
     } catch (e) {
-      Alert.alert("ما اتحفظش", (e as Error).message);
+      Alert.alert("لم يُحفظ", (e as Error).message);
     }
     setSaving(false);
   }
@@ -44,13 +44,13 @@ export function VideoSheet({ video, onClose }: { video: SheetVideo | null; onClo
     <Modal visible={!!video} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <View style={[s.root, { paddingTop: ins.top + 8, paddingBottom: ins.bottom + 16 }]}>
         <View style={s.top}>
-          <Pressable accessibilityRole="button" accessibilityLabel="اقفل" onPress={onClose} style={s.round}><Icon name="close" /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="إغلاق" onPress={onClose} style={s.round}><Icon name="close" /></Pressable>
           <T size={14} weight="medium" style={{ color: "#F1F1F3", flex: 1 }}>{video?.name || ""}</T>
         </View>
         <View style={{ flex: 1 }}>
           {video && headers ? <Player uri={mediaUrl(video.url)} headers={headers} /> : <ActivityIndicator color={ACCENT} style={{ marginTop: 80 }} />}
         </View>
-        <GlowButton title={saving ? "بيحفظ…" : "احفظ في الاستوديو"} disabled={saving || !headers} onPress={save} style={{ marginHorizontal: 16 }} />
+        <GlowButton title={saving ? "جارٍ الحفظ…" : "احفظ في معرض الصور"} disabled={saving || !headers} onPress={save} style={{ marginHorizontal: 16 }} />
       </View>
     </Modal>
   );

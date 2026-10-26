@@ -1,4 +1,4 @@
-// 📱 «كمّل على موبايلك»: طلب جاي من الويب (من إشعار أو من QR). التصوير بيفتح التيلي برومبتر بالسكريبت،
+// 📱 «أكمل على جوالك»: طلب جاي من الويب (من إشعار أو من QR). التصوير بيفتح التيلي برومبتر بالسكريبت،
 // والتسجيل الصوتي بيتعمل هنا وبيرجع لنفس الخطوة على الويب
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
@@ -22,12 +22,12 @@ async function openShoot(h: Handoff) {
   if (h.jid) {
     const p = await api<{ jobs: { id: string; title?: string; script?: string[] }[] }>("/api/pilot");
     const j = p.jobs.find((x) => x.id === h.jid);
-    if (!j?.script?.length) throw new Error("السكريبت لسه مش جاهز للفيديو ده");
+    if (!j?.script?.length) throw new Error("سكريبت هذا الفيديو غير جاهز بعد");
     shoot.start({ kind: "pilot", id: j.id, title: j.title || h.title }, j.script);
   } else {
     const d = await api<{ scenario?: { title?: string; beats?: { say?: string; text?: string }[] }; idea?: { title?: string } }>(`/api/flows/${h.fid}`);
     const lines = (d.scenario?.beats || []).map((b) => b.say || b.text || "").filter(Boolean);
-    if (!lines.length) throw new Error("المشروع ده لسه ما فيهوش سكريبت");
+    if (!lines.length) throw new Error("لا يوجد سكريبت لهذا المشروع بعد");
     shoot.start({ kind: "flow", id: String(h.fid), title: d.scenario?.title || d.idea?.title || h.title }, lines);
   }
   router.replace("/teleprompter");
@@ -52,7 +52,7 @@ export default function HandoffScreen() {
     api<Handoff>(`/api/handoff/${id}`).then(async (x) => {
       if (!live) return;
       setH(x);
-      if (x.status !== "waiting") { setStep("gone"); setMsg("الطلب ده خلص قبل كده."); return; }
+      if (x.status !== "waiting") { setStep("gone"); setMsg("اكتمل هذا الطلب من قبل."); return; }
       if (x.kind === "shoot") {
         try { await openShoot(x); } catch (e) { setStep("gone"); setMsg((e as Error).message); }
         return;
@@ -85,7 +85,7 @@ export default function HandoffScreen() {
       return;
     }
     const p = await requestRecordingPermissionsAsync();
-    if (!p.granted) return Alert.alert("محتاجين المايك", "عشان تسجّل بصوتك.");
+    if (!p.granted) return Alert.alert("نحتاج إلى الميكروفون", "لتسجّل بصوتك.");
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await rec.prepareToRecordAsync();
     setLevels(Array(BARS).fill(0));
@@ -103,37 +103,37 @@ export default function HandoffScreen() {
       setStep("sent");
     } catch (e) {
       setStep("review");
-      Alert.alert("ما اترفعش", (e as Error).message);
+      Alert.alert("لم يُرفع", (e as Error).message);
     }
   }
 
-  const status = { idle: ["00:00", "اضغط وابدأ الكلام", "rgba(241,241,243,.6)"], rec: [mmss(rs.durationMillis), "بيسجّل…", ACCENT],
-    review: [mmss(dur), "اسمعه قبل ما ترفعه", "rgba(241,241,243,.6)"], send: [mmss(dur), "بيرفع…", "rgba(241,241,243,.6)"],
-    sent: [mmss(dur), "اترفع", "#5FD1A4"] } as Record<string, [string, string, string]>;
+  const status = { idle: ["00:00", "اضغط وابدأ الحديث", "rgba(241,241,243,.6)"], rec: [mmss(rs.durationMillis), "جارٍ التسجيل…", ACCENT],
+    review: [mmss(dur), "استمع إليه قبل رفعه", "rgba(241,241,243,.6)"], send: [mmss(dur), "جارٍ الرفع…", "rgba(241,241,243,.6)"],
+    sent: [mmss(dur), "رُفع", "#5FD1A4"] } as Record<string, [string, string, string]>;
   const st = status[step];
 
   if (step === "load" || (h?.kind === "shoot" && step !== "gone")) {
-    return <View style={[s.root, s.center]}><ActivityIndicator color={ACCENT} /><Text style={s.sub}>بيفتح الطلب…</Text></View>;
+    return <View style={[s.root, s.center]}><ActivityIndicator color={ACCENT} /><Text style={s.sub}>جارٍ فتح الطلب…</Text></View>;
   }
 
   return (
     <View style={[s.root, { paddingTop: ins.top + 12, paddingBottom: ins.bottom + 24 }]}>
       <View style={s.top}>
         <IconButton label="رجوع" dim onPress={() => router.replace("/camera")}><Icon name="back" /></IconButton>
-        <Text style={s.title}>{h?.kind === "voice" ? "التسجيل الصوتي" : "كمّل على موبايلك"}</Text>
+        <Text style={s.title}>{h?.kind === "voice" ? "التسجيل الصوتي" : "أكمل على جوالك"}</Text>
       </View>
 
       {step === "gone" ? (
         <View style={[s.center, { flex: 1, gap: 16 }]}>
           <Text style={s.prompt}>{msg}</Text>
-          <GlowButton title="ارجع للكاميرا" onPress={() => router.replace("/camera")} style={{ alignSelf: "stretch" }} />
+          <GlowButton title="العودة إلى الكاميرا" onPress={() => router.replace("/camera")} style={{ alignSelf: "stretch" }} />
         </View>
       ) : (
         <>
           <View style={s.chip}>
             <View style={s.dot} />
             <View style={{ flex: 1 }}>
-              <Text style={s.chipSmall}>طلب من الويب · بيترفع على</Text>
+              <Text style={s.chipSmall}>طلب من الموقع · يُرفع إلى</Text>
               <Text style={s.chipTitle} numberOfLines={2}>{h?.title}</Text>
             </View>
           </View>
@@ -152,17 +152,17 @@ export default function HandoffScreen() {
           ) : null}
           {step === "review" ? (
             <View style={s.acts}>
-              <SoftButton title="اسمعه" icon={<Icon name="play" size={14} color="#F1F1F3" />} color="#F1F1F3" style={s.soft}
+              <SoftButton title="استمع" icon={<Icon name="play" size={14} color="#F1F1F3" />} color="#F1F1F3" style={s.soft}
                 onPress={() => { player.seekTo(0); player.play(); }} />
-              <SoftButton title="سجّل تاني" color="#F1F1F3" style={s.soft} onPress={() => { setUri(null); setStep("idle"); }} />
-              <GlowButton title="ارفعه على الويب" onPress={send} style={{ flex: 1 }} />
+              <SoftButton title="سجّل مرة أخرى" color="#F1F1F3" style={s.soft} onPress={() => { setUri(null); setStep("idle"); }} />
+              <GlowButton title="ارفعه إلى الموقع" onPress={send} style={{ flex: 1 }} />
             </View>
           ) : null}
           {step === "send" ? <ActivityIndicator color={ACCENT} style={{ marginBottom: 20 }} /> : null}
           {step === "sent" ? (
             <View style={{ gap: 12 }}>
-              <View style={s.ok}><Icon name="check" size={16} color="#5FD1A4" /><Text style={s.okText}>اترفع ✓ كمّل شغلك على الويب، التسجيل ظهر هناك</Text></View>
-              <SoftButton title="ارجع للكاميرا" color="#F1F1F3" style={s.soft} onPress={() => router.replace("/camera")} />
+              <View style={s.ok}><Icon name="check" size={16} color="#5FD1A4" /><Text style={s.okText}>رُفع ✓ أكمل عملك على الموقع، فالتسجيل ظهر هناك</Text></View>
+              <SoftButton title="العودة إلى الكاميرا" color="#F1F1F3" style={s.soft} onPress={() => router.replace("/camera")} />
             </View>
           ) : null}
         </>

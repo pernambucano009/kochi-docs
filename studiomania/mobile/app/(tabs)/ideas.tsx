@@ -1,4 +1,4 @@
-// الأفكار: أكبر زرار بالبرتقالي «سجّل فكرة بصوتك»، والكلام بيتكتب لوحده، وبعدين تختار «نسّقها» أو «خليها زي ما هي».
+// الأفكار: أكبر زرار بالبرتقالي «سجّل فكرة بصوتك»، والكلام بيتكتب لوحده، وبعدين تختار «نسّقها» أو «اتركها كما هي».
 // نفس مجلد الأفكار اللي على الويب، فأي فكرة هنا بتظهر هناك والعكس.
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -19,11 +19,11 @@ const mmss = (ms: number) => { const s = Math.floor(ms / 1000); return `${String
 function when(at: string) {
   const d = (Date.now() - new Date(at).getTime()) / 86400000;
   if (!(d >= 0)) return "";
-  if (d < 1 / 24) return "دلوقتي";
-  if (d < 1) return "النهارده";
-  if (d < 2) return "امبارح";
-  if (d < 7) return `من ${Math.floor(d)} أيام`;
-  if (d < 14) return "الأسبوع اللي فات";
+  if (d < 1 / 24) return "الآن";
+  if (d < 1) return "اليوم";
+  if (d < 2) return "أمس";
+  if (d < 7) return `منذ ${Math.floor(d)} أيام`;
+  if (d < 14) return "الأسبوع الماضي";
   return new Date(at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
 }
 
@@ -88,7 +88,7 @@ export default function Ideas() {
 
   async function startRec() {
     const p = await requestRecordingPermissionsAsync();
-    if (!p.granted) return Alert.alert("محتاجين المايك", "عشان تسجّل فكرتك بصوتك.");
+    if (!p.granted) return Alert.alert("نحتاج إلى الميكروفون", "لتسجّل فكرتك بصوتك.");
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await rec.prepareToRecordAsync();
     setLevels(Array(BARS).fill(0));
@@ -115,7 +115,7 @@ export default function Ideas() {
       if (what.text) { setDraft(list[0]?.text || what.text); setStep("review"); }
     } catch (e) {
       setStep("idle");
-      Alert.alert("ما اتحفظتش", (e as Error).message);
+      Alert.alert("لم تُحفظ", (e as Error).message);
     }
   }
 
@@ -128,12 +128,12 @@ export default function Ideas() {
       if (x) setDraft(x.text);
       if (after) setStep(after);
     } catch (e) {
-      Alert.alert("ما كملش", (e as Error).message);
+      Alert.alert("لم يكتمل", (e as Error).message);
     }
     setBusy("");
   }
 
-  // «خليها زي ما هي» / «احفظها»: لو عدّلت في النص بيتحفظ تعديلك
+  // «اتركها كما هي» / «احفظها»: لو عدّلت في النص بيتحفظ تعديلك
   const keep = () => act("save", () => (idea && draft.trim() !== idea.text
     ? api<Idea[]>(`/api/my-ideas/${cur}`, { ...json({ text: draft.trim() }), method: "PATCH" })
     : api<Idea[]>("/api/my-ideas")), "idle");
@@ -166,15 +166,15 @@ export default function Ideas() {
             <View style={s.wave}>
               {levels.map((v, k) => <View key={k} style={[s.bar, { height: 8 + v * 34 }]} />)}
             </View>
-            <Text style={s.recText}><Text style={{ fontFamily: F.latin }}>{mmss(rs.durationMillis)}</Text> · اضغط لما تخلص</Text>
+            <Text style={s.recText}><Text style={{ fontFamily: F.latin }}>{mmss(rs.durationMillis)}</Text> · اضغط عند الانتهاء</Text>
           </View>
         } />
       ) : null}
 
       {step === "write" ? (
         <Card style={{ gap: 10 }}>
-          <T muted size={12.5}>اكتب فكرتك زي ما هي في دماغك</T>
-          <TextInput value={draft} onChangeText={setDraft} multiline autoFocus placeholder="مثلًا: فيديو عن ٣ غلطات الناس بتعملها…" placeholderTextColor={t.muted}
+          <T muted size={12.5}>اكتب فكرتك كما تخطر في بالك</T>
+          <TextInput value={draft} onChangeText={setDraft} multiline autoFocus placeholder="مثلًا: فيديو عن ٣ أخطاء يقع فيها الناس…" placeholderTextColor={t.muted}
             style={[s.input, { backgroundColor: t.field, color: t.ink }]} textAlignVertical="top" />
           <View style={s.row}>
             <GlowButton title="احفظها" disabled={!draft.trim()} onPress={() => send({ text: draft.trim() })} style={{ flex: 1 }} />
@@ -186,13 +186,13 @@ export default function Ideas() {
       {step === "wait" ? (
         <Card style={s.waitCard}>
           <ActivityIndicator color={ACCENT} />
-          <T size={13.5}>بيكتب كلامك…</T>
+          <T size={13.5}>جارٍ تحويل كلامك إلى نص…</T>
         </Card>
       ) : null}
 
       {step === "review" && idea ? (
         <Card style={{ gap: 10 }}>
-          <T muted size={12.5}>{idea.polished ? "بعد التنسيق" : idea.audio_url ? "اتكتب من صوتك (تقدر تعدّل فيه)" : "فكرتك (تقدر تعدّل فيها)"}</T>
+          <T muted size={12.5}>{idea.polished ? "بعد التنسيق" : idea.audio_url ? "كُتب من صوتك (يمكنك تعديله)" : "فكرتك (يمكنك تعديلها)"}</T>
           {idea.error ? <T size={12.5} style={{ color: "#D44E2C" }}>{idea.error}</T> : null}
           {idea.polished ? (
             <View style={[s.polished, { backgroundColor: t.softAccent }]}>
@@ -207,12 +207,12 @@ export default function Ideas() {
             {idea.polished ? (
               <>
                 <GlowButton title="احفظها" onPress={() => setStep("idle")} style={{ flex: 1 }} />
-                <SoftButton title={busy === "revert" ? "…" : "رجّعها زي ما قلتها"} onPress={revert} />
+                <SoftButton title={busy === "revert" ? "…" : "أعِدها كما قلتها"} onPress={revert} />
               </>
             ) : (
               <>
-                <GlowButton title={busy === "polish" ? "بينسّق…" : "نسّقها"} icon={busy ? null : <Icon name="sparkle" size={16} />} disabled={!!busy || !draft.trim()} onPress={polish} style={{ flex: 1 }} />
-                <SoftButton title={busy === "save" ? "…" : "خليها زي ما هي"} onPress={keep} />
+                <GlowButton title={busy === "polish" ? "جارٍ التنسيق…" : "نسّقها"} icon={busy ? null : <Icon name="sparkle" size={16} />} disabled={!!busy || !draft.trim()} onPress={polish} style={{ flex: 1 }} />
+                <SoftButton title={busy === "save" ? "…" : "اتركها كما هي"} onPress={keep} />
               </>
             )}
           </View>
@@ -229,13 +229,13 @@ export default function Ideas() {
           <Pressable key={x.id} onPress={() => open(x)} style={({ pressed }) => [s.item, { backgroundColor: t.card, shadowColor: t.shadow }, pressed && { transform: [{ scale: 1.02 }] }]}>
             <View style={[s.itemIcon, { backgroundColor: t.softAccent }]}><Icon name={ic} size={17} color={ACCENT} /></View>
             <View style={{ flex: 1, gap: 2 }}>
-              <T size={14} weight="medium">{x.status === "transcribing" ? "بيكتب الفويس نوت…" : x.title || "فكرة"}</T>
-              <T muted size={11.5}>{[when(x.at), kind, x.polished ? "متنسّقة" : ""].filter(Boolean).join(" · ")}</T>
+              <T size={14} weight="medium">{x.status === "transcribing" ? "جارٍ تحويل الملاحظة الصوتية إلى نص…" : x.title || "فكرة"}</T>
+              <T muted size={11.5}>{[when(x.at), kind, x.polished ? "منسّقة" : ""].filter(Boolean).join(" · ")}</T>
             </View>
           </Pressable>
         );
       })}
-      {!ideas.length && !loading ? <T muted size={13} style={{ textAlign: "center", marginTop: 10 }}>لسه مفيش أفكار. سجّل أول فكرة بصوتك.</T> : null}
+      {!ideas.length && !loading ? <T muted size={13} style={{ textAlign: "center", marginTop: 10 }}>لا توجد أفكار بعد. سجّل أول فكرة بصوتك.</T> : null}
     </ScrollView>
   );
 }

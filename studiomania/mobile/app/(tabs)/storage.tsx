@@ -77,7 +77,7 @@ export default function StorageTab() {
           <T weight="medium" size={15}>فيديوهاتك النهائية</T>
           <T muted size={12}>{exps.length} فيديو</T>
         </View>
-        {!exps.length && st ? <T muted size={12.5}>لسه مفيش فيديوهات متصدّرة.</T> : null}
+        {!exps.length && st ? <T muted size={12.5}>لا توجد فيديوهات مُصدّرة بعد.</T> : null}
         {exps.slice(0, 30).map((e) => (
           <Pressable key={e.id} onPress={() => setVideo(e)} style={({ pressed }) => [s.item, { backgroundColor: t.card, shadowColor: t.shadow }, pressed && { transform: [{ scale: 1.02 }] }]}>
             <View style={[s.itemIcon, { backgroundColor: t.softAccent }]}><Icon name="play" size={16} color={ACCENT} /></View>
@@ -88,13 +88,13 @@ export default function StorageTab() {
           </Pressable>
         ))}
 
-        <T weight="medium" size={15} style={{ marginTop: 8 }}>زوّد مساحتك</T>
+        <T weight="medium" size={15} style={{ marginTop: 8 }}>زِد مساحتك</T>
         <View style={s.addons}>
           {ADDONS.map((n) => (
             <View key={n} style={[s.addon, { backgroundColor: t.card, shadowColor: t.shadow }]}>
               <T size={18} weight="medium">+{n === 1000 ? "1 تيرا" : n}</T>
               <T muted size={11.5}>{n === 1000 ? "" : "جيجا"}</T>
-              <T muted size={11}>قريب</T>
+              <T muted size={11}>قريبًا</T>
             </View>
           ))}
         </View>

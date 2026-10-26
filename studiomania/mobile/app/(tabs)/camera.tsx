@@ -56,9 +56,9 @@ export default function Camera() {
   if (!perm.granted || !mic.granted) {
     return (
       <View style={[s.root, s.ask]}>
-        <T size={17} weight="medium" style={s.center}>سمسمكيت محتاج الكاميرا والمايك</T>
-        <T muted size={13} style={s.center}>عشان تصوّر نفسك بالسكريبت والفيديو يترفع لمشروعك على طول.</T>
-        <GlowButton title="اسمح بالكاميرا والمايك" onPress={async () => { await askPerm(); await askMic(); }} style={{ marginTop: 14, alignSelf: "stretch" }} />
+        <T size={17} weight="medium" style={s.center}>يحتاج SimsimKit إلى الكاميرا والميكروفون</T>
+        <T muted size={13} style={s.center}>لتصوّر نفسك بالسكريبت ويُرفع الفيديو إلى مشروعك مباشرة.</T>
+        <GlowButton title="اسمح بالكاميرا والميكروفون" onPress={async () => { await askPerm(); await askMic(); }} style={{ marginTop: 14, alignSelf: "stretch" }} />
       </View>
     );
   }
@@ -76,9 +76,9 @@ export default function Camera() {
 
   async function save(uri: string, what: string) {
     const p = await MediaLibrary.requestPermissionsAsync(true);
-    if (!p.granted) return Alert.alert("محتاجين إذن الاستوديو", `عشان نحفظ ${what} على موبايلك.`);
+    if (!p.granted) return Alert.alert("نحتاج إذن الوصول إلى الصور", `لنحفظ ${what} على جوالك.`);
     await MediaLibrary.saveToLibraryAsync(uri);
-    Alert.alert("اتحفظ ✓", `${what} اتحفظ في الاستوديو بتاعك.`);
+    Alert.alert("حُفظ ✓", `حُفظ ${what} في معرض الصور.`);
   }
 
   async function shutter() {
@@ -98,7 +98,7 @@ export default function Camera() {
       const v = await cam.current.recordAsync({ maxDuration: 180 });
       if (v?.uri) await save(v.uri, "الفيديو");
     } catch (e) {
-      Alert.alert("التسجيل وقف", (e as Error).message);
+      Alert.alert("توقف التسجيل", (e as Error).message);
     } finally {
       if (tick.current) clearInterval(tick.current);
       setRec(false);
@@ -125,9 +125,9 @@ export default function Camera() {
     try {
       await uploadShots({ target: t, shots: [{ name: "", line: "", uri: r.assets[0].uri, secs: 0, takes: 1 }] });
       setTodos((x) => x.filter((y) => y.id !== t.id));
-      Alert.alert("وصل ✓", "الفيديو اترفع للمشروع، والمراجعة والمونتاج بيكمّلوا لوحدهم.");
+      Alert.alert("وصل ✓", "رُفع الفيديو إلى المشروع، وتكتمل المراجعة والمونتاج تلقائيًا.");
     } catch (e) {
-      Alert.alert("الرفع ما كملش", (e as Error).message);
+      Alert.alert("لم يكتمل الرفع", (e as Error).message);
     }
     setBusy(false);
   }
@@ -150,7 +150,7 @@ export default function Camera() {
     ]);
   }
 
-  const chip = todos.length ? `${todos[0].title} · ${todos.length === 1 ? "مستني تصويرك" : `${todos.length} فيديو مستنيين تصويرك`}` : "";
+  const chip = todos.length ? `${todos[0].title} · ${todos.length === 1 ? "بانتظار تصويرك" : `${todos.length} فيديوهات بانتظار تصويرك`}` : "";
 
   return (
     <View style={s.root}>
@@ -173,7 +173,7 @@ export default function Camera() {
       </View>
 
       <View style={[s.tools, { top: ins.top + 72 }]}>
-        <Round icon="flip" label="قلب الكاميرا" onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))} />
+        <Round icon="flip" label="تبديل الكاميرا" onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))} />
         <Round icon="flash" label="الفلاش" on={torch} onPress={() => setTorch((x) => !x)} />
         <Round icon="lines" label="التيلي برومتر" on onPress={() => router.push("/teleprompter")} />
         <Pressable accessibilityRole="button" accessibilityLabel="المؤقت" onPress={() => setTimer((t) => TIMERS[(TIMERS.indexOf(t) + 1) % TIMERS.length])} style={[s.round, timer > 0 && s.roundOn]}>
@@ -195,8 +195,8 @@ export default function Camera() {
       ) : null}
 
       <View style={[s.bottom, { bottom: ins.bottom + 92 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="ارفع من الاستوديو" disabled={busy}
-          onPress={() => (todos.length ? setSheet("upload") : Alert.alert("مفيش مشروع مستني فيديو", "ابدأ مشروع «تصوير بالجوال» من الموقع أو شغّل الأوتوبايلوت، وهيظهر هنا."))}
+        <Pressable accessibilityRole="button" accessibilityLabel="ارفع من معرض الصور" disabled={busy}
+          onPress={() => (todos.length ? setSheet("upload") : Alert.alert("لا يوجد مشروع بانتظار فيديو", "ابدأ مشروع «تصوير بالجوال» من الموقع أو فعّل الأوتوبايلوت، وسيظهر هنا."))}
           style={s.gallery}><Icon name="gallery" size={20} /></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={rec ? "إيقاف التسجيل" : "ابدأ التسجيل"} onPress={shutter} style={({ pressed }) => [s.shutterRing, pressed && { transform: [{ scale: 1.06 }] }]}>
           <LinearGradient colors={["#F48A62", "#E5613E", "#D44E2C"]} locations={[0, 0.55, 1]} style={s.shutter}>
@@ -209,7 +209,7 @@ export default function Camera() {
       <Modal visible={!!sheet} transparent animationType="slide" onRequestClose={() => setSheet(null)}>
         <Pressable style={s.scrim} onPress={() => setSheet(null)} />
         <View style={[s.sheet, { paddingBottom: ins.bottom + 16 }]}>
-          <T size={16} weight="medium" style={{ color: "#F1F1F3" }}>{sheet === "upload" ? "ترفع الفيديو لأنهي مشروع؟" : "مستنيين تصويرك"}</T>
+          <T size={16} weight="medium" style={{ color: "#F1F1F3" }}>{sheet === "upload" ? "إلى أي مشروع تريد رفع الفيديو؟" : "بانتظار تصويرك"}</T>
           <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ gap: 10, paddingTop: 12 }}>
             {todos.map((t) => (
               <Pressable key={t.kind + t.id} onPress={() => (sheet === "upload" ? uploadFrom(t) : startShoot(t))} style={({ pressed }) => [s.todo, pressed && { transform: [{ scale: 1.02 }] }]}>
