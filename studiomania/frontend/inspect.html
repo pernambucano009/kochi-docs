@@ -34,7 +34,7 @@
   .kpi { background: var(--bg); border-radius: 10px; padding: 10px 12px; } .kpi b { display: block; font-size: 22px; }
   .outs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
   .out { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .out h4 { margin: 0; font-size: 14px; } .out pre { margin: 0; white-space: pre-wrap; font: 13px/1.6 inherit; max-height: 260px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 8px; }
+  .out h4 { margin: 0; font-size: 14px; } .out pre { margin: 0; white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.7; unicode-bidi: plaintext; max-height: 260px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 8px; }
   .out .vote { display: flex; gap: 6px; align-items: center; } .out .vote button.on { background: var(--ink); color: var(--bg); }
   .out textarea { width: 100%; min-height: 48px; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--card); color: var(--ink); }
   .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
@@ -201,7 +201,7 @@ function renderOuts() {
   $("outCount").textContent = `${list.length} نتيجة · قيّمت ${done} من ${outs.length}`;
   $("outs").innerHTML = list.map((o) => { const r = rt[o.id] || {}; return `<div class="out" data-oid="${esc(o.id)}"><h4>${esc(o.kind)} · ${esc(o.brand)}</h4><div class="mute">${esc(o.title)}</div>
     ${o.media ? (/\.(mp4|webm)$/i.test(o.media) ? `<video controls src="${esc(o.media)}"></video>` : `<img src="${esc(o.media)}" style="max-width:100%;border-radius:8px">`) : ""}
-    ${o.text ? `<pre>${esc(o.text)}</pre>` : ""}
+    ${o.text ? `<pre dir="auto">${esc(o.text)}</pre>` : ""}
     <div class="vote"><button class="btn${r.vote === 1 ? " on" : ""}" data-v="1">👍</button><button class="btn${r.vote === -1 ? " on" : ""}" data-v="-1">👎</button><span class="mute" data-saved></span></div>
     <textarea placeholder="ملاحظتك على هذه النتيجة (ما الذي يحتاج تعديلًا؟)">${esc(r.note || "")}</textarea></div>`; }).join("") || `<p class="mute">لا توجد نتائج بعد</p>`;
 }
