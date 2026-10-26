@@ -3045,14 +3045,14 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 
 /* ➡️ أي تسلسل خطوات (الفكرة ← النص ← الصوت…، مسار الصفحة، خطوات الأوتوبايلوت والكاروسيل والإعلانات) بيمشي من الشمال لليمين
    في العربي والإنجليزي زي بعض، والكلام جوه كل خطوة بيفضل باتجاه لغته */
-.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs { direction: ltr; }
-:is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs) > * { unicode-bidi: plaintext; }
+.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps { direction: ltr; }
+:is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps) > * { unicode-bidi: plaintext; }
 :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps) :is(button, span, b, small) { unicode-bidi: plaintext; }
 
 /* 🔒 الترتيب نفسه في العربي والإنجليزي: أقسام النشر ومربعات الصفحات والتبويبات والباقات بتفضل في نفس أماكنها
    (زي الرئيسية)، والكلام جوه كل واحد بس هو اللي بيتقلب */
-[dir="ltr"] :is(.bl-folds, .nh-pgrid, .nh-astabs, .nh-ptabs, .pv-row, .pv-cards, .gl-grid, .gal-grid) { direction: rtl; }
-[dir="ltr"] :is(.bl-folds, .nh-pgrid, .nh-astabs, .nh-ptabs, .pv-row, .pv-cards, .gl-grid, .gal-grid) > * { direction: ltr; }
+[dir="ltr"] :is(.bl-folds, .nh-pgrid, .nh-astabs, .nh-ptabs, .pv-row, .pv-cards, .gl-grid, .gal-grid, .pub-tabs, .pub-grid, .db-bar, .db-strip, .db-main, .db-go-row, .db-opts) { direction: rtl; }
+[dir="ltr"] :is(.bl-folds, .nh-pgrid, .nh-astabs, .nh-ptabs, .pv-row, .pv-cards, .gl-grid, .gal-grid, .pub-tabs, .pub-grid, .db-bar, .db-strip, .db-main, .db-go-row, .db-opts) > * { direction: ltr; }
 
 /* تباين 4.5:1 (تقرير 25 أكتوبر): في الغامق البرتقالي فاتح، فالنص فوقه غامق بدل الأبيض. الفاتح بياخد برتقالي أغمق من المتغيرات. */
 :root[data-nh-theme="dark"] { --btn-g1: #F48A62; --btn-g2: #E5613E; --btn-g3: #D44E2C; }
@@ -3071,3 +3071,7 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
   #nhBar .nh-tools { flex-wrap: nowrap; gap: 4px; }
   #nhBar .nh-tools .nh-chip { height: 36px; min-width: 36px; }
 }
+/* شريط تبويبات النشر يمين في اللغتين، وعناوين الأعمدة وزرارها في نفس أماكنها */
+.pub-tabs { margin-left: auto; margin-right: 0; }
+[dir="ltr"] :is(.view[data-view="7"] .panel-head, .db-v2 .db-dh) { direction: rtl; }
+[dir="ltr"] :is(.view[data-view="7"] .panel-head, .db-v2 .db-dh) > * { direction: ltr; }

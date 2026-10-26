@@ -1,6 +1,12 @@
 // StudioMania — الترجمة الإنجليزي: كل جملة عربي في الواجهة وقصادها الإنجليزي.
 // {0} و {1}... مكان القيم اللي بتتغيّر (أرقام وأسماء). الجمل الجديدة: python tools/extract_i18n.py --missing
 window.I18N_EN = {
+  "تلقائي (لا توجد موسيقى، فلا حاجة للفصل)": "Auto (no music, so nothing to separate)",
+  "تلقائي (توجد موسيقى: تُفصل وتبقى)": "Auto (there's music: it's separated and kept)",
+  "🎚️ لا توجد موسيقى في الفيديو: يركّب الصوت وحده": "🎚️ No music in the video: mixing the voice alone",
+  "🎵 يفصل الموسيقى والمؤثرات عن الكلام": "🎵 Separating music and effects from the speech",
+  "🎚️ يجهّز الخلفية": "🎚️ Preparing the background",
+  "🎚️ يركّب الصوت في مكانه": "🎚️ Placing the voice in time",
   "يستمع إلى الكلام": "Listening to the speech",
   "🎧 يستمع إلى الكلام": "🎧 Listening to the speech",
   "يكتب النص باللهجة": "Writing the text in the dialect",

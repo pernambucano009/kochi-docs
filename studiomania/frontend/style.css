@@ -3205,9 +3205,9 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .view[data-view="7"] .pub-k { display: none; }
 :root:root .stage .pub-grid { gap: 0; }
 :root:root .stage .pub-grid > section { padding: 4px 24px 8px; }
-.pub-grid > section + section { border-inline-start: 1px solid var(--line); }
-:root:root .stage .pub-where { padding-inline: 0 20px; }
-:root:root .stage .pub-form { padding-inline-end: 0; }
+.pub-grid > section + section { border-right: 1px solid var(--line); }   /* الأعمدة نفس أماكنها في اللغتين (من اليمين)، فالخط ثابت */
+:root:root .stage .pub-where { padding-right: 0; padding-left: 20px; }
+:root:root .stage .pub-form { padding-left: 0; }
 /* حقول الفورم بقت على الأرضية، فلونها أفتح منها */
 :root:root .stage .view[data-view="7"] .pub-form :is(textarea, input[type=datetime-local], input[type=text]) { background: var(--card, #fff) !important; }
 :root:root .stage .view[data-view="7"] .pub-form .loc-row .btn { background: var(--card, #fff); }
@@ -3221,9 +3221,9 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
   :root:root .stage .pub-grid > section { overflow-y: auto; min-height: 0; overscroll-behavior: contain; scrollbar-width: thin; }
   .pub-form .row:has(#postSubmit) { position: sticky; bottom: 0; background: var(--page); padding: 10px 0 2px; margin-top: auto; }
 }
-@media (max-width: 1200px) { .pub-grid > section.pub-form { border-inline-start: 0; border-top: 1px solid var(--line); padding-top: 20px; } }
+@media (max-width: 1200px) { .pub-grid > section.pub-form { border-right: 0; border-top: 1px solid var(--line); padding-top: 20px; } }
 @media (max-width: 800px) {
-  .pub-grid > section + section { border-inline-start: 0; border-top: 1px solid var(--line); }
+  .pub-grid > section + section { border-right: 0; border-top: 1px solid var(--line); }
   :root:root .stage .pub-grid > section { padding: 18px 0; }
   .pub-tabs { width: auto; }
 }

@@ -66,6 +66,10 @@ async function serve(data) {
 async function main() {
   const only = process.argv[2] ? process.argv[2].split(",") : null;
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-audit-"));
+  // 💳 حالات ماتظهرش في وضع التجربة لوحدها (رصيد خلص، طلب فشل) عشان كروت «رصيد المنصات» تتفحص هي كمان
+  fs.writeFileSync(path.join(data, "providers.json"), JSON.stringify({ p: {
+    scrape: { balance: 0, ok: false, fail: { at: Date.now() / 1000, msg: "402 payment required: credits" } },
+    eleven: { balance: 4200, ok: true }, atlas: { balance: 3.5, ok: true } }, min: {}, alerted: {} }));
   const app = await serve(data);
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -91,11 +95,17 @@ async function main() {
     const fd = new FormData(); fd.append("text", "Audit idea"); await fetch("/api/my-ideas", { method: "POST", body: fd }).catch(() => {});
   });
 
-  const miss = new Map(), seen = new Map();   // الجملة ← أول شاشة ظهرت فيها
+  const miss = new Map(), seen = new Map(), vals = new Map();   // الجملة ← أول شاشة ظهرت فيها
   const collect = async (where) => {
-    const r = await page.evaluate(() => ({ m: window.I18N?.misses?.() || [], s: window.I18N?.seen?.() || [] })).catch(() => ({ m: [], s: [] }));
+    const r = await page.evaluate(() => ({ m: window.I18N?.misses?.() || [], s: window.I18N?.seen?.() || [],
+      // ✍️ اللي جوه خانات الكتابة: أداة الترجمة مابتلمسهاش، فالكلام العربي اللي البرنامج حاطه فيها كان بيعدّي من غير ما يتشاف
+      // (زي ملاحظات الفواتير في الإعدادات). اللي العميل كتبه أو محتوى علامته بيتعلّم data-no-i18n عشان مايتعدّش
+      v: [...document.querySelectorAll("input:not([type=hidden]):not([type=file]), textarea")]
+        .filter((x) => x.offsetParent && /[\u0600-\u06FF]/.test(x.value) && !x.closest("[data-no-i18n]") && x.value === x.defaultValue)
+        .map((x) => x.value.replace(/\s+/g, " ").trim().slice(0, 200)) })).catch(() => ({ m: [], s: [], v: [] }));
     r.m.forEach((x) => miss.has(x) || miss.set(x, where));
     r.s.forEach((x) => seen.has(x) || seen.set(x, where));
+    r.v.forEach((x) => vals.has(x) || vals.set(x, where));
   };
   const open = async (url) => {
     await page.goto(BASE + url).catch(() => {});
@@ -181,15 +191,17 @@ async function main() {
   const missing = [...miss].filter(([s]) => AR.test(s) && !(LATIN.test(s) && [...miss.keys()].some((o) => o !== s && !LATIN.test(o))) && !/^[؀-ۿ]$/.test(s) && !/^[٠-٩\d\s.,:%]+$/.test(s))
     .map(([s, w]) => ({ text: s, screen: w })).filter((x) => !ALLOW.missing.includes(x.text));
   const dialect = [...seen].map(([s, w]) => ({ text: s, screen: w, word: dialectOf(s) })).filter((x) => x.word && !ALLOW.dialect.includes(x.text));
-  const report = { at: new Date().toISOString(), screens: list.length, clicks, missing, dialect, errors: [...new Set(errors)] };
+  const inputs = [...vals].map(([s, w]) => ({ text: s, screen: w })).filter((x) => !(ALLOW.inputs || []).includes(x.text));
+  const report = { at: new Date().toISOString(), screens: list.length, clicks, missing, inputs, dialect, errors: [...new Set(errors)] };
   fs.writeFileSync(path.join(__dirname, "report.json"), JSON.stringify(report, null, 1));
   console.log(`\n🔎 ${list.length} شاشة، ${clicks} ضغطة`);
   console.log(`  ${missing.length} جملة ظهرت بالإنجليزي من غير ترجمة`);
+  console.log(`  ${inputs.length} خانة كتابة فيها كلام عربي من البرنامج`);
   console.log(`  ${dialect.length} جملة عربي فيها عامية`);
   console.log(`  ${report.errors.length} خطأ في الصفحة`);
   console.log("  التفاصيل: tests/i18n/report.json");
   fs.rmSync(data, { recursive: true, force: true });
-  process.exit(missing.length || dialect.length ? 1 : 0);
+  process.exit(missing.length || inputs.length || dialect.length ? 1 : 0);
 }
 
 main().catch((e) => { console.error(e); process.exit(2); });

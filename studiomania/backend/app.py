@@ -21369,6 +21369,30 @@ def dub_fail(did: str, exc: Exception, target: str | None = None) -> None:
     dub_update(did, fn)
 
 
+def dub_detect_bg(src: Path, words: list[dict], total: float) -> bool | None:
+    """🎵 فيه موسيقى أو مؤثرات ورا الكلام؟ بنقيس الصوت في الوقفات اللي مفيهاش كلام:
+    لو مسموع (أعلى من -52dB) يبقى فيه خلفية ونفصلها، ولو هادي يبقى مفيش ونوفّر الفصل. None = مش عارفين (مفيش وقفات كفاية)."""
+    import numpy as np  # noqa: PLC0415
+    ws = sorted((w for w in words if w.get("e") is not None), key=lambda w: w["s"])
+    if not ws:
+        return None
+    gaps, prev = [], 0.0
+    for w in ws:
+        if w["s"] - prev > 0.35:
+            gaps.append((prev + 0.08, w["s"] - 0.08))
+        prev = max(prev, w["e"])
+    if total - prev > 0.35:
+        gaps.append((prev + 0.08, total - 0.05))
+    if sum(b - a for a, b in gaps) < 0.8:
+        return None
+    raw = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-i", str(src), "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                         check=True, capture_output=True, timeout=300).stdout
+    pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    seg = np.concatenate([pcm[int(a * 16000):int(b * 16000)] for a, b in gaps if b > a] or [np.zeros(1, np.float32)])
+    db = 20 * np.log10(float(np.sqrt(np.mean(seg ** 2))) + 1e-9)
+    return bool(db > -52)   # هدوء الغرفة وضوضاء الموبايل حوالي -60، وأوطى موسيقى خلفية حوالي -47
+
+
 def run_dub_transcribe(did: str) -> None:
     try:
         d = dub_load(did)
@@ -21386,7 +21410,12 @@ def run_dub_transcribe(did: str) -> None:
         if not words:
             raise RuntimeError("تعذّر ذلك أسمع نص في هذا الفيديو")
         lines = dub.lines_from_words(words, typo.sentences(words))
-        dub_update(did, lambda x: x.update(words=words, lines=lines, busy=False, step=None, error=None))
+        try:
+            has_bg = dub_detect_bg(src, words, float(d["source"]["duration"] or 0))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[dub] bg detect: {exc}", flush=True)
+            has_bg = None
+        dub_update(did, lambda x: x.update(words=words, lines=lines, has_bg=has_bg, busy=False, step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         dub_fail(did, exc)
 
@@ -21475,7 +21504,8 @@ def dub_cost(d: dict, dialect: str, voice: str, lipsync: str | None, background:
     secs = float(d["source"].get("duration") or 0)
     texts = texts if texts is not None else ([x["src"] for x in d.get("lines") or []] or ["x" * int(secs * 15)])
     usd = dub.estimate(texts, voice, secs, lipsync)
-    if background in ("auto", "separate") and voicelab.eleven_key() and not (DUB_DIR / d.get("_id", "") / "bg.wav").exists():
+    if (background == "separate" or (background == "auto" and d.get("has_bg") is not False)) and voicelab.eleven_key() \
+            and not (DUB_DIR / d.get("_id", "") / "bg.wav").exists():
         usd += secs / 60 * dub.SEP_PER_MIN
     if write:
         usd += wallet.est(chars=sum(len(x) for x in texts) * 3 + 4000)
@@ -21591,8 +21621,8 @@ def dub_background(did: str, d: dict, mode: str) -> Path | None:
     """الموسيقى والمؤثرات بدون الكلام (ElevenLabs: كلام / كل حاجة تانية)، أو الصوت الأصلي واطي، أو لا شيء."""
     folder = DUB_DIR / did
     src = folder / d["source"]["file"]
-    if mode == "auto":
-        mode = "separate" if (voicelab.eleven_key() or atlas.mock_mode()) else "none"
+    if mode == "auto":   # 🎵 مفيش موسيقى أصلًا (الوقفات هادية): مانفصلش ومانصرفش
+        mode = "none" if d.get("has_bg") is False else "separate" if (voicelab.eleven_key() or atlas.mock_mode()) else "none"
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
     if mode == "none":
         return None
@@ -21684,7 +21714,8 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
         flt.append("".join(f"[a{j}]" for j in range(len(parts))) + f"amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f},atrim=0:{total:.3f}[v]")
         subprocess.run(ff + ins + ["-filter_complex", ";".join(flt), "-map", "[v]", "-ac", "1", "-ar", "48000", str(voice)],
                        check=True, capture_output=True, timeout=600)
-        step("🎵 بيفصل الموسيقى والمؤثرات عن الكلام" if background in ("auto", "separate") else "🎚️ بيجهّز الخلفية")
+        step("🎚️ لا توجد موسيقى في الفيديو: يركّب الصوت وحده" if background == "auto" and d.get("has_bg") is False
+             else "🎵 يفصل الموسيقى والمؤثرات عن الكلام" if background in ("auto", "separate") else "🎚️ يجهّز الخلفية")
         bg = dub_background(did, d, background)
         audio = folder / f"{dialect}.m4a"
         if bg:
