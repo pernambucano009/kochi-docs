@@ -1,11 +1,10 @@
 // 🔔 إشعارات الأوتوبايلوت: الموبايل بيسجّل توكنه على الحساب، ولما تدوس على إشعار بيفتح الموافقة نفسها
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
 import { router } from "expo-router";
-import { Alert } from "react-native";
 import { api, json } from "./api";
 
 Notifications.setNotificationHandler({
