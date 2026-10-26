@@ -13586,4 +13586,6 @@ window.I18N_EN = {
   "جارٍ إرسال الرمز…": "Sending the code…",
   "جارٍ التحقق…": "Verifying…",
   "خدمة الرسائل لم ترد. حاول مرة أخرى بعد قليل": "The messaging service didn't respond. Try again shortly",
+  "الدخول برقم الجوال متوقف مؤقتًا. ادخل بالبريد الإلكتروني أو بجوجل، أو حاول بعد قليل": "Mobile sign-in is paused for now. Sign in with email or Google, or try again shortly",
+  "تعذّر إرسال الرمز لهذا الرقم. تأكد منه أو جرّب واتساب": "Couldn't send a code to this number. Check it or try WhatsApp",
 };

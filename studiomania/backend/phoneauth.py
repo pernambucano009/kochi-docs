@@ -102,7 +102,9 @@ def _post(path: str, body: dict) -> dict:
         raise PhoneError("طلبات كثيرة. انتظر قليلًا ثم حاول مرة أخرى")
     if r.status_code >= 400:
         _log(path, "خدمة الرسائل رفضت الطلب", f"{r.status_code} {r.text[:1200]}", r.status_code)
-        raise PhoneError(f"خدمة الرسائل رفضت الطلب ({r.status_code}): {str(d.get('message') or d.get('errors') or '')[:160]}")
+        if r.status_code in (401, 403):   # المفتاح نفسه مرفوض: مشكلة عندنا مش عند العميل (التفاصيل في صندوق الأخطاء)
+            raise PhoneError("الدخول برقم الجوال متوقف مؤقتًا. ادخل بالبريد الإلكتروني أو بجوجل، أو حاول بعد قليل")
+        raise PhoneError("تعذّر إرسال الرمز لهذا الرقم. تأكد منه أو جرّب واتساب")
     return d if isinstance(d, dict) else {}
 
 
