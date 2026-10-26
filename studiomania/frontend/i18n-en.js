@@ -13377,5 +13377,6 @@ window.I18N_EN = {
   "كلمتا المرور غير متطابقتين": "The passwords don't match",
   "ترند": "trends",
   "منشور جديد": "New post",
-  "⏳ جارٍ البدء…": "⏳ Starting…"
+  "⏳ جارٍ البدء…": "⏳ Starting…",
+  "🔧 التفاصيل (للأدمن فقط)": "🔧 Details (admin only)"
 };

@@ -60,6 +60,7 @@ function dbRenderProj() {
     <div class="db-meta"><h2 data-no-i18n>${dbe(d.name)}</h2><p class="muted">${dbTime(d.source.duration || 0)}${d.lines.length ? ` · ${d.lines.length} جملة` : ""}</p>
       ${d.busy && d.step && !running ? `<p><span class="spin-inline"></span> ${dbe(d.step)}</p>` : ""}
       ${d.error ? `<p class="err">⚠️ ${dbe(d.error)}</p>` : ""}
+      ${d.error_raw ? `<details class="db-raw"><summary>🔧 التفاصيل (للأدمن فقط)</summary><code dir="ltr" data-no-i18n>${dbe(d.error_raw)}</code></details>` : ""}
       <label>عن الفيديو (اختياري، يساعد في الدبلجة) <input id="dbBrief" value="${dbe(d.brief)}" placeholder="مثلًا: مدرب يشرح خطأً في التمرين للمبتدئين"></label>
       <button class="btn sm danger" id="dbDel">🗑 احذف المشروع</button></div></div>`;
   // 🎙️ زرار واحد: اختار اللهجة والصوت ودوس «دبلج»، والباقي بيحصل لوحده
@@ -83,7 +84,8 @@ function dbRenderProj() {
     const tdis = t.busy || d.busy ? "disabled" : "";
     h += `<div class="panel db-dialect"><div class="db-dh"><h3>${tl.label}</h3>${t.video_url && !t.busy ? `<span class="ok">✓ جاهز</span>` : ""}</div>`;
     if (t.busy) h += dbSteps(t);
-    if (t.error || dbx.err[tk]) h += `<p class="err db-stat">⚠️ ${dbe(dbx.err[tk] || t.error)}</p>`;
+    if (t.error || dbx.err[tk]) h += `<p class="err db-stat">⚠️ ${dbe(dbx.err[tk] || t.error)}</p>`
+      + (t.error_raw && !dbx.err[tk] ? `<details class="db-raw"><summary>🔧 التفاصيل (للأدمن فقط)</summary><code dir="ltr" data-no-i18n>${dbe(t.error_raw)}</code></details>` : "");
     if (t.video_url) {
       h += `<div class="db-out"><video src="${t.video_url}" controls playsinline preload="metadata"></video>
         <p class="ok">✓ النسخة ${tl.label} في «الفيديوهات الجاهزة» ويمكنك نشرها من شاشة النشر${t.lipsync ? " (بمزامنة الشفاه)" : ""}.</p></div>`;

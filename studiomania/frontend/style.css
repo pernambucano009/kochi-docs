@@ -3315,3 +3315,5 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .db-v2 .db-edit[open] > summary { margin-bottom: 8px; }
 .db-v2 .db-edit .db-opts { margin-top: 12px; }
 .db-v2 .db-dh .ok { color: var(--ok, #2E8F63); font-size: 13px; }
+.db-v2 .db-raw { font-size: 12.5px; color: var(--muted); }
+.db-v2 .db-raw code { display: block; white-space: pre-wrap; word-break: break-word; margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--field, #EFEEEB); font-size: 12px; text-align: left; }

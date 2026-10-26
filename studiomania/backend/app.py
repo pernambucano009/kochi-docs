@@ -21263,6 +21263,9 @@ def dub_to_dict(did: str, d: dict) -> dict:
         targets[k] = {**t, "video_url": url(t.get("video")), "audio_url": url(t.get("audio")),
                       "cost": {v: dub.estimate(texts, v, d["source"].get("duration") or 0, None) for v in dub.DIALECTS[k]["voices"]},
                       "lip_cost": {m: round((d["source"].get("duration") or 0) * x["per_sec"], 2) for m, x in dub.LIPSYNC.items()}}
+    if TENANT_ROLE != "admin":   # الخطأ الخام فيه أسماء الخدمات: للأدمن بس
+        d = {k: v for k, v in d.items() if k != "error_raw"}
+        targets = {k: {a: b for a, b in t.items() if a != "error_raw"} for k, t in targets.items()}
     return {**d, "id": did, "busy": dub_busy(d), "source": {**d["source"], "url": url(d["source"].get("file"))}, "targets": targets}
 
 
@@ -21360,12 +21363,15 @@ def dub_friendly(raw: str) -> str:
 
 
 def dub_fail(did: str, exc: Exception, target: str | None = None) -> None:
-    msg = dub_friendly(str(getattr(exc, "detail", None) or exc))[:400]
+    raw = str(getattr(exc, "detail", None) or exc)
+    msg = dub_friendly(raw)[:400]
+    # 🔧 التفاصيل الخام للأدمن بس (العميل بيشوف الرسالة المفهومة): بيتشالوا من الرد لأي حد غير الأدمن
+    det = (raw[:500] if msg != raw else None)
     def fn(d):
         if target:
-            d["targets"][target].update(busy=False, step=None, error=msg)
+            d["targets"][target].update(busy=False, step=None, error=msg, error_raw=det)
         else:
-            d.update(busy=False, step=None, error=msg)
+            d.update(busy=False, step=None, error=msg, error_raw=det)
     dub_update(did, fn)
 
 
