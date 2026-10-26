@@ -89,6 +89,8 @@ function escapeHtml(s) {
 // بنغيّر بس اللي اتغيّر فعلًا. الخانة اللي انت بتكتب فيها، والفيديو اللي شغّال، و<details> اللي فتحتها بيفضلوا زي ما هم.
 function setHTML(el, html) {
   if (!el) return;
+  if (el._html === html) return;   // نفس الكلام: ولا حاجة تتلمس
+  el._html = html;
   const t = document.createElement("template");
   t.innerHTML = html;
   morphKids(el, t.content);
@@ -126,7 +128,13 @@ function morphNode(x, y) {
     return;
   }
   if (x.tagName === "SELECT") {
-    if (!busy) { morphKids(x, y); const o = y.querySelector("option[selected]"); x.value = o ? o.value : (y.options[0]?.value ?? x.value); }
+    if (!busy) {
+      const keep = x.value;
+      morphKids(x, y);
+      const o = y.querySelector("option[selected]");
+      // لو السيرفر مابيحددش اختيار: اختيارك يفضل (مايرجعش للأول مع كل تحديث)
+      x.value = o ? o.value : ([...x.options].some((op) => op.value === keep) ? keep : (y.options[0]?.value ?? keep));
+    }
     return;
   }
   if (busy && x.isContentEditable) return;   // ما تكتبه الآن لا يُلمس

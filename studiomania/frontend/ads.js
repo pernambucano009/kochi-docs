@@ -190,7 +190,7 @@ function renderDirections(a) {
   $("adDirsState").innerHTML = working ? `<span class="spin-inline"></span> يفكر في 3 اتجاهات...` : a.directions_status === "failed" ? `✕ ${adEsc(a.directions_error)}` : "";
   $("adDirChosen").hidden = !st.direction;
   $("adDirChosen").innerHTML = st.direction ? `<b>✅ الاتجاه المختار:</b> <span data-no-i18n>${adEsc(st.direction)}</span> <button class="btn sm" type="button" data-dir-clear>✕ أزله</button>` : "";
-  setHTML($("adDirs"), (a.directions || []).map((d, i) => `<article class="ad-dir">
+  adsHTML($("adDirs"), (a.directions || []).map((d, i) => `<article class="ad-dir">
     <h4 data-no-i18n>${adEsc(d.title)}</h4><p data-no-i18n>${adEsc(d.summary)}</p>
     <dl>${Object.entries(DIR_LABELS).filter(([k]) => d[k]).map(([k, l]) => `<dt>${l}</dt><dd data-no-i18n>${adEsc(d[k])}</dd>`).join("")}</dl>
     <button class="btn sm primary" type="button" data-dir-pick="${i}">✍️ اختر هذا واكتب الاقتراح</button></article>`).join(""));
@@ -852,7 +852,7 @@ function editTake(s, tid) {
 }
 
 // بيغيّر محتوى العنصر بس لو اتغير فعلًا: الصور والفيديوهات متتحملش من الأول كل ٣ ثواني والصفحة متتهزش
-function setHTML(el, html) {
+function adsHTML(el, html) {   // اسم مختلف عن setHTML اللي في app.js (كان بيغطّي عليها في البرنامج كله)
   if (el._html === html) return;
   el._html = html;
   el.innerHTML = html;
@@ -917,7 +917,7 @@ function adScript(a) {
 function renderVoices(a) {
   const p = a.prod, fv = p.full_voice || {}, working = fv.status === "working";
   const n = p.shots.filter((s) => (s.voice || "").trim()).length;
-  setHTML($("adVoices"), `<div class="ad-fullvoice">
+  adsHTML($("adVoices"), `<div class="ad-fullvoice">
     <div class="row wrap"><b>🎙️ الصوت الكامل للإعلان</b>
       <span class="muted">١) انسخ النص وحوّله لصوت باللهجة والنبرة التي تعجبك ← ٢) ارفع الصوت كله ملف واحد ← ٣) البرنامج يقطّعه على اللقطات بتوقيت النص، ومدة كل لقطة تُضبط عليه.</span></div>
     <div class="row wrap">
@@ -1000,7 +1000,7 @@ function renderCast(a) {
         ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ الغي الاعتماد" : "👤 اعتمد وأضفه لملف العميل"}</button>` : ""}
         <button class="btn sm danger" data-cast="del">✕</button></div>
     </div>`).join("");
-  setHTML($("adCast"), head + (cast.length ? `<div class="ad-cast-grid">${cards}</div>` : ""));
+  adsHTML($("adCast"), head + (cast.length ? `<div class="ad-cast-grid">${cards}</div>` : ""));
 }
 const cAPI = (path, opts) => pAPI(`/cast${path}`, opts);
 $("adCast").addEventListener("click", async (e) => {
@@ -1078,7 +1078,7 @@ function renderAdProd() {
   $("adPApproveAll").disabled = !drawn.length;
   if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
-  setHTML($("adPShots"), shots.map((s) => {
+  adsHTML($("adPShots"), shots.map((s) => {
     const fbusy = PBUSY.has(s.frame_status);
     const ref = s.ref_frame ? `<div class="ref"><img src="/media/ads/${a.id}/frames/${s.ref_frame}" alt="">من الإعلان الأصلي (مشهد ${s.ref_scene})</div>` : "";
     const chosen = s.takes.find((t) => t.id === s.chosen);
@@ -1483,7 +1483,7 @@ function renderAdGallery() {
   $("adGalAll").hidden = !!s;
   $("adGalView").hidden = !s;
   if (!s) {
-    setHTML($("adGalGrid"), shots.map((x) => {
+    adsHTML($("adGalGrid"), shots.map((x) => {
       const t = shotTake(x), approved = x.takes.some((k) => k.id === x.chosen && k.approved), working = x.takes.some((k) => PBUSY.has(k.status));
       const cls = approved ? "done" : t ? "review" : "todo";
       return `<button type="button" class="gal-tile ${cls}" data-gshot="${x.id}">
@@ -1516,7 +1516,7 @@ function renderAdGallery() {
     bindGalVoice();
   }
   $("adGalInfo").innerHTML = `<b>ما يحدث:</b> ${adEsc(s.visual)}${s.voice ? `<br><b>النص:</b> ${adEsc(s.voice)}` : ""}${s.motion_notes ? `<br><b>🎞️ الموشن:</b> ${adEsc(s.motion_notes)}` : ""}`;
-  setHTML($("adGalTakes"), s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
+  adsHTML($("adGalTakes"), s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
       ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
     || `<p class="muted">لا يوجد نسخ ما زال.</p>`);
   const t = s.takes.find((x) => x.id === agal.tid);

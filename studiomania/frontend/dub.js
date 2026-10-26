@@ -29,9 +29,9 @@ async function dbOpen(id) {
 }
 
 function dbRender() {
-  $("dbList").innerHTML = dbx.list.map((p) => `<li class="${dbx.cur?.id === p.id ? "active" : ""}" data-dbopen="${p.id}">
+  setHTML($("dbList"), dbx.list.map((p) => `<li class="${dbx.cur?.id === p.id ? "active" : ""}" data-dbopen="${p.id}">
     <span class="ph">🌍</span><span class="nm" data-no-i18n>${dbe(p.name)}<br><small class="muted">${p.duration ? dbTime(p.duration) : ""} ${p.targets.map((k) => dbx.info?.dialects?.[k]?.label.split(" ")[0] || "").join(" ")} ${p.busy ? "⏳" : ""}</small></span></li>`).join("")
-    || `<li class="muted">لا يوجد بعد</li>`;
+    || `<li class="muted">لا يوجد بعد</li>`);
   $("dbMain").hidden = !dbx.cur;
   $("dbEmpty").hidden = !!dbx.cur;
   if (dbx.cur) dbRenderProj();
@@ -45,7 +45,7 @@ function dbRenderProj() {
       ${d.error ? `<p class="err">⚠️ ${dbe(d.error)}</p>` : ""}
       <label>عن الفيديو (اختياري، يساعد في الدبلجة) <input id="dbBrief" value="${dbe(d.brief)}" placeholder="مثلًا: مدرب يشرح خطأً في التمرين للمبتدئين"></label>
       <button class="btn sm danger" id="dbDel">🗑 احذف المشروع</button></div></div>`;
-  if (!d.lines.length) { $("dbMain").innerHTML = h; return; }
+  if (!d.lines.length) { setHTML($("dbMain"), h); return; }
   // لهجة / لغة جديدة: العربي بأصوات فصيح، والأجنبي بـ ElevenLabs
   const opt = (g) => Object.entries(info.dialects).filter(([k, v]) => v.group === g && !d.targets[k]).map(([k, v]) => `<option value="${k}">${dbe(v.label)}</option>`).join("");
   h += `<div class="panel db-add"><b>＋ دبلجة جديدة</b><select id="dbNewLang"><optgroup label="لهجات عربية">${opt("ar")}</optgroup><optgroup label="لغات أجنبية">${opt("foreign")}</optgroup></select>
@@ -80,7 +80,8 @@ function dbRenderProj() {
     }
     h += `</div>`;
   }
-  $("dbMain").innerHTML = h;
+  // 🧊 بيتحدّث في مكانه: الفيديو اللي شغّال، ومكانك في الصفحة، واختياراتك (الخلفية، التعليق النصي) بيفضلوا زي ما هم
+  setHTML($("dbMain"), h);
 }
 
 function dbPoll() {
@@ -93,9 +94,8 @@ function dbPoll() {
       const was = JSON.stringify(Object.fromEntries(Object.entries(dbx.cur.targets).map(([k, t]) => [k, t.busy])));
       const cur = await api(`/api/dub/${id}`);
       if (dbx.cur?.id !== id) return;
-      const ta = document.activeElement?.matches?.("textarea[data-dbline]") ? document.activeElement : null;
       dbx.cur = cur;
-      if (!ta) dbRenderProj();
+      dbRenderProj();   // الخانة اللي بتكتب فيها مابتتلمسش (setHTML)
       if (!cur.busy) {
         const r = await api("/api/dub"); dbx.list = r.items; dbRender();
         if (cur.error) toast(cur.error, true);
