@@ -6,6 +6,7 @@
 //
 // التشغيل (من فولدر studiomania):   node tests/i18n/audit.js            ← كل الشاشات
 //                                    node tests/i18n/audit.js "#settings,#brand"   ← شاشات بعينها
+//                                    CHUNK=1/3 node tests/i18n/audit.js   ← تلت الشاشات (تقريبًا ٢٥ دقيقة لكل جزء)
 // النتيجة: tests/i18n/report.json، والخروج 1 لو فيه جملة جديدة مش في tests/i18n/allow.json
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -119,7 +120,10 @@ async function main() {
     }
   };
 
-  const list = (only || [...PUBLIC, ...screens()]);
+  // CHUNK=2/3 ← الجزء التاني من ٣ (الفحص الكامل أطول من حد وقت التشغيل، فبيتقسم)
+  const [ci, cn] = (process.env.CHUNK || "1/1").split("/").map(Number);
+  const all = only || [...PUBLIC, ...screens()];
+  const list = all.filter((_, i) => i % cn === ci - 1);
   let clicks = 0;
   for (const scr of list) {
     const url = scr.startsWith("#") ? "/" + scr : scr;
@@ -193,7 +197,7 @@ async function main() {
   const dialect = [...seen].map(([s, w]) => ({ text: s, screen: w, word: dialectOf(s) })).filter((x) => x.word && !ALLOW.dialect.includes(x.text));
   const inputs = [...vals].map(([s, w]) => ({ text: s, screen: w })).filter((x) => !(ALLOW.inputs || []).includes(x.text));
   const report = { at: new Date().toISOString(), screens: list.length, clicks, missing, inputs, dialect, errors: [...new Set(errors)] };
-  fs.writeFileSync(path.join(__dirname, "report.json"), JSON.stringify(report, null, 1));
+  fs.writeFileSync(path.join(__dirname, process.env.CHUNK ? `report-${ci}.json` : "report.json"), JSON.stringify(report, null, 1));
   console.log(`\n🔎 ${list.length} شاشة، ${clicks} ضغطة`);
   console.log(`  ${missing.length} جملة ظهرت بالإنجليزي من غير ترجمة`);
   console.log(`  ${inputs.length} خانة كتابة فيها كلام عربي من البرنامج`);
