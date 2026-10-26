@@ -144,6 +144,8 @@ def suggestions(brain: dict) -> dict[str, str]:
             out[q["id"]] = "\n".join(str(p.get("value") or p.get("summary") or p.get("title") or "").strip() for p in hits if (p.get("value") or p.get("summary")))[:4000]
         else:
             out[q["id"]] = str(hits[-1].get("value") or "")[:4000]
+    if social_link(out.get("link", "")):   # اقتراح قديم كان الحساب نفسه: مش رابط الدعوة
+        out.pop("link")
     return {k: v for k, v in out.items() if v}
 
 

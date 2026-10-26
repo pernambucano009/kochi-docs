@@ -12224,6 +12224,10 @@ def run_brain_social(bid: str, sid: str) -> None:
         f.unlink(missing_ok=True)
     out = brainsocial.deid(out, items)
     fields = dict(out.get("fields") or {})
+    # 🔗 «الرابط» = اللي العميل عايز الناس تروحله (موقع، حجز، واتساب)، مش الحساب نفسه: بناخد رابط البايو بس لو موجود
+    fields.pop("link", None)
+    if prof.get("link") and not brainquiz.social_link(prof["link"]):
+        fields["link"] = {"value": prof["link"], "why": "الرابط الموجود في البايو"}
     items_p = brainsrc.to_pending({"fields": fields, "rules": [], "notes": out.get("notes") or [], "questions": []}, b, sid)
     # الصور: كل صورة ليها مكان (أو بتتشال لو مش مفيدة)
     keep = set()
