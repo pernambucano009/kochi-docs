@@ -242,7 +242,7 @@
     B.riser = (t0, t1, ...r) => { hand.push(t1); return A.riser(t0, t1, ...r); };
     await sound(B);
     const cues = Array.isArray(window.SFX) && !window.SFX_OFF ? window.SFX : [];
-    const k = (M.SFX_GAIN ?? .7) * (hand.length >= 12 ? .6 : 1);   // قالب صوته متصمم بالكامل: أصوات الحركات أهدى
+    const k = (M.SFX_GAIN ?? .45) * (hand.length >= 12 ? .6 : 1);   // قالب صوته متصمم بالكامل: أصوات الحركات أهدى
     cues.forEach(([t, kind, g, pan = 0, d = 0]) => {
       if (hand.some((h) => Math.abs(h - t) < .15)) return;
       if (kind === "swish") A.swish(t, d || .35, g * k, pan); else if (kind === "thud") A.thud(t, g * k, pan); else A.pop(t, g * k, pan);
