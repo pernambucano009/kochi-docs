@@ -54,32 +54,44 @@ VOICE_SCRIPT = {
 }
 
 TIPS = {
-    "video": ["الكاميرا في مستوى العين، والجوال ثابت على حامل أو شيء ثابتة.", "إضاءة أمام وشك (نافذة أو لمبة)، غير وراك.",
-              "من الصدر لفوق، والوجه في نص الكادر، ومن غير نضارة شمس أو شيء مغطية البق.", "اقرا براحة وبصوتك الطبيعي، وانظر للكاميرا غير للشاشة.",
-              "نفس اللبس والمكان الذي تريدهم يظهرون في فيديوهاتك.", "من دقيقة لدقيقتين، وفيديو طولي إذا ستعمل ريلز."],
-    "photos": ["نفس الإضاءة واللبس الخاصين بالفيديو.", "خلفية بسيطة، والوجه واضح ومش متغطي.", "صورة لكل اتجاه، بدون فلاتر."],
-    "backgrounds": ["صوّر المكان الذي تصوّر فيه فيديوهاتك وهو فارغ (من غيرك)، من نفس مكان الكاميرا.", "صورة لكل مكان: المكتب، المطبخ، الجيم، المحل…",
-                    "نفس إضاءة التصوير، لكي اللقطات التي البرنامج يعملها بيك تظهر شبه فيديوهاتك."],
-    "voice": ["مكان هادي بدون صدى (أوضة فيها ستاير أو هدوم أحسن من حمام أو صالة فارغة).", "الجوال على بعد شبر من بقك.",
-              "اقرا نبرتك العادية، ومن غير موسيقى أو تكييف يعمل.", "من دقيقة لدقيقتين."],
+    "ar": {
+        "video": ["ضع الكاميرا في مستوى العين، والجوال ثابتًا على حامل أو شيء ثابت.", "اجعل الإضاءة أمام وجهك (نافذة أو مصباح)، لا خلفك.",
+                  "صوّر من الصدر إلى الأعلى، والوجه في منتصف الإطار، دون نظارة شمسية أو شيء يغطي الفم.", "اقرأ بهدوء وبصوتك الطبيعي، وانظر إلى الكاميرا لا إلى الشاشة.",
+                  "ارتدِ الملابس نفسها في المكان نفسه الذي تريد أن يظهرا في فيديوهاتك.", "من دقيقة إلى دقيقتين، وفيديو طولي إن كنت ستنشر ريلز."],
+        "photos": ["الإضاءة والملابس نفسها التي في الفيديو.", "خلفية بسيطة، والوجه واضح وغير مغطى.", "صورة لكل اتجاه، دون فلاتر."],
+        "backgrounds": ["صوّر المكان الذي تصوّر فيه فيديوهاتك وهو فارغ (من دونك)، من موضع الكاميرا نفسه.", "صورة لكل مكان: المكتب، المطبخ، النادي، المتجر…",
+                        "الإضاءة نفسها التي تصوّر بها، لتبدو اللقطات التي يصنعها البرنامج مثل فيديوهاتك."],
+        "voice": ["مكان هادئ دون صدى (غرفة فيها ستائر أو ملابس أفضل من حمّام أو صالة فارغة).", "الجوال على بُعد شبر من فمك.",
+                  "اقرأ بنبرتك المعتادة، دون موسيقى أو مكيّف يعمل.", "من دقيقة إلى دقيقتين."],
+    },
+    "en": {
+        "video": ["Camera at eye level, with the phone steady on a stand or something stable.", "Light in front of your face (a window or a lamp), not behind you.",
+                  "Frame from the chest up, face in the middle, with no sunglasses or anything covering your mouth.", "Read calmly in your natural voice, and look at the camera, not the screen.",
+                  "Wear the same clothes in the same place you want to appear in your videos.", "One to two minutes, and a vertical video if you'll post Reels."],
+        "photos": ["Same lighting and clothes as the video.", "A simple background, with your face clear and uncovered.", "One photo per angle, no filters."],
+        "backgrounds": ["Photograph the place where you film your videos while it's empty (without you), from the same camera spot.", "One photo per place: office, kitchen, gym, shop…",
+                        "The same lighting you film with, so the shots the app makes look like your videos."],
+        "voice": ["A quiet place with no echo (a room with curtains or clothes beats a bathroom or an empty hall).", "The phone about a hand-span from your mouth.",
+                  "Read in your usual tone, with no music or air conditioner running.", "One to two minutes."],
+    },
 }
 
 ANGLES = [
     ("front", "أمام الكاميرا مباشرة", "Facing the camera"),
     ("smile", "أمام الكاميرا بابتسامة", "Facing the camera, smiling"),
-    ("r45", "لافف ربع لفة يمين", "Quarter turn right"),
-    ("l45", "لافف ربع لفة شمال", "Quarter turn left"),
-    ("r90", "بجانب يمين (بروفايل)", "Right profile"),
-    ("l90", "بجانب شمال (بروفايل)", "Left profile"),
-    ("up", "باصص لفوق قليلًا", "Looking slightly up"),
-    ("body", "نص جسم أو جسم كامل", "Half or full body"),
+    ("r45", "ربع التفاتة إلى اليمين", "Quarter turn right"),
+    ("l45", "ربع التفاتة إلى اليسار", "Quarter turn left"),
+    ("r90", "الجانب الأيمن (بروفايل)", "Right profile"),
+    ("l90", "الجانب الأيسر (بروفايل)", "Left profile"),
+    ("up", "النظر إلى الأعلى قليلًا", "Looking slightly up"),
+    ("body", "نصف الجسم أو الجسم كاملًا", "Half or full body"),
 ]
 ANGLE_IDS = [a[0] for a in ANGLES]
 
 
 def kit(lang: str) -> dict:
     en = lang == "en"
-    return {"video_script": VIDEO_SCRIPT["en" if en else "ar"], "voice_script": VOICE_SCRIPT["en" if en else "ar"], "tips": TIPS,
+    return {"video_script": VIDEO_SCRIPT["en" if en else "ar"], "voice_script": VOICE_SCRIPT["en" if en else "ar"], "tips": TIPS["en" if en else "ar"],
             "angles": [{"id": a, "label": e if en else ar} for a, ar, e in ANGLES]}
 
 

@@ -66,6 +66,7 @@ const NH = (() => {
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة أخرى." },
     edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: KOCHI ? "6" : "6f", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
     coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر ورقة وصوتها والإنترو والأوترو." },
+    twin: { en: "Avatar", ar: "الأفاتار", icon: "users", page: "twin", desc: "نسخة منك أو من شخص لديك إذنه، من تسجيلات حقيقية، لتصنع بها فيديوهات بكلام جديد." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
     viral: { en: "Trends", ar: "الأفضل أداءً في مجالك", icon: "megaphone", page: "viral", desc: "منشورات المجال مرتّبة حسب تفوقها على المعتاد، وأفكار بالهيكل نفسه." },
@@ -94,7 +95,7 @@ const NH = (() => {
     return c?.logo ? `<img src="${esc(c.logo)}" alt="">` : esc((c?.name || "B").trim().slice(0, 1).toUpperCase());
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
-    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
+    series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", twin: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
     inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox", leads: "audience" };
   // 📤 أيقونات أقسام النشر (خط بسيط): نفس الأيقونة في مربعات صفحة النشر وفي عنوان صفحة كل قسم لما تدخله
   const PUB_IC = { pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
@@ -579,8 +580,8 @@ const NH = (() => {
     pjFilter();
   });
   // صفحات كاملة بتنزل لتحت (عقل العلامة، مكتبة الموشن): كل واحدة ليها موديول بيرسمها
-  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, leads: LeadsPage, bots: BotsPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
-  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
+  const MODS = { brand: BrandPage, motion: MotionPage, coaches: CharactersPage, voice: VoicesPage, music: MusicPage, viral: ViralPage, ref2p: Ref2PromptPage, rivals: RivalsPage, plan: RivalsPage, audience: RivalsPage, adsmgr: AdsMgrPage, wacamp: WaCampPage, leads: LeadsPage, twin: AvatarPage, bots: BotsPage, plans: PlansPage, comics: ComicsPage, brainlib: BrainLibPage, auto: AutoPage, pilot: PilotPage };
+  const stopMedia = () => { MotionPage.close(); VoicesPage.close(); MusicPage.close(); CharactersPage.close?.(); AvatarPage.close(); Ref2PromptPage.close(); RivalsPage.close(); ComicsPage.close(); BrainLibPage.close(); AutoPage.close(); };
   let pageArg = null, pStack = [];
   // عنوان الصفحة (من البروتوتايب): الأيقونة الزجاج كبيرة، وفوق الاسم اسم القسم بالإنجليزي بالبرتقالي
   const titleHTML = (t, key) => `<div class="nh-name"><span class="latin en-k">${t.en}</span><b>${esc(t.ar)}</b></div>${PUB_IC[key]
@@ -823,6 +824,8 @@ const NH = (() => {
     }
   }
   window.addEventListener("popstate", () => { if (location.hash !== navHash()) goHash(location.hash); });
+  // صفحة من أي مكان (حتى من الرئيسية أو من شاشة قديمة): لو فيه صفحة مفتوحة بنتنقّل جوّاها، وإلا بتتفتح من مربعها
+  window.NHGo = (key) => (zoom?.page ? window.NHNav(key) : goHash(`#${PAGE_PARENT[key] ? PAGE_PARENT[key] + "/" : ""}${key}`));
   // رجوع خطوة واحدة: القسم اللي قبله، أو تقفل القسم، أو الصفحة اللي قبلها، أو الرئيسية
   function goBack() {
     if (busy) return;

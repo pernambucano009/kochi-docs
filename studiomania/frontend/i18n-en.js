@@ -13588,4 +13588,8 @@ window.I18N_EN = {
   "خدمة الرسائل لم ترد. حاول مرة أخرى بعد قليل": "The messaging service didn't respond. Try again shortly",
   "الدخول برقم الجوال متوقف مؤقتًا. ادخل بالبريد الإلكتروني أو بجوجل، أو حاول بعد قليل": "Mobile sign-in is paused for now. Sign in with email or Google, or try again shortly",
   "تعذّر إرسال الرمز لهذا الرقم. تأكد منه أو جرّب واتساب": "Couldn't send a code to this number. Check it or try WhatsApp",
+  "أفاتار جديد": "New avatar",
+  "مثلًا: أنا، أو سارة": "e.g. Me, or Sara",
+  "احذف الأفاتار": "Delete avatar",
+  "نسخة منك أو من شخص لديك إذنه، من تسجيلات حقيقية، لتصنع بها فيديوهات بكلام جديد.": "A copy of you, or of someone who gave you permission, made from real recordings, to create videos with new words.",
 };

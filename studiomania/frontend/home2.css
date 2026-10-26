@@ -3102,3 +3102,8 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 :is(#nh) .ld-note { margin-top: 4px; height: 30px; border-radius: 9px; border: 1px solid var(--nh-line, rgba(24,23,24,.1)); background: transparent; color: inherit; font: inherit; font-size: 12.5px; padding: 0 10px; }
 :is(#nh) .pk-ib.on { color: var(--nh-accent); }
 @media (max-width: 760px) { :is(#nh) .ld-r { grid-template-columns: 56px 1fr; } :is(#nh) .ld-r .ld-say, :is(#nh) .ld-r .pk-acts { grid-column: 1 / -1; } }
+/* 🪞 الأفاتار: نفس كروت الشخصيات */
+.tw-art { aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden; display: grid; place-items: center; }
+.tw-art .tw-ph { font-size: 44px; opacity: .55; }
+#twMain .tw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+#twMain .tw-step { margin-bottom: 12px; }
