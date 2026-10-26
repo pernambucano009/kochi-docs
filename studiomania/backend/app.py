@@ -31751,11 +31751,13 @@ def push_tokens() -> list[str]:
         return []
 
 
-def push_send(title: str, body: str, data: dict) -> None:
+def push_send(title: str, body: str, data: dict, category: str = "") -> None:
     toks = push_tokens()
     if not toks or os.environ.get("PUBLISH_MOCK"):
         return
-    msgs = [{"to": t, "title": title, "body": body[:180], "data": data, "sound": "default", "channelId": "approvals"} for t in toks]
+    # category = زراير الإشعار نفسه (متعرّفة في تطبيق الموبايل: src/push.ts)
+    msgs = [{"to": t, "title": title, "body": body[:180], "data": data, "sound": "default", "channelId": "approvals", **({"categoryId": category} if category else {})}
+            for t in toks]
     def go():
         try:
             r = httpx.post("https://exp.host/--/api/v2/push/send", json=msgs, timeout=15)
@@ -31778,7 +31780,8 @@ def pilot_push(j: dict) -> None:
             name = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or ""
         except HTTPException:
             pass
-    push_send(title, f"«{name}» · {body}" if name else body, {"kind": "pilot", "jid": j["id"], "gate": gate})
+    push_send(title, f"«{name}» · {body}" if name else body, {"kind": "pilot", "jid": j["id"], "gate": gate},
+              "pilot_ok" if gate in ("montage", "video") else "pilot_open")
 
 
 # 📱 «كمّل على موبايلك»: خطوة على الويب (تصوير بالسكريبت أو تسجيل صوت) بتتبعت للموبايل بإشعار أو QR،
