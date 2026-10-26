@@ -169,13 +169,18 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
   <!-- ===== العرض: مكان فيديو الديمو ===== -->
   <sc-if value="{{isDemo}}" hint-placeholder-val="{{ false }}">
     <section data-k="demo" class="lp-in" dir="{{dir}}" style="{{panelStyle}}">
-      <h1 style="{{h1Style}}">{{t.demoTitle}}</h1>
-      <p style="{{leadStyle}}">{{t.demoLead}}</p>
-      <div style="{{demoBox}}"><video src="/gallery/t-brandreveal.mp4" poster="/gallery/t-brandreveal.jpg" controls playsinline preload="none" style="height:100%;max-width:100%;border-radius:18px;background:#000"></video></div>
-      <div style="display: flex; align-items: center; gap: 18px; margin-top: 16px; flex-wrap: wrap">
+      <div style="display: flex; gap: 40px; align-items: center">
+        <video src="/gallery/t-launch.mp4#t=4" controls playsinline preload="metadata" style="{{demoVid}}"></video>
+        <div style="flex: 1; min-width: 0">
+          <h1 style="{{h1Style}}">{{t.demoTitle}}</h1>
+          <p style="{{leadStyle}}">{{t.demoLead}}</p>
+          <div style="display: flex; align-items: center; gap: 18px; margin-top: 22px; flex-wrap: wrap">
         <button type="button" class="sk-go lp-btn" data-on-click="{{startFree}}" style="{{ctaSmall}}">
           <svg class="nh-snake" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s2" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/><rect class="s1" x="1" y="1" width="198" height="44" rx="22" pathLength="1000"/></svg>{{t.start}}</button>
-        <span style="{{heroNoteInline}}">{{t.heroNote}}</span>
+          </div>
+          <p style="{{heroNote}}">{{t.heroNote}}</p>
+          <button type="button" class="lp-btn lp-link" data-on-click="{{goHome}}" style="{{demoBtn}}">{{t.backHome}}</button>
+        </div>
       </div>
     </section>
   </sc-if>
@@ -430,7 +435,7 @@ const LP_TEXT = {
   ar: {
     signin: 'تسجيل الدخول', back: 'رجوع', crumbsAria: 'موقعك', langBtn: 'EN', langAria: 'Switch to English', themeAria: 'تبديل الوضع', light: 'فاتح', dark: 'غامق',
     nav: ['الرئيسية', 'كيف يعمل', 'أمثلة', 'المميزات', 'الأسعار', 'الأسئلة'], home: 'الرئيسية',
-    demo: 'شاهد مثالًا', start: 'ابدأ مجانًا',
+    demo: 'شاهد مثالًا', start: 'ابدأ مجانًا', backHome: '→ رجوع للرئيسية',
     heroTitle: 'محتوى كل يوم، من غير فريق',
     heroLead: 'سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.',
     heroNote: '300 نقطة مجانًا للتجربة · بدون بطاقة',
@@ -451,7 +456,7 @@ const LP_TEXT = {
   en: {
     signin: 'SIGN IN', back: 'Back', crumbsAria: 'You are here', langBtn: 'ع', langAria: 'التبديل إلى العربية', themeAria: 'Switch theme', light: 'LIGHT', dark: 'DARK',
     nav: ['HOME', 'HOW', 'EXAMPLES', 'FEATURES', 'PRICES', 'FAQ'], home: 'Home',
-    demo: 'SEE AN EXAMPLE', start: 'START FREE',
+    demo: 'SEE AN EXAMPLE', start: 'START FREE', backHome: '← Back to home',
     heroTitle: 'Daily content, no team needed',
     heroLead: 'SimsimKit learns your brand and dialect, writes the idea and the script, makes the video and posts it on time. You approve from your phone.',
     heroNote: '300 free credits to try. No card needed.',
@@ -656,7 +661,7 @@ class Component {
     return {
       dark: d, dir: ar ? 'rtl' : 'ltr', t: {
         signin: T.signin, langBtn: T.langBtn, langAria: T.langAria, themeAria: T.themeAria, back: T.back, crumbsAria: T.crumbsAria,
-        home: T.home, demo: T.demo, start: T.start,
+        home: T.home, demo: T.demo, start: T.start, backHome: T.backHome,
         heroTitle: T.heroTitle, heroLead: T.heroLead, heroNote: T.heroNote, demoTitle: T.demoTitle, demoLead: T.demoLead, vidCap: T.vidCap,
         fTitle: T.fTitle, fLead: T.fLead, pTitle: T.pTitle, pLead: T.pLead, monthly: T.monthly, yearly: T.yearly, pNote: T.pNote, qTitle: T.qTitle,
         sTitle: reg ? T.sTitleR : T.sTitleL, sLead: reg ? T.sLeadR : T.sLeadL, or: T.or, name: T.name, email: T.email, password: T.password, showPw: T.showPw,
@@ -714,9 +719,10 @@ class Component {
       ctaStyle: 'width:230px;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:center;font:500 ' + (ar ? 17 : 14) + 'px ' + F + ';letter-spacing:' + ls('.2em') + ';white-space:nowrap',
       ctaSmall: 'width:200px;height:46px;border-radius:23px;display:flex;align-items:center;justify-content:center;font:500 ' + (ar ? 15 : 13) + 'px ' + F + ';letter-spacing:' + ls('.16em') + ';white-space:nowrap',
       demoBtn: 'height:54px;padding:0 6px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;gap:10px;font:400 ' + (ar ? 16 : 14) + 'px ' + F + ';letter-spacing:' + ls('.16em') + ';color:' + ink,
-      vidCard: 'margin-top:22px;width:400px;height:200px;box-sizing:border-box;border-radius:20px;border:1.5px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(24,23,24,.06)') + ';background:center 30%/cover no-repeat url(/gallery/t-brandreveal.jpg),' + placeholderBg + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0;color:' + muted + ';font:400 13px ' + F,
+      vidCard: 'margin-top:22px;width:400px;height:200px;box-sizing:border-box;border-radius:20px;border:1.5px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(24,23,24,.06)') + ';background:center 25%/cover no-repeat url(/gallery/t-launch.jpg),' + placeholderBg + ';cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0;color:' + muted + ';font:400 13px ' + F,
       vidPlay: 'width:60px;height:60px;border-radius:30px;display:flex;align-items:center;justify-content:center;background:' + solid + ';box-shadow:' + shadow,
       vidCap: 'font:400 13px ' + F + ';color:' + muted,
+      demoVid: 'display:block;height:520px;aspect-ratio:9/16;border-radius:22px;background:#000;box-shadow:0 18px 50px -18px rgba(0,0,0,.45);flex:none',
       demoBox: 'margin:22px auto 0;width:680px;height:382px;box-sizing:border-box;padding:10px;border-radius:24px;border:1.5px solid ' + (d ? 'rgba(255,255,255,.08)' : 'rgba(24,23,24,.06)') + ';background:' + placeholderBg + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:' + muted,
       demoPlay: 'width:84px;height:84px;border-radius:42px;display:flex;align-items:center;justify-content:center;background:' + solid + ';box-shadow:' + shadow,
       demoCap: 'font:400 14px ' + F + ';color:' + muted,
