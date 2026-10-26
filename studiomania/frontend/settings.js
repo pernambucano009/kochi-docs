@@ -324,4 +324,6 @@ $("expBox")?.addEventListener("click", async (e) => {
     try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ حُفظت الفواتير"); } catch (err) { toast(err.message, true); }
   }
 });
-api("/api/expenses").then(expRender).catch(() => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; });
+// المصاريف لصاحب المنصة بس: العميل مايطلبهاش أصلًا (كانت بترجع ٤٠٣ عند كل عميل وتتسجل خطأ)
+const expHide = () => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; };
+(window.MEP || Promise.resolve(null)).then((me) => (me && me.role !== "admin" ? expHide() : api("/api/expenses").then(expRender))).catch(expHide);

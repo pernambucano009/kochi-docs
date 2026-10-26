@@ -19,7 +19,20 @@ function toast(msg, isError = false) {
   el.hidden = false;
   clearTimeout(toast.t);
   toast.t = setTimeout(() => (el.hidden = true), 3500);
+  if (isError) reportIssue("ui", msg);
 }
+
+// 🚨 أي رسالة خطأ ظهرت للعميل، أو كود وقع في المتصفح، بتوصل لصندوق الأخطاء عند الأدمن لوحدها (كل رسالة مرة واحدة في الجلسة)
+function reportIssue(kind, message, raw = "") {
+  const k = kind + "|" + String(message).slice(0, 200);
+  reportIssue.seen = reportIssue.seen || new Set();
+  if (!message || reportIssue.seen.has(k) || reportIssue.seen.size > 50) return;
+  reportIssue.seen.add(k);
+  fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, message: String(message).slice(0, 1000), raw: String(raw).slice(0, 3000), screen: location.hash || location.pathname }) }).catch(() => {});
+}
+window.addEventListener("error", (e) => { if (e.message) reportIssue("js", e.message, `${e.filename || ""}:${e.lineno || ""}\n${e.error?.stack || ""}`); });
+window.addEventListener("unhandledrejection", (e) => { const r = e.reason; if (r && !/abort/i.test(String(r.name || r))) reportIssue("js", r.message || String(r), r.stack || ""); });
 
 // 🚪 الحساب (لو البرنامج شغال ورا البوابة): الإيميل والباقة والنقط
 // 💳 الرصيد رقم واحد في كل الشاشات: أي مكان بيعرضه بيحط <span data-credits>، والرقم بيتحدّث بعد أي عملية وكل ٣٠ ثانية

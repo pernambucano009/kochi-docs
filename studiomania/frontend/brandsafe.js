@@ -66,7 +66,9 @@
     window.IS_CUSTOMER = customer;
     if (!customer) return;
     // 🌐 الواجهة الإنجليزية مخفية عن العملاء لحد ما الترجمة تكتمل: زرار EN مش ظاهر، واللي كان مختار الإنجليزي يرجع للعربي
-    if (window.I18N?.lang === "en") return window.I18N.setLang("ar");
+    // (الفحص الشامل بس بيعدّي: عشان يشوف الوضع الإنجليزي زي ما هيظهر للعميل يوم ما يتفتح)
+    let audit = false; try { audit = localStorage.getItem("studiomania.i18n-audit") === "1"; } catch { /* مفيش تخزين */ }
+    if (window.I18N?.lang === "en" && !audit) return window.I18N.setLang("ar");
     rate = Number(me.pts_per_usd) || rate;
     window.brandSafe = (s) => clean(String(s ?? ""), true);
     walk(document.body);

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة الفحص · الأدمن</title>
+<link rel="icon" href="/icon-32.png">
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #1d1d1f; --mute: #6b6b70; --line: #e4e2dc; --acc: #e8590c; --ok: #2b8a3e; --bad: #c92a2a; --soft: #fff4e6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141416; --card: #1d1d20; --ink: #ececef; --mute: #9a9aa2; --line: #2c2c31; --soft: #2a1f14; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 system-ui, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--ink); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; }
+  header a { color: var(--mute); text-decoration: none; font-size: 13px; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; margin-inline-start: auto; }
+  nav button, .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  nav button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.pri { background: var(--acc); border-color: var(--acc); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .mute { color: var(--mute); font-size: 13px; }
+  .chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; cursor: pointer; user-select: none; }
+  .chip input { margin: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: start; vertical-align: top; }
+  th { font-weight: 600; color: var(--mute); font-size: 13px; position: sticky; top: 58px; background: var(--card); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .st { font-weight: 600; } .st.running, .st.starting { color: var(--acc); } .st.done { color: var(--ok); } .st.failed, .st.stopped { color: var(--bad); }
+  .runs td { cursor: pointer; } .runs tr.on td { background: var(--soft); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .kpi { background: var(--bg); border-radius: 10px; padding: 10px 12px; } .kpi b { display: block; font-size: 22px; }
+  .outs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .out { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .out h4 { margin: 0; font-size: 14px; } .out pre { margin: 0; white-space: pre-wrap; font: 13px/1.6 inherit; max-height: 260px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 8px; }
+  .out .vote { display: flex; gap: 6px; align-items: center; } .out .vote button.on { background: var(--ink); color: var(--bg); }
+  .out textarea { width: 100%; min-height: 48px; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: var(--card); color: var(--ink); }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .shots a { display: block; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; color: var(--mute); font-size: 12px; text-decoration: none; }
+  .shots img { width: 100%; height: 150px; object-fit: cover; object-position: top; display: block; }
+  .shots span { display: block; padding: 4px 8px; direction: ltr; text-align: left; }
+  video { width: 100%; max-width: 640px; border-radius: 8px; background: #000; }
+  input[type=search] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; min-width: 260px; background: var(--card); color: var(--ink); }
+  .ltr { direction: ltr; text-align: left; }
+  pre.log { white-space: pre-wrap; direction: ltr; text-align: left; font-size: 12px; max-height: 300px; overflow: auto; background: var(--bg); padding: 10px; border-radius: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧭 لوحة الفحص</h1>
+  <a href="/#settings">← رجوع للبرنامج</a>
+  <nav id="tabs">
+    <button data-t="issues" class="on">🚨 صندوق الأخطاء <b id="issN"></b></button>
+    <button data-t="runs">الفحص الشامل</button>
+    <button data-t="steps">الخطوات</button>
+    <button data-t="outs">النتائج للمراجعة</button>
+    <button data-t="media">الصور والفيديو</button>
+    <button data-t="lang">اللغة</button>
+    <button data-t="msgs">الرسائل والأخطاء</button>
+    <button data-t="map">خريطة الكلام</button>
+  </nav>
+</header>
+<main>
+  <section data-p="issues">
+    <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل شغل فشل أو توقف في النص، يصل هنا تلقائيًا. نفس الخطأ يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
+      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من السيرفر</option><option value="job">شغل فشل</option><option value="stuck">شغل توقف في النص</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option></select>
+      <button class="btn" id="issReload">↻ حدّث</button></div></div>
+    <div id="iss"></div>
+  </section>
+  <section data-p="runs" hidden>
+    <div class="card">
+      <h3 style="margin-top:0">ابدأ فحصًا جديدًا</h3>
+      <p class="mute">عميل تجريبي (journey@test.simsimkit.com) يمشي في البرنامج كما يفعل العميل، بنقاط حقيقية، ويسجّل كل خطوة وكل رسالة وكل كلمة في الشاشة، بالعربية والإنجليزية.</p>
+      <div class="row">
+        <label>المرحلة <select id="phase"><option value="1">١: العقل والتخطيط</option></select></label>
+        <span class="mute">المجالات:</span>
+        <span id="niches" class="row"></span>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn pri" id="start">▶️ ابدأ الفحص</button><span id="startMsg" class="mute"></span></div>
+    </div>
+    <div class="card"><h3 style="margin-top:0">التشغيلات</h3><table class="runs"><thead><tr><th>التشغيلة</th><th>المرحلة</th><th>الحالة</th><th>الخطوة الحالية</th><th>النجاح</th><th>النقاط</th><th>التكلفة</th><th></th></tr></thead><tbody id="runs"></tbody></table></div>
+    <div class="card" id="logCard" hidden><h3 style="margin-top:0">سجلّ التشغيلة</h3><pre class="log" id="log"></pre></div>
+  </section>
+  <section data-p="steps" hidden><div class="card"><div class="kpis" id="kpis"></div></div><div class="card"><table><thead><tr><th>المجال</th><th>الخطوة</th><th>النتيجة</th><th>النقاط</th><th>التكلفة</th><th>ثوانٍ</th><th>ملاحظة / الخطأ</th></tr></thead><tbody id="steps"></tbody></table></div></section>
+  <section data-p="outs" hidden><div class="card"><div class="row"><span class="mute">قيّم كل نتيجة بعينك: 👍 مقبولة، 👎 تحتاج تعديلًا، واكتب ملاحظتك. التقييمات تُحفظ مع التشغيلة.</span>
+    <select id="outNiche"></select><select id="outKind"></select><span id="outCount" class="mute"></span></div></div><div class="outs" id="outs"></div></section>
+  <section data-p="media" hidden><div class="card"><h3 style="margin-top:0">الفيديو</h3><div id="videos" class="row"></div></div><div class="card"><h3 style="margin-top:0">صور الشاشات</h3><div class="shots" id="shots"></div></div></section>
+  <section data-p="lang" hidden>
+    <div class="card"><h3 style="margin-top:0">عربي ظهر في الوضع الإنجليزي</h3><p class="mute">«واجهة» = كلام البرنامج ناقص ترجمته. «محتوى» = كلام العميل أو الذكاء الاصطناعي (طبيعي أن يبقى بلغته، لكنه لا يجب أن يُترجم جزئيًا).</p><table><thead><tr><th>النوع</th><th>الجملة</th><th>المكان</th></tr></thead><tbody id="enAr"></tbody></table></div>
+    <div class="card"><h3 style="margin-top:0">عامية في كلام الواجهة</h3><table><thead><tr><th>الجملة</th><th>الكلمة</th><th>المكان</th></tr></thead><tbody id="dial"></tbody></table></div>
+  </section>
+  <section data-p="msgs" hidden>
+    <div class="card"><h3 style="margin-top:0">الرسائل التي ظهرت للعميل</h3><table><thead><tr><th>المجال</th><th>النوع</th><th>الرسالة</th></tr></thead><tbody id="msgs"></tbody></table></div>
+    <div class="card"><h3 style="margin-top:0">الأخطاء</h3><table><tbody id="errs"></tbody></table></div>
+  </section>
+  <section data-p="map" hidden>
+    <div class="card"><div class="row"><input type="search" id="mapQ" placeholder="ابحث في الكلام…"><label class="chip"><input type="checkbox" id="mapMiss"> الناقصة ترجمتها فقط</label>
+      <button class="btn" id="mapCsv">⬇️ تنزيل (CSV)</button><span id="mapInfo" class="mute"></span></div></div>
+    <div class="card"><table><thead><tr><th>الجملة</th><th>الإنجليزية</th><th>النوع</th><th>أماكن الظهور</th></tr></thead><tbody id="map"></tbody></table></div>
+  </section>
+</main>
+<script>
+const NICHES = [["realestate", "العقارات"], ["food", "المطاعم"], ["beauty", "التجميل"], ["fitness", "اللياقة"], ["edu", "التعليم"], ["tech", "التقنية"], ["travel", "السياحة"], ["retail", "المتاجر"], ["services", "الخدمات"], ["creator", "صناع المحتوى"]];
+const ST = { starting: "يبدأ", running: "يعمل", done: "انتهى", failed: "توقف بخطأ", stopped: "أُوقف" };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same-origin", ...o, headers: { "content-type": "application/json", ...(o.headers || {}) } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j; };
+const S = { cur: null, run: null, map: null, iss: [] };
+const KIND = { api: "رد خطأ من السيرفر", job: "شغل فشل", stuck: "شغل توقف في النص", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
+const when = (t) => t ? new Date(t * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }) : "";
+async function loadIssues() {
+  const r = await api("/api/platform/issues" + ($("issAll").checked ? "?all=1" : "")).catch((e) => ({ items: [], err: e.message }));
+  S.iss = r.items || []; $("issN").textContent = r.open ? `(${r.open})` : "";
+  renderIssues(r.err);
+  clearTimeout(loadIssues.t); loadIssues.t = setTimeout(loadIssues, 60000);
+}
+function renderIssues(err) {
+  const k = $("issKind").value, list = S.iss.filter((x) => !k || x.kind === k);
+  $("iss").innerHTML = err ? `<div class="card bad">${esc(err)}</div>` : list.map((x) => `<div class="card" data-iid="${esc(x.id)}">
+    <div class="row"><b class="${x.resolved_at ? "ok" : "bad"}">${x.resolved_at ? "✓ محلول" : "● مفتوح"}</b><span class="chip">${KIND[x.kind] || esc(x.kind)}</span>
+      <span class="mute">تكرر ${x.count} مرة · أول مرة ${when(x.first_at)} · آخر مرة ${when(x.last_at)}</span>
+      <span style="margin-inline-start:auto">${x.resolved_at ? `<button class="btn" data-reopen>أعد فتحه</button>` : `<button class="btn pri" data-resolve>✓ اتحل</button>`}</span></div>
+    <h3 style="margin:10px 0 4px">${esc(x.message)}</h3>
+    <div class="mute ltr">${esc(x.path)}${x.status ? " · " + x.status : ""}${x.screen ? " · " + esc(x.screen) : ""}</div>
+    <p style="margin:10px 0 4px"><b>السبب:</b> ${esc(x.cause)}</p><p style="margin:0 0 8px"><b>الإصلاح المقترح:</b> ${esc(x.fix)}</p>
+    <div class="mute">الحسابات: ${(x.accounts || []).map(esc).join("، ") || "—"}</div>
+    ${x.raw ? `<details style="margin-top:8px"><summary class="mute">التفاصيل التقنية</summary><pre class="log">${esc(x.raw)}</pre></details>` : ""}
+    ${x.note ? `<p class="mute">ملاحظة: ${esc(x.note)}</p>` : ""}</div>`).join("") || `<div class="card mute">لا توجد أخطاء ${$("issAll").checked ? "" : "مفتوحة "}✓</div>`;
+}
+$("issAll").onchange = loadIssues; $("issKind").onchange = () => renderIssues(); $("issReload").onclick = loadIssues;
+$("iss").onclick = async (e) => {
+  const card = e.target.closest("[data-iid]"); if (!card) return;
+  const reopen = !!e.target.closest("[data-reopen]"); if (!reopen && !e.target.closest("[data-resolve]")) return;
+  const note = reopen ? "" : (prompt("ملاحظة (ما الذي أصلحته؟) — اختياري") || "");
+  await api(`/api/platform/issues/${card.dataset.iid}/resolve`, { method: "POST", body: JSON.stringify({ note, reopen }) }).catch(() => {});
+  loadIssues();
+};
+
+$("niches").innerHTML = NICHES.map(([k, t]) => `<label class="chip"><input type="checkbox" value="${k}" checked> ${t}</label>`).join("");
+document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => tab(b.dataset.t));
+function tab(t) {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+  document.querySelectorAll("main > section").forEach((s) => (s.hidden = s.dataset.p !== t));
+  if (t === "map" && !S.map) loadMap();
+}
+
+$("start").onclick = async () => {
+  const niches = [...document.querySelectorAll("#niches input:checked")].map((x) => x.value);
+  $("start").disabled = true; $("startMsg").textContent = "يبدأ…";
+  try { const r = await api("/api/platform/journey", { method: "POST", body: JSON.stringify({ phase: $("phase").value, niches }) }); S.cur = r.id; $("startMsg").textContent = "بدأ الفحص ✓"; await loadRuns(); }
+  catch (e) { $("startMsg").textContent = "⚠️ " + e.message; }
+  $("start").disabled = false;
+};
+
+async function loadRuns() {
+  const { runs } = await api("/api/platform/journey");
+  if (!S.cur && runs[0]) S.cur = runs[0].id;
+  $("runs").innerHTML = runs.map((r) => `<tr data-id="${r.id}" class="${r.id === S.cur ? "on" : ""}"><td class="ltr">${esc(r.id)}</td><td>${esc(r.phase)}</td>
+    <td class="st ${r.state}">${ST[r.state] || esc(r.state)}</td><td>${esc(r.step || "")}</td>
+    <td>${r.total ? `${r.total.ok}/${r.total.steps}` : ""}</td><td>${r.total ? r.total.credits : ""}</td><td>${r.total ? "$" + r.total.usd : ""}</td>
+    <td>${["starting", "running"].includes(r.state) ? `<button class="btn" data-stop="${r.id}">⏹ أوقف</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="8" class="mute">لا توجد تشغيلات بعد</td></tr>`;
+  if (S.cur) await loadRun(S.cur);
+  const live = runs.some((r) => ["starting", "running"].includes(r.state));
+  clearTimeout(loadRuns.t); loadRuns.t = setTimeout(loadRuns, live ? 5000 : 30000);
+}
+$("runs").onclick = async (e) => {
+  const stop = e.target.closest("[data-stop]");
+  if (stop) { await api(`/api/platform/journey/${stop.dataset.stop}/stop`, { method: "POST" }).catch(() => {}); return loadRuns(); }
+  const tr = e.target.closest("tr[data-id]"); if (tr) { S.cur = tr.dataset.id; S.map = null; loadRuns(); }
+};
+
+async function loadRun(id) {
+  const r = await api(`/api/platform/journey/${id}`);
+  S.run = r;
+  const rep = r.report || {}, t = rep.total || {};
+  $("logCard").hidden = !r.log; $("log").textContent = r.log || "";
+  $("kpis").innerHTML = [["الخطوات", `${t.ok ?? 0}/${t.steps ?? 0}`], ["فشلت", t.failed ?? 0], ["النقاط", t.credits ?? 0], ["التكلفة الحقيقية", "$" + (t.usd ?? 0)],
+    ["نتائج للمراجعة", (rep.outputs || []).length], ["أخطاء", (rep.errors || []).length]].map(([k, v]) => `<div class="kpi"><span class="mute">${k}</span><b>${v}</b></div>`).join("");
+  $("steps").innerHTML = (rep.steps || []).map((s) => `<tr><td>${esc(s.brand)}</td><td>${esc(s.step)}</td><td class="${s.ok ? "ok" : "bad"}">${s.ok ? "✅" : "❌"}</td>
+    <td>${s.credits ?? ""}</td><td>${s.usd != null ? "$" + s.usd : ""}</td><td>${s.secs}</td><td>${esc(s.error || s.note || "")}</td></tr>`).join("");
+  renderOuts();
+  const f = r.files || {};
+  $("videos").innerHTML = (f.video || []).map((v) => `<div><div class="mute ltr">${esc(v)}</div><video controls preload="metadata" src="/api/platform/journey/${id}/f/video/${encodeURIComponent(v)}"></video></div>`).join("") || `<span class="mute">لا يوجد فيديو بعد</span>`;
+  $("shots").innerHTML = (f.shots || []).map((s) => { const u = `/api/platform/journey/${id}/f/shots/${encodeURIComponent(s)}`; return `<a href="${u}" target="_blank"><img loading="lazy" src="${u}" alt=""><span>${esc(s)}</span></a>`; }).join("");
+  const L = rep.lang || {};
+  $("enAr").innerHTML = (L.en_arabic || []).sort((a, b) => a.content - b.content).map((x) => `<tr><td>${x.content ? "محتوى" : "<b class='bad'>واجهة</b>"}</td><td>${esc(x.text)}</td><td>${esc(x.where)}</td></tr>`).join("") || `<tr><td class="mute">لا شيء ✓</td></tr>`;
+  $("dial").innerHTML = (L.ui_dialect || []).map((x) => `<tr><td>${esc(x.text)}</td><td>${esc(x.word)}</td><td>${esc(x.where)}</td></tr>`).join("") || `<tr><td class="mute">لا شيء ✓</td></tr>`;
+  $("msgs").innerHTML = (rep.messages || []).map((m) => `<tr><td>${esc(m.niche)}</td><td class="${m.err ? "bad" : ""}">${m.kind === "toast" ? (m.err ? "رسالة خطأ" : "رسالة") : "نافذة"}</td><td>${esc(m.t)}</td></tr>`).join("") || `<tr><td class="mute">لا شيء</td></tr>`;
+  $("errs").innerHTML = (rep.errors || []).map((e) => `<tr><td class="bad">${esc(e)}</td></tr>`).join("") || `<tr><td class="mute">لا أخطاء ✓</td></tr>`;
+}
+
+function renderOuts() {
+  const outs = (S.run?.report?.outputs) || [], rt = S.run?.ratings || {};
+  const fill = (sel, vals, all) => { const cur = sel.value; sel.innerHTML = `<option value="">${all}</option>` + [...new Set(vals)].map((v) => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join(""); };
+  fill($("outNiche"), outs.map((o) => o.brand), "كل المجالات"); fill($("outKind"), outs.map((o) => o.kind), "كل الأنواع");
+  const list = outs.filter((o) => (!$("outNiche").value || o.brand === $("outNiche").value) && (!$("outKind").value || o.kind === $("outKind").value));
+  const done = outs.filter((o) => rt[o.id]?.vote).length;
+  $("outCount").textContent = `${list.length} نتيجة · قيّمت ${done} من ${outs.length}`;
+  $("outs").innerHTML = list.map((o) => { const r = rt[o.id] || {}; return `<div class="out" data-oid="${esc(o.id)}"><h4>${esc(o.kind)} · ${esc(o.brand)}</h4><div class="mute">${esc(o.title)}</div>
+    ${o.media ? (/\.(mp4|webm)$/i.test(o.media) ? `<video controls src="${esc(o.media)}"></video>` : `<img src="${esc(o.media)}" style="max-width:100%;border-radius:8px">`) : ""}
+    ${o.text ? `<pre>${esc(o.text)}</pre>` : ""}
+    <div class="vote"><button class="btn${r.vote === 1 ? " on" : ""}" data-v="1">👍</button><button class="btn${r.vote === -1 ? " on" : ""}" data-v="-1">👎</button><span class="mute" data-saved></span></div>
+    <textarea placeholder="ملاحظتك على هذه النتيجة (ما الذي يحتاج تعديلًا؟)">${esc(r.note || "")}</textarea></div>`; }).join("") || `<p class="mute">لا توجد نتائج بعد</p>`;
+}
+$("outNiche").onchange = $("outKind").onchange = renderOuts;
+async function rate(card, vote) {
+  const oid = card.dataset.oid, prev = S.run.ratings[oid] || {};
+  const v = vote === undefined ? prev.vote || 0 : (prev.vote === vote ? 0 : vote);
+  S.run.ratings = await api(`/api/platform/journey/${S.cur}/rate`, { method: "POST", body: JSON.stringify({ oid, vote: v, note: card.querySelector("textarea").value }) });
+  card.querySelectorAll("[data-v]").forEach((b) => b.classList.toggle("on", +b.dataset.v === v));
+  card.querySelector("[data-saved]").textContent = "حُفظ ✓";
+}
+$("outs").onclick = (e) => { const b = e.target.closest("[data-v]"); if (b) rate(b.closest(".out"), +b.dataset.v); };
+$("outs").addEventListener("change", (e) => { if (e.target.matches("textarea")) rate(e.target.closest(".out")); });
+
+async function loadMap() {
+  S.map = await api("/api/platform/textmap" + (S.cur ? `?rid=${S.cur}` : "")).catch(() => ({ items: [] }));
+  renderMap();
+}
+function mapRows() {
+  const q = $("mapQ").value.trim(), miss = $("mapMiss").checked;
+  return (S.map?.items || []).filter((x) => (!miss || x.missing) && (!q || x.text.includes(q) || (x.en || "").toLowerCase().includes(q.toLowerCase())));
+}
+function renderMap() {
+  const rows = mapRows(), all = S.map?.items || [];
+  $("mapInfo").textContent = `${all.length} جملة · ناقصة الترجمة ${all.filter((x) => x.missing).length}${S.map?.run ? " · من تشغيلة " + S.map.run : ""}`;
+  $("map").innerHTML = rows.slice(0, 1500).map((x) => `<tr><td>${esc(x.text)}</td><td class="ltr ${x.missing ? "bad" : ""}">${esc(x.en || "")}</td><td>${esc(x.kind)}</td>
+    <td class="ltr mute">${(x.places || []).slice(0, 4).map(esc).join("<br>")}${(x.places || []).length > 4 ? `<br>+${x.places.length - 4}` : ""}</td></tr>`).join("");
+}
+$("mapQ").oninput = $("mapMiss").onchange = renderMap;
+$("mapCsv").onclick = () => {
+  const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+  const csv = "﻿" + ["arabic,english,missing,kind,screens,places", ...mapRows().map((x) => [x.text, x.en, x.missing ? 1 : 0, x.kind, (x.screens || []).join(" "), (x.places || []).join(" | ")].map(q).join(","))].join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "textmap.csv"; a.click();
+};
+loadIssues();
+loadRuns().catch((e) => { $("runs").innerHTML = `<tr><td class="bad">${esc(e.message)}</td></tr>`; });
+</script>
+</body>
+</html>

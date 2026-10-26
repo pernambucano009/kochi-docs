@@ -13410,4 +13410,9 @@ window.I18N_EN = {
   "اضغط للتعديل": "Click to edit",
   "{caption} {cta} 👇 {link} #هاشتاج": "{caption} {cta} 👇 {link} #hashtag",
   "{caption} {cta} 👇 {link} #وسم": "{caption} {cta} 👇 {link} #hashtag",
+  "تنتهي كل قطعة على نبضة في الموسيقى، ويتسارع القطع في الثلث الأخير (مثل ريلز الأعمال)": "Each clip ends on a music beat, and cuts speed up in the last third (like business reels)",
+  "أزل السكتات بضغطة (خفيف/متوسط/قوي) أو علّمها للمراجعة": "Remove silences in one click (light/medium/strong) or mark them for review",
+  "🧭 لوحة الفحص": "🧭 Inspection panel",
+  "صندوق الأخطاء: كل خطأ ظهر لأي عميل أو شغل فشل يصل تلقائيًا بسببه وإصلاحه المقترح. والفحص الشامل: عميل تجريبي يمشي في البرنامج كله ويسجّل كل خطوة ورسالة وكلمة، مع النتائج لتقييمها بعينك وخريطة كل كلام البرنامج.": "Error inbox: every error any customer saw, or any job that failed, arrives automatically with its cause and a suggested fix. Full inspection: a test customer walks through the whole app and records every step, message and word, with the outputs to rate yourself and a map of all the app's text.",
+  "افتح لوحة الفحص ↗": "Open inspection panel ↗",
 };

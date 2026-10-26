@@ -48,6 +48,8 @@ DATA_DIR = Path(os.environ.get("STUDIOMANIA_DATA") or ROOT / "data")
 PLATFORM = DATA_DIR / "_platform"
 TENANTS = PLATFORM / "tenants"
 PDB = PLATFORM / "platform.db"
+os.environ.setdefault("PLATFORM_DB", str(PDB))   # 🚨 صندوق الأخطاء (issues.py) في قاعدة المنصة نفسها، للبوابة وكل النسخ
+import issues  # noqa: E402
 TENANTS.mkdir(parents=True, exist_ok=True)
 
 COOKIE = "sp_session"
@@ -1276,42 +1278,189 @@ def admin_users(request: Request):
     return [dict(r) for r in rows]
 
 
-class TestAccountIn(BaseModel):
-    email: str
-    password: str
-    credits: int = 0
-    plan: str = "agency"
+# ---------------------------------------------------------------- 🧭 الفحص الشامل (صفحة الأدمن /admin/inspect)
+# عميل تجريبي بيمشي في البرنامج زي العميل بالظبط على نفس السيرفر (journey.py)، والنتيجة: الخطوات والنقاط والصور والفيديو،
+# والنتايج اللي تتراجع بالعين (👍/👎 وملاحظة)، وخريطة كل كلام البرنامج وأماكنه.
+JOURNEY = PLATFORM / "journey"
+JOURNEY.mkdir(parents=True, exist_ok=True)
+JOURNEY_EMAIL = "journey@test.simsimkit.com"
+JOURNEY_CREDITS = 100_000   # رصيد حساب التجربة في كل تشغيلة (من غير حد عملي: الحد الحقيقي رصيد المنصات نفسها)
+_journey: dict[str, subprocess.Popen] = {}
 
 
-@app.post("/api/platform/test-account")
-def admin_test_account(body: TestAccountIn, request: Request):
-    """🧪 حساب عميل للتجربة (رحلة التجربة): يُنشأ أو يُعاد ضبطه، مؤكَّد، على باقة كاملة، ورصيده = النقاط المطلوبة بالظبط."""
-    admin(request)
-    email = norm_email(body.email)
-    check_pw(body.password)
-    if not email.endswith("@test.simsimkit.com"):
-        raise HTTPException(400, "حسابات التجربة تكون على @test.simsimkit.com فقط")
-    plan = body.plan if any(p["key"] == body.plan for p in billing.DEFAULTS["plans"]) else "agency"
+def ensure_test_account(email: str, password: str, credits: int, plan: str = "agency") -> str:
+    """حساب عميل للتجربة: يُنشأ أو يُعاد ضبطه، مؤكَّد، على باقة كاملة، ورصيده = credits. يرجّع مساحة العمل."""
+    email = norm_email(email)
+    plan = plan if any(p["key"] == plan for p in billing.DEFAULTS["plans"]) else "agency"
     u = user_by("email", email)
     if u and u["role"] != "customer":
         raise HTTPException(400, "هذا البريد ليس حساب عميل")
     if not u:
-        wid = new_workspace("رحلة التجربة")
+        wid = new_workspace("الفحص الشامل")
         uid = uuid.uuid4().hex[:12]
         with closing(db()) as c, c:
             c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 1, 'customer', ?, ?)",
-                      (uid, email, "رحلة التجربة", pw_hash(body.password), wid, time.time()))
+                      (uid, email, "الفحص الشامل", pw_hash(password), wid, time.time()))
         u = user_by("id", uid)
     wid = u["workspace"]
     with closing(db()) as c, c:
-        c.execute("UPDATE users SET pw=?, verified=1 WHERE id=?", (pw_hash(body.password), u["id"]))
+        c.execute("UPDATE users SET pw=?, verified=1 WHERE id=?", (pw_hash(password), u["id"]))
         c.execute("UPDATE workspaces SET plan=?, autopilot=1 WHERE id=?", (plan, wid))
         c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
         r = c.execute("SELECT plan_credits + topup_credits AS n FROM wallet WHERE workspace=?", (wid,)).fetchone()
-        delta = max(0, int(body.credits)) - (r["n"] if r else 0)
-        c.execute("UPDATE wallet SET plan_credits=0, topup_credits=?, updated_at=? WHERE workspace=?", (max(0, int(body.credits)), time.time(), wid))
-        ledger_add(c, wid, delta, "test", "رصيد رحلة التجربة")
-    return {"ok": True, "email": email, "workspace": wid, "plan": plan, "credits": max(0, int(body.credits))}
+        c.execute("UPDATE wallet SET plan_credits=0, topup_credits=?, updated_at=? WHERE workspace=?", (credits, time.time(), wid))
+        ledger_add(c, wid, credits - (r["n"] if r else 0), "test", "رصيد الفحص الشامل")
+    return wid
+
+
+def journey_dir(rid: str) -> Path:
+    if not re.fullmatch(r"[0-9a-z-]{6,40}", rid) or not (JOURNEY / rid).is_dir():
+        raise HTTPException(404, "هذه التشغيلة غير موجودة")
+    return JOURNEY / rid
+
+
+def journey_read(d: Path, name: str, default=None):
+    try:
+        return json.loads((d / name).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def journey_summary(d: Path) -> dict:
+    st = journey_read(d, "status.json", {}) or {}
+    rid = d.name
+    if st.get("state") in ("starting", "running") and (rid not in _journey or _journey[rid].poll() is not None):
+        st["state"] = "failed" if rid not in _journey or _journey[rid].returncode else st["state"]
+        st.setdefault("step", "توقفت العملية")
+    rep = journey_read(d, "report.json", {}) or {}
+    return {"id": rid, **st, "total": rep.get("total"), "niches": (journey_read(d, "request.json", {}) or {}).get("niches") or []}
+
+
+class JourneyIn(BaseModel):
+    phase: str = "1"
+    niches: list[str] = []
+
+
+@app.post("/api/platform/journey")
+def journey_start(body: JourneyIn, request: Request):
+    admin(request)
+    if any(p.poll() is None for p in _journey.values()):
+        raise HTTPException(400, "يوجد فحص يعمل الآن، انتظر حتى ينتهي أو أوقفه")
+    pw = secrets.token_urlsafe(18)
+    ensure_test_account(JOURNEY_EMAIL, pw, JOURNEY_CREDITS)
+    rid = time.strftime("%Y%m%d-%H%M%S") + "-p" + re.sub(r"\W", "", body.phase)[:3]
+    d = JOURNEY / rid
+    d.mkdir(parents=True)
+    niches = [n for n in body.niches if re.fullmatch(r"[a-z]{2,20}", n)]
+    (d / "request.json").write_text(json.dumps({"phase": body.phase, "niches": niches, "at": time.time()}))
+    port = os.environ.get("PORT") or "8000"
+    _journey[rid] = subprocess.Popen(
+        [sys.executable, str(Path(__file__).with_name("journey.py")), "--base", f"http://127.0.0.1:{port}", "--out", str(d),
+         "--phase", body.phase, "--niches", ",".join(niches), "--email", JOURNEY_EMAIL],
+        env={**os.environ, "JOURNEY_PASSWORD": pw}, stdout=open(d / "log.txt", "w"), stderr=subprocess.STDOUT, cwd=str(Path(__file__).parent))
+    return journey_summary(d)
+
+
+@app.get("/api/platform/journey")
+def journey_list(request: Request):
+    admin(request)
+    runs = sorted((p for p in JOURNEY.iterdir() if p.is_dir()), reverse=True)[:30]
+    return {"runs": [journey_summary(d) for d in runs]}
+
+
+@app.get("/api/platform/journey/{rid}")
+def journey_get(rid: str, request: Request):
+    admin(request)
+    d = journey_dir(rid)
+    rep = journey_read(d, "report.json", {}) or {}
+    rep.pop("textmap", None)   # الخريطة لوحدها (كبيرة)
+    try:
+        log = (d / "log.txt").read_text(encoding="utf-8")[-6000:]
+    except OSError:
+        log = ""
+    files = {k: sorted(p.name for p in (d / k).glob("*")) if (d / k).is_dir() else [] for k in ("shots", "video")}
+    return {**journey_summary(d), "report": rep, "ratings": journey_read(d, "ratings.json", {}) or {}, "log": log, "files": files}
+
+
+@app.get("/api/platform/journey/{rid}/f/{kind}/{name}")
+def journey_file(rid: str, kind: str, name: str, request: Request):
+    admin(request)
+    d = journey_dir(rid)
+    if kind not in ("shots", "video") or not re.fullmatch(r"[\w.-]+", name) or not (d / kind / name).is_file():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(d / kind / name)
+
+
+class JourneyRateIn(BaseModel):
+    oid: str
+    vote: int = 0      # 1 = 👍، -1 = 👎، 0 = بدون
+    note: str = ""
+
+
+@app.post("/api/platform/journey/{rid}/rate")
+def journey_rate(rid: str, body: JourneyRateIn, request: Request):
+    admin(request)
+    d = journey_dir(rid)
+    r = journey_read(d, "ratings.json", {}) or {}
+    r[body.oid[:80]] = {"vote": max(-1, min(1, body.vote)), "note": body.note.strip()[:2000], "at": time.time()}
+    (d / "ratings.json").write_text(json.dumps(r, ensure_ascii=False))
+    return r
+
+
+@app.post("/api/platform/journey/{rid}/stop")
+def journey_stop(rid: str, request: Request):
+    admin(request)
+    d = journey_dir(rid)
+    p = _journey.get(rid)
+    if p and p.poll() is None:
+        p.terminate()
+    st = journey_read(d, "status.json", {}) or {}
+    (d / "status.json").write_text(json.dumps({**st, "state": "stopped", "step": "أوقفه الأدمن"}, ensure_ascii=False))
+    return journey_summary(d)
+
+
+@app.get("/api/platform/textmap")
+def journey_textmap(request: Request, rid: str = ""):
+    """🗺️ خريطة الكلام: من آخر تشغيلة فيها خريطة (أو تشغيلة بعينها)."""
+    admin(request)
+    runs = [journey_dir(rid)] if rid else sorted((p for p in JOURNEY.iterdir() if p.is_dir()), reverse=True)
+    for d in runs:
+        tm = (journey_read(d, "report.json", {}) or {}).get("textmap")
+        if tm:
+            return {"run": d.name, "items": tm}
+    return {"run": None, "items": []}
+
+
+# ---------------------------------------------------------------- 🚨 صندوق الأخطاء (issues.py)
+@app.get("/api/platform/issues")
+def issues_list(request: Request, all: int = 0):
+    admin(request)
+    rows = issues.listing(open_only=not all)
+    with closing(db()) as c:
+        emails = {r["workspace"]: r["email"] for r in c.execute("SELECT workspace, email FROM users")}
+    for r in rows:
+        r["accounts"] = sorted({*r["users"], *(emails.get(w, "صاحب المنصة" if w == OWNER else w) for w in r["workspaces"])})[:20]
+    return {"items": rows, "open": issues.open_count()}
+
+
+class IssueResolveIn(BaseModel):
+    note: str = ""
+    reopen: bool = False
+
+
+@app.post("/api/platform/issues/{iid}/resolve")
+def issues_resolve(iid: str, body: IssueResolveIn, request: Request):
+    admin(request)
+    issues.resolve(iid, body.note, body.reopen)
+    return {"ok": True, "open": issues.open_count()}
+
+
+@app.get("/admin/inspect")
+def admin_inspect_page(request: Request):
+    u = current_user(request)
+    if not u or u["role"] != "admin":
+        return RedirectResponse("/login")
+    return page("inspect.html")
 
 
 # ---------------------------------------------------------------- كل الباقي بيروح لنسخة البرنامج بتاعة العميل
@@ -1473,6 +1622,8 @@ async def proxy(path: str, request: Request):
         r = await _http.send(req, stream=True)
     except httpx.HTTPError:
         _tenants.pop(t.wid, None)
+        issues.record("api", f"{request.method} {url_path}", "نسخة العميل لم ترد (أُعيد تشغيلها)", "httpx.HTTPError عند الاتصال بنسخة العميل", 503,
+                      u["email"] if u else "")
         return JSONResponse({"detail": "البرنامج يعيد التشغيل، جرّب مرة أخرى بعد ثوانٍ"}, status_code=503)
     out_headers = [(k, v) for k, v in r.headers.multi_items() if k.lower() not in HOP and k.lower() != "set-cookie"]
     resp = StreamingResponse(r.aiter_raw(), status_code=r.status_code, background=BackgroundTask(r.aclose))

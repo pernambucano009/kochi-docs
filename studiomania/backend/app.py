@@ -537,6 +537,8 @@ with closing(db()) as _conn, _conn:
         )
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
+import issues  # noqa: E402  (🚨 صندوق الأخطاء: أي خطأ أو شغل فشل/وقف بيتسجل لوحده)
+app.add_middleware(issues.Middleware)
 
 
 # الصفحات والملفات اللي بتفتح من غير دخول
@@ -643,6 +645,21 @@ async def require_login(request: Request, call_next):
     if path.rstrip("/") == "/kochi":
         return kochi_page()
     return RedirectResponse("/login")
+
+
+class ClientIssueIn(BaseModel):
+    message: str
+    screen: str = ""
+    kind: str = "ui"     # ui = رسالة خطأ ظهرت للعميل · js = كود وقع في المتصفح
+    raw: str = ""
+
+
+@app.post("/api/issues/client")
+def client_issue(body: ClientIssueIn, request: Request):
+    """🚨 الواجهة بتبلّغ لوحدها: رسالة خطأ ظهرت للعميل، أو كود وقع في المتصفح."""
+    issues.record("js" if body.kind == "js" else "ui", body.screen[:120] or "/", body.message[:1000], body.raw[:3000],
+                  user=request.headers.get("x-user-email", ""), screen=body.screen[:120])
+    return {"ok": True}
 
 
 @app.get("/kochi")
@@ -11855,7 +11872,10 @@ def list_brains():
 
 @app.get("/api/ad-brains/{bid}")
 def get_brain(bid: str):
-    return brain_to_dict(brain_row(bid))
+    b = brain_row(bid)
+    if b is None:   # علامة اتحذفت (أو رابط قديم): رسالة واضحة بدل خطأ ٥٠٠
+        raise HTTPException(404, "هذه العلامة غير موجودة")
+    return brain_to_dict(b)
 
 
 class BrainIn(BaseModel):
