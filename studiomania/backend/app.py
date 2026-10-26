@@ -21396,6 +21396,7 @@ def dub_detect_bg(src: Path, words: list[dict], total: float) -> bool | None:
     pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     seg = np.concatenate([pcm[int(a * 16000):int(b * 16000)] for a, b in gaps if b > a] or [np.zeros(1, np.float32)])
     db = 20 * np.log10(float(np.sqrt(np.mean(seg ** 2))) + 1e-9)
+    print(f"[dub] pauses level {db:.1f} dB over {sum(b - a for a, b in gaps):.1f}s", flush=True)
     return bool(db > -52)   # هدوء الغرفة وضوضاء الموبايل حوالي -60، وأوطى موسيقى خلفية حوالي -47
 
 
@@ -21510,6 +21511,12 @@ def dub_cost(d: dict, dialect: str, voice: str, lipsync: str | None, background:
     secs = float(d["source"].get("duration") or 0)
     texts = texts if texts is not None else ([x["src"] for x in d.get("lines") or []] or ["x" * int(secs * 15)])
     usd = dub.estimate(texts, voice, secs, lipsync)
+    if background == "auto" and "has_bg" not in d and d.get("words") and d.get("_id"):   # مشروع قديم: نعرف فيه موسيقى ولا لا قبل ما نحسب
+        try:
+            d["has_bg"] = dub_detect_bg(DUB_DIR / d["_id"] / d["source"]["file"], d["words"], secs)
+            dub_update(d["_id"], lambda x: x.update(has_bg=d["has_bg"]))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[dub] bg detect: {exc}", flush=True)
     if (background == "separate" or (background == "auto" and d.get("has_bg") is not False)) and voicelab.eleven_key() \
             and not (DUB_DIR / d.get("_id", "") / "bg.wav").exists():
         usd += secs / 60 * dub.SEP_PER_MIN
@@ -21627,6 +21634,14 @@ def dub_background(did: str, d: dict, mode: str) -> Path | None:
     """الموسيقى والمؤثرات بدون الكلام (ElevenLabs: كلام / كل حاجة تانية)، أو الصوت الأصلي واطي، أو لا شيء."""
     folder = DUB_DIR / did
     src = folder / d["source"]["file"]
+    if mode == "auto" and "has_bg" not in d and d.get("words"):   # مشروع قديم اترفع قبل الكشف: نكشف دلوقتي ونحفظ
+        try:
+            hb = dub_detect_bg(src, d["words"], float(d["source"].get("duration") or 0))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[dub] bg detect: {exc}", flush=True)
+            hb = None
+        d["has_bg"] = hb
+        dub_update(did, lambda x: x.update(has_bg=hb))
     if mode == "auto":   # 🎵 مفيش موسيقى أصلًا (الوقفات هادية): مانفصلش ومانصرفش
         mode = "none" if d.get("has_bg") is False else "separate" if (voicelab.eleven_key() or atlas.mock_mode()) else "none"
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
