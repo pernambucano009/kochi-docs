@@ -103,16 +103,20 @@ input{font:inherit}
 html,body{height:100%;overflow:hidden}
 body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
 #lp-stage{position:absolute;top:0;left:0;width:1440px;height:810px;transform-origin:0 0}
+#lp-sky{position:fixed;inset:0;overflow:hidden;pointer-events:none}
+#lp-sky-in{position:absolute;top:0;left:0;width:1440px;height:810px;transform-origin:0 0}
+/* زرار قفل لوحة التسجيل */
+.lp-x{position:absolute;z-index:2;top:16px;inset-inline-end:16px;width:36px;height:36px;border-radius:18px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;background:transparent;color:inherit;opacity:.6;transition:opacity .2s,background-color .2s,transform .2s}
+.lp-pop>.lp-x{animation:none}
+.lp-x:hover,.lp-x:focus-visible{opacity:1;background:rgba(229,97,62,.12);transform:rotate(90deg)}
 </style>
 </head>
 <body>
+<!-- 🌟 النور والوهج برّه المسرح: بيملوا الشاشة كلها (حتى الجناب في الشاشات العريضة)، والمسرح شفاف فوقهم -->
+<div id="lp-sky" aria-hidden="true"><div id="lp-sky-in"><div id="lp-glow"></div><div id="lp-spread"></div></div></div>
 <div id="lp-stage"></div>
 <template id="lp-tpl">
 <div style="{{rootStyle}}">
-  <div style="{{litGlow}}"></div>
-  <sc-if value="{{flash}}" hint-placeholder-val="{{ false }}">
-    <div data-k="spread" class="lp-spread" style="{{spreadStyle}}"></div>
-  </sc-if>
   <div style="{{jellyWrap}}">
     <div class="lp-jf" style="position: absolute; inset: 0">
       <div class="{{litClass}}" style="position: absolute; inset: 0">
@@ -316,6 +320,7 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
   <!-- ===== التسجيل / الدخول ===== -->
   <sc-if value="{{isSignup}}" hint-placeholder-val="{{ false }}">
     <form data-k="signup" class="lp-pop" dir="{{dir}}" data-on-submit="{{submit}}" style="{{formStyle}}">
+      <button type="button" class="lp-x" data-on-click="{{goHome}}" aria-label="{{t.close}}" title="{{t.close}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       <h1 style="{{formTitle}}">{{t.sTitle}}</h1>
       <p style="{{formLead}}">{{t.sLead}}</p>
       <sc-if value="{{step1}}" hint-placeholder-val="{{ true }}">
@@ -441,7 +446,7 @@ const LP_TEXT = {
   ar: {
     signin: 'تسجيل الدخول', back: 'رجوع', crumbsAria: 'موقعك', langBtn: 'EN', langAria: 'Switch to English', themeAria: 'تبديل الوضع', light: 'فاتح', dark: 'غامق',
     nav: ['الرئيسية', 'كيف يعمل', 'أمثلة', 'المميزات', 'الأسعار', 'الأسئلة'], home: 'الرئيسية',
-    demo: 'شاهد مثالًا', start: 'ابدأ مجانًا', backHome: '→ رجوع للرئيسية',
+    demo: 'شاهد مثالًا', start: 'ابدأ مجانًا', backHome: '→ رجوع للرئيسية', close: 'إغلاق والرجوع للرئيسية',
     heroTitle: 'محتوى كل يوم، من غير فريق',
     heroLead: 'سمسمكيت يعرف علامتك ولهجتك، ويكتب الفكرة والسكريبت، ويصنع الفيديو وينشره في موعده. وأنت توافق من جوالك.',
     heroNote: '300 نقطة مجانًا للتجربة · بدون بطاقة',
@@ -462,7 +467,7 @@ const LP_TEXT = {
   en: {
     signin: 'SIGN IN', back: 'Back', crumbsAria: 'You are here', langBtn: 'ع', langAria: 'التبديل إلى العربية', themeAria: 'Switch theme', light: 'LIGHT', dark: 'DARK',
     nav: ['HOME', 'HOW', 'EXAMPLES', 'FEATURES', 'PRICES', 'FAQ'], home: 'Home',
-    demo: 'SEE AN EXAMPLE', start: 'START FREE', backHome: '← Back to home',
+    demo: 'SEE AN EXAMPLE', start: 'START FREE', backHome: '← Back to home', close: 'Close and go back home',
     heroTitle: 'Daily content, no team needed',
     heroLead: 'SimsimKit learns your brand and dialect, writes the idea and the script, makes the video and posts it on time. You approve from your phone.',
     heroNote: '300 free credits to try. No card needed.',
@@ -667,7 +672,7 @@ class Component {
     return {
       dark: d, dir: ar ? 'rtl' : 'ltr', t: {
         signin: T.signin, langBtn: T.langBtn, langAria: T.langAria, themeAria: T.themeAria, back: T.back, crumbsAria: T.crumbsAria,
-        home: T.home, demo: T.demo, start: T.start, backHome: T.backHome,
+        home: T.home, demo: T.demo, start: T.start, backHome: T.backHome, close: T.close,
         heroTitle: T.heroTitle, heroLead: T.heroLead, heroNote: T.heroNote, demoTitle: T.demoTitle, demoLead: T.demoLead, vidCap: T.vidCap,
         fTitle: T.fTitle, fLead: T.fLead, pTitle: T.pTitle, pLead: T.pLead, monthly: T.monthly, yearly: T.yearly, pNote: T.pNote, qTitle: T.qTitle,
         sTitle: reg ? T.sTitleR : T.sTitleL, sLead: reg ? T.sLeadR : T.sLeadL, or: T.or, name: T.name, email: T.email, password: T.password, showPw: T.showPw,
@@ -694,7 +699,8 @@ class Component {
       isHome: home, isInner: !home, isDemo: scr === 'demo', isFeatures: scr === 'features', isPrices: scr === 'prices', isFaq: scr === 'faq', isSignup: scr === 'signup', isRegister: reg,
       monthly: !y, yearly: y, showPw: s.showPw,
       markSrc: d ? '/logo-mark-dark.png' : '/logo-mark-light.png',
-      rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;color:' + ink + ';background:' + bg + ';' + (still || 'transition:background-color 1.6s ease;'),
+      rootStyle: 'position:relative;width:1440px;height:810px;overflow:hidden;color:' + ink + ';background:transparent',
+      pageBg: bg,
       litGlow: 'position:absolute;left:548px;top:44%;width:1200px;height:1200px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;' + (still || 'transition:opacity 1.6s ease;') + 'opacity:' + (lit ? (home ? 1 : 0.7) : (d ? 0.6 : 0)) + ';background:' + (d ? (lit ? 'radial-gradient(circle,rgba(255,226,160,.20) 0%,rgba(255,200,120,.06) 30%,rgba(23,23,26,0) 58%)' : 'radial-gradient(circle,rgba(120,150,255,.12) 0%,rgba(12,12,14,0) 58%)') : 'radial-gradient(circle,rgba(90,200,255,.20) 0%,rgba(120,190,255,.07) 32%,rgba(242,247,252,0) 60%)'),
       spreadStyle: 'position:absolute;left:548px;top:38%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;pointer-events:none;background:' + (d ? 'radial-gradient(circle,rgba(255,232,170,.32) 0%,rgba(255,232,170,0) 62%)' : 'radial-gradient(circle,rgba(80,200,255,.30) 0%,rgba(80,200,255,0) 62%)'),
       jellyWrap: 'position:absolute;left:300px;top:60px;width:497px;height:690px;pointer-events:none;' + (still || 'transition:opacity .7s ease;') + 'opacity:' + jellyOp,
@@ -806,7 +812,12 @@ Object.assign(Component.prototype, {
     R.lang = v.dir === 'rtl' ? 'ar' : 'en'; R.dir = v.dir; R.dataset.nhTheme = v.dark ? 'dark' : 'light';
     // تبديل الفاتح والغامق: الخلفية برّه المسرح بتتغير في نفس اللحظة (من غير انتقال)، وإلا حدود المسرح بتبان في النص
     document.body.style.transition = this.state.still ? 'none' : '';
-    document.body.style.backgroundColor = root.firstElementChild.style.backgroundColor;
+    document.body.style.backgroundColor = v.pageBg;
+    // النور (برّه المسرح): نفس الشكل والمكان، بس مش مقصوص على حدود المسرح
+    const glow = document.getElementById('lp-glow'), sp = document.getElementById('lp-spread');
+    glow.style.cssText = v.litGlow;
+    if (v.flash && !sp.className) { sp.style.cssText = v.spreadStyle; sp.className = 'lp-spread'; }
+    else if (!v.flash) { sp.className = ''; sp.style.cssText = 'display:none'; }
     root.querySelectorAll('video').forEach((x) => { x.muted = x.hasAttribute('muted'); });
     this.fill();
   },
@@ -866,6 +877,7 @@ Object.assign(Component.prototype, {
   const fit = () => {
     const k = Math.min(innerWidth / 1440, innerHeight / 810);
     stage.style.transform = 'translate(' + Math.round((innerWidth - 1440 * k) / 2) + 'px,' + Math.round((innerHeight - 810 * k) / 2) + 'px) scale(' + k + ')';
+    document.getElementById('lp-sky-in').style.transform = stage.style.transform;
   };
   addEventListener('resize', fit); fit();
   addEventListener('popstate', () => {
