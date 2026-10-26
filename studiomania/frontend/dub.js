@@ -42,7 +42,7 @@ const DB_STEPS = [["🎧", "يستمع إلى الكلام"], ["✍️", "يكت
 function dbSteps(t) {
   const st = String(t.step || ""), steps = DB_STEPS.filter(([e]) => e !== "👄" || t.lipsync);
   const at = Math.max(0, steps.findIndex(([e]) => [...e].some((c) => c.trim() && st.startsWith(c))));
-  return `<ol class="db-steps">${steps.map(([e, l], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}"><i>${i < at ? "✓" : e.slice(0, 2)}</i>${l}${i === at && /\(/.test(st) ? ` <small>${dbe(st.slice(st.indexOf("(")))}</small>` : ""}</li>`).join("")}</ol>`;
+  return `<ol class="db-steps">${steps.map(([e, l], i) => `<li class="${i < at ? "done" : i === at ? "now" : ""}"><i>${i < at ? "✓" : e.slice(0, 2)}</i>${l}${i === at && /\(([^)]*)\)/.test(st) ? ` <small>(${dbe(I18N.t(st.match(/\(([^)]*)\)/)[1]))})${/—/.test(st) ? ` — ${dbe(I18N.t(st.split("—").pop().trim()))}` : ""}</small>` : ""}</li>`).join("")}</ol>`;
 }
 const dbOpts = (k, t, dis) => {
   const info = dbx.info, lc = t.lip_cost || {};

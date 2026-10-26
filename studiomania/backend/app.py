@@ -21756,7 +21756,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
         src = folder / d["source"]["file"]
         video_in = src
         if lipsync:
-            step(f"👄 ليب سينك ({dub.LIPSYNC[lipsync]['label']}) — يأخذ دقايق")
+            step(f"👄 مزامنة الشفاه ({dub.LIPSYNC[lipsync]['label']}) — تستغرق دقائق")
             lip = work / "lip.mp4"
             if atlas.mock_mode():
                 shutil.copy(src, lip)
