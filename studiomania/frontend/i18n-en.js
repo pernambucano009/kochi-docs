@@ -13415,4 +13415,8 @@ window.I18N_EN = {
   "🧭 لوحة الفحص": "🧭 Inspection panel",
   "صندوق الأخطاء: كل خطأ ظهر لأي عميل أو شغل فشل يصل تلقائيًا بسببه وإصلاحه المقترح. والفحص الشامل: عميل تجريبي يمشي في البرنامج كله ويسجّل كل خطوة ورسالة وكلمة، مع النتائج لتقييمها بعينك وخريطة كل كلام البرنامج.": "Error inbox: every error any customer saw, or any job that failed, arrives automatically with its cause and a suggested fix. Full inspection: a test customer walks through the whole app and records every step, message and word, with the outputs to rate yourself and a map of all the app's text.",
   "افتح لوحة الفحص ↗": "Open inspection panel ↗",
+  "انتهت مهلة الدخول بجوجل أو فُتح في متصفح آخر. افتح الموقع من متصفح الجوال نفسه (Safari أو Chrome) وجرّب مرة أخرى": "Google sign-in timed out or opened in another browser. Open the site in your phone's own browser (Safari or Chrome) and try again",
+  "ألغيت الدخول بجوجل. اضغط «أكمل بجوجل» مرة أخرى إذا أردت": "You cancelled Google sign-in. Press \"Continue with Google\" again if you want",
+  "رفضت جوجل الدخول بهذا الحساب. جرّب حسابًا آخر أو ادخل بالبريد الإلكتروني": "Google refused sign-in with this account. Try another account or sign in with email",
+  "هذا الحساب في جوجل بريده غير مؤكد. أكّده في جوجل أو ادخل بالبريد الإلكتروني": "This Google account's email isn't verified. Verify it in Google or sign in with email",
 };

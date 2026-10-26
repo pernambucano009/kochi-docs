@@ -847,34 +847,60 @@ def change_pw(body: ChangePwIn, request: Request):
 
 # ---------------------------------------------------------------- الدخول بجوجل
 
+def g_state_make() -> str:
+    """حالة موقّعة (بدل كوكي بس): متصفحات التطبيقات على الموبايل (واتساب، جيميل، إنستجرام…) ساعات بتفتح جوجل في نافذة تانية
+    وبترجع من غير الكوكي، فالدخول كان بيفشل. التوقيع بالسر بيمنع أي حد يزوّرها، وصالحة ١٠ دقايق بس."""
+    raw = f"{int(time.time())}.{secrets.token_urlsafe(12)}"
+    return raw + "." + hmac.new(SECRET, raw.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def g_state_ok(state: str) -> bool:
+    try:
+        ts, nonce, sig = state.split(".")
+        good = hmac.new(SECRET, f"{ts}.{nonce}".encode(), hashlib.sha256).hexdigest()[:32]
+        return hmac.compare_digest(sig, good) and 0 <= time.time() - int(ts) < 600
+    except (ValueError, AttributeError):
+        return False
+
+
+def google_fail(why: str, raw: str = "") -> RedirectResponse:
+    """الدخول بجوجل فشل: السبب الحقيقي بيتسجل في صندوق الأخطاء، والعميل بيشوف رسالة بتقوله يعمل إيه."""
+    issues.record("api", "GET /auth/google/callback", f"الدخول بجوجل فشل: {why}", raw[:2000], 400)
+    return RedirectResponse(f"/login?err=google&why={why}")
+
+
 @app.get("/auth/google")
 def google_start(request: Request):
     cid = os.environ.get("GOOGLE_CLIENT_ID")
     if not cid:
         raise HTTPException(404, "الدخول بجوجل غير مفعّل")
-    state = secrets.token_urlsafe(16)
+    state = g_state_make()
     q = urlencode({"client_id": cid, "redirect_uri": f"{base_url(request)}/auth/google/callback", "response_type": "code",
                    "scope": "openid email profile", "state": state, "prompt": "select_account"})
     resp = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{q}")
-    resp.set_cookie("g_state", state, max_age=600, httponly=True, samesite="lax")
+    resp.set_cookie("g_state", state, max_age=600, httponly=True, samesite="lax", secure=base_url(request).startswith("https"))
     return resp
 
 
 @app.get("/auth/google/callback")
-def google_back(request: Request, code: str = "", state: str = ""):
-    if not state or not hmac.compare_digest(state, request.cookies.get("g_state") or ""):
-        return RedirectResponse("/login?err=google")
+def google_back(request: Request, code: str = "", state: str = "", error: str = ""):
+    if error:   # العميل لغى، أو جوجل رفض (مثلًا التطبيق لسه في وضع الاختبار والإيميل مش متضاف)
+        return google_fail("cancel" if error == "access_denied" else "denied", f"error={error}")
+    if not state or not (hmac.compare_digest(state, request.cookies.get("g_state") or "") or g_state_ok(state)):
+        return google_fail("state", f"cookie={'yes' if request.cookies.get('g_state') else 'no'} ua={request.headers.get('user-agent', '')[:200]}")
     try:
         r = httpx.post("https://oauth2.googleapis.com/token", timeout=20, data={
             "code": code, "client_id": os.environ["GOOGLE_CLIENT_ID"], "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
             "redirect_uri": f"{base_url(request)}/auth/google/callback", "grant_type": "authorization_code"})
-        idt = r.json()["id_token"]
-        seg = idt.split(".")[1]
+        body = r.json()
+        if "id_token" not in body:   # غالبًا: السر غلط (invalid_client) أو الرابط مختلف (redirect_uri_mismatch)
+            return google_fail("token", f"{r.status_code} {json.dumps(body)[:600]} redirect_uri={base_url(request)}/auth/google/callback")
+        seg = body["id_token"].split(".")[1]
         info = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
-    except (httpx.HTTPError, KeyError, ValueError, IndexError):
-        return RedirectResponse("/login?err=google")
+    except (httpx.HTTPError, KeyError, ValueError, IndexError) as exc:
+        return google_fail("token", f"{type(exc).__name__}: {exc}")
     if info.get("aud") != os.environ["GOOGLE_CLIENT_ID"] or not info.get("email_verified") or not info.get("email"):
-        return RedirectResponse("/login?err=google")
+        return google_fail("email", f"aud_ok={info.get('aud') == os.environ['GOOGLE_CLIENT_ID']} verified={info.get('email_verified')}")
     email, sub = info["email"].lower(), str(info["sub"])
     u = user_by("google_sub", sub) or user_by("email", email)
     if needs_owner_setup():

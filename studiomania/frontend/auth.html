@@ -145,7 +145,12 @@ async function render() {
   if (v === "verify" && !S.user) v = "login";
   if (!VIEWS[v]) v = "login";
   $("body").innerHTML = VIEWS[v]();
-  if (Q.get("err") === "google") err("الدخول بجوجل لم يكتمل، جرّب مرة أخرى");
+  if (Q.get("err") === "google") err({
+    state: "انتهت مهلة الدخول بجوجل أو فُتح في متصفح آخر. افتح الموقع من متصفح الجوال نفسه (Safari أو Chrome) وجرّب مرة أخرى",
+    cancel: "ألغيت الدخول بجوجل. اضغط «أكمل بجوجل» مرة أخرى إذا أردت",
+    denied: "رفضت جوجل الدخول بهذا الحساب. جرّب حسابًا آخر أو ادخل بالبريد الإلكتروني",
+    email: "هذا الحساب في جوجل بريده غير مؤكد. أكّده في جوجل أو ادخل بالبريد الإلكتروني",
+  }[Q.get("why")] || "الدخول بجوجل لم يكتمل، جرّب مرة أخرى");
   if (v === "verify") {
     $("dev").innerHTML = devLink(sessionStorage.getItem("devlink"));
     if (sessionStorage.getItem("mailfail")) err("تعذّر إرسال البريد الإلكتروني الآن. اضغط «أرسله مرة أخرى» بعد قليل");
