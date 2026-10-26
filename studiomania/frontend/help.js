@@ -56,6 +56,7 @@ const Help = (() => {
     q = String(q || "").trim();
     if (!q || S.busy) return;
     if (q === "أرسلها للدعم") return ticket();
+    q = I18N.t(q);   // الاقتراحات مكتوبة بالعربي: السؤال (وخانة التذكرة بعده) بلغة الواجهة
     S.msgs.push({ role: "user", text: q }); S.busy = true; draw();
     try {
       const r = await api("/api/help/chat", { method: "POST", ...jsonBody({ page: pageKey(), q, history: S.msgs.slice(0, -1), lang: I18N.lang }) });
