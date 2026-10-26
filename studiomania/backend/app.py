@@ -4293,9 +4293,9 @@ EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب 
 EXPENSE_PRESET = [
     {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
     {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد النطاق"},
-    {"name": "Zernio (النشر والرسايل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، من ٣ لـ ١٠ بـ $6 للحساب"},
-    {"name": "Atlas Cloud (الذكاء الصناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
-    {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري محتاج باقة مدفوعة"},
+    {"name": "Zernio (النشر والرسائل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، ومن ٣ إلى ١٠ بـ $6 للحساب"},
+    {"name": "Atlas Cloud (الذكاء الاصطناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
+    {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري يحتاج باقة مدفوعة"},
     {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة"},
     {"name": "منصت", "amount": 8, "cycle": "usage", "day": 0, "note": ""},
     {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "note": ""},
@@ -14578,7 +14578,7 @@ def lab_to_dict(lid: str, d: dict) -> dict:
             "picture_fx_url": f"{base}/{d['picture_fx']}" if d.get("picture_fx") else None, "audio": audio, "stems": stems, "schema": sch or None,
             "schema_roles": lab.SCHEMA_ROLES,
             "components": comps, "connectors": conns, "families": lab.CONNECTOR_FAMILIES,
-            "audioshake": bool(audioshake.api_key() or atlas.mock_mode()),
+            "audioshake": bool(voicelab.eleven_key() or atlas.mock_mode()),
             "reviews": lab_reviews(d), "busy": any((v or {}).get("status") in ("working", "queued") for v in (d.get("steps") or {}).values())
             or sch.get("status") == "working" or (d.get("typo") or {}).get("status") == "working",
             "typo": lab_typo_view(d.get("typo")),
@@ -15063,10 +15063,10 @@ def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
     if not d["source"].get("has_audio"):
         lab_update(lid, lambda d: d.update(stems={}))
         return
-    if not (audioshake.api_key() or atlas.mock_mode()):
+    if not (voicelab.eleven_key() or atlas.mock_mode()):
         lab_step(lid, step, status="skipped", progress="")
-        raise LabSkip("مفتاح AudioShake مش متسجل (AUDIOSHAKE_API_KEY)، فالصوت ما اتفصلش" + audioshake.missing_hint() if step == "split"
-                      else "مفتاح AudioShake غير مسجل (AUDIOSHAKE_API_KEY)، فالتحليل اشتغل على الصوت كله")
+        raise LabSkip("مفتاح ElevenLabs غير مسجل، فالصوت لم يُفصل" if step == "split"
+                      else "مفتاح ElevenLabs غير مسجل، فالتحليل اشتغل على الصوت كله")
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
     mix = folder / "mix.mp3"
@@ -15080,49 +15080,22 @@ def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
                            check=True, capture_output=True, timeout=120)
             stems[name] = {"file": f, "status": "done", "review": None}
     else:
-        lab_step(lid, step, progress="يرفع الصوت")
-        tid, plan = audioshake.create_task(atlas.upload_media(mix))
-        t0 = time.time()
-        def tick(out):
-            done = sum(v["status"] in ("completed", "complete", "done", "succeeded") for v in out.values())
-            lab_step(lid, step, progress=f"AudioShake يفصل النص والموسيقى والمؤثرات ({done}/{len(out) or 3} خلص · {int(time.time() - t0)} ث)")
-        res = audioshake.wait(tid, on_status=tick)
-        lab_step(lid, step, progress="يُحمّل التراكات")
+        # 🎚️ ElevenLabs (بدل AudioShake): الكلام + كل حاجة تانية. المؤثرات مش بتنفصل لوحدها عن الموسيقى
+        lab_step(lid, step, progress="يفصل الكلام عن الموسيقى والمؤثرات")
         raw = folder / "raw"
-        raw.mkdir(exist_ok=True)
-        got, errs = {}, {}
-        for name, r in res.items():
-            if r.get("link") and r["status"] not in ("error", "failed"):
-                atlas.download(r["link"], raw / f"{name}.wav")
-                got[name] = raw / f"{name}.wav"
-            else:
-                errs[name] = str(r.get("error") or "مرجعش ملف")[:200]
         ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
-        wav = {}   # التراكات بتاعتنا (wav عشان الطرح يبقى مظبوط بالعينة)
-        for name in ("dialogue", "effects", "music"):
-            how = plan[name]
-            src_of = lambda n: wav.get(n) or got.get(n)  # noqa: E731
-            try:
-                if how[0] == "target":
-                    if how[1] not in got:
-                        raise RuntimeError(errs.get(how[1]) or "مرجعش ملف")
-                    wav[name] = got[how[1]]
-                else:   # طرح: a − b
-                    a, b = src_of(how[1]), src_of(how[2])
-                    if not a or not b:
-                        raise RuntimeError(f"ناقص {how[1] if not a else how[2]}")
-                    out = raw / f"{name}.wav"
-                    subprocess.run(ff + ["-i", str(a), "-i", str(b), "-filter_complex",
-                                         "[1:a]volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)],
-                                   check=True, capture_output=True, timeout=300)
-                    wav[name] = out
+        try:
+            got = voicelab.eleven_stems(mix, raw)
+            for name, key in (("dialogue", "vocals"), ("music", "instrumental")):
+                if key not in got:
+                    stems[name] = {"file": None, "status": "failed", "error": "لم يرجع هذا التراك", "review": None}
+                    continue
                 f = f"{name}.mp3"
-                subprocess.run(ff + ["-i", str(wav[name]), "-b:a", "192k", str(folder / f)], check=True, capture_output=True, timeout=300)
-                stems[name] = {"file": f, "status": "done", "review": None, "how": "/".join(how[1:]) if how[0] == "sub" else how[1]}
-            except Exception as exc:  # noqa: BLE001
-                stems[name] = {"file": None, "status": "failed", "error": str(exc)[:200], "review": None}
-        shutil.rmtree(raw, ignore_errors=True)
-        stems["_task"] = tid
+                subprocess.run(ff + ["-i", str(got[key]), "-b:a", "192k", str(folder / f)], check=True, capture_output=True, timeout=300)
+                stems[name] = {"file": f, "status": "done", "review": None, "how": key}
+            stems["effects"] = {"file": None, "status": "failed", "error": "المؤثرات ضمن تراك الموسيقى", "review": None}
+        finally:
+            shutil.rmtree(raw, ignore_errors=True)
     lab_update(lid, lambda d: d.update(stems=stems))
 
 
@@ -21299,7 +21272,7 @@ def dub_info() -> dict:
             "voices": {k: v["label"] for k, v in dub.VOICES.items() if not v.get("hidden")},
             "fasih": bool(fasih.api_key() or atlas.mock_mode()), "brand_lang": dialect.code(active_client() or {}),
             "lipsync": {k: v["label"] for k, v in dub.LIPSYNC.items()},
-            "separate": bool(audioshake.api_key() or atlas.mock_mode()),
+            "separate": bool(voicelab.eleven_key() or atlas.mock_mode()),
             "caption_langs": CAPTION_LANGS}
 
 
@@ -21376,8 +21349,18 @@ def dub_delete(did: str):
     return {"ok": True}
 
 
+def dub_friendly(raw: str) -> str:
+    """الخطأ اللي بيشوفه العميل: من غير أسماء الخدمات ولا رد السيرفر الخام (الخام بيتسجّل في اللوج)."""
+    if not re.search(r"[A-Za-z]{3,}|[{}]", raw):
+        return raw   # رسالتنا بالعربي أصلًا
+    print(f"[dub] {raw[:400]}", flush=True)
+    if providers.LOW_WORDS.search(raw):
+        return "إحدى خدمات الصوت متوقفة مؤقتًا من جهتنا، وأُبلغ الفريق. لم يُخصم منك شيء. جرّب بعد قليل، أو اختر الخلفية «الصوت الأصلي منخفضًا»"
+    return "تعذّرت هذه الخطوة. لم يُخصم منك شيء. جرّب مرة أخرى، وإن تكرر أرسلها للدعم من المساعد"
+
+
 def dub_fail(did: str, exc: Exception, target: str | None = None) -> None:
-    msg = str(getattr(exc, "detail", None) or exc)[:400]
+    msg = dub_friendly(str(getattr(exc, "detail", None) or exc))[:400]
     def fn(d):
         if target:
             d["targets"][target].update(busy=False, step=None, error=msg)
@@ -21439,7 +21422,7 @@ def dub_target(did: str, body: DubTargetIn):
     return dub_to_dict(did, d)
 
 
-def run_dub_adapt(did: str, dialect: str) -> None:
+def run_dub_adapt(did: str, dialect: str, keep_busy: bool = False) -> None:
     try:
         d = dub_load(did)
         lines = d["lines"]
@@ -21450,7 +21433,9 @@ def run_dub_adapt(did: str, dialect: str) -> None:
             out = [dub.clean_line(x) for x in (res.get("lines") or [])]
             if len(out) != len(lines):   # الموديل غيّر عدد الجمل: نكمّل بالأصل عشان المواعيد ماتبوظش
                 out = (out + [ln["src"] for ln in lines[len(out):]])[: len(lines)]
-        dub_update(did, lambda x: x["targets"][dialect].update(lines=[{"text": t} for t in out], busy=False, step=None, error=None))
+        # في الزرار الواحد الشغل بيكمّل على طول للصوت، فما بنقولش «خلص» في النص
+        dub_update(did, lambda x: x["targets"][dialect].update(lines=[{"text": t} for t in out], busy=keep_busy,
+                                                               step="🎙️ جارٍ تسجيل الجمل" if keep_busy else None, error=None))
     except Exception as exc:  # noqa: BLE001
         dub_fail(did, exc, dialect)
 
@@ -21485,6 +21470,18 @@ class DubRenderIn(BaseModel):
     captions: str = ""              # "" من غير كابشن · same بلغة الدبلجة · كود لغة (en, fr…) مترجم
 
 
+def dub_cost(d: dict, dialect: str, voice: str, lipsync: str | None, background: str, texts: list[str] | None = None, write: bool = False) -> float:
+    """بالدولار: الصوت + الليب سينك + فصل الموسيقى (لو مطلوب) + كتابة النص باللهجة (في الزرار الواحد)."""
+    secs = float(d["source"].get("duration") or 0)
+    texts = texts if texts is not None else ([x["src"] for x in d.get("lines") or []] or ["x" * int(secs * 15)])
+    usd = dub.estimate(texts, voice, secs, lipsync)
+    if background in ("auto", "separate") and voicelab.eleven_key() and not (DUB_DIR / d.get("_id", "") / "bg.wav").exists():
+        usd += secs / 60 * dub.SEP_PER_MIN
+    if write:
+        usd += wallet.est(chars=sum(len(x) for x in texts) * 3 + 4000)
+    return usd
+
+
 @app.post("/api/dub/{did}/target/{dialect}/render")
 def dub_render(did: str, dialect: str, body: DubRenderIn):
     if dialect not in dub.DIALECTS:
@@ -21503,19 +21500,99 @@ def dub_render(did: str, dialect: str, body: DubRenderIn):
             raise HTTPException(400, "اكتب النص باللهجة أولًا")
         if dub_busy(d):
             raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
-        t.update(busy=True, step="🎙️ جارٍ تسجيل الجمل", error=None, lipsync=body.lipsync)
-    d = dub_update(did, fn)
+        t.update(busy=True, step="🎙️ جارٍ تسجيل الجمل", error=None, lipsync=body.lipsync, bg=body.background, caps=body.captions)
+    cur = dub_load(did)
+    t0 = cur["targets"].get(dialect) or {}
+    if t0.get("lines") and not dub_busy(cur):   # 💳 النقاط بتتحجز قبل الشغل، وبترجع لو ما كملش
+        usd = dub_cost({**cur, "_id": did}, dialect, t0.get("voice") or dub.DIALECTS[dialect]["voices"][0], body.lipsync, body.background,
+                       [x.get("text") or "" for x in t0["lines"]])
+        hold = None if atlas.mock_mode() else wallet.reserve(wallet.credits(usd), f"الدبلجة: {dub.DIALECTS[dialect]['label']}", did)
+    else:
+        hold = None
+    try:
+        d = dub_update(did, fn)
+    except Exception:
+        wallet.refund(hold, why="الدبلجة لم تبدأ")
+        raise
     caps = body.captions if body.captions in ("same", *CAPTION_LANGS) else ""
-    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background, caps), daemon=True).start()
+    threading.Thread(target=run_dub_render, args=(did, dialect, body.lipsync, body.background, caps, hold), daemon=True).start()
     return dub_to_dict(did, d)
 
 
+class DubAutoIn(BaseModel):
+    dialect: str
+    voice: str | None = None
+    brief: str | None = None
+    lipsync: str | None = None
+    background: str = "auto"
+    captions: str = ""
+
+
+@app.post("/api/dub/{did}/auto")
+def dub_auto(did: str, body: DubAutoIn):
+    """🎙️ زرار واحد: يسمع الكلام (لو لسه) ← يكتب النص باللهجة ← يسجّل الجمل ← يركّب الخلفية ← فيديو جاهز.
+    بعدها تقدر تعدّل أي جملة وتعيد الدبلجة من «أعد الدبلجة»."""
+    if body.dialect not in dub.DIALECTS:
+        raise HTTPException(400, "هذه اللهجة غير موجودة")
+    if not (atlas.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
+    if dub.DIALECTS[body.dialect]["group"] == "ar" and not (fasih.api_key() or atlas.mock_mode()):
+        raise HTTPException(400, "خدمة الأصوات العربية غير مهيأة بعد. تواصل مع الدعم")
+    if body.lipsync and body.lipsync not in dub.LIPSYNC:
+        raise HTTPException(400, "نوع مزامنة الشفاه غير معروف")
+    voice = body.voice if body.voice in dub.DIALECTS[body.dialect]["voices"] else dub.DIALECTS[body.dialect]["voices"][0]
+    cur = dub_load(did)
+    if any(t.get("busy") for t in cur.get("targets", {}).values()):
+        raise HTTPException(400, "انتظر حتى ينتهي العمل الجاري")
+    if cur.get("error") and not cur.get("lines"):
+        raise HTTPException(400, cur["error"])
+    usd = dub_cost({**cur, "_id": did}, body.dialect, voice, body.lipsync, body.background, write=True)
+    hold = None if atlas.mock_mode() else wallet.reserve(wallet.credits(usd), f"الدبلجة: {dub.DIALECTS[body.dialect]['label']}", did)
+
+    def fn(d):
+        if body.brief is not None:
+            d["brief"] = body.brief[:600]
+        old = d["targets"].get(body.dialect) or {}
+        d["targets"][body.dialect] = {**old, "voice": voice, "lines": [], "busy": True, "error": None, "auto": True,
+                                     "lipsync": body.lipsync, "bg": body.background, "caps": body.captions,
+                                     "step": "🎧 يستمع إلى الكلام" if not d.get("lines") else "✍️ جارٍ كتابة النص باللهجة"}
+    try:
+        d = dub_update(did, fn)
+    except Exception:
+        wallet.refund(hold, why="الدبلجة لم تبدأ")
+        raise
+    caps = body.captions if body.captions in ("same", *CAPTION_LANGS) else ""
+    threading.Thread(target=run_dub_auto, args=(did, body.dialect, body.lipsync, body.background, caps, hold), daemon=True).start()
+    return dub_to_dict(did, d)
+
+
+def run_dub_auto(did: str, dialect: str, lipsync: str | None, background: str, caps: str, hold: dict | None) -> None:
+    try:
+        for _ in range(600):   # الكلام لسه بيتسمع (الفيديو لسه مرفوع): نستنى لحد 10 دقايق
+            d = dub_load(did)
+            if d.get("lines") or (d.get("error") and not d.get("busy")):
+                break
+            time.sleep(1)
+        if not d.get("lines"):
+            raise RuntimeError(d.get("error") or "لم يُسمع كلام في هذا الفيديو")
+        dub_update(did, lambda x: x["targets"][dialect].update(step="✍️ جارٍ كتابة النص باللهجة"))
+        run_dub_adapt(did, dialect, keep_busy=True)
+        t = dub_load(did)["targets"][dialect]
+        if t.get("error") or not t.get("lines"):
+            wallet.refund(hold, why="الدبلجة لم تكتمل")
+            return
+        run_dub_render(did, dialect, lipsync, background, caps, hold)
+    except Exception as exc:  # noqa: BLE001
+        wallet.refund(hold, why="الدبلجة لم تكتمل")
+        dub_fail(did, exc, dialect)
+
+
 def dub_background(did: str, d: dict, mode: str) -> Path | None:
-    """الموسيقى والمؤثرات بدون النص (AudioShake)، أو الصوت الأصلي واطي، أو لا شيء."""
+    """الموسيقى والمؤثرات بدون الكلام (ElevenLabs: كلام / كل حاجة تانية)، أو الصوت الأصلي واطي، أو لا شيء."""
     folder = DUB_DIR / did
     src = folder / d["source"]["file"]
     if mode == "auto":
-        mode = "separate" if (audioshake.api_key() or atlas.mock_mode()) else "none"
+        mode = "separate" if (voicelab.eleven_key() or atlas.mock_mode()) else "none"
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
     if mode == "none":
         return None
@@ -21530,37 +21607,30 @@ def dub_background(did: str, d: dict, mode: str) -> Path | None:
     subprocess.run(ff + ["-i", str(src), "-vn", "-ac", "2", "-ar", "48000", str(mix)], check=True, capture_output=True, timeout=600)
     if atlas.mock_mode():
         subprocess.run(ff + ["-i", str(mix), "-af", "lowpass=f=300", str(out)], check=True, capture_output=True, timeout=300)
+        mix.unlink(missing_ok=True)
         return out
-    if not audioshake.api_key():
-        raise RuntimeError("فصل الموسيقى عن النص يحتاج مفتاح AudioShake" + audioshake.missing_hint())
+    if not voicelab.eleven_key():
+        raise RuntimeError("فصل الموسيقى عن الكلام غير متاح الآن. اختر «الصوت الأصلي منخفضًا» أو «بدون خلفية»")
     mp3 = folder / "mix.mp3"
     subprocess.run(ff + ["-i", str(mix), "-b:a", "192k", str(mp3)], check=True, capture_output=True, timeout=300)
-    tid, plan = audioshake.create_task(atlas.upload_media(mp3))
-    res = audioshake.wait(tid)
     raw = folder / "stems"
-    raw.mkdir(exist_ok=True)
-    got = {}
-    for name, r in res.items():
-        if r.get("link") and r["status"] not in ("error", "failed"):
-            atlas.download(r["link"], raw / f"{name}.wav")
-            got[name] = raw / f"{name}.wav"
-    keep = [got[n] for n in got if n not in ("dialogue", "vocals", "speech")]
-    if keep:   # موسيقى + مؤثرات
+    try:
+        got = voicelab.eleven_stems(mp3, raw)
+        keep = [p for k, p in got.items() if k != "vocals"]
+        if not keep:
+            raise RuntimeError("لم يرجع تراك الموسيقى")
         cmd = ff + sum([["-i", str(p)] for p in keep], []) + ["-filter_complex",
                                                               "".join(f"[{i}:a]" for i in range(len(keep))) + f"amix=inputs={len(keep)}:normalize=0[o]",
                                                               "-map", "[o]", "-ac", "2", "-ar", "48000", str(out)]
-    elif "dialogue" in got:   # الأصل − الكلام
-        cmd = ff + ["-i", str(mix), "-i", str(got["dialogue"]), "-filter_complex",
-                    "[1:a]aresample=48000,volume=-1[n];[0:a][n]amix=inputs=2:normalize=0:duration=first[o]", "-map", "[o]", str(out)]
-    else:
-        raise RuntimeError("AudioShake مرجعش تراكات")
-    subprocess.run(cmd, check=True, capture_output=True, timeout=600)
-    for f in (mix, mp3):
-        f.unlink(missing_ok=True)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    finally:
+        shutil.rmtree(raw, ignore_errors=True)
+        for f in (mix, mp3):
+            f.unlink(missing_ok=True)
     return out
 
 
-def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str, caps: str = "") -> None:
+def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str, caps: str = "", hold: dict | None = None) -> None:
     from concurrent.futures import ThreadPoolExecutor
     step = lambda s: dub_update(did, lambda x: x["targets"][dialect].update(step=s))  # noqa: E731
     try:
@@ -21692,6 +21762,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
         dub_update(did, lambda x: x["targets"][dialect].update(busy=False, step=None, error=None, video=out.name, audio=audio.name,
                                                                export_id=export_id, rendered_at=now(), spots=spots))
     except Exception as exc:  # noqa: BLE001
+        wallet.refund(hold, why="الدبلجة لم تكتمل")
         dub_fail(did, exc, dialect)
 
 

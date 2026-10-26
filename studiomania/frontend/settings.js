@@ -1,7 +1,7 @@
 // StudioMania — الإعدادات والخروج
 
 // باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
-const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجية"], ["eleven", "مفتاح ElevenLabs", "الأصوات واستنساخ الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات واستنساخ الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات بالفصحى والسعودية"], ["recraft", "مفتاح Recraft", "الشعار والرسومات المتجهية"], ["audioshake", "مفتاح AudioShake", "فصل الصوت عن الموسيقى"],
+const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجية"], ["eleven", "مفتاح ElevenLabs", "الأصوات واستنساخ الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات واستنساخ الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات بالفصحى والسعودية"], ["recraft", "مفتاح Recraft", "الشعار والرسومات المتجهية"],
   ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "رسائل تأكيد الحساب بالبريد"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "رسائل تأكيد الحساب بالبريد"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"]];
@@ -298,11 +298,11 @@ function expRender(d) {
   box.innerHTML = `<div class="exp-tbl" role="table" aria-label="فواتيري الشهرية">
     <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>المبلغ ($)</span><span>الدفع</span><span>يوم التجديد</span><span>ملاحظة</span><span></span></div>
     ${Exp.rows.map((r, i) => `<div class="exp-row" role="row" data-ei="${i}">
-      <input type="text" data-ek="name" value="${esc(r.name)}" aria-label="الخدمة">
+      <input type="text" data-ek="name" value="${esc(I18N.t(r.name))}" data-orig="${esc(r.name)}" aria-label="الخدمة">
       <input type="number" min="0" step="0.01" data-ek="amount" value="${esc(r.amount)}" aria-label="المبلغ" dir="ltr">
       <select data-ek="cycle" aria-label="الدفع">${Object.entries(Exp.cycles).map(([k, t]) => `<option value="${k}" ${k === r.cycle ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
       <input type="number" min="0" max="31" data-ek="day" value="${r.day || ""}" placeholder="—" aria-label="يوم التجديد" dir="ltr">
-      <input type="text" data-ek="note" value="${esc(r.note)}" aria-label="ملاحظة">
+      <input type="text" data-ek="note" value="${esc(I18N.t(r.note))}" data-orig="${esc(r.note)}" aria-label="ملاحظة">
       <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`).join("")}
     </div>
     <div class="exp-sum"><b>الشهري: $${Number(Exp.monthly || 0).toFixed(2)}</b><span>حسب الاستخدام (آخر شحن): $${Number(Exp.usage || 0).toFixed(2)}</span></div>
@@ -311,7 +311,8 @@ function expRender(d) {
 function expRead() {
   document.querySelectorAll("#expBox .exp-row[data-ei]").forEach((row) => {
     const r = Exp.rows[+row.dataset.ei];
-    row.querySelectorAll("[data-ek]").forEach((x) => { r[x.dataset.ek] = x.type === "number" ? Number(x.value || 0) : x.value; });
+    // الخانة معروضة مترجمة في الإنجليزي: لو ما اتعدلتش بنحفظ الأصل مش الترجمة
+    row.querySelectorAll("[data-ek]").forEach((x) => { r[x.dataset.ek] = x.type === "number" ? Number(x.value || 0) : x.dataset.orig != null && x.value === I18N.t(x.dataset.orig) ? x.dataset.orig : x.value; });
   });
 }
 $("expBox")?.addEventListener("click", async (e) => {

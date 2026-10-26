@@ -148,7 +148,7 @@ function renderLabParts(d) {
   const card = (icon, label, media, url, extra = "", cls = "") => `<div class="lab-part ${cls}"><div class="row"><b>${icon} ${label}</b>${extra}
       ${url ? `<a class="btn sm" href="${url}" download>⬇ نزّل</a>` : ""}</div>${media}</div>`;
   const noAudio = d.source?.has_audio === false;
-  const stemMsg = noAudio ? "هذا الفيديو لا يحتوي صوت." : !d.audioshake ? "مفتاح AudioShake غير مسجل (AUDIOSHAKE_API_KEY على Railway)."
+  const stemMsg = noAudio ? "هذا الفيديو لا يحتوي صوت." : !d.audioshake ? "مفتاح ElevenLabs غير مسجل. ضعه من ⚙️ الإعدادات."
     : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لم يُقسّم بعد.";
   const parts = Object.entries(LAB_PARTS).map(([k, [h, l]]) => {
     const x = st[k];
@@ -315,7 +315,7 @@ function labStems(d) {
       ${st[k].url ? rv("stem", k, st[k].review) : ""}</div>`).join("");
   return `<h4>🎚️ التراكات المفصولة</h4>${rows ? `<div class="lab-rows">${rows}</div>`
     : `<p class="muted">${step.status === "working" ? `<span class="spin-inline"></span> ${le(step.progress || "يفصل التراكات...")}`
-      : !d.audioshake ? "مفتاح AudioShake غير مسجل، فالتحليل اشتغل على الصوت كله. ضعه على Railway في المتغير AUDIOSHAKE_API_KEY ثم اضغط «🎚️ التراكات»."
+      : !d.audioshake ? "مفتاح ElevenLabs غير مسجل، فالتحليل اشتغل على الصوت كله. ضعه من ⚙️ الإعدادات ثم اضغط «🎚️ التراكات»."
       : step.error ? `✕ ${le(step.error)}` : "لم تُفصل بعد."}</p>`}`;
 }
 

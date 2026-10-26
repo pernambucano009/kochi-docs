@@ -68,6 +68,35 @@ def _fail_msg(resp: httpx.Response, who: str) -> LabError:
 EL_BASE = "https://api.elevenlabs.io/v1"
 
 
+def eleven_stems(src: Path, out_dir: Path, variant: str = "two_stems_v1") -> dict[str, Path]:
+    """🎚️ فصل الصوت (بدل AudioShake): two_stems_v1 = الكلام + كل حاجة تانية (موسيقى ومؤثرات).
+    بيرجع ZIP فيه ملف لكل تراك؛ بنفكّه ونرجّع {اسم التراك: الملف}."""
+    import zipfile  # noqa: PLC0415
+    with httpx.Client(timeout=900) as c, src.open("rb") as f:
+        r = c.post(f"{EL_BASE}/music/stem-separation", params={"output_format": "mp3_44100_128"},
+                   headers={"xi-api-key": eleven_key(), "Accept": "application/zip"},
+                   files={"file": (src.name, f, "audio/mpeg")}, data={"stem_variation_id": variant})
+    if r.status_code >= 400:
+        raise _fail(r, "ElevenLabs")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    zp = out_dir / "stems.zip"
+    zp.write_bytes(r.content)
+    got: dict[str, Path] = {}
+    with zipfile.ZipFile(zp) as z:
+        for n in z.namelist():
+            if n.endswith("/") or not n.lower().endswith((".mp3", ".wav", ".flac", ".m4a", ".ogg")):
+                continue
+            stem = Path(n).stem.lower()
+            key = "vocals" if "vocal" in stem else ("instrumental" if "instrument" in stem or "accomp" in stem else stem)
+            dest = out_dir / f"{key}{Path(n).suffix.lower()}"
+            dest.write_bytes(z.read(n))
+            got[key] = dest
+    zp.unlink(missing_ok=True)
+    if not got:
+        raise LabError("ElevenLabs: لم يرجع تراكات")
+    return got
+
+
 def eleven_voices() -> list[dict]:
     """الأصوات الجاهزة في الحساب (premade + اللي اتعملت)."""
     with httpx.Client(timeout=30) as c:

@@ -3295,3 +3295,23 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
   .db-v2 .db-src video { max-height: 300px; }
 }
 .db-v2 .db-strip .nm small { display: inline-block !important; margin-inline-start: 8px !important; }
+/* 🎙️ الدبلجة بزرار واحد */
+.db-v2 .db-go { display: flex; flex-direction: column; gap: 12px; padding-bottom: 18px !important; margin-bottom: 18px; border-bottom: 1px solid var(--line) !important; }
+.db-v2 .db-go-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.db-v2 .db-go-row label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 180px; }
+:root:root .stage .db-v2 .db-go-btn { padding: 13px 34px; font-size: 15.5px; }
+.db-v2 .db-go .hint { margin: 0; }
+.db-v2 .db-steps { list-style: none; margin: 6px 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.db-v2 .db-steps li { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.db-v2 .db-steps li i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--field, #EFEEEB); }
+.db-v2 .db-steps li.done { color: var(--text); }
+.db-v2 .db-steps li.done i { background: var(--ok, #2E8F63); color: #fff; }
+.db-v2 .db-steps li.now { color: var(--text); font-weight: 500; }
+.db-v2 .db-steps li.now i { background: var(--accent); color: #fff; animation: dbPulse 1.2s ease-in-out infinite; }
+@keyframes dbPulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .db-v2 .db-steps li.now i { animation: none; } }
+.db-v2 .db-edit { margin-top: 10px; }
+.db-v2 .db-edit > summary { cursor: pointer; font-size: 14px; padding: 6px 0; color: var(--text); }
+.db-v2 .db-edit[open] > summary { margin-bottom: 8px; }
+.db-v2 .db-edit .db-opts { margin-top: 12px; }
+.db-v2 .db-dh .ok { color: var(--ok, #2E8F63); font-size: 13px; }

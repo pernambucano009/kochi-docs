@@ -296,6 +296,9 @@ def tts_body(voice: str, dialect: str, text: str) -> dict:
     return {"model": "elevenlabs/v3/text-to-speech", "text": text, "voice": VOICES[voice]["voice"]}
 
 
+SEP_PER_MIN = 0.15   # فصل الموسيقى عن الكلام (تراكين) بالدقيقة
+
+
 def estimate(lines: list[str], voice: str, seconds: float, lipsync: str | None) -> float:
     """بالدولار: الصوت (ElevenLabs بالحرف، فصيح بالدقيقة) + الليب سينك لو مطلوب."""
     chars = sum(len(x) for x in lines)
