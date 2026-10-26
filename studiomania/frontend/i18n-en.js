@@ -13435,4 +13435,6 @@ window.I18N_EN = {
   "احذف هذا العميل": "Delete this client",
   "🗑 حُذف العميل": "🗑 Client deleted",
   "احذف «{0}» بكل عقله وصوره وملفاته؟ لا يمكن التراجع عن الحذف.": "Delete \"{0}\" with its whole brain, images and files? This can't be undone.",
+  "📱 إذا كتبت رابط حسابك على إنستغرام أو تيك توك، يحلّله العقل تلقائيًا بعد «التالي» ويملأ الإجابات ونقاط التحسين (💳 عادةً بين ١٠ و٦٠ نقطة).": "📱 If you enter your Instagram or TikTok link, the brain analyzes it automatically after \"Next\" and fills the answers and the points to improve (💳 usually 10 to 60 credits).",
+  "عند الانتهاء تظهر الإجابات المقترحة في أسئلتها لتعدّلها أو تعتمدها، وتمتلئ «نقاط للتحسين».": "When it's done, suggested answers appear in their questions for you to edit or accept, and \"Points to improve\" fills in.",
 };

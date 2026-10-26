@@ -101,7 +101,10 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("intro", "ارفع إنترو العلامة", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
         ("outro", "ارفع أوترو العلامة", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
         ("caption", "اكتب التعليق النصي الافتراضي", "الشكل الذي التعليق النصي ينزل به مع كل منشور", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
-        ("social", "حلّل حساب السوشيال الخاص بك", "العقل يتعلم من بوستاتك ومشاهداتك", bool(b.get("todos") or b.get("niche")), {"leaf": "improve:social:"}),
+        # الحساب اتدّى للعقل (من أسئلة البداية أو سؤال الرابط) ← التحليل شغّال لوحده، فالمهمة متتعدّش ومتطلبهوش تاني
+        ("social", "حلّل حساب السوشيال الخاص بك", "العقل يتعلم من بوستاتك ومشاهداتك",
+         bool(b.get("todos") or b.get("niche") or b.get("social") or any(x.get("kind") == "social" and x.get("status") != "failed" for x in b.get("sources") or [])),
+         {"leaf": "improve:social:"}),
         ("rivals", "وافق على منافسوك", "البرنامج يقترح، وأنت تختار ما تريد تصبح زيهم", bool(rivals.approved(b.get("competitors") or {})), {"page": "rivals"}),
         ("twin_photos", "ارفع صورك لكي الأفاتار", "صور وشّك من كذا زاوية في «نسختي»", bool(tw.get("photo")), {"page": "twin"}),
         ("twin_video", "ارفع فيديو لك وأنت تتكلم", "لكي الأفاتار يتحرك ويتكلم زيك", bool(tw.get("video")), {"page": "twin"}),
@@ -142,3 +145,9 @@ def suggestions(brain: dict) -> dict[str, str]:
         else:
             out[q["id"]] = str(hits[-1].get("value") or "")[:4000]
     return {k: v for k, v in out.items() if v}
+
+
+def social_link(ans: str) -> bool:
+    """الإجابة رابط حساب إنستغرام أو تيك توك (أو @اسم)؟ (مش موقع ولا رقم)"""
+    a = str(ans or "").strip()
+    return bool(a) and ("instagram.com" in a or "tiktok.com" in a or (a.startswith("@") and " " not in a and len(a) > 2))

@@ -12457,6 +12457,12 @@ def brain_quiz_answer(bid: str, body: QuizIn):
             d["pending"] = [p for p in d.get("pending") or [] if not brainquiz.answers(q, p)]
     old = brain_row(bid) or {}
     update_brain(bid, fn)
+    # 📱 رابط حساب إنستغرام أو تيك توك في سؤال الرابط: التحليل بيبدأ لوحده (مرة واحدة)، والإجابات ونقاط التحسين تتملا لما يخلص
+    if q["id"] == "link" and brainquiz.social_link(ans) and not any(x.get("kind") == "social" and x.get("status") != "failed" for x in old.get("sources") or []):
+        try:
+            add_brain_source(bid, url="", text="", note="", social=ans, files=None)
+        except HTTPException:
+            pass
     new = brain_row(bid) or {}
     seasons_if_changed(bid, old, new)
     return brain_to_dict(new)

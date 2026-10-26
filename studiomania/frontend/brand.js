@@ -649,10 +649,11 @@ const BrandPage = (() => {
     const q = qs[S.qi], sugg = !S.qa?.[q.id] && S.qa?._sugg?.[q.id], val = S.qa?.[q.id] || sugg || "";
     const field = q.opts ? `<div class="bm-pills">${q.opts.map(([v, t]) => `<button class="bm-pill${val === v ? " on" : ""}" data-qpick="${esc(v)}">${esc(t)}</button>`).join("")}</div>`
       : `<div class="bm-write bm-qans${q.multi ? " multi" : ""}" contenteditable="plaintext-only" data-k="@quiz" data-ph="${esc(q.ph || "اكتب إجابتك…")}"${q.ltr ? ' dir="ltr"' : ""}>${esc(val)}</div>`;
-    const wait = anal ? `<p class="bm-note bm-qwait">⏳ نحلّل حساب <span dir="ltr">@${esc(anal.handle || "")}</span> الآن. عند الانتهاء تظهر الإجابات المقترحة في أسئلتها لتعدّلها أو تعتمدها.</p>` : "";
+    const wait = anal ? `<div class="bm-note bm-qwait"><p>⏳ نحلّل حساب <span dir="ltr">@${esc(anal.handle || "")}</span> الآن${anal.step ? ` · ${esc(anal.step)}` : ""}. عند الانتهاء تظهر الإجابات المقترحة في أسئلتها لتعدّلها أو تعتمدها، وتمتلئ «نقاط للتحسين».</p><i class="bm-qwbar"></i></div>` : "";
     return head + wait + `<div class="bm-qtop"><span>سؤال <b class="num">${S.qi + 1}</b> من <b class="num">${total}</b></span>${done.has(q.id) ? `<small>✓ مُجاب</small>` : sugg ? `<small>✨ مقترحة من حسابك</small>` : ""}</div>` + bar
       + `<p class="bm-q">${esc(q.q)}</p>` + field
       + (sugg ? `<p class="bm-note">استنبطها العقل من حسابك. عدّلها كما تريد، أو اضغط «التالي» لتعتمدها.</p>` : "")
+      + (q.id === "link" && !(b.sources || []).some((x) => x.kind === "social") ? `<p class="bm-note">📱 إذا كتبت رابط حسابك على إنستغرام أو تيك توك، يحلّله العقل تلقائيًا بعد «التالي» ويملأ الإجابات ونقاط التحسين (💳 عادةً بين ١٠ و٦٠ نقطة).</p>` : "")
       + (q.multi ? `<p class="bm-note">كل عنصر في سطر (Enter لسطر جديد).</p>` : "")
       + `<div class="bm-acts bm-qacts">${S.qi > 0 ? `<button class="bm-pill" data-qprev>← السابق</button>` : ""}<span></span><button class="bm-pill" data-qskip>تخطَّ</button><button class="bm-go" data-qnext>${S.qi + 1 === total ? "انتهيت" : "التالي →"}</button></div>
       <p class="bm-note bm-qsave">تُحفظ إجابتك في العقل فور ضغط «التالي». يمكنك الخروج والإكمال في أي وقت.</p>`;
@@ -942,7 +943,7 @@ const BrandPage = (() => {
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
         if (!busy(b)) { clearInterval(S.poll); S.qaFor = null; loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
         layout();
-        if (S.open?.id === "add") refreshCard();
+        if (S.open?.id === "add" || (S.open?.id === "quiz" && !S.el.querySelector(".bm-card").contains(document.activeElement))) refreshCard();   // خطوة التحليل الحالية
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
