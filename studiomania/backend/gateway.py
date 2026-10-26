@@ -40,6 +40,7 @@ import billing
 import fieldpacks
 import mailer
 import payments
+import phoneauth
 
 BACKEND = Path(__file__).resolve().parent
 ROOT = BACKEND.parent
@@ -96,6 +97,9 @@ with closing(db()) as _c, _c:
                        ("cycle", "TEXT"), ("refill_at", "REAL")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
+    if "phone" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 📱 الدخول برقم الجوال
+        _c.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+        _c.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_phone ON users(phone)")
 
 
 def kv_get(k: str) -> str | None:
@@ -129,7 +133,7 @@ def _sign(payload: str) -> str:
 
 def _ver(u: sqlite3.Row) -> str:
     # تغيير الباسورد بيقفل كل الجلسات القديمة
-    return hashlib.sha256((u["pw"] or u["google_sub"] or "").encode()).hexdigest()[:10]
+    return hashlib.sha256((u["pw"] or u["google_sub"] or u["phone"] or "").encode()).hexdigest()[:10]
 
 
 def make_session(u: sqlite3.Row) -> str:
@@ -138,7 +142,7 @@ def make_session(u: sqlite3.Row) -> str:
 
 
 def user_by(field: str, value: str) -> sqlite3.Row | None:
-    assert field in ("id", "email", "google_sub")
+    assert field in ("id", "email", "google_sub", "phone")
     with closing(db()) as c:
         return c.execute(f"SELECT * FROM users WHERE {field}=?", (value,)).fetchone()
 
@@ -583,13 +587,20 @@ for _p, _f in SITE_PAGES.items():
 def auth_state(request: Request):
     u = current_user(request)
     return {"logged_in": bool(u and u["verified"]), "user": me_dict(u) if u else None, "needs_setup": needs_owner_setup(),
-            "old_password": old_password_set(), "google": bool(os.environ.get("GOOGLE_CLIENT_ID")),
+            "old_password": old_password_set(), "google": bool(os.environ.get("GOOGLE_CLIENT_ID")), "phone": phoneauth.enabled(),
             "mail": mailer.configured(), **fieldpacks.signup_options()}
+
+
+PHONE_MAIL = "@phone.simsimkit"   # حسابات الجوال من غير بريد: البريد في الجدول عنوان داخلي بس
+
+
+def real_email(u: sqlite3.Row) -> str:
+    return "" if u["email"].endswith(PHONE_MAIL) else u["email"]
 
 
 def me_dict(u: sqlite3.Row) -> dict:
     w = workspace(u["workspace"])
-    return {"email": u["email"], "name": u["name"], "verified": bool(u["verified"]), "role": u["role"],
+    return {"email": real_email(u) or u["phone"] or "", "phone": u["phone"] or "", "name": u["name"], "verified": bool(u["verified"]), "role": u["role"],
             "workspace": u["workspace"], "plan": (w["plan"] if w else "owner"), "credits": wallet(u["workspace"]),
             "has_password": bool(u["pw"]), "pts_per_usd": round(billing.MARKUP / billing.CREDIT_USD)}
 
@@ -751,6 +762,75 @@ def login(body: LoginIn, request: Request):
     with closing(db()) as c, c:
         c.execute("UPDATE users SET last_login=?, verified=MAX(verified, ?) WHERE id=?", (time.time(), int(SKIP_VERIFY), u["id"]))
     return with_session(JSONResponse({"ok": True, "verify": not (u["verified"] or SKIP_VERIFY)}), u, request)
+
+
+class PhoneSendIn(BaseModel):
+    phone: str
+    channel: str = "sms"
+
+
+@app.post("/api/auth/phone/send")
+def phone_send(body: PhoneSendIn, request: Request):
+    """📱 يرسل رمز الدخول للجوال (رسالة نصية أو واتساب)."""
+    if not phoneauth.enabled():
+        raise HTTPException(400, "الدخول برقم الجوال غير متاح الآن. ادخل بالبريد الإلكتروني أو بجوجل")
+    if needs_owner_setup():
+        raise HTTPException(400, "البرنامج قيد التجهيز")
+    ip = client_ip(request)
+    try:
+        phone = phoneauth.normalize(body.phone)
+        phoneauth.check_limits(phone, ip)
+        phoneauth.mark(phone, ip)
+        code = phoneauth.send(phone, body.channel)
+    except phoneauth.PhoneError as exc:
+        raise HTTPException(429 if "انتظر" in str(exc) else 400, str(exc)) from exc
+    return {"ok": True, "phone": phone, "channel": "whatsapp" if body.channel == "whatsapp" else "sms", "wait": phoneauth.COOLDOWN, "dev_code": code}
+
+
+class PhoneVerifyIn(BaseModel):
+    phone: str
+    code: str
+    name: str = ""
+    country: str = ""
+    dialect: str = ""
+    field: str = ""
+    goal: str = ""
+
+
+@app.post("/api/auth/phone/verify")
+def phone_verify(body: PhoneVerifyIn, request: Request):
+    """الرمز صح ← يدخل، ولو الرقم جديد يتعمل له حساب (من غير بريد ولا كلمة مرور)."""
+    try:
+        phone = phoneauth.normalize(body.phone)
+    except phoneauth.PhoneError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    throttle("otp:" + phone, client_ip(request))
+    if not phoneauth.verify(phone, body.code):
+        failed("otp:" + phone, client_ip(request))
+        time.sleep(0.5)
+        raise HTTPException(400, "الرمز غير صحيح أو انتهت صلاحيته. تأكد منه أو اطلب رمزًا جديدًا")
+    u = user_by("phone", phone)
+    new = not u
+    if new:
+        name = body.name.strip()[:80]
+        wid = new_workspace(name or phone)
+        save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], name)
+        uid = uuid.uuid4().hex[:12]
+        with closing(db()) as c, c:
+            c.execute("INSERT INTO users (id, email, name, verified, role, workspace, phone, created_at, last_login) VALUES (?, ?, ?, 1, 'customer', ?, ?, ?, ?)",
+                      (uid, phone[1:] + PHONE_MAIL, name, wid, phone, time.time(), time.time()))
+        u = user_by("id", uid)
+    else:
+        with closing(db()) as c, c:
+            c.execute("UPDATE users SET verified=1, last_login=? WHERE id=?", (time.time(), u["id"]))
+    return with_session(JSONResponse({"ok": True, "new": new}), u, request)
+
+
+@app.get("/api/platform/sms")
+def sms_status(request: Request):
+    """رصيد خدمة رسائل الدخول (للأدمن)."""
+    admin(request)
+    return {**phoneauth.balance(), "enabled": phoneauth.enabled(), "dev": phoneauth.dev()}
 
 
 @app.post("/api/auth/logout")
@@ -1134,7 +1214,7 @@ def checkout(body: CheckoutIn, request: Request):
             key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}"
             pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' yearly' if yr else ''}",
                                        px(tot["total"]), "YEAR" if yr else "MONTH")
-            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", u["email"],
+            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", real_email(u),
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
         else:
             raise HTTPException(400, "طريقة دفع غير معروفة")
@@ -1297,7 +1377,7 @@ def backup_disconnect(request: Request):
 def admin_users(request: Request):
     admin(request)
     with closing(db()) as c:
-        rows = c.execute("""SELECT u.email, u.name, u.verified, u.role, u.workspace, u.created_at, u.last_login, w.plan,
+        rows = c.execute("""SELECT CASE WHEN u.email LIKE '%@phone.simsimkit' THEN u.phone ELSE u.email END AS email, u.name, u.verified, u.role, u.workspace, u.created_at, u.last_login, w.plan,
                             COALESCE(x.plan_credits, 0) + COALESCE(x.topup_credits, 0) AS credits
                             FROM users u LEFT JOIN workspaces w ON w.id = u.workspace LEFT JOIN wallet x ON x.workspace = u.workspace
                             ORDER BY u.created_at DESC""").fetchall()
@@ -1463,7 +1543,7 @@ def issues_list(request: Request, all: int = 0):
     admin(request)
     rows = issues.listing(open_only=not all)
     with closing(db()) as c:
-        emails = {r["workspace"]: r["email"] for r in c.execute("SELECT workspace, email FROM users")}
+        emails = {r["workspace"]: (r["phone"] if r["email"].endswith(PHONE_MAIL) else r["email"]) for r in c.execute("SELECT workspace, email, phone FROM users")}
     for r in rows:
         r["accounts"] = sorted({*r["users"], *(emails.get(w, "صاحب المنصة" if w == OWNER else w) for w in r["workspaces"])})[:20]
     return {"items": rows, "open": issues.open_count()}

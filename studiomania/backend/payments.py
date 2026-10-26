@@ -130,7 +130,7 @@ def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = 
 
 def paypal_subscribe(plan_id: str, custom: str, email: str, ret: str, cancel: str) -> str:
     j = _pp("POST", "/v1/billing/subscriptions", {
-        "plan_id": plan_id, "custom_id": custom, "subscriber": {"email_address": email},
+        "plan_id": plan_id, "custom_id": custom, **({"subscriber": {"email_address": email}} if email else {}),
         "application_context": {"brand_name": "SimsimKit", "user_action": "SUBSCRIBE_NOW", "shipping_preference": "NO_SHIPPING",
                                 "return_url": ret, "cancel_url": cancel}})
     return _approve(j)

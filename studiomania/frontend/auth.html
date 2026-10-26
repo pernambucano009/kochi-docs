@@ -28,6 +28,12 @@
   a.btn { text-decoration: none; text-align: center; }
   .login .field select { padding: 12px 14px; font: inherit; font-size: 15px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); border-radius: 12px; }
   .au-hint { font-size: 12px; color: var(--muted); }
+  .au-ph { display: grid; gap: 10px; }
+  .au-ph input[type=tel], .au-ph .au-code { direction: ltr; text-align: left; letter-spacing: .5px; }
+  .au-ph .au-code { font-size: 26px; letter-spacing: 10px; text-align: center; font-variant-numeric: tabular-nums; }
+  .au-ph-meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .au-ph-meta a, .au-ph-meta button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+  .au-ph-meta button:disabled { opacity: .5; cursor: default; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -53,6 +59,55 @@ const G = `<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v
 const field = (id, label, type = "text", ac = "") => `<label class="field">${label} <input type="${type}" id="${id}" autocomplete="${ac}" required></label>`;
 const tabs = (on) => `<div class="au-tabs"><a href="/login" class="${on === "login" ? "on" : ""}">دخول</a><a href="/signup" class="${on === "signup" ? "on" : ""}">حساب جديد</a></div>`;
 const google = () => S.google ? `<a class="btn wide au-g" href="/auth/google">${G} أكمل بجوجل</a><div class="au-or">أو بالبريد الإلكتروني</div>` : "";
+// 📱 الدخول برقم الجوال: الرقم ← رمز من ٦ أرقام ← دخول (والرقم الجديد يتعمل له حساب)
+const P = { phone: "", step: "num", wait: 0, timer: null, ch: "sms" };
+const phoneBox = () => !S.phone ? "" : `<div class="au-ph" id="ph">${phoneInner()}</div><div class="au-or">${S.google ? "أو" : "أو بالبريد الإلكتروني"}</div>`;
+const phoneInner = () => P.step === "num"
+  ? `<label class="field">رقم جوالك <input type="tel" id="phNum" inputmode="tel" autocomplete="tel" placeholder="05XXXXXXXX" value="${P.phone}"></label>
+     <button type="button" class="btn primary wide" id="phSend">أرسل رمز الدخول</button>`
+  : `<p class="muted">أرسلنا رمزًا من ٦ أرقام ${P.ch === "whatsapp" ? "على واتساب" : "برسالة نصية"} إلى <b dir="ltr">${P.phone}</b></p>
+     <label class="field">رمز الدخول <input class="au-code" id="phCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></label>
+     <div id="phDev"></div>
+     <button type="button" class="btn primary wide" id="phGo">ادخل</button>
+     <div class="au-ph-meta"><span><button type="button" id="phAgain" disabled></button></span>
+       <span><button type="button" id="phWa">${P.ch === "whatsapp" ? "أرسله برسالة نصية" : "أرسله على واتساب"}</button> · <a href="#" id="phBack">غيّر الرقم</a></span></div>`;
+function tick() {
+  clearInterval(P.timer);
+  const paint = () => { const b = $("phAgain"); if (!b) return clearInterval(P.timer); b.disabled = P.wait > 0; b.textContent = P.wait > 0 ? `أعد الإرسال بعد ${P.wait} ث` : "أعد إرسال الرمز"; if ($("phWa")) $("phWa").disabled = P.wait > 0; };
+  paint(); P.timer = setInterval(() => { P.wait = Math.max(0, P.wait - 1); paint(); if (!P.wait) clearInterval(P.timer); }, 1000);
+}
+function phonePaint(dev) {
+  $("ph").innerHTML = phoneInner();
+  if (P.step === "num") { $("phSend").onclick = () => phoneSend(P.ch); $("phNum").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); phoneSend(P.ch); } }; return; }
+  if (dev) $("phDev").innerHTML = `<p class="au-dev">وضع التجربة (لا توجد خدمة رسائل): الرمز <b dir="ltr">${dev}</b></p>`;
+  const c = $("phCode");
+  c.oninput = () => { c.value = c.value.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g, "").slice(0, 6); if (c.value.length === 6) phoneVerify(); };
+  c.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); phoneVerify(); } };
+  $("phGo").onclick = phoneVerify;
+  $("phAgain").onclick = () => phoneSend(P.ch);
+  $("phWa").onclick = () => phoneSend(P.ch === "whatsapp" ? "sms" : "whatsapp");
+  $("phBack").onclick = (e) => { e.preventDefault(); P.step = "num"; phonePaint(); $("phNum").focus(); };
+  tick(); c.focus();
+  // 📲 أندرويد (Chrome): يقرأ الرمز من الرسالة لوحده لو الرسالة فيها سطر @الموقع #الرمز
+  if ("OTPCredential" in window && P.ch === "sms") navigator.credentials.get({ otp: { transport: ["sms"] } }).then((o) => { if (o?.code && $("phCode")) { $("phCode").value = o.code; phoneVerify(); } }).catch(() => {});
+}
+async function phoneSend(ch) {
+  err(""); if (P.step === "num") P.phone = $("phNum").value.trim();
+  if (!P.phone) return err("اكتب رقم جوالك أولًا");
+  const b = $("phSend") || $("phAgain"); if (b) b.disabled = true;
+  try { const d = await post("/api/auth/phone/send", { phone: P.phone, channel: ch }); P.phone = d.phone; P.ch = d.channel; P.wait = d.wait; P.step = "code"; phonePaint(d.dev_code); }
+  catch (x) { err(x.message); if (b) b.disabled = false; }
+}
+let phBusy = false;
+async function phoneVerify() {
+  const code = $("phCode").value; if (phBusy) return; if (code.length < 6) return err("اكتب الرمز كاملًا (٦ أرقام)");
+  err(""); phBusy = true; $("phGo").disabled = true;
+  try {
+    await post("/api/auth/phone/verify", { phone: P.phone, code, name: $("name")?.value || "", country: $("country")?.value || guessCountry(),
+      dialect: $("dialect")?.value || dialectOf(guessCountry()), field: $("field")?.value || "", goal: $("goal")?.value || "" });
+    location.replace(next());
+  } catch (x) { err(x.message); $("phGo").disabled = false; $("phCode").select(); } finally { phBusy = false; }
+}
 const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (لا يوجد بريد إلكتروني متظبط): <a href="${l}">${l}</a></p>` : "";
 
 function err(m) { $("err").textContent = m || ""; $("err").hidden = !m; }
@@ -81,13 +136,13 @@ function regionFields() {
 }
 
 const VIEWS = {
-  login: () => `${tabs("login")}${google()}
+  login: () => `${tabs("login")}${phoneBox()}${google()}
     ${field("email", "البريد الإلكتروني", "email", "email")}${field("pw", "كلمة المرور", "password", "current-password")}
     <button class="btn primary wide" id="go">دخول</button>
     <div class="au-links"><a href="/forgot">نسيت كلمة المرور؟</a><a href="/pricing">الباقات والأسعار</a></div>`,
   signup: () => `${tabs("signup")}
-    <p class="muted">ابدأ مجانًا: ${S.trial || 300} نقطة تجرّب بها.</p>${google()}
-    ${field("name", "اسمك أو اسم العلامة", "text", "name")}${field("email", "البريد الإلكتروني", "email", "email")}
+    <p class="muted">ابدأ مجانًا: ${S.trial || 300} نقطة تجرّب بها.</p>
+    ${S.phone ? `${field("name", "اسمك أو اسم العلامة", "text", "name")}${phoneBox()}${google()}` : `${google()}${field("name", "اسمك أو اسم العلامة", "text", "name")}`}${field("email", "البريد الإلكتروني", "email", "email")}
     ${field("pw", "كلمة المرور (8 حروف أو أرقام على الأقل)", "password", "new-password")}
     ${regionFields()}
     <button class="btn primary wide" id="go">أنشئ الحساب</button>
@@ -157,6 +212,7 @@ async function render() {
     $("resend").onclick = async () => { try { const d = await post("/api/auth/resend"); if (d.verified) return location.replace("/"); $("dev").innerHTML = `<p class="au-ok">أُرسل مرة أخرى ✓</p>${devLink(d.dev_link)}`; } catch (e) { err(e.message); } };
     $("out").onclick = async (e) => { e.preventDefault(); await post("/api/auth/logout"); location.replace("/login"); };
   }
+  if ($("ph")) phonePaint();
   if ($("country")) $("country").onchange = () => { $("dialect").value = dialectOf($("country").value); };
   if ($("field")) $("field").onchange = () => { const f = S.fields.find((x) => x.id === $("field").value); if (f) $("goal").value = f.goal; };
   document.querySelector("#body input")?.focus();
