@@ -2,7 +2,7 @@
 name: i18n
 on:
   push:
-    paths: ["studiomania/frontend/**", "studiomania/backend/**", "studiomania/mobile/app/**", "studiomania/mobile/src/**", "studiomania/library/**", "studiomania/tests/i18n/**", ".github/workflows/i18n.yml"]
+    paths: ["studiomania/frontend/**", "studiomania/backend/**", "studiomania/mobile/app/**", "studiomania/mobile/src/**", "studiomania/library/**", "studiomania/tests/i18n/**", "studiomania/tools/langmap.py", ".github/workflows/i18n.yml"]
   workflow_dispatch:
 jobs:
   audit:
@@ -31,6 +31,9 @@ jobs:
       - run: npm install --no-save playwright@1.56.1 && npx playwright install --with-deps chromium
       # فحص ثابت سريع: العامية في كود الواجهة وتطبيق الجوال حتى لو الشاشة ماظهرتش في الفحص
       - run: node tests/i18n/static.js
+        if: matrix.chunk == 1
+      # 🗺️ خريطة اللغة: كل جملة من الكود (الموقع والجوال والسيرفر والقوالب) لازم يكون ليها إنجليزي ومن غير عامية
+      - run: python3 tools/langmap.py --check
         if: matrix.chunk == 1
       - run: node tests/i18n/audit.js
         env:

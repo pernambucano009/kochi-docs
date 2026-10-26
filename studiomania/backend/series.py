@@ -351,7 +351,7 @@ def clean_script(text: str) -> str:
 
 
 def mock_script(number: int, chat: list[dict]) -> str:
-    note = f"\n(اتعدّل حسب: {chat[-1]['content'][:60]})" if chat and chat[-1]["role"] == "user" else ""
+    note = f"\n(عُدّل حسب: {chat[-1]['content'][:60]})" if chat and chat[-1]["role"] == "user" else ""
     return (f"الحلقة رقم {number} — «تجربة»\nالمشهد 1 — البداية\nالصورة: هو جالس أمام اللابتوب بالليل.\n"
             f"«أول سطر كتبته... ما اشتغل.»\n«والثاني بعد.»\nالمشهد 2 — القرار\nالصورة: يقفل اللابتوب ويطالع الشباك.\n"
             f"«فقط ما وقفت.»{note}")

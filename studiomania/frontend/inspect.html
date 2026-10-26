@@ -61,14 +61,26 @@
     <button data-t="lang">اللغة</button>
     <button data-t="msgs">الرسائل والأخطاء</button>
     <button data-t="map">خريطة الكلام</button>
+    <button data-t="lmap">🗺️ خريطة اللغة <b id="lmN"></b></button>
   </nav>
 </header>
 <main>
   <section data-p="issues">
     <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل شغل فشل أو توقف في النص، يصل هنا تلقائيًا. نفس الخطأ يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
-      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من السيرفر</option><option value="job">شغل فشل</option><option value="stuck">شغل توقف في النص</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option></select>
+      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من السيرفر</option><option value="job">شغل فشل</option><option value="stuck">شغل توقف في النص</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option></select>
       <button class="btn" id="issReload">↻ حدّث</button></div></div>
     <div id="iss"></div>
+  </section>
+  <section data-p="lmap" hidden>
+    <div class="card"><p class="mute" style="margin-top:0">كل جملة تظهر للعميل، مستخرجة من الكود نفسه (الموقع، وتطبيق الجوال، ورسائل السيرفر، وخانات القوالب) لا من الشاشة فقط:
+      مكانها بالملف والسطر، وترجمتها الإنجليزية، وهل فيها عامية. تنزل المشاكل في «صندوق الأخطاء» تلقائيًا مع كل تحديث للبرنامج، وما يُصلَح يُغلق.
+      ملف CSV فيه عمودان فارغان للإسبانية والبرتغالية: هما ما يُملأ عند إضافة لغة جديدة.</p>
+      <div class="row" id="lmStat"></div>
+      <div class="row"><input id="lmQ" placeholder="ابحث بالجملة أو الترجمة أو الملف" style="flex:1;min-width:220px">
+        <select id="lmP"><option value="any">فيها مشكلة</option><option value="no_en">ترجمة إنجليزي ناقصة</option><option value="dialect">عامية في الواجهة</option><option value="">كل الجمل</option></select>
+        <select id="lmK"><option value="">كل الأماكن</option><option value="web">الموقع</option><option value="mobile">تطبيق الجوال</option><option value="server">رسائل السيرفر</option><option value="template">خانات القوالب</option><option value="content">محتوى (بلهجة العميل)</option></select>
+        <button class="btn" id="lmScan">🔎 افحص الآن</button><a class="btn" href="/api/platform/langmap.csv" download>⬇ CSV (عربي · إنجليزي · إسباني · برتغالي)</a></div></div>
+    <table class="tbl"><thead><tr><th>الجملة</th><th>الإنجليزي</th><th>المكان</th><th>المشكلة</th></tr></thead><tbody id="lm"></tbody></table>
   </section>
   <section data-p="runs" hidden>
     <div class="card">
@@ -145,6 +157,7 @@ function tab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
   document.querySelectorAll("main > section").forEach((s) => (s.hidden = s.dataset.p !== t));
   if (t === "map" && !S.map) loadMap();
+  if (t === "lmap") loadLm();
 }
 
 $("start").onclick = async () => {
@@ -235,6 +248,29 @@ $("mapCsv").onclick = () => {
   const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   const csv = "﻿" + ["arabic,english,missing,kind,screens,places", ...mapRows().map((x) => [x.text, x.en, x.missing ? 1 : 0, x.kind, (x.screens || []).join(" "), (x.places || []).join(" | ")].map(q).join(","))].join("\n");
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "textmap.csv"; a.click();
+};
+// 🗺️ خريطة اللغة
+const LM_KIND = { web: "الموقع", mobile: "تطبيق الجوال", server: "رسالة سيرفر", template: "خانة قالب", content: "محتوى" };
+const LM_P = { no_en: "ترجمة ناقصة", dialect: "عامية" };
+let lmT = null;
+async function loadLm(fresh) {
+  const qs = new URLSearchParams({ q: $("lmQ").value.trim(), problem: $("lmP").value, kind: $("lmK").value, limit: 1500, fresh: fresh ? 1 : 0 });
+  const d = await api("/api/platform/langmap?" + qs).catch((e) => ({ err: e.message }));
+  if (d.err) { $("lm").innerHTML = `<tr><td class="bad">${esc(d.err)}</td></tr>`; return; }
+  const st = d.stat;
+  $("lmN").textContent = st.no_en + st.dialect || "";
+  $("lmStat").innerHTML = [["كل الجمل", st.total], ["تظهر للعميل", st.ui], ["ترجمة إنجليزي ناقصة", st.no_en], ["عامية في الواجهة", st.dialect],
+    ...Object.entries(st.by_kind).map(([k, n]) => [LM_KIND[k], n])].map(([t, n]) => `<span class="chip">${t}: <b>${n}</b></span>`).join("") + `<span class="mute">المعروض: ${d.count}</span>`;
+  $("lm").innerHTML = d.items.map((x) => `<tr><td>${esc(x.ar)}</td><td class="ltr ${x.problems.includes("no_en") ? "bad" : ""}">${esc(x.en || "")}</td>
+    <td class="ltr mute">${esc(LM_KIND[x.kind] || x.kind)} · ${x.where.slice(0, 3).map(esc).join("<br>")}${x.where.length > 3 ? `<br>+${x.where.length - 3}` : ""}</td>
+    <td class="${x.problems.length ? "bad" : "mute"}">${x.problems.map((p) => LM_P[p] + (p === "dialect" ? ` («${esc(x.dialect)}»)` : "")).join("، ") || "✓"}</td></tr>`).join("");
+}
+$("lmQ").oninput = () => { clearTimeout(lmT); lmT = setTimeout(loadLm, 300); };
+$("lmP").onchange = $("lmK").onchange = () => loadLm();
+$("lmScan").onclick = async () => {
+  $("lmScan").disabled = true;
+  try { const r = await api("/api/platform/langmap/scan", { method: "POST" }); await loadLm(); alert(`تم الفحص: ${r.stat.no_en} ترجمة ناقصة، ${r.stat.dialect} عامية، ونزلوا في صندوق الأخطاء (${r.groups} بند).`); loadIssues(); }
+  catch (e) { alert(e.message); } finally { $("lmScan").disabled = false; }
 };
 loadIssues();
 loadRuns().catch((e) => { $("runs").innerHTML = `<tr><td class="bad">${esc(e.message)}</td></tr>`; });

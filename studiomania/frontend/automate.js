@@ -280,7 +280,7 @@ const AutoPage = (() => {
       <div class="bm-zoom"><button data-zoom="1" aria-label="تكبير">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="تصغير">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ صِف القالب بكلامك (كتابة أو صوت)</button>
-        <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» لقطع أقل من ١٥ ثانية، وولّد كل قطعة بستايل كرتون، وجمّعهم، وحط موسيقى وتعليق نصي، وانتظر موافقتي قبل النشر"></div>
+        <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» إلى مقاطع أقصر من ١٥ ثانية، وولّد كل مقطع بأسلوب كرتوني، واجمعها، وأضف موسيقى وتعليقًا نصيًا، وانتظر موافقتي قبل النشر"></div>
           <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><button class="bm-pill" data-recphone data-nofx>📱 سجّل من جوالك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ افهم ما قلته</button><button class="bm-pill" data-undo hidden>↩ استعد كما كان</button></div>
           <div class="am-clip" hidden></div>

@@ -1405,7 +1405,7 @@ def mock_extract(duration: float) -> dict:
             {"t0": d * 0.2, "t1": d * 0.5, "kind": "type", "text": "how do you communicate", "how": "كتابة بمؤشر"},
             {"t0": d * 0.5, "t1": d * 0.8, "kind": "icon", "theme": "dark", "text": "action.", "how": "كاميرا جنب الكلمة",
              "icons": [{"name": "camera", "desc": "pixel art camera", "t": d * 0.6, "box": [0.3, 0.3, 0.6, 0.7]}]},
-            {"t0": d * 0.8, "t1": d, "kind": "scatter", "text": "love", "how": "حروف بتتجمع"},
+            {"t0": d * 0.8, "t1": d, "kind": "scatter", "text": "love", "how": "حروف تتجمّع"},
         ]}, duration)
 
 

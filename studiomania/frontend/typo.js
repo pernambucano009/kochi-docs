@@ -762,7 +762,7 @@ function tyRenderStk() {
       <input value="${tye(s.name)}" data-stkname data-no-i18n>
       <label class="ty-concept" title="معنى الأيقونة في القاموس: النص الذي يدل عليه يجلب هذه الأيقونة">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
       <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
-      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نضيفة بنفس شكلها">✨ نظّفها</button>` : ""}
+      <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نظيفة بالشكل نفسه">✨ نظّفها</button>` : ""}
         <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لا يوجد بعد ستيكرات</p>`}</div>`;
 }
 
@@ -782,7 +782,7 @@ $("tyStk").addEventListener("click", async (e) => {
   if (!fig) return;
   const id = fig.dataset.stk;
   const clean = t.closest("[data-stkclean]");
-  if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ أُضيفت نسخة نضيفة"); });
+  if (clean) return wrap(clean, async () => { await api(TY(`/stickers/${id}/clean`), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("✨ أُضيفت نسخة نظيفة"); });
   const del = t.closest("[data-stkdel]");
   if (del) {
     if (!(await uiConfirm("أتحذف هذا الملصق؟"))) return;

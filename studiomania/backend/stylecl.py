@@ -272,9 +272,9 @@ def extract_code(text: str) -> str:
 
 def mock_plan(idea: str, dur: int) -> dict:
     return {"title": (idea or "تجربة")[:40],
-            "style": {"name": "فلات بحبيبات", "look": "أشكال بسيطة وألوان دافية", "palette": ["#f4a259", "#5b8e7d", "#bc4b51", "#f4e285"],
+            "style": {"name": "فلات بحبيبات", "look": "أشكال بسيطة وألوان دافئة", "palette": ["#f4a259", "#5b8e7d", "#bc4b51", "#f4e285"],
                       "background": "#1d1a2f", "line": "بدون حدود", "texture": "حبيبات خفيفة", "motion": "ناعمة بارتداد", "type": "عريض"},
-            "beats": [{"t0": 0, "t1": dur * .3, "what": "دوائر تفتح", "text": ""}, {"t0": dur * .3, "t1": dur, "what": "النص", "text": idea[:30]}],
+            "beats": [{"t0": 0, "t1": dur * .3, "what": "دوائر تنفتح", "text": ""}, {"t0": dur * .3, "t1": dur, "what": "النص", "text": idea[:30]}],
             "sfx": [{"t": 0.1, "kind": "pop"}, {"t": dur * .3, "kind": "whoosh"}, {"t": dur * .6, "kind": "hit"}],
             "music": {"bpm": 104, "mood": "playful", "key": "D"}}
 

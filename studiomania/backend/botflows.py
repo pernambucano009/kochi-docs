@@ -20,15 +20,15 @@ REMOTE = {"instagram": "instagram", "facebook": "facebook", "whatsapp": "whatsap
 NAME_TAG = "🤖 "   # أسماء بوتاتنا عند Zernio بتبدأ بيها (علشان نعرف بتوعنا من اللي اتعمل في لوحتهم)
 
 RECIPES = {
-    "comment": {"t": "علّق بكلمة ← رسالة خاصة", "desc": "اللي يكتب الكلمة تحت بوست يوصله رد خاص فيه اللينك، والبوت يكمّل معاه لو سأل.",
+    "comment": {"t": "علّق بكلمة ← رسالة خاصة", "desc": "من يكتب الكلمة تحت منشور يصله رد خاص فيه الرابط، ويكمل البوت معه إن سأل.",
                 "platforms": ("instagram", "facebook"), "fields": ("keywords", "post", "message", "link_title", "link", "ai")},
-    "keyword": {"t": "كلمة في الرسايل ← رد", "desc": "اللي يبعت الكلمة في الخاص أو الواتساب يوصله الرد واللينك على طول.",
+    "keyword": {"t": "كلمة في الرسائل ← رد", "desc": "من يرسل الكلمة في الخاص أو على واتساب يصله الرد والرابط فورًا.",
                 "platforms": ("instagram", "facebook", "whatsapp"), "fields": ("keywords", "message", "link_title", "link", "ai")},
-    "story": {"t": "منشن في الستوري ← شكر وعرض", "desc": "اللي يعمل منشن لحسابك في ستوري يوصله شكر وعرض أو لينك.",
+    "story": {"t": "منشن في الستوري ← شكر وعرض", "desc": "من يذكر حسابك في قصة يصله شكر وعرض أو رابط.",
               "platforms": ("instagram",), "fields": ("message", "link_title", "link")},
-    "qualify": {"t": "اسأل عن الهدف والمستوى ← حوّل للفريق", "desc": "البوت يسأل سؤالين (مثلًا الهدف والمستوى)، يحفظ الإجابات على العميل، وبعدين يحوّل المحادثة لحد من الفريق.",
+    "qualify": {"t": "اسأل عن الهدف والمستوى ← حوّل للفريق", "desc": "يسأل البوت سؤالين (مثل الهدف والمستوى)، ويحفظ الإجابات للعميل، ثم يحوّل المحادثة إلى أحد أعضاء الفريق.",
                 "platforms": ("instagram", "facebook", "whatsapp"), "fields": ("keywords", "q1", "a1", "q2", "a2", "message")},
-    "assistant": {"t": "مساعد ذكي يرد على أي رسالة", "desc": "أي رسالة توصل، البوت يرد بأسلوب البراند ومن معلومات العقل، ولو العميل عايز إنسان أو السؤال صعب يحوّله للفريق.",
+    "assistant": {"t": "مساعد ذكي يرد على أي رسالة", "desc": "أي رسالة تصل يرد عليها البوت بأسلوب العلامة ومن معلومات العقل، وإن طلب العميل شخصًا أو كان السؤال صعبًا يحوّله إلى الفريق.",
                   "platforms": ("instagram", "facebook", "whatsapp"), "fields": ("message",)},
 }
 DEFAULTS = {
@@ -120,7 +120,7 @@ def _ai_loop(g: G, platform: str, start: str, bot_key: str, handle: str | None =
     g.link(hook, cond, "success")
     g.link(hook, g.add("handoff", {"note": "لم يتمكن البوت من الرد"}, "حوّل للفريق"), "error")
     g.link(cond, g.add("handoff", {"note": "طلب العميل أحدًا من الفريق"}, "حوّل للفريق"), "human")
-    say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "ابعت الرد")
+    say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "أرسل الرد")
     g.link(cond, say, "default")
     g.link(say, wait)
 
@@ -176,7 +176,7 @@ def build(recipe: str, platform: str, o: dict, bot_key: str) -> dict:
         cond = g.add("condition", {"rules": [{"id": "human", "variable": "ai.body.handoff", "operator": "is_true"}]}, "محتاج إنسان؟")
         g.link(hook, cond, "success")
         g.link(cond, g.add("handoff", {"note": "طلب العميل أحدًا من الفريق"}, "حوّل للفريق"), "human")
-        say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "ابعت الرد")
+        say = g.add("send_message", {"messageType": "text", "text": "{{ai.body.text}}"}, "أرسل الرد")
         g.link(cond, say, "default")
         _ai_loop(g, platform, say, bot_key)
     return {"nodes": g.nodes, "edges": g.edges, "entryNodeId": g.nodes[0]["id"]}

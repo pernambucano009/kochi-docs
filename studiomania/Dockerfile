@@ -23,6 +23,11 @@ COPY backend backend
 COPY frontend frontend
 COPY fonts fonts
 COPY library library
+# 🗺️ خريطة اللغة (لوحة الفحص): أداة الفحص وقايمة الاستثناءات وكود تطبيق الجوال عشان كلامه يتفحص هو كمان
+COPY tools tools
+COPY tests/i18n tests/i18n
+COPY mobile/app mobile/app
+COPY mobile/src mobile/src
 
 # الفيديوهات وقاعدة البيانات هنا. لازم يتربط بـ volume عشان متضيعش مع كل تحديث
 # (بيتعمل من إعدادات الاستضافة نفسها)

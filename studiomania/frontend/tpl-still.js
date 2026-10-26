@@ -33,7 +33,7 @@ function tvStillDetail(v) {
       <small class="muted">📐 <span data-no-i18n>${le(v.template_name)}</span></small></div>
     <details class="panel tv-step" data-dk="p1" ${open("p1", !items.length)}><summary>١. 📦 الصور والإعدادات</summary>
       <div class="ad-refs">${slot("product", "📦 المنتج")}${kind === "scene" ? slot("scene", "🏞️ المشهد الذي يعجبك") : ""}</div>
-      <small class="muted">صورة واحدة للمنتج. ${kind === "studio" ? "أي صورة تنفع (حتى من الجوال)، المهم الليبل يظهر واضح." : "صورة استوديو نضيفة تُخرج أحسن نتيجة (أنشئها بقالب «صورة استوديو للمنتج»)."}</small>
+      <small class="muted">صورة واحدة للمنتج. ${kind === "studio" ? "أي صورة تنفع (حتى من الجوال)، المهم الليبل يظهر واضح." : "صورة استوديو نظيفة تُخرج أحسن نتيجة (أنشئها بقالب «صورة استوديو للمنتج»)."}</small>
       ${setup}
       ${kind !== "adgen" ? `<label>📐 المقاس <div class="sc-chips">${fmts}</div></label>` : ""}
       <label>📝 ملاحظة (اختياري، تُضاف جملة واحدة في آخر البرومت) <input data-stin="note" value="${tse(st.note || "")}" ${dis}></label>

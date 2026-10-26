@@ -49,7 +49,7 @@ function tvAdDetail(v) {
       <div class="row wrap"><label>اسم المنتج <input data-adset="product_name" value="${tse(a.product?.name || "")}" placeholder="GlowDrop" ${dis}></label>
         <label>نوعه <input data-adset="product_kind" value="${tse(a.product?.kind || "")}" placeholder="سيروم للوش" ${dis}></label></div>
       <div class="ad-refs">${slot("product")}${ugc || plateK ? "" : slot("place")}</div>
-      <small class="muted">صورة واحدة نضيفة للمنتج (من أمام، مالية الكادر، خلفية بسيطة). الصورة هي المرجع: البرومت عمره ما يوصف شكل المنتج بالكلام.</small>
+      <small class="muted">صورة واحدة نظيفة للمنتج (من الأمام، تملأ الإطار، بخلفية بسيطة). الصورة هي المرجع: الوصف المكتوب لا يصف شكل المنتج أبدًا.</small>
       ${plateK ? "" : `<label>📍 المكان ${ugc ? `<div class="sc-chips">${Object.entries(v.places || {}).map(([k, l]) => `<button class="sc-chip ${a.place === l ? "on" : ""}" data-adplace="${tse(l)}" ${dis}>${tse(l)}</button>`).join("")}</div>` : ""}
         <input data-adset="place" value="${tse(a.place || "")}" placeholder="${ugc ? "أو اكتب مكان آخر" : "مثلًا: شارع هادي الفجر بعد المطر"}" ${dis}></label>
       ${ugc ? "" : `<div class="row wrap"><button class="btn sm" data-adplacego ${dis || !a.place ? "disabled" : ""}>🏙️ ارسم صورة المكان (~$${v.plate_cost})</button>

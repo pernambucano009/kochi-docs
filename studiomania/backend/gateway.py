@@ -1665,6 +1665,72 @@ def journey_textmap(request: Request, rid: str = ""):
     return {"run": None, "items": []}
 
 
+# ---------------------------------------------------------------- 🗺️ خريطة لغة البرنامج (tools/langmap.py)
+# كل جملة بتظهر للعميل من الكود نفسه (الموقع، تطبيق الجوال، رسايل السيرفر، خانات القوالب): مكانها وترجمتها ولو فيها عامية.
+# المشاكل بتنزل في صندوق الأخطاء لوحدها (مع كل تشغيل للبوابة، ومن زرار «افحص الآن»)، واللي اتصلّح بيتقفل.
+_langmap: dict = {"at": 0.0, "map": None}
+
+
+def langmap_get(force: bool = False) -> dict:
+    sys.path.insert(0, str(ROOT / "tools"))
+    import langmap   # noqa: PLC0415
+    if force or not _langmap["map"] or time.time() - _langmap["at"] > 600:
+        _langmap.update(at=time.time(), map=langmap.build())
+    return _langmap["map"]
+
+
+def langmap_report(force: bool = False) -> dict:
+    """المشاكل ← صندوق الأخطاء: بند لكل ملف ونوع مشكلة، وفيه الجمل بأماكنها. البنود القديمة اللي اتصلّحت بتتقفل."""
+    m = langmap_get(force)
+    groups: dict[tuple[str, str], list] = {}
+    for it in m["items"]:
+        for p in it["problems"]:
+            groups.setdefault((p, it["where"][0].split(":")[0]), []).append(it)
+    for r in issues.listing(open_only=True, limit=2000):
+        if r["kind"] == "i18n":
+            issues.resolve(r["id"], "اتصلّح (آخر فحص للغة مالقاهوش)")
+    for (p, f), its in groups.items():
+        what = "جمل بدون ترجمة إنجليزية" if p == "no_en" else "جمل فيها عامية في الواجهة"
+        raw = "\n".join(f"{x['where'][0]}  {x['ar']}" + (f"  [{x['dialect']}]" if p == "dialect" else "") for x in its[:60])
+        issues.record("i18n", f, f"{what}: {len(its)} في {f}", raw, 0, screen="خريطة اللغة")
+    return {"stat": m["stat"], "groups": len(groups)}
+
+
+@app.get("/api/platform/langmap")
+def langmap_api(request: Request, q: str = "", problem: str = "", kind: str = "", limit: int = 500, fresh: int = 0):
+    admin(request)
+    m = langmap_get(bool(fresh))
+    rows = [r for r in m["items"] if (not problem or problem in r["problems"] or (problem == "any" and r["problems"]))
+            and (not kind or r["kind"] == kind) and (not q or q in r["ar"] or q.lower() in (r["en"] or "").lower() or any(q in w for w in r["where"]))]
+    return {"stat": m["stat"], "count": len(rows), "items": rows[:max(1, min(limit, 5000))]}
+
+
+@app.get("/api/platform/langmap.csv")
+def langmap_csv(request: Request):
+    admin(request)
+    sys.path.insert(0, str(ROOT / "tools"))
+    import langmap   # noqa: PLC0415
+    return Response(langmap.to_csv(langmap_get()["items"]), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=simsimkit-language-map.csv"})
+
+
+@app.post("/api/platform/langmap/scan")
+def langmap_scan(request: Request):
+    admin(request)
+    return langmap_report(force=True)
+
+
+def _langmap_boot() -> None:
+    time.sleep(20)   # بعد ما البوابة تقوم
+    try:
+        langmap_report(force=True)
+    except Exception as exc:  # noqa: BLE001
+        issues.record("api", "langmap", "فحص خريطة اللغة نفسه فشل", f"{type(exc).__name__}: {exc}", 500)
+
+
+threading.Thread(target=_langmap_boot, daemon=True).start()
+
+
 # ---------------------------------------------------------------- 🚨 صندوق الأخطاء (issues.py)
 @app.get("/api/platform/issues")
 def issues_list(request: Request, all: int = 0):

@@ -147,7 +147,8 @@ def main():
     if "--missing" in sys.argv:
         # الجمل اللي لسه مش في القاموس الإنجليزي
         dic = (ROOT / "frontend" / "i18n-en.js").read_text(encoding="utf-8")
-        known = set(json.loads(dic.split("window.I18N_EN = ", 1)[1].strip().rstrip(";")))
+        body = re.sub(r",\s*}$", "}", dic.split("window.I18N_EN = ", 1)[1].strip().rstrip(";").strip())   # فاصلة بعد آخر جملة كانت بتبوّظ الأداة
+        known = set(json.loads(body))
         keys = {k: v for k, v in keys.items() if k not in known and len(k) > 1 and not re.search(r"[\\[\]$]", k)}
     json.dump(keys, sys.stdout, ensure_ascii=False, indent=0)
 

@@ -73,7 +73,15 @@ RULES: list[tuple[str, str, str]] = [
 BY_STATUS = {402: 0, 504: 2, 429: 3, 404: 8, 500: 9}   # الرقم ← القاعدة (لو الرسالة نفسها مافيهاش حاجة معروفة)
 
 
+LANG_FIX = {"no_en": ("جمل تظهر للعميل وليس لها ترجمة إنجليزية في frontend/i18n-en.js، فتظهر بالعربي في وضع الإنجليزي",
+                     "أضف ترجمتها في frontend/i18n-en.js (الجملة بالضبط كمفتاح)، أو علّمها data-no-i18n إن كانت محتوى العميل"),
+            "dialect": ("كلام الواجهة لازم يكون بالعربية الفصحى، وهذه الجمل فيها كلمات عامية",
+                        "أعد كتابتها بالفصحى (وحدّث مفتاحها في i18n-en.js)، أو أضفها إلى tests/i18n/allow.json إن كانت محتوى بلهجة العميل")}
+
+
 def explain(message: str, raw: str = "", status: int = 0, kind: str = "") -> tuple[str, str]:
+    if kind == "i18n":
+        return LANG_FIX["dialect" if "عامية" in message else "no_en"]
     txt = f"{message}\n{raw}\n{kind}"
     if status == 500:   # خطأ في الكود: الرسالة نفسها فيها كلام زي «key» أو «JSON» بيوه
         return RULES[9][1], RULES[9][2]

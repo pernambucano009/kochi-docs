@@ -197,8 +197,8 @@ def alerts(d: dict) -> list[dict]:
 def alert_text(row: dict) -> tuple[str, str]:
     bal = "" if row["balance"] is None else f"{row['balance']:g} {row['unit']}".strip()
     if row["state"] == "bad":
-        title = f"🔴 رصيد {row['name']} خلص"
+        title = f"🔴 نفد رصيد {row['name']}"
     else:
-        title = f"🟠 رصيد {row['name']} قرّب ينتهي"
+        title = f"🟠 رصيد {row['name']} أوشك على النفاد"
     body = f"{row['what']}. " + (f"الرصيد الآن: {bal}. " if bal else "") + (f"آخر غلطة: {row['fail']['msg'][:160]}" if row.get("fail") else f"حد التنبيه: {row['min']:g}")
     return title, body

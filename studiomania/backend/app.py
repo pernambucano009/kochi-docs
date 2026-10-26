@@ -725,7 +725,7 @@ def auth_state(request: Request):
 @app.post("/api/auth/setup")
 def auth_setup(body: PasswordIn, request: Request):
     if not auth.needs_setup():
-        raise HTTPException(400, "كلمة المرور متعمل من قبل")
+        raise HTTPException(400, "كلمة المرور معيّنة من قبل")
     if len(body.password) < 8:
         raise HTTPException(400, "يجب أن تتكون كلمة المرور من 8 أحرف أو أرقام على الأقل")
     auth.set_password(body.password)
@@ -4446,7 +4446,7 @@ async def bot_ai_hook(request: Request):
     d = botflows.parse_hook_body(await request.body())
     text = str(d.get("text") or "").strip()
     if not text:
-        return {"text": "أهلًا 👋 إزاي أقدر أساعدك؟", "handoff": False}
+        return {"text": "أهلًا 👋 كيف يمكنني مساعدتك؟", "handoff": False}
     if atlas.mock_mode():
         return {"text": f"(رد تجريبي) وصلت رسالتك: {text[:80]}", "handoff": "انسان" in text or "حد" in text}
     try:
@@ -6644,7 +6644,7 @@ def humanize(body: HumanizeIn):
             new, more = growth.clean_invisible(new)
             text = new
             changes += [str(c)[:200] for c in raw.get("changes") or [] if str(c).strip()][:12]
-    return {"text": text, "changes": changes or ["النص كان نضيف، ماغيرتش شيء"]}
+    return {"text": text, "changes": changes or ["النص سليم، ولم أغيّر شيئًا"]}
 
 
 # ---------------------------------------------------------------- 🔔 الإشعارات
@@ -7984,7 +7984,7 @@ def describe_asset(aid: str):
                 auth.set_setting("carousel_vision_model", model)
             break
         if d is None:
-            raise HTTPException(400, "ما قدرتش أقرا الصور بأي نموذج: " + " | ".join(errors[:3]))
+            raise HTTPException(400, "تعذّرت قراءة الصور بأي نموذج: " + " | ".join(errors[:3]))
     with closing(db()) as conn, conn:
         # الاسم بيتغيّر بس لو لسه تلقائي («تيمبليت 3»)، واسم المدرب ما بيتغيّرش
         auto = re.fullmatch(rf"{re.escape(ASSET_KINDS.get(r['kind'], ''))} \d+", r["name"] or "")
@@ -17657,7 +17657,7 @@ def run_film_raw(fid: str, prev: str) -> None:
         film_update(fid, fn)
     except Exception as exc:  # noqa: BLE001
         film_set(fid, status=film_idle_status(film_load(fid)), step=None,
-                 error="الخام ما اتجمّعش: " + str(getattr(exc, "detail", None) or exc)[:350])
+                 error="لم تُجمع اللقطات الخام: " + str(getattr(exc, "detail", None) or exc)[:350])
 
 
 @app.post("/api/films/{fid}/to-editor")
@@ -24611,7 +24611,7 @@ def flow_use_saved(fid: str, sid: str):
         flow_update(fid, lambda x: x.update(ideas=[it, *(x.get("ideas") or [])]))
         return flow_pick_idea(fid, FlowPickIn(id=it["id"]))
     if (s.get("template") or {}).get("id") != d["template"].get("id"):
-        raise HTTPException(400, f"هذا السيناريو متعمل لقالب «{(s.get('template') or {}).get('name') or ''}»، استخدمه من هناك")
+        raise HTTPException(400, f"هذا السيناريو مصنوع لقالب «{(s.get('template') or {}).get('name') or ''}»، استخدمه من هناك")
     sc, idea = {**s["item"], "id": uuid.uuid4().hex[:8]}, {**(s.get("idea") or {"title": s["item"].get("title", "")}), "id": uuid.uuid4().hex[:8]}
     flow_update(fid, lambda x: x.update(idea=idea, format=s.get("format") or x.get("format") or "reel", scenarios=[sc, *(x.get("scenarios") or [])]))
     mark_idea_used(d, idea, fid)
@@ -25087,7 +25087,7 @@ def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
             pick = [next((v for v in vs if dub.VOICES[v].get("gender") == g), None) for g in ("male", "female")]
             pick = [v for v in pick if v] or vs[:2]
             out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in pick] or [
-                {"provider": p, "voice": "", "label": "—", "skip": f"{VLAB_PROV[p]} مالوش أصوات في اللهجة دي"}]
+                {"provider": p, "voice": "", "label": "—", "skip": f"{VLAB_PROV[p]} لا توجد له أصوات في هذه اللهجة"}]
         elif p == "eleven_atlas":
             out += [{"provider": p, "voice": v, "label": dub.VOICES[v]["label"]} for v in list(dub.ELEVEN)[:2]]
         elif p == "eleven" and voicelab.eleven_key():
@@ -25104,7 +25104,7 @@ def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
                     out += [{"provider": p, "voice": v, "label": v, "atlas": m["model"], "vf": m.get("voice_field"), "tf": m.get("text_field")} for v in vs[:2]]
         elif p == "silma":
             model = voicelab.SILMA_MODELS["ksa"] if dialect.startswith("ar-sa") or dialect == "ar-gulf" else voicelab.SILMA_MODELS["msa"]
-            note = "" if dialect.startswith("ar-sa") or dialect in ("ar-msa", "ar-gulf") else " · SILMA عنده فصحى وسعودي بس"
+            note = "" if dialect.startswith("ar-sa") or dialect in ("ar-msa", "ar-gulf") else " · SILMA يدعم الفصحى والسعودية فقط"
             out += [{"provider": p, "voice": v, "label": voicelab.SILMA_VOICES[v] + note, "model": model} for v in ("sultan", "sarah")]
     return out
 
@@ -32327,7 +32327,7 @@ def pilot_tick() -> None:
             if j.get("status") == "run":
                 after = next((x for x in pilot_load()["jobs"] if x["id"] == j["id"]), {})
                 if after.get("status") in ("failed", "wait", "cam") and after.get("status") != j.get("status"):
-                    level, title = ("bad", f"🛫 وقف: {j['name']}") if after["status"] == "failed" else ("info", f"🛫 مستنيك: {j['name']}")
+                    level, title = ("bad", f"🛫 وقف: {j['name']}") if after["status"] == "failed" else ("info", f"🛫 بانتظارك: {j['name']}")
                     notify("autopilot", level, title, after.get("error") or after.get("note") or "", "pilot", j["id"])
     finally:
         PILOT_TICK.release()

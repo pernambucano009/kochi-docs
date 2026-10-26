@@ -627,7 +627,7 @@ function libDetail(a) {
     <div class="row wrap">
       <button class="btn sm" data-back>→ رجوع للمعرض</button>
       ${car.cur ? `<button class="btn sm ${libSelected(a) ? "" : "primary"}" data-pick>${libSelected(a) ? "✓ متختار (اضغط تلغيه)" : "✓ اختره للكاروسيل"}</button>` : ""}
-      <button class="btn sm" data-describe title="البرنامج ينظر على الصور ويكتب الخطوط والألوان والتفاصيل">✨ اقرا الصور واكتب الوصف</button>
+      <button class="btn sm" data-describe title="البرنامج ينظر على الصور ويكتب الخطوط والألوان والتفاصيل">✨ اقرأ الصور واكتب الوصف</button>
       <button class="btn sm danger" data-del-asset>🗑️ احذف من المكتبة</button>
     </div>
     <div class="lib-meta">

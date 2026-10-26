@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>كمّل على موبايلك · SimsimKit</title>
+<title>أكمل على جوالك · SimsimKit</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@300;400;500&display=swap">
 <style>
-  /* الصفحة اللي الـ QR بيفتحها: بتفتح التطبيق على طول على نفس الطلب، ولو التطبيق مش متسطّب بتقول كده */
+  /* الصفحة اللي الـ QR بيفتحها (فصحى، وإنجليزي لو الجهاز مش عربي): بتفتح التطبيق على طول على نفس الطلب، ولو التطبيق مش متسطّب بتقول كده */
   :root { --bg: #FAFAF8; --ink: #181718; --muted: #6B6B67; --card: #FFFFFF; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0C0C0E; --ink: #F1F1F3; --muted: #8A8A92; --card: #1C1C1F; } }
   body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--ink); font-family: "Readex Pro", sans-serif; }
@@ -23,14 +23,22 @@
 <body>
 <main>
   <img src="/logo-mark-light.png" alt="SimsimKit">
-  <h1>بيفتح تطبيق سمسمكيت…</h1>
-  <p>لو التطبيق ما فتحش لوحده، دوس على الزرار. ولو مش متسطّب، نزّله الأول وادخل بنفس حسابك، وبعدين امسح الكود تاني.</p>
+  <h1 id="t">جارٍ فتح تطبيق SimsimKit…</h1>
+  <p id="p">إن لم يُفتح التطبيق تلقائيًا، اضغط على الزر. وإن لم يكن مثبتًا، ثبّته أولًا وسجّل الدخول بحسابك نفسه، ثم امسح الرمز مرة أخرى.</p>
   <a class="go" id="go" href="#">افتح التطبيق</a>
 </main>
 <script>
   const id = (location.hash || "").slice(1).replace(/[^\w-]/g, "");
   const url = id ? `simsimkit://handoff/${id}` : "simsimkit://";
   document.getElementById("go").href = url;
+  let en = false;
+  try { en = (localStorage.getItem("studiomania.lang") || (navigator.language || "").slice(0, 2)) === "en"; } catch { /* */ }
+  if (en) {
+    document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; document.title = "Continue on your phone · SimsimKit";
+    document.getElementById("t").textContent = "Opening the SimsimKit app…";
+    document.getElementById("p").textContent = "If the app doesn't open by itself, tap the button. If it isn't installed, install it first, sign in with the same account, then scan the code again.";
+    document.getElementById("go").textContent = "Open the app";
+  }
   if (id) location.href = url;
 </script>
 </body>
