@@ -462,7 +462,7 @@ function tyPoll() {
 }
 
 $("tyNew").onclick = async () => {
-  const name = (await uiPrompt("اسم الفيديو:", "تايبوجرافي"));
+  const name = (await uiPrompt("اسم الفيديو:", I18N.t("تايبوجرافي")));
   if (name === null) return;
   try {
     const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: tyx.styles[0]?.id || "mono-red" }) });
@@ -905,7 +905,7 @@ $("labTypo").addEventListener("click", async (e) => {
   }
   const use = t.closest("[data-ltuse]");
   if (use) {
-    const name = (await uiPrompt("اسم الفيديو:", "تايبوجرافي"));
+    const name = (await uiPrompt("اسم الفيديو:", I18N.t("تايبوجرافي")));
     if (name === null) return;
     try {
       const v = await api(TY(""), { method: "POST", ...jsonBody({ name, ratio: "9:16", style: labx.cur.typo.style_id }) });
