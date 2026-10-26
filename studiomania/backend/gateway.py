@@ -1276,6 +1276,44 @@ def admin_users(request: Request):
     return [dict(r) for r in rows]
 
 
+class TestAccountIn(BaseModel):
+    email: str
+    password: str
+    credits: int = 0
+    plan: str = "agency"
+
+
+@app.post("/api/platform/test-account")
+def admin_test_account(body: TestAccountIn, request: Request):
+    """🧪 حساب عميل للتجربة (رحلة التجربة): يُنشأ أو يُعاد ضبطه، مؤكَّد، على باقة كاملة، ورصيده = النقاط المطلوبة بالظبط."""
+    admin(request)
+    email = norm_email(body.email)
+    check_pw(body.password)
+    if not email.endswith("@test.simsimkit.com"):
+        raise HTTPException(400, "حسابات التجربة تكون على @test.simsimkit.com فقط")
+    plan = body.plan if any(p["key"] == body.plan for p in billing.DEFAULTS["plans"]) else "agency"
+    u = user_by("email", email)
+    if u and u["role"] != "customer":
+        raise HTTPException(400, "هذا البريد ليس حساب عميل")
+    if not u:
+        wid = new_workspace("رحلة التجربة")
+        uid = uuid.uuid4().hex[:12]
+        with closing(db()) as c, c:
+            c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 1, 'customer', ?, ?)",
+                      (uid, email, "رحلة التجربة", pw_hash(body.password), wid, time.time()))
+        u = user_by("id", uid)
+    wid = u["workspace"]
+    with closing(db()) as c, c:
+        c.execute("UPDATE users SET pw=?, verified=1 WHERE id=?", (pw_hash(body.password), u["id"]))
+        c.execute("UPDATE workspaces SET plan=?, autopilot=1 WHERE id=?", (plan, wid))
+        c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+        r = c.execute("SELECT plan_credits + topup_credits AS n FROM wallet WHERE workspace=?", (wid,)).fetchone()
+        delta = max(0, int(body.credits)) - (r["n"] if r else 0)
+        c.execute("UPDATE wallet SET plan_credits=0, topup_credits=?, updated_at=? WHERE workspace=?", (max(0, int(body.credits)), time.time(), wid))
+        ledger_add(c, wid, delta, "test", "رصيد رحلة التجربة")
+    return {"ok": True, "email": email, "workspace": wid, "plan": plan, "credits": max(0, int(body.credits))}
+
+
 # ---------------------------------------------------------------- كل الباقي بيروح لنسخة البرنامج بتاعة العميل
 
 # حاجات للأدمن بس (المفاتيح، المعمل، أدوات السيرفر، مكسبنا)

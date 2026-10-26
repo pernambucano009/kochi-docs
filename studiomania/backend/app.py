@@ -26043,7 +26043,7 @@ def seasons_note(data: dict) -> dict | None:
              f"{': ' + i['angle'] if i.get('angle') else ''}" for i in items[:60]]
     where = data.get("target") or "، ".join(data.get("countries") or [])
     return {"id": uuid.uuid4().hex[:10], "quiz": "seasons_ai", "section": "seasonal", "title": "🗓️ مواسم ومناسبات السوق", "source": "ai",
-            "summary": f"{len(items)} مناسبة في السنة القادمة{' في ' + where if where else ''} (اتجابت بالذكاء الاصطناعي من السوق والجمهور)",
+            "summary": f"{len(items)} مناسبة في السنة القادمة{' في ' + where if where else ''} (أنشأها الذكاء الاصطناعي من السوق والجمهور)",
             "body": "\n".join(lines)}
 
 

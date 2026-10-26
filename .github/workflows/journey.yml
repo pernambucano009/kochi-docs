@@ -1,0 +1,56 @@
+# 🧭 رحلة التجربة على الـ staging بنقاط حقيقية: بتشتغل لما ملف الطلب يتغير (المرحلة، المجالات، أقصى نقاط)،
+# والنتيجة (التقرير والصور والفيديو) بتتحفظ في فرع journey-results تحت phase-N/
+name: journey
+on:
+  push:
+    paths: ["studiomania/tests/journey/request.json"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: journey
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: studiomania
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-save playwright@1.56.1 && npx playwright install --with-deps chromium
+      - id: req
+        run: |
+          echo "phase=$(jq -r .phase tests/journey/request.json)" >> "$GITHUB_OUTPUT"
+          echo "niches=$(jq -r '.niches // ""' tests/journey/request.json)" >> "$GITHUB_OUTPUT"
+          echo "budget=$(jq -r .budget tests/journey/request.json)" >> "$GITHUB_OUTPUT"
+      - run: node tests/journey/run.js
+        env:
+          BASE: https://staging.simsimkit.com
+          ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+          PHASE: ${{ steps.req.outputs.phase }}
+          NICHES: ${{ steps.req.outputs.niches }}
+          BUDGET: ${{ steps.req.outputs.budget }}
+      - if: always()
+        run: cat tests/journey/out/phase-*/report.md || true
+      - if: always()
+        name: احفظ النتيجة في فرع journey-results
+        run: |
+          set -e
+          src="$PWD/tests/journey/out"
+          [ -d "$src" ] || exit 0
+          cd "$RUNNER_TEMP"
+          git config --global user.name "journey-bot"
+          git config --global user.email "journey-bot@users.noreply.github.com"
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git clone --depth 1 -b journey-results "$url" res 2>/dev/null; then cd res; else
+            mkdir res && cd res && git init -q -b journey-results && git remote add origin "$url"; fi
+          for d in "$src"/phase-*; do rm -rf "$(basename "$d")"; cp -r "$d" .; done
+          git add -A
+          git commit -qm "journey: phase ${{ steps.req.outputs.phase }} · run ${{ github.run_number }}" || exit 0
+          git push -q origin journey-results

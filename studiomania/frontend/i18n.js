@@ -135,24 +135,32 @@
   Intl.NumberFormat = function (l, o) { return new _NF(enLoc(l), o); };
   Intl.NumberFormat.prototype = _NF.prototype; Intl.NumberFormat.supportedLocalesOf = _NF.supportedLocalesOf;
 
-  const ATTRS = ["placeholder", "title", "aria-label"];
+  // data-tip و data-ph: تلميح الزرار والكلام الرمادي في مربعات الكتابة (بيظهروا من الـ CSS بـ attr())
+  const ATTRS = ["placeholder", "title", "aria-label", "data-tip", "data-ph"];
+  // 🔒 كلام العميل نفسه (اللي بيكتبه، أو محتوى علامته) مايتترجمش: لا خانات الكتابة ولا اللي متعلّم data-no-i18n
+  const OWN = "[data-no-i18n], [contenteditable]";
   const SKIP = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT"]);
   function doText(node) {
     const v = node.nodeValue;
-    if (v && AR.test(v) && !SKIP.has(node.parentNode?.nodeName) && !node.parentNode?.closest?.("[data-no-i18n]")) {
+    if (v && AR.test(v) && !SKIP.has(node.parentNode?.nodeName) && !node.parentNode?.closest?.(OWN)) {
       const tv = t(v);
       if (tv !== v) node.nodeValue = tv;
     }
   }
-  function doEl(el) {
-    if (el.closest?.("[data-no-i18n]")) return;
-    for (const a of ATTRS) {
-      const v = el.getAttribute(a);
-      if (v && AR.test(v)) {
-        const tv = t(v);
-        if (tv !== v) el.setAttribute(a, tv); // إذا لا تغيّر لا نكتبه آخر، وإلا المراقب يظل يدور
-      }
+  function tr(el, a) {
+    const v = el.getAttribute(a);
+    if (v && AR.test(v)) {
+      const tv = t(v);
+      if (tv !== v) el.setAttribute(a, tv); // إذا لا تغيّر لا نكتبه آخر، وإلا المراقب يظل يدور
     }
+  }
+  function doEl(el) {
+    if (el.closest?.(OWN)) {
+      // خانة كتابة: كلام العميل جواها يفضل زي ما هو، بس الكلام الرمادي (data-ph) من البرنامج فبيتترجم
+      if (el.hasAttribute?.("contenteditable") && !el.closest("[data-no-i18n]")) tr(el, "data-ph");
+      return;
+    }
+    for (const a of ATTRS) tr(el, a);
     // الأماكن اللي كانت مجبورة يمين لشمال عشان العربي
     if (el.getAttribute("dir") === "rtl") el.setAttribute("dir", "ltr");
   }

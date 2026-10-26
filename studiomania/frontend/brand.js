@@ -349,7 +349,7 @@ const BrandPage = (() => {
     const side = (S.byId?.[n.from]?.x ?? 0) + 0 > n.x ? "l" : "r";
     return `<button class="bm-n bm-leaf ${cls}${S.open?.id === n.id ? " on" : ""}" data-n="${esc(n.id)}" aria-label="${esc(l.t)}">
       <i>${l.type === "action" ? "✲" : l.type === "rule-new" ? "+" : ""}</i>${lab ? `<span class="bm-lab ${side}">${esc(short(lab))}</span>` : ""}
-      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 يوجد اقتراح بالداخل</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لم تُملأ بعد</small>`}</span></button>`;
+      <span class="bm-tip"><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b>${l.sugg ? `<small class="miss">💡 يوجد اقتراح بالداخل</small>` : ""}${l.type === "rule" || l.type === "note" ? `<small${l.type === "note" && l.note.source === "ai" ? "" : " data-no-i18n"}>${esc(l.type === "note" ? l.note.summary || "" : l.t)}</small>` : val ? `<small data-no-i18n>${esc(val.slice(0, 60))}</small>` : l.type === "action" || l.type === "rule-new" ? "" : `<small class="miss">لم تُملأ بعد</small>`}</span></button>`;
   }
   // أول ٣ كلمات (بحد أقصى ٢٢ حرف) وبعدين «…»
   function short(t) {
@@ -729,7 +729,7 @@ const BrandPage = (() => {
           const KN = { products: "صور المنتج", characters: "شخصيات العلامة", sets: "الأماكن والخلفيات", props: "الأدوات", logos: "الشعار" };
           S.imgTarget = S.imgTarget?.id === p.id ? S.imgTarget : { id: p.id, t: p.target };
           return `<div class="bm-ch"><span class="latin en-k">SUGGESTION</span><b>صورة من الحساب</b></div>${from ? `<p class="bm-note">من «${esc(from)}»</p>` : ""}
-            <img class="bm-pimg" src="/media/ads/brains/${esc(b.id)}/src/${esc(p.file)}" alt="">${p.summary ? `<p class="bm-note">${esc(p.summary)}</p>` : ""}
+            <img class="bm-pimg" src="/media/ads/brains/${esc(b.id)}/src/${esc(p.file)}" alt="">${p.summary ? `<p class="bm-note" data-no-i18n>${esc(p.summary)}</p>` : ""}
             <div class="bm-sub"><small>توضع في</small><div class="bm-pills">${Object.entries(KN).map(([k, t]) => `<button class="bm-pill${S.imgTarget.t === k ? " on" : ""}" data-itgt="${k}">${t}</button>`).join("")}</div></div>
             <div class="bm-acts"><button class="bm-go" data-ok="${p.id}">ضعها</button><button class="bm-pill" data-no="${p.id}">لا</button></div>`;
         }
