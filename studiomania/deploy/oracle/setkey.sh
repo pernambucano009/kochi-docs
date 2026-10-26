@@ -13,6 +13,16 @@ read -rs -p "الصق المفتاح ودوس Enter (مش هيظهر وانت ب
 K="$(printf '%s' "$K" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
 [ -n "$K" ] || { echo "⚠️ مفيش مفتاح اتلصق. جرّب تاني"; exit 1; }
 
+# 📱 مفتاح رسائل الدخول: نتأكد إن Authentica قابلاه قبل ما نحفظه (من غير إرسال أي رسالة)
+if [ "$NAME" = "AUTHENTICA_API_KEY" ]; then
+  R="$(curl -s -m 20 -w ' HTTP%{http_code}' -H "X-Authorization: $K" -H 'Accept: application/json' https://api.authentica.sa/api/v2/balance || true)"
+  case "$R" in
+    *HTTP200) echo "✓ Authentica قابلين المفتاح. الرصيد: $(printf '%s' "${R% HTTP200}" | grep -o '"balance":[^,}]*' | cut -d: -f2)";;
+    *HTTP401*|*HTTP403*) echo "⚠️ Authentica رفضوا المفتاح ده (غلط أو اتلغى). اعمل مفتاح جديد من بوابتهم وجرّب تاني. ماحفظتش حاجة"; exit 1;;
+    *) echo "⚠️ ماقدرتش أتأكد من المفتاح (${R##* }). هحفظه وجرّب الدخول";;
+  esac
+fi
+
 cp -p "$ROOT/app.env" "$ROOT/app.env.bak"
 grep -v "^$NAME=" "$ROOT/app.env.bak" > "$ROOT/app.env" || true
 printf '%s=%s\n' "$NAME" "$K" >> "$ROOT/app.env"
