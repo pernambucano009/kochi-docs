@@ -21722,7 +21722,14 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
                        check=True, capture_output=True, timeout=600)
         step("🎚️ لا توجد موسيقى في الفيديو: يركّب الصوت وحده" if background == "auto" and d.get("has_bg") is False
              else "🎵 يفصل الموسيقى والمؤثرات عن الكلام" if background in ("auto", "separate") else "🎚️ يجهّز الخلفية")
-        bg = dub_background(did, d, background)
+        note = None
+        try:
+            bg = dub_background(did, d, background)
+        except Exception as exc:  # noqa: BLE001
+            # 🎵 الفصل فشل (رصيد/باقة الخدمة…): الدبلجة بتكمّل من غير موسيقى بدل ما تقف، وبنقول ده صراحة
+            print(f"[dub] bg separation failed: {str(exc)[:300]}", flush=True)
+            wallet.refund(hold, wallet.credits(total / 60 * dub.SEP_PER_MIN), why="فصل الموسيقى لم يتم")
+            bg, note = None, "تعذّر فصل الموسيقى هذه المرة، فخرجت الدبلجة بدون موسيقى خلفية. يمكنك إعادتها لاحقًا، أو اختيار «الصوت الأصلي منخفضًا»"
         audio = folder / f"{dialect}.m4a"
         if bg:
             subprocess.run(ff + ["-i", str(voice), "-i", str(bg), "-filter_complex",
@@ -21797,7 +21804,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
                          (export_id, name, filename, total, now()))
         shutil.rmtree(work, ignore_errors=True)
         dub_update(did, lambda x: x["targets"][dialect].update(busy=False, step=None, error=None, video=out.name, audio=audio.name,
-                                                               export_id=export_id, rendered_at=now(), spots=spots))
+                                                               export_id=export_id, rendered_at=now(), spots=spots, note=note))
     except Exception as exc:  # noqa: BLE001
         wallet.refund(hold, why="الدبلجة لم تكتمل")
         dub_fail(did, exc, dialect)

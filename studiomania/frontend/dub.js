@@ -88,7 +88,8 @@ function dbRenderProj() {
       + (t.error_raw && !dbx.err[tk] ? `<details class="db-raw"><summary>🔧 التفاصيل (للأدمن فقط)</summary><code dir="ltr" data-no-i18n>${dbe(t.error_raw)}</code></details>` : "");
     if (t.video_url) {
       h += `<div class="db-out"><video src="${t.video_url}" controls playsinline preload="metadata"></video>
-        <p class="ok">✓ النسخة ${tl.label} في «الفيديوهات الجاهزة» ويمكنك نشرها من شاشة النشر${t.lipsync ? " (بمزامنة الشفاه)" : ""}.</p></div>`;
+        <p class="ok">✓ النسخة ${tl.label} في «الفيديوهات الجاهزة» ويمكنك نشرها من شاشة النشر${t.lipsync ? " (بمزامنة الشفاه)" : ""}.</p>
+        ${t.note ? `<p class="hint db-note">⚠️ ${dbe(t.note)}</p>` : ""}</div>`;
     }
     if (t.lines?.length) {
       const open = !t.video_url && !t.busy ? " open" : (dbx.open?.[tk] ? " open" : "");

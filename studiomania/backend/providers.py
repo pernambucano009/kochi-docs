@@ -32,7 +32,7 @@ PROVIDERS = {
     "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودية", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
     "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0, "url": "https://zernio.com"},
 }
-LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|top.?up|رصيد", re.I)
+LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|paid plan|upgrade|top.?up|رصيد", re.I)
 CHECK_EVERY = 30 * 60
 
 
