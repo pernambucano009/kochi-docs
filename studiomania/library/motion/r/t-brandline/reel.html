@@ -1,0 +1,288 @@
+<!doctype html><html><head><meta charset="utf-8"><script src="../../lib/core.js"></script></head><body>
+<script>
+// قالب «خط علامتك»: خط نور واحد بلون العلامة بيعمل كل حاجة في لقطة واحدة من غير قطع: بيخبط تحت الاسم، ويبقى خط خانة البحث في الجوال،
+// ويملأ زرار الطلب، ويرسم طريق التوصيل في المدينة بالليل، ويلف على الكرتونة ويقعد عليها علامة، ويجري تحت الجملة الأخيرة، ويرجع تحت الاسم.
+// كله بيترسم بدالة واحدة (glowLine) عشان الخط يبان هو هو في كل مشهد. 1080×1920، ٢٠ ثانية.
+const G1 = "١ · الاسم", G2 = "٢ · البحث والطلب", G3 = "٣ · التوصيل", G4 = "٤ · الختام", GS = "الشكل العام";
+const PR = M.params({
+  brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "سوقنا", group: G1, max: 16, hint: "يظهر في البداية والنهاية، والخط يجري تحته." },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "رمز الشعار وحده وبلا خلفية: يُطبع على الكرتونة. إن لم يوجد يُطبع أول حرف من الاسم." } },
+  query: { label: "ما يُكتب في البحث", kind: "text", def: "سماعات لاسلكية", group: G2, max: 22, hint: "ما يبحث عنه عميلك عادةً، بكلماته هو." },
+  sug: { label: "اقتراحات البحث (٣ سطور)", kind: "lines", def: ["سماعات لاسلكية رياضية", "سماعات لاسلكية بعزل الصوت", "سماعات لاسلكية للأطفال"], group: G2, max: 30 },
+  product: { label: "اسم المنتج", kind: "text", role: "product", def: "سماعة هدوء برو", group: G2, max: 24 },
+  price: { label: "السعر", kind: "text", def: "٣٤٩ ريال", group: G2, max: 14 },
+  perk: { label: "ميزة تحت السعر", kind: "text", def: "توصيل مجاني اليوم", group: G2, max: 26 },
+  button: { label: "زر الطلب", kind: "text", def: "اطلب الآن", group: G2, max: 14 },
+  done: { label: "رسالة بعد الطلب", kind: "text", def: "تم الطلب، شكرًا لك", group: G2, max: 24 },
+  img1: { label: "صورة المنتج", kind: "image", role: "product_img1", def: "", group: G2, img: { ratio: "1:1", cut: false, tip: "صورة واضحة للمنتج على خلفية بسيطة." } },
+  img2: { label: "صورة منتج ٢ (نتائج البحث)", kind: "image", role: "product_img2", def: "", group: G2, img: { ratio: "1:1", cut: false } },
+  img3: { label: "صورة منتج ٣ (نتائج البحث)", kind: "image", role: "product_img3", def: "", group: G2, img: { ratio: "1:1", cut: false } },
+  eta: { label: "عنوان التوصيل", kind: "text", def: "يصلك اليوم", group: G3, max: 18 },
+  steps: { label: "مراحل الطلب (٤ سطور)", kind: "lines", def: ["تم الطلب", "يُجهَّز", "في الطريق", "وصل"], group: G3, max: 12 },
+  notify: { label: "إشعار الوصول", kind: "text", def: "وصل طلبك إلى الباب", group: G3, max: 26 },
+  tagline: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "كل ما تحبه، حتى بابك", group: G4, max: 26, hint: "وعد العلامة في سطر: الخط يجري تحته ثم يعود تحت الاسم." },
+  cta: { label: "الدعوة في النهاية", kind: "text", role: "cta", def: "حمّل التطبيق واطلب الآن", group: G4, max: 28 },
+  accent: { label: "لون العلامة (الخط)", kind: "color", role: "accent", def: "#3d7bff", group: GS, hint: "لون الخط الوحيد في الفيديو: لون العلامة الأساسي، ويُفضَّل أن يكون قويًا." },
+  bg: { label: "لون الخلفية", kind: "color", role: "dark", def: "#08080a", group: GS, hint: "غامق جدًا لكي يلمع الخط." },
+  fHead: { label: "خط العناوين", kind: "font", def: "plex", group: GS },
+  fText: { label: "خط النصوص", kind: "font", def: "plex4", group: GS },
+});
+M.meta({
+  story: "خط نور واحد بلون العلامة يحكي رحلة العميل في لقطة واحدة: يظهر تحت الاسم، ثم يصبح خط البحث في الجوال، ويملأ زر الطلب، ويرسم طريق التوصيل في المدينة، ويلتف حول الصندوق عند الباب ويصبح علامة عليه، ثم يجري تحت الجملة الأخيرة ويعود تحت الاسم.",
+  scenes: [{ name: "الاسم", t0: 0, t1: 2.0, about: "الخط يصل ويظهر الاسم" }, { name: "البحث", t0: 2.0, t1: 5.6, about: "الكتابة والاقتراحات والنتائج" },
+    { name: "الطلب", t0: 5.6, t1: 8.4, about: "صفحة المنتج وزر الطلب" }, { name: "الطريق", t0: 8.4, t1: 11.6, about: "الخط يرسم طريق التوصيل" },
+    { name: "الباب", t0: 11.6, t1: 14.6, about: "الصندوق والعلامة والإشعار" }, { name: "الختام", t0: 14.6, t1: 20, about: "الجملة الأخيرة والاسم" }],
+  tips: ["مناسب للمتاجر والمطاعم والتطبيقات وأي خدمة توصيل.", "اكتب في البحث ما يكتبه عميلك فعلًا.", "لون العلامة القوي يجعل الخط هو البطل."],
+});
+const W = 1080, H = 1920, DUR = 20;
+
+M.reel({
+  W, H, DUR, bg: "#08080a",
+  async init(M) {
+    await Promise.all([M.font("PB", PR.fHead), M.font("PX", PR.fText)]);
+    const [i1, i2, i3, lg] = await Promise.all([PR.img1, PR.img2, PR.img3, PR.logo].map(M.img));
+    const c = M.canvas(W, H);
+    return { x: c.getContext("2d"), imgs: [i1, i2, i3], logo: lg };
+  },
+  seek(t, C, M) {
+    const { x } = C, { seg, cubicIO, clamp, springO, expo, lerp, noise1 } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, BG = PR.bg;
+    const T = (s) => String(s || "").trim();
+    const st = [0, 1, 2, 3].map((i) => T(PR.steps[i]) || window.PARAM_SCHEMA.steps.def[i]);
+    const sg = [0, 1, 2].map((i) => T(PR.sug[i]) || window.PARAM_SCHEMA.sug.def[i]);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.fillStyle = BG; x.fillRect(0, 0, W, H);
+    // توهج دافئ بيتنفّس في الخلفية
+    { const g = x.createRadialGradient(540 + noise1(t * .3) * 160, 760 + noise1(t * .2 + 9) * 120, 40, 540, 900, 1100); g.addColorStop(0, A + "30"); g.addColorStop(1, "transparent"); x.fillStyle = g; x.fillRect(0, 0, W, H); }
+    // 🎥 كاميرا دايمًا بتتحرك شوية + هزة على الخبطات
+    const shake = (t0) => { const k = clamp((t - t0) / .35); return k > 0 && k < 1 ? (1 - k) * 14 : 0; };
+    const sh = shake(.35) + shake(17.6) * .6;
+    const camX = noise1(t * .5) * 10 + (sh ? noise1(t * 60) * sh : 0), camY = noise1(t * .4 + 5) * 10 + (sh ? noise1(t * 60 + 3) * sh : 0);
+    x.translate(camX, camY);
+
+    // ✨ الخط: دالة واحدة لكل المشاهد. pts نقط المسار، k من ٠ لـ ١ قد إيه اترسم، cool من ٠ (نور) لـ ١ (حبر مطبوع)
+    function glowLine(pts, k, w = 10, cool = 0, from = 0) {
+      if (k <= from || pts.length < 2) return null;
+      const L = []; let tot = 0; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); L.push(d); tot += d; }
+      const a = tot * from, b = tot * clamp(k); let acc = 0, head = pts[0], started = false;
+      x.save(); x.lineCap = "round"; x.lineJoin = "round"; x.beginPath();
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i], d = L[i - 1];
+        const s0 = clamp((a - acc) / d), s1 = clamp((b - acc) / d);
+        if (s1 > s0) {
+          const q0 = [lerp(p0[0], p1[0], s0), lerp(p0[1], p1[1], s0)], q1 = [lerp(p0[0], p1[0], s1), lerp(p0[1], p1[1], s1)];
+          if (!started) { x.moveTo(...q0); started = true; } x.lineTo(...q1); head = q1;
+        }
+        acc += d;
+      }
+      const glow = 1 - cool;
+      if (glow > 0) { x.shadowColor = A; x.shadowBlur = 34 * glow; x.strokeStyle = A; x.globalAlpha = .55 * glow; x.lineWidth = w * 2.6; x.stroke(); }
+      x.shadowBlur = 16 * glow; x.globalAlpha = 1; x.strokeStyle = A; x.lineWidth = w; x.stroke();
+      if (glow > .2) { x.shadowBlur = 0; x.strokeStyle = "rgba(255,255,255," + .65 * glow + ")"; x.lineWidth = w * .3; x.stroke(); }
+      if (glow > .1 && k < .999) { x.shadowBlur = 40; x.shadowColor = A; x.fillStyle = "#fff"; x.beginPath(); x.arc(head[0], head[1], w * .9, 0, Math.PI * 2); x.fill(); }
+      x.restore();
+      return head;
+    }
+    // قوس الابتسامة تحت كلمة: من اليمين للشمال (عربي) وبيتلوّى لفوق في آخره
+    // خط مستقيم تحت الكلمة (من اليمين للشمال) وفي آخره نقطة صغيرة مرفوعة
+    const smile = (cx, cy, wd, n = 26) => { const out = []; for (let i = 0; i <= n; i++) { const u = i / n; out.push([cx + wd / 2 - wd * u, cy]); } const e = out[n]; out.push([e[0] - 14, e[1]], [e[0] - 22, e[1] - 22]); return out; };
+    const txt = (s, px, py, size, fam = "PB", color = "#fff", align = "center", maxW = 900) => { x.fillStyle = color; x.font = `${fam === "PB" ? 700 : 400} ${M.fit(s, fam, maxW, size, 18, fam === "PB" ? "700" : "")}px ${fam}`; x.textAlign = align; x.direction = "rtl"; x.textBaseline = "alphabetic"; x.fillText(s, px, py); };
+    const rr = (px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
+    const img = (im, px, py, w, h, r = 24) => { x.save(); rr(px, py, w, h, r); x.clip(); if (im) { const s = Math.max(w / im.width, h / im.height); x.drawImage(im, px + (w - im.width * s) / 2, py + (h - im.height * s) / 2, im.width * s, im.height * s); } else { const g = x.createLinearGradient(px, py, px + w, py + h); g.addColorStop(0, A + "55"); g.addColorStop(1, "#ffffff12"); x.fillStyle = g; x.fillRect(px, py, w, h); x.fillStyle = "rgba(255,255,255,.55)"; x.beginPath(); x.arc(px + w / 2, py + h * .45, Math.min(w, h) * .18, 0, Math.PI * 2); x.fill(); } x.restore(); };
+
+    // ---------- ١) الخبطة: الخط جاي من بعيد ويخبط تحت الاسم ----------
+    const brandY = 930, nameW = Math.min(820, Math.max(360, M.measure(PR.brand, "700 150px PB") + 80));
+    const heroUnder = smile(540, brandY + 70, nameW);
+    if (t < 2.4) {
+      const fade = 1 - io(seg(t, 1.9, 2.4));
+      x.globalAlpha = fade;
+      if (t < .35) { // شعاع داخل من العمق ناحية الكاميرا
+        const k = expo(t / .35), z = lerp(.08, 1, k), cx = 540, cy = lerp(700, brandY + 70, k);
+        const pts = heroUnder.map(([px, py]) => [cx + (px - 540) * z, cy + (py - brandY - 70) * z]);
+        glowLine(pts, 1, 4 + 8 * k);
+        for (let s = 0; s < 6; s++) { x.strokeStyle = A; x.globalAlpha = .25 * fade * (1 - k); x.lineWidth = 2; x.beginPath(); x.moveTo(cx + (s - 3) * 30 * z, cy); x.lineTo(cx + (s - 3) * 90, cy - 500 * (1 - k)); x.stroke(); }
+        x.globalAlpha = fade;
+      } else {
+        glowLine(heroUnder, 1, 12);
+        // شظايا نور لحظة الخبطة
+        const sk = seg(t, .35, .8); if (sk < 1) for (let s = 0; s < 14; s++) { const a = s / 14 * Math.PI * 2, r = 40 + 260 * expo(sk); x.fillStyle = A; x.globalAlpha = (1 - sk) * fade; x.fillRect(540 + Math.cos(a) * r, brandY + 70 + Math.sin(a) * r * .4, 8, 3); }
+        x.globalAlpha = fade;
+        // الاسم بينكشف من اليمين للشمال مع جري النور تحته
+        const rv = io(seg(t, .4, .9)); x.save(); x.beginPath(); x.rect(540 + nameW / 2 - nameW * rv - 20, brandY - 170, nameW * rv + 40, 240); x.clip();
+        txt(PR.brand, 540, brandY, 150, "PB", "#fff", "center", 820); x.restore();
+      }
+      x.globalAlpha = 1;
+    }
+
+    // ---------- ٢) البحث: الجوال بيطلع والخط يبقى خط خانة البحث ----------
+    const phX = 220, phY = 380, phW = 640, phH = 1300, sx0 = phX + 50, sw = phW - 100, sy = phY + 170;
+    const phoneIn = io(seg(t, 2.0, 2.5)), zoomOut = io(seg(t, 7.8, 8.4));
+    if (t >= 2.0 && t < 8.6) {
+      const z = 1 + zoomOut * 2.6, lift = (1 - phoneIn) * 500;
+      x.save(); x.translate(540, 1030); x.scale(z, z); x.translate(-540, -1030 + lift); x.globalAlpha = 1 - zoomOut;
+      // الجوال: إطار تيتانيوم وشاشة غامقة
+      rr(phX - 14, phY - 14, phW + 28, phH + 28, 92); x.fillStyle = "#3a3c40"; x.fill();
+      rr(phX, phY, phW, phH, 80); x.fillStyle = "#0f1111"; x.fill();
+      rr(phX + phW / 2 - 70, phY + 26, 140, 38, 19); x.fillStyle = "#000"; x.fill();
+      if (t < 5.6) {
+        // خانة البحث
+        rr(sx0, sy, sw, 92, 24); x.fillStyle = "#212426"; x.fill();
+        const typed = [...PR.query].slice(0, Math.floor(clamp((t - 2.6) / .8) * [...PR.query].length)).join("");
+        x.save(); x.beginPath(); x.rect(sx0 + 20, sy, sw - 40, 92); x.clip();
+        txt(typed || "ابحث…", sx0 + sw - 32, sy + 60, 38, "PX", typed ? "#fff" : "rgba(255,255,255,.4)", "right", sw - 80);
+        if (t > 2.6 && t < 3.6 && Math.floor(t * 4) % 2 === 0) { x.fillStyle = A; const tw = M.measure(typed, "400 38px PX"); x.fillRect(sx0 + sw - 34 - tw - 6, sy + 24, 3, 46); }
+        x.restore();
+        // الخط ينزل من تحت الاسم ويقعد خط تركيز للخانة
+        const hk = io(seg(t, 2.1, 2.6));
+        glowLine([[sx0 + sw, sy + 92], [sx0, sy + 92]], hk, 6);
+        // الاقتراحات
+        sg.forEach((s, i) => { const k = io(seg(t, 2.9 + i * .12, 3.3 + i * .12)) * (1 - io(seg(t, 3.5, 3.8))); if (k <= 0) return; x.globalAlpha = k * (1 - zoomOut);
+          rr(sx0, sy + 120 + i * 88, sw, 76, 18); x.fillStyle = "#181a1b"; x.fill(); txt(s, sx0 + sw - 30, sy + 170 + i * 88, 32, "PX", "rgba(255,255,255,.85)", "right", sw - 60); });
+        x.globalAlpha = 1 - zoomOut;
+        // النتائج: ٣ كروت بتطلع من الشاشة وبتتفرد
+        for (let i = 2; i >= 0; i--) {
+          const k = springO(clamp((t - 3.6 - i * .12) / .8), 11, .62); if (k <= 0) continue;
+          const cw = 420, ch = 520, fan = [0, -1, 1][i], cx = 540 + fan * 150 * k, cy = 1150 + Math.abs(fan) * 50 * k + (1 - k) * 300, rot = fan * .12 * k;
+          x.save(); x.translate(cx, cy); x.rotate(rot); x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 40; rr(-cw / 2, -ch / 2, cw, ch, 30); x.fillStyle = "#212426"; x.fill(); x.shadowBlur = 0;
+          img(C.imgs[i], -cw / 2 + 24, -ch / 2 + 24, cw - 48, cw - 48, 20);
+          txt(i === 0 ? PR.product : sg[i], cw / 2 - 30, ch / 2 - 88, 32, "PB", "#fff", "right", cw - 60);
+          x.fillStyle = "#f5b301"; x.font = "28px PX"; x.textAlign = "right"; x.fillText("★★★★★", cw / 2 - 30, ch / 2 - 40);
+          if (i === 0) { const tk = io(seg(t, 4.6, 5.3)); glowLine([[cw / 2, -ch / 2 + 30], [cw / 2, ch / 2 - 30], [cw / 2 - 30, ch / 2], [-cw / 2 + 30, ch / 2], [-cw / 2, ch / 2 - 30], [-cw / 2, -ch / 2 + 30], [-cw / 2 + 30, -ch / 2], [cw / 2 - 30, -ch / 2], [cw / 2, -ch / 2 + 30]], tk, 6); }
+          x.restore();
+        }
+      } else {
+        // ---------- ٣) صفحة المنتج وزر الطلب ----------
+        const pk = io(seg(t, 5.6, 6.0)); x.globalAlpha = pk * (1 - zoomOut);
+        img(C.imgs[0], sx0, phY + 120, sw, sw * .85, 28);
+        const by = phY + 120 + sw * .85 + 40;
+        txt(PR.product, sx0 + sw, by + 50, 46, "PB", "#fff", "right", sw);
+        x.fillStyle = "#f5b301"; x.font = "32px PX"; x.textAlign = "right"; x.fillText("★★★★★", sx0 + sw, by + 104);
+        txt(PR.price, sx0 + sw, by + 190, 64, "PB", "#fff", "right", sw);
+        txt(PR.perk, sx0 + sw, by + 245, 32, "PX", "#7fd18b", "right", sw);
+        const bY = by + 300, bH = 110;
+        rr(sx0, bY, sw, bH, 55); x.fillStyle = "#2a2d30"; x.fill();
+        const fk = io(seg(t, 6.2, 6.8));   // الخط بيملأ الزرار، وراسه المنوّر حافة الملء
+        if (fk > 0) { x.save(); rr(sx0, bY, sw, bH, 55); x.clip(); x.fillStyle = A; x.fillRect(sx0 + sw * (1 - fk), bY, sw * fk, bH); x.restore(); glowLine([[sx0 + sw, bY + bH], [sx0, bY + bH]], fk, 6); }
+        txt(PR.button, 540, bY + 72, 44, "PB", fk > .5 ? "#111" : "#fff", "center", sw - 60);
+        // الضغطة
+        const tp = seg(t, 6.85, 7.3); if (tp > 0 && tp < 1) { x.strokeStyle = "#fff"; x.lineWidth = 4; x.globalAlpha = (1 - tp) * (1 - zoomOut); x.beginPath(); x.arc(540, bY + bH / 2, 30 + 180 * tp, 0, Math.PI * 2); x.stroke(); }
+        const dn = io(seg(t, 7.0, 7.3)); if (dn > 0) { x.globalAlpha = dn * (1 - zoomOut); rr(sx0, bY + 150, sw, 90, 22); x.fillStyle = "#1d3b24"; x.fill(); txt("✓ " + PR.done, 540, bY + 210, 36, "PB", "#9be3a8", "center", sw - 40); }
+        // الخط بيطلع من الزرار وينزل لتحت (الكاميرا هتعدّي جوه الشاشة)
+        const out = io(seg(t, 7.5, 8.2)); if (out > 0) { x.globalAlpha = 1; glowLine([[540, bY + bH], [540, bY + bH + 700]], out, 10, 0, Math.max(0, out - .45)); }
+      }
+      x.restore(); x.globalAlpha = 1;
+    }
+
+    // ---------- ٤) الطريق: مدينة بالليل من فوق، والخط بيرسم طريق التوصيل للبيت ----------
+    if (t >= 8.2 && t < 12.0) {
+      const a = io(seg(t, 8.2, 8.7)) * (1 - io(seg(t, 11.4, 12.0)));
+      x.save(); x.globalAlpha = a;
+      const tilt = io(seg(t, 8.3, 9.4)), sc = lerp(1.6, 1, tilt);
+      x.translate(540, 1000); x.scale(sc, sc * lerp(1, .82, tilt)); x.translate(-540, -1000);
+      const bs = 150, gap = 54;   // البلوكات
+      for (let r = -2; r < 10; r++) for (let c = -1; c < 7; c++) {
+        const bx = 40 + c * (bs + gap) - 60, byy = 260 + r * (bs + gap), hgt = 10 + ((r * 7 + c * 13) % 5) * 9 * tilt;
+        x.fillStyle = "#121418"; x.fillRect(bx + hgt * .5, byy - hgt, bs, bs);
+        x.fillStyle = "#1b1e24"; x.fillRect(bx, byy, bs, bs);
+        for (let w2 = 0; w2 < 3; w2++) if ((r * 3 + c * 5 + w2) % 4 === 0) { x.fillStyle = "#e8c76a55"; x.fillRect(bx + 20 + w2 * 42, byy + 30 + (w2 % 2) * 50, 16, 10); }
+      }
+      // الطريق في الشوارع (بين البلوكات)، والراس بيوصل للبيت
+      const street = (c) => 40 + c * (bs + gap) - 60 - gap / 2, avenue = (r) => 260 + r * (bs + gap) - gap / 2;
+      const route = [[street(5), avenue(9)], [street(5), avenue(6)], [street(3), avenue(6)], [street(3), avenue(4)], [street(1), avenue(4)], [street(1), avenue(2)]];
+      const rk = io(seg(t, 9.0, 10.8)); const head = glowLine(route, rk, 11) || route[0];
+      // البيت: دبوس بلون العلامة
+      const pin = springO(clamp((t - 10.6) / .5), 12, .55); const [hx, hy] = route[route.length - 1];
+      if (pin > 0) { x.save(); x.translate(hx, hy - 10); x.scale(pin, pin); x.fillStyle = A; x.shadowColor = A; x.shadowBlur = 30; x.beginPath(); x.arc(0, -46, 34, Math.PI, 0); x.lineTo(0, 10); x.closePath(); x.fill(); x.shadowBlur = 0; x.fillStyle = BG; x.beginPath(); x.arc(0, -46, 13, 0, Math.PI * 2); x.fill(); x.restore(); }
+      void head;
+      x.restore();
+      // كارت زجاجي: «يصلك اليوم» ومراحل الطلب
+      const gk = io(seg(t, 9.2, 9.7)) * (1 - io(seg(t, 11.4, 11.9)));
+      if (gk > 0) {
+        x.save(); x.globalAlpha = gk; x.translate(0, (1 - gk) * 40);
+        rr(110, 1480, 860, 280, 40); x.fillStyle = "rgba(255,255,255,.08)"; x.fill(); x.strokeStyle = "rgba(255,255,255,.18)"; x.lineWidth = 2; x.stroke();
+        txt(PR.eta, 910, 1565, 56, "PB", "#fff", "right", 760);
+        const cur = t < 9.6 ? 0 : t < 10.2 ? 1 : t < 10.8 ? 2 : 3, px0 = 900, dx = 240;
+        x.strokeStyle = "rgba(255,255,255,.25)"; x.lineWidth = 4; x.beginPath(); x.moveTo(px0, 1640); x.lineTo(px0 - dx * 3, 1640); x.stroke();
+        x.strokeStyle = A; x.beginPath(); x.moveTo(px0, 1640); x.lineTo(px0 - dx * cur, 1640); x.stroke();
+        st.forEach((s, i) => { const on = i <= cur; x.fillStyle = on ? A : "#2a2d30"; x.beginPath(); x.arc(px0 - dx * i, 1640, i === cur ? 16 : 12, 0, Math.PI * 2); x.fill();
+          txt(s, px0 - dx * i, 1710, 30, i === cur ? "PB" : "PX", on ? "#fff" : "rgba(255,255,255,.5)", "center", 220); });
+        x.restore();
+      }
+    }
+
+    // ---------- ٥) الباب: الكرتونة بتنزل، والخط بيلف عليها ويقعد علامة على وشها ----------
+    if (t >= 11.6 && t < 15.2) {
+      const a = io(seg(t, 11.6, 12.0)) * (1 - io(seg(t, 14.6, 15.2)));
+      x.save(); x.globalAlpha = a;
+      // الباب والأرض
+      x.fillStyle = "#16181c"; x.fillRect(300, 420, 480, 900); x.strokeStyle = "#2a2d33"; x.lineWidth = 10; x.strokeRect(300, 420, 480, 900);
+      x.fillStyle = "#e8c76a"; x.beginPath(); x.arc(720, 880, 12, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#101115"; x.fillRect(0, 1320, W, 600); for (let i = 0; i < 9; i++) { x.fillStyle = i % 2 ? "#14161a" : "#121317"; x.fillRect(0, 1320 + i * 66, W, 66); }
+      // الكرتونة
+      const land = springO(clamp((t - 11.8) / .7), 10, .6), bx = 340, bw = 400, bh = 320, byy = lerp(700, 1320 - bh, land);
+      const shadowK = clamp((byy - 700) / (1320 - bh - 700)); x.fillStyle = `rgba(0,0,0,${.55 * shadowK})`; x.beginPath(); x.ellipse(540, 1330, 260 * (.5 + shadowK * .5), 30, 0, 0, Math.PI * 2); x.fill();
+      const kraft = x.createLinearGradient(bx, byy, bx, byy + bh); kraft.addColorStop(0, "#c89a62"); kraft.addColorStop(1, "#a97b46");
+      rr(bx, byy, bw, bh, 10); x.fillStyle = kraft; x.fill(); x.fillStyle = "#b9894f"; x.fillRect(bx, byy, bw, 46); x.fillStyle = "rgba(255,255,255,.18)"; x.fillRect(bx + bw / 2 - 30, byy, 60, bh * .55);
+      // العلامة على وش الكرتونة: الشعار أو أول حرف، بعد ما الخط يلف ويقعد
+      const wrap = io(seg(t, 12.4, 13.2)), cool = io(seg(t, 13.2, 13.9));
+      glowLine([[0, 1318], [bx, 1318], [bx, byy], [bx + bw, byy], [bx + bw, byy + bh], [bx + 80, byy + bh]], wrap, 8, cool, Math.max(0, wrap - .5));
+      if (wrap > .95) {
+        const m = springO(clamp((t - 13.2) / .5), 12, .6), mx = 540, my = byy + bh * .62;
+        x.save(); x.translate(mx, my); x.scale(m, m);
+        if (C.logo) { const s = 150 / Math.max(C.logo.width, C.logo.height); x.globalAlpha = a; x.drawImage(C.logo, -C.logo.width * s / 2, -C.logo.height * s / 2, C.logo.width * s, C.logo.height * s); }
+        else { x.fillStyle = A; x.font = "700 120px PB"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText([...T(PR.brand)][0] || "", 0, 0); x.textBaseline = "alphabetic"; }
+        x.restore();
+        glowLine(smile(540, my + 96, 200, 16), 1, 7, 1);
+      }
+      x.restore();
+      // إشعار «وصل»
+      const nk = io(seg(t, 13.6, 14.0)) * (1 - io(seg(t, 14.6, 15.0)));
+      if (nk > 0) { x.save(); x.globalAlpha = nk; x.translate(0, (1 - nk) * -60); rr(80, 120, 920, 160, 40); x.fillStyle = "rgba(40,42,46,.92)"; x.fill();
+        rr(880, 150, 90, 90, 22); x.fillStyle = A; x.fill(); txt(PR.brand, 850, 185, 30, "PB", "rgba(255,255,255,.7)", "right", 700); txt(PR.notify, 850, 238, 38, "PB", "#fff", "right", 700); x.restore(); }
+    }
+
+    // ---------- ٦) الختام: الجملة الأخيرة والخط يجري تحتها، وبعدين يرجع تحت الاسم ----------
+    if (t >= 14.8) {
+      const tk = io(seg(t, 14.8, 15.4)) * (1 - io(seg(t, 17.0, 17.4)));
+      if (tk > 0) {
+        x.save(); x.globalAlpha = tk; const words = T(PR.tagline).split(/\s+/);
+        x.font = `700 ${M.fit(PR.tagline, "PB", 920, 92, 40, "700")}px PB`; const tw = Math.min(920, M.measure(PR.tagline, x.font));
+        // كلمة كلمة من اليمين
+        let acc = ""; words.forEach((w, i) => { const k = io(seg(t, 14.9 + i * .18, 15.3 + i * .18)); if (k <= 0) return; acc = words.slice(0, i + 1).join(" "); });
+        txt(acc, 540 + tw / 2, 980, M.fit(PR.tagline, "PB", 920, 92, 40, "700"), "PB", "#fff", "right", 920);
+        glowLine(smile(540, 1050, tw + 40), io(seg(t, 15.6, 16.4)), 10);
+        x.restore();
+      }
+      // البطل: الاسم تاني والخط قاعد تحته، ونور بطيء بيعدّي
+      const hk = io(seg(t, 17.4, 17.8));
+      if (hk > 0) {
+        x.save(); x.globalAlpha = hk;
+        glowLine(heroUnder, 1, 12, 0);
+        txt(PR.brand, 540, brandY, 150, "PB", "#fff", "center", 820);
+        const pass = seg(t, 18.0, 19.6); if (pass > 0 && pass < 1) { const px = 540 + nameW / 2 - nameW * pass; const g = x.createRadialGradient(px, brandY + 70, 0, px, brandY + 70, 120); g.addColorStop(0, "rgba(255,255,255,.55)"); g.addColorStop(1, "transparent"); x.fillStyle = g; x.fillRect(px - 120, brandY - 20, 240, 180); }
+        const ck = io(seg(t, 18.2, 18.7)); x.globalAlpha = hk * ck; txt(PR.cta, 540, brandY + 230 + (1 - ck) * 20, 46, "PX", "rgba(255,255,255,.85)", "center", 880);
+        x.restore();
+      }
+    }
+    // حبيبات خفيفة
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = .05; const rg = M.rng(Math.floor(t * 24) + 7); x.fillStyle = "#fff"; for (let i = 0; i < 260; i++) x.fillRect(rg() * W, rg() * H, 2, 2); x.globalAlpha = 1;
+  },
+  // 🔊 صوت لكل حركة: الخبطة، تكة لكل حرف، الكروت، الضغطة ورنة النجاح، الطريق، خبطة الكرتونة، الإشعار، والضربة الأخيرة
+  sound(A) {
+    const N = A.midi;
+    A.riser(0, .34, .35); A.hit(.35, .6); A.whoosh(.4, .45, .12);
+    for (let b = 0; b < 8; b++) A.pluck(b * 2.4 + .2, N([65, 69, 72, 67, 65, 70, 69, 72][b]), .05, 1.6);
+    A.pad(0, [N(53), N(57), N(60), N(64)], 7.2, .025);
+    A.whoosh(2.0, .45, .1);
+    const n = [...String(PR.query || "")].length; for (let i = 0; i < n; i++) A.click(2.6 + i * (.8 / Math.max(1, n)), .07);
+    for (let i = 0; i < 3; i++) A.whoosh(3.6 + i * .12, .3, .07);
+    A.tone(6.2, N(84), .5, "sine", .03); A.click(6.88, .3); A.tone(7.0, N(84), .12, "sine", .1); A.tone(7.12, N(91), .3, "sine", .1);
+    A.whoosh(7.6, .8, .16);
+    A.groove(100, 8.4, 16.5, { kg: .55, hg: .06 }); A.bass(8.4, 87, 3.0, .06); A.bass(11.4, 98, 3.0, .06);
+    A.whoosh(9.0, 1.6, .08); A.tone(10.75, N(81), .25, "sine", .08);
+    A.kick(12.45, .9); A.nz(12.45, .25, "lowpass", 500, .25); A.whoosh(12.4, .8, .1);
+    A.tone(13.65, N(88), .1, "sine", .12); A.tone(13.78, N(93), .2, "sine", .1);
+    A.whoosh(15.6, .8, .12); A.pad(12.0, [N(53), N(60), N(65), N(69)], 4.5, .03);
+    A.riser(16.6, 17.55, .25); A.hit(17.6, .7); A.pad(17.6, [N(41), N(53), N(60), N(65), N(69)], 2.4, .05);
+  },
+});
+</script>
+</body></html>
