@@ -32654,7 +32654,11 @@ def assistant_token(request: Request):
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
     known = {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q if q["id"] not in livevoice.SKIP_Q}
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
-    instr = livevoice.instructions(dia, "", a.get("name") or signup_name(request), ag, a.get("gender") or "", tools=True, known=known)
+    social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
+    have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
+    returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
+    instr = livevoice.instructions(dia, "", a.get("name") or signup_name(request), ag, a.get("gender") or "", tools=True, known=known,
+                                   returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:
         tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS)

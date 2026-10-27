@@ -121,7 +121,9 @@ TOOLS = [
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
-                 known: dict | None = None) -> str:
+                 known: dict | None = None, returning: bool = False, have: dict | None = None) -> str:
+    """have: اللي العقل فيه أصلًا ومش محتاج يتطلب تاني (account: اسم الحساب، logo / products: True لو اترفعوا)."""
+    have = have or {}
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
     # الاسم الأول بس («Islam Shehata» ← Islam)، والموديل بينطقه ويكتبه بالعربي
     user = (user or "").strip().split()[0] if (user or "").strip() else ""
@@ -139,10 +141,13 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
            "a man: address him ONLY with masculine pronouns, verbs and adjectives" if user_gender == "m" else
            "of unknown gender: infer it from their name if the name is clearly male or female, and from how they talk about themselves. "
            "Once you know, stick to it in every pronoun, verb and adjective. While unsure, phrase sentences so they need no gender")
-    qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(quiz_questions()))
-    kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in (known or {}).items() if v)
+    # 🧠 اللي في العقل أصلًا مابيتسألش تاني: الأسئلة المجاوبة بتتشال من القايمة، وبتتبعت كمعلومة يبني عليها الكلام
+    known = {k: v for k, v in (known or {}).items() if v}
+    left = [(qid, q) for qid, q in quiz_questions() if qid not in known]
+    qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
+    kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in known.items())
     if kn:
-        qs += "\nAlready known from signup (do not ask these again):\n" + kn
+        qs += "\nAlready in their brand brain (never ask these again; you may refer to them naturally):\n" + kn
     tool_txt = ("""
 Tools (use them silently, never read them out loud):
 - After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
@@ -171,15 +176,14 @@ actually said, and only then (if it fits) move toward your next goal. Examples o
 - Their answer is unclear or unrelated to your question → ask again in other words; do not save it and do not move on.
 
 Your goals, in this order (each is a goal to reach naturally, not a line to recite):
-1. Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them.
-   Style reference for the greeting (adapt it, do not read it blindly): «{t1}» … «{t2}»
+1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
+   Style reference for the greeting (adapt it, do not read it blindly): {"«أهلًا يا " + user + " تاني! عامل إيه؟» … «نكمّل من مكان ما وقفنا؟»" if returning and dialect == "ar-eg-cairo" else "«" + t1 + "» … «" + t2 + "»"}
    Each of these is its own turn: say one, then wait for their reply and respond to it.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
-2. Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}.
+2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
 3. Learn about their business through these questions, one at a time, in your own words in the dialect
    (skip any they already answered, and follow up naturally when an answer is interesting):
 {qs}
-4. Ask them to upload their logo, then a few photos of their products or work (one request per turn; if they have none or say later,
-   move on without insisting).
+4. {"Skip this step: their logo and product photos are already uploaded." if have.get("logo") and have.get("products") else ("Ask them to upload a few photos of their products or work (their logo is already uploaded)" if have.get("logo") else "Ask them to upload their logo" + ("" if have.get("products") else ", then a few photos of their products or work") + " (product photos are already uploaded)" * bool(have.get("products"))) + " (one request per turn; if they have none or say later, move on without insisting)."}
 5. When done, thank them and tell them you are preparing what you found.
 {tool_txt}
 Rules:
