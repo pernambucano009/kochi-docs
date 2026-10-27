@@ -294,7 +294,8 @@ const Assistant = (() => {
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
-    else try { localStorage.setItem(SKIP_KEY, String(Date.now())); } catch { /* التخزين مقفول */ }
+    // التأجيل لنفس العلامة بس: حساب جديد على نفس المتصفح (أو علامة تانية) المساعدة بتطلعله عادي
+    else try { localStorage.setItem(SKIP_KEY, JSON.stringify({ b: state?.brand || "", t: Date.now() })); } catch { /* التخزين مقفول */ }
     await close();
     if (typeof NH !== "undefined") NH?.refresh?.();
     S_done?.();
@@ -315,7 +316,7 @@ const Assistant = (() => {
     try { state = await api("/api/assistant"); } catch { return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return false;
-    if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return false; } catch { /* التخزين مقفول */ }
+    if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return false; } catch { /* التخزين مقفول أو قيمة قديمة */ }
     from = el || document.querySelector('[data-n="quiz"]');
     dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
     await new Promise((res) => { S_done = res; call(); });

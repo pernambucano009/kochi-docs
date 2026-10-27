@@ -15,7 +15,7 @@ async function loadSettings() {
       <input type="password" data-mkey="${k}" autocomplete="off" placeholder="${s.keys[k].set ? `•••••••••••• (${s.keys[k].hint})` : "الصق المفتاح هنا"}"></label>`).join("");
   for (const name of ["atlas", "zernio", "scrape", "pexels"]) {
     const k = s.keys[name];
-    // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
+    if (!k || !$(`${name}State`)) continue;   // العميل مابيشوفش مفاتيح المنصة    // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
     $(`${name}State`).textContent = k.set ? "" : "✕ لا يوجد مفتاح بعد";
     $(`${name}State`).hidden = k.set;
     $(`${name}State`).className = "hint";

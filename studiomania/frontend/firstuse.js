@@ -118,8 +118,9 @@ const FirstUse = (() => {
     if (!s) return;
     if (s.need) await askBasics();
     // 🎙️ المساعد الصوتي (بعد ما اللهجة تبقى معروفة): بيملا العقل بالكلام بدل الأسئلة المكتوبة
-    if (typeof Assistant !== "undefined") await Assistant.maybe();
-    if (state && !state.need && !state.logo && !state.logo_asked) await askLogo();
+    const talked = typeof Assistant !== "undefined" && (await Assistant.maybe());
+    // المساعدة بتطلب الشعار بنفسها: شاشة الشعار المنفصلة بس لو المساعدة ماطلعتش
+    if (!talked && state && !state.need && !state.logo && !state.logo_asked) await askLogo();
     if (state?.job?.status === "run") watch(false);
   }
 
