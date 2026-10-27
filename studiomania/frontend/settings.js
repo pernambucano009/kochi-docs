@@ -193,6 +193,18 @@ async function loadSetCredit() {
   $("setCreditRing").style.strokeDasharray = `${(c * Math.min(1, m.balance / full)).toFixed(1)} ${c.toFixed(1)}`;
 }
 $("setLogout")?.addEventListener("click", () => $("logout").click());
+// 🗑️ حذف الحساب نهائيًا (للعملاء، مش المشرف): الحساب والعلامات والفيديوهات والملفات كلها، والاشتراك بيتلغي. بعدها تقدر تسجّل من جديد بنفس البريد
+(window.MEP || Promise.resolve(null)).then((me) => { if (me && me.role !== "admin" && $("setDelete")) $("setDelete").hidden = false; });
+$("setDelete")?.addEventListener("click", async () => {
+  const v = await uiPrompt("سيُحذف حسابك وكل علاماتك وفيديوهاتك وملفاتك نهائيًا، ويُلغى اشتراكك، ولا يمكن استرجاع أي شيء. للتأكيد اكتب كلمة: احذف");
+  if (v == null) return;
+  if (!["احذف", "delete"].includes(v.trim().toLowerCase())) return toast("لم يُحذف شيء: اكتب كلمة «احذف» بالضبط للتأكيد", true);
+  try {
+    const r = await fetch("/api/me/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: "DELETE" }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر حذف الحساب، جرّب مرة أخرى");
+    location.replace("/welcome");
+  } catch (err) { toast(err.message, true); }
+});
 
 // ---------- الشكل واللغة: نفس سويتش الرئيسية، من جوه الإعدادات ----------
 const lookTheme = () => document.documentElement.dataset.nhTheme || "light";
