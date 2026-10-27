@@ -70,6 +70,9 @@ def _get(path: str, params: dict, timeout: float = 40) -> dict:
             if r.status_code == 402:
                 import providers
                 providers.note_error("scrape", "402 payment required: credits")
+                # العميل بيشوف رسالة عامة (من غير اسم المزوّد)، والسبب الحقيقي بيوصل صندوق الأخطاء لصاحب المنصة
+                import issues
+                issues.record("job", path, "رصيد ScrapeCreators خلص (تحليل الحسابات والمنافسين واقف)", "402 من ScrapeCreators: اشحن الرصيد", 402)
                 raise RivalsError(providers.friendly("scrape") if os.environ.get("TENANT_ROLE") == "customer" else "رصيد ScrapeCreators خلص")
             if r.status_code >= 500:
                 last = f"{r.status_code}"

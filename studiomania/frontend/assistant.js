@@ -239,14 +239,17 @@ const Assistant = (() => {
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; S.aBuf += e.delta;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); clearTimeout(S.nudgeT); }
+        else if (e.type === "output_audio_buffer.stopped") nudge(1200);
         else if (e.type === "session.created" || e.type === "session.updated") greet();
-        else if (e.type === "response.created") S.greeted = true;
+        else if (e.type === "response.created") { S.greeted = true; clearTimeout(S.nudgeT); }
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true;
           if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
+          // ردها كان كلام مش سؤال: لو العميل فضل ساكت ثانية بعد ما تخلّص، تكمّل هي (التقدير على طول الكلام لو حدث نهاية الصوت ماوصلش)
+          if (r.msg && id === S.capId) { S.lastQ = /[؟?]\s*$/.test(S.aBuf.trim()); nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); }
         } else if (e.type === "response.function_call_arguments.done") {
           const r = R(e.response_id); r.calls++; r.pending++;
           let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch { /* أرجومنت مش JSON */ }
@@ -269,9 +272,16 @@ const Assistant = (() => {
       };
       loop();
     } catch (e) {
+      if (!ov) return;   // اتقفلت وهي لسه بتتصل
       q("[data-err]").textContent = /[\u0600-\u06ff]/.test(e.message || "") ? e.message : "تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل";
       q(".as-st").textContent = "";
     }
+  }
+  function nudge(ms) {
+    if (!S) return;
+    clearTimeout(S.nudgeT);
+    if (S.lastQ !== false || S.finishing || S.box || q(".as-box")) return;   // سؤال، أو مستنية حاجة تتكتب: تستنى العميل
+    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && S.dc?.readyState === "open") { S.lastQ = null; S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;
@@ -289,7 +299,7 @@ const Assistant = (() => {
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer); clearInterval(s.capT);
+    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT);
     if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
@@ -312,7 +322,8 @@ const Assistant = (() => {
     lock = run(force, el).finally(() => { lock = null; });
     return lock;
   }
-  async function run(force, el) {
+  // هل المساعدة هتفتح؟ (من غير ما تفتح): عشان أول استخدام يروح لصفحة العقل الأول ويفتحها من دايرة «؟»
+  async function gate(force) {
     try { state = await api("/api/assistant"); } catch { return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     // 🚨 عميل جديد والمساعدة ماطلعتلوش: السبب بيروح صندوق الأخطاء (عشان نعرف من غير ما حد يبلّغ)
@@ -321,10 +332,15 @@ const Assistant = (() => {
     if (!state?.ready) return miss(`not ready: ${state?.why || "?"}`);
     if (!forced && (state.done || !state.new)) return false;
     if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }
+    return true;
+  }
+  async function run(force, el) {
+    if (!(await gate(force))) return false;
     from = el || document.querySelector('[data-n="quiz"]');
     dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
     await new Promise((res) => { S_done = res; call(); });
     return true;
   }
-  return { maybe, open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
+
+  return { maybe, can: () => (ov || S ? Promise.resolve(false) : gate(false)), open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
 })();

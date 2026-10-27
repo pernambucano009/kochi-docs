@@ -111,6 +111,15 @@ const FirstUse = (() => {
     if (r) { state = r; (typeof NH !== "undefined" && NH?.refresh?.()); }
   }
 
+  // يفتح صفحة العقل ويستنى دايرة «؟» تظهر (لو ماظهرتش، المساعدة بتفتح في نص الشاشة عادي)
+  async function openBrain() {
+    const q = () => document.querySelector('.bm [data-n="quiz"]');
+    if (!q()) document.querySelector('.nh-tile[data-id="brand"]')?.click();
+    for (let i = 0; i < 40 && !q(); i++) await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 700));   // الخريطة تستقر قبل ما الكرة تطلع من الدايرة
+    return q() || null;
+  }
+
   async function check() {
     if (asked || (typeof APP !== "undefined" && APP === "kochi")) return;
     asked = true;
@@ -118,7 +127,9 @@ const FirstUse = (() => {
     if (!s) return;
     if (s.need) await askBasics();
     // 🎙️ المساعد الصوتي (بعد ما اللهجة تبقى معروفة): بيملا العقل بالكلام بدل الأسئلة المكتوبة
-    const talked = typeof Assistant !== "undefined" && (await Assistant.maybe());
+    // 🧠 المساعدة بتفتح جوه صفحة العقل (من دايرة «؟»)، عشان العميل يشوف العقل بيتبني وهو بيتكلم
+    let talked = false;
+    if (typeof Assistant !== "undefined" && (await Assistant.can())) talked = await Assistant.maybe(false, await openBrain());
     // المساعدة بتطلب الشعار بنفسها: شاشة الشعار المنفصلة بس لو المساعدة ماطلعتش
     if (!talked && state && !state.need && !state.logo && !state.logo_asked) await askLogo();
     if (state?.job?.status === "run") watch(false);

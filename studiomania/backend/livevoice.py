@@ -179,6 +179,8 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
    Style reference for the greeting (adapt it, do not read it blindly): {"«أهلًا يا " + user + " تاني! عامل إيه؟» … «نكمّل من مكان ما وقفنا؟»" if returning and dialect == "ar-eg-cairo" else "«" + t1 + "» … «" + t2 + "»"}
    Each of these is its own turn: say one, then wait for their reply and respond to it.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
+   Once they agree to chat, tell them in one short sentence that they will see their brand brain filling up on the screen in front of
+   them with every answer (so they feel the brain being built while you talk).
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
 3. Learn about their business through these questions, one at a time, in your own words in the dialect
    (skip any they already answered, and follow up naturally when an answer is interesting):
@@ -187,6 +189,8 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 5. When done, thank them and tell them you are preparing what you found.
 {tool_txt}
 Rules:
+- Never end a turn on a plain statement: if you are not asking anything, keep going in the same turn to your next question.
+  Only stop talking after a question (or a request like uploading something).
 - Turn-taking: every turn is 1–2 short sentences with at most ONE question, then STOP and wait for the user. Never ask two things
   in one turn, never chain the next question before they answered. A tool result alone is never a reason to speak again
   (except get_account_analysis at the end).
@@ -224,8 +228,11 @@ def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", t
                          "output": {"voice": voice}}}
     if tools:
         session.update(tools=tools, tool_choice="auto")
-    r = httpx.post(f"{OPENAI_URL}/realtime/client_secrets", headers={"Authorization": f"Bearer {key}"},
-                   json={"expires_after": {"anchor": "created_at", "seconds": 600}, "session": session}, timeout=30)
+    try:
+        r = httpx.post(f"{OPENAI_URL}/realtime/client_secrets", headers={"Authorization": f"Bearer {key}"},
+                       json={"expires_after": {"anchor": "created_at", "seconds": 600}, "session": session}, timeout=30)
+    except httpx.HTTPError as exc:   # الشبكة وقعت أو الخدمة مابتردش: رسالة مفهومة بدل خطأ داخلي
+        raise LiveError(f"تعذّر الاتصال بخدمة الصوت: {type(exc).__name__}") from exc
     _fail(r, "OpenAI")
     d = r.json()
     return {"value": d.get("value"), "expires_at": d.get("expires_at")}

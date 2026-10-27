@@ -32644,7 +32644,7 @@ class AssistProfileIn(BaseModel):
 
 
 @app.post("/api/assistant/profile")
-def assistant_profile(body: AssistProfileIn):
+def assistant_profile(body: AssistProfileIn, request: Request):
     bid, _b, _a = assist_info()
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
@@ -32653,7 +32653,7 @@ def assistant_profile(body: AssistProfileIn):
         raise HTTPException(400, "اكتب اسمك")
     update_brain(bid, lambda d: d.setdefault("assistant", {}).update(name=nm, gender="f" if body.gender == "f" else "m",
                                                                      agent_gender="m" if body.agent_gender == "m" else "f"))
-    return assistant_state()
+    return assistant_state(request)
 
 
 @app.post("/api/assistant/token")
@@ -32749,11 +32749,11 @@ def assistant_account_state():
 
 
 @app.post("/api/assistant/done")
-def assistant_done():
+def assistant_done(request: Request):
     bid, _b, _a = assist_info()
     if bid:
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(done=True, done_at=now()))
-    return assistant_state()
+    return assistant_state(request)
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
