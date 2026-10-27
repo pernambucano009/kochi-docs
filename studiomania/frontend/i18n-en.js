@@ -3150,6 +3150,7 @@ window.I18N_EN = {
   "لا يوجد اشتراك فعّال": "No active subscription",
   "للأدمن فقط": "Admins only",
   "للمشرف فقط": "Admins only",
+  "مفتاح المتابعة غير صحيح": "Invalid monitoring key",
   "اربط جوجل درايف أولًا": "Connect Google Drive first",
   "محاولات خاطئة كثيرة. انتظر ربع ساعة ثم حاول مرة أخرى": "Too many wrong attempts. Wait 15 minutes and try again",
   "تعذّر فتح البرنامج، حاول مرة أخرى بعد قليل": "Couldn't open the app; try again shortly",
