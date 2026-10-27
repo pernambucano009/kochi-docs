@@ -147,9 +147,12 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
 Tools (use them silently, never read them out loud):
 - After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
   the next question. If one answer covers several questions, save each one.
-- Whenever you ask for the account, the logo, product photos or the intro video, call show_input with that kind in the same turn,
+- Only in the turn where you actually ask for the account, the logo, product photos or the intro video (and you say that word),
+  call show_input with that kind,
   and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
-- As soon as the user gives their account (by voice or in the box), call start_account_analysis with it.
+- Only when the user actually gives their account (typed in the box, or clearly said), call start_account_analysis with exactly
+  what they gave. NEVER guess or make up an account (not from the brand name, not from anything else). If they say later, do not
+  call it and do not say you are checking it: just say no problem and move on.
 - After the last question, call get_account_analysis. If it is ready, tell the user 2–3 short, specific findings from it in the dialect.
   If it is not ready yet, tell them the results will appear on their screen in a few minutes.
 - Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")

@@ -23,7 +23,7 @@ const Assistant = (() => {
 .as-go:disabled{opacity:.6}
 .as-btn{border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.14);color:inherit;border-radius:999px;padding:10px 22px;font:inherit;font-size:14.5px;cursor:pointer}
 .as-btn:hover{background:rgba(127,127,127,.24)}.as-btn.end:hover{background:rgba(255,80,40,.35)}
-.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);min-height:3.2em;text-align:center;font-size:19px;line-height:1.6;unicode-bidi:plaintext;font-weight:500}
+.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);height:3.2em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;text-align:center;font-size:18px;line-height:1.6;unicode-bidi:plaintext;font-weight:500;flex:none}
 .as-err{color:#d9472b;font-size:13.5px;min-height:1em;text-align:center;max-width:90vw}
 .as-side{position:fixed;inset-inline-end:22px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto;width:min(260px,40vw)}
 .as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(127,127,127,.16);font-size:13px;line-height:1.5;
@@ -83,8 +83,9 @@ const Assistant = (() => {
   function caption(t) { const c = q(".as-cap"); if (c) c.textContent = t.slice(-170); }
   // 📝 المكتوب جملة جملة على قد الكلام: النص بيوصل أسرع من الصوت، فكل جملة بتفضل ظاهرة على قد طولها وبعدين اللي بعدها.
   // والمربع اللي المساعد طلبه بيظهر لما الجملة اللي فيها اسمه تتقال (أو في آخر الرد لو الكلمة ماتقالتش)
-  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|حساب/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i };
-  const sentences = (t) => t.split(/(?<=[.!?؟…])\s+/).map((x) => x.trim()).filter(Boolean);
+  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i };
+  // جملة جملة، والجملة الطويلة بتتقسم عند الفاصلة عشان المكتوب مايزيدش عن سطرين ويغطي على خانة الكتابة
+  const sentences = (t) => t.split(/(?<=[.!?؟…])\s+/).flatMap((x) => (x.length > 80 ? x.split(/(?<=[،,])\s+/) : [x])).map((x) => x.trim()).filter(Boolean);
   function capReset() { if (!S) return; S.aBuf = ""; S.capI = 0; S.capAt = 0; S.capDone = false; caption(""); }
   function capTick() {
     if (!S) return;
@@ -95,8 +96,7 @@ const Assistant = (() => {
       if (now - S.capAt > dur && i < ss.length - 1) { S.capI = i + 1; S.capAt = now; }
       caption(ss[Math.min(S.capI, ss.length - 1)]);
       if (S.box && KW[S.box]?.test(ss.slice(0, S.capI + 1).join(" "))) { box(S.box); S.box = null; }
-      if (S.box && S.capDone && S.capI >= ss.length - 1 && now - S.capAt > dur) { box(S.box); S.box = null; }
-    } else if (S.box && S.capDone) { box(S.box); S.box = null; }
+    }
   }
 
   async function tool(name, args) {
@@ -106,6 +106,13 @@ const Assistant = (() => {
       return r;
     }
     if (name === "start_account_analysis") {
+      // 🛑 الحساب لازم يكون العميل كتبه أو قاله فعلًا (الموديل ساعات بيخمّن حساب من اسم العلامة)
+      const norm = (x) => String(x || "").toLowerCase().replace(/https?:\/\/|www\.|instagram\.com\/|tiktok\.com\/|[@\s/]/g, "");
+      const h = norm(args.account);
+      if (!h || !norm(S.heard).includes(h)) {
+        box("account");
+        return { ok: false, error: "The user has NOT given this account. Never guess an account. Ask them to type it in the box on the screen, or move on if they want to give it later." };
+      }
       const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: args.account || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) { S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
       return r;
@@ -118,6 +125,7 @@ const Assistant = (() => {
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
+    S.heard += " " + text;
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     S.dc.send(JSON.stringify({ type: "response.create" }));
   }
@@ -179,7 +187,7 @@ const Assistant = (() => {
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"></div>
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
-    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null };
+    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, heard: "" };
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
@@ -221,7 +229,8 @@ const Assistant = (() => {
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; S.aBuf += e.delta;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); if (S.box) { box(S.box); S.box = null; } }
+        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); }
+        else if (e.type === "conversation.item.input_audio_transcription.completed") S.heard += " " + (e.transcript || "");
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") S.greeted = true;
         else if (e.type === "response.done") {
