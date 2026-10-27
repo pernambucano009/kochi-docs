@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import threading
 import time
@@ -117,6 +118,9 @@ TOOLS = [
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
                  known: dict | None = None) -> str:
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
+    # الاسم الأول بس («Islam Shehata» ← Islam)، والموديل بينطقه ويكتبه بالعربي
+    user = (user or "").strip().split()[0] if (user or "").strip() else ""
+    latin = bool(re.search(r"[A-Za-z]", user))
     agent = agent or agent_name(dialect, agent_gender)
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
@@ -142,7 +146,7 @@ warm, natural, short sentences. Never use Modern Standard Arabic unless the dial
 Grammar of gender (very important in Arabic): you are {me}. The user is {you}.
 
 Follow this order:
-1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.{"" if user else " The name is unknown: drop it from the greeting and ask for their name in one short question first."}
+1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.{"" if user else " The name is unknown: drop it from the greeting and ask for their name in one short question first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
 2. Ask for their Instagram or TikTok account first, and explain in one sentence why: the analysis takes a while, so the team starts on it now
    and the results are ready by the end of the chat. When they give it, thank them in a few words and move on.
 3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):

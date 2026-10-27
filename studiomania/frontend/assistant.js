@@ -4,12 +4,14 @@
 const Assistant = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const css = `
-.as-ov{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;
-  background:rgba(14,8,3,0);-webkit-backdrop-filter:blur(0);backdrop-filter:blur(0);transition:background 1.1s,backdrop-filter 1.1s,-webkit-backdrop-filter 1.1s;font-family:inherit}
-.as-ov.on{background:radial-gradient(circle at 50% 40%,rgba(60,24,4,.6),rgba(10,6,3,.88) 70%);-webkit-backdrop-filter:blur(24px) saturate(1.25);backdrop-filter:blur(24px) saturate(1.25)}
-.as-in{opacity:0;transform:scale(.5);transition:opacity .7s .25s,transform 1s cubic-bezier(.2,1.3,.3,1) .25s}.as-ov.on .as-in{opacity:1;transform:none}
-.as-orb{position:relative;width:min(70vw,340px);aspect-ratio:1}.as-orb canvas{position:absolute;inset:0;width:100%;height:100%}
+.as-ov{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:inherit;
+  -webkit-backdrop-filter:blur(0);backdrop-filter:blur(0);transition:backdrop-filter .9s,-webkit-backdrop-filter .9s;font-family:inherit}
+.as-ov.on{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.as-ov>:not(.as-in){opacity:0;transition:opacity .45s}
+.as-ov.on>:not(.as-in){opacity:1;transition:opacity .7s .55s}
+.as-orb{position:relative;width:min(70vw,340px);aspect-ratio:1;will-change:transform}.as-orb canvas{position:absolute;inset:0;width:100%;height:100%}
 .as-orb::before{content:"";position:absolute;inset:-25%;border-radius:50%;background:radial-gradient(circle closest-side,rgba(255,120,30,.3),rgba(255,90,10,.1) 55%,transparent);pointer-events:none}
+.as-disc{position:absolute;inset:8%;border-radius:50%;background:#E5613E;pointer-events:none}
 .as-h{margin:0;font-size:22px;font-weight:600;text-align:center}.as-sub{margin:0;max-width:min(88vw,520px);text-align:center;font-size:14.5px;line-height:1.8;opacity:.8}
 .as-form{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center}
 .as-form input{width:200px;padding:11px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:15px;outline:0}
@@ -19,17 +21,17 @@ const Assistant = (() => {
 .as-acts{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 .as-go{border:0;border-radius:999px;padding:13px 34px;background:#E5613E;color:#fff;font:inherit;font-size:16px;cursor:pointer;box-shadow:0 10px 30px rgba(229,97,62,.45)}
 .as-go:disabled{opacity:.6}
-.as-btn{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:999px;padding:10px 22px;font:inherit;font-size:14.5px;cursor:pointer}
-.as-btn:hover{background:rgba(255,255,255,.18)}.as-btn.end:hover{background:rgba(255,80,40,.35)}
-.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);min-height:3.2em;text-align:center;font-size:19px;line-height:1.6;unicode-bidi:plaintext;text-shadow:0 2px 18px rgba(0,0,0,.4)}
-.as-err{color:#ffb4a2;font-size:13.5px;min-height:1em;text-align:center;max-width:90vw}
+.as-btn{border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.14);color:inherit;border-radius:999px;padding:10px 22px;font:inherit;font-size:14.5px;cursor:pointer}
+.as-btn:hover{background:rgba(127,127,127,.24)}.as-btn.end:hover{background:rgba(255,80,40,.35)}
+.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);min-height:3.2em;text-align:center;font-size:19px;line-height:1.6;unicode-bidi:plaintext;font-weight:500}
+.as-err{color:#d9472b;font-size:13.5px;min-height:1em;text-align:center;max-width:90vw}
 .as-side{position:fixed;inset-inline-end:22px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto;width:min(260px,40vw)}
-.as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(255,255,255,.1);font-size:13px;line-height:1.5;
+.as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(127,127,127,.16);font-size:13px;line-height:1.5;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:asIn .5s cubic-bezier(.2,1.3,.3,1)}
-.as-chip b{color:#ffb070;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
-.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;font:inherit;outline:0}
+.as-chip b{color:#E5613E;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
+.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
-  let S = null, state = null, orb = null, ov = null;
+  let S = null, state = null, orb = null, ov = null, from = null;
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
     products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الدعوة لاتخاذ إجراء", rivals: "المنافسون" };
   const SKIP_KEY = "simsim:assistSkip";
@@ -40,14 +42,31 @@ const Assistant = (() => {
     ov.className = "as-ov"; ov.dir = "rtl"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true");
     ov.innerHTML = html;
     document.body.appendChild(ov);
-    requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("on")));
+    ov.querySelector(".as-orb")?.insertAdjacentHTML("beforeend", '<div class="as-disc"></div>');
     try { orb = window.Orb3D?.(ov.querySelector("canvas")); } catch (e) { console.warn(e); }
+    grow(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => ov?.classList.add("on")));
+  }
+  // 🟠 الكرة بتطلع من دايرة «؟» (أو نقطة برتقالي في النص لو الدايرة مش ظاهرة) وتكبر، وعند القفل بتصغر وترجع لها
+  function grow(open) {
+    const o = ov?.querySelector(".as-orb"), disc = ov?.querySelector(".as-disc"), cv = ov?.querySelector("canvas");
+    if (!o) return null;
+    const t = o.getBoundingClientRect(), f = from?.isConnected && from.getBoundingClientRect(), vis = f && f.width && f.bottom > 0 && f.top < innerHeight;
+    const fx = vis ? f.left + f.width / 2 : innerWidth / 2, fy = vis ? f.top + f.height / 2 : innerHeight / 2, fs = (vis ? f.width : 48) / (t.width * 0.84);
+    const small = `translate(${fx - (t.left + t.width / 2)}px,${fy - (t.top + t.height / 2)}px) scale(${fs})`;
+    const k = (a, b) => (open ? [a, b] : [b, a]), opt = { duration: open ? 900 : 700, easing: open ? "cubic-bezier(.2,1.1,.3,1)" : "cubic-bezier(.5,0,.7,.4)", fill: "both" };
+    disc?.animate(k({ opacity: 1 }, { opacity: 0 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
+    cv?.animate(k({ opacity: 0 }, { opacity: 1 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
+    if (vis && open) from.style.visibility = "hidden";   // الدايرة نفسها هي اللي اتحولت للكرة
+    return o.animate(k({ transform: small }, { transform: "none" }), opt);
   }
   function close() {
     return new Promise((res) => {
       if (!ov) return res();
-      ov.classList.remove("on"); orb?.stop(); orb = null;
-      const o = ov; ov = null; setTimeout(() => { o.remove(); res(); }, 900);
+      const o = ov, a = grow(false); ov.classList.remove("on"); ov = null;
+      const done = () => { orb?.stop(); orb = null; o.remove(); if (from) from.style.visibility = ""; res(); };
+      if (a) a.onfinish = done; else done();
+      setTimeout(() => o.isConnected && done(), 1200);
     });
   }
   const q = (s) => ov?.querySelector(s);
@@ -165,13 +184,14 @@ const Assistant = (() => {
   }
   let S_done = null;
 
-  async function maybe(force) {
-    if (ov) return;   // مفتوح أصلًا
+  async function maybe(force, el) {
+    if (ov) return;
+    from = el || document.querySelector('[data-n="quiz"]');   // مفتوح أصلًا
     try { state = await api("/api/assistant"); } catch { return; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من زر «أجب بالصوت» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return;
     if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return; } catch { /* التخزين مقفول */ }
     await new Promise((res) => { S_done = res; call(); });
   }
-  return { maybe, open: async () => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true); } };
+  return { maybe, open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
 })();
