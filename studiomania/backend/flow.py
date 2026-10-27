@@ -59,9 +59,27 @@ KNOW = (
 KNOW_READY = 60   # من هنا العقل «يفهمك» وخطة المحتوى بتتعمل (ومعاها الشروط الأساسية)
 
 
+def _prefilled(b: dict) -> dict:
+    """القيم اللي البرنامج حطها لوحده وقت التسجيل (بروفايل المجال، واللهجة والبلد من القوائم): مش معرفة عن العميل نفسه.
+    العقول القديمة اللي اتعملت قبل ما نسجّلها: بنقارن بقيم بروفايل المجال الجاهزة."""
+    import fieldpacks  # noqa: PLC0415
+    pre = dict(b.get("prefilled") or {})
+    p = fieldpacks.FIELDS.get(b.get("field") or "")
+    if p:
+        for k, v in (("domain", p["name"]), ("audience", p["audience"]), ("rules", p["rules"])):
+            pre.setdefault(k, v)
+    g = fieldpacks.GOAL_BY.get(b.get("goal") or "")
+    if g:
+        pre.setdefault("cta", g[2])
+    return pre
+
+
 def _know_got(b: dict) -> dict[str, float]:
-    """كل شرط اتحقق قدر ماذا (٠ لـ ١). ما يتعد (المعرفة والذوق) يأخذ جزء على قدر الذي أُنشئ."""
-    txt = lambda k, n=1: len(str(b.get(k) or "").strip()) >= n  # noqa: E731
+    """كل شرط اتحقق قدر ماذا (٠ لـ ١). ما يتعد (المعرفة والذوق) يأخذ جزء على قدر الذي أُنشئ.
+    العقل بيبدأ من صفر: اللي البرنامج ملاه لوحده وقت التسجيل مابيتحسبش، بيتحسب بس اللي جه من العميل (أو من تحليل حسابه)."""
+    pre = _prefilled(b)
+    own = lambda k: str(b.get(k) or "").strip() != str(pre.get(k) or "").strip()  # noqa: E731
+    txt = lambda k, n=1: len(str(b.get(k) or "").strip()) >= n and own(k)  # noqa: E731
     import rivals  # noqa: PLC0415
     return {
         "domain": float(txt("domain", 2) or txt("niche", 2)),
@@ -74,7 +92,7 @@ def _know_got(b: dict) -> dict[str, float]:
         "palette": float(txt("palette", 4)),
         "typography": float(txt("typography", 2)),
         "rules": float(txt("rules", 5)),
-        "knowledge": min(1.0, len(b.get("notes") or []) / 3),
+        "knowledge": min(1.0, len([n for n in b.get("notes") or [] if n.get("source") != "field"]) / 3),
         "social": float(bool(b.get("todos") or (b.get("batch") or {}).get("analysis") or txt("niche", 2))),
         "rivals": float(bool(rivals.approved(b.get("competitors") or {}))),
         "taste": min(1.0, len(b.get("prefs") or []) / 10),

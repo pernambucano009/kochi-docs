@@ -11126,10 +11126,18 @@ def field_pack_apply(bid: str, ob: dict) -> None:
     field, goal = ob.get("field") or "", ob.get("goal") or ""
 
     def fn(d):
+        keys = ("language", "market", "domain", "audience", "rules", "cta")
+        before = {k: str(d.get(k) or "").strip() for k in keys}
         for k, v in (("language", ob.get("dialect_label") or ""), ("market", ob.get("country") or "")):
             if v and not str(d.get(k) or "").strip():
                 d[k] = v
         fieldpacks.brain_fill(field, goal, d)
+        # 🧮 اللي اتملى هنا لوحده مابيتحسبش في «العقل يفهمك قد إيه» (العقل بيبدأ من صفر لحد ما العميل نفسه يقول)
+        pre = d.setdefault("prefilled", {})
+        for k in keys:
+            v = str(d.get(k) or "").strip()
+            if v and not before[k]:
+                pre[k] = v
         d["onboarded"] = now()
     update_brain(bid, fn)
     row = brain_row(bid) or {}
