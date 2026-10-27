@@ -106,12 +106,12 @@ const Assistant = (() => {
       return r;
     }
     if (name === "start_account_analysis") {
-      // 🛑 الحساب لازم يكون العميل كتبه أو قاله فعلًا (الموديل ساعات بيخمّن حساب من اسم العلامة)
+      // 🛑 الحساب لازم العميل يكتبه بنفسه (في المربع أو خانة الكتابة): الكلام بالصوت مابيتكتبش صح، والموديل ساعات بيخمّن حساب من اسم العلامة
       const norm = (x) => String(x || "").toLowerCase().replace(/https?:\/\/|www\.|instagram\.com\/|tiktok\.com\/|[@\s/]/g, "");
       const h = norm(args.account);
-      if (!h || !norm(S.heard).includes(h)) {
+      if (!h || !norm(S.typed).includes(h)) {
         box("account");
-        return { ok: false, error: "The user has NOT given this account. Never guess an account. Ask them to type it in the box on the screen, or move on if they want to give it later." };
+        return { ok: false, error: "The user has NOT typed this account. Accounts must be typed, never taken from speech or guessed. Ask them to type it in the box on the screen, or move on if they want to give it later." };
       }
       const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: args.account || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) { S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
@@ -125,7 +125,7 @@ const Assistant = (() => {
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    S.heard += " " + text;
+    S.typed += " " + text;
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     S.dc.send(JSON.stringify({ type: "response.create" }));
   }
@@ -187,7 +187,7 @@ const Assistant = (() => {
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"></div>
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
-    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, heard: "" };
+    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "" };
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
@@ -230,7 +230,6 @@ const Assistant = (() => {
           R(e.response_id).msg = true; S.aBuf += e.delta;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
         else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); }
-        else if (e.type === "conversation.item.input_audio_transcription.completed") S.heard += " " + (e.transcript || "");
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") S.greeted = true;
         else if (e.type === "response.done") {
