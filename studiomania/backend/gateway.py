@@ -1684,25 +1684,132 @@ def langmap_report(force: bool = False) -> dict:
     m = langmap_get(force)
     groups: dict[tuple[str, str], list] = {}
     for it in m["items"]:
-        for p in it["problems"]:
+        for p in lm_problems(it):
             groups.setdefault((p, it["where"][0].split(":")[0]), []).append(it)
     for r in issues.listing(open_only=True, limit=2000):
         if r["kind"] == "i18n":
             issues.resolve(r["id"], "اتصلّح (آخر فحص للغة مالقاهوش)")
+    what = {"no_en": "جمل بدون ترجمة إنجليزية", "dialect": "جمل فيها عامية في الواجهة", "dialect_ai": "جمل فيها عامية أو عربي غير سليم (مراجعة الذكاء الاصطناعي)"}
     for (p, f), its in groups.items():
-        what = "جمل بدون ترجمة إنجليزية" if p == "no_en" else "جمل فيها عامية في الواجهة"
-        raw = "\n".join(f"{x['where'][0]}  {x['ar']}" + (f"  [{x['dialect']}]" if p == "dialect" else "") for x in its[:60])
-        issues.record("i18n", f, f"{what}: {len(its)} في {f}", raw, 0, screen="خريطة اللغة")
-    return {"stat": m["stat"], "groups": len(groups)}
+        def line(x):
+            if p == "dialect":
+                return f"{x['where'][0]}  {x['ar']}  [{x['dialect']}]"
+            if p == "dialect_ai":
+                v = lm_ai_verdict(x["ar"])
+                return f"{x['where'][0]}  {x['ar']}  [{v.get('words', '')}]\n    ← {v.get('fix', '')}"
+            return f"{x['where'][0]}  {x['ar']}"
+        issues.record("i18n", f, f"{what[p]}: {len(its)} في {f}", "\n".join(line(x) for x in its[:60]), 0, screen="خريطة اللغة")
+    return {"stat": lm_stat(m), "groups": len(groups)}
+
+
+# 🤖 مراجعة العامية بالذكاء الاصطناعي: قاموس الكلمات بيفوّت كلام كتير، فالموديل بيقرا جمل الواجهة ويعلّم اللي مش فصحى سليمة.
+# كل جملة بتتراجع مرة واحدة بس (النتيجة محفوظة ببصمة الجملة)، فالزرار بعد كده بيراجع الجديد أو اللي اتغيّر بس.
+LM_AI_FILE = DATA_DIR / "langmap_ai.json"
+LM_AI_MODEL = os.environ.get("LANGMAP_AI_MODEL", "google/gemini-2.5-flash")
+LM_AI_PRICE = (0.30, 2.50)   # دولار لكل مليون توكن (دخل، خرج) للموديل ده
+LM_AI_BATCH = 120
+_lm_ai: dict = {"cache": None, "job": {"running": False}}
+_lm_ai_lock = threading.Lock()
+
+
+def _lm_key(ar: str) -> str:
+    return hashlib.sha1(ar.encode("utf-8")).hexdigest()[:16]
+
+
+def lm_ai_cache() -> dict:
+    if _lm_ai["cache"] is None:
+        try:
+            _lm_ai["cache"] = json.loads(LM_AI_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _lm_ai["cache"] = {}
+    return _lm_ai["cache"]
+
+
+def lm_ai_verdict(ar: str) -> dict:
+    return lm_ai_cache().get(_lm_key(ar)) or {}
+
+
+def lm_problems(it: dict) -> list[str]:
+    ps = list(it["problems"])
+    if it["kind"] != "content" and "dialect" not in ps and lm_ai_verdict(it["ar"]).get("bad"):
+        ps.append("dialect_ai")
+    return ps
+
+
+def lm_ai_pending(m: dict) -> list[dict]:
+    c = lm_ai_cache()
+    return [it for it in m["items"] if it["kind"] != "content" and _lm_key(it["ar"]) not in c]
+
+
+def lm_ai_cost(items: list[dict]) -> float:
+    # العربي بيتقسم توكنز كتير: حرفين ونص تقريبًا للتوكن، والرد حوالي ربع الدخل، وفوقهم التعليمات في كل دفعة
+    tin = sum(len(x["ar"]) for x in items) / 2.5 + 400 * (len(items) / LM_AI_BATCH + 1)
+    return round((tin * LM_AI_PRICE[0] + tin * 0.25 * LM_AI_PRICE[1]) / 1e6, 3)
+
+
+def lm_stat(m: dict) -> dict:
+    pend = lm_ai_pending(m)
+    bad = sum(1 for it in m["items"] if "dialect_ai" in lm_problems(it))
+    return {**m["stat"], "dialect_ai": bad, "ai_pending": len(pend), "ai_cost": lm_ai_cost(pend), "ai_job": _lm_ai["job"]}
+
+
+LM_AI_PROMPT = """You review Arabic UI strings of a video-marketing web app. Every UI string must be correct Modern Standard Arabic (فصحى).
+Flag a string ONLY if it has colloquial/dialect words (Egyptian, Gulf, Levantine, Maghrebi…) or clearly broken Arabic grammar
+(e.g. «لا يوجد صور», «جارٍ الرفع الفيديو», «تريد تغيّر ماذا»). Do NOT flag: English words, brand/model names, placeholders like {0},
+or tech loanwords that are normal in MSA app UIs (فيديو، ريل، موشن جرافيك، لب سينك، ستوري بورد، أوتوبايلوت، تايبوجرافي، كاروسيل).
+Input: JSON list of [index, string]. Output JSON: {"bad": [{"i": index, "words": "the wrong words", "fix": "the full corrected MSA string, same meaning, same placeholders/emojis/punctuation"}]}.
+Return {"bad": []} if all are fine."""
+
+
+def _lm_ai_batch(batch: list[str], key: str) -> list[dict]:
+    body = {"model": LM_AI_MODEL, "temperature": 0, "max_tokens": 8000, "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": LM_AI_PROMPT},
+                         {"role": "user", "content": json.dumps([[i, s] for i, s in enumerate(batch)], ensure_ascii=False)}]}
+    url = os.environ.get("ATLASCLOUD_LLM_URL") or os.environ.get("ATLASCLOUD_BASE_URL", "https://api.atlascloud.ai") + "/v1"
+    r = httpx.post(f"{url}/chat/completions", headers={"Authorization": f"Bearer {key}"}, json=body, timeout=240)
+    if r.status_code >= 400:
+        raise RuntimeError(f"الموديل رد بخطأ {r.status_code}: {r.text[:300]}")
+    txt = (r.json()["choices"][0]["message"]["content"] or "").strip()
+    txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt)
+    return json.loads(txt).get("bad") or []
+
+
+def _lm_ai_run(items: list[dict], key: str) -> None:
+    job = _lm_ai["job"]
+    try:
+        strs = list(dict.fromkeys(x["ar"] for x in items))
+        for k in range(0, len(strs), LM_AI_BATCH):
+            batch = strs[k:k + LM_AI_BATCH]
+            bad = {int(b["i"]): b for b in _lm_ai_batch(batch, key) if str(b.get("i", "")).isdigit() and int(b["i"]) < len(batch)}
+            with _lm_ai_lock:
+                c = lm_ai_cache()
+                for i, s in enumerate(batch):
+                    b = bad.get(i)
+                    c[_lm_key(s)] = {"bad": True, "words": str(b.get("words") or "")[:200], "fix": str(b.get("fix") or "")[:1000]} if b else {"bad": False}
+                LM_AI_FILE.parent.mkdir(parents=True, exist_ok=True)
+                LM_AI_FILE.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+            job["done"] = min(len(strs), k + len(batch))
+            job["found"] = job.get("found", 0) + len(bad)
+        langmap_report()
+    except Exception as exc:  # noqa: BLE001
+        job["error"] = f"{type(exc).__name__}: {exc}"[:400]
+        issues.record("api", "langmap/ai", "مراجعة العامية بالذكاء الاصطناعي فشلت", job["error"], 500)
+    finally:
+        job["running"] = False
+        job["at"] = time.time()
 
 
 @app.get("/api/platform/langmap")
 def langmap_api(request: Request, q: str = "", problem: str = "", kind: str = "", limit: int = 500, fresh: int = 0):
     admin(request)
     m = langmap_get(bool(fresh))
-    rows = [r for r in m["items"] if (not problem or problem in r["problems"] or (problem == "any" and r["problems"]))
-            and (not kind or r["kind"] == kind) and (not q or q in r["ar"] or q.lower() in (r["en"] or "").lower() or any(q in w for w in r["where"]))]
-    return {"stat": m["stat"], "count": len(rows), "items": rows[:max(1, min(limit, 5000))]}
+    rows = []
+    for r in m["items"]:
+        ps = lm_problems(r)
+        if (not problem or problem in ps or (problem == "any" and ps)) and (not kind or r["kind"] == kind) \
+                and (not q or q in r["ar"] or q.lower() in (r["en"] or "").lower() or any(q in w for w in r["where"])):
+            rows.append({**r, "problems": ps, "ai": lm_ai_verdict(r["ar"]) if "dialect_ai" in ps else None})
+    return {"stat": lm_stat(m), "count": len(rows), "items": rows[:max(1, min(limit, 5000))]}
 
 
 @app.get("/api/platform/langmap.csv")
@@ -1718,6 +1825,24 @@ def langmap_csv(request: Request):
 def langmap_scan(request: Request):
     admin(request)
     return langmap_report(force=True)
+
+
+@app.post("/api/platform/langmap/ai")
+def langmap_ai(request: Request):
+    """يراجع بالموديل جمل الواجهة اللي لسه ماتراجعتش بس (التكلفة على المنصة، وبتظهر على الزرار قبل الضغط)."""
+    admin(request)
+    key = os.environ.get("ATLASCLOUD_API_KEY") or os.environ.get("ATLAS_CLOUD_API_KEY")
+    if not key:
+        raise HTTPException(400, "مفتاح Atlas غير مسجل. ضعه من ⚙️ الإعدادات")
+    with _lm_ai_lock:
+        if _lm_ai["job"].get("running"):
+            raise HTTPException(409, "المراجعة تعمل الآن، انتظر حتى تنتهي")
+        pend = lm_ai_pending(langmap_get(True))
+        if not pend:
+            return {"started": False, "stat": lm_stat(langmap_get())}
+        _lm_ai["job"] = {"running": True, "total": len(dict.fromkeys(x["ar"] for x in pend)), "done": 0, "found": 0, "cost": lm_ai_cost(pend)}
+    threading.Thread(target=_lm_ai_run, args=(pend, key), daemon=True).start()
+    return {"started": True, "job": _lm_ai["job"]}
 
 
 def _langmap_boot() -> None:

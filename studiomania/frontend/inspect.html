@@ -77,9 +77,9 @@
       ملف CSV فيه عمودان فارغان للإسبانية والبرتغالية: هما ما يُملأ عند إضافة لغة جديدة.</p>
       <div class="row" id="lmStat"></div>
       <div class="row"><input id="lmQ" placeholder="ابحث بالجملة أو الترجمة أو الملف" style="flex:1;min-width:220px">
-        <select id="lmP"><option value="any">فيها مشكلة</option><option value="no_en">ترجمة إنجليزية ناقصة</option><option value="dialect">عامية في الواجهة</option><option value="">كل الجمل</option></select>
+        <select id="lmP"><option value="any">فيها مشكلة</option><option value="no_en">ترجمة إنجليزية ناقصة</option><option value="dialect">عامية في الواجهة</option><option value="dialect_ai">عامية (مراجعة الذكاء الاصطناعي)</option><option value="">كل الجمل</option></select>
         <select id="lmK"><option value="">كل الأماكن</option><option value="web">الموقع</option><option value="mobile">تطبيق الجوال</option><option value="server">رسائل الخادم</option><option value="template">خانات القوالب</option><option value="content">محتوى (بلهجة العميل)</option></select>
-        <button class="btn" id="lmScan">🔎 افحص الآن</button><a class="btn" href="/api/platform/langmap.csv" download>⬇ CSV (عربي · إنجليزي · إسباني · برتغالي)</a></div></div>
+        <button class="btn" id="lmScan">🔎 افحص الآن</button><button class="btn" id="lmAi" title="قاموس الكلمات لا يلتقط كل العامية، فيقرأ النموذج جمل الواجهة التي لم تُراجع بعد فقط، ويعلّم ما ليس فصحى سليمة مع التصحيح المقترح. التكلفة على المنصة.">🤖 راجع العامية بالذكاء الاصطناعي</button><a class="btn" href="/api/platform/langmap.csv" download>⬇ CSV (عربي · إنجليزي · إسباني · برتغالي)</a></div></div>
     <table class="tbl"><thead><tr><th>الجملة</th><th>الإنجليزية</th><th>المكان</th><th>المشكلة</th></tr></thead><tbody id="lm"></tbody></table>
   </section>
   <section data-p="runs" hidden>
@@ -251,19 +251,33 @@ $("mapCsv").onclick = () => {
 };
 // 🗺️ خريطة اللغة
 const LM_KIND = { web: "الموقع", mobile: "تطبيق الجوال", server: "رسالة سيرفر", template: "خانة قالب", content: "محتوى" };
-const LM_P = { no_en: "ترجمة ناقصة", dialect: "عامية" };
+const LM_P = { no_en: "ترجمة ناقصة", dialect: "عامية", dialect_ai: "عامية (الذكاء الاصطناعي)" };
+let lmAiT = null;
+function lmAiBtn(st) {
+  const j = st.ai_job || {}, b = $("lmAi");
+  clearTimeout(lmAiT);
+  if (j.running) {
+    b.disabled = true; b.textContent = `🤖 جارٍ المراجعة… ${j.done || 0} من ${j.total} · وُجد ${j.found || 0}`;
+    lmAiT = setTimeout(() => loadLm(), 4000);
+    return;
+  }
+  b.disabled = !st.ai_pending;
+  b.textContent = st.ai_pending ? `🤖 راجع العامية بالذكاء الاصطناعي (${st.ai_pending} جملة جديدة · نحو $${st.ai_cost})` : "🤖 كل الجمل روجعت بالذكاء الاصطناعي ✓";
+  if (j.error) b.title = "آخر مراجعة فشلت: " + j.error;
+}
 let lmT = null;
 async function loadLm(fresh) {
   const qs = new URLSearchParams({ q: $("lmQ").value.trim(), problem: $("lmP").value, kind: $("lmK").value, limit: 1500, fresh: fresh ? 1 : 0 });
   const d = await api("/api/platform/langmap?" + qs).catch((e) => ({ err: e.message }));
   if (d.err) { $("lm").innerHTML = `<tr><td class="bad">${esc(d.err)}</td></tr>`; return; }
   const st = d.stat;
-  $("lmN").textContent = st.no_en + st.dialect || "";
-  $("lmStat").innerHTML = [["كل الجمل", st.total], ["تظهر للعميل", st.ui], ["ترجمة إنجليزية ناقصة", st.no_en], ["عامية في الواجهة", st.dialect],
+  $("lmN").textContent = st.no_en + st.dialect + (st.dialect_ai || 0) || "";
+  lmAiBtn(st);
+  $("lmStat").innerHTML = [["كل الجمل", st.total], ["تظهر للعميل", st.ui], ["ترجمة إنجليزية ناقصة", st.no_en], ["عامية في الواجهة", st.dialect], ["عامية (الذكاء الاصطناعي)", st.dialect_ai || 0], ["لم تُراجع بالذكاء الاصطناعي", st.ai_pending],
     ...Object.entries(st.by_kind).map(([k, n]) => [LM_KIND[k], n])].map(([t, n]) => `<span class="chip">${t}: <b>${n}</b></span>`).join("") + `<span class="mute">المعروض: ${d.count}</span>`;
   $("lm").innerHTML = d.items.map((x) => `<tr><td>${esc(x.ar)}</td><td class="ltr ${x.problems.includes("no_en") ? "bad" : ""}">${esc(x.en || "")}</td>
     <td class="ltr mute">${esc(LM_KIND[x.kind] || x.kind)} · ${x.where.slice(0, 3).map(esc).join("<br>")}${x.where.length > 3 ? `<br>+${x.where.length - 3}` : ""}</td>
-    <td class="${x.problems.length ? "bad" : "mute"}">${x.problems.map((p) => LM_P[p] + (p === "dialect" ? ` («${esc(x.dialect)}»)` : "")).join("، ") || "✓"}</td></tr>`).join("");
+    <td class="${x.problems.length ? "bad" : "mute"}">${x.problems.map((p) => LM_P[p] + (p === "dialect" ? ` («${esc(x.dialect)}»)` : p === "dialect_ai" && x.ai ? ` («${esc(x.ai.words)}»)<br><span class="mute">← ${esc(x.ai.fix)}</span>` : "")).join("، ") || "✓"}</td></tr>`).join("");
 }
 $("lmQ").oninput = () => { clearTimeout(lmT); lmT = setTimeout(loadLm, 300); };
 $("lmP").onchange = $("lmK").onchange = () => loadLm();
@@ -271,6 +285,14 @@ $("lmScan").onclick = async () => {
   $("lmScan").disabled = true;
   try { const r = await api("/api/platform/langmap/scan", { method: "POST" }); await loadLm(); alert(`تم الفحص: ${r.stat.no_en} ترجمة ناقصة، ${r.stat.dialect} عامية، ونزلوا في صندوق الأخطاء (${r.groups} بند).`); loadIssues(); }
   catch (e) { alert(e.message); } finally { $("lmScan").disabled = false; }
+};
+$("lmAi").onclick = async () => {
+  const b = $("lmAi"), m = b.textContent.match(/\$[\d.]+/);
+  if (!confirm(`سيقرأ النموذج جمل الواجهة التي لم تُراجع بعد ويعلّم العامية. التكلفة على المنصة${m ? ` نحو ${m[0]}` : ""}. هل تبدأ؟`)) return;
+  b.disabled = true;
+  try { const r = await api("/api/platform/langmap/ai", { method: "POST" }); if (!r.started) alert("لا توجد جمل جديدة للمراجعة."); }
+  catch (e) { alert(e.message); }
+  loadLm();
 };
 loadIssues();
 loadRuns().catch((e) => { $("runs").innerHTML = `<tr><td class="bad">${esc(e.message)}</td></tr>`; });
