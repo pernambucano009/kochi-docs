@@ -181,6 +181,8 @@ const Assistant = (() => {
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null };
     S.capT = setInterval(capTick, 120);
+    // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
+    history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
     q("[data-end]").onclick = () => end(false);
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
@@ -265,6 +267,7 @@ const Assistant = (() => {
     if (!S) return;
     const s = S; S = null;
     clearInterval(s.accTimer); clearInterval(s.capT);
+    if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
@@ -274,6 +277,7 @@ const Assistant = (() => {
     S_done?.();
   }
   let S_done = null;
+  addEventListener("popstate", () => { if (S) { S.hist = false; end(false); } });
 
   // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص
   // 🔒 مكالمة واحدة بس: ضغطتين ورا بعض (أو الفتح التلقائي مع ضغطة) كانوا بيفتحوا مكالمتين بيتكلموا مع بعض
