@@ -3150,6 +3150,8 @@ window.I18N_EN = {
   "لا يوجد اشتراك فعّال": "No active subscription",
   "للأدمن فقط": "Admins only",
   "للمشرف فقط": "Admins only",
+  "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى": "Microphone access was not allowed, so type your replies in the box. To talk by voice: allow the microphone from the address bar, then open the assistant again",
+  "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة": "No microphone found on this device, so type your replies in the box",
   "رفعت الشعار": "I uploaded the logo",
   "رابط حسابك على إنستغرام أو تيك توك": "Your Instagram or TikTok account link",
   "ارفع شعارك": "Upload your logo",

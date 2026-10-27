@@ -186,8 +186,12 @@ const Assistant = (() => {
     q("[data-end]").onclick = () => end(false);
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-      S.mic = mic; S.ctx = new AudioContext(); S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+      // 🎙️ من غير ميكروفون (مش موجود، أو العميل رفض الإذن) المكالمة بتكمل: المساعد بيتكلم والعميل بيكتب
+      let mic = null, noMic = "";
+      try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
+        : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
+      S.mic = mic; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
       const pc = new RTCPeerConnection(); S.pc = pc;
@@ -198,7 +202,7 @@ const Assistant = (() => {
         el.play().catch(() => unmute());
         if (S.ctx.state === "suspended") unmute();
       };
-      pc.addTrack(mic.getTracks()[0], mic);
+      if (mic) pc.addTrack(mic.getTracks()[0], mic); else pc.addTransceiver("audio", { direction: "recvonly" });
       const dc = pc.createDataChannel("oai-events"); S.dc = dc;
       // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
       const greet = () => { if (S && !S.greeted && dc.readyState === "open") { S.greeted = true; dc.send(JSON.stringify({ type: "response.create" })); } };
@@ -240,13 +244,14 @@ const Assistant = (() => {
       if (!r.ok) throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل");
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       q(".as-st").textContent = `${tok.agent || ""}`;
+      if (noMic) { q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
       q("[data-type]").onkeydown = (ev) => {
         if (ev.key !== "Enter" || !ev.target.value.trim()) return;
         say(ev.target.value.trim()); ev.target.value = "";
       };
       loop();
     } catch (e) {
-      q("[data-err]").textContent = e.name === "NotAllowedError" ? "اسمح للمتصفح باستخدام الميكروفون، أو اكتب بدل الكلام بعد السماح" : e.message;
+      q("[data-err]").textContent = /[\u0600-\u06ff]/.test(e.message || "") ? e.message : "تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل";
       q(".as-st").textContent = "";
     }
   }
