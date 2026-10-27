@@ -987,19 +987,33 @@ def google_back(request: Request, code: str = "", state: str = "", error: str = 
     if not state or not (hmac.compare_digest(state, request.cookies.get("g_state") or "") or g_state_ok(state)):
         return google_fail("state", f"cookie={'yes' if request.cookies.get('g_state') else 'no'} ua={request.headers.get('user-agent', '')[:200]}")
     app = bool(g_state_app(state))
+    # 🔑 السر ممكن يكون في متغيرات الاستضافة وفي صفحة الإعدادات بقيمتين مختلفتين (الاستضافة ليها الأولوية في sync_owner_keys)،
+    # فلو جوجل رفض واحد بنجرّب التاني. والتشخيص بيكتب مصدر كل سر وآخر ٤ حروف منه بس، عشان تتقارن بصفحة جوجل
+    cid, ok_keys = os.environ["GOOGLE_CLIENT_ID"], owner_keys()
+    tries = [("hosting" if "GOOGLE_CLIENT_SECRET" in ENV0 else "settings", os.environ.get("GOOGLE_CLIENT_SECRET", ""))]
+    if ok_keys.get("GOOGLE_CLIENT_SECRET") and ok_keys["GOOGLE_CLIENT_SECRET"] != tries[0][1]:
+        tries.append(("settings", ok_keys["GOOGLE_CLIENT_SECRET"]))
     try:
-        r = httpx.post("https://oauth2.googleapis.com/token", timeout=20, data={
-            "code": code, "client_id": os.environ["GOOGLE_CLIENT_ID"], "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
-            "redirect_uri": f"{base_url(request)}/auth/google/callback", "grant_type": "authorization_code"})
-        body = r.json()
+        notes = []
+        for src, sec in tries:
+            r = httpx.post("https://oauth2.googleapis.com/token", timeout=20, data={
+                "code": code, "client_id": cid, "client_secret": sec,
+                "redirect_uri": f"{base_url(request)}/auth/google/callback", "grant_type": "authorization_code"})
+            body = r.json()
+            notes.append(f"{src} secret …{sec[-4:] if len(sec) > 8 else '?'}: {r.status_code} {body.get('error', 'ok')}")
+            if "id_token" in body or body.get("error") != "invalid_client":
+                break
         if "id_token" not in body:   # غالبًا: السر غلط (invalid_client) أو الرابط مختلف (redirect_uri_mismatch)
-            return google_fail("token", f"{r.status_code} {json.dumps(body)[:600]} redirect_uri={base_url(request)}/auth/google/callback", app)
+            idnote = f"client_id …{cid[-30:]}" + (" (صفحة الإعدادات فيها client_id مختلف)" if ok_keys.get("GOOGLE_CLIENT_ID") not in (None, "", cid) else "")
+            return google_fail("token", f"{r.status_code} {json.dumps(body)[:600]} redirect_uri={base_url(request)}/auth/google/callback | {idnote} | {' ; '.join(notes)}", app)
+        if src != tries[0][0]:   # السر اللي في الإعدادات هو الصح: يبقى هو المستخدم من دلوقتي
+            os.environ["GOOGLE_CLIENT_SECRET"] = sec
         seg = body["id_token"].split(".")[1]
         info = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
     except (httpx.HTTPError, KeyError, ValueError, IndexError) as exc:
         return google_fail("token", f"{type(exc).__name__}: {exc}", app)
-    if info.get("aud") != os.environ["GOOGLE_CLIENT_ID"] or not info.get("email_verified") or not info.get("email"):
-        return google_fail("email", f"aud_ok={info.get('aud') == os.environ['GOOGLE_CLIENT_ID']} verified={info.get('email_verified')}", app)
+    if info.get("aud") != cid or not info.get("email_verified") or not info.get("email"):
+        return google_fail("email", f"aud_ok={info.get('aud') == cid} verified={info.get('email_verified')}", app)
     email, sub = info["email"].lower(), str(info["sub"])
     u = user_by("google_sub", sub) or user_by("email", email)
     if needs_owner_setup():
