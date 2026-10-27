@@ -356,6 +356,7 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
       <button type="submit" class="sk-go lp-btn" style="{{submitStyle}}">
         <svg class="nh-snake" viewBox="0 0 364 50" preserveAspectRatio="none" aria-hidden="true"><rect class="s3" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/><rect class="s2" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/><rect class="s1" x="1" y="1" width="362" height="48" rx="24" pathLength="1000"/></svg>{{t.submit}}</button>
       <p style="{{switchStyle}}">{{t.switchQ}} <button type="button" class="lp-link" data-on-click="{{switchMode}}" style="{{switchBtn}}">{{t.switchA}}</button></p>
+      <sc-if value="{{isLogin}}" hint-placeholder-val="{{ false }}"><p style="{{switchStyle}}"><a class="lp-link" href="/forgot" style="{{switchBtn}}">{{t.forgot}}</a></p></sc-if>
     </form>
   </sc-if>
 
@@ -452,7 +453,8 @@ const LP_TEXT = {
     heroNote: '300 نقطة مجانًا للتجربة · بدون بطاقة',
     demoTitle: 'من فكرة إلى فيديو جاهز للنشر', demoLead: 'هذا الفيديو صُنع بقالب من قوالب سمسمكيت: تكتب فكرتك، والعقل يكتب النص بلهجتك، والقالب يصنع الفيديو.', vidCap: 'شاهد مثالًا',
     hTitle: 'كيف يعمل؟', hLead: 'ثلاث خطوات، والباقي علينا.', exTitle: 'أمثلة لمجالك', exLead: 'اختر مجالك وشاهد القوالب التي تناسبه.',
-    country: 'بلدك', dialect: 'لهجة المحتوى', field: 'مجال نشاطك', goal: 'هدفك من المحتوى', next: 'التالي', step2Hint: 'نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، ويمكنك تغيير اللهجة لاحقًا.', soon: 'الدخول بأبل قريبًا', gsoon: 'الدخول بجوجل قريبًا',
+    country: 'بلدك', dialect: 'لهجة المحتوى', field: 'مجال نشاطك', goal: 'هدفك من المحتوى', next: 'التالي', step2Hint: 'نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، ويمكنك تغيير اللهجة لاحقًا.', soon: 'الدخول بأبل قريبًا', gsoon: 'الدخول بجوجل قريبًا', forgot: 'نسيت كلمة المرور؟',
+    gErr: { state: 'انتهت مهلة الدخول بجوجل أو فُتح في متصفح آخر. جرّب مرة أخرى من المتصفح نفسه', cancel: 'ألغيت الدخول بجوجل. اضغط «Google» مرة أخرى إذا أردت', denied: 'رفضت جوجل الدخول بهذا الحساب. جرّب حسابًا آخر أو ادخل بالبريد الإلكتروني', email: 'بريد هذا الحساب في جوجل غير مؤكد. أكّده في جوجل أو ادخل بالبريد الإلكتروني', _: 'لم يكتمل الدخول بجوجل، جرّب مرة أخرى' },
     screens: { how: 'كيف يعمل', examples: 'أمثلة', features: 'المميزات', prices: 'الأسعار', faq: 'الأسئلة', demo: 'مثال', signup: 'إنشاء حساب', login: 'تسجيل الدخول' },
     fTitle: 'كل ما تحتاجه في مكان واحد', fLead: 'عقل يعرف علامتك، وقوالب تصنع الفيديو، والأوتوبايلوت ينشر في موعده.',
     pTitle: 'باقات بسيطة، وتبدأ مجانًا', pLead: 'ادفع شهريًا أو سنويًا، وألغِ متى شئت.', monthly: 'شهري', yearly: 'سنوي · شهران مجانًا',
@@ -473,7 +475,8 @@ const LP_TEXT = {
     heroNote: '300 free credits to try. No card needed.',
     demoTitle: 'From an idea to a video ready to post', demoLead: 'This video was made with a SimsimKit template: you write your idea, the brain writes the script in your dialect, and the template makes the video.', vidCap: 'See an example',
     hTitle: 'How it works', hLead: 'Three steps. We handle the rest.', exTitle: 'Examples for your field', exLead: 'Pick your field and see the templates that fit it.',
-    country: 'Country', dialect: 'Content dialect', field: 'Your field', goal: 'Your goal', next: 'Next', step2Hint: 'We prepare your brand brain, ideas and a monthly plan from your field. You can change the dialect later.', soon: 'Sign in with Apple is coming soon', gsoon: 'Sign in with Google is coming soon',
+    country: 'Country', dialect: 'Content dialect', field: 'Your field', goal: 'Your goal', next: 'Next', step2Hint: 'We prepare your brand brain, ideas and a monthly plan from your field. You can change the dialect later.', soon: 'Sign in with Apple is coming soon', gsoon: 'Sign in with Google is coming soon', forgot: 'Forgot your password?',
+    gErr: { state: 'The Google sign-in timed out or opened in another browser. Try again from the same browser', cancel: 'You cancelled the Google sign-in. Press «Google» again if you want', denied: 'Google refused sign-in with this account. Try another account or use your email', email: 'This Google account\'s email is not verified. Verify it in Google or use your email', _: 'The Google sign-in did not finish, try again' },
     screens: { how: 'How it works', examples: 'Examples', features: 'Features', prices: 'Prices', faq: 'FAQ', demo: 'Example', signup: 'Sign up', login: 'Sign in' },
     fTitle: 'Everything in one place', fLead: 'A brain that knows your brand, templates that make the video, and an autopilot that posts on time.',
     pTitle: 'Simple plans. Start free.', pLead: 'Pay monthly or yearly, cancel anytime.', monthly: 'Monthly', yearly: 'Yearly · 2 months free',
@@ -534,9 +537,14 @@ class Component {
     this.state = { dark: (ls('studiomania.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark', lang: ls('studiomania.site.lang') === 'en' ? 'en' : null,
       screen: scr0, hist: [], lit: false, flash: false, still: false, yearly: false, open: 0, showPw: false, mode: h === 'login' ? 'login' : 'register',
       field: 0, step: 1, err: '', reg: {}, busy: false };
+    // ↩️ صفحة /login القديمة ورجوع جوجل بيحوّلوا هنا، فاللوحة واحدة: الخطأ بيظهر جوه اللوحة نفسها
+    const Q = new URLSearchParams(location.search);
+    if (Q.get('err') === 'google') this.gWhy = Q.get('why') || '_';
+    const n = Q.get('next'); this.next = n && /^\/(?![\/\\])/.test(n) ? n : '/';
   }
   componentWillUnmount() { clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._t3); }
   go(screen, extra, fromHash) {
+    this.gWhy = null;
     if (screen === this.state.screen && !extra) return;
     const off = screen !== 'signup' ? { lit: false, flash: false, leaving: false } : {};
     this.setState(Object.assign({ screen, err: '', hist: this.state.hist.concat(this.state.screen) }, off, extra || {}));
@@ -681,7 +689,7 @@ class Component {
         hTitle: T.hTitle, hLead: T.hLead, exTitle: T.exTitle, exLead: T.exLead, country: T.country, dialect: T.dialect, field: T.field, goal: T.goal, step2Hint: T.step2Hint
       },
       isHow: scr === 'how', isExamples: scr === 'examples',
-      step1: !reg || s.step === 1, step2: reg && s.step === 2, err: s.err,
+      step1: !reg || s.step === 1, step2: reg && s.step === 2, isLogin: !reg, err: s.err || (this.gWhy && scr === 'signup' ? T.gErr[this.gWhy] || T.gErr._ : ''),
       steps: LP_STEPS.map((x, i) => ({ n: i + 1, title: ar ? x[0] : x[1], text: ar ? x[2] : x[3],
         style: 'margin:0;padding:22px 20px;border-radius:22px;height:230px;box-sizing:border-box;color:' + ink + ';background:' + card + ';backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:' + shadow,
         titleStyle: 'margin:16px 0 6px;font:500 16px ' + F, textStyle: 'margin:0;font:400 13.5px/1.75 ' + F + ';color:' + muted })),
@@ -843,6 +851,7 @@ Object.assign(Component.prototype, {
     const s = this.state, ar = (s.lang || 'ar') === 'ar', g = (n) => ((form.elements[n] || {}).value || '').trim();
     const E = (a, e) => this.setState({ err: ar ? a : e, busy: false });
     if (s.busy) return;
+    this.gWhy = null;
     const post = async (url, body) => {
       const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
@@ -863,7 +872,7 @@ Object.assign(Component.prototype, {
         location.replace('/verify');
       } else {
         const d = await post('/api/auth/login', { email: g('email'), password: (form.elements.password || {}).value || '' });
-        location.replace(d.verify ? '/verify' : '/');
+        location.replace(d.verify ? '/verify' : this.next);
       }
     } catch (e) { this.setState({ err: e.message, busy: false }); }
   }

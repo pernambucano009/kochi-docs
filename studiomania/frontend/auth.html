@@ -201,6 +201,11 @@ async function render() {
   let v = path.slice(1);
   if (S.needs_setup) v = "setup";
   else if (v === "setup") v = "login";
+  // 🪟 على الكمبيوتر لوحة الدخول واحدة: لوحة الصفحة الرئيسية، ومعاها الخطأ والرجوع لنفس الصفحة
+  if ((v === "login" || v === "signup") && !S.needs_setup && !S.logged_in && !S.phone && innerWidth >= 1100) {
+    const k = new URLSearchParams(); for (const n of ["err", "why", "next"]) if (Q.get(n)) k.set(n, Q.get(n));
+    return location.replace("/welcome" + (k.toString() ? "?" + k : "") + "#" + v);
+  }
   if (v === "verify" && Q.get("token")) {
     $("body").innerHTML = `<p class="muted">نؤكد البريد الإلكتروني…</p>`;
     try { await fetch(`/api/auth/verify?token=${encodeURIComponent(Q.get("token"))}`).then(async (r) => { if (!r.ok) throw new Error((await r.json()).detail); }); location.replace("/"); }
