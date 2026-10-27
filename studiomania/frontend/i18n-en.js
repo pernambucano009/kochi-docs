@@ -14977,4 +14977,6 @@ window.I18N_EN = {
   "إفكت على أقوى اللحظات:": "effects at the strongest moments:",
   "✓ حُذف الإفكت، وسيختفي في التصدير القادم": "\u2713 Effect removed; it will be gone in the next export",
   "لا شيء": "Nothing",
+  "رجل": "Man",
+  "امرأة": "Woman",
 };

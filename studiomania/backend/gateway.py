@@ -1909,8 +1909,9 @@ class LiveTokenIn(BaseModel):
     model: str = ""
     voice: str = ""
     dialect: str = "ar-eg-cairo"
-    agent: str = "إيرل"
+    agent: str = ""          # فاضي = اسم اللهجة على حسب نوع الصوت
     user: str = ""
+    user_gender: str = "m"   # m / f: الضماير اللي المساعد بيكلم بيها العميل
     eagerness: str = "auto"
 
 
@@ -1918,7 +1919,8 @@ class LiveTokenIn(BaseModel):
 def live_token(request: Request, body: LiveTokenIn):
     u = admin(request)
     who = body.user.strip() or (u["name"] if "name" in u.keys() and u["name"] else "") or "محمود"
-    instr = livevoice.instructions(body.dialect, body.agent.strip() or "إيرل", who)
+    ag = livevoice.VOICE_GENDER.get(body.voice, "f")
+    instr = livevoice.instructions(body.dialect, body.agent.strip(), who, ag, "f" if body.user_gender == "f" else "m")
     try:
         if body.provider == "openai":
             tok = livevoice.openai_secret(body.model or livevoice.OPENAI_MODELS[0], body.voice or "marin", instr,

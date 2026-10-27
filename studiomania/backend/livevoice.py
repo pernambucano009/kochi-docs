@@ -29,56 +29,99 @@ GEMINI_MODELS = ["gemini-live-2.5-flash-preview", "gemini-2.5-flash-native-audio
 # دولار في الدقيقة تقريبًا (دخل وقت ما العميل بيتكلم، خرج وقت ما المساعد بيتكلم): تقدير للعرض بس، مش للفوترة
 PRICE_PER_MIN = {"openai": (0.02, 0.08), "openai-mini": (0.006, 0.024), "gemini": (0.005, 0.018)}
 
-# كل لهجة: اسمها، ووصف قصير للموديل، وجمل من اللهجة نفسها عشان يمسكها صح من أول كلمة
+# كل لهجة: اسمها، ووصفها للموديل، وجملة الافتتاح بلهجتها (صاحب المنصة كتب المصري، والباقي على نفس المعنى)
+# الجملة فيها {name} (اسم العميل) و{agent} (اسم المساعد)، وبصيغة المساعدة البنت؛ الموديل بيعدّل الضماير لو المساعد ولد أو العميل بنت
 DIALECTS = {
     "ar-eg-cairo": ("🇪🇬 مصري", "Egyptian Arabic (Cairene colloquial)",
-                    "أهلًا يا {name}، عامل إيه؟ أنا {agent}، مساعدك الشخصي. قبل ما نبدأ، احكيلي إنت بتشتغل في إيه؟ وإيه نوع المحتوى اللي بتعمله؟"),
+                    "إزيك يا {name}؟ أنا {agent}، وجاية النهارده عشان أضمن إن رحلتك مع سمسمكيت تكون ألطف ما يكون. ها، مستعد ندردش شوية عشان أتعرف عليك أكتر؟"),
     "ar-sa-najdi": ("🇸🇦 سعودي نجدي", "Saudi Najdi Arabic (Riyadh)",
-                    "هلا والله يا {name}، كيف حالك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدأ، علّمني وش شغلك؟ ووش نوع المحتوى اللي تسويه؟"),
+                    "هلا والله يا {name}، كيف حالك؟ أنا {agent}، وجيتك اليوم عشان أضمن إن رحلتك مع سمسمكيت تكون أحلى ما يكون. ها، جاهز نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-sa-hijazi": ("🇸🇦 سعودي حجازي", "Saudi Hijazi Arabic (Jeddah, Makkah)",
-                     "أهلين يا {name}، كيفك؟ أنا {agent}، مساعدك الشخصي. قبل ما نبدأ، قولّي إيش شغلك؟ وإيش نوع المحتوى اللي تسويه؟"),
+                     "أهلين يا {name}، كيفك؟ أنا {agent}، وجيت اليوم عشان أضمن إن رحلتك مع سمسمكيت تكون ألطف شي. ها، جاهز ندردش شوية عشان أتعرف عليك أكتر؟"),
     "ar-gulf": ("🌊 خليجي عام", "general Gulf Arabic",
-                "هلا والله يا {name}، شلونك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدأ، قولي شنو شغلك؟ وشنو نوع المحتوى اللي تسويه؟"),
+                "هلا والله يا {name}، شلونك؟ أنا {agent}، وجيت اليوم عشان أضمن إن رحلتك مع سمسمكيت تكون أحلى ما يكون. ها، جاهز نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-ae": ("🇦🇪 إماراتي", "Emirati Arabic",
-              "هلا والله يا {name}، شحالك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدا، خبرني شو شغلك؟ وشو نوع المحتوى اللي تسويه؟"),
+              "هلا والله يا {name}، شحالك؟ أنا {agent}، وياية اليوم عشان أضمن إن رحلتك ويا سمسمكيت تكون أحلى ما يكون. ها، مستعد نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-kw": ("🇰🇼 كويتي", "Kuwaiti Arabic",
-              "هلا والله يا {name}، شلونك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدي، گولي شنو شغلك؟ وشنو المحتوى اللي تسويه؟"),
+              "هلا والله يا {name}، شلونك؟ أنا {agent}، وجاية اليوم عشان أضمن إن رحلتك ويا سمسمكيت تكون أحلى شي. ها، جاهز نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-qa": ("🇶🇦 قطري", "Qatari Arabic",
-              "هلا والله يا {name}، شلونك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدا، قولي شو شغلك؟ وشنو المحتوى اللي تسويه؟"),
+              "هلا والله يا {name}، شلونك؟ أنا {agent}، وجاية اليوم عشان أضمن إن رحلتك ويا سمسمكيت تكون أحلى ما يكون. ها، مستعد نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-bh": ("🇧🇭 بحريني", "Bahraini Arabic",
-              "هلا والله يا {name}، شلونك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدي، قولي شنو شغلك؟ وشنو المحتوى اللي تسويه؟"),
+              "هلا والله يا {name}، شلونك؟ أنا {agent}، وجاية اليوم عشان أضمن إن رحلتك ويا سمسمكيت تكون أحلى شي. ها، جاهز نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-om": ("🇴🇲 عماني", "Omani Arabic",
-              "هلا يا {name}، كيف حالك؟ أنا {agent}، مساعدك الشخصي. قبل لا نبدا، خبرني إيش شغلك؟ وإيش المحتوى اللي تسويه؟"),
+              "هلا يا {name}، كيف حالك؟ أنا {agent}، وجاية اليوم عشان أضمن إن رحلتك مع سمسمكيت تكون أحلى ما يكون. ها، مستعد نسولف شوي عشان أتعرف عليك أكثر؟"),
     "ar-levant": ("🇱🇧 شامي", "Levantine Arabic (Syrian/Lebanese/Jordanian)",
-                  "أهلين يا {name}، كيفك؟ أنا {agent}، مساعدك الشخصي. قبل ما نبلّش، احكيلي شو بتشتغل؟ وشو نوع المحتوى اللي بتعمله؟"),
+                  "كيفك يا {name}؟ أنا {agent}، وجاية اليوم لأتأكد إنو رحلتك مع سمسمكيت تكون أحلى ما يكون. شو، جاهز نحكي شوي لأتعرّف عليك أكتر؟"),
     "ar-iq": ("🇮🇶 عراقي", "Iraqi Arabic (Baghdadi)",
-              "هلا بيك يا {name}، شلونك؟ آني {agent}، مساعدك الشخصي. قبل لا نبدي، گلّي شنو شغلك؟ وشنو نوع المحتوى اللي تسويه؟"),
+              "هلا بيك يا {name}، شلونك؟ آني {agent}، وجاية اليوم حتى أضمن إن رحلتك ويا سمسمكيت تكون أحلى شي. ها، حاضر نسولف شوية حتى أتعرف عليك أكثر؟"),
     "ar-sd": ("🇸🇩 سوداني", "Sudanese Arabic",
-              "أهلًا يا {name}، كيفك؟ أنا {agent}، مساعدك الشخصي. قبل ما نبدأ، قول لي إنت شغال شنو؟ ونوع المحتوى البتعملو شنو؟"),
+              "كيفك يا {name}؟ أنا {agent}، وجاية الليلة عشان أضمن إنو رحلتك مع سمسمكيت تكون أحلى حاجة. ها، جاهز نتونس شوية عشان أتعرف عليك أكتر؟"),
     "ar-ma": ("🇲🇦 مغربي", "Moroccan Darija",
-              "مرحبا بيك أ {name}، لاباس عليك؟ أنا {agent}، المساعد ديالك. قبل ما نبداو، قول ليا شنو كتخدم؟ وشنو نوع المحتوى اللي كدير؟"),
+              "لاباس عليك أ {name}؟ أنا {agent}، وجيت اليوم باش نضمن بلي الرحلة ديالك مع سمسمكيت تكون زوينة بزاف. واش واجد نهضرو شوية باش نتعرف عليك كثر؟"),
     "ar-dz": ("🇩🇿 جزائري", "Algerian Darja",
-              "مرحبا بيك يا {name}، واش راك؟ أنا {agent}، المساعد تاعك. قبل ما نبداو، قولي واش تخدم؟ وواش نوع المحتوى اللي دير؟"),
+              "واش راك يا {name}؟ أنا {agent}، وجيت اليوم باش نضمن بلي الرحلة تاعك مع سمسمكيت تكون مليحة بزاف. واش راك واجد نهدرو شوية باش نتعرف عليك كثر؟"),
     "ar-tn": ("🇹🇳 تونسي", "Tunisian Derja",
-              "عسلامة يا {name}، شنحوالك؟ أنا {agent}، المساعد متاعك. قبل ما نبداو، قلّي شنوة تخدم؟ وشنوة نوع المحتوى اللي تعمل فيه؟"),
+              "شنحوالك يا {name}؟ أنا {agent}، وجيت اليوم باش نضمن إلي الرحلة متاعك مع سمسمكيت تكون باهية برشا. حاضر نحكيو شوية باش نتعرف عليك أكثر؟"),
     "ar-msa": ("📖 فصحى", "Modern Standard Arabic",
-               "أهلًا بك يا {name}، كيف حالك؟ أنا {agent}، مساعدك الشخصي. قبل أن نبدأ، أخبرني ما عملك؟ وما نوع المحتوى الذي تقدّمه؟"),
+               "كيف حالك يا {name}؟ أنا {agent}، وجئت اليوم لأضمن أن تكون رحلتك مع سمسمكيت ألطف ما يكون. هل أنت مستعد لنتحدث قليلًا لأتعرف عليك أكثر؟"),
 }
+# اسم المساعد في كل لهجة (أقرب لأهلها): (اسم بنت، اسم ولد). الاسم لازم يمشي مع الصوت
+AGENT_NAMES = {
+    "ar-eg-cairo": ("سعاد", "كريم"), "ar-sa-najdi": ("نورة", "فهد"), "ar-sa-hijazi": ("ريم", "ماجد"), "ar-gulf": ("مريم", "خالد"),
+    "ar-ae": ("ميثاء", "حمدان"), "ar-kw": ("دانة", "مشاري"), "ar-qa": ("العنود", "جاسم"), "ar-bh": ("فاطمة", "علي"), "ar-om": ("شيخة", "سالم"),
+    "ar-levant": ("لين", "كرم"), "ar-iq": ("زينب", "حيدر"), "ar-sd": ("آمنة", "عثمان"), "ar-ma": ("سلمى", "يونس"), "ar-dz": ("أمينة", "ياسين"),
+    "ar-tn": ("ياسمين", "أيمن"), "ar-msa": ("سارة", "عمر"),
+}
+# نوع كل صوت (عشان الاسم والضماير): f بنت، m ولد
+VOICE_GENDER = {"marin": "f", "cedar": "m", "coral": "f", "sage": "f", "shimmer": "f", "alloy": "f", "ash": "m", "ballad": "m", "echo": "m", "verse": "m",
+                "Kore": "f", "Puck": "m", "Charon": "m", "Zephyr": "f", "Fenrir": "m", "Leda": "f", "Orus": "m", "Aoede": "f", "Callirrhoe": "f",
+                "Autonoe": "f", "Enceladus": "m", "Iapetus": "m", "Umbriel": "m", "Algieba": "m", "Despina": "f", "Erinome": "f", "Algenib": "m",
+                "Rasalgethi": "m", "Laomedeia": "f", "Achernar": "f", "Alnilam": "m", "Schedar": "m", "Gacrux": "f", "Pulcherrima": "f",
+                "Achird": "m", "Zubenelgenubi": "m", "Vindemiatrix": "f", "Sadachbia": "m", "Sadaltager": "m", "Sulafat": "f"}
+# أسئلة العقل اللي الموديل بيسألها بالترتيب (من نفس كويز العقل، عشان كل إجابة تروح خانتها)
+SKIP_Q = {"language", "link", "type"}   # اللهجة معروفة من التسجيل، والحساب بيتطلب الأول، والنوع بيبان من الوصف
 
 
-def instructions(dialect: str, agent: str = "إيرل", user: str = "محمود") -> str:
+def agent_name(dialect: str, gender: str) -> str:
+    f, m = AGENT_NAMES.get(dialect) or AGENT_NAMES["ar-eg-cairo"]
+    return m if gender == "m" else f
+
+
+def quiz_questions() -> list[str]:
+    try:
+        import brainquiz  # noqa: PLC0415
+        return [q["ar"] for q in brainquiz.Q if q["id"] not in SKIP_Q]
+    except Exception:  # noqa: BLE001
+        return ["ما مجال عملك؟", "صِف مشروعك: ماذا تقدم، وما الذي يميزك؟", "من هو عميلك المثالي؟", "في أي مدينة أو دولة عملاؤك؟"]
+
+
+def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m") -> str:
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
-    return f"""You are {agent}, the friendly personal assistant of SimsimKit, an AI platform that makes social-media videos for businesses.
-The user ({user}) just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
-natural, warm, short sentences, never Modern Standard Arabic unless the dialect IS Modern Standard Arabic. Never switch dialects.
-Example of how you sound in this dialect: «{sample.format(name=user, agent=agent)}»
+    agent = agent or agent_name(dialect, agent_gender)
+    # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
+    me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
+    you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
+           "a man: address him ONLY with masculine pronouns, verbs and adjectives")
+    qs = "\n".join(f"   {i + 1}. {q}" for i, q in enumerate(quiz_questions()))
+    return f"""You are {agent}, the personal assistant of SimsimKit, a platform that makes social-media videos for businesses.
+The user, {user}, just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
+warm, natural, short sentences. Never use Modern Standard Arabic unless the dialect IS Modern Standard Arabic. Never switch dialects.
+Grammar of gender (very important in Arabic): you are {me}. The user is {you}.
 
-Your job in this call:
-1. Greet {user} by name, introduce yourself in one sentence, and say you'll show what SimsimKit can do after a few quick questions.
-2. Ask ONE short question at a time to learn about the business: what they do, their field, who their customers are,
-   their city/market, their social accounts, what content they make now, and their goal. React briefly and naturally to each answer.
-3. Keep every turn under ~2 short sentences. If the user interrupts, stop and listen. If they go off-topic, answer briefly and come back.
-4. Never mention the names of the AI models or companies behind the platform."""
+Follow this order:
+1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.
+2. Ask for their Instagram or TikTok account first, and explain in one sentence why: the analysis takes a while, so the team starts on it now
+   and the results are ready by the end of the chat. When they give it, thank them in a few words and move on.
+3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):
+{qs}
+4. When done, thank them and tell them you are preparing what you found.
+
+Rules:
+- Keep every turn to 1–2 short sentences. React to each answer in a few words before the next question.
+- If the user interrupts, stop and listen. If they go off-topic, answer briefly and come back to the next question.
+- Only use facts the user actually said. Never assume a business, product or detail they did not say, and never mix in an example
+  as if it were theirs. If you did not hear clearly, ask them to repeat it, without guessing alternatives.
+- Never mention the names of the AI models or companies behind the platform."""
 
 
 # ---------------------------------------------------------------- مفاتيح مؤقتة للمتصفح
@@ -104,7 +147,7 @@ def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto") -
     if not key:
         raise LiveError("مفتاح OpenAI غير مسجل. ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة")
     session = {"type": "realtime", "model": model, "instructions": instr,
-               "audio": {"input": {"transcription": {"model": "gpt-4o-mini-transcribe"},
+               "audio": {"input": {"transcription": {"model": "gpt-4o-mini-transcribe"}, "noise_reduction": {"type": "near_field"},
                                    "turn_detection": {"type": "semantic_vad", "eagerness": eagerness, "interrupt_response": True, "create_response": True}},
                          "output": {"voice": voice}}}
     r = httpx.post(f"{OPENAI_URL}/realtime/client_secrets", headers={"Authorization": f"Bearer {key}"},
@@ -151,6 +194,7 @@ def models() -> dict:
         except (httpx.HTTPError, ValueError, KeyError):
             pass
     v = {"openai": {"ready": bool(openai_key()), "models": oa, "voices": OPENAI_VOICES},
+         "agents": AGENT_NAMES, "voice_gender": VOICE_GENDER,
          "gemini": {"ready": bool(gemini_key()), "models": gm, "voices": GEMINI_VOICES},
          "dialects": [{"code": k, "label": v[0]} for k, v in DIALECTS.items()], "price": PRICE_PER_MIN}
     if openai_key() or gemini_key():
