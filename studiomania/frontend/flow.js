@@ -615,7 +615,7 @@ const Flow = (() => {
       <video class="flw-rv" src="${esc(d.footage?.main?.url || "")}" controls playsinline preload="metadata"></video>
       <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>لا توجد ملاحظات مهمة 👌</b></li>`}</ul>
       ${(r.broll || []).length ? `<h3>🎥 لقطات B-roll تقوّي النص</h3><ul class="flw-bsug">${r.broll.map((b) => `<li>${esc(b.what)}${b.at ? ` <small class="muted">(${esc(b.at)})</small>` : ""}</li>`).join("")}</ul>` : ""}
-      <div class="flw-acts end"><label class="flw-csel">🎭 كوميكس <select data-comics><option value="auto" ${(S.comics || "auto") === "auto" ? "selected" : ""}>إذا كان الفيديو كوميديًا</option><option value="on" ${S.comics === "on" ? "selected" : ""}>دائمًا</option><option value="off" ${S.comics === "off" ? "selected" : ""}>لا</option></select></label><button type="button" class="flw-btn" data-reshoot>🎬 سأنفّذها وأعيد التصوير</button>
+      <div class="flw-acts end"><label class="flw-csel">🎭 كوميكس <select data-comics><option value="auto" ${(S.comics || "auto") === "auto" ? "selected" : ""}>إذا كان الفيديو كوميديًا</option><option value="on" ${S.comics === "on" ? "selected" : ""}>دائمًا</option><option value="off" ${S.comics === "off" ? "selected" : ""}>لا</option></select></label><label class="flw-csel" title="تأثيرات على الشخص نفسه في أقوى لحظات الكلام: كلمة كبيرة خلفه، أو خطوات تكتمل، أو بقعة ضوء…">✨ إفكتات <select data-fxmode><option value="auto" ${(S.fxMode || "auto") === "auto" ? "selected" : ""}>تلقائيًا على أقوى اللحظات</option><option value="off" ${S.fxMode === "off" ? "selected" : ""}>لا</option></select></label><button type="button" class="flw-btn" data-reshoot>🎬 سأنفّذها وأعيد التصوير</button>
         <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>⏭ أكمل إلى المونتاج التلقائي</button></div>`;
   }
   function stMontage(d) {
@@ -628,6 +628,7 @@ const Flow = (() => {
       ${mo.plain ? `<p class="flw-sub">الفيديو كما هو، بمقاس الريلز فقط.</p>` : `<ul class="flw-mrep">
         <li>✂️ أُزيل <b class="num">${rp.cut || 0}</b> ثانية صمت</li><li>🎥 <b class="num">${rp.shots || 1}</b> لقطة بزوايا كاميرا مختلفة (واسعة، قريبة، جانبية…)</li>
         <li>🎨 ضُبطت الألوان تلقائيًا</li>${rp.broll_ai ? `<li>🪄 <b class="num">${rp.broll_ai}</b> لقطة B-roll بالأفاتار (في المكان نفسه)</li>` : ""}${rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll_stock}</b> لقطة ستوك حقيقية فوق النص</li>` : ""}${rp.broll && !rp.broll_ai && !rp.broll_stock ? `<li>🎞️ <b class="num">${rp.broll}</b> لقطة B-roll فوق النص</li>` : ""}${rp.broll_note ? `<li class="muted">⚠️ ${esc(rp.broll_note)}</li>` : ""}${rp.comics ? `<li>🎭 <b class="num">${rp.comics}</b> كوميك عند الإفيهات</li>` : rp.comics === 0 ? `<li class="muted">🎭 لم أجد كوميكس في المكتبة تناسب هذا النص</li>` : ""}
+        ${(ms.effects || []).length ? `<li>✨ <b class="num">${ms.effects.length}</b> إفكت على أقوى اللحظات:<ul class="flw-fx">${ms.effects.map((x, i) => `<li><button type="button" class="flw-chip num" data-seek="${x.start}">⏱ ${secs(x.start)}</button> ${esc(x.name)}${x.text ? ` · «${esc(String(x.text).split("|")[0])}»` : ""} <button type="button" class="flw-link" data-fxdel="${i}" title="احذف هذا الإفكت">✕</button></li>`).join("")}</ul></li>` : rp.effects_note ? `<li class="muted">✨ ${esc(rp.effects_note)}</li>` : ""}
         <li>🔤 التايبوجرافي: ${!rp.typo ? "لا يوجد نص مسموع" : tyBusy ? `⏳ ${esc(ty.step || "جارٍ الإنشاء")}` : ty?.error ? `⚠️ ${esc(ty.error)}` : "✓ جاهز"}</li></ul>`}
       ${done ? `<video class="flw-rv" src="${esc(pj.export_url)}" controls playsinline></video>` : ""}
       ${rendering ? working(`جارٍ تصدير الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
@@ -778,7 +779,8 @@ const Flow = (() => {
     if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
     if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
     if (q("[data-gotwin]")) { S.twins = undefined; close(); return showStep("16"); }
-    if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto" }).then(poll); }
+    if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto", effects: S.fxMode || "auto" }).then(poll); }
+    if ((b = q("[data-fxdel]"))) { try { S.mstate = await api(`/api/flows/${S.d.id}/effects/remove`, { method: "POST", ...J({ index: +b.dataset.fxdel }) }); render(); toast("✓ حُذف الإفكت، وسيختفي في التصدير القادم"); } catch (err) { toast(err.message, true); } return; }
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
@@ -899,6 +901,7 @@ const Flow = (() => {
   }
   async function onChange(e) {
     if (e.target.matches?.("[data-comics]")) { S.comics = e.target.value; return; }
+    if (e.target.matches?.("[data-fxmode]")) { S.fxMode = e.target.value; return; }
     if (e.target.matches?.("[data-casttwin]")) return call("/phone-cast", { twin: e.target.value, bg: "" });
     if (e.target.id === "flwFiles") upload(e.target.files);
     const ph = e.target.dataset?.phup;

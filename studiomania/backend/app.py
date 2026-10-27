@@ -2557,6 +2557,7 @@ class ProjectIn(BaseModel):
     mix: dict = {}              # الصوت: {duck: 0..1 توطية الموسيقى وقت الكلام، normalize: توحيد العلو، enhance: تنضيف التعليق}
     algo: dict = {}             # ⚡ وضع الخوارزمية: {sig, caps, marks: [السكتات/الحشو اللي اتعلّمت بالأحمر للمراجعة]}
     hook_text: str = ""         # الهوك المكتوب على الشاشة لو جاي من الفكرة
+    effects: list | None = None  # ✨ إفكتات على الشخص [{fx, start, end, text...}] بتوقيت المونتاج (None = سيبها زي ما هي)
 
 
 PROJECT_SECTIONS = ("coach", "series", "ads", "free")   # coach = برنامج كوتشي · free = المونتاج الحر في ستوديومانيا
@@ -2669,6 +2670,8 @@ def save_project(project_id: str, body: ProjectIn):
         old = json.loads(get_project(conn, project_id)["data"])
         data["section"] = old.get("section") or "coach"  # القسم مبيتغيرش من الحفظ
         data["hook_text"] = data.get("hook_text") or old.get("hook_text") or ""
+        if data.get("effects") is None:
+            data["effects"] = old.get("effects") or []
         conn.execute(
             "UPDATE projects SET name = ?, data = ?, updated_at = ? WHERE id = ?",
             (data["name"], json.dumps(data), now(), project_id),
@@ -3307,7 +3310,7 @@ def prepend_intro(main: Path, intro: Path) -> float:
     return ii.duration
 
 
-def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: list[Path] | None = None) -> None:
+def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: float, name: str, work_dir: Path, typo_id: str | None = None, base_url: str = "", typo_click_vol: float = 0.0, scene_id: str | None = None, intro: list[Path] | None = None, fx_plan: list | None = None) -> None:
     filename = f"{export_id}.mp4"
     error = None
     RENDER_LOG.write_text("", encoding="utf-8")
@@ -3353,13 +3356,28 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                                         "-map", "[a]", "-c:a", "flac", "-sample_fmt", "s16", str(out)], capture_output=True, timeout=600)
                     if r.returncode == 0:
                         out.replace(mix)
+            if cmd is cmds[-2] and fx_plan:
+                # ✨ الإفكتات على الشخص (قبل التايبوجرافي، والتايبوجرافي بتختفي وقت الإفكت عشان الكلام ميتراكبش)
+                vid = Path(cmd[-1])
+                RENDER_ACTIVE[project_id] = "✨ يرسم الإفكتات"
+                try:
+                    effects.render(ffmpeg_exe(), vid, vid.with_name("video_fx.mp4"), fx_plan, Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")),
+                                   log=log_render)
+                    vid.with_name("video_fx.mp4").replace(vid)
+                    log_render(f"✨ اترسم {len(fx_plan)} إفكت")
+                except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+                    # الإفكت تجميل: لو فشل الفيديو بيكمل من غيره، والسبب في السجل وصندوق الأخطاء
+                    log_render(f"⚠️ الإفكتات اتسابت: {exc}")
+                    issues.record("job", "effects", "رسم الإفكتات فشل", str(exc)[:1500], 0)
+                    fx_plan = None
             if cmd is cmds[-2] and typo_id:
                 # 🔤 طبقة التايبوجرافي (الكلام والعناصر) بتترسم فوق الصورة قبل ما الصوت يتركّب
                 vid = Path(cmd[-1])
                 if typo_has_layer(typo_id):
                     RENDER_ACTIVE[project_id] = "🔤 يرسم التايبوجرافي"
                     typo_overlay(typo_id, vid, vid.with_name("video_t.mp4"), base_url,
-                                 lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🔤 يرسم التايبوجرافي {int(f * 100)}٪"))
+                                 lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🔤 يرسم التايبوجرافي {int(f * 100)}٪"),
+                                 skip=[(float(e["start"]), float(e["end"])) for e in fx_plan or []])
                     vid.with_name("video_t.mp4").replace(vid)
         if project_id in RENDER_CANCELLED:
             error = "ألغيتَ التصدير."
@@ -3463,7 +3481,8 @@ def start_render(conn: sqlite3.Connection, row: sqlite3.Row, project_id: str, da
         sid = None  # المشهد (الخلفية الجديدة والحاجات اللي اتشالت) معمول على 9:16 بس
     intro = [p for p in (coach_intro(data) if data.get("char_intro", True) else None,
                          brand_video("intro", data.get("client_id")) if data.get("brand_intro", True) else None) if p]
-    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro)
+    fxp = [e for e in data.get("effects") or [] if isinstance(e, dict) and e.get("fx") in effects.CATALOG] if effects.available() else []
+    render_executor.submit(run_render, project_id, export_id, cmd, total, row["name"], work_dir, tid, f"http://127.0.0.1:{port}", click, sid, intro, fxp)
     return {"ok": True, "duration": total}
 
 
@@ -4750,6 +4769,7 @@ import playbook  # noqa: E402
 import stylegen  # noqa: E402
 import twin  # noqa: E402
 import phone  # noqa: E402
+import effects  # noqa: E402  (✨ إفكتات الفيديو اللي بيتكلم فيه الشخص: vendor/effects)
 import wallet  # noqa: E402
 
 
@@ -20488,8 +20508,9 @@ def typo_has_layer(tid: str) -> bool:
     return bool(d.get("blocks") or d.get("fx"))  # الكلام أو العناصر الحرة
 
 
-def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) -> None:
-    """النص والعناصر تُرسم فريم فريم (شفافة) وتتركّب أعلى فيديو المونتاج بدون صوت."""
+def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None, skip: list[tuple[float, float]] | None = None) -> None:
+    """النص والعناصر تُرسم فريم فريم (شفافة) وتتركّب أعلى فيديو المونتاج بدون صوت.
+    skip: أوقات من غير تايبوجرافي (وقت الإفكتات اللي على الشخص، عشان الكلام ميتراكبش على بعضه)."""
     from playwright.sync_api import sync_playwright
     d = typo_load(tid)
     doc = typo_doc(tid, d)
@@ -20519,8 +20540,18 @@ def typo_overlay(tid: str, base: Path, out: Path, base_url: str, progress=None) 
                 page.evaluate("window.typoReady")
                 cdp = ctx.new_cdp_session(page)
                 cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
+                blank = None
                 for i in range(n):
-                    page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    t = i / TYPO_FPS
+                    if skip and any(a <= t < b for a, b in skip):
+                        if blank is None:
+                            from PIL import Image  # noqa: PLC0415
+                            buf = io.BytesIO()
+                            Image.new("RGBA", (W, H), (0, 0, 0, 0)).save(buf, "PNG")
+                            blank = buf.getvalue()
+                        proc.stdin.write(blank)
+                        continue
+                    page.evaluate(f"renderAt({t:.4f})")
                     proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", {"format": "png", "optimizeForSpeed": True})["data"]))
                     if progress and i % TYPO_FPS == 0:
                         progress(i / max(1, n))
@@ -29132,7 +29163,32 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
     return overlays, rep
 
 
-def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto", broll_mode: str = "auto") -> None:
+def phone_effects(d: dict, shots: list[tuple[float, float]], words: list[dict], starts: list[tuple[float, float]],
+                  overlays: list[dict], brief: str) -> tuple[list[dict], str]:
+    """✨ العقل بيختار ٢–٥ إفكتات على أقوى لحظات الكلام (بتوقيت المونتاج بعد قص السكتات) ويكتب كلامها بلهجة العميل."""
+    if not effects.available():
+        return [], "الإفكتات غير متاحة على الخادم الآن"
+    tl = []   # الكلام بتوقيت المونتاج: كل لقطة اتقصّت فبنحسب مكان الكلمة فيها
+    for (a, b), (t0, _ln) in zip(shots, starts):
+        tl += [{"w": w["w"], "s": round(t0 + w["s"] - a, 2)} for w in words if a <= w["s"] < b]
+    if not tl:
+        return [], ""
+    dur = sum(ln for _t, ln in starts)
+    busy = [(float(o["t0"]), float(o["t0"]) + float(o.get("dur") or 0)) for o in overlays if o.get("t0") is not None]
+    dia = (onboard_load() or {}).get("dialect") or ""
+    dname = (dub.DIALECTS.get(dia) or {}).get("label", "").split(" ", 1)[-1] if dia else ""
+    if atlas.mock_mode():
+        return effects.clean_plan(effects.mock_plan(tl, dur), dur, busy, tl), ""
+    try:
+        wallet.need(1, "اختيار الإفكتات")
+        raw = hk_chat_json([{"role": "user", "content": effects.plan_prompt(tl, brief, f"لهجة {dname}" if dname else "", dur, busy)}], "اختيار الإفكتات")
+        wallet.charge(1, "تصوير بالجوال: اختيار الإفكتات", d.get("id") or "")
+    except (wallet.NoCredits, RuntimeError, ValueError) as exc:
+        return [], str(exc)[:200]
+    return effects.clean_plan(raw, dur, busy, tl), ""
+
+
+def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto", broll_mode: str = "auto", fx_mode: str = "auto") -> None:
     """🎬 المونتاج التلقائي: قص السكتات، لقطة كل كم ثانية بزاوية كاميرا مختلفة، ألوان متظبطة، B-roll أعلى النص،
     وتايبوجرافي بالكلام نفسه. plain = الفيديو كما هو (بدون مونتاج)."""
     d = flow_load(fid)
@@ -29192,6 +29248,13 @@ def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto"
                 cm = []
             overlays += cm
             report["comics"] = len(cm)
+        fx_plan = []
+        if fx_mode == "auto" and words:
+            brief = (fz.scenario_script(d["scenario"], "reel") if d.get("scenario") else "")[:600] or title
+            fx_plan, note = phone_effects({**d, "id": fid}, shots, words, starts, overlays, brief)
+            report["effects"] = len(fx_plan)
+            if note:
+                report["effects_note"] = note
     data = {"name": f"📱 {title}"[:100], "section": "free", "clips": clips, "overlays": overlays, "outro": False, "brand_intro": True, "brand_outro": True,
             "char_intro": False, "canvas": {"ratio": "9:16", "bg": "#000000"}, "captions": {}, "hook_text": (d.get("idea") or {}).get("hook") or "",
             "mix": {"normalize": True, "enhance": True}}
@@ -29200,6 +29263,7 @@ def phone_build_montage(fid: str, plain: bool = False, comics_mode: str = "auto"
     data = {**ProjectIn(**data).model_dump(), "client_id": active_client_id()}
     for c, cam in zip(data["clips"], cams):
         c["cam"] = cam
+    data["effects"] = [] if plain else fx_plan
     old = (d.get("montage") or {}).get("project_id")
     with closing(db()) as conn, conn:
         if old and conn.execute("SELECT 1 FROM projects WHERE id = ?", (old,)).fetchone():
@@ -29345,6 +29409,7 @@ class PhoneMontageIn(BaseModel):
     plain: bool = False
     comics: str = "auto"   # auto = لو الفيديو كوميدي · on · off
     broll: str = "auto"    # auto = البرنامج بيختار ويعمل لقطات B-roll · off
+    effects: str = "auto"  # auto = العقل بيحط إفكتات على أقوى اللحظات · off
 
 
 @app.post("/api/flows/{fid}/auto-montage")
@@ -29354,7 +29419,7 @@ def flow_phone_montage(fid: str, body: PhoneMontageIn):
     flow_idle(d)
     phone_main_path(d)
     flow_job(fid, "montage", lambda: phone_build_montage(fid, body.plain, body.comics if body.comics in ("auto", "on", "off") else "auto",
-                                                         "off" if body.broll == "off" else "auto"))
+                                                         "off" if body.broll == "off" else "auto", "off" if body.effects == "off" else "auto"))
     return flow_to_dict(fid, flow_load(fid))
 
 
@@ -29377,9 +29442,31 @@ def flow_phone_state(fid: str):
         t = typo_load(tid)
         typo = {"status": t.get("status"), "step": t.get("step"), "busy": t.get("status") in TYPO_BUSY, "error": t.get("error")}
     shots = [{"i": i, "cam": c.get("cam") or "", "start": c.get("start"), "end": c.get("end")} for i, c in enumerate(data.get("clips") or [])]
+    fx = [{**e, "name": effects.CATALOG[e["fx"]][0]} for e in data.get("effects") or [] if isinstance(e, dict) and e.get("fx") in effects.CATALOG]
     return {"shots": shots, "project": {"id": pid, "render_status": pj.get("render_status"), "render_error": pj.get("render_error"),
                         "render_progress": pj.get("render_progress"), "export_url": f"/media/exports/{pj['export_id']}.mp4" if pj.get("export_id") else None},
-            "typo": typo}
+            "typo": typo, "effects": fx}
+
+
+class FlowFxDelIn(BaseModel):
+    index: int
+
+
+@app.post("/api/flows/{fid}/effects/remove")
+def flow_fx_remove(fid: str, body: FlowFxDelIn):
+    """✨ يشيل إفكت واحد من المونتاج التلقائي (بيبان في التصدير الجاي)."""
+    pid = (flow_load(fid).get("montage") or {}).get("project_id")
+    if not pid:
+        raise HTTPException(400, "أنشئ المونتاج التلقائي أولًا")
+    with closing(db()) as conn, conn:
+        data = json.loads(get_project(conn, pid)["data"])
+        fx = list(data.get("effects") or [])
+        if not 0 <= body.index < len(fx):
+            raise HTTPException(400, "هذا الإفكت غير موجود")
+        fx.pop(body.index)
+        data["effects"] = fx
+        conn.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), pid))
+    return flow_phone_state(fid)
 
 
 # ---------------------------------------------------------------- 🏞️ مكتبة محتويات البراند: الخلفيات والأماكن
