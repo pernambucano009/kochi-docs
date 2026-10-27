@@ -150,6 +150,8 @@ body.stage-settled #nh { visibility: hidden; }
 @keyframes nh-s2 { from { stroke-dashoffset: 94; } to { stroke-dashoffset: -906; } }
 @keyframes nh-s3 { from { stroke-dashoffset: 264; } to { stroke-dashoffset: -736; } }
 .nh-tile:hover > .nh-snake, .nh-tile:focus-visible > .nh-snake { opacity: 1; }
+/* الأزرار اللي على الجنب أيقونة من غير إطار: النور اللي بيلف حوالين الإطار كان بيبان نقطة ماشية تحت الأيقونة */
+.nh-tile.nh-side > .nh-snake { display: none; }
 .nh-tile:has(.nh-tile:hover, .nh-line:hover) > .nh-snake { opacity: .18; }
 .nh-sweep > .nh-snake { opacity: 1; transition: opacity .9s ease .9s; }
 .nh-sweep > .nh-snake rect { animation-duration: 1.1s; animation-iteration-count: 1; }

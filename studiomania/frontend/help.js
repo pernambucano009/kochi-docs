@@ -4,7 +4,7 @@ const Help = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   const S = { open: false, msgs: [], busy: false, names: {} };
   const CSS = `
-.hp-fab{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));right:calc(22px + env(safe-area-inset-right,0px));z-index:80;width:52px;height:52px;border-radius:50%;border:0;background:var(--nh-ink, var(--text, #181718));color:var(--nh-bg,#fff);display:grid;place-items:center;cursor:pointer;box-shadow:0 14px 30px -10px rgba(24,23,24,.5);transition:transform .2s}
+.hp-fab{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));right:calc(22px + env(safe-area-inset-right,0px));z-index:80;width:52px;height:52px;border-radius:50%;border:0;background:var(--nh-ink, var(--text, #181718));color:var(--nh-bg, var(--bg, #fff));display:grid;place-items:center;cursor:pointer;box-shadow:0 14px 30px -10px rgba(24,23,24,.5);transition:transform .2s}
 .hp-fab:hover{box-shadow:0 18px 36px -10px rgba(24,23,24,.6)}
 .hp-fab::before{content:"";position:absolute;inset:-10px;border-radius:50%}
 .hp-fab .fx-snake{color:var(--nh-accent, var(--accent))}
@@ -23,7 +23,7 @@ const Help = (() => {
 .hp-x{border:0;background:none;font-size:16px;color:var(--nh-muted, var(--muted, #6B6B67));cursor:pointer;padding:4px}
 .hp-log{flex:1;overflow:auto;padding:4px 18px 10px;display:flex;flex-direction:column;gap:10px}
 .hp-m{max-width:88%;font-size:13.5px;line-height:1.75;white-space:pre-line;padding:9px 13px;border-radius:16px}
-.hp-m.me{align-self:flex-start;background:var(--nh-ink, var(--text, #181718));color:var(--nh-bg,#fff);border-bottom-right-radius:4px}
+.hp-m.me{align-self:flex-start;background:var(--nh-ink, var(--text, #181718));color:var(--nh-bg, var(--bg, #fff));border-bottom-right-radius:4px}
 .hp-m.ai{align-self:flex-end;background:var(--nh-bg,#F3F2EF);border-bottom-left-radius:4px}
 .hp-sug{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 8px}
 .hp-sug button{border:0;background:var(--nh-bg,#F3F2EF);color:var(--nh-ink, var(--text, #181718));font:inherit;font-size:12.5px;padding:6px 12px;border-radius:999px;cursor:pointer}

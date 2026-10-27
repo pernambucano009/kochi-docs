@@ -315,8 +315,12 @@ const Assistant = (() => {
   async function run(force, el) {
     try { state = await api("/api/assistant"); } catch { return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
-    if (!state?.ready || (!forced && (state.done || !state.new))) return false;
-    if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return false; } catch { /* التخزين مقفول أو قيمة قديمة */ }
+    // 🚨 عميل جديد والمساعدة ماطلعتلوش: السبب بيروح صندوق الأخطاء (عشان نعرف من غير ما حد يبلّغ)
+    const miss = (why) => { if (state?.new && !state?.done) fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); return false; };
+    if (!state?.ready) return miss(`not ready: ${state?.why || "?"}`);
+    if (!forced && (state.done || !state.new)) return false;
+    if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }
     from = el || document.querySelector('[data-n="quiz"]');
     dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
     await new Promise((res) => { S_done = res; call(); });

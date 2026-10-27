@@ -3150,6 +3150,7 @@ window.I18N_EN = {
   "لا يوجد اشتراك فعّال": "No active subscription",
   "للأدمن فقط": "Admins only",
   "للمشرف فقط": "Admins only",
+  "المساعدة الصوتية لم تظهر لعميل جديد": "The voice assistant did not open for a new customer",
   "🗑️ احذف حسابي نهائيًا": "🗑️ Delete my account permanently",
   "سيُحذف حسابك وكل علاماتك وفيديوهاتك وملفاتك نهائيًا، ويُلغى اشتراكك، ولا يمكن استرجاع أي شيء. للتأكيد اكتب كلمة: احذف": "Your account and all your brands, videos and files will be deleted permanently, and your subscription cancelled. Nothing can be restored. To confirm, type: DELETE",
   "لم يُحذف شيء: اكتب كلمة «احذف» بالضبط للتأكيد": "Nothing was deleted: type DELETE exactly to confirm",
