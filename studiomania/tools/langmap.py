@@ -182,7 +182,7 @@ def sources():
 
 # الكود اللي بيعرض الكلام نفسه للعميل بالإنجليزي من غير القاموس (التطبيق عربي بس، والإنجليزي جوه الصفحة نفسها)
 NO_EN = ("mobile", "content")
-OWN_EN = ("frontend/welcome.html", "frontend/welcome-m.html", "frontend/inspect.html", "frontend/privacy.html", "frontend/terms.html", "frontend/refund.html")
+OWN_EN = ("frontend/welcome.html", "frontend/welcome-m.html", "frontend/inspect.html", "frontend/voicelive.html", "frontend/privacy.html", "frontend/terms.html", "frontend/refund.html")
 # كلام بيترسم جوه الفيديو نفسه (التايبوجرافي): محتوى بلهجة العميل، مش واجهة
 CONTENT_FILES = ("frontend/typo-studio.js", "frontend/typo-moments.js", "frontend/typo-engine.js")
 CODE = re.compile(r";\s*return\b|=>|\bfunction\b|P\.k_|\bconst\s|\}\s*\)|[{};]\s*$")

@@ -23,7 +23,7 @@ SETTING_KEYS = {"atlas": "ATLASCLOUD_API_KEY", "zernio": "ZERNIO_API_KEY", "scra
                 "resend": "RESEND_API_KEY", "smtp_pass": "SMTP_PASS", "paypal_id": "PAYPAL_CLIENT_ID", "paypal_secret": "PAYPAL_SECRET", "paypal_hook": "PAYPAL_WEBHOOK_ID",
                 "eleven": "ELEVENLABS_API_KEY", "minimax": "MINIMAX_API_KEY", "silma": "SILMA_API_KEY", "recraft": "RECRAFT_API_KEY",
                 "google_id": "GOOGLE_CLIENT_ID", "google_secret": "GOOGLE_CLIENT_SECRET",
-                "authentica": "AUTHENTICA_API_KEY"}
+                "authentica": "AUTHENTICA_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
 BASIC_KEYS = ("atlas", "zernio", "scrape", "pexels")
 
 

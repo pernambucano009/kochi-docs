@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مختبر الصوت المباشر · الأدمن</title>
+<link rel="icon" href="/icon-32.png">
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #1d1d1f; --mute: #6b6b70; --line: #e4e2dc; --acc: #e8590c; --ok: #2b8a3e; --bad: #c92a2a; --soft: #fff4e6; --orb1: #ff8a3d; --orb2: #e8590c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141416; --card: #1d1d20; --ink: #ececef; --mute: #9a9aa2; --line: #2c2c31; --soft: #2a1f14; } }
+  * { box-sizing: border-box; } [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.6 system-ui, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--ink); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; } header a { color: var(--mute); text-decoration: none; font-size: 13px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .mute { color: var(--mute); font-size: 13px; }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--mute); min-width: 150px; flex: 1; }
+  select, input, textarea { font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+  .btn.pri { background: var(--acc); border-color: var(--acc); color: #fff; } .btn:disabled { opacity: .5; cursor: default; }
+  .stage { display: grid; grid-template-columns: minmax(260px, 380px) 1fr; gap: 16px; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+  .orbbox { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 360px; background: radial-gradient(circle at 50% 45%, #2a1a10, #0d0d0f 70%); border-radius: 14px; color: #fff; position: relative; overflow: hidden; }
+  .orb { width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #fff3e6 0%, var(--orb1) 30%, var(--orb2) 65%, #6b2203 100%);
+    box-shadow: 0 0 60px 10px rgba(255, 120, 40, .45); transition: transform .08s linear, box-shadow .2s, filter .3s; filter: saturate(.6) brightness(.8); }
+  .orb.live { filter: none; animation: breathe 3.2s ease-in-out infinite; }
+  .orb.user { box-shadow: 0 0 80px 18px rgba(255, 255, 255, .35); }
+  @keyframes breathe { 50% { box-shadow: 0 0 90px 20px rgba(255, 120, 40, .55); } }
+  .orbbox .st { font-size: 14px; opacity: .85; } .orbbox .lat { font-size: 13px; opacity: .7; direction: ltr; }
+  .tx { height: 360px; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px; }
+  .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14px; unicode-bidi: plaintext; white-space: pre-wrap; }
+  .msg.a { background: var(--soft); align-self: flex-start; } .msg.u { background: var(--bg); border: 1px solid var(--line); align-self: flex-end; }
+  .msg small { display: block; color: var(--mute); font-size: 11px; }
+  .stars button { font-size: 22px; background: none; border: 0; cursor: pointer; color: var(--line); padding: 0 2px; } .stars button.on { color: #f5a524; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; } th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: start; vertical-align: top; }
+  th { color: var(--mute); font-weight: 600; } .ltr { direction: ltr; text-align: left; } .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .err { color: var(--bad); font-size: 13px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header><h1>🎙️ مختبر الصوت المباشر</h1><a href="/admin/inspect">← لوحة الفحص</a><a href="/">البرنامج</a></header>
+<main>
+  <div class="card">
+    <p class="mute" style="margin-top:0">جرّب المساعد الذي سيكلّم العميل أول ما يسجّل: اختر اللهجة والنموذج والصوت، واضغط «ابدأ المكالمة»، وتكلّم معه طبيعيًا وقاطِعه.
+      نقيس سرعة الرد في كل دور (من آخر كلمة قلتها حتى أول صوت منه). بعد كل مكالمة قيّمها بالنجوم وهل اللهجة صحيحة، والنتيجة تظهر في الأسفل لكل لهجة.
+      يحتاج إلى مفتاحَي OpenAI وGemini في ⚙️ الإعدادات ← بقية مفاتيح المنصة.</p>
+    <div class="row">
+      <label class="f">اللهجة<select id="dia"></select></label>
+      <label class="f">المزوّد<select id="prov"><option value="openai">OpenAI (Realtime)</option><option value="gemini">Gemini Live</option></select></label>
+      <label class="f">النموذج<select id="model"></select></label>
+      <label class="f">الصوت<select id="voice"></select></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">اسم المساعد<input id="agent" value="إيرل"></label>
+      <label class="f">اسم العميل في التجربة<input id="who" value="محمود"></label>
+      <label class="f" id="eagerBox">سرعة أخذ الدور<select id="eager"><option value="auto">تلقائي</option><option value="high">سريع (يرد بعد أقل وقفة)</option><option value="medium">متوسط</option><option value="low">صبور (ينتظر أكثر)</option></select></label>
+    </div>
+    <p class="err" id="err"></p>
+  </div>
+
+  <div class="stage">
+    <div class="orbbox">
+      <div class="orb" id="orb"></div>
+      <div class="st" id="st">اضغط «ابدأ المكالمة»</div>
+      <div class="lat" id="lat"></div>
+      <div class="row" style="justify-content:center"><button class="btn pri" id="go">▶ ابدأ المكالمة</button><button class="btn" id="stop" disabled>⏹ أنهِ</button></div>
+    </div>
+    <div class="card" style="margin:0"><div class="tx" id="tx"><p class="mute">سيظهر الكلام هنا مكتوبًا أثناء المكالمة.</p></div></div>
+  </div>
+
+  <div class="card" id="rate" hidden>
+    <h3 style="margin-top:0">قيّم المكالمة</h3>
+    <div class="row">
+      <span>الجودة العامة:</span><span class="stars" id="stars"></span>
+      <span>هل اللهجة صحيحة؟</span>
+      <label><input type="radio" name="dok" value="1"> نعم</label><label><input type="radio" name="dok" value="0"> لا</label>
+    </div>
+    <p class="mute" id="rateInfo"></p>
+    <textarea id="notes" rows="2" style="width:100%" placeholder="ملاحظاتك: النطق، كلمات خارج اللهجة، التأخير، المقاطعة…"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn pri" id="save">💾 احفظ التقييم</button></div>
+  </div>
+
+  <div class="card"><h3 style="margin-top:0">النتيجة لكل لهجة</h3>
+    <table><thead><tr><th>اللهجة</th><th>النموذج</th><th>الصوت</th><th>التجارب</th><th>النجوم</th><th>اللهجة صحيحة</th><th>سرعة الرد (الوسيط)</th></tr></thead><tbody id="sum"></tbody></table></div>
+  <div class="card"><h3 style="margin-top:0">كل التجارب</h3>
+    <table><thead><tr><th>الوقت</th><th>اللهجة</th><th>النموذج</th><th>الصوت</th><th>النجوم</th><th>اللهجة</th><th>الرد</th><th>المدة</th><th>ملاحظات</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same-origin", ...o, headers: { "content-type": "application/json", ...(o.headers || {}) } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j; };
+let CFG = null, S = null, last = null, stars = 0;
+const DLAB = {};
+const remember = (k, v) => { try { localStorage.setItem("vlive:" + k, v); } catch {} };
+const recall = (k) => { try { return localStorage.getItem("vlive:" + k); } catch { return null; } };
+
+async function boot() {
+  try { CFG = await api("/api/platform/live/config"); } catch (e) { $("err").textContent = e.message; return; }
+  CFG.dialects.forEach((d) => (DLAB[d.code] = d.label));
+  $("dia").innerHTML = CFG.dialects.map((d) => `<option value="${d.code}">${esc(d.label)}</option>`).join("");
+  for (const k of ["dia", "prov", "agent", "who", "eager"]) { const v = recall(k); if (v != null) $(k).value = v; }
+  fillProv();
+  const notReady = ["openai", "gemini"].filter((p) => !CFG[p].ready);
+  if (notReady.length) $("err").textContent = "⚠️ مفتاح " + notReady.map((p) => (p === "openai" ? "OpenAI" : "Gemini")).join(" و") + " غير مسجل بعد: ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة.";
+  loadResults();
+}
+function fillProv() {
+  const p = CFG[$("prov").value];
+  $("model").innerHTML = p.models.map((m) => `<option>${esc(m)}</option>`).join("");
+  $("voice").innerHTML = p.voices.map((m) => `<option>${esc(m)}</option>`).join("");
+  const pm = recall("model:" + $("prov").value), pv = recall("voice:" + $("prov").value);
+  if (pm && p.models.includes(pm)) $("model").value = pm;
+  if (pv && p.voices.includes(pv)) $("voice").value = pv;
+  $("eagerBox").hidden = $("prov").value !== "openai";
+}
+$("prov").onchange = () => { remember("prov", $("prov").value); fillProv(); };
+for (const k of ["dia", "agent", "who", "eager"]) $(k).onchange = () => remember(k, $(k).value);
+$("model").onchange = () => remember("model:" + $("prov").value, $("model").value);
+$("voice").onchange = () => remember("voice:" + $("prov").value, $("voice").value);
+
+// ---------- النص المكتوب أثناء المكالمة
+function bubble(who) { const tx = $("tx"); if (tx.querySelector("p.mute")) tx.innerHTML = ""; const d = document.createElement("div"); d.className = "msg " + who; tx.appendChild(d); tx.scrollTop = tx.scrollHeight; return d; }
+function say(who, text, append) {
+  if (!text) return;
+  let b = who === "a" ? S.aBub : S.uBub;
+  if (!append || !b) { b = bubble(who); if (who === "a") S.aBub = b; else S.uBub = b; b.textContent = ""; }
+  b.textContent += text; $("tx").scrollTop = $("tx").scrollHeight;
+}
+function endTurn(who) { if (who === "a") S.aBub = null; else S.uBub = null; }
+
+// ---------- القياس: مستوى صوتك وصوت المساعد (لسرعة الرد والدايرة)
+function meter(ctx, node) { const a = ctx.createAnalyser(); a.fftSize = 512; node.connect(a); const buf = new Float32Array(a.fftSize); return () => { a.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }; }
+function loop() {
+  if (!S) return;
+  const now = performance.now(), mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
+  S.noise = Math.min(Math.max(S.noise * 0.995 + mu * 0.005, 0.002), 0.05);
+  const userTalk = mu > Math.max(0.02, S.noise * 3), agentTalk = ag > 0.012;
+  if (userTalk) { if (!S.uOn) S.uStart = now; S.uOn = true; S.lastLoud = now; S.wait = true; }
+  else if (S.uOn && now - S.lastLoud > 250) { S.uOn = false; S.userMs += now - S.uStart; }
+  if (agentTalk) {
+    if (!S.aOn) {
+      S.aStart = now;
+      if (S.wait && S.lastLoud) { const l = Math.round(now - S.lastLoud); if (l > 0 && l < 15000) { S.lat.push(l); $("lat").textContent = `آخر رد: ${(l / 1000).toFixed(2)} ث · الوسيط: ${(median(S.lat) / 1000).toFixed(2)} ث`; } }
+      else if (S.greet == null) { S.greet = Math.round(now - S.t0); $("lat").textContent = `الترحيب بدأ بعد ${(S.greet / 1000).toFixed(2)} ث`; }
+      S.wait = false;
+    }
+    S.aOn = true; S.aLast = now;
+  } else if (S.aOn && now - S.aLast > 300) { S.aOn = false; S.agentMs += now - S.aStart; }
+  const lv = Math.min(1, (S.aOn ? ag * 6 : 0) + (userTalk ? mu * 3 : 0));
+  $("orb").style.transform = `scale(${1 + lv * 0.35})`;
+  $("orb").classList.toggle("user", userTalk && !S.aOn);
+  $("st").textContent = S.aOn ? "🔊 يتكلم…" : userTalk ? "🎤 يسمعك…" : "● يستمع";
+  if (now - S.t0 > 10 * 60 * 1000) return stop("انتهت المدة القصوى للتجربة (١٠ دقائق)");
+  requestAnimationFrame(loop);
+}
+const median = (a) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+
+// ---------- OpenAI Realtime (WebRTC: الصوت رايح جاي على طول من غير السيرفر)
+async function startOpenAI(tok, mic) {
+  const pc = new RTCPeerConnection(); S.pc = pc;
+  const el = new Audio(); el.autoplay = true; S.el = el;
+  pc.ontrack = (e) => { el.srcObject = e.streams[0]; S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0])); };
+  pc.addTrack(mic.getTracks()[0], mic);
+  const dc = pc.createDataChannel("oai-events"); S.dc = dc;
+  dc.onopen = () => dc.send(JSON.stringify({ type: "response.create" }));   // المساعد يبدأ بالترحيب
+  dc.onmessage = (m) => {
+    let e; try { e = JSON.parse(m.data); } catch { return; }
+    if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") say("a", e.delta, true);
+    else if (e.type === "response.output_audio_transcript.done" || e.type === "response.audio_transcript.done") endTurn("a");
+    else if (e.type === "conversation.item.input_audio_transcription.completed") { say("u", e.transcript); endTurn("u"); }
+    else if (e.type === "input_audio_buffer.speech_started" && S.aOn) S.interrupts++;
+    else if (e.type === "error") $("err").textContent = "OpenAI: " + (e.error?.message || JSON.stringify(e.error || e));
+  };
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+  const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
+  if (!r.ok) throw new Error("OpenAI: " + r.status + " " + (await r.text()).slice(0, 300));
+  await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
+}
+
+// ---------- Gemini Live (WebSocket: صوتك 16kHz رايح، وصوته 24kHz راجع)
+const WORKLET = `class P extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor("pcm-cap",P);`;
+function b64pcm(f32) { const b = new Int16Array(f32.length); for (let i = 0; i < f32.length; i++) { const v = Math.max(-1, Math.min(1, f32[i])); b[i] = v < 0 ? v * 0x8000 : v * 0x7fff; } let s = ""; const u = new Uint8Array(b.buffer); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+function pcmFrom64(b64) { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const i16 = new Int16Array(u.buffer, 0, u.length >> 1), f = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) f[i] = i16[i] / 0x8000; return f; }
+async function startGemini(tok, mic, instr) {
+  const cap = new AudioContext({ sampleRate: 16000 }); S.cap = cap;
+  await cap.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+  const src = cap.createMediaStreamSource(mic), node = new AudioWorkletNode(cap, "pcm-cap"); src.connect(node);
+  const out = new AudioContext({ sampleRate: 24000 }); S.out = out;
+  const gain = out.createGain(); gain.connect(out.destination); S.outLevel = meter(out, gain);
+  S.queue = []; S.next = 0;
+  const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tok.value)}`;
+  const ws = new WebSocket(url); S.ws = ws;
+  let pend = [], pendN = 0, ready = false;
+  node.port.onmessage = (e) => {
+    if (!ready || ws.readyState !== 1) return;
+    pend.push(e.data); pendN += e.data.length;
+    if (pendN >= 640) { const f = new Float32Array(pendN); let o = 0; for (const p of pend) { f.set(p, o); o += p.length; } pend = []; pendN = 0;
+      ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64pcm(f), mimeType: "audio/pcm;rate=16000" } } })); }
+  };
+  const flush = () => { for (const s of S.queue) try { s.stop(); } catch {} S.queue = []; S.next = 0; };
+  await new Promise((res, rej) => {
+    ws.onerror = () => rej(new Error("تعذّر الاتصال بـ Gemini Live"));
+    ws.onclose = (e) => { if (!ready) rej(new Error(`Gemini أغلق الاتصال: ${e.code} ${e.reason || ""}`)); else if (S) stop(e.reason ? "Gemini: " + e.reason : ""); };
+    ws.onopen = () => ws.send(JSON.stringify({ setup: {
+      model: "models/" + $("model").value,
+      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: $("voice").value } } } },
+      systemInstruction: { parts: [{ text: instr }] }, inputAudioTranscription: {}, outputAudioTranscription: {} } }));
+    ws.onmessage = async (m) => {
+      let e; try { e = JSON.parse(typeof m.data === "string" ? m.data : await m.data.text()); } catch { return; }
+      if (e.setupComplete) { ready = true; ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "ابدأ المكالمة الآن بالترحيب." }] }], turnComplete: true } })); res(); return; }
+      const sc = e.serverContent; if (!sc) { if (e.error) $("err").textContent = "Gemini: " + JSON.stringify(e.error); return; }
+      if (sc.interrupted) { flush(); S.interrupts++; endTurn("a"); }
+      for (const p of sc.modelTurn?.parts || []) {
+        if (!p.inlineData?.data) continue;
+        const f = pcmFrom64(p.inlineData.data), buf = out.createBuffer(1, f.length, 24000); buf.copyToChannel(f, 0);
+        const s = out.createBufferSource(); s.buffer = buf; s.connect(gain);
+        const t = Math.max(out.currentTime + 0.02, S.next); s.start(t); S.next = t + buf.duration; S.queue.push(s);
+        s.onended = () => (S && (S.queue = S.queue.filter((x) => x !== s)));
+      }
+      if (sc.inputTranscription?.text) say("u", sc.inputTranscription.text, true);
+      if (sc.outputTranscription?.text) { endTurn("u"); say("a", sc.outputTranscription.text, true); }
+      if (sc.turnComplete) endTurn("a");
+    };
+  });
+}
+
+// ---------- بدء وإنهاء
+$("go").onclick = async () => {
+  $("err").textContent = ""; $("rate").hidden = true; $("go").disabled = true; $("st").textContent = "⏳ جارٍ الاتصال…";
+  const prov = $("prov").value;
+  try {
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    S = { prov, model: $("model").value, voice: $("voice").value, dialect: $("dia").value, mic, t0: performance.now(), lat: [], greet: null, interrupts: 0, userMs: 0, agentMs: 0, noise: 0.01 };
+    S.ctx = new AudioContext(); S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+    const tok = await api("/api/platform/live/token", { method: "POST", body: JSON.stringify({ provider: prov, model: S.model, voice: S.voice, dialect: S.dialect, agent: $("agent").value, user: $("who").value, eagerness: $("eager").value }) });
+    $("tx").innerHTML = "";
+    if (prov === "openai") await startOpenAI(tok, mic); else await startGemini(tok, mic, tok.instructions);
+    $("orb").classList.add("live"); $("stop").disabled = false; S.t0 = performance.now(); requestAnimationFrame(loop);
+  } catch (e) { $("err").textContent = e.message || String(e); stop(); }
+};
+$("stop").onclick = () => stop();
+function stop(why) {
+  if (!S) return;
+  const s = S; S = null;
+  try { s.dc?.close(); s.pc?.close(); s.ws?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); s.cap?.close(); s.out?.close(); if (s.el) s.el.srcObject = null; } catch {}
+  $("orb").classList.remove("live", "user"); $("orb").style.transform = ""; $("go").disabled = false; $("stop").disabled = true; $("st").textContent = why || "انتهت المكالمة";
+  const secs = Math.round((performance.now() - s.t0) / 1000);
+  if (secs < 5) return;
+  const pk = s.prov === "openai" && /mini/.test(s.model) ? "openai-mini" : s.prov, pr = CFG.price[pk] || [0, 0];
+  const cost = +((s.userMs / 60000) * pr[0] + (s.agentMs / 60000) * pr[1] + (secs / 60) * pr[0] * 0.3).toFixed(3);
+  last = { provider: s.prov, model: s.model, voice: s.voice, dialect: s.dialect, latency_ms: s.lat.length ? median(s.lat) : null, latencies: s.lat, greet_ms: s.greet, seconds: secs, interrupts: s.interrupts, cost };
+  $("rateInfo").textContent = `${DLAB[s.dialect]} · ${s.model} · ${s.voice} · المدة ${secs} ث · سرعة الرد (الوسيط) ${last.latency_ms ? (last.latency_ms / 1000).toFixed(2) + " ث" : "—"} في ${s.lat.length} دور · المقاطعات ${s.interrupts} · التكلفة التقديرية نحو $${cost}`;
+  stars = 0; drawStars(); $("notes").value = ""; document.querySelectorAll("[name=dok]").forEach((r) => (r.checked = false)); $("rate").hidden = false;
+}
+function drawStars() { $("stars").innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" class="${n <= stars ? "on" : ""}" data-s="${n}">★</button>`).join(""); }
+$("stars").onclick = (e) => { const b = e.target.closest("[data-s]"); if (b) { stars = +b.dataset.s; drawStars(); } };
+$("save").onclick = async () => {
+  if (!last) return;
+  const dok = document.querySelector("[name=dok]:checked");
+  if (!stars || !dok) return alert("اختر عدد النجوم وهل اللهجة صحيحة.");
+  try { await api("/api/platform/live/results", { method: "POST", body: JSON.stringify({ ...last, stars, dialect_ok: dok.value === "1", notes: $("notes").value.trim() }) }); $("rate").hidden = true; last = null; loadResults(); }
+  catch (e) { alert(e.message); }
+};
+
+async function loadResults() {
+  const d = await api("/api/platform/live/results").catch(() => null); if (!d) return;
+  const sec = (ms) => (ms ? (ms / 1000).toFixed(2) + " ث" : "—");
+  $("sum").innerHTML = d.summary.map((r) => `<tr><td>${esc(DLAB[r.dialect] || r.dialect)}</td><td class="ltr">${esc(r.model)}</td><td class="ltr">${esc(r.voice)}</td><td>${r.n}</td>
+    <td>${r.stars ?? "—"}</td><td class="${r.dialect_ok >= 80 ? "ok" : r.dialect_ok != null ? "bad" : ""}">${r.dialect_ok != null ? r.dialect_ok + "٪" : "—"}</td><td>${sec(r.latency_ms)}</td></tr>`).join("") || `<tr><td colspan="7" class="mute">لا توجد تجارب بعد.</td></tr>`;
+  $("rows").innerHTML = d.rows.map((r) => `<tr><td class="mute">${new Date(r.at * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" })}</td><td>${esc(DLAB[r.dialect] || r.dialect)}</td>
+    <td class="ltr">${esc(r.model)}</td><td class="ltr">${esc(r.voice)}</td><td>${"★".repeat(r.stars || 0)}</td><td class="${r.dialect_ok ? "ok" : "bad"}">${r.dialect_ok ? "صحيحة" : "خطأ"}</td>
+    <td>${sec(r.latency_ms)}</td><td>${r.seconds || 0} ث</td><td>${esc(r.notes)}</td><td><button class="btn" data-del="${r.id}" title="احذف">🗑</button></td></tr>`).join("");
+}
+$("rows").onclick = async (e) => { const b = e.target.closest("[data-del]"); if (b && confirm("هل تحذف هذه التجربة؟")) { await api("/api/platform/live/results/" + b.dataset.del, { method: "DELETE" }).catch(() => {}); loadResults(); } };
+boot();
+</script>
+</body>
+</html>

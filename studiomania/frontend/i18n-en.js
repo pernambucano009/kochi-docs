@@ -14948,4 +14948,10 @@ window.I18N_EN = {
   "مثلًا: لقطات المشهد 5 أسرع، والإضاءة دافئة": "e.g. faster shots in scene 5, and warm lighting",
   "ومع الشروط الأساسية (●) يفهمك العقل وتُنشأ خطة المحتوى تلقائيًا.": "plus the core conditions (●), the brain understands you and the content plan is created automatically.",
   "مثلًا: قطّع الفيديو الذي في مجلد «لايفات» إلى مقاطع أقصر من ١٥ ثانية، وولّد كل مقطع بأسلوب كرتوني، واجمعها، وأضف موسيقى وتعليقًا نصيًا، وانتظر موافقتي قبل النشر": "e.g. cut the video in the «Lives» folder into clips under 15 seconds, generate each clip in a cartoon style, put them together, add music and captions, and wait for my approval before publishing",
+  "المراجعة تعمل الآن، انتظر حتى تنتهي": "The review is running now, wait until it finishes",
+  "مزوّد غير معروف": "Unknown provider",
+  "مفتاح OpenAI": "OpenAI key",
+  "مفتاح Gemini": "Gemini key",
+  "الصوت المباشر (مختبر المساعد)": "Live voice (assistant lab)",
+  "الرد": "Response",
 };

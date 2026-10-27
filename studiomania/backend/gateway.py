@@ -42,6 +42,7 @@ import fieldpacks
 import mailer
 import payments
 import appauth
+import livevoice
 import phoneauth
 
 BACKEND = Path(__file__).resolve().parent
@@ -1886,6 +1887,69 @@ def admin_inspect_page(request: Request):
     if not u or u["role"] != "admin":
         return RedirectResponse("/login")
     return page("inspect.html")
+
+
+# ---------------------------------------------------------------- 🎙️ مختبر الصوت المباشر (livevoice.py): المساعد اللي بيكلّم العميل لايف
+@app.get("/admin/live")
+def admin_live_page(request: Request):
+    u = current_user(request)
+    if not u or u["role"] != "admin":
+        return RedirectResponse("/login")
+    return page("voicelive.html")
+
+
+@app.get("/api/platform/live/config")
+def live_config(request: Request):
+    admin(request)
+    return livevoice.models()
+
+
+class LiveTokenIn(BaseModel):
+    provider: str
+    model: str = ""
+    voice: str = ""
+    dialect: str = "ar-eg-cairo"
+    agent: str = "إيرل"
+    user: str = ""
+    eagerness: str = "auto"
+
+
+@app.post("/api/platform/live/token")
+def live_token(request: Request, body: LiveTokenIn):
+    u = admin(request)
+    who = body.user.strip() or (u["name"] if "name" in u.keys() and u["name"] else "") or "محمود"
+    instr = livevoice.instructions(body.dialect, body.agent.strip() or "إيرل", who)
+    try:
+        if body.provider == "openai":
+            tok = livevoice.openai_secret(body.model or livevoice.OPENAI_MODELS[0], body.voice or "marin", instr,
+                                          body.eagerness if body.eagerness in ("low", "medium", "high", "auto") else "auto")
+        elif body.provider == "gemini":
+            tok = livevoice.gemini_token()
+        else:
+            raise HTTPException(400, "مزوّد غير معروف")
+    except livevoice.LiveError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {**tok, "instructions": instr}
+
+
+@app.get("/api/platform/live/results")
+def live_results(request: Request):
+    admin(request)
+    rows = livevoice.results(DATA_DIR)
+    return {"rows": rows[-300:][::-1], "summary": livevoice.summary(rows)}
+
+
+@app.post("/api/platform/live/results")
+def live_result_add(request: Request, body: dict):
+    admin(request)
+    return livevoice.save_result(DATA_DIR, body)
+
+
+@app.delete("/api/platform/live/results/{rid}")
+def live_result_del(request: Request, rid: str):
+    admin(request)
+    livevoice.delete_result(DATA_DIR, rid)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- كل الباقي بيروح لنسخة البرنامج بتاعة العميل
