@@ -110,6 +110,11 @@ TOOLS = [
                     "required": ["account"]}},
     {"type": "function", "name": "get_account_analysis", "description": "Check whether the account analysis is ready and get its main findings.",
      "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
+     "Call it in the SAME turn you ask for it.",
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro"],
+         "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
+                        "intro: a short video that opens their videos."}}, "required": ["kind"]}},
     {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
      "parameters": {"type": "object", "properties": {}}},
 ]
@@ -134,9 +139,11 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
         qs += "\nAlready known from signup (do not ask these again):\n" + kn
     tool_txt = ("""
 Tools (use them silently, never read them out loud):
-- After each answer, call save_answer with the question id in [brackets] and the answer. If one answer covers several questions,
-  save each one. Keep talking naturally while it saves.
-- As soon as the user gives their account, call start_account_analysis with it.
+- After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
+  the next question. If one answer covers several questions, save each one.
+- Whenever you ask for the account, the logo, product photos or the intro video, call show_input with that kind in the same turn,
+  and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
+- As soon as the user gives their account (by voice or in the box), call start_account_analysis with it.
 - After the last question, call get_account_analysis. If it is ready, tell the user 2–3 short, specific findings from it in the dialect.
   If it is not ready yet, tell them the results will appear on their screen in a few minutes.
 - Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")
@@ -151,10 +158,15 @@ Follow this order:
    and the results are ready by the end of the chat. When they give it, thank them in a few words and move on.
 3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):
 {qs}
-4. When done, thank them and tell them you are preparing what you found.
+4. Then ask them to upload their logo, and after that a few photos of their products or work, one request per turn
+   (if they say later or have none, move on without insisting).
+5. When done, thank them and tell them you are preparing what you found.
 {tool_txt}
 Rules:
-- Keep every turn to 1–2 short sentences. React to each answer in a few words before the next question.
+- Turn-taking (very important): every turn is 1–2 short sentences with exactly ONE question, then STOP talking and wait for the
+  user's reply. Never ask the next question, and never say anything more, before the user has answered. A tool result alone is never
+  a reason to speak again (except get_account_analysis at the end).
+- React to each answer in a few words before the next question.
 - If the user interrupts, stop and listen. If they go off-topic, answer briefly and come back to the next question.
 - Only use facts the user actually said. Never assume a business, product or detail they did not say, and never mix in an example
   as if it were theirs. If you did not hear clearly, ask them to repeat it, without guessing alternatives.

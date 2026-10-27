@@ -32619,7 +32619,7 @@ def assistant_state(request: Request):
     dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
-    return {"ready": bool(bid and livevoice.openai_key()), "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
+    return {"ready": bool(bid and livevoice.openai_key()), "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None}

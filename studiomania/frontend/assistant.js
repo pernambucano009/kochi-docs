@@ -9,7 +9,7 @@ const Assistant = (() => {
 .as-ov.on{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .as-ov>:not(.as-in){opacity:0;transition:opacity .45s}
 .as-ov.on>:not(.as-in){opacity:1;transition:opacity .7s .55s}
-.as-orb{position:relative;width:min(70vw,340px);aspect-ratio:1;will-change:transform}.as-orb canvas{position:absolute;inset:0;width:100%;height:100%}
+.as-orb{position:relative;width:min(70vw,340px,40vh);aspect-ratio:1;will-change:transform}.as-orb canvas{position:absolute;inset:0;width:100%;height:100%}
 .as-orb::before{content:"";position:absolute;inset:-25%;border-radius:50%;background:radial-gradient(circle closest-side,rgba(255,120,30,.3),rgba(255,90,10,.1) 55%,transparent);pointer-events:none}
 .as-disc{position:absolute;inset:8%;border-radius:50%;background:#E5613E;pointer-events:none}
 .as-h{margin:0;font-size:22px;font-weight:600;text-align:center}.as-sub{margin:0;max-width:min(88vw,520px);text-align:center;font-size:14.5px;line-height:1.8;opacity:.8}
@@ -30,6 +30,12 @@ const Assistant = (() => {
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:asIn .5s cubic-bezier(.2,1.3,.3,1)}
 .as-chip b{color:#E5613E;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
 .as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
+.as-box{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 18px;border-radius:20px;background:rgba(127,127,127,.14);
+  border:1px solid rgba(127,127,127,.25);max-width:min(92vw,460px);animation:asUp .5s cubic-bezier(.2,1.1,.3,1)}
+.as-box b{font-size:14.5px}.as-box .as-err{margin:0;min-height:0}.as-box .as-err:empty{display:none}.as-box .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.as-box input[type=text]{width:min(64vw,300px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
+.as-drop{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 22px;border:1.5px dashed rgba(229,97,62,.7);border-radius:16px;cursor:pointer;font-size:14px}
+.as-drop.over{background:rgba(229,97,62,.12)}@keyframes asUp{from{opacity:0;transform:translateY(12px) scale(.96)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
   let S = null, state = null, orb = null, ov = null, from = null, opts = {};
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
@@ -88,8 +94,56 @@ const Assistant = (() => {
       return r;
     }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
+    if (name === "show_input") { box(args.kind); return { ok: true, shown: args.kind }; }
     if (name === "finish") { S.finishing = true; setTimeout(() => end(true), 3500); return { ok: true }; }
     return { ok: false, error: "unknown tool" };
+  }
+  // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
+  function say(text) {
+    if (!S?.dc || S.dc.readyState !== "open") return;
+    S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
+    S.dc.send(JSON.stringify({ type: "response.create" }));
+  }
+  // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
+  const BOX = {
+    account: { t: "رابط حسابك على إنستغرام أو تيك توك", ph: "instagram.com/… أو @اسم_الحساب" },
+    logo: { t: "ارفع شعارك", accept: "image/png,image/jpeg,image/webp", kind: "logos", done: "رفعت الشعار" },
+    products: { t: "ارفع صور منتجاتك أو أعمالك", accept: "image/png,image/jpeg,image/webp", multi: true, kind: "products", done: "رفعت صور المنتجات" },
+    intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
+  };
+  function box(kind) {
+    const k = BOX[kind]; q(".as-box")?.remove();
+    if (!k || !ov) return;
+    const d = document.createElement("div"); d.className = "as-box";
+    d.innerHTML = `<b>${esc(k.t)}</b>` + (k.ph
+      ? `<div class="row"><input type="text" dir="ltr" placeholder="${esc(k.ph)}"><button type="button" class="as-btn" data-send>أرسل</button></div>`
+      : `<label class="as-drop">📎 <span>اختر ${k.multi ? "الصور" : k.video ? "الفيديو" : "الصورة"} أو اسحبها هنا</span><input type="file" hidden accept="${k.accept}"${k.multi ? " multiple" : ""}></label>`)
+      + `<div class="row"><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
+    q(".as-acts").before(d);
+    const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
+    d.querySelector("[data-later]").onclick = () => { d.remove(); say("سأرسله لاحقًا"); };
+    if (k.ph) {
+      const inp = d.querySelector("input"), send = () => { const v = inp.value.trim(); if (!v) return; d.remove(); say(`حسابي: ${v}`); };
+      d.querySelector("[data-send]").onclick = send; inp.onkeydown = (e) => { if (e.key === "Enter") send(); };
+      setTimeout(() => inp.focus(), 300);
+      return;
+    }
+    const drop = d.querySelector(".as-drop"), fin = d.querySelector("input");
+    const up = async (files) => {
+      files = [...files].slice(0, k.multi ? 30 : 1); if (!files.length) return;
+      err(""); drop.querySelector("span").textContent = "⏳ جارٍ الرفع…";
+      const f = new FormData();
+      if (k.video) { f.append("kind", "intro"); f.append("file", files[0]); } else { f.append("kind", k.kind); files.forEach((x) => f.append("files", x)); }
+      try {
+        const r = await fetch(`/api/ad-brains/${encodeURIComponent(state.brand)}/${k.video ? "brand-video" : "assets"}`, { method: "POST", body: f, credentials: "same-origin" });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
+        d.remove(); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
+      } catch (e) { err(e.message); drop.querySelector("span").textContent = "جرّب مرة أخرى"; }
+    };
+    fin.onchange = () => up(fin.files);
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+    drop.ondragleave = () => drop.classList.remove("over");
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); up(e.dataTransfer.files); };
   }
   async function pollAccount() {
     if (!S || S.accTimer) return;
@@ -129,17 +183,35 @@ const Assistant = (() => {
       // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
       const greet = () => { if (S && !S.greeted && dc.readyState === "open") { S.greeted = true; dc.send(JSON.stringify({ type: "response.create" })); } };
       dc.onopen = () => setTimeout(greet, 2500);
+      // ⏸️ كل رد = سؤال واحد ويستنى العميل: بعد نتيجة الأداة المساعد مابيتكلمش تاني إلا لو الرد كان أداة بس من غير كلام
+      S.resp = {};
+      const R = (id) => S.resp[id] || (S.resp[id] = { msg: false, calls: 0, pending: 0, done: false });
+      const follow = (id) => {
+        const r = S?.resp[id];
+        if (!r || !r.done || r.pending || !r.calls || r.msg || S.finishing) return;
+        delete S.resp[id]; S.dc.send(JSON.stringify({ type: "response.create" }));
+      };
       dc.onmessage = async (m) => {
         let e; try { e = JSON.parse(m.data); } catch { return; }
-        if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") { S.aBuf += e.delta; caption(S.aBuf); }
+        if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") {
+          if (e.response_id !== S.capId) { S.capId = e.response_id; S.aBuf = ""; }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
+          R(e.response_id).msg = true; S.aBuf += e.delta; caption(S.aBuf);
+        } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
+        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; S.aBuf = ""; caption(""); }
         else if (e.type === "session.created" || e.type === "session.updated") greet();
-        else if (e.type === "response.created") { S.aBuf = ""; S.greeted = true; }
-        else if (e.type === "response.function_call_arguments.done") {
+        else if (e.type === "response.created") S.greeted = true;
+        else if (e.type === "response.done") {
+          const id = e.response?.id, r = R(id); r.done = true;
+          if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
+          follow(id);
+        } else if (e.type === "response.function_call_arguments.done") {
+          const r = R(e.response_id); r.calls++; r.pending++;
           let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch { /* أرجومنت مش JSON */ }
           const out = await tool(e.name, args);
+          r.pending--;
           if (!S || S.dc.readyState !== "open") return;
           S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(out) } }));
-          if (e.name !== "finish") S.dc.send(JSON.stringify({ type: "response.create" }));
+          follow(e.response_id);
         } else if (e.type === "error") console.warn("assistant:", e.error);
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -148,9 +220,8 @@ const Assistant = (() => {
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       q(".as-st").textContent = `${tok.agent || ""}`;
       q("[data-type]").onkeydown = (ev) => {
-        if (ev.key !== "Enter" || !ev.target.value.trim() || S.dc.readyState !== "open") return;
-        S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: ev.target.value.trim() }] } }));
-        S.dc.send(JSON.stringify({ type: "response.create" })); ev.target.value = "";
+        if (ev.key !== "Enter" || !ev.target.value.trim()) return;
+        say(ev.target.value.trim()); ev.target.value = "";
       };
       loop();
     } catch (e) {
