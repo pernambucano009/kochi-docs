@@ -31,7 +31,7 @@ const Assistant = (() => {
 .as-chip b{color:#E5613E;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
 .as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
-  let S = null, state = null, orb = null, ov = null, from = null;
+  let S = null, state = null, orb = null, ov = null, from = null, opts = {};
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
     products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الدعوة لاتخاذ إجراء", rivals: "المنافسون" };
   const SKIP_KEY = "simsim:assistSkip";
@@ -106,9 +106,10 @@ const Assistant = (() => {
   async function call() {
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"></div>
-      <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
+      <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button>${opts.tasks ? `<button type="button" class="as-btn" data-tasks>✅ مهام العقل (صور، فيديو، صوت)</button>` : ""}</div><p class="as-err" data-err></p><div class="as-side"></div>`);
     S = { saved: 0, aBuf: "" };
     q("[data-end]").onclick = () => end(false);
+    const tk = opts.tasks; if (tk) q("[data-tasks]").onclick = async () => { await end(false); tk(); };
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -184,14 +185,17 @@ const Assistant = (() => {
   }
   let S_done = null;
 
-  async function maybe(force, el) {
-    if (ov) return;
-    from = el || document.querySelector('[data-n="quiz"]');   // مفتوح أصلًا
-    try { state = await api("/api/assistant"); } catch { return; }
-    const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من زر «أجب بالصوت» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
-    if (!state?.ready || (!forced && (state.done || !state.new))) return;
-    if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return; } catch { /* التخزين مقفول */ }
+  // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص
+  async function maybe(force, el, o) {
+    if (ov) return true;   // مفتوح أصلًا
+    try { state = await api("/api/assistant"); } catch { return false; }
+    const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
+    if (!state?.ready || (!forced && (state.done || !state.new))) return false;
+    if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return false; } catch { /* التخزين مقفول */ }
+    opts = o || {};
+    from = el || document.querySelector('[data-n="quiz"]');
     await new Promise((res) => { S_done = res; call(); });
+    return true;
   }
-  return { maybe, open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
+  return { maybe, open: async (el, o) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el, o); } };
 })();

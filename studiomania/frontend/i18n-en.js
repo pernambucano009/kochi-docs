@@ -3150,6 +3150,7 @@ window.I18N_EN = {
   "لا يوجد اشتراك فعّال": "No active subscription",
   "للأدمن فقط": "Admins only",
   "للمشرف فقط": "Admins only",
+  "✅ مهام العقل (صور، فيديو، صوت)": "✅ Brain tasks (photos, video, voice)",
   "🔊 اضغط لسماع المساعدة": "🔊 Tap to hear your assistant",
   "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك": "🎙️ Allow the browser to use your microphone if it asks",
   "🎙️ أجب بالصوت مع مساعدك": "🎙️ Answer by voice with your assistant",

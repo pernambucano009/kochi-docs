@@ -627,8 +627,7 @@ const BrandPage = (() => {
     const tabs = `<div class="bm-pills bm-qtabs"><button class="bm-pill${S.qtab !== "t" ? " on" : ""}" data-qtab="q">🧩 الأسئلة <span class="num">${qd}/${qn || "…"}</span></button>
       <button class="bm-pill${S.qtab === "t" ? " on" : ""}" data-qtab="t">✅ المهام <span class="num">${tq ? `${tq.done}/${tq.total}` : "…"}</span></button></div>`;
     const head = `<div class="bm-ch"><span class="latin en-k">COMPLETE THE BRAIN</span><b>أكمل العقل</b></div>
-      <p class="bm-note">عند انتهاء الأسئلة والمهام يصبح لدى العقل كل ما يحتاجه ليعرفك.</p>
-      ${typeof Assistant !== "undefined" ? `<button type="button" class="bm-pill on" data-assist style="margin:0 0 10px">🎙️ أجب بالصوت مع مساعدك</button>` : ""}${tabs}`;
+      <p class="bm-note">عند انتهاء الأسئلة والمهام يصبح لدى العقل كل ما يحتاجه ليعرفك.</p>${tabs}`;
     if (S.qtab === "t") return head + tasksHTML(b);
     // 🏷️ علامة من غير اسم: أول خطوة اسمها أو رابط حسابها (والعقل يستنبط الاسم والإجابات من الحساب)
     if (b && DEFAULT_NAMES.has(String(b.name || "").trim()) && !(S.started || {})[b.id] && S.qtab !== "t") return head + startHTML(b);
@@ -1127,6 +1126,8 @@ const BrandPage = (() => {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
         if (S.open?.id === n.id) return openCard(null);
+        // 🎙️ دايرة «؟» هي المساعد نفسه: بيسأل أسئلة العقل بالصوت أو بالكتابة، والمهام (صور وفيديو وصوت) زرار جوه المكالمة
+        if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node, { tasks: () => { S.qtab = "t"; openCard(n); } }).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
         if (n.kind === "quiz") S.qi = null;
         if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
@@ -1156,7 +1157,6 @@ const BrandPage = (() => {
       if (ara) { const v = (await uiPrompt("القاعدة الجديدة:")); if (!v?.trim()) return; const rows = arRows(ara.dataset.aradd); rows.push({ t: v.trim(), on: true }); return algoSave(ara.dataset.aradd, rows); }
       const arr = t.closest("[data-arreset]");
       if (arr) { if (!(await uiConfirm(arr.dataset.arreset === "all" ? "أتعيد كل قواعد الخوارزميات إلى الأصل؟ سيُحذف أي تعديل أجريته." : "أتعيد هذه القواعد إلى الأصل؟"))) return; return algoSave(arr.dataset.arreset, null, true); }
-      if (t.closest("[data-assist]")) return Assistant.open();
       const qt = t.closest("[data-qtab]");
       if (qt) { S.qtab = qt.dataset.qtab; if (S.qtab === "t") { const b = cur(); if (b) { S.tqFor = null; loadTasks(b); } } return refreshCard(); }
       const tg = t.closest("[data-tgo]");
