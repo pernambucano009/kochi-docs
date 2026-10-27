@@ -70,6 +70,10 @@
     <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل عمل فشل أو توقف في المنتصف، يصل إلى هنا تلقائيًا. الخطأ نفسه يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
       <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من الخادم</option><option value="job">عمل فشل</option><option value="stuck">عمل توقف في المنتصف</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option></select>
       <button class="btn" id="issReload">↻ حدّث</button></div></div>
+    <div class="card"><div class="row"><b>🤖 متابعة Claude</b><span class="mute" id="feedSt"></span>
+      <button class="btn" id="feedNew" style="margin-inline-start:auto">أنشئ مفتاح متابعة</button></div>
+      <p class="mute" style="margin:8px 0 0">بهذا المفتاح تسحب جلسة Claude الأخطاء الجديدة وتصلحها وتغلقها بنفسها. يظهر مرة واحدة: انسخه وضعه في أسرار بيئة Claude باسم SIMSIM_FEED_KEY، ولا تلصقه في المحادثة. إنشاء مفتاح جديد يلغي القديم.</p>
+      <div class="row" id="feedOut" hidden><input id="feedKey" readonly dir="ltr" style="flex:1;min-width:220px"><button class="btn pri" id="feedCopy">انسخ</button></div></div>
     <div id="iss"></div>
   </section>
   <section data-p="lmap" hidden>
@@ -124,6 +128,17 @@ const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same
 const S = { cur: null, run: null, map: null, iss: [] };
 const KIND = { api: "رد خطأ من الخادم", job: "عمل فشل", stuck: "عمل توقف في المنتصف", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
 const when = (t) => t ? new Date(t * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }) : "";
+async function feedState() {
+  const r = await api("/api/platform/issues/feed-state").catch(() => null); if (!r) return;
+  $("feedSt").textContent = !r.has_key ? "لم يُنشأ مفتاح بعد" : r.seen_at ? `آخر سحب للأخطاء: ${when(r.seen_at)}` : "المفتاح جاهز ولم يُستخدم بعد";
+}
+$("feedNew").onclick = async () => {
+  if (!confirm("إنشاء مفتاح جديد يلغي المفتاح القديم. هل تريد المتابعة؟")) return;
+  const r = await api("/api/platform/issues/feed-key", { method: "POST" }).catch((e) => alert(e.message)); if (!r) return;
+  $("feedKey").value = r.key; $("feedOut").hidden = false; feedState();
+};
+$("feedCopy").onclick = () => { $("feedKey").select(); navigator.clipboard.writeText($("feedKey").value).then(() => { $("feedCopy").textContent = "نُسخ ✓"; }); };
+feedState();
 async function loadIssues() {
   const r = await api("/api/platform/issues" + ($("issAll").checked ? "?all=1" : "")).catch((e) => ({ items: [], err: e.message }));
   S.iss = r.items || []; $("issN").textContent = r.open ? `(${r.open})` : "";

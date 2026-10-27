@@ -1881,6 +1881,47 @@ def issues_resolve(iid: str, body: IssueResolveIn, request: Request):
     return {"ok": True, "open": issues.open_count()}
 
 
+# 🤖 متابعة Claude: نفس صندوق الأخطاء لكن بمفتاح بدل الدخول، عشان جلسة Claude تسحب الأخطاء الجديدة وتصلّحها وتقفلها.
+# المفتاح بيتعمل من /admin/inspect ويظهر مرة واحدة، والمتخزّن بصمته بس (sha256)، وتوليد مفتاح جديد بيلغي القديم.
+def feed_ok(request: Request) -> None:
+    want, got = kv_get("issues_feed_hash") or "", (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+    if not want or not got or not hmac.compare_digest(want, hashlib.sha256(got.encode()).hexdigest()):
+        raise HTTPException(403, "مفتاح المتابعة غير صحيح")
+
+
+@app.post("/api/platform/issues/feed-key")
+def issues_feed_key(request: Request):
+    admin(request)
+    k = "ssk_" + secrets.token_urlsafe(32)
+    kv_set("issues_feed_hash", hashlib.sha256(k.encode()).hexdigest())
+    kv_set("issues_feed_at", str(time.time()))
+    return {"key": k}
+
+
+@app.get("/api/platform/issues/feed")
+def issues_feed(request: Request, since: float = 0, all: int = 0):
+    feed_ok(request)
+    kv_set("issues_feed_seen", str(time.time()))
+    rows = [r for r in issues.listing(open_only=not all, limit=500) if (r["last_at"] or 0) > since]
+    for r in rows:   # من غير بريد العملاء: العدد بس يكفي للتصليح
+        r["accounts"] = len({*r.pop("users"), *r.pop("workspaces")})
+    return {"items": rows, "open": issues.open_count(), "now": time.time()}
+
+
+@app.post("/api/platform/issues/feed/{iid}/resolve")
+def issues_feed_resolve(iid: str, body: IssueResolveIn, request: Request):
+    feed_ok(request)
+    issues.resolve(iid, body.note, body.reopen)
+    return {"ok": True, "open": issues.open_count()}
+
+
+@app.get("/api/platform/issues/feed-state")
+def issues_feed_state(request: Request):
+    admin(request)
+    f = lambda k: float(kv_get(k) or 0) or None
+    return {"has_key": bool(kv_get("issues_feed_hash")), "made_at": f("issues_feed_at"), "seen_at": f("issues_feed_seen")}
+
+
 @app.get("/admin/inspect")
 def admin_inspect_page(request: Request):
     u = current_user(request)
