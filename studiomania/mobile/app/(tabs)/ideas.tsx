@@ -198,7 +198,7 @@ export default function Ideas() {
             <View style={[s.polished, { backgroundColor: t.softAccent }]}>
               <T weight="medium" size={15}>{idea.title}</T>
               <T size={14}>{idea.text}</T>
-              {idea.hook ? <T muted size={13}>الهوك: «{idea.hook}»</T> : null}
+              {idea.hook ? <T muted size={13}>الخطاف: «{idea.hook}»</T> : null}
             </View>
           ) : (
             <TextInput value={draft} onChangeText={setDraft} multiline style={[s.input, { backgroundColor: t.field, color: t.ink }]} textAlignVertical="top" />

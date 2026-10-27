@@ -67,7 +67,7 @@ const RivalsPage = (() => {
     const B = S.bt, d = B.d;
     if (!d) return `<div class="pk-empty">جارٍ التحميل…</div>`;
     const c = d.calc, a = d.analysis, handle = B.handle || d.handle, plat = B.platform || d.platform;
-    const by = { leads: "العملاء", follows: "المتابعين", views: "المشاهدات" };
+    const by = { leads: "العملاء", follows: "المتابعون", views: "المشاهدات" };
     const head = `<p class="pk-note">نقارن الفيديوهات ببعضها لا بالأرقام المجردة: ما حقق ٥ أضعاف وسيط الدفعة فائز، و١٠ أضعاف ذهبي.${d.live ? "" : " (وضع تجريبي: أرقام تجريبية)"}</p>
       <div class="pk-row2"><input type="text" class="pk-q" data-btin placeholder="@حساب العلامة" dir="ltr" value="${esc(handle)}">
         <select data-btpl>${Object.entries(PL).map(([k, t]) => `<option value="${k}" ${k === plat ? "selected" : ""}>${t}</option>`).join("")}</select>

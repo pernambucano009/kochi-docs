@@ -37,17 +37,16 @@ function filmHome() {
   const cs = filmx.conns;
   return `<div class="car-head"><h2>🎞️ فيديو بالكونيكتورز</h2></div>
     <section class="panel lab-sec fm-new">
-      <p class="hint">البرنامج يقرأ ملف العميل والموصلات التي في المكتبة، ويكتب سيناريو كل مشهد فيه ينتهي في المكان الذي الموصل يبدأ منه،
-        والمشهد الذي بعده يبدأ مكان ما الموصل يوصل. كتابة السيناريو مجانًا تقريبًا، والرسم والتوليد ينتظرون موافقتك.</p>
-      <label>الفيديو عن ماذا؟ <textarea rows="3" data-fmbrief placeholder="مثلًا: فيديو ٢٠ ثانية عن أهم ٣ مميزات في التطبيق: المدرب الشخصي، متابعة التمرين، والنتائج. الختام: حمّل التطبيق"></textarea></label>
+      <p class="hint">يقرأ البرنامج ملف العميل والموصلات التي في المكتبة، ويكتب سيناريو كل مشهد فيه ينتهي حيث يبدأ الموصل، ويبدأ المشهد الذي بعده حيث ينتهي الموصل. كتابة السيناريو مجانية تقريبًا، والرسم والتوليد ينتظران موافقتك.</p>
+      <label>عمّ الفيديو؟ <textarea rows="3" data-fmbrief placeholder="مثلًا: فيديو ٢٠ ثانية عن أهم ٣ مميزات في التطبيق: المدرب الشخصي، متابعة التمرين، والنتائج. الختام: حمّل التطبيق"></textarea></label>
       <div><b>🔗 الموصلات التي ستُطبّق</b> <small class="muted">(${filmx.pick.size} من ${cs.length})</small>
         ${cs.length ? `<div class="fm-conns">${cs.map((a) => `<label class="fm-conn ${filmx.pick.has(a.id) ? "on" : ""}">
             <input type="checkbox" data-fmpick="${a.id}" ${filmx.pick.has(a.id) ? "checked" : ""}>
             <video src="${a.url}" poster="${a.thumb_url}" preload="none" muted loop playsinline></video>
             <small data-no-i18n>${le(a.name)}</small></label>`).join("")}</div>`
-          : `<p class="muted">لا يوجد موصلات في المكتبة. فكّك فيديو في المعمل، واقبل ✅ الموصلات التي تعجبك.</p>`}</div>
+          : `<p class="muted">لا توجد موصلات في المكتبة. فكّك فيديو في المعمل، واقبل ✅ الموصلات التي تعجبك.</p>`}</div>
       <div class="row wrap">
-        <label>عدد المشاهد <select data-fmn><option value="0">تلقائي (على قدر الموصلات)</option>${[2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}">${n}</option>`).join("")}</select></label>
+        <label>عدد المشاهد <select data-fmn><option value="0">تلقائي (بحسب عدد الموصلات)</option>${[2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}">${n}</option>`).join("")}</select></label>
         <label>المقاس <select data-fmratio><option value="9:16">9:16 (ريلز)</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label>
         <label>نموذج الحركة <select data-fmmodel>${[["seedance-mini", "Seedance 2.0 Mini (الأرخص)"], ["seedance-fast", "Seedance 2.0 Fast"], ["seedance", "Seedance 2.0 (أجود)"]].map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
         <label>الجودة <select data-fmres><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
@@ -65,7 +64,7 @@ function fmFrame(f, i, w) {
   return `<figure class="fm-frame">${u ? `<img src="${u}" alt="">` : `<div class="fm-ph">${w === "a" ? "أول المشهد" : "آخر المشهد"}</div>`}
     <figcaption>${w === "a" ? "أول المشهد" : "آخر المشهد"}
       ${queued ? `<small class="fm-queued">⏳ في الدور</small>` : ""}
-      ${u && can ? `<button type="button" class="btn sm" data-fmredo="${i}" data-w="${w}" title="${w === "a" ? "يرسمه مرة أخرى (وآخر المشهد معه)" : "يرسمه مرة أخرى"}">↻</button>` : ""}</figcaption></figure>`;
+      ${u && can ? `<button type="button" class="btn sm" data-fmredo="${i}" data-w="${w}" title="${w === "a" ? "يرسمه مرة أخرى (ومعه آخر المشهد)" : "يرسمه مرة أخرى"}">↻</button>` : ""}</figcaption></figure>`;
 }
 
 // ✏️ تعديل فريم: ملاحظة + صور مرجعية (لوجو أو شاشة من ملف العميل، أو صورة ترفعها) وبعدين ↻ على الفريم
@@ -80,7 +79,7 @@ function fmFix(f, i) {
       ${(f.ref_files || []).map((r) => chip(`u:${r.file}`, r.url, `📎 ${r.name}`, r.file)).join("")}
       <label class="btn sm fm-up">📎 ارفع صورة<input type="file" accept="image/*" data-fmup="${i}" hidden></label>
     </div>
-    <small class="muted">علّم على الصورة الصحيح (الشعار مثلًا) واكتب الملاحظة، ثم اضغط ↻ على الفريم الذي تريد تصلّحه. الصور التي معلّم عليها تُرسل للنموذج ويستخدمها كما هي بالضبط.</small>
+    <small class="muted">علّم على الصورة الصحيحة (الشعار مثلًا) واكتب الملاحظة، ثم اضغط ↻ على الفريم الذي تريد إصلاحه. الصور المعلَّم عليها تُرسل إلى النموذج ويستخدمها كما هي بالضبط.</small>
   </details>`;
 }
 
@@ -89,7 +88,7 @@ function fmScene(f, sc, i) {
   return `<article class="fm-scene" data-scene="${i}">
     <header><b>🎬 المشهد ${i + 1}</b> <input data-sf="label" value="${le(sc.label)}" ${lock} data-no-i18n>
       <small class="muted" data-no-i18n>${le(sc.feature)}</small>
-      ${v ? `<span class="fm-done">✅ وُلّد</span>` : `<span class="fm-todo">⏳ ما زال لم يُولّد</span>`}
+      ${v ? `<span class="fm-done">✅ وُلّد</span>` : `<span class="fm-todo">⏳ لم يُولَّد بعد</span>`}
       ${!v && f.scene_files[i]?.a && f.scene_files[i]?.b && !f.busy ? `<button type="button" class="btn sm primary" data-fmgen="scene" data-i="${i}" data-new="1">🎬 ولّد هذا المشهد (~${f.costs?.scenes?.[i] ?? ""}$)</button>` : ""}</header>
     <div class="fm-row">
       ${fmFrame(f, i, "a")}<span class="fm-arrow">←</span>${fmFrame(f, i, "b")}
@@ -103,7 +102,7 @@ function fmScene(f, sc, i) {
       <label>آخر المشهد <textarea rows="2" dir="ltr" data-sf="end" ${lock} data-no-i18n>${le(sc.end)}</textarea></label>
       <label>الحركة <textarea rows="2" dir="ltr" data-sf="motion" ${lock} data-no-i18n>${le(sc.motion)}</textarea></label>
       <label class="row">الطول <input type="number" step="0.1" min="2" max="5" value="${sc.seconds}" data-sf="seconds" ${lock}> ث</label>
-      <small class="muted">إذا غيّرت وصف فريم، اضغط ↻ عليه لكي يُرسم بالجديد.</small>
+      <small class="muted">إن غيّرت وصف فريم، اضغط ↻ عليه ليُرسم بالوصف الجديد.</small>
     </details>
   </article>`;
 }
@@ -114,8 +113,8 @@ function fmLink(f, l, i) {
     <header><b>🔗 الموصل ${i + 1}</b>
       <select data-la ${lock}>${filmx.conns.map((a) => `<option value="${a.id}" ${a.id === l.asset ? "selected" : ""} data-no-i18n>${le(a.name)}</option>`).join("")}
         ${la.name || filmx.conns.some((a) => a.id === l.asset) ? "" : `<option selected value="${le(l.asset)}">⚠️ حُذف من المكتبة</option>`}</select>
-      ${!f.busy && (p || (f.scene_files[i]?.b && f.scene_files[i + 1]?.a)) ? `<button type="button" class="btn sm ${p ? "" : "primary"}" data-fmlplan="${i}" title="خطة هذا للكونيكتور بين هؤلاء المشهدين">🧠 ${p ? "خطة أخرى" : "أنشئ الخطة"}</button>` : ""}
-      ${lf.video ? `<span class="fm-done">✅ وُلّد</span>` : `<span class="fm-todo">⏳ ما زال لم يُولّد</span>`}
+      ${!f.busy && (p || (f.scene_files[i]?.b && f.scene_files[i + 1]?.a)) ? `<button type="button" class="btn sm ${p ? "" : "primary"}" data-fmlplan="${i}" title="خطة هذا الموصل بين هذين المشهدين">🧠 ${p ? "خطة أخرى" : "أنشئ الخطة"}</button>` : ""}
+      ${lf.video ? `<span class="fm-done">✅ وُلّد</span>` : `<span class="fm-todo">⏳ لم يُولَّد بعد</span>`}
       ${!lf.video && p && !f.busy ? `<button type="button" class="btn sm primary" data-fmgen="link" data-i="${i}" data-new="1">🎬 ولّد هذا الموصل (~${f.costs?.links?.[i] ?? ""}$)</button>` : ""}</header>
     ${l.why ? `<p class="muted" data-no-i18n>💡 ${le(l.why)}</p>` : ""}
     <div class="fm-row">
@@ -125,7 +124,7 @@ function fmLink(f, l, i) {
     </div>
     ${lf.video && !f.busy ? `<div class="fm-redo" data-redo="${i}">
       <b>لم يعجبك؟</b>
-      <input type="text" data-lnote placeholder="قل ماذا الذي لم يعجبك (مثلًا: الحركة سريعة، الشعار يتشوّه، تريد الزووم أوضح) أو اتركها فارغة لمحاولة جديدة بنفس الخطة" data-no-i18n>
+      <input type="text" data-lnote placeholder="قل ما الذي لم يعجبك (مثلًا: الحركة سريعة، الشعار يتشوّه، تريد الزووم أوضح) أو اتركها فارغة لمحاولة جديدة بنفس الخطة" data-no-i18n>
       <button type="button" class="btn sm primary" data-fmlredo="${i}">↻ ولّد الموصل مرة أخرى (~${f.costs?.links?.[i] ?? ""}$)</button>
       ${(l.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك الذي فاتت: ${l.notes.map(le).join(" · ")}</small>` : ""}
     </div>` : ""}
@@ -135,7 +134,7 @@ function fmLink(f, l, i) {
       ${(p.segments || []).map((x, j) => `<label>🎬 حركة ${j + 1}: <span data-no-i18n>${le(x.label)}</span>
         <span class="row">الطول <input type="number" step="0.1" min="0.6" max="6" value="${x.seconds}" data-lsec="${j}" ${lock}> ث</span>
         <textarea rows="2" dir="ltr" data-ls="${j}" ${lock} data-no-i18n>${le(x.prompt)}</textarea></label>`).join("")}
-    </details>` : `<small class="muted">الخطة تُكتب تلقائيًا بعد ما فريمات المشهدين يترسمون.</small>`}
+    </details>` : `<small class="muted">تُكتب الخطة تلقائيًا بعد أن تُرسم فريمات المشهدين.</small>`}
   </article>`;
 }
 
@@ -143,10 +142,10 @@ function fmLink(f, l, i) {
 function fmScript(f) {
   const p = f.plan, v = f.voice, lines = v?.lines || [], lock = f.status === "planning" ? "disabled" : "", busy = f.busy;
   const staleN = (f.stale || []).filter(Boolean).length;
-  return `<details class="panel fm-script" data-dk="script" ${filmx.open.has("script") ? "open" : ""}><summary>📜 النص والفويس أوفر</summary>
+  return `<details class="panel fm-script" data-dk="script" ${filmx.open.has("script") ? "open" : ""}><summary>📜 النص والتعليق الصوتي</summary>
     <div class="row wrap fm-copy">
-      <button type="button" class="btn sm" data-fmcopy="voice" title="جمل التعليق الصوتي فقط، كل جملة في سطر (لكي تسجّلها أو تحطها في برنامج الصوت)">📋 انسخ التعليق الصوتي</button>
-      <button type="button" class="btn sm" data-fmcopy="all" title="كل مشهد: التعليق الصوتي والنص الذي على الشاشة">📋 انسخ النص كامل</button></div>
+      <button type="button" class="btn sm" data-fmcopy="voice" title="جمل التعليق الصوتي فقط، كل جملة في سطر (لتسجّلها أو تضعها في برنامج الصوت)">📋 انسخ التعليق الصوتي</button>
+      <button type="button" class="btn sm" data-fmcopy="all" title="كل مشهد: التعليق الصوتي والنص الذي على الشاشة">📋 انسخ النص كاملًا</button></div>
     <div class="fm-slines">${p.scenes.map((sc, i) => {
       const ln = lines[i], link = i < p.scenes.length - 1 ? f.link_lens?.[i] : 0;
       return `<div class="fm-sline ${f.stale?.[i] ? "stale" : ""}" data-sline="${i}">
@@ -156,31 +155,30 @@ function fmScript(f) {
           <label>🎙️ التعليق الصوتي <textarea rows="2" data-sf="voice" ${lock} data-no-i18n>${le(sc.voice)}</textarea></label>
           <label>🔤 على الشاشة <input data-sf="text" value="${le(sc.text)}" ${lock} data-no-i18n></label>
           <div class="row wrap fm-smeta">
-            <small class="fm-stale">✏️ تغيّر بعد ما الفريمات رُسمت</small>
+            <small class="fm-stale">✏️ تغيّر بعد أن رُسمت الفريمات</small>
             ${ln ? `<audio src="${ln.url}" controls preload="metadata"></audio><small class="muted">${ln.dur} ث</small>
-              ${ln.stale ? `<small class="err">🎙️ الجملة تغيّرت، الصوت ما زال القديم</small>` : ""}${ln.missed ? `<small class="err">لم أجدها في التسجيل بالضبط (وُضعت بالتقريب)</small>` : ""}` : ""}
+              ${ln.stale ? `<small class="err">🎙️ تغيّرت الجملة، والصوت ما زال القديم</small>` : ""}${ln.missed ? `<small class="err">لم أجدها في التسجيل بالضبط (وُضعت بالتقريب)</small>` : ""}` : ""}
             <small class="muted">⏱️ المشهد ${sc.seconds} ث${link ? ` + الموصل ${link} ث` : ""}</small>
           </div>
         </div></div>`;
     }).join("")}</div>
     <div class="row wrap fm-sapply" ${staleN ? "" : "hidden"}>
       <button type="button" class="btn primary" data-fmapply ${busy ? "disabled" : ""}>✨ طبّق التعديلات على الفريمات (<span data-fmstalen>${staleN}</span> مشهد)</button>
-      <small class="muted">النموذج يقرر لكل مشهد: يبدّل النص الذي على الشاشة فقط، ولا يرسم المشهد من جديد إذا معناه تغيّر.</small></div>
-    <div class="row wrap fm-rewrite"><input type="text" data-fmrw placeholder="اطلب تعديل على النص كله (مثلًا: اجعل الخطاف أقوى، والجمل أقصر)" data-no-i18n>
+      <small class="muted">يقرر النموذج لكل مشهد: يبدّل النص الذي على الشاشة فقط، أو يرسم المشهد من جديد إن تغيّر معناه.</small></div>
+    <div class="row wrap fm-rewrite"><input type="text" data-fmrw placeholder="اطلب تعديلًا على النص كله (مثلًا: اجعل الخطاف أقوى، والجمل أقصر)" data-no-i18n>
       <button type="button" class="btn sm" data-fmrewrite ${busy ? "disabled" : ""}>✍️ عدّل</button></div>
     <div class="fm-voice">
       <b>🎙️ التعليق الصوتي</b>
       ${v ? `<small class="muted">${v.mode === "tts" ? `مولّد (${le((f.voices || []).find((x) => x.id === v.voice_id)?.label || v.voice_id)})` : "تسجيلك"}</small>` : `<small class="muted">لا يوجد بعد</small>`}
       <div class="row wrap">
         <select data-fmvoice>${(f.voices || []).map((x) => `<option value="${x.id}" ${x.id === v?.voice_id ? "selected" : ""}>${le(x.label)}</option>`).join("")}</select>
-        <button type="button" class="btn sm primary" data-fmtts ${busy ? "disabled" : ""}>🎙️ ${v?.mode === "tts" ? "ولّد الجمل الذي تغيّرت" : "ولّد التعليق الصوتي"}</button>
-        <button type="button" class="btn sm" data-fmvoup ${busy ? "disabled" : ""} title="تسجيلك الكامل. إذا جمل النص فارغة أو مختلفة، نص التسجيل نفسه يُقسّم على المشاهد ويُكتب في النص">⬆ ارفع تعليق صوتي كامل</button>
-        ${v?.mode === "upload" ? `<button type="button" class="btn sm" data-fmrecut ${busy ? "disabled" : ""} title="بعد ما عدّلت جمل النص">✂️ قطّعه مرة أخرى</button>` : ""}
-        ${v ? `<button type="button" class="btn sm danger" data-fmvodel ${busy ? "disabled" : ""}>🗑️ أزل الفويس</button>` : ""}
+        <button type="button" class="btn sm primary" data-fmtts ${busy ? "disabled" : ""}>🎙️ ${v?.mode === "tts" ? "ولّد الجمل التي تغيّرت" : "ولّد التعليق الصوتي"}</button>
+        <button type="button" class="btn sm" data-fmvoup ${busy ? "disabled" : ""} title="تسجيلك الكامل. إن كانت جمل النص فارغة أو مختلفة، يُقسَّم نص التسجيل نفسه على المشاهد ويُكتب في النص">⬆ ارفع تعليق صوتي كامل</button>
+        ${v?.mode === "upload" ? `<button type="button" class="btn sm" data-fmrecut ${busy ? "disabled" : ""} title="بعد أن عدّلت جمل النص">✂️ قطّعه مرة أخرى</button>` : ""}
+        ${v ? `<button type="button" class="btn sm danger" data-fmvodel ${busy ? "disabled" : ""}>🗑️ أزل التعليق الصوتي</button>` : ""}
       </div>
       ${v?.full_url ? `<audio src="${v.full_url}" controls preload="metadata"></audio>` : ""}
-      <small class="muted">كل مشهد (والموصل الذي بعده) يأخذ طول جملته، وجملة كل مشهد تبدأ مع أوله. إذا مشهد طوله تغيّر كثير، حركته تُولّد مرة أخرى وده يظهر في ثمن «ولّد».
-        التسجيل الكامل يجب يكون نفس نص جمل التعليق الصوتي الذي أعلى لكي يُقطّع صحيح.</small>
+      <small class="muted">كل مشهد (والموصل الذي بعده) يأخذ طول جملته، وجملة كل مشهد تبدأ مع أوله. إن تغيّر طول مشهد كثيرًا، تُولَّد حركته مرة أخرى ويظهر ذلك في سعر «ولّد». يجب أن يطابق التسجيل الكامل نص جمل التعليق الصوتي في الأعلى ليُقطَّع بشكل صحيح.</small>
     </div>
   </details>`;
 }
@@ -199,18 +197,18 @@ function filmDetail(f) {
   const ready = sc.length && !framesLeft && (p.links || []).every((l) => l.plan);
   return `<div class="car-head"><button type="button" class="btn sm" data-fmback>→ كل الفيديوهات</button>
       <input class="ad-title" data-fmname value="${le(f.name)}" data-no-i18n>
-      <div class="row wrap">${f.scene_files.some((x) => x.a) ? `<button type="button" class="btn sm primary" data-fmeditor ${working ? "disabled" : ""} title="كل مشهد وكل كونيكتور قطعة تلقائيًا في المونتاج، ومعهم التعليق الصوتي في مكانه والموسيقى">🎞️ انقل للمونتاج</button>` : ""}
+      <div class="row wrap">${f.scene_files.some((x) => x.a) ? `<button type="button" class="btn sm primary" data-fmeditor ${working ? "disabled" : ""} title="كل مشهد وكل موصل قطعة تلقائيًا في المونتاج، ومعها التعليق الصوتي في مكانه والموسيقى">🎞️ انقل إلى المونتاج</button>` : ""}
         ${f.final_url ? `<a class="btn sm" href="${f.final_url}" download="${le(f.name)}.mp4">⬇️ نزّل</a>` : ""}
         <button type="button" class="btn sm danger" data-fmdel ${working ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status"><span class="lab-st ${working ? "working" : f.status}">${working ? `<span class="spin-inline"></span>` : ""} ${FILM_ST[f.status] || ""}</span>
       ${f.step ? `<small class="muted">${le(f.step)}</small>` : ""}${f.error ? `<small class="err">${le(f.error)}</small>` : ""}</div>
     ${f.final_url || f.raw_url || f.scene_files.some((x) => x.video) ? `<section class="panel fm-final">
       <div class="row wrap fm-views">
-        ${f.final_url ? `<button type="button" class="chip ${filmx.view !== "raw" ? "on" : ""}" data-fmview="final">🎬 الفيديو المتجمّع (بالفويس)</button>` : ""}
-        <button type="button" class="chip ${filmx.view === "raw" || !f.final_url ? "on" : ""}" data-fmraw ${working ? "disabled" : ""} title="كل جزء وُلّدت بطولها الأصلي، خلف بعض، بدون فويس ولا تسريع ولا قص">▶️ الخام كامل (بدون فويس ولا قص)</button>
+        ${f.final_url ? `<button type="button" class="chip ${filmx.view !== "raw" ? "on" : ""}" data-fmview="final">🎬 الفيديو المجمَّع (بالتعليق الصوتي)</button>` : ""}
+        <button type="button" class="chip ${filmx.view === "raw" || !f.final_url ? "on" : ""}" data-fmraw ${working ? "disabled" : ""} title="كل جزء وُلّد بطوله الأصلي، متتاليًا، دون تعليق صوتي ولا تسريع ولا قص">▶️ الخام كاملًا (دون تعليق صوتي ولا قص)</button>
         ${f.raw_url && (filmx.view === "raw" || !f.final_url) ? `<a class="btn sm" href="${f.raw_url}" download="${le(f.name)}-خام.mp4">⬇️ نزّل الخام</a>` : ""}
       </div>
-      ${(filmx.view === "raw" || !f.final_url) ? (f.raw_url ? `<video src="${f.raw_url}" controls playsinline preload="metadata"></video>` : `<p class="muted">اضغط «▶️ الخام كامل» لكي يُجمع.</p>`)
+      ${(filmx.view === "raw" || !f.final_url) ? (f.raw_url ? `<video src="${f.raw_url}" controls playsinline preload="metadata"></video>` : `<p class="muted">اضغط «▶️ الخام كاملًا» ليُجمع.</p>`)
         : `<video src="${f.final_url}" controls playsinline preload="metadata"></video>`}
     </section>` : ""}
     ${p.idea ? `<p class="panel fm-idea" data-no-i18n><b>${le(p.title)}</b><br>${le(p.idea)}</p>` : ""}
@@ -221,7 +219,7 @@ function filmDetail(f) {
           ? `<button type="button" class="btn primary" data-fmrun ${working ? "disabled" : ""}>🎬 ولّد ما ما زال لم يُولّد فقط (${[c.todo_scenes ? `${c.todo_scenes} مشهد` : "", c.todo_links ? `${c.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}) ~${c.video}$</button>`
           : `<button type="button" class="btn ${f.final_url ? "" : "primary"}" data-fmrun ${working ? "disabled" : ""}>🎞️ ${f.final_url ? "جمّع الفيديو مرة أخرى" : "جمّع الفيديو"} (مجانًا)</button>`) : ""}
         <button type="button" class="btn sm" data-fmreplan ${working ? "disabled" : ""}>✍️ سيناريو جديد</button>
-        <small class="muted">التعديلات تُحفظ تلقائيًا. ما وُلّد من قبل يظل، والتوليد يعمل الناقص فقط.</small></div>` : ""}
+        <small class="muted">التعديلات تُحفظ تلقائيًا. ما وُلّد من قبل يبقى، والتوليد يصنع الناقص فقط.</small></div>` : ""}
     <div class="fm-board ${f.ratio === "16:9" ? "wide" : f.ratio === "1:1" ? "square" : ""}">${sc.map((s, i) => fmScene(f, s, i) + (i < sc.length - 1 && p.links?.[i] ? fmLink(f, p.links[i], i) : "")).join("")}</div>`;
 }
 
@@ -265,7 +263,7 @@ $("labFilm").addEventListener("click", async (e) => {
   const nb = t.closest("[data-fmnew]");
   if (nb) {
     const box = $("labFilm"), g = (k) => box.querySelector(`[data-${k}]`).value;
-    if (!filmx.pick.size) return toast("اختر كونيكتور واحد على الأقل", true);
+    if (!filmx.pick.size) return toast("اختر موصلًا واحدًا على الأقل", true);
     return busyButton(nb, "⏳", async () => {
       filmx.cur = await api("/api/films", { method: "POST", ...jsonBody({ brief: g("fmbrief"), connectors: [...filmx.pick],
         scenes: Number(g("fmn")), ratio: g("fmratio"), model: g("fmmodel"), resolution: g("fmres") }) });
@@ -275,18 +273,18 @@ $("labFilm").addEventListener("click", async (e) => {
   }
   if (!filmx.cur) return;
   if (t.closest("[data-fmdel]")) {
-    if (!(await uiConfirm("تحذف هذا الفيديو بكل فريماته؟"))) return;
+    if (!(await uiConfirm("هل تحذف هذا الفيديو بكل فريماته؟"))) return;
     try { await F("", { method: "DELETE" }); filmx.cur = null; return openFilm(); } catch (err) { return toast(err.message, true); }
   }
   const replan = t.closest("[data-fmreplan]");
   if (replan) {
-    if (!(await uiConfirm("تكتب سيناريو جديد من أولًا؟ الفريمات والفيديوهات التي أُنشئت ستُحذف."))) return;
+    if (!(await uiConfirm("هل تكتب سيناريو جديدًا من البداية؟ ستُحذف الفريمات والفيديوهات التي أُنشئت."))) return;
     return go(replan, () => F("/replan", { method: "POST" }));
   }
   const fr = t.closest("[data-fmframes]");
   if (fr) {
     await filmSave();
-    if (!(await uiConfirm(`يرسم الفريمات؟ نحو ${filmx.cur.costs.frames}$ على Atlas، وبعدها يكتب خطة كل كونيكتور.`))) return renderFilm();
+    if (!(await uiConfirm(`هل يرسم الفريمات؟ نحو ${filmx.cur.costs.frames}$ على Atlas، وبعدها يكتب خطة كل موصل.`))) return renderFilm();
     return go(fr, () => F("/frames", { method: "POST" }));
   }
   const redo = t.closest("[data-fmredo]");
@@ -301,7 +299,7 @@ $("labFilm").addEventListener("click", async (e) => {
     return go(redo, async () => {
       const r = await F(`/scenes/${i}/${w}`, { method: "POST", ...jsonBody({ note, refs, client }) });
       delete filmx.sel[i]; delete filmx.notes[i];
-      if (r.queue?.length && filmx.cur?.status === "drawing") toast("⏳ وُضع في الدور: سيُرسم أول ما الذي يعمل ينتهي");
+      if (r.queue?.length && filmx.cur?.status === "drawing") toast("⏳ وُضع في الدور: سيُرسم فور انتهاء ما يعمل الآن");
       return r;
     });
   }
@@ -340,11 +338,11 @@ $("labFilm").addEventListener("click", async (e) => {
   if (ed) {
     return busyButton(ed, "⏳", async () => {
       const miss = [...filmx.cur.scene_files.map((x, i) => (x.video ? null : `المشهد ${i + 1}`)), ...filmx.cur.link_files.map((x, i) => (x.video ? null : `الموصل ${i + 1}`))].filter(Boolean);
-      if (miss.length && !(await uiConfirm(`ما زال لم يُولّد: ${miss.join("، ")}. أنقل الذي جاهز؟ (المشهد الذي ليس له حركة يدخل صورة ثابتة، والموصل الذي ليس له فيديو يُزال)`))) return;
+      if (miss.length && !(await uiConfirm(`لم يُولَّد بعد: ${miss.join("، ")}. هل أنقل الجاهز؟ (المشهد الذي ليس له حركة يدخل صورة ثابتة، والموصل الذي ليس له فيديو يُزال)`))) return;
       const r = await F("/to-editor", { method: "POST" });
       storageSet("studiomania.projectId.ads", r.project_id);
       if (typeof mt !== "undefined") mt.project = null;
-      toast("🎞️ فُتح في مونتاج الإعلانات: كل مشهد وكل كونيكتور قطعة تلقائيًا، والفويس أوفر في مكانه");
+      toast("🎞️ فُتح في مونتاج الإعلانات: كل مشهد وكل موصل قطعة تلقائيًا، والتعليق الصوتي في مكانه");
       showStep("6a");
     });
   }
@@ -352,16 +350,16 @@ $("labFilm").addEventListener("click", async (e) => {
   if (apply) {
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const n = (filmx.cur.stale || []).filter(Boolean).length;
-    if (!(await uiConfirm(`يطبّق تعديلات النص على ${n} مشهد؟ كل مشهد يُعدّل بحوالي 0.12$ (وإذا التعديل لا يحتاج يُرى في الصورة لا يُحسب).`))) return;
+    if (!(await uiConfirm(`هل يطبّق تعديلات النص على ${n} مشهد؟ كل مشهد يُعدَّل بنحو 0.12$ (وإن كان التعديل لا يحتاج إلى أن يُرى في الصورة فلا يُحسب).`))) return;
     return go(apply, () => F("/script/apply", { method: "POST" }));
   }
   const rw = t.closest("[data-fmrewrite]");
   if (rw) {
     const ins = $("labFilm").querySelector("[data-fmrw]").value.trim();
-    if (!ins) return toast("اكتب تريد تعدّل ماذا في النص", true);
+    if (!ins) return toast("اكتب ما تريد تعديله في النص", true);
     return busyButton(rw, "⏳", async () => {
       filmx.cur = await F("/script/rewrite", { method: "POST", ...jsonBody({ instruction: ins }) });
-      renderFilm(); toast("✍️ النص عُدّل. راجعه، ثم «✨ طبّق التعديلات على الفريمات»");
+      renderFilm(); toast("✍️ عُدّل النص. راجعه، ثم «✨ طبّق التعديلات على الفريمات»");
     });
   }
   const tts = t.closest("[data-fmtts]");
@@ -369,7 +367,7 @@ $("labFilm").addEventListener("click", async (e) => {
     try { await filmSave("scenes"); } catch (err) { return toast(err.message, true); }
     const voice = $("labFilm").querySelector("[data-fmvoice]").value;
     const force = filmx.cur.voice?.mode === "tts" && filmx.cur.voice.voice_id !== voice;
-    if (!(await uiConfirm(`يولّد التعليق الصوتي${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، ويُحسب على Atlas)`))) return;
+    if (!(await uiConfirm(`هل يولّد التعليق الصوتي${force ? " كله بالصوت الجديد" : ""}؟ (رخيص، ويُحسب على Atlas)`))) return;
     return go(tts, () => F("/voice/tts", { method: "POST", ...jsonBody({ voice_id: voice }) }));
   }
   const vup = t.closest("[data-fmvoup]");
@@ -384,7 +382,7 @@ $("labFilm").addEventListener("click", async (e) => {
   }
   const vdel = t.closest("[data-fmvodel]");
   if (vdel) {
-    if (!(await uiConfirm("تزيل التعليق الصوتي؟ (المشاهد تظل بطولها الحالي)"))) return;
+    if (!(await uiConfirm("هل تزيل التعليق الصوتي؟ (تبقى المشاهد بطولها الحالي)"))) return;
     return go(vdel, () => F("/voice", { method: "DELETE" }));
   }
   const lp = t.closest("[data-fmlplan]");
@@ -393,7 +391,7 @@ $("labFilm").addEventListener("click", async (e) => {
   if (lr) {
     const i = Number(lr.dataset.fmlredo), note = lr.closest("[data-redo]").querySelector("[data-lnote]").value.trim();
     try { await filmSave("links"); } catch (err) { return toast(err.message, true); }
-    if (!(await uiConfirm(`${note ? `يعدّل خطة الموصل ${i + 1} على ملاحظتك («${note}») ويولّده مرة أخرى` : `يولّد الموصل ${i + 1} مرة أخرى بنفس الخطة (محاولة جديدة)`}؟ نحو ${filmx.cur.costs?.links?.[i]}$، والفيديو القديم يُستبدل.`))) return;
+    if (!(await uiConfirm(`${note ? `يعدّل خطة الموصل ${i + 1} حسب ملاحظتك («${note}») ويولّده مرة أخرى` : `يولّد الموصل ${i + 1} مرة أخرى بنفس الخطة (محاولة جديدة)`}؟ نحو ${filmx.cur.costs?.links?.[i]}$، ويُستبدل الفيديو القديم.`))) return;
     return go(lr, () => F(`/links/${i}/redo`, { method: "POST", ...jsonBody({ note }) }));
   }
   const run = t.closest("[data-fmrun]"), gen = t.closest("[data-fmgen]");
@@ -403,13 +401,13 @@ $("labFilm").addEventListener("click", async (e) => {
     const gi = gen ? Number(gen.dataset.i) : 0, gc = gen ? filmx.cur.costs?.[gen.dataset.fmgen === "scene" ? "scenes" : "links"]?.[gi] : 0;
     const cc = filmx.cur.costs || {};
     const what = gen ? `${gen.dataset.fmgen === "scene" ? "حركة المشهد" : "الموصل"} ${gi + 1}${gen.dataset.new ? "" : " مرة أخرى"} فقط (نحو ${gc}$)`
-      : cc.todo_scenes || cc.todo_links ? `ما ما زال لم يُولّد فقط: ${[cc.todo_scenes ? `${cc.todo_scenes} مشهد` : "", cc.todo_links ? `${cc.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}. ما وُلّد من قبل لن يُلمس` : "";
+      : cc.todo_scenes || cc.todo_links ? `ما لم يُولَّد بعد فقط: ${[cc.todo_scenes ? `${cc.todo_scenes} مشهد` : "", cc.todo_links ? `${cc.todo_links} كونيكتور` : ""].filter(Boolean).join(" و")}. لن يُلمس ما وُلّد من قبل` : "";
     if (!gen && !what) return go(run, () => F("/run", { method: "POST", ...jsonBody({}) }));   // كله جاهز: تجميع فقط، مجانًا
     const staleN = (filmx.cur.stale || []).filter(Boolean).length;
-    if (staleN && !(await uiConfirm(`فيه ${staleN} مشهد النص الخاص به تغيّر والفريمات ما زال على القديم. تُكمل بدون «✨ طبّق التعديلات على الفريمات»؟`))) return renderFilm();
+    if (staleN && !(await uiConfirm(`يوجد ${staleN} مشهد تغيّر نصه والفريمات ما زالت على القديم. هل تُكمل دون «✨ طبّق التعديلات على الفريمات»؟`))) return renderFilm();
     const voStale = (filmx.cur.voice?.lines || []).some((l) => l?.stale);
-    if (voStale && !(await uiConfirm("فيه جمل في التعليق الصوتي تغيّرت وصوتها ما زال القديم. تُكمل؟"))) return renderFilm();
-    if (!(await uiConfirm(`يولّد ${what}؟ سيُحسب على Atlas${c && !gen ? ` نحو ${c}$` : ""}، ويأخذ كم دقيقة.${gen ? " (الفيديو الكامل يُجمع تلقائيًا عندما كل الحتت تصبح جاهزة)" : ""}`))) return renderFilm();
+    if (voStale && !(await uiConfirm("توجد جمل في التعليق الصوتي تغيّرت وصوتها ما زال القديم. تُكمل؟"))) return renderFilm();
+    if (!(await uiConfirm(`يولّد ${what}؟ سيُحسب على Atlas${c && !gen ? ` نحو ${c}$` : ""}، ويأخذ كم دقيقة.${gen ? " (يُجمع الفيديو الكامل تلقائيًا عندما تجهز كل القطع)" : ""}`))) return renderFilm();
     return go(run || gen, () => F("/run", { method: "POST", ...jsonBody(gen ? { kind: gen.dataset.fmgen, i: Number(gen.dataset.i) } : {}) }));
   }
 });
@@ -431,7 +429,7 @@ $("labFilm").addEventListener("change", async (e) => {
       const r = await api(`/api/films/${filmx.cur.id}/refs`, { method: "POST", body: fd });
       filmx.cur = r;
       (filmx.sel[i] ||= new Set()).add(`u:${r.uploaded}`);
-      renderFilm(); toast("📎 الصورة رُفعت ومتعلّم عليها");
+      renderFilm(); toast("📎 رُفعت الصورة ومعلَّم عليها");
     } catch (err) { toast(err.message, true); }
     return;
   }

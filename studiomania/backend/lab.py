@@ -1221,7 +1221,7 @@ def mock_elements(shot: dict, sfx: list[dict]) -> dict:
     s, e = shot["start"], shot["end"]
     if shot["n"] % 2 == 0:
         return {"scene_type": "live_action", "summary": "تجربة: شخص يتكلم أمام الكاميرا", "motion_graphics": False,
-                "mg_reason": "تصوير عادي بدون جرافيك", "background": {"name": "كافيه", "description": "تجربة"},
+                "mg_reason": "تصوير عادي بدون جرافيك", "background": {"name": "مقهى", "description": "تجربة"},
                 "elements": [{"id": "e1", "name": "شخص", "type": "character", "description": "راجل قاعد", "first_t": s, "last_t": e,
                               "actions": [{"t0": s, "t1": e, "action": "speak", "detail": "يتكلم"}]}]}
     return {"scene_type": "screen_recording", "summary": "تجربة: ماوس يسحب ملف", "motion_graphics": True,

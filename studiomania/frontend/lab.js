@@ -3,15 +3,15 @@
 
 const labx = { list: [], cur: null, timer: null, pick: {}, aopen: {}, view: "lab", cfilter: "", audioOpen: false, xedit: {}, xwide: {}, hear: { speech: true, music: true, sfx: true }, stems: null, win: {} };
 const LAB_KEY = "studiomania.lab";
-const LAB_SFX_CAT = { click: "🖱️ كليك", whoosh: "💨 ووش", pop: "💥 بوب", impact: "🥁 خبطة", typing: "⌨️ كتابة", swipe: "🖍️ سحبة",
-  notification: "🔔 إشعار", riser: "📈 رايزر", transition: "🔀 انتقال", ui: "📱 صوت واجهة", foley: "👣 فولي", ambience: "🌫️ جو المكان", other: "❔ مرة أخرى" };
-const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفية", cursor: "🖱️ مؤشر ماوس", icon: "⭐ أيقونة", file: "📄 ملف", folder: "📁 مجلد",
+const LAB_SFX_CAT = { click: "🖱️ نقرة", whoosh: "💨 ووش", pop: "💥 بوب", impact: "🥁 خبطة", typing: "⌨️ كتابة", swipe: "🖍️ سحبة",
+  notification: "🔔 إشعار", riser: "📈 رايزر", transition: "🔀 انتقال", ui: "📱 صوت واجهة", foley: "👣 مؤثرات حركة (فولي)", ambience: "🌫️ جو المكان", other: "❔ مرة أخرى" };
+const LAB_TYPES = { character: "🧍 شخصية", background: "🖼️ خلفية", cursor: "🖱️ مؤشر الفأرة", icon: "⭐ أيقونة", file: "📄 ملف", folder: "📁 مجلد",
   window: "🪟 نافذة", button: "🔘 زر", text: "🔤 نص", logo: "🏷️ شعار", photo: "🖼️ صورة", ui: "📱 واجهة", object: "📦 شيء", shape: "🔷 شكل",
-  effect: "✨ افيكت", other: "❔ مرة أخرى" };
+  effect: "✨ مؤثر", other: "❔ مرة أخرى" };
 const LAB_ACTIONS = { appear: "يظهر", disappear: "يختفي", move: "يتحرك", click: "يضغط", drag: "يسحب", drop: "يترك", type: "جارٍ الكتابة",
-  scale: "يكبر/يصغر", rotate: "يدور", highlight: "يُنشأ له هايلايت", transform: "يتحول", speak: "يتكلم", gesture: "يشاور", other: "مرة أخرى" };
+  scale: "يكبر/يصغر", rotate: "يدور", highlight: "يُبرَز", transform: "يتحول", speak: "يتكلم", gesture: "يشير", other: "مرة أخرى" };
 const LAB_SCENE = { live_action: "🎥 تصوير حقيقي", screen_recording: "🖥️ تسجيل شاشة", motion_graphics: "✨ موشن جرافيك", mixed: "🔀 مزيج" };
-const LAB_STEP = { split: "🎚️ التقسيم", shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الموصلات", stems: "🎚️ فصل التراكات", audio: "🎧 الصوت" };
+const LAB_STEP = { split: "🎚️ التقسيم", shots: "✂️ القطعات", elements: "🧩 العناصر", components: "💡 المكونات", connectors: "🔗 الموصلات", stems: "🎚️ فصل المسارات", audio: "🎧 الصوت" };
 const LAB_STEMS = { dialogue: "🗣️ النص", music: "🎵 الموسيقى", effects: "🔊 المؤثرات" };
 const lt = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(2).padStart(5, "0")}`;
 const le = (v) => escapeHtml(v == null ? "" : String(v));
@@ -41,7 +41,7 @@ async function openLab(id) {
 }
 
 // ▶️ إنت بتختار تطلّع إيه من الفيديو (كل خطوة لوحدها)
-const LAB_PICK = { elements: "🧩 العناصر", components: "💡 الكومبوننتس", connectors: "🔗 الموصلات", schema: "🗺️ المخطط" };
+const LAB_PICK = { elements: "🧩 العناصر", components: "💡 المكونات", connectors: "🔗 الموصلات", schema: "🗺️ المخطط" };
 const LAB_PICK_KEY = "studiomania.lab.pick";
 function labPicked() {
   try { return new Set(JSON.parse(storageGet(LAB_PICK_KEY) || "null") || ["schema"]); } catch { return new Set(["schema"]); }
@@ -51,10 +51,10 @@ function renderLabPick(d) {
   const fresh = !["elements", "components", "connectors"].some((k) => st[k]) && !d.schema;
   const note = (k) => (k === "components" && st.elements?.status !== "done" ? " <small class=\"muted\">(يحتاج العناصر، ستُنشأ معه)</small>" : "")
     + (st[k]?.status === "done" || (k === "schema" && d.schema?.data) ? " ✅" : "");
-  $("labPick").innerHTML = `${fresh && st.shots?.status === "done" ? `<p class="hint">✂️ الفيديو قُسّم. اختر أنت تريد تُخرج ماذا منه (كل شيء تلقائيًا، والأسرع المخطط فقط):</p>` : ""}
-    <div class="row wrap lab-pickrow"><b>تريد تُخرج ماذا؟</b>
+  $("labPick").innerHTML = `${fresh && st.shots?.status === "done" ? `<p class="hint">✂️ قُسّم الفيديو. اختر ما تريد استخراجه منه (كل شيء تلقائيًا، والأسرع المخطط فقط):</p>` : ""}
+    <div class="row wrap lab-pickrow"><b>ماذا تريد أن تستخرج؟</b>
       ${Object.entries(LAB_PICK).map(([k, l]) => `<label class="check"><input type="checkbox" data-pick="${k}" ${pick.has(k) ? "checked" : ""} ${d.busy ? "disabled" : ""}> ${l}${note(k)}</label>`).join("")}
-      <button type="button" class="btn sm primary" data-pickgo ${d.busy ? "disabled" : ""}>▶️ طلّع الذي اخترته</button></div>`;
+      <button type="button" class="btn sm primary" data-pickgo ${d.busy ? "disabled" : ""}>▶️ استخرج ما اخترته</button></div>`;
 }
 
 function scheduleLabPoll() {
@@ -79,14 +79,14 @@ const rv = (kind, ref, review) => {
     <button type="button" class="${ok === false ? "on bad" : ""}" data-rvok="0" title="خطأ">❌</button>
     <input type="text" class="lab-note" value="${le(review?.note)}" placeholder="ملاحظة" data-rvnote></span>`;
 };
-const orig = (x) => x?.original ? `<small class="muted" title="ما النموذج قاله قبل تصحيحك" data-no-i18n>كان: ${le(Object.values(x.original).join(" · "))}</small>` : "";
+const orig = (x) => x?.original ? `<small class="muted" title="ما قاله النموذج قبل تصحيحك" data-no-i18n>كان: ${le(Object.values(x.original).join(" · "))}</small>` : "";
 
 function renderLab() {
   $("labList").innerHTML = labx.list.map((x) => `<li class="${x.id === labx.cur?.id ? "active" : ""}" data-lab="${x.id}">
       ${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ph">🎬</span>`}
       <span class="ad-li-body"><span class="nm" data-no-i18n>${le(x.name)}</span>
         <small class="muted">${x.duration} ث${x.fx ? " · 🎬🔊" : ""}</small></span>
-      <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لا يوجد بعد فيديوهات.</li>`;
+      <small>${x.busy ? "⏳" : ""}</small></li>`).join("") || `<li class="muted">لا توجد فيديوهات بعد.</li>`;
   const nfx = labx.list.filter((x) => x.fx).length;
   $("labFxCount").textContent = nfx ? `(${nfx})` : "";
   $("labFxZip").classList.toggle("disabled", !nfx);
@@ -148,28 +148,28 @@ function renderLabParts(d) {
   const card = (icon, label, media, url, extra = "", cls = "") => `<div class="lab-part ${cls}"><div class="row"><b>${icon} ${label}</b>${extra}
       ${url ? `<a class="btn sm" href="${url}" download>⬇ نزّل</a>` : ""}</div>${media}</div>`;
   const noAudio = d.source?.has_audio === false;
-  const stemMsg = noAudio ? "هذا الفيديو لا يحتوي صوت." : !d.audioshake ? "مفتاح ElevenLabs غير مسجل. ضعه من ⚙️ الإعدادات."
+  const stemMsg = noAudio ? "هذا الفيديو لا يحتوي على صوت." : !d.audioshake ? "مفتاح ElevenLabs غير مسجل. ضعه من ⚙️ الإعدادات."
     : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لم يُقسّم بعد.";
   const parts = Object.entries(LAB_PARTS).map(([k, [h, l]]) => {
     const x = st[k];
-    const tog = x?.url ? ` <button type="button" class="lab-hear ${labx.hear[h] ? "on" : ""}" data-hear="${h}" title="اسمعه في الفيديو الذي أعلى / أغلقه">${labx.hear[h] ? "🔊" : "🔇"}</button>` : "";
+    const tog = x?.url ? ` <button type="button" class="lab-hear ${labx.hear[h] ? "on" : ""}" data-hear="${h}" title="استمع إليه في الفيديو الذي في الأعلى / أغلقه">${labx.hear[h] ? "🔊" : "🔇"}</button>` : "";
     const [icon, ...rest] = l.split(" ");
     return card(icon, rest.join(" "), x?.url ? `<audio src="${x.url}" controls preload="metadata"></audio>`
       : x?.error ? `<span class="err">✕ ${le(x.error)}</span>` : wait(stemMsg), x?.url, tog);
   }).join("");
   const isNew = !d.steps?.split;
   el.innerHTML = `<h3>🎚️ الفيديو مقسّم إلى ٤</h3>
-    ${isNew ? `<p class="hint">هذا الفيديو رُفع قبل التقسيم الجديد. اضغط «🎚️ قسّم آخر» أعلى لكي يُقسّم لصورة ونص وموسيقى ومؤثرات.</p>` : ""}
-    ${labx.stems ? `<p class="hint">🎧 الفيديو الذي أعلى يشغّل التراكات المفصولة: اضغط 🔊 بجانب أي جزء لكي تقفله وتسمع الباقي تلقائيًا.</p>` : ""}
+    ${isNew ? `<p class="hint">رُفع هذا الفيديو قبل التقسيم الجديد. اضغط «🎚️ قسّم مرة أخرى» في الأعلى ليُقسَّم إلى صورة ونص وموسيقى ومؤثرات.</p>` : ""}
+    ${labx.stems ? `<p class="hint">🎧 الفيديو الذي في الأعلى يشغّل المسارات المفصولة: اضغط 🔊 بجانب أي جزء لتكتمه وتسمع الباقي تلقائيًا.</p>` : ""}
     <div class="lab-parts">
       ${card("🎬🔊", "الصورة + المؤثرات", d.picture_fx_url ? `<video src="${d.picture_fx_url}" controls playsinline preload="metadata"></video>`
-        : wait(noAudio ? "هذا الفيديو لا يحتوي صوت." : isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : stemMsg), d.picture_fx_url, "", "main")}
-      ${card("🎬", "الصورة (بدون صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "ما زال."), d.picture_url)}
+        : wait(noAudio ? "هذا الفيديو لا يحتوي على صوت." : isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : stemMsg), d.picture_fx_url, "", "main")}
+      ${card("🎬", "الصورة (دون صوت)", d.picture_url ? `<video src="${d.picture_url}" controls muted playsinline preload="metadata"></video>` : wait(isNew ? "لم يُقسّم بعد." : step.error ? `<span class="err">✕ ${le(step.error)}</span>` : "لم يُراجَع بعد."), d.picture_url)}
       ${parts}
     </div>`;
 }
 
-const LAB_SCORE = { components: "💡 الكومبوننتس المقبولة", shots: "✂️ القطعات", stems: "🎚️ التراكات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ النص" };
+const LAB_SCORE = { components: "💡 المكونات المقبولة", shots: "✂️ القطعات", stems: "🎚️ المسارات", sfx: "🔊 المؤثرات", music: "🎵 الموسيقى", speech: "🗣️ النص" };
 function renderLabScore(d) {
   const r = d.reviews || {};
   $("labScore").innerHTML = `<b>👤 تقييمك:</b>` + Object.entries(LAB_SCORE).filter(([k]) => r[k]?.total && (k === "components" || r[k].ok + r[k].bad)).map(([k, l]) => {
@@ -182,15 +182,15 @@ function renderLabScore(d) {
 // التايم لاين: لقطات / كلام / موسيقى / مؤثرات، والمؤشر ماشي مع الفيديو
 function renderLabTimeline(d) {
   const T = d.source.duration || 1, pct = (t) => `${(Math.max(0, Math.min(T, t)) / T) * 100}%`, a = d.audio || {};
-  const lane = (label, items, k) => `<div class="lab-lane"><span class="lab-ll">${k ? `<button type="button" class="lab-hear ${labx.hear[k] ? "on" : ""}" data-hear="${k}" title="اسمع / أغلق">${labx.hear[k] ? "🔊" : "🔇"}</button>` : ""}${label}</span><div class="lab-lt">${items}</div></div>`;
+  const lane = (label, items, k) => `<div class="lab-lane"><span class="lab-ll">${k ? `<button type="button" class="lab-hear ${labx.hear[k] ? "on" : ""}" data-hear="${k}" title="استمع / أغلق">${labx.hear[k] ? "🔊" : "🔇"}</button>` : ""}${label}</span><div class="lab-lt">${items}</div></div>`;
   const allOn = Object.values(labx.hear).every(Boolean), hasAudio = !!(a.sfx || a.speech || a.music);
   const cst = (c) => c.asset ? "ok" : c.review?.ok === false ? "bad" : "";
   $("labTimeline").innerHTML =
     lane("✂️ اللقطات", (d.shots || []).map((s) => `<i class="blk shot ${s.review?.ok === false ? "bad" : ""} ${s.ignored ? "off" : ""} ${s.cut === "change" ? "chg" : ""}" style="right:${pct(s.start)};width:calc(${pct(s.end - s.start)} - 2px)" data-seek="${s.start}" title="لقطة ${s.n}">${s.n}</i>`).join(""))
     + lane("🔗 موصلات", (d.connectors || []).map((c) => `<i class="blk conn ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-goconn="${c.id}" title="${le(c.name)}"></i>`).join(""))
-    + lane("💡 كومبوننتس", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
-    + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 اضغط 🔊 بجانب أي حارة لكي تقفلها وتسمع الباقي تلقائيًا"
-      : labx.stems ? "🎚️ تسمع التراكات المفصولة التي مفتوحة فقط" : "⚠️ لا يوجد تراكات مفصولة: الصوت يسكت برا أوقات الأشياء التي مفتوحة (يمكنك تتأكد من التوقيت، فقط النص والموسيقى في نفس اللحظة يصبحون مع بعض)"}</div>`
+    + lane("💡 مكونات", (d.components || []).map((c) => `<i class="blk comp ${cst(c)}" style="right:${pct(c.t0)};width:calc(${pct(c.t1 - c.t0)} - 2px)" data-seek="${c.t0}" data-gocomp="${c.id}" title="${le(c.name)}"></i>`).join(""))
+    + (!hasAudio ? "" : `<div class="lab-hearnote ${allOn ? "" : "on"}">${allOn ? "🎧 اضغط 🔊 بجانب أي مسار لتكتمه وتسمع الباقي تلقائيًا"
+      : labx.stems ? "🎚️ تسمع المسارات المفصولة المفتوحة فقط" : "⚠️ لا توجد مسارات مفصولة: يُكتم الصوت خارج أوقات الأشياء المفتوحة (يمكنك التأكد من التوقيت، لكن النص والموسيقى في اللحظة نفسها يُسمعان معًا)"}</div>`
     + lane("🗣️ نص", (a.speech || []).map((s) => `<i class="blk sp" style="right:${pct(s.start)};width:${pct(s.end - s.start)}" data-seek="${s.start}" title="${le(s.text)}"></i>`).join(""), "speech")
     + lane("🎵 موسيقى", (a.music || []).map((s) => `<i class="blk mu" style="right:${pct(s.start)};width:${pct(s.end - s.start)}" data-seek="${s.start}" title="${le(s.description)}"></i>`).join(""), "music")
     + lane("🔊 مؤثرات", (a.sfx || []).map((x) => `<i class="tick ${x.review?.ok === false ? "bad" : x.review?.ok ? "ok" : ""}" style="right:${pct(x.t)}" data-seek="${x.t}" data-clip="${x.clip_url || ""}" title="${le(x.label)} · ${lt(x.t)}"></i>`).join(""), "sfx"))
@@ -270,33 +270,33 @@ function labPlayShot(n, from, to) {
 
 function renderLabAudio(d) {
   const inner = labAudioInner(d);
-  $("labAudio").innerHTML = `<details data-audiobox ${labx.audioOpen ? "open" : ""}><summary><b>🎧 الصوت</b> <span class="muted">(متوقف الآن: الأصل يُحفظ بصوته الأصلي، هذا والتحليل تجريبي)</span></summary>
-    <div class="row wrap"><button type="button" class="btn sm" data-labrun="stems">🎚️ افصل التراكات (AudioShake)</button>
+  $("labAudio").innerHTML = `<details data-audiobox ${labx.audioOpen ? "open" : ""}><summary><b>🎧 الصوت</b> <span class="muted">(متوقف الآن: يُحفظ الأصل بصوته الأصلي، وهذا التحليل تجريبي)</span></summary>
+    <div class="row wrap"><button type="button" class="btn sm" data-labrun="stems">🎚️ افصل المسارات (AudioShake)</button>
       <button type="button" class="btn sm" data-labrun="audio">🎧 حلّل الصوت</button></div>${inner}</details>`;
 }
 function labAudioInner(d) {
   const a = d.audio || {};
-  if (a.none) return `<p class="muted">هذا الفيديو لا يحتوي صوت.</p>`;
-  if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ يفكك الصوت..." : "لم يُفكّك بعد."}</p>`;
+  if (a.none) return `<p class="muted">هذا الفيديو لا يحتوي على صوت.</p>`;
+  if (!a.sfx && !a.speech) return `<p class="muted">${d.steps?.audio?.status === "working" ? "⏳ يحلّل الصوت..." : "لم يُحلَّل بعد."}</p>`;
   const sfx = a.sfx || [];
-  return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت قيست)</span></h4>
+  return `<h4>🎧 الصوت <span class="muted">(${sfx.length} مؤثر · ${(a.speech || []).length} جملة · ${(a.music || []).length} موسيقى · ${(a.onsets || []).length} بداية صوت مقيسة)</span></h4>
     ${labStems(d)}
-    <p class="hint">⏱️ = الوقت ضُبط على بداية الصوت الذي قيست بالكود (دقة 10 مللي ثانية)${a.from_stem ? "، ومن تراك المؤثرات النضيف" : ""}. ▶️ يشغّل الصوت تلقائيًا ويودّي الفيديو للحظته.</p>
+    <p class="hint">⏱️ = ضُبط الوقت على بداية الصوت التي قيست بالكود (بدقة 10 مللي ثانية)${a.from_stem ? "، ومن مسار المؤثرات النظيف" : ""}. ▶️ يشغّل الصوت تلقائيًا وينقل الفيديو إلى لحظته.</p>
     <h4>🔊 المؤثرات الصوتية</h4>
     <div class="lab-rows">${sfx.map((x) => `<div class="lab-row" data-sfx="${x.id}">
       <button type="button" class="btn sm" data-play="${x.clip_url}" data-seek="${x.t}">▶️</button>
-      <span class="lab-time" title="${x.snapped ? `النموذج قال ${x.t_model}` : "مقاسش"}">${lt(x.t)} ${x.snapped ? "⏱️" : ""}</span>
+      <span class="lab-time" title="${x.snapped ? `النموذج قال ${x.t_model}` : "لم يُقَس"}">${lt(x.t)} ${x.snapped ? "⏱️" : ""}</span>
       <input type="text" value="${le(x.label)}" data-fix="sfx|${x.id}|label" data-no-i18n>
       <select data-fix="sfx|${x.id}|category">${labOpts(LAB_SFX_CAT, x.category)}</select>
       <small class="muted grow" data-no-i18n>${le(x.what)}</small>${orig(x)}
-      ${rv("sfx", x.id, x.review)}</div>`).join("") || `<p class="muted">لا يوجد مؤثرات.</p>`}</div>
+      ${rv("sfx", x.id, x.review)}</div>`).join("") || `<p class="muted">لا توجد مؤثرات.</p>`}</div>
     <h4>🎵 الموسيقى</h4>
     <div class="lab-rows">${(a.music || []).map((m, i) => `<div class="lab-row">
       <button type="button" class="btn sm" data-seek="${m.start}" data-playvid>▶️</button>
       <span class="lab-time">${lt(m.start)} ← ${lt(m.end)}</span>
       <input type="text" value="${le(m.description)}" data-fix="music|${i}|description" data-no-i18n>
       <input type="text" class="sm" value="${le(m.mood)}" data-fix="music|${i}|mood" data-no-i18n>${orig(m)}
-      ${rv("music", i, m.review)}</div>`).join("") || `<p class="muted">لا يوجد موسيقى.</p>`}</div>
+      ${rv("music", i, m.review)}</div>`).join("") || `<p class="muted">لا توجد موسيقى.</p>`}</div>
     <h4>🗣️ النص</h4>
     <div class="lab-rows">${(a.speech || []).map((s, i) => `<div class="lab-row">
       <button type="button" class="btn sm" data-seek="${s.start}" data-playvid>▶️</button>
@@ -313,26 +313,26 @@ function labStems(d) {
       <b class="lab-stem-l">${l}</b>
       ${st[k].url ? `<audio src="${st[k].url}" controls preload="metadata"></audio><a class="btn sm" href="${st[k].url}" download>⬇</a>` : `<span class="err">✕ ${le(st[k].error || "لم يظهر")}</span>`}
       ${st[k].url ? rv("stem", k, st[k].review) : ""}</div>`).join("");
-  return `<h4>🎚️ التراكات المفصولة</h4>${rows ? `<div class="lab-rows">${rows}</div>`
-    : `<p class="muted">${step.status === "working" ? `<span class="spin-inline"></span> ${le(step.progress || "يفصل التراكات...")}`
-      : !d.audioshake ? "مفتاح ElevenLabs غير مسجل، فالتحليل اشتغل على الصوت كله. ضعه من ⚙️ الإعدادات ثم اضغط «🎚️ التراكات»."
+  return `<h4>🎚️ المسارات المفصولة</h4>${rows ? `<div class="lab-rows">${rows}</div>`
+    : `<p class="muted">${step.status === "working" ? `<span class="spin-inline"></span> ${le(step.progress || "يفصل المسارات...")}`
+      : !d.audioshake ? "مفتاح ElevenLabs غير مسجل، فعمل التحليل على الصوت كله. ضعه من ⚙️ الإعدادات ثم اضغط «🎚️ المسارات»."
       : step.error ? `✕ ${le(step.error)}` : "لم تُفصل بعد."}</p>`}`;
 }
 
 // 📚 احفظ مقطع من اللقطة (بحركته وخلفيته وصوته) كأصل في المكتبة
-const ASSET_CATS = { connector: "🔗 كونيكتور", motion_graphics: "✨ موشن جرافيك", effect: "💥 افيكت", transition: "🔀 انتقال", text: "🔤 نص متحرك",
-  screen: "🖥️ تسجيل شاشة / واجهة", cursor: "🖱️ حركة ماوس", character: "🧍 شخصية", background: "🖼️ خلفية", product: "📦 منتج", other: "آخر" };
+const ASSET_CATS = { connector: "🔗 موصل", motion_graphics: "✨ موشن جرافيك", effect: "💥 مؤثر", transition: "🔀 انتقال", text: "🔤 نص متحرك",
+  screen: "🖥️ تسجيل شاشة / واجهة", cursor: "🖱️ حركة الفأرة", character: "🧍 شخصية", background: "🖼️ خلفية", product: "📦 منتج", other: "آخر" };
 function labAssetForm(d, s) {
   const els = s.analysis?.elements || [], T = d.source.duration;
   const guess = s.analysis?.scene_type === "screen_recording" ? "screen" : s.analysis?.scene_type === "motion_graphics" ? "motion_graphics" : "other";
-  return `<details class="lab-asset" data-ashot="${s.n}" ${labx.aopen[s.n] ? "open" : ""}><summary>📚 احفظ جزء بنفسك</summary>
-    <small class="muted">إذا الاقتراحات فاتتها شيء: تأخذ المقطع كما هو (الحركة والخلفية والصوت) ومعه تفكيك عناصره، ويمكنك تعدّي حدود اللقطة.</small>
+  return `<details class="lab-asset" data-ashot="${s.n}" ${labx.aopen[s.n] ? "open" : ""}><summary>📚 احفظ جزءًا بنفسك</summary>
+    <small class="muted">إن فات الاقتراحاتِ شيءٌ: تأخذ المقطع كما هو (الحركة والخلفية والصوت) ومعه تفكيك عناصره، ويمكنك تجاوز حدود اللقطة.</small>
     <div class="lab-chips"><button type="button" class="chip" data-arange="${s.start},${s.end}">🎬 اللقطة كلها</button>
       ${els.map((e) => `<button type="button" class="chip" data-arange="${e.first_t},${e.last_t}" data-aname="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)} <small>${lt(e.first_t)}–${lt(e.last_t)}</small></button>`).join("")}</div>
     <div class="row wrap">
       <input type="text" data-af="name" placeholder="اسم الأصل" value="${le((s.analysis?.summary || "").slice(0, 80))}" data-no-i18n>
       <select data-af="category">${labOpts(ASSET_CATS, guess)}</select>
-      <input type="text" data-af="tags" placeholder="تاجز: ماوس، سحب، مجلد" data-no-i18n>
+      <input type="text" data-af="tags" placeholder="وسوم: فأرة، سحب، مجلد" data-no-i18n>
     </div>
     <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${T}" value="${s.start.toFixed(2)}" data-af="t0"></label>
       <label>لـ <input type="number" step="0.05" min="0" max="${T}" value="${s.end.toFixed(2)}" data-af="t1"></label>
@@ -342,7 +342,7 @@ function labAssetForm(d, s) {
 }
 
 // ---------- 💡 الكومبوننتس المقترحة: كل كارت حتة من الفيديو بتلف لوحدها، ✅ = تدخل المكتبة، ❌ = مرفوضة (وسببك بيعلّم الموديل)
-const COMP_FILTER = { "": "الكل", todo: "ما زال", ok: "في المكتبة", bad: "مرفوضة" };
+const COMP_FILTER = { "": "الكل", todo: "لم يُراجَع بعد", ok: "في المكتبة", bad: "مرفوضة" };
 const compState = (c) => (c.asset ? "ok" : c.review?.ok === false ? "bad" : "todo");
 function compPoster(d, t) {
   const fr = (d.shots || []).flatMap((s) => s.frames || []);
@@ -353,11 +353,11 @@ function renderLabComps(d) {
   const n = { todo: 0, ok: 0, bad: 0 };
   all.forEach((c) => n[compState(c)]++);
   const items = all.filter((c) => !labx.cfilter || compState(c) === labx.cfilter);
-  $("labComps").innerHTML = `<h3 class="pane-h">💡 الكومبوننتس المقترحة <span class="muted">(${all.length})</span>
-      <button type="button" class="btn sm" data-labrun="components" ${d.busy ? "disabled" : ""} title="اقتراحات جديدة. ما قبلته أو رفضته يظل كما هو">↻ اقترح مرة أخرى</button>
+  $("labComps").innerHTML = `<h3 class="pane-h">💡 المكونات المقترحة <span class="muted">(${all.length})</span>
+      <button type="button" class="btn sm" data-labrun="components" ${d.busy ? "disabled" : ""} title="اقتراحات جديدة. ما قبلته أو رفضته يبقى كما هو">↻ اقترح مرة أخرى</button>
       ${all.length ? `<button type="button" class="btn sm danger" data-compfresh ${d.busy ? "disabled" : ""} title="يحذف كل الاقتراحات ويقترح من الصفر">🗑️ احذف واقترح من جديد</button>` : ""}</h3>
-    <p class="hint">النموذج طلّع هذه الحتت من التفكيك. شاهد كل واحدة: ✅ تدخل المكتبة مباشرة بحركتها وخلفيتها وصوتها ومفاتيح التحكم الخاصة بها، ❌ ترفضها واكتب السبب لكي الاقتراحات القادمة تصبح أحسن. يمكنك تضبط الاسم والبداية والنهاية قبل ما تقبل.</p>
-    ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "ينتظر العناصر تنتهي...")}</p>` : ""}
+    <p class="hint">استخرج النموذج هذه القطع من التفكيك. شاهد كل واحدة: ✅ تدخل المكتبة مباشرة بحركتها وخلفيتها وصوتها ومفاتيح التحكم الخاصة بها، ❌ ترفضها وتكتب السبب لتتحسن الاقتراحات القادمة. يمكنك ضبط الاسم والبداية والنهاية قبل أن تقبل.</p>
+    ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "ينتظر انتهاء العناصر...")}</p>` : ""}
     ${st.status === "skipped" || st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
     ${all.length ? `<div class="lab-chips">${Object.entries(COMP_FILTER).map(([k, l]) => `<button type="button" class="chip ${labx.cfilter === k ? "on" : ""}" data-cfilter="${k}">${l} <small>${k ? n[k] : all.length}</small></button>`).join("")}</div>` : ""}
     <div class="lab-comps">${items.map((c) => {
@@ -380,7 +380,7 @@ function renderLabComps(d) {
           <input type="text" class="lab-note grow" value="${le(c.review?.note)}" placeholder="لماذا؟ (مثلًا: مقطوع من النص، غير مفيد)" data-cnote>
         </div>
       </article>`;
-    }).join("") || (all.length ? `<p class="muted">لا شيء هنا.</p>` : st.status === "done" ? `<p class="muted">النموذج لم يجد حتت تستاهل تُحفظ.</p>` : "")}</div>`;
+    }).join("") || (all.length ? `<p class="muted">لا شيء هنا.</p>` : st.status === "done" ? `<p class="muted">لم يجد النموذج قطعًا تستحق الحفظ.</p>` : "")}</div>`;
 }
 async function labComp(cid, body, btn) {
   const go = async () => {
@@ -399,12 +399,12 @@ function renderLabConns(d) {
   all.forEach((c) => n[compState(c)]++);
   const items = all.filter((c) => !labx.xfilter || compState(c) === labx.xfilter);
   $("labConns").innerHTML = `<h3 class="pane-h">🔗 الموصلات <span class="muted">(${all.length})</span>
-      <button type="button" class="btn sm" data-labrun="connectors" ${d.busy ? "disabled" : ""} title="يشاهد الفيديو مرة أخرى ويبحث عن موصلات. ما قبلته أو رفضته يظل">↻ ابحث مرة أخرى</button>
+      <button type="button" class="btn sm" data-labrun="connectors" ${d.busy ? "disabled" : ""} title="يشاهد الفيديو مرة أخرى ويبحث عن موصلات. ما قبلته أو رفضته يبقى">↻ ابحث مرة أخرى</button>
       ${all.length ? `<button type="button" class="btn sm danger" data-connfresh ${d.busy ? "disabled" : ""}>🗑️ احذف وابحث من جديد</button>` : ""}</h3>
-    <p class="hint">الموصل = لحظة القصة فيها تتحوّل للمشهد الذي بعده أمام عينك بدون قطع (زووم داخل شيء، الخلفية تصبح عالم آخر، الماوس يودّينا لمكان...). النموذج يشاهد الفيديو كله ويكتب لكل واحد وصفته: الشرارة، واللي يظل ثابت، وماذا يتحول لإيه، والكاميرا والإيقاع. ✅ يدخل المكتبة بوصفته وفريماته.</p>
+    <p class="hint">الموصل = لحظة تتحول فيها القصة إلى المشهد التالي أمام عينك دون قطع (تكبير داخل شيء، الخلفية تصبح عالمًا آخر، الفأرة تنقلنا إلى مكان...). يشاهد النموذج الفيديو كله ويكتب لكل واحد وصفته: الشرارة، وما يبقى ثابتًا، وإلى ماذا يتحول، والكاميرا والإيقاع. ✅ يدخل المكتبة بوصفته وإطاراته.</p>
     ${st.status === "working" || st.status === "queued" ? `<p class="muted"><span class="spin-inline"></span> ${le(st.progress || "ينتظر...")}</p>` : ""}
     ${st.status === "failed" ? `<p class="err">${le(st.error)}</p>` : ""}
-    ${!st.status && !all.length ? `<p class="muted">هذا الفيديو فُكّك قبل خطوة الموصلات. اضغط «↻ ابحث مرة أخرى» أعلى.</p>` : ""}
+    ${!st.status && !all.length ? `<p class="muted">فُكّك هذا الفيديو قبل خطوة الموصلات. اضغط «↻ ابحث مرة أخرى» في الأعلى.</p>` : ""}
     ${all.length ? `<div class="lab-chips">${Object.entries(COMP_FILTER).map(([k, l]) => `<button type="button" class="chip ${(labx.xfilter || "") === k ? "on" : ""}" data-xfilter="${k}">${l} <small>${k ? n[k] : all.length}</small></button>`).join("")}</div>` : ""}
     <div class="lab-conns">${items.map((c) => {
       const s = compState(c);
@@ -413,7 +413,7 @@ function renderLabConns(d) {
           <video data-cvid data-t0="${labx.xwide[c.id] ? Math.max(0, c.t0 - 3) : c.t0}" data-t1="${labx.xwide[c.id] ? Math.min(d.source.duration, c.t1 + 3) : c.t1}"
             src="${d.source_url}#t=${labx.xwide[c.id] ? Math.max(0, c.t0 - 3) : c.t0}" poster="${c.keyframes?.[0]?.url || ""}" preload="none" playsinline controls></video>
           <div class="lab-conn-range">
-            <label class="check" title="يشغّل 3 ثواني قبل الموصل و3 بعده لكي ترى هو يبدأ وينتهي أين بالضبط"><input type="checkbox" data-xwide ${labx.xwide[c.id] ? "checked" : ""}> 🔓 انظر ما حواليه</label>
+            <label class="check" title="يشغّل 3 ثوانٍ قبل الموصل و3 بعده لترى أين يبدأ وأين ينتهي بالضبط"><input type="checkbox" data-xwide ${labx.xwide[c.id] ? "checked" : ""}> 🔓 شاهد ما حوله</label>
             <div class="row wrap"><b>البداية</b> <button type="button" class="btn sm" data-xnudge="t0:-0.5">−½ث</button><button type="button" class="btn sm" data-xnudge="t0:0.5">+½ث</button>
               <button type="button" class="btn sm" data-xset="t0" title="أوقف الفيديو عند أول الموصل واضغط هنا">⏮ من هنا</button></div>
             <div class="row wrap"><b>النهاية</b> <button type="button" class="btn sm" data-xnudge="t1:-0.5">−½ث</button><button type="button" class="btn sm" data-xnudge="t1:0.5">+½ث</button>
@@ -428,21 +428,21 @@ function renderLabConns(d) {
             <label>لـ <input type="number" step="0.05" min="0" max="${d.source.duration}" value="${c.t1}" data-xf="t1"></label>
             <small class="muted">${(c.t1 - c.t0).toFixed(2)} ث</small></div>
           ${labx.xedit[c.id] ? connEditForm(c) : `<div class="row wrap"><button type="button" class="btn sm" data-xedit>✏️ عدّل الشرح</button>
-            ${c.edited ? `<span class="chip" title="هذا الشرح عُدّل (بنفسك أو بالكلام مع النموذج)">✏️ عُدّل</span>` : ""}</div>
+            ${c.edited ? `<span class="chip" title="عُدّل هذا الشرح (بنفسك أو بالكلام مع النموذج)">✏️ عُدّل</span>` : ""}</div>
           <div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>
           <dl class="lab-conn-dl">
             ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
-            ${(c.anchors || []).length ? `<dt>📌 يظل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
+            ${(c.anchors || []).length ? `<dt>📌 يبقى ثابتًا</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
             ${(c.transforms || []).length ? `<dt>🔄 التحوّلات</dt><dd><ol class="lab-conn-tr">${c.transforms.map((x) => `<li><button type="button" class="btn sm" data-seek="${x.t0}" data-to="${x.t1}" data-cplay="${c.id}">▶️</button>
               <span class="lab-time">${lt(x.t0)}–${lt(x.t1)}</span> <span data-no-i18n><b>${le(x.from)}</b> ← ${le(x.to)}${x.how ? ` <small class="muted">(${le(x.how)})</small>` : ""}</span></li>`).join("")}</ol></dd>` : ""}
             ${c.camera ? `<dt>🎥 الكاميرا</dt><dd data-no-i18n>${le(c.camera)}</dd>` : ""}
             ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
             ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
-            ${c.story_role ? `<dt>📖 يخدم القصة كيف</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
+            ${c.story_role ? `<dt>📖 كيف يخدم القصة</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
           </dl>`}
           <div class="lab-conn-chat">
             ${(c.chat || []).slice(-6).map((m) => `<div class="msg ${m.role}" data-no-i18n>${m.role === "user" ? "👤" : "🤖"} ${le(m.text)}</div>`).join("")}
-            <div class="row"><input type="text" class="grow" data-xchat placeholder="💬 قل للشرح يعدّل ماذا، مثلًا: الماوس لا يضغط Enter، يضغط على أيقونة البحث، والموصل يُكمل حتى ما الخريطة تظهر كلها" data-no-i18n>
+            <div class="row"><input type="text" class="grow" data-xchat placeholder="💬 قل للشرح ماذا يعدّل، مثلًا: الفأرة لا تضغط Enter، بل تضغط على أيقونة البحث، والموصل يستمر حتى تظهر الخريطة كلها" data-no-i18n>
               <button type="button" class="btn sm primary" data-xsend>✨ عدّل</button></div>
           </div>
           <label class="lab-conn-recipe">🧪 الوصفة (تُطبّق على أي مشهدين، سطر لكل خطوة)
@@ -451,11 +451,11 @@ function renderLabConns(d) {
             ${c.asset ? `<button type="button" class="btn sm ok" data-casset="${c.asset}">📚 في المكتبة ↗</button>`
               : `<button type="button" class="btn sm primary" data-xok>✅ اقبل وضعه في المكتبة</button>`}
             <button type="button" class="btn sm ${s === "bad" ? "danger" : ""}" data-xbad>❌ ${s === "bad" ? "مرفوض" : "ارفض"}</button>
-            <input type="text" class="lab-note grow" value="${le(c.review?.note)}" placeholder="لماذا؟ (مثلًا: هذا قطع عادي غير كونيكتور)" data-xnote>
+            <input type="text" class="lab-note grow" value="${le(c.review?.note)}" placeholder="لماذا؟ (مثلًا: هذا قطع عادي وليس موصلًا)" data-xnote>
           </div>
         </div>
       </article>`;
-    }).join("") || (st.status === "done" && !all.length ? `<p class="muted">النموذج لم يجد موصلات في هذا الفيديو.</p>` : "")}</div>`;
+    }).join("") || (st.status === "done" && !all.length ? `<p class="muted">لم يجد النموذج موصلات في هذا الفيديو.</p>` : "")}</div>`;
 }
 // ✏️ الشرح كخانات تكتب فيها
 function connEditForm(c) {
@@ -463,11 +463,11 @@ function connEditForm(c) {
   return `<div class="lab-xedit">
     <div class="lab-xe2">${f("from_scene", "المشهد قبله")}${f("to_scene", "المشهد بعده")}</div>
     ${f("trigger", "🎯 الشرارة")}
-    <label class="lab-xe">📌 يظل ثابت (سطر لكل شيء)<textarea rows="2" data-xe="anchors" data-no-i18n>${le((c.anchors || []).join("\n"))}</textarea></label>
+    <label class="lab-xe">📌 يبقى ثابتًا (سطر لكل شيء)<textarea rows="2" data-xe="anchors" data-no-i18n>${le((c.anchors || []).join("\n"))}</textarea></label>
     <div class="lab-xe">🔄 التحوّلات
       <div class="lab-xtr">${(c.transforms || []).map((x) => connTrRow(x)).join("")}</div>
       <button type="button" class="btn sm" data-xtradd>＋ تحوّل</button></div>
-    ${f("camera", "🎥 الكاميرا")}${f("rhythm", "⏱️ الإيقاع")}${f("sound", "🔊 الصوت")}${f("story_role", "📖 يخدم القصة كيف", 2)}
+    ${f("camera", "🎥 الكاميرا")}${f("rhythm", "⏱️ الإيقاع")}${f("sound", "🔊 الصوت")}${f("story_role", "📖 كيف يخدم القصة", 2)}
     <div class="row wrap"><button type="button" class="btn sm primary" data-xsave>💾 احفظ الشرح</button><button type="button" class="btn sm" data-xcancel>إلغاء</button></div>
   </div>`;
 }
@@ -482,7 +482,7 @@ async function labConn(cid, body, btn) {
   const go = async () => {
     labx.cur = await api(`/api/lab/${labx.cur.id}/connectors/${cid}`, { method: "PATCH", ...jsonBody(body) });
     renderLabConns(labx.cur); renderLabTimeline(labx.cur); renderLabScore(labx.cur);
-    if (body.ok) { toast("📚 الموصل حُفظ في المكتبة بوصفته"); labLibCount(); }
+    if (body.ok) { toast("📚 حُفظ الموصل في المكتبة بوصفته"); labLibCount(); }
   };
   if (btn) return busyButton(btn, "⏳", go);
   try { await go(); } catch (err) { toast(err.message, true); }
@@ -490,12 +490,12 @@ async function labConn(cid, body, btn) {
 
 function renderLabShots(d) {
   const sfxById = Object.fromEntries((d.audio?.sfx || []).map((x) => [x.id, x]));
-  if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ يبحث عن القطعات..." : "ما زال."}</p>`; return; }
+  if (!(d.shots || []).length) { $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات</h3><p class="muted">${d.steps?.shots?.status === "working" ? "⏳ يبحث عن القطعات..." : "لم يُراجَع بعد."}</p>`; return; }
   const kept = d.shots.filter((s) => !s.ignored), gone = d.shots.filter((s) => s.ignored);
   const noComp = kept.filter((s) => !(d.components || []).some((c) => c.review?.ok !== false && c.t0 < s.end && c.t1 > s.start));
   $("labShots").innerHTML = `<h3 class="pane-h">🎬 اللقطات وعناصرها <span class="muted">(${kept.length}${gone.length ? ` من ${d.shots.length}` : ""})</span>
       ${noComp.length && (d.components || []).length ? `<button type="button" class="btn sm" data-prune title="${noComp.map((s) => s.n).join("، ")}">🧹 أزل اللقطات التي ليس لها كومبوننتس (${noComp.length})</button>` : ""}</h3>
-    ${gone.length ? `<details class="lab-gone"><summary>🙈 لقطات أُزيلت (${gone.length}) <span class="muted">لا تدخل في الكومبوننتس. البرنامج يزيل تلقائيًا التصوير العادي الذي لا يحتوي موشن جرافيك.</span></summary>
+    ${gone.length ? `<details class="lab-gone"><summary>🙈 لقطات أُزيلت (${gone.length}) <span class="muted">لا تدخل في المكونات. يزيل البرنامج تلقائيًا التصوير العادي الذي لا يحتوي على موشن جرافيك.</span></summary>
       ${gone.map((s) => `<div class="lab-row"><img src="${s.frames?.[0]?.url || ""}" alt="" class="lab-gone-th">
         <b>لقطة ${s.n}</b> <span class="lab-time">${lt(s.start)} ← ${lt(s.end)}</span>
         <small class="muted grow" data-no-i18n>${s.ignored.by === "auto" ? "🤖 " : "✋ "}${le(s.ignored.reason)}${s.analysis?.summary ? ` · ${le(s.analysis.summary)}` : ""}</small>
@@ -512,11 +512,11 @@ function renderLabShots(d) {
       <div class="lab-shotbody">
       <header><b>لقطة ${s.n}</b> <span class="lab-time">${lt(s.start)} ← ${lt(s.end)} (${(s.end - s.start).toFixed(2)} ث)</span>
         ${an ? `<span class="chip">${LAB_SCENE[an.scene_type] || ""}</span>` : ""}
-        <span class="muted">القطع مظبوط؟</span>${rv("shot", s.n, s.review)}
-        ${s.cut === "change" ? `<span class="chip" title="لا يوجد قطع هنا: الحركة وقفت وبدأت حركة جديدة في نفس المشهد">🔀 تغيير داخل المشهد</span>` : ""}
-        <button type="button" class="btn sm" data-split="${s.n}" title="إذا البرنامج فوّت تغيير: اختر فريم من الشريط (أو أوقف الفيديو عند المكان) واضغط هنا">✂️ قسّم هنا</button>
-        <button type="button" class="btn sm" data-hide="${s.n}" title="لن تدخل في الكومبوننتس، ويمكنك ترجّعها">🗑️ أزلها</button>
-        ${d.shots[d.shots.length - 1].n !== s.n ? `<button type="button" class="btn sm" data-merge="${s.n}" title="إذا هذه الجزء واللي بعدها حركة واحدة">🔗 ادمج مع ما بعدها</button>` : ""}</header>
+        <span class="muted">هل القطع صحيح؟</span>${rv("shot", s.n, s.review)}
+        ${s.cut === "change" ? `<span class="chip" title="لا يوجد قطع هنا: توقفت الحركة وبدأت حركة جديدة في المشهد نفسه">🔀 تغيير داخل المشهد</span>` : ""}
+        <button type="button" class="btn sm" data-split="${s.n}" title="إن فوّت البرنامج تغييرًا: اختر إطارًا من الشريط (أو أوقف الفيديو عند المكان) واضغط هنا">✂️ قسّم هنا</button>
+        <button type="button" class="btn sm" data-hide="${s.n}" title="لن تدخل في المكونات، ويمكنك إرجاعها">🗑️ أزلها</button>
+        ${d.shots[d.shots.length - 1].n !== s.n ? `<button type="button" class="btn sm" data-merge="${s.n}" title="إن كان هذا الجزء والذي بعده حركة واحدة">🔗 ادمج مع ما بعدها</button>` : ""}</header>
       <div class="lab-strip">${(s.frames || []).map((f) => `<span class="lab-fr"><img src="${f.url}" data-seek="${f.t}" data-pickt="${f.t}" class="${Math.abs(f.t - pick) < 0.001 ? "sel" : ""}" title="${lt(f.t)}" alt="">${f.t > s.start + 0.25 && f.t < s.end - 0.25 ? `<button type="button" class="lab-frcut" data-splitat="${f.t}" data-splitn="${s.n}" title="قسّم الجزء هنا (عند ${lt(f.t)})">✂️</button>` : ""}</span>`).join("")}</div>
       ${s.analysis_error ? `<div class="err">${le(s.analysis_error)}</div>` : ""}
       ${an ? `<p data-no-i18n>${le(an.summary)}</p>
@@ -525,7 +525,7 @@ function renderLabShots(d) {
         <div class="lab-els">${(an.elements || []).map((e) => `<div class="lab-el">
           <div class="lab-row"><select data-fix="element|${e.id}|type">${labOpts(LAB_TYPES, e.type)}</select>
             <input type="text" value="${le(e.name)}" data-fix="element|${e.id}|name" data-no-i18n>
-            <button type="button" class="btn sm" data-seek="${e.first_t}" data-to="${e.last_t}" title="شغّل العنصر من أول ما يظهر حتى ما يختفي">▶️</button>
+            <button type="button" class="btn sm" data-seek="${e.first_t}" data-to="${e.last_t}" title="شغّل العنصر من لحظة ظهوره حتى اختفائه">▶️</button>
           <span class="lab-time">${lt(e.first_t)} ← ${lt(e.last_t)}</span>${orig(e)}</div>
           <small class="muted" data-no-i18n>${le(e.description)}</small>
           ${(e.actions || []).map((x, i) => `<div class="lab-row lab-act">
@@ -536,7 +536,7 @@ function renderLabShots(d) {
             <small class="grow" data-no-i18n>${le(x.detail)}</small>
             ${x.sfx && sfxById[x.sfx] ? `<button type="button" class="btn sm" data-seek="${sfxById[x.sfx].t}" data-to="${sfxById[x.sfx].t + 0.4}" title="الصوت المربوط">🔊 ${le(sfxById[x.sfx].label)}</button>` : ""}
             </div>`).join("")}
-        </div>`).join("") || `<p class="muted">لا يوجد عناصر.</p>`}</div>`
+        </div>`).join("") || `<p class="muted">لا توجد عناصر.</p>`}</div>`
         : `<p class="muted">${d.steps?.elements?.status === "working" ? "⏳ يفكك العناصر..." : "العناصر لم تُفكّك بعد."}</p>`}
       ${labAssetForm(d, s)}
       </div></div></article>`;
@@ -566,7 +566,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       return labConn(cid, { [k]: Math.round((c[k] + Number(dt)) * 100) / 100 }, nudge);
     }
     if (xset) {
-      if (!v || v.readyState < 1) return toast("شغّل الفيديو ووقّفه عند المكان أولًا", true);
+      if (!v || v.readyState < 1) return toast("شغّل الفيديو وأوقفه عند المكان أولًا", true);
       return labConn(cid, { [xset.dataset.xset]: Math.round(v.currentTime * 100) / 100 }, xset);
     }
     if (e.target.closest("[data-xedit]")) { labx.xedit[cid] = true; return renderLabConns(labx.cur); }
@@ -591,7 +591,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     const send = e.target.closest("[data-xsend]");
     if (send) {
       const inp = conn.querySelector("[data-xchat]"), message = inp.value.trim();
-      if (!message) return toast("اكتب تريد تعدّل ماذا", true);
+      if (!message) return toast("اكتب ما تريد تعديله", true);
       return busyButton(send, "⏳ يشاهد ويعدّل...", async () => {
         const r = await api(`/api/lab/${labx.cur.id}/connectors/${cid}/refine`, { method: "POST", ...jsonBody({ message }) });
         labx.cur = r; labx.xedit[cid] = false;
@@ -651,7 +651,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   const cutAt = e.target.closest("[data-splitat]");
   if (cutAt) {  // ✂️ على الفريم نفسه: ضغطة واحدة
     const n = cutAt.dataset.splitn, t = Number(cutAt.dataset.splitat);
-    if (!(await uiConfirm(`تقسم الجزء ${n} عند ${lt(t)}؟`))) return;
+    if (!(await uiConfirm(`هل تقسم الجزء ${n} عند ${lt(t)}؟`))) return;
     return busyButton(cutAt, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
       labx.pick = {};
@@ -664,8 +664,8 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
     const v = document.querySelector(`[data-shotvid="${n}"]`), pick = labx.pick[n];
     const t = pick > s.start + 0.2 && pick < s.end - 0.2 ? pick
       : v && v.currentTime > s.start + 0.2 && v.currentTime < s.end - 0.2 ? v.currentTime : null;
-    if (t == null) return toast("اختر الفريم الذي التغيير يبدأ لديه من الشريط، أو أوقف الفيديو الخاص بالجزء لديه", true);
-    if (!(await uiConfirm(`تقسم الجزء عند ${lt(t)}؟ (العناصر تتحلل للحتتين من جديد)`))) return;
+    if (t == null) return toast("اختر من الشريط الإطار الذي يبدأ عنده التغيير، أو أوقف فيديو الجزء عنده", true);
+    if (!(await uiConfirm(`هل تقسم الجزء عند ${lt(t)}؟ (تُحلَّل العناصر للقطعتين من جديد)`))) return;
     return busyButton(split, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${n}/split`, { method: "POST", ...jsonBody({ t }) });
       labx.pick = {};
@@ -678,12 +678,12 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
       labx.cur = await api(`/api/lab/${labx.cur.id}/shots/${merge.dataset.merge}/merge`, { method: "POST" });
       labx.pick = {};
       renderLab();
-      toast("🔗 دُمجوا. إذا تريد الكومبوننتس تُضبط عليهم اضغط «↻ اقترح مرة أخرى»");
+      toast("🔗 دُمجت. إن أردت ضبط المكونات عليها فاضغط «↻ اقترح مرة أخرى»");
     });
   }
   const hide = e.target.closest("[data-hide], [data-unhide]"), prune = e.target.closest("[data-prune]");
   if (hide || prune) {
-    if (prune && !(await uiConfirm("يزيل كل اللقطات التي ليس لها ولا كومبوننت؟ (يمكنك تعود أي واحدة لاحقًا)"))) return;
+    if (prune && !(await uiConfirm("هل يزيل كل اللقطات التي ليس لها أي مكوّن؟ (يمكنك إرجاع أي واحدة لاحقًا)"))) return;
     const url = prune ? `/api/lab/${labx.cur.id}/shots/prune` : `/api/lab/${labx.cur.id}/shots/${hide.dataset.hide || hide.dataset.unhide}`;
     return busyButton(hide || prune, "⏳", async () => {
       labx.cur = await api(url, prune ? { method: "POST" } : { method: "PATCH", ...jsonBody({ ignored: !!hide.dataset.hide }) });
@@ -703,7 +703,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const cfresh = e.target.closest("[data-connfresh]");
   if (cfresh) {
-    if (!(await uiConfirm("تحذف كل الموصلات التي التُقطت في هذا الفيديو (حتى الذي قبلتها أو رفضتها) ويبحث من أولًا؟ ما في المكتبة يظل فيها."))) return;
+    if (!(await uiConfirm("هل تحذف كل الموصلات التي التُقطت في هذا الفيديو (حتى التي قبلتها أو رفضتها) ويبحث من البداية؟ ما في المكتبة يبقى فيها."))) return;
     return busyButton(cfresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=connectors&fresh=true`, { method: "POST" });
       labx.xfilter = "";
@@ -712,7 +712,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const fresh = e.target.closest("[data-compfresh]");
   if (fresh) {
-    if (!(await uiConfirm("تحذف كل اقتراحات الكومبوننتس (حتى الذي قبلتها أو رفضتها) ويقترح من الصفر؟\nما حُفظ في المكتبة يظل فيها، وأسباب الرفض تظل محفوظة لكي النموذج يتعلم منها."))) return;
+    if (!(await uiConfirm("هل تحذف كل اقتراحات المكونات (حتى التي قبلتها أو رفضتها) ويقترح من الصفر؟\nما حُفظ في المكتبة يبقى فيها، وأسباب الرفض تبقى محفوظة ليتعلم منها النموذج."))) return;
     return busyButton(fresh, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=components&fresh=true`, { method: "POST" });
       labx.cfilter = "";
@@ -772,10 +772,10 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   const go = e.target.closest("[data-pickgo]");
   if (go) {
     const pick = [...document.querySelectorAll("#labPick [data-pick]:checked")].map((x) => x.dataset.pick);
-    if (!pick.length) return toast("اختر شيء واحدة على الأقل", true);
+    if (!pick.length) return toast("اختر شيئًا واحدًا على الأقل", true);
     storageSet(LAB_PICK_KEY, JSON.stringify(pick));
     const steps = pick.filter((k) => k !== "schema");
-    if (!(await uiConfirm(`يُخرج من «${labx.cur.name}»: ${pick.map((k) => LAB_PICK[k]).join("، ")}؟`))) return;
+    if (!(await uiConfirm(`هل يستخرج من «${labx.cur.name}»: ${pick.map((k) => LAB_PICK[k]).join("، ")}؟`))) return;
     return busyButton(go, "⏳", async () => {
       if (steps.length) labx.cur = await api(`/api/lab/${labx.cur.id}/run?steps=${steps.join(",")}`, { method: "POST" });
       if (pick.includes("schema")) labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
@@ -784,11 +784,11 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const run = e.target.closest("[data-labrun]");
   if (run) {
-    const ask = { split: "يقسّم الفيديو مرة أخرى لصورة ونص وموسيقى ومؤثرات؟ (AudioShake يُحسب مرة أخرى)", shots: "يقسّم الفيديو مرة أخرى؟ (العناصر الخاصة باللقطات القديمة ستروح، وإذا تريدها اضغط «🧩 العناصر» بعدها)",
-      elements: "يفكك عناصر كل لقطة؟ (يأخذ وقت: النموذج يرى كل لقطة تلقائيًا)",
-      components: "يقترح كومبوننتس جديدة؟ ما قبلته أو رفضته يظل كما هو، ورفضك يُرسل له لكي يتعلم منه.",
-      connectors: "يبحث عن موصلات؟ ما قبلته أو رفضته يظل." }[run.dataset.labrun]
-      || "تعيد هذه الخطوة؟";
+    const ask = { split: "هل يقسّم الفيديو مرة أخرى إلى صورة ونص وموسيقى ومؤثرات؟ (يُحسب AudioShake مرة أخرى)", shots: "هل يقسّم الفيديو مرة أخرى؟ (ستُحذف عناصر اللقطات القديمة، وإن أردتها فاضغط «🧩 العناصر» بعدها)",
+      elements: "هل يفكك عناصر كل لقطة؟ (يستغرق وقتًا: يرى النموذج كل لقطة تلقائيًا)",
+      components: "هل يقترح مكونات جديدة؟ ما قبلته أو رفضته يبقى كما هو، ويُرسل إليه رفضك ليتعلم منه.",
+      connectors: "هل يبحث عن موصلات؟ ما قبلته أو رفضته يبقى." }[run.dataset.labrun]
+      || "هل تعيد هذه الخطوة؟";
     if (!(await uiConfirm(ask))) return;
     try { labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=${run.dataset.labrun}`, { method: "POST" }); renderLab(); scheduleLabPoll(); }
     catch (err) { toast(err.message, true); }
@@ -867,7 +867,7 @@ $("labFile").addEventListener("change", async (e) => {
     const form = new FormData();
     form.append("file", f);
     try {
-      toast(files.length > 1 ? `⏳ جارٍ الرفع ${i + 1} من ${files.length}: ${f.name}` : "⏳ جارٍ الرفع الفيديو...");
+      toast(files.length > 1 ? `⏳ جارٍ الرفع ${i + 1} من ${files.length}: ${f.name}` : "⏳ جارٍ رفع الفيديو...");
       last = await api("/api/lab", { method: "POST", body: form });
       ok++;
       labx.list = await api("/api/lab");
@@ -882,7 +882,7 @@ $("labName").addEventListener("change", async () => {
   catch (err) { toast(err.message, true); }
 });
 $("labDelete").onclick = async () => {
-  if (!(await uiConfirm("تحذف هذا الفيديو من المعمل بكل أجزائه؟"))) return;
+  if (!(await uiConfirm("هل تحذف هذا الفيديو من المعمل بكل أجزائه؟"))) return;
   try {
     await api(`/api/lab/${labx.cur.id}`, { method: "DELETE" });
     labx.cur = null;
@@ -895,8 +895,8 @@ $("labSplit").addEventListener("change", async () => {
   const v = $("labSplit").value;
   try {
     labx.cur = await api(`/api/lab/${labx.cur.id}`, { method: "PATCH", ...jsonBody({ split: v }) });
-    if ((await uiConfirm(v === "fine" ? "تقسّم الفيديو من جديد على كل تغيير داخل المشهد؟ (العناصر والكومبوننتس يُنشأ من جديد بعدها)"
-      : "تقسّم الفيديو من جديد على القطعات فقط؟ (العناصر والكومبوننتس يُنشأ من جديد بعدها)"))) {
+    if ((await uiConfirm(v === "fine" ? "هل تقسّم الفيديو من جديد على كل تغيير داخل المشهد؟ (تُنشأ العناصر والمكونات من جديد بعدها)"
+      : "هل تقسّم الفيديو من جديد على القطعات فقط؟ (تُنشأ العناصر والمكونات من جديد بعدها)"))) {
       labx.cur = await api(`/api/lab/${labx.cur.id}/run?step=shots`, { method: "POST" });
       scheduleLabPoll();
     }
@@ -907,5 +907,5 @@ $("labSplit").addEventListener("change", async () => {
 $("labStop").onclick = () => busyButton($("labStop"), "⏳", async () => {
   labx.cur = await api(`/api/lab/${labx.cur.id}/stop`, { method: "POST" });
   renderLab(); scheduleLabPoll();
-  toast("⏹ يوقف. ما خلص يظل، والخطوة التي تعمل تقف عند أقرب نقطة");
+  toast("⏹ يوقف. ما انتهى يبقى، والخطوة الجارية تتوقف عند أقرب نقطة");
 });

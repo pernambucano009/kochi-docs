@@ -62,7 +62,7 @@ function renderAds() {
         <small class="muted">${new Date(a.created_at).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}${AD_MODE[a.progress?.mode] ? ` · ${AD_MODE[a.progress.mode]}` : ""}</small>
         ${adStages(a.progress)}</span>
       <small>${a.status === "working" || a.status === "queued" ? "⏳" : a.status === "failed" ? "✕" : a.adapt_status === "working" ? "✍️" : ""}</small></li>`).join("")
-    || `<li class="muted">لا يوجد بعد مشاريع. اضغط «＋ مشروع إعلان جديد» وارفع إعلان يعجبك.</li>`;
+    || `<li class="muted">لا توجد مشاريع بعد. اضغط «＋ مشروع إعلان جديد» وارفع إعلانًا يعجبك.</li>`;
   const a = adx.cur;
   $("adStyles").hidden = adx.view !== "styles";
   $("adBrain").hidden = adx.view !== "brain";
@@ -92,7 +92,7 @@ function renderAdStatus() {
   const el = $("adStatus");
   el.hidden = !busy && a.status !== "failed";
   el.className = `ad-status ${a.status === "failed" ? "err" : ""}`;
-  el.innerHTML = busy ? `<div class="spin"></div> ${adEsc(a.step || "في الطابور...")} <span class="muted">(الإعلان الطويل يأخذ دقيقة أو اثنان)</span>`
+  el.innerHTML = busy ? `<div class="spin"></div> ${adEsc(a.step || "في الطابور...")} <span class="muted">(الإعلان الطويل يستغرق دقيقة أو دقيقتين)</span>`
     : a.status === "failed" ? `✕ ${adEsc(a.error || "التحليل فشل")} <button class="btn sm" data-ad-retry>🔍 حلّل مرة أخرى</button>` : "";
 }
 
@@ -106,7 +106,7 @@ function renderAdAnalysis() {
   const missing = sc.length && !sc.some((s) => (s.components || []).length);
   $("adSceneCompsGo").hidden = !a.analysis;
   $("adSceneCompsGo").disabled = a.scomp_status === "working";
-  $("adSceneCompsGo").textContent = a.scomp_status === "working" ? "⏳ يستخرج الموشن جرافيك..." : missing ? "🎞️ استخرج الموشن جرافيك والمكونات" : "↻ استخرج الموشن جرافيك والمكونات آخر";
+  $("adSceneCompsGo").textContent = a.scomp_status === "working" ? "⏳ يستخرج الموشن جرافيك..." : missing ? "🎞️ استخرج الموشن جرافيك والمكونات" : "↻ استخرج الموشن جرافيك والمكونات مرة أخرى";
   $("adSceneCompsGo").classList.toggle("primary", !!missing);
   $("adSceneCompsErr").hidden = !a.analysis?.components_error;
   $("adSceneCompsErr").textContent = a.analysis?.components_error ? `✕ ${a.analysis.components_error}` : "";
@@ -114,7 +114,7 @@ function renderAdAnalysis() {
   if (a.source_url && v.getAttribute("src") !== a.source_url) v.src = a.source_url;
   const an = a.analysis;
   if (!an) {
-    $("adSummary").innerHTML = `<p class="muted">${a.status === "failed" ? "" : "⏳ جارٍ التحليل الإعلان..."}</p>`;
+    $("adSummary").innerHTML = `<p class="muted">${a.status === "failed" ? "" : "⏳ جارٍ تحليل الإعلان..."}</p>`;
     $("adScenes").innerHTML = "";
     return;
   }
@@ -140,12 +140,12 @@ function renderAdAudio() {
   const working = a.audio_status === "working";
   $("adAudioGo").hidden = !a.source?.has_audio;
   $("adAudioGo").disabled = working;
-  $("adAudioGo").textContent = working ? "⏳ جارٍ الاستماع الصوت..." : au ? "↻ حلّل الصوت مرة أخرى" : "🎧 حلّل الصوت";
+  $("adAudioGo").textContent = working ? "⏳ جارٍ الاستماع إلى الصوت..." : au ? "↻ حلّل الصوت مرة أخرى" : "🎧 حلّل الصوت";
   $("adAudioGo").classList.toggle("primary", !au);
   if (!a.source?.has_audio) { $("adAudio").innerHTML = `<p class="muted">هذا الإعلان بدون صوت.</p>`; return; }
   const err = a.audio_error && !working ? `<div class="err">✕ ${adEsc(a.audio_error)}</div>` : "";
   if (!au) {
-    $("adAudio").innerHTML = err || `<p class="muted">${working ? "⏳ جارٍ الاستماع الصوت بالتفصيل (دقيقة تقريبًا)..." : "ما زال لم يُحلّل. اضغط «🎧 حلّل الصوت» إذا تحتاجه."}</p>`;
+    $("adAudio").innerHTML = err || `<p class="muted">${working ? "⏳ جارٍ الاستماع إلى الصوت بالتفصيل (دقيقة تقريبًا)..." : "لم يُحلَّل بعد. اضغط «🎧 حلّل الصوت» إن كنت تحتاجه."}</p>`;
     return;
   }
   const m = au.music || {};
@@ -509,7 +509,7 @@ $("adStylePick").addEventListener("click", async (e) => {
   if (!b) return;
   await patchAd({ settings: { style_id: b.dataset.pickStyle || null } });
   renderAds();
-  toast(b.dataset.pickStyle ? "🎨 اختير الأسلوب. اضغط «اكتب الاقتراح من جديد» لكي الأوصاف تُكتب به" : "أُزيل الأسلوب");
+  toast(b.dataset.pickStyle ? "🎨 اختير الأسلوب. اضغط «اكتب الاقتراح من جديد» لتُكتب الأوصاف به" : "أُزيل الأسلوب");
 });
 $("adDirsGo").onclick = () => busyButton($("adDirsGo"), "⏳", async () => {
   adx.cur = await api(`/api/ads/${adx.cur.id}/directions`, { method: "POST" });
@@ -520,7 +520,7 @@ async function adaptWithControls() {
   renderAds(); scheduleAdPoll();
 }
 $("adCtlApply").onclick = async () => {
-  if (adx.cur.adaptation && !(await uiConfirm("يكتب الاقتراح من جديد هذه بالاختيارات؟ الاقتراح الحالي سيتغير."))) return;
+  if (adx.cur.adaptation && !(await uiConfirm("هل يُكتب الاقتراح من جديد بهذه الاختيارات؟ سيتغير الاقتراح الحالي."))) return;
   busyButton($("adCtlApply"), "⏳", adaptWithControls);
 };
 $("adBrandCtl").addEventListener("click", async (e) => {
@@ -540,7 +540,7 @@ $("adReadapt").onclick = () => busyButton($("adReadapt"), "⏳", async () => {
   renderAds();
 });
 async function reanalyze() {
-  if (!(await uiConfirm("تحلل الإعلان من أولًا؟ التعديلات التي عملتها على التحليل ستُحذف. الاقتراح الحالي سيظل حتى ما تضغط «التالي» لكي يُكتب من التحليل الجديد."))) return;
+  if (!(await uiConfirm("هل تحلل الإعلان من البداية؟ ستُحذف التعديلات التي أجريتها على التحليل. سيبقى الاقتراح الحالي حتى تضغط «التالي» ليُكتب من التحليل الجديد."))) return;
   busyButton($("adReanalyze"), "⏳", async () => {
     adx.cur = await api(`/api/ads/${adx.cur.id}/analyze`, { method: "POST" });
     adx.tab = "analysis";
@@ -580,7 +580,7 @@ $("adStyleFiles").addEventListener("change", async (e) => {
   files.forEach((f) => form.append("files", f));
   form.append("name", $("adStyleName").value.trim());
   try {
-    toast("⏳ جارٍ الرفع الصور...");
+    toast("⏳ جارٍ رفع الصور...");
     await api("/api/ad-styles", { method: "POST", body: form });
     $("adStyleName").value = "";
     adx.styles = await api("/api/ad-styles");
@@ -644,27 +644,27 @@ function renderAdFlow() {
   n1.hidden = !a.analysis;
   const sc = a.analysis?.scenes || [];
   if (a.analysis && sc.length && !sc.some((s) => (s.components || []).length || s.motion_graphics) && a.scomp_status !== "working") {
-    n1.innerHTML = `<span class="muted">⚠️ ما زال الموشن جرافيك ومكونات المشاهد ما لم تُستخرج، والاقتراح يُبنى عليهم.</span>
+    n1.innerHTML = `<span class="muted">⚠️ لم يُستخرج الموشن جرافيك ومكونات المشاهد بعد، والاقتراح يُبنى عليها.</span>
       <button class="btn primary" data-scomps ${anBusy ? "disabled" : ""}>🎞️ استخرج الموشن جرافيك والمكونات</button>`;
   } else if (a.analysis) {
     const fresh = a.adaptation && !adaptStale(a);
     n1.innerHTML = `<span class="muted">${adBusy ? "✍️ الاقتراح يُكتب من هذا التحليل..." : fresh ? "✅ الاقتراح متحدّث بآخر نسخة من التحليل والمكونات."
-      : a.adaptation ? "⚠️ التحليل أو المكونات تغيّرون بعد ما الاقتراح كُتب." : "الخطوة القادمة: اقتراح للعميل مبني على المشاهد هذه والمكونات."}</span>
-      <button class="btn primary" data-flow="adapt" ${anBusy || adBusy ? "disabled" : ""}>${adBusy ? "⏳ جارٍ الكتابة الاقتراح..."
+      : a.adaptation ? "⚠️ تغيّر التحليل أو المكونات بعد أن كُتب الاقتراح." : "الخطوة القادمة: اقتراح للعميل مبني على المشاهد هذه والمكونات."}</span>
+      <button class="btn primary" data-flow="adapt" ${anBusy || adBusy ? "disabled" : ""}>${adBusy ? "⏳ جارٍ كتابة الاقتراح..."
         : fresh ? "التالي: الاقتراح →" : "التالي: اكتب الاقتراح من هذا التحليل →"}</button>`;
   }
   const s1 = $("adAdaptStale");
   s1.hidden = !adaptStale(a) || adBusy;
-  s1.innerHTML = `<span class="grow">${adaptNoMotion(a) ? "⚠️ هذا الاقتراح مكتوب بالطريقة القديمة على الفكرة فقط، بدون الموشن جرافيك الخاص بـ كل مشهد."
-    : "⚠️ هذا الاقتراح مكتوب على نسخة أقدم من التحليل (التحليل أو المكونات تغيّرون بعده)."}</span>
+  s1.innerHTML = `<span class="grow">${adaptNoMotion(a) ? "⚠️ هذا الاقتراح مكتوب بالطريقة القديمة على الفكرة فقط، دون الموشن جرافيك الخاص بكل مشهد."
+    : "⚠️ هذا الاقتراح مكتوب على نسخة أقدم من التحليل (تغيّر التحليل أو المكونات بعده)."}</span>
     <button class="btn sm primary" data-flow="adapt" ${anBusy ? "disabled" : ""}>↻ اكتبه من جديد بالتحليل الجديد</button>`;
   const n2 = $("adNextAdapt");
   n2.hidden = !a.adaptation?.scenes?.length || adBusy;
   if (!n2.hidden) {
     const fresh = a.prod && !prodStale(a), old = adaptStale(a);
-    n2.innerHTML = `<span class="muted">${fresh ? "✅ التنفيذ حسنًا على آخر نسخة من الاقتراح."
-      : old ? "⚠️ هذا الاقتراح مبني على تحليل أقدم، فالموشن جرافيك الجديد غير فيه. سيُكتب من جديد بالموشن ثم يُؤخذ للتنفيذ."
-      : a.prod ? "⚠️ الاقتراح تغيّر بعد ما التنفيذ بدأ." : "الخطوة القادمة: التنفيذ (ستوري بورد ← مكونات ← فيديو لكل لقطة)."}</span>
+    n2.innerHTML = `<span class="muted">${fresh ? "✅ التنفيذ مطابق لآخر نسخة من الاقتراح."
+      : old ? "⚠️ هذا الاقتراح مبني على تحليل أقدم، فالموشن جرافيك الجديد ليس فيه. سيُكتب من جديد بالموشن ثم يُؤخذ للتنفيذ."
+      : a.prod ? "⚠️ تغيّر الاقتراح بعد أن بدأ التنفيذ." : "الخطوة القادمة: التنفيذ (ستوري بورد ← مكونات ← فيديو لكل لقطة)."}</span>
       <button class="btn primary" data-flow="prod" ${prodBusy(a) && !fresh ? "disabled" : ""}>${fresh ? "التالي: التنفيذ →"
         : old ? "التالي: حدّث الاقتراح بالموشن وخذه للتنفيذ →" : "التالي: خذ هذا الاقتراح للتنفيذ →"}</button>`;
   }
@@ -673,9 +673,9 @@ function renderAdFlow() {
   s2.hidden = !stale && !hist.length;
   s2.classList.toggle("ad-stale", stale);
   s2.classList.toggle("ad-next", !stale);
-  s2.innerHTML = `${stale ? `<span class="grow">${adaptStale(a) ? "⚠️ التحليل أو الموشن جرافيك تغيّرون بعد ما الاقتراح كُتب، فاللقطات هنا ماشية على النسخة القديمة."
-      : "⚠️ الاقتراح تغيّر بعد ما هذا التنفيذ بدأ، فاللقطات هنا ماشية على النسخة القديمة."}</span>
-      <button class="btn sm primary" data-flow="prod" ${prodBusy(a) || a.adapt_status === "working" ? "disabled" : ""}>${adaptStale(a) ? "↻ حدّث الاقتراح بالموشن وخذه للتنفيذ" : "↻ خذ الاقتراح الجديد للتنفيذ"}</button>` : `<span class="grow muted">📦 في تنفيذ قديم محفوظ.</span>`}
+  s2.innerHTML = `${stale ? `<span class="grow">${adaptStale(a) ? "⚠️ تغيّر التحليل أو الموشن جرافيك بعد أن كُتب الاقتراح، فاللقطات هنا تسير على النسخة القديمة."
+      : "⚠️ تغيّر الاقتراح بعد أن بدأ هذا التنفيذ، فاللقطات هنا تسير على النسخة القديمة."}</span>
+      <button class="btn sm primary" data-flow="prod" ${prodBusy(a) || a.adapt_status === "working" ? "disabled" : ""}>${adaptStale(a) ? "↻ حدّث الاقتراح بالموشن وخذه للتنفيذ" : "↻ خذ الاقتراح الجديد للتنفيذ"}</button>` : `<span class="grow muted">📦 يوجد تنفيذ قديم محفوظ.</span>`}
     ${hist.length ? `<button class="btn sm" data-prod-restore="0" ${prodBusy(a) ? "disabled" : ""}>↶ استعد التنفيذ السابق (${hist[0].shots} لقطة)</button>` : ""}`;
 }
 
@@ -687,7 +687,7 @@ function renderAdActivity() {
   if (a.scomp_status === "working") items.push(["analysis", "🎞️ يستخرج الموشن جرافيك ومكونات كل مشهد"]);
   if (a.directions_status === "working") items.push(["adapt", "🎲 يفكر في 3 اتجاهات مختلفة للإعلان"]);
   if (a.adapt_status === "working") items.push(["adapt", a.chain_prod ? "✍️ يكتب الاقتراح بالموشن، وبعده سيبدأ التنفيذ" : "✍️ يكتب الاقتراح"]);
-  if (a.audio_status === "working") items.push(["audio", "🎧 يسمع الصوت ويفصّصه"]);
+  if (a.audio_status === "working") items.push(["audio", "🎧 يستمع إلى الصوت ويحلّله بالتفصيل"]);
   const shots = a.prod?.shots || [];
   const drawing = shots.filter((s) => s.frame_status === "working"), waitDraw = shots.filter((s) => s.frame_status === "queued");
   if (drawing.length) items.push(["prod", `🎨 يرسم الستوري بورد: لقطة ${nums(drawing)}`]);
@@ -703,7 +703,7 @@ function renderAdActivity() {
   const vc = shots.filter((s) => s.voice_status === "working");
   if (vc.length) items.push(["prod", `🎙️ يولّد الصوت: لقطة ${nums(vc)}`]);
   const ls = shots.filter((s) => s.takes.some((t) => t.lipsync && PBUSY.has(t.status)));
-  if (ls.length) items.push(["prod", `👄 يحرّك البق مع النص: لقطة ${nums(ls)}`]);
+  if (ls.length) items.push(["prod", `👄 يحرّك الشفاه مع النص: لقطة ${nums(ls)}`]);
   const gen = shots.filter((s) => s.takes.some((t) => t.status === "working" && !t.composite && !t.lipsync)), waitGen = shots.filter((s) => s.takes.some((t) => t.status === "queued" && !t.composite && !t.lipsync));
   if (gen.length) items.push(["prod", `🎬 يولّد فيديو: لقطة ${nums(gen)}`]);
   if (waitGen.length) items.push(["prod", `⏳ فيديو في الطابور: لقطة ${nums(waitGen)}`]);
@@ -711,7 +711,7 @@ function renderAdActivity() {
   el.classList.toggle("busy", !!items.length);
   el.innerHTML = items.length
     ? `<div class="spin"></div><b>يعمل الآن:</b>${items.map(([t, x]) => `<button type="button" class="ad-act" data-act-tab="${t}">${x}</button>`).join("")}`
-    : `<span class="dot"></span><span class="muted">ساكت الآن، لا شيء تعمل. اختر الخطوة التي تريدها.</span>`;
+    : `<span class="dot"></span><span class="muted">لا يعمل شيء الآن. اختر الخطوة التي تريدها.</span>`;
 }
 
 async function adFlow(btn, to) {
@@ -728,7 +728,7 @@ async function adFlow(btn, to) {
   if (a.prod && !prodStale(a)) { adx.tab = "prod"; return renderAds(); }
   if (adaptStale(a)) {
     // الموشن بيوصل للتنفيذ عن طريق الاقتراح: يتكتب من جديد من آخر تحليل، وبعدها التنفيذ بيبدأ منه لوحده
-    if (!(await uiConfirm(a.prod ? "الاقتراح سيُكتب من جديد من آخر تحليل (بالموشن جرافيك الذي استُخرج)، وبعدها التنفيذ سيبدأ منه تلقائيًا. التنفيذ الحالي سيُحفظ ويمكنك ترجعه. تُكمل؟"
+    if (!(await uiConfirm(a.prod ? "سيُكتب الاقتراح من جديد من آخر تحليل (بالموشن جرافيك الذي استُخرج)، وبعدها سيبدأ التنفيذ منه تلقائيًا. سيُحفظ التنفيذ الحالي ويمكنك استعادته. تُكمل؟"
       : "الاقتراح سيُكتب من جديد من آخر تحليل (بالموشن جرافيك الذي استُخرج)، وبعدها التنفيذ سيبدأ منه تلقائيًا. تُكمل؟"))) return;
     return busyButton(btn, "⏳", async () => {
       adx.cur = await api(`/api/ads/${a.id}/adapt`, { method: "POST", ...jsonBody({ message: "", then_prod: true }) });
@@ -736,7 +736,7 @@ async function adFlow(btn, to) {
       renderAds();
     });
   }
-  if (a.prod && !(await uiConfirm("سيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. التنفيذ الحالي (صوره وفيديوهاته) سيُحفظ ويمكنك ترجعه بزرار «استعد التنفيذ السابق». تُكمل؟"))) return;
+  if (a.prod && !(await uiConfirm("سيبدأ تنفيذ جديد من آخر نسخة من الاقتراح. سيُحفظ التنفيذ الحالي (صوره وفيديوهاته) ويمكنك استعادته بزر «استعد التنفيذ السابق». تُكمل؟"))) return;
   return busyButton(btn, "⏳", async () => {
     adx.cur = await pAPI("/start", { method: "POST" });
     adx.tab = "prod";
@@ -750,7 +750,7 @@ document.querySelector('.view[data-view="10"]').addEventListener("click", async 
   const go = e.target.closest("[data-act-tab]");
   if (go) { adx.tab = go.dataset.actTab; return renderAds(); }
   const r = e.target.closest("[data-prod-restore]");
-  if (r && (await uiConfirm("تعود التنفيذ السابق؟ التنفيذ الحالي سيُحفظ مكانه."))) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
+  if (r && (await uiConfirm("هل تستعيد التنفيذ السابق؟ سيُحفظ التنفيذ الحالي مكانه."))) pDo(r, "⏳", () => pAPI(`/restore?i=${r.dataset.prodRestore}`, { method: "POST" }));
 });
 
 // ---------- 4. التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات ← المونتاج ----------
@@ -826,20 +826,20 @@ $("adFixForm").addEventListener("submit", async (e) => {
 function editFrame(s) {
   openFix({
     title: `✏️ عدّل الستوري بورد: لقطة ${s.n}`,
-    placeholder: "مثلًا: قرّب الكاميرا على وشه، اجعل الخلفية جيم، أزل الكوباية، لبّسه مثل الصورة المرجعية",
-    hint: "الصورة الحالية تُعدّل: ما طلبته فقط يتغير والباقي يظل كما هو. النسخة القديمة تظل في النسخ.",
+    placeholder: "مثلًا: قرّب الكاميرا على وجهه، اجعل الخلفية صالة رياضية، أزل الكوب، ألبسه مثل الصورة المرجعية",
+    hint: "تُعدَّل الصورة الحالية: يتغير ما طلبته فقط ويبقى الباقي كما هو. تبقى النسخة القديمة في النسخ.",
     submit: async (form) => {
       adx.cur = await pAPI(`/shots/${s.id}/edit-frame`, { method: "POST", body: form });
       renderAds();
-      toast("✏️ يرسم نسخة معدّلة، والقديمة تظل في النسخ");
+      toast("✏️ يرسم نسخة معدّلة، وتبقى القديمة في النسخ");
     },
   });
 }
 function editTake(s, tid) {
   openFix({
     title: `✏️ عدّل فيديو لقطة ${s.n} (نسخة جديدة)`,
-    placeholder: "مثلًا: الكاميرا تتحرك أبطأ، يبتسم في الآخر، بدون ما ينظر للكاميرا",
-    hint: "يولّد نسخة جديدة بـ Seedance (التوليد يُحسب عليك) والقديمة تظل. إذا التعديل في الكادر نفسه (المكان، اللبس)، عدّل الستوري بورد أولًا.",
+    placeholder: "مثلًا: الكاميرا تتحرك أبطأ، يبتسم في النهاية، دون أن ينظر إلى الكاميرا",
+    hint: "يولّد نسخة جديدة بـ Seedance (التوليد يُحسب عليك) وتبقى القديمة. إن كان التعديل في الكادر نفسه (المكان، الملابس)، عدّل الستوري بورد أولًا.",
     submit: async (form) => {
       form.append("take_id", tid || "");
       adx.cur = await pAPI(`/shots/${s.id}/edit-take`, { method: "POST", body: form });
@@ -872,9 +872,9 @@ function renderSb(a, s) {
   const rest = db.filter((x) => !ments.includes(x.name));
   return `<div class="ad-sb">
     <label class="ad-f"><span>✍️ وصف الستوري بورد (بالمنشن من 👤 ملف العميل)</span>
-      <textarea rows="3" dir="ltr" data-pf="sb_prompt" placeholder="ما زال لم يُكتب. اضغط «✍️ اكتبه بالمنشن» أو زر الرسم أعلى" data-no-i18n>${adEsc(s.sb_prompt || "")}</textarea></label>
+      <textarea rows="3" dir="ltr" data-pf="sb_prompt" placeholder="لم يُكتب بعد. اضغط «✍️ اكتبه بالمنشن» أو زر الرسم في الأعلى" data-no-i18n>${adEsc(s.sb_prompt || "")}</textarea></label>
     <div class="ad-ments">${ments.map((n) => `<span class="ment" title="${adEsc(byName[n].kind)}"><img src="${byName[n].url}" alt="">@${adEsc(n)}</span>`).join("")
-      || `<span class="muted">لا يوجد إشارة ما زال: الرسم لن يأخذ صور من ملف العميل هذه للقطة.</span>`}</div>
+      || `<span class="muted">لا توجد إشارة بعد: لن يأخذ الرسم صورًا من ملف العميل لهذه اللقطة.</span>`}</div>
     <div class="row wrap">
       <button class="btn sm" data-p="sbwrite">✍️ ${s.sb_prompt ? "اكتبه مرة أخرى بالمنشن" : "اكتبه بالمنشن"}</button>
       ${rest.length ? `<select class="btn sm" data-addment><option value="">＋ إشارة من ملف العميل</option>${rest.map((x) => `<option value="${adEsc(x.name)}">${DB_KIND[x.kind] || ""} @${adEsc(x.name)}</option>`).join("")}</select>` : ""}
@@ -893,13 +893,13 @@ function renderVoice(a, s) {
     <div class="row wrap">
       <b>🎙️ الصوت</b>
       <select data-pf="speaker" title="من يتكلم"><option value="">🎙️ راوي (تعليق صوتي)</option>${spk.map((n) => `<option value="${adEsc(n)}" ${n === s.speaker ? "selected" : ""}>🧍 ${adEsc(n)}</option>`).join("")}</select>
-      <label class="check" title="الشخصية تتكلم أمام الكاميرا وبُقها يجب يتحرك مع النص"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 يتكلم أمام الكاميرا</label>
+      <label class="check" title="الشخصية تتكلم أمام الكاميرا ويجب أن يتحرك فمها مع النص"><input type="checkbox" data-pf="talking" ${s.talking ? "checked" : ""}> 👄 يتكلم أمام الكاميرا</label>
       ${s.a_end != null ? `<span class="muted">⏱️ من ${s.a_start} لـ ${s.a_end} في الصوت الكامل (${s.seconds} ث)</span>` : ""}
     </div>
-    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="metadata"></audio>` : `<span class="muted">${s.voice ? "الصوت الخاص بـ هذه اللقطة يُقص تلقائيًا عندما ترفع الصوت الكامل أعلى." : "هذه اللقطة بدون نص."}</span>`}
+    ${s.voice_url ? `<audio src="${s.voice_url}" controls preload="metadata"></audio>` : `<span class="muted">${s.voice ? "الصوت الخاص بهذه اللقطة يُقص تلقائيًا عندما ترفع الصوت الكامل في الأعلى." : "هذه اللقطة بدون نص."}</span>`}
     ${s.voice_error ? `<div class="muted">⚠️ ${adEsc(s.voice_error)}</div>` : ""}
     ${s.voice_url ? `<div class="row wrap ad-lip">
-      <button class="btn sm primary" data-p="lipkavatar" ${s.frame_url && !lipBusy ? "" : "disabled"} title="صورة الستوري بورد + صوتنا + الوصف → فيديو جديد الشخصية تقول فيه النص بصوتنا">🎬👄 فيديو يتكلم بصوتنا من الستوري بورد (الأفضل)</button>
+      <button class="btn sm primary" data-p="lipkavatar" ${s.frame_url && !lipBusy ? "" : "disabled"} title="صورة الستوري بورد + صوتنا + الوصف → فيديو جديد تقول فيه الشخصية النص بصوتنا">🎬👄 فيديو يتكلم بصوتنا من الستوري بورد (الأفضل)</button>
       <button class="btn sm" data-p="lipvideo" ${base && !lipBusy ? "" : "disabled"} title="${base ? "" : "ولّد فيديو اللقطة أولًا"}">👄 ركّب النص على الفيديو (سريع)</button>
     </div>` : ""}
   </div>`;
@@ -919,12 +919,12 @@ function renderVoices(a) {
   const n = p.shots.filter((s) => (s.voice || "").trim()).length;
   adsHTML($("adVoices"), `<div class="ad-fullvoice">
     <div class="row wrap"><b>🎙️ الصوت الكامل للإعلان</b>
-      <span class="muted">١) انسخ النص وحوّله لصوت باللهجة والنبرة التي تعجبك ← ٢) ارفع الصوت كله ملف واحد ← ٣) البرنامج يقطّعه على اللقطات بتوقيت النص، ومدة كل لقطة تُضبط عليه.</span></div>
+      <span class="muted">١) انسخ النص وحوّله إلى صوت باللهجة والنبرة التي تعجبك ← ٢) ارفع الصوت كله في ملف واحد ← ٣) يقطّعه البرنامج على اللقطات بتوقيت النص، وتُضبط مدة كل لقطة عليه.</span></div>
     <div class="row wrap">
-      <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"} title="النص فقط، جاهز تحوّله لصوت">📋 انسخ النص (${n} جملة)</button>
+      <button class="btn sm" data-fv="copy" ${n ? "" : "disabled"} title="النص فقط، جاهز لتحويله إلى صوت">📋 انسخ النص (${n} جملة)</button>
       <button class="btn sm" data-fv="download" ${n ? "" : "disabled"} title="نسخة فيها رقم كل لقطة ومن يقول الجملة (للمراجعة)">⬇ نزّل نسخة بالتفاصيل</button>
       <label class="btn sm primary">⬆ ارفع الصوت الكامل<input type="file" accept="audio/*,video/*" data-fv-up hidden></label>
-      ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد ما تعدّل النص في اللقطات">↻ قطّع آخر</button>` : ""}
+      ${fv.file ? `<button class="btn sm" data-fv="realign" ${working ? "disabled" : ""} title="بعد أن تعدّل النص في اللقطات">↻ قطّع مرة أخرى</button>` : ""}
       ${working ? `<span class="muted"><span class="spin-inline"></span> يسمع الصوت ويقطّعه على اللقطات...</span>` : ""}
       ${fv.status === "done" ? `<span class="muted">✅ ${fv.duration} ث · تطابق ${Math.round((fv.ratio || 0) * 100)}% من النص</span>` : ""}
     </div>
@@ -961,7 +961,7 @@ $("adVoices").addEventListener("change", async (e) => {
   const form = new FormData();
   form.append("file", f);
   try {
-    toast("⏳ جارٍ الرفع الصوت...");
+    toast("⏳ جارٍ رفع الصوت...");
     adx.cur = await pAPI("/full-voice", { method: "POST", body: form });
     renderAds();
     scheduleAdPoll();
@@ -969,7 +969,7 @@ $("adVoices").addEventListener("change", async (e) => {
   } catch (err) { toast(err.message, true); }
 });
 $("adVideoModelSel").addEventListener("change", () => saveVoices({ video_model: $("adVideoModelSel").value })
-  .then(() => toast("🎬 الفيديوهات القادمة ستُولّد هذا بالنموذج")));
+  .then(() => toast("🎬 الفيديوهات القادمة ستُولَّد بهذا النموذج")));
 
 // ---------- 🎭 الأبطال والمكونات المتكررة (قبل الستوري بورد) ----------
 const CAST_KIND = { character: "🧍 شخصية", background: "🏞️ مكان / خلفية", prop: "🧰 أداة" };
@@ -977,12 +977,12 @@ function renderCast(a) {
   const p = a.prod, cast = p.cast || [], busy = p.cast_status === "working";
   const pending = cast.filter((c) => !c.approved).length;
   const head = `<div class="ad-cast-head"><h3 class="pane-h">🎭 الأبطال والمكونات المتكررة</h3>
-      <span class="muted">${cast.length ? `${cast.length - pending}/${cast.length} اعتُمد عليهم` : "قبل الستوري بورد: صورة ثابتة لكل شخصية ومكان يتكرر، لكي يظلون هم هم في كل اللقطات."}</span>
-      <button class="btn sm ${cast.length ? "" : "primary"}" data-cast="extract" ${busy ? "disabled" : ""}>${busy ? "⏳ يطلّعهم..." : cast.length ? "↻ طلّعهم مرة أخرى" : "🎭 طلّع الأبطال والمكونات"}</button>
-      ${cast.some((c) => !c.approved) ? `<button class="btn sm" data-cast="images">🖼️ ${cast.some((c) => c.image) ? "ارسم ما غير معتمدين" : "ارسم صورهم"}</button>` : ""}
+      <span class="muted">${cast.length ? `${cast.length - pending}/${cast.length} معتمدة` : "قبل الستوري بورد: صورة ثابتة لكل شخصية ومكان يتكرر، لتبقى كما هي في كل اللقطات."}</span>
+      <button class="btn sm ${cast.length ? "" : "primary"}" data-cast="extract" ${busy ? "disabled" : ""}>${busy ? "⏳ جارٍ استخراجها..." : cast.length ? "↻ استخرجها مرة أخرى" : "🎭 استخرج الأبطال والمكونات"}</button>
+      ${cast.some((c) => !c.approved) ? `<button class="btn sm" data-cast="images">🖼️ ${cast.some((c) => c.image) ? "ارسم غير المعتمدة" : "ارسم صورهم"}</button>` : ""}
       ${cast.some((c) => c.image && !c.approved) ? `<button class="btn sm primary" data-cast="approveall">👤 اعتمد الكل وأضفهم لملف العميل</button>` : ""}</div>
     ${p.cast_error ? `<div class="muted">${adEsc(p.cast_error)}</div>` : ""}
-    ${cast.length ? `<p class="hint">عندما تعتمد، الصورة تُحفظ في 👤 ملف العميل باسمها، وأوصاف الستوري بورد تعمل لها إشارة (@الاسم) فصورتها الحقيقية تُرسل مع الرسم في كل لقطة.</p>` : ""}`;
+    ${cast.length ? `<p class="hint">عندما تعتمد، تُحفظ الصورة في 👤 ملف العميل باسمها، وتشير إليها أوصاف الستوري بورد (@الاسم) فتُرسل صورتها الحقيقية مع الرسم في كل لقطة.</p>` : ""}`;
   const cards = cast.map((c) => `<div class="ad-cast-card ${c.approved ? "ok" : ""}" data-cast-id="${c.id}">
       <div class="img">${c.image_url ? `<img src="${c.image_url}" alt="">` : c.status === "working" ? `<div class="spin"></div>` : "🖼️"}${c.status === "working" && c.image_url ? `<div class="car-wait over"><div class="spin"></div></div>` : ""}</div>
       ${c.images.length > 1 ? `<div class="vers">${c.images.map((f) => `<img src="${f.url}" data-cast-pick="${f.file}" class="${f.url === c.image_url ? "sel" : ""}" title="${adEsc(f.note)}" alt="">`).join("")}</div>` : ""}
@@ -997,7 +997,7 @@ function renderCast(a) {
         <button class="btn sm" data-cast="img" ${c.status === "working" ? "disabled" : ""}>🖼️ ${c.image_url ? "مرة أخرى" : "ارسم"}</button>
         ${c.image_url ? `<button class="btn sm" data-cast="edit" ${c.status === "working" ? "disabled" : ""}>✏️ عدّل</button>` : ""}
         <label class="btn sm" title="صورة من جهازك">⬆<input type="file" accept="image/*" data-cast-up hidden></label>
-        ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ الغي الاعتماد" : "👤 اعتمد وأضفه لملف العميل"}</button>` : ""}
+        ${c.image_url ? `<button class="btn sm ${c.approved ? "" : "primary"}" data-cast="${c.approved ? "unapprove" : "approve"}">${c.approved ? "↩ ألغِ الاعتماد" : "👤 اعتمد وأضفه لملف العميل"}</button>` : ""}
         <button class="btn sm danger" data-cast="del">✕</button></div>
     </div>`).join("");
   adsHTML($("adCast"), head + (cast.length ? `<div class="ad-cast-grid">${cards}</div>` : ""));
@@ -1010,11 +1010,11 @@ $("adCast").addEventListener("click", async (e) => {
   try {
     if (b.dataset.castPick) adx.cur = await cAPI(`/${cid}/pick`, { method: "POST", ...jsonBody({ file: b.dataset.castPick }) });
     else if (act === "extract") {
-      if (adx.cur.prod.cast?.length && !(await uiConfirm("يُخرج الأبطال والمكونات آخر من الاقتراح؟ ما لهم صور أو اعتُمد عليهم يظلون."))) return;
+      if (adx.cur.prod.cast?.length && !(await uiConfirm("هل يُستخرج الأبطال والمكونات مرة أخرى من الاقتراح؟ ما له صور أو اعتُمد يبقى."))) return;
       adx.cur = await cAPI("/extract", { method: "POST" });
     } else if (act === "images") {
       const redo = adx.cur.prod.cast.filter((c) => !c.approved && c.image_url);
-      if (redo.length && !(await uiConfirm(`في ${redo.length} (${redo.map((c) => c.name).join("، ")}) لهم صور ومش معتمدين: سيترسمون من جديد والصورة القديمة الخاصة بهم ستُحذف.\n\nإذا في صورة تعجبك، اعتمدها أولًا بـ «🧠 اعتمد وأضفه للعقل» لكي لا تُحذف.\n\nتُكمل؟`))) return;
+      if (redo.length && !(await uiConfirm(`في ${redo.length} (${redo.map((c) => c.name).join("، ")}) لهم صور ومش معتمدين: سيترسمون من جديد والصورة القديمة الخاصة بهم ستُحذف.\n\nإن كانت هناك صورة تعجبك، فاعتمدها أولًا بـ «🧠 اعتمد وأضفه للعقل» لكي لا تُحذف.\n\nتُكمل؟`))) return;
       adx.cur = await cAPI(`/images?redo=true`, { method: "POST" });
     }
     else if (act === "approveall") adx.cur = await cAPI("/approve-all", { method: "POST" });
@@ -1026,8 +1026,8 @@ $("adCast").addEventListener("click", async (e) => {
       const c = adx.cur.prod.cast.find((x) => x.id === cid);
       return openFix({
         title: `✏️ عدّل صورة «${c.name}»`,
-        placeholder: "مثلًا: شعره أطول، لبسه أزرق، أكبر في السن، اجعل الجيم أوسع",
-        hint: "الصورة الحالية تُعدّل والقديمة تظل في النسخ.",
+        placeholder: "مثلًا: شعره أطول، ملابسه زرقاء، أكبر سنًا، اجعل النادي أوسع",
+        hint: "تُعدَّل الصورة الحالية، وتبقى القديمة في النسخ.",
         submit: async (form) => { adx.cur = await cAPI(`/${cid}/edit`, { method: "POST", body: form }); renderAds(); },
       });
     }
@@ -1074,7 +1074,7 @@ function renderAdProd() {
   $("adPProgress").textContent = `🎨 ${framed}/${n} · 🧩 ${comps}/${n} · ✅ ${shots.filter((s) => s.approved).length}/${n} · 🎬 ${okv}/${n}`;
   const drawn = shots.filter((s) => s.frame_url && !PBUSY.has(s.frame_status));
   const allOk = drawn.length > 0 && drawn.every((s) => s.approved);
-  $("adPApproveAll").textContent = allOk ? "↩ الغي اعتماد كل الستوري بورد" : `✅ اعتمد كل الستوري بورد (${drawn.filter((s) => !s.approved).length})`;
+  $("adPApproveAll").textContent = allOk ? "↩ ألغِ اعتماد كل الستوري بورد" : `✅ اعتمد كل الستوري بورد (${drawn.filter((s) => !s.approved).length})`;
   $("adPApproveAll").disabled = !drawn.length;
   if (editingIn($("adPShots")) || [...$("adPShots").querySelectorAll("video")].some((v) => !v.paused)) return;
   $("adPShots").style.setProperty("--ad-ar", (h.aspect || "9:16").replace(":", " / "));
@@ -1090,11 +1090,11 @@ function renderAdProd() {
         ${s.frame_note ? `<p class="muted ad-note" data-no-i18n>✏️ ${adEsc(s.frame_note)}</p>` : ""}
         ${ref}
         <div class="row wrap" style="margin-top:6px">
-          ${fbusy ? `<button class="btn sm" data-p="frameredo" title="إذا الرسم علّق: يلغيه ويبدأ رسم جديد مباشرة">↻ علّق؟ ابدأ من جديد</button>
-            <button class="btn sm danger" data-p="framecancel" title="يلغي الرسم ويعود اللقطة كما كانت">✕ الغي</button>`
+          ${fbusy ? `<button class="btn sm" data-p="frameredo" title="إن توقف الرسم: يلغيه ويبدأ رسمًا جديدًا مباشرة">↻ توقف؟ ابدأ من جديد</button>
+            <button class="btn sm danger" data-p="framecancel" title="يلغي الرسم وتعود اللقطة كما كانت">✕ ألغِ</button>`
             : `<button class="btn sm" data-p="frame">🎨 ${s.frame_url ? "ارسم مرة أخرى" : "ارسم"}</button>`}
-          ${s.frame_url && !fbusy ? `<button class="btn sm" data-p="editframe" title="قل تريد تغيّر ماذا ويرسمها مرة أخرى">✏️ عدّل</button>
-            <button class="btn sm danger" data-p="delframe" title="احذف الستوري بورد هذه">🗑️</button>` : ""}
+          ${s.frame_url && !fbusy ? `<button class="btn sm" data-p="editframe" title="قل ما تريد تغييره ويرسمها مرة أخرى">✏️ عدّل</button>
+            <button class="btn sm danger" data-p="delframe" title="احذف هذا الستوري بورد">🗑️</button>` : ""}
           <button class="btn sm ${s.approved ? "" : "primary"}" data-p="approve">${s.approved ? "✅ معتمدة" : "✅ اعتمد"}</button>
         </div>
         ${(() => { const n = s.components.filter((c) => c.use !== false && c.image_url).length;
@@ -1127,14 +1127,14 @@ function renderAdProd() {
         </div>`).join("")}</div>
         ${adField("وصف تجميع اللقطة (Seedance)", s.assembly_prompt || s.prompt, 'data-pf="assembly_prompt"', 3, true)}
         <div class="ad-takes">${s.takes.map((t) => `<div class="ad-take ${t.id === s.chosen ? "sel" : ""} ${t.approved ? "ok" : ""}" data-pt="${t.id}" ${t.note ? `title="✏️ ${adEsc(t.note)}"` : ""}>
-          ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : t.lipsync ? `<b class="ad-take-badge">👄 يتكلم</b>` : t.video_model && t.video_model !== "seedance" ? `<b class="ad-take-badge alt">${adEsc(t.video_model.startsWith("kling") ? "Kling" : t.video_model)}</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ يركّب" : t.lipsync ? "👄 يحرّك البق" : "🎬 يُولّد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
+          ${t.composite ? `<b class="ad-take-badge">✨ موشن</b>` : t.lipsync ? `<b class="ad-take-badge">👄 يتكلم</b>` : t.video_model && t.video_model !== "seedance" ? `<b class="ad-take-badge alt">${adEsc(t.video_model.startsWith("kling") ? "Kling" : t.video_model)}</b>` : ""}${t.url ? `<button type="button" class="ad-take-play" data-tplay="${t.id}" title="شغّل وعاين">${lightVideo(t.url, "muted playsinline")}<i>▶</i></button>` : `<div class="wait">${PBUSY.has(t.status) ? `<div class="spin"></div>${t.composite ? "✨ يركّب" : t.lipsync ? "👄 يحرّك الشفاه" : "🎬 يُولّد"}` : `✕ ${adEsc(t.error || "فشل")}`}</div>`}
           <div class="acts">${t.status === "done" ? `<button class="btn sm" data-t="${t.approved ? "unapprove" : "approve"}">${t.approved ? "✅" : "موافق"}</button>` : ""}
             ${t.status === "failed" ? `<button class="btn sm" data-t="retry">↻</button>` : ""}
-            ${t.status === "done" && !t.composite ? `<button class="btn sm" data-tedit="${t.id}" title="قل تريد تغيّر ماذا ويولّد نسخة جديدة">✏️</button>` : ""}
+            ${t.status === "done" && !t.composite ? `<button class="btn sm" data-tedit="${t.id}" title="قل ما تريد تغييره ويولّد نسخة جديدة">✏️</button>` : ""}
             ${t.id !== s.chosen && t.status === "done" ? `<button class="btn sm" data-t="pick">اختر</button>` : ""}
             ${PBUSY.has(t.status) ? "" : `<button class="btn sm danger" data-t="delete">✕</button>`}</div></div>`).join("")}</div>
         <div class="row wrap">
-          <button class="btn sm ${chosen ? "" : "primary"}" data-p="gen" ${s.frame_url ? "" : "disabled"} title="${s.frame_url ? "" : "ارسم الستوري بورد أولًا"}">🎬 ${chosen ? "ولّد واحد آخر" : "ولّد الفيديو"}</button>
+          <button class="btn sm ${chosen ? "" : "primary"}" data-p="gen" ${s.frame_url ? "" : "disabled"} title="${s.frame_url ? "" : "ارسم الستوري بورد أولًا"}">🎬 ${chosen ? "ولّد واحدًا آخر" : "ولّد الفيديو"}</button>
           <label class="btn sm">⬆ ارفع فيديو<input type="file" accept="video/*" data-p="uptake" hidden></label>
         </div>
       </div>
@@ -1144,7 +1144,7 @@ function renderAdProd() {
 
 $("adProdGo").onclick = () => pDo($("adProdGo"), "⏳", () => pAPI("/start", { method: "POST" }));
 $("adProdRestart").onclick = async () => {
-  if (!(await uiConfirm("تبدأ التنفيذ من جديد من الاقتراح الحالي؟ هذا التنفيذ (صوره وفيديوهاته) سيُحفظ ويمكنك ترجعه بزرار «استعد التنفيذ السابق»."))) return;
+  if (!(await uiConfirm("هل تبدأ التنفيذ من جديد من الاقتراح الحالي؟ سيُحفظ هذا التنفيذ (صوره وفيديوهاته) ويمكنك استعادته بزر «استعد التنفيذ السابق»."))) return;
   pDo($("adProdRestart"), "⏳", () => pAPI("/start", { method: "POST" }));
 };
 $("adHeader").addEventListener("change", (e) => {
@@ -1159,25 +1159,25 @@ $("adPBrain").onclick = () => busyButton($("adPBrain"), "⏳", async () => {
   const r = await pAPI("/apply-brain", { method: "POST" });
   adx.cur = r;
   renderAds();
-  toast(r.applied ? `🧠 وُضع ${r.applied} مكون من ملف العميل (شاشات / شعار / منتج)` : "لا يوجد مكونات شاشات أو شعار تحتاج صور من ملف العميل");
+  toast(r.applied ? `🧠 وُضع ${r.applied} مكون من ملف العميل (شاشات / شعار / منتج)` : "لا توجد مكونات شاشات أو شعار تحتاج إلى صور من ملف العميل");
 });
 $("adPDelFrames").onclick = async () => {
   const n = adx.cur.prod.shots.filter((s) => s.frames.length).length;
-  if (!n) return toast("لا يوجد ستوري بورد تُحذف");
-  if (!(await uiConfirm(`تحذف الستوري بورد الخاصة بـ كل اللقطات (${n} لقطة، بكل نسخها)؟ المكونات والفيديوهات لن تُلمس.`))) return;
+  if (!n) return toast("لا يوجد ستوري بورد لحذفه");
+  if (!(await uiConfirm(`هل تحذف الستوري بورد لكل اللقطات (${n} لقطة، بكل نسخها)؟ لن تُمَس المكونات والفيديوهات.`))) return;
   pDo($("adPDelFrames"), "⏳", () => pAPI("/frames", { method: "DELETE" }));
 };
 const castWarn = async () => {
   const n = (adx.cur.prod.cast || []).filter((c) => !c.approved).length;
-  return !n || (await uiConfirm(`في ${n} من الأبطال والمكونات المتكررة لم يُعتمد عليهم بعد، فلن يدخلوا في الرسم. ترسم على أي حال؟`));
+  return !n || (await uiConfirm(`${n} من الأبطال والمكونات المتكررة لم تُعتمد بعد، فلن تدخل في الرسم. هل ترسم على أي حال؟`));
 };
 $("adPFrames").onclick = async () => {
   if (!(await castWarn())) return;
   // المعتمدة متتلمسش. اللي مش معتمدة: البرومبت بيتكتب من جديد بالمنشن وبتترسم، والجديد بيمسح القديم
   const shots = adx.cur.prod.shots, todo = shots.filter((s) => !s.approved);
-  if (!todo.length) return toast("كل اللقطات معتمدة ✅. الغي اعتماد اللقطة التي تريد ترسمها مرة أخرى");
+  if (!todo.length) return toast("كل اللقطات معتمدة ✅. ألغِ اعتماد اللقطة التي تريد رسمها مرة أخرى");
   const old = todo.filter((s) => s.frame_url);
-  if (old.length && !(await uiConfirm(`${old.length} لقطة (${old.map((s) => s.n).join("، ")}) لها ستوري بورد ومش معتمدة: ستُرسم من جديد والصورة القديمة الخاصة بها ستُحذف.\n\nإذا في ستوري بورد يعجبك، اعتمده أولًا بـ «✅ اعتمد» أسفل الصورة لكي لا يُحذف.\n\nالمعتمدة (${shots.length - todo.length}) لن تُلمس. تُكمل؟`))) return;
+  if (old.length && !(await uiConfirm(`${old.length} لقطة (${old.map((s) => s.n).join("، ")}) لها ستوري بورد ومش معتمدة: ستُرسم من جديد والصورة القديمة الخاصة بها ستُحذف.\n\nإن كان هناك ستوري بورد يعجبك، فاعتمده أولًا بـ «✅ اعتمد» أسفل الصورة لكي لا يُحذف.\n\nالمعتمدة (${shots.length - todo.length}) لن تُلمس. تُكمل؟`))) return;
   busyButton($("adPFrames"), "✍️ يكتب الأوصاف...", async () => {
     adx.cur = await pAPI("/sb-prompts?skip_approved=true", { method: "POST" });
     renderAds();
@@ -1198,7 +1198,7 @@ $("adPApproveAll").onclick = async () => {
   const drawn = adx.cur.prod.shots.filter((s) => s.frame_url && !PBUSY.has(s.frame_status));
   const on = !(drawn.length && drawn.every((s) => s.approved));
   const missing = adx.cur.prod.shots.length - drawn.length;
-  if (on && missing && !(await uiConfirm(`سيعتمد ${drawn.length} ستوري بورد. فيه ${missing} لقطة ما زال ليس لها ستوري بورد (أو ترسم) ولن تُعتمد. تُكمل؟`))) return;
+  if (on && missing && !(await uiConfirm(`سيُعتمد ${drawn.length} ستوري بورد. هناك ${missing} لقطة ليس لها ستوري بورد بعد (أو قيد الرسم) ولن تُعتمد. هل تُكمل؟`))) return;
   busyButton($("adPApproveAll"), "⏳", async () => {
     adx.cur = await pAPI(`/approve-all?approved=${on}`, { method: "POST" });
     toast(on ? "✅ اعتُمد كل الستوري بورد" : "↩ أُلغي الاعتماد");
@@ -1264,8 +1264,8 @@ $("adPShots").addEventListener("click", async (e) => {
     else if (b.dataset.p === "voicedel") { if (!(await uiConfirm("تحذف صوت هذه اللقطة؟"))) return; adx.cur = await pAPI(`/shots/${sid}/voice`, { method: "DELETE" }); }
     else if (["lipvideo", "lipimage", "lipkavatar"].includes(b.dataset.p)) {
       const m = { lipvideo: "video", lipimage: "image", lipkavatar: "kavatar" }[b.dataset.p];
-      if (!(await uiConfirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك البق مع النص (نسخة جديدة «👄»). تُكمل؟"
-        : "يعمل فيديو جديد من صورة الستوري بورد والشخصية تقول هذا النص (يأخذ نحو ٣ دقايق). تُكمل؟"))) return;
+      if (!(await uiConfirm(m === "video" ? "يركّب الصوت على فيديو اللقطة ويحرّك الشفاه مع النص (نسخة جديدة «👄»). تُكمل؟"
+        : "يصنع فيديو جديدًا من صورة الستوري بورد تقول فيه الشخصية هذا النص (يستغرق نحو ٣ دقائق). تُكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=${m}`, { method: "POST" });
     }
     else if (b.dataset.p === "framecancel") adx.cur = await pAPI(`/shots/${sid}/frame-cancel`, { method: "POST" });
@@ -1278,12 +1278,12 @@ $("adPShots").addEventListener("click", async (e) => {
     else if (b.dataset.tedit) return editTake(s, b.dataset.tedit);
     else if (b.dataset.p === "delframe") {
       const more = s.frames.length > 1;
-      if (!(await uiConfirm(more ? `تحذف الستوري بورد المعروضة للقطة ${s.n}؟ النسخة التي قبلها ستظهر مكانها.` : `تحذف الستوري بورد الخاصة باللقطة ${s.n}؟`))) return;
+      if (!(await uiConfirm(more ? `هل تحذف الستوري بورد المعروض للقطة ${s.n}؟ ستظهر النسخة السابقة مكانه.` : `هل تحذف الستوري بورد الخاص باللقطة ${s.n}؟`))) return;
       adx.cur = await pAPI(`/shots/${sid}/frame`, { method: "DELETE" });
     }
     else if (b.dataset.p === "approve") adx.cur = await pAPI(`/shots/${sid}`, { method: "PATCH", ...jsonBody({ fields: { approved: !s.approved } }) });
     else if (b.dataset.p === "comps") {
-      if (s.components.length && !(await uiConfirm("تحدّث المكونات من الستوري بورد؟ المكونات التي لها صورة بنفس الاسم تظل بصورتها."))) return;
+      if (s.components.length && !(await uiConfirm("هل تحدّث المكونات من الستوري بورد؟ المكونات التي لها صورة بنفس الاسم تبقى بصورتها."))) return;
       adx.cur = await pAPI(`/components?shot_id=${sid}`, { method: "POST" });
     } else if (b.dataset.p === "compimgs") adx.cur = await pAPI(`/comp-images?shot_id=${sid}`, { method: "POST" });
     else if (b.dataset.p === "addcomp") adx.cur = await pAPI(`/shots/${sid}/components`, { method: "POST", ...jsonBody({ fields: {} }) });
@@ -1407,7 +1407,7 @@ $("adBrainNew").onclick = async () => {
 };
 $("adBrainDel").onclick = async () => {
   const b = curBrain();
-  if (!b || !(await uiConfirm(`تحذف العميل «${b.name}» بكل شاشاته ولوجوهاته؟ (إعلاناته وكاروسيلاته تروح لأقدم عميل)`))) return;
+  if (!b || !(await uiConfirm(`هل تحذف العميل «${b.name}» بكل شاشاته وشعاراته؟ (تنتقل إعلاناته وكاروسيلاته إلى أقدم عميل)`))) return;
   try { await api(`/api/ad-brains/${b.id}`, { method: "DELETE" }); adx.brains = await api("/api/ad-brains"); adx.brainId = null; renderAds(); loadClients(); }
   catch (err) { toast(err.message, true); }
 };
@@ -1425,19 +1425,19 @@ $("adBrainBody").addEventListener("change", async (e) => {
     const form = new FormData();
     form.append("kind", el.dataset.bvup);
     form.append("file", f);
-    toast("⏳ جارٍ الرفع الفيديو...");
+    toast("⏳ جارٍ رفع الفيديو...");
     return brainSave(() => bAPI("/brand-video", { method: "POST", body: form }));
   }
   if (el.dataset.bup) {
     const files = [...el.files].filter((f) => /\.(png|jpe?g|webp)$/i.test(f.name));
     el.value = "";
-    if (!files.length) return toast("لا يوجد صور (PNG / JPG / WEBP) في ما اخترته", true);
+    if (!files.length) return toast("لا توجد صور (PNG / JPG / WEBP) فيما اخترته", true);
     const form = new FormData();
     form.append("kind", el.dataset.bup);
     files.slice(0, 120).forEach((f) => form.append("files", f));
     toast(`⏳ جارٍ الرفع ${files.length} صورة...`);
     await brainSave(() => bAPI("/assets", { method: "POST", body: form }));
-    toast("✅ رُفعت، والبرنامج يوصفهم ويستنبط الهوية");
+    toast("✅ رُفعت، ويصفها البرنامج ويستنبط الهوية");
   }
 });
 $("adBrainBody").addEventListener("click", async (e) => {
@@ -1477,8 +1477,8 @@ function renderAdGallery() {
   const ok = shots.filter((s) => s.takes.some((t) => t.id === s.chosen && t.approved)).length;
   const busy = shots.filter((s) => s.takes.some((t) => PBUSY.has(t.status))).length;
   $("adGalCount").textContent = `${shots.length} لقطة · ✅ ${ok} موافق عليها · 🎬 ${busy} تُولّد`;
-  $("adGalFullHint").textContent = adx.cur.prod.full_voice?.url ? "الفيديوهات المختارة خلف بعض مع صوتك الكامل، لكي ترى الإعلان واللب سينك كما سيطلعون."
-    : "ارفع الصوت الكامل أولًا لكي يمكنك تشغّل الإعلان كله بالصوت.";
+  $("adGalFullHint").textContent = adx.cur.prod.full_voice?.url ? "الفيديوهات المختارة متتالية مع صوتك الكامل، لترى الإعلان واللب سينك كما سيظهران."
+    : "ارفع الصوت الكامل أولًا لتتمكن من تشغيل الإعلان كله بالصوت.";
   const s = shots.find((x) => x.id === agal.sid);
   $("adGalAll").hidden = !!s;
   $("adGalView").hidden = !s;
@@ -1518,15 +1518,15 @@ function renderAdGallery() {
   $("adGalInfo").innerHTML = `<b>ما يحدث:</b> ${adEsc(s.visual)}${s.voice ? `<br><b>النص:</b> ${adEsc(s.voice)}` : ""}${s.motion_notes ? `<br><b>🎞️ الموشن:</b> ${adEsc(s.motion_notes)}` : ""}`;
   adsHTML($("adGalTakes"), s.takes.map((t, k) => `<button type="button" class="take ${t.id === agal.tid ? "viewing" : ""} ${t.id === s.chosen ? "sel" : ""}" data-gtake="${t.id}" ${t.url ? "" : "disabled"}>
       ${t.url ? lightVideo(t.url, "muted playsinline") : `<span>${TAKE_ST[t.status] || ""}</span>`}<small>${t.approved ? "✅" : t.id === s.chosen ? "⭐" : ""} ${k + 1}</small></button>`).join("")
-    || `<p class="muted">لا يوجد نسخ ما زال.</p>`);
+    || `<p class="muted">لا توجد نسخ بعد.</p>`);
   const t = s.takes.find((x) => x.id === agal.tid);
   if (t?.note) $("adGalInfo").innerHTML += `<br><b>✏️ التعديل المطلوب:</b> ${adEsc(t.note)}`
     + (t.ref_urls?.length ? `<div class="ad-fix-thumbs">${t.ref_urls.map((u) => `<span class="th"><img src="${u}" alt=""></span>`).join("")}</div>` : "");
   $("adGalErr").hidden = !(t?.status === "failed");
   $("adGalErr").textContent = t?.status === "failed" ? `✕ ${t.error || "فشل"}` : "";
   $("adGalActs").innerHTML = (t && t.status === "done" ? `
-      <button class="btn ${t.approved ? "" : "primary"}" data-ga="${t.approved ? "unapprove" : "approve"}">${t.approved ? "↩ الغي الموافقة" : "✅ موافق عليه"}</button>
-      ${t.id !== s.chosen ? `<button class="btn" data-ga="pick">⭐ اختره هذه للقطة</button>` : ""}
+      <button class="btn ${t.approved ? "" : "primary"}" data-ga="${t.approved ? "unapprove" : "approve"}">${t.approved ? "↩ ألغِ الموافقة" : "✅ موافق عليه"}</button>
+      ${t.id !== s.chosen ? `<button class="btn" data-ga="pick">⭐ اختره لهذه اللقطة</button>` : ""}
       ${t.composite ? "" : `<button class="btn" data-ga="edit">✏️ عدّل وأنشئ نسخة جديدة</button>`}
       ${s.voice_url && !t.lipsync && !t.composite ? `<button class="btn" data-ga="lip">👄 ركّب النص على هذا الفيديو</button>` : ""}
       <button class="btn danger" data-ga="delete">🗑️ احذف هذه النسخة</button>` : t?.status === "failed" ? `<button class="btn" data-ga="retry">↻ جرّب مرة أخرى</button>` : "")
@@ -1628,18 +1628,18 @@ $("adGalActs").addEventListener("click", async (e) => {
   const sid = agal.sid, a = b.dataset.ga;
   try {
     if (a === "gen") {
-      if (!(await uiConfirm("تولّد نسخة أخرى هذه للقطة بـ Seedance؟ (التوليد يُحسب عليك)"))) return;
+      if (!(await uiConfirm("هل تولّد نسخة أخرى لهذه اللقطة بـ Seedance؟ (التوليد يُحسب عليك)"))) return;
       adx.cur = await pAPI(`/shots/${sid}/generate`, { method: "POST" });
     } else if (a === "edit") {
       return editTake(adx.cur.prod.shots.find((x) => x.id === sid), agal.tid);
     } else if (a === "kavatar") {
-      if (!(await uiConfirm("يعمل فيديو جديد من صورة الستوري بورد والشخصية تقول نص اللقطة بصوتنا (يأخذ نحو ٣ دقايق). تُكمل؟"))) return;
+      if (!(await uiConfirm("يصنع فيديو جديدًا من صورة الستوري بورد تقول فيه الشخصية نص اللقطة بصوتنا (يستغرق نحو ٣ دقائق). تُكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=kavatar`, { method: "POST" });
       toast("🎬👄 يعمل الفيديو الذي يتكلم... سيظهر هنا عندما ينتهي");
     } else if (a === "lip") {
-      if (!(await uiConfirm("يحرّك البق في هذا الفيديو على صوت اللقطة (نسخة جديدة «👄»، تأخذ أقل من دقيقة). تُكمل؟"))) return;
+      if (!(await uiConfirm("يحرّك الشفاه في هذا الفيديو على صوت اللقطة (نسخة جديدة «👄»، تستغرق أقل من دقيقة). تُكمل؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/lipsync?method=video&take_id=${agal.tid}`, { method: "POST" });
-      toast("👄 يحرّك البق... النسخة الجديدة ستظهر بجانب القديمة وفيها الصوت");
+      toast("👄 يحرّك الشفاه... ستظهر النسخة الجديدة بجانب القديمة وفيها الصوت");
     } else {
       if (a === "delete" && !(await uiConfirm("تحذف هذه النسخة؟"))) return;
       adx.cur = await pAPI(`/shots/${sid}/take?action=${a}`, { method: "POST", ...jsonBody({ take_id: agal.tid }) });

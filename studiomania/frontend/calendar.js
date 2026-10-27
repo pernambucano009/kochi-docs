@@ -57,7 +57,7 @@ function calCard(it, compact) {
   if (it.kind === "job") {
     const j = it.j;
     return `<div class="cal-card job" title="${escapeHtml(`🤖 الأوتوبايلوت ما زال يحضّره: ${AP_STEPS?.[j.step] || j.step}`)}">
-      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">أوتوبايلوت يحضّره</span></div>`;
+      <span class="cal-t">${calTime(it.when)}</span><span class="cal-n">الأوتوبايلوت يحضّره</span></div>`;
   }
   const p = it.p;
   const thumb = p.image_url || thumbOf(p.export_url || "");
@@ -85,7 +85,7 @@ function calDayCell(date, items, compact, extraCls = "") {
     <div class="cal-list">${shown.map((it) => calCard(it, compact)).join("")}</div>
     ${more > 0 ? `<button type="button" class="cal-more" data-more="${key}">+${more} أيضًا</button>` : ""}
     ${open && items.length > CAL_MAX ? `<button type="button" class="cal-more" data-more="">أقل</button>` : ""}
-    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدول منشور في هذا اليوم"><span>＋</span><b>جدول هنا</b></button>`}
+    ${past ? "" : `<button type="button" class="cal-add" data-add="${key}" title="جدوِل منشورًا في هذا اليوم"><span>＋</span><b>جدوِل هنا</b></button>`}
   </div>`;
 }
 
@@ -129,11 +129,11 @@ function renderCal() {
   }
   const unsched = cal.jobs.length;
   box.innerHTML = `<div class="cal-head">
-      <button type="button" class="btn sm" data-nav="-1" aria-label="ما فات">${document.dir === "rtl" ? "›" : "‹"}</button>
+      <button type="button" class="btn sm" data-nav="-1" aria-label="ما مضى">${document.dir === "rtl" ? "›" : "‹"}</button>
       <b class="cal-title">${title}</b>
-      <button type="button" class="btn sm" data-nav="1" aria-label="ما قادم">${document.dir === "rtl" ? "‹" : "›"}</button>
+      <button type="button" class="btn sm" data-nav="1" aria-label="القادم">${document.dir === "rtl" ? "‹" : "›"}</button>
       <button type="button" class="btn sm" data-nav="0">اليوم</button>
-      <span class="cal-legend"><i class="cal-dot sch"></i>متجدول <i class="cal-dot pub"></i>نُشر <i class="cal-dot bad"></i>فشل${unsched ? ` <i class="cal-dot job"></i>يتحضّر` : ""}</span>
+      <span class="cal-legend"><i class="cal-dot sch"></i>مجدول <i class="cal-dot pub"></i>نُشر <i class="cal-dot bad"></i>فشل${unsched ? ` <i class="cal-dot job"></i>قيد التحضير` : ""}</span>
     </div>${body}`;
 }
 
@@ -175,7 +175,7 @@ $("postsCal").addEventListener("click", (e) => {
     if (calPage()) showStep("7");
     pubTab("new");
     setTimeout(() => $("postForm").scrollIntoView({ behavior: "smooth", block: "start" }), calPage() ? 0 : 400);
-    toast(`📅 الموعد وُضع: ${calFull(when)} — اختر الفيديو وجدول`);
+    toast(`📅 حُدّد الموعد: ${calFull(when)}، اختر الفيديو وجدوِله`);
     return;
   }
   const card = e.target.closest("[data-pid]");
@@ -212,8 +212,8 @@ $("postsCal").addEventListener("drop", async (e) => {
   const [y, m, d] = day.dataset.day.split("-").map(Number);
   const when = new Date(y, m - 1, d, old.getHours(), old.getMinutes());
   if (calKey(when) === calKey(old)) return;
-  if (when < new Date()) return toast("هذا الموعد عدّى. افتح المنشور واختر ساعة قادمة", true);
-  if (!(await uiConfirm(`تنقل «${p.export_name || "المنشور"}» لـ ${calFull(when)}؟`))) return;
+  if (when < new Date()) return toast("هذا الموعد مضى. افتح المنشور واختر ساعة قادمة", true);
+  if (!(await uiConfirm(`هل تنقل «${p.export_name || "المنشور"}» إلى ${calFull(when)}؟`))) return;
   await calReschedule(p, when);
 });
 
@@ -248,7 +248,7 @@ function calOpenPost(p) {
     <div class="cal-dlg-body">
       ${media ? `<div class="cal-media">${media}</div>` : ""}
       <div class="cal-info">
-        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو حُذف"))}</h3>
+        <h3>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ حُذف الفيديو"))}</h3>
         <span class="pill ${cls}">${p.status === "scheduled" && p.sent ? "مجدول للنشر ✓" : label}</span>
         <p class="when">📅 ${calFull(when)}</p>
         <p>${p.platforms.map((k) => `${PLATFORM_ICON[k] || ""} ${escapeHtml(pub.platforms[k] || k)}`).join(" · ")}</p>
@@ -273,7 +273,7 @@ function calOpenPost(p) {
     if (b.dataset.a === "move") {
       const d = new Date(dlg.querySelector("[data-when]").value);
       if (isNaN(d)) return toast("اختر الموعد", true);
-      if (d < new Date() && !(await uiConfirm("هذا الموعد عدّى، فالمنشور سيُنشر مباشرة. تُكمل؟"))) return;
+      if (d < new Date() && !(await uiConfirm("هذا الموعد مضى، فسيُنشر المنشور مباشرة. تُكمل؟"))) return;
       b.disabled = true;
       if (await calReschedule(p, d)) dlg.close();
       b.disabled = false;

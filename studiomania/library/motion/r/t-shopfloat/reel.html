@@ -21,7 +21,7 @@ const PR = M.params({
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "دار", group: G4, max: 16, hint: "يظهر كبيرًا إن لم يوجد شعار، وصغيرًا تحت اسم كل منتج." },
   logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G4, img: { ratio: "16:9", cut: true, tip: "شعار فاتح (أبيض أو كريمي) بلا خلفية، لأنه يظهر على لون العلامة." } },
   tag: { label: "الجملة الأخيرة", kind: "text", role: "cta", def: "اكتشف البيت بتاعك", group: G4, max: 28, hint: "دعوة هادئة تحت الشعار (اكتشف، زورونا، الرابط في النبذة)." },
-  c1: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a0a", group: GS, hint: "خلفية البداية والختام والقوس الكبير خلف المنتج. اللون القوي المشبّع أفضل." },
+  c1: { label: "لون العلامة", kind: "color", role: "accent", def: "#ff4a0a", group: GS, hint: "خلفية البداية والختام والقوس الكبير خلف المنتج. اللون القوي المشبّع أفضل." },
   c2: { label: "اللون الثاني", kind: "color", role: "accent2", def: "#0f3b2e", group: GS, hint: "غامق (للنص والكتل). يجب أن يظهر على اللون الفاتح." },
   c3: { label: "لون الخلفية الفاتح", kind: "color", def: "#ece4d8", group: GS, hint: "فاتح ودافئ (كريمي، بيج). هذا خلف المنتجات." },
   fHead: { label: "خط العناوين", kind: "font", def: "alexandria", group: GS, hint: "خط عريض للجمل وأسماء المنتجات." },

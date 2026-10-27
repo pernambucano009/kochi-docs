@@ -83,7 +83,7 @@ async function postT(url, body, ms = 30000) {
   try {
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}), signal: ac.signal });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب مرة أخرى");
+    if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حدثت مشكلة، جرّب مرة أخرى");
     return d;
   } catch (x) { throw x.name === "AbortError" ? new Error("خدمة الرسائل لم ترد. حاول مرة أخرى بعد قليل") : x; } finally { clearTimeout(t); }
 }
@@ -119,13 +119,13 @@ async function phoneVerify() {
     location.replace(next());
   } catch (x) { phErr(x.message); $("phGo").disabled = false; $("phGo").textContent = "ادخل"; $("phCode").select(); } finally { phBusy = false; }
 }
-const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (لا يوجد بريد إلكتروني متظبط): <a href="${l}">${l}</a></p>` : "";
+const devLink = (l) => l ? `<p class="au-dev">وضع التجربة (لا يوجد بريد إلكتروني مُعَدّ): <a href="${l}">${l}</a></p>` : "";
 
 function err(m) { $("err").textContent = m || ""; $("err").hidden = !m; }
 async function post(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حصلت مشكلة، جرّب مرة أخرى");
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "حدثت مشكلة، جرّب مرة أخرى");
   return d;
 }
 const next = () => { const n = Q.get("next"); return n && /^\/(?![\/\\])/.test(n) ? n : "/"; };
@@ -202,7 +202,7 @@ async function render() {
   if (S.needs_setup) v = "setup";
   else if (v === "setup") v = "login";
   if (v === "verify" && Q.get("token")) {
-    $("body").innerHTML = `<p class="muted">نأكد البريد الإلكتروني…</p>`;
+    $("body").innerHTML = `<p class="muted">نؤكد البريد الإلكتروني…</p>`;
     try { await fetch(`/api/auth/verify?token=${encodeURIComponent(Q.get("token"))}`).then(async (r) => { if (!r.ok) throw new Error((await r.json()).detail); }); location.replace("/"); }
     catch (e) { $("body").innerHTML = `<p class="err">${e.message}</p><div class="au-links"><a href="/login">الدخول</a></div>`; }
     return;

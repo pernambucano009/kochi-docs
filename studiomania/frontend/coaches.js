@@ -89,7 +89,7 @@ $("coachForm").addEventListener("submit", async (e) => {
       method: editing ? "PATCH" : "POST",
       body: form,
     });
-    toast(editing ? "✅ عُدّل" : "✅ الشخصية أُضيفت");
+    toast(editing ? "✅ عُدّل" : "✅ أُضيفت الشخصية");
     resetCoachForm();
     await loadCoaches();
   } catch (err) {
@@ -107,7 +107,7 @@ $("coachesGrid").addEventListener("click", async (e) => {
   if (!c) return;
   if (btn.dataset.act === "edit") editCoach(c);
   if (btn.dataset.act === "delete") {
-    if (!(await uiConfirm(`حذف الشخصية "${c.name}"؟`))) return;
+    if (!(await uiConfirm(`هل تحذف الشخصية "${c.name}"؟`))) return;
     await api(`/api/coaches/${c.id}`, { method: "DELETE" });
     if (coachState.editing?.id === c.id) resetCoachForm();
     await loadCoaches();
@@ -188,7 +188,7 @@ function renderBulk() {
   const noOutro = rows.filter((r) => r.outro === null).length;
   const warn = [];
   if (noOutro && outros.length) warn.push(`${noOutro} شخصية بدون أوترو.`);
-  if (bulk.ignored.size) warn.push(`${bulk.ignored.size} أوترو تُجوهل ولن يُرفع.`);
+  if (bulk.ignored.size) warn.push(`تُجوهل ${bulk.ignored.size} أوترو ولن يُرفع.`);
   $("bulkWarn").hidden = !warn.length;
   $("bulkWarn").innerHTML = warn.map(escapeHtml).join("<br>");
   const names = new Map();
@@ -252,7 +252,7 @@ function renderUnmatched(unmatched) {
           <span>${escapeHtml(c.name)}</span>
           ${c.hasOutro ? `<small>لديه أوترو</small>` : ""}${c.existing ? `<small>موجود من قبل</small>` : ""}
         </button>`)
-        .join("") || `<p class="muted">لا يوجد شخصيات. ارفع صورها أولًا.</p>`}</div>
+        .join("") || `<p class="muted">لا توجد شخصيات. ارفع صورها أولًا.</p>`}</div>
     </div>`)
     .join("");
 }
@@ -358,7 +358,7 @@ $("bulkUpload").onclick = async () => {
   bulk.busy = false;
   await loadCoaches();
   if (failed.length) {
-    $("bulkProgress").textContent = `✅ ${ok} حسنًا · ✕ ${failed.length} فشلوا`;
+    $("bulkProgress").textContent = `✅ نجح ${ok} · ✕ فشل ${failed.length}`;
     $("bulkWarn").hidden = false;
     $("bulkWarn").innerHTML = failed.map(escapeHtml).join("<br>");
     bulk.rows = bulk.rows.filter((r) => failed.some((f) => f.startsWith(r.name.trim() + ":")));
@@ -390,9 +390,9 @@ $("handlesFile").addEventListener("change", async (e) => {
 });
 
 function renderHandles() {
-  const opts = (sel) => `<option value="">— غير في البرنامج —</option>` + handlesState.coaches
+  const opts = (sel) => `<option value="">— غير موجود في البرنامج —</option>` + handlesState.coaches
     .map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
-  const bad = (v) => `<span class="warn-text" title="اسم الحساب غير مظبوط، ولن يُحفظ">⚠️ ${escapeHtml(v)}</span>`;
+  const bad = (v) => `<span class="warn-text" title="اسم الحساب غير صحيح، ولن يُحفظ">⚠️ ${escapeHtml(v)}</span>`;
   $("handlesRows").innerHTML = handlesState.rows
     .map((r, i) => `<tr data-i="${i}">
       <td>${escapeHtml(r.name)}</td>
@@ -402,7 +402,7 @@ function renderHandles() {
     </tr>`)
     .join("");
   const linked = handlesState.rows.filter((r) => r.coach_id).length;
-  $("handlesInfo").textContent = `${handlesState.rows.length} حساب · ${linked} مربوطين بشخصيات`;
+  $("handlesInfo").textContent = `${handlesState.rows.length} حساب · ${linked} مربوطة بشخصيات`;
 }
 
 $("handlesRows").addEventListener("change", (e) => {
@@ -418,7 +418,7 @@ $("handlesApply").onclick = async () => {
       body: JSON.stringify({ rows: handlesState.rows }),
     });
     $("handlesDialog").close();
-    toast(`✅ حُفظ · ${res.coaches_updated} شخصية حُدّثت`);
+    toast(`✅ حُفظ · حُدّثت ${res.coaches_updated} شخصية`);
     await loadCoaches();
   } catch (err) {
     toast(err.message, true);

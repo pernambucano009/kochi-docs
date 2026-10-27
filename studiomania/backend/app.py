@@ -735,7 +735,7 @@ def auth_setup(body: PasswordIn, request: Request):
 @app.post("/api/auth/login")
 def auth_login(body: PasswordIn, request: Request):
     if auth.needs_setup():
-        raise HTTPException(400, "لا يوجد بعد كلمة مرور، أنشئ واحد أولًا")
+        raise HTTPException(400, "لا توجد كلمة مرور بعد، أنشئ واحدة أولًا")
     if not auth.check_password(body.password):
         time.sleep(1)  # يبطّأ أي حد بيجرّب باسوردات كتير
         raise HTTPException(401, "كلمة المرور خطأ")
@@ -757,7 +757,7 @@ class ChangePasswordIn(BaseModel):
 @app.post("/api/auth/password")
 def change_password(body: ChangePasswordIn, request: Request):
     if auth.env_password():
-        raise HTTPException(400, "كلمة المرور متحدد من إعدادات الخادم (APP_PASSWORD)، غيّره من هناك")
+        raise HTTPException(400, "كلمة المرور محددة من إعدادات الخادم (APP_PASSWORD)، غيّرها من هناك")
     if not auth.check_password(body.current):
         raise HTTPException(400, "كلمة المرور الحالية غير صحيحة")
     if len(body.new) < 8:
@@ -992,7 +992,7 @@ def split_video(video_id: str):
             if not s["skipped"]
         ]
     if not segs:
-        raise HTTPException(400, "كل القطع مستبعدة، لا شيء تتقطع")
+        raise HTTPException(400, "كل القطع مستبعدة، فلا يوجد ما يُقطَّع")
     too_long = [s["index"] + 1 for s in segs if s["too_long"]]
     if too_long:
         raise HTTPException(
@@ -1171,7 +1171,7 @@ def coach_handles(instagram: str | None, tiktok: str | None) -> dict[str, str | 
             continue
         handle = sheets.clean_handle(value, col)
         if value.strip() and not handle:
-            raise HTTPException(400, f"اسم حساب {'إنستجرام' if col == 'instagram' else 'تيك توك'} غير مظبوط: {value.strip()}")
+            raise HTTPException(400, f"اسم حساب {'إنستجرام' if col == 'instagram' else 'تيك توك'} غير صحيح: {value.strip()}")
         out[col] = handle
     return out
 
@@ -1282,7 +1282,7 @@ async def preview_handles(file: UploadFile = File(...)):
     try:
         rows = sheets.read_table(file.filename or "", data)
     except Exception as exc:  # noqa: BLE001  (ملف بايظ أو مش Excel)
-        raise HTTPException(400, f"لا قادر أقرا الملف: {exc}") from exc
+        raise HTTPException(400, f"تعذّرت قراءة الملف: {exc}") from exc
     if not rows:
         raise HTTPException(400, "الملف فارغ")
     header = rows[0]
@@ -1290,7 +1290,7 @@ async def preview_handles(file: UploadFile = File(...)):
     ig_col = _find_col(header, "إنستقرام", "انستقرام", "إنستجرام", "انستجرام", "instagram", "insta")
     tt_col = _find_col(header, "تيك توك", "تيكتونك", "tiktok")
     if name_col is None or (ig_col is None and tt_col is None):
-        raise HTTPException(400, "يجب الملف يصبح فيه عمود للاسم وعمود لإنستجرام أو تيك توك")
+        raise HTTPException(400, "يجب أن يحتوي الملف على عمود للاسم وعمود لإنستجرام أو تيك توك")
     with closing(db()) as conn:
         coaches = [dict(r) for r in conn.execute("SELECT id, name FROM coaches WHERE vis(client_id, 'chars')")]
     by_name = {sheets.norm_name(c["name"]): c for c in coaches}
@@ -1756,7 +1756,7 @@ def delete_prompt(prompt_id: str):
     with closing(db()) as conn, conn:
         get_prompt(conn, prompt_id)
         if conn.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] <= 1:
-            raise HTTPException(400, "يجب يظل وصف واحد على الأقل")
+            raise HTTPException(400, "يجب أن يبقى وصف واحد على الأقل")
         conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
         if not conn.execute("SELECT 1 FROM prompts WHERE is_default = 1").fetchone():
             conn.execute(
@@ -1791,10 +1791,10 @@ def create_generations(body: GenerationIn):
             body.clip_ids,
         ).fetchall()
         if len(rows) != len(set(body.clip_ids)):
-            raise HTTPException(400, "فيه قطع غير موجودة. حدّث الصفحة")
+            raise HTTPException(400, "توجد قطع غير موجودة. حدّث الصفحة")
         short = [f"{r['video_name']} #{r['idx']}" for r in rows if r["end"] - r["start"] < MIN_REFERENCE_SECONDS]
         if short:
-            raise HTTPException(400, f"قطع أقصر من {MIN_REFERENCE_SECONDS:g} ثانية ولا يصلح تُرسل: {', '.join(short)}")
+            raise HTTPException(400, f"مقاطع أقصر من {MIN_REFERENCE_SECONDS:g} ثانية ولا يمكن إرسالها: {', '.join(short)}")
 
         if not forced:
             missing = sorted({r["video_name"] for r in rows if not r["video_coach_id"]})
@@ -1931,7 +1931,7 @@ def delete_generation(gen_id: str):
         if row is None:
             raise HTTPException(404, "الطلب غير موجود")
         if row["status"] in ACTIVE_STATUSES:
-            raise HTTPException(400, "الطلب ما زال يعمل، انتظر عندما ينتهي")
+            raise HTTPException(400, "الطلب ما زال يعمل، انتظر حتى ينتهي")
         conn.execute("DELETE FROM generations WHERE id = ?", (gen_id,))
     if row["output_filename"]:
         (GENERATED_DIR / row["output_filename"]).unlink(missing_ok=True)
@@ -2419,7 +2419,7 @@ def video_thumb(src: str):
             capture_output=True, text=True,
         )
         if result.returncode != 0 or not part.exists():
-            raise HTTPException(500, "لا قادر أعمل صورة للفيديو")
+            raise HTTPException(500, "تعذّر إنشاء صورة للفيديو")
         part.replace(out)
     return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "max-age=604800"})
 
@@ -2470,7 +2470,7 @@ def montage_filmstrip(kind: str, id: str):
             capture_output=True, text=True,
         )
         if result.returncode != 0 or not part.exists():
-            raise HTTPException(500, "لا قادر أعمل صور التايم لاين")
+            raise HTTPException(500, "تعذّر إنشاء صور الخط الزمني")
         part.replace(out)
     return FileResponse(
         out, media_type="image/jpeg",
@@ -2615,7 +2615,7 @@ def project_cover(project_id: str):
         r = get_project(conn, project_id)
         src = project_cover_src(conn, r)
     if not src:
-        raise HTTPException(404, "لا يوجد فيديو ما زال")
+        raise HTTPException(404, "لا يوجد فيديو بعد")
     PROJECT_COVERS.mkdir(parents=True, exist_ok=True)
     out = PROJECT_COVERS / f"{Path(project_id).name}.jpg"
     if not out.exists() or out.stat().st_mtime < src.stat().st_mtime:
@@ -2681,7 +2681,7 @@ def delete_project(project_id: str):
     with closing(db()) as conn, conn:
         row = get_project(conn, project_id)
         if row["render_status"] == "rendering":
-            raise HTTPException(400, "المشروع قيد التصدير الآن، انتظر عندما ينتهي")
+            raise HTTPException(400, "المشروع قيد التصدير الآن، انتظر حتى ينتهي")
         conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
     return {"ok": True}
 
@@ -3097,9 +3097,9 @@ def storage_count(section: str) -> int:
 @app.post("/api/storage/wipe/{section}")
 def wipe_storage(section: str):
     if section not in WIPE_SECTIONS:
-        raise HTTPException(400, "هذا القسم لا يصلح يُحذف كله")
+        raise HTTPException(400, "لا يمكن حذف هذا القسم كله")
     if RENDER_ACTIVE and section in ("raw", "exports"):
-        raise HTTPException(400, "فيه تصدير يعمل الآن، انتظر عندما ينتهي")
+        raise HTTPException(400, "يوجد تصدير يعمل الآن، انتظر حتى ينتهي")
     before = shutil.disk_usage(DATA_DIR).free
     gone, kept = 0, 0
     if section == "lab":
@@ -3217,7 +3217,7 @@ def kochi_cleanup():
 def clean_storage():
     """يحذف الملفات المؤقتة فقط (صور التايم لاين وبقايا التصدير)، وهي تُنشأ مرة أخرى تلقائيًا عندما تحتاجها."""
     if RENDER_ACTIVE:
-        raise HTTPException(400, "فيه تصدير يعمل الآن، انتظر عندما ينتهي")
+        raise HTTPException(400, "يوجد تصدير يعمل الآن، انتظر حتى ينتهي")
     before = folder_mb(TMP_DIR) + folder_mb(SYSTEM_TMP)
     for item in list(TMP_DIR.iterdir()) + list(SYSTEM_TMP.glob("render-*")):
         if item.name in ("fonts.conf", "fontcache", "render.log"):
@@ -3336,7 +3336,7 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                 break
             if code == -999:
                 wait = f"{STALL_SECONDS // 60} دقايق" if STALL_SECONDS >= 120 else f"{STALL_SECONDS} ثانية"
-                error = (f"التصدير توقف مكانه أكثر من {wait} في «{label}» فوقّفته{memory_note()}. "
+                error = (f"توقف التصدير في مكانه أكثر من {wait} عند «{label}»، فأوقفته{memory_note()}. "
                          "جرّب مرة أخرى، وإذا تكرر أرسل «سجل آخر تصدير» من ⚙️ الإعدادات.")
                 break
             if code != 0:
@@ -3362,14 +3362,14 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
                                  lambda f: RENDER_ACTIVE.__setitem__(project_id, f"🔤 يرسم التايبوجرافي {int(f * 100)}٪"))
                     vid.with_name("video_t.mp4").replace(vid)
         if project_id in RENDER_CANCELLED:
-            error = "أنت لغيت التصدير."
+            error = "ألغيتَ التصدير."
         elif intro:   # الأقرب للفيديو الأول (إنترو الشخصية) وبعده إنترو البراند في أول خالص
             RENDER_ACTIVE[project_id] = "🎬 يضع الإنترو"
             for p in intro:
                 if p.exists():
                     total += prepend_intro(EXPORTS_DIR / filename, p)
     except Exception as exc:  # أي مشكلة غير متوقعة لازم تظهر، مش يفضل «بيصدّر» على طول
-        error = f"حصلت مشكلة أثناء التصدير: {exc}"
+        error = f"حدثت مشكلة أثناء التصدير: {exc}"
         log_render(f"مشكلة: {exc!r}")
     finally:
         cancelled = project_id in RENDER_CANCELLED
@@ -3405,7 +3405,7 @@ def run_render(project_id: str, export_id: str, cmds: list[list[str]], total: fl
 @app.post("/api/projects/{project_id}/render/cancel")
 def cancel_render(project_id: str):
     if project_id not in RENDER_ACTIVE:
-        raise HTTPException(400, "لا يوجد تصدير يعمل هذا للمشروع")
+        raise HTTPException(400, "لا يوجد تصدير يعمل لهذا المشروع")
     RENDER_CANCELLED.add(project_id)
     proc = RENDER_PROCS.get(project_id)
     if proc and proc.poll() is None:
@@ -3607,7 +3607,7 @@ def delete_export(export_id: str):
             "SELECT COUNT(*) FROM posts WHERE export_id = ? AND status IN ('scheduled', 'sending', 'publishing')", (export_id,)
         ).fetchone()[0]
         if pending:
-            raise HTTPException(400, "هذا الفيديو عليه منشورات متجدولة. الغيها أولًا")
+            raise HTTPException(400, "لهذا الفيديو منشورات مجدولة. ألغِها أولًا")
         conn.execute("DELETE FROM exports WHERE id = ?", (export_id,))
     (EXPORTS_DIR / row["filename"]).unlink(missing_ok=True)
     return {"ok": True}
@@ -3891,15 +3891,15 @@ def clean_options(opts: PostOptions) -> str:
     for t in opts.ig_tags:
         h = sheets.clean_handle(t, "instagram")
         if t.strip() and not h:
-            raise HTTPException(400, f"اسم الحساب غير مظبوط: {t.strip()}")
+            raise HTTPException(400, f"اسم الحساب غير صحيح: {t.strip()}")
         if h and h not in tags:
             tags.append(h)
     if len(tags) > 20:
-        raise HTTPException(400, "إنستجرام يقبل 20 تاج بالكتير")
+        raise HTTPException(400, "يقبل إنستجرام 20 وسمًا على الأكثر")
     if opts.ig_collab and not tags:
-        raise HTTPException(400, "الكولاب يحتاج حساب واحد على الأقل في خانة التاج")
+        raise HTTPException(400, "يحتاج التعاون (Collab) إلى حساب واحد على الأقل في خانة الإشارة")
     if opts.ig_collab and len(tags) > 3:
-        raise HTTPException(400, "الكولاب يقبل 3 حسابات بالكتير")
+        raise HTTPException(400, "يقبل التعاون (Collab) 3 حسابات على الأكثر")
     cover = max(0, int(opts.cover_ms)) if opts.cover_ms is not None else None
     out = {"ig_tags": tags, "ig_collab": opts.ig_collab, "cover_ms": cover, "tag_slide": max(1, int(opts.tag_slide or 1))}
     if opts.dm_on:
@@ -3920,7 +3920,7 @@ def clean_post(conn: sqlite3.Connection, body: PostIn) -> tuple[str, str, str]:
         raise HTTPException(400, "اختر منصة واحدة على الأقل")
     when = body.scheduled_at
     if when.tzinfo is None:
-        raise HTTPException(400, "الموعد يجب يكون فيه المنطقة الزمنية")
+        raise HTTPException(400, "يجب أن يتضمن الموعد المنطقة الزمنية")
     return json.dumps(platforms), when.astimezone(timezone.utc).isoformat(timespec="seconds"), body.caption.strip()
 
 
@@ -3980,7 +3980,7 @@ def send_post(post_id: str, old_remote_id: str | None = None) -> None:
         set_post(post_id, status="scheduled", remote_id=remote_id, error=None)
     except (publisher.PublishError, httpx.HTTPError, HTTPException, subprocess.SubprocessError) as exc:
         detail = exc.detail if isinstance(exc, HTTPException) else exc
-        set_post(post_id, status="failed", remote_id=None, error=f"تعذّر ذلك أسلّم المنشور لخدمة النشر: {detail}"[:500])
+        set_post(post_id, status="failed", remote_id=None, error=f"تعذّر تسليم المنشور لخدمة النشر: {detail}"[:500])
 
 
 def after_save(post_id: str, when: str, old_remote_id: str | None) -> None:
@@ -4041,7 +4041,7 @@ def delete_post(post_id: str):
     if row is None:
         raise HTTPException(404, "المنشور غير موجود")
     if row["status"] in ("sending", "publishing"):
-        raise HTTPException(400, "المنشور يُرسل الآن، انتظر ثواني")
+        raise HTTPException(400, "المنشور يُرسل الآن، انتظر بضع ثوانٍ")
     if row["remote_id"] and row["status"] in ("scheduled", "failed"):
         # لازم نلغيه عند Zernio الأول، وإلا هيتنشر برضه (حتى الفاشل ممكن يكون لسه متجدول على منصات تانية)
         try:
@@ -7846,7 +7846,7 @@ def convert_image(f: UploadFile, folder: Path) -> str:
     finally:
         src.unlink(missing_ok=True)
     if result.returncode != 0 or not (folder / name).exists():
-        raise HTTPException(400, f"لا قادر أفتح «{f.filename}». احفظها PNG أو JPG وارفعها مرة أخرى")
+        raise HTTPException(400, f"تعذّر فتح «{f.filename}». احفظها بصيغة PNG أو JPG وارفعها مرة أخرى")
     return name
 
 
@@ -7880,7 +7880,7 @@ def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Fo
             gone = Path(remove).name
             if gone in current:
                 if len(current) == 1:
-                    raise HTTPException(400, "يجب تظل صورة واحدة على الأقل. احذفه كله إذا لا تريده")
+                    raise HTTPException(400, "يجب أن تبقى صورة واحدة على الأقل. احذفه كله إن لم تكن تريده")
                 current.remove(gone)
                 (LIBRARY_DIR / aid / gone).unlink(missing_ok=True)
         skipped = 0
@@ -7893,7 +7893,7 @@ def update_asset(aid: str, name: str | None = Form(None), notes: str | None = Fo
         if handle is not None:
             h = sheets.clean_handle(handle, "instagram")
             if handle.strip() and not h:
-                raise HTTPException(400, f"اسم حساب إنستجرام غير مظبوط: {handle.strip()}")
+                raise HTTPException(400, f"اسم حساب إنستجرام غير صحيح: {handle.strip()}")
             conn.execute("UPDATE carousel_assets SET handle = ? WHERE id = ?", (h, aid))
         conn.execute("UPDATE carousel_assets SET files = ? WHERE id = ?", (json.dumps(current), aid))
         return {**asset_to_dict(get_asset(conn, aid)), "skipped": skipped}
@@ -7913,7 +7913,7 @@ async def import_library_pack(file: UploadFile = File(...)):
         names = {Path(n).name: n for n in z.namelist() if not n.endswith("/")}
         manifest = json.loads(z.read(names["manifest.json"]).decode("utf-8"))
     except (zipfile.BadZipFile, KeyError, ValueError) as exc:
-        raise HTTPException(400, "هذا غير ملف حزمة مكتبة (يجب zip فيه manifest.json)") from exc
+        raise HTTPException(400, "هذا ليس ملف حزمة مكتبة (يجب أن يكون zip فيه manifest.json)") from exc
     added = updated = 0
     with closing(db()) as conn, conn:
         for item in manifest.get("items", []):
@@ -8167,7 +8167,7 @@ def patch_carousel(cid: str, body: CarouselPatch):
                 st["cta"] = {k: str(c.get(k) or "")[:300] for k in ("type", "keyword", "reward", "text")}
         if body.plan is not None:
             if cid in CAROUSEL_JOBS:
-                raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
+                raise HTTPException(400, "انتظر حتى ينتهي الرسم")
             plan = cz.parse_plan(json.dumps(body.plan, ensure_ascii=False))
             data["plan"] = plan
             sync_slides(data)
@@ -8188,7 +8188,7 @@ def sync_slides(data: dict) -> None:
 @app.delete("/api/carousels/{cid}")
 def delete_carousel(cid: str):
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي الرسم")
     with closing(db()) as conn, conn:
         conn.execute("DELETE FROM carousels WHERE id = ?", (cid,))
     shutil.rmtree(CAROUSELS_DIR / Path(cid).name, ignore_errors=True)
@@ -8211,7 +8211,7 @@ class ChatIn(BaseModel):
 def carousel_chat(cid: str, body: ChatIn):
     text = body.message.strip()
     if not text:
-        raise HTTPException(400, "اكتب شيء")
+        raise HTTPException(400, "اكتب شيئًا")
     with closing(db()) as conn:
         _, data = load_carousel(conn, cid)
     history = [*data["chat"], {"role": "user", "content": text}]
@@ -8315,7 +8315,7 @@ def carousel_polish(cid: str):
         raise HTTPException(400, str(exc)) from exc
     old = data["plan"]["slides"]
     if len(plan["slides"]) != len(old):
-        raise HTTPException(400, "التنقيح غيّر عدد السلايدات، فمتحفظش. جرّب مرة أخرى")
+        raise HTTPException(400, "غيّر التنقيح عدد السلايدات، فلم يُحفظ. جرّب مرة أخرى")
     for new, prev in zip(plan["slides"], old):
         new["visual"] = prev.get("visual") or new["visual"]  # الرسمة متتغيرش
     def put(d):
@@ -8458,7 +8458,7 @@ def run_slides(cid: str, only: int | None, redo_all: bool = False) -> None:
 def start_job(cid: str, target, *args) -> None:
     with CAROUSEL_LOCK:
         if cid in CAROUSEL_JOBS:
-            raise HTTPException(400, "فيه رسم يعمل هذا للكاروسيل. انتظر ينتهي")
+            raise HTTPException(400, "يوجد رسم يعمل لهذا الكاروسيل. انتظر حتى ينتهي")
         CAROUSEL_JOBS.add(cid)
     threading.Thread(target=target, args=(cid, *args), daemon=True).start()
 
@@ -8478,7 +8478,7 @@ def carousel_overview(cid: str):
         raise HTTPException(400, "اكتب الخطة أولًا")
     check_kind_ready(data)
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "فيه رسم يعمل هذا للكاروسيل. انتظر ينتهي")
+        raise HTTPException(400, "يوجد رسم يعمل لهذا الكاروسيل. انتظر حتى ينتهي")
     wallet.need(carousel_img_credits(), "رسم الشكل العام للكاروسيل")
     update_carousel(cid, lambda d: d["overview"].update(status="working", error=None))
     start_job(cid, run_overview)
@@ -8508,7 +8508,7 @@ def carousel_slides(cid: str, only: int | None = None, redo_all: bool = False):
     if only is not None and not 1 <= only <= n:
         raise HTTPException(400, "رقم السلايد خطأ")
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "فيه رسم يعمل هذا للكاروسيل. انتظر ينتهي")
+        raise HTTPException(400, "يوجد رسم يعمل لهذا الكاروسيل. انتظر حتى ينتهي")
     todo = 1 if only else sum(1 for x in data["slides"] if redo_all or x["status"] != "done")
     wallet.need(carousel_img_credits() * max(1, todo), f"رسم {todo} سلايد")
     def mark(d):
@@ -8529,7 +8529,7 @@ class PickIn(BaseModel):
 def carousel_pick(cid: str, body: PickIn):
     """تختار نسخة قديمة لسلايد (أو للشكل العام) بدل ما متختارة."""
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي الرسم")
     def pick(d):
         if body.file not in [v["file"] for v in d.get("versions", {}).get(body.target, [])]:
             raise HTTPException(404, "هذه النسخة غير موجودة")
@@ -8547,7 +8547,7 @@ def carousel_pick(cid: str, body: PickIn):
 def carousel_delete_version(cid: str, target: str, file: str):
     """مسح نسخة لا تريدها (المتختارة لا تُحذف)."""
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي الرسم")
     def drop(d):
         cur = d["overview"].get("file") if target == "overview" else (
             d["slides"][int(target) - 1].get("file") if target.isdigit() and 1 <= int(target) <= len(d["slides"]) else None)
@@ -8591,7 +8591,7 @@ def ready_slides(cid: str) -> tuple[sqlite3.Row, dict, list[Path]]:
     if not data["slides"] or any(s.get("status") != "done" or not s.get("file") for s in data["slides"]):
         raise HTTPException(400, "أكمل رسم كل الشرائح أولًا")
     if cid in CAROUSEL_JOBS:
-        raise HTTPException(400, "انتظر حتى ما الرسم ينتهي")
+        raise HTTPException(400, "انتظر حتى ينتهي الرسم")
     return row, data, post_images(cid, data)
 
 
@@ -8609,7 +8609,7 @@ def publish_carousel(cid: str, body: CarouselPostIn):
         raise HTTPException(400, "يقبل إنستغرام الكاروسيل من 2 إلى 10 صور")
     when = body.scheduled_at
     if when.tzinfo is None:
-        raise HTTPException(400, "الموعد يجب يكون فيه المنطقة الزمنية")
+        raise HTTPException(400, "يجب أن يتضمن الموعد المنطقة الزمنية")
     when = when.astimezone(timezone.utc).isoformat(timespec="seconds")
     options = clean_options(body.options)
     post_id = uuid.uuid4().hex[:12]
@@ -13440,7 +13440,7 @@ def prod_edit_frame(aid: str, sid: str, note: str = Form(""), files: list[Upload
         raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. تواصل مع الدعم")
     note = note.strip()[:1500]
     if not note:
-        raise HTTPException(400, "اكتب تريد تعدّل ماذا")
+        raise HTTPException(400, "اكتب ما تريد تعديله")
     extra = save_edit_refs(aid, files)
     def fn(d):
         s = find_pshot(prod_of(d), sid)
@@ -13952,7 +13952,7 @@ def prod_cast_edit(aid: str, cid: str, note: str = Form(""), files: list[UploadF
     """✏️ تعديل الصورة المرجعية بطلبك (ومعه صور مرجعية)."""
     note = note.strip()[:1500]
     if not note:
-        raise HTTPException(400, "اكتب تريد تعدّل ماذا")
+        raise HTTPException(400, "اكتب ما تريد تعديله")
     extra = save_edit_refs(aid, files)
     set_cast(aid, cid, status="working", error=None)
     ad_executor.submit(run_cast_image, aid, cid, note, extra)
@@ -14531,7 +14531,7 @@ def prod_edit_take(aid: str, sid: str, note: str = Form(""), take_id: str = Form
         raise HTTPException(400, "خدمة التوليد غير مهيأة بعد. تواصل مع الدعم")
     note = note.strip()[:1500]
     if not note:
-        raise HTTPException(400, "اكتب تريد تعدّل ماذا")
+        raise HTTPException(400, "اكتب ما تريد تعديله")
     queue_ad_take(aid, sid, note, take_id or None, save_edit_refs(aid, files))
     return ad_response(aid)
 
@@ -15513,7 +15513,7 @@ def vedit_item(body) -> dict:
     else:
         text = body.instruction.strip()[:2000]
         if not text:
-            raise HTTPException(400, "اكتب تريد تغيّر ماذا")
+            raise HTTPException(400, "اكتب ما تريد تغييره")
         if body.model not in lab.VEDIT_MODELS:
             raise HTTPException(400, "نموذج غير معروف")
         if not (atlas.api_key() or atlas.mock_mode()):
@@ -15659,7 +15659,7 @@ def run_lab_components(lid: str) -> None:
     rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
                 for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("comp_lessons") or [])
     lab_step(lid, "components", progress="يبحث عن الحتت الذي تنفع تُعاد")
-    raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "الكومبوننتس")
+    raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "المكونات")
     ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
     bounds = sorted({x for s in d.get("shots") or [] if not s.get("ignored") for x in (s["start"], s["end"])})
     new = [c for c in lab.clean_components(raw, d["source"]["duration"], ids, bounds)
@@ -15830,7 +15830,7 @@ def lab_connector_refine(lid: str, cid: str, body: RefineIn):
     """💬 تقول للشرح «عدّل كذا»: النموذج يشاهد هذه الجزء مرة أخرى (ومعها ثانية ونص قبلها وبعدها) ويعدّل."""
     msg = body.message.strip()[:1500]
     if not msg:
-        raise HTTPException(400, "اكتب تريد تعدّل ماذا")
+        raise HTTPException(400, "اكتب ما تريد تعديله")
     d = lab_load(lid)
     c = next((x for x in d.get("connectors") or [] if x["id"] == cid), None)
     if c is None:
@@ -17415,7 +17415,7 @@ def film_script_rewrite(fid: str, body: FilmRewriteIn):
     if d.get("status") == "planning" or not (d.get("plan") or {}).get("scenes"):
         raise HTTPException(400, "انتظر حتى ينتهي السيناريو")
     if not body.instruction.strip():
-        raise HTTPException(400, "اكتب تريد تعدّل ماذا")
+        raise HTTPException(400, "اكتب ما تريد تعديله")
     p = d["plan"]
     if atlas.mock_mode():
         raw = {"scenes": [{"i": i, "voice": (s.get("voice") or "") + " (اتعدلت)", "text": s.get("text", "")} for i, s in enumerate(p["scenes"])]}
@@ -26645,7 +26645,7 @@ def style_create(idea: str = Form(...), duration: int = Form(10), ratio: str = F
     if ratio not in stylecl.RATIOS:
         raise HTTPException(400, "هذا المقاس غير مدعوم")
     if duration not in stylecl.DURATIONS:
-        raise HTTPException(400, "المدة يجب تكون " + " أو ".join(map(str, stylecl.DURATIONS)) + " ثانية")
+        raise HTTPException(400, "يجب أن تكون المدة " + " أو ".join(map(str, stylecl.DURATIONS)) + " ثانية")
     files = [f for f in files if f.filename][:6]
     if not files:
         raise HTTPException(400, "ارفع صورة أو فيديو مرجعيًا واحدًا على الأقل")
@@ -27199,7 +27199,7 @@ class R2pVariantIn(BaseModel):
 @app.post("/api/ref2p/{rid}/variant")
 def r2p_variant(rid: str, body: R2pVariantIn):
     if not body.change.strip():
-        raise HTTPException(400, "اكتب ماذا الذي يتغيّر")
+        raise HTTPException(400, "اكتب ما الذي يتغيّر")
     return r2p_job(Path(rid).name, "variant", run_r2p_variant, body.change.strip()[:300])
 
 
@@ -30129,7 +30129,7 @@ GEN_MOCK = [{"model": "mock/kling-o1/video-edit", "label": "Kling O1 Edit (تج�
             {"model": "mock/kling-v2.6-pro/avatar", "label": "Kling Avatar (تجريبي)", "per_sec": 0.095, "mode": "avatar", "kind": "edit", "video_in": False},
             {"model": "mock/veed/lipsync", "label": "Veed Lipsync (تجريبي)", "per_sec": 0.05, "mode": "lipsync", "kind": "edit", "video_in": True}]
 GEN_MODE_T = {"video": "من القطعة نفسها (فيديو ← فيديو)", "refs": "من مراجع (شخصيات وخلفيات وصور)", "image": "من صورة بداية",
-              "startend": "من صورة بداية وصورة نهاية", "text": "من النص فقط", "avatar": "صورة + صوت ← حد يتكلم (أفاتار)",
+              "startend": "من صورة بداية وصورة نهاية", "text": "من النص فقط", "avatar": "صورة + صوت ← شخص يتكلم (أفاتار)",
               "lipsync": "القطعة + صوت ← الشفايف على الصوت (ليب سينك)"}
 
 

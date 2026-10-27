@@ -2,41 +2,41 @@
 // وكمان خطوة «🔤 التايبوجرافي» في معمل التفكيك (اللي بتطلّع الستايل والأيقونات من فيديو).
 
 const tyx = { list: [], cur: null, stk: [], styles: [], view: "home", timer: null, eng: null, play: null, t: 0, open: {} };
-const TY_KINDS = { track: "⭐ 🎬 نص كبير على الخطوط", sign: "⭐ ✍️ سطر وإمضا", spot: "⭐ 🌟 نجمة وبقعة ضوء", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف يُستبدل بصورة", scatter: "🌪️ حروف تُجمع", ring: "⭕ دائرة أيقونات", anchor: "📍 مندمج مع الفيديو",
-  behind: "🎬 🧍 نص عملاق خلف الشخص", arc: "🎬 🌙 نص متقوّس حوالين الرأس", artype: "🎬 ⌨️ كتابة بمؤشر برتقالي", redword: "🎬 🔴 كلمة حمراء واحدة", signature: "🎬 ✒️ إمضا تُكتب",
+const TY_KINDS = { track: "⭐ 🎬 نص كبير على الخطوط", sign: "⭐ ✍️ سطر وتوقيع", spot: "⭐ 🌟 نجمة وبقعة ضوء", pop: "💥 كلمة كبيرة", type: "⌨️ كتابة بمؤشر", build: "✨ كلمة كلمة", icon: "🖼️ كلمة وأيقونة", letters: "🔠 حرف يُستبدل بصورة", scatter: "🌪️ حروف تُجمع", ring: "⭕ دائرة أيقونات", anchor: "📍 مندمج مع الفيديو",
+  behind: "🎬 🧍 نص عملاق خلف الشخص", arc: "🎬 🌙 نص مقوّس حول الرأس", artype: "🎬 ⌨️ كتابة بمؤشر برتقالي", redword: "🎬 🔴 كلمة حمراء واحدة", signature: "🎬 ✒️ توقيع يُكتب",
   poster: "🎬 🟥 بوستر أحمر", stack: "🎬 📚 كومة نص مائلة بجانب الشخص", push: "🎬 ➡️ كلمة تدفع ما قبلها", crt: "🎬 📺 شاشة قديمة وجلتش",
-  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دائرة حوالين الرأس", floor: "🎬 🛣️ نص على الأرض", hand: "🎬 🖊️ خط يد يرتجف", tags: "🎬 🏷️ كلمات على مربعات حمراء",
-  space: "🎬 🌌 نص في فراغ 3D", route: "🎬 ✈️ خريطة ومسار وطيارة", board: "🎬 🧵 لوحة تحقيق", cube: "🎬 🧊 مكعب سلكي حوالين الشخص",
+  ransom: "🎬 ✂️ حروف مقصوصة", halo: "🎬 ⭕ دائرة حول الرأس", floor: "🎬 🛣️ نص على الأرض", hand: "🎬 🖊️ خط يد يرتجف", tags: "🎬 🏷️ كلمات على مربعات حمراء",
+  space: "🎬 🌌 نص في فراغ 3D", route: "🎬 ✈️ خريطة ومسار وطائرة", board: "🎬 🧵 لوحة تحقيق", cube: "🎬 🧊 مكعب سلكي حول الشخص",
   comments: "🎬 💬 تعليقات على لوحة زجاج", lock: "🎬 🔒 كبسولة بقفل", thermal: "🎬 🌡️ كاميرا حرارية", shapes: "🎬 🎞️ أشكال فيلم ترتجف",
-  select: "🎬 🖱️ مربع تحديد وماوس", chat: "🎬 📱 فقاعات شات", counter: "🎬 🔢 رقم يعدّ",
-  fill: "🎬 🖼️ الصورة داخل الحروف", polaroid: "🎬 📸 بولارويد بخط يد", cards: "🎬 🃏 بطاقات طايرة 3D", burst: "🎬 💥 انفجار كوميكس",
-  dots: "🎬 ✨ الشخص يتحول لنقط", neon: "🎬 🔴 نيون خلف الشخص",
-  outline: "🎬 🩷 كلمة بحدود بينك تقفز", spin: "🎬 🌀 حروف عملاقة تدور", sweep: "🎬 💨 كلمة تعدّي ودائرة نسخ", extrude: "🎬 🧱 نص بينك 3D ومربع أسود",
+  select: "🎬 🖱️ مربع تحديد وفأرة", chat: "🎬 📱 فقاعات محادثة", counter: "🎬 🔢 رقم يعدّ",
+  fill: "🎬 🖼️ الصورة داخل الحروف", polaroid: "🎬 📸 بولارويد بخط يد", cards: "🎬 🃏 بطاقات طائرة 3D", burst: "🎬 💥 انفجار كوميكس",
+  dots: "🎬 ✨ الشخص يتحول إلى نقاط", neon: "🎬 🔴 نيون خلف الشخص",
+  outline: "🎬 🩷 كلمة بحدود وردية تقفز", spin: "🎬 🌀 حروف عملاقة تدور", sweep: "🎬 💨 كلمة تعبر ودائرة نسخ", extrude: "🎬 🧱 نص وردي 3D ومربع أسود",
   stories: "🎬 📲 بطاقات ستوري 3D", post: "🎬 🖼️ بطاقة منشور والنص صاعد منه",
-  retro: "🎬 📰 بوستر قديم ونجمة حمراء", duotone: "🎬 🟦 فيديو أزرق ونص خلف الشخص", label: "🎬 🏷️ كلمة حمراء وتاج أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
-  banners: "🎬 🎗️ شرائط مائلة تتحرك", tiles: "🎬 🔲 بطاقات صور وبطاقة أحمر", bubble: "🎬 💬 فقاعة نص حمراء", band: "🎬 🟦 شريط أزرق خلف كلمة", emerge: "🎬 🗣️ النص يظهر من خلف الرأس",
-  film: "🎬 🎞️ برواز فيلم", ghost: "🎬 👻 كلمة عملاقة باهتة خلف", notify: "🎬 🔔 إشعارات جوال", dialog: "🎬 🖥️ رسالة نظام قديمة",
-  pills: "🎬 💊 أزرار لامعة والماوس", steps: "🎬 🔢 بطاقات مرقّمة", scribble: "🎬 ⭕ دائرة بالقلم", list: "🎬 📋 لستة بسهم",
+  retro: "🎬 📰 بوستر قديم ونجمة حمراء", duotone: "🎬 🟦 فيديو أزرق ونص خلف الشخص", label: "🎬 🏷️ كلمة حمراء ووسم أزرق", mirror: "🎬 🪞 كلمة وانعكاسها",
+  banners: "🎬 🎗️ شرائط مائلة تتحرك", tiles: "🎬 🔲 بطاقات صور وبطاقة حمراء", bubble: "🎬 💬 فقاعة نص حمراء", band: "🎬 🟦 شريط أزرق خلف كلمة", emerge: "🎬 🗣️ النص يظهر من خلف الرأس",
+  film: "🎬 🎞️ إطار فيلم", ghost: "🎬 👻 كلمة عملاقة باهتة في الخلف", notify: "🎬 🔔 إشعارات جوال", dialog: "🎬 🖥️ رسالة نظام قديمة",
+  pills: "🎬 💊 أزرار لامعة والفأرة", steps: "🎬 🔢 بطاقات مرقّمة", scribble: "🎬 ⭕ دائرة بالقلم", list: "🎬 📋 قائمة بسهم",
   prompt: "🎬 🤖 مربع ذكاء اصطناعي", spread: "🎬 ✨ نص متفرّق",
-  serif: "🎬 🖋️ كلمة بخط سيريف مايل", chalk: "🎬 🧑‍🏫 سبورة طباشير", ticket: "🎬 🎟️ تذكرة سينما", frame: "🎬 🖼️ برواز دهب", toggle: "🎬 🔘 زر تشغيل",
+  serif: "🎬 🖋️ كلمة بخط سيريف مائل", chalk: "🎬 🧑‍🏫 سبورة طباشير", ticket: "🎬 🎟️ تذكرة سينما", frame: "🎬 🖼️ إطار ذهبي", toggle: "🎬 🔘 زر تشغيل",
   years: "🎬 📅 أرقام تدور", wave: "🎬 〰️ نص على خط متعرج", spaced: "🎬 ↔️ نص بمسافات واسعة", search: "🎬 🔎 خانة بحث", digits: "🎬 🔢 أرقام في مربعات",
-  torn: "🎬 📜 شرايط ورق مقطوع", emoji: "🎬 😀 إيموجي على قدر المعنى", doodle: "🎬 ✏️ خربشة بالقلم", browser: "🎬 🌐 نافذة متصفح", split: "🎬 ↔️ قبل وبعد",
+  torn: "🎬 📜 شرائط ورق مقطوع", emoji: "🎬 😀 إيموجي بحسب المعنى", doodle: "🎬 ✏️ خربشة بالقلم", browser: "🎬 🌐 نافذة متصفح", split: "🎬 ↔️ قبل وبعد",
   spotlight: "🎬 🔦 كشاف ضوء", phone: "🎬 📱 جوال",
-  window: "🎬 🪟 الفيديو في برواز", inline: "🎬 🖼️ صورة داخل السطر", bigtype: "🎬 ⌨️ كلمة عملاقة تُكتب", checks: "🎬 ✅ لستة تتعلّم", progress: "🎬 📊 شرايط نسب",
-  flow: "🎬 🔀 خطوات قالب مخصص", aura: "🎬 🌈 ألوان ناعمة", stairs: "🎬 🪜 كلمات مثل السلم", dates: "🎬 📆 شريط أيام", endcard: "🎬 🏁 بطاقة النهاية", wintitle: "🎬 🪟 كلمة عملاقة على البرواز", corners: "🎬 📐 نص في الركنين", inbox: "🎬 📥 صندوق رسائل", doc: "🎬 📝 دوكيومنت بهايلايتر", workcards: "🎬 📅 بطاقة موعد ورسالة وملف", call: "🎬 📞 مكالمة فيديو", canvas: "🎬 🗂️ لوحة بطاقات والكاميرا تقرّب", colorcard: "🎬 🟦 بطاقة لون ونص صغير", imsg: "🎬 📲 محادثة جوال", dashboard: "🎬 📈 بطاقة داشبورد", apps: "🎬 🔌 تطبيقات تتوصل", bell: "🎬 🔔 جرس والعداد يزيد", chapter: "🎬 🔢 رقم فصل عملاق", sidepanel: "🎬 🗃️ فيديو وبانل جنبه", clones: "🎬 👯 الشخص متكرر", megapan: "🎬 🔠 كلمة عملاقة والكاميرا ماشية عليها", badge: "🎬 🔴 دائرة بأول حرف تكبر", leaderboard: "🎬 🏆 لوحة ترتيب", donut: "🎬 🍩 دائرة نسبة", photowords: "🎬 🖼️ كلمات وصور طايرة", titlecard: "🎬 🎬 عنوان سينمائي يُبنى", departures: "🎬 🚆 لوحة مواعيد قطر", loading: "🎬 ⚙️ شاشة يُنشأ الآن", countdown: "🎬 ⏳ عدّاد تنازلي", dragdrop: "🎬 🖐️ صور تطير لمربع الكتابة", lineup: "🎬 🎤 قائمة أسامي كبيرة", isomap: "🎬 🗺️ خريطة أيزومتريك", stickers: "🎬 🏷️ كلمة عملاقة ووسوم مائلة", promptline: "🎬 ⌨️ سطر كتابة وزر إرسال", crowd: "🎬 👥 بوستر بسيلويتات", photohero: "🎬 🖼️ صورة وكلمة عملاقة عليها", menu: "🎬 🖱️ قائمة منسدلة", pricing: "🎬 💲 اختيارات بأسعار", pins: "🎬 📍 نقاط مرقّمة على صورة", result: "🎬 🔗 نتيجة بحث", calendar: "🎬 🗓️ كاليندر وموعد", mapdots: "🎬 🗺️ خريطة ودوائر تنبض", marker: "🎬 🖍️ عنوان بهايلايتر أصفر", lowerthird: "🎬 🪪 اسم ووظيفة أسفل", cardwords: "🎬 🃏 بطاقات بكلمات عملاقة", bars: "🎬 📊 رسم بياني يكبر", table: "🎬 🧾 جدول بتاجات", dayplan: "🎬 🕘 جدول اليوم", stutter: "🎬 🔁 كلمة تتهته", section: "🎬 🔢 فصل كامل برقم ورمز", worklog: "🎬 📋 سجل عمل", toggles: "🎬 🔛 مفاتيح تُفتح", checkout: "🎬 🛒 فاتورة وزر الدفع", lockscreen: "🎬 📱 شاشة مغلقة وإشعارات", wizard: "🎬 🪜 خطوات بشريط تقدّم", wordroll: "🎬 🎰 كلمات تدور رأسي", bignum: "🎬 🔢 رقم عملاق على الحرف", stickynote: "🎬 🗒️ ملاحظات متعلقة", colorpicker: "🎬 🎨 لوحة اختيار لون", uploads: "🎬 📎 ملفات تُرفع", timer: "🎬 ⏱️ تايمر تنازلي", anchorword: "🎬 🅱️ كلمة ضخمة أسفل", orders: "🎬 🧾 تذاكر طلبات", stats: "🎬 🔢 دوائر أرقام", duo: "🎬 🪟 شاشتين بجانب بعض", route: "🎬 🗺️ طريق على الخريطة", flank: "🎬 ▫️ كلمة بين كادرين", flood: "🎬 📆 نتيجة تتزحم", chips: "🎬 ▪️ شرايح كلمات", wordtiles: "🎬 🧩 بلاطات كلمات", profile: "🎬 👤 بطاقة بروفايل", bigbutton: "🎬 🔘 زر عملاق", gauge: "🎬 ⭕ عداد دايري", rule: "🎬 ⚡ جملة أتمتة", iconrow: "🎬 ✳️ صف أيقونات", led: "🎬 🔴 أرقام ديجيتال", drop: "🎬 🚀 عداد إطلاق", report: "🎬 📡 بطاقة تقرير مباشر", serp: "🎬 🔍 نتيجة بحث", files: "🎬 🗂️ قائمة ملفات تتحدد", generating: "🎬 🖼️ صور تُنشأ", portfolio: "🎬 📷 صفحة بورتفوليو", letterorb: "🎬 🟠 كلمة بكورة متدرجة", connect: "🎬 🔗 زرارين يتوصلون", assistant: "🎬 ✨ بطاقة مساعد ذكي", themeswap: "🎬 🎨 ألوان الصفحة تُستبدل", slider: "🎬 🎚️ سلايدر وقت", weather: "🎬 🌤️ ويدجت طقس", post: "🎬 📝 منشور بكلام متظلل", highlightpan: "🎬 🖍️ نص عملاق متظلل", blocklines: "🎬 🟧 سطور على بلوكات", reactions: "🎬 👍 تفاعلات منشور", qr: "🎬 🔳 ورقة QR", codetag: "🎬 ‹› نص بين أقواس كود", toolbar: "🎬 🧰 شريط أدوات", terminal: "🎬 ⌨️ تيرمينال", scan: "🎬 🛡️ فحص أمان", toasts: "🎬 🔔 إشعارات تتراكم", footer: "🎬 🦶 فوتر موقع", marquee: "🎬 〰️ سطرين ماشيين", datestrip: "🎬 🗓️ شريط أيام", fileicon: "🎬 📄 أيقونة ملف", chaos: "🎬 🌀 سطح مكتب زحمة", gradword: "🎬 🌈 جملة وكلمة متدرّجة", meshprompt: "🎬 🫧 كتابة على خلفية ضبابية", orbsplit: "🎬 🟠 كلمتين وكورة بينهم", bento: "🎬 🍱 شبكة بطاقات", figdays: "📅 شبكة أيام", figcurve: "📈 منحنى نمو", figplay: "▶️ إطار تشغيل", figequal: "≠ ليسا متماثلين", figwords: "🔠 نص بأحجام", figphone: "📱 جوال مرسوم", figdrop: "📉 هبوط", figcount: "⏺ عداد REC", figgears: "⚙️ تروس", figbar: "▮▮ شريط مجهود", figcheck: "☑️ بنود وتسجيل", figcta: "💬 علّق بالكلمة", goldcap: "✨ عنوان ذهبي", iconbelt: "⚗️ شريط رموز", glowsweep: "🌟 ضوء ولوح زجاج", namepill: "💊 كبسولة اسم", kashida: "ـــ كشيدة", molecule: "🧬 جزيء", weightstack: "☰ سطور ثقيلة/رفيعة", stretch: "↔ كلمة تتمدد", desatpop: "⚫ خفوت وكلمة", arcs: "◯ دوائر رفيعة", chrome: "💎 كلمة معدنية", inkverse: "🖋️ نسخ بالحبر", poemfade: "🌫️ شعر يظهر", hashend: "#️⃣ وسم النهاية", flipverb: "🔁 فعل يتبدّل", strobe: "⚡ وميض كلمات", duoline: "▤ سطران مضغوطان", capstack: "❓ سؤال مضغوط", pillword: "🟨 كبسولة خلف الكلمة", blurduo: "🟢 سطران بدائرة", tagstack: "🏷️ سطور بوسم", underbars: "▁ خطوط تحت النص", contactcard: "📇 بطاقة تواصل", iconorbit: "🪐 أيقونات في قوس", blurstrobe: "💥 كلمة بسحبة", kinstack: "⇋ نص متدرّج", incall: "📞 مكالمة واردة", cineband: "🎞️ شريط سينما", scriptover: "✍️ خط يد فوق الفيديو", tricolor: "🟪 ثلاثة ألوان", drumpicker: "🎡 عجلة اختيار", redmix: "🔴 كبير أحمر وصغير", headbubble: "⚪ دائرة مكان الرأس", pincard: "📌 بطاقة بدبوس", emojifloat: "🤡 إيموجي عائم", slotreel: "🎰 آلة خدمات", posterwall: "🖼️ جدار ملصقات", quoteline: "💬 سطر اقتباس", medallion: "🏅 ملصق ميدالية", clockhand: "🕰️ عقرب ساعة", roadtext: "🛣️ طريق متعرج", markpan: "🖍️ قلم تحديد ودائرة", objectquote: "⏳ رمز وحكمة", racechart: "📈 خطان يتسابقان", calflip: "📆 تقويم يتقلّب", glosscards: "🃏 بطاقات لامعة", dropword: "💧 قطرة وتحول", tasklens: "🔍 مهام تحت عدسة", monostack: "⚫ سرد أحادي اللون", dashbox: "⬚ مربع متقطع وفأرة", sparklist: "✦ قائمة بنجوم", followbtn: "👆 زر متابعة", silhouette: "🕴️ رجل ببدلة", petalstack: "🌸 بتلات وعنوان", followcount: "👤 عداد متابعين", twopillars: "🏛️ عمودان وفجوة", cutmat: "🟩 لوح قص", labelbox: "🏷️ تذكرة سوداء", stampcard: "✉️ طابع بريد", lcdtype: "📟 شاشة جوال قديم", genpanel: "🪟 لوح توليد طائر", holopulse: "💚 حلقات وهولوجرام", coverflow: "💿 دوّارة بطاقات", featuretag: "🟢 عنوان ميزة", luxmix: "✨ سيريف فاخر", goldframes: "🔶 إطارات ذهبية", goldrows: "📜 صفوف ذهبية", tilegrid: "🔲 موقع بشبكة", goldpill: "🟡 كبسولة ذهبية", holoclock: "🕚 ساعة ومجلدات", curvewall: "🎞️ جدار مقوّس", newsscan: "📰 جريدة وقلم تحديد", neonvenn: "⭕ حلقات ضوء", wavebelt: "〰️ موجة تزيل أشياء", cardarc: "🌙 قوس بطاقات", shadowquote: "🪟 ملصق بظل نافذة", haloring: "💫 حلقة ضوء تكبر", noirtitle: "🕵️ عنوان نوار", stickerstack: "🏴 ملصقات سوداء", graphhop: "📈 دوائر على رسم بياني", podium: "🥇 منصة وميدالية", hudcallout: "📐 إطار تقني", termbar: "⌨️ شريط طرفية", glowtoggle: "🌈 مفتاح ألوان", pinkdoodle: "✳️ نجمة ودوائر وردية", lensfind: "🔎 عدسة تدور", echostack: "🔁 صدى سطور", dofwords: "🎥 نص بعمق", portalchat: "🫧 محادثة في دائرة", cardframe: "🎴 الفيديو في بطاقة", wordvoid: "🌌 فضاء كلمات", facecam: "🔥 دائرة الشارح", spreadcaps: "🏛️ سيريف فخم وكابيتال", tinysub: "▁ ترجمة صغيرة فخمة", ringword: "⭕ كلمة بحلقة يد", handcap: "✍️ تعليق نصي بخط اليد", blobcam: "🥚 فيديو في بقعة", brushbar: "🖌️ ضربة فرشة زرقاء", beforeafter: "🆚 قبل وبعد", pillcarousel: "💊 معرض كبسولات", namescript: "🌟 اسم أصفر ونص", stackrepeat: "🔂 كلمة متكررة في عمود", vertword: "🏙️ كلمة طولية", serifsolo: "📜 كلمة سيريف وحيدة", selectword: "🔵 كلمة تتحدد", tornlabel: "📄 ورقة مقطوعة", radartags: "📡 رادار ووسوم" };
+  window: "🎬 🪟 الفيديو في إطار", inline: "🎬 🖼️ صورة داخل السطر", bigtype: "🎬 ⌨️ كلمة عملاقة تُكتب", checks: "🎬 ✅ قائمة تُعلَّم", progress: "🎬 📊 شرائط نسب",
+  flow: "🎬 🔀 خطوات قالب مخصص", aura: "🎬 🌈 ألوان ناعمة", stairs: "🎬 🪜 كلمات مثل السلّم", dates: "🎬 📆 شريط أيام", endcard: "🎬 🏁 بطاقة النهاية", wintitle: "🎬 🪟 كلمة عملاقة على الإطار", corners: "🎬 📐 نص في الركنين", inbox: "🎬 📥 صندوق رسائل", doc: "🎬 📝 مستند بقلم تحديد", workcards: "🎬 📅 بطاقة موعد ورسالة وملف", call: "🎬 📞 مكالمة فيديو", canvas: "🎬 🗂️ لوحة بطاقات والكاميرا تقرّب", colorcard: "🎬 🟦 بطاقة لون ونص صغير", imsg: "🎬 📲 محادثة جوال", dashboard: "🎬 📈 بطاقة داشبورد", apps: "🎬 🔌 تطبيقات تتصل", bell: "🎬 🔔 جرس والعداد يزيد", chapter: "🎬 🔢 رقم فصل عملاق", sidepanel: "🎬 🗃️ فيديو ولوحة بجانبه", clones: "🎬 👯 الشخص متكرر", megapan: "🎬 🔠 كلمة عملاقة والكاميرا تسير عليها", badge: "🎬 🔴 دائرة بأول حرف تكبر", leaderboard: "🎬 🏆 لوحة ترتيب", donut: "🎬 🍩 دائرة نسبة", photowords: "🎬 🖼️ كلمات وصور طائرة", titlecard: "🎬 🎬 عنوان سينمائي يُبنى", departures: "🎬 🚆 لوحة مواعيد قطارات", loading: "🎬 ⚙️ شاشة «جارٍ الإنشاء»", countdown: "🎬 ⏳ عدّاد تنازلي", dragdrop: "🎬 🖐️ صور تطير إلى مربع الكتابة", lineup: "🎬 🎤 قائمة أسماء كبيرة", isomap: "🎬 🗺️ خريطة أيزومتريك", stickers: "🎬 🏷️ كلمة عملاقة ووسوم مائلة", promptline: "🎬 ⌨️ سطر كتابة وزر إرسال", crowd: "🎬 👥 بوستر بسيلويتات", photohero: "🎬 🖼️ صورة وكلمة عملاقة عليها", menu: "🎬 🖱️ قائمة منسدلة", pricing: "🎬 💲 اختيارات بأسعار", pins: "🎬 📍 نقاط مرقّمة على صورة", result: "🎬 🔗 نتيجة بحث", calendar: "🎬 🗓️ تقويم وموعد", mapdots: "🎬 🗺️ خريطة ودوائر تنبض", marker: "🎬 🖍️ عنوان بقلم تحديد أصفر", lowerthird: "🎬 🪪 اسم ووظيفة في الأسفل", cardwords: "🎬 🃏 بطاقات بكلمات عملاقة", bars: "🎬 📊 رسم بياني يكبر", table: "🎬 🧾 جدول بوسوم", dayplan: "🎬 🕘 جدول اليوم", stutter: "🎬 🔁 كلمة تتلعثم", section: "🎬 🔢 فصل كامل برقم ورمز", worklog: "🎬 📋 سجل عمل", toggles: "🎬 🔛 مفاتيح تُفتح", checkout: "🎬 🛒 فاتورة وزر الدفع", lockscreen: "🎬 📱 شاشة مغلقة وإشعارات", wizard: "🎬 🪜 خطوات بشريط تقدّم", wordroll: "🎬 🎰 كلمات تدور رأسي", bignum: "🎬 🔢 رقم عملاق على الحرف", stickynote: "🎬 🗒️ ملاحظات معلّقة", colorpicker: "🎬 🎨 لوحة اختيار لون", uploads: "🎬 📎 ملفات تُرفع", timer: "🎬 ⏱️ تايمر تنازلي", anchorword: "🎬 🅱️ كلمة ضخمة في الأسفل", orders: "🎬 🧾 تذاكر طلبات", stats: "🎬 🔢 دوائر أرقام", duo: "🎬 🪟 شاشتان متجاورتان", route: "🎬 🗺️ طريق على الخريطة", flank: "🎬 ▫️ كلمة بين كادرين", flood: "🎬 📆 تقويم يزدحم", chips: "🎬 ▪️ شرائح كلمات", wordtiles: "🎬 🧩 بلاطات كلمات", profile: "🎬 👤 بطاقة بروفايل", bigbutton: "🎬 🔘 زر عملاق", gauge: "🎬 ⭕ عداد دائري", rule: "🎬 ⚡ جملة أتمتة", iconrow: "🎬 ✳️ صف أيقونات", led: "🎬 🔴 أرقام ديجيتال", drop: "🎬 🚀 عداد إطلاق", report: "🎬 📡 بطاقة تقرير مباشر", serp: "🎬 🔍 نتيجة بحث", files: "🎬 🗂️ قائمة ملفات تُحدَّد", generating: "🎬 🖼️ صور تُنشأ", portfolio: "🎬 📷 صفحة بورتفوليو", letterorb: "🎬 🟠 كلمة بكرة متدرجة", connect: "🎬 🔗 زران يتصلان", assistant: "🎬 ✨ بطاقة مساعد ذكي", themeswap: "🎬 🎨 ألوان الصفحة تُستبدل", slider: "🎬 🎚️ سلايدر وقت", weather: "🎬 🌤️ ويدجت طقس", post: "🎬 📝 منشور بكلام مظلَّل", highlightpan: "🎬 🖍️ نص عملاق مظلَّل", blocklines: "🎬 🟧 سطور على بلوكات", reactions: "🎬 👍 تفاعلات منشور", qr: "🎬 🔳 ورقة QR", codetag: "🎬 ‹› نص بين أقواس كود", toolbar: "🎬 🧰 شريط أدوات", terminal: "🎬 ⌨️ تيرمينال", scan: "🎬 🛡️ فحص أمان", toasts: "🎬 🔔 إشعارات تتراكم", footer: "🎬 🦶 فوتر موقع", marquee: "🎬 〰️ سطران متحركان", datestrip: "🎬 🗓️ شريط أيام", fileicon: "🎬 📄 أيقونة ملف", chaos: "🎬 🌀 سطح مكتب مزدحم", gradword: "🎬 🌈 جملة وكلمة متدرّجة", meshprompt: "🎬 🫧 كتابة على خلفية ضبابية", orbsplit: "🎬 🟠 كلمتان وكرة بينهما", bento: "🎬 🍱 شبكة بطاقات", figdays: "📅 شبكة أيام", figcurve: "📈 منحنى نمو", figplay: "▶️ إطار تشغيل", figequal: "≠ ليسا متماثلين", figwords: "🔠 نص بأحجام", figphone: "📱 جوال مرسوم", figdrop: "📉 هبوط", figcount: "⏺ عداد REC", figgears: "⚙️ تروس", figbar: "▮▮ شريط مجهود", figcheck: "☑️ بنود وتسجيل", figcta: "💬 علّق بالكلمة", goldcap: "✨ عنوان ذهبي", iconbelt: "⚗️ شريط رموز", glowsweep: "🌟 ضوء ولوح زجاج", namepill: "💊 كبسولة اسم", kashida: "ـــ كشيدة", molecule: "🧬 جزيء", weightstack: "☰ سطور ثقيلة/رفيعة", stretch: "↔ كلمة تتمدد", desatpop: "⚫ خفوت وكلمة", arcs: "◯ دوائر رفيعة", chrome: "💎 كلمة معدنية", inkverse: "🖋️ نسخ بالحبر", poemfade: "🌫️ شعر يظهر", hashend: "#️⃣ وسم النهاية", flipverb: "🔁 فعل يتبدّل", strobe: "⚡ وميض كلمات", duoline: "▤ سطران مضغوطان", capstack: "❓ سؤال مضغوط", pillword: "🟨 كبسولة خلف الكلمة", blurduo: "🟢 سطران بدائرة", tagstack: "🏷️ سطور بوسم", underbars: "▁ خطوط تحت النص", contactcard: "📇 بطاقة تواصل", iconorbit: "🪐 أيقونات في قوس", blurstrobe: "💥 كلمة بسحبة", kinstack: "⇋ نص متدرّج", incall: "📞 مكالمة واردة", cineband: "🎞️ شريط سينما", scriptover: "✍️ خط يد فوق الفيديو", tricolor: "🟪 ثلاثة ألوان", drumpicker: "🎡 عجلة اختيار", redmix: "🔴 كبير أحمر وصغير", headbubble: "⚪ دائرة مكان الرأس", pincard: "📌 بطاقة بدبوس", emojifloat: "🤡 إيموجي عائم", slotreel: "🎰 آلة خدمات", posterwall: "🖼️ جدار ملصقات", quoteline: "💬 سطر اقتباس", medallion: "🏅 ملصق ميدالية", clockhand: "🕰️ عقرب ساعة", roadtext: "🛣️ طريق متعرج", markpan: "🖍️ قلم تحديد ودائرة", objectquote: "⏳ رمز وحكمة", racechart: "📈 خطان يتسابقان", calflip: "📆 تقويم يتقلّب", glosscards: "🃏 بطاقات لامعة", dropword: "💧 قطرة وتحول", tasklens: "🔍 مهام تحت عدسة", monostack: "⚫ سرد أحادي اللون", dashbox: "⬚ مربع متقطع وفأرة", sparklist: "✦ قائمة بنجوم", followbtn: "👆 زر متابعة", silhouette: "🕴️ رجل ببدلة", petalstack: "🌸 بتلات وعنوان", followcount: "👤 عداد متابعين", twopillars: "🏛️ عمودان وفجوة", cutmat: "🟩 لوح قص", labelbox: "🏷️ تذكرة سوداء", stampcard: "✉️ طابع بريد", lcdtype: "📟 شاشة جوال قديم", genpanel: "🪟 لوح توليد طائر", holopulse: "💚 حلقات وهولوجرام", coverflow: "💿 دوّارة بطاقات", featuretag: "🟢 عنوان ميزة", luxmix: "✨ سيريف فاخر", goldframes: "🔶 إطارات ذهبية", goldrows: "📜 صفوف ذهبية", tilegrid: "🔲 موقع بشبكة", goldpill: "🟡 كبسولة ذهبية", holoclock: "🕚 ساعة ومجلدات", curvewall: "🎞️ جدار مقوّس", newsscan: "📰 جريدة وقلم تحديد", neonvenn: "⭕ حلقات ضوء", wavebelt: "〰️ موجة تزيل أشياء", cardarc: "🌙 قوس بطاقات", shadowquote: "🪟 ملصق بظل نافذة", haloring: "💫 حلقة ضوء تكبر", noirtitle: "🕵️ عنوان نوار", stickerstack: "🏴 ملصقات سوداء", graphhop: "📈 دوائر على رسم بياني", podium: "🥇 منصة وميدالية", hudcallout: "📐 إطار تقني", termbar: "⌨️ شريط طرفية", glowtoggle: "🌈 مفتاح ألوان", pinkdoodle: "✳️ نجمة ودوائر وردية", lensfind: "🔎 عدسة تدور", echostack: "🔁 صدى سطور", dofwords: "🎥 نص بعمق", portalchat: "🫧 محادثة في دائرة", cardframe: "🎴 الفيديو في بطاقة", wordvoid: "🌌 فضاء كلمات", facecam: "🔥 دائرة الشارح", spreadcaps: "🏛️ سيريف فخم وكابيتال", tinysub: "▁ ترجمة صغيرة فخمة", ringword: "⭕ كلمة بحلقة يد", handcap: "✍️ تعليق نصي بخط اليد", blobcam: "🥚 فيديو في بقعة", brushbar: "🖌️ ضربة فرشة زرقاء", beforeafter: "🆚 قبل وبعد", pillcarousel: "💊 معرض كبسولات", namescript: "🌟 اسم أصفر ونص", stackrepeat: "🔂 كلمة متكررة في عمود", vertword: "🏙️ كلمة طولية", serifsolo: "📜 كلمة سيريف وحيدة", selectword: "🔵 كلمة تتحدد", tornlabel: "📄 ورقة مقطوعة", radartags: "📡 رادار ووسوم" };
 // العناصر اللي ليها «الكلمة اللي عليها الضغط»
 const TY_FOCUS = ["sign", "spot", "arc", "artype", "stack", "halo", "space", "cube", "lock", "outline", "label", "tiles", "bubble", "film", "ghost", "scribble", "spread",
   "serif", "toggle", "emoji", "doodle", "spotlight", "frame", "years", "digits", "spaced", "phone", "browser", "inline", "endcard", "wintitle", "megapan", "badge", "photohero", "result", "marker", "stutter", "anchorword", "letterorb", "themeswap", "post", "highlightpan", "gradword"];
-const TY_TRANS = { "": "بدون انتقال", whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دائرة تنفتح",
-  leak: "🌅 تسريب ضوء", burn: "🔥 حرق فيلم", rise: "⬆️ صاعد من أسفل", wipe: "🟧 مسحة لون", blur: "🌫️ بلير", pop: "🫧 نطة من داخل", slab: "🚪 لوح عابر", bars: "▥ شرائح ألوان", orb: "🟢 دائرة تكبر" };
-const TY_INTRO = { track: { "": "بدون افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "بدون فلاش", burst: "💛 فلاش أصفر قبلها" } };
-const TY_OUTRO = { track: { "": "بدون قفلة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "بدون قفلة", red: "🔴 فلاش أحمر في الآخر" } };
-const TY_PLACES = { auto: "📍 مكان النص: البرنامج يختار", left: "⬅️ شمالها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
+const TY_TRANS = { "": "دون انتقال", whip: "💨 سحبة سريعة", zoom: "🔍 زووم داخل", glitch: "📺 جلتش", flash: "⚡ فلاش", iris: "⭕ دائرة تنفتح",
+  leak: "🌅 تسريب ضوء", burn: "🔥 حرق فيلم", rise: "⬆️ صاعد من أسفل", wipe: "🟧 مسحة لون", blur: "🌫️ تمويه", pop: "🫧 قفزة من الداخل", slab: "🚪 لوح عابر", bars: "▥ شرائح ألوان", orb: "🟢 دائرة تكبر" };
+const TY_INTRO = { track: { "": "دون افتتاح", flash: "⚡ افتتاح بفلاشات" }, spot: { "": "دون فلاش", burst: "💛 فلاش أصفر قبلها" } };
+const TY_OUTRO = { track: { "": "دون خاتمة", pixel: "▦ تتكسّر بكسلات" }, spot: { "": "دون خاتمة", red: "🔴 فلاش أحمر في النهاية" } };
+const TY_PLACES = { auto: "📍 مكان النص: البرنامج يختار", left: "⬅️ يسارها", right: "➡️ يمينها", above: "⬆️ فوقها", below: "⬇️ تحتها", on: "📝 عليها" };
 const TY_AKINDS = { photo: "🖼️ صورة", paper: "📄 ورقة", screen: "📱 شاشة", object: "📦 شيء", product: "🛍️ منتج", face: "🙂 وجه", person: "🧍 شخص", sign: "🪧 يافطة", space: "⬜ مساحة فارغة" };
 const TY_THEMES = { light: "☀️ فاتح", dark: "🌙 غامق", accent: "🟨 ملوّن" };
 const TY_BG = { theme: "🎨 ألوان الأسلوب", solid: "🟦 لون سادة", image: "🖼️ صورة", video: "🎬 فيديو", source: "🎥 الفيديو المرفوع" };
 const TY_ST = { new: "", bgauto: "🎬 جارٍ جلب خلفيات بحسب النص", ready: "📝 النص جاهز", planned: "🧠 الحركات جاهزة", done: "✅ الفيديو جاهز", failed: "⚠️ فشل",
-  transcribing: "🎧 يسمع", analyzing: "👁️ يحلل الفيديو", planning: "🧠 يوزّع", drawing: "🎨 يرسم الأيقونات", rendering: "🎬 يعمل الفيديو", tracking: "🎯 جارٍ التتبع" };
+  transcribing: "🎧 يستمع", analyzing: "👁️ يحلل الفيديو", planning: "🧠 يوزّع", drawing: "🎨 يرسم الأيقونات", rendering: "🎬 يصنع الفيديو", tracking: "🎯 جارٍ التتبع" };
 const tye = (v) => escapeHtml(v == null ? "" : String(v));
 const tyT = (t) => `${Math.floor((t || 0) / 60)}:${((t || 0) % 60).toFixed(1).padStart(4, "0")}`;
 const TY = (p) => `/api/typo${p}`;
@@ -97,15 +97,15 @@ function tyRenderProj() {
   const stOpts = tyx.styles.map((s) => `<option value="${s.id}" ${s.id === v.style ? "selected" : ""}>${tye(s.name)}</option>`).join("");
   el.innerHTML = `<div class="car-head"><input class="ad-title" data-tyname value="${tye(v.name)}" data-no-i18n>
       <div class="row wrap">${v.final_url ? `<a class="btn sm" href="${v.final_url}" download="${tye(v.name)}.mp4">⬇️ نزّل</a>
-        <button type="button" class="btn sm primary" data-tyedit>🎞️ انقل للمونتاج</button>` : ""}
+        <button type="button" class="btn sm primary" data-tyedit>🎞️ انقل إلى المونتاج</button>` : ""}
         <button type="button" class="btn sm danger" data-tydel ${busy ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status" id="tyStatus"></div>
     <div class="row wrap tv-opts">
       <label>المقاس <select data-tyopt="ratio">${v.ratios.map((r) => `<option ${r === v.ratio ? "selected" : ""}>${r}</option>`).join("")}</select></label>
       <label>الأسلوب <select data-tyopt="style">${stOpts}</select></label>
-      <label title="بدون ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس فقط، والنص يتفرّغ على الخادم إذا متفعّل">الذكاء <select data-tyopt="ai">
-        <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ بدون ذكاء اصطناعي</option></select></label>
-      <label title="0 = لا يوجد كليكات تمامًا، 100 = كليك على كل كلمة، وما بينهم الكليكات تقل أو تكتر">🔊 الكليكات
+      <label title="دون ذكاء اصطناعي: الحركات بالقواعد، والأيقونات من القاموس فقط، والنص يُفرَّغ على الخادم إن كان مفعّلًا">الذكاء <select data-tyopt="ai">
+        <option value="smart" ${v.ai !== "off" ? "selected" : ""}>🤖 ذكي</option><option value="off" ${v.ai === "off" ? "selected" : ""}>⚙️ دون ذكاء اصطناعي</option></select></label>
+      <label title="0 = لا توجد نقرات إطلاقًا، 100 = نقرة على كل كلمة، وما بينهما تقل النقرات أو تكثر">🔊 النقرات
         <input type="range" min="0" max="100" step="5" data-tysfx value="${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}">
         <b data-tysfxval>${v.sound?.sfx_level ?? (v.sfx === "off" ? 0 : 100)}</b></label>
       ${tyx.styles.find((x) => x.id === v.style)?.pro && TypoEngine.MOMENT_FONTS ? `
@@ -123,11 +123,11 @@ function tyRenderProj() {
       ${["image", "video", "source"].includes(bg.kind) ? `<label>تغميق <input type="range" min="0" max="0.8" step="0.05" data-tybg="dim" value="${bg.dim || 0}"></label>` : ""}
     </div>
     <details class="panel tv-step" ${tyx.open.s1 ?? !v.words?.length ? "open" : ""} data-tydk="s1"><summary>١. 🗣️ النص <small class="muted">${v.words?.length ? `${v.words.length} كلمة · ${tyT(v.duration)}` : ""} ${kindTxt}</small></summary>
-      <p class="hint">اكتب النص (وكل كلمة تأخذ وقت تقريبي)، أو ارفع صوت أو فيديو والنص يُكتب بتوقيته. إذا رفعت فيديو، التايبوجرافي يتركب فوقه.</p>
+      <p class="hint">اكتب النص (وتأخذ كل كلمة وقتًا تقريبيًا)، أو ارفع صوتًا أو فيديو ليُكتب النص بتوقيته. إن رفعت فيديو، يُركَّب التايبوجرافي فوقه.</p>
       ${v.source?.kind === "audio" || v.source?.kind === "video" ? `<p class="ty-words" dir="auto" data-no-i18n>${(v.words || []).map((w) => tye(w.w)).join(" ")}</p>`
-        : `<textarea rows="4" dir="auto" data-tytext placeholder="النص الذي سيتحوّل لتايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
+        : `<textarea rows="4" dir="auto" data-tytext placeholder="النص الذي سيتحول إلى تايبوجرافي" data-no-i18n>${tye(v.script || "")}</textarea>
            <button type="button" class="btn sm" data-tysavetext ${busy ? "disabled" : ""}>✍️ استخدم هذا النص</button>`}
-      <div class="row wrap"><label class="btn sm">⬆ ارفع صوت أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
+      <div class="row wrap"><label class="btn sm">⬆ ارفع صوتًا أو فيديو<input type="file" data-tysrc accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.mov" hidden></label>
         <button type="button" class="btn sm ${tyx.rec ? "danger" : ""}" data-tyrec ${busy ? "disabled" : ""}>${tyx.rec ? "⏹ أوقف واستخدم التسجيل" : "🎙️ سجّل صوتك"}</button>
         ${tyx.rec ? `<b class="num" data-tyrect>0:00</b>` : ""}</div>
       ${tyx.styles.find((x) => x.id === v.style)?.audio_only ? `<p class="hint">✏️ هذا الأسلوب يأخذ الصوت فقط: إن رفعت فيديو فلن تظهر صورته، ويكون النص والرسومات بخط رفيع على خلفية سوداء.</p>` : ""}
@@ -136,10 +136,10 @@ function tyRenderProj() {
     </details>
     ${v.source?.kind === "video" ? tySceneView(v, busy) : ""}
     <details class="panel tv-step" ${tyx.open.s2 ?? !!v.words?.length ? "open" : ""} data-tydk="s2"><summary>٢. 🧠 الحركات <small class="muted">${v.blocks?.length ? `${v.blocks.length} لقطة` : ""}</small></summary>
-      <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): من يتكلم ولمين وماذا الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
+      <div class="row wrap"><input type="text" data-tybrief placeholder="عن الفيديو (اختياري): من يتكلم، ولمن، وما الإحساس" value="${tye(v.brief || "")}" data-no-i18n>
         <button type="button" class="btn primary" data-typlan ${busy || !v.words?.length ? "disabled" : ""}>🧠 ${v.blocks?.length ? "وزّعه من جديد" : "وزّع النص على الحركات"}</button></div>
       ${v.missing_icons?.length ? `<div class="ty-miss"><span>أيقونات غير في المكتبة: ${v.missing_icons.map((n) => tyIconChip(n)).join("")}</span>
-        <button type="button" class="btn sm primary" data-tyicons ${busy ? "disabled" : ""}>🎨 ارسمهم (~${v.draw_cost}$)</button></div>` : ""}
+        <button type="button" class="btn sm primary" data-tyicons ${busy ? "disabled" : ""}>🎨 ارسمها (~${v.draw_cost}$)</button></div>` : ""}
       <div class="ty-blocks">${(v.blocks || []).map((b, i) => tyBlockRow(v, b, i)).join("")}</div>
     </details>
     ${v.blocks?.length ? `<section class="panel ty-preview">
@@ -151,7 +151,7 @@ function tyRenderProj() {
         <input type="range" min="0" max="${v.duration}" step="0.01" value="${tyx.t}" data-tyscrub><small class="muted" id="tyTime"></small></div>
       <div class="row wrap"><select data-tyq><option value="high">جودة كاملة (1080)</option><option value="fast">أسرع (720)</option></select>
         <button type="button" class="btn primary" data-tyrender ${busy ? "disabled" : ""}>🎬 ${v.final_url ? "أنشئ الفيديو مرة أخرى" : "أنشئ الفيديو"}</button>
-        <small class="muted">المعاينة هنا بنفس الرسم الذي سيظهر في الفيديو. الفيديو يُرسم على الخادم فريم فريم (دقيقة تقريبًا لكل 15 ثانية).</small></div>
+        <small class="muted">المعاينة هنا بنفس الرسم الذي سيظهر في الفيديو. يُرسم الفيديو على الخادم إطارًا إطارًا (دقيقة تقريبًا لكل 15 ثانية).</small></div>
       ${tySoundLine(v.sound)}
       ${v.final_url ? `<video src="${v.final_url}" controls playsinline preload="metadata" class="ty-final"></video>` : ""}
     </section>` : ""}`;
@@ -161,13 +161,13 @@ function tyRenderProj() {
 
 function tySceneView(v, busy) {
   const an = v.scene?.anchors;
-  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ ما في الفيديو <small class="muted">${an ? `${an.length} شيء` : "لم يُحلّل بعد"}</small></summary>
-    <p class="hint">البرنامج يرى الأشياء التي في الكادر (صورة، ورقة، شاشة، وجه...) وأماكنها وهي تتحرك، لكي النص يُكتب جنبها أو عليها، والكلمة التي تشاور على شيء (مثل «me» وفيه صورتك) ما لا تُكتب والشيء نفسها تصبح مكانها. يُنشأ تلقائيًا مع «🧠 وزّع».</p>
+  return `<details class="panel tv-step" ${tyx.open.s15 ?? true ? "open" : ""} data-tydk="s15"><summary>👁️ ما في الفيديو <small class="muted">${an ? `${an.length} شيء` : "لم يُحلَّل بعد"}</small></summary>
+    <p class="hint">يرى البرنامج الأشياء التي في الكادر (صورة، ورقة، شاشة، وجه...) وأماكنها وهي تتحرك، ليُكتب النص بجانبها أو عليها، والكلمة التي تشير إلى شيء (مثل «me» وفيه صورتك) لا تُكتب بل يحلّ الشيء نفسه مكانها. يُنشأ تلقائيًا مع «🧠 وزّع».</p>
     <div class="row wrap"><button type="button" class="btn sm" data-tyscene ${busy ? "disabled" : ""}>👁️ ${an ? "حلّله من جديد" : "حلّل الفيديو"}</button>
       <label class="ty-check"><input type="checkbox" data-tyguides ${tyx.guides ? "checked" : ""}> اعرض أماكنها على المعاينة</label></div>
     ${v.scene ? `<p class="hint">${!v.scene.person?.present ? "🧍 لا يوجد شخص ظاهر بوضوح في الفيديو"
-      : v.scene.person.model === "video" ? "🧍 الشخص قُرئ بموديل الفيديو ✓"
-      : "🧍 الشخص قُرئ بالنموذج القديم (حلّل الفيديو مرة أخرى بعد تحديث الخادم)"}</p>` : ""}
+      : v.scene.person.model === "video" ? "🧍 قُرئ الشخص بنموذج الفيديو ✓"
+      : "🧍 قُرئ الشخص بالنموذج القديم (حلّل الفيديو مرة أخرى بعد تحديث الخادم)"}</p>` : ""}
     ${an?.length ? `<div class="ty-anchors">${an.map((a) => `<figure class="ty-anchor" data-tyseek="${a.t0}">${a.thumb_url ? `<img src="${a.thumb_url}" alt="">` : ""}
       <figcaption><b>${a.id}</b> ${TY_AKINDS[a.kind] || a.kind}<small dir="ltr" data-no-i18n>${tye(a.label)}</small><small class="muted">${tyT(a.t0)} ← ${tyT(a.t1)}</small></figcaption></figure>`).join("")}</div>` : ""}
   </details>`;
@@ -176,24 +176,24 @@ function tySceneView(v, busy) {
 function tyBlockRow(v, b, i) {
   const icons = b.kind === "letters" || b.kind === "ring" || b.kind === "spot" ? b.icons || [] : b.kind === "icon" ? [b.icon].filter(Boolean) : [];
   const side = b.kind === "build" ? [b.side].filter(Boolean) : [];
-  const stkOpts = `<option value="">＋ ستيكر</option>` + tyx.stk.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("");
+  const stkOpts = `<option value="">＋ ملصق</option>` + tyx.stk.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("");
   return `<article class="ty-block" data-tyb="${i}">
     <header><button type="button" class="btn sm" data-tyseek="${b.t0}">▶️ ${tyT(b.t0)}</button>
       <select data-tbf="kind">${Object.entries(TY_KINDS).map(([k, l]) => `<option value="${k}" ${k === b.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select data-tbf="theme">${Object.entries(TY_THEMES).map(([k, l]) => `<option value="${k}" ${k === b.theme ? "selected" : ""}>${l}</option>`).join("")}</select>
       <small class="muted" dir="auto" data-no-i18n>«${tye((b.words || []).map((w) => w.w).join(" "))}»</small>
       ${i < v.blocks.length - 1 ? `<button type="button" class="btn sm" data-tymerge="${i}" title="يضم هذه اللقطة مع ما بعدها">⤵ ضم</button>` : ""}
-      ${(b.to - b.from) >= 1 ? `<button type="button" class="btn sm" data-tysplit="${i}" title="يقسم اللقطة نصين">✂️ قسّم</button>` : ""}</header>
+      ${(b.to - b.from) >= 1 ? `<button type="button" class="btn sm" data-tysplit="${i}" title="يقسم اللقطة إلى نصين">✂️ قسّم</button>` : ""}</header>
     ${v.scene?.anchors?.length && v.bg?.kind === "source" ? `<div class="row wrap">
-      <select data-tbf="anchor"><option value="">📍 بدون مرساة (نص الشاشة)</option>${v.scene.anchors.map((a) => `<option value="${a.id}" ${a.id === b.anchor ? "selected" : ""}>📍 ${a.id} · ${TY_AKINDS[a.kind] || a.kind} · ${tye(a.label)}</option>`).join("")}</select>
+      <select data-tbf="anchor"><option value="">📍 دون مرساة (منتصف الشاشة)</option>${v.scene.anchors.map((a) => `<option value="${a.id}" ${a.id === b.anchor ? "selected" : ""}>📍 ${a.id} · ${TY_AKINDS[a.kind] || a.kind} · ${tye(a.label)}</option>`).join("")}</select>
       ${b.anchor ? `<select data-tbf="place">${Object.entries(TY_PLACES).map(([k, l]) => `<option value="${k}" ${k === (b.place || "auto") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
-      ${b.anchor && b.kind === "anchor" ? `<label>الكلمة التي الشيء نفسها مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
+      ${b.anchor && b.kind === "anchor" ? `<label>الكلمة التي يحلّ الشيء نفسه مكانها <select data-tbf="skip"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.skip ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
     </div>` : ""}
     ${TY_INTRO[b.kind] || b.kind === "sign" || b.kind === "signature" || TY_FOCUS.includes(b.kind) ? `<div class="row wrap">
       ${TY_INTRO[b.kind] ? `<select data-tbf="intro">${Object.entries(TY_INTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.intro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
         <select data-tbf="outro">${Object.entries(TY_OUTRO[b.kind]).map(([k, l]) => `<option value="${k}" ${k === (b.outro || "") ? "selected" : ""}>${l}</option>`).join("")}</select>` : ""}
       ${TY_FOCUS.includes(b.kind) ? `<label>الكلمة التي عليها الضغط <select data-tbf="focus"><option value="-1">—</option>${(b.words || []).map((w, j) => `<option value="${j}" ${j === b.focus ? "selected" : ""}>${tye(w.w)}</option>`).join("")}</select></label>` : ""}
-      ${b.kind === "sign" || b.kind === "signature" ? `<label>الإمضا <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
+      ${b.kind === "sign" || b.kind === "signature" ? `<label>التوقيع <input data-tbf="sign" value="${tye(b.sign || "")}" dir="auto" data-no-i18n></label>` : ""}
     </div>` : ""}
     <div class="row wrap"><label>📐 حجم النص <input type="range" min="0.3" max="2.5" step="0.05" data-tbf="ms" value="${b.ms ?? 1}"></label>
       ${window.TypoEngine?.STUDIO?.has(b.kind) ? `<label>🎞️ الدخول <select data-tbf="trans">${Object.entries(TY_TRANS).map(([k, l]) => `<option value="${k}" ${k === (b.trans || "") ? "selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
@@ -204,7 +204,7 @@ function tyBlockRow(v, b, i) {
       ${b.kind === "letters" ? `<label>الحرف الذي يُستبدل <input type="number" min="0" max="20" data-tbf="letter" value="${b.letter ?? 1}"></label>` : ""}
       ${["icon", "letters", "ring", "spot"].includes(b.kind) ? `<span class="ty-icons">${icons.map((n, j) => tyIconChip(n, `data-tyrm="${j}"`)).join("")}
         <select data-tyadd>${stkOpts}</select></span>` : ""}
-      ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ستيكر", "＋ صورة بجانب النص")}</select>`}</span>` : ""}
+      ${b.kind === "build" ? `<span class="ty-icons">${side.map((n) => tyIconChip(n, 'data-tyrmside="1"')).join("")}${side.length ? "" : `<select data-tyside>${stkOpts.replace("＋ ملصق", "＋ صورة بجانب النص")}</select>`}</span>` : ""}
     </div></article>`;
 }
 
@@ -234,8 +234,8 @@ function tyUpload(url, file) {
       if (xhr.status >= 200 && xhr.status < 300) { toast("✅ رُفع"); resolve(data); }
       else reject(new Error(typeof data.detail === "string" ? data.detail : `فشل الرفع (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error("الرفع توقف: تأكد من النت وجرب مرة أخرى"));
-    xhr.ontimeout = () => reject(new Error("الرفع خذ وقت طويل جدًا: جرب فيديو أصغر"));
+    xhr.onerror = () => reject(new Error("توقف الرفع: تأكد من الإنترنت وجرّب مرة أخرى"));
+    xhr.ontimeout = () => reject(new Error("استغرق الرفع وقتًا طويلًا جدًا: جرّب فيديو أصغر"));
     const fd = new FormData();
     fd.append("file", file);
     xhr.send(fd);
@@ -247,8 +247,8 @@ function tySoundLine(sd) {
   if (!sd) return "";
   const n = (sd.sfx?.click || 0) + (sd.sfx?.key || 0) + (sd.sfx?.typing || 0);
   const voice = sd.voice === "source" ? "🎙️ صوت الفيديو" : sd.voice === "bg" ? "🎙️ صوت فيديو الخلفية"
-    : sd.voice === "silent" ? "⚠️ الفيديو الذي رفعته لا يحتوي صوت (إذا هذا «الصورة فقط» من المعمل، ارفع الفيديو الأصلي)" : "🔇 لا يوجد صوت نص (النص مكتوب)";
-  const fx = !sd.sfx_on ? "🔇 بدون كليكات" : n ? `🔊 النقرات ${sd.sfx_level ?? 100}٪ (${n} صوت في المكتبة)` : "⚠️ مكتبة الأصوات فارغة على الخادم: ارفعها مرة أخرى من «🔊 الأصوات»";
+    : sd.voice === "silent" ? "⚠️ الفيديو الذي رفعته لا يحتوي على صوت (إن كان هذا «الصورة فقط» من المعمل، فارفع الفيديو الأصلي)" : "🔇 لا يوجد صوت للنص (النص مكتوب)";
+  const fx = !sd.sfx_on ? "🔇 دون نقرات" : n ? `🔊 النقرات ${sd.sfx_level ?? 100}٪ (${n} صوت في المكتبة)` : "⚠️ مكتبة الأصوات فارغة على الخادم: ارفعها مرة أخرى من «🔊 الأصوات»";
   return `<p class="hint">${voice} · ${fx}</p>`;
 }
 
@@ -423,7 +423,7 @@ async function tyRecord(v) {
   if (tyx.rec) { tyx.rec.mr.stop(); return; }
   if (v.blocks?.length && !(await uiConfirm("أتسجّل من جديد؟ سيُستبدل النص والحركات الحالية."))) return;
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("تعذّر فتح الميكروفون. اسمح للمتصفح يستخدمه", true); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast("تعذّر فتح الميكروفون. اسمح للمتصفح باستخدامه", true); }
   const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || "";
   const mr = new MediaRecorder(stream, type ? { mimeType: type } : {}), parts = [], t0 = Date.now();
   mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
@@ -472,8 +472,8 @@ $("tyNew").onclick = async () => {
 };
 
 // ---------- 🔊 الأصوات الرسمية
-const TY_SFX = { click: ["🖱️ نقرات", "على كل كلمة أو حرف أو عنصر يظهر أو يختفي (البرنامج يبدّل بينهم)"],
-  key: ["⌨️ ضغطات لوحة المفاتيح", "على كتابة الرسائل فقط (حرف حرف)"], typing: ["💬 كتابة", "صوت كتابة رسالة كامل (احتياطي إذا لا يوجد ضغطات)"] };
+const TY_SFX = { click: ["🖱️ نقرات", "على كل كلمة أو حرف أو عنصر يظهر أو يختفي (يبدّل البرنامج بينها)"],
+  key: ["⌨️ ضغطات لوحة المفاتيح", "على كتابة الرسائل فقط (حرف حرف)"], typing: ["💬 كتابة", "صوت كتابة رسالة كامل (احتياطي إن لم توجد ضغطات)"] };
 function tyRenderSfx() {
   const lib = tyx.sfx || {};
   $("tySfx").innerHTML = `<div class="car-head"><h2>🔊 الأصوات الرسمية <small class="muted">${Object.values(lib).flat().length}</small></h2>
@@ -623,7 +623,7 @@ $("tyMain").addEventListener("click", async (e) => {
   if (st) return wrap(st, () => tyPatch({ text: document.querySelector("[data-tytext]").value }));
   const plan = t.closest("[data-typlan]");
   if (plan) {
-    if (v.blocks?.length && !(await uiConfirm("توزّع النص من جديد؟ التعديلات التي عملتها على اللقطات ستُستبدل."))) return;
+    if (v.blocks?.length && !(await uiConfirm("هل توزّع النص من جديد؟ ستُستبدل التعديلات التي أجريتها على اللقطات."))) return;
     return wrap(plan, async () => {
       tyx.cur = await api(TY(`/${v.id}/plan`), { method: "POST", ...jsonBody({ brief: document.querySelector("[data-tybrief]").value }) });
       tyRender(); tyPoll();
@@ -631,7 +631,7 @@ $("tyMain").addEventListener("click", async (e) => {
   }
   const ic = t.closest("[data-tyicons]");
   if (ic) {
-    if (!(await uiConfirm(`يرسم ${v.missing_icons.length} أيقونة ناقصة هذا بالستايل؟ نحو ${v.draw_cost}$`))) return;
+    if (!(await uiConfirm(`هل يرسم ${v.missing_icons.length} أيقونة ناقصة بهذا الأسلوب؟ نحو ${v.draw_cost}$`))) return;
     return wrap(ic, async () => { tyx.cur = await api(TY(`/${v.id}/icons`), { method: "POST" }); tyRender(); tyPoll(); });
   }
   const ren = t.closest("[data-tyrender]");
@@ -669,7 +669,7 @@ $("tyMain").addEventListener("click", async (e) => {
     bl[i].to = bl[i + 1].to;
     bl[i].text = "";
     bl.splice(i + 1, 1);
-    return tySaveBlocks(bl, "⤵ ضُمّوا");
+    return tySaveBlocks(bl, "⤵ ضُمّت");
   }
   const split = t.closest("[data-tysplit]");
   if (split) {
@@ -711,7 +711,7 @@ $("tyMain").addEventListener("change", async (e) => {
     }
     if (t.matches("[data-tyname]")) { tyx.cur = await api(TY(`/${v.id}`), { method: "PATCH", ...jsonBody({ name: t.value }) }); tyx.list = await api(TY("")); return tyRender(); }
     if (t.matches("[data-tyopt]")) return tyPatch({ [t.dataset.tyopt]: t.value });
-    if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 النقرات: ${t.value}` : "🔇 بدون كليكات"); }
+    if (t.matches("[data-tysfx]")) { await tyPatch({ sfx_level: Number(t.value) }); return toast(Number(t.value) ? `🔊 النقرات: ${t.value}` : "🔇 دون نقرات"); }
     if (t.matches("[data-tyfont]")) return tyPatch({ fonts: { ...(v.fonts || {}), [t.dataset.tyfont]: t.value } });
     if (t.matches("[data-tybg]")) return tyPatch({ bg: { ...(v.bg || {}), [t.dataset.tybg]: t.dataset.tybg === "dim" ? Number(t.value) : t.value } });
     if (t.matches("[data-tybgfile]") && t.files[0]) {
@@ -720,7 +720,7 @@ $("tyMain").addEventListener("change", async (e) => {
       return tyRender();
     }
     if (t.matches("[data-tysrc]") && t.files[0]) {
-      if (v.blocks?.length && !(await uiConfirm("ترفع ملف جديد؟ النص والحركات الحالية سيتبدلون."))) return;
+      if (v.blocks?.length && !(await uiConfirm("هل ترفع ملفًا جديدًا؟ سيُستبدل النص والحركات الحالية."))) return;
       tyx.cur = await tyUpload(TY(`/${v.id}/source`), t.files[0]);
       tyx.force = true;
       tyRender();
@@ -750,8 +750,8 @@ $("tyMain").addEventListener("input", (e) => {
 // ---------- 🧩 مكتبة الستيكرات
 
 function tyRenderStk() {
-  $("tyStk").innerHTML = `<div class="car-head"><h2>🧩 مكتبة الستيكرات <small class="muted">${tyx.stk.length}</small></h2>
-      <div class="row wrap"><label class="btn sm primary">⬆ ارفع صور<input type="file" data-stkup accept="image/*" multiple hidden></label>
+  $("tyStk").innerHTML = `<div class="car-head"><h2>🧩 مكتبة الملصقات <small class="muted">${tyx.stk.length}</small></h2>
+      <div class="row wrap"><label class="btn sm primary">⬆ ارفع صورًا<input type="file" data-stkup accept="image/*" multiple hidden></label>
         <label class="ty-check"><input type="checkbox" data-stkkey checked> أزل الخلفية السادة</label></div></div>
     <div class="row wrap"><input type="text" data-stkdesc placeholder="وصف أيقونة جديدة (مثلًا: pixel art dumbbell)" data-no-i18n>
       <select data-stkstyle>${tyx.styles.map((s) => `<option value="${s.id}">${tye(s.name)}</option>`).join("")}</select>
@@ -761,9 +761,9 @@ function tyRenderStk() {
     <div class="ty-stk">${tyx.stk.map((s) => `<figure data-stk="${s.id}"><div class="ty-checker"><img src="${s.url}" alt=""></div>
       <input value="${tye(s.name)}" data-stkname data-no-i18n>
       <label class="ty-concept" title="معنى الأيقونة في القاموس: النص الذي يدل عليه يجلب هذه الأيقونة">📖 <input value="${tye(s.concept || "")}" data-stkconcept placeholder="المعنى" data-no-i18n></label>
-      <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مترسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
+      <small class="muted">${s.source.startsWith("lab:") ? "🔬 من المعمل" : s.source === "drawn" ? "🎨 مرسومة" : "⬆ مرفوعة"}${s.style ? ` · ${tye(tyx.styles.find((x) => x.id === s.style)?.name || s.style)}` : ""}</small>
       <div class="row">${s.source.startsWith("lab:") ? `<button type="button" class="btn sm" data-stkclean title="يرسمها تلقائيًا نظيفة بالشكل نفسه">✨ نظّفها</button>` : ""}
-        <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لا يوجد بعد ستيكرات</p>`}</div>`;
+        <button type="button" class="btn sm danger" data-stkdel>🗑️</button></div></figure>`).join("") || `<p class="muted">لا توجد ملصقات بعد</p>`}</div>`;
 }
 
 $("tyStk").addEventListener("click", async (e) => {
@@ -821,12 +821,11 @@ function tyDictView() {
   const d = tyx.dict;
   if (!d) return "";
   return `<details class="panel ty-dict" ${tyx.open.dict ? "open" : ""} data-tydictdk><summary>📖 القاموس <small class="muted">${d.concepts.length} معنى · ${d.learned} كلمة تعلّمت</small></summary>
-    <p class="hint">يُملأ تلقائيًا: كل أيقونة تُستخرج من فيديو في المعمل (أو تُرسم) تدخل بمعناها وكلماتها عربي وإنجليزي. الكلمة التي لا يعرفها يسأل عليها نموذج صغير مرة واحدة ويحفظ الإجابة.
-      ونفس المعنى يمكن يصبح له أيقونة مختلفة في كل أسلوب: المشروع يأخذ أيقونة الأسلوب الخاص به أولًا.</p>
-    ${d.untagged ? `<button type="button" class="btn sm" data-dicttag>🏷️ دخّل ${d.untagged} أيقونة قديمة للقاموس</button>` : ""}
-    <div class="row wrap"><input type="text" data-dictc placeholder="المعنى (مثلًا dumbbell)" data-no-i18n><input type="text" data-dictar placeholder="كلمات عربي: حديد، دمبل، جيم" data-no-i18n>
+    <p class="hint">يُملأ تلقائيًا: كل أيقونة تُستخرج من فيديو في المعمل (أو تُرسم) تدخل بمعناها وكلماتها بالعربية والإنجليزية. الكلمة التي لا يعرفها يسأل عنها نموذجًا صغيرًا مرة واحدة ويحفظ الإجابة. ويمكن أن يكون للمعنى نفسه أيقونة مختلفة في كل أسلوب: يأخذ المشروع أيقونة أسلوبه أولًا.</p>
+    ${d.untagged ? `<button type="button" class="btn sm" data-dicttag>🏷️ أدخل ${d.untagged} أيقونة قديمة إلى القاموس</button>` : ""}
+    <div class="row wrap"><input type="text" data-dictc placeholder="المعنى (مثلًا dumbbell)" data-no-i18n><input type="text" data-dictar placeholder="كلمات عربية: حديد، دمبل، نادي رياضي" data-no-i18n>
       <input type="text" data-dicten placeholder="English words: weights, gym" data-no-i18n><button type="button" class="btn sm" data-dictadd>＋ أضف</button></div>
-    <div class="ty-dict-list">${d.concepts.map((c) => `<div><b data-no-i18n>${tye(c.concept)}</b> <small class="muted">${c.stickers.length ? `🧩 ${c.stickers.length}` : "❔ لا يوجد أيقونة"}</small>
+    <div class="ty-dict-list">${d.concepts.map((c) => `<div><b data-no-i18n>${tye(c.concept)}</b> <small class="muted">${c.stickers.length ? `🧩 ${c.stickers.length}` : "❔ لا توجد أيقونة"}</small>
       <small dir="auto" data-no-i18n>${tye([...c.ar, ...c.en].slice(0, 14).join("، "))}</small></div>`).join("")}</div></details>`;
 }
 
@@ -836,7 +835,7 @@ $("tyStk").addEventListener("click", async (e) => {
   const t = e.target;
   const wrap = (btn, fn) => busyButton(btn, "⏳", async () => { try { await fn(); } catch (err) { toast(err.message, true); } });
   const tag = t.closest("[data-dicttag]");
-  if (tag) return wrap(tag, async () => { tyx.dict = await api(TY("/concepts/tag"), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("🏷️ أُضيفوا للقاموس"); });
+  if (tag) return wrap(tag, async () => { tyx.dict = await api(TY("/concepts/tag"), { method: "POST" }); tyx.stk = await api(TY("/stickers")); tyRender(); toast("🏷️ أُضيفت إلى القاموس"); });
   const add = t.closest("[data-dictadd]");
   if (add) {
     const val = (k) => document.querySelector(`[data-dict${k}]`).value.trim();
@@ -860,12 +859,12 @@ function renderLabTypo(d) {
   el.innerHTML = `<details class="sch" open><summary><b>🔤 التايبوجرافي</b>
       ${ty.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> ${tye(ty.step || "يشاهد الفيديو")}</span>
         <button type="button" class="btn sm" data-ltstop>⏹ أوقف</button>` : ""}
-      ${ty.status !== "working" && (data || ty.error) ? `<button type="button" class="btn sm danger" data-ltdel title="الأسلوب والستيكرات التي حُفظت يظلون">🗑️ احذف النتيجة</button>` : ""}
+      ${ty.status !== "working" && (data || ty.error) ? `<button type="button" class="btn sm danger" data-ltdel title="يبقى الأسلوب والملصقات التي حُفظت">🗑️ احذف النتيجة</button>` : ""}
       ${ty.error ? `<small class="err">${tye(ty.error)}</small>` : ""}
-      ${data ? `<small class="muted">${data.moments.length} لحظة · ${data.moments.reduce((a, m) => a + m.icons.filter((i) => i.url).length, 0)} ستيكر</small>` : ""}</summary>
+      ${data ? `<small class="muted">${data.moments.length} لحظة · ${data.moments.reduce((a, m) => a + m.icons.filter((i) => i.url).length, 0)} ملصق</small>` : ""}</summary>
     ${data ? `<div class="ty-labstyle"><b data-no-i18n>${tye(data.style.name)}</b> ${sw(data.style.light)}${sw(data.style.dark)}${sw(data.style.accent)}
         <small class="muted" dir="ltr" data-no-i18n>${tye(data.style.font_look)} ${data.style.icon_style ? `· ${tye(data.style.icon_style)}` : ""}</small>
-        <button type="button" class="btn sm primary" data-ltuse>🔤 أنشئ فيديو هذا بالستايل</button></div>
+        <button type="button" class="btn sm primary" data-ltuse>🔤 أنشئ فيديو بهذا الأسلوب</button></div>
       ${data.style.rules?.length ? `<ul class="ty-rules" data-no-i18n>${data.style.rules.map((r) => `<li>${tye(r)}</li>`).join("")}</ul>` : ""}
       <div class="ty-moments">${data.moments.map((m) => `<article class="ty-moment">
         <button type="button" class="btn sm" data-schplay="${m.t0}" data-to="${m.t1}">▶️ ${lt(m.t0)}</button>
@@ -880,8 +879,8 @@ function renderLabTypo(d) {
 
 $("labTypoBtn").onclick = async () => {
   const has = labx.cur?.typo?.data;
-  if (!(await uiConfirm(has ? `تُخرج تايبوجرافي «${labx.cur.name}» من جديد؟ (الأسلوب والستيكرات القديمة يظلون في المكتبة)`
-    : `يُخرج التايبوجرافي من «${labx.cur.name}»: الأسلوب، وكل لحظة النص تحوّل فيها لشكل، والأيقونات كستيكرات شفافة؟`))) return;
+  if (!(await uiConfirm(has ? `هل تستخرج تايبوجرافي «${labx.cur.name}» من جديد؟ (يبقى الأسلوب والملصقات القديمة في المكتبة)`
+    : `هل يستخرج التايبوجرافي من «${labx.cur.name}»: الأسلوب، وكل لحظة يتحول فيها النص إلى شكل، والأيقونات كملصقات شفافة؟`))) return;
   busyButton($("labTypoBtn"), "⏳", async () => {
     try {
       labx.cur = await api(`/api/lab/${labx.cur.id}/typo`, { method: "POST" });

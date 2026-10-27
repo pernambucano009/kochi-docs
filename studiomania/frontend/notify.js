@@ -58,13 +58,13 @@ function ntfRender() {
   const box = $("bellPanel");
   const canAsk = "Notification" in window && Notification.permission === "default";
   box.innerHTML = `<div class="ntf-head"><b>الإشعارات</b>
-      ${ntf.unread ? `<button type="button" class="btn sm" data-n="readall">✓ علّم الكل قُرئ</button>` : ""}
+      ${ntf.unread ? `<button type="button" class="btn sm" data-n="readall">✓ علّم الكل مقروءًا</button>` : ""}
       ${ntf.items.length ? `<button type="button" class="btn sm" data-n="clear" title="احذف كل الإشعارات">🗑️</button>` : ""}</div>
-    ${canAsk ? `<button type="button" class="ntf-ask" data-n="ask">🔔 وصّلّي الإشعارات على الجهاز حتى إذا الصفحة مغلقة</button>` : ""}
+    ${canAsk ? `<button type="button" class="ntf-ask" data-n="ask">🔔 أوصل الإشعارات إلى الجهاز حتى إن كانت الصفحة مغلقة</button>` : ""}
     <ul class="ntf-list">${ntf.items.map((x) => `<li class="${x.read ? "" : "unread"} ${x.level}" data-id="${x.id}">
         <i class="ntf-ic">${x.level === "bad" ? "✕" : x.kind === "autopilot" ? "🤖" : x.kind === "render" ? "🎬" : "✓"}</i>
         <span class="ntf-txt"><b>${escapeHtml(x.title)}</b>${x.body ? `<small>${escapeHtml(x.body)}</small>` : ""}<small class="ntf-ago">${ntfAgo(x.created_at)}</small></span>
-      </li>`).join("") || `<li class="ntf-empty">لا يوجد إشعارات ما زال. سيوصلك هنا عندما فيديو ينتهي تصدير أو منشور يُنشر.</li>`}</ul>`;
+      </li>`).join("") || `<li class="ntf-empty">لا توجد إشعارات بعد. ستصلك هنا عندما ينتهي تصدير فيديو أو يُنشر منشور.</li>`}</ul>`;
 }
 
 // اللوحة بتفتح جنب الجرس اللي اتداس (في الشريط الجانبي أو فوق في الرئيسية)
@@ -127,7 +127,7 @@ new MutationObserver(() => { if (document.getElementById("nhBell") && !document.
   .observe(document.body, { childList: true, subtree: true });
     }
     if (b?.dataset.n === "clear") {
-      if (!(await uiConfirm("تحذف كل الإشعارات؟"))) return;
+      if (!(await uiConfirm("هل تحذف كل الإشعارات؟"))) return;
       await api("/api/notifications", { method: "DELETE" });
       return ntfPoll();
 // الرئيسية بتتبني بعد الملف ده، فنحدّث العداد عليها لما تظهر

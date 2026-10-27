@@ -59,7 +59,7 @@ function assetGrid() {
       <small class="muted">${ASSET_CATS[a.category] || ""} · ${a.duration} ث · ${a.elements} عنصر${a.variants ? ` · ${a.variants} نسخة` : ""}</small>
       ${(a.tags || []).length ? `<small class="as-tags" data-no-i18n>${a.tags.map((t) => `#${le(t)}`).join(" ")}</small>` : ""}
     </article>`).join("")}</div>`
-    : `<p class="panel muted">${asx.list.length ? "لا يوجد أصول هذا بالبحث." : "المكتبة ما زال فارغة. افتح أي فيديو في المعمل، وفي أي لقطة اضغط «📚 احفظ كأصل في المكتبة»."}</p>`}`;
+    : `<p class="panel muted">${asx.list.length ? "لا توجد أصول بهذا البحث." : "المكتبة ما زالت فارغة. افتح أي فيديو في المعمل، وفي أي لقطة اضغط «📚 احفظ كأصل في المكتبة»."}</p>`}`;
 }
 
 
@@ -75,7 +75,7 @@ function assetDetail(a) {
       <div class="as-meta">
         <label>النوع <select data-asf="category">${labOpts(ASSET_CATS, a.category)}</select></label>
         <label>تاجز <input type="text" data-asf="tags" value="${le((a.tags || []).join("، "))}" placeholder="ماوس، سحب، مجلد" data-no-i18n></label>
-        <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="ستستخدمه في ماذا؟ ماذا الذي جميل فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
+        <label>ملاحظات <textarea rows="2" data-asf="notes" placeholder="فيمَ ستستخدمه؟ ما الجميل فيه؟" data-no-i18n>${le(a.notes)}</textarea></label>
         <small class="muted">${a.duration} ث · ${a.width}×${a.height} · ${src.motion ? "من 🎞️ مكتبة الحركة" : `من
           <a href="#" data-asgolab="${src.lab}" data-no-i18n>«${le(src.lab_name)}»</a> ${(src.shots || [src.shot]).length > 1 ? `لقطات ${(src.shots || []).join("، ")}` : `لقطة ${(src.shots || [src.shot])[0]}`} (${lt(src.t0)} ← ${lt(src.t1)})`}</small>
         ${a.description || a.summary ? `<p data-no-i18n>${le(a.description || a.summary)}</p>` : ""}
@@ -83,7 +83,7 @@ function assetDetail(a) {
       </div>
     </div>
     ${a.connector ? assetConnector(a) + assetTrials(a) : ""}
-    <section class="panel lab-sec"><h4>🧩 ما جواه</h4>
+    <section class="panel lab-sec"><h4>🧩 ما بداخله</h4>
       ${a.background?.name ? `<div class="lab-row"><b>🖼️ الخلفية:</b> <span data-no-i18n>${le(a.background.name)}</span> <small class="muted" data-no-i18n>${le(a.background.description)}</small></div>` : ""}
       ${(a.elements || []).map((e) => `<div class="lab-el">
         <div class="lab-row"><span>${LAB_TYPES[e.type] || ""}</span> <b data-no-i18n>${le(e.name)}</b>
@@ -91,25 +91,25 @@ function assetDetail(a) {
           <span class="lab-time">${lt(e.first_t)} ← ${lt(e.last_t)}</span></div>
         ${(e.actions || []).map((x) => `<div class="lab-row lab-act"><button type="button" class="btn sm" data-asplay="${x.t0}" data-to="${x.t1}">▶️</button>
           <span class="lab-time">${lt(x.t0)}–${lt(x.t1)}</span> ${LAB_ACTIONS[x.action] || le(x.action)} <small class="grow" data-no-i18n>${le(x.detail)}</small></div>`).join("")}
-      </div>`).join("") || `<p class="muted">لا يوجد عناصر متفككة في هذا المقطع.</p>`}
+      </div>`).join("") || `<p class="muted">لا توجد عناصر مفككة في هذا المقطع.</p>`}
       ${(a.sfx || []).length ? `<div class="lab-chips">${a.sfx.map((x) => `<button type="button" class="chip" data-asplay="${x.t}" data-to="${x.t + 0.4}">🔊 ${le(x.label || x.category)} <small>${lt(x.t)}</small></button>`).join("")}</div>` : ""}
     </section>
     <section class="panel lab-sec"><div class="lab-vedit" data-asedit>
-      <b>✏️ اطلع منه نسخة</b> <small class="muted">المشهد يظل بحركته وخلفيته، واللي تطلبه فقط هو ما يتغيّر</small>
-      ${(a.controls || []).length ? `<div class="as-ctls"><b>🎛️ مفاتيح التحكم</b> <small class="muted">غيّر ما أنت تريده فقط واترك الباقي</small>
+      <b>✏️ اصنع منه نسخة</b> <small class="muted">يبقى المشهد بحركته وخلفيته، ولا يتغير إلا ما تطلبه</small>
+      ${(a.controls || []).length ? `<div class="as-ctls"><b>🎛️ مفاتيح التحكم</b> <small class="muted">غيّر ما تريده فقط واترك الباقي</small>
         ${a.controls.map((k) => `<label class="as-ctl" title="${le(k.target)}"><span data-no-i18n>${le(k.label)}</span>
           ${k.type === "color" ? `<input type="color" value="${/^#[0-9a-f]{6}$/i.test(k.value) ? k.value : "#000000"}" data-ctl="${k.key}">`
             : k.type === "choice" ? `<select data-ctl="${k.key}">${(k.options || []).map((o) => `<option ${o === k.value ? "selected" : ""} data-no-i18n>${le(o)}</option>`).join("")}</select>`
             : `<input type="${k.type === "number" ? "number" : "text"}" value="${le(k.value)}" data-ctl="${k.key}" data-no-i18n>`}</label>`).join("")}
       </div>` : ""}
       ${(a.elements || []).length ? `<div class="lab-chips">${a.elements.map((e) => `<button type="button" class="chip" data-vchip="${le(e.name)}">${LAB_TYPES[e.type]?.split(" ")[0] || ""} ${le(e.name)}</button>`).join("")}</div>` : ""}
-      <textarea rows="2" data-vtext placeholder="${(a.controls || []).length ? "وأي شيء أخرى تريد تغيّرها بالكلام (اختياري)" : "مثلًا: «مؤشر الماوس» اجعله بلون العلامة، والمجلد اسمه «عملاء»"}"></textarea>
+      <textarea rows="2" data-vtext placeholder="${(a.controls || []).length ? "وأي شيء آخر تريد تغييره بالكلام (اختياري)" : "مثلًا: «مؤشر الماوس» اجعله بلون العلامة، والمجلد اسمه «عملاء»"}"></textarea>
       <div class="row wrap">
         <select data-vmodel>${models.map((m) => `<option value="${m.key}">${le(m.label)} · ~${(m.per_sec * dur).toFixed(2)}$</option>`).join("")}</select>
         ${done.length ? `<select data-vbase><option value="">على الأصل</option>${done.map((v) => `<option value="${v.id}">على النسخة ${vs.indexOf(v) + 1}</option>`).join("")}</select>` : ""}
         <button type="button" class="btn sm primary" data-vgo>✨ عدّل</button>
       </div>
-      <details class="lab-speed"><summary>⏩ سرّع / بطّأ جزء (مجانًا، بدون AI)</summary>
+      <details class="lab-speed"><summary>⏩ سرّع / بطّئ جزءًا (مجانًا، دون AI)</summary>
         <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${dur}" value="0" data-sp="t0"></label>
           <label>لـ <input type="number" step="0.05" min="0" max="${dur}" value="${dur}" data-sp="t1"></label>
           <label>السرعة <input type="number" step="0.1" min="0.2" max="5" value="1.5" data-sp="factor">×</label>
@@ -139,20 +139,20 @@ function assetConnector(a) {
     ${c.from_scene || c.to_scene ? `<div class="lab-conn-story" data-no-i18n><span>${le(c.from_scene)}</span> <b>⟵</b> <span>${le(c.to_scene)}</span></div>` : ""}
     <dl class="lab-conn-dl">
       ${c.trigger ? `<dt>🎯 الشرارة</dt><dd data-no-i18n>${le(c.trigger)}</dd>` : ""}
-      ${(c.anchors || []).length ? `<dt>📌 يظل ثابت</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
+      ${(c.anchors || []).length ? `<dt>📌 يبقى ثابتًا</dt><dd data-no-i18n>${c.anchors.map((x) => `<span class="chip">${le(x)}</span>`).join(" ")}</dd>` : ""}
       ${(c.transforms || []).length ? `<dt>🔄 التحوّلات</dt><dd><ol class="lab-conn-tr">${c.transforms.map((x) => `<li><button type="button" class="btn sm" data-asplay="${Math.max(0, x.t0 - t0)}" data-to="${Math.max(0, x.t1 - t0)}">▶️</button>
         <span data-no-i18n><b>${le(x.from)}</b> ← ${le(x.to)}${x.how ? ` <small class="muted">(${le(x.how)})</small>` : ""}</span></li>`).join("")}</ol></dd>` : ""}
       ${c.camera ? `<dt>🎥 الكاميرا</dt><dd data-no-i18n>${le(c.camera)}</dd>` : ""}
       ${c.rhythm ? `<dt>⏱️ الإيقاع</dt><dd data-no-i18n>${le(c.rhythm)}</dd>` : ""}
       ${c.sound ? `<dt>🔊 الصوت</dt><dd data-no-i18n>${le(c.sound)}</dd>` : ""}
-      ${c.story_role ? `<dt>📖 يخدم القصة كيف</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
+      ${c.story_role ? `<dt>📖 كيف يخدم القصة</dt><dd data-no-i18n>${le(c.story_role)}</dd>` : ""}
     </dl>
     ${(c.recipe || []).length ? `<h4>🧪 الوصفة</h4><ol class="as-recipe" data-no-i18n>${c.recipe.map((x) => `<li>${le(x)}</li>`).join("")}</ol>` : ""}
   </section>`;
 }
 
 // 🧪 جرّب الكونيكتور: بين نفس النقطتين في الفيديو الأصلي (إعادة بناء) أو بين لقطتين تانيين (نقل)
-const TRIAL_ST = { planning: "🧠 يكتب الخطة", planned: "📝 الخطة جاهزة", working: "🎬 يولّد", done: "✅ خلص", failed: "✕ فشل" };
+const TRIAL_ST = { planning: "🧠 يكتب الخطة", planned: "📝 الخطة جاهزة", working: "🎬 يولّد", done: "✅ انتهى", failed: "✕ فشل" };
 function trialSidePick(side) {
   const sel = asx.tsel[side] || {}, labs = asx.labs || [];
   const shots = (asx.shots[sel.lab] || []).filter((x) => !x.ignored || true);
@@ -169,7 +169,7 @@ function assetTrials(a) {
     <p class="hint">البرنامج يكتب خطة على مقاس اللقطتين (مجانًا تقريبًا)، تراجعها وتعدّلها، ثم يولّد: صور مفتاحية للمراحل، وحركة بين كل صورتين بموديل فيديو يأخذ صورة بداية وصورة نهاية، ويجمّع آخر A ← الموصل ← أول B.</p>
     <div class="row wrap as-tmode">
       <label class="check"><input type="radio" name="tmode" value="rebuild" data-tmode ${asx.tmode === "rebuild" ? "checked" : ""}> 🔁 إعادة بناء (نفس المكان في الفيديو الأصلي: نقارن بالأصلي)</label>
-      <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين آخرين)</label>
+      <label class="check"><input type="radio" name="tmode" value="transfer" data-tmode ${asx.tmode === "transfer" ? "checked" : ""}> 🔀 نقل (بين لقطتين أخريين)</label>
     </div>
     ${asx.tmode === "transfer" ? `<div class="as-tsides">${trialSidePick("a")}<span class="as-tarrow">⟵ 🔗 ⟵</span>${trialSidePick("b")}</div>` : ""}
     <div class="row wrap"><select data-tmodel>${vmOptions(models, models[0]?.key, 10)}</select>
@@ -190,17 +190,17 @@ function trialCard(a, t) {
     ${t.status === "done" ? `<div class="as-tvids">
         <figure><figcaption>🧪 التجربة (آخر A ← الموصل ← أول B)</figcaption><video data-tvid="gen" src="${t.final_url}" playsinline controls preload="metadata"></video></figure>
         <figure><figcaption>🎯 الموصل الأصلي</figcaption><video data-tvid="ref" src="${a.url}" playsinline controls preload="metadata" muted></video></figure></div>
-      <div class="row wrap"><button type="button" class="btn sm" data-tboth>▶️ شغّل الاتنين مع بعض</button>
+      <div class="row wrap"><button type="button" class="btn sm" data-tboth>▶️ شغّلهما معًا</button>
         <a class="btn sm" href="${t.conn_url}" download>⬇️ الموصل تلقائيًا</a>
         <span class="lab-rv" data-trv><button type="button" class="${t.review?.ok === true ? "on ok" : ""}" data-tok="1">✅</button><button type="button" class="${t.review?.ok === false ? "on bad" : ""}" data-tok="0">❌</button>
-          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="ماذا الذي جميل أو سيئ؟ (مهم للتجارب القادمة)" data-tnote></span></div>
+          <input type="text" class="lab-note" value="${le(t.review?.note)}" placeholder="ما الجميل أو السيئ؟ (مهم للتجارب القادمة)" data-tnote></span></div>
       <div class="fm-redo"><b>لم يعجبك؟</b>
-        <input type="text" data-tredonote placeholder="قل ماذا الذي لم يعجبك (مثلًا: الحركة سريعة، تريد الزووم أوضح) أو اتركها فارغة لمحاولة جديدة بنفس الخطة" data-no-i18n>
+        <input type="text" data-tredonote placeholder="قل ما الذي لم يعجبك (مثلًا: الحركة سريعة، تريد الزووم أوضح) أو اتركها فارغة لمحاولة جديدة بنفس الخطة" data-no-i18n>
         <button type="button" class="btn sm primary" data-tredo>↻ ولّد مرة أخرى (~${t.cost}$)</button>
         ${(t.notes || []).length ? `<small class="muted" data-no-i18n>ملاحظاتك الذي فاتت: ${t.notes.map(le).join(" · ")}</small>` : ""}</div>` : ""}
     ${p.segments ? `<details class="as-tplan" ${t.status === "planned" ? "open" : ""}><summary>📝 الخطة ${t.cost ? `<small class="muted">· التوليد نحو ${t.cost}$</small>` : ""}</summary>
       ${p.adapted ? `<p class="as-tadapt" data-no-i18n>${le(p.adapted)}</p>` : ""}
-      ${(p.anchors || []).length ? `<p><b>📌 يظل ثابت:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
+      ${(p.anchors || []).length ? `<p><b>📌 يبقى ثابتًا:</b> <span data-no-i18n>${p.anchors.map(le).join("، ")}</span></p>` : ""}
       ${(p.keyframes || []).map((k, i) => `<label class="lab-xe">🖼️ مرحلة ${i + 1}: <span data-no-i18n>${le(k.label)}</span><textarea rows="2" data-tk="${i}" dir="ltr" ${editable ? "" : "disabled"} data-no-i18n>${le(k.prompt)}</textarea></label>`).join("")}
       ${p.segments.map((x, i) => `<label class="lab-xe">🎬 حركة ${i + 1}: <span data-no-i18n>${le(x.label)}</span>
         <span class="row">الطول في الفيديو <input type="number" step="0.1" min="0.6" max="6" value="${x.seconds}" data-tsec="${i}" ${editable ? "" : "disabled"}> ث</span>
@@ -257,7 +257,7 @@ $("labLib").addEventListener("click", async (e) => {
   const clear = t.closest("[data-asclear]");
   if (clear) {
     if (!(await uiConfirm(`تحذف كل الأصول الذي في المكتبة (${asx.list.length}) بكل نسخها؟ لا يوجد رجوع.`))) return;
-    if (!(await uiConfirm("متأكد؟ المكتبة ستصبح فارغة. (الفيديوهات التي في المعمل لن تُحذف، والكومبوننتس الذي كنت قبلتها ستعود «ما زال» ويمكنك تقبلها مرة أخرى)"))) return;
+    if (!(await uiConfirm("متأكد؟ ستصبح المكتبة فارغة. (لن تُحذف الفيديوهات التي في المعمل، والمكونات التي قبلتها ستعود إلى «لم تُراجع بعد» ويمكنك قبولها مرة أخرى)"))) return;
     return busyButton(clear, "⏳", async () => {
       const r = await api("/api/assets", { method: "DELETE" });
       toast(`🗑️ حُذف ${r.deleted} أصل. المكتبة فارغة`);
@@ -303,7 +303,7 @@ $("labLib").addEventListener("click", async (e) => {
       return busyButton(run, "⏳", async () => {
         asx.cur = await T(`/${tid}`, { method: "PATCH", ...jsonBody({ plan: trialPlanFrom(card) }) });
         const cost = asx.cur.trials.find((x) => x.id === tid).cost;
-        if (!(await uiConfirm(`يولّد هذه التجربة؟ ستُحسب على Atlas نحو ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وتأخذ كم دقيقة.`))) return renderLib();
+        if (!(await uiConfirm(`هل تولّد هذه التجربة؟ ستُحسب على Atlas نحو ${cost}$ (${tr.plan.keyframes.length} صورة و${tr.plan.segments.length} حركة)، وتستغرق بضع دقائق.`))) return renderLib();
         asx.cur = await T(`/${tid}/run`, { method: "POST" });
         renderLib(); scheduleAssetPoll();
       });
@@ -311,7 +311,7 @@ $("labLib").addEventListener("click", async (e) => {
     const redo = t.closest("[data-tredo]");
     if (redo) {
       const note = card.querySelector("[data-tredonote]").value.trim(), tr = asx.cur.trials.find((x) => x.id === tid);
-      if (!(await uiConfirm(`${note ? `يعدّل الخطة على ملاحظتك («${note}») ويولّد آخر` : "يولّد مرة أخرى بنفس الخطة (محاولة جديدة)"}؟ نحو ${tr.cost}$، والنتيجة القديمة تُستبدل.`))) return;
+      if (!(await uiConfirm(`${note ? `يعدّل الخطة حسب ملاحظتك («${note}») ويولّد نسخة أخرى` : "يولّد مرة أخرى بنفس الخطة (محاولة جديدة)"}؟ نحو ${tr.cost}$، والنتيجة القديمة تُستبدل.`))) return;
       return busyButton(redo, "⏳", async () => { asx.cur = await T(`/${tid}/redo`, { method: "POST", ...jsonBody({ note }) }); renderLib(); scheduleAssetPoll(); });
     }
     if (t.closest("[data-tdel]")) {
@@ -347,7 +347,7 @@ $("labLib").addEventListener("click", async (e) => {
       return String(v).toLowerCase() === String(k.value).toLowerCase() ? null : `${k.label}${k.target ? ` («${k.target}»)` : ""}: من «${k.value}» لـ «${v}»`;
     }).filter(Boolean);
     const text = [...changes, box.querySelector("[data-vtext]").value.trim()].filter(Boolean).join("\n");
-    if (!text) return toast("غيّر مفتاح أو اكتب تريد تغيّر ماذا", true);
+    if (!text) return toast("غيّر مفتاحًا أو اكتب ما تريد تغييره", true);
     const sel = box.querySelector("[data-vmodel]");
     if (!(await uiConfirm(`يعدّل الأصل بـ ${sel.selectedOptions[0].textContent}؟`))) return;
     return busyButton(go, "⏳", async () => {

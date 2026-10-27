@@ -781,7 +781,7 @@ def mock_cast(shots: list[dict]) -> dict:
     ns = [s.get("n") for s in shots] or [1]
     return {"cast": [
         {"name": "المتدرب", "kind": "character", "description": "شاب سعودي في العشرينات", "image_prompt": "A Saudi man in his 20s, short black hair, light beard, loose navy t-shirt, grey track pants.", "shots": ns},
-        {"name": "الجيم", "kind": "background", "description": "جيم حديث", "image_prompt": "A modern bright gym with black rubber floor and wooden walls.", "shots": ns[:2]},
+        {"name": "النادي الرياضي", "kind": "background", "description": "جيم حديث", "image_prompt": "A modern bright gym with black rubber floor and wooden walls.", "shots": ns[:2]},
     ]}
 
 

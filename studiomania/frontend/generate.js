@@ -6,7 +6,7 @@ const ACTIVE = new Set(["queued", "uploading", "submitted", "processing", "downl
 const STATUS_LABEL = {
   queued: "في الطابور",
   uploading: "يرفع الملفات",
-  submitted: "أُرسل لـ Seedance",
+  submitted: "أُرسل إلى Seedance",
   processing: "Seedance يولّد",
   downloading: "يُحمّل الفيديو",
   completed: "جاهز",
@@ -29,7 +29,7 @@ async function initGenerate() {
   if (!gen.atlas) {
     gen.atlas = await api("/api/atlas");
     const a = gen.atlas;
-    $("fixedSettings").innerHTML = [a.model_label, a.resolution, a.ratio, "المدة على قدر القطعة"]
+    $("fixedSettings").innerHTML = [a.model_label, a.resolution, a.ratio, "المدة بحسب طول القطعة"]
       .map((t) => `<span class="pill">${t}</span>`).join("");
     $("audioCheck").checked = storageGet(AUDIO_KEY) === "1";
     gen.promptId = storageGet(PROMPT_KEY);
@@ -51,7 +51,7 @@ async function initGenerate() {
     const mine = clips.filter((c) => c.video_id === videoId && c.duration >= MIN_REF);
     const coach = gen.coaches.get(mine[0]?.video_coach_id);
     if (coach) mine.forEach((c) => gen.selected.add(c.id));
-    toast(coach ? `✅ تعلّم على ${mine.length} قطعة · الشخصية: ${coach.name}` : "⚠️ هذا المشروع لا يحتوي شخصية. اختره من صفحة المشاريع", !coach);
+    toast(coach ? `✅ تعلّم على ${mine.length} قطعة · الشخصية: ${coach.name}` : "⚠️ هذا المشروع لا يحتوي على شخصية. اخترها من صفحة المشاريع", !coach);
     setTimeout(() => document.querySelector(`.clip-group[data-vid="${videoId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 200);
   }
   renderClipPicker();
@@ -120,7 +120,7 @@ $("promptForm").addEventListener("submit", async (e) => {
     });
     gen.promptId = saved.id;
     storageSet(PROMPT_KEY, saved.id);
-    toast("✅ الوصف حُفظ واختير");
+    toast("✅ حُفظ الوصف واختير");
     closePromptForm();
     await loadPrompts();
   } catch (err) {
@@ -135,7 +135,7 @@ $("promptList").addEventListener("click", async (e) => {
   const act = e.target.closest("button[data-act]")?.dataset.act;
   if (act === "edit") return openPromptForm(p);
   if (act === "delete") {
-    if (!(await uiConfirm(`حذف الوصف "${p.name}"؟`))) return;
+    if (!(await uiConfirm(`هل تحذف الوصف "${p.name}"؟`))) return;
     try {
       await api(`/api/prompts/${p.id}`, { method: "DELETE" });
       if (gen.editing?.id === p.id) closePromptForm();
@@ -174,7 +174,7 @@ async function setArchived(vid, archived) {
       gen.clips.filter((c) => c.video_id === vid).forEach((c) => gen.selected.delete(c.id));
       if (gen.viewArchive === vid) gen.viewArchive = null;
     } else if (gen.viewArchive === vid) gen.viewArchive = null;
-    toast(archived ? "🗄️ نُقل للأرشيف" : "↩ أعد للشغال");
+    toast(archived ? "🗄️ نُقل إلى الأرشيف" : "↩ أعده إلى قيد العمل");
     renderClipPicker();
     renderGenerations();
   } catch (err) {
@@ -192,10 +192,10 @@ function renderArchive() {
     .map((a) => `<li data-vid="${a.video_id}" class="${gen.viewArchive === a.video_id ? "active" : ""}">
       <div class="nm">${escapeHtml(a.name)}</div>
       <div class="meta">${counts.get(a.video_id) ? `<span>🎞️ ${counts.get(a.video_id)} فيديو</span>` : ""}
-        ${a.exported_url ? `<a href="${a.exported_url}" target="_blank">✅ صُدّر</a>` : `<span>أُرشف بنفسك</span>`}</div>
+        ${a.exported_url ? `<a href="${a.exported_url}" target="_blank">✅ صُدّر</a>` : `<span>أرشفته بنفسك</span>`}</div>
       <div class="acts">
         <button class="btn sm" data-arch="view">${gen.viewArchive === a.video_id ? "✕ أغلق" : "👁 اعرض"}</button>
-        <button class="btn sm" data-arch="restore" title="أعده للشغال">↩ أعده</button>
+        <button class="btn sm" data-arch="restore" title="أعده إلى قيد العمل">↩ أعده</button>
       </div>
     </li>`)
     .join("");
@@ -222,7 +222,7 @@ function coachChip(coachId) {
   const c = gen.coaches.get(coachId);
   return c
     ? `<span class="coach-chip"><img src="${c.image_url}" alt="">${escapeHtml(c.name)}</span>`
-    : `<span class="coach-chip missing">⚠️ لا يوجد شخصية</span>`;
+    : `<span class="coach-chip missing">⚠️ لا توجد شخصية</span>`;
 }
 
 function renderClipPicker() {
@@ -246,14 +246,14 @@ function renderClipPicker() {
           ${hasCoach
             ? `<button class="btn sm" data-all="${vid}">${all ? "إلغاء الكل" : "اختر الكل"}</button>`
             : `<button class="btn sm primary" data-pick-coach="${vid}">🧍 اختر الشخصية من المشروع</button>`}
-          <button class="btn sm" data-archive="${vid}" title="انقل هذا المشروع للأرشيف">🗄️</button>
+          <button class="btn sm" data-archive="${vid}" title="انقل هذا المشروع إلى الأرشيف">🗄️</button>
         </div>
         <div class="clip-picks">${g.clips
           .map((c) => {
             const short = c.duration < MIN_REF;
             const off = short || !hasCoach;
             return `<div class="clip-pick ${gen.selected.has(c.id) ? "selected" : ""} ${off ? "too-short" : ""}"
-              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، Seedance لن يقبلها` : !hasCoach ? "اختر شخصية للمشروع أولًا" : ""}">
+              data-id="${c.id}" title="${short ? `أقصر من ${MIN_REF} ثانية، ولن يقبلها Seedance` : !hasCoach ? "اختر شخصية للمشروع أولًا" : ""}">
               ${lightVideo(c.url, "muted playsinline")}
               <span class="tick">✓</span>
               <span class="tag"><span>#${c.index}</span><span>${c.duration.toFixed(1)}ث</span></span>
@@ -284,7 +284,7 @@ $("clipPicker").addEventListener("click", async (e) => {
   const pick = e.target.closest(".clip-pick");
   if (!pick) return;
   if (pick.classList.contains("too-short")) {
-    if (pick.closest(".no-coach")) toast("هذا المشروع لا يحتوي شخصية. اضغط «اختر الشخصية من المشروع»", true);
+    if (pick.closest(".no-coach")) toast("هذا المشروع لا يحتوي على شخصية. اضغط «اختر الشخصية من المشروع»", true);
     return;
   }
   const id = pick.dataset.id;
@@ -360,12 +360,12 @@ function renderGenerations() {
   $("gensTitle").textContent = viewing ? "🗄️ فيديوهات من الأرشيف" : "الفيديوهات المولَّدة";
   $("archiveBanner").hidden = !viewing;
   if (viewing) {
-    $("archiveBanner").innerHTML = `<span>تشاهد <b>${escapeHtml(viewing.name)}</b> من الأرشيف</span>
-      <button class="btn sm" data-arch-restore>↩ أعده للشغال</button>
-      <button class="btn sm primary" data-arch-close>رجوع للشغال عليه</button>`;
+    $("archiveBanner").innerHTML = `<span>تُشاهَد <b>${escapeHtml(viewing.name)}</b> من الأرشيف</span>
+      <button class="btn sm" data-arch-restore>↩ أعده إلى قيد العمل</button>
+      <button class="btn sm primary" data-arch-close>رجوع إلى قيد العمل</button>`;
   }
   $("gensEmpty").hidden = list.length > 0;
-  $("gensEmpty").textContent = viewing ? "لا يوجد فيديوهات مولَّدة هذا للمشروع." : "لا يوجد بعد فيديوهات مولَّدة.";
+  $("gensEmpty").textContent = viewing ? "لا توجد فيديوهات مولَّدة لهذا المشروع." : "لا توجد فيديوهات مولَّدة بعد.";
   const active = list.filter((g) => ACTIVE.has(g.status)).length;
   const done = list.filter((g) => g.status === "completed").length;
   $("genSummary").textContent = list.length ? `${done} جاهز${active ? ` · ${active} يعمل` : ""}` : "";
@@ -391,7 +391,7 @@ function renderGenerations() {
         <span class="muted">${ready} / ${gens.length} جاهز</span>
         ${a?.exported_url ? `<a class="muted" href="${a.exported_url}" target="_blank">✅ صُدّر</a>` : ""}
         <span class="spacer"></span>
-        ${vid && ready ? `<button class="btn sm primary" data-montage="${vid}" title="يفتح المونتاج الخاص بـ هذا الفيديو بآخر الفيديوهات المولَّدة بالترتيب، والتعليق الصوتي الخاص به">🎬 خذه للمونتاج</button>` : ""}
+        ${vid && ready ? `<button class="btn sm primary" data-montage="${vid}" title="يفتح المونتاج الخاص بهذا الفيديو بآخر الفيديوهات المولَّدة بالترتيب، والتعليق الصوتي الخاص به">🎬 انقله إلى المونتاج</button>` : ""}
         ${vid && !viewing ? `<button class="btn sm" data-archive="${vid}">🗄️ أرشفه</button>` : ""}
       </div><div class="gens"></div>`;
     const grid = box.querySelector(".gens");
@@ -429,7 +429,7 @@ function genCard(g) {
         <a class="btn sm" href="${g.clip_url}" target="_blank">القطعة الأصلية</a>
         ${g.output_url ? `<a class="btn sm" href="${g.output_url}" download>⬇ تحميل</a>` : ""}
         ${g.status === "failed" ? `<button class="btn sm" data-act="retry">↻ إعادة المحاولة</button>` : ""}
-        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد لنفس القطعة بنفس الشخصية والوصف، مكان القديم">🔄 ولّد مرة أخرى</button>`}
+        ${isActive ? "" : `<button class="btn sm" data-act="again" title="فيديو جديد للقطعة نفسها بالشخصية والوصف نفسيهما، مكان القديم">🔄 ولّد مرة أخرى</button>`}
         ${isActive ? "" : `<button class="btn sm danger" data-act="delete">حذف</button>`}
       </div>
     </div>`;
@@ -446,12 +446,12 @@ $("gensGroups").addEventListener("click", async (e) => {
   try {
     if (btn.dataset.act === "retry") await api(`/api/generations/${id}/retry`, { method: "POST" });
     if (btn.dataset.act === "again") {
-      if (!(await uiConfirm("تولّد فيديو جديد هذه للقطعة مكان القديم؟\nالفيديو القديم سيُحذف، والجديد سيُولّد في نفس مكانه (هذا توليد جديد يُحسب عليك)."))) return;
+      if (!(await uiConfirm("هل تولّد فيديو جديدًا لهذه القطعة مكان القديم؟\nسيُحذف الفيديو القديم، ويُولَّد الجديد في مكانه (هذا توليد جديد يُحسب عليك)."))) return;
       await api(`/api/generations/${id}/again`, { method: "POST" });
-      toast("🔄 يُولّد فيديو جديد هذه للقطعة");
+      toast("🔄 يُولَّد فيديو جديد لهذه القطعة");
     }
     if (btn.dataset.act === "delete") {
-      if (!(await uiConfirm("حذف هذا الفيديو؟"))) return;
+      if (!(await uiConfirm("هل تحذف هذا الفيديو؟"))) return;
       await api(`/api/generations/${id}`, { method: "DELETE" });
     }
     await loadGenerations();

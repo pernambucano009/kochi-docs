@@ -14,7 +14,7 @@ const PR = M.params({
   shape: { label: "رمز العلامة", kind: "select", def: "عضمة", options: [["عضمة", "🦴 عضمة"], ["نجمة", "⭐ نجمة"], ["قلب", "❤️ قلب"], ["دايرة", "⚪ دايرة"], ["ورقة", "🍃 ورقة شجر"]], group: G4,
     hint: "الشكل الذي يتساقط ويملأ الشاشة في النهاية (ويظهر في البطاقات إن لم توجد صور). اختر ما يناسب مجالك." },
   tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك", group: G4, max: 26, hint: "وعد العلامة في سطر (يظهر تحت الاسم في النهاية)." },
-  accent: { label: "لون البراند", kind: "color", role: "accent", def: "#ff4a12", group: GS, hint: "لون واحد قوي: يملأ الشاشة كثيرًا، فيجب أن يكون لون العلامة الأساسي." },
+  accent: { label: "لون العلامة", kind: "color", role: "accent", def: "#ff4a12", group: GS, hint: "لون واحد قوي: يملأ الشاشة كثيرًا، فيجب أن يكون لون العلامة الأساسي." },
   ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e", group: GS, hint: "خلفية الحرف والدليل والبطاقات الغامقة." },
   paper: { label: "اللون الفاتح", kind: "color", def: "#f4f4f4", group: GS, hint: "أبيض العلامة (أبيض مائل أو كريمي)." },
   fHead: { label: "خط الاسم والنص", kind: "font", def: "outfit", group: GS, hint: "خط عريض يمثّل العلامة." },

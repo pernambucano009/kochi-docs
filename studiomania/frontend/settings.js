@@ -15,14 +15,14 @@ async function loadSettings() {
   for (const name of ["atlas", "zernio", "scrape", "pexels"]) {
     const k = s.keys[name];
     // المفتاح المتسجل بيبان نقط جوه الخانة (زي البروتوتايب)، والحالة سطر صغير بس لو مفيش مفتاح
-    $(`${name}State`).textContent = k.set ? "" : "✕ لا يوجد مفتاح ما زال";
+    $(`${name}State`).textContent = k.set ? "" : "✕ لا يوجد مفتاح بعد";
     $(`${name}State`).hidden = k.set;
     $(`${name}State`).className = "hint";
     $(`${name}Key`).placeholder = k.set ? `•••••••••••• (${k.hint})` : "الصق المفتاح هنا";
     $(`${name}Key`).value = "";
   }
   api("/api/system").then((x) => {
-    $("sysInfo").textContent = `🖥️ الخادم: ${x.cpus ?? "?"} معالج · الذاكرة ${x.memory_limit_mb ? `${x.memory_limit_mb} ميجا (مستخدم ${x.memory_used_mb ?? "?"})` : "بدون حد معروف"}`;
+    $("sysInfo").textContent = `🖥️ الخادم: ${x.cpus ?? "?"} معالج · الذاكرة ${x.memory_limit_mb ? `${x.memory_limit_mb} ميجا (مستخدم ${x.memory_used_mb ?? "?"})` : "دون حد معروف"}`;
   }).catch(() => {});
   loadStorage();
   $("pwForm").hidden = s.password_from_env;
@@ -37,10 +37,10 @@ $("keysForm").addEventListener("submit", async (e) => {
     if (v) body[name] = v;
   }
   document.querySelectorAll("[data-mkey]").forEach((i) => { if (i.value.trim()) (body.keys ||= {})[i.dataset.mkey] = i.value.trim(); });
-  if (!Object.keys(body).length) return toast("الصق مفتاح أولًا");
+  if (!Object.keys(body).length) return toast("الصق مفتاحًا أولًا");
   try {
     await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    toast("✅ المفاتيح حُفظت");
+    toast("✅ حُفظت المفاتيح");
     gen.atlas = null; // صفحة التوليد تعيد قراءة حالة المفتاح
     await loadSettings();
   } catch (err) {
@@ -57,7 +57,7 @@ $("pwForm").addEventListener("submit", async (e) => {
       body: JSON.stringify({ current: $("pwCurrent").value, new: $("pwNew").value }),
     });
     $("pwForm").reset();
-    toast("✅ كلمة المرور تغيّر");
+    toast("✅ تغيّرت كلمة المرور");
   } catch (err) {
     toast(err.message, true);
   }
@@ -216,7 +216,7 @@ const STORAGE_LABELS = {
   raw: "الفيديوهات الخام", clips: "القطع", generated: "فيديوهات Seedance", coaches: "الشخصيات",
   audio: "الصوت والموسيقى", exports: "الفيديوهات الجاهزة", tmp: "ملفات مؤقتة",
   lab: "معمل التفكيك (تقسيم الفيديوهات)", typo: "فيديوهات التايبوجرافي", refs: "📦 أرشيف المراجع", ads: "الإعلانات",
-  series: "المسلسلات", films: "الأفلام", carousels: "الكاروسيل", assets: "مكتبة العناصر", tvideos: "فيديوهات التيمبليتس",
+  series: "المسلسلات", films: "الأفلام", carousels: "الكاروسيل", assets: "مكتبة العناصر", tvideos: "فيديوهات القوالب",
 };
 // الأقسام اللي ينفع تتمسح كلها مرة واحدة، واللي بيتمسح فيها بالظبط
 const WIPE_INFO = {
@@ -283,7 +283,7 @@ $("showLog").onclick = async () => {
 $("copyLog").onclick = async () => {
   try {
     await navigator.clipboard.writeText($("renderLog").textContent);
-    toast("✅ نُسخ، أرسله في الشات");
+    toast("✅ نُسخ، أرسله في المحادثة");
   } catch {
     toast("حدّد النص وانسخه بنفسك", true);
   }

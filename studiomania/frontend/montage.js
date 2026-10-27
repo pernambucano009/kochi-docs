@@ -6,7 +6,7 @@ const MIN_CLIP = 1 / 30; // أقل طول لقطعة: فريم واحد
 const PPS_MIN = 0.5, PPS_MAX = 900; // حدود زووم التايم لاين (بكسل لكل ثانية): من ساعة كاملة على الشاشة حتى فريم فريم
 // كل قسم ليه مونتاج لوحده: مشاريعه ومشروعه المفتوح (فيديوهات الشخصيات / المسلسلات / الإعلانات)
 const SECTION_OF_STEP = { "6": "coach", "6s": "series", "6a": "ads", "6f": "free" };
-const SECTION_BACK = { series: ["9", "↩ رجوع للمسلسلات"], ads: ["10", "↩ رجوع للإعلانات"] };
+const SECTION_BACK = { series: ["9", "↩ رجوع إلى المسلسلات"], ads: ["10", "↩ رجوع إلى الإعلانات"] };
 const projectKey = (section) => section === "coach" ? "studiomania.projectId" : `studiomania.projectId.${section}`;
 let PROJECT_KEY = projectKey("coach");
 const CLIP_DEFAULTS = { start: 0, end: null, zoom: 1, x: 0, y: 0, volume: 1 };
@@ -421,8 +421,8 @@ $("binGrid").addEventListener("click", async (e) => {
   if (item && e.target.closest(".add")) insertClip(item.dataset.id, insertIndexAt(mt.t));
   if (item && e.target.closest(".del")) {
     const src = mt.sources.find((s) => s.id === item.dataset.id);
-    if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("هذا الأوترو في التايم لاين. أزله منه أولًا", true);
-    if (!(await uiConfirm(`مسح «${src.label}»؟`))) return;
+    if (mt.project.data.clips.some((c) => c.gen_id === src.id)) return toast("هذا الأوترو في الخط الزمني. أزله منه أولًا", true);
+    if (!(await uiConfirm(`هل تحذف «${src.label}»؟`))) return;
     try {
       await api(`/api/outros/${encodeURIComponent(src.id)}`, { method: "DELETE" });
       mt.sources = mt.sources.filter((s) => s.id !== src.id);
@@ -450,7 +450,7 @@ $("outroUpload").addEventListener("change", async (e) => {
     mt.sources = await api("/api/montage/sources");
     renderBin();
     insertClip(o.id, d.clips.length);
-    toast("✅ الأوترو أُضيف في آخر المونتاج. يمكنك تحركه وتقصه مثل أي قطعة");
+    toast("✅ أُضيف الأوترو في نهاية المونتاج. يمكنك تحريكه وقصّه مثل أي قطعة");
   } catch (err) {
     toast(err.message, true);
   }
@@ -462,7 +462,7 @@ $("clipUpload").addEventListener("change", async (e) => {
   if (!file || !mt.project) return;
   const d = mt.project.data;
   const c = selectedClip();
-  const replace = c && (await uiConfirm("تبدّل فيديو القطعة المتحددة هذا بالفيديو؟\n(إذا لا، سيوضع كقطعة جديدة عند المؤشر)"));
+  const replace = c && (await uiConfirm("هل تستبدل فيديو القطعة المحددة بهذا الفيديو؟\n(إن لم تفعل، سيوضع قطعةً جديدة عند المؤشر)"));
   const form = new FormData();
   form.append("file", file);
   if (d.coach_id) form.append("coach_id", d.coach_id);
@@ -478,11 +478,11 @@ $("clipUpload").addEventListener("change", async (e) => {
       Object.assign(c, { gen_id: r.id, start: 0, end: Math.min(r.duration, len || r.duration) });
       changed();
       toast(r.duration + 0.05 < len
-        ? `✅ استُبدل الفيديو. اجعل بالك: الفيديو الجديد ${r.duration.toFixed(1)}ث والقطعة كانت ${len.toFixed(1)}ث`
+        ? `✅ استُبدل الفيديو. انتبه: الفيديو الجديد ${r.duration.toFixed(1)}ث والقطعة كانت ${len.toFixed(1)}ث`
         : `✅ استُبدل الفيديو${r.synced_shot ? " وأُضيف أيضًا على اللقطة في تبويب المسلسل" : ""}`);
     } else {
       insertClip(r.id, insertIndexAt(mt.t));
-      toast("✅ الفيديو أُضيف عند المؤشر");
+      toast("✅ أُضيف الفيديو عند المؤشر");
     }
   } catch (err) {
     toast(err.message, true);
@@ -645,7 +645,7 @@ function renderTimeline() {
           const w = (it.t1 - it.t0) * mt.pps;
           const sel = isSel(it.kind === "clip" ? { kind: "clip", i: it.i } : { kind: "outro" });
           const strip = it.kind === "clip" ? clipStrip(it.s, it.in, w, it.speed) : stripHtml("outro", it.coach.id, 0, w);
-          const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ الفيديو حُذف") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
+          const label = it.kind === "clip" ? (it.s ? escapeHtml(it.s.label) : "⚠️ حُذف الفيديو") : `🎬 أوترو ${escapeHtml(it.coach.name)}`;
           const kfd = hasKf(it.c) ? it.c.kf.map((k) => `<i class="kfd" style="left:${k.t * mt.pps}px"></i>`).join("") : "";
           return `<div class="tl-clip ${it.kind} ${sel ? "selected" : ""} ${it.s || it.kind === "outro" ? "" : "missing"} ${it.c?.disabled ? "disabled" : ""}"
               ${it.kind === "clip" ? `data-i="${it.i}"` : `data-outro="1"`} style="left:${it.t0 * mt.pps}px;width:${w}px">
@@ -676,7 +676,7 @@ function renderTimeline() {
     const el = $(kind === "voice" ? "trkVoice" : "trkMusic");
     const parts = trackParts(kind);
     if (!parts.length) {
-      el.innerHTML = `<div class="tl-empty-track">${kind === "voice" ? "لا يوجد تعليق صوتي — اختره من تبويب 🔊 الصوت" : "لا يوجد موسيقى — اخترها من تبويب 🔊 الصوت"}</div>`;
+      el.innerHTML = `<div class="tl-empty-track">${kind === "voice" ? "لا يوجد تعليق صوتي — اختره من تبويب 🔊 الصوت" : "لا توجد موسيقى — اخترها من تبويب 🔊 الصوت"}</div>`;
       continue;
     }
     el.innerHTML = parts
@@ -697,12 +697,12 @@ function renderTimeline() {
   if (typeof renderTextRow === "function") renderTextRow();
   if (typeof renderOverRow === "function") renderOverRow();
   $("trkCaps").innerHTML = captionBlocks()
-    .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="ضغطة تختاره · Delete تحذفه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
+    .map((g, n) => `<div class="tl-cap ${isSel({ kind: "cap", i: n }) ? "selected" : ""}" data-c="${n}" data-t="${g.t0}" title="ضغطة لاختياره · Delete لحذفه" style="left:${g.t0 * mt.pps}px;width:${Math.max(2, (g.t1 - g.t0) * mt.pps)}px">${escapeHtml(g.text)}</div>`)
     .join("");
 
   renderTrackHeads();
   const nSel = allSelected().length;
-  $("totalLabel").textContent = total ? `${d.clips.length} قطعة${nSel > 1 ? ` · ✔ ${nSel} مختارين` : ""}` : "";
+  $("totalLabel").textContent = total ? `${d.clips.length} قطعة${nSel > 1 ? ` · ✔ ${nSel} مختارة` : ""}` : "";
   drawPlayhead();
 }
 
@@ -774,7 +774,7 @@ function soundBadge(it) {
   if (!hasSound(it)) return "";
   const v = Math.round(it.volume * 100);
   const icon = v === 0 ? "🔇" : v < 60 ? "🔉" : "🔊";
-  return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — اضغط ترجّعه" : "هذا الفيديو فيه صوت — اضغط تكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
+  return `<button class="snd ${v === 0 ? "off" : ""}" data-mute title="${v === 0 ? "الصوت مكتوم — اضغط لإعادته" : "هذا الفيديو فيه صوت — اضغط لكتمه"}">${icon}${v === 0 ? "" : ` ${v}%`}</button>`;
 }
 // خط الصوت جوه القطعة: تسحبه لفوق يعلّي ولتحت يوطّي (من 0% لـ 200%)
 const VOL_MAX = 2;
@@ -867,7 +867,7 @@ $("muteAll").onclick = () => {
     if (mute && c.volume > 0) { lastVolume.set(c, c.volume); c.volume = 0; }
     else if (!mute) c.volume = lastVolume.get(c) || 1;
   }
-  toast(mute ? "🔇 كتمت صوت كل الفيديوهات" : "🔊 رجّعت صوت الفيديوهات");
+  toast(mute ? "🔇 كتمت صوت كل الفيديوهات" : "🔊 أعدت صوت الفيديوهات");
   changed();
 };
 
@@ -957,7 +957,7 @@ document.querySelectorAll(".tl-toolbar .tool").forEach((b) => (b.onclick = () =>
 
 function splitPart(x, t) {
   const cut = snap(t - x.t0);
-  if (cut < MIN_CLIP - 1e-6 || x.len - cut < MIN_CLIP - 1e-6) return toast("لا يوجد أي فريم بين المؤشر وطرف القطعة", true);
+  if (cut < MIN_CLIP - 1e-6 || x.len - cut < MIN_CLIP - 1e-6) return toast("لا يوجد أي إطار بين المؤشر وطرف القطعة", true);
   pushHistory();
   const parts = x.t.parts;
   const rest = x.p.length == null ? null : snap(x.len - cut);
@@ -984,12 +984,12 @@ function splitAt(t, target) {
   if (s?.kind === "voice" || s?.kind === "music") {
     const x = trackParts(s.kind)[s.p];
     if (x && t > x.t0 && t < x.t1) return splitPart(x, t);
-    return toast("ضع المؤشر على قطعة الصوت المختارة لكي تقسمها", true);
+    return toast("ضع المؤشر على قطعة الصوت المختارة لتقسمها", true);
   }
   const it = seq().items.find((x) => x.kind === "clip" && t > x.t0 && t < x.t1);
-  if (!it) return toast("ضع المؤشر على قطعة فيديو لكي تقسمها", true);
+  if (!it) return toast("ضع المؤشر على قطعة فيديو لتقسمها", true);
   const at = snap(srcTimeAt(it, t));
-  if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("لا يوجد أي فريم بين المؤشر وطرف القطعة", true);
+  if (at - it.in < MIN_CLIP - 1e-6 || clipOut(it.c) - at < MIN_CLIP - 1e-6) return toast("لا يوجد أي إطار بين المؤشر وطرف القطعة", true);
   pushHistory();
   const clips = mt.project.data.clips;
   // القطعة اللي بالعكس: الجزء الأول على التايم لاين هو آخر الفيديو الأصلي
@@ -1398,7 +1398,7 @@ function videoFor(url) {
 }
 
 // ---------- تأثيرات القطعة (زي كاب كات): نفس حسبة FFmpeg في المعاينة ----------
-const LOOKS = [["", "بدون"], ["vivid", "حيوي"], ["warm", "دافي"], ["cool", "بارد"], ["teal", "سينما"], ["vintage", "قديم"],
+const LOOKS = [["", "بدون"], ["vivid", "حيوي"], ["warm", "دافئ"], ["cool", "بارد"], ["teal", "سينما"], ["vintage", "قديم"],
   ["fade", "باهت"], ["film", "فيلم"], ["pink", "وردي"], ["bw", "أبيض وأسود"], ["noir", "نوار"]];
 const LOOK_CSS = { bw: "grayscale(1)", noir: "grayscale(1) contrast(1.35) brightness(.97)", warm: "sepia(.25) saturate(1.1)",
   cool: "hue-rotate(-10deg) saturate(.9) brightness(1.03)", vintage: "sepia(.35) contrast(.9) saturate(.85)", vivid: "saturate(1.45) contrast(1.08)",
@@ -2156,7 +2156,7 @@ function renderInspector() {
   $("clipNone").hidden = !!s || mt.sel?.kind === "outro";
   if (!s) return;
   $("editorLabel").textContent = `${mt.sel.i + 1}. ${s.label}`;
-  $("clipTimes").textContent = `المدة ${clipLength(c).toFixed(2)}ث · من ${fmtTC(c.start)} لـ ${fmtTC(clipOut(c))} في الفيديو الأصلي`;
+  $("clipTimes").textContent = `المدة ${clipLength(c).toFixed(2)}ث · من ${fmtTC(c.start)} إلى ${fmtTC(clipOut(c))} في الفيديو الأصلي`;
   const tv = transformNow(c);
   $("edZoom").value = Math.round(tv.zoom * 100);
   $("edX").value = Math.round(tv.x * 100);
@@ -2230,7 +2230,7 @@ $("edReset").onclick = editorInput(null, (c) => Object.assign(c, { zoom: 1, x: 0
 // ---------- لوحة التأثيرات (سرعة/عكس/شكل/فلتر/ألوان/ظهور) ----------
 const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
 const FITS = [["fill", "يملأ الكادر"], ["blur", "كامل + خلفية مغبّشة"], ["black", "كامل + أسود"]];
-const ADJ = [["bright", "الإضاءة"], ["contrast", "التباين"], ["sat", "التشبّع"], ["temp", "دافي ⟷ بارد"], ["vignette", "إطار غامق"], ["sharp", "الحدّة"]];
+const ADJ = [["bright", "الإضاءة"], ["contrast", "التباين"], ["sat", "التشبّع"], ["temp", "دافئ ⟷ بارد"], ["vignette", "إطار غامق"], ["sharp", "الحدّة"]];
 const REV_MAX = 60;
 $("fxSpeedChips").innerHTML = SPEEDS.map((v) => `<button class="chip" data-speed="${v}">${v}x</button>`).join("");
 $("fxFit").innerHTML = FITS.map(([k, l]) => `<button class="chip" data-fit="${k}">${l}</button>`).join("");
@@ -2452,7 +2452,7 @@ $("ttsGo").onclick = async () => {
     toast(err.message, true);
   } finally {
     $("ttsGo").disabled = false;
-    $("ttsGo").textContent = "🗣️ حوّل لصوت";
+    $("ttsGo").textContent = "🗣️ حوّل إلى صوت";
   }
 };
 // صوت جديد: لو مفيش تعليق بيبقى هو التعليق، وإلا بيتحط في مقطوعة صوت زيادة عند المؤشر
@@ -2571,7 +2571,7 @@ $("micRec").onclick = async () => {
     rec = null;
     $("micRec").textContent = "🎙️ سجّل";
     $("micRec").classList.remove("rec");
-    $("micInfo").textContent = "⬆ يرفع…";
+    $("micInfo").textContent = "⬆ جارٍ الرفع…";
     const blob = new Blob(chunks, { type: chunks[0]?.type || "audio/webm" });
     const form = new FormData();
     form.append("kind", "voice");
@@ -2774,7 +2774,7 @@ function renderSide() {
     const end = trackEnd("music");
     const total = totalLength();
     $("musicWarn").hidden = !end || end >= total - 0.05;
-    $("musicWarn").textContent = `⚠️ الموسيقى تنتهي عند ${fmtDuration(end)} والفيديو طوله ${fmtDuration(total)}، فآخر الفيديو سيصبح بدون موسيقى.`;
+    $("musicWarn").textContent = `⚠️ الموسيقى تنتهي عند ${fmtDuration(end)} والفيديو طوله ${fmtDuration(total)}، فسيصبح آخر الفيديو دون موسيقى.`;
   }
   $("renderBtn").disabled = d.clips.length === 0 || mt.project.render_status === "rendering";
   if (typeof renderBrandPanels === "function") renderBrandPanels();
@@ -2821,7 +2821,7 @@ document.querySelectorAll("[data-audio-up]").forEach((inp) => inp.addEventListen
     sel.value = a.id;
     sel.dispatchEvent(new Event("change"));
     renderAll();
-    toast(kind === "voice" ? "✅ التعليق الصوتي رُفع ووُضع في المونتاج" : "✅ الموسيقى رُفعت ووُضعت في المونتاج");
+    toast(kind === "voice" ? "✅ رُفع التعليق الصوتي ووُضع في المونتاج" : "✅ رُفعت الموسيقى ووُضعت في المونتاج");
   } catch (err) {
     toast(err.message, true);
   }
@@ -2834,7 +2834,7 @@ function newVoiceTrack(d, id) {
 }
 $("mVoice").addEventListener("change", sideInput(null, (d) => {
   d.voice = newVoiceTrack(d, $("mVoice").value);
-  if (d.voice) toast("✅ التعليق الصوتي استُبدل في المونتاج");
+  if (d.voice) toast("✅ استُبدل التعليق الصوتي في المونتاج");
 }));
 // لو التعليق الصوتي بتاع المشروع (الفيديو الخام) اتغير بعد ما المونتاج اتعمل: تنبيه وزرار يبدّله
 function renderVoiceSync() {
@@ -2845,12 +2845,12 @@ function renderVoiceSync() {
   box.hidden = $("voiceSyncTop").hidden = !stale;
   if (!stale) return;
   const cur = mt.voices.find((a) => a.id === d.voice?.id);
-  box.innerHTML = `<b>⚠️ التعليق الصوتي الخاص بالمشروع تغيّر</b>
-    <span>المشروع الآن على «<b data-no-i18n>${escapeHtml(fresh.name)}</b>» والمونتاج ما زال ${cur ? `على «<b data-no-i18n>${escapeHtml(cur.name)}</b>»` : "بدون تعليق"}.</span>
+  box.innerHTML = `<b>⚠️ تغيّر التعليق الصوتي الخاص بالمشروع</b>
+    <span>المشروع الآن على «<b data-no-i18n>${escapeHtml(fresh.name)}</b>» والمونتاج ما زال على ${cur ? `على «<b data-no-i18n>${escapeHtml(cur.name)}</b>»` : "بدون تعليق"}.</span>
     <button type="button" class="btn sm primary" id="voiceSyncGo">🔁 بدّله بالجديد</button>`;
   $("voiceSyncGo").onclick = $("voiceSyncTop").onclick = sideInput(null, (dd) => {
     dd.voice = newVoiceTrack(dd, fresh.id);
-    toast(`✅ التعليق الصوتي استُبدل بـ «${fresh.name}»`);
+    toast(`✅ استُبدل التعليق الصوتي بـ «${fresh.name}»`);
   });
 }
 // سلايدر الصوت في التاب بيغيّر كل قطع التعليق مرة واحدة
@@ -2937,8 +2937,8 @@ async function pickVideoCoach(videoId) {
   return new Promise((resolve) => {
     const dlg = document.createElement("dialog");
     dlg.className = "bulk-dlg coach-pick-dlg";
-    dlg.innerHTML = `<div class="panel-head"><h2>🎬 تريد مونتاج أي شخصية؟</h2><button class="btn sm" data-x>إلغاء</button></div>
-      <p class="hint">هذا المشروع وُلّد بأكتر من شخصية. كل شخصية لها مونتاج تلقائيًا.</p>
+    dlg.innerHTML = `<div class="panel-head"><h2>🎬 مونتاج أي شخصية تريد؟</h2><button class="btn sm" data-x>إلغاء</button></div>
+      <p class="hint">وُلّد هذا المشروع بأكثر من شخصية. لكل شخصية مونتاج تلقائيًا.</p>
       <div class="coach-pick">${list.map((c, i) => `<button type="button" class="coach-pick-item" data-i="${i}">
         <img src="${c.image_url}" alt=""><b data-no-i18n>${escapeHtml(c.name)}</b>
         <small class="muted">${c.ready} / ${c.total} جاهز</small></button>`).join("")}</div>`;
@@ -3009,7 +3009,7 @@ $("kochiLayoutBtn").onclick = async () => {
   }
 };
 $("deleteProject").onclick = async () => {
-  if (!(await uiConfirm(`حذف المشروع "${mt.project.data.name}"؟ (الفيديوهات التي صُدّرت منه ستظل موجودة)`))) return;
+  if (!(await uiConfirm(`هل تحذف المشروع "${mt.project.data.name}"؟ (ستبقى الفيديوهات التي صُدّرت منه)`))) return;
   try {
     await api(`/api/projects/${mt.project.id}`, { method: "DELETE" });
     mt.projects = mt.projects.filter((p) => p.id !== mt.project.id);
@@ -3080,10 +3080,10 @@ $("renderBtn").onclick = async () => {
 };
 
 $("renderCancel").onclick = async () => {
-  if (!(await uiConfirm("توقّف التصدير؟"))) return;
+  if (!(await uiConfirm("هل توقف التصدير؟"))) return;
   try {
     await api(`/api/projects/${mt.project.id}/render/cancel`, { method: "POST" });
-    toast("⏹ يوقف التصدير…");
+    toast("⏹ جارٍ إيقاف التصدير…");
   } catch (err) {
     toast(err.message, true);
   }
@@ -3107,17 +3107,17 @@ async function pollRender() {
   renderRender();
   if (fresh.render_status === "rendering") mt.pollTimer = setTimeout(pollRender, 2000);
   else if (fresh.render_status === "done") toast("✅ الفيديو جاهز");
-  else if (fresh.render_status === "failed") toast("✕ التصدير فشل، انظر السبب أسفل الزر", true);
+  else if (fresh.render_status === "failed") toast("✕ فشل التصدير، اطّلع على السبب أسفل الزر", true);
 }
 
 // ---------- الربط بالفيديو الخام ----------
 function reportDraft(draft) {
   const got = draft.gen_ids.length;
-  if (!draft.clips_total) return toast("هذا الفيديو ما زال لم يُقطّع", true);
+  if (!draft.clips_total) return toast("هذا الفيديو لم يُقطَّع بعد", true);
   if (draft.missing.length) {
-    toast(`جبت ${got} من ${draft.clips_total} قطعة. القطع رقم ${draft.missing.join("، ")} ما زال لم تُولّد`, true);
+    toast(`جُلب ${got} من ${draft.clips_total} قطعة. القطع رقم ${draft.missing.join("، ")} لم تُولَّد بعد`, true);
   } else {
-    toast(`✅ جبت ${got} قطعة بالترتيب${draft.voice ? " والتعليق الصوتي الخاص بهم" : ""}`);
+    toast(`✅ جبت ${got} قطعة بالترتيب${draft.voice ? " والتعليق الصوتي الخاص بها" : ""}`);
   }
 }
 
@@ -3128,7 +3128,7 @@ function renderLinkedVideo() {
   if (d?.video_id) {
     $("linkedVideo").textContent = video
       ? `🔗 من فيديو: ${video.name}${video.voice ? ` · 🎙️ ${video.voice.name}` : ""}`
-      : "🔗 الفيديو الخام حُذف";
+      : "🔗 حُذف الفيديو الخام";
   }
 }
 
@@ -3211,7 +3211,7 @@ function renderSilReview() {
   const dels = list.filter((m) => m.del), secs = dels.reduce((s, m) => s + (m.b - m.a), 0);
   box.hidden = false;
   box.innerHTML = `<div class="sr-head"><b>⚡ وُجد ${list.length} ${list.length === 1 ? "جزء" : "أجزاء"} يمكن إزالتها</b>
-      <span class="muted">سيُزال الأحمر (${secs.toFixed(1)} ثانية). استمع لكل جزء وانقر عليه إن أردت إبقاءه.</span>
+      <span class="muted">سيُزال الأحمر (${secs.toFixed(1)} ثانية). استمع إلى كل جزء وانقر عليه إن أردت إبقاءه.</span>
       <button class="btn sm primary" id="srApply" ${dels.length ? "" : "disabled"}>✂️ احذف الأحمر (${dels.length})</button>
       <button class="btn sm" id="srFillers" title="يفرّغ كلام الفيديوهات ويبحث عن «أمم/نعم» والكلام المكرر (يُخصم من نقاطك)">🔎 الحشو أيضًا</button>
       <button class="btn sm" id="srDismiss">أبقِها كلها</button></div>
@@ -3272,7 +3272,7 @@ $("silReview").addEventListener("click", async (e) => {
   if (e.target.closest("#srDismiss")) { silPending().forEach((m) => (m.done = true)); renderTimeline(); renderSilReview(); return scheduleSave(); }
   if (e.target.closest("#srFillers")) {
     const b = e.target.closest("#srFillers");
-    b.disabled = true; b.textContent = "⏳ جارٍ الاستماع للكلام…";
+    b.disabled = true; b.textContent = "⏳ جارٍ الاستماع إلى الكلام…";
     await saveProject();
     try {
       const r = await api(`/api/projects/${mt.project.id}/fillers`, { method: "POST" });
@@ -3349,7 +3349,7 @@ $("tlSilence").onclick = (e) => {
   m.className = "sil-menu";
   m.setAttribute("role", "menu");
   m.innerHTML = `<b>إزالة السكتات</b>${SIL_LEVELS.map(([k, t, sub, v]) => `<button type="button" role="menuitem" data-sl="${v}"><span>${t}</span><small>${sub}</small></button>`).join("")}
-    <button type="button" role="menuitem" class="rv" data-sl="0.45" data-rv="1"><span>علّمها فقط</span><small>سأراجعها واحدة واحدة قبل الحذف</small></button>`;
+    <button type="button" role="menuitem" class="rv" data-sl="0.45" data-rv="1"><span>علّمها فقط</span><small>سأراجعها واحدة تلو الأخرى قبل الحذف</small></button>`;
   document.body.appendChild(m);
   m.style.top = `${Math.max(8, r.top - m.offsetHeight - 6)}px`;
   m.style.left = `${Math.min(innerWidth - m.offsetWidth - 8, Math.max(8, r.left))}px`;

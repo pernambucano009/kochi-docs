@@ -16,7 +16,7 @@ export function spoken(s: string) {
 }
 
 function shotName(i: number, n: number) {
-  if (i === 0) return "الهوك";
+  if (i === 0) return "الخطاف";
   if (i === n - 1 && n > 2) return "الدعوة";
   return "المحتوى";
 }

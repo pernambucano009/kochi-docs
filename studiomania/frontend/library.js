@@ -36,9 +36,9 @@ const CharactersPage = (() => {
         </div>
       </div>
       <div class="ch-sec"><div class="nb-kh"><b>صور ورقة الملامح</b><span class="num">${c.sheet.length}</span>
-        <label class="nb-btn sm">⬆ ارفع صور<input type="file" accept="image/*" multiple data-sheet hidden></label></div>
+        <label class="nb-btn sm">⬆ ارفع صورًا<input type="file" accept="image/*" multiple data-sheet hidden></label></div>
         <p class="nb-hint">زوايا وتعبيرات مختلفة للشخصية نفسها، ليحافظ التوليد على شكلها.</p>
-        <div class="nb-imgs">${c.sheet.map((x) => `<figure data-sfile="${libEsc(x.file)}"><img src="${libEsc(x.url)}" alt="" loading="lazy"><button class="nb-x" data-sdel title="احذف">✕</button></figure>`).join("") || `<div class="nb-none">لا يوجد صور ما زال</div>`}</div></div>
+        <div class="nb-imgs">${c.sheet.map((x) => `<figure data-sfile="${libEsc(x.file)}"><img src="${libEsc(x.url)}" alt="" loading="lazy"><button class="nb-x" data-sdel title="احذف">✕</button></figure>`).join("") || `<div class="nb-none">لا توجد صور بعد</div>`}</div></div>
       <div class="ch-sec"><div class="nb-kh"><b>الصوت</b></div>
         <p class="nb-hint">عينة من صوت الشخصية (أي ملف صوت أو فيديو).</p>
         <div class="nb-row">${c.voice_url ? `<audio src="${libEsc(c.voice_url)}" controls preload="metadata"></audio><button class="nb-btn sm danger" data-cdel="voice">أزله</button>` : `<span class="nb-none" style="flex:1">لا يوجد صوت بعد</span>`}
@@ -161,7 +161,7 @@ const CharactersPage = (() => {
         form.append("name", name);
         form.append("image", img);
         S.adding = false;
-        return save(async () => { const c = await api("/api/coaches", { method: "POST", body: form }); S.open = c.id; return c; }, "✅ الشخصية أُضيفت");
+        return save(async () => { const c = await api("/api/coaches", { method: "POST", body: form }); S.open = c.id; return c; }, "✅ أُضيفت الشخصية");
       }
       if (t.closest("[data-cclose]")) { S.open = null; return render(); }
       if (t.closest("[data-cremove]")) {
@@ -292,7 +292,7 @@ function makeAudioPage(kind, noun, hint) {
     if (!files.length) return;
     let ok = 0;
     for (const f of files) {
-      toast(`⏳ جارٍ الرفع ${f.name}…`);
+      toast(`⏳ جارٍ رفع ${f.name}…`);
       const form = new FormData();
       form.append("kind", kind);
       form.append("file", f);
@@ -312,7 +312,7 @@ function makeAudioPage(kind, noun, hint) {
         else { player.src = a.url; player.play().catch(() => {}); S.playing = a.id; }
         w.querySelector(".au-list").innerHTML = rows();
       }
-      if (e.target.closest("[data-adel]") && (await uiConfirm(`تحذف «${a.name}»؟`))) {
+      if (e.target.closest("[data-adel]") && (await uiConfirm(`هل تحذف «${a.name}»؟`))) {
         try { await api(`/api/audio/${a.id}`, { method: "DELETE" }); S.list = S.list.filter((x) => x.id !== a.id); if (S.playing === a.id) player.pause(); render(); }
         catch (err) { toast(err.message, true); }
       }
@@ -427,7 +427,7 @@ const StyleClonePage = (() => {
       <div class="sc-refs">${p.refs.map((u) => /\.(mp4|mov|webm|m4v)$/i.test(u) ? `<video src="${u}" muted></video>` : `<img src="${u}" alt="">`).join("")}</div>
       <p class="nb-hint">${libEsc(p.idea)}</p>
       ${BUSY.includes(p.status) ? `<div class="sc-step">${libEsc(p.step || "⏳ يعمل…")}</div>` : ""}
-      ${p.status === "failed" ? `<div class="sc-err">⚠️ ${libEsc(p.error || "حصلت مشكلة")} <button class="nb-btn sm" data-sretry>جرّب مرة أخرى</button></div>` : ""}
+      ${p.status === "failed" ? `<div class="sc-err">⚠️ ${libEsc(p.error || "حدثت مشكلة")} <button class="nb-btn sm" data-sretry>جرّب مرة أخرى</button></div>` : ""}
       ${p.style ? `<div class="sc-style">${(p.style.palette || []).map((c) => `<i style="background:${libEsc(c)}"></i>`).join("")}<span>${libEsc(p.style.name || "")}: ${libEsc(p.style.look || "")}</span></div>` : ""}
       ${p.video ? `<video class="sc-video" src="${p.video}" controls playsinline></video>
         <div class="nb-bar"><a class="nb-btn sm" href="${p.video}" download>⬇ نزّل</a>${p.review?.score ? `<span class="nb-state">تقييم المراجعة: ${p.review.score}/10</span>` : ""}</div>`

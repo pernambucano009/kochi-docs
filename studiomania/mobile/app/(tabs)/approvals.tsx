@@ -117,7 +117,7 @@ export default function Approvals() {
     }
     if (j.gate === "montage" || j.gate === "video") {
       const carousel = j.kind === "carousel";
-      const okLabel = carousel ? (j.gate === "montage" ? "موافق، ارسم السلايدات" : "موافق، جدوِله") : j.gate === "montage" ? "موافق، صدّره" : "انشر في ميعاده";
+      const okLabel = carousel ? (j.gate === "montage" ? "موافق، ارسم السلايدات" : "موافق، جدوِله") : j.gate === "montage" ? "موافق، صدّره" : "انشر في موعده";
       return (
         <>
           {j.video_url && headers.Authorization ? <Video uri={mediaUrl(j.video_url)} headers={headers} /> : null}

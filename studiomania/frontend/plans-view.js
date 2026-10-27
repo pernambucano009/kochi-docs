@@ -174,7 +174,7 @@ const PlansView = (() => {
       const act = s === "buy" ? `<button class="pv-act ${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? "اشترك" : "ابدأ مجانًا"}</button>`
         : s === "cur" ? `<span class="pv-act cur">✓ باقتك</span>`
         : s === "up" || s === "switch" ? `<button class="pv-act go" data-pvopen>${s === "switch" ? "حوّل" : curI < 0 ? "اشترك" : "ترقية"}</button>`
-        : s === "owner" ? "" : `<span class="pv-act low">${p.once ? "خلصت" : "أقل من باقتك"}</span>`;
+        : s === "owner" ? "" : `<span class="pv-act low">${p.once ? "انتهت" : "أقل من باقتك"}</span>`;
       const tipM = s === "cur" ? renew : s === "up" ? "ترقية فورية، والفرق يُحسب بالأيام" : "";
       return `<div class="pv-pl${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
         ${guest && p.popular ? `<span class="pv-hot">الأكثر اختيارًا</span>` : ""}

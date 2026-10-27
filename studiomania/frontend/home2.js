@@ -44,28 +44,28 @@ const NH = (() => {
   const T = {
     create: KOCHI ? { en: "New Project", ar: "مشروع جديد", icon: "create", go: "0", desc: "الفيديو الخام ← التقطيع ← التوليد ← المونتاج ← النشر، خطوة خطوة." }
       : { en: "Create", ar: "ابدأ مشروعًا جديدًا", icon: "create", page: "create", desc: "كل أنواع العمل من هنا: اختر النوع، والخطوات تسير معك حتى التصدير." },
-    brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاته وستايله. أي عمل يُنشأ يبني عليه." },
+    brand: { en: "Your Brand", ar: "عقل العلامة", icon: "brand", page: "brand", desc: "كل تفاصيل العلامة وتفضيلاتها وأسلوبها. أي عمل يُنشأ يُبنى عليه." },
     assets: { en: "Assets", ar: "الأصول", icon: "box", page: "assets", desc: "الشخصيات والأصوات والموسيقى التي تستخدمها في أي عمل." },
     // مكان «الأصول» في الرئيسية (الأصول بقت فرع من عقل العلامة)
     dubhub: { en: "Translate & Dub", ar: "الترجمة والدبلجة", icon: "globe", go: "13", desc: "أي فيديو بلغة أو لهجة أخرى: ترجمة النص، وصوت جديد، ومزامنة حركة الشفاه." },
     settings: { en: "Settings", ar: "الإعدادات", icon: "gear", go: "settings", desc: "المفاتيح والرصيد والعملاء." },
-    progress: { en: "In Progress", ar: "قيد العمل", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. اضغط على أي خط يُكمل من مكان ما وقفت." },
-    publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة واللي نُشر." }
+    progress: { en: "In Progress", ar: "قيد العمل", icon: "pulse", page: "progress", desc: "كل خط مشروع، وكل نقطة خطوة. اضغط على أي خط ليُكمل من حيث توقف." },
+    publish: KOCHI ? { en: "Publish", ar: "النشر", icon: "send", go: "7", desc: "الحسابات المربوطة والجدولة وما نُشر." }
       : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
     pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة وما نُشر." },
     inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد، وبوتات ترد تلقائيًا." },
     audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من هو الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
-    reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوب، اكتب فكرتك، والقالب يُكمل: نص ← صوت ← مشاهد." },
+    reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوبًا، واكتب فكرتك، ويُكمل القالب: نص ← صوت ← مشاهد." },
     raw: { en: "From Footage", ar: "فيديو من تصويرك", icon: "cut", go: "0", desc: "المشروع ← التقطيع ← التوليد ← المونتاج ← النشر." },
-    series: { en: "Series", ar: "مسلسل من حلقات", icon: "clapper", go: "9", desc: "حلقات خلف بعض بنفس الشخصيات والعالم." },
+    series: { en: "Series", ar: "مسلسل من حلقات", icon: "clapper", go: "9", desc: "حلقات متتالية بنفس الشخصيات والعالم." },
     carousel: { en: "Carousel", ar: "كاروسيل", icon: "slides", go: "8", desc: "فكرة ← نص ← تصميم ← سلايدات." },
     ad: { en: "Ad", ar: "إعلان", icon: "megaphone", go: "10", desc: "إعلان من مرجع أو من الصفر على علامة العميل." },
     typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "نص متحرك من صوت أو نص." },
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة أخرى." },
     edit: { en: "Edit", ar: "مونتاج حر", icon: "film", go: KOCHI ? "6" : "6f", desc: "المحرر الكامل: تراكات ونص وطبقات وصوت." },
-    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها والكاركتر ورقة وصوتها والإنترو والأوترو." },
+    coaches: { en: "Characters", ar: "الشخصيات", icon: "users", page: "coaches", desc: "كل شخصية بصورتها وورقة الشخصية وصوتها والإنترو والأوترو." },
     twin: { en: "Avatar", ar: "الأفاتار", icon: "users", page: "twin", desc: "نسخة منك أو من شخص لديك إذنه، من تسجيلات حقيقية، لتصنع بها فيديوهات بكلام جديد." },
     voice: { en: "Voices", ar: "التعليق الصوتي", icon: "mic", page: "voice", desc: "مكتبة التعليق." },
     music: { en: "Music", ar: "الموسيقى", icon: "music", page: "music", desc: "مكتبة الموسيقى." },
@@ -73,7 +73,7 @@ const NH = (() => {
     plan: { en: "Content Plan", ar: "خطة المحتوى", icon: "megaphone", page: "plan", desc: "استراتيجية حسابك، تُبنى تلقائيًا من كل ما عرفه العقل عنك." },
     rivals: { en: "Your Competitors", ar: "منافسوك", icon: "megaphone", page: "rivals", desc: "البرنامج يقترح منافسين وأنت توافق، ومنهم نعرف ما ينجح لديهم ووصفة الاستهداف." },
     bots: { en: "Message Bots", ar: "بوتات الرسائل", icon: "megaphone", page: "bots", desc: "بوت يرد على التعليقات والرسائل والستوري تلقائيًا، يسأل ويفرز، ويحوّل إلى الفريق عند الحاجة." },
-    leads: { en: "Target Leads", ar: "العملاء المستهدفون", icon: "megaphone", page: "leads", desc: "ناس مهتمون بموضوعك من التعليقات على أكثر المنشورات انتشارًا فيه، مرتّبون حسب اهتمامهم، مع ملف تنزّله." },
+    leads: { en: "Target Leads", ar: "العملاء المستهدفون", icon: "megaphone", page: "leads", desc: "أشخاص مهتمون بموضوعك من التعليقات على أكثر المنشورات انتشارًا فيه، مرتّبون حسب اهتمامهم، مع ملف تنزّله." },
     wacamp: { en: "WhatsApp Campaigns", ar: "حملات واتساب", icon: "megaphone", page: "wacamp", desc: "اجمع موافقات الأشخاص، وأنشئ رسائل معتمدة، وأرسل حملات وسلاسل متابعة للمشتركين فقط." },
     plans: { en: "My Plan & Credits", ar: "باقتي ونقاطي", icon: "settings", page: "plans", desc: "باقتك ونقاطك، والترقية، والنقاط الإضافية." },
     adsmgr: { en: "Your Ads", ar: "إعلاناتك", icon: "megaphone", page: "adsmgr", desc: "روّج منشورًا أو أنشئ إعلانًا جديدًا بالاستهداف من الوصفة، وتابع أرقامه، وأنشئ جماهير." },
@@ -136,7 +136,7 @@ const NH = (() => {
     },
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      return `<span>${up ? `${up} منشور مجدول` : "لا يوجد منشورات متجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
+      return `<span>${up ? `${up} منشور مجدول` : "لا توجد منشورات مجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
     settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
       : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
@@ -296,7 +296,7 @@ const NH = (() => {
   let live = 0, shown = null;
   function stageHTML(key) {
     const big = (k) => (GL ? "" : `<div class="big">${iconOf(k)}</div>`);
-    if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو أكمل مشروع من «قيد العمل».</p>`;
+    if (!key && KOCHI) return `${big("app")}<h1 class="latin">Kochi Studio</h1><div class="ar">فيديوهات مدربين كوتشي</div><p>ابدأ من «مشروع جديد»، أو أكمل مشروعًا من «قيد العمل».</p>`;
     if (!key) return window.I18N?.lang !== "en" ? homeTitle(big("app")) : `${big("app")}<h1 class="latin">SimsimKit</h1><div class="ar">استوديو المحتوى والفيديو</div>`;
     if (key.startsWith("f:")) {
       const f = D.folders.find((x) => x.id === key.slice(2)), s = folderStage(f);
@@ -392,7 +392,7 @@ const NH = (() => {
   document.getElementById("nhAcct").onclick = async () => {
     let who = "";
     try { const r = await fetch("/api/me"); if (r.ok) { const m = await r.json(); who = m.email || ""; } } catch { /* بدون بوابة الحسابات */ }
-    if (!(await uiConfirm(who ? `مسجّل الدخول بـ ${who}\nتسجيل الخروج؟` : "تسجيل الخروج؟", { ok: "تسجيل الخروج" }))) return;
+    if (!(await uiConfirm(who ? `مسجّل الدخول بـ ${who}\nهل تسجّل الخروج؟` : "هل تسجّل الخروج؟", { ok: "تسجيل الخروج" }))) return;
     try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
     location.href = "/login";
   };
@@ -522,7 +522,7 @@ const NH = (() => {
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       const sub = { pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
-        audience: "من سيشتري، وكيف تصل إليه", leads: "ناس مهتمون بموضوعك", wacamp: "رسائل لمشتركينك" };
+        audience: "من سيشتري، وكيف تصل إليه", leads: "أشخاص مهتمون بموضوعك", wacamp: "رسائل لمشتركينك" };
       const ic = PUB_IC;
       return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubpost", "inbox", "adsmgr", "audience", "leads", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
         <span class="bl-fi"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${ic[id]}"/></svg></span><b>${esc(T[id].ar)}</b><small>${esc(sub[id])}</small></button>`).join("")}</div></div>`;

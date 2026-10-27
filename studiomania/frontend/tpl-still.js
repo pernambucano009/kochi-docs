@@ -15,13 +15,13 @@ function tvStillDetail(v) {
       <small class="muted">الخلفية لون واحد فقط. تريد المنتج في مكان؟ استخدم قالب «المنتج داخل مشهد».</small>`;
   } else if (kind === "scene") {
     setup = `<div class="sc-chips"><button class="sc-chip ${st.how !== "recompose" ? "on" : ""}" data-stset="how" data-val="recreate" ${dis}>📋 نسخ المشهد كما هو (نفس الكاميرا والضوء والتكوين)</button>
-        <button class="sc-chip ${st.how === "recompose" ? "on" : ""}" data-stset="how" data-val="recompose" ${dis}>🏗️ بناء المشهد حوالين المنتج (نفس الروح، كادر جديد)</button></div>
-      <small class="muted">${st.how === "recompose" ? "إعادة البناء تتغير من مرة للتانية: أنشئ ٢-٣ مرات وخد الأحلى." : "النسخ يسير على المشهد بالضبط، والأشخاص والإيدين الذين في المرجع يظلون موجودين."}</small>`;
+        <button class="sc-chip ${st.how === "recompose" ? "on" : ""}" data-stset="how" data-val="recompose" ${dis}>🏗️ بناء المشهد حول المنتج (الروح نفسها، كادر جديد)</button></div>
+      <small class="muted">${st.how === "recompose" ? "إعادة البناء تختلف من مرة إلى أخرى: أنشئ ٢-٣ مرات واختر الأجمل." : "النسخ يسير على المشهد بالضبط، ويبقى الأشخاص والأيدي التي في المرجع."}</small>`;
   } else {
     setup = `<div class="row wrap"><label>اسم المنتج <input data-stin="product" value="${tse(st.product || "")}" ${dis}></label>
         <label>🗣️ لغة النص الذي على الصورة <select data-stin="copy_lang" ${dis}><option value="ar" ${st.copy_lang !== "en" ? "selected" : ""}>عربي (نفس لهجة الفيديو)</option><option value="en" ${st.copy_lang === "en" ? "selected" : ""}>English (النموذج يكتبه أدق)</option></select></label></div>
       <label>العرض / الفكرة <textarea rows="2" data-stin="offer" ${dis}>${tse(st.offer || "")}</textarea></label>
-      <p class="hint">اختر حتى ١٠ قوالب (${(st.picks || []).length} متختار). النص والألوان يتملون من ملف العميل، واللي غير موجود فيه يتعلّم عليه ⚠️ لكي تراجعه.</p>
+      <p class="hint">اختر حتى ١٠ قوالب (${(st.picks || []).length} مختار). يُملأ النص والألوان من ملف العميل، وما ليس موجودًا فيه يُعلَّم عليه ⚠️ لتراجعه.</p>
       <div class="st-grid">${(v.adgen || []).map((t) => `<button class="st-tpl ${(st.picks || []).includes(t.n) ? "on" : ""}" data-stpick="${t.n}" ${dis}>
         <b>${t.n}. ${tse(t.ar)}</b><small class="muted" dir="ltr" data-no-i18n>${tse(t.name)} · ${t.ratio}</small></button>`).join("")}</div>`;
   }
@@ -33,21 +33,21 @@ function tvStillDetail(v) {
       <small class="muted">📐 <span data-no-i18n>${le(v.template_name)}</span></small></div>
     <details class="panel tv-step" data-dk="p1" ${open("p1", !items.length)}><summary>١. 📦 الصور والإعدادات</summary>
       <div class="ad-refs">${slot("product", "📦 المنتج")}${kind === "scene" ? slot("scene", "🏞️ المشهد الذي يعجبك") : ""}</div>
-      <small class="muted">صورة واحدة للمنتج. ${kind === "studio" ? "أي صورة تنفع (حتى من الجوال)، المهم الليبل يظهر واضح." : "صورة استوديو نظيفة تُخرج أحسن نتيجة (أنشئها بقالب «صورة استوديو للمنتج»)."}</small>
+      <small class="muted">صورة واحدة للمنتج. ${kind === "studio" ? "أي صورة تصلح (حتى من الجوال)، المهم أن يظهر الملصق بوضوح." : "صورة استوديو نظيفة تُخرج أفضل نتيجة (أنشئها بقالب «صورة استوديو للمنتج»)."}</small>
       ${setup}
       ${kind !== "adgen" ? `<label>📐 المقاس <div class="sc-chips">${fmts}</div></label>` : ""}
-      <label>📝 ملاحظة (اختياري، تُضاف جملة واحدة في آخر البرومت) <input data-stin="note" value="${tse(st.note || "")}" ${dis}></label>
+      <label>📝 ملاحظة (اختياري، تُضاف جملة واحدة في آخر الموجّه) <input data-stin="note" value="${tse(st.note || "")}" ${dis}></label>
       <div class="row wrap"><label>نموذج الصور <select data-tvopt="image_model">${(v.image_models || []).map((m) => `<option value="${m.key}" ${m.key === v.image_model ? "selected" : ""}>${le(m.label)}</option>`).join("")}</select></label>
-        <button class="btn primary" data-stprep ${dis || !R.product ? "disabled" : ""}>${items.length ? "↻ اكتب البرومتات من جديد" : "✍️ جهّز البرومت"}</button></div>
+        <button class="btn primary" data-stprep ${dis || !R.product ? "disabled" : ""}>${items.length ? "↻ اكتب الموجّهات من جديد" : "✍️ جهّز الموجّه"}</button></div>
     </details>
     ${items.length ? `<details class="panel tv-step" data-dk="p2" ${open("p2", true)}><summary>٢. 🖼️ الصور <small class="muted">${items.length - missing}/${items.length} رُسمت</small></summary>
-      <div class="row wrap"><button class="btn primary" data-strun ${dis}>${missing ? `🖼️ ارسم ${missing === items.length ? "الكل" : `الناقص (${missing})`} (~$${v.missing_cost})` : "✅ كله رُسم"}</button>
-        <small class="muted">النص الذي على الصورة يتغير من مرة للتانية: إذا حرف باظ ارسمها مرة أخرى، هذا عادي.</small></div>
+      <div class="row wrap"><button class="btn primary" data-strun ${dis}>${missing ? `🖼️ ارسم ${missing === items.length ? "الكل" : `الناقص (${missing})`} (~$${v.missing_cost})` : "✅ رُسم كله"}</button>
+        <small class="muted">النص الذي على الصورة يختلف من مرة إلى أخرى: إن تلف حرف فارسمها مرة أخرى، هذا طبيعي.</small></div>
       <div class="ad-jobs">${items.map((it, i) => `<article class="ts-scene" data-sti="${i}"><header><b>${tse(it.label)}</b> <small class="muted">${it.ratio}</small></header>
-        <div class="ts-sbody">${v.item_urls[i] ? `<a href="${v.item_urls[i]}" target="_blank"><img class="st-out" src="${v.item_urls[i]}" alt=""></a>` : `<div class="fm-ph">ما زال</div>`}
+        <div class="ts-sbody">${v.item_urls[i] ? `<a href="${v.item_urls[i]}" target="_blank"><img class="st-out" src="${v.item_urls[i]}" alt=""></a>` : `<div class="fm-ph">لم يُراجَع بعد</div>`}
           <div class="ts-sf">${(it.copy || []).length ? `<p class="hint">🔤 النص: ${it.copy.map((c) => `«${tse(c)}»`).join(" · ")}</p>` : ""}
             ${(it.invented || []).length ? `<p class="err">⚠️ متألّف (راجعه): ${it.invented.map((c) => tse(c)).join(" · ")}</p>` : ""}
-            <details><summary class="muted">📋 البرومت (يمكنك تعدّله)</summary><textarea rows="7" dir="ltr" data-stprompt data-no-i18n ${dis}>${tse(it.prompt)}</textarea></details>
+            <details><summary class="muted">📋 الموجّه (يمكنك تعديله)</summary><textarea rows="7" dir="ltr" data-stprompt data-no-i18n ${dis}>${tse(it.prompt)}</textarea></details>
             <div class="row wrap"><button class="btn sm" data-stone="${i}" ${dis}>${v.item_urls[i] ? "↻ ارسمها مرة أخرى" : "🖼️ ارسمها"} (~$${v.item_cost})</button>
               ${v.item_urls[i] ? `<a class="btn sm" href="${v.item_urls[i]}" download>⬇️ نزّل</a>` : ""}</div></div></div></article>`).join("")}</div>
     </details>` : ""}`;

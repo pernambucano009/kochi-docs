@@ -236,7 +236,7 @@ function mtTypoPoll() {
       if (!cur.busy) {
         const was = mtx.lastStep || "";
         if (cur.blocks?.length || cur.fx?.length) await mtTypoDoc();
-        if (cur.status === "failed") toast(`🔤 ${cur.error || "حصلت مشكلة"}`, true);
+        if (cur.status === "failed") toast(`🔤 ${cur.error || "حدثت مشكلة"}`, true);
         else if (/^(🪄|🧽|✨|🎥)/u.test(was)) { /* المشهد: التبويب الخاص به يقول خلص */ }
         else if (was.includes("🎯")) toast("🎯 وُجد الشيء وجرى تتبعه: شغّل الفيديو وانظر إلى الحدود الصفراء");
         else if (cur.blocks?.length) toast("🔤 وُزّعت التايبوجرافي على المونتاج");
@@ -260,7 +260,7 @@ function mtTypoPaneRender() {
     ${busy ? `<p><span class="spin-inline"></span> ${escapeHtml(c.step || "جارٍ العمل…")}</p>` : ""}
     ${c?.status === "failed" ? `<p class="err">⚠️ ${escapeHtml(c.error || "")}</p>` : ""}
     ${stale && !busy ? `<p class="hint">⚠️ تغيّر المونتاج بعد توزيع التايبوجرافي (الطول مختلف): وزّعها من جديد لتُضبط التوقيتات.</p>` : ""}
-    <input type="text" id="mtTypoBrief" placeholder="عن الفيديو (اختياري): من يتكلم ولمين وماذا الإحساس" value="${escapeHtml(c?.brief || "")}">
+    <input type="text" id="mtTypoBrief" placeholder="عن الفيديو (اختياري): من يتكلم، ولمن، وما الإحساس" value="${escapeHtml(c?.brief || "")}">
     <div class="row wrap"><button class="btn primary sm" id="mtTypoPlan" ${busy || !d.clips.length ? "disabled" : ""}>🧠 ${c?.blocks?.length ? "وزّع من جديد" : "وزّع التايبوجرافي"}</button>
       ${c ? `<label class="check"><input type="checkbox" id="mtTypoOn" ${mtTypoOn() ? "checked" : ""}> أظهرها في المعاينة والتصدير</label>` : ""}
       ${c ? `<button class="btn sm" id="mtTypoOpen" title="المحرر الكامل: الأسلوب والأيقونات والعلامات">✏️ المحرر الكامل</button>` : ""}</div>

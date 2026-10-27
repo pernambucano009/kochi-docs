@@ -51,7 +51,7 @@
 <body>
 <header>
   <h1>🧭 لوحة الفحص</h1>
-  <a href="/#settings">← رجوع للبرنامج</a>
+  <a href="/#settings">← رجوع إلى البرنامج</a>
   <nav id="tabs">
     <button data-t="issues" class="on">🚨 صندوق الأخطاء <b id="issN"></b></button>
     <button data-t="runs">الفحص الشامل</button>
@@ -66,8 +66,8 @@
 </header>
 <main>
   <section data-p="issues">
-    <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل شغل فشل أو توقف في النص، يصل هنا تلقائيًا. نفس الخطأ يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
-      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من السيرفر</option><option value="job">شغل فشل</option><option value="stuck">شغل توقف في النص</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option></select>
+    <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل عمل فشل أو توقف في المنتصف، يصل إلى هنا تلقائيًا. الخطأ نفسه يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
+      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من الخادم</option><option value="job">عمل فشل</option><option value="stuck">عمل توقف في المنتصف</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option></select>
       <button class="btn" id="issReload">↻ حدّث</button></div></div>
     <div id="iss"></div>
   </section>
@@ -77,15 +77,15 @@
       ملف CSV فيه عمودان فارغان للإسبانية والبرتغالية: هما ما يُملأ عند إضافة لغة جديدة.</p>
       <div class="row" id="lmStat"></div>
       <div class="row"><input id="lmQ" placeholder="ابحث بالجملة أو الترجمة أو الملف" style="flex:1;min-width:220px">
-        <select id="lmP"><option value="any">فيها مشكلة</option><option value="no_en">ترجمة إنجليزي ناقصة</option><option value="dialect">عامية في الواجهة</option><option value="">كل الجمل</option></select>
-        <select id="lmK"><option value="">كل الأماكن</option><option value="web">الموقع</option><option value="mobile">تطبيق الجوال</option><option value="server">رسائل السيرفر</option><option value="template">خانات القوالب</option><option value="content">محتوى (بلهجة العميل)</option></select>
+        <select id="lmP"><option value="any">فيها مشكلة</option><option value="no_en">ترجمة إنجليزية ناقصة</option><option value="dialect">عامية في الواجهة</option><option value="">كل الجمل</option></select>
+        <select id="lmK"><option value="">كل الأماكن</option><option value="web">الموقع</option><option value="mobile">تطبيق الجوال</option><option value="server">رسائل الخادم</option><option value="template">خانات القوالب</option><option value="content">محتوى (بلهجة العميل)</option></select>
         <button class="btn" id="lmScan">🔎 افحص الآن</button><a class="btn" href="/api/platform/langmap.csv" download>⬇ CSV (عربي · إنجليزي · إسباني · برتغالي)</a></div></div>
-    <table class="tbl"><thead><tr><th>الجملة</th><th>الإنجليزي</th><th>المكان</th><th>المشكلة</th></tr></thead><tbody id="lm"></tbody></table>
+    <table class="tbl"><thead><tr><th>الجملة</th><th>الإنجليزية</th><th>المكان</th><th>المشكلة</th></tr></thead><tbody id="lm"></tbody></table>
   </section>
   <section data-p="runs" hidden>
     <div class="card">
       <h3 style="margin-top:0">ابدأ فحصًا جديدًا</h3>
-      <p class="mute">عميل تجريبي (journey@test.simsimkit.com) يمشي في البرنامج كما يفعل العميل، بنقاط حقيقية، ويسجّل كل خطوة وكل رسالة وكل كلمة في الشاشة، بالعربية والإنجليزية.</p>
+      <p class="mute">عميل تجريبي (journey@test.simsimkit.com) يمر على البرنامج كما يفعل العميل، بنقاط حقيقية، ويسجّل كل خطوة وكل رسالة وكل كلمة في الشاشة، بالعربية والإنجليزية.</p>
       <div class="row">
         <label>المرحلة <select id="phase"><option value="1">١: العقل والتخطيط</option></select></label>
         <span class="mute">المجالات:</span>
@@ -121,7 +121,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same-origin", ...o, headers: { "content-type": "application/json", ...(o.headers || {}) } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j; };
 const S = { cur: null, run: null, map: null, iss: [] };
-const KIND = { api: "رد خطأ من السيرفر", job: "شغل فشل", stuck: "شغل توقف في النص", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
+const KIND = { api: "رد خطأ من الخادم", job: "عمل فشل", stuck: "عمل توقف في المنتصف", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
 const when = (t) => t ? new Date(t * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }) : "";
 async function loadIssues() {
   const r = await api("/api/platform/issues" + ($("issAll").checked ? "?all=1" : "")).catch((e) => ({ items: [], err: e.message }));
@@ -134,7 +134,7 @@ function renderIssues(err) {
   $("iss").innerHTML = err ? `<div class="card bad">${esc(err)}</div>` : list.map((x) => `<div class="card" data-iid="${esc(x.id)}">
     <div class="row"><b class="${x.resolved_at ? "ok" : "bad"}">${x.resolved_at ? "✓ محلول" : "● مفتوح"}</b><span class="chip">${KIND[x.kind] || esc(x.kind)}</span>
       <span class="mute">تكرر ${x.count} مرة · أول مرة ${when(x.first_at)} · آخر مرة ${when(x.last_at)}</span>
-      <span style="margin-inline-start:auto">${x.resolved_at ? `<button class="btn" data-reopen>أعد فتحه</button>` : `<button class="btn pri" data-resolve>✓ اتحل</button>`}</span></div>
+      <span style="margin-inline-start:auto">${x.resolved_at ? `<button class="btn" data-reopen>أعد فتحه</button>` : `<button class="btn pri" data-resolve>✓ حُلّ</button>`}</span></div>
     <h3 style="margin:10px 0 4px">${esc(x.message)}</h3>
     <div class="mute ltr">${esc(x.path)}${x.status ? " · " + x.status : ""}${x.screen ? " · " + esc(x.screen) : ""}</div>
     <p style="margin:10px 0 4px"><b>السبب:</b> ${esc(x.cause)}</p><p style="margin:0 0 8px"><b>الإصلاح المقترح:</b> ${esc(x.fix)}</p>
@@ -259,7 +259,7 @@ async function loadLm(fresh) {
   if (d.err) { $("lm").innerHTML = `<tr><td class="bad">${esc(d.err)}</td></tr>`; return; }
   const st = d.stat;
   $("lmN").textContent = st.no_en + st.dialect || "";
-  $("lmStat").innerHTML = [["كل الجمل", st.total], ["تظهر للعميل", st.ui], ["ترجمة إنجليزي ناقصة", st.no_en], ["عامية في الواجهة", st.dialect],
+  $("lmStat").innerHTML = [["كل الجمل", st.total], ["تظهر للعميل", st.ui], ["ترجمة إنجليزية ناقصة", st.no_en], ["عامية في الواجهة", st.dialect],
     ...Object.entries(st.by_kind).map(([k, n]) => [LM_KIND[k], n])].map(([t, n]) => `<span class="chip">${t}: <b>${n}</b></span>`).join("") + `<span class="mute">المعروض: ${d.count}</span>`;
   $("lm").innerHTML = d.items.map((x) => `<tr><td>${esc(x.ar)}</td><td class="ltr ${x.problems.includes("no_en") ? "bad" : ""}">${esc(x.en || "")}</td>
     <td class="ltr mute">${esc(LM_KIND[x.kind] || x.kind)} · ${x.where.slice(0, 3).map(esc).join("<br>")}${x.where.length > 3 ? `<br>+${x.where.length - 3}` : ""}</td>

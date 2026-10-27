@@ -331,7 +331,7 @@ function renderCoachLink() {
   $("coachLinkImg").hidden = !c;
   if (c) $("coachLinkImg").src = c.image_url;
   $("coachLinkInfo").textContent = !c
-    ? "اربطه لكي صورته تُرسل لـ Seedance والأوترو الخاص به يوضع في الآخر تلقائيًا"
+    ? "اربطه لتُرسل صورته إلى Seedance ويوضع الأوترو الخاص به في النهاية تلقائيًا"
     : c.has_outro ? "✓ صورته للتوليد والأوترو الخاص به في الآخر" : "⚠️ هذه الشخصية ليس لها أوترو، أضفه من صفحة الشخصيات";
 }
 
@@ -369,12 +369,12 @@ function renderVoiceInfo() {
   const v = state.current;
   const info = $("voiceInfo");
   if (!v?.voice) {
-    info.textContent = "اربطه لكي المونتاج يلاقيه جاهز";
+    info.textContent = "اربطه ليجده المونتاج جاهزًا";
     return;
   }
   const diff = Math.abs(v.voice.duration - v.duration);
   info.textContent = `طول الصوت ${fmtDuration(v.voice.duration)} · طول الفيديو ${fmtDuration(v.duration)}` +
-    (diff > 2 ? " ⚠️ مختلفين" : " ✓");
+    (diff > 2 ? " ⚠️ مختلفان" : " ✓");
 }
 
 async function linkVoice(voiceId) {
@@ -437,7 +437,7 @@ function renderEditor() {
           ? `<span class="status long">أطول من ${state.maxClip} ث</span>`
           : `<span class="status ok">حسنًا</span>`;
       const removeCut = s.index > 0
-        ? `<button class="btn sm" data-act="merge" data-i="${s.index}" title="احذف نقطة القطع الذي في بداية هذه القطعة">دمج مع ما قبلها</button>`
+        ? `<button class="btn sm" data-act="merge" data-i="${s.index}" title="احذف نقطة القطع التي في بداية هذه القطعة">دمج مع ما قبلها</button>`
         : "";
       return `<tr class="${cls}">
         <td>${s.index + 1}</td><td>${fmt(s.start)}</td><td>${fmt(s.end)}</td><td>${s.duration.toFixed(1)} ث</td>
@@ -559,7 +559,7 @@ function renderCutTimeline() {
       </div>`;
     })
     .join("") + v.cuts
-    .map((c, i) => `<div class="ct-cut" data-c="${i}" style="left:${c * ct.pps}px" title="${fmtFrames(c)} · اسحب تحرّكه · نقرتان يمسحه"></div>`)
+    .map((c, i) => `<div class="ct-cut" data-c="${i}" style="left:${c * ct.pps}px" title="${fmtFrames(c)} · اسحب لتحريكه · نقرتان لحذفه"></div>`)
     .join("");
   $("ctZoom").value = Math.round((Math.log(ct.pps / CT_MIN) / Math.log(CT_MAX / CT_MIN)) * 1000);
   updatePlayhead();
@@ -732,11 +732,11 @@ function cutHere() {
   if (!v) return;
   const t = Math.round(snapFrame(player.currentTime) * 1000) / 1000;
   if (t < state.minGap || t > v.duration - state.minGap) {
-    toast("لا يصلح تقطع في أول أو آخر الفيديو بالضبط");
+    toast("لا يمكن القطع في أول الفيديو أو آخره بالضبط");
     return;
   }
   if (v.cuts.some((c) => Math.abs(c - t) < state.minGap)) {
-    toast("فيه نقطة قطع قريبة جدًا من هنا");
+    toast("توجد نقطة قطع قريبة جدًا من هنا");
     return;
   }
   // لو القطعة اللي اتقسمت كانت مستبعدة، الجزئين يفضلوا مستبعدين
@@ -833,7 +833,7 @@ document.addEventListener("keydown", (e) => {
 
 $("deleteVideo").onclick = async () => {
   const v = state.current;
-  if (!(await uiConfirm(`حذف "${v.name}" وكل القطع الذي أُنشئت منه؟`))) return;
+  if (!(await uiConfirm(`هل تحذف "${v.name}" وكل القطع التي أُنشئت منه؟`))) return;
   await api(`/api/videos/${v.id}`, { method: "DELETE" });
   state.current = null;
   player.removeAttribute("src");
@@ -861,7 +861,7 @@ async function splitCurrent(thenSend) {
       openGenerateWith(v.id, v.coach?.id || null);
       return;
     }
-    toast(`✅ أُنشئ ${res.clips_count} قطعة. اضغط «✨ أرسل القطع لـ Seedance» أسفل`);
+    toast(`✅ أُنشئ ${res.clips_count} قطعة. اضغط «✨ أرسل القطع لـ Seedance» في الأسفل`);
     await loadClips();
     $("clipsSection").scrollIntoView({ behavior: "smooth", block: "start" });
     $("toSeedance").classList.add("pulse");

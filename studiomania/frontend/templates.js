@@ -5,9 +5,9 @@ const tplx = { list: [], tvs: [], cur: null, timer: null, stop: null };
 const TV_ST = { filling: "✍️ يملأ الخانات", filled: "📝 الخانات جاهزة", sheeting: "🖼️ يرسم الورقة", cut: "✂️ اللوحات جاهزة",
   sharpening: "✨ يوضّح", working: "🎬 يولّد", done: "✅ الفيديو جاهز", failed: "✕ فشل" };
 const TV_RATIOS = { "9:16": "📱 9:16 طولي (ريلز)", "16:9": "🖥️ 16:9 عرضي", "1:1": "⬛ 1:1 مربع" };
-const SCH_GLOBAL = { style: "🎨 العالم والأسلوب", spine: "🦴 العمود الفقري (ما ممسك العين طول الفيديو)", camera: "🎥 لغة الكاميرا",
+const SCH_GLOBAL = { style: "🎨 العالم والأسلوب", spine: "🦴 العمود الفقري (ما يشد العين طوال الفيديو)", camera: "🎥 لغة الكاميرا",
   text_style: "🔤 شكل النص", palette: "🌈 الألوان", music: "🎵 الموسيقى" };
-const SCH_BEAT = { what: "ما يحدث", layout: "🧩 التكوين والخانات", camera: "🎥 الكاميرا", into_next: "➡️ يدخل في ما بعده كيف", keeps: "📌 يظل ثابت", sfx: "🔊 الصوت" };
+const SCH_BEAT = { what: "ما يحدث", layout: "🧩 التكوين والخانات", camera: "🎥 الكاميرا", into_next: "➡️ كيف يدخل فيما بعده", keeps: "📌 يبقى ثابتًا", sfx: "🔊 الصوت" };
 
 // ---------- في المعمل: 🗺️ المخطط
 function renderLabSchema(d) {
@@ -18,11 +18,11 @@ function renderLabSchema(d) {
   el.innerHTML = `<details class="sch" ${tplx.schOpen === false ? "" : "open"} data-schbox><summary><b>🗺️ مخطط الفيديو</b>
       ${sc.status === "working" ? `<span class="lab-st working"><span class="spin-inline"></span> يشاهد الفيديو كله</span>
         <button type="button" class="btn sm" data-schstop>⏹ أوقف</button>` : ""}
-      ${sc.status !== "working" && (data || sc.error) ? `<button type="button" class="btn sm danger" data-schdel title="يحذف هذا المخطط (التيمبليتس الذي حُفظت منه تظل)">🗑️ احذف المخطط</button>` : ""}
+      ${sc.status !== "working" && (data || sc.error) ? `<button type="button" class="btn sm danger" data-schdel title="يحذف هذا المخطط (تبقى القوالب التي حُفظت منه)">🗑️ احذف المخطط</button>` : ""}
       ${sc.error ? `<small class="err">${le(sc.error)}</small>` : ""}
-      ${data ? `<small class="muted">${data.beats.length} جزء${data.beat_sec ? ` · بيت كل ${data.beat_sec} ث` : ""}</small>` : ""}</summary>
+      ${data ? `<small class="muted">${data.beats.length} جزء${data.beat_sec ? ` · إيقاع كل ${data.beat_sec} ث` : ""}</small>` : ""}</summary>
     ${data ? `<p class="sch-sum" data-no-i18n><b>${le(data.title)}</b> — ${le(data.summary)}</p>
-      <details class="sch-glob"><summary>الثوابت (ما يخلّي الفيديو قطعة واحدة)</summary>
+      <details class="sch-glob"><summary>الثوابت (ما يجعل الفيديو قطعة واحدة)</summary>
         ${Object.entries(SCH_GLOBAL).map(([k, l]) => `<label>${l}<textarea rows="2" data-sg="${k}" ${k === "music" ? "" : 'dir="ltr"'} data-no-i18n>${le(data[k])}</textarea></label>`).join("")}
       </details>
       <div class="sch-beats">${data.beats.map((b, i) => `<article class="sch-beat" data-sb="${i}">
@@ -32,9 +32,9 @@ function renderLabSchema(d) {
             <small class="muted">${(b.t1 - b.t0).toFixed(1)} ث</small></div></div>
         ${Object.entries(SCH_BEAT).map(([k, l]) => `<label>${l}<textarea rows="${k === "what" || k === "sfx" ? 1 : 2}" data-sbf="${k}" ${k === "what" || k === "sfx" ? "" : 'dir="ltr"'} data-no-i18n>${le(b[k])}</textarea></label>`).join("")}
       </article>`).join("")}</div>
-      <div class="row wrap sch-save"><input type="text" data-schname placeholder="اسم التيمبليت" value="${le(data.title)}" data-no-i18n>
-        <button type="button" class="btn primary" data-schtpl>📐 احفظه كتيمبليت</button>
-        <small class="muted">التعديلات تُحفظ تلقائيًا. التيمبليت يُحفظ بصور الأجزاء ونسخة من هذا الفيديو للمقارنة.</small></div>` : ""}
+      <div class="row wrap sch-save"><input type="text" data-schname placeholder="اسم القالب" value="${le(data.title)}" data-no-i18n>
+        <button type="button" class="btn primary" data-schtpl>📐 احفظه قالبًا</button>
+        <small class="muted">التعديلات تُحفظ تلقائيًا. يُحفظ القالب بصور الأجزاء ونسخة من هذا الفيديو للمقارنة.</small></div>` : ""}
   </details>`;
 }
 
@@ -60,8 +60,8 @@ function schPlay(t0, t1) {
 
 $("labSchemaBtn").onclick = async () => {
   const has = labx.cur?.schema?.data;
-  if (!(await uiConfirm(has ? `تُخرج مخطط «${labx.cur.name}» من جديد؟ التعديلات التي عملتها عليه ستُستبدل (التيمبليتس الذي حُفظت لن تتأثر).`
-    : `يُخرج مخطط الفيديو المفتوح الآن: «${labx.cur.name}»؟ (إذا تريد فيديو آخر، اختره من القائمة أولًا)`))) return;
+  if (!(await uiConfirm(has ? `هل تستخرج مخطط «${labx.cur.name}» من جديد؟ ستُستبدل التعديلات التي أجريتها عليه (لن تتأثر القوالب التي حُفظت).`
+    : `هل يستخرج مخطط الفيديو المفتوح الآن: «${labx.cur.name}»؟ (إن أردت فيديو آخر، فاختره من القائمة أولًا)`))) return;
   busyButton($("labSchemaBtn"), "⏳", async () => {
     labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "POST" });
     renderLab(); scheduleLabPoll();
@@ -80,7 +80,7 @@ $("labSchema").addEventListener("click", async (e) => {
   const del = e.target.closest("[data-schdel]");
   if (del) {
     e.preventDefault();
-    if (!(await uiConfirm(`تحذف مخطط «${labx.cur.name}»؟ (التيمبليتس الذي حُفظت منه تظل)`))) return;
+    if (!(await uiConfirm(`هل تحذف مخطط «${labx.cur.name}»؟ (تبقى القوالب التي حُفظت منه)`))) return;
     return busyButton(del, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "DELETE" });
       renderLab(); toast("🗑️ حُذف");
@@ -94,7 +94,7 @@ $("labSchema").addEventListener("click", async (e) => {
     return busyButton(save, "⏳", async () => {
       labx.cur = await api(`/api/lab/${labx.cur.id}/schema`, { method: "PATCH", ...jsonBody({ data: schemaFromDom() }) });
       await api(`/api/lab/${labx.cur.id}/schema/template`, { method: "POST", ...jsonBody({ name }) });
-      toast("📐 حُفظ كتيمبليت. تلاقيه في «📐 فيديو من تيمبليت»");
+      toast("📐 حُفظ قالبًا. تجده في «📐 فيديو من قالب»");
     });
   }
 });
@@ -142,9 +142,9 @@ const tplBack = () => (tplx.host === "studio" ? tsHome() : openTpl());
 
 function tplHome() {
   const L = tplx.list;
-  return `<div class="car-head"><h2>📐 فيديو من تيمبليت</h2></div>
+  return `<div class="car-head"><h2>📐 فيديو من قالب</h2></div>
     <section class="panel lab-sec">
-      <h4>📐 التيمبليتس <small class="muted">(${L.length})</small></h4>
+      <h4>📐 القوالب <small class="muted">(${L.length})</small></h4>
       ${L.length ? `<div class="tp-list">${L.map((t) => `<article class="tp-card">
           <div class="tp-strip">${t.schema.beats.slice(0, 6).map((b) => (b.thumb_url ? `<img src="${b.thumb_url}" alt="">` : "")).join("")}</div>
           <input class="tp-name" data-tpname="${t.id}" value="${le(t.name)}" data-no-i18n>
@@ -153,18 +153,18 @@ function tplHome() {
           <div class="row wrap">${t.source_url ? `<a class="btn sm" href="${t.source_url}" target="_blank" rel="noopener">▶️ الأصلي</a>` : ""}
             <button type="button" class="btn sm danger" data-tpdel="${t.id}">🗑️</button></div>
         </article>`).join("")}</div>`
-        : `<p class="muted">لا يوجد بعد تيمبليتس. افتح فيديو احترافي في المعمل، واضغط «🗺️ المخطط»، ثم «📐 احفظه كتيمبليت».</p>`}
+        : `<p class="muted">لا توجد قوالب بعد. افتح فيديو احترافيًا في المعمل، واضغط «🗺️ المخطط»، ثم «📐 احفظه قالبًا».</p>`}
     </section>
-    ${L.length ? `<section class="panel lab-sec tp-new"><h4>➕ فيديو جديد من تيمبليت</h4>
-      <label>التيمبليت <select data-tvf="template">${L.map((t) => `<option value="${t.id}" data-no-i18n>${le(t.name)} (${t.schema.beats.length} جزء)</option>`).join("")}</select></label>
-      <label>الفيديو عن ماذا؟ <textarea rows="2" data-tvf="brief" placeholder="مثلًا: أهم ٣ مميزات في التطبيق، والختام: حمّل التطبيق"></textarea></label>
+    ${L.length ? `<section class="panel lab-sec tp-new"><h4>➕ فيديو جديد من قالب</h4>
+      <label>القالب <select data-tvf="template">${L.map((t) => `<option value="${t.id}" data-no-i18n>${le(t.name)} (${t.schema.beats.length} جزء)</option>`).join("")}</select></label>
+      <label>عمّ الفيديو؟ <textarea rows="2" data-tvf="brief" placeholder="مثلًا: أهم ٣ مميزات في التطبيق، والختام: حمّل التطبيق"></textarea></label>
       <div class="row wrap">
         <label>المقاس <select data-tvf="ratio">${Object.entries(TV_RATIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
         <label>نموذج الصور <select data-tvf="image_model"><option value="nano2">Nano Banana 2 (يلتزم بالمقاس، رخيص)</option><option value="nanopro">Nano Banana Pro (أجود)</option><option value="sunburst">GPT Image 2.5 (مثل ChatGPT)</option></select></label>
         <label>النص على الشاشة <select data-tvf="text_mode"><option value="blank">مساحات فارغة (العربية في المونتاج)</option><option value="en">إنجليزي داخل الصور</option></select></label>
         <label>نموذج الحركة <select data-tvf="model">${vmOptions(VMODELS, VMODELS[0]?.key, 10)}</select></label>
         <label>الجودة <select data-tvf="resolution"><option value="480p">480p</option><option value="720p">720p (الضعف)</option></select></label>
-        <button type="button" class="btn primary" data-tvnew>✍️ املا التيمبليت</button></div>
+        <button type="button" class="btn primary" data-tvnew>✍️ املأ القالب</button></div>
     </section>` : ""}
     ${tplx.tvs.length ? `<h4>🎞️ الفيديوهات</h4><div class="fm-list">${tplx.tvs.map((v) => `<article class="fm-card" data-tvopen="${v.id}">
       ${v.thumb ? `<img src="${v.thumb}" alt="">` : `<span class="ph">📐</span>`}
@@ -179,17 +179,17 @@ function tvPanelImg(v, j) {
 // صورة الشيت ومربعات القص (وفي وضع التعديل: المربعات بتتسحب وبتتكبّر بإيدك)
 function tvSheetView(sh, busy) {
   const ed = tplx.edit?.[sh.k], boxes = ed || sh.boxes || [];
-  const msg = { found: ["muted", "✂️ لقيت اللوحات في الصورة وقطعتها كما رُسمت، وكل لوحة اكتملت لـ 9:16 بدون ما يُقص منها شيء (الأطراف المغبّشة «وضّح» يكمّلها)"],
-    manual: ["muted", "✏️ قُطعت بالمربعات التي أنت ظبطتها"], grid: ["muted", "✂️ قطعتها على الشبكة التي طلبناها"],
-    equal: ["err", "⚠️ لم أجد فواصل واضحة بين اللوحات، فقطعتها خانات متساوية. انظر على المربعات، وإذا غير مظبوطة: «✏️ اضبط القص بنفسك»"] }[sh.how];
+  const msg = { found: ["muted", "✂️ وجدت اللوحات في الصورة وقطعتها كما رُسمت، وكل لوحة اكتملت إلى 9:16 دون أن يُقص منها شيء (الأطراف المغبّشة يكملها «وضّح»)"],
+    manual: ["muted", "✏️ قُطعت بالمربعات التي ضبطتها"], grid: ["muted", "✂️ قطعتها على الشبكة التي طلبناها"],
+    equal: ["err", "⚠️ لم أجد فواصل واضحة بين اللوحات، فقطعتها خانات متساوية. انظر إلى المربعات، وإن لم تكن صحيحة: «✏️ اضبط القص بنفسك»"] }[sh.how];
   return `<div class="tv-sheetwrap ${ed ? "editing" : ""}" data-sheetwrap="${sh.k}"><img src="${sh.url}" alt="" class="tv-sheetimg" draggable="false">
       ${boxes.map((b, i) => `<span class="tv-box" data-bi="${i}" style="left:${b[0] * 100}%;width:${(b[1] - b[0]) * 100}%;top:${b[2] * 100}%;height:${(b[3] - b[2]) * 100}%">${sh.cells[i] + 1}${ed ? `<i class="tv-handle" data-handle></i>` : ""}</span>`).join("")}</div>
     ${msg && !ed ? `<small class="${msg[0]}">${msg[1]}</small>` : ""}
-    ${ed ? `<small class="muted">اسحب أي مربع لكي تحرّكه، واسحب الركن لكي تكبّره أو تصغّره. كل مربع يجب يغطي اللوحة الخاصة به بالضبط (الرقم = رقم اللوحة).</small>
-      <div class="row wrap"><button type="button" class="btn sm primary" data-tvcut="${sh.k}">💾 قطّع هذه بالمربعات</button>
+    ${ed ? `<small class="muted">اسحب أي مربع لتحريكه، واسحب الركن لتكبيره أو تصغيره. يجب أن يغطي كل مربع لوحته بالضبط (الرقم = رقم اللوحة).</small>
+      <div class="row wrap"><button type="button" class="btn sm primary" data-tvcut="${sh.k}">💾 قطّع بهذه المربعات</button>
         <button type="button" class="btn sm" data-tvcutcancel="${sh.k}">إلغاء</button></div>`
       : `<div class="row wrap"><button type="button" class="btn sm" data-tvedit="${sh.k}" ${busy ? "disabled" : ""}>✏️ اضبط القص بنفسك</button>
-        <button type="button" class="btn sm" data-tvreslice="${sh.k}" ${busy ? "disabled" : ""} title="يبحث عن اللوحات في الصورة من جديد ويقطّعها (مجانًا)">✂️ ابحث وقطّع آخر</button></div>`}`;
+        <button type="button" class="btn sm" data-tvreslice="${sh.k}" ${busy ? "disabled" : ""} title="يبحث عن اللوحات في الصورة من جديد ويقطّعها (مجانًا)">✂️ ابحث وقطّع مرة أخرى</button></div>`}`;
 }
 
 // سحب المربعات (تحريك أو تكبير من الركن)
@@ -225,7 +225,7 @@ function tvDetail(v) {
   const sheetsAll = v.sheets.length && v.sheets.every((sh) => sh.url);
   return `<div class="car-head"><button type="button" class="btn sm" data-tvback>→ كل الفيديوهات</button>
       <input class="ad-title" data-tvname value="${le(v.name)}" data-no-i18n>
-      <div class="row wrap">${v.seg_files.some(Boolean) || v.final_url ? `<button type="button" class="btn sm primary" data-tveditor ${busy ? "disabled" : ""}>🎞️ انقل للمونتاج</button>` : ""}
+      <div class="row wrap">${v.seg_files.some(Boolean) || v.final_url ? `<button type="button" class="btn sm primary" data-tveditor ${busy ? "disabled" : ""}>🎞️ انقل إلى المونتاج</button>` : ""}
         ${v.final_url ? `<a class="btn sm" href="${v.final_url}" download="${le(v.name)}.mp4">⬇️ نزّل</a>` : ""}
         <button type="button" class="btn sm danger" data-tvdel ${busy ? "disabled" : ""}>🗑️</button></div></div>
     <div class="fm-status"><span class="lab-st ${busy ? "working" : v.status}">${busy ? `<span class="spin-inline"></span>` : ""} ${TV_ST[v.status] || ""}</span>
@@ -238,7 +238,7 @@ function tvDetail(v) {
       <label>النص على الشاشة <select data-tvopt="text_mode">${Object.entries(v.text_modes).map(([k, l]) => `<option value="${k}" ${k === v.text_mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label>نموذج الحركة <select data-tvopt="model">${vmOptions(v.models, v.model, beats.at(-1).t1 - beats[0].t0, v.resolution, "للفيديو كله")}</select></label>
       <label>الجودة <select data-tvopt="resolution"><option value="480p" ${v.resolution === "480p" ? "selected" : ""}>480p</option><option value="720p" ${v.resolution === "720p" ? "selected" : ""}>720p</option></select></label>
-      <button type="button" class="btn sm" data-tvrefill ${busy ? "disabled" : ""}>✍️ املاه من جديد</button>
+      <button type="button" class="btn sm" data-tvrefill ${busy ? "disabled" : ""}>✍️ املأه من جديد</button>
     </div>
     ${v.section === "templates" ? tvVoiceBlock(v) : ""}
     ${v.mode === "scenes" ? tvScenesBlock(v) : ""}
@@ -252,14 +252,14 @@ function tvDetail(v) {
         <div class="tv-brow"><figure class="fm-frame">${tvPanelImg(v, i)}<figcaption>لوحة ${i + 1}</figcaption></figure>
           <div class="tv-bf"><label>🖼️ اللوحة ${i + 1} <textarea rows="2" dir="ltr" data-pd="${i}" data-no-i18n>${le(fill.panels[i].desc)}</textarea></label>
             <label>🔤 النص <input data-tf="text" value="${le(fill.beats[i].text)}" data-no-i18n></label>
-            <label>🎙️ الفويس <input data-tf="voice" value="${le(fill.beats[i].voice)}" data-no-i18n></label>
+            <label>🎙️ التعليق الصوتي <input data-tf="voice" value="${le(fill.beats[i].voice)}" data-no-i18n></label>
             <label>🎬 الحركة للوحة ${i + 2} <textarea rows="2" dir="ltr" data-tf="motion" data-no-i18n>${le(fill.beats[i].motion)}</textarea></label></div></div>
       </article>`).join("")}
       <article class="tv-beat"><header><b>🏁</b> آخر الفيديو</header>
         <div class="tv-brow"><figure class="fm-frame">${tvPanelImg(v, beats.length)}<figcaption>لوحة ${beats.length + 1}</figcaption></figure>
           <div class="tv-bf"><label>🖼️ اللوحة ${beats.length + 1} <textarea rows="2" dir="ltr" data-pd="${beats.length}" data-no-i18n>${le(fill.panels[beats.length].desc)}</textarea></label></div></div></article>
     </details>
-    <details class="panel tv-step" data-dk="s2" ${open("s2", !cutAll)}><summary>٢. 🎞️ الستوري بورد في صورة واحدة <small class="muted">(كل اللوحات مع بعض لكي تظهر متسقة)</small></summary>
+    <details class="panel tv-step" data-dk="s2" ${open("s2", !cutAll)}><summary>٢. 🎞️ الستوري بورد في صورة واحدة <small class="muted">(كل اللوحات معًا لتظهر متسقة)</small></summary>
       ${v.sheets.map((sh) => `<div class="tv-sheet" data-sheet="${sh.k}">
         <b>${v.sheets.length > 1 ? `الورقة ${sh.k + 1}: ` : ""}لوحات ${sh.cells[0] + 1}–${sh.cells.at(-1) + 1} (${sh.rows}×${sh.cols})</b>
         <textarea rows="4" dir="ltr" readonly data-no-i18n>${le(sh.prompt)}</textarea>
@@ -267,27 +267,27 @@ function tvDetail(v) {
           <button type="button" class="btn sm primary" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}>${sh.url ? "↻ ارسم الورقة مرة أخرى" : "🖼️ ارسمه هنا"} (~${c.sheets && (c.sheets / v.sheets.length).toFixed(2)}$)</button>
           <button type="button" class="btn sm" data-tvup="${sh.k}" ${busy ? "disabled" : ""}>⬆ ارفع الورقة من ChatGPT</button></div>
         ${sh.url ? tvSheetView(sh, busy) : ""}
-        <small class="muted">إذا تستخدم ChatGPT: الصق الوصف، وارفع معه صور الشعار والشاشات التي في الوصف، ثم ارفع الصورة التي يطلّعها هنا. البرنامج يقطّعها تلقائيًا.</small>
+        <small class="muted">إن كنت تستخدم ChatGPT: الصق الوصف، وارفع معه صور الشعار والشاشات التي في الوصف، ثم ارفع الصورة التي يُخرجها هنا. يقطّعها البرنامج تلقائيًا.</small>
       </div>`).join("")}
     </details>
     <section class="panel tv-once"><b>🎬 الفيديو كله مرة واحدة (لقطة متصلة)</b>
-      <p class="hint">الورقة كله يُرسل للنموذج مرة واحدة، فيُخرج فيديو واحد حسنًا على اللوحات بالترتيب بدون ما يتقطع. يحتاج الورقة فقط، بدون تقطيع ولا توضيح.</p>
+      <p class="hint">تُرسل الورقة كلها إلى النموذج مرة واحدة، فيُخرج فيديو واحدًا يسير على اللوحات بالترتيب دون أن يتقطع. يحتاج إلى الورقة فقط، دون تقطيع ولا توضيح.</p>
       <button type="button" class="btn primary" data-tvonce ${busy || !sheetsAll ? "disabled" : ""}>${v.final_kind === "once" ? "↻ ولّده مرة أخرى" : "🎬 ولّد الفيديو كله مرة واحدة"} (~${c.once}$)</button>
-      ${!sheetsAll ? `<small class="muted">ارسم الورقة أو ارفعه أولًا (خطوة ٢)</small>` : ""}
-      ${c.once_parts > 1 ? `<small class="muted">الفيديو أطول من ${c.once_max} ثانية، فسيُولّد على ${c.once_parts} حتت. كل جزء تُكمل على ما قبلها من آخر فريم فيها، فيظل لقطة واحدة. (Seedance 2.5 يعمل حتى 30 ثانية في توليدة واحدة)</small>` : ""}
+      ${!sheetsAll ? `<small class="muted">ارسم الورقة أو ارفعها أولًا (خطوة ٢)</small>` : ""}
+      ${c.once_parts > 1 ? `<small class="muted">الفيديو أطول من ${c.once_max} ثانية، فسيُولَّد على ${c.once_parts} أجزاء. كل جزء يُكمل ما قبله من آخر إطار فيه، فيبقى لقطة واحدة. (Seedance 2.5 يعمل حتى 30 ثانية في توليدة واحدة)</small>` : ""}
     </section>
     <details class="panel tv-step" data-dk="s3" ${open("s3", false)}><summary>٣. ✨ اللوحات <small class="muted">${v.panel_files.filter((p) => p.full).length}/${v.panel_files.length} واضحة</small></summary>
       ${v.sheets.some((sh) => sh.url) ? `<div class="row wrap">${v.sheets.map((sh) => `<button type="button" class="btn sm" data-tvdraw="${sh.k}" ${busy ? "disabled" : ""}
-        title="يرسم الورقة كله من جديد ويقطّعه (اللوحات التي منه تُستبدل)">↻ ارسم ${v.sheets.length > 1 ? `الورقة ${sh.k + 1}` : "الورقة"} مرة أخرى</button>`).join("")}</div>` : ""}
-      <p class="hint">اللوحات المقطوعة من الورقة صغيرة. «وضّح» يرسم كل لوحة بجودة كاملة بنفس شكلها بالضبط. يمكن تولّد بدون توضيح فقط الجودة ستصبح أقل.</p>
+        title="يرسم الورقة كلها من جديد ويقطّعها (تُستبدل اللوحات المأخوذة منها)">↻ ارسم ${v.sheets.length > 1 ? `الورقة ${sh.k + 1}` : "الورقة"} مرة أخرى</button>`).join("")}</div>` : ""}
+      <p class="hint">اللوحات المقطوعة من الورقة صغيرة. «وضّح» يرسم كل لوحة بجودة كاملة بشكلها نفسه بالضبط. يمكنك التوليد دون توضيح، لكن الجودة ستكون أقل.</p>
       ${c.sharpen ? `<button type="button" class="btn primary" data-tvsharp ${busy || !cutAll ? "disabled" : ""}>✨ وضّح كل اللوحات (~${c.sharpen}$)</button>` : ""}
       <div class="tv-panels">${v.panel_files.map((p, j) => `<div class="tv-panel" data-tp="${j}">${tvPanelImg(v, j)}
         <small>لوحة ${j + 1} ${p.full ? "✅" : p.cell ? "✂️" : ""}</small>
-        ${p.cell && !busy ? `<input type="text" data-tpnote placeholder="ملاحظة (اختياري)" data-no-i18n><button type="button" class="btn sm" data-tvsharp1="${j}" title="يرسمها بجودة كاملة بنفس شكلها التي في الورقة">${p.full ? "✨ وضّحها مرة أخرى" : "✨ وضّحها"}</button>
-          <button type="button" class="btn sm" data-tvredraw="${j}" title="إذا اللوحة التي في الورقة باظت: ترسم من وصفها من أولًا، بعالم اللوحات التي جنبها">🎨 ارسمها من جديد</button>` : ""}</div>`).join("")}</div>
+        ${p.cell && !busy ? `<input type="text" data-tpnote placeholder="ملاحظة (اختياري)" data-no-i18n><button type="button" class="btn sm" data-tvsharp1="${j}" title="يرسمها بجودة كاملة بالشكل نفسه الذي في الورقة">${p.full ? "✨ وضّحها مرة أخرى" : "✨ وضّحها"}</button>
+          <button type="button" class="btn sm" data-tvredraw="${j}" title="إن تلفت اللوحة التي في الورقة: تُرسم من وصفها من البداية، بعالم اللوحات المجاورة">🎨 ارسمها من جديد</button>` : ""}</div>`).join("")}</div>
     </details>
-    <details class="panel tv-step" data-dk="s4" ${open("s4", false)}><summary>٤. 🧩 أو جزء جزء <small class="muted">(كل لوحتين = جزء، ويتلزقون) ${v.seg_files.filter(Boolean).length}/${beats.length} جزء وُلّد</small></summary>
-      ${missSegs ? `<button type="button" class="btn primary" data-tvrun ${busy || !cutAll ? "disabled" : ""}>🎬 ولّد ما ما زال لم يُولّد فقط (${missSegs} جزء) ~${c.video}$</button>`
+    <details class="panel tv-step" data-dk="s4" ${open("s4", false)}><summary>٤. 🧩 أو جزء جزء <small class="muted">(كل لوحتين = جزء، وتُلصقان معًا) ${v.seg_files.filter(Boolean).length}/${beats.length} جزء وُلّد</small></summary>
+      ${missSegs ? `<button type="button" class="btn primary" data-tvrun ${busy || !cutAll ? "disabled" : ""}>🎬 ولّد ما لم يُولَّد بعد فقط (${missSegs} جزء) ~${c.video}$</button>`
         : `<button type="button" class="btn" data-tvrun ${busy ? "disabled" : ""}>🎞️ جمّع الفيديو مرة أخرى (مجانًا)</button>`}
       <div class="tv-segs">${beats.map((b, i) => `<div class="tv-seg">
         <div class="tv-segimgs">${tvPanelImg(v, i)}<span>←</span>${tvPanelImg(v, i + 1)}</div>
@@ -319,7 +319,7 @@ function tvSheetInput() {
     inp.value = "";
     if (!file || !vid) return;
     const fd = new FormData(); fd.append("file", file);
-    toast("⬆ يرفع الورقة ويقطّعه...");
+    toast("⬆ يرفع الورقة ويقطّعها...");
     try { tplx.cur = await api(`/api/tvideos/${vid}/sheets/${k}/upload`, { method: "POST", body: fd }); renderTpl(); toast("✂️ قُطّع لوحات"); }
     catch (err) { toast(err.message, true); }
   });
@@ -338,7 +338,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (t.closest("[data-tvback]")) { tplx.cur = null; return tplBack(); }
   const del = t.closest("[data-tpdel]");
   if (del) {
-    if (!(await uiConfirm("تحذف هذا التيمبليت؟ (الفيديوهات التي أُنشئت منه تظل)"))) return;
+    if (!(await uiConfirm("هل تحذف هذا القالب؟ (تبقى الفيديوهات التي أُنشئت منه)"))) return;
     await api(`/api/templates/${del.dataset.tpdel}`, { method: "DELETE" });
     return openTpl();
   }
@@ -355,12 +355,12 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   if (!tplx.cur) return;
   if (t.closest("[data-tvdel]")) {
-    if (!(await uiConfirm("تحذف هذا الفيديو بكل لوحاته؟"))) return;
+    if (!(await uiConfirm("هل تحذف هذا الفيديو بكل لوحاته؟"))) return;
     await V("", { method: "DELETE" }); tplx.cur = null; return tplBack();
   }
   const rf = t.closest("[data-tvrefill]");
   if (rf) {
-    if (!(await uiConfirm("تملأ الخانات من جديد؟ الشيتات واللوحات والفيديوهات التي أُنشئت ستُحذف."))) return;
+    if (!(await uiConfirm("هل تملأ الخانات من جديد؟ ستُحذف الأوراق واللوحات والفيديوهات التي أُنشئت."))) return;
     return go(rf, () => V("/refill", { method: "POST" }));
   }
   const cp = t.closest("[data-tvcopy]");
@@ -378,7 +378,7 @@ $("labTpl").addEventListener("click", async (e) => {
   const dr = t.closest("[data-tvdraw]");
   if (dr) {
     const sh = tplx.cur.sheets[Number(dr.dataset.tvdraw)];
-    if (sh.url && !(await uiConfirm("هذا الورقة مرسوم. ترسمه مرة أخرى؟ اللوحات المقطوعة منه ستُستبدل."))) return;
+    if (sh.url && !(await uiConfirm("هذه الورقة مرسومة. هل ترسمها مرة أخرى؟ ستُستبدل اللوحات المقطوعة منها."))) return;
     try { tplx.cur = await V("", { method: "PATCH", ...jsonBody({ fill: tvFillFromDom() }) }); } catch (err) { return toast(err.message, true); }
     return go(dr, () => V(`/sheets/${dr.dataset.tvdraw}/draw`, { method: "POST" }));
   }
@@ -386,7 +386,7 @@ $("labTpl").addEventListener("click", async (e) => {
   if (up) { const inp = tvSheetInput(); inp.dataset.k = up.dataset.tvup; return inp.click(); }
   const sh = t.closest("[data-tvsharp]");
   if (sh) {
-    if (!(await uiConfirm(`يوضّح كل اللوحات التي لم تتضح بعد؟ نحو ${tplx.cur.costs.sharpen}$`))) return;
+    if (!(await uiConfirm(`هل يوضّح كل اللوحات التي لم تتضح بعد؟ نحو ${tplx.cur.costs.sharpen}$`))) return;
     return go(sh, () => V("/sharpen", { method: "POST", ...jsonBody({}) }));
   }
   const edb = t.closest("[data-tvedit]");
@@ -411,7 +411,7 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   const rs = t.closest("[data-tvreslice]");
   if (rs) {
-    if (!(await uiConfirm("يبحث عن اللوحات في الصورة من جديد ويقطّعها؟ اللوحات الحالية (والموضّحة منها) ستُستبدل."))) return;
+    if (!(await uiConfirm("هل يبحث عن اللوحات في الصورة من جديد ويقطّعها؟ ستُستبدل اللوحات الحالية (والموضّحة منها)."))) return;
     return busyButton(rs, "⏳", async () => {
       tplx.cur = await V(`/sheets/${rs.dataset.tvreslice}/slice`, { method: "POST", ...jsonBody({}) });
       renderTpl(); toast("✂️ قُطّع مرة أخرى");
@@ -420,7 +420,7 @@ $("labTpl").addEventListener("click", async (e) => {
   const rd = t.closest("[data-tvredraw]");
   if (rd) {
     const j = Number(rd.dataset.tvredraw), note = rd.closest("[data-tp]").querySelector("[data-tpnote]").value.trim();
-    if (!(await uiConfirm(`يرسم اللوحة ${j + 1} من أولًا من وصفها (نحو ${tplx.cur.costs.panel}$)؟ ما في الورقة تُستبدل.`))) return;
+    if (!(await uiConfirm(`هل يرسم اللوحة ${j + 1} من البداية من وصفها (نحو ${tplx.cur.costs.panel}$)؟ سيُستبدل ما في الورقة.`))) return;
     return go(rd, () => V(`/panels/${j}/redraw`, { method: "POST", ...jsonBody({ note }) }));
   }
   const sh1 = t.closest("[data-tvsharp1]");
@@ -430,14 +430,14 @@ $("labTpl").addEventListener("click", async (e) => {
   }
   const once = t.closest("[data-tvonce]");
   if (once) {
-    if (!(await uiConfirm(`يولّد الفيديو كله في توليدة واحدة من الورقة؟ نحو ${tplx.cur.costs.once}$`))) return;
+    if (!(await uiConfirm(`هل يولّد الفيديو كله في توليدة واحدة من الورقة؟ نحو ${tplx.cur.costs.once}$`))) return;
     return go(once, () => V("/run", { method: "POST", ...jsonBody({ once: true }) }));
   }
   const run = t.closest("[data-tvrun]"), run1 = t.closest("[data-tvrun1]");
   if (run || run1) {
     const c = tplx.cur.costs;
-    const msg = run1 ? `يولّد الجزء ${Number(run1.dataset.tvrun1) + 1} فقط؟ نحو ${c.seg[Number(run1.dataset.tvrun1)]}$`
-      : c.video ? `يولّد الأجزاء الذي ما زال لم تُولّد فقط؟ نحو ${c.video}$، واللي وُلّد لن يُلمس.` : "";
+    const msg = run1 ? `هل يولّد الجزء ${Number(run1.dataset.tvrun1) + 1} فقط؟ نحو ${c.seg[Number(run1.dataset.tvrun1)]}$`
+      : c.video ? `هل يولّد الأجزاء التي لم تُولَّد بعد فقط؟ نحو ${c.video}$، ولن يُلمس ما وُلّد.` : "";
     if (msg && !(await uiConfirm(msg))) return;
     return go(run || run1, () => V("/run", { method: "POST", ...jsonBody(run1 ? { i: Number(run1.dataset.tvrun1) } : {}) }));
   }
@@ -447,7 +447,7 @@ $("labTpl").addEventListener("click", async (e) => {
       const r = await V("/to-editor", { method: "POST" });
       storageSet("studiomania.projectId.ads", r.project_id);
       if (typeof mt !== "undefined") mt.project = null;
-      toast("🎞️ فُتح في مونتاج الإعلانات. النص العربية: «📋 انسخ النص بتوقيته» وأضفه هناك");
+      toast("🎞️ فُتح في مونتاج الإعلانات. النص العربي: «📋 انسخ النص بتوقيته» وأضفه هناك");
       showStep("6a");
     });
   }
@@ -475,18 +475,18 @@ $("labTpl").addEventListener("change", async (e) => {
     if (t.matches("[data-tpratio]")) {
       await api(`/api/templates/${t.dataset.tpratio}`, { method: "PATCH", ...jsonBody({ ratio: t.value }) });
       tplx.list = await api("/api/templates");
-      return toast("✅ حُفظ. الفيديوهات الجديدة من هذا التيمبليت ستصبح هذا بالمقاس");
+      return toast("✅ حُفظ. ستكون الفيديوهات الجديدة من هذا القالب بهذا المقاس");
     }
     if (t.matches('[data-tvopt="ratio"]')) {
-      if ((tplx.cur.sheets || []).some((x) => x.url) && !(await uiConfirm("تغيّر المقاس؟ الشيتات واللوحات والفيديوهات التي أُنشئت بالمقاس القديم ستُحذف، ويجب ترسم الورقة مرة أخرى."))) {
+      if ((tplx.cur.sheets || []).some((x) => x.url) && !(await uiConfirm("هل تغيّر المقاس؟ ستُحذف الأوراق واللوحات والفيديوهات التي أُنشئت بالمقاس القديم، ويجب أن ترسم الورقة مرة أخرى."))) {
         t.value = tplx.cur.ratio; return;
       }
     }
     if (t.matches("[data-tvopt]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ [t.dataset.tvopt]: t.value }) });
       renderTpl();
-      return toast(t.dataset.tvopt === "text_mode" ? "✅ تغيّر. الأوصاف حُدّثت؛ ارسم الورقة مرة أخرى لكي يأخذ به"
-        : t.dataset.tvopt === "image_model" ? "✅ تغيّر. اضغط «↻ ارسم الورقة مرة أخرى» لكي يُرسم بالنموذج الجديد" : "✅ حُفظ");
+      return toast(t.dataset.tvopt === "text_mode" ? "✅ تغيّر. حُدّثت الأوصاف؛ ارسم الورقة مرة أخرى ليُؤخذ به"
+        : t.dataset.tvopt === "image_model" ? "✅ تغيّر. اضغط «↻ ارسم الورقة مرة أخرى» ليُرسم بالنموذج الجديد" : "✅ حُفظ");
     }
     if (t.matches("[data-pd], [data-tf]")) {
       tplx.cur = await api(`/api/tvideos/${tplx.cur.id}`, { method: "PATCH", ...jsonBody({ fill: tvFillFromDom() }) });

@@ -28,7 +28,7 @@ async function loadCarList() {
     .map((c) => `<li data-id="${c.id}" class="${car.cur?.id === c.id ? "active" : ""}">
       ${c.cover ? `<img src="${c.cover}" alt="">` : `<span class="ph"></span>`}
       <div><div class="name" data-no-i18n>${escapeHtml(c.name)}</div>
-      <div class="muted">${c.slides ? `${c.done} / ${c.slides} سلايد` : "ما زال في الفكرة"}${c.busy ? " · 🎨" : ""}</div></div>
+      <div class="muted">${c.slides ? `${c.done} / ${c.slides} سلايد` : "ما زال في مرحلة الفكرة"}${c.busy ? " · 🎨" : ""}</div></div>
     </li>`)
     .join("");
 }
@@ -119,7 +119,7 @@ function renderChat() {
   const c = car.cur;
   const msgs = c.chat.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.content)}</div>`);
   if (car.sending) msgs.push(`<div class="msg assistant typing"><span></span><span></span><span></span></div>`);
-  $("carChat").innerHTML = msgs.join("") || `<p class="empty">ابدأ بالموضوع، والنموذج سيقترح أفكار. ناقش معه حتى ما توصلون لفكرة، ثم اضغط «اكتب الكاروسيل».</p>`;
+  $("carChat").innerHTML = msgs.join("") || `<p class="empty">ابدأ بالموضوع، وسيقترح النموذج أفكارًا. ناقشه حتى تصلا إلى فكرة، ثم اضغط «اكتب الكاروسيل».</p>`;
   $("carChat").scrollTop = $("carChat").scrollHeight;
   $("carSend").disabled = car.sending;
   $("carPlanBtn").disabled = car.sending || !c.chat.length;
@@ -179,14 +179,14 @@ function coachThumb(c, selected) {
 function renderSetup() {
   const st = car.cur.settings;
   const picked = new Set(st.character_ids || []);
-  const empty = (what) => `<span class="muted">لا يوجد ${what} ما زال. أضف من 📚 المكتبة.</span>`;
-  $("carTemplates").innerHTML = car.lib.filter((a) => a.kind === "template").map((a) => assetThumb(a, a.id === st.template_id)).join("") || empty("تيمبليتس");
+  const empty = (what) => `<span class="muted">لا يوجد ${what} بعد. أضف من 📚 المكتبة.</span>`;
+  $("carTemplates").innerHTML = car.lib.filter((a) => a.kind === "template").map((a) => assetThumb(a, a.id === st.template_id)).join("") || empty("قوالب");
   $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("") || empty("أساليب");
   $("carChars").innerHTML = car.lib.filter((a) => a.kind === "character").map((a) => assetThumb(a, picked.has(a.id))).join("") || empty("شخصيات");
   $("carCoaches").innerHTML = car.coaches.map((c) => coachThumb(c, c.id === st.coach_id)).join("")
-    || `<span class="muted">لا يوجد شخصيات ما زال. أضفها من صفحة الشخصيات.</span>`;
+    || `<span class="muted">لا توجد شخصيات بعد. أضفها من صفحة الشخصيات.</span>`;
   const coach = currentCoach();
-  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} سيُكتب بجانب صورته ويُنشأ له تاج في النشر` : "⚠️ هذه الشخصية ليس لها حساب إنستجرام مسجل (أضفه من صفحة الشخصيات)") : "";
+  $("carCoachNote").textContent = coach ? (coach.handle ? `@${coach.handle} سيُكتب بجانب صورته ويُضاف له وسم في النشر` : "⚠️ هذه الشخصية ليس لها حساب إنستجرام مسجل (أضفه من صفحة الشخصيات)") : "";
   // الـ CTA
   const cta = st.cta || { type: "auto" };
   $("carCta").innerHTML = `<option value="auto">🤖 اجعله يختار الأنسب</option>` +
@@ -217,7 +217,7 @@ function currentCoach() {
 
 function ctaPreview() {
   const type = $("carCta").value;
-  if (type === "auto") return "النموذج سيختار الدعوة الأنسب للمحتوى.";
+  if (type === "auto") return "سيختار النموذج الدعوة الأنسب للمحتوى.";
   if (type === "custom") return $("carCtaText").value ? `آخر سلايد: ${$("carCtaText").value}` : "";
   const tpl = car.cfg.ctas.find((c) => c.id === type);
   if (!tpl) return "";
@@ -249,7 +249,7 @@ $("carChars").addEventListener("click", (e) => {
   if (!b) return;
   const ids = new Set(car.cur.settings.character_ids || []);
   if (ids.has(b.dataset.id)) ids.delete(b.dataset.id);
-  else if (ids.size >= 4) return toast("4 شخصيات بالكتير", true);
+  else if (ids.size >= 4) return toast("4 شخصيات على الأكثر", true);
   else ids.add(b.dataset.id);
   saveSetup({ character_ids: [...ids] });
 });
@@ -283,14 +283,14 @@ async function busyButton(btn, label, fn) {
 
 $("carPlanBtn").onclick = async () => {
   const c = car.cur;
-  if (c.plan && !(await uiConfirm("فيه نص مكتوب من قبل. تكتبه من أولًا من النقاش؟"))) return;
+  if (c.plan && !(await uiConfirm("يوجد نص مكتوب من قبل. هل تكتبه من البداية من النقاش؟"))) return;
   busyButton($("carPlanBtn"), "⏳ جارٍ الكتابة...", async () => {
     await patchCarousel({ settings: { slides: $("carCount").value, ratio: $("carRatio").value, cta: ctaFromForm() } });
     car.cur = await api(`/api/carousels/${c.id}/plan`, { method: "POST" });
     car.sec = "plan";
     await loadCarList();
     renderCarousel();
-    toast("✅ الكاروسيل كُتب. راجع النص");
+    toast("✅ كُتب الكاروسيل. راجع النص");
   });
 };
 
@@ -305,7 +305,7 @@ function renderPlan() {
       <div class="num">${i + 1}</div>
       <div class="fields">
         <input type="text" data-k="headline" value="${escapeHtml(s.headline)}" placeholder="العنوان">
-        <textarea data-k="body" rows="2" placeholder="النص (يمكن يصبح فارغ)">${escapeHtml(s.body)}</textarea>
+        <textarea data-k="body" rows="2" placeholder="النص (يمكن أن يكون فارغًا)">${escapeHtml(s.body)}</textarea>
         <details><summary>وصف الرسمة</summary><textarea data-k="visual" rows="2" dir="ltr">${escapeHtml(s.visual)}</textarea></details>
       </div>
       <div class="acts">
@@ -328,7 +328,7 @@ function planFromForm() {
   return { ...car.cur.plan, slides, caption: $("carCaption").value.trim(), hashtags: $("carTags").value.split(/\s+/).filter(Boolean) };
 }
 function savePlanSoon() {
-  $("carPlanState").textContent = "● متعدّل";
+  $("carPlanState").textContent = "● معدَّل";
   clearTimeout(car.saveTimer);
   car.saveTimer = setTimeout(savePlan, 700);
 }
@@ -356,7 +356,7 @@ $("carPlan").addEventListener("click", async (e) => {
   const i = Number(b.closest(".car-slide-edit").dataset.i);
   const plan = planFromForm();
   if (b.dataset.act === "del") {
-    if (plan.slides.length <= 2) return toast("يجب سلايدين على الأقل", true);
+    if (plan.slides.length <= 2) return toast("يجب سلايدان على الأقل", true);
     plan.slides.splice(i, 1);
   }
   if (b.dataset.act === "up") [plan.slides[i - 1], plan.slides[i]] = [plan.slides[i], plan.slides[i - 1]];
@@ -375,7 +375,7 @@ $("carPolish").onclick = () => busyButton($("carPolish"), "⏳ ينقّح...", a
 $("carToOverview").onclick = () => busyButton($("carToOverview"), "⏳", async () => {
   await savePlan();
   const ov = car.cur.overview;
-  if (ov.status === "done" && !(await uiConfirm("فيه شكل عام مرسوم. ترسمه مرة أخرى بالنص الجديد؟"))) {
+  if (ov.status === "done" && !(await uiConfirm("يوجد شكل عام مرسوم. هل ترسمه مرة أخرى بالنص الجديد؟"))) {
     car.sec = "overview";
     return renderCarousel();
   }
@@ -388,7 +388,7 @@ $("carToOverview").onclick = () => busyButton($("carToOverview"), "⏳", async (
 function renderOverview() {
   const ov = car.cur.overview;
   const working = ov.status === "working";
-  $("carOvState").textContent = working ? "🎨 يرسم... (يمكن يأخذ دقيقة أو اثنان)" : ov.approved ? "✅ موافق عليه" : "";
+  $("carOvState").textContent = working ? "🎨 يرسم... (قد يستغرق دقيقة أو دقيقتين)" : ov.approved ? "✅ موافق عليه" : "";
   $("carOverview").innerHTML = ov.url
     ? `<a href="${ov.url}" target="_blank"><img src="${ov.url}" alt=""></a>`
     : working ? `<div class="car-wait"><div class="spin"></div>يرسم الكاروسيل كله...</div>` : "";
@@ -398,7 +398,7 @@ function renderOverview() {
   $("carOvRedo").textContent = ov.url || ov.error ? "🔄 ارسم مرة أخرى" : "🎨 ارسم";
   $("carOverview").insertAdjacentHTML("beforeend", versionsRow("overview", ov.versions || [], ov.file, working || car.cur.busy));
   $("carApprove").disabled = working || ov.status !== "done";
-  $("carApprove").textContent = ov.approved ? "📱 اذهب للسلايدات" : "✅ الشكل حسنًا، أكمل للسلايدات";
+  $("carApprove").textContent = ov.approved ? "📱 انتقل إلى السلايدات" : "✅ الشكل مناسب، انتقل إلى السلايدات";
 }
 $("carOvRedo").onclick = () => busyButton($("carOvRedo"), "⏳", async () => {
   car.cur = await api(`/api/carousels/${car.cur.id}/overview`, { method: "POST" });
@@ -427,7 +427,7 @@ async function onVersionClick(e) {
   const file = ver.dataset.file;
   try {
     if (e.target.closest("[data-del-ver]")) {
-      if (!(await uiConfirm("مسح هذه النسخة نهائي؟"))) return;
+      if (!(await uiConfirm("هل تحذف هذه النسخة نهائيًا؟"))) return;
       car.cur = await api(`/api/carousels/${car.cur.id}/versions?target=${encodeURIComponent(target)}&file=${encodeURIComponent(file)}`, { method: "DELETE" });
     } else {
       car.cur = await api(`/api/carousels/${car.cur.id}/pick`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target, file }) });
@@ -475,7 +475,7 @@ function renderSlides() {
     .join("");
 }
 $("carSlidesAll").onclick = () => busyButton($("carSlidesAll"), "⏳", async () => {
-  if (!(await uiConfirm("ترسم نسخة جديدة لكل السلايدات؟ النسخ القديمة ستظل محفوظة ويمكنك ترجعلها."))) return;
+  if (!(await uiConfirm("هل ترسم نسخة جديدة لكل السلايدات؟ ستبقى النسخ القديمة محفوظة ويمكنك الرجوع إليها."))) return;
   car.cur = await api(`/api/carousels/${car.cur.id}/slides?redo_all=true`, { method: "POST" });
   renderCarousel();
 });
@@ -493,7 +493,7 @@ $("carGrid").addEventListener("click", (e) => {
 });
 
 $("carDelete").onclick = async () => {
-  if (!(await uiConfirm(`حذف «${car.cur.name}» وكل صوره؟`))) return;
+  if (!(await uiConfirm(`هل تحذف «${car.cur.name}» وكل صوره؟`))) return;
   try {
     await api(`/api/carousels/${car.cur.id}`, { method: "DELETE" });
     car.cur = null;
@@ -587,12 +587,12 @@ async function openLibrary(tab = car.libTab) {
   if (!$("libDialog").open) $("libDialog").showModal();
 }
 const LIB_HINTS = {
-  template: "اضغط على التصميم الذي يعجبك يُختار للكاروسيل (وضغطة أخرى تلغيه). البرنامج يأخذ التقسيم والشكل ويلوّنه بألوان العميل ويضع كلامنا.",
-  style: "اضغط على الأسلوب يُختار (وضغطة أخرى تلغيه). البرنامج يأخذ طريقة الرسم فقط ويرسم شخصيات جديدة بألوان العميل.",
+  template: "اضغط على التصميم الذي يعجبك ليُختار للكاروسيل (وضغطة أخرى تلغيه). يأخذ البرنامج التقسيم والشكل ويلوّنه بألوان العميل ويضع كلامنا.",
+  style: "اضغط على الأسلوب ليُختار (وضغطة أخرى تلغيه). يأخذ البرنامج طريقة الرسم فقط ويرسم شخصيات جديدة بألوان العميل.",
   character: "اضغط على الشخصيات التي تريدها في الكاروسيل (حتى 4).",
-  coach: "اضغط على الشخصية يُختار لكاروسيل «معلومات من شخصية».",
+  coach: "اضغط على الشخصية لتُختار لكاروسيل «معلومات من شخصية».",
 };
-const LIB_NEW = { template: "أضف تصميم", style: "أضف أسلوب", character: "أضف شخصية", coach: "أضف شخصية" };
+const LIB_NEW = { template: "أضف تصميمًا", style: "أضف أسلوبًا", character: "أضف شخصية", coach: "أضف شخصية" };
 // المختار في الكاروسيل المفتوح
 function libSelected(a) {
   const st = car.cur?.settings;
@@ -620,30 +620,30 @@ function libCard(a) {
   return `<div class="lib-card2 ${libSelected(a) ? "selected" : ""}" data-id="${a.id}" title="${escapeHtml(a.notes || a.name)}">
     <div class="lc-img">${img ? `<img src="${img.url}" alt="" loading="lazy">` : ""}${a.images.length > 1 ? `<em>${a.images.length} صور</em>` : ""}</div>
     <div class="lc-name">${escapeHtml(a.name)}${a.handle ? `<small dir="ltr">@${escapeHtml(a.handle)}</small>` : ""}</div>
-    <button class="lc-edit" data-edit title="انظر الصور وعدّل">✏️</button><i>✓</i></div>`;
+    <button class="lc-edit" data-edit title="شاهد الصور وعدّل">✏️</button><i>✓</i></div>`;
 }
 function libDetail(a) {
   return `<div class="lib-item lib-detail" data-id="${a.id}">
     <div class="row wrap">
-      <button class="btn sm" data-back>→ رجوع للمعرض</button>
-      ${car.cur ? `<button class="btn sm ${libSelected(a) ? "" : "primary"}" data-pick>${libSelected(a) ? "✓ متختار (اضغط تلغيه)" : "✓ اختره للكاروسيل"}</button>` : ""}
-      <button class="btn sm" data-describe title="البرنامج ينظر على الصور ويكتب الخطوط والألوان والتفاصيل">✨ اقرأ الصور واكتب الوصف</button>
+      <button class="btn sm" data-back>→ رجوع إلى المعرض</button>
+      ${car.cur ? `<button class="btn sm ${libSelected(a) ? "" : "primary"}" data-pick>${libSelected(a) ? "✓ مختار (اضغط لإلغائه)" : "✓ اختره للكاروسيل"}</button>` : ""}
+      <button class="btn sm" data-describe title="ينظر البرنامج إلى الصور ويكتب الخطوط والألوان والتفاصيل">✨ اقرأ الصور واكتب الوصف</button>
       <button class="btn sm danger" data-del-asset>🗑️ احذف من المكتبة</button>
     </div>
     <div class="lib-meta">
       <label>الاسم<input type="text" data-f="name" value="${escapeHtml(a.name)}"></label>
-      <label>الوصف (البرنامج يكتبه تلقائيًا، ويمكنك تعدّله)<textarea data-f="notes" rows="4" placeholder="الألوان، الخط، أي تفاصيل">${escapeHtml(a.notes)}</textarea></label>
+      <label>الوصف (يكتبه البرنامج تلقائيًا، ويمكنك تعديله)<textarea data-f="notes" rows="4" placeholder="الألوان، الخط، أي تفاصيل">${escapeHtml(a.notes)}</textarea></label>
       ${a.kind === "coach" ? `<label>إنستجرام<input type="text" data-f="handle" dir="ltr" value="${a.handle ? `@${escapeHtml(a.handle)}` : ""}" placeholder="@instagram"></label>` : ""}
     </div>
     <div class="lib-big">${a.images.map((im) => `<div class="ref"><a href="${im.url}" target="_blank"><img src="${im.url}" alt=""></a><button class="del" data-img="${im.name}" title="احذف الصورة">✕</button></div>`).join("")}
-      <label class="lib-add" title="أضف صور (حتى 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
+      <label class="lib-add" title="أضف صورًا (حتى 12)">＋<input type="file" data-add accept="image/*" multiple hidden></label></div>
   </div>`;
 }
 function renderCarLibrary() {
   const tab = car.libTab;
   document.querySelectorAll("#libTabs [data-t]").forEach((b) => b.classList.toggle("active", b.dataset.t === tab));
   const editing = car.lib.find((a) => a.id === car.libEdit);
-  $("libHint").textContent = editing ? "" : car.cur ? LIB_HINTS[tab] : "افتح كاروسيل لكي تختار منها. من هنا يمكنك تضيف وتعدّل.";
+  $("libHint").textContent = editing ? "" : car.cur ? LIB_HINTS[tab] : "افتح كاروسيلًا لتختار منها. من هنا يمكنك الإضافة والتعديل.";
   $("libItems").classList.toggle("detail", !!editing);
   if (editing) { $("libItems").innerHTML = libDetail(editing); return; }
   const items = car.lib.filter((a) => a.kind === tab);
@@ -665,11 +665,11 @@ function libStatus(msg, isError = false) {
   el.classList.toggle("err", isError);
 }
 function uploadedMsg(res, count) {
-  return res.skipped ? `✅ أُضيف ${count - res.skipped} صورة · ${res.skipped} تُركوا (12 صورة بالكتير لكل واحد)` : `✅ أُضيف ${count} صورة`;
+  return res.skipped ? `✅ أُضيف ${count - res.skipped} صورة · تُرك ${res.skipped} (12 صورة على الأكثر لكل واحد)` : `✅ أُضيف ${count} صورة`;
 }
 async function libPick(a) {
   const settings = libPickSettings(a);
-  if (!settings) return libStatus("✕ 4 شخصيات بالكتير", true);
+  if (!settings) return libStatus("✕ 4 شخصيات على الأكثر", true);
   const was = libSelected(a);
   try {
     await patchCarousel({ settings });
@@ -701,12 +701,12 @@ $("libItems").addEventListener("change", async (e) => {
   }
 });
 async function describeAsset(id, prefix = "") {
-  libStatus(`${prefix ? `${prefix} · ` : ""}🔍 البرنامج ينظر على الصور ويكتب الاسم والخطوط والألوان...`);
+  libStatus(`${prefix ? `${prefix} · ` : ""}🔍 ينظر البرنامج إلى الصور ويكتب الاسم والخطوط والألوان...`);
   document.querySelector("[data-describe]")?.classList.add("busy");
   try {
     const a = await api(`/api/carousel/library/${id}/describe`, { method: "POST" });
     await openLibrary();
-    libStatus(`✅ كُتب الوصف لـ«${a.name}». راجعه وعدّل إذا حابب`);
+    libStatus(`✅ كُتب الوصف لـ«${a.name}». راجعه وعدّله إن أردت`);
   } catch (err) {
     document.querySelector("[data-describe]")?.classList.remove("busy");
     libStatus(`${prefix ? `${prefix} · ` : ""}✕ ${err.message}. اكتب الوصف بنفسك أو جرّب مرة أخرى`, true);
@@ -758,7 +758,7 @@ $("libItems").addEventListener("click", async (e) => {
     return patchAsset(item.dataset.id, form);
   }
   if (e.target.closest("[data-del-asset]")) {
-    if (!(await uiConfirm("مسح هذا من المكتبة؟"))) return;
+    if (!(await uiConfirm("هل تحذف هذا من المكتبة؟"))) return;
     await api(`/api/carousel/library/${item.dataset.id}`, { method: "DELETE" });
     car.libEdit = null;
     await openLibrary();
@@ -803,8 +803,8 @@ async function renderPublish() {
   $("carPubReel").hidden = !reel;
   $("carPubSlideWrap").hidden = reel;
   $("carPubHint").textContent = reel
-    ? "البرنامج سيعمل فيديو من السلايدات بالموسيقى، ويُحفظ أيضًا في الفيديوهات الجاهزة. التاج في الريل يصبح على الفيديو كله."
-    : "الكاروسيل يُنشر صور بمقاس 1080×1350 على إنستجرام. تيك توك لا يقبل كاروسيل صور من هنا، استخدم الريل.";
+    ? "سيصنع البرنامج فيديو من السلايدات بالموسيقى، ويُحفظ أيضًا في الفيديوهات الجاهزة. يكون الوسم في الريل على الفيديو كله."
+    : "يُنشر الكاروسيل صورًا بمقاس 1080×1350 على إنستجرام. تيك توك لا يقبل كاروسيل الصور من هنا، استخدم الريل.";
   // أول ما تفتح النشر للكاروسيل ده: الكابشن من النص، والتاج حساب الشخصية
   if (car.pubFor !== c.id) {
     car.pubFor = c.id;
@@ -837,7 +837,7 @@ async function publishCarousel(now) {
   const c = car.cur;
   const when = now ? new Date() : new Date($("carPubWhen").value);
   if (Number.isNaN(when.getTime())) return toast("اختر الموعد", true);
-  if (!now && when < new Date()) return toast("هذا الموعد عدّى، اختر موعد قادم أو اضغط انشر الآن", true);
+  if (!now && when < new Date()) return toast("هذا الموعد مضى، اختر موعدًا قادمًا أو اضغط انشر الآن", true);
   const options = { ig_tags: pubTags(), ig_collab: $("carPubCollab").checked, tag_slide: Number($("carPubSlide").value) || 1 };
   const caption = $("carPubCaption").value;
   const btns = [$("carPubNow"), $("carPubSchedule")];
@@ -847,7 +847,7 @@ async function publishCarousel(now) {
     if (car.pubMode === "reel") {
       const platforms = [["instagram", "carPubIg"], ["tiktok", "carPubTt"]].filter(([, id]) => $(id).checked).map(([p]) => p);
       if (!platforms.length) return toast("اختر منصة واحدة على الأقل", true);
-      $("carPubState").textContent = "🎬 يعمل الريل...";
+      $("carPubState").textContent = "🎬 يصنع الريل...";
       const exp = await api(`/api/carousels/${c.id}/reel`, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ music_id: $("carPubMusic").value || null, seconds: Number($("carPubSec").value) }) });
       $("carPubState").textContent = "📤 يرسله للنشر...";

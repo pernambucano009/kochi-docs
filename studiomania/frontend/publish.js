@@ -3,7 +3,7 @@
 const pub = { exports: [], posts: [], platforms: {}, accounts: {}, service: null, videoId: null, editing: null, timer: null };
 const PLATFORMS_KEY = "studiomania.platforms";
 const POST_STATUS = {
-  scheduled: ["متجدول", "scheduled"],
+  scheduled: ["مجدول", "scheduled"],
   sending: ["جارٍ الإرسال للنشر…", "active"],
   publishing: ["جارٍ النشر...", "active"],
   published: ["نُشر", "published"],
@@ -73,12 +73,12 @@ function renderReady() {
   const scheduled = new Set(pub.posts.filter((p) => p.status === "scheduled" || p.status === "sending").map((p) => p.export_id));
   $("readyGrid").innerHTML = pub.exports
     .map(
-      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="اضغط لكي تجدوله">
+      (e) => `<div class="ready ${e.id === pub.videoId ? "selected" : ""}" data-id="${e.id}" title="اضغط لجدولته">
         <div class="ready-art">${lightVideo(e.url, "muted playsinline loop")}<span class="ready-dur">${fmtDuration(e.duration)}</span><i class="ready-tick" aria-hidden="true"></i>${typeof BrainRate !== "undefined" ? BrainRate.html({ kind: "video", what: e.name, ref: `exp:${e.id}`, compact: true }) : ""}</div>
         <div class="body">
           <div class="name" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div>
-          <div class="meta">${e.id === pub.videoId ? `<span class="st-pick">مختار للجدولة</span>` : scheduled.has(e.id) ? `<span class="st-sched">متجدول</span>` : `<span>جاهز</span>`}
-            <span class="pill">${e.source === "upload" ? "من برا" : "من المونتاج"}</span></div>
+          <div class="meta">${e.id === pub.videoId ? `<span class="st-pick">مختار للجدولة</span>` : scheduled.has(e.id) ? `<span class="st-sched">مجدول</span>` : `<span>جاهز</span>`}
+            <span class="pill">${e.source === "upload" ? "من الخارج" : "من المونتاج"}</span></div>
           <div class="acts">
             <button class="btn sm primary" data-act="pick">جدول</button>
             <a class="btn sm" href="${e.download_url}" download="${escapeHtml(e.name)}.mp4" title="تحميل">⬇</a>
@@ -130,7 +130,7 @@ $("readyGrid").addEventListener("click", async (e) => {
       await pubLoadPosts();
     }
     if (btn.dataset.act === "delete") {
-      if (!(await uiConfirm(`حذف "${ex.name}" من المجلد؟`))) return;
+      if (!(await uiConfirm(`هل تحذف "${ex.name}" من المجلد؟`))) return;
       await api(`/api/exports/${ex.id}`, { method: "DELETE" });
       await pubLoadExports();
     }
@@ -260,8 +260,7 @@ const PA_FORMS = {
     help: "من بلوسكاي: Settings ← Privacy and security ← App passwords ← Add App Password. انسخ كلمة المرور التي تظهر وضعها هنا (وهي غير كلمة مرور حسابك العادية).", url: "/api/publisher/connect/bluesky" },
   whatsapp: { t: "اربط واتساب للأعمال", fields: [["token", "Access Token (دائم، من System User)", "EAAG…", "ltr"], ["waba", "WhatsApp Business Account ID", "1234567890", "ltr"],
       ["phone", "Phone Number ID", "1098765432", "ltr"], ["pin", "رمز التحقق بخطوتين (إن كان مفعّلًا)", "6 أرقام", "ltr"]],
-    help: `واتساب هنا للرسائل والرد على العملاء (الإنبوكس والرسائل الجماعية بقوالب متوافق عليها)، غير لنشر الفيديوهات.
-يحتاج: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، وهو غير تطبيق واتساب للأعمال العادي على الجوال.
+    help: `واتساب هنا للرسائل والرد على العملاء (صندوق الرسائل والرسائل الجماعية بقوالب معتمدة)، وليس لنشر الفيديوهات. يحتاج إلى: <b>WhatsApp Business Platform (Cloud API)</b> من Meta، وهو غير تطبيق واتساب للأعمال العادي على الجوال.
 <ol><li>من business.facebook.com أنشئ أو اختر WhatsApp Business Account، وأضف رقمًا غير مسجّل على واتساب العادي.</li>
 <li>من Business Settings ← System Users أنشئ System User وامنحه صلاحيتي whatsapp_business_management و whatsapp_business_messaging.</li>
 <li>أنشئ له Access Token دائمًا.</li><li>من WhatsApp Manager ← Phone Numbers ستجد الـ WABA ID والـ Phone Number ID.</li></ol>`, url: "/api/publisher/connect/whatsapp" },
@@ -403,7 +402,7 @@ function renderPostVideo() {
   }
   $("igTagsHint").textContent = ex?.coach
     ? (ex.coach.instagram ? `الشخصية: ${ex.coach.name} (@${ex.coach.instagram})` : `⚠️ الشخصية ${ex.coach.name} ليس لها حساب إنستجرام مسجل. أضفه من صفحة الشخصيات`)
-    : "اكتب الحسابات التي تريد تعملها تاج، وافصل بينهم بفاصلة.";
+    : "اكتب الحسابات التي تريد وسمها، وافصل بينها بفاصلة.";
   // الغلاف بيتختار من نفس الفيديو
   const v = $("coverVideo");
   if (ex && v.dataset.src !== ex.url) {
@@ -451,7 +450,7 @@ function renderPostExtras() {
   const tagged = !!$("igTags").value.trim() || $("igCollab").checked;
   $("igOptsChip").hidden = !ig;
   $("igOptsChip").classList.toggle("on", ig && (pub.showIg || tagged));
-  $("igOptsChip").textContent = tagged ? "✓ تاج الكوتش + كولاب" : "تاج الكوتش + كولاب";
+  $("igOptsChip").textContent = tagged ? "✓ وسم الكوتش + تعاون" : "وسم الكوتش + تعاون";
   $("igOpts").hidden = !ig || !pub.showIg;
   $("coverChip").hidden = !(ig || tt) || !pub.videoId;
   $("coverChip").classList.toggle("on", !!pub.showCover);
@@ -585,9 +584,9 @@ function nextSlot() {
 }
 const QUICK = [
   ["بعد ساعة", () => nextSlot()],
-  ["غدًا 12 الضهر", () => atHour(1, 12)],
+  ["غدًا 12 الظهر", () => atHour(1, 12)],
   ["غدًا 6 المغرب", () => atHour(1, 18)],
-  ["غدًا 9 بالليل", () => atHour(1, 21)],
+  ["غدًا 9 ليلًا", () => atHour(1, 21)],
 ];
 function atHour(daysAhead, hour) {
   const d = new Date();
@@ -639,8 +638,8 @@ async function submitPost(now) {
   const when = now ? new Date() : new Date($("postWhen").value);
   if (isNaN(when)) return toast("اختر الموعد", true);
   const names = platforms.map(tLabel).join("، ");
-  if (now && !(await uiConfirm(`المنشور سينزل الآن على: ${names}. تُكمل؟`))) return;
-  if (!now && when < new Date() && !(await uiConfirm("هذا الموعد عدّى، فالمنشور سيُنشر مباشرة. تُكمل؟"))) return;
+  if (now && !(await uiConfirm(`سيُنشر المنشور الآن على: ${names}. تُكمل؟`))) return;
+  if (!now && when < new Date() && !(await uiConfirm("هذا الموعد مضى، فسيُنشر المنشور مباشرة. تُكمل؟"))) return;
   const body = JSON.stringify({
     export_id: pub.videoId,
     caption: $("postCaption").value,
@@ -654,7 +653,7 @@ async function submitPost(now) {
       headers: { "Content-Type": "application/json" },
       body,
     });
-    toast(now ? "🚀 المنشور يُرسل للنشر الآن" : pub.editing ? "✅ المنشور عُدّل"
+    toast(now ? "🚀 يُرسل المنشور للنشر الآن" : pub.editing ? "✅ عُدّل المنشور"
       : `✅ جُدول ${when.toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" })}`);
     resetPostForm();
     await pubLoadPosts();
@@ -704,7 +703,7 @@ function renderPosts() {
         ${p.image_url ? `<img class="post-thumb" src="${p.image_url}" alt="">` : p.export_url ? lightVideo(p.export_url, "muted") : ""}
         <div class="info">
           <span class="when">${when}</span>
-          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ الفيديو حُذف"))} · ${p.platforms.map(tLabel).join("، ")}</span>
+          <span>${escapeHtml(p.export_name || (p.from_zernio ? "🔗 من حساباتك" : "⚠️ حُذف الفيديو"))} · ${p.platforms.map(tLabel).join("، ")}</span>
           ${p.caption ? `<span class="cap" title="${escapeHtml(p.caption)}">${escapeHtml(p.caption)}</span>` : ""}
           ${p.options?.ig_tags?.length ? `<span class="tags" dir="ltr">🏷️ ${p.options.ig_tags.map((t) => `@${escapeHtml(t)}`).join(" ")}${p.options.ig_collab ? " · 🤝" : ""}</span>` : ""}
           ${p.options?.dm ? `<span class="tags" title="${escapeHtml(Object.entries(p.options.dm_auto || {}).map(([k, v]) => `${k}: ${v.error || "يعمل"}`).join(" · "))}">💬 «${escapeHtml(p.options.dm.words[0])}»${p.options.dm_auto ? (Object.values(p.options.dm_auto).some((v) => v.error) ? " ⚠️" : " ✓ يعمل") : ""}</span>` : ""}
@@ -772,7 +771,7 @@ async function postAction(act, p) {
       await pubLoadPosts();
     }
     if (act === "delete") {
-      if (!(await uiConfirm(p.status === "scheduled" ? "إلغاء هذا المنشور؟" : "حذف هذا المنشور من القائمة؟"))) return false;
+      if (!(await uiConfirm(p.status === "scheduled" ? "هل تلغي هذا المنشور؟" : "هل تحذف هذا المنشور من القائمة؟"))) return false;
       await api(`/api/posts/${p.id}`, { method: "DELETE" });
       if (pub.editing === p.id) resetPostForm();
       await pubLoadPosts();
@@ -801,7 +800,7 @@ async function loadRemoteOrphans(verbose = false) {
         <div class="info"><span class="when">${when(o.scheduled_for)}</span>
           <span>${o.platforms.map(tLabel).join("، ")}</span>
           ${o.content ? `<span class="cap">${escapeHtml(o.content)}</span>` : ""}</div>
-        <span class="acts"><button class="btn sm" data-oact="adopt">＋ أضفه للقايمة</button>
+        <span class="acts"><button class="btn sm" data-oact="adopt">＋ أضفه إلى القائمة</button>
           <button class="btn sm danger" data-oact="cancel">✕ ألغِه</button></span>
       </div>`).join("") : "";
   } catch (err) {
@@ -816,7 +815,7 @@ $("remoteOrphans").addEventListener("click", async (e) => {
   try {
     if (btn.dataset.oact === "adopt") {
       await api("/api/posts/adopt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remote_id: rid }) });
-      toast("✅ المنشور أُضيف للقايمة");
+      toast("✅ أُضيف المنشور إلى القائمة");
     } else {
       if (!(await uiConfirm("هل تلغي هذا المنشور؟ لن يُنشر."))) return;
       await api(`/api/posts/remote/${encodeURIComponent(rid)}/cancel`, { method: "POST" });
@@ -884,7 +883,7 @@ function dmCheck(cap, pl) {
     ? [{ ok: null, t: "هل يقول الفيديو في آخره «علّق بكلمة…»؟", tip: "نستمع لآخر ٢٠ ثانية لنتأكد أن الرد التلقائي مفعّل", act: "spoken" }] : [];
   const where = inCap ? "في التعليق النصي" : "في آخر الفيديو";
   if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يعمل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على واتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
-  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: من يعلّق تصله رسالة في الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير مفعّل`, tip: "بدونه لن يصل شيء لمن يعلّق، وهذا يُضيّع العميل", act: "dm", word }];
+  return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: من يعلّق تصله رسالة في الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير مفعّل`, tip: "دونه لن يصل شيء لمن يعلّق، وهذا يُضيّع العميل", act: "dm", word }];
 }
 function pubChecks() {
   const cap = $("postCaption").value.trim(), first = cap.split("\n").find((l) => l.trim()) || "";
@@ -895,7 +894,7 @@ function pubChecks() {
     { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، وليس «أهلًا بكم»)", tip: "آخر ما يقرؤه قبل أن يمرّر: اترك سؤالًا مفتوحًا أو أكمل وعد الفيديو" },
     { ok: PC_CTA.test(cap), t: "توجد دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
     { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ وسوم من المجال (الآن ${tags.length})`, tip: "تأثير الوسوم ضعيف؛ ٣–٥ محددة تكفي" },
-    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "توصل الفيديو لأشخاص غير مهتمين فيقل وقت المشاهدة" },
+    { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "توصل الفيديو إلى أشخاص غير مهتمين فيقل وقت المشاهدة" },
     ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "اخترت الغلاف بنفسك (إطار مثير)", tip: "فرصة خطاف إضافية في الملف الشخصي", act: "cover" }] : []),
     ...dmCheck(cap, pl),
     { ok: PC_AI.test(cap) || !!pub.notAi, t: "إذا كان الفيديو مصنوعًا بالذكاء الاصطناعي فهو معلَّم", tip: "لا عقوبة، وقد تحذفه المنصة إذا لم تحدد", act: "ai" },

@@ -249,15 +249,15 @@ const PilotPage = (() => {
     } else if (j.status === "wait" && j.gate === "montage" && j.kind === "carousel") {
       body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم الشرائح</button></div>`;
     } else if (j.status === "wait" && j.gate === "video" && j.kind === "carousel") {
-      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
+      body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوِله</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage") {
       body = `<div class="ap-acts"><button type="button" data-edit="${esc(j.project_id)}">افتح المونتاج</button><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، صدّره</button></div>`;
     } else if (j.status === "wait" && j.gate === "video") {
       body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : ""}
-        <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوله</button></div>`;
+        <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوِله</button></div>`;
     } else if (j.status === "cam") {
       body = `${(j.script || []).length ? `<p class="ap-say">${j.script.map(esc).join("<br>")}</p>` : ""}
-        <div class="ap-acts"><button type="button" class="ok" data-phone="${esc(j.id)}">📱 صوّر من موبايلك بالملقّن</button><label>⬆ ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+        <div class="ap-acts"><button type="button" class="ok" data-phone="${esc(j.id)}">📱 صوّر من جوالك بالملقّن</button><label>⬆ ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "failed") {
       body = `<span class="ap-err">${esc(j.error || "")}</span><div class="ap-acts"><button type="button" data-retry="${esc(j.id)}">جرّب مرة أخرى</button><button type="button" data-del="${esc(j.id)}">احذفها</button></div>`;
     } else if (j.status === "done" && (j.images || []).length) {

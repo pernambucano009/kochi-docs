@@ -4,8 +4,8 @@
 // تفاصيل الفيديو نفسه بتترسم بنفس شاشة «📐 فيديو من تيمبليت» (templates.js) جوه القسم ده.
 
 const tsx = { data: null, pick: null, timer: null };
-const TS_TRANS = { cut: "قطع مباشر", fade: "تلاشي", fadeblack: "سواد", fadewhite: "فلاش أبيض", dissolve: "ذوبان", wipeleft: "مسحة", slideleft: "زحلقة",
-  smoothleft: "زحلقة ناعمة", circleopen: "دائرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "عصرة", diagtl: "مايلة", slideup: "للأعلى" };
+const TS_TRANS = { cut: "قطع مباشر", fade: "تلاشي", fadeblack: "سواد", fadewhite: "فلاش أبيض", dissolve: "ذوبان", wipeleft: "مسحة", slideleft: "انزلاق",
+  smoothleft: "انزلاق ناعم", circleopen: "دائرة", zoomin: "زووم", pixelize: "بكسلات/غليتش", hblur: "ضباب", radial: "عقارب", squeezeh: "ضغطة", diagtl: "مائلة", slideup: "للأعلى" };
 const tse = (s) => escapeHtml(String(s ?? ""));
 
 viewHooks["14"] = tsInit;
@@ -57,7 +57,7 @@ function tsHome() {
     <section class="panel"><div class="car-head"><h2>القوالب</h2><small class="muted">اختر أسلوبًا، واكتب فكرتك، والباقي علينا: نص ← تعليق صوتي ← لوحة القصة ← فيديو متصل ← مونتاج</small></div>
       <div class="ts-grid">${D.templates.map(card).join("")}</div></section>
     ${t ? `<section class="panel ts-new" id="tsNew"><h3>${tse(t.icon || "")} فيديو جديد على «${tse(t.name)}»</h3>
-      <label>الفيديو عن ماذا؟ <textarea id="tsBrief" rows="2" placeholder="${tse(t.sample_brief || "مثلًا: أهم ٣ مميزات في التطبيق والختام: جرّبه اليوم")}"></textarea></label>
+      <label>عمّ الفيديو؟ <textarea id="tsBrief" rows="2" placeholder="${tse(t.sample_brief || "مثلًا: أهم ٣ مميزات في التطبيق والختام: جرّبه اليوم")}"></textarea></label>
       <div class="ts-mode"><label class="check"><input type="radio" name="tsMode" value="ai" checked> ✍️ الذكاء الاصطناعي يكتب النص بطول القالب</label>
         <label class="check"><input type="radio" name="tsMode" value="own"> 📝 سأكتبه بنفسي</label></div>
       <textarea id="tsScript" rows="4" placeholder="اكتب النص هنا، وسيوزّعه البرنامج على لقطات القالب دون تغيير كلامك" hidden></textarea>
@@ -66,7 +66,7 @@ function tsHome() {
         <label>🎙️ الصوت <select id="tsVoice"></select></label>
         <label class="check"><input type="checkbox" id="tsVoiceOn" checked> تعليق صوتي (يحدد مدة كل لقطة)</label>
       </div>
-      ${t.mode === "still" ? `<small class="muted">📦 صور فقط (بدون فيديو). ارفع صورة المنتج داخل، وكل صورة توريك تمنها قبل ما تُرسم.</small>` : t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: الشخصية تتكلم بصوتها داخل الفيديو." : "🎬 الطول وعدد اللقطات تختارهم داخل."} الخطوات: الشخصية ← صورة المنتج ← النص ← التوليد.</small>` : `
+      ${t.mode === "still" ? `<small class="muted">📦 صور فقط (دون فيديو). ارفع صورة المنتج بالداخل، وتعرض لك كل صورة سعرها قبل أن تُرسم.</small>` : t.mode === "ad" ? `<small class="muted">${t.ad_cfg?.kind === "ugc" ? "📱 ١٥ ثانية: تتكلم الشخصية بصوتها داخل الفيديو." : "🎬 تختار الطول وعدد اللقطات بالداخل."} الخطوات: الشخصية ← صورة المنتج ← النص ← التوليد.</small>` : `
       <div class="row wrap"><label>⏱️ الطول <select id="tsLen">${[30, 60, 90, 120].map((x) => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x} ثانية (${x / 10} مشاهد)</option>`).join("")}</select></label>
         <small class="muted">كل مشهد ١٠ ثوانٍ وله جملة تعليق صوتي. اكتب في الفكرة الأرقام التي تريدها في الفيديو (البرنامج لا يخترع أرقامًا).</small></div>`}
       <div class="row wrap">
@@ -123,7 +123,7 @@ $("tsGallery").addEventListener("click", async (e) => {
   if (!b) return;
   if (b.dataset.tssample) {
     const t = tsx.data.templates.find((x) => x.id === b.dataset.tssample);
-    if (!(await uiConfirm(`تعمل عينة لـ «${t.name}»؟ نحو $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p بدون صوت)`))) return;
+    if (!(await uiConfirm(`هل تصنع عينة لـ «${t.name}»؟ نحو $${t.sample_cost} (ستوري بورد GPT Image + لقطات Seedance Mini 480p دون صوت)`))) return;
     try { await api(`/api/templates/${t.id}/sample`, { method: "POST" }); tsx.data = await api("/api/tpl-studio"); tsHome(); tsPoll(); toast("🎞️ جارٍ صنع العينة… دقائق"); }
     catch (err) { toast(err.message, true); }
     return;
@@ -207,7 +207,7 @@ function tvScenesBlock(v) {
       <div class="row wrap"><button class="btn primary" data-scgo ${busy || !v.stylekey_url ? "disabled" : ""}>${miss ? `🎬 ولّد ${miss === sc.length ? "كل المشاهد" : `الناقص (${miss})`} (~$${(miss * v.scene_cost).toFixed(2)})` : "🎞️ جمّع الفيديو مرة أخرى (مجانًا)"}</button>
         ${!v.stylekey_url ? `<small class="muted">ارسم مفتاح الأسلوب أولًا</small>` : ""}</div>
       <div class="ts-scenes">${sc.map((s, i) => `<article class="ts-scene" data-sci="${i}"><header><b>مشهد ${i + 1}</b> <small dir="auto">«${tse((v.vo?.lines || v.script_lines || [])[i] || "")}»</small></header>
-        <div class="ts-sbody">${v.scene_urls[i] ? `<video src="${v.scene_urls[i]}" controls playsinline preload="metadata"></video>` : `<div class="fm-ph">ما زال</div>`}
+        <div class="ts-sbody">${v.scene_urls[i] ? `<video src="${v.scene_urls[i]}" controls playsinline preload="metadata"></video>` : `<div class="fm-ph">لم يُراجَع بعد</div>`}
           <div class="ts-sf"><label>🖼️ المشهد <textarea rows="3" dir="ltr" data-scf="scene" data-no-i18n ${busy ? "disabled" : ""}>${tse(s.scene)}</textarea></label>
             <label>🎥 الحركة <textarea rows="2" dir="ltr" data-scf="motion" data-no-i18n ${busy ? "disabled" : ""}>${tse(s.motion)}</textarea></label>
             <label>🔊 المؤثرات <input dir="ltr" data-scf="audio" value="${tse(s.audio)}" data-no-i18n ${busy ? "disabled" : ""}></label>

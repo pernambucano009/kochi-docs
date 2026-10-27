@@ -229,7 +229,7 @@ function mscPane() {
       return `<div class="sc-item"><b>🧽 ${escapeHtml(r.name)}</b> <span class="muted">من ${(r.f0 / SC_FPS).toFixed(1)}ث إلى ${((r.f1 + 1) / SC_FPS).toFixed(1)}ث</span>
         <div class="muted">${ok ? "✓ مُلئ المكان من الإطارات الأخرى" : r.ai ? `✨ مُلئ بالذكاء الاصطناعي (${Math.round(r.holes * 100)}٪ لم يظهر قط)` : `⚠️ ${Math.round(r.holes * 100)}٪ من المكان لم يظهر قط في الفيديو، ومُلئ تقريبيًا`}</div>
         <div class="row wrap"><button class="btn sm" data-rmgo="${r.id}">▶︎ انتقل إليه</button>
-          ${!ok && !r.ai ? `<button class="btn sm primary" data-rmai="${r.id}" ${busy ? "disabled" : ""}>✨ املاه بالـ AI (نحو $0.05)</button>` : ""}
+          ${!ok && !r.ai ? `<button class="btn sm primary" data-rmai="${r.id}" ${busy ? "disabled" : ""}>✨ املأه بالذكاء الاصطناعي (نحو $0.05)</button>` : ""}
           <button class="btn sm danger" data-rmdel="${r.id}" ${busy ? "disabled" : ""}>🗑</button></div></div>`;
     }).join("")}</div>`;
   }
@@ -338,7 +338,7 @@ function mscPoll() {
       msc.ui = null;
       const was = msc.lastStep || "";
       msc.lastStep = "";
-      if (doc.status === "failed") toast(`🪄 ${doc.error || "حصلت مشكلة"}`, true);
+      if (doc.status === "failed") toast(`🪄 ${doc.error || "حدثت مشكلة"}`, true);
       else if (was.includes("🧽") || was.includes("خلف الشيء")) toast("🧽 أُزيل الشيء: شغّل الفيديو وانظر");
       else if (was.includes("الخلفية")) toast("✨ الخلفية الجديدة جاهزة");
       else toast("🪄 المشهد جاهز: اختر الخلفية التي تحبها");

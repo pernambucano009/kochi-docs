@@ -197,7 +197,7 @@ $("dbMain").addEventListener("click", async (e) => {
   if (b.id === "dbGo") {
     const lip = $("dbGoLang") && document.querySelector('[data-dblip="go"]').value || null;
     const cost = lip ? dbx.cur.targets[dbx.go]?.lip_cost?.[lip] : null;
-    if (lip && !(await uiConfirm(`مزامنة الشفاه تتكلف${cost != null ? ` نحو $${cost}` : ""} لهذا الفيديو. تُكمل؟`))) return;
+    if (lip && !(await uiConfirm(`مزامنة الشفاه تكلّف${cost != null ? ` نحو $${cost}` : ""} لهذا الفيديو. تُكمل؟`))) return;
     return dbAct("/auto", "POST", { dialect: dbx.go, voice: $("dbGoVoice").value, brief: $("dbBrief")?.value || "", lipsync: lip,
       background: document.querySelector('[data-dbbg="go"]').value, captions: document.querySelector('[data-dbcap="go"]')?.value || "" }, "🎙️ بدأت الدبلجة", "go");
   }
@@ -219,7 +219,7 @@ $("dbMain").addEventListener("click", async (e) => {
   if (b.dataset.dbrender) {
     const k = b.dataset.dbrender, lip = document.querySelector(`[data-dblip="${k}"]`).value || null;
     const bg = document.querySelector(`[data-dbbg="${k}"]`).value;
-    if (lip && !(await uiConfirm(`الليب سينك يتكلف نحو $${dbx.cur.targets[k].lip_cost[lip]} هذا للفيديو. تُكمل؟`))) return;
+    if (lip && !(await uiConfirm(`مزامنة الشفاه تكلّف نحو $${dbx.cur.targets[k].lip_cost[lip]} لهذا الفيديو. تُكمل؟`))) return;
     const caps = document.querySelector(`[data-dbcap="${k}"]`)?.value || "";
     return dbAct(`/target/${k}/render`, "POST", { lipsync: lip, background: bg, captions: caps }, "🎙️ جارٍ إنشاء الدبلجة…", k);
   }

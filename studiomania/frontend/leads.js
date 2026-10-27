@@ -5,7 +5,7 @@ const LeadsPage = (() => {
   const S = { el: null, d: null, topic: "", plats: ["instagram", "tiktok"], f: "all", q: "", poll: null, busy: false };
   const html = () => `<div class="nb-wrap fs-wrap rv-wrap" id="ldWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const PL = { instagram: "إنستغرام", tiktok: "تيك توك" };
-  const heat = (n) => (n >= 80 ? ["سخن", "hot"] : n >= 50 ? ["مهتم", "warm"] : ["بارد", "cold"]);
+  const heat = (n) => (n >= 80 ? ["ساخن", "hot"] : n >= 50 ? ["مهتم", "warm"] : ["بارد", "cold"]);
 
   function list() {
     const q = S.q.trim().toLowerCase();
@@ -30,7 +30,7 @@ const LeadsPage = (() => {
     const d = S.d, busy = d.status === "working", items = list(), all = d.items || [];
     const hot = all.filter((x) => x.score >= 80).length, warm = all.filter((x) => x.score >= 50).length, fresh = all.filter((x) => !x.contacted).length;
     const both = S.plats.length > 1, cost = both ? d.cost.both : d.cost.one;
-    S.el.innerHTML = `<div class="pk-top"><div class="pk-sub"><span><b class="num">${all.length}</b> شخصًا في القائمة</span><span><b class="num">${hot}</b> سخن</span>
+    S.el.innerHTML = `<div class="pk-top"><div class="pk-sub"><span><b class="num">${all.length}</b> شخصًا في القائمة</span><span><b class="num">${hot}</b> ساخن</span>
         ${d.live ? "" : `<span>وضع تجريبي: أسماء تجريبية</span>`}${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "جارٍ البحث…")}</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         <div class="pk-acts"><a class="pk-ib" href="/api/leads.csv${S.f === "hot" ? "?min_score=80" : S.f === "warm" ? "?min_score=50" : ""}" download="leads.csv" data-tip="نزّل القائمة (ملف Excel)" aria-label="نزّل القائمة (ملف Excel)">${pkIc("download")}</a></div></div>
       <div class="ld-find">
@@ -41,10 +41,10 @@ const LeadsPage = (() => {
         ${(d.suggest || []).length ? `<div class="pk-chips ld-sug"><span class="pk-lbl">من عقل العلامة:</span>${d.suggest.map((x) => `<button class="pk-chip" data-ldsug="${esc(x)}" data-no-i18n>${esc(x)}</button>`).join("")}</div>` : ""}
       </div>
       <p class="pk-note ld-warn">💬 الرسالة الأولى تُرسل من حسابك بنفسك (زر «افتح محادثة» أو الملف)، لأن إنستغرام وتيك توك لا يسمحان في الربط الرسمي ببدء محادثة مع من لم يراسلك. وعندما يرد عليك أحدهم، يتابع معه بوت الرسائل تلقائيًا.</p>
-      ${all.length ? `<div class="pk-top"><span class="pk-chips">${[["all", "الكل", all.length], ["hot", "سخن (٨٠ فأكثر)", hot], ["warm", "مهتم (٥٠ فأكثر)", warm], ["new", "لم أتواصل معه", fresh]]
+      ${all.length ? `<div class="pk-top"><span class="pk-chips">${[["all", "الكل", all.length], ["hot", "ساخن (٨٠ فأكثر)", hot], ["warm", "مهتم (٥٠ فأكثر)", warm], ["new", "لم أتواصل معه", fresh]]
         .map(([k, t, n]) => `<button class="pk-chip${S.f === k ? " on" : ""}" data-ldf="${k}">${t}<span class="num">${n}</span></button>`).join("")}</span>
         <input class="ld-in ld-q" data-ldq value="${esc(S.q)}" placeholder="ابحث في القائمة…"></div>
-        <div class="ld-rows">${items.map(row).join("") || `<div class="pk-empty">لا يوجد أحد بهذا الفلتر</div>`}</div>`
+        <div class="ld-rows">${items.map(row).join("") || `<div class="pk-empty">لا يوجد أحد بهذا المرشّح</div>`}</div>`
         : `<div class="pk-empty">${busy ? "جارٍ البحث عن المهتمين…" : "القائمة فارغة. ابحث عن موضوع لتبدأ."}</div>`}`;
     if (busy) watch(); else clearInterval(S.poll);
   }

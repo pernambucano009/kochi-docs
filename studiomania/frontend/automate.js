@@ -552,7 +552,7 @@ const AutoPage = (() => {
         + G.map(([mode, t]) => { const xs = ms.filter((m) => m.mode === mode); return xs.length ? `<p class="am-gh">${t}</p>` + pills("model", xs.map((m) => [m.model, `${m.label}${m.ref ? " · يقبل صوتًا مرجعيًا" : ""}${m.price ? ` · $${m.price}` : ""}`]), cur) : ""; }).join("");
     }
     if (["refs", "start", "end", "audio", "ref"].includes(l.f)) return head + refsCard(s, l.f);
-    if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند نهاية كل جملة، وأزل أول ٣ ثوانٍ، ودون السكوت الطويل") + `<p class="bm-note">إن تركته فارغًا: قطع متساوية، ويُزاح القطع إلى أقرب سكوت كي لا يقطع في منتصف كلمة. إن كتبت: يستمع العقل إلى الكلام ويقطّع حسب طلبك (يُخصم بحسب طول الفيديو).</p>`;
+    if (l.f === "note") return head + editable("opt:note", o.note || "", "مثلًا: اقطع عند نهاية كل جملة، وأزل أول ٣ ثوانٍ والسكوت الطويل") + `<p class="bm-note">إن تركته فارغًا: قطع متساوية، ويُزاح القطع إلى أقرب سكوت كي لا يقطع في منتصف كلمة. إن كتبت: يستمع العقل إلى الكلام ويقطّع حسب طلبك (يُخصم بحسب طول الفيديو).</p>`;
     if (l.f === "model") {
       const cur = genModel(o)?.model;
       return head + `<p class="bm-note">كل نموذج يأخذ مدخلات مختلفة، وتتغيّر النقاط حول الخطوة بحسبه.</p>` + Object.entries(M.gen_modes || {}).map(([mode, t]) => {

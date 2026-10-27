@@ -2,8 +2,8 @@
 // الاتنين نفس الشكل، الفرق في نوع الملفات اللي بتتحفظ
 
 const AUDIO_TEXT = {
-  voice: { title: "مكتبة التعليق الصوتي", empty: "لا يوجد بعد تعليقات صوتية. ارفع أول ملف.", drop: "اسحب ملفات التعليق الصوتي وضعها هنا" },
-  music: { title: "مكتبة الموسيقى", empty: "لا يوجد بعد موسيقى. ارفع أول ملف.", drop: "اسحب ملفات الموسيقى وضعها هنا" },
+  voice: { title: "مكتبة التعليق الصوتي", empty: "لا توجد تعليقات صوتية بعد. ارفع أول ملف.", drop: "اسحب ملفات التعليق الصوتي وضعها هنا" },
+  music: { title: "مكتبة الموسيقى", empty: "لا توجد موسيقى بعد. ارفع أول ملف.", drop: "اسحب ملفات الموسيقى وضعها هنا" },
 };
 const AUDIO_ACCEPT = ".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*";
 
@@ -71,7 +71,7 @@ function mountAudioLibrary(root) {
         </li>`
       )
       .join("");
-    if (lib.items.length && !items.length) el("list").innerHTML = `<li class="none">لا يوجد نتائج</li>`;
+    if (lib.items.length && !items.length) el("list").innerHTML = `<li class="none">لا توجد نتائج</li>`;
   }
 
   async function upload(files) {

@@ -29,7 +29,7 @@ function renderFolders() {
       <div class="fparts">
         <span class="${f.video ? "ok" : "miss"}">🎬 ${f.video ? "فيديو" : "لا يوجد فيديو"}</span>
         <span class="${f.voice ? "ok" : "miss"}">🎙️ ${f.voice ? "صوت" : "لا يوجد صوت"}</span>
-        <span class="${f.coach ? "ok" : "miss"}">🧍 ${f.coach ? escapeHtml(f.coach.name) : "لا يوجد شخصية"}</span>
+        <span class="${f.coach ? "ok" : "miss"}">🧍 ${f.coach ? escapeHtml(f.coach.name) : "لا توجد شخصية"}</span>
       </div>
       ${folderBadges(f).length ? `<div class="fbadges">${folderBadges(f).map((x) => `<span class="badge">${x}</span>`).join("")}</div>` : ""}
     </li>`)
@@ -49,13 +49,13 @@ $("newFolderForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("newFolderName").value.trim();
   if (!name) return;
-  if (fol.list.some((f) => f.name.trim() === name) && !(await uiConfirm("فيه مشروع بنفس الاسم. تعمل واحد آخر؟"))) return;
+  if (fol.list.some((f) => f.name.trim() === name) && !(await uiConfirm("يوجد مشروع بنفس الاسم. هل تنشئ مشروعًا آخر؟"))) return;
   try {
     const f = await api("/api/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     $("newFolderName").value = "";
     fol.current = f;
     await loadFolders();
-    toast("✅ المشروع أُنشئ. ارفع الفيديو والتعليق الصوتي واختر الشخصية");
+    toast("✅ أُنشئ المشروع. ارفع الفيديو والتعليق الصوتي واختر الشخصية");
   } catch (err) {
     toast(err.message, true);
   }
@@ -77,12 +77,12 @@ function renderFolderDetail() {
   // الفيديو الخام
   $("elVideo").innerHTML = `<h3>🎬 الفيديو الخام</h3>` + (f.video
     ? `<video src="${f.video.url}" controls preload="metadata" playsinline></video>
-       <div class="muted">${fmtDuration(f.video.duration)}${f.video.clips ? ` · ${f.video.clips} قطعة` : " · ما زال لم يُقطّع"}</div>
+       <div class="muted">${fmtDuration(f.video.duration)}${f.video.clips ? ` · ${f.video.clips} قطعة` : " · لم يُقطَّع بعد"}</div>
        <div class="row wrap">
          <label class="btn sm">🔄 بدّل الفيديو<input type="file" data-up="video" accept="video/*,.mkv" hidden></label>
          <button class="btn sm danger" data-del="video">🗑️ احذف</button>
        </div>`
-    : `<div class="el-empty">لا يوجد فيديو ما زال</div>
+    : `<div class="el-empty">لا يوجد فيديو بعد</div>
        <label class="btn primary sm">⬆ ارفع الفيديو الخام<input type="file" data-up="video" accept="video/*,.mkv" hidden></label>`)
     + `<div class="bar el-bar" hidden><i></i></div>`;
 
@@ -93,9 +93,9 @@ function renderFolderDetail() {
     ? `<audio src="${f.voice.url}" controls preload="metadata"></audio>
        <div class="el-title">${escapeHtml(f.voice.name)} <span class="muted">${fmtDuration(f.voice.duration)}</span></div>
        ${f.video && Math.abs(f.voice.duration - f.video.duration) > 2 ? `<div class="warn-text">⚠️ طوله مختلف عن الفيديو (${fmtDuration(f.video.duration)})</div>` : ""}`
-    : `<div class="el-empty">لا يوجد تعليق صوتي ما زال</div>`)
+    : `<div class="el-empty">لا يوجد تعليق صوتي بعد</div>`)
     + `<div class="row wrap">
-         <label class="btn sm ${f.voice ? "" : "primary"}">${f.voice ? "🔄 بدّل: ارفع تسجيل" : "⬆ ارفع تسجيل"}<input type="file" data-up="voice" accept=".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*" hidden></label>
+         <label class="btn sm ${f.voice ? "" : "primary"}">${f.voice ? "🔄 بدّل: ارفع تسجيلًا" : "⬆ ارفع تسجيلًا"}<input type="file" data-up="voice" accept=".mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,audio/*" hidden></label>
          ${f.voice ? `<button class="btn sm danger" data-del="voice">✕ أزله</button>` : ""}
        </div>
        <select data-pick="voice">${voiceOpts}</select>
@@ -108,8 +108,8 @@ function renderFolderDetail() {
     ? `<img class="el-coach" src="${f.coach.image_url}" alt="">
        <div class="el-title">${escapeHtml(f.coach.name)}</div>
        <div class="${f.coach.outro_url ? "muted" : "warn-text"}">${f.coach.outro_url ? `🎬 أوترو ${fmtDuration(f.coach.outro_duration)}` : "⚠️ ليس له أوترو"}</div>
-       ${f.coach.outro_url ? `<details><summary>انظر الأوترو</summary><video src="${f.coach.outro_url}" controls preload="none" playsinline></video></details>` : ""}`
-    : `<div class="el-empty">لا يوجد شخصية ما زال</div>`)
+       ${f.coach.outro_url ? `<details><summary>شاهد الأوترو</summary><video src="${f.coach.outro_url}" controls preload="none" playsinline></video></details>` : ""}`
+    : `<div class="el-empty">لا توجد شخصيات بعد</div>`)
     + `<select data-pick="coach">${coachOpts}</select>
        <div class="row wrap">
          ${f.coach ? `<button class="btn sm danger" data-del="coach">✕ أزله</button>` : ""}
@@ -169,14 +169,14 @@ function renderScript(f) {
   scriptState.saved = f.script || "";
   scriptState.dirty = false;
   el.innerHTML = `<h3>📝 النص</h3>
-    <div class="muted">النص الذي الراوي يقرؤه. إذا حبيت تغيّر صوت الراوي لاحقًا، هذا النص الذي سيُسجّل به.</div>
-    <textarea id="scriptText" dir="auto" placeholder="اكتب أو ألصق النص هنا، أو ارفع ملف تكست (.txt)"></textarea>
+    <div class="muted">النص الذي يقرؤه الراوي. إن أردت تغيير صوت الراوي لاحقًا، فهذا النص الذي سيُسجّل به.</div>
+    <textarea id="scriptText" dir="auto" placeholder="اكتب النص أو ألصقه هنا، أو ارفع ملفًا نصيًا (.txt)"></textarea>
     <div class="script-meta" id="scriptMeta"></div>
     <div class="row wrap">
       <button class="btn sm primary" id="scriptSave" disabled>💾 احفظ النص</button>
-      <label class="btn sm">📄 ارفع ملف تكست<input type="file" id="scriptFile" accept=".txt,.md,.srt,text/plain" hidden></label>
+      <label class="btn sm">📄 ارفع ملفًا نصيًا<input type="file" id="scriptFile" accept=".txt,.md,.srt,text/plain" hidden></label>
       <button class="btn sm" id="scriptCopy" ${f.script ? "" : "disabled"}>📋 انسخ</button>
-      <button class="btn sm" id="scriptDownload" ${f.script ? "" : "disabled"}>⬇ نزّله ملف</button>
+      <button class="btn sm" id="scriptDownload" ${f.script ? "" : "disabled"}>⬇ نزّله ملفًا</button>
     </div>`;
   $("scriptText").value = scriptState.saved;
   updateScriptMeta();
@@ -187,7 +187,7 @@ function updateScriptMeta() {
   const text = $("scriptText").value;
   scriptState.dirty = text.trim() !== scriptState.saved.trim();
   $("scriptSave").disabled = !scriptState.dirty;
-  $("scriptMeta").innerHTML = scriptMeta(f, text) + (scriptState.dirty ? `<span class="dirty">● متعدّل ولا تحفظ</span>` : "");
+  $("scriptMeta").innerHTML = scriptMeta(f, text) + (scriptState.dirty ? `<span class="dirty">● معدَّل ولم يُحفظ</span>` : "");
 }
 
 async function saveScript() {
@@ -207,7 +207,7 @@ async function saveScript() {
     }
     const i = fol.list.findIndex((x) => x.id === id);
     if (i >= 0) fol.list[i] = f;
-    toast(text ? "✅ النص حُفظ" : "النص حُذف");
+    toast(text ? "✅ حُفظ النص" : "حُذف النص");
   } catch (err) {
     if (scriptState.folder === id) scriptState.dirty = true;
     toast(err.message, true);
@@ -232,7 +232,7 @@ $("elScript").addEventListener("change", async (e) => {
   try {
     const text = await readTextFile(file);
     if (!text) return toast("الملف فارغ", true);
-    if (scriptState.saved && !(await uiConfirm("هذا سيبدّل النص الحالي بالملف الجديد. تُكمل؟"))) return;
+    if (scriptState.saved && !(await uiConfirm("سيستبدل هذا النص الحالي بالملف الجديد. تُكمل؟"))) return;
     $("scriptText").value = text;
     await saveScript();
   } catch (err) {
@@ -270,7 +270,7 @@ async function patchFolder(changes, msg) {
 
 $("folderName").addEventListener("change", () => {
   const name = $("folderName").value.trim();
-  if (name && name !== fol.current.name) patchFolder({ name }, "✅ الاسم تغيّر (وده اسم الفيديو النهائي)");
+  if (name && name !== fol.current.name) patchFolder({ name }, "✅ تغيّر الاسم (وهو اسم الفيديو النهائي)");
 });
 $("folderName").addEventListener("keydown", (e) => { if (e.key === "Enter") e.target.blur(); });
 
@@ -288,7 +288,7 @@ function uploadWithProgress(url, form, bar) {
       if (xhr.status === 401) location.href = "/login";
       xhr.status < 300 ? resolve(data) : reject(new Error(data.detail || `خطأ ${xhr.status}`));
     };
-    xhr.onerror = () => { bar.hidden = true; reject(new Error("الاتصال قُطع")); };
+    xhr.onerror = () => { bar.hidden = true; reject(new Error("انقطع الاتصال")); };
     xhr.send(form);
   });
 }
@@ -301,20 +301,20 @@ $("folderDetail").addEventListener("change", async (e) => {
     e.target.value = "";
     if (!file) return;
     if (up === "video" && fol.current.video?.clips &&
-        !(await uiConfirm("تبديل الفيديو سيحذف الفيديو القديم والتقطيع الخاص به. الفيديوهات التي وُلّدت من قبل ستظل موجودة. تُكمل؟"))) return;
+        !(await uiConfirm("تبديل الفيديو سيحذف الفيديو القديم والتقطيع الخاص به. ستبقى الفيديوهات التي وُلّدت من قبل. تُكمل؟"))) return;
     const form = new FormData();
     form.append("file", file);
     try {
       const bar = e.target.closest(".element").querySelector(".el-bar");
       fol.current = await uploadWithProgress(`/api/folders/${fol.current.id}/${up}`, form, bar);
       await loadFolders();
-      toast(up === "video" ? "✅ الفيديو رُفع. قطّعه من «افتح في التقطيع»" : "✅ التعليق الصوتي رُفع");
+      toast(up === "video" ? "✅ رُفع الفيديو. قطّعه من «افتح في التقطيع»" : "✅ رُفع التعليق الصوتي");
     } catch (err) {
       toast(err.message, true);
     }
   }
-  if (pick === "voice") patchFolder({ voice_id: e.target.value || null }, "✅ التعليق الصوتي تغيّر");
-  if (pick === "coach") patchFolder({ coach_id: e.target.value || null }, "✅ الشخصية تغيّرت");
+  if (pick === "voice") patchFolder({ voice_id: e.target.value || null }, "✅ تغيّر التعليق الصوتي");
+  if (pick === "coach") patchFolder({ coach_id: e.target.value || null }, "✅ تغيّرت الشخصية");
 });
 
 $("folderDetail").addEventListener("click", async (e) => {
@@ -322,19 +322,19 @@ $("folderDetail").addEventListener("click", async (e) => {
   if (!del) return;
   const f = fol.current;
   if (del === "video") {
-    if (!(await uiConfirm("حذف الفيديو الخام والتقطيع الخاص به؟"))) return;
+    if (!(await uiConfirm("هل تحذف الفيديو الخام والتقطيع الخاص به؟"))) return;
     try {
       fol.current = await api(`/api/folders/${f.id}/video`, { method: "DELETE" });
       await loadFolders();
     } catch (err) { toast(err.message, true); }
   }
-  if (del === "voice") patchFolder({ voice_id: null }, "أُزيل من المشروع (ما زال موجود في مكتبة التعليق الصوتي)");
-  if (del === "coach") patchFolder({ coach_id: null }, "أُزيل من المشروع (ما زال موجود في الشخصيات)");
+  if (del === "voice") patchFolder({ voice_id: null }, "أُزيل من المشروع (ما زال موجودًا في مكتبة التعليق الصوتي)");
+  if (del === "coach") patchFolder({ coach_id: null }, "أُزيل من المشروع (ما زال موجودًا في الشخصيات)");
 });
 
 $("folderDelete").onclick = async () => {
   const f = fol.current;
-  if (!(await uiConfirm(`حذف المشروع "${f.name}" والفيديو الخام والقطع والفيديوهات المولّدة ومونتاجه؟\nالتعليق الصوتي والشخصية سيظلون في مكتباتهم، والفيديوهات التي صُدّرت ستظل في مجلد الجاهز.`))) return;
+  if (!(await uiConfirm(`هل تحذف المشروع "${f.name}" والفيديو الخام والقطع والفيديوهات المولّدة ومونتاجه؟\nسيبقى التعليق الصوتي والشخصية في مكتباتهما، وستبقى الفيديوهات التي صُدّرت في مجلد الجاهز.`))) return;
   try {
     await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [f.id] }) });
   } catch (err) {
@@ -395,9 +395,9 @@ function groupIntoProjects(items) {
       .sort((a, b) => (/\.srt$/i.test(a.name) - /\.srt$/i.test(b.name)) || b.size - a.size);
     if (!raws.length && !audios.length && !images.length && !texts.length) continue;
     const notes = [];
-    if (raws.length > 1) notes.push(`فيه ${raws.length} فيديوهات، هاخد الأكبر`);
-    if (audios.length > 1) notes.push(`فيه ${audios.length} ملفات صوت، هاخد الأكبر`);
-    if (texts.length > 1) notes.push(`فيه ${texts.length} ملفات تكست، هاخد الأكبر`);
+    if (raws.length > 1) notes.push(`يوجد ${raws.length} فيديوهات، سيُؤخذ الأكبر`);
+    if (audios.length > 1) notes.push(`يوجد ${audios.length} ملفات صوت، سيُؤخذ الأكبر`);
+    if (texts.length > 1) notes.push(`يوجد ${texts.length} ملفات نصية، سيُؤخذ الأكبر`);
     const image = images[0] || null;
     const key = image ? matchKey(image.name) : "";
     const existingCoach = key ? coachState.list.find((c) => matchKey(c.name) === key) || fol.coaches.find((c) => matchKey(c.name) === key) : null;
@@ -432,12 +432,12 @@ async function loadRowScript(r) {
 function slotSelect(r, slot) {
   const files = r.files[slot];
   const cur = r[slot];
-  if (!files.length) return `<span class="muted">لا يوجد في المجلد</span>`;
+  if (!files.length) return `<span class="muted">غير موجود في المجلد</span>`;
   const opts = `<option value="">— لا يوجد —</option>` + files
     .map((f, i) => `<option value="${i}" ${cur === f ? "selected" : ""}>${escapeHtml(f.name)} (${mb(f)})</option>`)
     .join("");
   return `<div class="slot"><select data-slot="${slot}">${opts}</select>
-    ${cur ? `<button type="button" class="btn sm" data-preview="${slot}" title="انظر/اسمع">👁</button>` : ""}</div>`;
+    ${cur ? `<button type="button" class="btn sm" data-preview="${slot}" title="شاهد/استمع">👁</button>` : ""}</div>`;
 }
 
 function coachOutroNote(r) {
@@ -456,7 +456,7 @@ function renderFup() {
         coaches.map((c) => `<option value="${c.id}" ${r.coach === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
       return `<tr data-i="${i}" class="${r.status === "done" ? "done" : ""}">
         <td><input type="text" data-f="name" value="${escapeHtml(r.name)}">
-          ${r.existingFolderId ? `<div class="warn-text">مشروع هذا بالاسم موجود، سيُحدّث</div>` : ""}
+          ${r.existingFolderId ? `<div class="warn-text">يوجد مشروع بهذا الاسم، وسيُحدَّث</div>` : ""}
           ${r.status && r.status !== "done" ? `<div class="${r.status.startsWith("✕") ? "err" : "muted"}">${escapeHtml(r.status)}</div>` : ""}</td>
         <td>${slotSelect(r, "video")}</td>
         <td>${slotSelect(r, "voice")}
@@ -468,7 +468,7 @@ function renderFup() {
           <div class="slot-label">🖼️ الصورة</div>${slotSelect(r, "image")}
           <div class="slot-label">🧍 الشخصية</div><select data-f="coach">${coachOpts}</select>
           ${r.coach === "new" ? `<input type="text" data-f="newCoachName" value="${escapeHtml(r.newCoachName)}" placeholder="اسم الشخصية">
-            <div class="muted">شخصية جديدة بدون أوترو. أضفه لاحقًا من صفحة الشخصيات</div>` : ""}
+            <div class="muted">شخصية جديدة دون أوترو. أضفه لاحقًا من صفحة الشخصيات</div>` : ""}
           ${coachOutroNote(r)}</td>
         <td>${r.status === "done" ? "✅" : `<button class="btn sm danger" data-f="remove" title="لا تُرفع">✕</button>`}</td>
       </tr>`;
@@ -615,7 +615,7 @@ $("fupUpload").onclick = async () => {
     const label = `${n + 1} من ${rows.length}: ${r.name}`;
     const step = (s) => { r.status = s; $("fupProgress").textContent = `⏳ ${label} · ${s}`; renderFup(); };
     try {
-      step("يعمل المشروع...");
+      step("يُنشئ المشروع...");
       let folder = r.existingFolderId
         ? fol.list.find((f) => f.id === r.existingFolderId)
         : await api("/api/folders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: r.name.trim() }) });
@@ -640,7 +640,7 @@ $("fupUpload").onclick = async () => {
         const cname = r.newCoachName.trim();
         coachId = newCoaches.get(cname) || fol.coaches.find((c) => c.name.trim() === cname)?.id || null;
         if (!coachId) {
-          step("يعمل الشخصية...");
+          step("يُنشئ الشخصية...");
           const form = new FormData();
           form.append("name", cname);
           form.append("image", r.image);
@@ -660,7 +660,7 @@ $("fupUpload").onclick = async () => {
   fup.busy = false;
   await loadFolders();
   const failed = fup.rows.filter((r) => r.status !== "done").length;
-  $("fupProgress").textContent = failed ? `✅ ${rows.length - failed} حسنًا · ✕ ${failed} فشلوا، صلّح واضغط ارفع مرة أخرى` : "";
+  $("fupProgress").textContent = failed ? `✅ نجح ${rows.length - failed} · ✕ فشل ${failed}، أصلحه واضغط ارفع مرة أخرى` : "";
   renderFup();
   if (!failed) {
     $("fupDialog").close();
@@ -791,7 +791,7 @@ async function openAutopilot() {
         if (!st.settings.platforms?.length) return toast("اختر منصة واحدة على الأقل", true);
         const at = manual() ? Object.fromEntries(ids.map((id) => [id, dlg.querySelector(`[data-at="${id}"]`)?.value || ""])) : {};
         if (manual() && Object.values(at).some((v) => !v)) return toast("حدد يومًا وساعة لكل مشروع مختار", true);
-        if (!(await uiConfirm(`سيُولَّد ${ids.length} مشروع ويُنشر تلقائيًا، والتوليد يُخصم من الرصيد. أنكمل؟`))) return;
+        if (!(await uiConfirm(`سيُولَّد ${ids.length} مشروع ويُنشر تلقائيًا، والتوليد يُخصم من الرصيد. هل نُكمل؟`))) return;
         await saveSettings();
         st = await api("/api/autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder_ids: ids, at }) });
         dlg.querySelectorAll("[data-pick]").forEach((x) => (x.checked = false));
@@ -844,7 +844,7 @@ async function openFoldersPurge() {
       const ids = [...dlg.querySelectorAll("[data-pick]:checked")].map((x) => x.dataset.pick);
       if (!ids.length) return toast("اختر مشروعًا واحدًا على الأقل", true);
       const exports = dlg.querySelector("[data-exp]").checked;
-      if (!(await uiConfirm(`سيُحذف ${ids.length} مشروع${exports ? " ومعها الفيديوهات النهائية" : ""} ولا يمكن استرجاعها. أمتأكد؟`))) return;
+      if (!(await uiConfirm(`سيُحذف ${ids.length} مشروع${exports ? " ومعها الفيديوهات النهائية" : ""} ولا يمكن استرجاعها. هل أنت متأكد؟`))) return;
       try {
         const r = await api("/api/folders/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, exports }) });
         toast(`🗑️ حُذف ${r.deleted} مشروع${r.kept_exports ? ` (${r.kept_exports} فيديو بقي لأن عليه منشورًا مجدولًا)` : ""}`);

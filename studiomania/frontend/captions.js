@@ -145,13 +145,13 @@ $("logoUpload").addEventListener("change", async (e) => {
     logoCfg().enabled = true;
     renderBrandPanels();
     scheduleSave();
-    toast("✅ الشعار رُفع");
+    toast("✅ رُفع الشعار");
   } catch (err) {
     toast(err.message, true);
   }
 });
 $("logoRemove").onclick = async () => {
-  if (!(await uiConfirm("حذف الشعار من كل الفيديوهات القادمة؟"))) return;
+  if (!(await uiConfirm("هل تحذف الشعار من كل الفيديوهات القادمة؟"))) return;
   await api("/api/logo", { method: "DELETE" });
   brand.logoUrl = null;
   renderBrandPanels();
@@ -210,7 +210,7 @@ function liveCaption(c) {
 function sampleWords(n) {
   const voice = mt.project?.data.voice;
   const tr = voice && brand.tr[voice.id];
-  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "هذا مثال للكابشن على الفيديو الخاص بك".split(" ");
+  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "هذا مثال للتعليق النصي على فيديوك".split(" ");
   return src.slice(0, Math.max(1, n));
 }
 
@@ -229,7 +229,7 @@ function renderTranscriptStatus() {
   clearTimeout(brand.trTimer);
   if (!voice) {
     st.className = "cap-status err";
-    st.textContent = "⚠️ اختر تعليق صوتي أولًا (أسفل)، التعليق النصي يُكتب منه.";
+    st.textContent = "⚠️ اختر تعليقًا صوتيًا أولًا (في الأسفل)، فالتعليق النصي يُكتب منه.";
     return;
   }
   if (!tr) {
@@ -240,7 +240,7 @@ function renderTranscriptStatus() {
   }
   if (tr.status === "working") {
     st.className = "cap-status";
-    st.textContent = "⏳ جارٍ الاستماع التعليق الصوتي ويكتب النص...";
+    st.textContent = "⏳ يستمع إلى التعليق الصوتي ويكتب النص...";
     $("capTranscribe").disabled = true;
     brand.trTimer = setTimeout(async () => {
       await loadTranscript(voice.id);
@@ -250,15 +250,15 @@ function renderTranscriptStatus() {
     }, 3000);
   } else if (tr.status === "done") {
     st.className = "cap-status ok";
-    st.textContent = `✓ النص جاهز (${tr.words.length} كلمة)${tr.edited ? " · متعدّل" : ""}`;
-    $("capTranscribe").textContent = "🎧 اكتبه مرة أخرى من أولًا";
+    st.textContent = `✓ النص جاهز (${tr.words.length} كلمة)${tr.edited ? " · معدَّل" : ""}`;
+    $("capTranscribe").textContent = "🎧 اكتبه مرة أخرى من البداية";
   } else if (tr.status === "failed") {
     st.className = "cap-status err";
     st.textContent = `✕ ${tr.error || "فشل"}`;
     $("capTranscribe").textContent = "🎧 جرّب مرة أخرى";
   } else {
     st.className = "cap-status";
-    st.textContent = "ما زال النص لم يُكتب.";
+    st.textContent = "لم يُكتب النص بعد.";
     $("capTranscribe").textContent = "🎧 اكتب النص من التعليق الصوتي";
     // الكابشن شغال: الكلام بيتكتب من التعليق الصوتي لوحده (مرة واحدة لكل صوت)
     brand.autoTr ||= new Set();
@@ -274,7 +274,7 @@ function renderTranscriptStatus() {
 $("capTranscribe").onclick = async () => {
   const voice = mt.project.data.voice;
   const tr = brand.tr[voice.id];
-  if (tr?.edited && !(await uiConfirm("أنت عدّلت النص من قبل. الكتابة من أولًا ستحذف تعديلاتك. تُكمل؟"))) return;
+  if (tr?.edited && !(await uiConfirm("لقد عدّلت النص من قبل. الكتابة من البداية ستحذف تعديلاتك. تُكمل؟"))) return;
   try {
     await api(`/api/audio/${voice.id}/transcribe`, { method: "POST" });
     brand.tr[voice.id] = { status: "working", words: [] };
@@ -305,7 +305,7 @@ $("capEdit").onclick = () => {
   $("trAudio").src = track?.url || "";
   $("trList").innerHTML = groups
     .map((g, i) => `<div class="tr-row" data-i="${i}">
-      <button class="btn sm" data-play="${i}" title="اسمع">▶︎</button>
+      <button class="btn sm" data-play="${i}" title="استمع">▶︎</button>
       <span class="t">${g[0].s.toFixed(1)}s → ${g[g.length - 1].e.toFixed(1)}s</span>
       <input type="text" value="${escapeHtml(g.map((w) => w.w).join(" "))}">
     </div>`)
@@ -354,7 +354,7 @@ $("trSave").onclick = async () => {
       body: JSON.stringify({ words }),
     });
     closeTr();
-    toast("✅ النص حُفظ");
+    toast("✅ حُفظ النص");
     renderBrandPanels();
     scheduleTimeline();
   } catch (err) {

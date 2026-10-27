@@ -188,8 +188,8 @@ async function goNext(step) {
 
 async function nextFromProjects() {
   const f = fol.current || (await flowFolder(true));
-  if (!f) return toast("اختر مشروع أولًا", true);
-  if (!f.video) return toast("هذا المشروع ما زال لا يحتوي فيديو خام. ارفعه أولًا", true);
+  if (!f) return toast("اختر مشروعًا أولًا", true);
+  if (!f.video) return toast("هذا المشروع لا يحتوي على فيديو خام بعد. ارفعه أولًا", true);
   setFlowFolder(f.id);
   fol.current = f;
   $("goCut").onclick();
@@ -197,17 +197,17 @@ async function nextFromProjects() {
 
 async function nextFromCutting() {
   const v = state.current;
-  if (!v) return toast("افتح الفيديو الذي تريد تقطّعه أولًا", true);
+  if (!v) return toast("افتح الفيديو الذي تريد تقطيعه أولًا", true);
   setFlowByVideo(v.id);
   if (v.clips_count) return openGenerateWith(v.id, v.coach?.id || null);
-  if (!v.cuts?.length) return toast("علّم أماكن القطع أولًا بزرار «اقطع هنا»", true);
+  if (!v.cuts?.length) return toast("علّم أماكن القطع أولًا بزر «اقطع هنا»", true);
   await splitCurrent(true); // يقطّع ويفتح التوليد بالقطع
 }
 
 async function nextFromGenerate() {
   const f = await flowFolder(true);
-  if (!f?.video) return toast("لا تعرف المشروع. افتح المشروع من خطوة المشاريع أولًا", true);
-  if (!f.video.generated) return toast("لا يوجد بعد فيديوهات وُلّدت هذا للمشروع. ولّد القطع أولًا", true);
+  if (!f?.video) return toast("المشروع غير معروف. افتح المشروع من خطوة المشاريع أولًا", true);
+  if (!f.video.generated) return toast("لا توجد فيديوهات وُلّدت لهذا المشروع بعد. ولّد القطع أولًا", true);
   fol.current = f;
   await $("goMontage").onclick();
 }
@@ -217,7 +217,7 @@ function nextFromMontage() {
   if (!p) return toast("افتح مشروع المونتاج أولًا", true);
   if (p.render_status !== "done" || !p.export_id) {
     showTab("export");
-    return toast("صدّر الفيديو أولًا، ثم أكمل للنشر", true);
+    return toast("صدّر الفيديو أولًا، ثم انتقل إلى النشر", true);
   }
   pub.videoId = p.export_id; // الفيديو الذي ما زال متصدّر يصبح متختار في فورم النشر
   showStep("7");

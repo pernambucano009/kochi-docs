@@ -127,7 +127,7 @@ const Flow = (() => {
   function rateBtns(stage, id) {
     const v = (S.d.ratings || {})[`${stage}:${id || "final"}`] || 0;
     return `<span class="flw-rate"><button type="button" class="${v === 1 ? "on" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === 1 ? 0 : 1}" title="أعجبني">👍</button>
-      <button type="button" class="${v === -1 ? "on bad" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === -1 ? 0 : -1}" title="غير يعجبني">👎</button></span>`;
+      <button type="button" class="${v === -1 ? "on bad" : ""}" data-rate="${stage}" data-rid="${esc(id || "")}" data-v="${v === -1 ? 0 : -1}" title="لا يعجبني">👎</button></span>`;
   }
   const working = (t) => `<div class="flw-work"><span class="flw-spin"></span><p>${t} <small class="muted" data-secs></small></p></div>`;
   const failed = (what) => (S.d.error && !S.d.busy ? `<div class="flw-empty bad">⚠️ ${esc(S.d.error)}
@@ -633,10 +633,10 @@ const Flow = (() => {
       ${rendering ? working(`جارٍ تصدير الفيديو… ${esc(pj.render_progress || "")}`) : pj.render_error ? `<div class="flw-empty bad">⚠️ ${esc(pj.render_error)}</div>` : ""}
       <div class="flw-acts end">
         ${mo.plain ? `<button type="button" class="flw-link" data-automont>↩︎ استعد المونتاج التلقائي</button>` : `<button type="button" class="flw-link" data-plain>✕ بدون مونتاج</button>`}
-        <button type="button" class="flw-btn" data-myedit>✏️ سأعمل المونتاج بنفسي</button>
+        <button type="button" class="flw-btn" data-myedit>✏️ سأصنع المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
         <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر نسخة أخرى" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button></div>
-      ${rp.broll && !mo.plain ? `<p class="muted">✏️ إذا أردت عمل المونتاج بنفسك: لقطات الـ B-roll طبقات فوق الفيديو، يمكنك إزالة أي منها أو استبدالها بفيديو أو صورة من جهازك.</p>` : ""}
+      ${rp.broll && !mo.plain ? `<p class="muted">✏️ إن أردت صنع المونتاج بنفسك: لقطات الـ B-roll طبقات فوق الفيديو، يمكنك إزالة أي منها أو استبدالها بفيديو أو صورة من جهازك.</p>` : ""}
       ${tyBusy ? `<p class="muted">التصدير ينتظر انتهاء التايبوجرافي ليظهر النص فوق الفيديو.</p>` : ""}
       ${mo.plain ? "" : camBench(d)}`;
   }
@@ -648,7 +648,7 @@ const Flow = (() => {
     if (!cm) return `<div class="flw-cam">${working("جارٍ البحث عن النماذج المتاحة…")}</div>`;
     const sec = cm.seconds || 5;
     const runs = (cb?.runs || []).map((r) => `<figure class="${r.status}">${r.file ? `<video src="/media/ads/flows/${esc(d.id)}/${esc(r.file)}" controls loop playsinline></video>` : `<span class="flw-ph">${r.status === "failed" ? "⚠️" : "⏳"}</span>`}
-      <figcaption><b>${esc(r.label)}</b><small class="${r.status === "failed" ? "err" : "muted"}">${r.status === "done" ? `✓${r.credits ? ` · ${r.credits} نقطة` : ""}` : r.status === "failed" ? esc(r.error || "فشل") : "يُنشأ (قد يأخذ بضع دقائق)"}</small></figcaption></figure>`).join("");
+      <figcaption><b>${esc(r.label)}</b><small class="${r.status === "failed" ? "err" : "muted"}">${r.status === "done" ? `✓${r.credits ? ` · ${r.credits} نقطة` : ""}` : r.status === "failed" ? esc(r.error || "فشل") : "يُنشأ (قد يستغرق بضع دقائق)"}</small></figcaption></figure>`).join("");
     return `<div class="flw-cam"><h3>🎥 زاوية كاميرا حقيقية (تجربة)</h3>
       <p class="flw-sub">نرسل ${sec} ثوانٍ من اللقطة إلى كل نموذج يستطيع تصوير المشهد نفسه من مكان آخر، وترى النتائج جنبًا إلى جنب وتقرر أيها يناسب.</p>
       ${cm.models.length ? "" : `<p class="flw-empty bad">لم أجد نماذج تعديل فيديو متاحة.</p>`}
@@ -725,7 +725,7 @@ const Flow = (() => {
       const n = Math.round((Date.now() - S.busyFrom) / 1000);
       const cur = S.el?.querySelector("[data-secs]");
       if (!cur) return clearInterval(S.tickT);
-      cur.textContent = n < 3 ? "" : n < 45 ? `${n} ثانية` : `${n} ثانية · يأخذ وقتًا أطول من المعتاد، وإذا تأخر كثيرًا سيجرّب العقل نموذجًا أسرع تلقائيًا`;
+      cur.textContent = n < 3 ? "" : n < 45 ? `${n} ثانية` : `${n} ثانية · يستغرق وقتًا أطول من المعتاد، وإن تأخر كثيرًا سيجرّب العقل نموذجًا أسرع تلقائيًا`;
     };
     up();
     S.tickT = setInterval(up, 1000);
@@ -907,7 +907,7 @@ const Flow = (() => {
       e.target.value = "";
       for (const [i, file] of files.entries()) {
         const f = new FormData(); f.append("role", ph); f.append("file", file);
-        toast(`⏳ جارٍ الرفع ${files.length > 1 ? `${i + 1} من ${files.length}` : "الفيديو"}…`);
+        toast(`⏳ جارٍ رفع ${files.length > 1 ? `${i + 1} من ${files.length}` : "الفيديو"}…`);
         if (!(await call("/footage", f))) break;
       }
       return;
