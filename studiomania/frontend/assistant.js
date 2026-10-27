@@ -118,19 +118,24 @@ const Assistant = (() => {
     S = { saved: 0, aBuf: "" };
     q("[data-end]").onclick = () => end(false);
     try {
+      q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       S.mic = mic; S.ctx = new AudioContext(); S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+      q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;
       pc.ontrack = (e) => { el.srcObject = e.streams[0]; S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0])); };
       pc.addTrack(mic.getTracks()[0], mic);
       const dc = pc.createDataChannel("oai-events"); S.dc = dc;
-      dc.onopen = () => dc.send(JSON.stringify({ type: "response.create" }));
+      // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
+      const greet = () => { if (S && !S.greeted && dc.readyState === "open") { S.greeted = true; dc.send(JSON.stringify({ type: "response.create" })); } };
+      dc.onopen = () => setTimeout(greet, 2500);
       dc.onmessage = async (m) => {
         let e; try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") { S.aBuf += e.delta; caption(S.aBuf); }
-        else if (e.type === "response.created") S.aBuf = "";
+        else if (e.type === "session.created" || e.type === "session.updated") greet();
+        else if (e.type === "response.created") { S.aBuf = ""; S.greeted = true; }
         else if (e.type === "response.function_call_arguments.done") {
           let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch { /* أرجومنت مش JSON */ }
           const out = await tool(e.name, args);
@@ -175,14 +180,15 @@ const Assistant = (() => {
   }
   let S_done = null;
 
-  async function maybe() {
+  async function maybe(force) {
+    if (ov) return;   // مفتوح أصلًا
     try { state = await api("/api/assistant"); } catch { return; }
-    const forced = /[?&]assistant=1\b/.test(location.search);   // للتجربة: يفتح حتى لو اتعمل قبل كده
+    const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من زر «أجب بالصوت» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return;
     if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return; } catch { /* التخزين مقفول */ }
     if (!(await intro())) return;
     await close();
     await new Promise((res) => { S_done = res; call(); });
   }
-  return { maybe, open: async () => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(); } };
+  return { maybe, open: async () => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true); } };
 })();
