@@ -87,22 +87,53 @@ def agent_name(dialect: str, gender: str) -> str:
     return m if gender == "m" else f
 
 
-def quiz_questions() -> list[str]:
+def quiz_questions() -> list[tuple[str, str]]:
+    """(رقم السؤال في كويز العقل، نصه) بالترتيب."""
     try:
         import brainquiz  # noqa: PLC0415
-        return [q["ar"] for q in brainquiz.Q if q["id"] not in SKIP_Q]
+        return [(q["id"], q["ar"]) for q in brainquiz.Q if q["id"] not in SKIP_Q]
     except Exception:  # noqa: BLE001
-        return ["ما مجال عملك؟", "صِف مشروعك: ماذا تقدم، وما الذي يميزك؟", "من هو عميلك المثالي؟", "في أي مدينة أو دولة عملاؤك؟"]
+        return [("domain", "ما مجال عملك؟"), ("about", "صِف مشروعك: ماذا تقدم، وما الذي يميزك؟"), ("audience", "من هو عميلك المثالي؟"),
+                ("market", "في أي مدينة أو دولة عملاؤك؟")]
 
 
-def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m") -> str:
+# 🧰 أدوات المساعد الحقيقي (بعد التسجيل): كل إجابة بتتحفظ في العقل وقت ما بتتقال، وتحليل الحساب بيبدأ في الخلفية
+TOOLS = [
+    {"type": "function", "name": "save_answer", "description": "Save the user's answer to one onboarding question into their brand profile.",
+     "parameters": {"type": "object", "properties": {
+         "qid": {"type": "string", "description": "The question id from the list in the instructions."},
+         "answer": {"type": "string", "description": "The answer, written clearly in Arabic, keeping the user's own facts and words. No invented details."}},
+         "required": ["qid", "answer"]}},
+    {"type": "function", "name": "start_account_analysis", "description": "Start analysing the user's Instagram or TikTok account in the background.",
+     "parameters": {"type": "object", "properties": {"account": {"type": "string", "description": "The @handle or profile link exactly as the user gave it."}},
+                    "required": ["account"]}},
+    {"type": "function", "name": "get_account_analysis", "description": "Check whether the account analysis is ready and get its main findings.",
+     "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
+     "parameters": {"type": "object", "properties": {}}},
+]
+
+
+def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
+                 known: dict | None = None) -> str:
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
     agent = agent or agent_name(dialect, agent_gender)
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
     you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
            "a man: address him ONLY with masculine pronouns, verbs and adjectives")
-    qs = "\n".join(f"   {i + 1}. {q}" for i, q in enumerate(quiz_questions()))
+    qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(quiz_questions()))
+    kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in (known or {}).items() if v)
+    if kn:
+        qs += "\nAlready known from signup (do not ask these again):\n" + kn
+    tool_txt = ("""
+Tools (use them silently, never read them out loud):
+- After each answer, call save_answer with the question id in [brackets] and the answer. If one answer covers several questions,
+  save each one. Keep talking naturally while it saves.
+- As soon as the user gives their account, call start_account_analysis with it.
+- After the last question, call get_account_analysis. If it is ready, tell the user 2–3 short, specific findings from it in the dialect.
+  If it is not ready yet, tell them the results will appear on their screen in a few minutes.
+- Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")
     return f"""You are {agent}, the personal assistant of SimsimKit, a platform that makes social-media videos for businesses.
 The user, {user}, just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
 warm, natural, short sentences. Never use Modern Standard Arabic unless the dialect IS Modern Standard Arabic. Never switch dialects.
@@ -115,7 +146,7 @@ Follow this order:
 3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):
 {qs}
 4. When done, thank them and tell them you are preparing what you found.
-
+{tool_txt}
 Rules:
 - Keep every turn to 1–2 short sentences. React to each answer in a few words before the next question.
 - If the user interrupts, stop and listen. If they go off-topic, answer briefly and come back to the next question.
@@ -142,7 +173,7 @@ def _fail(r: httpx.Response, who: str) -> None:
         raise LiveError(f"{who} رد بخطأ {r.status_code}: {r.text[:400]}")
 
 
-def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto") -> dict:
+def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", tools: list | None = None) -> dict:
     key = openai_key()
     if not key:
         raise LiveError("مفتاح OpenAI غير مسجل. ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة")
@@ -150,6 +181,8 @@ def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto") -
                "audio": {"input": {"transcription": {"model": "gpt-4o-mini-transcribe"}, "noise_reduction": {"type": "near_field"},
                                    "turn_detection": {"type": "semantic_vad", "eagerness": eagerness, "interrupt_response": True, "create_response": True}},
                          "output": {"voice": voice}}}
+    if tools:
+        session.update(tools=tools, tool_choice="auto")
     r = httpx.post(f"{OPENAI_URL}/realtime/client_secrets", headers={"Authorization": f"Bearer {key}"},
                    json={"expires_after": {"anchor": "created_at", "seconds": 600}, "session": session}, timeout=30)
     _fail(r, "OpenAI")

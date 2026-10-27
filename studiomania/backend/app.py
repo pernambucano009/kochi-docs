@@ -12398,7 +12398,8 @@ def run_brain_social(bid: str, sid: str) -> None:
     todos = brainsocial.clean_todos(out.get("todos"), sid)
     niche = str(out.get("niche") or "").strip()[:300]
     usd = meter["usd"] or wallet.est(chars=len(prompt) + 6000, images=len(imgs))
-    cost = 0 if atlas.mock_mode() else wallet.charge(wallet.credits(usd + wallet.est(scrape=calls, stt_min=stt / 60)), f"العقل: تحليل حساب @{handle}", sid)
+    # 🎙️ تحليل الحساب اللي بيبدأ من مكالمة المساعد أول التسجيل: مرة واحدة على المنصة (مصاريف دعاية)، مش من رصيد العميل
+    cost = 0 if atlas.mock_mode() or s.get("free") else wallet.charge(wallet.credits(usd + wallet.est(scrape=calls, stt_min=stt / 60)), f"العقل: تحليل حساب @{handle}", sid)
 
     def fn(d):
         d.setdefault("pending", []).extend(items_p)
@@ -32593,4 +32594,146 @@ def pilot_delete(jid: str):
 
 
 # الواجهة آخر حاجة: أي مسار مش API بيروح للملفات (لازم تفضل بعد كل الـ routes)
+# ---------------------------------------------------------------- 🎙️ المساعد الصوتي أول التسجيل (livevoice.py)
+# بيكلّم العميل لايف بلهجته واسمه، وبيملا العقل من كلامه (بدل كويز العقل)، وبيبدأ تحليل حسابه في الخلفية.
+# التكلفة (المكالمة وتحليل الحساب) على المنصة: مرة واحدة لكل علامة.
+import livevoice  # noqa: E402
+ASSIST_VOICE = {"f": "marin", "m": "cedar"}   # الصوت على حسب المساعد (بنت أو ولد)
+
+
+def assist_info() -> tuple[str | None, dict, dict]:
+    bid = active_client_id()
+    b = (brain_row(bid) or {}) if bid else {}
+    return bid, b, b.get("assistant") or {}
+
+
+@app.get("/api/assistant")
+def assistant_state():
+    bid, b, a = assist_info()
+    ob = onboard_load() or {}
+    dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
+    social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
+    # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
+    return {"ready": bool(bid and livevoice.openai_key()), "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or "",
+            "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
+            "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
+            "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None}
+
+
+class AssistProfileIn(BaseModel):
+    name: str = ""
+    gender: str = "m"
+    agent_gender: str = "f"
+
+
+@app.post("/api/assistant/profile")
+def assistant_profile(body: AssistProfileIn):
+    bid, _b, _a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    nm = body.name.strip()[:60]
+    if not nm:
+        raise HTTPException(400, "اكتب اسمك")
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(name=nm, gender="f" if body.gender == "f" else "m",
+                                                                     agent_gender="m" if body.agent_gender == "m" else "f"))
+    return assistant_state()
+
+
+@app.post("/api/assistant/token")
+def assistant_token():
+    bid, b, a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    if not a.get("name"):
+        raise HTTPException(400, "اكتب اسمك أولًا")
+    ob = onboard_load() or {}
+    dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
+    ag = a.get("agent_gender") or "f"
+    known = {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q if q["id"] not in livevoice.SKIP_Q}
+    instr = livevoice.instructions(dia, "", a["name"], ag, a.get("gender") or "m", tools=True, known=known)
+    model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
+    try:
+        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS)
+    except livevoice.LiveError as exc:
+        issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
+        raise HTTPException(503, "المساعد غير متاح الآن. جرّب مرة أخرى بعد قليل") from exc
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(started=now(), calls=int((d.get("assistant") or {}).get("calls") or 0) + 1))
+    return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag)}
+
+
+class AssistAnswerIn(BaseModel):
+    qid: str
+    answer: str
+
+
+@app.post("/api/assistant/answer")
+def assistant_answer(body: AssistAnswerIn):
+    bid, _b, _a = assist_info()
+    q = brainquiz.BY_ID.get(body.qid)
+    if not bid or not q:
+        return {"ok": False, "error": "unknown question"}
+    brain_quiz_answer(bid, QuizIn(qid=body.qid, answer=body.answer))
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("saved", []).append(body.qid)
+                 if body.qid not in (d.get("assistant") or {}).get("saved", []) else None)
+    return {"ok": True, "saved": q["ar"]}
+
+
+class AssistAccountIn(BaseModel):
+    account: str
+
+
+@app.post("/api/assistant/account")
+def assistant_account(body: AssistAccountIn):
+    """تحليل الحساب من المكالمة: مجاني مرة واحدة (على المنصة)، والمرة التانية من نقاط العميل زي العادي."""
+    bid, b, a = assist_info()
+    plat, handle = brainsocial.parse(body.account)
+    if not bid or not handle:
+        return {"ok": False, "error": "no handle"}
+    if not atlas.mock_mode() and not rivals.live():
+        return {"ok": False, "error": "account analysis unavailable right now"}
+    if any(x.get("kind") == "social" and x.get("handle", "").lower() == handle.lower() and x.get("status") != "failed" for x in b.get("sources") or []):
+        return {"ok": True, "started": False, "note": "already analysing"}
+    free = not a.get("free_used")
+    s = {"kind": "social", "name": f"@{handle} · {'تيك توك' if plat == 'tiktok' else 'إنستجرام'}", "platform": plat, "handle": handle,
+         "id": uuid.uuid4().hex[:10], "status": "working", "error": None, "count": 0, "note": "", "created_at": now(), "free": free}
+    if not free:
+        try:
+            wallet.need(wallet.credits(wallet.est(scrape=3, chars=40000, images=20, stt_min=3)), "تحليل الحساب")
+        except wallet.NoCredits as e:
+            return {"ok": False, "error": str(e)}
+
+    def fn(d):
+        d.setdefault("sources", []).append(s)
+        d.setdefault("assistant", {})["free_used"] = True
+    update_brain(bid, fn)
+    threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
+    return {"ok": True, "started": True}
+
+
+@app.get("/api/assistant/account")
+def assistant_account_state():
+    """للمساعد: التحليل خلص؟ وأهم اللي لقاه (عشان يقوله للعميل بلهجته)."""
+    _bid, b, _a = assist_info()
+    s = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
+    if not s:
+        return {"ready": False, "status": "none"}
+    if s.get("status") != "done":
+        return {"ready": False, "status": s.get("status"), "step": s.get("step"), "error": s.get("error")}
+    so = b.get("social") or {}
+    st = so.get("stats") or {}
+    todos = [{"title": t["title"], "why": t.get("why", "")[:200]} for t in b.get("todos") or [] if t.get("source") == s["id"]][:5]
+    return {"ready": True, "account": s.get("name"), "followers": so.get("followers"), "niche": b.get("niche") or "",
+            "avg_views": st.get("avg_views"), "median_views": st.get("median_views"), "engagement_pct": st.get("engagement"),
+            "posts_every_days": st.get("every_days"), "improvements": todos,
+            "suggestions_waiting": len([p for p in b.get("pending") or [] if p.get("source") == s["id"]])}
+
+
+@app.post("/api/assistant/done")
+def assistant_done():
+    bid, _b, _a = assist_info()
+    if bid:
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(done=True, done_at=now()))
+    return assistant_state()
+
+
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
