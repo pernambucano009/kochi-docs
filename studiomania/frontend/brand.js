@@ -137,6 +137,25 @@ const BrandPage = (() => {
       default: return false;
     }
   }
+  // 🌱 العقل بيتبني قدام العميل: الفرع مايطلعش غير لما يبقى فيه معلومة منه هو (مش اللي البرنامج ملاه لوحده وقت التسجيل).
+  // قبلها بيبقى نقطة صغيرة جنب العقل تدوس عليها وتملاها بإيدك. والثابت (المنافسون، الترند، خطة المحتوى، الخوارزميات، المكتبة،
+  // الشخصيات) بييجي في الآخر: لما العقل يفهمه (٦٠٪) أو المساعدة تخلّص كلامها معاه، والمنافسون أول ما يتلاقوا
+  const SEED = new Set(["identity", "look", "rules", "delivery", "knowledge", "improve"]);
+  const lateOn = (b) => (b?.knowledge?.score || 0) >= 60 || !!b?.assistant_done;
+  function branchOn(b, br) {
+    if (!b) return false;
+    const pre = b.prefilled || {}, own = (f) => String(b[f] ?? "").trim() !== String(pre[f] ?? "").trim();
+    if (br.leaves.some((l) => l.type === "pending")) return true;
+    switch (br.k) {
+      case "identity": case "look": case "delivery":
+        return br.leaves.some((l) => !["pick", "action", "page", "rule-new", "pending"].includes(l.type) && l.f !== "@name" && filled(b, l) && (l.type !== "text" || own(l.f)));
+      case "rules": return rulesOf(b).length > 0 && own("rules");
+      case "knowledge": return (b.notes || []).some((x) => x.source !== "field");
+      case "improve": return (b.todos || []).length > 0;
+      case "pulse": return (b.rivals || []).length > 0 || !!b.rivals_pending || lateOn(b);
+      default: return lateOn(b);   // algo, content, chars
+    }
+  }
   // الشعار على الفيديو شغّال من الأول (أي قيمة غير «0» معناها نعم)، فمايظهرش كأنه خانة فاضية
   const pickRaw = (b, l) => (l.f === "logo_on" ? (String(b?.logo_on ?? "") === "0" ? "0" : "1") : String(b?.[l.f] || ""));
   const leafValue = (b, l) => {
@@ -204,31 +223,38 @@ const BrandPage = (() => {
       const a = i < nr ? -Math.PI / 2 + Math.PI * (i + .5) / nr : Math.PI / 2 + Math.PI * (i - nr + .5) / nl;
       // الفرع بيطول مع كل حاجة بتتضاف فيه: العميل يشوف العقل بيكبر
       const g = growth(b, br), D = 250 + 140 * (1 - Math.exp(-g / 8));
-      const bx = Math.cos(a) * D * ex, by = Math.sin(a) * D * ey;
+      const on = branchOn(b, br);
+      if (!on && !SEED.has(br.k)) return;   // الثابت بييجي في الآخر
+      const DD = on ? D : 215, bx = Math.cos(a) * DD * ex, by = Math.sin(a) * DD * ey;
       const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && !["action", "pending", "page"].includes(l.type));
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
-      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g });
+      nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g: on ? g : -1, seed: !on });
       // ورق الفرع على قوس برّه، ولو كتير بيبقى على صفين؛ بين كل نقطة والتانية مسافة كفاية
       const n = br.leaves.length, two = n > 7, RL = 92 + Math.min(36, n * 2.5);
       const spread = Math.min(Math.PI * .95, Math.max(0, n - 1) * (two ? 24 : 40) / RL);
       br.leaves.forEach((l, j) => {
         const la = a + (n === 1 ? 0 : -spread / 2 + (j / (n - 1)) * spread);
         const rr = RL * (two && j % 2 ? 1.42 : 1);
-        nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: bx + Math.cos(la) * rr, y: by + Math.sin(la) * rr, from: br.k, on: filled(b, l) });
+        // فرع لسه نقطة: ورقه موجود (عشان كارته يفتح) بس مستخبي جوه النقطة لحد ما الفرع يطلع
+        nodes.push({ id: `${br.k}:${l.f}:${l.i ?? ""}`, kind: "leaf", br, l, x: on ? bx + Math.cos(la) * rr : bx, y: on ? by + Math.sin(la) * rr : by, from: br.k, on: filled(b, l), hidden: !on });
       });
     });
     // 📈 الترند: دراع طويل طالع لفوق في الزاوية الشمال، ومربع أحمر بعدد الترندات الجديدة
-    { const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
-      nodes.push({ id: "trends", kind: "trends", x: Math.min(...xs) * .9, y: Math.min(...ys) - 70, from: "c" });
+    // الترند بعد المنافسين، وخطة المحتوى بعد الترند وفي الآخر
+    { const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y), X = Math.max(320, ...xs.map(Math.abs)), Y = Math.min(-260, ...ys);
+      if (branchOn(b, { k: "pulse", leaves: [] })) nodes.push({ id: "trends", kind: "trends", x: -X * .9, y: Y - 70, from: "c" });
       // 🧭 خطة المحتوى: نقطة لوحدها فوق يمين، عدّادها بيزيد مع كل معلومة العقل بيعرفها والخطة بتتبني لوحدها
-      nodes.push({ id: "plan", kind: "plan", x: Math.max(...xs) * .9, y: Math.min(...ys) - 70, from: "c" }); }
+      if (lateOn(b)) nodes.push({ id: "plan", kind: "plan", x: X * .9, y: Y - 70, from: "c" }); }
     // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
-    const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n]));
+    const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n])), again = !!S.nodes?.length && !reduce.matches;
     S.nodes = nodes.map((n, i) => {
       const o = old[n.id];
-      // الفرع لما يطول بيتمد لمكانه الجديد بالزنبرك (مش بينط)
-      const grew = o && n.kind !== "center" && o.g !== n.g && !reduce.matches;
-      return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : n.y, vx: o?.vx || 0, vy: o?.vy || 0 };
+      // الفرع لما يطول (أو يطلع من نقطته) بيتمد لمكانه الجديد بالزنبرك (مش بينط)، وورقه بيطلع منه
+      const grew = o && n.kind !== "center" && (o.g !== n.g || (o.hidden && !n.hidden)) && !reduce.matches;
+      // جديد خالص وإحنا شغالين: بيطلع من أبوه (الورقة من فرعها، والفرع من العقل)
+      const par = !o && again && (old[n.from] || (n.from === "c" ? { px: 0, py: 0 } : null));
+      return { ...n, ph: i * 1.7, px: o ? (grew ? o.px : o.px + (n.x - o.x)) : par ? par.px : n.x, py: o ? (grew ? o.py : o.py + (n.y - o.y)) : par ? par.py : n.y,
+        vx: o?.vx || 0, vy: o?.vy || 0, born: !!par || (grew && o.hidden) };
     });
     S.byId = Object.fromEntries(S.nodes.map((n) => [n.id, n]));
     fit();
@@ -246,8 +272,9 @@ const BrandPage = (() => {
     }
     // الشريط اللي فوق ثابت وطاير فوق الصفحة: الخريطة بتتحط تحته مش وراه
     const top = topInset(), hh = H - top - 40;
-    const s = Math.max(.35, Math.min(1.05, (W - 32) / (x1 - x0), hh / (y1 - y0)));
-    S.view = { s, x: W / 2 - (x0 + x1) / 2 * s, y: top + hh / 2 - (y0 + y1) / 2 * s, user: false };
+    // المساعدة مفتوحة على اليمين: الخريطة بتتحط في الباقي من الشاشة
+    const R = S.reserve || 0, s = Math.max(.35, Math.min(1.05, (W - R - 32) / (x1 - x0), hh / (y1 - y0)));
+    S.view = { s, x: (W - R) / 2 - (x0 + x1) / 2 * s, y: top + hh / 2 - (y0 + y1) / 2 * s, user: false };
     applyView();
   }
   // الخريطة مالية الصفحة كلها، والشريط اللي فوق وعنوان الصفحة طايرين فوقها: المحتوى بيتحط تحتهم
@@ -292,7 +319,7 @@ const BrandPage = (() => {
     }
     return g;
   }
-  const beadsOf = (n) => Math.min(30, 2 + n.g);
+  const beadsOf = (n) => (n.seed ? 0 : Math.min(30, 2 + n.g));
   function nodeHTML(n, b) {
     if (n.kind === "center") {
       const reading = (b?.sources || []).filter((s) => s.status === "working").length, waiting = (b?.pending || []).length;
@@ -329,7 +356,7 @@ const BrandPage = (() => {
       return `<button class="bm-n bm-add${reading ? " busy" : ""}" data-n="add" title="أضف للعقل: ملف أو رابط أو نص"><i>+</i><b>أضف للعقل</b></button>`;
     }
     if (n.kind === "branch") {
-      return `<button class="bm-n bm-branch${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.br.t)}">
+      return `<button class="bm-n bm-branch${n.seed ? " bm-seed" : ""}${S.open?.br === n.br.k ? " on" : ""}" data-n="${n.id}" title="${esc(n.seed ? `${n.br.t}: اضغط لتملأه` : n.br.t)}">
         <span class="bm-bic">${svg(IC[n.br.k])}${n.waiting ? `<em class="num">${n.waiting}</em>` : ""}</span><b>${esc(n.br.t)}</b>${n.total ? `<small class="num">${n.br.k === "knowledge" ? n.total : `${n.done}/${n.total}`}</small>` : ""}</button>`;
     }
     const l = n.l, val = leafValue(b, l);
@@ -356,11 +383,18 @@ const BrandPage = (() => {
   }
   function draw() {
     const w = S.el, b = cur();
-    w.querySelector(".bm-nodes").innerHTML = S.nodes.map((n) => nodeHTML(n, b)).join("");
+    w.querySelector(".bm-nodes").innerHTML = S.nodes.filter((n) => !n.hidden).map((n) => nodeHTML(n, b)).join("");
     S.nodes.forEach((n) => { n.el = w.querySelector(`[data-n="${CSS.escape(n.id)}"]`); });
+    // 🌱 اللي لسه طالع (فرع طلع من نقطته، أو ورقة جديدة): بيظهر بالتدريج وهو بيتمد، والورق ورا بعض
+    let bi = 0;
+    for (const n of S.nodes) {
+      if (!n.born || !n.el) continue;
+      n.born = false;
+      n.el.animate([{ opacity: 0, scale: .35 }, { opacity: 1, scale: 1 }], { duration: 650, delay: n.kind === "leaf" ? 180 + (bi++ % 12) * 110 : 0, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" });
+    }
     if (S.hovNode) { const h = S.nodes.find((x) => x.id === S.hovNode.id); S.hovNode = h || null; h?.el?.classList.add("hot"); }
-    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}"/>`).join("");
-    S.nodes.forEach((n) => { n.line = n.from ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
+    w.querySelector(".bm-lines").innerHTML = S.nodes.filter((n) => n.from && !n.hidden).map((n) => `<path data-l="${esc(n.id)}" class="${n.kind}${n.on === false ? " empty" : ""}${n.seed ? " seed" : ""}"/>`).join("");
+    S.nodes.forEach((n) => { n.line = n.from && !n.hidden ? w.querySelector(`.bm-lines [data-l="${CSS.escape(n.id)}"]`) : null; });
     // نقط الدراع: النقط الجديدة بتطلع بنبضة
     const prev = S.beads || null;
     S.beads = {};
@@ -1361,6 +1395,16 @@ const BrandPage = (() => {
     if (busy(cur())) watch();
   }
 
+  // 🎙️ وقت المكالمة: كل ما العقل يتغيّر الخريطة تتحدث لوحدها (والفرع الجديد يطلع بالحركة)، والكرة على اليمين بتاخد مكانها
+  let reT = 0;
+  window.addEventListener("brain:changed", () => {
+    clearTimeout(reT);
+    reT = setTimeout(async () => {
+      if (!S.el?.isConnected || !S.id) return;
+      try { const b = await bAPI(""); S.brains = S.brains.map((x) => (x.id === b.id ? b : x)); layout(); if (busy(b)) watch(); } catch { /* الخريطة هتتحدث المرة الجاية */ }
+    }, 400);
+  });
+  window.addEventListener("assistant:dock", (e) => { S.reserve = e.detail?.w || 0; if (S.el?.isConnected && S.nodes) fit(true); });
   async function mount(root, id) {
     const w = root.querySelector("#nbWrap");
     if (!w) return;
@@ -1373,7 +1417,8 @@ const BrandPage = (() => {
     dotsSize();
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
     if (!S.raf) S.raf = requestAnimationFrame(loop);
-    if ((cur()?.knowledge?.score ?? 100) < 30 && S.byId?.quiz) openCard(S.byId.quiz);
+    // من غير المساعدة الصوتية: «أكمل العقل» بيفتح لوحده في الأول. معاها، الخريطة تفضل فاضية قدامه ودايرة «؟» هي المساعدة
+    if (typeof Assistant === "undefined" && (cur()?.knowledge?.score ?? 100) < 30 && S.byId?.quiz) openCard(S.byId.quiz);
     // أول ما الخريطة تفتح: النقط بتطلع من المخ لبرّه
     if (!reduce.matches) S.nodes.forEach((n, i) => n.el?.animate([{ opacity: 0, translate: `${S.nodes[0].x - n.x}px ${S.nodes[0].y - n.y}px`, scale: .3 }, { opacity: 1, translate: "0 0", scale: 1 }],
       { duration: 700, delay: n.kind === "center" ? 0 : n.kind === "branch" ? 120 : 260 + (i % 9) * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }));

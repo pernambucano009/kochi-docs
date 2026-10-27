@@ -10881,6 +10881,9 @@ def brain_to_dict(b: dict) -> dict:
     out["pending"] = b.get("pending") or []
     out["notes"] = b.get("notes") or []
     out["knowledge"] = fz.knowledge(b)
+    # 🌱 الخريطة بتبني الفروع من اللي العميل قاله بس: اللي اتملى لوحده وقت التسجيل، وهل المساعدة خلّصت كلامها (الثابت بييجي بعدها)
+    out["prefilled"] = fz._prefilled(b)
+    out["assistant_done"] = bool((b.get("assistant") or {}).get("done"))
     out["rivals"] = [{k: i.get(k) for k in ("id", "platform", "handle", "median_views")} for i in rivals.approved(b.get("competitors") or {})]
     out["rivals_pending"] = sum(1 for i in (b.get("competitors") or {}).get("items") or [] if not rivals.is_ok(i))
     out["custom_styles"] = [{**c, "cover_url": f"{base}/{c['cover']}" if c.get("cover") else None} for c in b.get("custom_styles") or []]

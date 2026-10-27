@@ -36,8 +36,16 @@ const Assistant = (() => {
 .as-box input[type=text]{width:min(64vw,300px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 .as-drop{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 22px;border:1.5px dashed rgba(229,97,62,.7);border-radius:16px;cursor:pointer;font-size:14px}
 .as-drop.over{background:rgba(229,97,62,.12)}@keyframes asUp{from{opacity:0;transform:translateY(12px) scale(.96)}}
+/* 🧠 من خريطة العقل: الكرة على اليمين من غير بلير، والعقل باين بيكبر في النص */
+.as-ov.dock{left:auto;right:0;width:min(380px,100vw);pointer-events:none;justify-content:center;padding:70px 18px 24px}
+.as-ov.dock.on{-webkit-backdrop-filter:none;backdrop-filter:none}.as-ov.dock>*{pointer-events:auto}.as-ov.dock .as-side{display:none}
+.as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
+@media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
-  let S = null, state = null, orb = null, ov = null, from = null;
+  let S = null, state = null, orb = null, ov = null, from = null, dock = false;
+  // 📣 العقل اتغيّر (إجابة اتحفظت، صورة اترفعت، حساب بيتحلل): الخريطة تعيد رسم نفسها والفرع يطلع قدام العميل
+  const changed = () => window.dispatchEvent(new CustomEvent("brain:changed"));
+  const docked = (on) => window.dispatchEvent(new CustomEvent("assistant:dock", { detail: { on, w: on && innerWidth > 720 ? 380 : 0 } }));
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
     products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الدعوة لاتخاذ إجراء", rivals: "المنافسون" };
   const SKIP_KEY = "simsim:assistSkip";
@@ -45,11 +53,12 @@ const Assistant = (() => {
   function mount(html) {
     if (!document.getElementById("as-css")) { const st = document.createElement("style"); st.id = "as-css"; st.textContent = css; document.head.appendChild(st); }
     ov = document.createElement("div");
-    ov.className = "as-ov"; ov.dir = "rtl"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true");
+    ov.className = "as-ov" + (dock ? " dock" : ""); ov.dir = "rtl"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true");
     ov.innerHTML = html;
     document.body.appendChild(ov);
     ov.querySelector(".as-orb")?.insertAdjacentHTML("beforeend", '<div class="as-disc"></div>');
     try { orb = window.Orb3D?.(ov.querySelector("canvas")); } catch (e) { console.warn(e); }
+    if (dock) docked(true);
     grow(true);
     requestAnimationFrame(() => requestAnimationFrame(() => ov?.classList.add("on")));
   }
@@ -69,7 +78,7 @@ const Assistant = (() => {
   function close() {
     return new Promise((res) => {
       if (!ov) return res();
-      const o = ov, a = grow(false); ov.classList.remove("on"); ov = null;
+      const o = ov, a = grow(false); ov.classList.remove("on"); ov = null; if (dock) docked(false);
       const done = () => { orb?.stop(); orb = null; o.remove(); if (from) from.style.visibility = ""; res(); };
       if (a) a.onfinish = done; else done();
       setTimeout(() => o.isConnected && done(), 1200);
@@ -102,7 +111,7 @@ const Assistant = (() => {
   async function tool(name, args) {
     if (name === "save_answer") {
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
-      if (r.ok) { S.saved++; chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
+      if (r.ok) { S.saved++; changed(); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
       return r;
     }
     if (name === "start_account_analysis") {
@@ -114,7 +123,7 @@ const Assistant = (() => {
         return { ok: false, error: "The user has NOT typed this account. Accounts must be typed, never taken from speech or guessed. Ask them to type it in the box on the screen, or move on if they want to give it later." };
       }
       const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: args.account || "" }) }).catch((e) => ({ ok: false, error: e.message }));
-      if (r.ok) { S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
+      if (r.ok) { changed(); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
       return r;
     }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
@@ -162,7 +171,7 @@ const Assistant = (() => {
       try {
         const r = await fetch(`/api/ad-brains/${encodeURIComponent(state.brand)}/${k.video ? "brand-video" : "assets"}`, { method: "POST", body: f, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
-        d.remove(); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
+        d.remove(); changed(); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
       } catch (e) { err(e.message); drop.querySelector("span").textContent = "جرّب مرة أخرى"; }
     };
     fin.onchange = () => up(fin.files);
@@ -177,6 +186,7 @@ const Assistant = (() => {
       if (!S || !r) return;
       if (r.ready || r.status === "failed") {
         clearInterval(S.accTimer); S.accTimer = null;
+        changed();
         if (S.accChip) S.accChip.innerHTML = r.ready ? `✓ <span><b>حُلّل حسابك</b><br>${esc(r.account || "")}</span>` : `⚠️ <span><b>تعذّر تحليل الحساب</b></span>`;
       }
     }, 6000);
@@ -307,6 +317,7 @@ const Assistant = (() => {
     if (!state?.ready || (!forced && (state.done || !state.new))) return false;
     if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return false; } catch { /* التخزين مقفول */ }
     from = el || document.querySelector('[data-n="quiz"]');
+    dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
     await new Promise((res) => { S_done = res; call(); });
     return true;
   }
