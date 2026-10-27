@@ -29,7 +29,7 @@ import time
 import uuid
 from contextlib import closing
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -2160,7 +2160,8 @@ async def proxy(path: str, request: Request):
     headers += [(b"x-gateway-secret", GATEWAY_SECRET.encode()), (b"x-forwarded-host", (request.headers.get("host") or "").encode()),
                 (b"x-forwarded-proto", (request.headers.get("x-forwarded-proto") or request.url.scheme).encode())]
     if u and not u_pub:
-        headers += [(b"x-user-email", u["email"].encode()), (b"x-user-role", u["role"].encode())]
+        headers += [(b"x-user-email", u["email"].encode()), (b"x-user-role", u["role"].encode()),
+                    (b"x-user-name", quote((u["name"] or "")[:80]).encode())]   # اسم التسجيل (المساعد الصوتي بيناديه بيه)
     target = f"http://127.0.0.1:{t.port}{url_path}" + (f"?{request.url.query}" if request.url.query else "")
     req = _http.build_request(request.method, target, headers=headers,
                               content=capped(request.stream()) if request.method not in ("GET", "HEAD", "OPTIONS") else None)

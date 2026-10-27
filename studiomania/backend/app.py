@@ -25,7 +25,7 @@ from xml.sax.saxutils import escape as xml_escape
 import threading
 import time
 import uuid
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, unquote, urlparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
@@ -32607,14 +32607,19 @@ def assist_info() -> tuple[str | None, dict, dict]:
     return bid, b, b.get("assistant") or {}
 
 
+def signup_name(request: Request) -> str:
+    """الاسم اللي العميل سجّل بيه (البوابة بتبعته)، عشان المساعد مايسألش عنه تاني."""
+    return unquote(request.headers.get("x-user-name") or "").strip()[:60]
+
+
 @app.get("/api/assistant")
-def assistant_state():
+def assistant_state(request: Request):
     bid, b, a = assist_info()
     ob = onboard_load() or {}
     dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
-    return {"ready": bool(bid and livevoice.openai_key()), "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or "",
+    return {"ready": bool(bid and livevoice.openai_key()), "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None}
@@ -32640,17 +32645,16 @@ def assistant_profile(body: AssistProfileIn):
 
 
 @app.post("/api/assistant/token")
-def assistant_token():
+def assistant_token(request: Request):
     bid, b, a = assist_info()
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
-    if not a.get("name"):
-        raise HTTPException(400, "اكتب اسمك أولًا")
     ob = onboard_load() or {}
     dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
-    ag = a.get("agent_gender") or "f"
+    ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
     known = {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q if q["id"] not in livevoice.SKIP_Q}
-    instr = livevoice.instructions(dia, "", a["name"], ag, a.get("gender") or "m", tools=True, known=known)
+    # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
+    instr = livevoice.instructions(dia, "", a.get("name") or signup_name(request), ag, a.get("gender") or "", tools=True, known=known)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:
         tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS)

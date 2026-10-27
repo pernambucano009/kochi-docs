@@ -52,33 +52,6 @@ const Assistant = (() => {
   }
   const q = (s) => ov?.querySelector(s);
 
-  // ---------- الشاشة الأولى: اسمك ورجل/امرأة وصوت المساعد (الضماير لازم تمشي صح من أول كلمة)
-  function intro() {
-    return new Promise((resolve) => {
-      const a = state, g = a.gender || "m", ag = a.agent_gender || "f";
-      mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div>
-        <h2 class="as-h">مساعدك الشخصي في انتظارك</h2>
-        <p class="as-sub">محادثة قصيرة بالصوت ${esc(a.dialect_phrase || "")}: يتعرّف فيها على نشاطك ويملأ عقل علامتك بنفسه، ويحلّل حسابك أثناء الكلام. يمكنك مقاطعته في أي وقت، أو الكتابة بدل الكلام.</p>
-        <div class="as-form"><input data-name placeholder="اسمك" value="${esc(a.name || "")}" maxlength="40">
-          <span class="as-seg" data-g><button type="button" data-v="m" class="${g === "m" ? "on" : ""}">رجل</button><button type="button" data-v="f" class="${g === "f" ? "on" : ""}">امرأة</button></span>
-          <span class="as-seg" data-ag title="صوت المساعد"><button type="button" data-v="f" class="${ag === "f" ? "on" : ""}">🎙️ ${esc(a.agents[0])}</button><button type="button" data-v="m" class="${ag === "m" ? "on" : ""}">🎙️ ${esc(a.agents[1])}</button></span></div>
-        <div class="as-acts"><button type="button" class="as-go" data-go>ابدأ المحادثة</button><button type="button" class="as-btn" data-skip>لاحقًا</button></div>
-        <p class="as-err" data-err></p>`);
-      ov.querySelectorAll(".as-seg").forEach((sg) => sg.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; sg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); });
-      q("[data-skip]").onclick = async () => { try { localStorage.setItem(SKIP_KEY, String(Date.now())); } catch { /* التخزين مقفول */ } await close(); resolve(false); };
-      q("[data-go]").onclick = async () => {
-        const name = q("[data-name]").value.trim();
-        if (!name) { q("[data-err]").textContent = "اكتب اسمك أولًا"; q("[data-name]").focus(); return; }
-        q("[data-go]").disabled = true;
-        try {
-          state = await api("/api/assistant/profile", { method: "POST", ...jsonBody({ name, gender: q("[data-g] .on").dataset.v, agent_gender: q("[data-ag] .on").dataset.v }) });
-          resolve(true);
-        } catch (e) { q("[data-err]").textContent = e.message; q("[data-go]").disabled = false; }
-      };
-      setTimeout(() => q("[data-name]")?.focus(), 400);
-    });
-  }
-
   // ---------- المكالمة
   function meter(ctx, node) { const a = ctx.createAnalyser(); a.fftSize = 512; node.connect(a); const buf = new Float32Array(a.fftSize); return () => { a.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }; }
   function chip(html) { const d = document.createElement("div"); d.className = "as-chip"; d.innerHTML = html; q(".as-side")?.prepend(d); return d; }
@@ -125,7 +98,12 @@ const Assistant = (() => {
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;
-      pc.ontrack = (e) => { el.srcObject = e.streams[0]; S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0])); };
+      pc.ontrack = (e) => {
+        el.srcObject = e.streams[0]; S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0]));
+        // 🔊 لو المساعد فتح لوحده (من غير ضغطة)، المتصفح ممكن يمنع الصوت: زرار واحد يشغّله
+        el.play().catch(() => unmute());
+        if (S.ctx.state === "suspended") unmute();
+      };
       pc.addTrack(mic.getTracks()[0], mic);
       const dc = pc.createDataChannel("oai-events"); S.dc = dc;
       // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
@@ -160,6 +138,12 @@ const Assistant = (() => {
       q(".as-st").textContent = "";
     }
   }
+  function unmute() {
+    if (!S || q("[data-unmute]")) return;
+    const b = document.createElement("button"); b.type = "button"; b.className = "as-go"; b.dataset.unmute = "1"; b.textContent = "🔊 اضغط لسماع المساعدة";
+    q(".as-acts")?.prepend(b);
+    b.onclick = () => { S?.ctx?.resume(); S?.el?.play().catch(() => {}); b.remove(); };
+  }
   function loop() {
     if (!S) return;
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
@@ -174,6 +158,7 @@ const Assistant = (() => {
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
+    else try { localStorage.setItem(SKIP_KEY, String(Date.now())); } catch { /* التخزين مقفول */ }
     await close();
     if (typeof NH !== "undefined") NH?.refresh?.();
     S_done?.();
@@ -186,8 +171,6 @@ const Assistant = (() => {
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من زر «أجب بالصوت» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return;
     if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return; } catch { /* التخزين مقفول */ }
-    if (!(await intro())) return;
-    await close();
     await new Promise((res) => { S_done = res; call(); });
   }
   return { maybe, open: async () => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true); } };

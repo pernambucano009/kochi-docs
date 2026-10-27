@@ -121,7 +121,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
     you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
-           "a man: address him ONLY with masculine pronouns, verbs and adjectives")
+           "a man: address him ONLY with masculine pronouns, verbs and adjectives" if user_gender == "m" else
+           "of unknown gender: infer it from their name if the name is clearly male or female, and from how they talk about themselves. "
+           "Once you know, stick to it in every pronoun, verb and adjective. While unsure, phrase sentences so they need no gender")
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(quiz_questions()))
     kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in (known or {}).items() if v)
     if kn:
@@ -135,12 +137,12 @@ Tools (use them silently, never read them out loud):
   If it is not ready yet, tell them the results will appear on their screen in a few minutes.
 - Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")
     return f"""You are {agent}, the personal assistant of SimsimKit, a platform that makes social-media videos for businesses.
-The user, {user}, just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
+The user, {user or "(name unknown)"}, just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
 warm, natural, short sentences. Never use Modern Standard Arabic unless the dialect IS Modern Standard Arabic. Never switch dialects.
 Grammar of gender (very important in Arabic): you are {me}. The user is {you}.
 
 Follow this order:
-1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.
+1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.{"" if user else " The name is unknown: drop it from the greeting and ask for their name in one short question first."}
 2. Ask for their Instagram or TikTok account first, and explain in one sentence why: the analysis takes a while, so the team starts on it now
    and the results are ready by the end of the chat. When they give it, thank them in a few words and move on.
 3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):
