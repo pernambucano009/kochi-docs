@@ -175,6 +175,7 @@ const Assistant = (() => {
   }
 
   async function call() {
+    if (S) await end(false);   // احتياط: أي مكالمة قديمة تتقفل قبل الجديدة
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"></div>
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
@@ -275,8 +276,15 @@ const Assistant = (() => {
   let S_done = null;
 
   // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص
-  async function maybe(force, el) {
-    if (ov) return true;   // مفتوح أصلًا
+  // 🔒 مكالمة واحدة بس: ضغطتين ورا بعض (أو الفتح التلقائي مع ضغطة) كانوا بيفتحوا مكالمتين بيتكلموا مع بعض
+  let lock = null;
+  function maybe(force, el) {
+    if (ov || S) return Promise.resolve(true);   // مفتوح أصلًا
+    if (lock) return force === true ? lock.then((ok) => ok || maybe(true, el)) : lock;   // الضغطة بتستنى الفتح التلقائي، ولو مافتحش تفتح هي
+    lock = run(force, el).finally(() => { lock = null; });
+    return lock;
+  }
+  async function run(force, el) {
     try { state = await api("/api/assistant"); } catch { return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return false;
