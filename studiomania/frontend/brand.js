@@ -1126,8 +1126,8 @@ const BrandPage = (() => {
         const n = S.nodes.find((x) => x.id === node.dataset.n);
         if (!n) return;
         if (S.open?.id === n.id) return openCard(null);
-        // 🎙️ دايرة «؟» هي المساعد نفسه: بيسأل أسئلة العقل بالصوت أو بالكتابة، والمهام (صور وفيديو وصوت) زرار جوه المكالمة
-        if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node, { tasks: () => { S.qtab = "t"; openCard(n); } }).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
+        // 🎙️ دايرة «؟» هي المساعد نفسه: بيسأل أسئلة العقل وبيطلب الرفع (الشعار والصور) بالصوت أو بالكتابة
+        if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
         if (n.kind === "quiz") S.qi = null;
         if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);

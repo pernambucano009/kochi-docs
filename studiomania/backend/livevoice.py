@@ -127,6 +127,12 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     user = (user or "").strip().split()[0] if (user or "").strip() else ""
     latin = bool(re.search(r"[A-Za-z]", user))
     agent = agent or agent_name(dialect, agent_gender)
+    # الافتتاح على أدوار: التحية لوحدها (لحد أول «؟»)، وبعدها الباقي، وكل دور العميل لازم يرد بعده
+    full = sample.format(name=user, agent=agent)
+    t1, _, t2 = full.partition("؟")
+    t1, t2 = t1.strip() + "؟", (re.split(r"(?<=[.!])\s+", t2.strip())[-1] if t2.strip() else full)   # «ها، مستعد ندردش شوية…؟» بس
+    ig_ex = ' (in Egyptian, say exactly: «إيه رأيك تكتبلي لينك حسابك على الإنستجرام عشان الشباب يبدأوا فيه التحليل لحد ما إحنا نخلص؟»)' \
+        if dialect == "ar-eg-cairo" else ""
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
     you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
@@ -153,9 +159,11 @@ warm, natural, short sentences. Never use Modern Standard Arabic unless the dial
 Grammar of gender (very important in Arabic): you are {me}. The user is {you}.
 
 Follow this order:
-1. Open with this, adapted naturally to the gender rules above: «{sample.format(name=user, agent=agent)}» Then wait for the answer.{"" if user else " The name is unknown: drop it from the greeting and ask for their name in one short question first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
-2. Ask for their Instagram or TikTok account first, and explain in one sentence why: the analysis takes a while, so the team starts on it now
-   and the results are ready by the end of the chat. When they give it, thank them in a few words and move on.
+1. The opening is split into separate turns. Each turn is ONE short sentence that ends with a question, then you stop and wait:
+   a) Only the greeting: «{t1}» — stop and wait for the reply.
+   b) Then (adapted to the gender rules above): «{t2}» — stop and wait for the reply.{"" if user else " The name is unknown: drop it from the greeting and ask for their name in one short question first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
+2. Then ask for their Instagram account in one sentence, with this meaning{ig_ex}: they write the link of their account so the team starts
+   analysing it while you two talk. Stop and wait. When they give it, thank them in a few words and move on.
 3. Then ask these questions, ONE per turn, in this order, rephrased in the dialect (skip one if the user already answered it):
 {qs}
 4. Then ask them to upload their logo, and after that a few photos of their products or work, one request per turn

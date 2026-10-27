@@ -37,7 +37,7 @@ const Assistant = (() => {
 .as-drop{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 22px;border:1.5px dashed rgba(229,97,62,.7);border-radius:16px;cursor:pointer;font-size:14px}
 .as-drop.over{background:rgba(229,97,62,.12)}@keyframes asUp{from{opacity:0;transform:translateY(12px) scale(.96)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
-  let S = null, state = null, orb = null, ov = null, from = null, opts = {};
+  let S = null, state = null, orb = null, ov = null, from = null;
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
     products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الدعوة لاتخاذ إجراء", rivals: "المنافسون" };
   const SKIP_KEY = "simsim:assistSkip";
@@ -81,6 +81,23 @@ const Assistant = (() => {
   function meter(ctx, node) { const a = ctx.createAnalyser(); a.fftSize = 512; node.connect(a); const buf = new Float32Array(a.fftSize); return () => { a.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }; }
   function chip(html) { const d = document.createElement("div"); d.className = "as-chip"; d.innerHTML = html; q(".as-side")?.prepend(d); return d; }
   function caption(t) { const c = q(".as-cap"); if (c) c.textContent = t.slice(-170); }
+  // 📝 المكتوب جملة جملة على قد الكلام: النص بيوصل أسرع من الصوت، فكل جملة بتفضل ظاهرة على قد طولها وبعدين اللي بعدها.
+  // والمربع اللي المساعد طلبه بيظهر لما الجملة اللي فيها اسمه تتقال (أو في آخر الرد لو الكلمة ماتقالتش)
+  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|حساب/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i };
+  const sentences = (t) => t.split(/(?<=[.!?؟…])\s+/).map((x) => x.trim()).filter(Boolean);
+  function capReset() { if (!S) return; S.aBuf = ""; S.capI = 0; S.capAt = 0; S.capDone = false; caption(""); }
+  function capTick() {
+    if (!S) return;
+    const ss = sentences(S.aBuf), now = performance.now();
+    if (ss.length) {
+      if (!S.capAt) S.capAt = now;
+      const i = Math.min(S.capI, ss.length - 1), dur = Math.max(1100, ss[i].length * 80);
+      if (now - S.capAt > dur && i < ss.length - 1) { S.capI = i + 1; S.capAt = now; }
+      caption(ss[Math.min(S.capI, ss.length - 1)]);
+      if (S.box && KW[S.box]?.test(ss.slice(0, S.capI + 1).join(" "))) { box(S.box); S.box = null; }
+      if (S.box && S.capDone && S.capI >= ss.length - 1 && now - S.capAt > dur) { box(S.box); S.box = null; }
+    } else if (S.box && S.capDone) { box(S.box); S.box = null; }
+  }
 
   async function tool(name, args) {
     if (name === "save_answer") {
@@ -94,7 +111,7 @@ const Assistant = (() => {
       return r;
     }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
-    if (name === "show_input") { box(args.kind); return { ok: true, shown: args.kind }; }
+    if (name === "show_input") { if (BOX[args.kind]) S.box = args.kind; return { ok: true, shown: args.kind }; }
     if (name === "finish") { S.finishing = true; setTimeout(() => end(true), 3500); return { ok: true }; }
     return { ok: false, error: "unknown tool" };
   }
@@ -160,10 +177,10 @@ const Assistant = (() => {
   async function call() {
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"></div>
-      <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button>${opts.tasks ? `<button type="button" class="as-btn" data-tasks>✅ مهام العقل (صور، فيديو، صوت)</button>` : ""}</div><p class="as-err" data-err></p><div class="as-side"></div>`);
-    S = { saved: 0, aBuf: "" };
+      <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
+    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null };
+    S.capT = setInterval(capTick, 120);
     q("[data-end]").onclick = () => end(false);
-    const tk = opts.tasks; if (tk) q("[data-tasks]").onclick = async () => { await end(false); tk(); };
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -194,14 +211,15 @@ const Assistant = (() => {
       dc.onmessage = async (m) => {
         let e; try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") {
-          if (e.response_id !== S.capId) { S.capId = e.response_id; S.aBuf = ""; }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
-          R(e.response_id).msg = true; S.aBuf += e.delta; caption(S.aBuf);
+          if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
+          R(e.response_id).msg = true; S.aBuf += e.delta;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; S.aBuf = ""; caption(""); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); if (S.box) { box(S.box); S.box = null; } }
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") S.greeted = true;
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true;
+          if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
         } else if (e.type === "response.function_call_arguments.done") {
@@ -245,7 +263,7 @@ const Assistant = (() => {
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer);
+    clearInterval(s.accTimer); clearInterval(s.capT);
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
@@ -257,16 +275,15 @@ const Assistant = (() => {
   let S_done = null;
 
   // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص
-  async function maybe(force, el, o) {
+  async function maybe(force, el) {
     if (ov) return true;   // مفتوح أصلًا
     try { state = await api("/api/assistant"); } catch { return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search);   // من دايرة «؟» (أو للتجربة): يفتح حتى لو اتعمل قبل كده
     if (!state?.ready || (!forced && (state.done || !state.new))) return false;
     if (!forced) try { const t = +localStorage.getItem(SKIP_KEY); if (t && Date.now() - t < 864e5) return false; } catch { /* التخزين مقفول */ }
-    opts = o || {};
     from = el || document.querySelector('[data-n="quiz"]');
     await new Promise((res) => { S_done = res; call(); });
     return true;
   }
-  return { maybe, open: async (el, o) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el, o); } };
+  return { maybe, open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
 })();
