@@ -61,7 +61,6 @@ import captions  # noqa: E402
 import montage  # noqa: E402
 import kochi_layout  # noqa: E402  (ترتيب مونتاج كوتشي التلقائي)
 import lab  # noqa: E402  (معمل التفكيك)
-import audioshake  # noqa: E402  (فصل الكلام / الموسيقى / المؤثرات)
 import publisher  # noqa: E402
 import sheets  # noqa: E402
 import carousel as cz  # noqa: E402
@@ -4338,7 +4337,6 @@ EXPENSE_PRESET = [
     # 🔑 كل مفتاح API عندنا ليه سطر: أقل مبلغ شراء، وبيدّينا كام وحدة، فنعرف الفاتورة الثابتة وسعر الوحدة (العدد بيتكتب من الأدمن)
     {"name": "Authentica (رسائل التحقق)", "amount": 0, "cycle": "usage", "day": 0, "unit": "رسالة", "note": "الدخول برقم الجوال"},
     {"name": "OpenAI (المساعدة الصوتية)", "amount": 0, "cycle": "usage", "day": 0, "unit": "دولار رصيد", "note": "مكالمة سعاد أول التسجيل"},
-    {"name": "AudioShake", "amount": 0, "cycle": "usage", "day": 0, "unit": "دقيقة", "note": "فصل الصوت في الدبلجة"},
     {"name": "Recraft", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الصور المتجهة"},
     {"name": "Resend (البريد الإلكتروني)", "amount": 0, "cycle": "monthly", "day": 0, "unit": "رسالة", "note": ""},
     {"name": "Pexels", "amount": 0, "cycle": "free", "day": 0, "unit": "", "note": "صور وفيديوهات مجانية"},
@@ -4347,7 +4345,7 @@ EXPENSE_PRESET = [
 ]
 
 
-EXPENSE_GONE = {"منصت", "MiniMax", "SILMA", "Gemini"}   # خدمات اتشالت من المنصة: بتختفي من الجدول
+EXPENSE_GONE = {"منصت", "MiniMax", "SILMA", "Gemini", "AudioShake"}   # خدمات اتشالت من المنصة: بتختفي من الجدول
 
 
 def expenses_load() -> list[dict]:
@@ -10277,7 +10275,7 @@ def admin_providers_custom(body: ProviderCustomIn):
 
 @app.post("/api/admin/providers/{key}/clear")
 def admin_providers_clear(key: str):
-    """للمنصات التي ليس لها API رصيد (AudioShake وفصيح): «شحنت» تحذف آخر غلطة."""
+    """للمنصات التي ليس لها API رصيد (فصيح): «شحنت» تحذف آخر غلطة."""
     d = providers.load(PROVIDERS_FILE)
     cur = d["p"].get(key) or {}
     cur.pop("fail", None)
@@ -15327,7 +15325,7 @@ def run_lab_split(lid: str, d: dict, src: Path) -> None:
 
 
 def _run_lab_split(lid: str, d: dict, src: Path) -> None:
-    """✂️ يقسّم الفيديو لـ ٤: الصورة بدون صوت، والنص والموسيقى والمؤثرات (AudioShake)."""
+    """✂️ يقسّم الفيديو لـ ٤: الصورة بدون صوت، والنص والموسيقى والمؤثرات (فصل الصوت بـ ElevenLabs)."""
     folder = lab_dir(lid)
     lab_step(lid, "split", progress="يفصل الصورة عن الصوت")
     pic = folder / "picture.mp4"
@@ -15358,7 +15356,7 @@ def lab_picture_fx(lid: str) -> None:
 
 
 def run_lab_stems(lid: str, d: dict, src: Path, step: str = "stems") -> None:
-    """🎚️ فصل الصوت لكلام / موسيقى / مؤثرات (AudioShake). بدون مفتاح الخطوة تتخطى والتحليل يُكمل على الصوت كله."""
+    """🎚️ فصل الصوت لكلام / موسيقى / مؤثرات (ElevenLabs). بدون مفتاح الخطوة تتخطى والتحليل يُكمل على الصوت كله."""
     folder = lab_dir(lid) / "stems"
     if not d["source"].get("has_audio"):
         lab_update(lid, lambda d: d.update(stems={}))
@@ -21489,7 +21487,7 @@ reset_stuck_typo()
 
 # ---------------------------------------------------------------- 🌍 الدبلجة باللهجات العامية
 # فيديو (من برّه أو من الفيديوهات الجاهزة) ← الكلام بيتسمع ← يتحوّل للهجة (تقدر تعدّله) ← كل جملة بصوت جاهز في مكانها
-# ← الموسيقى والمؤثرات بتفضل (AudioShake) ← ليب سينك (اختياري) ← نسخة في الفيديوهات الجاهزة للنشر لكل لهجة.
+# ← الموسيقى والمؤثرات بتفضل (فصل الصوت بـ ElevenLabs) ← ليب سينك (اختياري) ← نسخة في الفيديوهات الجاهزة للنشر لكل لهجة.
 
 import dub  # noqa: E402
 import fasih  # noqa: E402
@@ -26222,7 +26220,7 @@ def gen_delete(gid: str):
 # ---------------------------------------------------------------- 💳 الأسعار والنقط
 import billing  # noqa: E402
 
-# فصل الصوت (AudioShake): كلام ١.٥ + مؤثرات ١.٥ + موسيقى ~١ كريديت للدقيقة، والكريديت من $0.027 لـ $0.04 حسب الباقة عندهم،
+# فصل الصوت (كان AudioShake، دلوقتي ElevenLabs، والتقدير زي ما هو): كلام ١.٥ + مؤثرات ١.٥ + موسيقى ~١ كريديت للدقيقة، والكريديت من $0.027 لـ $0.04 حسب الباقة عندهم،
 # وكل ملف بيتقرّب لدقيقة كاملة. حاسبينها $0.25 للدقيقة (أعلى من المتوقع عشان الأمان) لحد ما نتأكد من الداشبورد.
 AUDIOSHAKE_PER_MIN: float | None = 0.25
 

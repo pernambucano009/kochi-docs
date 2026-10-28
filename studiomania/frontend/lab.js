@@ -271,7 +271,7 @@ function labPlayShot(n, from, to) {
 function renderLabAudio(d) {
   const inner = labAudioInner(d);
   $("labAudio").innerHTML = `<details data-audiobox ${labx.audioOpen ? "open" : ""}><summary><b>🎧 الصوت</b> <span class="muted">(متوقف الآن: يُحفظ الأصل بصوته الأصلي، وهذا التحليل تجريبي)</span></summary>
-    <div class="row wrap"><button type="button" class="btn sm" data-labrun="stems">🎚️ افصل المسارات (AudioShake)</button>
+    <div class="row wrap"><button type="button" class="btn sm" data-labrun="stems">🎚️ افصل المسارات</button>
       <button type="button" class="btn sm" data-labrun="audio">🎧 حلّل الصوت</button></div>${inner}</details>`;
 }
 function labAudioInner(d) {
@@ -306,7 +306,7 @@ function labAudioInner(d) {
       ${rv("speech", i, s.review)}</div>`).join("") || `<p class="muted">لا يوجد نص.</p>`}</div>`;
 }
 
-// 🎚️ التراكات المفصولة (AudioShake): كل تراك تسمعه لوحده وتقيّمه
+// 🎚️ التراكات المفصولة (ElevenLabs): كل تراك تسمعه لوحده وتقيّمه
 function labStems(d) {
   const st = d.stems || {}, step = d.steps?.stems || {};
   const rows = Object.entries(LAB_STEMS).filter(([k]) => st[k]).map(([k, l]) => `<div class="lab-row">
@@ -784,7 +784,7 @@ document.querySelector('.view[data-view="11"]').addEventListener("click", async 
   }
   const run = e.target.closest("[data-labrun]");
   if (run) {
-    const ask = { split: "هل يقسّم الفيديو مرة أخرى إلى صورة ونص وموسيقى ومؤثرات؟ (يُحسب AudioShake مرة أخرى)", shots: "هل يقسّم الفيديو مرة أخرى؟ (ستُحذف عناصر اللقطات القديمة، وإن أردتها فاضغط «🧩 العناصر» بعدها)",
+    const ask = { split: "هل يقسّم الفيديو مرة أخرى إلى صورة ونص وموسيقى ومؤثرات؟ (يُحسب فصل الصوت مرة أخرى)", shots: "هل يقسّم الفيديو مرة أخرى؟ (ستُحذف عناصر اللقطات القديمة، وإن أردتها فاضغط «🧩 العناصر» بعدها)",
       elements: "هل يفكك عناصر كل لقطة؟ (يستغرق وقتًا: يرى النموذج كل لقطة تلقائيًا)",
       components: "هل يقترح مكونات جديدة؟ ما قبلته أو رفضته يبقى كما هو، ويُرسل إليه رفضك ليتعلم منه.",
       connectors: "هل يبحث عن موصلات؟ ما قبلته أو رفضته يبقى." }[run.dataset.labrun]
