@@ -71,6 +71,8 @@ def packs(d: dict, name: str) -> list[dict]:
     ps = [dict(x) for x in d.get("pack", {}).get(name) or [] if x.get("usd") and x.get("units")]
     for x in ps:
         x["unit_usd"] = x["usd"] / x["units"]
+        x.setdefault("billing", "once")
+        x.setdefault("unit", default_unit(name))
     top = max((x["unit_usd"] for x in ps), default=0)
     for x in ps:
         x["save_pct"] = round((1 - x["unit_usd"] / top) * 100, 1) if top else 0
@@ -103,12 +105,21 @@ def topup_usd(d: dict, name: str, units: float) -> float | None:
     return units * u if u is not None else None
 
 
+BILLING = {"once": None, "month": 1, "year": 12}   # الدفع: مرة واحدة (شحن) / اشتراك شهري / اشتراك سنوي (الوحدات = لكل فترة)
+UNITS = ("pts", "min", "sec", "usd", "chars", "msg", "req", "tok", "img", "vid")   # الوحدة اللي الباقة بتدّيها
+_UNIT_OF = {"$": "usd", "حرف": "chars", "رسالة": "msg"}
+
+
+def default_unit(name: str) -> str:
+    return _UNIT_OF.get(PROVIDERS.get(name, {}).get("unit") or "", "pts")
+
+
 CUSTOM_PCT = 20          # تقدير افتراضي لخصم الباقة المخصصة لو لسه مفيش عرض من المزود
 CUSTOM_STATUS = ("idea", "asked", "quoted", "no")   # لم نتواصل / تواصلنا / وصلنا عرض / رفض
 
 
 def custom(d: dict, name: str) -> dict:
-    c = {"pct": CUSTOM_PCT, "usd": None, "units": None, "status": "idea", "contact": "", "note": ""}
+    c = {"pct": CUSTOM_PCT, "usd": None, "units": None, "status": "idea", "contact": "", "note": "", "billing": "once", "unit": default_unit(name)}
     c.update(d.get("custom", {}).get(name) or {})
     return c
 
@@ -129,10 +140,20 @@ def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dic
     proj = project(used, t0, t1)
     ps = packs(d, name)
     out = []
+    def buy(usd: float, units: float, billing: str) -> tuple[int, float]:
+        """كام باقة/اشتراك محتاجين للشهر ده، وبكام فعلًا في الشهر (الاشتراك السنوي = سعره ÷ ١٢، ووحداته ÷ ١٢)."""
+        per = BILLING.get(billing)
+        if per:
+            n = math.ceil(proj / (units / per)) if proj else 1   # الاشتراك بيتدفع حتى لو مفيش استهلاك
+            return n, n * usd / per
+        n = math.ceil(proj / units) if proj else 0
+        return n, n * usd
+
     for x in ps:
-        n = math.ceil(proj / x["units"]) if proj else 0
+        n, b = buy(x["usd"], x["units"], x["billing"])
         out.append({"name": x.get("name") or "", "usd": x["usd"], "units": x["units"], "unit_usd": x["unit_usd"], "save_pct": x["save_pct"],
-                    "use": bool(x.get("use")), "month_units": round(proj, 2), "month_usd": round(proj * x["unit_usd"], 2), "packs": n, "buy_usd": round(n * x["usd"], 2)})
+                    "billing": x["billing"], "unit": x["unit"], "use": bool(x.get("use")), "month_units": round(proj, 2),
+                    "month_usd": round(proj * x["unit_usd"], 2), "packs": n, "buy_usd": round(b, 2)})
     c = custom(d, name)
     top = max((x["unit_usd"] for x in ps), default=None)
     base = min((x["unit_usd"] for x in ps), default=None)
@@ -145,10 +166,10 @@ def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dic
         u = base * (1 - float(c.get("pct") or 0) / 100)
     else:
         return out
-    n = math.ceil(proj / c["units"]) if quoted and proj else None
+    n, b = buy(c["usd"], c["units"], c.get("billing") or "once") if quoted else (None, proj * u)
     out.append({"name": "باقة مخصصة لنا", "custom": True, "quoted": quoted, "status": c.get("status"), "pct": c.get("pct"),
-                "usd": c.get("usd"), "units": c.get("units"), "unit_usd": u, "save_pct": round((1 - u / top) * 100, 1) if top else 0, "use": False,
-                "month_units": round(proj, 2), "month_usd": round(proj * u, 2), "packs": n, "buy_usd": round(n * c["usd"], 2) if n is not None else round(proj * u, 2)})
+                "usd": c.get("usd"), "units": c.get("units"), "billing": c.get("billing"), "unit": c.get("unit"), "unit_usd": u, "save_pct": round((1 - u / top) * 100, 1) if top else 0, "use": False,
+                "month_units": round(proj, 2), "month_usd": round(proj * u, 2), "packs": n, "buy_usd": round(b, 2)})
     return out
 
 
@@ -338,7 +359,7 @@ def summary(d: dict) -> list[dict]:
         state = "bad" if (bal is not None and bal <= 0) or recent_fail else "low" if bal is not None and low and bal < low else "ok" if cur.get("ok") else "unknown"
         out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api", "url")}, "balance": bal, "min": low, "state": state,
                     "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None,
-                    "spend": bool(meta.get("spend")), "packs": packs(d, name), "custom": custom(d, name), "unit_usd": unit_usd(d, name),
+                    "spend": bool(meta.get("spend")), "packs": packs(d, name), "custom": custom(d, name), "unit_def": default_unit(name), "unit_usd": unit_usd(d, name),
                     "month": month_stats(d, name)})
     return out
 

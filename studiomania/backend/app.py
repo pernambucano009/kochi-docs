@@ -10216,6 +10216,8 @@ class ProviderPackItem(BaseModel):
     usd: float = 0
     units: float = 0
     use: bool = False
+    billing: str = "once"     # once / month / year
+    unit: str = ""            # pts / min / usd / …
 
 
 class ProviderPackIn(BaseModel):
@@ -10228,7 +10230,9 @@ def admin_providers_pack(body: ProviderPackIn):
     """باقات المنصة (واحدة أو أكتر): كل باقة بكام دولار وبتدّينا كام وحدة، واللي بنشتريها دلوقتي ← سعر الوحدة، ومنه الاستهلاك والشحنات بالدولار وسيناريوهات الباقات."""
     if body.key not in providers.PROVIDERS:
         raise HTTPException(404, "منصة غير معروفة")
-    ps = [{"name": x.name.strip()[:40], "usd": round(float(x.usd), 2), "units": float(x.units), "use": bool(x.use)} for x in body.packs[:12] if x.usd > 0 and x.units > 0]
+    ps = [{"name": x.name.strip()[:40], "usd": round(float(x.usd), 2), "units": float(x.units), "use": bool(x.use),
+           "billing": x.billing if x.billing in providers.BILLING else "once", "unit": x.unit if x.unit in providers.UNITS else providers.default_unit(body.key)}
+          for x in body.packs[:12] if x.usd > 0 and x.units > 0]
     if ps and sum(x["use"] for x in ps) != 1:   # باقة واحدة بس هي اللي بنشتريها: لو مفيش (أو أكتر من واحدة) ← أقل باقة سعرًا
         lo = min(range(len(ps)), key=lambda i: ps[i]["usd"])
         for i, x in enumerate(ps):
@@ -10250,6 +10254,8 @@ class ProviderCustomIn(BaseModel):
     status: str = "idea"
     contact: str = ""
     note: str = ""
+    billing: str = "once"
+    unit: str = ""
 
 
 @app.put("/api/admin/providers/custom")
@@ -10261,7 +10267,9 @@ def admin_providers_custom(body: ProviderCustomIn):
     d["custom"][body.key] = {"pct": max(0.0, min(90.0, float(body.pct))), "usd": round(float(body.usd), 2) if body.usd > 0 and body.units > 0 else None,
                              "units": float(body.units) if body.usd > 0 and body.units > 0 else None,
                              "status": body.status if body.status in providers.CUSTOM_STATUS else "idea",
-                             "contact": body.contact.strip()[:200], "note": body.note.strip()[:300]}
+                             "contact": body.contact.strip()[:200], "note": body.note.strip()[:300],
+                             "billing": body.billing if body.billing in providers.BILLING else "once",
+                             "unit": body.unit if body.unit in providers.UNITS else providers.default_unit(body.key)}
     providers.save(PROVIDERS_FILE, d)
     return providers_out()
 

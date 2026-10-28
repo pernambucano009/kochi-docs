@@ -127,28 +127,36 @@ function renderProviders(d) {
 const nf = (v, d = 2) => Number(v).toLocaleString("en-US", { maximumFractionDigits: d });
 const usdf = (v) => (v == null ? "—" : "$" + nf(v));
 const unitf = (v) => (v >= 0.01 ? "$" + nf(v, 4) : "$" + Number(v).toPrecision(2));
-function packRow(key, x = {}) {
+// الدفع (مرة واحدة / شهري / سنوي) والوحدة اللي بتيجي (نقاط / دقائق / دولار …) لكل باقة
+const PK_BILL = { once: "مرة واحدة", month: "اشتراك شهري", year: "اشتراك سنوي" };
+const PK_UNIT = { pts: "نقاط", min: "دقائق", sec: "ثوانٍ", usd: "دولار", chars: "حروف", msg: "رسائل", req: "طلبات", tok: "رموز (Tokens)", img: "صور", vid: "فيديوهات" };
+const PK_PER = { once: "", month: " / شهر", year: " / سنة" };
+const opts = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("");
+const pkUnits = (x) => `${nf(x.units, 0)} ${PK_UNIT[x.unit] || ""}`;
+function packRow(key, x = {}, unit = "pts") {
   return `<div class="pk-row"><label class="pk-use" title="الباقة التي نشتريها الآن"><input type="radio" name="pkuse-${key}" ${x.use ? "checked" : ""}> نشتريها</label>
     <input type="text" class="pk-name" placeholder="اسم الباقة" value="${escapeHtml(x.name || "")}" maxlength="40">
     <label>السعر $<input type="number" class="pk-usd" min="0" step="any" value="${x.usd ?? ""}"></label>
     <label>تعطينا<input type="number" class="pk-units" min="0" step="any" value="${x.units ?? ""}"></label>
+    <select class="pk-unit" title="الوحدة">${opts(PK_UNIT, x.unit || unit)}</select>
+    <label>الدفع<select class="pk-bill">${opts(PK_BILL, x.billing || "once")}</select></label>
     <span class="hint">${x.unit_usd ? `سعر الوحدة ${unitf(x.unit_usd)}${x.save_pct ? ` · أرخص بـ ${nf(x.save_pct, 1)}٪` : ""}` : ""}</span>
     <button type="button" class="btn xs ghost" data-pkdel title="احذف الباقة">✕</button></div>`;
 }
 function provPack(p) {
   const m = p.month || {};
   const unit = p.unit && p.unit !== "$" ? p.unit : "وحدة";
-  const pack = p.spend || p.unit === "$" ? "" : `<div class="pk-list" data-pk="${p.key}"><b class="pk-h">باقات ${escapeHtml(p.name)} (${escapeHtml(unit)})</b>
-      ${(p.packs?.length ? p.packs : [{ use: true }]).map((x) => packRow(p.key, x)).join("")}
+  const pack = p.spend || p.unit === "$" ? "" : `<div class="pk-list" data-pk="${p.key}" data-unit="${p.unit_def || "pts"}"><b class="pk-h">باقات ${escapeHtml(p.name)}</b>
+      ${(p.packs?.length ? p.packs : [{ use: true }]).map((x) => packRow(p.key, x, p.unit_def)).join("")}
       <div class="pk-act"><button type="button" class="btn xs ghost" data-pkadd>＋ باقة أخرى</button><button type="button" class="btn xs" data-pksave>حفظ الباقات</button>
       ${p.unit_usd ? "" : `<span class="hint">اكتب باقة واحدة على الأقل لنحسب بالدولار</span>`}</div></div>`;
   const use = p.spend ? `<span>مصاريف هذا الشهر: <b>${usdf(m.used_usd)}</b></span>`
     : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? nf(m.used) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usdf(m.used_usd)})` : ""}</span>
       ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usdf(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
   const sc = (m.scenarios || []).length ? `<div class="pk-sc"><b class="pk-h">🧮 لو اشترينا بكل باقة (استهلاك الشهر كله المتوقَّع: ${nf(m.scenarios[0].month_units)} ${escapeHtml(unit)})</b>
-      <table><thead><tr><th>الباقة</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ما ندفعه فعلًا</th></tr></thead><tbody>
-      ${m.scenarios.map((x) => `<tr class="${x.use ? "on" : ""}${x.custom ? " cu" : ""}"><td>${x.custom ? `🤝 باقة مخصصة لنا ${x.quoted ? "(عرض المزود)" : `(تقدير: خصم ${nf(x.pct, 1)}٪)`}` : escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}</td>
-        <td>${unitf(x.unit_usd)}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs ?? "—"}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
+      <table><thead><tr><th>الباقة</th><th>الدفع</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ما ندفعه فعلًا هذا الشهر</th></tr></thead><tbody>
+      ${m.scenarios.map((x) => `<tr class="${x.use ? "on" : ""}${x.custom ? " cu" : ""}"><td>${x.custom ? `🤝 باقة مخصصة لنا ${x.quoted ? "(عرض المزود)" : `(تقدير: خصم ${nf(x.pct, 1)}٪)`}` : escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}${x.units ? `<small> · $${nf(x.usd)}${PK_PER[x.billing] || ""} ← ${pkUnits(x)}</small>` : ""}</td>
+        <td>${x.units ? PK_BILL[x.billing] || "" : "—"}</td><td>${unitf(x.unit_usd)}${x.unit && PK_UNIT[x.unit] ? `<small> / ${PK_UNIT[x.unit]}</small>` : ""}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs ?? "—"}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
       </tbody></table></div>` : "";
   return `<div class="prov-pack">${pack}${use}${provCustom(p)}${sc}</div>`;
 }
@@ -160,7 +168,9 @@ function provCustom(p) {
     <div class="pk-row"><label>الحالة<select class="cu-st">${Object.entries(CU_ST).map(([k, v]) => `<option value="${k}"${(c.status || "idea") === k ? " selected" : ""}>${v}</option>`).join("")}</select></label>
       <label>الخصم المتوقع ٪<input type="number" class="cu-pct" min="0" max="90" step="any" value="${c.pct ?? 20}"></label>
       <label>سعر العرض $<input type="number" class="cu-usd" min="0" step="any" value="${c.usd ?? ""}"></label>
-      <label>يعطينا<input type="number" class="cu-units" min="0" step="any" value="${c.units ?? ""}"></label></div>
+      <label>يعطينا<input type="number" class="cu-units" min="0" step="any" value="${c.units ?? ""}"></label>
+      <select class="cu-unit" title="الوحدة">${opts(PK_UNIT, c.unit || p.unit_def || "pts")}</select>
+      <label>الدفع<select class="cu-bill">${opts(PK_BILL, c.billing || "once")}</select></label></div>
     <div class="pk-row"><input type="text" class="cu-contact" placeholder="وسيلة التواصل (بريد المبيعات أو رابط النموذج)" value="${escapeHtml(c.contact || "")}" maxlength="200">
       <input type="text" class="cu-note" placeholder="ملاحظة (مثلًا: طلبوا التزامًا سنويًا)" value="${escapeHtml(c.note || "")}" maxlength="300">
       <button type="button" class="btn xs" data-cusave>حفظ</button></div>
@@ -188,16 +198,16 @@ $("provList")?.addEventListener("click", async (e) => {
     const v = (c) => cu.querySelector(c).value, usd = +v(".cu-usd") || 0, units = +v(".cu-units") || 0;
     if ((usd > 0) !== (units > 0)) { toast("اكتب سعر العرض وعدد الوحدات معًا", true); return; }
     try { renderProviders(await api("/api/admin/providers/custom", { method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: cu.dataset.cu, status: v(".cu-st"), pct: +v(".cu-pct") || 0, usd, units, contact: v(".cu-contact").trim(), note: v(".cu-note").trim() }) })); toast("✅ حُفظت الباقة المخصصة"); }
+      body: JSON.stringify({ key: cu.dataset.cu, status: v(".cu-st"), pct: +v(".cu-pct") || 0, usd, units, contact: v(".cu-contact").trim(), note: v(".cu-note").trim(), unit: v(".cu-unit"), billing: v(".cu-bill") }) })); toast("✅ حُفظت الباقة المخصصة"); }
     catch (err) { toast(err.message, true); }
     return;
   }
   const list = e.target.closest(".pk-list:not(.pk-cu)");
-  if (list && e.target.closest("[data-pkadd]")) { list.querySelector(".pk-act").insertAdjacentHTML("beforebegin", packRow(list.dataset.pk)); return; }
+  if (list && e.target.closest("[data-pkadd]")) { list.querySelector(".pk-act").insertAdjacentHTML("beforebegin", packRow(list.dataset.pk, {}, list.dataset.unit)); return; }
   if (list && e.target.closest("[data-pkdel]")) { e.target.closest(".pk-row").remove(); return; }
   if (list && e.target.closest("[data-pksave]")) {
     const packs = [...list.querySelectorAll(".pk-row")].map((r) => ({ name: r.querySelector(".pk-name").value.trim(), usd: +r.querySelector(".pk-usd").value || 0,
-      units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked }));
+      units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked, unit: r.querySelector(".pk-unit").value, billing: r.querySelector(".pk-bill").value }));
     if (packs.some((x) => (x.usd > 0) !== (x.units > 0))) { toast("اكتب السعر وعدد الوحدات لكل باقة", true); return; }
     try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: list.dataset.pk, packs }) })); toast("✅ حُفظت الباقات"); }
     catch (err) { toast(err.message, true); }
