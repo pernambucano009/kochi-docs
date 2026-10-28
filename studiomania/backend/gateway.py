@@ -1929,6 +1929,93 @@ def admin_finance_xlsx(request: Request, months: int = 12):
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
+# 📼 معمل سعاد: كل مكالمة متسجلة كتابة (كلامها، وكلام العميل من الصوت أو الكتابة، والأدوات، و«كمّلت لوحدها»، والكتم)
+ACALLS = PLATFORM / "assistant_calls"
+
+
+def _acall_sum(d: dict) -> dict:
+    ev = d.get("events") or []
+    n = lambda who, text=None: sum(1 for e in ev if e.get("who") == who and (text is None or e.get("text") == text))  # noqa: E731
+    users = [e for e in ev if e.get("who") == "user"]
+    short = sum(1 for e in users if (e.get("data") or {}).get("voice") and len((e.get("text") or "").strip()) < 4)
+    saves = sum(1 for e in ev if e.get("who") == "tool" and e.get("text") == "save_answer")
+    flags = []
+    if n("sys", "auto-continue") >= 3:
+        flags.append("أكملت وحدها كثيرًا")
+    if short >= 3 or n("sys", "speech_started") > 2 * max(1, len(users)) + 4:
+        flags.append("ضوضاء محتملة")
+    if n("err"):
+        flags.append("أخطاء")
+    return {"id": d.get("id"), "started": d.get("started"), "ended": d.get("ended"), "updated": d.get("updated"), "role": d.get("role"),
+            "email": d.get("email"), "name": d.get("name"), "brand": d.get("brand"), "dialect": d.get("dialect"), "meta": d.get("meta") or {},
+            "turns": {"agent": n("agent"), "user": len(users), "tools": n("tool"), "saved": saves, "auto": n("sys", "auto-continue")},
+            "flags": flags, "review": d.get("review")}
+
+
+@app.get("/api/platform/assistant-calls")
+def acalls_list(request: Request, limit: int = 100):
+    admin(request)
+    out = []
+    for f in sorted(ACALLS.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:max(1, min(limit, 500))]:
+        try:
+            out.append(_acall_sum(json.loads(f.read_text("utf-8"))))
+        except (OSError, ValueError):
+            continue
+    try:
+        cust = bool(json.loads((PLATFORM / "assist_log.json").read_text("utf-8")).get("customers"))
+    except (OSError, ValueError):
+        cust = False
+    return {"items": out, "customers": cust}
+
+
+def _acall_file(cid: str) -> Path:
+    f = ACALLS / f"{re.sub(r'[^A-Za-z0-9_-]', '', cid)}.json"
+    if not f.exists():
+        raise HTTPException(404, "المكالمة غير موجودة")
+    return f
+
+
+@app.get("/api/platform/assistant-calls/{cid}")
+def acall_get(cid: str, request: Request):
+    admin(request)
+    d = json.loads(_acall_file(cid).read_text("utf-8"))
+    return {**_acall_sum(d), "events": d.get("events") or []}
+
+
+class ACallReviewIn(BaseModel):
+    stars: int = 0
+    note: str = ""
+
+
+@app.put("/api/platform/assistant-calls/{cid}/review")
+def acall_review(cid: str, body: ACallReviewIn, request: Request):
+    admin(request)
+    f = _acall_file(cid)
+    d = json.loads(f.read_text("utf-8"))
+    d["review"] = {"stars": max(0, min(5, body.stars)), "note": body.note.strip()[:2000], "at": time.time()}
+    f.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
+    return _acall_sum(d)
+
+
+@app.delete("/api/platform/assistant-calls/{cid}")
+def acall_delete(cid: str, request: Request):
+    admin(request)
+    _acall_file(cid).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+class ACallSetIn(BaseModel):
+    customers: bool = False
+
+
+@app.put("/api/platform/assistant-calls-settings")
+def acalls_settings(body: ACallSetIn, request: Request):
+    """تسجيل مكالمات العملاء (كتابة بس): مقفول افتراضيًا. مكالمات الأدمن بتتسجل دايمًا."""
+    admin(request)
+    (PLATFORM / "assist_log.json").write_text(json.dumps({"customers": body.customers}), "utf-8")
+    return {"customers": body.customers}
+
+
 class GiftIn(BaseModel):
     points: int
     note: str = ""

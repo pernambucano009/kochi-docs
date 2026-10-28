@@ -19,6 +19,18 @@
   .btn.pri { background: var(--acc); border-color: var(--acc); color: #fff; }
   .btn:disabled { opacity: .5; cursor: default; }
   main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  .ac-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { .ac-wrap { grid-template-columns: 1fr; } }
+  .ac-list tr.on td { background: rgba(229, 97, 62, .08); }
+  .ac-log { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; max-height: 70vh; overflow: auto; }
+  .ac-l { padding: 8px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.6; }
+  .ac-l p { margin: 2px 0 0; }
+  .ac-l.agent { background: rgba(229, 97, 62, .1); margin-inline-end: 12%; }
+  .ac-l.user { background: rgba(60, 120, 220, .1); margin-inline-start: 12%; }
+  .ac-l.tool { background: rgba(127, 127, 127, .08); font-size: 12px; } .ac-l.tool code { font-size: 11.5px; overflow-wrap: anywhere; }
+  .ac-l.sys { font-size: 12px; opacity: .7; padding: 2px 12px; } .ac-l.err { color: #c0392b; opacity: 1; }
+  .ac-star { padding: 2px 8px; } .ac-star.on { color: #E5613E; }
+  .ac-rev { margin-top: 10px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .mute { color: var(--mute); font-size: 13px; }
@@ -56,6 +68,7 @@
   <nav id="tabs">
     <button data-t="issues" class="on">🚨 صندوق الأخطاء <b id="issN"></b></button>
     <button data-t="cust">👥 العملاء والاستهلاك</button>
+    <button data-t="calls">🎙️ معمل سعاد</button>
     <button data-t="runs">الفحص الشامل</button>
     <button data-t="steps">الخطوات</button>
     <button data-t="outs">النتائج للمراجعة</button>
@@ -76,6 +89,13 @@
       <p class="mute" style="margin:8px 0 0">بهذا المفتاح تسحب جلسة Claude الأخطاء الجديدة وتصلحها وتغلقها بنفسها. يظهر مرة واحدة: انسخه وضعه في أسرار بيئة Claude باسم SIMSIM_FEED_KEY، ولا تلصقه في المحادثة. إنشاء مفتاح جديد يلغي القديم.</p>
       <div class="row" id="feedOut" hidden><input id="feedKey" readonly dir="ltr" style="flex:1;min-width:220px"><button class="btn pri" id="feedCopy">انسخ</button></div></div>
     <div id="iss"></div>
+  </section>
+  <section data-p="calls" hidden>
+    <div class="card"><div class="row"><b>🎙️ معمل سعاد</b><span class="mute">كل مكالمة مع المساعدة مكتوبة سطرًا سطرًا: كلامها، وكلام العميل (من الصوت أو الكتابة)، والأدوات التي استخدمتها ونتائجها، وكل مرة أكملت فيها وحدها، وكتم الميكروفون. الكتابة فقط، دون تسجيل صوت.</span></div>
+      <div class="row" style="margin-top:10px"><label class="chip"><input type="checkbox" id="acCust"> سجّل مكالمات العملاء أيضًا (مكالمات الأدمن تُسجّل دائمًا)</label>
+        <a class="btn" href="/?assistant=1" target="_blank" rel="noopener">▶ ابدأ مكالمة تجريبية ↗</a><button class="btn" id="acReload">↻ حدّث</button></div></div>
+    <div class="ac-wrap"><div class="card ac-list"><table><thead><tr><th>الوقت</th><th>من</th><th>المدة</th><th>أدوار</th><th>حُفظ</th><th>أكملت وحدها</th><th>تنبيهات</th><th>تقييم</th></tr></thead><tbody id="acRows"></tbody></table></div>
+      <div class="card ac-view" id="acView"><p class="mute">اختر مكالمة لتظهر هنا.</p></div></div>
   </section>
   <section data-p="cust" hidden>
     <div class="card"><div class="row"><b>💸 إنفاق الشهر</b><span class="mute">كل دولار أنفقناه: على المشتركين، وعلى التجربة المجانية، وعلى الترويج (مكالمة المساعدة وأول تحليل والبحث عن المنافسين)، وعلى حسابنا، والفواتير الثابتة.</span>
@@ -202,12 +222,64 @@ $("iss").onclick = async (e) => {
 $("niches").innerHTML = NICHES.map(([k, t]) => `<label class="chip"><input type="checkbox" value="${k}" checked> ${t}</label>`).join("");
 document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => tab(b.dataset.t));
 if (location.hash === "#cust") setTimeout(() => tab("cust"), 0);   // من الإعدادات ← «العملاء والاستهلاك»
+if (location.hash === "#calls") setTimeout(() => tab("calls"), 0);
+
+// 🎙️ معمل سعاد: المكالمات المتسجلة، وكل مكالمة سطر بسطر، وتقييمها بملاحظة (عشان نطوّر منطقها)
+const AC_WHO = { agent: "سعاد", user: "العميل", tool: "أداة", sys: "النظام", err: "خطأ" };
+const AC_SYS = { "speech_started": "التقط الميكروفون صوتًا", "auto-continue": "أكملت وحدها بعد جملة ليست سؤالًا", "mic muted": "كتم الميكروفون", "mic on": "شغّل الميكروفون",
+  "end: finished": "انتهت المكالمة (أنهتها سعاد)", "end: closed": "أُغلقت المكالمة" };
+const acTime = (t) => new Date(t * 1000).toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const acDur = (sec) => sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "—";
+let AC = { items: [], cur: null };
+async function loadCalls() {
+  const d = await api("/api/platform/assistant-calls").catch((e) => ({ items: [], err: e.message }));
+  AC.items = d.items || []; $("acCust").checked = !!d.customers;
+  $("acRows").innerHTML = AC.items.map((c) => `<tr data-ac="${esc(c.id)}" class="${AC.cur === c.id ? "on" : ""}" style="cursor:pointer"><td>${acTime(c.started)}</td>
+    <td>${esc(c.name || "")}<div class="mute">${esc(c.email || "")}${c.role === "customer" ? "" : " · أدمن"}</div></td><td>${acDur(c.meta?.sec)}</td>
+    <td>${c.turns.agent} / ${c.turns.user}</td><td>${c.turns.saved}</td><td>${c.turns.auto || ""}</td>
+    <td>${(c.flags || []).map((f) => `<span class="chip">${esc(f)}</span>`).join(" ")}</td><td>${c.review?.stars ? "★".repeat(c.review.stars) : ""}</td></tr>`).join("")
+    || `<tr><td colspan="8" class="mute">${esc(d.err || "لا توجد مكالمات مسجّلة بعد. ابدأ مكالمة تجريبية من الزر أعلاه.")}</td></tr>`;
+}
+function acLine(e) {
+  const t = `<small class="mute num">${acDur(Math.round((e.t || 0) / 1000))}</small>`;
+  if (e.who === "tool") return `<div class="ac-l tool">${t} 🔧 <b dir="ltr">${esc(e.text)}</b> <code dir="ltr">${esc(JSON.stringify(e.data?.args || {}))}</code><div class="mute" dir="ltr">← ${esc(JSON.stringify(e.data?.out || {}).slice(0, 300))}</div></div>`;
+  if (e.who === "sys" || e.who === "err") return `<div class="ac-l sys${e.who === "err" ? " err" : ""}">${t} ${esc(AC_SYS[e.text] || e.text)}</div>`;
+  return `<div class="ac-l ${e.who}">${t} <b>${AC_WHO[e.who] || e.who}${e.data?.typed ? " (كتابة)" : ""}</b><p>${esc(e.text) || '<span class="mute">(صوت غير مفهوم أو ضوضاء)</span>'}</p></div>`;
+}
+async function openCall(id) {
+  AC.cur = id; loadCalls();
+  const d = await api(`/api/platform/assistant-calls/${id}`).catch((e) => ({ err: e.message }));
+  if (d.err) return ($("acView").innerHTML = `<p class="mute">${esc(d.err)}</p>`);
+  AC.d = d;
+  const hideNoise = $("acView").dataset.noise !== "1";
+  $("acView").innerHTML = `<div class="row"><b>${esc(d.name || "")} · ${esc(d.brand || "")}</b><span class="mute">${acTime(d.started)} · ${acDur(d.meta?.sec)} · ${esc(d.dialect || "")}</span>
+      <button class="btn" id="acCopy" style="margin-inline-start:auto">📋 انسخ النص</button><button class="btn" id="acNoise">${hideNoise ? "اعرض التقاط الأصوات" : "أخفِ التقاط الأصوات"}</button><button class="btn" id="acDel">🗑️</button></div>
+    <div class="ac-rev row"><span>تقييمك:</span>${[1, 2, 3, 4, 5].map((n) => `<button class="btn ac-star${(d.review?.stars || 0) >= n ? " on" : ""}" data-star="${n}">★</button>`).join("")}
+      <input id="acNote" placeholder="ما الذي كان خطأ في هذه المكالمة؟" value="${esc(d.review?.note || "")}" style="flex:1;min-width:200px"><button class="btn pri" id="acSave">حفظ</button></div>
+    <div class="ac-log">${(d.events || []).filter((e) => !(hideNoise && e.who === "sys" && e.text === "speech_started")).map(acLine).join("")}</div>`;
+}
+$("acRows").onclick = (e) => { const r = e.target.closest("[data-ac]"); if (r) openCall(r.dataset.ac); };
+$("acReload").onclick = loadCalls;
+$("acCust").onchange = async (e) => { await api("/api/platform/assistant-calls-settings", { method: "PUT", body: JSON.stringify({ customers: e.target.checked }) }).catch(() => {}); };
+$("acView").onclick = async (e) => {
+  const d = AC.d; if (!d) return;
+  const st = e.target.closest("[data-star]");
+  if (st) { $("acView").querySelectorAll(".ac-star").forEach((b) => b.classList.toggle("on", +b.dataset.star <= +st.dataset.star)); $("acView").dataset.stars = st.dataset.star; return; }
+  if (e.target.closest("#acSave")) { await api(`/api/platform/assistant-calls/${d.id}/review`, { method: "PUT", body: JSON.stringify({ stars: +($("acView").dataset.stars || d.review?.stars || 0), note: $("acNote").value }) }).catch(() => {}); loadCalls(); }
+  if (e.target.closest("#acNoise")) { $("acView").dataset.noise = $("acView").dataset.noise === "1" ? "" : "1"; openCall(d.id); }
+  if (e.target.closest("#acDel") && confirm("أتحذف هذه المكالمة من المعمل؟")) { await api(`/api/platform/assistant-calls/${d.id}`, { method: "DELETE" }).catch(() => {}); AC.cur = null; $("acView").innerHTML = ""; loadCalls(); }
+  if (e.target.closest("#acCopy")) {
+    const txt = (d.events || []).filter((x) => x.who !== "sys" || x.text !== "speech_started").map((x) => `[${acDur(Math.round((x.t || 0) / 1000))}] ${AC_WHO[x.who] || x.who}: ${x.who === "tool" ? `${x.text} ${JSON.stringify(x.data?.args || {})} → ${JSON.stringify(x.data?.out || {}).slice(0, 200)}` : AC_SYS[x.text] || x.text}`).join("\n");
+    navigator.clipboard.writeText(txt).then(() => { e.target.textContent = "✓ نُسخ"; }).catch(() => {});
+  }
+};
 function tab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
   document.querySelectorAll("main > section").forEach((s) => (s.hidden = s.dataset.p !== t));
   if (t === "map" && !S.map) loadMap();
   if (t === "lmap") loadLm();
   if (t === "cust") { loadCosts(); loadCust(); loadCoupons(); }
+  if (t === "calls") loadCalls();
 }
 
 $("start").onclick = async () => {

@@ -47,6 +47,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-tw{position:relative;display:flex;align-items:center}.as-tw input{padding-right:46px!important}
 .as-send{position:absolute;right:5px;width:34px;height:34px;border-radius:50%;border:0;background:#E5613E;color:#fff;font-size:14px;cursor:pointer;display:grid;place-items:center}
 .as-send:hover{filter:brightness(1.08)}
+.as-btn[data-mute].on{background:#E5613E;color:#fff;border-color:#E5613E}
 .as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
@@ -176,7 +177,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    S.typed += " " + text; S.wait = null; S.nudged = 0; clearTimeout(S.nudgeT);
+    S.typed += " " + text; S.wait = null; S.nudged = 0; clearTimeout(S.nudgeT); lg("user", text, { typed: 1 });
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
@@ -223,6 +224,18 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     drop.ondragleave = () => drop.classList.remove("over");
     drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); up(e.dataTransfer.files); };
   }
+  // 📼 مسجّل المكالمة (عشان نطوّر منطقها): كلامها وكلام العميل (المكتوب من الصوت أو الكتابة)، والأدوات ونتايجها، وأي «كمّلت لوحدها»
+  // كتابة بس من غير صوت. بيتبعت كل ١٥ ثانية وفي الآخر، والخادم بيحفظه لو التسجيل مسموح (محادثات الأدمن دايمًا، والعملاء لو اتفعّل)
+  function lg(who, text, data) {
+    if (!S?.log) return;
+    S.log.push({ t: Math.round(performance.now() - S.t0), who, text: String(text ?? "").slice(0, 2000), ...(data ? { data } : {}) });
+  }
+  function flush(final) {
+    if (!S?.log || (!S.log.length && !final)) return;
+    const body = JSON.stringify({ call: S.call, events: S.log.splice(0), final: !!final,
+      meta: { agent: S.agent || "", saved: S.saved, steps: S.steps.length, done: S.done.size, sec: Math.round((performance.now() - S.t0) / 1000), noMic: !S.mic } });
+    fetch("/api/assistant/log", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+  }
   async function pollAccount() {
     if (!S || S.accTimer) return;
     S.accTimer = setInterval(async () => {
@@ -241,13 +254,22 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
       <div class="as-type"><div class="as-tw"><input data-type placeholder="أو اكتب هنا واضغط Enter"><button type="button" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-hint" data-hint hidden></p></div>
-      <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
-    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false };
+      <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
+    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
+      call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [] };
     prog();
+    S.logT = setInterval(() => flush(false), 15000);
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
     q("[data-end]").onclick = () => end(false);
+    // 🔇 كتم الميكروفون: لو العميل هيبعد أو فيه كلام في الأوضة، عشان أصوات الأوضة ماتتاخدش على إنها إجابات
+    q("[data-mute]").onclick = () => {
+      const t = S?.mic?.getTracks()[0]; if (!t) return;
+      t.enabled = !t.enabled; S.muted = !t.enabled; lg("sys", S.muted ? "mic muted" : "mic on");
+      q("[data-mute]").textContent = S.muted ? "🎙️ شغّل الميكروفون" : "🔇 اكتم الميكروفون";
+      q("[data-mute]").classList.toggle("on", S.muted); status();
+    };
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       // 🎙️ من غير ميكروفون (مش موجود، أو العميل رفض الإذن) المكالمة بتكمل: المساعد بيتكلم والعميل بيكتب
@@ -255,7 +277,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
-      S.mic = mic; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+      S.mic = mic; if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
       const pc = new RTCPeerConnection(); S.pc = pc;
@@ -285,9 +307,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
-        else if (e.type === "conversation.item.input_audio_transcription.completed") { if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
+        else if (e.type === "conversation.item.input_audio_transcription.completed") { lg("user", e.transcript || "", { voice: 1 }); if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
@@ -309,11 +331,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           const r = R(e.response_id); r.calls++; r.pending++;
           let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch { /* أرجومنت مش JSON */ }
           const out = await tool(e.name, args);
+          lg("tool", e.name, { args, out });
           r.pending--;
           if (!S || S.dc.readyState !== "open") return;
           S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(out) } }));
           follow(e.response_id);
-        } else if (e.type === "error") console.warn("assistant:", e.error);
+        } else if (e.type === "response.output_audio_transcript.done" || e.type === "response.audio_transcript.done") lg("agent", e.transcript || "");
+        else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error"); }
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
@@ -338,7 +362,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function status() {
     if (!S || !S.agent) return;
     const st = q(".as-st"); if (!st) return;
-    const what = S.speaking ? "تتحدث" : S.thinking ? "لحظة…" : S.lastQ ? "في انتظار ردك" : "";
+    const what = S.speaking ? "تتحدث" : S.thinking ? "لحظة…" : S.muted ? "الميكروفون مكتوم: اكتب ردك أو شغّله" : S.lastQ ? "في انتظار ردك" : "";
     st.textContent = S.agent + (what ? ` · ${what}` : "") + (S.accTimer ? " · ⏳ حسابك قيد التحليل" : "");
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
@@ -375,7 +399,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     clearTimeout(S.nudgeT);
     if (S.lastQ !== false || S.finishing || S.wait) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
     if (S.nudged >= 1) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
-    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && !S.nudged && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = 1; S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
+    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && !S.nudged && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = 1; lg("sys", "auto-continue"); S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;
@@ -402,7 +426,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT);
+    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT);
+    { const keep = S; S = s; lg("sys", finished ? "end: finished" : "end: closed"); flush(true); S = keep; }
     // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
     if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});
     if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها

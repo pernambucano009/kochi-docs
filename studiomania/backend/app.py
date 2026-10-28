@@ -32786,6 +32786,56 @@ def assistant_profile(body: AssistProfileIn, request: Request):
     return assistant_state(request)
 
 
+# 📼 تسجيل مكالمات سعاد (كتابة بس، من غير صوت) عشان نطوّر منطقها: محادثات الأدمن دايمًا، والعملاء لو الأدمن فعّل ده من «معمل سعاد».
+# بيتحفظ في فولدر المنصة المشترك (جنب قاعدة بياناتها)، فالبوابة بتعرضهم كلهم في مكان واحد.
+ASSIST_LOG_DIR = providers.state_file(DATA_DIR).parent / "assistant_calls"
+ASSIST_LOG_LOCK = threading.Lock()
+
+
+def assist_log_on() -> bool:
+    if TENANT_ROLE != "customer":
+        return True
+    try:
+        return bool(json.loads((ASSIST_LOG_DIR.parent / "assist_log.json").read_text("utf-8")).get("customers"))
+    except (OSError, ValueError):
+        return False
+
+
+class AssistLogIn(BaseModel):
+    call: str
+    events: list[dict] = []
+    meta: dict = {}
+    final: bool = False
+
+
+@app.post("/api/assistant/log")
+def assistant_log(body: AssistLogIn, request: Request):
+    if not assist_log_on():
+        return {"ok": False, "off": True}
+    cid = re.sub(r"[^a-z0-9]", "", body.call.lower())[:24]
+    if not cid:
+        return {"ok": False}
+    ASSIST_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    f = ASSIST_LOG_DIR / f"{re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('TENANT_ID') or 'owner')}-{cid}.json"
+    with ASSIST_LOG_LOCK:
+        try:
+            d = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            bid, b, a = assist_info()
+            ob = onboard_load() or {}
+            d = {"id": f.stem, "tenant": os.environ.get("TENANT_ID") or "owner", "role": TENANT_ROLE, "started": time.time(),
+                 "email": request.headers.get("x-user-email", ""), "name": a.get("name") or signup_name(request), "brand": first_brand_name(b) if b else "",
+                 "dialect": ob.get("dialect") or "", "events": [], "meta": {}}
+        ev = [{k: e.get(k) for k in ("t", "who", "text", "data") if k in e} for e in body.events[:400]]
+        d["events"] = (d["events"] + ev)[-3000:]
+        d["meta"] = {**d.get("meta", {}), **{k: v for k, v in (body.meta or {}).items() if k in ("agent", "saved", "steps", "done", "sec", "noMic")}}
+        d["updated"] = time.time()
+        if body.final:
+            d["ended"] = time.time()
+        f.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
+    return {"ok": True}
+
+
 class AssistGenderIn(BaseModel):
     gender: str
 
