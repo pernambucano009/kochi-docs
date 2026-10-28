@@ -32751,6 +32751,70 @@ def assistant_account(body: AssistAccountIn):
     return {"ok": True, "started": True}
 
 
+class AssistRivalsIn(BaseModel):
+    names: list[str] = []
+
+
+def rivals_named(bid: str, names: list[str]) -> None:
+    """🏆 المنافسين اللي العميل ذكرهم بالاسم في المكالمة: بندوّر عليهم (اسم مستخدم أو رابط ← الحساب نفسه، كلام ← بحث ونختار
+    الحساب اللي اسمه أقرب لكلامه)، واللي نلاقيه بيتحط في صفحة المنافسين مستني موافقته، وإشعار من المساعدة يقوله يأكّد.
+    اللي مالقيناهوش بنقوله عليه عشان يكتب رابطه بنفسه. جزء من مكالمة أول مرة، فمابيتخصمش من نقاطه."""
+    brain = brain_row(bid) or {}
+    have = {rivals_key(i) for i in (brain.get("competitors") or {}).get("items") or []} | set((brain.get("competitors") or {}).get("excluded") or [])
+    found, missing, broke = [], [], ""
+    for nm in names:
+        nm = nm.strip()
+        hit = None
+        try:
+            if "instagram.com" in nm or "tiktok.com" in nm or re.fullmatch(r"@?[A-Za-z0-9._]{2,40}", nm):
+                h = rivals.clean_handle(nm)
+                for plat in ([rivals.guess_platform(nm)] if "." in nm and "/" in nm else ["instagram", "tiktok"]):
+                    try:
+                        hit = rivals_fetch(plat, h)
+                        break
+                    except rivals.RivalsError:
+                        continue
+            else:
+                posts = []
+                for plat in rivals.PLATFORMS:
+                    try:
+                        posts += rivals.search(plat, nm) if rivals.live() else rivals.mock_search(brain)
+                    except rivals.RivalsError as exc:
+                        broke = broke or str(exc)
+                words = [w for w in re.split(r"\s+", nm.lower()) if len(w) > 1]
+                score = lambda c: sum(w in f"{c['name']} {c['handle']}".lower() for w in words)  # noqa: E731
+                best = max(rivals.candidates(posts, have), key=lambda c: (score(c), c["sum_views"]), default=None)
+                if best and score(best):
+                    hit = rivals_fetch(best["platform"], best["handle"])
+        except rivals.RivalsError as exc:
+            broke = broke or str(exc)
+        if hit and rivals_key(hit) not in have:
+            have.add(rivals_key(hit))
+            found.append({**hit, "id": uuid.uuid4().hex[:8], "why": f"ذكرته بالاسم: «{nm[:60]}»", "named": nm[:60], "state": "pending", "updated": time.time()})
+        elif not hit:
+            missing.append(nm[:60])
+    rivals_merge(bid, found=found)
+    ob = onboard_load() or {}
+    who = livevoice.agent_name(ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo", "f")
+    miss = f"لم أجد: {'، '.join(missing)}. إن كانت حسابات حقيقية فأضف رابطها من صفحة المنافسين." if missing else ""
+    if found:
+        notify("rivals", "ok", f"{who}: وجدتُ {len(found)} من المنافسين الذين ذكرتهم", " ".join(x for x in ("راجعهم ووافق على الصحيح منهم.", miss) if x), "rivals")
+    elif missing:
+        notify("rivals", "bad", f"{who}: لم أجد المنافسين الذين ذكرتهم", miss if not broke else "تعذّر البحث الآن، أضف روابط حساباتهم من صفحة المنافسين.", "rivals")
+
+
+@app.post("/api/assistant/rivals")
+def assistant_rivals(body: AssistRivalsIn):
+    bid, _b, _a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    names = [str(n).strip()[:80] for n in body.names if str(n).strip()][:5]
+    if not names:
+        raise HTTPException(400, "لا توجد أسماء")
+    threading.Thread(target=rivals_named, args=(bid, names), daemon=True).start()
+    return {"ok": True, "searching": names}
+
+
 @app.get("/api/assistant/account")
 def assistant_account_state():
     """للمساعد: التحليل خلص؟ وأهم اللي لقاه (عشان يقوله للعميل بلهجته)."""

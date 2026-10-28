@@ -115,6 +115,11 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
                         "intro: a short video that opens their videos. none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
+    {"type": "function", "name": "find_competitors", "description": "Search for the competitor accounts the user named (by voice or typed). "
+     "The team looks them up in the background and sends the user a notification to confirm the ones found.",
+     "parameters": {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"},
+         "description": "Each competitor exactly as the user said or typed it: a brand name, a person's name, an @handle or a link."}},
+         "required": ["names"]}},
     {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
      "parameters": {"type": "object", "properties": {}}},
 ]
@@ -159,6 +164,8 @@ Tools (use them silently, never read them out loud):
 - The account link must be TYPED by the user in the box (spoken links are not accepted). If they say it by voice, thank them and
   ask them to type it in the box. Only after they typed it, call start_account_analysis with exactly what they typed. NEVER guess or make up an account (not from the brand name, not from anything else). If they say later, do not
   call it and do not say you are checking it: just say no problem and move on.
+- When the user names competitors or accounts they like (the [rivals] question, or anytime), call find_competitors with each one,
+  and tell them in one short sentence that you will look them up and they will get a notification to confirm the ones you found.
 - After the last question, call get_account_analysis. If it is ready, tell the user 2–3 short, specific findings from it in the dialect.
   If it is not ready yet, tell them the results will appear on their screen in a few minutes.
 - Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")

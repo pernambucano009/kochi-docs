@@ -909,7 +909,7 @@ const viewHooks = {}; // كل صفحة تسجّل هنا الذي يحدث عن�
 // خطوات بتفتح نفس الصفحة بس لقسم تاني: مونتاج المسلسلات والإعلانات منفصل عن مونتاج فيديوهات الشخصيات
 const VIEW_OF = { "6s": "6", "6a": "6", "6f": "6", cal: "7" };
 // 🧑‍🎤 الشخصيات (٤) والأفاتار (١٦): الشكل الجديد صفحات جوه الرئيسية، فأي رابط قديم بيوصل لهم
-const NEW_PAGE = { 4: "coaches", 16: "twin" };
+const NEW_PAGE = { 4: "coaches", 16: "twin", rivals: "rivals" };   // rivals: من الإشعار (المنافسين اللي ذكرتهم في المكالمة)
 function showStep(step) {
   if (NEW_PAGE[step] && window.NHGo && !(typeof APP !== "undefined" && APP === "kochi")) return window.NHGo(NEW_PAGE[step]);
   const view = VIEW_OF[step] || step;

@@ -131,6 +131,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (r.ok) { changed(); step("account"); acct(false); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
       return r;
     }
+    if (name === "find_competitors") {
+      const r = await api("/api/assistant/rivals", { method: "POST", ...jsonBody({ names: args.names || [] }) }).catch((e) => ({ ok: false, error: e.message }));
+      if (r.ok) chip(`🔎 <span><b>نبحث عن منافسيك</b><br>${esc((r.searching || []).join("، "))}</span>`);
+      return r;
+    }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
     if (name === "show_input") {
       if (args.kind === "none") { later(); return { ok: true, closed: true }; }
