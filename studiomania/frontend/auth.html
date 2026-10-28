@@ -7,10 +7,8 @@
 <script src="/i18n-en.js"></script>
 <script src="/i18n.js"></script>
 <script src="/pw-eye.js" defer></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png"><link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600&family=Alexandria:wght@300;400;500;600&family=Readex+Pro:wght@200;300;400;500;600;700&family=Unbounded:wght@300;500;700&display=swap">
+<link rel="stylesheet" href="/gfonts.css">
 <link rel="stylesheet" href="/style.css">
 <style>
   .au-tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 14px; margin: 6px 0 4px; }
@@ -34,6 +32,7 @@
   .au-ph-meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
   .au-ph-meta a, .au-ph-meta button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
   .au-ph-meta button:disabled { opacity: .5; cursor: default; text-decoration: none; }
+.au-agree{display:flex;gap:8px;align-items:flex-start;margin:6px 0 12px;font-size:13px;line-height:1.6;cursor:pointer}.au-agree input{margin-top:4px;accent-color:#E5613E}
 </style>
 </head>
 <body>
@@ -156,6 +155,7 @@ const VIEWS = {
     ${S.phone ? `${field("name", "اسمك أو اسم العلامة", "text", "name")}${phoneBox()}${google()}` : `${google()}${field("name", "اسمك أو اسم العلامة", "text", "name")}`}${field("email", "البريد الإلكتروني", "email", "email")}
     ${field("pw", "كلمة المرور (8 حروف أو أرقام على الأقل)", "password", "new-password")}
     ${regionFields()}
+    <label class="au-agree"><input type="checkbox" id="agree"> <span>أؤكد أن عمري 18 سنة أو أكثر، وأوافق على <a href="/terms" target="_blank">الشروط</a> و<a href="/privacy" target="_blank">سياسة الخصوصية</a>. وبالمتابعة بجوجل أو برقم الجوال تؤكد ذلك أيضًا.</span></label>
     <button class="btn primary wide" id="go">أنشئ الحساب</button>
     <div class="au-links"><a href="/pricing">الباقات والأسعار</a></div>`,
   forgot: () => `<p class="muted">اكتب بريدك الإلكتروني وسنرسل إليك رابطًا لتعيين كلمة مرور جديدة.</p>
@@ -178,7 +178,8 @@ const VIEWS = {
 const ACTIONS = {
   login: async () => { const d = await post("/api/auth/login", { email: $("email").value, password: $("pw").value }); location.replace(d.verify ? "/verify" : next()); },
   signup: async () => {
-    const d = await post("/api/auth/signup", { name: $("name").value, email: $("email").value, password: $("pw").value,
+    if (!$("agree")?.checked) throw new Error("أكّد أن عمرك 18 سنة أو أكثر ووافق على الشروط لتكمل");
+    const d = await post("/api/auth/signup", { adult: true, name: $("name").value, email: $("email").value, password: $("pw").value,
       country: $("country")?.value || "", dialect: $("dialect")?.value || "", field: $("field")?.value || "", goal: $("goal")?.value || "" });
     sessionStorage.setItem("devlink", d.dev_link || ""); sessionStorage.setItem("mailfail", d.mail_failed ? "1" : ""); location.replace("/verify");
   },

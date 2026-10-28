@@ -700,6 +700,7 @@ class SignupIn(BaseModel):
     goal: str = ""
     coupon: str = ""
     gender: str = ""          # m / f: عشان المساعدة تخاطبه صح
+    adult: bool = False       # أكّد إن عمره ١٨ سنة أو أكثر ووافق على الشروط وسياسة الخصوصية
 
 
 # 🗣️ البلد واللهجة والمجال والهدف (fieldpacks): بيتحفظوا في onboard.json في مساحة العميل، والعقل بياخدهم أول ما يتعمل.
@@ -2771,8 +2772,8 @@ MAX_BODY = int(float(os.environ.get("MAX_UPLOAD_MB") or 2048) * 1024 * 1024)
 CSP = "; ".join((
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",   # الخطوط من سيرفرنا: المتصفح مابيكلمش جوجل خالص
     "img-src 'self' data: blob: https:",
     "media-src 'self' data: blob: https:",
     "connect-src 'self' https: wss: data: blob:",
@@ -2877,6 +2878,9 @@ async def proxy(path: str, request: Request):
             return Response(f.read_bytes(), media_type={".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml",
                                                         ".png": "image/png"}.get(f.suffix, "application/octet-stream"),
                             headers={"Cache-Control": "no-cache"})
+        # 🔤 خطوط الواجهة من سيرفرنا (بدل جوجل): أسماءها فيها بصمة، فبتتخزن عند الزائر سنة
+        if f.parent == FRONTEND.resolve() / "webfonts" and f.suffix == ".woff2" and f.is_file():
+            return Response(f.read_bytes(), media_type="font/woff2", headers={"Cache-Control": "public, max-age=31536000, immutable"})
         # 🌐 صفحة الهبوط: صور الموقع (site/) وعيّنات القوالب (gallery/: فيديو وغلاف) مفتوحة للزوار
         if (f.parent == FRONTEND.resolve() / "site" or FRONTEND.resolve() / "gallery" in f.parents) and f.suffix in (".webp", ".png", ".jpg", ".mp4") and f.is_file():
             return FileResponse(f, headers={"Cache-Control": "public, max-age=86400"})
