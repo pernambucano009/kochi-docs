@@ -1949,7 +1949,7 @@ def _acall_sum(d: dict) -> dict:
     return {"id": d.get("id"), "started": d.get("started"), "ended": d.get("ended"), "updated": d.get("updated"), "role": d.get("role"),
             "email": d.get("email"), "name": d.get("name"), "brand": d.get("brand"), "dialect": d.get("dialect"), "meta": d.get("meta") or {},
             "turns": {"agent": n("agent"), "user": len(users), "tools": n("tool"), "saved": saves, "auto": n("sys", "auto-continue")},
-            "flags": flags, "review": d.get("review")}
+            "flags": flags, "review": d.get("review"), "auto": {k: (d.get("auto") or {}).get(k) for k in ("score", "summary")} if d.get("auto") else None}
 
 
 @app.get("/api/platform/assistant-calls")
@@ -1961,6 +1961,11 @@ def acalls_list(request: Request, limit: int = 100):
             out.append(_acall_sum(json.loads(f.read_text("utf-8"))))
         except (OSError, ValueError):
             continue
+    # 🤖 المكالمات اللي خلصت ولسه ماتراجعتش: بتتراجع في الخلفية (٣ في المرة)
+    todo = [x["id"] for x in out if x.get("ended") and not x.get("auto") and x["id"] not in _acall_rev_busy and x["turns"]["agent"] + x["turns"]["user"] >= 3][:3]
+    if todo and (os.environ.get("ATLASCLOUD_API_KEY") or os.environ.get("ATLAS_CLOUD_API_KEY")):
+        _acall_rev_busy.update(todo)
+        acall_review_bg(todo)
     try:
         cust = bool(json.loads((PLATFORM / "assist_log.json").read_text("utf-8")).get("customers"))
     except (OSError, ValueError):
@@ -1979,7 +1984,7 @@ def _acall_file(cid: str) -> Path:
 def acall_get(cid: str, request: Request):
     admin(request)
     d = json.loads(_acall_file(cid).read_text("utf-8"))
-    return {**_acall_sum(d), "events": d.get("events") or []}
+    return {**_acall_sum(d), "events": d.get("events") or [], "auto": d.get("auto"), "reviewing": cid in _acall_rev_busy}
 
 
 class ACallReviewIn(BaseModel):
@@ -2002,6 +2007,146 @@ def acall_delete(cid: str, request: Request):
     admin(request)
     _acall_file(cid).unlink(missing_ok=True)
     return {"ok": True}
+
+
+# 🤖 مراجِع سعاد: بعد كل مكالمة، موديل بيقرا المكالمة كلها ويطلّع: درجة، وأخطاءها بالدقيقة والجملة، ودروس مقترحة.
+# الدروس بتستنى اعتماد الأدمن، وبعد الاعتماد بتتضاف لتعليمات سعاد في كل مكالمة جاية (فبتتحسن مع الوقت من غير ما تتغيّر لوحدها)
+ALESSONS = PLATFORM / "assistant_lessons.json"
+ACALL_REVIEW_MODEL = os.environ.get("ASSIST_REVIEW_MODEL", "google/gemini-2.5-flash")
+_acall_rev_lock = threading.Lock()
+_acall_rev_busy: set = set()
+ACALL_REVIEW_PROMPT = """You review a recorded onboarding voice call between "Suad" (an AI assistant of a video-marketing platform) and a new user.
+Suad must: greet, ask the user to TYPE their Instagram/TikTok account, then learn about them and their work through short questions
+(a checklist, not a script), then ask for a logo and product photos, then say goodbye.
+Her rules: 1-2 short sentences and at most ONE question per turn, then wait. Never repeat or rephrase a question while the user is silent.
+Never end a turn on a plain statement. Never treat background noise, other people or unrelated talk as an answer (never save it).
+Never assume the user has a "project/business/products": first learn what they do and then use THEIR terms (a dentist: clinic, patients).
+Build every question on the previous answers; skip what does not apply or was already said; never ask something that contradicts them.
+Address the user with the right gender. The account must be typed, never guessed or taken from speech. React to what the user says.
+Speak the user's dialect naturally. Never mention AI model or company names.
+Lines: [mm:ss] WHO: text. WHO is سعاد (assistant), العميل (user; "(كتابة)" = typed; empty = noise), أداة (tool call → result),
+النظام (platform events such as "auto-continue" = she continued on her own after a non-question).
+Output JSON only: {"score": 0-100, "summary": "1-2 Arabic sentences on how the call went",
+"mistakes": [{"at": "mm:ss", "kind": "short English tag", "quote": "her exact words (or the user's)", "why": "short Arabic explanation"}],
+"lessons": [{"text": "one short English instruction for Suad that would prevent a mistake next time", "why": "short Arabic reason"}]}
+Only real mistakes that appear in this call. Max 8 mistakes and 4 lessons. If an existing lesson already covers it, reuse its exact text."""
+
+
+def _alessons() -> list[dict]:
+    try:
+        return json.loads(ALESSONS.read_text("utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def _acall_text(d: dict) -> str:
+    who = {"agent": "سعاد", "user": "العميل", "tool": "أداة", "sys": "النظام", "err": "خطأ"}
+    out = []
+    for e in d.get("events") or []:
+        if e.get("who") == "sys" and e.get("text") == "speech_started":
+            continue
+        t = int((e.get("t") or 0) / 1000)
+        x = e.get("data") or {}
+        txt = f"{e.get('text')} {json.dumps(x.get('args') or {}, ensure_ascii=False)} → {json.dumps(x.get('out') or {}, ensure_ascii=False)[:200]}" \
+            if e.get("who") == "tool" else (e.get("text") or "") + (" (كتابة)" if x.get("typed") else "")
+        out.append(f"[{t // 60:02d}:{t % 60:02d}] {who.get(e.get('who'), e.get('who'))}: {txt}")
+    return "\n".join(out)[-60000:]
+
+
+def acall_review_run(cid: str) -> dict:
+    """يراجع مكالمة واحدة ويحفظ النتيجة فيها، ويضيف الدروس الجديدة (أو يزوّد عدّاد القديمة) في قائمة الدروس."""
+    key = os.environ.get("ATLASCLOUD_API_KEY") or os.environ.get("ATLAS_CLOUD_API_KEY")
+    if not key:
+        raise HTTPException(400, "مفتاح Atlas غير مسجل")
+    f = _acall_file(cid)
+    d = json.loads(f.read_text("utf-8"))
+    tx = _acall_text(d)
+    known = [x["text"] for x in _alessons() if x.get("status") != "rejected"]
+    body = {"model": ACALL_REVIEW_MODEL, "temperature": 0.2, "max_tokens": 4000, "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": ACALL_REVIEW_PROMPT},
+                         {"role": "user", "content": ("Existing lessons:\n- " + "\n- ".join(known) + "\n\n" if known else "") + "Call:\n" + tx}]}
+    url = os.environ.get("ATLASCLOUD_LLM_URL") or os.environ.get("ATLASCLOUD_BASE_URL", "https://api.atlascloud.ai") + "/v1"
+    r = httpx.post(f"{url}/chat/completions", headers={"Authorization": f"Bearer {key}"}, json=body, timeout=180)
+    if r.status_code >= 400:
+        raise HTTPException(502, f"المراجعة لم تكتمل ({r.status_code})")
+    j = r.json()
+    txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", (j["choices"][0]["message"]["content"] or "").strip())
+    try:
+        res = json.loads(txt)
+    except ValueError:
+        raise HTTPException(502, "رد المراجعة غير مفهوم") from None
+    u = j.get("usage") or {}
+    usd = (u.get("prompt_tokens") or len(tx) / 3) * 0.3e-6 + (u.get("completion_tokens") or 800) * 2.5e-6
+    auto = {"score": max(0, min(100, int(res.get("score") or 0))), "summary": str(res.get("summary") or "")[:600],
+            "mistakes": [{k: str(m.get(k) or "")[:400] for k in ("at", "kind", "quote", "why")} for m in (res.get("mistakes") or [])[:8]],
+            "lessons": [{k: str(x.get(k) or "")[:300] for k in ("text", "why")} for x in (res.get("lessons") or [])[:4] if x.get("text")],
+            "at": time.time(), "usd": round(usd, 5)}
+    d = json.loads(f.read_text("utf-8"))
+    d["auto"] = auto
+    f.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
+    with _acall_rev_lock:
+        ls = _alessons()
+        for x in auto["lessons"]:
+            hit = next((y for y in ls if y["text"].strip().lower() == x["text"].strip().lower()), None)
+            if hit:
+                hit["count"] = int(hit.get("count") or 1) + 1
+                hit.setdefault("calls", []).append(cid)
+            else:
+                ls.append({"id": uuid.uuid4().hex[:10], "text": x["text"], "why": x["why"], "count": 1, "status": "pending", "at": time.time(), "calls": [cid]})
+        ALESSONS.write_text(json.dumps(ls, ensure_ascii=False), "utf-8")
+    try:   # 💸 على حساب المنصة (عدّاد الصرف)
+        with closing(db()) as c, c:
+            c.execute("INSERT INTO costs (id, workspace, usd, what, promo, plan, ref, at) VALUES (?, ?, ?, ?, 0, 'owner', ?, ?)",
+                      (uuid.uuid4().hex, OWNER, round(usd, 5), "مراجعة مكالمات سعاد", cid[:60], time.time()))
+    except sqlite3.Error:
+        pass
+    return auto
+
+
+def acall_review_bg(ids: list[str]) -> None:
+    def go():
+        for cid in ids:
+            try:
+                acall_review_run(cid)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[acall-review] {cid}: {exc}", flush=True)
+            finally:
+                _acall_rev_busy.discard(cid)
+    threading.Thread(target=go, daemon=True).start()
+
+
+@app.post("/api/platform/assistant-calls/{cid}/auto")
+def acall_auto(cid: str, request: Request):
+    admin(request)
+    return acall_review_run(cid)
+
+
+@app.get("/api/platform/assistant-lessons")
+def alessons_get(request: Request):
+    admin(request)
+    return {"items": sorted(_alessons(), key=lambda x: ({"pending": 0, "approved": 1}.get(x.get("status"), 2), -int(x.get("count") or 1)))}
+
+
+class ALessonIn(BaseModel):
+    status: str = ""
+    text: str = ""
+
+
+@app.put("/api/platform/assistant-lessons/{lid}")
+def alesson_set(lid: str, body: ALessonIn, request: Request):
+    """اعتماد الدرس (يدخل تعليمات سعاد من المكالمة الجاية)، أو رفضه، أو تعديل نصه."""
+    admin(request)
+    with _acall_rev_lock:
+        ls = _alessons()
+        x = next((y for y in ls if y["id"] == lid), None)
+        if not x:
+            raise HTTPException(404, "الدرس غير موجود")
+        if body.status in ("pending", "approved", "rejected"):
+            x["status"] = body.status
+        if body.text.strip():
+            x["text"] = body.text.strip()[:400]
+        ALESSONS.write_text(json.dumps(ls, ensure_ascii=False), "utf-8")
+    return alessons_get(request)
 
 
 class ACallSetIn(BaseModel):

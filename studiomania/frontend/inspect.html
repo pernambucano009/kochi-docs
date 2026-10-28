@@ -31,6 +31,12 @@
   .ac-l.sys { font-size: 12px; opacity: .7; padding: 2px 12px; } .ac-l.err { color: #c0392b; opacity: 1; }
   .ac-star { padding: 2px 8px; } .ac-star.on { color: #E5613E; }
   .ac-rev { margin-top: 10px; }
+  .ac-sc { font-variant-numeric: tabular-nums; padding: 1px 8px; border-radius: 999px; } .ac-sc.ok { background: rgba(30, 158, 106, .15); color: #1E9E6A; }
+  .ac-sc.mid { background: rgba(229, 154, 30, .15); color: #b27500; } .ac-sc.bad { background: rgba(217, 71, 43, .14); color: #c0392b; }
+  .ac-auto { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(127, 127, 127, .07); display: grid; gap: 6px; }
+  .ac-mis { font-size: 13px; border-inline-start: 3px solid #E5613E; padding-inline-start: 8px; }
+  .ac-les { display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 6px; }
+  .ac-les.approved { border-color: rgba(30, 158, 106, .5); } .ac-les.rejected { opacity: .55; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .mute { color: var(--mute); font-size: 13px; }
@@ -94,7 +100,9 @@
     <div class="card"><div class="row"><b>🎙️ معمل سعاد</b><span class="mute">كل مكالمة مع المساعدة مكتوبة سطرًا سطرًا: كلامها، وكلام العميل (من الصوت أو الكتابة)، والأدوات التي استخدمتها ونتائجها، وكل مرة أكملت فيها وحدها، وكتم الميكروفون. الكتابة فقط، دون تسجيل صوت.</span></div>
       <div class="row" style="margin-top:10px"><label class="chip"><input type="checkbox" id="acCust"> سجّل مكالمات العملاء أيضًا (مكالمات الأدمن تُسجّل دائمًا)</label>
         <a class="btn" href="/?assistant=1" target="_blank" rel="noopener">▶ ابدأ مكالمة تجريبية ↗</a><button class="btn" id="acReload">↻ حدّث</button></div></div>
-    <div class="ac-wrap"><div class="card ac-list"><table><thead><tr><th>الوقت</th><th>من</th><th>المدة</th><th>أدوار</th><th>حُفظ</th><th>أكملت وحدها</th><th>تنبيهات</th><th>تقييم</th></tr></thead><tbody id="acRows"></tbody></table></div>
+    <div class="card"><div class="row"><b>📚 دروس سعاد</b><span class="mute">بعد كل مكالمة يراجعها مراجِع آلي ويقترح دروسًا من أخطائها. الدرس الذي تعتمده يُضاف إلى تعليماتها من المكالمة القادمة، فتتحسن مع الوقت دون أن تتغير وحدها.</span></div>
+      <div id="acLessons" style="margin-top:10px"></div></div>
+    <div class="ac-wrap"><div class="card ac-list"><table><thead><tr><th>الوقت</th><th>من</th><th>المدة</th><th>أدوار</th><th>حُفظ</th><th>أكملت وحدها</th><th>تنبيهات</th><th>المراجِع</th><th>تقييمك</th></tr></thead><tbody id="acRows"></tbody></table></div>
       <div class="card ac-view" id="acView"><p class="mute">اختر مكالمة لتظهر هنا.</p></div></div>
   </section>
   <section data-p="cust" hidden>
@@ -231,14 +239,29 @@ const AC_SYS = { "speech_started": "التقط الميكروفون صوتًا",
 const acTime = (t) => new Date(t * 1000).toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const acDur = (sec) => sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "—";
 let AC = { items: [], cur: null };
+const AC_LST = { pending: "بانتظار اعتمادك", approved: "معتمد: في تعليماتها", rejected: "مرفوض" };
+async function loadLessons() {
+  const d = await api("/api/platform/assistant-lessons").catch(() => ({ items: [] }));
+  $("acLessons").innerHTML = (d.items || []).map((x) => `<div class="ac-les ${x.status}" data-lid="${esc(x.id)}"><div><b dir="ltr">${esc(x.text)}</b>
+      <div class="mute">${esc(x.why || "")} · تكرر في ${x.count || 1} مكالمة · ${AC_LST[x.status] || ""}</div></div>
+      <div class="row">${x.status !== "approved" ? '<button class="btn pri" data-les="approved">✓ اعتمد</button>' : '<button class="btn" data-les="pending">↩ ألغِ الاعتماد</button>'}
+      ${x.status !== "rejected" ? '<button class="btn" data-les="rejected">✕ ارفض</button>' : ""}</div></div>`).join("") || '<p class="mute">لا توجد دروس بعد: تظهر هنا بعد مراجعة أول مكالمة منتهية.</p>';
+}
+$("acLessons").onclick = async (e) => {
+  const b = e.target.closest("[data-les]"); if (!b) return;
+  await api(`/api/platform/assistant-lessons/${b.closest("[data-lid]").dataset.lid}`, { method: "PUT", body: JSON.stringify({ status: b.dataset.les }) }).catch(() => {});
+  loadLessons();
+};
 async function loadCalls() {
+  loadLessons();
   const d = await api("/api/platform/assistant-calls").catch((e) => ({ items: [], err: e.message }));
   AC.items = d.items || []; $("acCust").checked = !!d.customers;
   $("acRows").innerHTML = AC.items.map((c) => `<tr data-ac="${esc(c.id)}" class="${AC.cur === c.id ? "on" : ""}" style="cursor:pointer"><td>${acTime(c.started)}</td>
     <td>${esc(c.name || "")}<div class="mute">${esc(c.email || "")}${c.role === "customer" ? "" : " · أدمن"}</div></td><td>${acDur(c.meta?.sec)}</td>
     <td>${c.turns.agent} / ${c.turns.user}</td><td>${c.turns.saved}</td><td>${c.turns.auto || ""}</td>
-    <td>${(c.flags || []).map((f) => `<span class="chip">${esc(f)}</span>`).join(" ")}</td><td>${c.review?.stars ? "★".repeat(c.review.stars) : ""}</td></tr>`).join("")
-    || `<tr><td colspan="8" class="mute">${esc(d.err || "لا توجد مكالمات مسجّلة بعد. ابدأ مكالمة تجريبية من الزر أعلاه.")}</td></tr>`;
+    <td>${(c.flags || []).map((f) => `<span class="chip">${esc(f)}</span>`).join(" ")}</td><td>${c.auto?.score != null ? `<b class="ac-sc ${c.auto.score >= 80 ? "ok" : c.auto.score >= 60 ? "mid" : "bad"}">${c.auto.score}</b>` : c.ended ? '<span class="mute">⏳</span>' : ""}</td>
+    <td>${c.review?.stars ? "★".repeat(c.review.stars) : ""}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="mute">${esc(d.err || "لا توجد مكالمات مسجّلة بعد. ابدأ مكالمة تجريبية من الزر أعلاه.")}</td></tr>`;
 }
 function acLine(e) {
   const t = `<small class="mute num">${acDur(Math.round((e.t || 0) / 1000))}</small>`;
@@ -254,6 +277,10 @@ async function openCall(id) {
   const hideNoise = $("acView").dataset.noise !== "1";
   $("acView").innerHTML = `<div class="row"><b>${esc(d.name || "")} · ${esc(d.brand || "")}</b><span class="mute">${acTime(d.started)} · ${acDur(d.meta?.sec)} · ${esc(d.dialect || "")}</span>
       <button class="btn" id="acCopy" style="margin-inline-start:auto">📋 انسخ النص</button><button class="btn" id="acNoise">${hideNoise ? "اعرض التقاط الأصوات" : "أخفِ التقاط الأصوات"}</button><button class="btn" id="acDel">🗑️</button></div>
+    ${d.auto ? `<div class="ac-auto"><div class="row"><b>🤖 المراجِع: <span class="ac-sc ${d.auto.score >= 80 ? "ok" : d.auto.score >= 60 ? "mid" : "bad"}">${d.auto.score}/100</span></b><span>${esc(d.auto.summary)}</span></div>
+      ${(d.auto.mistakes || []).map((m) => `<div class="ac-mis"><small class="num">${esc(m.at)}</small> <b>${esc(m.why)}</b>${m.quote ? `<div class="mute">«${esc(m.quote)}»</div>` : ""}</div>`).join("")}
+      ${(d.auto.lessons || []).length ? `<div class="mute" style="margin-top:6px">دروس مقترحة (في «📚 دروس سعاد» بالأعلى): ${d.auto.lessons.map((x) => esc(x.why || x.text)).join(" · ")}</div>` : ""}</div>`
+      : `<div class="ac-auto row"><span class="mute">${d.reviewing ? "⏳ المراجِع يراجع هذه المكالمة الآن…" : d.ended ? "لم تُراجع بعد." : "المكالمة لم تنتهِ بعد."}</span><button class="btn" id="acAuto">🤖 راجعها الآن</button></div>`}
     <div class="ac-rev row"><span>تقييمك:</span>${[1, 2, 3, 4, 5].map((n) => `<button class="btn ac-star${(d.review?.stars || 0) >= n ? " on" : ""}" data-star="${n}">★</button>`).join("")}
       <input id="acNote" placeholder="ما الذي كان خطأ في هذه المكالمة؟" value="${esc(d.review?.note || "")}" style="flex:1;min-width:200px"><button class="btn pri" id="acSave">حفظ</button></div>
     <div class="ac-log">${(d.events || []).filter((e) => !(hideNoise && e.who === "sys" && e.text === "speech_started")).map(acLine).join("")}</div>`;
@@ -265,6 +292,7 @@ $("acView").onclick = async (e) => {
   const d = AC.d; if (!d) return;
   const st = e.target.closest("[data-star]");
   if (st) { $("acView").querySelectorAll(".ac-star").forEach((b) => b.classList.toggle("on", +b.dataset.star <= +st.dataset.star)); $("acView").dataset.stars = st.dataset.star; return; }
+  if (e.target.closest("#acAuto")) { e.target.disabled = true; e.target.textContent = "⏳ جارٍ المراجعة…"; await api(`/api/platform/assistant-calls/${d.id}/auto`, { method: "POST" }).catch((er) => alert(er.message)); openCall(d.id); return; }
   if (e.target.closest("#acSave")) { await api(`/api/platform/assistant-calls/${d.id}/review`, { method: "PUT", body: JSON.stringify({ stars: +($("acView").dataset.stars || d.review?.stars || 0), note: $("acNote").value }) }).catch(() => {}); loadCalls(); }
   if (e.target.closest("#acNoise")) { $("acView").dataset.noise = $("acView").dataset.noise === "1" ? "" : "1"; openCall(d.id); }
   if (e.target.closest("#acDel") && confirm("أتحذف هذه المكالمة من المعمل؟")) { await api(`/api/platform/assistant-calls/${d.id}`, { method: "DELETE" }).catch(() => {}); AC.cur = null; $("acView").innerHTML = ""; loadCalls(); }

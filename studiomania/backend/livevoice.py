@@ -153,7 +153,7 @@ def name_gender(name: str) -> str:
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
-                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "") -> str:
+                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "", lessons: list[str] | None = None) -> str:
     """have: اللي العقل فيه أصلًا ومش محتاج يتطلب تاني (account: اسم الحساب، logo / products: True لو اترفعوا)."""
     have = have or {}
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
@@ -251,7 +251,8 @@ Rules:
 - If the user interrupts, stop immediately and listen to them.
 - Only use facts the user actually said. Never assume a business, product or detail they did not say, and never mix in an example
   as if it were theirs. If you did not hear clearly, ask them to repeat it, without guessing alternatives.
-- Never mention the names of the AI models or companies behind the platform."""
+- Never mention the names of the AI models or companies behind the platform.""" + (
+        "\nLessons from reviewing your past calls (follow them strictly):\n" + "\n".join(f"- {x}" for x in lessons[:30]) if lessons else "")
 
 
 # ---------------------------------------------------------------- مفاتيح مؤقتة للمتصفح

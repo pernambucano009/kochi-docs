@@ -32868,7 +32868,11 @@ def assistant_token(request: Request):
     gl = fieldpacks.GOAL_BY.get(ob.get("goal") or "")
     ctx = "، ".join(x for x in (f"المجال: {fp['name']}" if fp.get("name") else "", f"الهدف: {gl[1]}" if gl else "",
                                 f"اسم العلامة: {ob['brand']}" if ob.get("brand") else "") if x)
-    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx,
+    try:   # 📚 الدروس اللي الأدمن اعتمدها من مراجعة المكالمات اللي فاتت (معمل سعاد)
+        lessons = [x["text"] for x in json.loads((ASSIST_LOG_DIR.parent / "assistant_lessons.json").read_text("utf-8")) if x.get("status") == "approved"]
+    except (OSError, ValueError, KeyError, TypeError):
+        lessons = []
+    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:
