@@ -349,8 +349,9 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
           <label style="{{labelStyle}}">{{t.dialect}}<select class="lp-field" name="dialect" data-fill="dialect" style="{{fieldStyle}}"></select></label>
           <label style="{{labelStyle}}">{{t.field}}<select class="lp-field" name="field" data-fill="field" style="{{fieldStyle}}"></select></label>
           <label style="{{labelStyle}}">{{t.goal}}<select class="lp-field" name="goal" data-fill="goal" style="{{fieldStyle}}"></select></label>
+          <label style="{{labelStyle}}">{{t.gender}}<select class="lp-field" name="gender" style="{{fieldStyle}}"><option value="">{{t.genderPick}}</option><option value="m">{{t.male}}</option><option value="f">{{t.female}}</option></select></label>
+          <label style="{{labelStyle}}">{{t.coupon}}<input class="lp-field" type="text" name="coupon" dir="ltr" autocomplete="off" placeholder="WELCOME50" style="{{fieldStyle}}"></label>
         </div>
-        <label style="{{labelStyle}}">{{t.coupon}}<input class="lp-field" type="text" name="coupon" dir="ltr" autocomplete="off" placeholder="WELCOME50" style="{{fieldStyle}}"></label>
         <p style="{{hintStyle}}">{{t.step2Hint}}</p>
       </sc-if>
       <sc-if value="{{err}}" hint-placeholder-val="{{ false }}"><p data-k="err" role="alert" style="{{errStyle}}">{{err}}</p></sc-if>
@@ -454,7 +455,7 @@ const LP_TEXT = {
     heroNote: '300 نقطة مجانًا للتجربة · بدون بطاقة',
     demoTitle: 'من فكرة إلى فيديو جاهز للنشر', demoLead: 'هذا الفيديو صُنع بقالب من قوالب سمسمكيت: تكتب فكرتك، والعقل يكتب النص بلهجتك، والقالب يصنع الفيديو.', vidCap: 'شاهد مثالًا',
     hTitle: 'كيف يعمل؟', hLead: 'ثلاث خطوات، والباقي علينا.', exTitle: 'أمثلة لمجالك', exLead: 'اختر مجالك وشاهد القوالب التي تناسبه.',
-    country: 'بلدك', dialect: 'لهجة المحتوى', field: 'مجال نشاطك', goal: 'هدفك من المحتوى', next: 'التالي', step2Hint: 'نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، ويمكنك تغيير اللهجة لاحقًا.', soon: 'الدخول بأبل قريبًا', gsoon: 'الدخول بجوجل قريبًا', forgot: 'نسيت كلمة المرور؟', coupon: 'كود خصم (اختياري)',
+    country: 'بلدك', dialect: 'لهجة المحتوى', field: 'مجال نشاطك', goal: 'هدفك من المحتوى', next: 'التالي', step2Hint: 'نجهّز لك عقل العلامة وأفكارًا وخطة شهر من مجالك، ويمكنك تغيير اللهجة لاحقًا.', soon: 'الدخول بأبل قريبًا', gsoon: 'الدخول بجوجل قريبًا', forgot: 'نسيت كلمة المرور؟', coupon: 'كود خصم (اختياري)', gender: 'أنت', genderPick: 'اختر', male: 'ذكر', female: 'أنثى',
     gErr: { state: 'انتهت مهلة الدخول بجوجل أو فُتح في متصفح آخر. جرّب مرة أخرى من المتصفح نفسه', cancel: 'ألغيت الدخول بجوجل. اضغط «Google» مرة أخرى إذا أردت', denied: 'رفضت جوجل الدخول بهذا الحساب. جرّب حسابًا آخر أو ادخل بالبريد الإلكتروني', email: 'بريد هذا الحساب في جوجل غير مؤكد. أكّده في جوجل أو ادخل بالبريد الإلكتروني', _: 'لم يكتمل الدخول بجوجل، جرّب مرة أخرى' },
     screens: { how: 'كيف يعمل', examples: 'أمثلة', features: 'المميزات', prices: 'الأسعار', faq: 'الأسئلة', demo: 'مثال', signup: 'إنشاء حساب', login: 'تسجيل الدخول' },
     fTitle: 'كل ما تحتاجه في مكان واحد', fLead: 'عقل يعرف علامتك، وقوالب تصنع الفيديو، والأوتوبايلوت ينشر في موعده.',
@@ -476,7 +477,7 @@ const LP_TEXT = {
     heroNote: '300 free credits to try. No card needed.',
     demoTitle: 'From an idea to a video ready to post', demoLead: 'This video was made with a SimsimKit template: you write your idea, the brain writes the script in your dialect, and the template makes the video.', vidCap: 'See an example',
     hTitle: 'How it works', hLead: 'Three steps. We handle the rest.', exTitle: 'Examples for your field', exLead: 'Pick your field and see the templates that fit it.',
-    country: 'Country', dialect: 'Content dialect', field: 'Your field', goal: 'Your goal', next: 'Next', step2Hint: 'We prepare your brand brain, ideas and a monthly plan from your field. You can change the dialect later.', soon: 'Sign in with Apple is coming soon', gsoon: 'Sign in with Google is coming soon', forgot: 'Forgot your password?', coupon: 'Discount code (optional)',
+    country: 'Country', dialect: 'Content dialect', field: 'Your field', goal: 'Your goal', next: 'Next', step2Hint: 'We prepare your brand brain, ideas and a monthly plan from your field. You can change the dialect later.', soon: 'Sign in with Apple is coming soon', gsoon: 'Sign in with Google is coming soon', forgot: 'Forgot your password?', coupon: 'Discount code (optional)', gender: 'You are', genderPick: 'Choose', male: 'Male', female: 'Female',
     gErr: { state: 'The Google sign-in timed out or opened in another browser. Try again from the same browser', cancel: 'You cancelled the Google sign-in. Press «Google» again if you want', denied: 'Google refused sign-in with this account. Try another account or use your email', email: 'This Google account\'s email is not verified. Verify it in Google or use your email', _: 'The Google sign-in did not finish, try again' },
     screens: { how: 'How it works', examples: 'Examples', features: 'Features', prices: 'Prices', faq: 'FAQ', demo: 'Example', signup: 'Sign up', login: 'Sign in' },
     fTitle: 'Everything in one place', fLead: 'A brain that knows your brand, templates that make the video, and an autopilot that posts on time.',
@@ -868,7 +869,8 @@ Object.assign(Component.prototype, {
     this.setState({ busy: true, err: '' });
     try {
       if (s.mode === 'register') {
-        const d = await post('/api/auth/signup', { ...s.reg, country: g('country'), dialect: g('dialect'), field: g('field'), goal: g('goal'), coupon: g('coupon') });
+        if (!g('gender')) { this.setState({ busy: false }); return E('اختر ذكر أو أنثى (لكي تخاطبك المساعدة بشكل صحيح)', 'Choose male or female (so the assistant addresses you correctly)'); }
+        const d = await post('/api/auth/signup', { ...s.reg, country: g('country'), dialect: g('dialect'), field: g('field'), goal: g('goal'), coupon: g('coupon'), gender: g('gender') });
         sessionStorage.setItem('devlink', d.dev_link || ''); sessionStorage.setItem('mailfail', d.mail_failed ? '1' : '');
         location.replace('/verify');
       } else {

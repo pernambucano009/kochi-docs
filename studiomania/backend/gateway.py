@@ -699,15 +699,18 @@ class SignupIn(BaseModel):
     field: str = ""
     goal: str = ""
     coupon: str = ""
+    gender: str = ""          # m / f: عشان المساعدة تخاطبه صح
 
 
 # 🗣️ البلد واللهجة والمجال والهدف (fieldpacks): بيتحفظوا في onboard.json في مساحة العميل، والعقل بياخدهم أول ما يتعمل.
 
 
-def save_onboard(wid: str, country: str, dial: str, field: str = "", goal: str = "", brand: str = "") -> None:
+def save_onboard(wid: str, country: str, dial: str, field: str = "", goal: str = "", brand: str = "", gender: str = "") -> None:
     ob = fieldpacks.onboard_dict(country, dial, field, goal, brand)
     if not ob:
         return
+    if gender in ("m", "f"):
+        ob["gender"] = gender
     d = workspace_dir(wid)
     d.mkdir(parents=True, exist_ok=True)
     (d / "onboard.json").write_text(json.dumps(ob, ensure_ascii=False), encoding="utf-8")
@@ -749,7 +752,7 @@ def signup(body: SignupIn, request: Request):
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
     if body.coupon.strip():
         coupon_redeem(wid, body.coupon)
-    save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], body.name.strip()[:80])
+    save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], body.name.strip()[:80], body.gender)
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
         c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, ?, 'customer', ?, ?)",

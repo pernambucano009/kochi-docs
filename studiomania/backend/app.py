@@ -11334,6 +11334,7 @@ class OnboardIn(BaseModel):
     dialect: str = ""
     field: str = ""
     goal: str = ""
+    gender: str = ""   # m / f (مين دخل بجوجل: جوجل مابيدّيناش النوع)
 
 
 class FirstIn(BaseModel):
@@ -11378,6 +11379,9 @@ def onboard_save(body: OnboardIn):
     ob = fieldpacks.onboard_dict(body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20])
     if not ob:
         raise HTTPException(400, "اختر بلدك أو لهجة المحتوى")
+    if body.gender in ("m", "f"):
+        ob["gender"] = body.gender
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(gender=body.gender))
     field_pack_apply(bid, ob)
     return onboard_state()
 
@@ -32808,7 +32812,8 @@ def assistant_token(request: Request):
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
     returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
     who = a.get("name") or signup_name(request)
-    ug = a.get("gender") or livevoice.name_gender(who) or "m"   # 👤 مش معروف ← مذكر، ولو العميل صحّحها بتتحفظ (set_user_gender)
+    # 👤 النوع: اللي اختاره في التسجيل، وإلا من اسمه الأول، وإلا مذكر. ولو صحّح المساعدة بيتحفظ (set_user_gender)
+    ug = a.get("gender") or (ob.get("gender") if ob.get("gender") in ("m", "f") else "") or livevoice.name_gender(who) or "m"
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known,
                                    returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
