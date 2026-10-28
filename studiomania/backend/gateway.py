@@ -2472,8 +2472,6 @@ def live_token(request: Request, body: LiveTokenIn):
         if body.provider == "openai":
             tok = livevoice.openai_secret(body.model or livevoice.OPENAI_MODELS[0], body.voice or "marin", instr,
                                           body.eagerness if body.eagerness in ("low", "medium", "high", "auto") else "auto")
-        elif body.provider == "gemini":
-            tok = livevoice.gemini_token()
         else:
             raise HTTPException(400, "مزوّد غير معروف")
     except livevoice.LiveError as exc:

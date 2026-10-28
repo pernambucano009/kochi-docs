@@ -2,7 +2,6 @@
 
 - المتصفح بيكلّم المزوّد على طول (أسرع رد ممكن)، والسيرفر بيدّيه مفتاح مؤقت بس (المفتاح الأساسي ما بيطلعش من السيرفر).
 - OpenAI: مفتاح مؤقت من /v1/realtime/client_secrets، والمتصفح بيوصل WebRTC على /v1/realtime/calls.
-- Gemini Live: مفتاح مؤقت من /v1alpha/auth_tokens، والمتصفح بيوصل WebSocket على BidiGenerateContentConstrained.
 - تقييمات الأدمن (النجوم وسرعة الرد والملاحظات) بتتحفظ في data/live_lab.json، وعليها هنختار النموذج لكل لهجة.
 """
 from __future__ import annotations
@@ -13,22 +12,16 @@ import os
 import threading
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 
 OPENAI_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-GEMINI_URL = os.environ.get("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com")
 OPENAI_VOICES = ["marin", "cedar", "coral", "sage", "shimmer", "ash", "ballad", "echo", "verse", "alloy"]
-GEMINI_VOICES = ["Kore", "Puck", "Charon", "Zephyr", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus",
-                 "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar",
-                 "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"]
 # لو المزوّد ما رجعش قائمة النماذج (أو المفتاح لسه مش متسجل) بنعرض دول
 OPENAI_MODELS = ["gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime", "gpt-realtime-mini"]
-GEMINI_MODELS = ["gemini-live-2.5-flash-preview", "gemini-2.5-flash-native-audio-preview-09-2025"]
 # دولار في الدقيقة تقريبًا (دخل وقت ما العميل بيتكلم، خرج وقت ما المساعد بيتكلم): تقدير للعرض بس، مش للفوترة
-PRICE_PER_MIN = {"openai": (0.02, 0.08), "openai-mini": (0.006, 0.024), "gemini": (0.005, 0.018)}
+PRICE_PER_MIN = {"openai": (0.02, 0.08), "openai-mini": (0.006, 0.024)}
 
 # كل لهجة: اسمها، ووصفها للموديل، وجملة الافتتاح بلهجتها (صاحب المنصة كتب المصري، والباقي على نفس المعنى)
 # الجملة فيها {name} (اسم العميل) و{agent} (اسم المساعد)، وبصيغة المساعدة البنت؛ الموديل بيعدّل الضماير لو المساعد ولد أو العميل بنت
@@ -219,10 +212,6 @@ def openai_key() -> str:
     return (os.environ.get("OPENAI_API_KEY") or "").strip()
 
 
-def gemini_key() -> str:
-    return (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
-
-
 def _fail(r: httpx.Response, who: str) -> None:
     if r.status_code >= 400:
         raise LiveError(f"{who} رد بخطأ {r.status_code}: {r.text[:400]}")
@@ -248,18 +237,6 @@ def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", t
     return {"value": d.get("value"), "expires_at": d.get("expires_at")}
 
 
-def gemini_token() -> dict:
-    key = gemini_key()
-    if not key:
-        raise LiveError("مفتاح Gemini غير مسجل. ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة")
-    now = datetime.now(timezone.utc)
-    body = {"uses": 1, "expireTime": (now + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
-            "newSessionExpireTime": (now + timedelta(minutes=2)).isoformat().replace("+00:00", "Z")}
-    r = httpx.post(f"{GEMINI_URL}/v1alpha/auth_tokens", params={"key": key}, json=body, timeout=30)
-    _fail(r, "Gemini")
-    return {"value": r.json().get("name")}
-
-
 _models: dict = {"at": 0.0, "v": None}
 
 
@@ -267,7 +244,7 @@ def models() -> dict:
     """النماذج المتاحة فعلًا بالمفاتيح المتسجلة (الأسماء بتتغير كتير، فبنسأل المزوّد نفسه)."""
     if _models["v"] and time.time() - _models["at"] < 600:
         return _models["v"]
-    oa, gm = list(OPENAI_MODELS), list(GEMINI_MODELS)
+    oa = list(OPENAI_MODELS)
     if openai_key():
         try:
             r = httpx.get(f"{OPENAI_URL}/models", headers={"Authorization": f"Bearer {openai_key()}"}, timeout=20)
@@ -276,19 +253,10 @@ def models() -> dict:
                 oa = [m for m in OPENAI_MODELS if m in found] + [m for m in found if m not in OPENAI_MODELS]
         except (httpx.HTTPError, ValueError, KeyError):
             pass
-    if gemini_key():
-        try:
-            r = httpx.get(f"{GEMINI_URL}/v1beta/models", params={"key": gemini_key(), "pageSize": 1000}, timeout=20)
-            found = [m["name"].split("/", 1)[-1] for m in r.json().get("models", []) if "bidiGenerateContent" in (m.get("supportedGenerationMethods") or [])]
-            if found:
-                gm = sorted(found, key=lambda m: (("native-audio" not in m and "live" not in m), m), reverse=False)
-        except (httpx.HTTPError, ValueError, KeyError):
-            pass
     v = {"openai": {"ready": bool(openai_key()), "models": oa, "voices": OPENAI_VOICES},
          "agents": AGENT_NAMES, "voice_gender": VOICE_GENDER,
-         "gemini": {"ready": bool(gemini_key()), "models": gm, "voices": GEMINI_VOICES},
          "dialects": [{"code": k, "label": v[0]} for k, v in DIALECTS.items()], "price": PRICE_PER_MIN}
-    if openai_key() or gemini_key():
+    if openai_key():
         _models.update(at=time.time(), v=v)
     return v
 

@@ -44,7 +44,17 @@ ELEVEN = {"eleven_liam": ("ليام (رجل)", "Liam"), "eleven_jessica": ("جي
           "eleven_charlie": ("تشارلي (رجل)", "Charlie"), "eleven_bella": ("بيلا (امرأة)", "Bella")}
 
 FASIH_PER_MIN = 0.19   # باقة فصيح: ١٠٠ دقيقة بـ $19
-VOICES: dict[str, dict] = {k: {"label": lab, "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()}
+class _Voices(dict):
+    """الأصوات. صوت متشال (زي أصوات منصت القديمة المحفوظة في مشاريع) بيتقال بأول صوت فصيح في الخليجي العام بدل ما يوقع."""
+    def __missing__(self, key):
+        if isinstance(key, str) and key.startswith("munsit:"):
+            alt = next((v for v in DIALECTS.get("ar-gulf", {}).get("voices", []) if dict.get(self, v)), None)
+            if alt:
+                return dict.__getitem__(self, alt)
+        raise KeyError(key)
+
+
+VOICES: dict[str, dict] = _Voices({k: {"label": lab, "provider": "eleven", "voice": v, "per_1k": 0.10} for k, (lab, v) in ELEVEN.items()})
 DIALECTS: dict[str, dict] = {}
 for code, label, where, base, stable in AR:
     vs = []
@@ -80,43 +90,6 @@ def merge_fasih(voices: list[dict]) -> int:
             # الصوت الخاص بيبقى أول اختيار في لهجته
             DIALECTS[dia]["voices"].insert(0, vid) if x.get("custom") else DIALECTS[dia]["voices"].append(vid)
             added += 1
-    return added
-
-
-# 🗣️ منصت للهجات الخليجية: كل صوت بيروح للهجته من الـ id أو الوصف، وبيبقى أول اختيار فيها (فصيح بيفضل بعده).
-# الفصحى مش من منصت (هتبقى SILMA)، والصوت اللي لهجته مش معروفة بيروح للخليجي العام.
-MUNSIT_PER_1K = 0.08   # باقة منصت: 200 ألف كريدت بـ $8، وكل 1000 كريدت ≈ 500 حرف
-MUNSIT_HINTS = (("najd", "ar-sa-najdi"), ("hijaz", "ar-sa-hijazi"), ("uae", "ar-ae"), ("emira", "ar-ae"), ("kuwai", "ar-kw"), ("-kw-", "ar-kw"),
-                ("qatar", "ar-qa"), ("bahrain", "ar-bh"), ("oman", "ar-om"), ("saudi", "ar-sa-najdi"), ("-sa-", "ar-sa-najdi"), ("gulf", "ar-gulf"), ("khaleej", "ar-gulf"))
-
-
-def munsit_dialect(x: dict) -> str | None:
-    txt = " ".join(str(x.get(k) or "") for k in ("voice_id", "id", "description", "dialect", "accent")).lower() + " " + " ".join(map(str, x.get("languages") or [])).lower()
-    if any(w in txt for w in ("fusha", "msa", "formal", "modern standard")) and not any(h in txt for h, _ in MUNSIT_HINTS):
-        return None
-    if any(w in txt for w in ("egypt", "masri", "cairo", "levant", "syria", "leban", "iraq", "morocc", "sudan")):
-        return None   # منصت للخليجي بس: الأصوات بلهجات تانية ماتظهرش تحت النجدي ولا الخليجي
-    return next((d for h, d in MUNSIT_HINTS if h in txt), "ar-gulf")
-
-
-def merge_munsit(voices: list[dict]) -> int:
-    added = 0
-    for x in voices or []:
-        vid = str(x.get("voice_id") or x.get("id") or "")
-        dia = munsit_dialect(x)
-        if not vid or not dia or dia not in DIALECTS:
-            continue
-        key = f"munsit:{vid}"
-        g = "female" if str(x.get("gender") or "").lower().startswith(("f", "w")) else "male"
-        name = x.get("name") or vid
-        VOICES[key] = {"label": f"{name} ({'امرأة' if g == 'female' else 'رجل'})", "provider": "munsit", "voice": vid, "dialect": dia, "gender": g,
-                       "per_1k": MUNSIT_PER_1K, "raw_name": name}
-        if key not in DIALECTS[dia]["voices"]:
-            # أصوات منصت قبل أصوات فصيح في لهجتها (بالترتيب اللي جت بيه)
-            at = sum(1 for v in DIALECTS[dia]["voices"] if VOICES.get(v, {}).get("provider") == "munsit")
-            DIALECTS[dia]["voices"].insert(at, key)
-            added += 1
-    apply_approved()
     return added
 
 

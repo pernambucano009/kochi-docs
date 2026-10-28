@@ -1,4 +1,4 @@
-// 🎧 مختبر الأصوات (لصاحب المنصة): نفس الجملة بكل مزوّد في كل لهجة جنب بعض، تقييم بالنجوم، وكلون صوت بين ElevenLabs و MiniMax.
+// 🎧 مختبر الأصوات (لصاحب المنصة): نفس الجملة بكل مزوّد في كل لهجة جنب بعض، تقييم بالنجوم، وكلون صوت بـ ElevenLabs.
 // النتيجة النهائية = متوسط النجوم لكل مزوّد في كل لهجة، والأعلى في كل لهجة متعلّم.
 const VoiceLab = (() => {
   const S = { el: null, d: null, tab: "cmp", dialect: "ar-sa-najdi", provs: null, text: "", timer: 0, all: false, texts: null, dirty: new Set(), review: false };
@@ -58,7 +58,7 @@ const VoiceLab = (() => {
       <label class="field">الفيديو <input type="file" accept="video/*" id="vlDubFile"></label>
       <button type="button" class="btn primary" id="vlDubGo">🌍 ابدأ المقارنة</button>
       <div class="vl-runs">${tabRuns().map(runHTML).join("")}</div>` : S.tab === "clone" ? `
-      <p class="hint">ارفع عينة صوت واضحة (من ٣٠ ثانية إلى دقيقة كلام دون موسيقى). سننشئ منها نسخة صوتية في ElevenLabs و MiniMax، ويقولان الجملة نفسها.${!D.ready.eleven || !D.ready.minimax ? " يحتاج مفتاحي ElevenLabs و MiniMax المباشرين في «المفاتيح» (الاستنساخ في ElevenLabs يحتاج اشتراك Starter على الأقل)." : ""}</p>
+      <p class="hint">ارفع عينة صوت واضحة (من ٣٠ ثانية إلى دقيقة كلام دون موسيقى). سننشئ منها نسخة صوتية في ElevenLabs تقول الجملة نفسها.${!D.ready.eleven ? " يحتاج مفتاح ElevenLabs المباشر في «المفاتيح» (الاستنساخ يحتاج اشتراك Starter على الأقل)." : ""}</p>
       <label class="field">العينة <input type="file" accept="audio/*,video/*" id="vlSample"></label>
       <label class="field">اللهجة <select id="vlCloneDia">${Object.entries(D.dialects).map(([k, v]) => `<option value="${k}"${k === S.dialect ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></label>
       <label class="field">الجملة التي سيقولونها <textarea id="vlCloneText" rows="2">${esc(S.text)}</textarea></label>

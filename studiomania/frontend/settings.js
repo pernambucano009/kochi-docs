@@ -1,12 +1,12 @@
 // StudioMania — الإعدادات والخروج
 
 // باقي مفاتيح المنصة (الأدمن بس): بتتحفظ على السيرفر، والبوابة بتشتغل بيها في خلال دقيقة من غير إعادة تشغيل
-const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["munsit", "مفتاح منصت", "الأصوات الخليجية"], ["eleven", "مفتاح ElevenLabs", "الأصوات واستنساخ الصوت (مباشر)"], ["minimax", "مفتاح MiniMax", "الأصوات واستنساخ الصوت (مباشر)"], ["silma", "مفتاح SILMA", "أصوات بالفصحى والسعودية"], ["recraft", "مفتاح Recraft", "الشعار والرسومات المتجهية"],
+const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربية"], ["eleven", "مفتاح ElevenLabs", "الأصوات واستنساخ الصوت (مباشر)"], ["recraft", "مفتاح Recraft", "الشعار والرسومات المتجهية"],
   ["giphy", "مفتاح Giphy", "الكوميكس"], ["klipy", "مفتاح Klipy", "الكوميكس"], ["resend", "مفتاح Resend", "رسائل تأكيد الحساب بالبريد"], ["smtp_pass", "كلمة مرور البريد الإلكتروني (SMTP_PASS)", "رسائل تأكيد الحساب بالبريد"],
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"],
   ["authentica", "مفتاح Authentica", "الدخول برقم الجوال (رمز برسالة نصية أو واتساب)"],
-  ["openai", "مفتاح OpenAI", "الصوت المباشر (مختبر المساعد)"], ["gemini", "مفتاح Gemini", "الصوت المباشر (مختبر المساعد)"],
+  ["openai", "مفتاح OpenAI", "الصوت المباشر (مختبر المساعد)"],
   ["openai_admin", "مفتاح أدمن OpenAI (Admin key)", "قراءة مصاريف OpenAI الفعلية في «رصيد المنصات» (من إعدادات المنظمة في OpenAI ← Admin keys)"]];
 
 async function loadSettings() {
@@ -151,7 +151,7 @@ function renderProviders(d) {
     return `<div class="prov ${st[1]}" data-prov="${p.key}"><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.what)}</small>${top}</div>
       <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
       <span class="prov-st">${st[0]}</span>
-      ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني عند أقل من <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
+      ${["zernio", "fasih"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني عند أقل من <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
       ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}
       ${provPack(p)}</div>`;
   }).join("");

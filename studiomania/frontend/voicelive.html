@@ -65,10 +65,10 @@
   <div class="card">
     <p class="mute" style="margin-top:0">جرّب المساعد الذي سيكلّم العميل أول ما يسجّل: اختر اللهجة والنموذج والصوت، واضغط «ابدأ المكالمة»، وتكلّم معه طبيعيًا وقاطِعه.
       نقيس سرعة الرد في كل دور (من آخر كلمة قلتها حتى أول صوت منه). بعد كل مكالمة قيّمها بالنجوم وهل اللهجة صحيحة، والنتيجة تظهر في الأسفل لكل لهجة.
-      يحتاج إلى مفتاحَي OpenAI وGemini في ⚙️ الإعدادات ← بقية مفاتيح المنصة.</p>
+      يحتاج إلى مفتاح OpenAI في ⚙️ الإعدادات ← بقية مفاتيح المنصة.</p>
     <div class="row">
       <label class="f">اللهجة<select id="dia"></select></label>
-      <label class="f">المزوّد<select id="prov"><option value="openai">OpenAI (Realtime)</option><option value="gemini">Gemini Live</option></select></label>
+      <label class="f">المزوّد<select id="prov"><option value="openai">OpenAI (Realtime)</option></select></label>
       <label class="f">النموذج<select id="model"></select></label>
       <label class="f">الصوت<select id="voice"></select></label>
     </div>
@@ -123,8 +123,7 @@ async function boot() {
   $("dia").innerHTML = CFG.dialects.map((d) => `<option value="${d.code}">${esc(d.label)}</option>`).join("");
   for (const k of ["dia", "prov", "who", "eager", "ug"]) { const v = recall(k); if (v != null) $(k).value = v; }
   fillProv();
-  const notReady = ["openai", "gemini"].filter((p) => !CFG[p].ready);
-  if (notReady.length) $("err").textContent = "⚠️ مفتاح " + notReady.map((p) => (p === "openai" ? "OpenAI" : "Gemini")).join(" و") + " غير مسجل بعد: ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة.";
+  if (!CFG.openai.ready) $("err").textContent = "⚠️ مفتاح OpenAI غير مسجل بعد: ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة.";
   loadResults();
 }
 let agentTouched = false;
@@ -209,53 +208,6 @@ async function startOpenAI(tok, mic) {
   await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
 }
 
-// ---------- Gemini Live (WebSocket: صوتك 16kHz رايح، وصوته 24kHz راجع)
-const WORKLET = `class P extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor("pcm-cap",P);`;
-function b64pcm(f32) { const b = new Int16Array(f32.length); for (let i = 0; i < f32.length; i++) { const v = Math.max(-1, Math.min(1, f32[i])); b[i] = v < 0 ? v * 0x8000 : v * 0x7fff; } let s = ""; const u = new Uint8Array(b.buffer); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
-function pcmFrom64(b64) { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const i16 = new Int16Array(u.buffer, 0, u.length >> 1), f = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) f[i] = i16[i] / 0x8000; return f; }
-async function startGemini(tok, mic, instr) {
-  const cap = new AudioContext({ sampleRate: 16000 }); S.cap = cap;
-  await cap.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
-  const src = cap.createMediaStreamSource(mic), node = new AudioWorkletNode(cap, "pcm-cap"); src.connect(node);
-  const out = new AudioContext({ sampleRate: 24000 }); S.out = out;
-  const gain = out.createGain(); gain.connect(out.destination); S.outLevel = meter(out, gain);
-  S.queue = []; S.next = 0;
-  const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tok.value)}`;
-  const ws = new WebSocket(url); S.ws = ws;
-  let pend = [], pendN = 0, ready = false;
-  node.port.onmessage = (e) => {
-    if (!ready || ws.readyState !== 1) return;
-    pend.push(e.data); pendN += e.data.length;
-    if (pendN >= 640) { const f = new Float32Array(pendN); let o = 0; for (const p of pend) { f.set(p, o); o += p.length; } pend = []; pendN = 0;
-      ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64pcm(f), mimeType: "audio/pcm;rate=16000" } } })); }
-  };
-  const flush = () => { for (const s of S.queue) try { s.stop(); } catch {} S.queue = []; S.next = 0; };
-  await new Promise((res, rej) => {
-    ws.onerror = () => rej(new Error("تعذّر الاتصال بـ Gemini Live"));
-    ws.onclose = (e) => { if (!ready) rej(new Error(`Gemini أغلق الاتصال: ${e.code} ${e.reason || ""}`)); else if (S) stop(e.reason ? "Gemini: " + e.reason : ""); };
-    ws.onopen = () => ws.send(JSON.stringify({ setup: {
-      model: "models/" + $("model").value,
-      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: $("voice").value } } } },
-      systemInstruction: { parts: [{ text: instr }] }, inputAudioTranscription: {}, outputAudioTranscription: {} } }));
-    ws.onmessage = async (m) => {
-      let e; try { e = JSON.parse(typeof m.data === "string" ? m.data : await m.data.text()); } catch { return; }
-      if (e.setupComplete) { ready = true; ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "ابدأ المكالمة الآن بالترحيب." }] }], turnComplete: true } })); res(); return; }
-      const sc = e.serverContent; if (!sc) { if (e.error) $("err").textContent = "Gemini: " + JSON.stringify(e.error); return; }
-      if (sc.interrupted) { flush(); S.interrupts++; endTurn("a"); }
-      for (const p of sc.modelTurn?.parts || []) {
-        if (!p.inlineData?.data) continue;
-        const f = pcmFrom64(p.inlineData.data), buf = out.createBuffer(1, f.length, 24000); buf.copyToChannel(f, 0);
-        const s = out.createBufferSource(); s.buffer = buf; s.connect(gain);
-        const t = Math.max(out.currentTime + 0.02, S.next); s.start(t); S.next = t + buf.duration; S.queue.push(s);
-        s.onended = () => (S && (S.queue = S.queue.filter((x) => x !== s)));
-      }
-      if (sc.inputTranscription?.text) say("u", sc.inputTranscription.text, true);
-      if (sc.outputTranscription?.text) { endTurn("u"); say("a", sc.outputTranscription.text, true); }
-      if (sc.turnComplete) endTurn("a");
-    };
-  });
-}
-
 // ---------- بدء وإنهاء
 $("go").onclick = async () => {
   $("err").textContent = ""; $("rate").hidden = true; $("go").disabled = true; $("st").textContent = "⏳ جارٍ الاتصال…";
@@ -267,7 +219,7 @@ $("go").onclick = async () => {
     S.ctx = new AudioContext(); S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
     const tok = await api("/api/platform/live/token", { method: "POST", body: JSON.stringify({ provider: prov, model: S.model, voice: S.voice, dialect: S.dialect, agent: $("agent").value, user: $("who").value, user_gender: $("ug").value, eagerness: $("eager").value }) });
     $("tx").innerHTML = ""; $("cap").textContent = ""; $("lat").textContent = "";
-    if (prov === "openai") await startOpenAI(tok, mic); else await startGemini(tok, mic, tok.instructions);
+    await startOpenAI(tok, mic);
     S.t0 = performance.now(); requestAnimationFrame(loop);
   } catch (e) {
     $("err").textContent = e.message || String(e);

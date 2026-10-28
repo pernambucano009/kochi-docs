@@ -4,7 +4,7 @@
 - AudioShake (فصل الصوت في الدبلجة) وفصيح (الأصوات العربية): مالهمش API للرصيد، فنعرف من أول طلب يفشل بسبب الرصيد،
   ونطلّع الرقم إذا مكتوب في الرسالة (مثل «Client has -1.5 credits»).
 - Zernio (النشر): اشتراك شهري غير رصيد، فنشيّك أنه يعمل فقط.
-- ElevenLabs: له API يقول الحروف المتبقية في الاشتراك. MiniMax و SILMA: مالهمش API للرصيد، فنعرف من أول طلب يفشل.
+- ElevenLabs: له API يقول الحروف المتبقية في الاشتراك.
 كل منصة معها رابط صفحة الشحن (url) لكي الأدمن يدخل ويشحن على طول.
 الحالة في ملف واحد بجانب قاعدة بيانات المنصة، لكي كل نسخ العملاء تكتب فيه، والبوابة تنبّه الأدمن (جرس + بريد إلكتروني).
 """
@@ -24,18 +24,13 @@ PROVIDERS = {
     "scrape": {"name": "ScrapeCreators", "what": "تحليل الحسابات والمنافسين", "unit": "رصيد", "api": True, "default_min": 500,
                "url": "https://app.scrapecreators.com"},
     "fasih": {"name": "فصيح", "what": "الأصوات العربية", "unit": "", "api": False, "default_min": 0, "url": "https://www.fasihtts.com"},
-    "munsit": {"name": "منصت", "what": "الأصوات الخليجية", "unit": "", "api": False, "default_min": 0, "url": "https://munsit.com"},
     "eleven": {"name": "ElevenLabs", "what": "الأصوات والاستنساخ وفصل الموسيقى عن الكلام (المفتاح المباشر)", "unit": "حرف", "api": True, "default_min": 10000,
                "url": "https://elevenlabs.io/app/subscription"},
-    "minimax": {"name": "MiniMax", "what": "الأصوات والاستنساخ (المفتاح المباشر)", "unit": "", "api": False, "default_min": 0,
-                "url": "https://platform.minimax.io/user-center/payment/balance"},
-    "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودية", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
     "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0, "url": "https://zernio.com"},
     # OpenAI مالهاش رصيد بيتقري، بس عندها «مصاريف الشهر» الحقيقية بمفتاح الأدمن (Admin key) من صفحة المنظمة
     "openai": {"name": "OpenAI", "what": "المساعدة الصوتية (مصاريف الشهر الفعلية)", "unit": "$", "api": True, "default_min": 0, "spend": True,
                "url": "https://platform.openai.com/settings/organization/billing/overview"},
     "authentica": {"name": "Authentica", "what": "رسائل التحقق برقم الجوال", "unit": "رسالة", "api": False, "default_min": 0, "url": "https://authentica.sa"},
-    "gemini": {"name": "Gemini", "what": "تجارب الصوت (Google)", "unit": "", "api": False, "default_min": 0, "url": "https://aistudio.google.com/usage"},
 }
 HIST_DAYS = 120   # سجل الرصيد كام يوم
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|paid plan|upgrade|top.?up|رصيد", re.I)

@@ -4334,14 +4334,10 @@ EXPENSE_PRESET = [
     {"name": "Atlas Cloud (الذكاء الاصطناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
     {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري يحتاج باقة مدفوعة"},
     {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة"},
-    {"name": "منصت", "amount": 8, "cycle": "usage", "day": 0, "note": ""},
     {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "unit": "رصيد", "note": "تحليل الحسابات والمنافسين والترند"},
     # 🔑 كل مفتاح API عندنا ليه سطر: أقل مبلغ شراء، وبيدّينا كام وحدة، فنعرف الفاتورة الثابتة وسعر الوحدة (العدد بيتكتب من الأدمن)
     {"name": "Authentica (رسائل التحقق)", "amount": 0, "cycle": "usage", "day": 0, "unit": "رسالة", "note": "الدخول برقم الجوال"},
     {"name": "OpenAI (المساعدة الصوتية)", "amount": 0, "cycle": "usage", "day": 0, "unit": "دولار رصيد", "note": "مكالمة سعاد أول التسجيل"},
-    {"name": "Gemini", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": ""},
-    {"name": "MiniMax", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الأصوات والاستنساخ"},
-    {"name": "SILMA", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "أصوات الفصحى والسعودية"},
     {"name": "AudioShake", "amount": 0, "cycle": "usage", "day": 0, "unit": "دقيقة", "note": "فصل الصوت في الدبلجة"},
     {"name": "Recraft", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الصور المتجهة"},
     {"name": "Resend (البريد الإلكتروني)", "amount": 0, "cycle": "monthly", "day": 0, "unit": "رسالة", "note": ""},
@@ -4349,6 +4345,9 @@ EXPENSE_PRESET = [
     {"name": "GIPHY / Klipy", "amount": 0, "cycle": "free", "day": 0, "unit": "", "note": "الصور المتحركة"},
     {"name": "PayPal", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "عمولة على كل دفعة (حوالي ٣٪ + ٣٠ سنت)"},
 ]
+
+
+EXPENSE_GONE = {"منصت", "MiniMax", "SILMA", "Gemini"}   # خدمات اتشالت من المنصة: بتختفي من الجدول
 
 
 def expenses_load() -> list[dict]:
@@ -4361,6 +4360,7 @@ def expenses_load() -> list[dict]:
         seen = set(json.loads(EXPENSES_SEEN.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         seen = set()
+    rows = [r for r in rows if r.get("name") not in EXPENSE_GONE]
     have = {r.get("name") for r in rows}
     return rows + [dict(x) for x in EXPENSE_PRESET if x["name"] not in seen and x["name"] not in have]
 
@@ -21493,21 +21493,15 @@ reset_stuck_typo()
 
 import dub  # noqa: E402
 import fasih  # noqa: E402
-import munsit  # noqa: E402
 
 
 def ar_speak(v: dict, text: str, dest: Path) -> Path:
-    """صوت عربي جاهز: منصت للخليجي (إذا صوته من منصت)، وElevenLabs (المباشر أو عن طريق Atlas) لو معتمد في اللهجة، وفصيح للباقي."""
+    """صوت عربي جاهز: ElevenLabs (المباشر أو عن طريق Atlas) لو معتمد في اللهجة، وفصيح للباقي."""
     if v["provider"] == "eleven_direct":
         return voicelab.eleven_say(text, v["voice"], dest)
     if v["provider"] == "eleven":
         atlas.download(atlas.run_model("Audio", {"model": "elevenlabs/v3/text-to-speech", "text": text, "voice": v["voice"]}, "التعليق الصوتي", max_seconds=300, interval=2), dest)
         return dest
-    if v["provider"] == "munsit":
-        try:
-            return munsit.speak(text, v["voice"], dest)
-        except munsit.MunsitError as e:
-            raise fasih.FasihError(str(e)) from e
     return fasih.speak(text, v["voice"], v["dialect"], dest)
 
 
@@ -21524,7 +21518,6 @@ def fasih_sync() -> None:
         try:
             dub.merge_fasih(fasih.catalog())
             dub.merge_fasih(fasih.custom_voices())   # 🎨 الصوت الخاص المتصمم في حساب فصيح
-            dub.merge_munsit(munsit.catalog())       # 🗣️ أصوات منصت الخليجية (لو المفتاح متسجل)
             if voicelab.eleven_key():                # 🎙️ ElevenLabs المباشر (معتمد في الفصحى)
                 dub.merge_eleven_direct(voicelab.eleven_voices())
             dub.apply_approved()                     # ✅ المزوّد المعتمد لكل لهجة يظل أول اختيار
@@ -22040,7 +22033,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
             else:
                 raw = work / f"l{i:03d}.src"
                 v = dub.VOICES[t["voice"]]
-                if v["provider"] in ("fasih", "munsit", "eleven_direct"):
+                if v["provider"] in ("fasih", "eleven_direct"):
                     ar_speak(v, texts[i], raw)
                 else:
                     atlas.download(atlas.run_model("Audio", dub.tts_body(t["voice"], dialect, texts[i]), "صوت الجملة", max_seconds=300, interval=2), raw)
@@ -22244,10 +22237,10 @@ def tpl_sample_cost(d: dict) -> float:
 
 
 def voice_usd(voice: str, text: str) -> float:
-    """تكلفة التعليق الصوتي الحقيقية: منصت كل ١٠٠٠ كريدت ≈ ٥٠٠ حرف، وفصيح بالدقيقة، وElevenLabs بالألف حرف."""
+    """تكلفة التعليق الصوتي الحقيقية: فصيح بالدقيقة، وElevenLabs بالألف حرف."""
     v = dub.VOICES.get(voice) or {}
     n = len(text or "")
-    per_1k = v.get("per_1k", 0.1) * (2 if v.get("provider") == "munsit" else 1)
+    per_1k = v.get("per_1k", 0.1)
     return n / 1000 * per_1k + (n / dub.CHARS_PER_SEC) / 60 * v.get("per_min", 0)
 
 
@@ -22263,7 +22256,7 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     wallet.need(cost, "التعليق الصوتي")
     raw = out.with_suffix(".src")
     v = dub.VOICES[voice]
-    if v["provider"] in ("fasih", "munsit", "eleven_direct"):
+    if v["provider"] in ("fasih", "eleven_direct"):
         ar_speak(v, text, raw)
     else:
         atlas.download(atlas.run_model("Audio", dub.tts_body(voice, lang, text), "التعليق الصوتي", max_seconds=300, interval=2), raw)
@@ -25153,8 +25146,7 @@ VLAB_DIR = DATA_DIR / "voicelab"
 VLAB_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media/voicelab", StaticFiles(directory=VLAB_DIR), name="voicelab")
 VLAB_LOCK = threading.Lock()
-VLAB_PROV = {"fasih": "فصيح", "munsit": "منصت", "eleven_atlas": "ElevenLabs (عن طريق Atlas)", "eleven": "ElevenLabs (مباشر)",
-             "minimax": "MiniMax", "silma": "SILMA"}
+VLAB_PROV = {"fasih": "فصيح", "eleven_atlas": "ElevenLabs (عن طريق Atlas)", "eleven": "ElevenLabs (مباشر)"}
 VLAB_OTHER = {"eleven_dub": "ElevenLabs (دبلجة)", "fasih_dub": "دبلجتنا بالأصوات العربية"}
 
 
@@ -25189,16 +25181,14 @@ def vlab_texts() -> dict:
     return {k: (saved.get(k) or VLAB_TEXT.get(k) or VSAMPLE_TEXT.get(k, VSAMPLE_GULF)) for k, v in dub.DIALECTS.items() if v["group"] == "ar"}
 
 
-SILMA_DIALECTS = ("ar-msa", "ar-gulf")   # SILMA عنده فصحى وسعودي بس (والخليجي العام قريب من السعودي)
 
 
 def vlab_support(dialect: str) -> dict:
-    """المزوّد بيدعم اللهجة دي؟ فصيح ومنصت: لو عندهم أصوات فيها. SILMA: فصحى وسعودي وخليجي عام. الباقي متعدد اللغات وبيقرا أي نص."""
+    """المزوّد بيدعم اللهجة دي؟ فصيح: لو عنده أصوات فيها. ElevenLabs متعدد اللغات وبيقرا أي نص."""
     dv = dub.DIALECTS[dialect]["voices"]
     def has(p):
         return any(dub.VOICES[v].get("provider") == p and dub.VOICES[v].get("dialect") == dialect for v in dub.VOICES) or any(dub.VOICES[v]["provider"] == p for v in dv)
-    return {"fasih": has("fasih"), "munsit": has("munsit"), "eleven_atlas": True, "eleven": True, "minimax": True,
-            "silma": dialect.startswith("ar-sa") or dialect in SILMA_DIALECTS}
+    return {"fasih": has("fasih"), "eleven_atlas": True, "eleven": True}
 
 
 def vlab_owner() -> None:
@@ -25207,9 +25197,7 @@ def vlab_owner() -> None:
 
 
 def vlab_ready() -> dict:
-    mm_atlas = [m for m in auto_voice_models() if "minimax" in m["model"].lower() and m["mode"] == "tts" and m.get("voices")]
-    return {"fasih": bool(fasih.api_key()), "munsit": bool(munsit.api_key()), "eleven_atlas": bool(atlas.api_key()),
-            "eleven": bool(voicelab.eleven_key()), "minimax": bool(voicelab.minimax_key() or mm_atlas), "silma": bool(voicelab.silma_key())}
+    return {"fasih": bool(fasih.api_key()), "eleven_atlas": bool(atlas.api_key()), "eleven": bool(voicelab.eleven_key())}
 
 
 def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
@@ -25217,7 +25205,7 @@ def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
     out = []
     dv = dub.DIALECTS[dialect]["voices"]
     for p in provs:
-        if p in ("fasih", "munsit"):
+        if p == "fasih":
             vs = [v for v in dub.VOICES if dub.VOICES[v].get("provider") == p and dub.VOICES[v].get("dialect") == dialect] or [v for v in dv if dub.VOICES[v]["provider"] == p]
             pick = [next((v for v in vs if dub.VOICES[v].get("gender") == g), None) for g in ("male", "female")]
             pick = [v for v in pick if v] or vs[:2]
@@ -25229,18 +25217,6 @@ def vlab_jobs(dialect: str, provs: list[str]) -> list[dict]:
             vs = [v for v in voicelab.eleven_voices() if v["cat"] == "premade"] or voicelab.eleven_voices()
             pick = [next((v for v in vs if v["gender"] == g), None) for g in ("male", "female")]
             out += [{"provider": p, "voice": v["id"], "label": v["name"]} for v in pick if v]
-        elif p == "minimax":
-            if voicelab.minimax_key():
-                out += [{"provider": p, "voice": v["id"], "label": v["name"]} for v in voicelab.minimax_voices()[:2]]
-            else:
-                m = next((m for m in auto_voice_models() if "minimax" in m["model"].lower() and m["mode"] == "tts" and m.get("voices")), None)
-                if m:
-                    vs = sorted(m["voices"], key=lambda v: "arab" not in v.lower())
-                    out += [{"provider": p, "voice": v, "label": v, "atlas": m["model"], "vf": m.get("voice_field"), "tf": m.get("text_field")} for v in vs[:2]]
-        elif p == "silma":
-            model = voicelab.SILMA_MODELS["ksa"] if dialect.startswith("ar-sa") or dialect == "ar-gulf" else voicelab.SILMA_MODELS["msa"]
-            note = "" if dialect.startswith("ar-sa") or dialect in ("ar-msa", "ar-gulf") else " · SILMA يدعم الفصحى والسعودية فقط"
-            out += [{"provider": p, "voice": v, "label": voicelab.SILMA_VOICES[v] + note, "model": model} for v in ("sultan", "sarah")]
     return out
 
 
@@ -25252,20 +25228,11 @@ def vlab_say(j: dict, text: str, dialect: str, dest: Path) -> Path:
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
                         f"sine=frequency={300 + 40 * (hash(p) % 8)}:duration={max(1.5, len(text) / dub.CHARS_PER_SEC):.2f}", "-f", "wav", str(raw)],
                        check=True, capture_output=True, timeout=60)
-    elif p in ("fasih", "munsit", "eleven_atlas"):
+    elif p in ("fasih", "eleven_atlas"):
         vo_say(text, j["voice"], dialect, raw.with_suffix(".wav"))
         raw = raw.with_suffix(".wav")
     elif p == "eleven":
         voicelab.eleven_say(text, j["voice"], raw)
-    elif p == "minimax" and j.get("atlas"):
-        body = {"model": j["atlas"], j.get("tf") or "text": text}
-        if j.get("vf"):
-            body[j["vf"]] = j["voice"]
-        atlas.download(atlas.run_model("Audio", body, "مختبر الأصوات", max_seconds=300, interval=2), raw)
-    elif p == "minimax":
-        voicelab.minimax_say(text, j["voice"], raw)
-    elif p == "silma":
-        voicelab.silma_say(text, j["voice"], j["model"], raw)
     else:
         raise voicelab.LabError("مزوّد مش معروف")
     subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-c:a", "libmp3lame", "-b:a", "128k", str(dest)],
@@ -25283,8 +25250,8 @@ def vlab_save(rid: str, fn) -> dict:
     return d
 
 
-# حد الطلبات في نفس الوقت لكل مزوّد (منصت و SILMA بيقبلوا طلب واحد بس في المرة، والباقي بيرجع 429)
-VLAB_SLOTS = {"munsit": threading.Semaphore(1), "silma": threading.Semaphore(1)}
+# حد الطلبات في نفس الوقت لكل مزوّد (ولو رجع 429 بنستنى ونعيد)
+VLAB_SLOTS: dict[str, threading.Semaphore] = {}
 VLAB_SLOT_DEFAULT = 2
 
 
@@ -25318,15 +25285,11 @@ def run_vlab(rid: str, only: set | None = None) -> None:
         try:
             if d["kind"] == "clone":
                 sample = folder / d["sample"]
-                if c["provider"] == "eleven":
-                    vid = voicelab.eleven_clone(sample, f"lab-{rid}")
-                    try:
-                        voicelab.eleven_say(d["text"], vid, folder / f"{i}.src")
-                    finally:
-                        voicelab.eleven_delete(vid)
-                else:
-                    vid = voicelab.minimax_clone(sample)
-                    voicelab.minimax_say(d["text"], vid, folder / f"{i}.src")
+                vid = voicelab.eleven_clone(sample, f"lab-{rid}")   # الاستنساخ بـ ElevenLabs بس
+                try:
+                    voicelab.eleven_say(d["text"], vid, folder / f"{i}.src")
+                finally:
+                    voicelab.eleven_delete(vid)
                 subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / f"{i}.src"), "-c:a", "libmp3lame", "-b:a", "128k",
                                 str(folder / f"{i}.mp3")], check=True, capture_output=True, timeout=120)
                 (folder / f"{i}.src").unlink(missing_ok=True)
@@ -25421,11 +25384,11 @@ def voicelab_run(body: VLabIn):
 
 @app.post("/api/voicelab/clone")
 def voicelab_clone(text: str = Form(""), dialect: str = Form("ar-sa-najdi"), file: UploadFile = File(...)):
-    """نفس عينة الصوت ← كلون بـ ElevenLabs و MiniMax ← نفس الجملة بالصوتين."""
+    """عينة الصوت ← كلون بـ ElevenLabs ← نفس الجملة بالصوت المستنسخ."""
     vlab_owner()
-    provs = [p for p in ("eleven", "minimax") if (voicelab.eleven_key() if p == "eleven" else voicelab.minimax_key()) or atlas.mock_mode()]
+    provs = ["eleven"] if voicelab.eleven_key() or atlas.mock_mode() else []
     if not provs:
-        raise HTTPException(400, "الاستنساخ يحتاج إلى مفتاح ElevenLabs أو MiniMax المباشر في الإعدادات")
+        raise HTTPException(400, "الاستنساخ يحتاج إلى مفتاح ElevenLabs المباشر في الإعدادات")
     rid = uuid.uuid4().hex[:10]
     folder = VLAB_DIR / rid
     folder.mkdir(parents=True, exist_ok=True)
@@ -25709,13 +25672,13 @@ class VoiceSampleIn(BaseModel):
 
 @app.post("/api/voice-sample")
 def voice_sample(body: VoiceSampleIn):
-    """🔊 عيّنة لكل صوت عربي (فصيح ومنصت وElevenLabs)، بجملة قصيرة بلهجته. بتتعمل مرة واحدة على حساب المنصة وتتحفظ."""
+    """🔊 عيّنة لكل صوت عربي (فصيح وElevenLabs)، بجملة قصيرة بلهجته. بتتعمل مرة واحدة على حساب المنصة وتتحفظ."""
     v = dub.VOICES.get(body.voice)
-    if not v or v.get("provider") not in ("fasih", "munsit", "eleven", "eleven_direct") or v.get("hidden"):
+    if not v or v.get("provider") not in ("fasih", "eleven", "eleven_direct") or v.get("hidden"):
         raise HTTPException(400, "العينة متاحة للأصوات العربية فقط")
     dia = v.get("dialect") or (body.lang if body.lang in dub.DIALECTS else "ar-sa-najdi")
     tag = "" if v.get("dialect") else f"-{dia}"
-    dest = VSAMPLE_DIR / f"{Path(body.voice.replace(':', '_')).name}{tag}.{'wav' if v['provider'] == 'munsit' else 'mp3'}"
+    dest = VSAMPLE_DIR / f"{Path(body.voice.replace(':', '_')).name}{tag}.mp3"
     if not dest.exists():
         if atlas.mock_mode():
             raise HTTPException(400, "العينات غير متاحة في الوضع التجريبي")
