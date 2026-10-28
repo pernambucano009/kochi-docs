@@ -4,6 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SimsimKit</title>
+<script>
+// 🚪 الصفحة بتتفتح على صفحة داخلية (ريلود أو رجوع من موقع تاني): ستارة بلون الوضع لحد ما الصفحة نفسها تجهز،
+// بدل ما الرئيسية تبان الأول وبعدها الزوم لحد الصفحة. واللون من أول لحظة على حسب الوضع (مفيش ومضة بيضا في الغامق)
+(function () {
+  var r = document.documentElement, h = location.hash.replace(/^#/, ""), t = null;
+  try { t = localStorage.getItem("studiomania.theme"); } catch (e) { /* التخزين مقفول */ }
+  r.dataset.nhTheme = t ? t : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  if (h && h !== "home") { r.classList.add("nh-boot"); setTimeout(function () { r.classList.remove("nh-boot"); }, 6000); }
+})();
+</script>
+<style>
+html { background: #FAFAF8; } html[data-nh-theme="dark"] { background: #0c0c0e; }
+html.nh-boot::after { content: ""; position: fixed; inset: 0; z-index: 2147483600; background: #FAFAF8; transition: opacity .45s ease; pointer-events: none; }
+html.nh-boot[data-nh-theme="dark"]::after { background: #0c0c0e; }
+html.nh-boot.nh-boot-out::after { opacity: 0; }
+</style>
 <script src="/pagekit.js"></script>
 <script src="/i18n-en.js"></script>
 <script src="/i18n.js"></script>

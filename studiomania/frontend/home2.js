@@ -9,7 +9,17 @@ const NH = (() => {
   if (typeof APP !== "undefined" && APP === "kochi") { host?.remove(); return null; }
   if (!host) return null;
   document.body.classList.add("nh");
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  // أول فتحة على صفحة داخلية (الستارة نازلة): الحركات بتتعمل في لحظة، والصفحة بتبان مرة واحدة جاهزة
+  let booting = document.documentElement.classList.contains("nh-boot");
+  const _rm = matchMedia("(prefers-reduced-motion: reduce)");
+  const reduce = { get matches() { return _rm.matches || booting; } };
+  function bootDone() {
+    if (!booting) return;
+    booting = false;
+    const r = document.documentElement;
+    requestAnimationFrame(() => requestAnimationFrame(() => { r.classList.add("nh-boot-out"); setTimeout(() => r.classList.remove("nh-boot", "nh-boot-out"), 500); }));
+  }
+  setTimeout(bootDone, 5000);   // احتياط
   const EASE = "cubic-bezier(.65,0,.35,1)";
   const esc = (s) => escapeHtml(String(s ?? ""));
   const KOCHI = typeof APP !== "undefined" && APP === "kochi";
@@ -730,13 +740,14 @@ const NH = (() => {
     step = String(step);
     navReady = true;   // أول مرة = الرابط اللي الصفحة اتفتحت عليه، ومن بعدها الرابط بيتبع التنقل
     if (isPageHash(step)) return goHash("#" + step);   // رابط صفحة (#brand، #publish/audience)
-    if (step === "home") return closeStage();
+    if (step === "home") { bootDone(); return closeStage(); }
     if (!popping && location.hash !== `#${step}`) history.pushState(null, "", `#${step}`);   // كل قسم خطوة في تاريخ المتصفح
     const was = stageOpen();
     if (!was && !sectionZoom) cornerStage = "tr";
     if (!was) stageTrail = [step];
     else { const i = stageTrail.indexOf(step); stageTrail = i >= 0 ? stageTrail.slice(0, i + 1) : [...stageTrail, step]; }
     _showStep(step);
+    if (booting) setTimeout(bootDone, 120);
     // قسم بيتفتح فوق صفحة (من «ابدأ مشروع جديد» مثلًا): بيظهر بهدوء
     if (!was && !sectionZoom && !opts.instant && !reduce.matches) $("stage").animate([{ opacity: 0, transform: "scale(.985)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: EASE });
     else if (was && !reduce.matches) $("stageBody").animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: EASE });
@@ -821,6 +832,7 @@ const NH = (() => {
       popping = false;
       await idle();
       renderBar();
+      bootDone();
     }
   }
   window.addEventListener("popstate", () => { if (location.hash !== navHash()) goHash(location.hash); });
