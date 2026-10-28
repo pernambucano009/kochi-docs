@@ -169,20 +169,21 @@ const PK_PER = { once: "", month: " / شهر", year: " / سنة" };
 const opts = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("");
 const pkUnits = (x) => `${nf(x.units, 0)} ${PK_UNIT[x.unit] || ""}`;
 function packRow(key, x = {}, unit = "pts") {
-  return `<div class="pk-row"><label class="pk-use" title="الباقة التي نشتريها الآن"><input type="radio" name="pkuse-${key}" ${x.use ? "checked" : ""}> نشتريها</label>
-    <input type="text" class="pk-name" placeholder="اسم الباقة" value="${escapeHtml(x.name || "")}" maxlength="40">
-    <label>السعر $<input type="number" class="pk-usd" min="0" step="any" value="${x.usd ?? ""}"></label>
-    <label>تعطينا<input type="number" class="pk-units" min="0" step="any" value="${x.units ?? ""}"></label>
-    <select class="pk-unit" title="الوحدة">${opts(PK_UNIT, x.unit || unit)}</select>
-    <label>الدفع<select class="pk-bill">${opts(PK_BILL, x.billing || "once")}</select></label>
-    <input type="text" class="pk-note" placeholder="ملاحظة" value="${escapeHtml(x.note || "")}" maxlength="200">
-    <span class="hint">${x.unit_usd ? `سعر الوحدة ${unitf(x.unit_usd)}${x.save_pct ? ` · أرخص بـ ${nf(x.save_pct, 1)}٪` : ""}` : ""}</span>
+  return `<div class="pk-row"><label class="pk-use" title="الباقة التي نشتريها الآن"><input type="radio" name="pkuse-${key}" ${x.use ? "checked" : ""}></label>
+    <input type="text" class="pk-name" placeholder="اسم الباقة" value="${escapeHtml(x.name || "")}" maxlength="40" aria-label="اسم الباقة">
+    <input type="number" class="pk-usd" min="0" step="any" value="${x.usd ?? ""}" aria-label="السعر $" dir="ltr">
+    <input type="number" class="pk-units" min="0" step="any" value="${x.units ?? ""}" aria-label="تعطينا" dir="ltr">
+    <select class="pk-unit" aria-label="الوحدة">${opts(PK_UNIT, x.unit || unit)}</select>
+    <select class="pk-bill" aria-label="الدفع">${opts(PK_BILL, x.billing || "once")}</select>
+    <input type="text" class="pk-note" placeholder="ملاحظة" value="${escapeHtml(x.note || "")}" maxlength="200" aria-label="ملاحظة">
+    <span class="hint">${x.unit_usd ? `${unitf(x.unit_usd)}${x.save_pct ? ` · أرخص بـ ${nf(x.save_pct, 1)}٪` : ""}` : "—"}</span>
     <button type="button" class="btn xs ghost" data-pkdel title="احذف الباقة">✕</button></div>`;
 }
+const PK_HEAD = `<div class="pk-row pk-head"><span>نشتريها</span><span>اسم الباقة</span><span>السعر $</span><span>تعطينا</span><span>الوحدة</span><span>الدفع</span><span>ملاحظة</span><span>سعر الوحدة</span><span></span></div>`;
 function provPack(p) {
   const m = p.month || {};
   const unit = p.unit && p.unit !== "$" ? p.unit : "وحدة";
-  const pack = p.spend || p.unit === "$" ? "" : `<div class="pk-list" data-pk="${p.key}" data-unit="${p.unit_def || "pts"}"><b class="pk-h">باقات ${escapeHtml(p.name)}</b>
+  const pack = p.spend || p.unit === "$" ? "" : `<div class="pk-list" data-pk="${p.key}" data-unit="${p.unit_def || "pts"}"><b class="pk-h">باقات ${escapeHtml(p.name)}</b>${PK_HEAD}
       ${(p.packs?.length ? p.packs : [{ use: true }]).map((x) => packRow(p.key, x, p.unit_def)).join("")}
       <div class="pk-act"><button type="button" class="btn xs ghost" data-pkadd>＋ باقة أخرى</button><button type="button" class="btn xs" data-pksave>حفظ الباقات</button>
       ${p.unit_usd ? "" : `<span class="hint">اكتب باقة واحدة على الأقل لنحسب بالدولار</span>`}</div></div>`;
@@ -242,7 +243,7 @@ $("provList")?.addEventListener("click", async (e) => {
   if (list && e.target.closest("[data-pkadd]")) { list.querySelector(".pk-act").insertAdjacentHTML("beforebegin", packRow(list.dataset.pk, {}, list.dataset.unit)); return; }
   if (list && e.target.closest("[data-pkdel]")) { e.target.closest(".pk-row").remove(); return; }
   if (list && e.target.closest("[data-pksave]")) {
-    const packs = [...list.querySelectorAll(".pk-row")].map((r) => ({ name: r.querySelector(".pk-name").value.trim(), usd: +r.querySelector(".pk-usd").value || 0,
+    const packs = [...list.querySelectorAll(".pk-row:not(.pk-head)")].map((r) => ({ name: r.querySelector(".pk-name").value.trim(), usd: +r.querySelector(".pk-usd").value || 0,
       units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked, unit: r.querySelector(".pk-unit").value, billing: r.querySelector(".pk-bill").value, note: r.querySelector(".pk-note").value.trim() }));
     if (packs.some((x) => (x.usd > 0) !== (x.units > 0))) { toast("اكتب السعر وعدد الوحدات لكل باقة", true); return; }
     try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: list.dataset.pk, packs }) })); toast("✅ حُفظت الباقات"); }
@@ -427,44 +428,68 @@ $("copyLog").onclick = async () => {
   }
 };
 
-// 💸 فواتيري الشهرية (لصاحب المنصة): جدول بيتعدّل في مكانه، وبيتحفظ بزرار
-const Exp = { rows: [], cycles: {} };
+// 💼 الحسابات (لصاحب المنصة): كل خدمة ندفع لها والباقة اللي بندفعها وكل كام شهر بنشحن، ومتوسط اللي بندفعه في الشهر.
+// الخدمة المربوطة بمنصة: سعرها ونوع دفعها من الباقة نفسها (ونفس الباقة بتتعلّم «نشتريها» في رصيد المنصات)
+const Exp = { rows: [], cycles: {}, packs: {}, provs: {} };
+// نفس حساب الخادم (عشان الرقم يتغيّر وانت بتكتب قبل الحفظ)
+const expM = (r) => { const a = Number(r.amount || 0); return r.cycle === "monthly" ? a : r.cycle === "yearly" ? a / 12 : r.cycle === "usage" ? a / Math.max(1, Number(r.every || 1)) : 0; };
 function expRender(d) {
   const box = $("expBox");
   if (!box) return;
-  if (d) Object.assign(Exp, { rows: d.rows, cycles: d.cycles, monthly: d.monthly, usage: d.usage });
-  const esc = (s) => escapeHtml(String(s ?? ""));
-  box.innerHTML = `<div class="exp-tbl" role="table" aria-label="فواتيري الشهرية">
-    <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>أقل شراء ($)</span><span>الدفع</span><span>يوم التجديد</span><span>يعطينا</span><span>الوحدة</span><span>سعر الوحدة</span><span>ملاحظة</span><span></span></div>
-    ${Exp.rows.map((r, i) => `<div class="exp-row" role="row" data-ei="${i}">
-      <input type="text" data-ek="name" value="${esc(I18N.t(r.name))}" data-orig="${esc(r.name)}" aria-label="الخدمة">
-      <input type="number" min="0" step="0.01" data-ek="amount" value="${esc(r.amount)}" aria-label="المبلغ" dir="ltr">
-      <select data-ek="cycle" aria-label="الدفع">${Object.entries(Exp.cycles).map(([k, t]) => `<option value="${k}" ${k === r.cycle ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
+  if (d) Object.assign(Exp, d);
+  const esc = (s) => escapeHtml(String(s ?? "")), m$ = (v) => "$" + Number(v || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const tot = { subs: 0, refill: 0 };
+  Exp.rows.forEach((r) => { if (r.cycle === "monthly" || r.cycle === "yearly") tot.subs += expM(r); else tot.refill += expM(r); });
+  box.innerHTML = `<div class="acc-kpis">
+      <div><small>متوسط ما ندفعه شهريًا</small><b>${m$(tot.subs + tot.refill)}</b></div>
+      <div><small>اشتراكات (الشهري والسنوي ÷ ١٢)</small><b>${m$(tot.subs)}</b></div>
+      <div><small>شحن مرة واحدة (متوسط شهري)</small><b>${m$(tot.refill)}</b></div>
+      <div><small>الاستهلاك الفعلي من الأرصدة هذا الشهر</small><b>${m$(Exp.real)}</b></div></div>
+    <div class="exp-tbl" role="table" aria-label="الحسابات">
+    <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>الباقة التي ندفعها</span><span>المبلغ ($)</span><span>الدفع</span><span>نشحن كل</span><span>يوم التجديد</span><span>متوسط شهري</span><span>ملاحظة</span><span></span></div>
+    ${Exp.rows.map((r, i) => {
+      const ps = (r.prov && Exp.packs[r.prov]) || [], fromPack = !!r.from_pack;
+      return `<div class="exp-row" role="row" data-ei="${i}">
+      <span class="exp-name"><input type="text" data-ek="name" value="${esc(I18N.t(r.name))}" data-orig="${esc(r.name)}" aria-label="الخدمة">${r.prov && Exp.provs[r.prov] ? `<small>🔗 ${esc(Exp.provs[r.prov])}</small>` : ""}</span>
+      ${ps.length ? `<select data-ek="pack" aria-label="الباقة التي ندفعها"><option value="">— اكتب المبلغ يدويًا —</option>${ps.map((p) => `<option value="${esc(p.name)}" ${p.name === r.pack ? "selected" : ""}>${esc(p.name)} · ${m$(p.usd)}${p.billing === "month" ? " / شهر" : p.billing === "year" ? " / سنة" : ""}</option>`).join("")}</select>` : `<span class="exp-pu">—</span>`}
+      <input type="number" min="0" step="0.01" data-ek="amount" value="${esc(r.amount)}" aria-label="المبلغ" dir="ltr" ${fromPack ? `readonly title="${escapeHtml(I18N.t("من الباقة"))}"` : ""}>
+      <select data-ek="cycle" aria-label="الدفع" ${fromPack ? `disabled title="${escapeHtml(I18N.t("من الباقة"))}"` : ""}>${Object.entries(Exp.cycles).map(([k, t]) => `<option value="${k}" ${k === r.cycle ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      ${r.cycle === "usage" ? `<label class="exp-every"><input type="number" min="1" max="60" step="1" data-ek="every" value="${r.every || 1}" dir="ltr" aria-label="نشحن كل كم شهر"> شهر</label>` : `<span class="exp-pu">—</span>`}
       <input type="number" min="0" max="31" data-ek="day" value="${r.day || ""}" placeholder="—" aria-label="يوم التجديد" dir="ltr">
-      <input type="number" min="0" data-ek="units" value="${r.units || ""}" placeholder="—" aria-label="يعطينا كم وحدة" dir="ltr">
-      <input type="text" data-ek="unit" value="${esc(I18N.t(r.unit || ""))}" data-orig="${esc(r.unit || "")}" placeholder="نقطة، رسالة…" aria-label="الوحدة">
-      <span class="exp-pu">${r.units && r.amount ? "$" + (r.amount / r.units).toPrecision(2) : "—"}</span>
+      <span class="exp-m"><b>${m$(expM(r))}</b>${r.real ? `<small title="الاستهلاك الفعلي هذا الشهر من فرق الرصيد">فعلي ${m$(r.real)}</small>` : ""}</span>
       <input type="text" data-ek="note" value="${esc(I18N.t(r.note))}" data-orig="${esc(r.note)}" aria-label="ملاحظة">
-      <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`).join("")}
+      <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`;
+    }).join("")}
     </div>
-    <div class="exp-sum"><b>الشهري: $${Number(Exp.monthly || 0).toFixed(2)}</b><span>حسب الاستخدام (آخر شحن): $${Number(Exp.usage || 0).toFixed(2)}</span></div>
-    <div class="row wrap"><button type="button" class="btn sm" id="expAdd">+ خدمة</button><button type="button" class="btn primary sm" id="expSave">حفظ</button></div>`;
+    <p class="hint">«شحن مرة واحدة» يُقسم على «نشحن كل كم شهر» ليصبح متوسطًا شهريًا. اختيار الباقة هنا يجعلها «نشتريها» في رصيد المنصات بالأسفل.</p>
+    <div class="row wrap"><button type="button" class="btn sm" id="expAdd">+ خدمة</button><button type="button" class="btn primary sm" id="expSave">حفظ الحسابات</button></div>`;
 }
 function expRead() {
   document.querySelectorAll("#expBox .exp-row[data-ei]").forEach((row) => {
     const r = Exp.rows[+row.dataset.ei];
     // الخانة معروضة مترجمة في الإنجليزي: لو ما اتعدلتش بنحفظ الأصل مش الترجمة
-    row.querySelectorAll("[data-ek]").forEach((x) => { r[x.dataset.ek] = x.type === "number" ? Number(x.value || 0) : x.dataset.orig != null && x.value === I18N.t(x.dataset.orig) ? x.dataset.orig : x.value; });
+    row.querySelectorAll("[data-ek]").forEach((x) => { if (x.disabled) return; r[x.dataset.ek] = x.type === "number" ? Number(x.value || 0) : x.dataset.orig != null && x.value === I18N.t(x.dataset.orig) ? x.dataset.orig : x.value; });
   });
 }
 $("expBox")?.addEventListener("click", async (e) => {
-  if (e.target.closest("#expAdd")) { expRead(); Exp.rows.push({ name: "", amount: 0, cycle: "monthly", day: 0, units: 0, unit: "", note: "" }); return expRender(); }
+  if (e.target.closest("#expAdd")) { expRead(); Exp.rows.push({ name: "", amount: 0, cycle: "monthly", day: 0, units: 0, unit: "", note: "", every: 1 }); return expRender(); }
   const del = e.target.closest("[data-edel]");
   if (del) { expRead(); Exp.rows.splice(+del.dataset.edel, 1); return expRender(); }
   if (e.target.closest("#expSave")) {
     expRead();
-    try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ حُفظت الفواتير"); } catch (err) { toast(err.message, true); }
+    try { expRender(await api("/api/expenses", { method: "PUT", ...jsonBody({ rows: Exp.rows }) })); toast("✓ حُفظت الحسابات"); loadProviders(); } catch (err) { toast(err.message, true); }
   }
+});
+// تغيير الباقة أو نوع الدفع بيغيّر الخانات اللي تظهر (المبلغ من الباقة، «نشحن كل» للشحن مرة واحدة): نعيد الرسم بالقيم اللي اتكتبت
+$("expBox")?.addEventListener("change", (e) => {
+  const k = e.target.dataset.ek;
+  if (k === "amount" || k === "every") { expRead(); return expRender(); }
+  if (k !== "pack" && k !== "cycle") return;
+  expRead();
+  const r = Exp.rows[+e.target.closest("[data-ei]").dataset.ei];
+  const p = k === "pack" && (Exp.packs[r.prov] || []).find((x) => x.name === r.pack);
+  if (k === "pack") Object.assign(r, p ? { amount: p.usd, cycle: { once: "usage", month: "monthly", year: "yearly" }[p.billing] || "usage", from_pack: true } : { from_pack: false });
+  expRender();
 });
 // المصاريف لصاحب المنصة بس: العميل مايطلبهاش أصلًا (كانت بترجع ٤٠٣ عند كل عميل وتتسجل خطأ)
 const expHide = () => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; };

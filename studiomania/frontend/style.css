@@ -2754,11 +2754,11 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 .stage-ic .ic-d, :root[data-nh-theme="dark"] .stage-ic .ic-l { display: none; }
 :root[data-nh-theme="dark"] .stage-ic .ic-d { display: block; }
 .stage-head:has(#stageIc:not([hidden])) .stage-back { justify-self: start; }
-/* الكروت على قد محتواها */
-.set-grid { align-items: start; gap: 20px; }
+/* الكروت في نفس الصف بنفس الطول (عشان الصفوف تبان متناسقة)، والأقسام العريضة بعرض الصفحة */
+.set-grid { align-items: stretch; gap: 20px; }
 .set-card { padding: 24px !important; gap: 16px; }
 .set-card h2 { margin-top: -10px; }
-.set-fill { display: none; }
+.set-fill { flex: 1; }
 /* الحسابات */
 .set-acc li { padding: 10px 12px; }
 .set-acc li small[dir="ltr"] { font-size: 12.5px; color: var(--sub, #6B6A66); }
@@ -3163,7 +3163,40 @@ html:not([data-role="customer"]) .cust-only { display: none !important; }   /* �
 /* 💸 فواتيري الشهرية */
 .set-wide{grid-column:1 / -1}
 .exp-tbl{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
-.exp-row{display:grid;grid-template-columns:minmax(150px,1.4fr) 90px 140px 90px 100px 90px 90px minmax(140px,1.6fr) 36px;gap:6px;align-items:center;min-width:1000px}
+.exp-row{display:grid;grid-template-columns:minmax(170px,1.3fr) minmax(150px,1.1fr) 90px 130px 90px 80px 100px minmax(140px,1.4fr) 36px;gap:8px;align-items:center;min-width:1080px}
+.exp-row .exp-name{display:flex;flex-direction:column;gap:2px;min-width:0}.exp-row .exp-name small{font-size:11.5px;color:var(--muted)}
+.exp-row .exp-every{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted)}.exp-row .exp-every input{width:52px}
+.exp-row .exp-m{display:flex;flex-direction:column;align-items:flex-start;direction:ltr}.exp-row .exp-m small{font-size:11px;color:var(--muted)}
+.exp-row input[readonly],.exp-row select:disabled{opacity:.65}
+.acc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.acc-kpis>div{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:16px;background:var(--field,var(--surface-2))}
+.acc-kpis small{font-size:12.5px;color:var(--muted)}.acc-kpis b{font-family:var(--display);font-weight:500;font-size:24px;direction:ltr;text-align:start}
+[dir="rtl"] .acc-kpis b{text-align:right}
+.acc-kpis>div:first-child{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+@media (max-width:900px){.acc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.set-provs>summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:6px 0;list-style:none}
+.set-provs>summary::-webkit-details-marker{display:none}.set-provs>summary::before{content:"▸";transition:transform .2s}.set-provs[open]>summary::before{transform:rotate(90deg)}
+[dir="rtl"] .set-provs>summary::before{content:"◂"}[dir="rtl"] .set-provs[open]>summary::before{transform:rotate(-90deg)}
+.set-span2{grid-column:span 2}
+@media (max-width:1000px){.set-span2{grid-column:auto}}
+/* رصيد المنصات في قسم الحسابات العريض: كل منصة كارت، رأسه سطر واحد، وتحته الباقات والسيناريوهات بعرض الكارت */
+.set-money .prov-list{grid-template-columns:minmax(0,1fr);gap:14px}
+.set-money .prov .pk-row{display:grid;grid-template-columns:58px minmax(120px,1fr) 90px 110px 120px 140px minmax(160px,1.6fr) 150px 32px;gap:8px;align-items:center;min-width:1040px}
+.set-money .prov .pk-list:not(.pk-cu) .pk-row input,.set-money .prov .pk-list:not(.pk-cu) .pk-row select{width:100%;min-width:0}
+.set-money .prov .pk-row .pk-use{justify-content:center}
+.set-money .prov .pk-head{font-size:11.5px;color:var(--muted);padding-bottom:2px}
+.set-money .prov .pk-list:not(.pk-cu){overflow-x:auto}
+.set-money .prov .pk-cu .pk-row{display:flex;flex-wrap:wrap;gap:8px 12px;min-width:0}
+.set-money .prov .pk-cu label{white-space:nowrap}.set-money .prov .pk-cu input[type=number]{width:80px}
+.set-money .prov .pk-cu .cu-contact,.set-money .prov .pk-cu .cu-note{flex:1 1 200px;width:auto}
+.set-money .prov .prov-pack{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
+.set-money .prov .prov-pack>.pk-list:not(.pk-cu),.set-money .prov .prov-pack>span{grid-column:1 / -1}
+@media (max-width:1100px){.set-money .prov .prov-pack{grid-template-columns:minmax(0,1fr)}}
+.set-stack{display:flex;flex-direction:column;gap:20px;min-width:0}.set-stack>.set-card{flex:1}
+.set-money .prov{align-content:start;padding:14px 16px;border-radius:16px}
+.set-money .prov .prov-pack{gap:10px 16px}
+.set-money .prov .pk-sc{overflow-x:auto}.set-money .prov .pk-sc table{min-width:560px}
+.set-money .prov .pk-sc td small{display:block;font-size:11px;opacity:.7}
 .exp-row .exp-pu{font-size:12.5px;color:var(--muted);direction:ltr;text-align:center}
 .exp-row input,.exp-row select{font:inherit;font-size:13px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--field,transparent);color:inherit;min-width:0}
 .exp-h span{font-size:11px;color:var(--muted)}

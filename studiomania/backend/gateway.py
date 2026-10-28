@@ -1754,14 +1754,20 @@ def admin_customer(wid: str, request: Request, days: int = 30):
     return {"by_cat": by, "moves": moves[:120], "payments": pays, "spend": spend[:120], "spend_cat": spend_cat}
 
 
-def fixed_bills() -> float:
-    """الفواتير الثابتة الشهرية من جدول «فواتيري الشهرية» (الشهري + السنوي ÷ ١٢)."""
+def fixed_bills(refill: bool = False) -> float:
+    """متوسط ما ندفعه شهريًا من قسم «💼 الحسابات»: الاشتراكات (الشهري + السنوي ÷ ١٢)، أو (refill=True) متوسط الشحن مرة واحدة.
+    الشحن مالوش مكان في «الفواتير الثابتة» عشان استهلاكه محسوب أصلًا في إنفاق الخدمات (وإلا يتحسب مرتين)."""
     try:
         rows = json.loads((DATA_DIR / "expenses.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return 0.0
-    return round(sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "monthly")
-                 + sum(float(r.get("amount") or 0) / 12 for r in rows if r.get("cycle") == "yearly"), 2)
+    tot = 0.0
+    for r in rows:
+        cyc = r.get("eff") or r.get("cycle")
+        if (cyc == "usage") != refill or cyc == "free":
+            continue
+        tot += float(r["monthly"]) if "monthly" in r else float(r.get("amount") or 0) / (12 if cyc == "yearly" else 1)
+    return round(tot, 2)
 
 
 @app.get("/api/platform/costs")
@@ -1793,6 +1799,7 @@ def admin_costs(request: Request, month: str = ""):
         cats[cat] = cats.get(cat, 0) + r["usd"]
     usage = sum(who.values())
     bills = fixed_bills()
+    refill = fixed_bills(refill=True)
     # اقتصاد الباقات (آخر ٣٠ يوم): متوسط صرف المشترك، وسعر الباقة، والمكسب، وأقصى خصم (بعد عمولة الدفع)
     cfg = billing.config(DATA_DIR)
     eco = []
@@ -1818,7 +1825,7 @@ def admin_costs(request: Request, month: str = ""):
                          "custom": next((x for x in st.get("scenarios") or [] if x.get("custom")), None)})
     r2 = lambda v: round(v, 2)  # noqa: E731
     return {"real": real, "real_usd": r2(sum(x["used_usd"] or 0 for x in real)), "topup_usd": r2(sum(x["topup_usd"] or 0 for x in real)),
-            "month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),
+            "month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "refill_avg": refill, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),
             "who": {k: r2(v) for k, v in who.items()}, "by_cat": [{"cat": k, "usd": r2(v)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
             "plans": eco}
 
@@ -1904,13 +1911,16 @@ def admin_finance_xlsx(request: Request, months: int = 12):
     except (OSError, ValueError):
         ex = []
     cyc = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب الاستخدام", "once": "مرة واحدة"}
-    bills = [["البند", "المبلغ $", "الدورة", "يوم الدفع", "الوحدات", "الوحدة", "ملاحظة", "شهريًا $"]]
+    cyc["usage"] = "شحن مرة واحدة"
+    bills = [["الخدمة", "الباقة التي ندفعها", "المبلغ $", "الدفع", "نشحن كل (شهر)", "يوم الدفع", "ملاحظة", "متوسط شهري $"]]
     for r in ex:
         a = float(r.get("amount") or 0)
-        bills.append([r.get("name") or "", a, cyc.get(r.get("cycle"), r.get("cycle") or ""), r.get("day") or "", r.get("units") or "", r.get("unit") or "",
-                      r.get("note") or "", round(a if r.get("cycle") == "monthly" else a / 12 if r.get("cycle") == "yearly" else 0, 2)])
+        c = r.get("eff") or r.get("cycle")
+        bills.append([r.get("name") or "", r.get("pack") or "", a, cyc.get(c, c or ""), r.get("every") or 1 if c == "usage" else "", r.get("day") or "",
+                      r.get("note") or "", float(r["monthly"]) if "monthly" in r else round(a if c == "monthly" else a / 12 if c == "yearly" else 0, 2)])
+    bills.append(["■ الإجمالي", "", "", "", "", "", "", round(sum(x[-1] or 0 for x in bills[1:]), 2)])
     data = xlsx.build([("ملخص شهري", summary), ("الباقات", packs), ("سيناريوهات الباقات", scen), ("الباقات المخصصة", custom), ("أرصدة المنصات", bal),
-                       ("استهلاك المنصات", use), ("أقسام الإنفاق", catm), ("العملاء", cust), ("اقتصاد الباقات", eco), ("الفواتير الثابتة", bills)])
+                       ("استهلاك المنصات", use), ("أقسام الإنفاق", catm), ("العملاء", cust), ("اقتصاد الباقات", eco), ("الحسابات الشهرية", bills)])
     name = f"financial-model-{now:%Y-%m-%d}.xlsx"
     return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})

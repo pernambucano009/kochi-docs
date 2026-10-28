@@ -1626,43 +1626,7 @@
                 <button class="btn primary" type="submit" title="المفاتيح تُحفظ على خادمك فقط. إن تركت الخانة فارغة يبقى المفتاح القديم كما هو.">حفظ المفاتيح</button>
               </form>
             </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">INSPECT</div><h2>🧭 لوحة الفحص</h2>
-              <p class="hint">صندوق الأخطاء: كل خطأ ظهر لأي عميل أو عمل فشل يصل تلقائيًا بسببه وإصلاحه المقترح. والفحص الشامل: عميل تجريبي يمر على البرنامج كله ويسجّل كل خطوة ورسالة وكلمة، مع النتائج لتقييمها بعينك وخريطة كل كلام البرنامج.</p>
-              <div class="row wrap"><a class="btn sm" href="/admin/inspect" target="_blank" rel="noopener">افتح لوحة الفحص ↗</a></div>
-            </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">PROVIDERS</div><h2>💳 رصيد المنصات</h2>
-              <p class="hint">كل منصة نأخذ منها خدمة، ورصيدها. إن قلّ الرصيد عن الحد يصلك تنبيه وبريد إلكتروني، ويُفحص تلقائيًا كل نصف ساعة.</p>
-              <div class="prov-list" id="provList"><p class="hint">جارٍ التحميل…</p></div>
-              <div class="row wrap"><button type="button" class="btn sm" id="provRefresh">↻ افحص الآن</button><a class="btn sm ghost" href="/api/platform/finance.xlsx" download title="ملف Excel: الباقات والسيناريوهات واستهلاك المنصات والعملاء والإنفاق والإيراد">📊 تصدير النموذج المالي</a><span class="hint" id="provAt"></span></div>
-            </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">BACKUP</div><h2>🗄️ النسخة الاحتياطية</h2>
-              <p class="hint">كل يوم نسخة من بيانات المنصة كلها (الحسابات والعلامات والإعدادات، دون الفيديوهات) على جوجل درايف، ونحتفظ بآخر أسبوعين.</p>
-              <div id="bkBox"><p class="hint">جارٍ التحميل…</p></div>
-            </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">SERVER STORAGE</div><h2>🧹 مساحة الخادم كلها</h2>
-              <p class="hint">من يأخذ المساحة: كل حساب، وكل قسم، وأكبر الملفات، وما يمكن حذفه دون أن يتأثر شيء.</p>
-              <div class="row wrap"><button type="button" class="btn sm" id="dskLoad">🔍 احسب المساحة</button></div>
-              <div id="dskBox"></div>
-            </section>
-            <section class="panel set-card">
-              <div class="set-k">PLANS &amp; CREDITS</div><h2>الباقات والأسعار</h2>
-              <p class="hint" id="setPlan">الاشتراكات، والإضافات، والنقاط الإضافية، وتكلفة كل شيء بالنقاط.</p>
-              <div class="row wrap"><button class="btn primary" type="button" onclick="document.getElementById('stagePlans').click()">💳 باقتي ونقاطي</button></div>
-            </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">CUSTOMERS</div><h2>👥 العملاء والاستهلاك</h2>
-              <p class="hint">كل العملاء: من سجّل، ومجاني أم مشترك، وكم صرف ومن أي قسم، وتكلفته علينا بالدولار. ومنها تهدي نقاطًا وتصنع كوبونات الخصم.</p>
-              <div class="row wrap"><a class="btn primary" href="/admin/inspect#cust">افتح العملاء والكوبونات</a></div>
-            </section>
-            <section class="panel set-card cust-only">
-              <div class="set-k">USAGE</div><h2>📊 استهلاك نقاطك</h2>
-              <p class="hint">آخر ٣٠ يومًا: كم نقطة صرفت، وفي أي الأقسام.</p>
-              <div id="useBox"><p class="hint">جارٍ التحميل…</p></div>
-            </section>
+            <div class="set-stack">
             <section class="panel set-card settings studio-only">
               <div class="set-k">PREFERENCES</div><h2><span class="admin-lang-t">الشكل واللغة</span><span class="cust-lang-t">الشكل</span></h2>
               <p class="hint admin-lang">اللغة</p>
@@ -1679,9 +1643,62 @@
               <button type="button" class="btn set-out" id="setLogout">خروج</button>
               <button type="button" class="set-del" id="setDelete" hidden>🗑️ احذف حسابي نهائيًا</button>
             </section>
-          </div>
-          <div class="set-grid set-row2">
+            <section class="panel set-card settings">
+              <div class="set-k">SECURITY</div><h2>تغيير كلمة المرور</h2>
+              <form id="pwForm">
+                <label class="field">كلمة المرور الحالية <input type="password" id="pwCurrent" autocomplete="current-password" required></label>
+                <label class="field">كلمة المرور الجديدة <input type="password" id="pwNew" autocomplete="new-password" required></label>
+                <button class="btn primary" type="submit">غيّر كلمة المرور</button>
+              </form>
+              <p class="hint" id="pwEnvNote" hidden>كلمة المرور محددة من إعدادات الخادم، فتُغيَّر من هناك.</p>
+            </section>
+            </div>
+            <section class="panel set-card cust-only">
+              <div class="set-k">USAGE</div><h2>📊 استهلاك نقاطك</h2>
+              <p class="hint">آخر ٣٠ يومًا: كم نقطة صرفت، وفي أي الأقسام.</p>
+              <div id="useBox"><p class="hint">جارٍ التحميل…</p></div>
+            </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">INSPECT</div><h2>🧭 لوحة الفحص</h2>
+              <p class="hint">صندوق الأخطاء: كل خطأ ظهر لأي عميل أو عمل فشل يصل تلقائيًا بسببه وإصلاحه المقترح. والفحص الشامل: عميل تجريبي يمر على البرنامج كله ويسجّل كل خطوة ورسالة وكلمة، مع النتائج لتقييمها بعينك وخريطة كل كلام البرنامج.</p>
+              <div class="row wrap"><a class="btn sm" href="/admin/inspect" target="_blank" rel="noopener">افتح لوحة الفحص ↗</a></div>
+            </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">CUSTOMERS</div><h2>👥 العملاء والاستهلاك</h2>
+              <p class="hint">كل العملاء: من سجّل، ومجاني أم مشترك، وكم صرف ومن أي قسم، وتكلفته علينا بالدولار. ومنها تهدي نقاطًا وتصنع كوبونات الخصم.</p>
+              <div class="row wrap"><a class="btn primary" href="/admin/inspect#cust">افتح العملاء والكوبونات</a></div>
+            </section>
             <section class="panel set-card">
+              <div class="set-k">PLANS &amp; CREDITS</div><h2>الباقات والأسعار</h2>
+              <p class="hint" id="setPlan">الاشتراكات، والإضافات، والنقاط الإضافية، وتكلفة كل شيء بالنقاط.</p>
+              <div class="row wrap"><button class="btn primary" type="button" onclick="document.getElementById('stagePlans').click()">💳 باقتي ونقاطي</button></div>
+            </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">BACKUP</div><h2>🗄️ النسخة الاحتياطية</h2>
+              <p class="hint">كل يوم نسخة من بيانات المنصة كلها (الحسابات والعلامات والإعدادات، دون الفيديوهات) على جوجل درايف، ونحتفظ بآخر أسبوعين.</p>
+              <div id="bkBox"><p class="hint">جارٍ التحميل…</p></div>
+            </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">VOICE LAB</div><h2>🎧 مختبر الأصوات</h2>
+              <p class="hint">الجملة نفسها بكل محركات الأصوات وبكل لهجة جنبًا إلى جنب، مع تقييم بالنجوم، ونسخ الصوت بين المحركات. وتظهر النتيجة النهائية تلقائيًا.</p>
+              <div class="row wrap"><button type="button" class="btn primary" id="openVoiceLab">🎧 افتح المختبر</button></div>
+            </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">SERVER STORAGE</div><h2>🧹 مساحة الخادم كلها</h2>
+              <p class="hint">من يأخذ المساحة: كل حساب، وكل قسم، وأكبر الملفات، وما يمكن حذفه دون أن يتأثر شيء.</p>
+              <div class="row wrap"><button type="button" class="btn sm" id="dskLoad">🔍 احسب المساحة</button></div>
+              <div id="dskBox"></div>
+            </section>
+            <section class="panel set-card admin-only set-wide set-money">
+              <div class="set-k">ACCOUNTS &amp; BILLS</div><h2>💼 الحسابات</h2>
+              <p class="hint">كل خدمة ندفع لها: الباقة التي ندفعها، وكل كم شهر نشحن، ومتوسط ما ندفعه شهريًا. وتحتها رصيد كل منصة وباقاتها وسيناريوهات الأرخص.</p>
+              <div id="expBox"><p class="hint">جارٍ التحميل…</p></div>
+              <details class="set-provs" open><summary><b>💳 رصيد المنصات وباقاتها</b> <span class="hint">إن قلّ الرصيد عن الحد يصلك تنبيه وبريد إلكتروني، ويُفحص تلقائيًا كل نصف ساعة.</span></summary>
+                <div class="prov-list" id="provList"><p class="hint">جارٍ التحميل…</p></div>
+              </details>
+              <div class="row wrap"><button type="button" class="btn sm" id="provRefresh">↻ افحص الأرصدة الآن</button><a class="btn sm" href="/api/platform/finance.xlsx" download title="ملف Excel: الباقات والسيناريوهات واستهلاك المنصات والعملاء والإنفاق والإيراد">📊 تصدير النموذج المالي</a><span class="hint" id="provAt"></span></div>
+            </section>
+            <section class="panel set-card set-wide">
               <div class="set-k">STORAGE</div><h2>المساحة</h2>
               <div class="kochi-old" id="kochiOld" hidden>
                 <span><b>أعمال كوتشي القديمة</b><small id="kochiOldInfo"></small></span>
@@ -1693,25 +1710,6 @@
               <pre class="render-log" id="renderLog" dir="ltr" hidden></pre>
               <p class="hint">الملفات المؤقتة هي صور الخط الزمني وبقايا التصدير، وتُنشأ مرة أخرى تلقائيًا. لتوفير مساحة أكبر اضغط 🗑️ بجانب القسم الذي تريد حذف فيديوهاته كلها دفعة واحدة (ما يعمل الآن يبقى).</p>
               <p class="hint" id="sysInfo"></p>
-            </section>
-            <section class="panel set-card admin-only set-wide">
-              <div class="set-k">MONTHLY BILLS</div><h2>💸 فواتيري الشهرية</h2>
-              <p class="hint">كل خدمة تدفع لها وتعمل بها المنصة. عدّل المبلغ ونوع الدفع، ويُحسب المجموع تلقائيًا (السنوي يُقسم على ١٢).</p>
-              <div id="expBox"><p class="hint">جارٍ التحميل…</p></div>
-            </section>
-            <section class="panel set-card admin-only">
-              <div class="set-k">VOICE LAB</div><h2>🎧 مختبر الأصوات</h2>
-              <p class="hint">الجملة نفسها بكل محركات الأصوات وبكل لهجة جنبًا إلى جنب، مع تقييم بالنجوم، ونسخ الصوت بين المحركات. وتظهر النتيجة النهائية تلقائيًا.</p>
-              <div class="row wrap"><button type="button" class="btn primary" id="openVoiceLab">🎧 افتح المختبر</button></div>
-            </section>
-            <section class="panel set-card settings">
-              <div class="set-k">SECURITY</div><h2>تغيير كلمة المرور</h2>
-              <form id="pwForm">
-                <label class="field">كلمة المرور الحالية <input type="password" id="pwCurrent" autocomplete="current-password" required></label>
-                <label class="field">كلمة المرور الجديدة <input type="password" id="pwNew" autocomplete="new-password" required></label>
-                <button class="btn primary" type="submit">غيّر كلمة المرور</button>
-              </form>
-              <p class="hint" id="pwEnvNote" hidden>كلمة المرور محددة من إعدادات الخادم، فتُغيَّر من هناك.</p>
             </section>
           </div>
         </main>

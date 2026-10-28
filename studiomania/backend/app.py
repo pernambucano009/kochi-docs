@@ -4325,18 +4325,18 @@ def dm_flow_set(body: DmFlowIn):
 # كل اشتراك أو خدمة بتدفعلها: المبلغ، شهري ولا سنوي ولا على قد الاستخدام، ويوم التجديد. المجموع الشهري بيتحسب لوحده.
 EXPENSES_F = DATA_DIR / "expenses.json"
 EXPENSES_SEEN = DATA_DIR / "expenses_seen.json"   # أسماء الخدمات اللي ظهرت لك في الجدول (عشان اللي تمسحه مايرجعش)
-EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب الاستخدام", "free": "مجاني"}
+EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "شحن مرة واحدة", "free": "مجاني"}
 EXPENSE_PRESET = [
     {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
     {"name": "GoDaddy (simsimkit.com)", "amount": 0, "cycle": "yearly", "day": 0, "note": "تجديد النطاق"},
-    {"name": "Zernio (النشر والرسائل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، ومن ٣ إلى ١٠ بـ $6 للحساب"},
-    {"name": "Atlas Cloud (الذكاء الاصطناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا"},
-    {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري يحتاج باقة مدفوعة"},
-    {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة"},
-    {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "unit": "رصيد", "note": "تحليل الحسابات والمنافسين والترند"},
+    {"name": "Zernio (النشر والرسائل)", "amount": 0, "cycle": "monthly", "day": 0, "note": "أول حسابين مجانًا، ومن ٣ إلى ١٠ بـ $6 للحساب", "prov": "zernio"},
+    {"name": "Atlas Cloud (الذكاء الاصطناعي)", "amount": 0, "cycle": "usage", "day": 0, "note": "رصيد مدفوع مقدمًا", "prov": "atlas"},
+    {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري يحتاج باقة مدفوعة", "prov": "eleven", "pack": "Creator"},
+    {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة", "prov": "fasih", "pack": "Project Pack"},
+    {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "unit": "رصيد", "note": "تحليل الحسابات والمنافسين والترند", "prov": "scrape", "pack": "Freelance"},
     # 🔑 كل مفتاح API عندنا ليه سطر: أقل مبلغ شراء، وبيدّينا كام وحدة، فنعرف الفاتورة الثابتة وسعر الوحدة (العدد بيتكتب من الأدمن)
-    {"name": "Authentica (رسائل التحقق)", "amount": 0, "cycle": "usage", "day": 0, "unit": "رسالة", "note": "الدخول برقم الجوال"},
-    {"name": "OpenAI (المساعدة الصوتية)", "amount": 0, "cycle": "usage", "day": 0, "unit": "دولار رصيد", "note": "مكالمة سعاد أول التسجيل"},
+    {"name": "Authentica (رسائل التحقق)", "amount": 0, "cycle": "usage", "day": 0, "unit": "رسالة", "note": "الدخول برقم الجوال", "prov": "authentica", "pack": "Lite"},
+    {"name": "OpenAI (المساعدة الصوتية)", "amount": 0, "cycle": "usage", "day": 0, "unit": "دولار رصيد", "note": "مكالمة سعاد أول التسجيل", "prov": "openai"},
     {"name": "Recraft", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الصور المتجهة"},
     {"name": "Resend (البريد الإلكتروني)", "amount": 0, "cycle": "monthly", "day": 0, "unit": "رسالة", "note": ""},
     {"name": "Pexels", "amount": 0, "cycle": "free", "day": 0, "unit": "", "note": "صور وفيديوهات مجانية"},
@@ -4359,14 +4359,45 @@ def expenses_load() -> list[dict]:
     except (OSError, ValueError):
         seen = set()
     rows = [r for r in rows if r.get("name") not in EXPENSE_GONE]
+    pre = {x["name"]: x for x in EXPENSE_PRESET}
+    for r in rows:   # السطور القديمة: بتتربط بمنصتها في «رصيد المنصات» (والباقة المقترحة) لو لسه مش مربوطة
+        x = pre.get(r.get("name"))
+        if x and "prov" not in r and x.get("prov"):
+            r["prov"] = x["prov"]
+            r.setdefault("pack", x.get("pack", ""))
     have = {r.get("name") for r in rows}
     return rows + [dict(x) for x in EXPENSE_PRESET if x["name"] not in seen and x["name"] not in have]
 
 
+PACK_CYCLE = {"once": "usage", "month": "monthly", "year": "yearly"}
+
+
+def expense_monthly(r: dict, pd: dict) -> dict:
+    """💼 متوسط اللي بندفعه في الشهر لكل خدمة: الاشتراك الشهري زي ما هو، والسنوي ÷ ١٢، والشحن مرة واحدة ÷ «كل كام شهر بنشحن».
+    لو الخدمة مربوطة بمنصة واخترنا الباقة اللي بندفعها: السعر ونوع الدفع بييجوا من الباقة نفسها."""
+    every = max(1.0, float(r.get("every") or 1))
+    pk = next((x for x in providers.packs(pd, r["prov"]) if x.get("name") == r.get("pack")), None) if r.get("prov") and r.get("pack") else None
+    amount, cycle = (pk["usd"], PACK_CYCLE.get(pk.get("billing"), "usage")) if pk else (float(r.get("amount") or 0), r.get("cycle") or "monthly")
+    m = amount if cycle == "monthly" else amount / 12 if cycle == "yearly" else amount / every if cycle == "usage" else 0.0
+    return {"amount": round(amount, 2), "cycle": cycle, "monthly": round(m, 2), "from_pack": bool(pk)}
+
+
 def expenses_out(rows: list[dict]) -> dict:
-    monthly = sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "monthly") + sum(float(r.get("amount") or 0) / 12 for r in rows if r.get("cycle") == "yearly")
-    usage = sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "usage")
-    return {"rows": rows, "cycles": EXPENSE_CYCLES, "monthly": round(monthly, 2), "usage": round(usage, 2)}
+    pd = providers.load(PROVIDERS_FILE)
+    out, tot = [], {"monthly": 0.0, "subs": 0.0, "refill": 0.0, "real": 0.0}
+    for r in rows:
+        x = {**r, **expense_monthly(r, pd)}
+        if r.get("prov") in providers.PROVIDERS:
+            st = providers.month_stats(pd, r["prov"])
+            x["real"] = st.get("used_usd")   # الاستهلاك الفعلي الشهر ده من فرق الرصيد
+            tot["real"] += st.get("used_usd") or 0
+        out.append(x)
+        tot["monthly"] += x["monthly"]
+        tot["subs" if x["cycle"] in ("monthly", "yearly") else "refill"] += x["monthly"]
+    packs = {k: [{"name": p.get("name") or f"${p['usd']}", "usd": p["usd"], "billing": p.get("billing"), "units": p["units"]} for p in providers.packs(pd, k)]
+             for k in providers.PROVIDERS}
+    return {"rows": out, "cycles": EXPENSE_CYCLES, "packs": packs, "provs": {k: v["name"] for k, v in providers.PROVIDERS.items()},
+            **{k: round(v, 2) for k, v in tot.items()}, "usage": round(tot["refill"], 2)}
 
 
 @app.get("/api/expenses")
@@ -4398,9 +4429,28 @@ def expenses_put(body: ExpensesIn):
             units = max(0, min(10**9, int(float(r.get("units") or 0))))
         except (TypeError, ValueError):
             units = 0
+        try:
+            every = max(1.0, min(60.0, float(r.get("every") or 1)))
+        except (TypeError, ValueError):
+            every = 1.0
+        prov = r.get("prov") if r.get("prov") in providers.PROVIDERS else ""
         rows.append({"name": name, "amount": round(amount, 2), "cycle": r.get("cycle") if r.get("cycle") in EXPENSE_CYCLES else "monthly", "day": day,
-                     "units": units, "unit": str(r.get("unit") or "").strip()[:30],
-                     "note": str(r.get("note") or "").strip()[:160]})
+                     "units": units, "unit": str(r.get("unit") or "").strip()[:30], "note": str(r.get("note") or "").strip()[:160],
+                     "prov": prov, "pack": str(r.get("pack") or "").strip()[:40] if prov else "", "every": every})
+    pd = providers.load(PROVIDERS_FILE)
+    changed = False
+    for r in rows:   # الباقة اللي بندفعها هنا = «نشتريها» في رصيد المنصات (عشان سعر الوحدة والاستهلاك يتحسبوا بيها)
+        em = expense_monthly(r, pd)
+        r["monthly"], r["eff"] = em["monthly"], em["cycle"]   # eff = نوع الدفع الفعلي (من الباقة لو مربوطة)
+        if em["from_pack"]:
+            r["amount"] = em["amount"]
+        ps = pd["pack"].get(r["prov"]) or [] if r["prov"] and r["pack"] else []
+        if any(x.get("name") == r["pack"] for x in ps):
+            for x in ps:
+                changed |= x.get("use") != (x.get("name") == r["pack"])
+                x["use"] = x.get("name") == r["pack"]
+    if changed:
+        providers.save(PROVIDERS_FILE, pd)
     EXPENSES_F.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
     EXPENSES_SEEN.write_text(json.dumps(sorted({x["name"] for x in EXPENSE_PRESET} | {r["name"] for r in rows}), ensure_ascii=False), encoding="utf-8")
     return expenses_out(rows)
