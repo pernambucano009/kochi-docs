@@ -1699,8 +1699,17 @@ def admin_costs(request: Request, month: str = ""):
         eco.append({"plan": p["key"], "name": p["name"], "price": p["price"], "subs": subs, "avg_cost": round(avg, 2) if avg is not None else None,
                     "margin": round(p["price"] - fee - avg, 2) if avg is not None else None,
                     "max_discount": max(0, int((1 - (avg + fee) / p["price"]) * 100)) if avg is not None else None})
+    # 📒 الإنفاق الفعلي من أرصدة المنصات نفسها (فرق الرصيد × سعر الوحدة، ومصاريف OpenAI من المنصة) قصاد تقديرنا
+    import providers  # noqa: PLC0415
+    pd = providers.load(PLATFORM / "providers.json")
+    real = []
+    for k, meta in providers.PROVIDERS.items():
+        st = providers.month_stats(pd, k, t0, t1)
+        if st.get("used_usd") or st.get("topups"):
+            real.append({"key": k, "name": meta["name"], "used_usd": st.get("used_usd"), "topups": st.get("topups"), "topup_usd": st.get("topup_usd")})
     r2 = lambda v: round(v, 2)  # noqa: E731
-    return {"month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),
+    return {"real": real, "real_usd": r2(sum(x["used_usd"] or 0 for x in real)), "topup_usd": r2(sum(x["topup_usd"] or 0 for x in real)),
+            "month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),
             "who": {k: r2(v) for k, v in who.items()}, "by_cat": [{"cat": k, "usd": r2(v)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
             "plans": eco}
 

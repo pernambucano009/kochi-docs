@@ -31,7 +31,13 @@ PROVIDERS = {
                 "url": "https://platform.minimax.io/user-center/payment/balance"},
     "silma": {"name": "SILMA", "what": "أصوات الفصحى والسعودية", "unit": "", "api": False, "default_min": 0, "url": "https://silma.ai"},
     "zernio": {"name": "Zernio", "what": "النشر والرسائل والإعلانات (اشتراك)", "unit": "", "api": True, "default_min": 0, "url": "https://zernio.com"},
+    # OpenAI مالهاش رصيد بيتقري، بس عندها «مصاريف الشهر» الحقيقية بمفتاح الأدمن (Admin key) من صفحة المنظمة
+    "openai": {"name": "OpenAI", "what": "المساعدة الصوتية (مصاريف الشهر الفعلية)", "unit": "$", "api": True, "default_min": 0, "spend": True,
+               "url": "https://platform.openai.com/settings/organization/billing/overview"},
+    "authentica": {"name": "Authentica", "what": "رسائل التحقق برقم الجوال", "unit": "رسالة", "api": False, "default_min": 0, "url": "https://authentica.sa"},
+    "gemini": {"name": "Gemini", "what": "تجارب الصوت (Google)", "unit": "", "api": False, "default_min": 0, "url": "https://aistudio.google.com/usage"},
 }
+HIST_DAYS = 120   # سجل الرصيد كام يوم
 LOW_WORDS = re.compile(r"credit|balance|quota|insufficient|payment required|paid plan|upgrade|top.?up|رصيد", re.I)
 CHECK_EVERY = 30 * 60
 
@@ -50,7 +56,58 @@ def load(f: Path) -> dict:
     d.setdefault("p", {})
     d.setdefault("min", {})
     d.setdefault("alerted", {})
+    d.setdefault("pack", {})     # أقل شحنة: {key: {"usd": 47, "units": 25000}} ← سعر الوحدة
+    d.setdefault("hist", {})     # سجل الرصيد: {key: [[وقت, رصيد], …]}
+    d.setdefault("moves", {})    # الشحنات والاستهلاك المحسوب من فرق الرصيد: {key: [{"at", "units", "kind": "use"|"topup"}]}
     return d
+
+
+def unit_usd(d: dict, name: str) -> float | None:
+    """سعر الوحدة بالدولار: الرصيد بالدولار أصلًا (Atlas) = ١، وإلا من أقل شحنة (المبلغ ÷ الوحدات)."""
+    if PROVIDERS.get(name, {}).get("unit") == "$":
+        return 1.0
+    pk = d.get("pack", {}).get(name) or {}
+    return pk["usd"] / pk["units"] if pk.get("usd") and pk.get("units") else None
+
+
+def track(d: dict, name: str, bal: float | None) -> None:
+    """📒 كل قراية رصيد بتتسجل، والفرق عن اللي قبلها: نقص = استهلاك حقيقي، زاد = شحنة (انت شحنت)."""
+    if bal is None:
+        return
+    h = d["hist"].setdefault(name, [])
+    now = time.time()
+    if h:
+        prev = h[-1][1]
+        delta = bal - prev
+        if abs(delta) > 1e-9:
+            d["moves"].setdefault(name, []).append({"at": now, "units": round(abs(delta), 6), "kind": "topup" if delta > 0 else "use"})
+    if not h or h[-1][1] != bal or now - h[-1][0] > 6 * 3600:
+        h.append([now, bal])
+    cut = now - HIST_DAYS * 86400
+    d["hist"][name] = [x for x in h if x[0] >= cut][-3000:]
+    d["moves"][name] = [x for x in d["moves"].get(name, []) if x["at"] >= cut][-3000:]
+
+
+def month_start(ts: float | None = None) -> float:
+    import datetime as dt  # noqa: PLC0415
+    t = dt.datetime.fromtimestamp(ts or time.time())
+    return dt.datetime(t.year, t.month, 1).timestamp()
+
+
+def month_stats(d: dict, name: str, t0: float | None = None, t1: float | None = None) -> dict:
+    """استهلاك الشهر وشحناته (بالوحدات وبالدولار) من سجل الرصيد."""
+    t0 = t0 or month_start()
+    t1 = t1 or time.time() + 1
+    mv = [m for m in d.get("moves", {}).get(name, []) if t0 <= m["at"] < t1]
+    used = sum(m["units"] for m in mv if m["kind"] == "use")
+    tops = [m for m in mv if m["kind"] == "topup"]
+    u = unit_usd(d, name)
+    if PROVIDERS.get(name, {}).get("spend"):   # OpenAI: المصاريف الفعلية من المنصة نفسها
+        sp = (d["p"].get(name) or {}).get("month_spend")
+        return {"used": sp, "used_usd": sp, "topups": 0, "topup_usd": None, "last_topup": None}
+    return {"used": round(used, 4), "used_usd": round(used * u, 2) if u is not None else None, "topups": len(tops),
+            "topup_units": round(sum(m["units"] for m in tops), 4), "topup_usd": round(sum(m["units"] for m in tops) * u, 2) if u is not None else None,
+            "last_topup": tops[-1]["at"] if tops else None}
 
 
 def save(f: Path, d: dict) -> None:
@@ -115,6 +172,24 @@ def fetch(name: str, keys: dict | None = None) -> dict:
             used, limit = _num(d.get("character_count")), _num(d.get("character_limit"))
             bal = None if used is None or limit is None else max(0.0, limit - used)
             return {"ok": bal is not None, "balance": bal, "error": None if bal is not None else "رد غير مفهوم"}
+        if name == "openai":
+            key = _env(keys, "OPENAI_ADMIN_KEY")
+            if not key:
+                return {"ok": None}   # من غير مفتاح الأدمن مانقدرش نقرا المصاريف
+            total, page = 0.0, None
+            for _ in range(5):
+                params = {"start_time": int(month_start()), "bucket_width": "1d", "limit": 31, **({"page": page} if page else {})}
+                r = httpx.get("https://api.openai.com/v1/organization/costs", headers={"Authorization": f"Bearer {key}"}, params=params, timeout=20)
+                if r.status_code >= 400:
+                    return {"ok": False, "error": f"HTTP {r.status_code}: {r.text[:150]}"}
+                j = r.json()
+                for b in j.get("data") or []:
+                    for x in b.get("results") or []:
+                        total += _num((x.get("amount") or {}).get("value")) or 0
+                page = j.get("next_page")
+                if not j.get("has_more") or not page:
+                    break
+            return {"ok": True, "month_spend": round(total, 4)}
         if name == "zernio":
             key = _env(keys, "ZERNIO_API_KEY", "LATE_API_KEY")
             if not key:
@@ -137,6 +212,9 @@ def refresh(f: Path, keys: dict | None = None) -> dict:
             cur.update(ok=r["ok"], error=r.get("error"), at=time.time())
             if "balance" in r:
                 cur["balance"] = r["balance"]
+                track(d, name, r["balance"])
+            if "month_spend" in r:
+                cur["month_spend"] = r["month_spend"]
             if r["ok"] and (r.get("balance") is None or r["balance"] > 0):
                 cur.pop("fail", None)   # اتشحن
     d["checked"] = time.time()
@@ -175,8 +253,11 @@ def summary(d: dict) -> list[dict]:
         fail = cur.get("fail") or {}
         recent_fail = bool(fail) and time.time() - fail.get("at", 0) < 3 * 86400
         state = "bad" if (bal is not None and bal <= 0) or recent_fail else "low" if bal is not None and low and bal < low else "ok" if cur.get("ok") else "unknown"
+        pk = d.get("pack", {}).get(name) or {}
         out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api", "url")}, "balance": bal, "min": low, "state": state,
-                    "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None})
+                    "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None,
+                    "spend": bool(meta.get("spend")), "pack_usd": pk.get("usd"), "pack_units": pk.get("units"), "unit_usd": unit_usd(d, name),
+                    "month": month_stats(d, name)})
     return out
 
 

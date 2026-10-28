@@ -3329,3 +3329,8 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 /* 🗑️ حذف الحساب: رابط هادي تحت «خروج» (مش زرار بارز عشان محدش يدوسه بالغلط) */
 :root .stage .set-card .set-del { align-self: center; margin-top: 10px; border: 0; background: none; color: var(--muted, #888); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 :root .stage .set-card .set-del:hover { color: #d9472b; }
+
+/* 📒 رصيد المنصات: أقل شحنة وسعر الوحدة واستهلاك الشهر تحت كل منصة */
+.prov .prov-pack{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
+.prov .prov-pack label{display:inline-flex;gap:6px;align-items:center}.prov .prov-pack input{width:90px;font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}
+.prov .prov-pack b{color:var(--text)}

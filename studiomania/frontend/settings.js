@@ -6,7 +6,8 @@ const MORE_KEYS = [["fasih", "مفتاح فصيح", "الأصوات العربي
   ["paypal_id", "PayPal Client ID", "الدفع"], ["paypal_secret", "PayPal Secret", "الدفع"], ["paypal_hook", "PayPal Webhook ID", "الدفع"],
   ["google_id", "Google Client ID", "الدخول بجوجل والنسخة الاحتياطية"], ["google_secret", "Google Client secret", "الدخول بجوجل والنسخة الاحتياطية"],
   ["authentica", "مفتاح Authentica", "الدخول برقم الجوال (رمز برسالة نصية أو واتساب)"],
-  ["openai", "مفتاح OpenAI", "الصوت المباشر (مختبر المساعد)"], ["gemini", "مفتاح Gemini", "الصوت المباشر (مختبر المساعد)"]];
+  ["openai", "مفتاح OpenAI", "الصوت المباشر (مختبر المساعد)"], ["gemini", "مفتاح Gemini", "الصوت المباشر (مختبر المساعد)"],
+  ["openai_admin", "مفتاح أدمن OpenAI (Admin key)", "قراءة مصاريف OpenAI الفعلية في «رصيد المنصات» (من إعدادات المنظمة في OpenAI ← Admin keys)"]];
 
 async function loadSettings() {
   const s = await api("/api/settings");
@@ -116,9 +117,22 @@ function renderProviders(d) {
       <div class="prov-bal">${bal}${p.fail ? `<small class="bad" title="${escapeHtml(p.fail.msg)}">آخر طلب فشل: ${escapeHtml(p.fail.msg.slice(0, 70))}</small>` : ""}</div>
       <span class="prov-st">${st[0]}</span>
       ${["zernio", "fasih", "munsit", "minimax", "silma"].includes(p.key) ? "<span></span>" : `<label class="prov-min">نبّهني عند أقل من <input type="number" min="0" step="any" value="${p.min}" data-provmin="${p.key}"></label>`}
-      ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}</div>`;
+      ${!p.api || p.fail ? `<button type="button" class="btn xs" data-provclear="${p.key}">شحنت ✓</button>` : ""}
+      ${provPack(p)}</div>`;
   }).join("");
   $("provAt").textContent = d.checked ? `آخر فحص ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
+}
+// 📒 أقل شحنة (بكام وبتدّينا كام) ← سعر الوحدة، واستهلاك الشهر وشحناته من فرق الرصيد نفسه (مش تقدير)
+function provPack(p) {
+  const m = p.month || {}, usd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+  const unit = p.unit && p.unit !== "$" ? p.unit : "وحدة";
+  const pack = p.spend || p.unit === "$" ? "" : `<label>أقل شحنة $<input type="number" min="0" step="any" value="${p.pack_usd ?? ""}" data-packusd="${p.key}"></label>
+      <label>تعطينا<input type="number" min="0" step="any" value="${p.pack_units ?? ""}" data-packunits="${p.key}"> ${escapeHtml(unit)}</label>
+      <span class="hint">${p.unit_usd ? `سعر الـ${escapeHtml(unit)}: $${Number(p.unit_usd).toPrecision(2)}` : "اكتب أقل شحنة لنحسب بالدولار"}</span>`;
+  const use = p.spend ? `<span>مصاريف هذا الشهر: <b>${usd(m.used_usd)}</b></span>`
+    : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? Number(m.used).toLocaleString("en-US", { maximumFractionDigits: 2 }) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usd(m.used_usd)})` : ""}</span>
+      ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usd(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
+  return pack || use ? `<div class="prov-pack">${pack}${use}</div>` : "";
 }
 async function loadProviders() {
   if (!$("provList")) return;
@@ -130,6 +144,14 @@ $("provRefresh")?.addEventListener("click", async () => {
   $("provRefresh").disabled = false;
 });
 $("provList")?.addEventListener("change", async (e) => {
+  const pk = e.target.dataset.packusd || e.target.dataset.packunits;
+  if (pk) {
+    const row = e.target.closest(".prov-pack"), usd = +row.querySelector("[data-packusd]").value || 0, units = +row.querySelector("[data-packunits]").value || 0;
+    if (usd && !units) return;   // يستنى الخانة التانية
+    try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: pk, usd, units }) })); toast("✅ حُفظت أقل شحنة"); }
+    catch (err) { toast(err.message, true); }
+    return;
+  }
   const k = e.target.dataset.provmin;
   if (!k) return;
   try { renderProviders(await api("/api/admin/providers/min", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, min: +e.target.value || 0 }) })); toast("✅ حُفظ حد التنبيه"); }

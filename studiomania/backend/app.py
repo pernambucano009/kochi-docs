@@ -10211,6 +10211,26 @@ def admin_providers_min(body: ProviderMinIn):
     return providers_out()
 
 
+class ProviderPackIn(BaseModel):
+    key: str
+    usd: float = 0
+    units: float = 0
+
+
+@app.put("/api/admin/providers/pack")
+def admin_providers_pack(body: ProviderPackIn):
+    """أقل شحنة للمنصة: بكام دولار، وبتدّينا كام وحدة ← سعر الوحدة، ومنه الاستهلاك والشحنات بالدولار."""
+    if body.key not in providers.PROVIDERS:
+        raise HTTPException(404, "منصة غير معروفة")
+    d = providers.load(PROVIDERS_FILE)
+    if body.usd > 0 and body.units > 0:
+        d["pack"][body.key] = {"usd": round(float(body.usd), 2), "units": float(body.units)}
+    else:
+        d["pack"].pop(body.key, None)
+    providers.save(PROVIDERS_FILE, d)
+    return providers_out()
+
+
 @app.post("/api/admin/providers/{key}/clear")
 def admin_providers_clear(key: str):
     """للمنصات التي ليس لها API رصيد (AudioShake وفصيح): «شحنت» تحذف آخر غلطة."""
