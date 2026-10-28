@@ -48,6 +48,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-send{position:absolute;right:5px;width:34px;height:34px;border-radius:50%;border:0;background:#E5613E;color:#fff;font-size:14px;cursor:pointer;display:grid;place-items:center}
 .as-send:hover{filter:brightness(1.08)}
 .as-btn[data-mute].on{background:#E5613E;color:#fff;border-color:#E5613E}
+.as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
@@ -232,6 +233,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   function flush(final) {
     if (!S?.log || (!S.log.length && !final)) return;
+    if (S.nolog || !state?.log) { S.log.length = 0; return; }   // التسجيل مقفول، أو العميل قال «لا تحفظها»
     const body = JSON.stringify({ call: S.call, events: S.log.splice(0), final: !!final,
       meta: { agent: S.agent || "", saved: S.saved, steps: S.steps.length, done: S.done.size, sec: Math.round((performance.now() - S.t0) / 1000), noMic: !S.mic } });
     fetch("/api/assistant/log", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
@@ -254,7 +256,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
       <div class="as-type"><div class="as-tw"><input data-type placeholder="أو اكتب هنا واضغط Enter"><button type="button" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-hint" data-hint hidden></p></div>
-      <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
+      <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
+      ${state?.log && window.IS_CUSTOMER ? `<p class="as-lognote" data-lognote>📝 تُحفظ هذه المحادثة نصًا فقط (دون صوت) لمدة 30 يومًا لتحسين المساعدة، دون اسمك أو بيانات تواصلك. <button type="button" data-nolog>لا تحفظها</button></p>` : ""}`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
       call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [] };
     prog();
@@ -265,6 +268,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
     q("[data-end]").onclick = () => end(false);
+    const nl = q("[data-nolog]");
+    if (nl) nl.onclick = () => { S.nolog = true; S.log.length = 0; q("[data-lognote]").textContent = "✓ لن تُحفظ هذه المحادثة"; };
     // 🔇 كتم الميكروفون: لو العميل هيبعد أو فيه كلام في الأوضة، عشان أصوات الأوضة ماتتاخدش على إنها إجابات
     q("[data-mute]").onclick = () => {
       const t = S?.mic?.getTracks()[0]; if (!t) return;

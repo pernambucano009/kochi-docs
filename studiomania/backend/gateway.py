@@ -1973,6 +1973,10 @@ def _acall_sum(d: dict) -> dict:
 def acalls_list(request: Request, limit: int = 100):
     admin(request)
     out = []
+    # 🗑️ مكالمات العملاء بتتمسح لوحدها بعد ٣٠ يوم (زي ما مكتوب في سياسة الخصوصية)
+    for f in ACALLS.glob("*.json"):
+        if not f.name.startswith("owner-") and time.time() - f.stat().st_mtime > 30 * 86400:
+            f.unlink(missing_ok=True)
     for f in sorted(ACALLS.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:max(1, min(limit, 500))]:
         try:
             out.append(_acall_sum(json.loads(f.read_text("utf-8"))))

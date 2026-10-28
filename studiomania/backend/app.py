@@ -32777,7 +32777,7 @@ def assistant_state(request: Request):
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
     why = "" if bid and livevoice.openai_key() else "no_brand" if not bid else "no_key"
-    return {"ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
+    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
@@ -32840,10 +32840,18 @@ def assistant_log(body: AssistLogIn, request: Request):
         except (OSError, ValueError):
             bid, b, a = assist_info()
             ob = onboard_load() or {}
+            cust = TENANT_ROLE == "customer"   # 🔒 مكالمات العملاء: من غير اسم ولا إيميل (رقم الحساب بس)
             d = {"id": f.stem, "tenant": os.environ.get("TENANT_ID") or "owner", "role": TENANT_ROLE, "started": time.time(),
-                 "email": request.headers.get("x-user-email", ""), "name": a.get("name") or signup_name(request), "brand": first_brand_name(b) if b else "",
+                 "email": "" if cust else request.headers.get("x-user-email", ""), "name": "" if cust else a.get("name") or signup_name(request),
+                 "brand": "" if cust else (first_brand_name(b) if b else ""),
                  "dialect": ob.get("dialect") or "", "events": [], "meta": {}}
         ev = [{k: e.get(k) for k in ("t", "who", "text", "data") if k in e} for e in body.events[:400]]
+        if TENANT_ROLE == "customer":   # 🔒 الإيميلات وأرقام الجوال اللي اتقالت أو اتكتبت بتتشال قبل الحفظ
+            red = lambda x: re.sub(r"[\w.+-]+@[\w-]+\.[\w.]+", "[بريد]", re.sub(r"\+?\d[\d\s-]{7,}\d", "[رقم]", x)) if isinstance(x, str) else x  # noqa: E731
+            for e in ev:
+                e["text"] = red(e.get("text"))
+                if isinstance(e.get("data"), dict):
+                    e["data"] = json.loads(red(json.dumps(e["data"], ensure_ascii=False)))
         d["events"] = (d["events"] + ev)[-3000:]
         d["meta"] = {**d.get("meta", {}), **{k: v for k, v in (body.meta or {}).items() if k in ("agent", "saved", "steps", "done", "sec", "noMic")}}
         d["updated"] = time.time()
