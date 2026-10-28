@@ -34,13 +34,29 @@
     fit();
   }
 
+  let on = null, box = null;   // الزرار المرفوع دلوقتي، ومكانه قبل ما يطلع
+  const off = () => { on?.classList.remove("fx-on"); on = box = null; };
   document.addEventListener("pointerover", (e) => {
     const el = e.target.closest?.(SEL);
     if (!el || el.matches(SKIP) || el.closest(SKIP) || el.disabled) return;
     if (el.offsetWidth < 26 || el.offsetHeight < 22) return;   // أيقونات صغيرة جدًا
     el.classList.add("fx");
     snake(el);
+    if (on !== el && e.pointerType !== "touch") {
+      off();
+      const r = el.getBoundingClientRect();
+      on = el; box = { l: r.left - 2, r: r.right + 2, t: r.top - 2, b: r.bottom + 4 };
+      el.classList.add("fx-on");
+    }
   }, { passive: true });
+  // 🫨 البروز بيتشال لما الماوس يخرج من مكان الزرار الأصلي (قبل ما يطلع لفوق)، مش من الزرار وهو مرفوع:
+  // وإلا الماوس اللي على طرف الزرار التحتاني كان بيخرج منه أول ما يطلع، فيرجع، فيطلع تاني… والزرار يرعش
+  document.addEventListener("pointermove", (e) => {
+    if (on && (!on.isConnected || e.clientX < box.l || e.clientX > box.r || e.clientY < box.t || e.clientY > box.b)) off();
+  }, { passive: true });
+  document.documentElement.addEventListener("pointerleave", off);
+  addEventListener("scroll", off, { capture: true, passive: true });
+  addEventListener("blur", off);
   document.addEventListener("focusin", (e) => {
     const el = e.target.closest?.(SEL);
     if (el && !el.matches(SKIP) && !el.closest(SKIP) && el.offsetWidth >= 26) { el.classList.add("fx"); snake(el); }

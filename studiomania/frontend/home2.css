@@ -1307,14 +1307,14 @@ html { overflow-x: clip; }
 /* ===== ✨ الزراير في البرنامج كله (fx.js): بروز بسيط لبرّه + السنيك بيلف حوالين الزرار بلون كلامه ===== */
 .fx { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
 /* البروز: واضح (بيكبر ويطلع لفوق) وبيكسب أي قاعدة تانية في الصفحة */
-:root .fx:not(:disabled):hover, :root .fx:focus-visible { translate: 0 -3px !important; scale: 1.06 !important; z-index: 2; }
+:root .fx.fx-on:not(:disabled), :root .fx:focus-visible { translate: 0 -3px !important; scale: 1.06 !important; z-index: 2; }
 .fx:not(:disabled):active { translate: 0 0; scale: .98; transition-duration: .12s; }
 .fx-snake { position: absolute; pointer-events: none; overflow: visible; opacity: 0; transition: opacity .4s ease; z-index: 3; }
 .fx-snake rect { fill: none; stroke: currentColor; stroke-linecap: round; }
 .fx-snake .s1 { stroke-width: 1.4; stroke-dasharray: 36 964; animation: nh-s1 3.2s linear infinite; filter: drop-shadow(0 0 3px currentColor); }
 .fx-snake .s2 { stroke-width: 1.2; stroke-dasharray: 130 870; opacity: .38; animation: nh-s2 3.2s linear infinite; }
 .fx-snake .s3 { stroke-width: 1; stroke-dasharray: 300 700; opacity: .13; animation: nh-s3 3.2s linear infinite; }
-.fx:not(:disabled):hover > .fx-snake, .fx:focus-visible > .fx-snake { opacity: 1; }
+.fx.fx-on:not(:disabled) > .fx-snake, .fx:focus-visible > .fx-snake { opacity: 1; }
 /* زراير الرئيسية (ليها السنيك بتاعها): نفس البروز */
 .nh-cta, .nh-tile.nh-cont { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1), box-shadow .5s var(--nh-ease), background .3s; }
 .nh-cta:hover, .nh-cta:focus-visible, .nh-tile.nh-cont:hover { translate: 0 -3px; scale: 1.06; }

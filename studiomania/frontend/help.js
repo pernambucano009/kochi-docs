@@ -87,7 +87,7 @@ const Help = (() => {
     if (document.querySelector(".hp-fab")) return;
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
     const fab = document.createElement("button");
-    fab.type = "button"; fab.className = "hp-fab"; fab.setAttribute("aria-label", "المساعد"); fab.title = "المساعد";
+    fab.type = "button"; fab.className = "hp-fab"; fab.setAttribute("aria-label", "المساعد");   // من غير title: مربع المتصفح الأبيض كان بيطلع فوقه
     fab.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>`;
     const box = document.createElement("div");
     box.className = "hp-box"; box.hidden = true; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "المساعد");
