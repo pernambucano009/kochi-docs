@@ -32887,7 +32887,7 @@ def assistant_token(request: Request):
     ob = onboard_load() or {}
     dia = assist_dialect()
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
-    known, have, _steps = assist_plan(b)
+    known, have, steps = assist_plan(b)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
     returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
     who = a.get("name") or signup_name(request)
@@ -32902,6 +32902,7 @@ def assistant_token(request: Request):
     except (OSError, ValueError, KeyError, TypeError):
         lessons = []
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
+                                   steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:

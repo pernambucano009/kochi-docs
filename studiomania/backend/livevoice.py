@@ -152,8 +152,11 @@ def name_gender(name: str) -> str:
     return ""
 
 
+STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "photos": "uploading photos of their work/products/cases"}
+
+
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
-                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "", lessons: list[str] | None = None) -> str:
+                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "", lessons: list[str] | None = None, steps: list[str] | None = None) -> str:
     """have: اللي العقل فيه أصلًا ومش محتاج يتطلب تاني (account: اسم الحساب، logo / products: True لو اترفعوا)."""
     have = have or {}
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
@@ -167,6 +170,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     t1, t2 = t1.strip() + "؟", (re.split(r"(?<=[.!])\s+", t2.strip())[-1] if t2.strip() else full)   # «ها، مستعد ندردش شوية…؟» بس
     ig_ex = ', for example: «إيه رأيك تكتبلي لينك حسابك على الإنستجرام عشان الشباب يبدأوا فيه التحليل لحد ما إحنا نخلص؟»' \
         if dialect == "ar-eg-cairo" else ""
+    fill_line = "" if returning else ("   Once they agree to chat, tell them in one short sentence that they will see their brand brain filling up on the screen in front of\n"
+                                      "   them with every answer (so they feel the brain being built while you talk).")
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
     you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
@@ -213,10 +218,10 @@ actually said, and only then (if it fits) move toward your next goal. Examples o
 
 Your goals, in this order (each is a goal to reach naturally, not a line to recite):
 1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
-   Style reference for the greeting (adapt it, do not read it blindly): {"«أهلًا يا " + user + " تاني! عامل إيه؟» … «نكمّل من مكان ما وقفنا؟»" if returning and dialect == "ar-eg-cairo" else "«" + t1 + "» … «" + t2 + "»"}
+   Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! عامل إيه؟» … «جاهز نكمّل أسئلتنا؟ فاضلنا حاجات بسيطة»" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name (like: hello again, how are you?), then ask if they are ready to continue our questions where we stopped, saying how little is left") if returning else "«" + t1 + "» … «" + t2 + "»"}
    Each of these is its own turn: say one, then wait for their reply and respond to it.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
-   Once they agree to chat, tell them in one short sentence that they will see their brand brain filling up on the screen in front of
-   them with every answer (so they feel the brain being built while you talk).
+{fill_line}
+{("   What is left, in this order (continue from the first one; everything else is done, never redo it): " + ", ".join(STEP_NAMES.get(x, x) for x in steps) + ".") if steps else ""}
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
 3. Get to know them and their work. The list below is ONLY the information you need (a checklist), NOT a script to read:
 {qs}
