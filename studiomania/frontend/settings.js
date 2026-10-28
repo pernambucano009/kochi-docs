@@ -322,7 +322,8 @@ $("setLogout")?.addEventListener("click", () => $("logout").click());
 // 🗑️ حذف الحساب نهائيًا (للعملاء، مش المشرف): الحساب والعلامات والفيديوهات والملفات كلها، والاشتراك بيتلغي. بعدها تقدر تسجّل من جديد بنفس البريد
 (window.MEP || Promise.resolve(null)).then((me) => { if (me && me.role !== "admin" && $("setDelete")) $("setDelete").hidden = false; });
 $("setDelete")?.addEventListener("click", async () => {
-  const v = await uiPrompt("سيُحذف حسابك وكل علاماتك وفيديوهاتك وملفاتك نهائيًا، ويُلغى اشتراكك، ولا يمكن استرجاع أي شيء. للتأكيد اكتب كلمة: احذف");
+  const v = await uiPrompt("سيُحذف حسابك وكل علاماتك وفيديوهاتك وملفاتك نهائيًا، ويُلغى اشتراكك، ولا يمكن استرجاع أي شيء.\n\nللتأكيد اكتب كلمة «احذف» في الخانة بالأسفل:", "",
+    { placeholder: "اكتب هنا: احذف", ok: "🗑️ احذف حسابي نهائيًا", danger: true });
   if (v == null) return;
   if (!["احذف", "delete"].includes(v.trim().toLowerCase())) return toast("لم يُحذف شيء: اكتب كلمة «احذف» بالضبط للتأكيد", true);
   try {

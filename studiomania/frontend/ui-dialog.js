@@ -14,7 +14,7 @@
 .ui-dlg-ok.danger{background:#D9443A;box-shadow:0 8px 20px rgba(217,68,58,.28)}
 .ui-dlg-no{background:var(--ui-dlg-field,#F1EFEC);color:inherit}
 :root[data-nh-theme="dark"] .ui-dlg-box{--ui-dlg-bg:#1f1f24;--ui-dlg-ink:#f2f2f2;--ui-dlg-field:rgba(255,255,255,.07)}
-:root[data-nh-theme="dark"] .ui-dlg-in{border-color:rgba(255,255,255,.14)}
+:root[data-nh-theme="dark"] .ui-dlg-in{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.1)}
 .ui-kn{width:min(520px,100%);max-height:86vh;overflow:auto}
 .ui-kn h3{margin:0 0 2px;font-size:18px}.ui-kn .sub{margin:0 0 12px;font-size:13px;opacity:.7;line-height:1.7}
 .ui-kn .bar{position:relative;height:6px;border-radius:99px;background:rgba(127,127,127,.18);margin:0 0 14px}
@@ -45,7 +45,7 @@
       const okT = opts.ok || (kind === "alert" ? "حسنًا" : kind === "prompt" ? "حسنًا" : DANGER.test(msg) ? "نعم، تابع" : "نعم");
       back.innerHTML = `<div class="ui-dlg-box" dir="auto"><p class="ui-dlg-msg">${esc(msg)}</p>
         ${kind === "prompt" ? `<input class="ui-dlg-in" type="text" dir="auto" value="${esc(def ?? "")}" placeholder="${esc(opts.placeholder || "")}">` : ""}
-        <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok${kind === "confirm" && DANGER.test(msg) ? " danger" : ""}">${esc(okT)}</button>
+        <div class="ui-dlg-acts"><button type="button" class="ui-dlg-ok${(kind === "confirm" && DANGER.test(msg)) || opts.danger ? " danger" : ""}">${esc(okT)}</button>
         ${kind === "alert" ? "" : `<button type="button" class="ui-dlg-no">${esc(opts.cancel || "إلغاء")}</button>`}</div></div>`;
       const prev = document.activeElement;
       const input = back.querySelector(".ui-dlg-in");
