@@ -39,6 +39,11 @@ const Assistant = (() => {
 /* 🧠 من خريطة العقل: الكرة على اليمين من غير بلير، والعقل باين بيكبر في النص */
 .as-ov.dock{left:auto;right:0;width:min(380px,100vw);pointer-events:none;justify-content:flex-start;padding:96px 18px 24px}
 .as-ov.dock .as-acts{margin-top:auto}
+/* 📥 خانة الرفع مفتوحة: الكرة بتصغر عشان الخانة والزراير يبانوا من غير ما ينزلوا تحت الشاشة، ولو الشاشة قصيرة أوي تتحرك بالسكرول */
+.as-ov{overflow-y:auto;overscroll-behavior:contain}.as-orb{transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.as-ov.has-box .as-orb{width:min(46vw,210px,24vh)}.as-ov.dock{gap:12px;padding-top:84px}.as-ov.dock.has-box .as-orb{width:min(150px,20vh)}
+.as-ov.has-box .as-cap{height:auto;max-height:3.2em}.as-ov.dock .as-box{max-width:100%;width:100%;box-sizing:border-box}
+@media (max-height:720px){.as-ov.dock{padding-top:64px}.as-ov.dock .as-orb{width:min(180px,26vh)}}
 body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as-docked #nhCorner,body.as-docked .bm-hint{opacity:0!important;pointer-events:none!important;transition:opacity .4s}
 .as-prog{width:min(260px,80vw);display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12.5px;opacity:.75}
 .as-prog i{display:block;width:100%;height:4px;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}.as-prog i b{display:block;height:100%;width:0;background:#E5613E;transition:width .6s}
@@ -165,7 +170,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
-        setTimeout(() => { if (S?.box === args.kind && !S.speaking) { box(args.kind); S.box = null; } }, 900);
+        setTimeout(() => { if (S?.box === args.kind && !S.speaking && (args.kind !== "account" || KW.account.test(S.aBuf))) { box(args.kind); S.box = null; } }, 900);
       }
       return { ok: true, shown: args.kind };
     }
@@ -336,7 +341,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           // «في انتظار ردك» بس لو آخر جملة قالتها سؤال، أو طلبت حاجة وخانتها ظاهرة فعلًا. أي جملة تانية (زي «خلينا نكمل…») هي اللي تكمّل
           if (r.msg && (id === S.capId || !S.capId)) {
             const last = sentences(S.aBuf).pop() || "";
-            S.lastQ = isQ(last) || !!S.wait;   // طلبت حاجة تتكتب أو تترفع: بتستنى بهدوء لحد ما توصل (أو «لاحقًا»)
+            // بتستنى بهدوء بس لو طلبت حاجة وخانتها ظاهرة فعلًا قدام العميل (الأداة لوحدها من غير ما تطلبها بالكلام مش انتظار)
+            S.lastQ = isQ(last) || (!!S.wait && !!(q(".as-box") || S.acct));
             nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
           }
           if (!r.msg) { S.thinking = false; status(); }
@@ -419,7 +425,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function nudge(ms) {
     if (!S) return;
     clearTimeout(S.nudgeT);
-    if (S.lastQ !== false || S.finishing || S.wait) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
+    if (S.lastQ !== false || S.finishing || (S.wait && (q(".as-box") || S.acct))) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
     if (S.nudged >= 2) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
     S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && (S.nudged || 0) < 2 && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = (S.nudged || 0) + 1; lg("sys", "auto-continue"); S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
@@ -431,6 +437,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   function loop() {
     if (!S) return;
+    ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
     orb?.set(talk ? Math.min(1, ag * 7) : user ? Math.min(0.35, mu * 2) : 0, user);
