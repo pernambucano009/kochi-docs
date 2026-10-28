@@ -214,6 +214,7 @@ const BrandPage = (() => {
     if (!W || !H) return;
     // الشاشة بالعرض (16:9): الفروع بتتمد يمين وشمال أكتر من فوق وتحت، فالمخ يكبر ويملا الشاشة
     const ex = Math.max(1.2, Math.min(2.1, (W / H) * 1.15)), ey = .78;
+    S.ex = ex;
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
     // «+» تحت المخ (ترمي فيه أي حاجة)، و«ضيف للعقل بكويز» البرتقاني فوقه
     nodes.push({ id: "add", kind: "add", x: 0, y: 214, from: "c" }, { id: "quiz", kind: "quiz", x: 0, y: -206, from: "c" });
@@ -225,7 +226,7 @@ const BrandPage = (() => {
       const g = growth(b, br), D = 250 + 140 * (1 - Math.exp(-g / 8));
       const on = branchOn(b, br);
       if (!on && !SEED.has(br.k)) return;   // الثابت بييجي في الآخر
-      const DD = on ? D : 215, bx = Math.cos(a) * DD * ex, by = Math.sin(a) * DD * ey;
+      const DD = on ? D : 185, bx = Math.cos(a) * DD * ex, by = Math.sin(a) * DD * ey;
       const real = br.leaves.filter((l) => !l.type.startsWith("rule-") && !["action", "pending", "page"].includes(l.type));
       const done = real.filter((l) => filled(b, l)).length, total = real.length, waiting = br.leaves.length - br.leaves.filter((l) => l.type !== "pending").length;
       nodes.push({ id: br.k, kind: "branch", br, x: bx, y: by, from: "c", done, total, waiting, g: on ? g : -1, seed: !on });
@@ -265,7 +266,9 @@ const BrandPage = (() => {
     const w = S.el, W = w.clientWidth, H = w.clientHeight;
     if (S.view?.user && !force) return applyView();
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    for (const n of S.nodes) {
+    // وقت المكالمة: الخريطة ثابتة على مساحة العقل كله وهو مليان، فالفروع بتطلع في مكانها من غير ما الشاشة تتحرك أو تصغر
+    if (S.docked) { const X = 330 * (S.ex || 1.6) + 140, Y = 330 * .78; x0 = -X; x1 = X; y0 = -Y - 210; y1 = Y + 150; }
+    else for (const n of S.nodes) {
       const m = n.kind === "leaf" ? 26 : n.kind === "center" ? 130 : 80;
       // الشرح بيطلع فوق النقطة دايمًا: مساحة فوق النقط اللي فوق علشان مايدخلش تحت الشريط
       x0 = Math.min(x0, n.x - m); x1 = Math.max(x1, n.x + m); y0 = Math.min(y0, n.y - m - (n.kind === "leaf" ? 46 : 0)); y1 = Math.max(y1, n.y + m + (n.kind === "branch" ? 30 : 0));
@@ -334,7 +337,7 @@ const BrandPage = (() => {
       if (b && S.tqFor !== b.id && S.tqLoading !== b.id) loadTasks(b);
       const tq = S.tqFor === b?.id ? S.tq : null;
       const qd = Math.min((b?.quiz_done || []).length, S.quiz?.length || 17), done = qd + (tq?.done || 0), total = (S.quiz?.length || 17) + (tq?.total || 0);
-      return `<button class="bm-n bm-quiz${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل ما يحتاجه العقل: أسئلة قصيرة + مهام (رفع صور، فيديو، صوتك…)"><i>?</i><b>أكمل العقل</b><small class="num">${done}/${total}</small></button>`;
+      return `<button class="bm-n bm-quiz${S.agent ? " bm-agent" : ""}${tq && done >= total ? " full" : ""}" data-n="quiz" title="كل ما يحتاجه العقل: أسئلة قصيرة + مهام (رفع صور، فيديو، صوتك…)"><i>?</i><b>${esc(S.agent || "أكمل العقل")}</b><small class="num">${done}/${total}</small></button>`;
     }
     if (n.kind === "trends") {
       if (b && S.trFor !== b.id && S.trLoading !== b.id) loadTrends(b);
@@ -1404,7 +1407,7 @@ const BrandPage = (() => {
       try { const b = await bAPI(""); S.brains = S.brains.map((x) => (x.id === b.id ? b : x)); layout(); if (busy(b)) watch(); } catch { /* الخريطة هتتحدث المرة الجاية */ }
     }, 400);
   });
-  window.addEventListener("assistant:dock", (e) => { S.reserve = e.detail?.w || 0; if (S.el?.isConnected && S.nodes) fit(true); });
+  window.addEventListener("assistant:dock", (e) => { S.reserve = e.detail?.w || 0; S.docked = !!e.detail?.on; if (S.el?.isConnected && S.nodes) fit(true); });
   async function mount(root, id) {
     const w = root.querySelector("#nbWrap");
     if (!w) return;
@@ -1417,6 +1420,8 @@ const BrandPage = (() => {
     dotsSize();
     try { await load(); } catch (err) { w.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
     if (!S.raf) S.raf = requestAnimationFrame(loop);
+    // 🎙️ دايرة «؟» باسم المساعدة (سعاد في المصري…) لو المساعدة الصوتية شغالة
+    if (typeof Assistant !== "undefined" && !S.agent) api("/api/assistant").then((a) => { if (a?.ready && a.agents?.[0]) { S.agent = a.agents[0]; layout(); } }).catch(() => {});
     // من غير المساعدة الصوتية: «أكمل العقل» بيفتح لوحده في الأول. معاها، الخريطة تفضل فاضية قدامه ودايرة «؟» هي المساعدة
     if (typeof Assistant === "undefined" && (cur()?.knowledge?.score ?? 100) < 30 && S.byId?.quiz) openCard(S.byId.quiz);
     // أول ما الخريطة تفتح: النقط بتطلع من المخ لبرّه

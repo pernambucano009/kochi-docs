@@ -112,9 +112,9 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
-                        "intro: a short video that opens their videos."}}, "required": ["kind"]}},
+                        "intro: a short video that opens their videos. none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
     {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
      "parameters": {"type": "object", "properties": {}}},
 ]
@@ -155,6 +155,7 @@ Tools (use them silently, never read them out loud):
 - Only in the turn where you actually ask for the account, the logo, product photos or the intro video (and you say that word),
   call show_input with that kind,
   and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
+  If they say later, not now, or that they have none, call show_input with kind "none" and move on.
 - The account link must be TYPED by the user in the box (spoken links are not accepted). If they say it by voice, thank them and
   ask them to type it in the box. Only after they typed it, call start_account_analysis with exactly what they typed. NEVER guess or make up an account (not from the brand name, not from anything else). If they say later, do not
   call it and do not say you are checking it: just say no problem and move on.

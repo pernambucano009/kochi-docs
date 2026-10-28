@@ -32623,6 +32623,28 @@ def signup_name(request: Request) -> str:
     return unquote(request.headers.get("x-user-name") or "").strip()[:60]
 
 
+def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
+    """اللي العميل قاله قبل كده (مش اللي البرنامج ملاه لوحده من بروفايل المجال)، واللي عنده (الحساب، الشعار، الصور)،
+    وخطوات المكالمة اللي فاضلة بالترتيب: الحساب ← الأسئلة ← الشعار ← صور المنتجات (عشان العدّاد يبان للعميل)."""
+    pre = fz._prefilled(b)
+    known = {}
+    for q in brainquiz.Q:
+        if q["id"] in livevoice.SKIP_Q:
+            continue
+        v, to = brainquiz.current(q, b), q["to"]
+        if "field" in to and str(v).strip() == str(pre.get(to["field"]) or "").strip():
+            continue
+        if "note" in to and any(n.get("quiz") == q["id"] and n.get("source") == "field" for n in b.get("notes") or []):
+            continue
+        if str(v).strip():
+            known[q["id"]] = v
+    social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
+    have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
+    steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known] \
+        + ([] if have["logo"] else ["logo"]) + ([] if have["products"] else ["photos"])
+    return known, have, steps
+
+
 @app.get("/api/assistant")
 def assistant_state(request: Request):
     bid, b, a = assist_info()
@@ -32634,7 +32656,8 @@ def assistant_state(request: Request):
     return {"ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
-            "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None}
+            "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
+            "steps": assist_plan(b)[2] if bid else []}
 
 
 class AssistProfileIn(BaseModel):
@@ -32664,10 +32687,8 @@ def assistant_token(request: Request):
     ob = onboard_load() or {}
     dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
-    known = {q["id"]: brainquiz.current(q, b) for q in brainquiz.Q if q["id"] not in livevoice.SKIP_Q}
+    known, have, _steps = assist_plan(b)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
-    social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
-    have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
     returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
     instr = livevoice.instructions(dia, "", a.get("name") or signup_name(request), ag, a.get("gender") or "", tools=True, known=known,
                                    returning=returning, have=have)
