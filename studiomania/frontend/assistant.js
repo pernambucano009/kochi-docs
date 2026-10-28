@@ -23,7 +23,7 @@ const Assistant = (() => {
 .as-go:disabled{opacity:.6}
 .as-btn{border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.14);color:inherit;border-radius:999px;padding:10px 22px;font:inherit;font-size:14.5px;cursor:pointer}
 .as-btn:hover{background:rgba(127,127,127,.24)}.as-btn.end:hover{background:rgba(255,80,40,.35)}
-.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);height:3.2em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;text-align:center;font-size:18px;line-height:1.6;unicode-bidi:plaintext;font-weight:500;flex:none}
+.as-st{font-size:14px;opacity:.8;min-height:1.2em}.as-cap{max-width:min(88vw,640px);height:3.2em;overflow:hidden;text-align:center;font-size:18px;line-height:1.6;unicode-bidi:plaintext;font-weight:500;flex:none}
 .as-err{color:#d9472b;font-size:13.5px;min-height:1em;text-align:center;max-width:90vw}
 .as-side{position:fixed;inset-inline-end:22px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto;width:min(260px,40vw)}
 .as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(127,127,127,.16);font-size:13px;line-height:1.5;
@@ -42,7 +42,7 @@ const Assistant = (() => {
 body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as-docked #nhCorner,body.as-docked .bm-hint{opacity:0!important;pointer-events:none!important;transition:opacity .4s}
 .as-prog{width:min(260px,80vw);display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12.5px;opacity:.75}
 .as-prog i{display:block;width:100%;height:4px;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}.as-prog i b{display:block;height:100%;width:0;background:#E5613E;transition:width .6s}
-.as-type{flex-direction:column;align-items:center}.as-hint{font-size:12.5px;opacity:.8;min-height:0;text-align:center}.as-type.acct input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.18)}
+.as-type{flex-direction:column;align-items:center;visibility:hidden;opacity:0;transition:opacity .5s}.as-ov.talked .as-type{visibility:visible;opacity:1}.as-hint{font-size:12.5px;opacity:.8;min-height:0;text-align:center}.as-type.acct input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.18)}
 .as-ov.dock.on{-webkit-backdrop-filter:none;backdrop-filter:none}.as-ov.dock>*{pointer-events:auto}.as-ov.dock .as-side{display:none}
 .as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
@@ -68,13 +68,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     requestAnimationFrame(() => requestAnimationFrame(() => ov?.classList.add("on")));
   }
   // 🟠 الكرة بتطلع من دايرة «؟» (أو نقطة برتقالي في النص لو الدايرة مش ظاهرة) وتكبر، وعند القفل بتصغر وترجع لها
-  function grow(open) {
-    const o = ov?.querySelector(".as-orb"), disc = ov?.querySelector(".as-disc"), cv = ov?.querySelector("canvas");
+  function grow(open, root = ov) {
+    const o = root?.querySelector(".as-orb"), disc = root?.querySelector(".as-disc"), cv = root?.querySelector("canvas");
     if (!o) return null;
-    const t = o.getBoundingClientRect(), f = from?.isConnected && from.getBoundingClientRect(), vis = f && f.width && f.bottom > 0 && f.top < innerHeight;
+    const dot = from?.querySelector?.(":scope > i") || from;   // الدايرة نفسها، مش الزرار كله (اللي تحته الاسم)
+    const t = o.getBoundingClientRect(), f = dot?.isConnected && dot.getBoundingClientRect(), vis = f && f.width && f.bottom > 0 && f.top < innerHeight;
     const fx = vis ? f.left + f.width / 2 : innerWidth / 2, fy = vis ? f.top + f.height / 2 : innerHeight / 2, fs = (vis ? f.width : 48) / (t.width * 0.84);
     const small = `translate(${fx - (t.left + t.width / 2)}px,${fy - (t.top + t.height / 2)}px) scale(${fs})`;
-    const k = (a, b) => (open ? [a, b] : [b, a]), opt = { duration: open ? 900 : 700, easing: open ? "cubic-bezier(.2,1.1,.3,1)" : "cubic-bezier(.5,0,.7,.4)", fill: "both" };
+    const k = (a, b) => (open ? [a, b] : [b, a]), opt = { duration: open ? 900 : 700, easing: open ? "cubic-bezier(.2,1.1,.3,1)" : "cubic-bezier(.4,0,.2,1)", fill: "both" };
     disc?.animate(k({ opacity: 1 }, { opacity: 0 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
     cv?.animate(k({ opacity: 0 }, { opacity: 1 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
     if (vis && open) from.style.visibility = "hidden";   // الدايرة نفسها هي اللي اتحولت للكرة
@@ -83,10 +84,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function close() {
     return new Promise((res) => {
       if (!ov) return res();
-      const o = ov, a = grow(false); ov.classList.remove("on"); ov = null; if (dock) docked(false);
+      const o = ov; ov = null;
       const done = () => { orb?.stop(); orb = null; o.remove(); if (from) from.style.visibility = ""; res(); };
-      if (a) a.onfinish = done; else done();
-      setTimeout(() => o.isConnected && done(), 1200);
+      // الخريطة بترجع لمكانها الأول، وبعدها الكرة تصغر ناحية دايرة سعاد في مكانها الجديد (مش القديم)
+      const go = () => { const a = grow(false, o); o.classList.remove("on"); if (a) a.onfinish = done; else done(); setTimeout(() => o.isConnected && done(), 1200); };
+      if (dock) { docked(false); requestAnimationFrame(() => requestAnimationFrame(go)); } else go();
     });
   }
   const q = (s) => ov?.querySelector(s);
@@ -99,16 +101,31 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // والمربع اللي المساعد طلبه بيظهر لما الجملة اللي فيها اسمه تتقال (أو في آخر الرد لو الكلمة ماتقالتش)
   const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i };
   // جملة جملة، والجملة الطويلة بتتقسم عند الفاصلة عشان المكتوب مايزيدش عن سطرين ويغطي على خانة الكتابة
-  const sentences = (t) => t.split(/(?<=[.!?؟…])\s+/).flatMap((x) => (x.length > 80 ? x.split(/(?<=[،,])\s+/) : [x])).map((x) => x.trim()).filter(Boolean);
-  function capReset() { if (!S) return; S.aBuf = ""; S.capI = 0; S.capAt = S.speaking ? performance.now() : 0; S.capDone = false; caption(""); }
+  // كل حتة ≤ ٦٠ حرف تقريبًا (عند الفاصلة لو فيه، وإلا عند آخر كلمة) عشان تتقري كاملة في سطرين من غير ما تتقطع بنقط
+  const chunk = (x) => {
+    const out = [];
+    for (let part of x.split(/(?<=[،,])\s+/)) {
+      if (out.length && out[out.length - 1].length < 20) part = out.pop() + " " + part;   // «تمام،» لوحدها: تتلزق في اللي بعدها
+      while (part.length > 64) { const cut = part.lastIndexOf(" ", 60); const at = cut > 20 ? cut : 60; out.push(part.slice(0, at)); part = part.slice(at).trim(); }
+      if (out.length && out[out.length - 1].length + part.length < 50) out[out.length - 1] += " " + part; else out.push(part);
+    }
+    return out;
+  };
+  const sentences = (t) => t.split(/(?<=[.!?؟…])\s+/).flatMap((x) => (x.length > 64 ? chunk(x) : [x])).map((x) => x.trim()).filter(Boolean);
+  function capReset() {
+    if (!S) return;
+    // سرعة كلامها الحقيقية من الرد اللي فات (مدة الصوت ÷ عدد الحروف): المكتوب يمشي على قدها مش على تقدير ثابت
+    if (S.spFirst && S.spLast > S.spFirst && S.aBuf.length > 25) S.rate = .6 * (S.rate || 85) + .4 * Math.max(55, Math.min(130, (S.spLast - S.spFirst) / S.aBuf.length));
+    S.spFirst = S.spLast = 0;
+    S.aBuf = ""; S.capI = 0; S.capAt = S.speaking ? performance.now() : 0; S.capDone = false; caption(""); }
   function capTick() {
     if (!S) return;
     const ss = sentences(S.aBuf), now = performance.now();
     if (ss.length) {
       if (!S.capAt) { if (!S.speaking && !(S.noAudio && now - S.textAt > 400)) return; S.capAt = now; }   // المكتوب بيستنى الصوت يبدأ
-      const i = Math.min(S.capI, ss.length - 1), dur = Math.max(1000, ss[i].length * 70);
+      const i = Math.min(S.capI, ss.length - 1), dur = Math.max(1000, ss[i].length * (S.rate || 85));
       if (now - S.capAt > dur && i < ss.length - 1) { S.capI = i + 1; S.capAt = now; }
-      caption(ss[Math.min(S.capI, ss.length - 1)]);
+      caption(ss[Math.min(S.capI, ss.length - 1)]); ov?.classList.add("talked");
       if (S.box && KW[S.box]?.test(ss.slice(0, S.capI + 1).join(" "))) { box(S.box); S.box = null; }
     }
   }
@@ -142,7 +159,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (BOX[args.kind]) { S.box = args.kind; S.ask = S.capId || true; }
       return { ok: true, shown: args.kind };
     }
-    if (name === "finish") { S.finishing = true; setTimeout(() => end(true), 3500); return { ok: true }; }
+    // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
+    if (name === "finish") {
+      S.finishing = true; S.endDone = !args.later;
+      setTimeout(() => S?.finishing && end(S.endDone), 9000);   // احتياط لو الصوت ماوصلش
+      if (!S.speaking) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 1500);
+      return { ok: true };
+    }
     return { ok: false, error: "unknown tool" };
   }
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
@@ -285,7 +308,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (!r.ok) throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل");
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       S.agent = tok.agent || ""; status();
-      if (noMic) { q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
+      if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
       q("[data-type]").onkeydown = (ev) => {
         if (ev.key !== "Enter" || !ev.target.value.trim()) return;
         const v = ev.target.value.trim(); ev.target.value = "";
@@ -344,10 +367,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // بتتكلم ولا سكتت: من مستوى صوتها نفسه (السكتة الصغيرة بين الكلمات ماتتحسبش). المكتوب بيبدأ مع الصوت، ولما تسكت يتقرر تكمّل ولا تستنى
     const now = performance.now();
     if (talk) S.lastTalk = now;
-    const sp = talk || now - (S.lastTalk || 0) < 650;
+    const sp = talk || (!!S.lastTalk && now - S.lastTalk < 650);
     if (sp !== S.speaking) {
       S.speaking = sp;
-      if (sp) { S.thinking = false; if (!S.capAt) S.capAt = now; } else nudge(1200);
+      if (sp) { S.thinking = false; if (!S.capAt) S.capAt = now; if (!S.spFirst) S.spFirst = now; ov?.classList.add("talked"); } else { S.spLast = now; nudge(1200); if (S.finishing) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 700); }   // قالت مع السلامة وسكتت: تقفل
       status();
     }
     requestAnimationFrame(loop);

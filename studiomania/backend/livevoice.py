@@ -121,7 +121,8 @@ TOOLS = [
          "description": "Each competitor exactly as the user said or typed it: a brand name, a person's name, an @handle or a link."}},
          "required": ["names"]}},
     {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
-     "parameters": {"type": "object", "properties": {}}},
+     "parameters": {"type": "object", "properties": {"later": {"type": "boolean",
+         "description": "true if the user wants to continue another time (said later / not now / not ready), false when the conversation is complete."}}}},
 ]
 
 
@@ -178,8 +179,9 @@ This is a REAL conversation, not a script. The most important rule: every time t
 actually said, and only then (if it fits) move toward your next goal. Examples of what that means:
 - They ask "who are you?" or "what is this?" → answer warmly in a sentence or two (you are {agent}, their assistant at SimsimKit,
   you help set up their brand so the platform makes videos that sound like them), then gently continue.
-- They say "no", "not now", or they are not ready → respect it. Ask what is on their mind or if they want to continue later; do not
-  carry on with the questions. If they want to stop, say a kind goodbye and call finish.
+- They say "no", "later", "not now", or they are not ready (above all to "ready to chat?") → do not insist and do not ask anything
+  else: answer warmly in one short sentence, like «تمام، زي ما تحب، أنا موجودة هنا في أي وقت تحب نكمّل فيه», then call finish with
+  later=true. If they stop in the middle for any reason, the same.
 - They ask a question, joke, or go off-topic → reply to it naturally first. Never ignore what they said.
 - Their answer is unclear or unrelated to your question → ask again in other words; do not save it and do not move on.
 
