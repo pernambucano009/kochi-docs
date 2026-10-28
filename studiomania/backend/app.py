@@ -10211,20 +10211,31 @@ def admin_providers_min(body: ProviderMinIn):
     return providers_out()
 
 
-class ProviderPackIn(BaseModel):
-    key: str
+class ProviderPackItem(BaseModel):
+    name: str = ""
     usd: float = 0
     units: float = 0
+    use: bool = False
+
+
+class ProviderPackIn(BaseModel):
+    key: str
+    packs: list[ProviderPackItem] = []
 
 
 @app.put("/api/admin/providers/pack")
 def admin_providers_pack(body: ProviderPackIn):
-    """أقل شحنة للمنصة: بكام دولار، وبتدّينا كام وحدة ← سعر الوحدة، ومنه الاستهلاك والشحنات بالدولار."""
+    """باقات المنصة (واحدة أو أكتر): كل باقة بكام دولار وبتدّينا كام وحدة، واللي بنشتريها دلوقتي ← سعر الوحدة، ومنه الاستهلاك والشحنات بالدولار وسيناريوهات الباقات."""
     if body.key not in providers.PROVIDERS:
         raise HTTPException(404, "منصة غير معروفة")
+    ps = [{"name": x.name.strip()[:40], "usd": round(float(x.usd), 2), "units": float(x.units), "use": bool(x.use)} for x in body.packs[:12] if x.usd > 0 and x.units > 0]
+    if ps and sum(x["use"] for x in ps) != 1:   # باقة واحدة بس هي اللي بنشتريها: لو مفيش (أو أكتر من واحدة) ← أقل باقة سعرًا
+        lo = min(range(len(ps)), key=lambda i: ps[i]["usd"])
+        for i, x in enumerate(ps):
+            x["use"] = i == lo
     d = providers.load(PROVIDERS_FILE)
-    if body.usd > 0 and body.units > 0:
-        d["pack"][body.key] = {"usd": round(float(body.usd), 2), "units": float(body.units)}
+    if ps:
+        d["pack"][body.key] = ps
     else:
         d["pack"].pop(body.key, None)
     providers.save(PROVIDERS_FILE, d)

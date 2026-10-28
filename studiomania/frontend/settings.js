@@ -122,17 +122,34 @@ function renderProviders(d) {
   }).join("");
   $("provAt").textContent = d.checked ? `آخر فحص ${new Date(d.checked * 1000).toLocaleTimeString(UI_LOCALE(), { hour: "numeric", minute: "2-digit" })}` : "";
 }
-// 📒 أقل شحنة (بكام وبتدّينا كام) ← سعر الوحدة، واستهلاك الشهر وشحناته من فرق الرصيد نفسه (مش تقدير)
+// 📒 باقات كل منصة (واحدة أو أكتر: بكام وبتدّينا كام) ← سعر الوحدة لكل باقة، والباقة اللي بنشتريها بتحسب الاستهلاك والشحنات بالدولار.
+// وتحتها 🧮 السيناريوهات: استهلاك الشهر ده (متوقَّع للشهر كله) لو اشترينا بكل باقة، عشان دراسة الجدوى.
+const nf = (v, d = 2) => Number(v).toLocaleString("en-US", { maximumFractionDigits: d });
+const usdf = (v) => (v == null ? "—" : "$" + nf(v));
+const unitf = (v) => (v >= 0.01 ? "$" + nf(v, 4) : "$" + Number(v).toPrecision(2));
+function packRow(key, x = {}) {
+  return `<div class="pk-row"><label class="pk-use" title="الباقة التي نشتريها الآن"><input type="radio" name="pkuse-${key}" ${x.use ? "checked" : ""}> نشتريها</label>
+    <input type="text" class="pk-name" placeholder="اسم الباقة" value="${escapeHtml(x.name || "")}" maxlength="40">
+    <label>السعر $<input type="number" class="pk-usd" min="0" step="any" value="${x.usd ?? ""}"></label>
+    <label>تعطينا<input type="number" class="pk-units" min="0" step="any" value="${x.units ?? ""}"></label>
+    <span class="hint">${x.unit_usd ? `سعر الوحدة ${unitf(x.unit_usd)}${x.save_pct ? ` · أرخص بـ ${nf(x.save_pct, 1)}٪` : ""}` : ""}</span>
+    <button type="button" class="btn xs ghost" data-pkdel title="احذف الباقة">✕</button></div>`;
+}
 function provPack(p) {
-  const m = p.month || {}, usd = (v) => (v == null ? "—" : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+  const m = p.month || {};
   const unit = p.unit && p.unit !== "$" ? p.unit : "وحدة";
-  const pack = p.spend || p.unit === "$" ? "" : `<label>أقل شحنة $<input type="number" min="0" step="any" value="${p.pack_usd ?? ""}" data-packusd="${p.key}"></label>
-      <label>تعطينا<input type="number" min="0" step="any" value="${p.pack_units ?? ""}" data-packunits="${p.key}"> ${escapeHtml(unit)}</label>
-      <span class="hint">${p.unit_usd ? `سعر الـ${escapeHtml(unit)}: $${Number(p.unit_usd).toPrecision(2)}` : "اكتب أقل شحنة لنحسب بالدولار"}</span>`;
-  const use = p.spend ? `<span>مصاريف هذا الشهر: <b>${usd(m.used_usd)}</b></span>`
-    : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? Number(m.used).toLocaleString("en-US", { maximumFractionDigits: 2 }) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usd(m.used_usd)})` : ""}</span>
-      ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usd(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
-  return pack || use ? `<div class="prov-pack">${pack}${use}</div>` : "";
+  const pack = p.spend || p.unit === "$" ? "" : `<div class="pk-list" data-pk="${p.key}"><b class="pk-h">باقات ${escapeHtml(p.name)} (${escapeHtml(unit)})</b>
+      ${(p.packs?.length ? p.packs : [{ use: true }]).map((x) => packRow(p.key, x)).join("")}
+      <div class="pk-act"><button type="button" class="btn xs ghost" data-pkadd>＋ باقة أخرى</button><button type="button" class="btn xs" data-pksave>حفظ الباقات</button>
+      ${p.unit_usd ? "" : `<span class="hint">اكتب باقة واحدة على الأقل لنحسب بالدولار</span>`}</div></div>`;
+  const use = p.spend ? `<span>مصاريف هذا الشهر: <b>${usdf(m.used_usd)}</b></span>`
+    : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? nf(m.used) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usdf(m.used_usd)})` : ""}</span>
+      ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usdf(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
+  const sc = (m.scenarios || []).length > 1 || ((m.scenarios || []).length && m.used) ? `<div class="pk-sc"><b class="pk-h">🧮 لو اشترينا بكل باقة (استهلاك الشهر كله المتوقَّع: ${nf(m.scenarios[0].month_units)} ${escapeHtml(unit)})</b>
+      <table><thead><tr><th>الباقة</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ما ندفعه فعلًا</th></tr></thead><tbody>
+      ${m.scenarios.map((x) => `<tr${x.use ? ' class="on"' : ""}><td>${escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}</td><td>${unitf(x.unit_usd)}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
+      </tbody></table></div>` : "";
+  return pack || use || sc ? `<div class="prov-pack">${pack}${use}${sc}</div>` : "";
 }
 async function loadProviders() {
   if (!$("provList")) return;
@@ -144,20 +161,24 @@ $("provRefresh")?.addEventListener("click", async () => {
   $("provRefresh").disabled = false;
 });
 $("provList")?.addEventListener("change", async (e) => {
-  const pk = e.target.dataset.packusd || e.target.dataset.packunits;
-  if (pk) {
-    const row = e.target.closest(".prov-pack"), usd = +row.querySelector("[data-packusd]").value || 0, units = +row.querySelector("[data-packunits]").value || 0;
-    if (usd && !units) return;   // يستنى الخانة التانية
-    try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: pk, usd, units }) })); toast("✅ حُفظت أقل شحنة"); }
-    catch (err) { toast(err.message, true); }
-    return;
-  }
+  if (e.target.closest(".pk-list")) return;   // الباقات بتتحفظ بزرار «حفظ الباقات»
   const k = e.target.dataset.provmin;
   if (!k) return;
   try { renderProviders(await api("/api/admin/providers/min", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, min: +e.target.value || 0 }) })); toast("✅ حُفظ حد التنبيه"); }
   catch (err) { toast(err.message, true); }
 });
 $("provList")?.addEventListener("click", async (e) => {
+  const list = e.target.closest(".pk-list");
+  if (list && e.target.closest("[data-pkadd]")) { list.querySelector(".pk-act").insertAdjacentHTML("beforebegin", packRow(list.dataset.pk)); return; }
+  if (list && e.target.closest("[data-pkdel]")) { e.target.closest(".pk-row").remove(); return; }
+  if (list && e.target.closest("[data-pksave]")) {
+    const packs = [...list.querySelectorAll(".pk-row")].map((r) => ({ name: r.querySelector(".pk-name").value.trim(), usd: +r.querySelector(".pk-usd").value || 0,
+      units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked }));
+    if (packs.some((x) => (x.usd > 0) !== (x.units > 0))) { toast("اكتب السعر وعدد الوحدات لكل باقة", true); return; }
+    try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: list.dataset.pk, packs }) })); toast("✅ حُفظت الباقات"); }
+    catch (err) { toast(err.message, true); }
+    return;
+  }
   const k = e.target.closest("[data-provclear]")?.dataset.provclear;
   if (!k) return;
   try { renderProviders(await api(`/api/admin/providers/${k}/clear`, { method: "POST" })); toast("✅ سُجّل الشحن"); } catch (err) { toast(err.message, true); }

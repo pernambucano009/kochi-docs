@@ -3334,3 +3334,9 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .prov .prov-pack{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
 .prov .prov-pack label{display:inline-flex;gap:6px;align-items:center}.prov .prov-pack input{width:90px;font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}
 .prov .prov-pack b{color:var(--text)}
+.prov .pk-list,.prov .pk-sc{flex:1 1 100%;display:flex;flex-direction:column;gap:6px}.prov .pk-h{font-weight:600}
+.prov .pk-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}.prov .pk-row .pk-name{width:130px}.prov .pk-row .pk-units{width:110px}
+.prov .pk-use input{width:auto}
+.prov .pk-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prov .pk-sc table{width:100%;border-collapse:collapse;font-size:12.5px}.prov .pk-sc th,.prov .pk-sc td{padding:4px 8px;text-align:start;border-bottom:1px solid var(--line)}
+.prov .pk-sc tr.on td{color:var(--text);background:rgba(127,127,127,.08)}

@@ -1706,7 +1706,8 @@ def admin_costs(request: Request, month: str = ""):
     for k, meta in providers.PROVIDERS.items():
         st = providers.month_stats(pd, k, t0, t1)
         if st.get("used_usd") or st.get("topups"):
-            real.append({"key": k, "name": meta["name"], "used_usd": st.get("used_usd"), "topups": st.get("topups"), "topup_usd": st.get("topup_usd")})
+            real.append({"key": k, "name": meta["name"], "used_usd": st.get("used_usd"), "topups": st.get("topups"), "topup_usd": st.get("topup_usd"),
+                         "best": min(st.get("scenarios") or [], key=lambda x: x["unit_usd"], default=None)})
     r2 = lambda v: round(v, 2)  # noqa: E731
     return {"real": real, "real_usd": r2(sum(x["used_usd"] or 0 for x in real)), "topup_usd": r2(sum(x["topup_usd"] or 0 for x in real)),
             "month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),

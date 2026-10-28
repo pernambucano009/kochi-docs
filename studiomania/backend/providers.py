@@ -56,18 +56,66 @@ def load(f: Path) -> dict:
     d.setdefault("p", {})
     d.setdefault("min", {})
     d.setdefault("alerted", {})
-    d.setdefault("pack", {})     # أقل شحنة: {key: {"usd": 47, "units": 25000}} ← سعر الوحدة
+    d.setdefault("pack", {})     # باقات كل منصة: {key: [{"name", "usd": 47, "units": 25000, "use": True}]} ← سعر الوحدة (اللي عليها use = اللي بنشتريها دلوقتي)
+    for k, v in list(d["pack"].items()):   # الشكل القديم (باقة واحدة dict) ← قائمة
+        if isinstance(v, dict):
+            d["pack"][k] = [{"name": "", **v, "use": True}] if v.get("usd") and v.get("units") else []
     d.setdefault("hist", {})     # سجل الرصيد: {key: [[وقت, رصيد], …]}
     d.setdefault("moves", {})    # الشحنات والاستهلاك المحسوب من فرق الرصيد: {key: [{"at", "units", "kind": "use"|"topup"}]}
     return d
 
 
+def packs(d: dict, name: str) -> list[dict]:
+    """باقات المنصة بسعر الوحدة لكل واحدة، ونسبة التوفير عن أغلى سعر وحدة."""
+    ps = [dict(x) for x in d.get("pack", {}).get(name) or [] if x.get("usd") and x.get("units")]
+    for x in ps:
+        x["unit_usd"] = x["usd"] / x["units"]
+    top = max((x["unit_usd"] for x in ps), default=0)
+    for x in ps:
+        x["save_pct"] = round((1 - x["unit_usd"] / top) * 100, 1) if top else 0
+    return ps
+
+
+def active_pack(d: dict, name: str) -> dict | None:
+    """الباقة اللي بنشتريها دلوقتي: المعلَّم عليها، وإلا أقل باقة سعرًا."""
+    ps = packs(d, name)
+    return next((x for x in ps if x.get("use")), None) or min(ps, key=lambda x: x["usd"], default=None)
+
+
 def unit_usd(d: dict, name: str) -> float | None:
-    """سعر الوحدة بالدولار: الرصيد بالدولار أصلًا (Atlas) = ١، وإلا من أقل شحنة (المبلغ ÷ الوحدات)."""
+    """سعر الوحدة بالدولار: الرصيد بالدولار أصلًا (Atlas) = ١، وإلا من الباقة اللي بنشتريها (المبلغ ÷ الوحدات)."""
     if PROVIDERS.get(name, {}).get("unit") == "$":
         return 1.0
-    pk = d.get("pack", {}).get(name) or {}
-    return pk["usd"] / pk["units"] if pk.get("usd") and pk.get("units") else None
+    pk = active_pack(d, name)
+    return pk["unit_usd"] if pk else None
+
+
+def topup_usd(d: dict, name: str, units: float) -> float | None:
+    """سعر شحنة: لو عدد الوحدات اللي زادت يطابق باقة (أو مضاعفاتها) يبقى سعرها، وإلا بسعر وحدة الباقة الحالية."""
+    if PROVIDERS.get(name, {}).get("unit") == "$":
+        return units
+    for x in packs(d, name):
+        n = round(units / x["units"])
+        if n >= 1 and abs(units - n * x["units"]) <= 0.01 * x["units"]:
+            return n * x["usd"]
+    u = unit_usd(d, name)
+    return units * u if u is not None else None
+
+
+def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dict]:
+    """🧮 دراسة الجدوى: استهلاك الشهر ده لو اشترينا بكل باقة. الشهر كامل متوقَّع من معدل الأيام اللي فاتت،
+    وعدد الباقات اللي هنشتريها (بالتقريب لفوق) وتكلفتها الفعلية، والتكلفة بسعر الوحدة بس."""
+    import math  # noqa: PLC0415
+    end = month_start(t0 + 32 * 86400)            # آخر الشهر ده
+    now = min(time.time(), t1, end)
+    elapsed = max(1.0, (now - t0) / 86400)
+    proj = used * ((end - t0) / 86400) / elapsed if now < end - 60 else used
+    out = []
+    for x in packs(d, name):
+        n = math.ceil(proj / x["units"]) if proj else 0
+        out.append({"name": x.get("name") or "", "usd": x["usd"], "units": x["units"], "unit_usd": x["unit_usd"], "save_pct": x["save_pct"],
+                    "use": bool(x.get("use")), "month_units": round(proj, 2), "month_usd": round(proj * x["unit_usd"], 2), "packs": n, "buy_usd": round(n * x["usd"], 2)})
+    return out
 
 
 def track(d: dict, name: str, bal: float | None) -> None:
@@ -102,12 +150,13 @@ def month_stats(d: dict, name: str, t0: float | None = None, t1: float | None = 
     used = sum(m["units"] for m in mv if m["kind"] == "use")
     tops = [m for m in mv if m["kind"] == "topup"]
     u = unit_usd(d, name)
+    tp = [topup_usd(d, name, m["units"]) for m in tops]
     if PROVIDERS.get(name, {}).get("spend"):   # OpenAI: المصاريف الفعلية من المنصة نفسها
         sp = (d["p"].get(name) or {}).get("month_spend")
         return {"used": sp, "used_usd": sp, "topups": 0, "topup_usd": None, "last_topup": None}
     return {"used": round(used, 4), "used_usd": round(used * u, 2) if u is not None else None, "topups": len(tops),
-            "topup_units": round(sum(m["units"] for m in tops), 4), "topup_usd": round(sum(m["units"] for m in tops) * u, 2) if u is not None else None,
-            "last_topup": tops[-1]["at"] if tops else None}
+            "topup_units": round(sum(m["units"] for m in tops), 4), "topup_usd": round(sum(tp), 2) if tp and None not in tp else None,
+            "last_topup": tops[-1]["at"] if tops else None, "scenarios": scenarios(d, name, used, t0, t1)}
 
 
 def save(f: Path, d: dict) -> None:
@@ -253,10 +302,9 @@ def summary(d: dict) -> list[dict]:
         fail = cur.get("fail") or {}
         recent_fail = bool(fail) and time.time() - fail.get("at", 0) < 3 * 86400
         state = "bad" if (bal is not None and bal <= 0) or recent_fail else "low" if bal is not None and low and bal < low else "ok" if cur.get("ok") else "unknown"
-        pk = d.get("pack", {}).get(name) or {}
         out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api", "url")}, "balance": bal, "min": low, "state": state,
                     "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None,
-                    "spend": bool(meta.get("spend")), "pack_usd": pk.get("usd"), "pack_units": pk.get("units"), "unit_usd": unit_usd(d, name),
+                    "spend": bool(meta.get("spend")), "packs": packs(d, name), "unit_usd": unit_usd(d, name),
                     "month": month_stats(d, name)})
     return out
 
