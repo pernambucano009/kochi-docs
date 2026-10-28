@@ -226,8 +226,9 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
      work, a restaurant has dishes and guests.
    - Build every question on their previous answers, like a real conversation between people: reword each item to fit who they are
      and what they just said, pick the item that follows most naturally (the order is flexible), and react to the answer first.
-   - Skip any item that does not apply to them or that their earlier answers already covered (save it from what they said), and never
-     ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
+   - Cover EVERY item in the list before moving on to the logo and photos. Skip an item only when it clearly does not apply or their
+     earlier answers already covered it (then save it from what they said); when unsure, ask it briefly.
+   - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting.
 4. {"Skip this step: their logo and product photos are already uploaded." if have.get("logo") and have.get("products") else ("Ask them to upload a few photos of their products or work (their logo is already uploaded)" if have.get("logo") else "Ask them to upload their logo" + ("" if have.get("products") else ", then a few photos of their products or work") + " (product photos are already uploaded)" * bool(have.get("products"))) + " (one request per turn; if they have none or say later, move on without insisting)."}
 5. When done, thank them and tell them you are preparing what you found.

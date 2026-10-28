@@ -32762,6 +32762,10 @@ def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
             continue
         if str(v).strip():
             known[q["id"]] = v
+    # اللي اتحفظ في مكالمة قبل كده يتحسب متجاوب، حتى لو مكانه في العقل مش بيرجع كنص (زي «الممنوعات» اللي بتتحفظ قواعد)
+    for qid in (b.get("assistant") or {}).get("saved") or []:
+        if qid not in known and qid not in livevoice.SKIP_Q:
+            known[qid] = "(أجاب عنه في مكالمة سابقة)"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
     steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known] \
