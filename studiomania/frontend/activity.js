@@ -98,7 +98,11 @@
       x.send(init.body);
     });
   }
-  window.fetch = (input, init = {}) => {
+  // عدد الطلبات اللي لسه ماخلصتش (الستارة أول الفتح بتستنى الصفحة تجيب بياناتها عشان كل حاجة تبان مع بعض)
+  window.__inflight = 0;
+  const count = (p) => { window.__inflight++; const dn = () => { window.__inflight = Math.max(0, window.__inflight - 1); }; p.then(dn, dn); return p; };
+  window.fetch = (input, init = {}) => count(act(input, init));
+  const act = (input, init = {}) => {
     const method = String(init?.method || "GET").toUpperCase();
     if (filesOf(init?.body).length) return xhrFetch(input, init || {});
     if (method === "GET" || method === "HEAD") return ofetch(input, init);

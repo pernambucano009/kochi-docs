@@ -1602,7 +1602,23 @@ def admin_storage(request: Request):
     sys_tmp = Path(tempfile.gettempdir())
     sys_b = _du(sys_tmp)[0] if sys_tmp.exists() else 0
     big.sort(reverse=True)
-    return {"total_mb": usage.total // 2**20, "used_mb": (usage.total - usage.free) // 2**20, "free_mb": usage.free // 2**20,
+    # 🖥️ برّه بيانات البرنامج: على نفس القرص فيه النظام والمؤقت والسجلات والكاش (وDocker لو موجود). بنقيس الكبار بس (du، دقيقة بالكتير)
+    data_b = sum(r["mb"] for r in accounts + orphans) * 2**20 + plat_b + shared.get("_shared", 0) * 2**20
+    system = []
+    dd = str(DATA_DIR.resolve())
+    for sp in ("/tmp", "/var/tmp", "/var/log", "/var/cache", "/var/lib/docker", "/var/lib/containerd", "/root", "/home", "/opt", "/usr", "/snap", "/swapfile"):
+        try:
+            if not os.path.exists(sp) or os.stat(sp).st_dev != os.stat(dd).st_dev:
+                continue
+            out = subprocess.run(["du", "-sxm", f"--exclude={dd}", sp], capture_output=True, text=True, timeout=60).stdout.split()
+            mb = int(out[0]) if out and out[0].isdigit() else 0
+            if mb >= 50:
+                system.append({"path": sp, "mb": mb})
+        except (OSError, subprocess.SubprocessError, ValueError):
+            continue
+    system.sort(key=lambda x: -x["mb"])
+    return {"data_mb": round(data_b / 2**20, 1), "outside_mb": max(0, (usage.total - usage.free) // 2**20 - round(data_b / 2**20)), "system": system,
+            "total_mb": usage.total // 2**20, "used_mb": (usage.total - usage.free) // 2**20, "free_mb": usage.free // 2**20,
             "accounts": sorted(accounts, key=lambda r: -r["mb"]), "orphans": sorted(orphans, key=lambda r: -r["mb"]),
             "cats": sorted(({"cat": k, "mb": round(v / 2**20, 1)} for k, v in cats.items()), key=lambda r: -r["mb"])[:25],
             "platform_mb": round(plat_b / 2**20, 1), "shared_mb": shared.get("_shared", 0), "system_tmp_mb": round(sys_b / 2**20, 1),

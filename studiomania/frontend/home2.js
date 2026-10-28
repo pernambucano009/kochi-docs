@@ -13,8 +13,11 @@ const NH = (() => {
   let booting = document.documentElement.classList.contains("nh-boot");
   const _rm = matchMedia("(prefers-reduced-motion: reduce)");
   const reduce = { get matches() { return _rm.matches || booting; } };
-  function bootDone() {
-    if (!booting) return;
+  async function bootDone() {
+    if (!booting || bootDone.wait) return;
+    bootDone.wait = true;
+    // الصفحة بتجيب بياناتها (الحسابات، الرصيد…): الستارة بتستنى لحد ما تخلص (أقصى ثانية ونص)، فالكروت كلها بتبان مرة واحدة
+    for (let quiet = 0, t = 0; t < 1500 && quiet < 3; t += 60) { await new Promise((r) => setTimeout(r, 60)); quiet = (window.__inflight || 0) === 0 ? quiet + 1 : 0; }
     booting = false;
     const r = document.documentElement;
     requestAnimationFrame(() => requestAnimationFrame(() => { r.classList.add("nh-boot-out"); setTimeout(() => r.classList.remove("nh-boot", "nh-boot-out"), 500); }));

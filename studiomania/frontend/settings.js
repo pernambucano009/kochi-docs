@@ -92,6 +92,8 @@ function renderBackup(b) {
 const DSK_CAT = { raw: "الفيديوهات الخام", clips: "القطع", generated: "الفيديوهات المولّدة", exports: "الفيديوهات الجاهزة", tmp: "ملفات مؤقتة", audio: "الصوت",
   coaches: "الشخصيات", lab: "معمل التفكيك", typo: "التايبوجرافي", refs: "أرشيف المراجع", ads: "الإعلانات", series: "المسلسلات", films: "الأفلام",
   carousels: "الكاروسيل", assets: "الملفات المرفوعة", tvideos: "فيديوهات القوالب" };
+const DSK_SYS = { "/tmp": "مؤقت النظام", "/var/tmp": "مؤقت النظام الدائم", "/var/log": "سجلات النظام", "/var/cache": "كاش النظام", "/var/lib/docker": "Docker (الصور والحاويات)",
+  "/var/lib/containerd": "Containerd", "/root": "ملفات حساب root (الكاش والمتصفح)", "/home": "ملفات المستخدمين", "/opt": "برامج مثبتة", "/usr": "النظام والبرامج", "/snap": "حزم Snap", "/swapfile": "ملف الذاكرة البديلة" };
 let DSK = null;
 function renderDisk(d) {
   DSK = d;
@@ -99,6 +101,8 @@ function renderDisk(d) {
   $("dskBox").innerHTML = `<div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
     <p class="hint">مستخدم ${fmtMb(d.used_mb)} من ${fmtMb(d.total_mb)} · فارغ ${fmtMb(d.free_mb)} · بيانات المنصة ${fmtMb(d.platform_mb)}${d.shared_mb ? ` · المكتبة المشتركة ${fmtMb(d.shared_mb)}` : ""}${d.system_tmp_mb >= 1 ? ` · مؤقت النظام ${fmtMb(d.system_tmp_mb)}` : ""}</p>
     ${del >= 1 ? `<div class="row wrap"><button type="button" class="btn sm danger" id="dskClean">🧹 احذف ما لا يلزم (${fmtMb(del)})</button><span class="hint">الملفات المؤقتة ${fmtMb(d.tmp_mb)}${d.orphans.length ? ` · ${d.orphans.length} فولدر لحسابات محذوفة ${fmtMb(d.orphans.reduce((a, r) => a + r.mb, 0))}` : ""}</span></div>` : `<p class="hint">✅ لا توجد ملفات مؤقتة أو بقايا حسابات محذوفة.</p>`}
+    <div class="acc-kpis" style="margin:6px 0"><div><small>بيانات البرنامج (كل الحسابات)</small><b>${fmtMb(d.data_mb || 0)}</b></div><div><small>خارج بيانات البرنامج (النظام وغيره)</small><b>${fmtMb(d.outside_mb || 0)}</b></div></div>
+    ${(d.system || []).length ? `<h4>على نفس القرص خارج البرنامج</h4><ul>${d.system.map((x) => `<li><span>${escapeHtml(DSK_SYS[x.path] || x.path)} <small class="muted" dir="ltr">${escapeHtml(x.path)}</small></span><b>${fmtMb(x.mb)}</b></li>`).join("")}</ul>` : ""}
     <h4>حسب القسم (كل الحسابات)</h4><ul>${d.cats.filter((c) => c.mb >= 1).map((c) => `<li><span>${escapeHtml(DSK_CAT[c.cat] || c.cat)}</span><b>${fmtMb(c.mb)}</b></li>`).join("")}</ul>
     <h4>حسب الحساب</h4><ul>${d.accounts.filter((a) => a.mb >= 1).map((a) => `<li><span>${escapeHtml(a.name || a.id)}${a.email ? ` <small class="muted" dir="ltr">${escapeHtml(a.email)}</small>` : ""}${a.tmp_mb >= 1 ? ` <small class="muted">(منها مؤقت ${fmtMb(a.tmp_mb)})</small>` : ""}</span><b>${fmtMb(a.mb)}</b></li>`).join("")}</ul>
     ${d.big.length ? `<h4>أكبر الملفات</h4><ul>${d.big.map((f) => `<li><span dir="ltr" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${escapeHtml(f.path)}</span><b>${fmtMb(f.mb)}</b></li>`).join("")}</ul>` : ""}`;
