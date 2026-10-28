@@ -145,11 +145,26 @@ function provPack(p) {
   const use = p.spend ? `<span>مصاريف هذا الشهر: <b>${usdf(m.used_usd)}</b></span>`
     : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? nf(m.used) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usdf(m.used_usd)})` : ""}</span>
       ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usdf(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
-  const sc = (m.scenarios || []).length > 1 || ((m.scenarios || []).length && m.used) ? `<div class="pk-sc"><b class="pk-h">🧮 لو اشترينا بكل باقة (استهلاك الشهر كله المتوقَّع: ${nf(m.scenarios[0].month_units)} ${escapeHtml(unit)})</b>
+  const sc = (m.scenarios || []).length ? `<div class="pk-sc"><b class="pk-h">🧮 لو اشترينا بكل باقة (استهلاك الشهر كله المتوقَّع: ${nf(m.scenarios[0].month_units)} ${escapeHtml(unit)})</b>
       <table><thead><tr><th>الباقة</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ما ندفعه فعلًا</th></tr></thead><tbody>
-      ${m.scenarios.map((x) => `<tr${x.use ? ' class="on"' : ""}><td>${escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}</td><td>${unitf(x.unit_usd)}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
+      ${m.scenarios.map((x) => `<tr class="${x.use ? "on" : ""}${x.custom ? " cu" : ""}"><td>${x.custom ? `🤝 باقة مخصصة لنا ${x.quoted ? "(عرض المزود)" : `(تقدير: خصم ${nf(x.pct, 1)}٪)`}` : escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}</td>
+        <td>${unitf(x.unit_usd)}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs ?? "—"}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
       </tbody></table></div>` : "";
-  return pack || use || sc ? `<div class="prov-pack">${pack}${use}${sc}</div>` : "";
+  return `<div class="prov-pack">${pack}${use}${provCustom(p)}${sc}</div>`;
+}
+// 🤝 باقة مخصصة لنا: لكل منصة احتمال التواصل مع المزود لباقة كبيرة بسعر أفضل. قبل العرض = تقدير بنسبة خصم، وبعده = سعر العرض نفسه
+const CU_ST = { idea: "لم نتواصل بعد", asked: "تواصلنا وننتظر الرد", quoted: "وصلنا عرض", no: "رفض المزود" };
+function provCustom(p) {
+  const c = p.custom || {};
+  return `<div class="pk-list pk-cu" data-cu="${p.key}"><b class="pk-h">🤝 باقة مخصصة لنا من ${escapeHtml(p.name)} (للتفاوض على سعر أفضل)</b>
+    <div class="pk-row"><label>الحالة<select class="cu-st">${Object.entries(CU_ST).map(([k, v]) => `<option value="${k}"${(c.status || "idea") === k ? " selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>الخصم المتوقع ٪<input type="number" class="cu-pct" min="0" max="90" step="any" value="${c.pct ?? 20}"></label>
+      <label>سعر العرض $<input type="number" class="cu-usd" min="0" step="any" value="${c.usd ?? ""}"></label>
+      <label>يعطينا<input type="number" class="cu-units" min="0" step="any" value="${c.units ?? ""}"></label></div>
+    <div class="pk-row"><input type="text" class="cu-contact" placeholder="وسيلة التواصل (بريد المبيعات أو رابط النموذج)" value="${escapeHtml(c.contact || "")}" maxlength="200">
+      <input type="text" class="cu-note" placeholder="ملاحظة (مثلًا: طلبوا التزامًا سنويًا)" value="${escapeHtml(c.note || "")}" maxlength="300">
+      <button type="button" class="btn xs" data-cusave>حفظ</button></div>
+    <span class="hint">قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.</span></div>`;
 }
 async function loadProviders() {
   if (!$("provList")) return;
@@ -168,7 +183,16 @@ $("provList")?.addEventListener("change", async (e) => {
   catch (err) { toast(err.message, true); }
 });
 $("provList")?.addEventListener("click", async (e) => {
-  const list = e.target.closest(".pk-list");
+  const cu = e.target.closest("[data-cu]");
+  if (cu && e.target.closest("[data-cusave]")) {
+    const v = (c) => cu.querySelector(c).value, usd = +v(".cu-usd") || 0, units = +v(".cu-units") || 0;
+    if ((usd > 0) !== (units > 0)) { toast("اكتب سعر العرض وعدد الوحدات معًا", true); return; }
+    try { renderProviders(await api("/api/admin/providers/custom", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: cu.dataset.cu, status: v(".cu-st"), pct: +v(".cu-pct") || 0, usd, units, contact: v(".cu-contact").trim(), note: v(".cu-note").trim() }) })); toast("✅ حُفظت الباقة المخصصة"); }
+    catch (err) { toast(err.message, true); }
+    return;
+  }
+  const list = e.target.closest(".pk-list:not(.pk-cu)");
   if (list && e.target.closest("[data-pkadd]")) { list.querySelector(".pk-act").insertAdjacentHTML("beforebegin", packRow(list.dataset.pk)); return; }
   if (list && e.target.closest("[data-pkdel]")) { e.target.closest(".pk-row").remove(); return; }
   if (list && e.target.closest("[data-pksave]")) {

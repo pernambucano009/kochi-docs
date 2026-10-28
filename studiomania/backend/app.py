@@ -10242,6 +10242,30 @@ def admin_providers_pack(body: ProviderPackIn):
     return providers_out()
 
 
+class ProviderCustomIn(BaseModel):
+    key: str
+    pct: float = providers.CUSTOM_PCT
+    usd: float = 0
+    units: float = 0
+    status: str = "idea"
+    contact: str = ""
+    note: str = ""
+
+
+@app.put("/api/admin/providers/custom")
+def admin_providers_custom(body: ProviderCustomIn):
+    """🤝 باقة مخصصة لنا من المزود (للتفاوض): الخصم المتوقع، أو سعر العرض وعدد وحداته لو وصل، وحالة التواصل ووسيلته."""
+    if body.key not in providers.PROVIDERS:
+        raise HTTPException(404, "منصة غير معروفة")
+    d = providers.load(PROVIDERS_FILE)
+    d["custom"][body.key] = {"pct": max(0.0, min(90.0, float(body.pct))), "usd": round(float(body.usd), 2) if body.usd > 0 and body.units > 0 else None,
+                             "units": float(body.units) if body.usd > 0 and body.units > 0 else None,
+                             "status": body.status if body.status in providers.CUSTOM_STATUS else "idea",
+                             "contact": body.contact.strip()[:200], "note": body.note.strip()[:300]}
+    providers.save(PROVIDERS_FILE, d)
+    return providers_out()
+
+
 @app.post("/api/admin/providers/{key}/clear")
 def admin_providers_clear(key: str):
     """للمنصات التي ليس لها API رصيد (AudioShake وفصيح): «شحنت» تحذف آخر غلطة."""

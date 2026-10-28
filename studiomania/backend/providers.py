@@ -60,6 +60,7 @@ def load(f: Path) -> dict:
     for k, v in list(d["pack"].items()):   # الشكل القديم (باقة واحدة dict) ← قائمة
         if isinstance(v, dict):
             d["pack"][k] = [{"name": "", **v, "use": True}] if v.get("usd") and v.get("units") else []
+    d.setdefault("custom", {})   # 🤝 باقة مخصصة لنا (تفاوض مع المزود): {key: {"pct", "usd", "units", "status", "contact", "note"}}
     d.setdefault("hist", {})     # سجل الرصيد: {key: [[وقت, رصيد], …]}
     d.setdefault("moves", {})    # الشحنات والاستهلاك المحسوب من فرق الرصيد: {key: [{"at", "units", "kind": "use"|"topup"}]}
     return d
@@ -102,19 +103,52 @@ def topup_usd(d: dict, name: str, units: float) -> float | None:
     return units * u if u is not None else None
 
 
-def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dict]:
-    """🧮 دراسة الجدوى: استهلاك الشهر ده لو اشترينا بكل باقة. الشهر كامل متوقَّع من معدل الأيام اللي فاتت،
-    وعدد الباقات اللي هنشتريها (بالتقريب لفوق) وتكلفتها الفعلية، والتكلفة بسعر الوحدة بس."""
-    import math  # noqa: PLC0415
+CUSTOM_PCT = 20          # تقدير افتراضي لخصم الباقة المخصصة لو لسه مفيش عرض من المزود
+CUSTOM_STATUS = ("idea", "asked", "quoted", "no")   # لم نتواصل / تواصلنا / وصلنا عرض / رفض
+
+
+def custom(d: dict, name: str) -> dict:
+    c = {"pct": CUSTOM_PCT, "usd": None, "units": None, "status": "idea", "contact": "", "note": ""}
+    c.update(d.get("custom", {}).get(name) or {})
+    return c
+
+
+def project(used: float, t0: float, t1: float) -> float:
+    """استهلاك الشهر كله المتوقَّع من معدل الأيام اللي فاتت (الشهر اللي خلص = الفعلي)."""
     end = month_start(t0 + 32 * 86400)            # آخر الشهر ده
     now = min(time.time(), t1, end)
     elapsed = max(1.0, (now - t0) / 86400)
-    proj = used * ((end - t0) / 86400) / elapsed if now < end - 60 else used
+    return used * ((end - t0) / 86400) / elapsed if now < end - 60 else used
+
+
+def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dict]:
+    """🧮 دراسة الجدوى: استهلاك الشهر ده لو اشترينا بكل باقة، وعدد الباقات اللي هنشتريها (بالتقريب لفوق) وتكلفتها الفعلية.
+    وآخر سطر دايمًا: 🤝 باقة مخصصة لنا بالتفاوض مع المزود (بسعر العرض لو وصل، وإلا تقدير = أرخص سعر وحدة − نسبة الخصم المتوقعة)."""
+    import math  # noqa: PLC0415
+    meta = PROVIDERS.get(name, {})
+    proj = project(used, t0, t1)
+    ps = packs(d, name)
     out = []
-    for x in packs(d, name):
+    for x in ps:
         n = math.ceil(proj / x["units"]) if proj else 0
         out.append({"name": x.get("name") or "", "usd": x["usd"], "units": x["units"], "unit_usd": x["unit_usd"], "save_pct": x["save_pct"],
                     "use": bool(x.get("use")), "month_units": round(proj, 2), "month_usd": round(proj * x["unit_usd"], 2), "packs": n, "buy_usd": round(n * x["usd"], 2)})
+    c = custom(d, name)
+    top = max((x["unit_usd"] for x in ps), default=None)
+    base = min((x["unit_usd"] for x in ps), default=None)
+    if meta.get("unit") == "$":                   # الرصيد بالدولار (Atlas) أو مصاريف فعلية (OpenAI): الوحدة = دولار
+        top = base = 1.0
+    quoted = bool(c.get("usd") and c.get("units"))
+    if quoted:
+        u = c["usd"] / c["units"]
+    elif base is not None:
+        u = base * (1 - float(c.get("pct") or 0) / 100)
+    else:
+        return out
+    n = math.ceil(proj / c["units"]) if quoted and proj else None
+    out.append({"name": "باقة مخصصة لنا", "custom": True, "quoted": quoted, "status": c.get("status"), "pct": c.get("pct"),
+                "usd": c.get("usd"), "units": c.get("units"), "unit_usd": u, "save_pct": round((1 - u / top) * 100, 1) if top else 0, "use": False,
+                "month_units": round(proj, 2), "month_usd": round(proj * u, 2), "packs": n, "buy_usd": round(n * c["usd"], 2) if n is not None else round(proj * u, 2)})
     return out
 
 
@@ -153,7 +187,7 @@ def month_stats(d: dict, name: str, t0: float | None = None, t1: float | None = 
     tp = [topup_usd(d, name, m["units"]) for m in tops]
     if PROVIDERS.get(name, {}).get("spend"):   # OpenAI: المصاريف الفعلية من المنصة نفسها
         sp = (d["p"].get(name) or {}).get("month_spend")
-        return {"used": sp, "used_usd": sp, "topups": 0, "topup_usd": None, "last_topup": None}
+        return {"used": sp, "used_usd": sp, "topups": 0, "topup_usd": None, "last_topup": None, "scenarios": scenarios(d, name, sp or 0, t0, t1)}
     return {"used": round(used, 4), "used_usd": round(used * u, 2) if u is not None else None, "topups": len(tops),
             "topup_units": round(sum(m["units"] for m in tops), 4), "topup_usd": round(sum(tp), 2) if tp and None not in tp else None,
             "last_topup": tops[-1]["at"] if tops else None, "scenarios": scenarios(d, name, used, t0, t1)}
@@ -304,7 +338,7 @@ def summary(d: dict) -> list[dict]:
         state = "bad" if (bal is not None and bal <= 0) or recent_fail else "low" if bal is not None and low and bal < low else "ok" if cur.get("ok") else "unknown"
         out.append({"key": name, **{k: meta[k] for k in ("name", "what", "unit", "api", "url")}, "balance": bal, "min": low, "state": state,
                     "at": cur.get("at"), "error": cur.get("error"), "fail": fail if recent_fail else None,
-                    "spend": bool(meta.get("spend")), "packs": packs(d, name), "unit_usd": unit_usd(d, name),
+                    "spend": bool(meta.get("spend")), "packs": packs(d, name), "custom": custom(d, name), "unit_usd": unit_usd(d, name),
                     "month": month_stats(d, name)})
     return out
 

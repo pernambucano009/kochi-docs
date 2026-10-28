@@ -3339,4 +3339,7 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .prov .pk-use input{width:auto}
 .prov .pk-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .prov .pk-sc table{width:100%;border-collapse:collapse;font-size:12.5px}.prov .pk-sc th,.prov .pk-sc td{padding:4px 8px;text-align:start;border-bottom:1px solid var(--line)}
+.prov .pk-cu{padding:8px 10px;border-radius:10px;border:1px dashed var(--line)}.prov .pk-cu .cu-contact{width:260px}.prov .pk-cu .cu-note{flex:1;min-width:200px}
+.prov .pk-cu select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit}
+.prov .pk-sc tr.cu td{font-style:italic}
 .prov .pk-sc tr.on td{color:var(--text);background:rgba(127,127,127,.08)}

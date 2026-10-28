@@ -83,8 +83,8 @@
       <div class="kpis" id="coKpis" style="margin-top:12px"></div>
       <div class="row" style="margin-top:14px;align-items:flex-start;gap:24px">
         <div style="flex:1;min-width:280px"><h4 style="margin:4px 0">الإنفاق الفعلي من أرصدة المنصات</h4>
-          <table><thead><tr><th>المنصة</th><th>استهلاك</th><th>شحنات</th><th>بأرخص باقة</th></tr></thead><tbody id="coReal"></tbody></table>
-          <p class="mute" style="margin:6px 0 0">من فرق رصيد كل منصة (نقص = استهلاك، زيادة = شحنة) × سعر الوحدة من الباقة التي نشتريها في رصيد المنصات، و«بأرخص باقة» = ما كنا سندفعه لو اشترينا أكبر باقة توفيرًا، ومصاريف OpenAI من المنصة نفسها.</p></div>
+          <table><thead><tr><th>المنصة</th><th>استهلاك</th><th>شحنات</th><th>بأرخص باقة</th><th>🤝 بباقة مخصصة</th></tr></thead><tbody id="coReal"></tbody></table>
+          <p class="mute" style="margin:6px 0 0">من فرق رصيد كل منصة (نقص = استهلاك، زيادة = شحنة) × سعر الوحدة من الباقة التي نشتريها في رصيد المنصات، و«بأرخص باقة» = ما كنا سندفعه لو اشترينا أكبر باقة توفيرًا، و«بباقة مخصصة» = لو تفاوضنا مع المزود على باقة لنا (تقدير حتى يصل عرض)، ومصاريف OpenAI من المنصة نفسها.</p></div>
         <div style="flex:1;min-width:280px"><h4 style="margin:4px 0">أين يذهب الإنفاق</h4><table><thead><tr><th>القسم</th><th>الدولار</th></tr></thead><tbody id="coCats"></tbody></table></div>
         <div style="flex:1.4;min-width:340px"><h4 style="margin:4px 0">اقتصاد الباقات (آخر ٣٠ يومًا)</h4>
           <table><thead><tr><th>الباقة</th><th>السعر</th><th>مشتركون</th><th>متوسط إنفاقنا على المشترك</th><th>المكسب</th><th>أقصى خصم آمن</th></tr></thead><tbody id="coPlans"></tbody></table>
@@ -407,7 +407,7 @@ async function loadCosts() {
     ["على المشتركين", money(w.paying)], ["على التجربة المجانية", money(w.trial)], ["ترويج", money(w.promo)], ["حسابنا", money(w.owner)],
     ["الدخل", money(d.revenue)], ["الصافي", `<span class="${d.net < 0 ? "bad" : "ok"}">${money(d.net)}</span>`]]
     .map(([k, v]) => `<div class="kpi"><span class="mute">${k}</span><b>${v}</b></div>`).join("");
-  $("coReal").innerHTML = (d.real || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${x.used_usd == null ? "—" : money(x.used_usd)}</td><td>${x.topups ? `${num(x.topups)}${x.topup_usd != null ? ` · ${money(x.topup_usd)}` : ""}` : ""}</td><td>${x.best && !x.best.use ? `${money(x.best.month_usd)} (${esc(x.best.name || "")} −${x.best.save_pct}٪)` : ""}</td></tr>`).join("")
+  $("coReal").innerHTML = (d.real || []).map((x) => `<tr><td>${esc(x.name)}</td><td>${x.used_usd == null ? "—" : money(x.used_usd)}</td><td>${x.topups ? `${num(x.topups)}${x.topup_usd != null ? ` · ${money(x.topup_usd)}` : ""}` : ""}</td><td>${x.best && !x.best.use ? `${money(x.best.month_usd)} (${esc(x.best.name || "")} −${x.best.save_pct}٪)` : ""}</td><td>${x.custom ? `${money(x.custom.month_usd)} (${x.custom.quoted ? "عرض" : "تقدير"} −${x.custom.save_pct}٪)` : ""}</td></tr>`).join("")
     || `<tr><td colspan="3" class="mute">لا يوجد سجل أرصدة لهذا الشهر بعد</td></tr>`;
   $("coCats").innerHTML = (d.by_cat || []).map((x) => `<tr><td>${esc(x.cat)}</td><td>${money(x.usd)}</td></tr>`).join("") || `<tr><td colspan="2" class="mute">لم يُسجَّل إنفاق هذا الشهر بعد</td></tr>`;
   $("coPlans").innerHTML = (d.plans || []).map((p) => `<tr><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${num(p.subs)}</td>
