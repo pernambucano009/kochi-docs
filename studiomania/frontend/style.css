@@ -3360,8 +3360,8 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .db-v2 .db-raw { font-size: 12.5px; color: var(--muted); }
 .db-v2 .db-raw code { display: block; white-space: pre-wrap; word-break: break-word; margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--field, #EFEEEB); font-size: 12px; text-align: left; }
 /* 🗑️ حذف الحساب: رابط هادي تحت «خروج» (مش زرار بارز عشان محدش يدوسه بالغلط) */
-:root .stage .set-card .set-del { align-self: center; margin-top: 10px; border: 0; background: none; color: var(--muted, #888); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-:root .stage .set-card .set-del:hover { color: #d9472b; }
+:root .stage .set-card .set-del { align-self: stretch; margin-top: 4px; border: 1.5px solid color-mix(in srgb, #d9472b 45%, transparent); border-radius: 999px; padding: 10px; background: none; color: #c0392b; font: inherit; font-size: 13.5px; cursor: pointer; }
+:root .stage .set-card .set-del:hover { background: #d9472b; color: #fff; border-color: #d9472b; }
 
 /* 📒 رصيد المنصات: أقل شحنة وسعر الوحدة واستهلاك الشهر تحت كل منصة */
 .prov .prov-pack{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
