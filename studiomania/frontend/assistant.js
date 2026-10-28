@@ -259,6 +259,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [] };
     prog();
     S.logT = setInterval(() => flush(false), 15000);
+    // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
+    if (dock) { let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false); } }, 400); }
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
@@ -280,6 +282,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       S.mic = mic; if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
+      if (!S || (dock && !onBrain())) { if (S) end(false); return; }   // خرج من العقل وهي بتتصل
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;
       pc.ontrack = (e) => {
@@ -426,7 +429,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT);
+    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
     { const keep = S; S = s; lg("sys", finished ? "end: finished" : "end: closed"); flush(true); S = keep; }
     // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
     if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});
@@ -464,8 +467,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }
     return true;
   }
+  // 🧠 صفحة العقل لسه مفتوحة؟ المكالمة بتاعتها: لو العميل خرج منها قبل ما تفتح أو وهي شغالة، المكالمة ماتكملش في صفحة تانية
+  const onBrain = () => { const m = document.querySelector("#nh .bm"); return !!m && m.isConnected && m.offsetParent !== null; };
   async function run(force, el) {
+    const fromBrain = !!(el || document.querySelector('[data-n="quiz"]'))?.closest?.(".bm");
     if (!(await gate(force))) return false;
+    if (fromBrain && !onBrain()) return false;   // ضغط على سعاد وخرج من العقل قبل ما تفتح
     calm = !!el?.classList?.contains("fu-call") || document.body.classList.contains("fu-cine");
     from = el || document.querySelector('[data-n="quiz"]');
     dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
