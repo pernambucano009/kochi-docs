@@ -176,7 +176,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    S.typed += " " + text; S.wait = null; clearTimeout(S.nudgeT);
+    S.typed += " " + text; S.wait = null; S.nudged = 0; clearTimeout(S.nudgeT);
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
@@ -285,7 +285,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
@@ -374,7 +374,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S) return;
     clearTimeout(S.nudgeT);
     if (S.lastQ !== false || S.finishing || S.wait) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
-    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && S.dc?.readyState === "open") { S.lastQ = null; S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
+    if (S.nudged >= 1) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
+    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && !S.nudged && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = 1; S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;
