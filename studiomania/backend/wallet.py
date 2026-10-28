@@ -63,9 +63,27 @@ def need(n: int, what: str) -> None:
         raise NoCredits(f"معك {b} نقطة، و«{what}» تحتاج نحو {n} نقطة. اشحن نقاطًا إضافية وأكمل.")
 
 
+# 💸 عدّاد الصرف الحقيقي: كل دولار بنصرفه بيتسجل على العميل (حتى لو ببلاش عليه، زي مكالمة سعاد وأول تحليل)،
+# ومعاه باقته وقتها (تجربة ولا مشترك)، عشان نعرف صرف الشهر رايح فين، وكل عميل كلّفنا كام قبل ما يدفع وبعدها.
+def cost(usd: float, what: str, promo: bool = False, ref: str = "") -> None:
+    if usd <= 0 or not PDB or not TENANT:
+        return
+    try:
+        with closing(_db()) as c, c:
+            c.execute("""CREATE TABLE IF NOT EXISTS costs (id TEXT PRIMARY KEY, workspace TEXT, usd REAL, what TEXT, promo INTEGER DEFAULT 0,
+                         plan TEXT, ref TEXT, at REAL)""")
+            r = c.execute("SELECT plan FROM workspaces WHERE id=?", (TENANT,)).fetchone()
+            c.execute("INSERT INTO costs (id, workspace, usd, what, promo, plan, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                      (uuid.uuid4().hex, TENANT, round(usd, 5), what[:120], int(promo), (r["plan"] if r else "owner") or "trial", ref[:60], time.time()))
+    except sqlite3.Error:
+        pass   # العدّاد عمره ما يوقّف الشغل
+
+
 def charge(n: int, what: str, ref: str = "") -> int:
-    """بعد ما العمل ينتهي: الخصم (نقاط الباقة أولًا). يعود ما اتخصم فعلًا."""
+    """بعد ما العمل ينتهي: الخصم (نقاط الباقة أولًا). يعود ما اتخصم فعلًا. والتكلفة الحقيقية بتتسجل في عدّاد الصرف."""
     n = int(math.ceil(n))
+    if n > 0:
+        cost(n * billing.CREDIT_USD / billing.MARKUP, what, ref=ref)   # النقاط ← تكلفتنا (السعر = التكلفة × ٣)
     if n <= 0 or free():
         return 0
     with closing(_db()) as c, c:

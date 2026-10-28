@@ -95,12 +95,13 @@ with closing(db()) as _c, _c:
     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
     CREATE TABLE IF NOT EXISTS payments (ref TEXT PRIMARY KEY, workspace TEXT, provider TEXT, kind TEXT, amount REAL, note TEXT, at REAL);
     CREATE TABLE IF NOT EXISTS coupons (code TEXT PRIMARY KEY, points INTEGER DEFAULT 0, pct INTEGER DEFAULT 0, max_uses INTEGER DEFAULT 0,
-      used INTEGER DEFAULT 0, expires REAL, note TEXT DEFAULT '', created_at REAL);
+      used INTEGER DEFAULT 0, expires REAL, note TEXT DEFAULT '', created_at REAL, once INTEGER DEFAULT 1);
     CREATE TABLE IF NOT EXISTS coupon_uses (code TEXT, workspace TEXT, at REAL, PRIMARY KEY (code, workspace));
+    CREATE TABLE IF NOT EXISTS costs (id TEXT PRIMARY KEY, workspace TEXT, usd REAL, what TEXT, promo INTEGER DEFAULT 0, plan TEXT, ref TEXT, at REAL);
     """)
     _cols = {r[1] for r in _c.execute("PRAGMA table_info(workspaces)")}
     for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL"),
-                       ("cycle", "TEXT"), ("refill_at", "REAL"), ("discount_pct", "INTEGER"), ("discount_code", "TEXT")):
+                       ("cycle", "TEXT"), ("refill_at", "REAL"), ("discount_pct", "INTEGER"), ("discount_code", "TEXT"), ("discount_once", "INTEGER")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
     if "apple_sub" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 🍎 الدخول بـ Apple من الآيفون
@@ -1131,6 +1132,8 @@ def paid_once(c: sqlite3.Connection, ref: str, wid: str, provider: str, kind: st
     try:
         c.execute("INSERT INTO payments (ref, workspace, provider, kind, amount, note, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                   (ref, wid, provider, kind, amount, note, time.time()))
+        # 🎟️ خصم «للدفعة الجاية بس» بيتشال أول ما يدفع (الاشتراك نفسه خلاص دورته الأولى بالخصم والباقي بالسعر العادي)
+        c.execute("UPDATE workspaces SET discount_pct=NULL, discount_code=NULL, discount_once=NULL WHERE id=? AND discount_once=1", (wid,))
         return True
     except sqlite3.IntegrityError:
         return False
@@ -1282,7 +1285,7 @@ def billing_state(request: Request):
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
             "paypal": payments.paypal_on(),
             "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist,
-            "discount": {"pct": w["discount_pct"] or 0, "code": w["discount_code"] or ""} if w and w["discount_pct"] else None}
+            "discount": {"pct": w["discount_pct"] or 0, "code": w["discount_code"] or "", "once": bool(w["discount_once"])} if w and w["discount_pct"] else None}
 
 
 @app.get("/api/billing/usage")
@@ -1318,6 +1321,7 @@ def checkout(body: CheckoutIn, request: Request):
     # 🎟️ خصم الكوبون (٪) على الاشتراك والشحن
     w = workspace(wid)
     pct = int(w["discount_pct"] or 0) if w else 0
+    once = bool(w and w["discount_once"])   # «للدفعة الجاية بس»: الاشتراك أول دورة بس بالخصم، والخصم بيتشال بعد أول دفعة
     off = lambda v: round(v * (100 - pct) / 100, 2) if pct else v  # noqa: E731
     try:
         if body.kind == "topup":
@@ -1335,16 +1339,18 @@ def checkout(body: CheckoutIn, request: Request):
             tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
         except ValueError as e:
             raise HTTPException(400, str(e))
-        tot = {**tot, "total": off(tot["total"])}
+        full = tot["total"]
+        tot = {**tot, "total": full if once else off(full)}
+        first = off(full) if once and pct else None
         p = plan_of(body.plan)
         extra = tot["accounts"] - p["accounts"]
         ap_paid = tot["autopilot"] and not p.get("autopilot")
         yr = body.cycle == "year"
         px = (lambda v: billing.yearly(cfg, v)) if yr else (lambda v: v)
         if body.provider == "paypal":
-            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}"
+            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}{f':first{first}' if first else ''}"
             pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' yearly' if yr else ''}",
-                                       px(tot["total"]), "YEAR" if yr else "MONTH")
+                                       px(tot["total"]), "YEAR" if yr else "MONTH", first=px(first) if first else None)
             url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", real_email(u),
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
         else:
@@ -1567,7 +1573,8 @@ COST_PER_POINT = billing.CREDIT_USD / billing.MARKUP
 
 def _cat(note: str) -> str:
     """«المنافسين: اقتراح منافسين» ← «المنافسين»: الجزء قبل النقطتين هو القسم."""
-    return (str(note or "").split(":")[0].split("·")[0].strip() or "أخرى")[:40]
+    t = re.sub(r"\s*\([^)]*\)|\s*@\S+", "", str(note or "").removeprefix("ترويج: "))   # «(٤ دقايق)» و«@حساب» مش جزء من اسم القسم
+    return (t.split(":")[0].split("·")[0].strip() or "أخرى")[:40]
 
 
 @app.get("/api/platform/customers")
@@ -1584,14 +1591,22 @@ def admin_customers(request: Request, days: int = 30):
         use = {r["workspace"]: dict(r) for r in c.execute("""SELECT workspace, -SUM(CASE WHEN at >= ? THEN delta ELSE 0 END) AS used_period,
             -SUM(delta) AS used_all FROM ledger WHERE kind = 'use' GROUP BY workspace""", (since,))}
         gifts = {r["workspace"]: r["n"] for r in c.execute("SELECT workspace, SUM(delta) AS n FROM ledger WHERE kind IN ('gift', 'coupon') GROUP BY workspace")}
+        # 💸 من عدّاد الصرف: الفترة، وكل الوقت، ومنها وهو تجربة مجانية، ومنها ترويج (مكالمة سعاد وأول تحليل…)
+        spend = {r["workspace"]: dict(r) for r in c.execute("""SELECT workspace, SUM(CASE WHEN at >= ? THEN usd ELSE 0 END) AS period, SUM(usd) AS total,
+            SUM(CASE WHEN plan = 'trial' THEN usd ELSE 0 END) AS trial, SUM(CASE WHEN promo = 1 THEN usd ELSE 0 END) AS promo
+            FROM costs GROUP BY workspace""", (since,))}
         paid = {r["workspace"]: r["n"] for r in c.execute("SELECT workspace, SUM(amount) AS n FROM payments GROUP BY workspace")}
     tot = {"customers": len(rows), "paying": 0, "used_period": 0, "cost_period": 0.0, "cost_free": 0.0, "revenue": 0.0}
     for r in rows:
         u = use.get(r["workspace"]) or {}
         r["used_period"], r["used_all"] = int(u.get("used_period") or 0), int(u.get("used_all") or 0)
-        r["cost_period"], r["cost_all"] = round(r["used_period"] * COST_PER_POINT, 2), round(r["used_all"] * COST_PER_POINT, 2)
+        sp = spend.get(r["workspace"]) or {}
+        r["cost_period"], r["cost_all"] = round(sp.get("period") or 0, 2), round(sp.get("total") or 0, 2)
+        r["cost_trial"], r["cost_promo"] = round(sp.get("trial") or 0, 2), round(sp.get("promo") or 0, 2)
         r["gifted"], r["paid"] = int(gifts.get(r["workspace"]) or 0), round(float(paid.get(r["workspace"]) or 0), 2)
         r["paying"] = r["plan"] not in ("trial", None, "") and r["paid"] > 0
+        r["margin"] = round(r["paid"] - r["cost_all"], 2)   # اللي دفعه ناقص كل اللي صرفناه عليه (من أول يوم، حتى وهو مجاني)
+        r["losing"] = r["paying"] and r["margin"] < 0
         tot["paying"] += r["paying"]
         tot["used_period"] += r["used_period"]
         tot["cost_period"] += r["cost_period"]
@@ -1620,7 +1635,74 @@ def admin_customer(wid: str, request: Request, days: int = 30):
     by = sorted(cats.values(), key=lambda x: -x["points"])
     for x in by:
         x["cost"] = round(x["points"] * COST_PER_POINT, 2)
-    return {"by_cat": by, "moves": moves[:120], "payments": pays}
+    with closing(db()) as c:
+        spend = [dict(r) for r in c.execute("SELECT usd, what, promo, plan, at FROM costs WHERE workspace=? ORDER BY at DESC LIMIT 300", (wid,))]
+    sc: dict[str, dict] = {}
+    for x in spend:
+        y = sc.setdefault(_cat(x["what"]), {"cat": _cat(x["what"]), "usd": 0.0, "trial": 0.0, "promo": 0.0})
+        y["usd"] += x["usd"]
+        y["trial"] += x["usd"] if x["plan"] == "trial" else 0
+        y["promo"] += x["usd"] if x["promo"] else 0
+    spend_cat = sorted(({k: round(v, 3) if isinstance(v, float) else v for k, v in y.items()} for y in sc.values()), key=lambda y: -y["usd"])
+    return {"by_cat": by, "moves": moves[:120], "payments": pays, "spend": spend[:120], "spend_cat": spend_cat}
+
+
+def fixed_bills() -> float:
+    """الفواتير الثابتة الشهرية من جدول «فواتيري الشهرية» (الشهري + السنوي ÷ ١٢)."""
+    try:
+        rows = json.loads((DATA_DIR / "expenses.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0.0
+    return round(sum(float(r.get("amount") or 0) for r in rows if r.get("cycle") == "monthly")
+                 + sum(float(r.get("amount") or 0) / 12 for r in rows if r.get("cycle") == "yearly"), 2)
+
+
+@app.get("/api/platform/costs")
+def admin_costs(request: Request, month: str = ""):
+    """💸 عدّاد صرف الشهر: صرفنا كام، على مين (مشتركين، تجربة مجانية، ترويج، حسابنا إحنا)، وفي أنهي أقسام.
+    واقتصاد كل باقة: متوسط اللي بنصرفه على المشترك فيها في الشهر قصاد سعرها، وأقصى خصم يفضل معاه مكسب."""
+    admin(request)
+    import datetime as dt  # noqa: PLC0415
+    now = dt.datetime.now()
+    try:
+        y, m = (int(x) for x in (month or f"{now.year}-{now.month}").split("-"))
+        start = dt.datetime(y, m, 1)
+    except ValueError:
+        raise HTTPException(400, "اكتب الشهر بالشكل 2026-10") from None
+    end = dt.datetime(y + (m == 12), m % 12 + 1, 1)
+    t0, t1 = start.timestamp(), end.timestamp()
+    with closing(db()) as c:
+        rows = c.execute("SELECT workspace, usd, what, promo, plan, at FROM costs WHERE at >= ? AND at < ?", (t0, t1)).fetchall()
+        rev = c.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE at >= ? AND at < ?", (t0, t1)).fetchone()[0]
+        plans_now = {r["id"]: r["plan"] for r in c.execute("SELECT id, plan FROM workspaces")}
+        recent = c.execute("SELECT workspace, SUM(usd) AS usd FROM costs WHERE at >= ? AND promo = 0 AND plan NOT IN ('trial', 'owner') GROUP BY workspace",
+                           (time.time() - 30 * 86400,)).fetchall()
+    who = {"paying": 0.0, "trial": 0.0, "promo": 0.0, "owner": 0.0}
+    cats: dict[str, float] = {}
+    for r in rows:
+        k = "owner" if r["workspace"] == OWNER else "promo" if r["promo"] else "trial" if r["plan"] == "trial" else "paying"
+        who[k] += r["usd"]
+        cat = _cat(str(r["what"]))
+        cats[cat] = cats.get(cat, 0) + r["usd"]
+    usage = sum(who.values())
+    bills = fixed_bills()
+    # اقتصاد الباقات (آخر ٣٠ يوم): متوسط صرف المشترك، وسعر الباقة، والمكسب، وأقصى خصم (بعد عمولة الدفع)
+    cfg = billing.config(DATA_DIR)
+    eco = []
+    for p in cfg["plans"]:
+        if not p.get("price"):
+            continue
+        ws = [r["usd"] for r in recent if plans_now.get(r["workspace"]) == p["key"]]
+        subs = sum(1 for v in plans_now.values() if v == p["key"])
+        avg = (sum(ws) / max(1, subs)) if subs else None
+        fee = billing.fee(p["price"])
+        eco.append({"plan": p["key"], "name": p["name"], "price": p["price"], "subs": subs, "avg_cost": round(avg, 2) if avg is not None else None,
+                    "margin": round(p["price"] - fee - avg, 2) if avg is not None else None,
+                    "max_discount": max(0, int((1 - (avg + fee) / p["price"]) * 100)) if avg is not None else None})
+    r2 = lambda v: round(v, 2)  # noqa: E731
+    return {"month": f"{y}-{m:02d}", "usage": r2(usage), "bills": bills, "total": r2(usage + bills), "revenue": r2(rev), "net": r2(rev - usage - bills),
+            "who": {k: r2(v) for k, v in who.items()}, "by_cat": [{"cat": k, "usd": r2(v)} for k, v in sorted(cats.items(), key=lambda x: -x[1])],
+            "plans": eco}
 
 
 class GiftIn(BaseModel):
@@ -1651,6 +1733,7 @@ class CouponIn(BaseModel):
     pct: int = 0
     max_uses: int = 0      # ٠ = من غير حد
     days: int = 0          # صالح كام يوم (٠ = من غير تاريخ انتهاء)
+    once: bool = True      # الخصم ٪: على الدفعة الجاية بس (True)، ولا على كل دفعاته (False)
     note: str = ""
 
 
@@ -1677,8 +1760,9 @@ def coupons_add(body: CouponIn, request: Request):
     with closing(db()) as c, c:
         if c.execute("SELECT 1 FROM coupons WHERE code=?", (code,)).fetchone():
             raise HTTPException(400, "هذا الكود موجود بالفعل")
-        c.execute("INSERT INTO coupons (code, points, pct, max_uses, used, expires, note, created_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)",
-                  (code, pts, pct, max(0, int(body.max_uses)), time.time() + body.days * 86400 if body.days > 0 else None, body.note.strip()[:120], time.time()))
+        c.execute("INSERT INTO coupons (code, points, pct, max_uses, used, expires, note, created_at, once) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)",
+                  (code, pts, pct, max(0, int(body.max_uses)), time.time() + body.days * 86400 if body.days > 0 else None, body.note.strip()[:120], time.time(),
+                   int(body.once)))
     return coupons_list(request)
 
 
@@ -1710,8 +1794,8 @@ def coupon_redeem(wid: str, raw: str) -> dict:
             c.execute("UPDATE wallet SET topup_credits = topup_credits + ?, updated_at=? WHERE workspace=?", (k["points"], time.time(), wid))
             ledger_add(c, wid, k["points"], "coupon", f"كوبون {code}")
         if k["pct"]:
-            c.execute("UPDATE workspaces SET discount_pct=?, discount_code=? WHERE id=?", (k["pct"], code, wid))
-    return {"ok": True, "points": k["points"], "pct": k["pct"]}
+            c.execute("UPDATE workspaces SET discount_pct=?, discount_code=?, discount_once=? WHERE id=?", (k["pct"], code, int(k["once"] if k["once"] is not None else 1), wid))
+    return {"ok": True, "points": k["points"], "pct": k["pct"], "once": bool(k["once"] if k["once"] is not None else 1)}
 
 
 class RedeemIn(BaseModel):

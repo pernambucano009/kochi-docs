@@ -109,7 +109,7 @@ const FirstUse = (() => {
         if (k && !b.dataset.kOk) {
           const r = await api("/api/billing/coupon", { method: "POST", ...jsonBody({ code: k }) });
           b.dataset.kOk = "1";
-          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
+          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : r.once ? `🎟️ خصم ${r.pct}٪ على دفعتك القادمة` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
         }
         return api("/api/onboard", { method: "POST", ...jsonBody({ country: b.querySelector("#fuC").value, dialect: b.querySelector("#fuD").value,
           field: b.querySelector("#fuF").value, goal: b.querySelector("#fuG").value }) });

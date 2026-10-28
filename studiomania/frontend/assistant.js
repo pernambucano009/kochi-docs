@@ -236,7 +236,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
       <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"><p class="as-hint" data-hint hidden></p></div>
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
-    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", steps: [...(state?.steps || [])], done: new Set(), speaking: false };
+    S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false };
     prog();
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
@@ -370,7 +370,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const sp = talk || (!!S.lastTalk && now - S.lastTalk < 650);
     if (sp !== S.speaking) {
       S.speaking = sp;
-      if (sp) { S.thinking = false; if (!S.capAt) S.capAt = now; if (!S.spFirst) S.spFirst = now; ov?.classList.add("talked"); } else { S.spLast = now; nudge(1200); if (S.finishing) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 700); }   // قالت مع السلامة وسكتت: تقفل
+      if (sp) { S.thinking = false; S.talkAt = now; if (!S.capAt) S.capAt = now; if (!S.spFirst) S.spFirst = now; ov?.classList.add("talked"); } else { S.spLast = now; S.agentMs = (S.agentMs || 0) + (now - (S.talkAt || now)); nudge(1200); if (S.finishing) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 700); }   // قالت مع السلامة وسكتت: تقفل
       status();
     }
     requestAnimationFrame(loop);
@@ -379,6 +379,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S) return;
     const s = S; S = null;
     clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT);
+    // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
+    if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});
     if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية

@@ -219,7 +219,7 @@ const PlansView = (() => {
     // 🎟️ كود الخصم: يكتبه هنا في أي وقت (نقاط هدية أو خصم ٪ على الاشتراك والشحن)، والخصم الشغّال بيبان
     function coupon() {
       if (guest || d.owner || !o.coupon) return "";
-      return `<div class="pv-coupon">${d.discount ? `<span>🎟️ خصمك ${d.discount.pct}٪ على الاشتراك والشحن <bdi dir="ltr">(${esc(d.discount.code)})</bdi></span>` : ""}
+      return `<div class="pv-coupon">${d.discount ? `<span>🎟️ ${d.discount.once ? `خصمك ${d.discount.pct}٪ على دفعتك القادمة` : `خصمك ${d.discount.pct}٪ على الاشتراك والشحن`} <bdi dir="ltr">(${esc(d.discount.code)})</bdi></span>` : ""}
         <input data-pvk dir="ltr" autocomplete="off" placeholder="كود خصم" aria-label="كود خصم"><button class="pv-hist-b" data-pvkgo>طبّق الكود</button></div>`;
     }
     // 🧾 سجل النقاط: كل خصم وكل رجوع وكل هدية بسطر، عشان العميل يعرف الرقم جه منين

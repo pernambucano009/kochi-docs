@@ -25,7 +25,7 @@ const PlansPage = (() => {
         if (demo) return toast("هذه معاينة، والكود يعمل في النسخة الحقيقية");
         try {
           const r = await api("/api/billing/coupon", { method: "POST", ...jsonBody({ code }) });
-          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
+          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : r.once ? `🎟️ خصم ${r.pct}٪ على دفعتك القادمة` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
           if (typeof refreshMe === "function") refreshMe();
           mount(root);
         } catch (err) { toast(err.message, true); }

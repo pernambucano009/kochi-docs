@@ -12437,6 +12437,8 @@ def run_brain_social(bid: str, sid: str) -> None:
     usd = meter["usd"] or wallet.est(chars=len(prompt) + 6000, images=len(imgs))
     # 🎙️ تحليل الحساب اللي بيبدأ من مكالمة المساعد أول التسجيل: مرة واحدة على المنصة (مصاريف دعاية)، مش من رصيد العميل
     cost = 0 if atlas.mock_mode() or s.get("free") else wallet.charge(wallet.credits(usd + wallet.est(scrape=calls, stt_min=stt / 60)), f"العقل: تحليل حساب @{handle}", sid)
+    if s.get("free") and not atlas.mock_mode():   # ببلاش على العميل (أول تحليل)، بس علينا: يتسجل في عدّاد الصرف كترويج
+        wallet.cost(usd + wallet.est(scrape=calls, stt_min=stt / 60), f"ترويج: أول تحليل حساب @{handle}", promo=True, ref=sid)
 
     def fn(d):
         d.setdefault("pending", []).extend(items_p)
@@ -32787,7 +32789,7 @@ def rivals_named(bid: str, names: list[str]) -> None:
     اللي مالقيناهوش بنقوله عليه عشان يكتب رابطه بنفسه. جزء من مكالمة أول مرة، فمابيتخصمش من نقاطه."""
     brain = brain_row(bid) or {}
     have = {rivals_key(i) for i in (brain.get("competitors") or {}).get("items") or []} | set((brain.get("competitors") or {}).get("excluded") or [])
-    found, missing, broke = [], [], ""
+    found, missing, broke, calls = [], [], "", 0   # calls: طلبات سحب الداتا (عشان عدّاد الصرف)
     for nm in names:
         nm = nm.strip()
         hit = None
@@ -32795,14 +32797,17 @@ def rivals_named(bid: str, names: list[str]) -> None:
             if "instagram.com" in nm or "tiktok.com" in nm or re.fullmatch(r"@?[A-Za-z0-9._]{2,40}", nm):
                 h = rivals.clean_handle(nm)
                 for plat in ([rivals.guess_platform(nm)] if "." in nm and "/" in nm else ["instagram", "tiktok"]):
+                    calls += 1
                     try:
                         hit = rivals_fetch(plat, h)
+                        calls += 2   # تفريغ كلام أول بوستين
                         break
                     except rivals.RivalsError:
                         continue
             else:
                 posts = []
                 for plat in rivals.PLATFORMS:
+                    calls += 1
                     try:
                         posts += rivals.search(plat, nm) if rivals.live() else rivals.mock_search(brain)
                     except rivals.RivalsError as exc:
@@ -32811,6 +32816,7 @@ def rivals_named(bid: str, names: list[str]) -> None:
                 score = lambda c: sum(w in f"{c['name']} {c['handle']}".lower() for w in words)  # noqa: E731
                 best = max(rivals.candidates(posts, have), key=lambda c: (score(c), c["sum_views"]), default=None)
                 if best and score(best):
+                    calls += 3
                     hit = rivals_fetch(best["platform"], best["handle"])
         except rivals.RivalsError as exc:
             broke = broke or str(exc)
@@ -32820,6 +32826,8 @@ def rivals_named(bid: str, names: list[str]) -> None:
         elif not hit:
             missing.append(nm[:60])
     rivals_merge(bid, found=found)
+    if rivals.live():   # ببلاش على العميل (جزء من مكالمة أول مرة)، بس علينا
+        wallet.cost(wallet.est(scrape=calls), f"ترويج: البحث عن المنافسين المذكورين ({len(names)})", promo=True)
     ob = onboard_load() or {}
     who = livevoice.agent_name(ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo", "f")
     miss = f"لم أجد: {'، '.join(missing)}. إن كانت حسابات حقيقية فأضف رابطها من صفحة المنافسين." if missing else ""
@@ -32857,6 +32865,21 @@ def assistant_account_state():
             "avg_views": st.get("avg_views"), "median_views": st.get("median_views"), "engagement_pct": st.get("engagement"),
             "posts_every_days": st.get("every_days"), "improvements": todos,
             "suggestions_waiting": len([p for p in b.get("pending") or [] if p.get("source") == s["id"]])}
+
+
+class AssistUsageIn(BaseModel):
+    call_s: float = 0     # طول المكالمة
+    agent_s: float = 0    # سعاد كانت بتتكلم قد إيه منها
+
+
+@app.post("/api/assistant/usage")
+def assistant_usage(body: AssistUsageIn):
+    """💸 تكلفة مكالمة سعاد (ببلاش على العميل، بس علينا): الصوت الداخل بسعره والخارج بسعره من الدقايق،
+    والداخل ×٢ لأن كلام المكالمة كله بيتبعت تاني مع كل رد."""
+    call_m, agent_m = max(0.0, min(body.call_s, 3600)) / 60, max(0.0, min(body.agent_s, body.call_s, 3600)) / 60
+    pin, pout = livevoice.PRICE_PER_MIN["openai"]
+    wallet.cost((call_m - agent_m) * pin * 2 + agent_m * pout, f"ترويج: مكالمة المساعدة الصوتية ({max(1, round(call_m))} دقيقة)", promo=True)
+    return {"ok": True}
 
 
 @app.post("/api/assistant/done")

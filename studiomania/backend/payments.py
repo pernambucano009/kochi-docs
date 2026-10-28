@@ -109,8 +109,9 @@ def paypal_capture(order_id: str) -> dict:
             "amount": float((cap.get("amount") or {}).get("value") or 0)}
 
 
-def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = "MONTH") -> str:
-    """خطة اشتراك (شهري أو سنوي) هذا بالسعر (تُنشأ مرة واحدة وتُحفظ). plans_cache = (get, set)."""
+def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = "MONTH", first: float | None = None) -> str:
+    """خطة اشتراك (شهري أو سنوي) هذا بالسعر (تُنشأ مرة واحدة وتُحفظ). plans_cache = (get, set).
+    first: سعر أول دورة بس (كوبون خصم «للدفعة الجاية بس»)، وبعدها السعر العادي."""
     get, put = plans_cache
     _pp_token()   # يحدد sandbox ولا live قبل ما نقرا الكاش
     if (pid := get(f"paypal_plan:{_pp_base()}:{key}")):
@@ -119,10 +120,14 @@ def paypal_plan(plans_cache, key: str, name: str, price: float, interval: str = 
     if not prod:
         prod = _pp("POST", "/v1/catalogs/products", {"name": "SimsimKit", "type": "SERVICE"})["id"]
         put(f"paypal_product:{_pp_base()}", prod)
+    freq = {"interval_unit": interval, "interval_count": 1}
+    cycles = [{"frequency": freq, "tenure_type": "TRIAL", "sequence": 1, "total_cycles": 1,
+               "pricing_scheme": {"fixed_price": {"value": f"{first:.2f}", "currency_code": CUR}}}] if first is not None and first < price else []
+    cycles.append({"frequency": freq, "tenure_type": "REGULAR", "sequence": len(cycles) + 1, "total_cycles": 0,
+                   "pricing_scheme": {"fixed_price": {"value": f"{price:.2f}", "currency_code": CUR}}})
     pid = _pp("POST", "/v1/billing/plans", {
         "product_id": prod, "name": name[:120], "status": "ACTIVE",
-        "billing_cycles": [{"frequency": {"interval_unit": interval, "interval_count": 1}, "tenure_type": "REGULAR", "sequence": 1,
-                            "total_cycles": 0, "pricing_scheme": {"fixed_price": {"value": f"{price:.2f}", "currency_code": CUR}}}],
+        "billing_cycles": cycles,
         "payment_preferences": {"auto_bill_outstanding": True, "payment_failure_threshold": 1}})["id"]
     put(f"paypal_plan:{_pp_base()}:{key}", pid)
     return pid
