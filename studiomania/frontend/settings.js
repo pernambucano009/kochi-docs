@@ -129,7 +129,7 @@ const usdf = (v) => (v == null ? "—" : "$" + nf(v));
 const unitf = (v) => (v >= 0.01 ? "$" + nf(v, 4) : "$" + Number(v).toPrecision(2));
 // الدفع (مرة واحدة / شهري / سنوي) والوحدة اللي بتيجي (نقاط / دقائق / دولار …) لكل باقة
 const PK_BILL = { once: "مرة واحدة", month: "اشتراك شهري", year: "اشتراك سنوي" };
-const PK_UNIT = { pts: "نقاط", min: "دقائق", sec: "ثوانٍ", usd: "دولار", chars: "حروف", msg: "رسائل", req: "طلبات", tok: "رموز (Tokens)", img: "صور", vid: "فيديوهات" };
+const PK_UNIT = { pts: "نقاط", min: "دقائق", sec: "ثوانٍ", usd: "دولار", chars: "حروف", msg: "رسائل", req: "طلبات", tok: "رموز (Tokens)", img: "صور", vid: "فيديوهات", acc: "حسابات" };
 const PK_PER = { once: "", month: " / شهر", year: " / سنة" };
 const opts = (o, v) => Object.entries(o).map(([k, t]) => `<option value="${k}"${k === v ? " selected" : ""}>${t}</option>`).join("");
 const pkUnits = (x) => `${nf(x.units, 0)} ${PK_UNIT[x.unit] || ""}`;
@@ -140,6 +140,7 @@ function packRow(key, x = {}, unit = "pts") {
     <label>تعطينا<input type="number" class="pk-units" min="0" step="any" value="${x.units ?? ""}"></label>
     <select class="pk-unit" title="الوحدة">${opts(PK_UNIT, x.unit || unit)}</select>
     <label>الدفع<select class="pk-bill">${opts(PK_BILL, x.billing || "once")}</select></label>
+    <input type="text" class="pk-note" placeholder="ملاحظة" value="${escapeHtml(x.note || "")}" maxlength="200">
     <span class="hint">${x.unit_usd ? `سعر الوحدة ${unitf(x.unit_usd)}${x.save_pct ? ` · أرخص بـ ${nf(x.save_pct, 1)}٪` : ""}` : ""}</span>
     <button type="button" class="btn xs ghost" data-pkdel title="احذف الباقة">✕</button></div>`;
 }
@@ -207,7 +208,7 @@ $("provList")?.addEventListener("click", async (e) => {
   if (list && e.target.closest("[data-pkdel]")) { e.target.closest(".pk-row").remove(); return; }
   if (list && e.target.closest("[data-pksave]")) {
     const packs = [...list.querySelectorAll(".pk-row")].map((r) => ({ name: r.querySelector(".pk-name").value.trim(), usd: +r.querySelector(".pk-usd").value || 0,
-      units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked, unit: r.querySelector(".pk-unit").value, billing: r.querySelector(".pk-bill").value }));
+      units: +r.querySelector(".pk-units").value || 0, use: r.querySelector(".pk-use input").checked, unit: r.querySelector(".pk-unit").value, billing: r.querySelector(".pk-bill").value, note: r.querySelector(".pk-note").value.trim() }));
     if (packs.some((x) => (x.usd > 0) !== (x.units > 0))) { toast("اكتب السعر وعدد الوحدات لكل باقة", true); return; }
     try { renderProviders(await api("/api/admin/providers/pack", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: list.dataset.pk, packs }) })); toast("✅ حُفظت الباقات"); }
     catch (err) { toast(err.message, true); }

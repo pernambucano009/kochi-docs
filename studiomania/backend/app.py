@@ -10218,6 +10218,7 @@ class ProviderPackItem(BaseModel):
     use: bool = False
     billing: str = "once"     # once / month / year
     unit: str = ""            # pts / min / usd / …
+    note: str = ""
 
 
 class ProviderPackIn(BaseModel):
@@ -10231,8 +10232,8 @@ def admin_providers_pack(body: ProviderPackIn):
     if body.key not in providers.PROVIDERS:
         raise HTTPException(404, "منصة غير معروفة")
     ps = [{"name": x.name.strip()[:40], "usd": round(float(x.usd), 2), "units": float(x.units), "use": bool(x.use),
-           "billing": x.billing if x.billing in providers.BILLING else "once", "unit": x.unit if x.unit in providers.UNITS else providers.default_unit(body.key)}
-          for x in body.packs[:12] if x.usd > 0 and x.units > 0]
+           "billing": x.billing if x.billing in providers.BILLING else "once", "unit": x.unit if x.unit in providers.UNITS else providers.default_unit(body.key), "note": x.note.strip()[:200]}
+          for x in body.packs[:16] if x.usd > 0 and x.units > 0]
     if ps and sum(x["use"] for x in ps) != 1:   # باقة واحدة بس هي اللي بنشتريها: لو مفيش (أو أكتر من واحدة) ← أقل باقة سعرًا
         lo = min(range(len(ps)), key=lambda i: ps[i]["usd"])
         for i, x in enumerate(ps):

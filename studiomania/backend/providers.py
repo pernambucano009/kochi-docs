@@ -63,6 +63,7 @@ def load(f: Path) -> dict:
     d.setdefault("custom", {})   # 🤝 باقة مخصصة لنا (تفاوض مع المزود): {key: {"pct", "usd", "units", "status", "contact", "note"}}
     d.setdefault("hist", {})     # سجل الرصيد: {key: [[وقت, رصيد], …]}
     d.setdefault("moves", {})    # الشحنات والاستهلاك المحسوب من فرق الرصيد: {key: [{"at", "units", "kind": "use"|"topup"}]}
+    seed(d)
     return d
 
 
@@ -106,12 +107,85 @@ def topup_usd(d: dict, name: str, units: float) -> float | None:
 
 
 BILLING = {"once": None, "month": 1, "year": 12}   # الدفع: مرة واحدة (شحن) / اشتراك شهري / اشتراك سنوي (الوحدات = لكل فترة)
-UNITS = ("pts", "min", "sec", "usd", "chars", "msg", "req", "tok", "img", "vid")   # الوحدة اللي الباقة بتدّيها
+UNITS = ("pts", "min", "sec", "usd", "chars", "msg", "req", "tok", "img", "vid", "acc")   # الوحدة اللي الباقة بتدّيها
 _UNIT_OF = {"$": "usd", "حرف": "chars", "رسالة": "msg"}
 
 
 def default_unit(name: str) -> str:
     return _UNIT_OF.get(PROVIDERS.get(name, {}).get("unit") or "", "pts")
+
+
+SAR = 3.75   # الريال مربوط بالدولار
+
+# 📋 الباقات من صفحات أسعار المزودين (٢٨ أكتوبر ٢٠٢٦): بتتحط مرة واحدة لكل منصة لو مالهاش باقات، وبعدها التعديل من «رصيد المنصات».
+# السنوي: السعر والوحدات للسنة كلها (سعر الشهر في السنوي × ١٢). الباقات «تواصل» راحت للباقة المخصصة.
+def _p(name, usd, units, billing="once", unit="", note="", use=False):
+    return {"name": name, "usd": round(usd, 2), "units": units, "billing": billing, "unit": unit, "note": note, "use": use}
+
+
+PACK_PRESET = {
+    "scrape": [_p("Freelance", 47, 25000, unit="pts", note="رصيد يُشحن مرة واحدة", use=True),
+               _p("Business", 497, 500000, unit="pts", note="يوجد شحن تلقائي عند انخفاض الرصيد")],
+    "fasih": [_p("Project Pack", 19, 100, unit="min", note="صالح ١٢ شهرًا بدون تجديد، Long-form + MP3", use=True),
+              _p("Basic", 9.99, 60, "month", "min", "Short-form فقط، تتجدد كل شهر"),
+              _p("Pro", 29.99, 200, "month", "min", "Long-form، دعم أولوية، تتجدد كل شهر")],
+    "eleven": [_p("Starter", 6, 30000, "month", "chars", "≈٣٠ دقيقة، الدقيقة الإضافية $0.20"),
+               _p("Starter سنوي", 60, 360000, "year", "chars", "$5 شهريًا"),
+               _p("Creator", 22, 121000, "month", "chars", "≈١٢١ دقيقة، أول شهر $11، الدقيقة الإضافية $0.18", use=True),
+               _p("Creator سنوي", 219.96, 1452000, "year", "chars", "$18.33 شهريًا"),
+               _p("Pro", 99, 600000, "month", "chars", "≈٦٠٠ دقيقة، PCM 44.1kHz، الدقيقة الإضافية $0.17"),
+               _p("Pro سنوي", 990, 7200000, "year", "chars", "$82.5 شهريًا"),
+               _p("Scale", 299, 1800000, "month", "chars", "≈١٨٠٠ دقيقة، ٣ مقاعد"),
+               _p("Scale سنوي", 2990.04, 21600000, "year", "chars", "$249.17 شهريًا"),
+               _p("Business", 990, 6000000, "month", "chars", "≈٦٠٠٠ دقيقة، بث سريع $0.05/دقيقة"),
+               _p("Business سنوي", 9900, 72000000, "year", "chars", "$825 شهريًا")],
+    "zernio": [_p("٣–١٠ حسابات", 6, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا (أول حسابين مجانًا)", use=True),
+               _p("١١–١٠٠ حساب", 3, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا"),
+               _p("+١٠١ حساب", 1, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا")],
+    "authentica": [_p("Lite", 240 / SAR, 2000, unit="msg", note="٢٤٠ ريال · الصفحة لا توضح شهري أم مرة واحدة", use=True),
+                   _p("Core", 500 / SAR, 5000, unit="msg", note="٥٠٠ ريال"),
+                   _p("Plus", 900 / SAR, 10000, unit="msg", note="٩٠٠ ريال (موصى بها)"),
+                   _p("Pro+", 1600 / SAR, 20000, unit="msg", note="١٦٠٠ ريال"),
+                   _p("Scale", 2400 / SAR, 30000, unit="msg", note="٢٤٠٠ ريال")],
+}
+CUSTOM_PRESET = {
+    "scrape": {"contact": "support@scrapecreators.com", "note": "Enterprise بسعر خاص + شحن تلقائي"},
+    "fasih": {"contact": "https://www.fasihtts.com/en/pricing", "note": "Talk to us للحجم الكبير والتكاملات"},
+    "eleven": {"contact": "https://elevenlabs.io/contact-sales", "note": "Enterprise: خصومات حجم، SSO، SLA"},
+    "zernio": {"contact": "https://zernio.com/pricing", "note": "Enterprise بعد ٢٠٠٠ حساب"},
+    "authentica": {"contact": "https://authentica.sa/ar/pricing/", "note": "باقة مخصصة للمؤسسات، واسألهم: شهري أم مرة واحدة؟"},
+    "openai": {"note": "لا توجد باقات في الـ API: الدفع حسب الاستخدام (Batch بخصم ٥٠٪)"},
+}
+
+
+def seed(d: dict) -> bool:
+    """يحط الباقات والتواصل من القائمة الجاهزة لأي منصة لسه ماتحطلهاش (مرة واحدة: لو اتمسحت ماترجعش)."""
+    seen = d.setdefault("seeded", [])
+    changed = False
+    for k, ps in PACK_PRESET.items():
+        if k not in seen:
+            cur = d["pack"].get(k) or []
+            if not cur:
+                d["pack"][k] = [dict(x) for x in ps]
+            else:   # فيه باقات متكتبة: نكمّل الناقص، واللي متكتب زي باقة جاهزة ياخد اسمها ونوعها وملاحظتها
+                for x in ps:
+                    same = next((c for c in cur if abs(c.get("usd", 0) - x["usd"]) < 0.01 and c.get("units") == x["units"]), None)
+                    if same:
+                        for f in ("name", "billing", "unit", "note"):
+                            if not same.get(f):
+                                same[f] = x[f]
+                    else:
+                        cur.append({**x, "use": False})
+            seen.append(k)
+            changed = True
+    for k, c in CUSTOM_PRESET.items():
+        if "c:" + k not in seen:
+            cur = d["custom"].setdefault(k, {})
+            for f, v in c.items():
+                cur.setdefault(f, v)
+            seen.append("c:" + k)
+            changed = True
+    return changed
 
 
 CUSTOM_PCT = 20          # تقدير افتراضي لخصم الباقة المخصصة لو لسه مفيش عرض من المزود
