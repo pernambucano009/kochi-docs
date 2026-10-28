@@ -3198,6 +3198,8 @@ window.I18N_EN = {
   "قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.": "Until a quote arrives we estimate it: our cheapest unit price minus the expected discount. Once you enter the quoted price we use it directly.",
   "اكتب سعر العرض وعدد الوحدات معًا": "Enter the quoted price and units together",
   "✅ حُفظت الباقة المخصصة": "✅ Custom pack saved",
+  "🎚️ افصل المسارات": "🎚️ Separate the tracks",
+  "هل يقسّم الفيديو مرة أخرى إلى صورة ونص وموسيقى ومؤثرات؟ (يُحسب فصل الصوت مرة أخرى)": "Split the video again into picture, speech, music and effects? (audio separation is charged again)",
   "الاستنساخ يحتاج إلى مفتاح ElevenLabs المباشر في الإعدادات": "Cloning needs the direct ElevenLabs key in settings",
   " يحتاج مفتاح ElevenLabs المباشر في «المفاتيح» (الاستنساخ يحتاج اشتراك Starter على الأقل).": " Needs the direct ElevenLabs key in “Keys” (cloning needs at least the Starter plan).",
   "يحتاج مفتاح ElevenLabs المباشر في «المفاتيح» (الاستنساخ يحتاج اشتراك Starter على الأقل).": "Needs the direct ElevenLabs key in “Keys” (cloning needs at least the Starter plan).",
