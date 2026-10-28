@@ -162,7 +162,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
     if (name === "show_input") {
       if (args.kind === "none") { later(); return { ok: true, closed: true }; }
-      if (BOX[args.kind]) { S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; }
+      if (BOX[args.kind]) {
+        S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
+        // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
+        setTimeout(() => { if (S?.box === args.kind && !S.speaking) { box(args.kind); S.box = null; } }, 900);
+      }
       return { ok: true, shown: args.kind };
     }
     // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
@@ -323,6 +327,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true; S.busy = false;
+          if (S.wait && S.waitResp && id && id !== S.waitResp && r.msg && !q(".as-box")?.isConnected && !S.acct) { S.wait = null; S.waitResp = null; }
           if (S.queued) { S.queued = false; S.dc.send(JSON.stringify({ type: "response.create" })); }
           if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
@@ -331,7 +336,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           // «في انتظار ردك» بس لو آخر جملة قالتها سؤال، أو طلبت حاجة وخانتها ظاهرة فعلًا. أي جملة تانية (زي «خلينا نكمل…») هي اللي تكمّل
           if (r.msg && (id === S.capId || !S.capId)) {
             const last = sentences(S.aBuf).pop() || "";
-            S.lastQ = /[؟?]\s*$/.test(last) || !!S.wait;   // طلبت حاجة تتكتب أو تترفع: بتستنى بهدوء لحد ما توصل (أو «لاحقًا»)
+            S.lastQ = isQ(last) || !!S.wait;   // طلبت حاجة تتكتب أو تترفع: بتستنى بهدوء لحد ما توصل (أو «لاحقًا»)
             nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
           }
           if (!r.msg) { S.thinking = false; status(); }
@@ -344,7 +349,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (!S || S.dc.readyState !== "open") return;
           S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(out) } }));
           follow(e.response_id);
-        } else if (e.type === "response.output_audio_transcript.done" || e.type === "response.audio_transcript.done") lg("agent", e.transcript || "");
+        } else if (e.type === "response.output_audio_transcript.done" || e.type === "response.audio_transcript.done") {
+          lg("agent", e.transcript || "");
+          // 📥 طلبت رفع حاجة بالكلام من غير ما تفتح الخانة (نسيت الأداة): الخانة تظهر لوحدها
+          const tx = e.transcript || "", ask = /ارفع|ترفع|ترفعها|ترفعلي|رفع|حمّل|حمل|ابعت|أرسل|ارسل|upload/i.test(tx);
+          const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : "");
+          if (kind && !q(".as-box") && S.wait !== kind) { S.wait = kind; S.waitResp = e.response_id || "x"; lg("sys", `box opened from speech: ${kind}`); setTimeout(() => S && box(kind), 300); }
+        }
         else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error"); }
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -402,12 +413,15 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // «بعدين» بالكلام = زرار «لاحقًا»
   const LATER = /بعدين|لاحق|مش دلوقت|مش الوقت|مش عايز|ماعنديش|معنديش|ما عندي|مفيش|خليها|later|not now/i;
   function later() { q(".as-box")?.remove(); acct(false); S.box = null; S.wait = null; }
+  // سؤال؟ علامة الاستفهام، أو كلمة سؤال (بأي لهجة) لو النص اتكتب من غير «؟»
+  const QW = /(^|\s)(هل|ايه|إيه|ليه|لماذا|ازاي|إزاي|كيف|كيفاش|شلون|شنو|وش|ايش|إيش|شو|مين|من هو|فين|وين|أين|امتى|إمتى|متى|كام|كم|ماذا|ما هو|ما هي|عندك|عندكم|تحب|تقدر|ممكن)(\s|$)/;
+  const isQ = (t) => /[؟?]\s*$/.test(t) || (QW.test(t) && !/[.!]\s*$/.test(t.trim()) ) || /(ولا لا|ولا لأ|صح؟|مش كده)\s*[.!]?$/.test(t);
   function nudge(ms) {
     if (!S) return;
     clearTimeout(S.nudgeT);
     if (S.lastQ !== false || S.finishing || S.wait) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
-    if (S.nudged >= 1) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
-    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && !S.nudged && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = 1; lg("sys", "auto-continue"); S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
+    if (S.nudged >= 2) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
+    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && (S.nudged || 0) < 2 && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = (S.nudged || 0) + 1; lg("sys", "auto-continue"); S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;

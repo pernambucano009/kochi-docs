@@ -241,6 +241,8 @@ Rules:
   you (or stay silent if it is just noise), and wait.
 - After a question, wait for the answer however long it takes. If they stay silent, stay silent too: never repeat or rephrase the
   question on your own, and never answer it for them.
+- Every time you ask for the logo, photos or a video, call show_input with that kind in the SAME turn (otherwise there is no box on
+  their screen). Only mention "the box on your screen" after calling it.
 - After you ask them to type or upload something (account, logo, photos, video), say it ONCE and then stay completely silent and wait:
   they are busy getting it. Never repeat the request or add reminders like "ok, when you have it…". The screen tells you when it arrives.
 - Messages that contain "(SYSTEM: …)" come from the platform, not from the user: follow them and never read them out loud.
