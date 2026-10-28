@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SimsimKit</title>
 <script>
-// 🚪 الصفحة بتتفتح على صفحة داخلية (ريلود أو رجوع من موقع تاني): ستارة بلون الوضع لحد ما الصفحة نفسها تجهز،
+// 🚪 أول ما الصفحة تتفتح (ريلود أو رجوع من موقع تاني): ستارة بلون الوضع لحد ما الصفحة نفسها تجهز،
 // بدل ما الرئيسية تبان الأول وبعدها الزوم لحد الصفحة. واللون من أول لحظة على حسب الوضع (مفيش ومضة بيضا في الغامق)
 (function () {
   var r = document.documentElement, h = location.hash.replace(/^#/, ""), t = null;
   try { t = localStorage.getItem("studiomania.theme"); } catch (e) { /* التخزين مقفول */ }
   r.dataset.nhTheme = t ? t : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  if (h && h !== "home") { r.classList.add("nh-boot"); setTimeout(function () { r.classList.remove("nh-boot"); }, 6000); }
+  // الرئيسية كمان: الستارة لحد ما بيانات الحساب توصل وكل حاجة تترسم، فالصفحة بتبان مرة واحدة كاملة
+  r.classList.add("nh-boot"); setTimeout(function () { r.classList.remove("nh-boot"); }, 6000);
 })();
 </script>
 <style>

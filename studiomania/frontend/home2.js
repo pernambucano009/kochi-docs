@@ -6,8 +6,9 @@ const NH = (() => {
   const root = document.documentElement;
   const host = document.getElementById("nh");
   // كوتشي بيفضل بالرئيسية والتصميم القديم (عشان البرنامجين ميتلخبطوش في بعض)
-  if (typeof APP !== "undefined" && APP === "kochi") { host?.remove(); return null; }
-  if (!host) return null;
+  const unboot = () => root.classList.remove("nh-boot");   // من غير الرئيسية الجديدة: مفيش حاجة تستنى الستارة
+  if (typeof APP !== "undefined" && APP === "kochi") { host?.remove(); unboot(); return null; }
+  if (!host) { unboot(); return null; }
   document.body.classList.add("nh");
   // أول فتحة على صفحة داخلية (الستارة نازلة): الحركات بتتعمل في لحظة، والصفحة بتبان مرة واحدة جاهزة
   let booting = document.documentElement.classList.contains("nh-boot");
@@ -18,6 +19,7 @@ const NH = (() => {
     bootDone.wait = true;
     // الصفحة بتجيب بياناتها (الحسابات، الرصيد…): الستارة بتستنى لحد ما تخلص (أقصى ثانية ونص)، فالكروت كلها بتبان مرة واحدة
     for (let quiet = 0, t = 0; t < 1500 && quiet < 3; t += 60) { await new Promise((r) => setTimeout(r, 60)); quiet = (window.__inflight || 0) === 0 ? quiet + 1 : 0; }
+    await new Promise((r) => setTimeout(r, 180));   // آخر رسم وحركات الظهور تخلص تحت الستارة
     booting = false;
     const r = document.documentElement;
     requestAnimationFrame(() => requestAnimationFrame(() => { r.classList.add("nh-boot-out"); setTimeout(() => r.classList.remove("nh-boot", "nh-boot-out"), 500); }));
@@ -972,7 +974,9 @@ const NH = (() => {
     renderTiles();
     if (window.I18N?.lang !== "en" && !KOCHI) slots[live].innerHTML = stageHTML(shown);
     unwait();
-  }, unwait);
+    if (!/^#?(home)?$/.test(location.hash) || !booting) return;
+    bootDone();   // الرئيسية اترسمت ببياناتها: الستارة ترفع
+  }, () => { unwait(); bootDone(); });
   setInterval(() => { if (!document.hidden && window.money?.last) { D.money = money.last; if (!zoom) renderTiles(); } }, 60000);
 
   // لما القسم يتقفل: الكاميرا بترجع لورا للرئيسية
