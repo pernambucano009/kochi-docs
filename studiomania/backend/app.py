@@ -11253,6 +11253,19 @@ def first_client_id() -> str | None:
 import fieldpacks  # noqa: E402
 
 
+def assist_dialect(b: dict | None = None) -> str:
+    """🗣️ لهجة المساعدة: اللي العميل اختاره في التسجيل (onboard.json)، وإلا لهجة عقل علامته (اللي اتملت من أسئلة أول استخدام بجوجل)،
+    وإلا المصري. كانت بتقع على المصري لكل اللي دخلوا بجوجل لأن اختيارهم بيروح للعقل بس."""
+    ob = onboard_load() or {}
+    if ob.get("dialect") in livevoice.DIALECTS:
+        return ob["dialect"]
+    if b is None:
+        bid = active_client_id()
+        b = (brain_row(bid) or {}) if bid else {}
+    c = dialect.code(b or {}) if (b or {}).get("language") or (b or {}).get("market") else ""
+    return c if c in livevoice.DIALECTS else "ar-eg-cairo"
+
+
 def onboard_load() -> dict | None:
     f = DATA_DIR / "onboard.json"
     try:
@@ -11383,6 +11396,10 @@ def onboard_save(body: OnboardIn):
         ob["gender"] = body.gender
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(gender=body.gender))
     field_pack_apply(bid, ob)
+    try:   # نفس ملف التسجيل العادي: المساعدة (واسمها ولهجتها) بتقرا منه
+        (DATA_DIR / "onboard.json").write_text(json.dumps({**(onboard_load() or {}), **ob}, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
     return onboard_state()
 
 
@@ -32756,7 +32773,7 @@ def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
 def assistant_state(request: Request):
     bid, b, a = assist_info()
     ob = onboard_load() or {}
-    dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
+    dia = assist_dialect()
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
     why = "" if bid and livevoice.openai_key() else "no_brand" if not bid else "no_key"
@@ -32856,7 +32873,7 @@ def assistant_token(request: Request):
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
     ob = onboard_load() or {}
-    dia = ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo"
+    dia = assist_dialect()
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
     known, have, _steps = assist_plan(b)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
@@ -32983,7 +33000,7 @@ def rivals_named(bid: str, names: list[str]) -> None:
     if rivals.live():   # ببلاش على العميل (جزء من مكالمة أول مرة)، بس علينا
         wallet.cost(wallet.est(scrape=calls), f"ترويج: البحث عن المنافسين المذكورين ({len(names)})", promo=True)
     ob = onboard_load() or {}
-    who = livevoice.agent_name(ob.get("dialect") if ob.get("dialect") in livevoice.DIALECTS else "ar-eg-cairo", "f")
+    who = livevoice.agent_name(assist_dialect(), "f")
     miss = f"لم أجد: {'، '.join(missing)}. إن كانت حسابات حقيقية فأضف رابطها من صفحة المنافسين." if missing else ""
     if found:
         notify("rivals", "ok", f"{who}: وجدتُ {len(found)} من المنافسين الذين ذكرتهم", " ".join(x for x in ("راجعهم ووافق على الصحيح منهم.", miss) if x), "rivals")
