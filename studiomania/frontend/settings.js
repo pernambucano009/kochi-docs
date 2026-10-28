@@ -155,9 +155,9 @@ function provPack(p) {
     : p.balance == null && !m.used ? "" : `<span>استهلاك هذا الشهر: <b>${m.used ? nf(m.used) : 0}</b> ${p.unit === "$" ? "$" : escapeHtml(unit)}${m.used_usd != null && p.unit !== "$" ? ` (${usdf(m.used_usd)})` : ""}</span>
       ${m.topups ? `<span>شحنات هذا الشهر: <b>${m.topups}</b>${m.topup_usd != null ? ` بإجمالي ${usdf(m.topup_usd)}` : ""}، آخرها ${new Date(m.last_topup * 1000).toLocaleDateString(UI_LOCALE())}</span>` : ""}`;
   const sc = (m.scenarios || []).length ? `<div class="pk-sc"><b class="pk-h">🧮 لو اشترينا بكل باقة (استهلاك الشهر كله المتوقَّع: ${nf(m.scenarios[0].month_units)} ${escapeHtml(unit)})</b>
-      <table><thead><tr><th>الباقة</th><th>الدفع</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ما ندفعه فعلًا هذا الشهر</th></tr></thead><tbody>
+      <table><thead><tr><th>الباقة</th><th>الدفع</th><th>سعر الوحدة</th><th>التوفير</th><th>بسعر الوحدة</th><th>عدد الباقات</th><th>ندفع</th><th>تكلفة السنة</th></tr></thead><tbody>
       ${m.scenarios.map((x) => `<tr class="${x.use ? "on" : ""}${x.custom ? " cu" : ""}"><td>${x.custom ? `🤝 باقة مخصصة لنا ${x.quoted ? "(عرض المزود)" : `(تقدير: خصم ${nf(x.pct, 1)}٪)`}` : escapeHtml(x.name || `$${nf(x.usd)} / ${nf(x.units, 0)}`)}${x.use ? " ✓" : ""}${x.units ? `<small> · $${nf(x.usd)}${PK_PER[x.billing] || ""} ← ${pkUnits(x)}</small>` : ""}</td>
-        <td>${x.units ? PK_BILL[x.billing] || "" : "—"}</td><td>${unitf(x.unit_usd)}${x.unit && PK_UNIT[x.unit] ? `<small> / ${PK_UNIT[x.unit]}</small>` : ""}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs ?? "—"}</td><td><b>${usdf(x.buy_usd)}</b></td></tr>`).join("")}
+        <td>${x.units ? PK_BILL[x.billing] || "" : "—"}</td><td>${unitf(x.unit_usd)}${x.unit && PK_UNIT[x.unit] ? `<small> / ${PK_UNIT[x.unit]}</small>` : ""}</td><td>${x.save_pct ? nf(x.save_pct, 1) + "٪" : "—"}</td><td>${usdf(x.month_usd)}</td><td>${x.packs ?? "—"}</td><td><b>${usdf(x.pay_usd)}</b>${x.units ? PK_PER[x.billing] || "" : ""}</td><td>${usdf(x.year_usd)}</td></tr>`).join("")}
       </tbody></table></div>` : "";
   return `<div class="prov-pack">${pack}${use}${provCustom(p)}${sc}</div>`;
 }

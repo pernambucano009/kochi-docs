@@ -1716,6 +1716,99 @@ def admin_costs(request: Request, month: str = ""):
             "plans": eco}
 
 
+BILL_AR = {"once": "مرة واحدة", "month": "اشتراك شهري", "year": "اشتراك سنوي"}
+UNIT_AR = {"pts": "نقاط", "min": "دقائق", "sec": "ثوانٍ", "usd": "دولار", "chars": "حروف", "msg": "رسائل", "req": "طلبات", "tok": "رموز (Tokens)",
+           "img": "صور", "vid": "فيديوهات", "acc": "حسابات"}
+CU_AR = {"idea": "لم نتواصل بعد", "asked": "تواصلنا وننتظر الرد", "quoted": "وصلنا عرض", "no": "رفض المزود"}
+
+
+@app.get("/api/platform/finance.xlsx")
+def admin_finance_xlsx(request: Request, months: int = 12):
+    """📊 تصدير النموذج المالي (Excel): ملخص كل شهر (الإيراد والإنفاق على مين والفواتير والصافي والإنفاق الفعلي من الأرصدة)،
+    وباقات كل منصة وسيناريوهاتها (والباقة المخصصة)، واستهلاك المنصات شهر بشهر، وأقسام الإنفاق، والعملاء، واقتصاد الباقات، والفواتير الثابتة."""
+    admin(request)
+    import datetime as dt  # noqa: PLC0415
+
+    import providers  # noqa: PLC0415
+    import xlsx  # noqa: PLC0415
+    now = dt.datetime.now()
+    ms = []
+    y, m = now.year, now.month
+    for _ in range(max(1, min(months, 36))):
+        ms.append(f"{y}-{m:02d}")
+        y, m = (y - 1, 12) if m == 1 else (y, m - 1)
+    ms.reverse()
+    per = {k: admin_costs(request, k) for k in ms}
+    pd = providers.load(PLATFORM / "providers.json")
+    summary = [["الشهر", "الإيراد $", "إنفاق الخدمات (تقديرنا) $", "على المشتركين $", "على التجربة المجانية $", "على الترويج $", "على حسابنا $",
+                "الفواتير الثابتة $", "إجمالي الإنفاق $", "الصافي $", "الإنفاق الفعلي من أرصدة المنصات $", "شحنات المنصات $"]]
+    for k in ms:
+        d = per[k]
+        w = d["who"]
+        summary.append([k, d["revenue"], d["usage"], w["paying"], w["trial"], w["promo"], w["owner"], d["bills"], d["total"], d["net"], d["real_usd"], d["topup_usd"]])
+    summary.append(["■ الإجمالي"] + [round(sum(r[i] or 0 for r in summary[1:]), 2) for i in range(1, len(summary[0]))])
+    packs = [["المنصة", "الاستخدام", "الباقة", "الدفع", "السعر $", "تعطينا", "الوحدة", "سعر الوحدة $", "التوفير ٪", "نشتريها", "ملاحظة"]]
+    scen = [["المنصة", "الباقة", "الدفع", "الاستهلاك الشهري المتوقع", "الوحدة", "عدد الباقات", "ندفع لكل فترة $", "تكلفة السنة $", "بسعر الوحدة شهريًا $",
+             "سعر الوحدة $", "التوفير ٪", "نشتريها", "باقة مخصصة", "عرض فعلي من المزود", "ملاحظة"]]
+    custom = [["المنصة", "الحالة", "الخصم المتوقع ٪", "سعر العرض $", "يعطينا", "الوحدة", "الدفع", "وسيلة التواصل", "ملاحظة"]]
+    bal = [["المنصة", "الاستخدام", "الرصيد الآن", "الوحدة", "حد التنبيه", "الحالة", "سعر الوحدة $", "قيمة الرصيد $"]]
+    use = [["الشهر", "المنصة", "الاستهلاك (وحدات)", "الاستهلاك $", "عدد الشحنات", "الشحنات $"]]
+    st_ar = {"ok": "سليم", "low": "أوشك على النفاد", "bad": "نفد / توجد مشكلة", "unknown": "—"}
+    for row in providers.summary(pd):
+        k, nm = row["key"], row["name"]
+        for x in row["packs"]:
+            packs.append([nm, row["what"], x.get("name") or "", BILL_AR.get(x.get("billing"), ""), x["usd"], x["units"], UNIT_AR.get(x.get("unit"), ""),
+                          float(x["unit_usd"]), x["save_pct"], bool(x.get("use")), x.get("note") or ""])
+        for x in (row["month"] or {}).get("scenarios") or []:
+            scen.append([nm, x["name"] if not x.get("custom") else "🤝 باقة مخصصة لنا", BILL_AR.get(x.get("billing"), ""), x["month_units"], UNIT_AR.get(x.get("unit"), ""),
+                         x["packs"], x["pay_usd"], x["year_usd"], x["month_usd"], float(x["unit_usd"]), x["save_pct"], bool(x.get("use")), bool(x.get("custom")),
+                         bool(x.get("quoted")) if x.get("custom") else "", x.get("note") or ""])
+        c = row.get("custom") or {}
+        custom.append([nm, CU_AR.get(c.get("status"), ""), c.get("pct"), c.get("usd"), c.get("units"), UNIT_AR.get(c.get("unit"), ""), BILL_AR.get(c.get("billing"), ""),
+                       c.get("contact") or "", c.get("note") or ""])
+        u = row.get("unit_usd")
+        bal.append([nm, row["what"], row["balance"], row["unit"] or "", row["min"], st_ar.get(row["state"], ""), float(u) if u else None,
+                    round(row["balance"] * u, 2) if row["balance"] is not None and u else None])
+        for mk in ms:
+            yy, mm = (int(v) for v in mk.split("-"))
+            t0 = dt.datetime(yy, mm, 1).timestamp()
+            t1 = dt.datetime(yy + (mm == 12), mm % 12 + 1, 1).timestamp()
+            stt = providers.month_stats(pd, k, t0, t1)
+            if stt.get("used") or stt.get("topups"):
+                use.append([mk, nm, stt.get("used"), stt.get("used_usd"), stt.get("topups"), stt.get("topup_usd")])
+    cats = sorted({c["cat"] for k in ms for c in per[k]["by_cat"]})
+    catm = [["القسم"] + ms + ["الإجمالي $"]]
+    for cat in cats:
+        vals = [next((c["usd"] for c in per[k]["by_cat"] if c["cat"] == cat), 0) for k in ms]
+        catm.append([cat] + vals + [round(sum(vals), 2)])
+    eco = [["الباقة", "السعر $", "المشتركون", "متوسط إنفاقنا على المشترك $", "المكسب $", "أقصى خصم آمن ٪"]]
+    for x in per[ms[-1]]["plans"]:
+        eco.append([x["name"], x["price"], x["subs"], x["avg_cost"], x["margin"], x["max_discount"]])
+    cu = admin_customers(request, 30)
+    cust = [["البراند", "الاسم", "البريد / الجوال", "الباقة", "مشترك يدفع", "تاريخ التسجيل", "آخر دخول", "دفع إجمالًا $", "صرفنا عليه إجمالًا $", "منها وهو مجاني $",
+             "منها ترويج $", "صرفنا عليه آخر ٣٠ يومًا $", "المكسب $", "خسران", "نقاط استهلكها إجمالًا", "نقاط آخر ٣٠ يومًا", "نقاط هدية", "رصيده الآن (نقاط)", "الخصم ٪", "الكوبون"]]
+    day = lambda t: dt.datetime.fromtimestamp(t).strftime("%Y-%m-%d") if t else ""  # noqa: E731
+    for r in cu["items"]:
+        cust.append([r.get("brand") or "", r.get("name") or "", r.get("email") or "", r.get("plan") or "", bool(r["paying"]), day(r.get("created_at")), day(r.get("last_login")),
+                     r["paid"], r["cost_all"], r["cost_trial"], r["cost_promo"], r["cost_period"], r["margin"], bool(r["losing"]), r["used_all"], r["used_period"],
+                     r["gifted"], r.get("balance") or 0, r.get("discount_pct") or 0, r.get("discount_code") or ""])
+    try:
+        ex = json.loads((DATA_DIR / "expenses.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        ex = []
+    cyc = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب الاستخدام", "once": "مرة واحدة"}
+    bills = [["البند", "المبلغ $", "الدورة", "يوم الدفع", "الوحدات", "الوحدة", "ملاحظة", "شهريًا $"]]
+    for r in ex:
+        a = float(r.get("amount") or 0)
+        bills.append([r.get("name") or "", a, cyc.get(r.get("cycle"), r.get("cycle") or ""), r.get("day") or "", r.get("units") or "", r.get("unit") or "",
+                      r.get("note") or "", round(a if r.get("cycle") == "monthly" else a / 12 if r.get("cycle") == "yearly" else 0, 2)])
+    data = xlsx.build([("ملخص شهري", summary), ("الباقات", packs), ("سيناريوهات الباقات", scen), ("الباقات المخصصة", custom), ("أرصدة المنصات", bal),
+                       ("استهلاك المنصات", use), ("أقسام الإنفاق", catm), ("العملاء", cust), ("اقتصاد الباقات", eco), ("الفواتير الثابتة", bills)])
+    name = f"financial-model-{now:%Y-%m-%d}.xlsx"
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
 class GiftIn(BaseModel):
     points: int
     note: str = ""

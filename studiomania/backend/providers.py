@@ -118,7 +118,7 @@ def default_unit(name: str) -> str:
 SAR = 3.75   # الريال مربوط بالدولار
 
 # 📋 الباقات من صفحات أسعار المزودين (٢٨ أكتوبر ٢٠٢٦): بتتحط مرة واحدة لكل منصة لو مالهاش باقات، وبعدها التعديل من «رصيد المنصات».
-# السنوي: السعر والوحدات للسنة كلها (سعر الشهر في السنوي × ١٢). الباقات «تواصل» راحت للباقة المخصصة.
+# السنوي: سعر السنة الفعلي اللي بيتدفع مرة واحدة، والوحدات = رصيد السنة كلها. الباقات «تواصل» راحت للباقة المخصصة.
 def _p(name, usd, units, billing="once", unit="", note="", use=False):
     return {"name": name, "usd": round(usd, 2), "units": units, "billing": billing, "unit": unit, "note": note, "use": use}
 
@@ -130,15 +130,15 @@ PACK_PRESET = {
               _p("Basic", 9.99, 60, "month", "min", "Short-form فقط، تتجدد كل شهر"),
               _p("Pro", 29.99, 200, "month", "min", "Long-form، دعم أولوية، تتجدد كل شهر")],
     "eleven": [_p("Starter", 6, 30000, "month", "chars", "≈٣٠ دقيقة، الدقيقة الإضافية $0.20"),
-               _p("Starter سنوي", 60, 360000, "year", "chars", "$5 شهريًا"),
+               _p("Starter سنوي", 60, 360000, "year", "chars", "يُدفع مرة في السنة، والرصيد يتجدد كل شهر"),
                _p("Creator", 22, 121000, "month", "chars", "≈١٢١ دقيقة، أول شهر $11، الدقيقة الإضافية $0.18", use=True),
-               _p("Creator سنوي", 219.96, 1452000, "year", "chars", "$18.33 شهريًا"),
+               _p("Creator سنوي", 220, 1452000, "year", "chars", "يُدفع مرة في السنة، والرصيد يتجدد كل شهر"),
                _p("Pro", 99, 600000, "month", "chars", "≈٦٠٠ دقيقة، PCM 44.1kHz، الدقيقة الإضافية $0.17"),
-               _p("Pro سنوي", 990, 7200000, "year", "chars", "$82.5 شهريًا"),
+               _p("Pro سنوي", 990, 7200000, "year", "chars", "يُدفع مرة في السنة، والرصيد يتجدد كل شهر"),
                _p("Scale", 299, 1800000, "month", "chars", "≈١٨٠٠ دقيقة، ٣ مقاعد"),
-               _p("Scale سنوي", 2990.04, 21600000, "year", "chars", "$249.17 شهريًا"),
+               _p("Scale سنوي", 2990, 21600000, "year", "chars", "يُدفع مرة في السنة، والرصيد يتجدد كل شهر"),
                _p("Business", 990, 6000000, "month", "chars", "≈٦٠٠٠ دقيقة، بث سريع $0.05/دقيقة"),
-               _p("Business سنوي", 9900, 72000000, "year", "chars", "$825 شهريًا")],
+               _p("Business سنوي", 9900, 72000000, "year", "chars", "يُدفع مرة في السنة، والرصيد يتجدد كل شهر")],
     "zernio": [_p("٣–١٠ حسابات", 6, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا (أول حسابين مجانًا)", use=True),
                _p("١١–١٠٠ حساب", 3, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا"),
                _p("+١٠١ حساب", 1, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا")],
@@ -158,25 +158,36 @@ CUSTOM_PRESET = {
 }
 
 
+PRESET_VER = {"eleven": 2}   # لما باقات منصة تتعدّل في القائمة الجاهزة: الرقم يزيد، والباقات المطابقة تاخد الملاحظة الجديدة
+
+
 def seed(d: dict) -> bool:
     """يحط الباقات والتواصل من القائمة الجاهزة لأي منصة لسه ماتحطلهاش (مرة واحدة: لو اتمسحت ماترجعش)."""
     seen = d.setdefault("seeded", [])
     changed = False
     for k, ps in PACK_PRESET.items():
-        if k not in seen:
+        ver = PRESET_VER.get(k, 1)
+        mark = k if ver == 1 else f"{k}@{ver}"
+        bump = ver > 1 and k in seen
+        if mark not in seen:
             cur = d["pack"].get(k) or []
             if not cur:
                 d["pack"][k] = [dict(x) for x in ps]
             else:   # فيه باقات متكتبة: نكمّل الناقص، واللي متكتب زي باقة جاهزة ياخد اسمها ونوعها وملاحظتها
                 for x in ps:
-                    same = next((c for c in cur if abs(c.get("usd", 0) - x["usd"]) < 0.01 and c.get("units") == x["units"]), None)
-                    if same:
+                    same = next((c for c in cur if abs(c.get("usd", 0) - x["usd"]) < 0.01 and c.get("units") == x["units"]), None) \
+                        or (next((c for c in cur if c.get("name") == x["name"]), None) if bump else None)
+                    if same and bump:   # نسخة أحدث من القائمة: الباقة اللي بنفس الاسم تاخد السعر والوحدات والملاحظة الجديدة
+                        same.update({f: x[f] for f in ("usd", "units", "billing", "unit", "note")})
+                    elif same:
                         for f in ("name", "billing", "unit", "note"):
-                            if not same.get(f):
+                            if not same.get(f) or (bump and f == "note"):
                                 same[f] = x[f]
-                    else:
+                    elif not bump:
                         cur.append({**x, "use": False})
-            seen.append(k)
+            for m in (k, mark):
+                if m not in seen:
+                    seen.append(m)
             changed = True
     for k, c in CUSTOM_PRESET.items():
         if "c:" + k not in seen:
@@ -214,20 +225,23 @@ def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dic
     proj = project(used, t0, t1)
     ps = packs(d, name)
     out = []
-    def buy(usd: float, units: float, billing: str) -> tuple[int, float]:
-        """كام باقة/اشتراك محتاجين للشهر ده، وبكام فعلًا في الشهر (الاشتراك السنوي = سعره ÷ ١٢، ووحداته ÷ ١٢)."""
-        per = BILLING.get(billing)
-        if per:
-            n = math.ceil(proj / (units / per)) if proj else 1   # الاشتراك بيتدفع حتى لو مفيش استهلاك
-            return n, n * usd / per
+    def buy(usd: float, units: float, billing: str) -> dict:
+        """كام باقة محتاجين وبندفع كام لكل فترة دفع (من غير ما نقسّم السنوي على ١٢)، وتكلفة السنة كلها عشان المقارنة.
+        مرة واحدة: باقات الشهر ده. شهري: اشتراكات الشهر. سنوي: اشتراكات تغطي استهلاك السنة (الشهر × ١٢)."""
+        if billing == "year":
+            n = max(1, math.ceil(proj * 12 / units)) if proj else 1
+            return {"packs": n, "pay_usd": round(n * usd, 2), "year_usd": round(n * usd, 2)}
+        if billing == "month":
+            n = max(1, math.ceil(proj / units)) if proj else 1   # الاشتراك بيتدفع حتى لو مفيش استهلاك
+            return {"packs": n, "pay_usd": round(n * usd, 2), "year_usd": round(n * usd * 12, 2)}
         n = math.ceil(proj / units) if proj else 0
-        return n, n * usd
+        return {"packs": n, "pay_usd": round(n * usd, 2), "year_usd": round(math.ceil(proj * 12 / units) * usd, 2) if proj else 0}
 
     for x in ps:
-        n, b = buy(x["usd"], x["units"], x["billing"])
+        b = buy(x["usd"], x["units"], x["billing"])
         out.append({"name": x.get("name") or "", "usd": x["usd"], "units": x["units"], "unit_usd": x["unit_usd"], "save_pct": x["save_pct"],
-                    "billing": x["billing"], "unit": x["unit"], "use": bool(x.get("use")), "month_units": round(proj, 2),
-                    "month_usd": round(proj * x["unit_usd"], 2), "packs": n, "buy_usd": round(b, 2)})
+                    "billing": x["billing"], "unit": x["unit"], "note": x.get("note") or "", "use": bool(x.get("use")), "month_units": round(proj, 2),
+                    "month_usd": round(proj * x["unit_usd"], 2), **b, "buy_usd": b["pay_usd"]})
     c = custom(d, name)
     top = max((x["unit_usd"] for x in ps), default=None)
     base = min((x["unit_usd"] for x in ps), default=None)
@@ -240,10 +254,10 @@ def scenarios(d: dict, name: str, used: float, t0: float, t1: float) -> list[dic
         u = base * (1 - float(c.get("pct") or 0) / 100)
     else:
         return out
-    n, b = buy(c["usd"], c["units"], c.get("billing") or "once") if quoted else (None, proj * u)
+    b = buy(c["usd"], c["units"], c.get("billing") or "once") if quoted else {"packs": None, "pay_usd": round(proj * u, 2), "year_usd": round(proj * 12 * u, 2)}
     out.append({"name": "باقة مخصصة لنا", "custom": True, "quoted": quoted, "status": c.get("status"), "pct": c.get("pct"),
                 "usd": c.get("usd"), "units": c.get("units"), "billing": c.get("billing"), "unit": c.get("unit"), "unit_usd": u, "save_pct": round((1 - u / top) * 100, 1) if top else 0, "use": False,
-                "month_units": round(proj, 2), "month_usd": round(proj * u, 2), "packs": n, "buy_usd": round(b, 2)})
+                "month_units": round(proj, 2), "month_usd": round(proj * u, 2), "note": c.get("note") or "", **b, "buy_usd": b["pay_usd"]})
     return out
 
 
