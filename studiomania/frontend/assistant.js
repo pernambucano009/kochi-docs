@@ -44,6 +44,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-prog i{display:block;width:100%;height:4px;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}.as-prog i b{display:block;height:100%;width:0;background:#E5613E;transition:width .6s}
 .as-type{flex-direction:column;align-items:center;visibility:hidden;opacity:0;transition:opacity .5s}.as-ov.talked .as-type{visibility:visible;opacity:1}.as-hint{font-size:12.5px;opacity:.8;min-height:0;text-align:center}.as-type.acct input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.18)}
 .as-ov.dock.on{-webkit-backdrop-filter:none;backdrop-filter:none}.as-ov.dock>*{pointer-events:auto}.as-ov.dock .as-side{display:none}
+.as-tw{position:relative;display:flex;align-items:center}.as-tw input{padding-inline-end:46px!important}
+.as-send{position:absolute;inset-inline-end:5px;width:34px;height:34px;border-radius:50%;border:0;background:#E5613E;color:#fff;font-size:14px;cursor:pointer;display:grid;place-items:center;transform:scaleX(-1)}
+[dir="ltr"] .as-send{transform:none}.as-send:hover{filter:brightness(1.08)}
 .as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
@@ -134,7 +137,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function tool(name, args) {
     if (name === "save_answer") {
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
-      if (r.ok) { S.saved++; changed(); step(args.qid); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
+      if (r.ok) { S.saved++; S.wait = null; changed(); step(args.qid); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
       return r;
     }
     if (name === "start_account_analysis") {
@@ -157,7 +160,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
     if (name === "show_input") {
       if (args.kind === "none") { later(); return { ok: true, closed: true }; }
-      if (BOX[args.kind]) { S.box = args.kind; S.ask = S.capId || true; }
+      if (BOX[args.kind]) { S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; }
       return { ok: true, shown: args.kind };
     }
     // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
@@ -173,9 +176,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    S.typed += " " + text;
+    S.typed += " " + text; S.wait = null; clearTimeout(S.nudgeT);
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
-    S.dc.send(JSON.stringify({ type: "response.create" }));
+    // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
+    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
   }
   // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
   const BOX = {
@@ -236,7 +240,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (S) await end(false);   // احتياط: أي مكالمة قديمة تتقفل قبل الجديدة
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
-      <div class="as-type"><input data-type placeholder="أو اكتب هنا واضغط Enter"><p class="as-hint" data-hint hidden></p></div>
+      <div class="as-type"><div class="as-tw"><input data-type placeholder="أو اكتب هنا واضغط Enter"><button type="button" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-hint" data-hint hidden></p></div>
       <div class="as-acts"><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false };
     prog();
@@ -283,12 +287,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
         else if (e.type === "input_audio_buffer.speech_started") { S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
-        else if (e.type === "conversation.item.input_audio_transcription.completed") { if ((q(".as-box") || S.acct) && LATER.test(e.transcript || "")) later(); }
+        else if (e.type === "conversation.item.input_audio_transcription.completed") { if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
-        else if (e.type === "response.created") { S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
+        else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
         else if (e.type === "response.done") {
-          const id = e.response?.id, r = R(id); r.done = true;
+          const id = e.response?.id, r = R(id); r.done = true; S.busy = false;
+          if (S.queued) { S.queued = false; S.dc.send(JSON.stringify({ type: "response.create" })); }
           if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
@@ -296,7 +301,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           // «في انتظار ردك» بس لو آخر جملة قالتها سؤال، أو طلبت حاجة وخانتها ظاهرة فعلًا. أي جملة تانية (زي «خلينا نكمل…») هي اللي تكمّل
           if (r.msg && (id === S.capId || !S.capId)) {
             const last = sentences(S.aBuf).pop() || "";
-            S.lastQ = /[؟?]\s*$/.test(last) || (!!S.ask && !!(q(".as-box") || S.acct));
+            S.lastQ = /[؟?]\s*$/.test(last) || !!S.wait;   // طلبت حاجة تتكتب أو تترفع: بتستنى بهدوء لحد ما توصل (أو «لاحقًا»)
             nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
           }
           if (!r.msg) { S.thinking = false; status(); }
@@ -316,10 +321,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       S.agent = tok.agent || ""; status();
       if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
+      q("[data-tsend]").onclick = () => { const i = q("[data-type]"), v = i.value.trim(); if (!v) return i.focus(); i.value = ""; submit(v); };
       q("[data-type]").onkeydown = (ev) => {
         if (ev.key !== "Enter" || !ev.target.value.trim()) return;
         const v = ev.target.value.trim(); ev.target.value = "";
-        if (S.acct) { acct(false); say(`حسابي: ${v}`); } else say(v);
+        submit(v);
       };
       loop();
     } catch (e) {
@@ -344,20 +350,30 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     q("[data-pt]").textContent = d >= n ? "اكتملت المحادثة تقريبًا" : `الخطوة ${d + 1} من ${n}`;
     q("[data-pb]").style.width = `${Math.round((100 * d) / n)}%`;
   }
+  // ⏎ اللي اتكتب في الخانة (بزرار السهم أو Enter). الحساب: المنصة نفسها بتبدأ تحليله على طول، وسعاد بتعرف إنه بدأ وتكمّل
+  async function submit(v) {
+    if (!S || !v) return;
+    if (!S.acct && S.wait !== "account") return say(v);
+    acct(false); S.typed += " " + v;
+    const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: v }) }).catch((e) => ({ ok: false, error: e.message }));
+    if (r.ok) { changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount(); }
+    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly and go on with the next question.)`
+      : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);
+  }
   // ✍️ الحساب بيتكتب في نفس خانة الكتابة: الخانة بتنوّر وتحتها سطر بيقول المطلوب
   function acct(on) {
-    if (!S) return; S.acct = on;
+    if (!S) return; S.acct = on; if (on) S.wait = "account";
     const h = q("[data-hint]"), t = q(".as-type"), inp = q("[data-type]");
-    t?.classList.toggle("acct", on); if (h) { h.hidden = !on; h.textContent = on ? "اكتب رابط حسابك على إنستغرام أو تيك توك، أو اسم المستخدم (مثلًا @studio)، ثم Enter" : ""; }
+    t?.classList.toggle("acct", on); if (h) { h.hidden = !on; h.textContent = on ? "اكتب رابط حسابك على إنستغرام أو تيك توك، أو اسم المستخدم (مثلًا @studio)، ثم اضغط ➤" : ""; }
     if (inp) { inp.dir = on ? "ltr" : "auto"; inp.placeholder = on ? "instagram.com/… أو @اسم_الحساب" : "أو اكتب هنا واضغط Enter"; if (on) setTimeout(() => inp.focus(), 200); }
   }
   // «بعدين» بالكلام = زرار «لاحقًا»
   const LATER = /بعدين|لاحق|مش دلوقت|مش الوقت|مش عايز|ماعنديش|معنديش|ما عندي|مفيش|خليها|later|not now/i;
-  function later() { q(".as-box")?.remove(); acct(false); S.box = null; }
+  function later() { q(".as-box")?.remove(); acct(false); S.box = null; S.wait = null; }
   function nudge(ms) {
     if (!S) return;
     clearTimeout(S.nudgeT);
-    if (S.lastQ !== false || S.finishing) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
+    if (S.lastQ !== false || S.finishing || S.wait) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
     S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && S.dc?.readyState === "open") { S.lastQ = null; S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
