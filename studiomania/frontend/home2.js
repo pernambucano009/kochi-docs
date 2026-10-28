@@ -153,8 +153,9 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} منشور مجدول` : "لا توجد منشورات مجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
-    settings: () => `<span>${window.ME && window.ME.role !== "admin" ? `نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة`
-      : D.money ? `رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span>` : "المفاتيح والرصيد والعملاء"}</span>`,
+    // من غير رصيد معروف: مفيش سطر تاني (كان بيكرر نفس الوصف اللي فوقه)
+    settings: () => (window.ME && window.ME.role !== "admin" ? `<span>نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة</span>`
+      : D.money ? `<span>رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span></span>` : ""),
   };
   // الرئيسية بسيطة: كل قسم أيقونة واسمه بس، والشرح والحالة بيظهروا في فقاعة لما تقف بالماوس عليه
   const tipOf = (id, extra = "") => `<span class="nh-tip" role="tooltip"><b>${esc(T[id].ar)}</b><span>${esc(T[id].desc)}</span>${extra ? `<span class="nh-tip-m">${extra}</span>` : ""}</span>`;
@@ -521,7 +522,7 @@ const NH = (() => {
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=11" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=11" alt="" loading="lazy">`; }
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=12" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=12" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه

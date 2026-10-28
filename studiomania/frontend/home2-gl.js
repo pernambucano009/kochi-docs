@@ -410,7 +410,7 @@ window.NHGL = (stage, getClient) => {
   const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "autopilot"], loader = new THREE.TextureLoader(), imgPlanes = [];
   // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
   const texCache = {};
-  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=11`;
+  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=12`;
   function loadTex(url, cb) {
     const c = texCache[url] || (texCache[url] = { t: null, cbs: [] });
     if (c.t) return cb && cb(c.t);
