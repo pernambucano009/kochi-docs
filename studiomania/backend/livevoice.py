@@ -153,7 +153,7 @@ def name_gender(name: str) -> str:
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
-                 known: dict | None = None, returning: bool = False, have: dict | None = None) -> str:
+                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "") -> str:
     """have: اللي العقل فيه أصلًا ومش محتاج يتطلب تاني (account: اسم الحساب، logo / products: True لو اترفعوا)."""
     have = have or {}
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
@@ -218,9 +218,17 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    Once they agree to chat, tell them in one short sentence that they will see their brand brain filling up on the screen in front of
    them with every answer (so they feel the brain being built while you talk).
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
-3. Learn about their business through these questions, one at a time, in your own words in the dialect
-   (skip any they already answered, and follow up naturally when an answer is interesting):
+3. Get to know them and their work. The list below is ONLY the information you need (a checklist), NOT a script to read:
 {qs}
+   {("What they chose when signing up (a hint, confirm it naturally, it may be inaccurate): " + ctx) if ctx else ""}
+   - Never assume they have a "project", "business", "company", "shop" or "products". If you do not know yet, first ask what they do.
+     Then talk in THEIR terms: a dentist has a clinic, patients and treatments (عيادتك، مرضاك، خدماتك), a freelancer has clients and
+     work, a restaurant has dishes and guests.
+   - Build every question on their previous answers, like a real conversation between people: reword each item to fit who they are
+     and what they just said, pick the item that follows most naturally (the order is flexible), and react to the answer first.
+   - Skip any item that does not apply to them or that their earlier answers already covered (save it from what they said), and never
+     ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
+   - One question per turn; follow up briefly when an answer is interesting.
 4. {"Skip this step: their logo and product photos are already uploaded." if have.get("logo") and have.get("products") else ("Ask them to upload a few photos of their products or work (their logo is already uploaded)" if have.get("logo") else "Ask them to upload their logo" + ("" if have.get("products") else ", then a few photos of their products or work") + " (product photos are already uploaded)" * bool(have.get("products"))) + " (one request per turn; if they have none or say later, move on without insisting)."}
 5. When done, thank them and tell them you are preparing what you found.
 {tool_txt}

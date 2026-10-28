@@ -32814,7 +32814,11 @@ def assistant_token(request: Request):
     who = a.get("name") or signup_name(request)
     # 👤 النوع: اللي اختاره في التسجيل، وإلا من اسمه الأول، وإلا مذكر. ولو صحّح المساعدة بيتحفظ (set_user_gender)
     ug = a.get("gender") or (ob.get("gender") if ob.get("gender") in ("m", "f") else "") or livevoice.name_gender(who) or "m"
-    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known,
+    fp = fieldpacks.FIELDS.get(ob.get("field") or "") or {}
+    gl = fieldpacks.GOAL_BY.get(ob.get("goal") or "")
+    ctx = "، ".join(x for x in (f"المجال: {fp['name']}" if fp.get("name") else "", f"الهدف: {gl[1]}" if gl else "",
+                                f"اسم العلامة: {ob['brand']}" if ob.get("brand") else "") if x)
+    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx,
                                    returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:
