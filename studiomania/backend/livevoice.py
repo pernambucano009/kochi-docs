@@ -113,10 +113,43 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"},
          "description": "Each competitor exactly as the user said or typed it: a brand name, a person's name, an @handle or a link."}},
          "required": ["names"]}},
+    {"type": "function", "name": "set_user_gender", "description": "The user told you (or corrected you) that they are a man or a woman. "
+     "Call it once, then keep using that gender.",
+     "parameters": {"type": "object", "properties": {"gender": {"type": "string", "enum": ["m", "f"]}}, "required": ["gender"]}},
     {"type": "function", "name": "finish", "description": "Call once at the very end, after you thanked the user and said goodbye.",
      "parameters": {"type": "object", "properties": {"later": {"type": "boolean",
          "description": "true if the user wants to continue another time (said later / not now / not ready), false when the conversation is complete."}}}},
 ]
+
+
+# 👤 نوع العميل من اسمه الأول (عشان المساعدة ماتكلمش راجل بصيغة المؤنث). مش متأكدين ← مذكر (الأصل في الكلام)، ولو صحّحها بتغيّر
+_F_NAMES = set("""فاطمة فاطمه مريم سارة ساره نور نورة نوره هدى منى مها هند ليلى ليلي سلمى رنا ريم دانة دانه لمى جود شهد هالة هاله آية اية ايه ياسمين
+رحاب أمل امل عبير ندى نهى سمر سماح أسماء اسماء دعاء رضوى نادين شيماء إيمان ايمان هبة هبه رحمة رحمه بسمة بسمه زينب خديجة عائشة عايشه حنان سهى رغد
+لينا جنى جنا ملك روان غادة غاده إسراء اسراء آلاء الاء منار مروة مروه نسرين وفاء سعاد ميار يارا تسنيم أريج اريج عفاف نجلاء مي ميرنا نرمين شروق
+fatma fatima fatmah mariam maryam mariem sara sarah nour noor noura nora huda hoda mona muna maha hind laila layla leila salma rana reem rim
+dana lama jood shahd hala aya ayah yasmin yasmine jasmine rehab amal abeer nada noha samar samah asmaa asma doaa radwa nadine shaimaa shaymaa
+eman iman heba hiba rahma basma zeinab zainab khadija aisha aysha hanan soha raghad lina lena jana malak rawan ghada esraa israa manar
+marwa nesreen nisreen wafaa souad suad mayar yara tasneem areej afaf nagla may mai mirna nermeen shorouk""".split())
+_M_NAMES = set("""محمد أحمد احمد محمود مصطفى علي عمر خالد حسن حسين إسلام اسلام يوسف إبراهيم ابراهيم عبدالله عبد كريم طارق ياسر وليد هاني سامي زياد مازن
+فهد فيصل سعد سلطان ناصر تركي بدر راشد حمد ماجد عادل أيمن ايمن أسامة اسامة أسامه حمزة حمزه طه رضا علاء بهاء ضياء مؤمن مؤنس معاذ عمرو شريف
+mohamed mohammed muhammad mohammad ahmed ahmad mahmoud mostafa moustafa mustafa ali omar khaled khalid hassan hussein hossam islam youssef yousef
+yusuf ibrahim abdullah abdallah abdo kareem karim tarek tariq yasser waleed walid hany hani sami ziad mazen fahad fahd faisal saad sultan nasser
+turki badr rashid hamad majed adel ayman osama usama hamza taha reda alaa bahaa diaa moamen moaz amr sherif""".split())
+
+
+def name_gender(name: str) -> str:
+    """m / f من الاسم الأول. مش معروف ← "" (والمساعدة بتكلّمه بالمذكر)."""
+    n = (name or "").strip().split()[0].lower() if (name or "").strip() else ""
+    n = n.replace("أ", "ا").replace("إ", "ا") if n else n
+    if not n:
+        return ""
+    if n in _M_NAMES or n.replace("ا", "أ", 1) in _M_NAMES:
+        return "m"
+    if n in _F_NAMES or n.replace("ا", "أ", 1) in _F_NAMES:
+        return "f"
+    if re.search(r"[\u0600-\u06FF]", n) and n.endswith(("ة", "اء")) and n not in ("علاء", "بهاء", "ضياء", "حمزة", "اسامة", "طلحة"):
+        return "f"
+    return ""
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
@@ -137,9 +170,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
     you = ("a woman: address her ONLY with feminine pronouns, verbs and adjectives" if user_gender == "f" else
-           "a man: address him ONLY with masculine pronouns, verbs and adjectives" if user_gender == "m" else
-           "of unknown gender: infer it from their name if the name is clearly male or female, and from how they talk about themselves. "
-           "Once you know, stick to it in every pronoun, verb and adjective. While unsure, phrase sentences so they need no gender")
+           "a man: address him ONLY with masculine pronouns, verbs and adjectives (never feminine forms for him)")
+    you += (". Your own gender is NOT the user's: feminine forms are only for words about yourself. "
+            "If the user says or shows they are of the other gender, switch at once" + (" and call set_user_gender" if tools else ""))
     # 🧠 اللي في العقل أصلًا مابيتسألش تاني: الأسئلة المجاوبة بتتشال من القايمة، وبتتبعت كمعلومة يبني عليها الكلام
     known = {k: v for k, v in (known or {}).items() if v}
     left = [(qid, q) for qid, q in quiz_questions() if qid not in known]

@@ -32782,6 +32782,20 @@ def assistant_profile(body: AssistProfileIn, request: Request):
     return assistant_state(request)
 
 
+class AssistGenderIn(BaseModel):
+    gender: str
+
+
+@app.post("/api/assistant/gender")
+def assistant_gender(body: AssistGenderIn):
+    """العميل قال للمساعدة إنه راجل / ست (أو صحّحها): بيتحفظ، والمكالمات الجاية تبدأ بيه."""
+    bid, _b, _a = assist_info()
+    if not bid:
+        return {"ok": False}
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(gender="f" if body.gender == "f" else "m"))
+    return {"ok": True}
+
+
 @app.post("/api/assistant/token")
 def assistant_token(request: Request):
     bid, b, a = assist_info()
@@ -32793,7 +32807,9 @@ def assistant_token(request: Request):
     known, have, _steps = assist_plan(b)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
     returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
-    instr = livevoice.instructions(dia, "", a.get("name") or signup_name(request), ag, a.get("gender") or "", tools=True, known=known,
+    who = a.get("name") or signup_name(request)
+    ug = a.get("gender") or livevoice.name_gender(who) or "m"   # 👤 مش معروف ← مذكر، ولو العميل صحّحها بتتحفظ (set_user_gender)
+    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known,
                                    returning=returning, have=have)
     model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
     try:

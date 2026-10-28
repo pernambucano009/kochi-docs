@@ -160,6 +160,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return { ok: true, shown: args.kind };
     }
     // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
+    if (name === "set_user_gender") return api("/api/assistant/gender", { method: "POST", ...jsonBody({ gender: args.gender }) }).catch(() => ({ ok: false }));
     if (name === "finish") {
       S.finishing = true; S.endDone = !args.later;
       setTimeout(() => S?.finishing && end(S.endDone), 9000);   // احتياط لو الصوت ماوصلش
