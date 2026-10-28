@@ -1530,7 +1530,114 @@ def drive_back(request: Request, code: str = "", state: str = "", error: str = "
 @app.get("/api/platform/backup")
 def backup_get(request: Request):
     admin(request)
-    return backup_state()
+    # عنوان الرجوع اللي لازم يكون متسجل في Google Cloud (وإلا جوجل بيرفض بـ redirect_uri_mismatch)
+    return {**backup_state(), "redirect": f"{base_url(request)}/auth/drive/callback"}
+
+
+# 🧹 المساحة على الخادم: مين واخد كام (كل حساب وكل قسم)، وأكبر الملفات، والحاجات اللي ينفع تتمسح من غير ما حاجة تبوظ
+def _du(path: Path, big: list | None = None, rel: Path | None = None) -> tuple[int, int]:
+    """حجم فولدر بالبايت وعدد ملفاته، ويجمّع أكبر الملفات في big."""
+    total = n = 0
+    for dp, dirs, files in os.walk(path):
+        for f in files:
+            fp = os.path.join(dp, f)
+            try:
+                sz = os.lstat(fp).st_size
+            except OSError:
+                continue
+            total += sz
+            n += 1
+            if big is not None and sz > 50 * 2**20:
+                big.append((sz, str(Path(fp).relative_to(rel or path))))
+    return total, n
+
+
+def _tmp_dirs(root: Path) -> list[Path]:
+    """الملفات المؤقتة لحساب: فولدر tmp (إلا ملفات الخطوط واللوج) وبقايا التصدير."""
+    t = root / "tmp"
+    return [x for x in (t.iterdir() if t.is_dir() else []) if x.name not in ("fonts.conf", "fontcache", "render.log")]
+
+
+@app.get("/api/platform/storage")
+def admin_storage(request: Request):
+    admin(request)
+    import tempfile  # noqa: PLC0415
+    usage = shutil.disk_usage(DATA_DIR)
+    big: list = []
+    with closing(db()) as c:
+        names = {r["id"]: r["name"] for r in c.execute("SELECT id, name FROM workspaces")}
+        mails = {r["workspace"]: r["email"] for r in c.execute("SELECT workspace, MIN(email) AS email FROM users GROUP BY workspace")}
+    accounts, cats, orphans = [], {}, []
+    roots = [(OWNER, DATA_DIR)] + [(p.name, p) for p in sorted(TENANTS.iterdir()) if p.is_dir() and not p.name.startswith((".",))]
+    for wid, root in roots:
+        size = files = tmp = 0
+        for sub in root.iterdir() if root.is_dir() else []:
+            if root == DATA_DIR and sub.name in ("_platform", "_shared"):
+                continue
+            if sub.is_dir():
+                b, n = _du(sub, big, DATA_DIR)
+            else:
+                try:
+                    b, n = sub.stat().st_size, 1
+                except OSError:
+                    continue
+                if b > 50 * 2**20:
+                    big.append((b, str(sub.relative_to(DATA_DIR))))
+            size += b
+            files += n
+            if sub.is_dir():
+                cats[sub.name] = cats.get(sub.name, 0) + b
+        for x in _tmp_dirs(root):
+            tmp += _du(x)[0] if x.is_dir() else x.stat().st_size
+        known = wid == OWNER or wid in names
+        row = {"id": wid, "name": "حساب المنصة" if wid == OWNER else names.get(wid) or "", "email": mails.get(wid) or "", "mb": round(size / 2**20, 1),
+               "files": files, "tmp_mb": round(tmp / 2**20, 1), "orphan": not known}
+        (accounts if known else orphans).append(row)
+    shared = {k: round(_du(DATA_DIR / k, big, DATA_DIR)[0] / 2**20, 1) for k in ("_shared",) if (DATA_DIR / k).exists()}
+    plat = PLATFORM
+    plat_b = sum(_du(x, big, DATA_DIR)[0] if x.is_dir() else x.stat().st_size for x in plat.iterdir() if x != TENANTS)
+    sys_tmp = Path(tempfile.gettempdir())
+    sys_b = _du(sys_tmp)[0] if sys_tmp.exists() else 0
+    big.sort(reverse=True)
+    return {"total_mb": usage.total // 2**20, "used_mb": (usage.total - usage.free) // 2**20, "free_mb": usage.free // 2**20,
+            "accounts": sorted(accounts, key=lambda r: -r["mb"]), "orphans": sorted(orphans, key=lambda r: -r["mb"]),
+            "cats": sorted(({"cat": k, "mb": round(v / 2**20, 1)} for k, v in cats.items()), key=lambda r: -r["mb"])[:25],
+            "platform_mb": round(plat_b / 2**20, 1), "shared_mb": shared.get("_shared", 0), "system_tmp_mb": round(sys_b / 2**20, 1),
+            "tmp_mb": round(sum(r["tmp_mb"] for r in accounts), 1),
+            "big": [{"mb": round(b / 2**20, 1), "path": p} for b, p in big[:30]]}
+
+
+class StorageCleanIn(BaseModel):
+    tmp: bool = True          # الملفات المؤقتة في كل الحسابات (بتتعمل تاني لوحدها)
+    orphans: bool = False     # فولدرات حسابات اتمسحت (مالهاش حساب في المنصة)
+
+
+@app.post("/api/platform/storage/clean")
+def admin_storage_clean(body: StorageCleanIn, request: Request):
+    admin(request)
+    import tempfile  # noqa: PLC0415
+    before = shutil.disk_usage(DATA_DIR).free
+    with closing(db()) as c:
+        known = {r["id"] for r in c.execute("SELECT id FROM workspaces")}
+    busy = {w for w, t in _tenants.items() if t.proc.poll() is None}
+    gone = 0
+    if body.tmp:
+        for root in [DATA_DIR] + [p for p in TENANTS.iterdir() if p.is_dir()]:
+            for x in _tmp_dirs(root):
+                if x.name.startswith("render-") and root.name in busy and time.time() - x.stat().st_mtime < 6 * 3600:
+                    continue   # تصدير ممكن يكون شغال دلوقتي في الحساب ده
+                shutil.rmtree(x, ignore_errors=True) if x.is_dir() else x.unlink(missing_ok=True)
+                gone += 1
+        for x in Path(tempfile.gettempdir()).glob("studiomania-render/render-*"):
+            if time.time() - x.stat().st_mtime > 6 * 3600:
+                shutil.rmtree(x, ignore_errors=True)
+                gone += 1
+    if body.orphans:
+        for p in TENANTS.iterdir():
+            if p.is_dir() and p.name not in known and p.name not in _tenants and not p.name.startswith(("_", ".")):
+                shutil.rmtree(p, ignore_errors=True)
+                gone += 1
+    return {"deleted": gone, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
 
 
 @app.post("/api/platform/backup")

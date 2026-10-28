@@ -79,13 +79,46 @@ function renderBackup(b) {
   if (!box) return;
   const last = b.last?.at ? `${new Date(b.last.at * 1000).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${(b.last.size / 1048576).toFixed(1)} ميجا · ${b.last.files} ملف` : "لم تُنشأ بعد";
   box.innerHTML = !b.google ? `<p class="hint">⚠️ يلزم ضبط GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في Railway أولًا (وهما نفسهما المستخدمان للدخول بجوجل).</p>`
-    : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">ستسجّل الدخول ببريد الشركة. لا يرى البرنامج إلا الملفات التي أنشأها هو.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}`
+    : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">ستسجّل الدخول ببريد الشركة. لا يرى البرنامج إلا الملفات التي أنشأها هو.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}
+       ${b.redirect ? `<p class="hint">إذا ظهر لك من جوجل «redirect_uri_mismatch»: أضف هذا العنوان في Google Cloud ← Credentials ← OAuth Client ← Authorized redirect URIs:</p>
+       <div class="row"><input readonly dir="ltr" value="${escapeHtml(b.redirect)}" style="flex:1;min-width:220px" onclick="this.select()"><button type="button" class="btn sm" data-copy="${escapeHtml(b.redirect)}">انسخ</button></div>` : ""}`
     : `<p>✅ مربوط بـ <b dir="ltr">${escapeHtml(b.email || "جوجل درايف")}</b></p>
        <p class="hint">آخر نسخة: ${escapeHtml(last)}${b.busy ? " · ⏳ تُنشأ الآن" : ""}</p>
        ${b.error ? `<p class="hint bad">⚠️ آخر محاولة فشلت: ${escapeHtml(b.error)}</p>` : ""}
        <div class="row wrap"><button type="button" class="btn sm primary" id="bkRun" ${b.busy ? "disabled" : ""}>أنشئ نسخة الآن</button>
          <button type="button" class="btn sm" id="bkOff">افصل درايف</button></div>`;
 }
+// 🧹 مساحة الخادم كلها (للأدمن): كل حساب وكل قسم وأكبر الملفات، ومسح الملفات المؤقتة وفولدرات الحسابات المحذوفة
+const DSK_CAT = { raw: "الفيديوهات الخام", clips: "القطع", generated: "الفيديوهات المولّدة", exports: "الفيديوهات الجاهزة", tmp: "ملفات مؤقتة", audio: "الصوت",
+  coaches: "الشخصيات", lab: "معمل التفكيك", typo: "التايبوجرافي", refs: "أرشيف المراجع", ads: "الإعلانات", series: "المسلسلات", films: "الأفلام",
+  carousels: "الكاروسيل", assets: "الملفات المرفوعة", tvideos: "فيديوهات القوالب" };
+let DSK = null;
+function renderDisk(d) {
+  DSK = d;
+  const pct = Math.round((d.used_mb / d.total_mb) * 100), del = d.tmp_mb + d.orphans.reduce((a, r) => a + r.mb, 0);
+  $("dskBox").innerHTML = `<div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
+    <p class="hint">مستخدم ${fmtMb(d.used_mb)} من ${fmtMb(d.total_mb)} · فارغ ${fmtMb(d.free_mb)} · بيانات المنصة ${fmtMb(d.platform_mb)}${d.shared_mb ? ` · المكتبة المشتركة ${fmtMb(d.shared_mb)}` : ""}${d.system_tmp_mb >= 1 ? ` · مؤقت النظام ${fmtMb(d.system_tmp_mb)}` : ""}</p>
+    ${del >= 1 ? `<div class="row wrap"><button type="button" class="btn sm danger" id="dskClean">🧹 احذف ما لا يلزم (${fmtMb(del)})</button><span class="hint">الملفات المؤقتة ${fmtMb(d.tmp_mb)}${d.orphans.length ? ` · ${d.orphans.length} فولدر لحسابات محذوفة ${fmtMb(d.orphans.reduce((a, r) => a + r.mb, 0))}` : ""}</span></div>` : `<p class="hint">✅ لا توجد ملفات مؤقتة أو بقايا حسابات محذوفة.</p>`}
+    <h4>حسب القسم (كل الحسابات)</h4><ul>${d.cats.filter((c) => c.mb >= 1).map((c) => `<li><span>${escapeHtml(DSK_CAT[c.cat] || c.cat)}</span><b>${fmtMb(c.mb)}</b></li>`).join("")}</ul>
+    <h4>حسب الحساب</h4><ul>${d.accounts.filter((a) => a.mb >= 1).map((a) => `<li><span>${escapeHtml(a.name || a.id)}${a.email ? ` <small class="muted" dir="ltr">${escapeHtml(a.email)}</small>` : ""}${a.tmp_mb >= 1 ? ` <small class="muted">(منها مؤقت ${fmtMb(a.tmp_mb)})</small>` : ""}</span><b>${fmtMb(a.mb)}</b></li>`).join("")}</ul>
+    ${d.big.length ? `<h4>أكبر الملفات</h4><ul>${d.big.map((f) => `<li><span dir="ltr" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${escapeHtml(f.path)}</span><b>${fmtMb(f.mb)}</b></li>`).join("")}</ul>` : ""}`;
+}
+$("dskLoad")?.addEventListener("click", async () => {
+  $("dskLoad").disabled = true; $("dskBox").innerHTML = `<p class="hint">⏳ جارٍ حساب المساحة (قد يستغرق دقيقة)…</p>`;
+  try { renderDisk(await api("/api/platform/storage")); } catch (err) { $("dskBox").innerHTML = `<p class="hint bad">${escapeHtml(err.message)}</p>`; }
+  $("dskLoad").disabled = false;
+});
+$("dskBox")?.addEventListener("click", async (e) => {
+  if (!e.target.closest("#dskClean") || !DSK) return;
+  const orph = DSK.orphans.length;
+  if (!(await uiConfirm(`ستُحذف الملفات المؤقتة في كل الحسابات${orph ? ` و${orph} فولدر لحسابات محذوفة` : ""}.\n\nالمؤقتة تُنشأ من جديد عند الحاجة، ولا يُحذف أي فيديو أو مشروع لحساب موجود.\n\nلا يمكن التراجع عن هذا الحذف.`))) return;
+  e.target.disabled = true;
+  try {
+    const r = await api("/api/platform/storage/clean", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tmp: true, orphans: true }) });
+    toast(`✅ تحرّر ${fmtMb(r.freed_mb)}`);
+    renderDisk(await api("/api/platform/storage"));
+  } catch (err) { toast(err.message, true); e.target.disabled = false; }
+});
 async function loadBackup() {
   const box = $("bkBox");
   if (!box) return;
@@ -93,6 +126,8 @@ async function loadBackup() {
   catch { box.innerHTML = `<p class="hint">النسخة الاحتياطية تعمل على الخادم فقط (عبر البوابة).</p>`; }
 }
 $("bkBox")?.addEventListener("click", async (e) => {
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast("✅ نُسخ"); } catch { /* المتصفح منع النسخ: العنوان ظاهر في الخانة */ } return; }
   if (e.target.closest("#bkRun")) {
     e.target.disabled = true; e.target.textContent = "⏳ جارٍ إنشاء النسخة…";
     try { renderBackup(await api("/api/platform/backup", { method: "POST" })); toast("✅ رُفعت النسخة إلى درايف"); } catch (err) { toast(err.message, true); loadBackup(); }
