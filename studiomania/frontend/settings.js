@@ -193,6 +193,18 @@ async function loadSetCredit() {
   $("setCreditRing").style.strokeDasharray = `${(c * Math.min(1, m.balance / full)).toFixed(1)} ${c.toFixed(1)}`;
 }
 $("setLogout")?.addEventListener("click", () => $("logout").click());
+// 📊 استهلاك نقاط العميل (آخر ٣٠ يومًا، بالأقسام)
+(window.MEP || Promise.resolve(null)).then(async (me) => {
+  const box = $("useBox");
+  if (!box || !me || me.role === "admin") return;
+  try {
+    const d = await api("/api/billing/usage");
+    const max = Math.max(1, ...d.by_cat.map((x) => x.points)), n = (v) => (+v || 0).toLocaleString("ar-EG");
+    box.innerHTML = `<div class="use-tot"><span><small class="hint">صرفت</small><b>${n(d.used)} نقطة</b></span><span><small class="hint">رصيدك الآن</small><b>${n(d.balance)} نقطة</b></span></div>`
+      + (d.by_cat.length ? `<div class="use-bars">${d.by_cat.slice(0, 8).map((x) => `<div><span>${escapeHtml(x.cat)}</span><i style="width:${Math.max(4, Math.round((100 * x.points) / max))}%"></i><span>${n(x.points)}</span></div>`).join("")}</div>`
+        : `<p class="hint">لم تصرف نقاطًا في آخر ٣٠ يومًا.</p>`);
+  } catch { box.innerHTML = ""; }
+});
 // 🗑️ حذف الحساب نهائيًا (للعملاء، مش المشرف): الحساب والعلامات والفيديوهات والملفات كلها، والاشتراك بيتلغي. بعدها تقدر تسجّل من جديد بنفس البريد
 (window.MEP || Promise.resolve(null)).then((me) => { if (me && me.role !== "admin" && $("setDelete")) $("setDelete").hidden = false; });
 $("setDelete")?.addEventListener("click", async () => {
@@ -310,12 +322,15 @@ function expRender(d) {
   if (d) Object.assign(Exp, { rows: d.rows, cycles: d.cycles, monthly: d.monthly, usage: d.usage });
   const esc = (s) => escapeHtml(String(s ?? ""));
   box.innerHTML = `<div class="exp-tbl" role="table" aria-label="فواتيري الشهرية">
-    <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>المبلغ ($)</span><span>الدفع</span><span>يوم التجديد</span><span>ملاحظة</span><span></span></div>
+    <div class="exp-row exp-h" role="row"><span>الخدمة</span><span>أقل شراء ($)</span><span>الدفع</span><span>يوم التجديد</span><span>يعطينا</span><span>الوحدة</span><span>سعر الوحدة</span><span>ملاحظة</span><span></span></div>
     ${Exp.rows.map((r, i) => `<div class="exp-row" role="row" data-ei="${i}">
       <input type="text" data-ek="name" value="${esc(I18N.t(r.name))}" data-orig="${esc(r.name)}" aria-label="الخدمة">
       <input type="number" min="0" step="0.01" data-ek="amount" value="${esc(r.amount)}" aria-label="المبلغ" dir="ltr">
       <select data-ek="cycle" aria-label="الدفع">${Object.entries(Exp.cycles).map(([k, t]) => `<option value="${k}" ${k === r.cycle ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
       <input type="number" min="0" max="31" data-ek="day" value="${r.day || ""}" placeholder="—" aria-label="يوم التجديد" dir="ltr">
+      <input type="number" min="0" data-ek="units" value="${r.units || ""}" placeholder="—" aria-label="يعطينا كم وحدة" dir="ltr">
+      <input type="text" data-ek="unit" value="${esc(I18N.t(r.unit || ""))}" data-orig="${esc(r.unit || "")}" placeholder="نقطة، رسالة…" aria-label="الوحدة">
+      <span class="exp-pu">${r.units && r.amount ? "$" + (r.amount / r.units).toPrecision(2) : "—"}</span>
       <input type="text" data-ek="note" value="${esc(I18N.t(r.note))}" data-orig="${esc(r.note)}" aria-label="ملاحظة">
       <button type="button" class="btn sm" data-edel="${i}" aria-label="احذف السطر">✕</button></div>`).join("")}
     </div>
@@ -330,7 +345,7 @@ function expRead() {
   });
 }
 $("expBox")?.addEventListener("click", async (e) => {
-  if (e.target.closest("#expAdd")) { expRead(); Exp.rows.push({ name: "", amount: 0, cycle: "monthly", day: 0, note: "" }); return expRender(); }
+  if (e.target.closest("#expAdd")) { expRead(); Exp.rows.push({ name: "", amount: 0, cycle: "monthly", day: 0, units: 0, unit: "", note: "" }); return expRender(); }
   const del = e.target.closest("[data-edel]");
   if (del) { expRead(); Exp.rows.splice(+del.dataset.edel, 1); return expRender(); }
   if (e.target.closest("#expSave")) {

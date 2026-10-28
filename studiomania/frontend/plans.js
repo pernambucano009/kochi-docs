@@ -21,6 +21,15 @@ const PlansPage = (() => {
     if (new URLSearchParams(location.search).get("plans") === "public") d = { ...d, me: null };
     PlansView.mount(w, d, {
       toast: (m, bad) => toast(m, bad),
+      async coupon(code) {
+        if (demo) return toast("هذه معاينة، والكود يعمل في النسخة الحقيقية");
+        try {
+          const r = await api("/api/billing/coupon", { method: "POST", ...jsonBody({ code }) });
+          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
+          if (typeof refreshMe === "function") refreshMe();
+          mount(root);
+        } catch (err) { toast(err.message, true); }
+      },
       signup: (plan, cycle) => { location.href = `/signup${plan ? `?plan=${encodeURIComponent(plan)}&cycle=${cycle}` : ""}`; },
       async pay(kind, key, provider, cycle) {
         if (demo) return toast("هذه معاينة، والدفع يعمل في النسخة الحقيقية");

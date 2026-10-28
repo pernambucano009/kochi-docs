@@ -101,9 +101,19 @@ const FirstUse = (() => {
       sel("fuC", "بلدك", s.regions.map((r) => [r.id, r.name]), c)
       + sel("fuD", "لهجة المحتوى (الأفكار والنص والصوت)", s.dialects.map((d) => [d.id, d.name]), dia, "اخترناها حسب بلدك، ويمكنك تغييرها.")
       + sel("fuF", "مجال نشاطك", s.fields.map((f) => [f.id, f.hint ? `${f.name} (${f.hint})` : f.name]), s.fields[0].id)
-      + sel("fuG", "هدفك من المحتوى", s.goals.map((g) => [g.id, g.name]), s.fields[0].goal),
-      "ابدأ", async (b) => api("/api/onboard", { method: "POST", ...jsonBody({ country: b.querySelector("#fuC").value, dialect: b.querySelector("#fuD").value,
-        field: b.querySelector("#fuF").value, goal: b.querySelector("#fuG").value }) }));
+      + sel("fuG", "هدفك من المحتوى", s.goals.map((g) => [g.id, g.name]), s.fields[0].goal)
+      + `<label class="fu-f"><span>كود خصم (اختياري)</span><input id="fuK" dir="ltr" autocomplete="off" placeholder="WELCOME50"></label>`,
+      "ابدأ", async (b) => {
+        // 🎟️ الكوبون الأول: لو الكود غلط بتظهر الرسالة ومابيكملش (يقدر يمسحه ويكمّل)
+        const k = b.querySelector("#fuK").value.trim();
+        if (k && !b.dataset.kOk) {
+          const r = await api("/api/billing/coupon", { method: "POST", ...jsonBody({ code: k }) });
+          b.dataset.kOk = "1";
+          toast(r.points ? `🎁 أُضيفت ${r.points} نقطة إلى رصيدك` : `🎟️ خصم ${r.pct}٪ على الاشتراك والشحن`);
+        }
+        return api("/api/onboard", { method: "POST", ...jsonBody({ country: b.querySelector("#fuC").value, dialect: b.querySelector("#fuD").value,
+          field: b.querySelector("#fuF").value, goal: b.querySelector("#fuG").value }) });
+      });
     const b = form.last;
     b.querySelector("#fuC").onchange = () => { b.querySelector("#fuD").value = (s.regions.find((r) => r.id === b.querySelector("#fuC").value) || {}).dialect || "ar-msa"; };
     b.querySelector("#fuF").onchange = () => { b.querySelector("#fuG").value = (s.fields.find((f) => f.id === b.querySelector("#fuF").value) || {}).goal || "sales"; };

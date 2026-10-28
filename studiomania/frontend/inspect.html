@@ -55,6 +55,7 @@
   <a href="/admin/live">🎙️ مختبر الصوت المباشر</a>
   <nav id="tabs">
     <button data-t="issues" class="on">🚨 صندوق الأخطاء <b id="issN"></b></button>
+    <button data-t="cust">👥 العملاء والاستهلاك</button>
     <button data-t="runs">الفحص الشامل</button>
     <button data-t="steps">الخطوات</button>
     <button data-t="outs">النتائج للمراجعة</button>
@@ -75,6 +76,25 @@
       <p class="mute" style="margin:8px 0 0">بهذا المفتاح تسحب جلسة Claude الأخطاء الجديدة وتصلحها وتغلقها بنفسها. يظهر مرة واحدة: انسخه وضعه في أسرار بيئة Claude باسم SIMSIM_FEED_KEY، ولا تلصقه في المحادثة. إنشاء مفتاح جديد يلغي القديم.</p>
       <div class="row" id="feedOut" hidden><input id="feedKey" readonly dir="ltr" style="flex:1;min-width:220px"><button class="btn pri" id="feedCopy">انسخ</button></div></div>
     <div id="iss"></div>
+  </section>
+  <section data-p="cust" hidden>
+    <div class="card"><div class="row"><b>استهلاك العملاء</b><span class="mute">التكلفة علينا = النقاط المصروفة ÷ ٣٠٠ دولار (النقطة سنت على العميل، والسعر ٣ أضعاف التكلفة)</span>
+      <select id="cuDays" style="margin-inline-start:auto"><option value="7">آخر ٧ أيام</option><option value="30" selected>آخر ٣٠ يومًا</option><option value="90">آخر ٩٠ يومًا</option><option value="3650">من البداية</option></select>
+      <input type="search" id="cuQ" placeholder="ابحث بالبريد أو الاسم"></div>
+      <div class="kpis" id="cuKpis" style="margin-top:12px"></div></div>
+    <div class="card"><table><thead><tr><th>العميل</th><th>سجّل</th><th>آخر دخول</th><th>الباقة</th><th>الرصيد</th><th>صرف (الفترة)</th><th>التكلفة علينا</th><th>هدايا</th><th>دفع</th></tr></thead><tbody id="cuRows" class="runs"></tbody></table></div>
+    <div class="card" id="cuOne" hidden></div>
+    <div class="card"><div class="row"><b>🎟️ الكوبونات</b><span class="mute">العميل يكتب الكود وهو يسجّل أو من «باقتي ونقاطي»: نقاط هدية، أو خصم ٪ على الاشتراك والشحن. كل عميل يستخدم الكود مرة واحدة.</span></div>
+      <div class="row" style="margin-top:10px">
+        <input id="kpCode" placeholder="الكود (إنجليزي)" class="ltr" style="width:150px">
+        <label class="mute">نقاط هدية <input id="kpPts" type="number" min="0" value="0" style="width:90px"></label>
+        <label class="mute">خصم ٪ <input id="kpPct" type="number" min="0" max="90" value="0" style="width:70px"></label>
+        <label class="mute">أقصى استخدام <input id="kpMax" type="number" min="0" value="0" style="width:80px"></label>
+        <label class="mute">صالح (أيام) <input id="kpDays" type="number" min="0" value="0" style="width:70px"></label>
+        <input id="kpNote" placeholder="ملاحظة (اختياري)">
+        <button class="btn pri" id="kpAdd">أنشئ الكود</button></div>
+      <p class="mute" style="margin:6px 0 0">٠ في «أقصى استخدام» أو «صالح» = من غير حد.</p>
+      <table style="margin-top:10px"><thead><tr><th>الكود</th><th>النقاط</th><th>الخصم</th><th>استُخدم</th><th>ينتهي</th><th>ملاحظة</th><th></th></tr></thead><tbody id="kpRows"></tbody></table></div>
   </section>
   <section data-p="lmap" hidden>
     <div class="card"><p class="mute" style="margin-top:0">كل جملة تظهر للعميل، مستخرجة من الكود نفسه (الموقع، وتطبيق الجوال، ورسائل السيرفر، وخانات القوالب) لا من الشاشة فقط:
@@ -169,11 +189,13 @@ $("iss").onclick = async (e) => {
 
 $("niches").innerHTML = NICHES.map(([k, t]) => `<label class="chip"><input type="checkbox" value="${k}" checked> ${t}</label>`).join("");
 document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => tab(b.dataset.t));
+if (location.hash === "#cust") setTimeout(() => tab("cust"), 0);   // من الإعدادات ← «العملاء والاستهلاك»
 function tab(t) {
   document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
   document.querySelectorAll("main > section").forEach((s) => (s.hidden = s.dataset.p !== t));
   if (t === "map" && !S.map) loadMap();
   if (t === "lmap") loadLm();
+  if (t === "cust") { loadCust(); loadCoupons(); }
 }
 
 $("start").onclick = async () => {
@@ -312,6 +334,68 @@ $("lmAi").onclick = async () => {
 };
 loadIssues();
 loadRuns().catch((e) => { $("runs").innerHTML = `<tr><td class="bad">${esc(e.message)}</td></tr>`; });
+// ---------- 👥 العملاء والاستهلاك
+const CU = { items: [], one: null };
+const money = (v) => "$" + (+v || 0).toFixed(2), num = (v) => (+v || 0).toLocaleString("ar-EG");
+const PLAN = { trial: "تجربة مجانية", starter: "Starter", pro: "Pro", agency: "Agency" };
+async function loadCust() {
+  const d = await api("/api/platform/customers?days=" + $("cuDays").value).catch((e) => ({ items: [], total: {}, err: e.message }));
+  CU.items = d.items || [];
+  const t = d.total || {};
+  $("cuKpis").innerHTML = [["العملاء", num(t.customers)], ["المشتركون", num(t.paying)], ["نقاط مصروفة (الفترة)", num(t.used_period)],
+    ["التكلفة علينا (الفترة)", money(t.cost_period)], ["منها على المجانيين", money(t.cost_free)], ["إجمالي ما دُفع", money(t.revenue)]]
+    .map(([k, v]) => `<div class="kpi"><span class="mute">${k}</span><b>${v}</b></div>`).join("");
+  renderCust(d.err);
+}
+function renderCust(err) {
+  const q = $("cuQ").value.trim().toLowerCase();
+  const rows = CU.items.filter((r) => !q || `${r.email} ${r.name} ${r.brand}`.toLowerCase().includes(q));
+  $("cuRows").innerHTML = err ? `<tr><td colspan="9" class="bad">${esc(err)}</td></tr>` : rows.map((r) => `<tr data-w="${esc(r.workspace)}" class="${CU.one === r.workspace ? "on" : ""}">
+    <td><b>${esc(r.name || r.brand || "—")}</b><br><span class="mute ltr">${esc(r.email || "")}</span></td><td class="mute">${when(r.created_at)}</td><td class="mute">${when(r.last_login)}</td>
+    <td>${r.paying ? `<b class="ok">${esc(PLAN[r.plan] || r.plan)}</b>` : esc(PLAN[r.plan] || r.plan || "—")}${r.discount_pct ? ` <span class="chip">خصم ${r.discount_pct}٪</span>` : ""}</td>
+    <td>${num(r.balance)}</td><td>${num(r.used_period)}</td><td>${money(r.cost_period)}</td><td>${r.gifted ? num(r.gifted) : ""}</td><td>${r.paid ? money(r.paid) : ""}</td></tr>`).join("")
+    || `<tr><td colspan="9" class="mute">لا يوجد عملاء بعد</td></tr>`;
+}
+async function openCust(w) {
+  CU.one = w; renderCust();
+  const r = CU.items.find((x) => x.workspace === w), box = $("cuOne");
+  box.hidden = false; box.innerHTML = `<p class="mute">جارٍ التحميل…</p>`;
+  const d = await api(`/api/platform/customers/${w}?days=${$("cuDays").value}`).catch((e) => ({ err: e.message }));
+  if (d.err) { box.innerHTML = `<p class="bad">${esc(d.err)}</p>`; return; }
+  const KIND = { use: "صرف", trial: "تجربة", plan: "الباقة", topup: "شحن", gift: "هدية", coupon: "كوبون", renewal: "تجديد", test: "فحص" };
+  box.innerHTML = `<div class="row"><b>${esc(r?.name || r?.brand || "")}</b><span class="mute ltr">${esc(r?.email || "")}</span>
+      <span style="margin-inline-start:auto" class="row"><input id="gfPts" type="number" min="1" placeholder="عدد النقاط" style="width:110px"><input id="gfNote" placeholder="سبب الهدية (يظهر للعميل)">
+      <button class="btn pri" id="gfGo">🎁 أهدِ نقاطًا</button></span></div>
+    <h4>صرف نقاطه في (الفترة المختارة)</h4>
+    <table><thead><tr><th>القسم</th><th>النقاط</th><th>مرات</th><th>التكلفة علينا</th></tr></thead><tbody>${(d.by_cat || []).map((x) => `<tr><td>${esc(x.cat)}</td><td>${num(x.points)}</td><td>${num(x.times)}</td><td>${money(x.cost)}</td></tr>`).join("") || `<tr><td colspan="4" class="mute">لم يصرف شيئًا في هذه الفترة</td></tr>`}</tbody></table>
+    <h4>آخر حركات النقاط</h4>
+    <table><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>النقاط</th></tr></thead><tbody>${(d.moves || []).map((m) => `<tr><td class="mute">${when(m.at)}</td><td>${KIND[m.kind] || esc(m.kind)}</td><td>${esc(m.note || "")}</td><td class="${m.delta > 0 ? "ok" : ""}" dir="ltr">${m.delta > 0 ? "+" : ""}${num(m.delta)}</td></tr>`).join("")}</tbody></table>
+    ${(d.payments || []).length ? `<h4>المدفوعات</h4><table><tbody>${d.payments.map((p) => `<tr><td class="mute">${when(p.at)}</td><td>${esc(p.kind)}</td><td>${esc(p.note || "")}</td><td>${money(p.amount)}</td></tr>`).join("")}</tbody></table>` : ""}`;
+  $("gfGo").onclick = async () => {
+    const n = +$("gfPts").value;
+    if (!(n > 0)) return alert("اكتب عدد النقاط");
+    try { await api(`/api/platform/customers/${w}/gift`, { method: "POST", body: JSON.stringify({ points: n, note: $("gfNote").value }) }); await loadCust(); openCust(w); }
+    catch (e) { alert(e.message); }
+  };
+}
+$("cuRows").onclick = (e) => { const tr = e.target.closest("tr[data-w]"); if (tr) openCust(tr.dataset.w); };
+$("cuDays").onchange = () => { loadCust(); if (CU.one) openCust(CU.one); };
+$("cuQ").oninput = () => renderCust();
+// ---------- 🎟️ الكوبونات
+async function loadCoupons() {
+  const d = await api("/api/platform/coupons").catch(() => ({ items: [] }));
+  $("kpRows").innerHTML = (d.items || []).map((k) => `<tr><td class="ltr"><b>${esc(k.code)}</b></td><td>${k.points ? num(k.points) : ""}</td><td>${k.pct ? k.pct + "٪" : ""}</td>
+    <td>${num(k.used)}${k.max_uses ? " / " + num(k.max_uses) : ""}</td><td class="mute">${k.expires ? when(k.expires) : "—"}</td><td>${esc(k.note || "")}</td>
+    <td><button class="btn" data-kdel="${esc(k.code)}">احذف</button></td></tr>`).join("") || `<tr><td colspan="7" class="mute">لا توجد كوبونات بعد</td></tr>`;
+}
+$("kpAdd").onclick = async () => {
+  try {
+    await api("/api/platform/coupons", { method: "POST", body: JSON.stringify({ code: $("kpCode").value, points: +$("kpPts").value || 0, pct: +$("kpPct").value || 0,
+      max_uses: +$("kpMax").value || 0, days: +$("kpDays").value || 0, note: $("kpNote").value }) });
+    $("kpCode").value = ""; loadCoupons();
+  } catch (e) { alert(e.message); }
+};
+$("kpRows").onclick = async (e) => { const b = e.target.closest("[data-kdel]"); if (!b || !confirm(`تحذف الكود ${b.dataset.kdel}؟ من استخدمه يحتفظ بما أخذه.`)) return; await api(`/api/platform/coupons/${b.dataset.kdel}`, { method: "DELETE" }).catch(() => {}); loadCoupons(); };
 </script>
 </body>
 </html>

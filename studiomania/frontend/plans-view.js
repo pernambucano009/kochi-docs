@@ -109,6 +109,8 @@ const PlansView = (() => {
 :is(#nh, body) .pv-cont:not(.open) .sep, :is(#nh, body) .pv-cont:not(.open) .tp { display: none; }
 :is(#nh, body) .pv-low { position: relative; flex-direction: column; align-items: center; gap: 8px; }
 :is(#nh, body) .pv-hist-b { height: 30px; padding: 0 12px; border-radius: 99px; font-size: 12.5px; color: var(--pv-sub); background: var(--pv-fill); }
+:is(#nh, body) .pv-coupon { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--pv-sub); }
+:is(#nh, body) .pv-coupon input { height: 30px; width: 130px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--pv-fill); background: transparent; color: inherit; font: inherit; }
 :is(#nh, body) .pv-hist { width: min(420px, 100%); max-height: 240px; overflow-y: auto; padding: 8px 14px; border-radius: 18px; background: var(--pv-card); box-shadow: var(--pv-cont); }
 :is(#nh, body) .pv-hist li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 12.5px; border-bottom: 1px solid var(--pv-line); }
 :is(#nh, body) .pv-hist li:last-child { border-bottom: 0; }
@@ -214,12 +216,18 @@ const PlansView = (() => {
       return `<div class="pv-cont${S.tops ? " open" : ""}"><svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="trk"/><circle cx="20" cy="20" r="16" class="val" style="stroke-dasharray:${pct} 100.5"/></svg>
         <b class="ttl" title="نقاط الباقة ${n(c.plan_credits)} · نقاط إضافية ${n(c.topup_credits)}"><span class="num">${n(c.total)}</span> نقطة</b><span class="sep"></span>${tops}<button class="more" data-pvmore aria-label="أضف نقاطًا">+</button></div>`;
     }
+    // 🎟️ كود الخصم: يكتبه هنا في أي وقت (نقاط هدية أو خصم ٪ على الاشتراك والشحن)، والخصم الشغّال بيبان
+    function coupon() {
+      if (guest || d.owner || !o.coupon) return "";
+      return `<div class="pv-coupon">${d.discount ? `<span>🎟️ خصمك ${d.discount.pct}٪ على الاشتراك والشحن <bdi dir="ltr">(${esc(d.discount.code)})</bdi></span>` : ""}
+        <input data-pvk dir="ltr" autocomplete="off" placeholder="كود خصم" aria-label="كود خصم"><button class="pv-hist-b" data-pvkgo>طبّق الكود</button></div>`;
+    }
     // 🧾 سجل النقاط: كل خصم وكل رجوع وكل هدية بسطر، عشان العميل يعرف الرقم جه منين
     const KIND = { gift: "هدية", refund: "استرجاع", use: "", plan: "الباقة", topup: "شحن", trial: "التجربة" };
     function hist() {
       if (guest || d.owner || !(d.history || []).length) return "";
       const rows = d.history.map((h) => `<li><span>${KIND[h.kind] ? `<b>${esc(KIND[h.kind])}</b> · ` : ""}${esc(h.note || "")}<small>${fmtD(h.at)}</small></span><bdi class="d${h.delta > 0 ? " plus" : ""}" dir="ltr">${h.delta > 0 ? "+" : "-"}${n(Math.abs(h.delta))}</bdi></li>`).join("");
-      return `<button class="pv-hist-b" data-pvhist aria-expanded="${!!S.hist}">${S.hist ? "إخفاء سجل النقاط" : "سجل النقاط"}</button>${S.hist ? `<ul class="pv-hist">${rows}</ul>` : ""}`;
+      return coupon() + `<button class="pv-hist-b" data-pvhist aria-expanded="${!!S.hist}">${S.hist ? "إخفاء سجل النقاط" : "سجل النقاط"}</button>${S.hist ? `<ul class="pv-hist">${rows}</ul>` : ""}`;
     }
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
@@ -257,6 +265,7 @@ const PlansView = (() => {
         S.pick = key; render(); return pv().classList.add("open");
       }
       if (q("[data-pvpay]")) { const b = q("[data-pvpay]"); return pay("plan", b.dataset.plan, b.dataset.pvpay); }
+      if (q("[data-pvkgo]")) { const v = el.querySelector("[data-pvk]")?.value.trim(); return v ? o.coupon(v) : null; }
       if (q("[data-pvhist]")) { S.hist = !S.hist; const o2 = S.open; render(); return o2 && pv().classList.add("open"); }
       if (q("[data-pvmore]")) { S.tops = !S.tops; S.top = null; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
       const t = q("[data-pvtop]");

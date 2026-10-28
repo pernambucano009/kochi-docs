@@ -4325,6 +4325,7 @@ def dm_flow_set(body: DmFlowIn):
 # ---------------------------------------------------------------- 💸 مصاريف المنصة الشهرية (لمالك المنصة فقط)
 # كل اشتراك أو خدمة بتدفعلها: المبلغ، شهري ولا سنوي ولا على قد الاستخدام، ويوم التجديد. المجموع الشهري بيتحسب لوحده.
 EXPENSES_F = DATA_DIR / "expenses.json"
+EXPENSES_SEEN = DATA_DIR / "expenses_seen.json"   # أسماء الخدمات اللي ظهرت لك في الجدول (عشان اللي تمسحه مايرجعش)
 EXPENSE_CYCLES = {"monthly": "شهري", "yearly": "سنوي", "usage": "حسب الاستخدام", "free": "مجاني"}
 EXPENSE_PRESET = [
     {"name": "Oracle Cloud (السيرفر)", "amount": 0, "cycle": "free", "day": 0, "note": "باقة Always Free"},
@@ -4334,15 +4335,34 @@ EXPENSE_PRESET = [
     {"name": "ElevenLabs", "amount": 22, "cycle": "monthly", "day": 0, "note": "Creator: أول شهر $11، والاستخدام التجاري يحتاج باقة مدفوعة"},
     {"name": "فصيح", "amount": 19, "cycle": "usage", "day": 0, "note": "باقة ١٠٠ دقيقة"},
     {"name": "منصت", "amount": 8, "cycle": "usage", "day": 0, "note": ""},
-    {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "note": ""},
+    {"name": "ScrapeCreators", "amount": 0, "cycle": "usage", "day": 0, "unit": "رصيد", "note": "تحليل الحسابات والمنافسين والترند"},
+    # 🔑 كل مفتاح API عندنا ليه سطر: أقل مبلغ شراء، وبيدّينا كام وحدة، فنعرف الفاتورة الثابتة وسعر الوحدة (العدد بيتكتب من الأدمن)
+    {"name": "Authentica (رسائل التحقق)", "amount": 0, "cycle": "usage", "day": 0, "unit": "رسالة", "note": "الدخول برقم الجوال"},
+    {"name": "OpenAI (المساعدة الصوتية)", "amount": 0, "cycle": "usage", "day": 0, "unit": "دولار رصيد", "note": "مكالمة سعاد أول التسجيل"},
+    {"name": "Gemini", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": ""},
+    {"name": "MiniMax", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الأصوات والاستنساخ"},
+    {"name": "SILMA", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "أصوات الفصحى والسعودية"},
+    {"name": "AudioShake", "amount": 0, "cycle": "usage", "day": 0, "unit": "دقيقة", "note": "فصل الصوت في الدبلجة"},
+    {"name": "Recraft", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "الصور المتجهة"},
+    {"name": "Resend (البريد الإلكتروني)", "amount": 0, "cycle": "monthly", "day": 0, "unit": "رسالة", "note": ""},
+    {"name": "Pexels", "amount": 0, "cycle": "free", "day": 0, "unit": "", "note": "صور وفيديوهات مجانية"},
+    {"name": "GIPHY / Klipy", "amount": 0, "cycle": "free", "day": 0, "unit": "", "note": "الصور المتحركة"},
+    {"name": "PayPal", "amount": 0, "cycle": "usage", "day": 0, "unit": "", "note": "عمولة على كل دفعة (حوالي ٣٪ + ٣٠ سنت)"},
 ]
 
 
 def expenses_load() -> list[dict]:
     try:
-        return json.loads(EXPENSES_F.read_text(encoding="utf-8"))
+        rows = json.loads(EXPENSES_F.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return [dict(x) for x in EXPENSE_PRESET]
+    # خدمة جديدة اتضافت للبرنامج ومش في جدولك: تظهر في الآخر. اللي مسحته بإيدك مابيرجعش (بيتسجل «اتشاف» لما تحفظ الجدول)
+    try:
+        seen = set(json.loads(EXPENSES_SEEN.read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        seen = set()
+    have = {r.get("name") for r in rows}
+    return rows + [dict(x) for x in EXPENSE_PRESET if x["name"] not in seen and x["name"] not in have]
 
 
 def expenses_out(rows: list[dict]) -> dict:
@@ -4376,9 +4396,15 @@ def expenses_put(body: ExpensesIn):
             day = max(0, min(31, int(r.get("day") or 0)))
         except (TypeError, ValueError):
             amount, day = 0.0, 0
+        try:
+            units = max(0, min(10**9, int(float(r.get("units") or 0))))
+        except (TypeError, ValueError):
+            units = 0
         rows.append({"name": name, "amount": round(amount, 2), "cycle": r.get("cycle") if r.get("cycle") in EXPENSE_CYCLES else "monthly", "day": day,
+                     "units": units, "unit": str(r.get("unit") or "").strip()[:30],
                      "note": str(r.get("note") or "").strip()[:160]})
     EXPENSES_F.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+    EXPENSES_SEEN.write_text(json.dumps(sorted({x["name"] for x in EXPENSE_PRESET} | {r["name"] for r in rows}), ensure_ascii=False), encoding="utf-8")
     return expenses_out(rows)
 
 

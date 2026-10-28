@@ -1646,6 +1646,16 @@
               <p class="hint" id="setPlan">الاشتراكات، والإضافات، والنقاط الإضافية، وتكلفة كل شيء بالنقاط.</p>
               <div class="row wrap"><button class="btn primary" type="button" onclick="document.getElementById('stagePlans').click()">💳 باقتي ونقاطي</button></div>
             </section>
+            <section class="panel set-card admin-only">
+              <div class="set-k">CUSTOMERS</div><h2>👥 العملاء والاستهلاك</h2>
+              <p class="hint">كل العملاء: من سجّل، ومجاني أم مشترك، وكم صرف ومن أي قسم، وتكلفته علينا بالدولار. ومنها تهدي نقاطًا وتصنع كوبونات الخصم.</p>
+              <div class="row wrap"><a class="btn primary" href="/admin/inspect#cust">افتح العملاء والكوبونات</a></div>
+            </section>
+            <section class="panel set-card cust-only">
+              <div class="set-k">USAGE</div><h2>📊 استهلاك نقاطك</h2>
+              <p class="hint">آخر ٣٠ يومًا: كم نقطة صرفت، وفي أي الأقسام.</p>
+              <div id="useBox"><p class="hint">جارٍ التحميل…</p></div>
+            </section>
             <section class="panel set-card settings studio-only">
               <div class="set-k">PREFERENCES</div><h2><span class="admin-lang-t">الشكل واللغة</span><span class="cust-lang-t">الشكل</span></h2>
               <p class="hint admin-lang">اللغة</p>

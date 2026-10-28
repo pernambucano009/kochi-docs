@@ -94,10 +94,13 @@ with closing(db()) as _c, _c:
     CREATE TABLE IF NOT EXISTS ledger (id TEXT PRIMARY KEY, workspace TEXT, delta INTEGER, kind TEXT, note TEXT, ref TEXT, at REAL);
     CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
     CREATE TABLE IF NOT EXISTS payments (ref TEXT PRIMARY KEY, workspace TEXT, provider TEXT, kind TEXT, amount REAL, note TEXT, at REAL);
+    CREATE TABLE IF NOT EXISTS coupons (code TEXT PRIMARY KEY, points INTEGER DEFAULT 0, pct INTEGER DEFAULT 0, max_uses INTEGER DEFAULT 0,
+      used INTEGER DEFAULT 0, expires REAL, note TEXT DEFAULT '', created_at REAL);
+    CREATE TABLE IF NOT EXISTS coupon_uses (code TEXT, workspace TEXT, at REAL, PRIMARY KEY (code, workspace));
     """)
     _cols = {r[1] for r in _c.execute("PRAGMA table_info(workspaces)")}
     for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL"),
-                       ("cycle", "TEXT"), ("refill_at", "REAL")):
+                       ("cycle", "TEXT"), ("refill_at", "REAL"), ("discount_pct", "INTEGER"), ("discount_code", "TEXT")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
     if "apple_sub" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 🍎 الدخول بـ Apple من الآيفون
@@ -694,6 +697,7 @@ class SignupIn(BaseModel):
     dialect: str = ""
     field: str = ""
     goal: str = ""
+    coupon: str = ""
 
 
 # 🗣️ البلد واللهجة والمجال والهدف (fieldpacks): بيتحفظوا في onboard.json في مساحة العميل، والعقل بياخدهم أول ما يتعمل.
@@ -736,7 +740,14 @@ def signup(body: SignupIn, request: Request):
     check_pw(body.password)
     if user_by("email", email):
         raise HTTPException(400, "يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول به أو استخدم «نسيت كلمة المرور»")
+    if body.coupon.strip():   # الكود الغلط بيتقال قبل ما الحساب يتعمل
+        with closing(db()) as c:
+            k = c.execute("SELECT expires, max_uses, used FROM coupons WHERE code=?", (coupon_code(body.coupon),)).fetchone()
+        if not k or (k["expires"] and k["expires"] < time.time()) or (k["max_uses"] and k["used"] >= k["max_uses"]):
+            raise HTTPException(400, "كود الخصم غير صحيح أو انتهت صلاحيته")
     wid = new_workspace(body.name.strip()[:80] or email.split("@")[0])
+    if body.coupon.strip():
+        coupon_redeem(wid, body.coupon)
     save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], body.name.strip()[:80])
     uid = uuid.uuid4().hex[:12]
     with closing(db()) as c, c:
@@ -1270,7 +1281,23 @@ def billing_state(request: Request):
             "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
             "paypal": payments.paypal_on(),
-            "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist}
+            "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist,
+            "discount": {"pct": w["discount_pct"] or 0, "code": w["discount_code"] or ""} if w and w["discount_pct"] else None}
+
+
+@app.get("/api/billing/usage")
+def billing_usage(request: Request, days: int = 30):
+    """📊 استهلاك العميل: صرف كام نقطة في الفترة، وفي أنهي أقسام (من سجل النقاط)."""
+    u = customer_user(request)
+    since = time.time() - max(1, min(days, 365)) * 86400
+    with closing(db()) as c:
+        moves = c.execute("SELECT delta, note FROM ledger WHERE workspace=? AND kind='use' AND at>=?", (u["workspace"], since)).fetchall()
+        b = c.execute("SELECT plan_credits + topup_credits AS n FROM wallet WHERE workspace=?", (u["workspace"],)).fetchone()
+    cats: dict[str, int] = {}
+    for m in moves:
+        cats[_cat(m["note"])] = cats.get(_cat(m["note"]), 0) - m["delta"]
+    return {"days": days, "used": sum(cats.values()), "balance": b["n"] if b else 0, "times": len(moves),
+            "by_cat": [{"cat": k, "points": v} for k, v in sorted(cats.items(), key=lambda x: -x[1])]}
 
 
 class CheckoutIn(BaseModel):
@@ -1288,6 +1315,10 @@ def checkout(body: CheckoutIn, request: Request):
     u = customer_user(request)
     wid, back = u["workspace"], base_url(request)
     cfg = billing.config(DATA_DIR)
+    # 🎟️ خصم الكوبون (٪) على الاشتراك والشحن
+    w = workspace(wid)
+    pct = int(w["discount_pct"] or 0) if w else 0
+    off = lambda v: round(v * (100 - pct) / 100, 2) if pct else v  # noqa: E731
     try:
         if body.kind == "topup":
             t = next((x for x in cfg["topups"] if x["key"] == body.topup), None)
@@ -1295,7 +1326,7 @@ def checkout(body: CheckoutIn, request: Request):
                 raise HTTPException(400, "باقة النقاط هذه غير موجودة")
             name = f"SimsimKit · {t['credits']:,} نقطة"
             if body.provider == "paypal":
-                url = payments.paypal_order(t["price"], f"{wid}|topup|{t['key']}", name,
+                url = payments.paypal_order(off(t["price"]), f"{wid}|topup|{t['key']}", name,
                                             ret=f"{back}/api/billing/paypal/order", cancel=f"{back}/billing")
             else:
                 raise HTTPException(400, "طريقة دفع غير معروفة")
@@ -1304,6 +1335,7 @@ def checkout(body: CheckoutIn, request: Request):
             tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
         except ValueError as e:
             raise HTTPException(400, str(e))
+        tot = {**tot, "total": off(tot["total"])}
         p = plan_of(body.plan)
         extra = tot["accounts"] - p["accounts"]
         ap_paid = tot["autopilot"] and not p.get("autopilot")
@@ -1525,6 +1557,171 @@ def admin_users(request: Request):
                             FROM users u LEFT JOIN workspaces w ON w.id = u.workspace LEFT JOIN wallet x ON x.workspace = u.workspace
                             ORDER BY u.created_at DESC""").fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------- 👥 العملاء واستهلاكهم (للأدمن)
+# كل عميل: سجّل إمتى، باقته (تجربة مجانية ولا مشترك)، نقاطه اللي صرفها، وتكلفتها الحقيقية علينا بالدولار
+# (النقطة = سنت على العميل، والسعر = التكلفة × ٣، فالتكلفة = النقاط ÷ ٣٠٠ دولار)، واللي دفعه، وصرف نقاطه في إيه.
+COST_PER_POINT = billing.CREDIT_USD / billing.MARKUP
+
+
+def _cat(note: str) -> str:
+    """«المنافسين: اقتراح منافسين» ← «المنافسين»: الجزء قبل النقطتين هو القسم."""
+    return (str(note or "").split(":")[0].split("·")[0].strip() or "أخرى")[:40]
+
+
+@app.get("/api/platform/customers")
+def admin_customers(request: Request, days: int = 30):
+    admin(request)
+    since = time.time() - max(1, min(days, 3650)) * 86400
+    with closing(db()) as c:
+        rows = [dict(r) for r in c.execute("""SELECT w.id AS workspace, w.name AS brand, w.plan, w.created_at, w.discount_pct, w.discount_code,
+            (SELECT CASE WHEN u.email LIKE '%@phone.simsimkit' THEN u.phone ELSE u.email END FROM users u WHERE u.workspace = w.id ORDER BY u.created_at LIMIT 1) AS email,
+            (SELECT u.name FROM users u WHERE u.workspace = w.id ORDER BY u.created_at LIMIT 1) AS name,
+            (SELECT MAX(u.last_login) FROM users u WHERE u.workspace = w.id) AS last_login,
+            COALESCE(x.plan_credits, 0) + COALESCE(x.topup_credits, 0) AS balance
+            FROM workspaces w LEFT JOIN wallet x ON x.workspace = w.id WHERE w.id != ? ORDER BY w.created_at DESC""", (OWNER,))]
+        use = {r["workspace"]: dict(r) for r in c.execute("""SELECT workspace, -SUM(CASE WHEN at >= ? THEN delta ELSE 0 END) AS used_period,
+            -SUM(delta) AS used_all FROM ledger WHERE kind = 'use' GROUP BY workspace""", (since,))}
+        gifts = {r["workspace"]: r["n"] for r in c.execute("SELECT workspace, SUM(delta) AS n FROM ledger WHERE kind IN ('gift', 'coupon') GROUP BY workspace")}
+        paid = {r["workspace"]: r["n"] for r in c.execute("SELECT workspace, SUM(amount) AS n FROM payments GROUP BY workspace")}
+    tot = {"customers": len(rows), "paying": 0, "used_period": 0, "cost_period": 0.0, "cost_free": 0.0, "revenue": 0.0}
+    for r in rows:
+        u = use.get(r["workspace"]) or {}
+        r["used_period"], r["used_all"] = int(u.get("used_period") or 0), int(u.get("used_all") or 0)
+        r["cost_period"], r["cost_all"] = round(r["used_period"] * COST_PER_POINT, 2), round(r["used_all"] * COST_PER_POINT, 2)
+        r["gifted"], r["paid"] = int(gifts.get(r["workspace"]) or 0), round(float(paid.get(r["workspace"]) or 0), 2)
+        r["paying"] = r["plan"] not in ("trial", None, "") and r["paid"] > 0
+        tot["paying"] += r["paying"]
+        tot["used_period"] += r["used_period"]
+        tot["cost_period"] += r["cost_period"]
+        tot["cost_free"] += 0 if r["paying"] else r["cost_period"]
+        tot["revenue"] += r["paid"]
+    tot = {k: round(v, 2) if isinstance(v, float) else v for k, v in tot.items()}
+    return {"items": rows, "total": tot, "days": days}
+
+
+@app.get("/api/platform/customers/{wid}")
+def admin_customer(wid: str, request: Request, days: int = 30):
+    """تفاصيل عميل: صرف نقاطه في أنهي قسم (والتكلفة علينا)، وآخر حركات نقاطه."""
+    admin(request)
+    if not workspace(wid):
+        raise HTTPException(404, "هذا العميل غير موجود")
+    since = time.time() - max(1, min(days, 3650)) * 86400
+    with closing(db()) as c:
+        moves = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? ORDER BY at DESC LIMIT 300", (wid,))]
+        pays = [dict(r) for r in c.execute("SELECT provider, kind, amount, note, at FROM payments WHERE workspace=? ORDER BY at DESC LIMIT 50", (wid,))]
+    cats: dict[str, dict] = {}
+    for m in moves:
+        if m["kind"] == "use" and m["at"] >= since:
+            x = cats.setdefault(_cat(m["note"]), {"cat": _cat(m["note"]), "points": 0, "times": 0})
+            x["points"] -= m["delta"]
+            x["times"] += 1
+    by = sorted(cats.values(), key=lambda x: -x["points"])
+    for x in by:
+        x["cost"] = round(x["points"] * COST_PER_POINT, 2)
+    return {"by_cat": by, "moves": moves[:120], "payments": pays}
+
+
+class GiftIn(BaseModel):
+    points: int
+    note: str = ""
+
+
+@app.post("/api/platform/customers/{wid}/gift")
+def admin_gift(wid: str, body: GiftIn, request: Request):
+    """🎁 نقاط هدية من الأدمن (بتتحط مع النقاط المشحونة، فمابتروحش مع تجديد الباقة)."""
+    admin(request)
+    n = int(body.points)
+    if not workspace(wid) or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    if not 1 <= n <= 1_000_000:
+        raise HTTPException(400, "اكتب عدد نقاط صحيحًا")
+    with closing(db()) as c, c:
+        c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+        c.execute("UPDATE wallet SET topup_credits = topup_credits + ?, updated_at=? WHERE workspace=?", (n, time.time(), wid))
+        ledger_add(c, wid, n, "gift", (body.note.strip() or "نقاط هدية من فريق سمسمكيت")[:120])
+    return {"ok": True}
+
+
+# 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن
+class CouponIn(BaseModel):
+    code: str
+    points: int = 0
+    pct: int = 0
+    max_uses: int = 0      # ٠ = من غير حد
+    days: int = 0          # صالح كام يوم (٠ = من غير تاريخ انتهاء)
+    note: str = ""
+
+
+def coupon_code(s: str) -> str:
+    return re.sub(r"[^A-Z0-9_-]", "", str(s or "").upper())[:24]
+
+
+@app.get("/api/platform/coupons")
+def coupons_list(request: Request):
+    admin(request)
+    with closing(db()) as c:
+        return {"items": [dict(r) for r in c.execute("SELECT * FROM coupons ORDER BY created_at DESC")]}
+
+
+@app.post("/api/platform/coupons")
+def coupons_add(body: CouponIn, request: Request):
+    admin(request)
+    code = coupon_code(body.code)
+    if len(code) < 3:
+        raise HTTPException(400, "الكود ٣ أحرف أو أرقام على الأقل (إنجليزي)")
+    pts, pct = max(0, min(int(body.points), 1_000_000)), max(0, min(int(body.pct), 90))
+    if not pts and not pct:
+        raise HTTPException(400, "حدّد نقاط هدية أو نسبة خصم")
+    with closing(db()) as c, c:
+        if c.execute("SELECT 1 FROM coupons WHERE code=?", (code,)).fetchone():
+            raise HTTPException(400, "هذا الكود موجود بالفعل")
+        c.execute("INSERT INTO coupons (code, points, pct, max_uses, used, expires, note, created_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)",
+                  (code, pts, pct, max(0, int(body.max_uses)), time.time() + body.days * 86400 if body.days > 0 else None, body.note.strip()[:120], time.time()))
+    return coupons_list(request)
+
+
+@app.delete("/api/platform/coupons/{code}")
+def coupons_del(code: str, request: Request):
+    admin(request)
+    with closing(db()) as c, c:
+        c.execute("DELETE FROM coupons WHERE code=?", (coupon_code(code),))
+    return coupons_list(request)
+
+
+def coupon_redeem(wid: str, raw: str) -> dict:
+    """يطبّق الكوبون على مساحة العميل مرة واحدة: النقاط تنزل في رصيده، والخصم يتسجل على المساحة ويتطبق في الدفع."""
+    code = coupon_code(raw)
+    with closing(db()) as c, c:
+        k = c.execute("SELECT * FROM coupons WHERE code=?", (code,)).fetchone()
+        if not k:
+            raise HTTPException(400, "هذا الكود غير صحيح")
+        if k["expires"] and k["expires"] < time.time():
+            raise HTTPException(400, "انتهت صلاحية هذا الكود")
+        if k["max_uses"] and k["used"] >= k["max_uses"]:
+            raise HTTPException(400, "استُخدم هذا الكود بالعدد المسموح")
+        if c.execute("SELECT 1 FROM coupon_uses WHERE code=? AND workspace=?", (code, wid)).fetchone():
+            raise HTTPException(400, "استخدمت هذا الكود من قبل")
+        c.execute("INSERT INTO coupon_uses (code, workspace, at) VALUES (?, ?, ?)", (code, wid, time.time()))
+        c.execute("UPDATE coupons SET used = used + 1 WHERE code=?", (code,))
+        if k["points"]:
+            c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+            c.execute("UPDATE wallet SET topup_credits = topup_credits + ?, updated_at=? WHERE workspace=?", (k["points"], time.time(), wid))
+            ledger_add(c, wid, k["points"], "coupon", f"كوبون {code}")
+        if k["pct"]:
+            c.execute("UPDATE workspaces SET discount_pct=?, discount_code=? WHERE id=?", (k["pct"], code, wid))
+    return {"ok": True, "points": k["points"], "pct": k["pct"]}
+
+
+class RedeemIn(BaseModel):
+    code: str
+
+
+@app.post("/api/billing/coupon")
+def billing_coupon(body: RedeemIn, request: Request):
+    u = customer_user(request)
+    return coupon_redeem(u["workspace"], body.code)
 
 
 # ---------------------------------------------------------------- 🧭 الفحص الشامل (صفحة الأدمن /admin/inspect)

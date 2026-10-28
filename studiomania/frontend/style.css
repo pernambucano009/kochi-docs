@@ -2926,6 +2926,10 @@ dialog.cal-dlg { width: min(720px, 94vw); max-height: 90vh; border: 1px solid va
 
 /* 🚪 حساب عميل (من البوابة): أدوات الأدمن بتستخبى */
 html[data-role="customer"] .admin-only { display: none !important; }
+html:not([data-role="customer"]) .cust-only { display: none !important; }   /* استهلاك نقاط العميل: للعملاء بس */
+.use-tot { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 10px; } .use-tot b { display: block; font-size: 22px; }
+.use-bars { display: flex; flex-direction: column; gap: 6px; } .use-bars div { display: grid; grid-template-columns: minmax(90px, 1fr) 3fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.use-bars i { display: block; height: 6px; border-radius: 6px; background: var(--accent); }
 
 /* 🧠 فرز الكومنتات */
 .ib-triage { display: grid; gap: 8px; padding: 12px 14px; margin: 10px 0; border-radius: 14px; background: var(--surface-2); }
@@ -3159,7 +3163,8 @@ html[data-role="customer"] .admin-only { display: none !important; }
 /* 💸 فواتيري الشهرية */
 .set-wide{grid-column:1 / -1}
 .exp-tbl{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
-.exp-row{display:grid;grid-template-columns:minmax(150px,1.4fr) 90px 140px 90px minmax(140px,1.6fr) 36px;gap:6px;align-items:center;min-width:680px}
+.exp-row{display:grid;grid-template-columns:minmax(150px,1.4fr) 90px 140px 90px 100px 90px 90px minmax(140px,1.6fr) 36px;gap:6px;align-items:center;min-width:1000px}
+.exp-row .exp-pu{font-size:12.5px;color:var(--muted);direction:ltr;text-align:center}
 .exp-row input,.exp-row select{font:inherit;font-size:13px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--field,transparent);color:inherit;min-width:0}
 .exp-h span{font-size:11px;color:var(--muted)}
 .exp-sum{display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin:10px 0 6px}
