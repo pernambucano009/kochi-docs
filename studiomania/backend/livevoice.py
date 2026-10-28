@@ -226,6 +226,7 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 {tool_txt}
 Rules:
 - Never end a turn on a plain statement: if you are not asking anything, keep going in the same turn to your next question.
+  A transition like "ok, let's continue step by step" is never a whole turn: say it and ask the next question right after it, in the same turn.
   Only stop talking after a question (or a request like uploading something).
 - Turn-taking: every turn is 1–2 short sentences with at most ONE question, then STOP and wait for the user. Never ask two things
   in one turn, never chain the next question before they answered. A tool result alone is never a reason to speak again

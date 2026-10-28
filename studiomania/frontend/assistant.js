@@ -293,7 +293,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
           // ردها كان كلام مش سؤال: لو العميل فضل ساكت ثانية بعد ما تخلّص، تكمّل هي (التقدير على طول الكلام لو حدث نهاية الصوت ماوصلش)
-          if (r.msg && id === S.capId) { S.lastQ = /[؟?]\s*$/.test(S.aBuf.trim()) || !!S.ask; nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status(); }
+          // «في انتظار ردك» بس لو آخر جملة قالتها سؤال، أو طلبت حاجة وخانتها ظاهرة فعلًا. أي جملة تانية (زي «خلينا نكمل…») هي اللي تكمّل
+          if (r.msg && (id === S.capId || !S.capId)) {
+            const last = sentences(S.aBuf).pop() || "";
+            S.lastQ = /[؟?]\s*$/.test(last) || (!!S.ask && !!(q(".as-box") || S.acct));
+            nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
+          }
           if (!r.msg) { S.thinking = false; status(); }
         } else if (e.type === "response.function_call_arguments.done") {
           const r = R(e.response_id); r.calls++; r.pending++;
