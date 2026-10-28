@@ -3198,6 +3198,8 @@ window.I18N_EN = {
   "قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.": "Until a quote arrives we estimate it: our cheapest unit price minus the expected discount. Once you enter the quoted price we use it directly.",
   "اكتب سعر العرض وعدد الوحدات معًا": "Enter the quoted price and units together",
   "✅ حُفظت الباقة المخصصة": "✅ Custom pack saved",
+  "٢٤٠ ريال · دفع مرة واحدة": "SAR 240 · one-time payment",
+  "باقة مخصصة للمؤسسات (الدفع مرة واحدة)": "Enterprise custom pack (one-time payment)",
   "📊 تصدير النموذج المالي": "📊 Export financial model",
   "ملف Excel: الباقات والسيناريوهات واستهلاك المنصات والعملاء والإنفاق والإيراد": "Excel file: packs, scenarios, platform usage, customers, spend and revenue",
   "ملف Excel: الباقات والسيناريوهات واستهلاك المنصات والعملاء والإنفاق والإيراد (آخر ١٢ شهرًا)": "Excel file: packs, scenarios, platform usage, customers, spend and revenue (last 12 months)",

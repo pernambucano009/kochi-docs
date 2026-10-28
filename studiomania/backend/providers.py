@@ -142,7 +142,7 @@ PACK_PRESET = {
     "zernio": [_p("٣–١٠ حسابات", 6, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا (أول حسابين مجانًا)", use=True),
                _p("١١–١٠٠ حساب", 3, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا"),
                _p("+١٠١ حساب", 1, 1, "month", "acc", "السعر لكل حساب مربوط شهريًا")],
-    "authentica": [_p("Lite", 240 / SAR, 2000, unit="msg", note="٢٤٠ ريال · الصفحة لا توضح شهري أم مرة واحدة", use=True),
+    "authentica": [_p("Lite", 240 / SAR, 2000, unit="msg", note="٢٤٠ ريال · دفع مرة واحدة", use=True),
                    _p("Core", 500 / SAR, 5000, unit="msg", note="٥٠٠ ريال"),
                    _p("Plus", 900 / SAR, 10000, unit="msg", note="٩٠٠ ريال (موصى بها)"),
                    _p("Pro+", 1600 / SAR, 20000, unit="msg", note="١٦٠٠ ريال"),
@@ -153,12 +153,12 @@ CUSTOM_PRESET = {
     "fasih": {"contact": "https://www.fasihtts.com/en/pricing", "note": "Talk to us للحجم الكبير والتكاملات"},
     "eleven": {"contact": "https://elevenlabs.io/contact-sales", "note": "Enterprise: خصومات حجم، SSO، SLA"},
     "zernio": {"contact": "https://zernio.com/pricing", "note": "Enterprise بعد ٢٠٠٠ حساب"},
-    "authentica": {"contact": "https://authentica.sa/ar/pricing/", "note": "باقة مخصصة للمؤسسات، واسألهم: شهري أم مرة واحدة؟"},
+    "authentica": {"contact": "https://authentica.sa/ar/pricing/", "note": "باقة مخصصة للمؤسسات (الدفع مرة واحدة)"},
     "openai": {"note": "لا توجد باقات في الـ API: الدفع حسب الاستخدام (Batch بخصم ٥٠٪)"},
 }
 
 
-PRESET_VER = {"eleven": 2}   # لما باقات منصة تتعدّل في القائمة الجاهزة: الرقم يزيد، والباقات المطابقة تاخد الملاحظة الجديدة
+PRESET_VER = {"eleven": 2, "authentica": 2}   # لما باقات منصة تتعدّل في القائمة الجاهزة: الرقم يزيد، والباقات المطابقة تاخد الملاحظة الجديدة
 
 
 def seed(d: dict) -> bool:
@@ -188,6 +188,11 @@ def seed(d: dict) -> bool:
             for m in (k, mark):
                 if m not in seen:
                     seen.append(m)
+            changed = True
+    old_cu = {"authentica": "باقة مخصصة للمؤسسات، واسألهم: شهري أم مرة واحدة؟"}   # ملاحظات قديمة اتأكدت: تتبدل بالجديدة
+    for k, t in old_cu.items():
+        if (d["custom"].get(k) or {}).get("note") == t:
+            d["custom"][k]["note"] = CUSTOM_PRESET[k]["note"]
             changed = True
     for k, c in CUSTOM_PRESET.items():
         if "c:" + k not in seen:
