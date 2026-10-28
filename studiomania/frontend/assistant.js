@@ -68,6 +68,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     requestAnimationFrame(() => requestAnimationFrame(() => ov?.classList.add("on")));
   }
   // 🟠 الكرة بتطلع من دايرة «؟» (أو نقطة برتقالي في النص لو الدايرة مش ظاهرة) وتكبر، وعند القفل بتصغر وترجع لها
+  let calm = false;   // أول مرة بعد التسجيل: الكرة بتكبر على مهلها (مش فجأة)
   function grow(open, root = ov) {
     const o = root?.querySelector(".as-orb"), disc = root?.querySelector(".as-disc"), cv = root?.querySelector("canvas");
     if (!o) return null;
@@ -75,7 +76,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const t = o.getBoundingClientRect(), f = dot?.isConnected && dot.getBoundingClientRect(), vis = f && f.width && f.bottom > 0 && f.top < innerHeight;
     const fx = vis ? f.left + f.width / 2 : innerWidth / 2, fy = vis ? f.top + f.height / 2 : innerHeight / 2, fs = (vis ? f.width : 48) / (t.width * 0.84);
     const small = `translate(${fx - (t.left + t.width / 2)}px,${fy - (t.top + t.height / 2)}px) scale(${fs})`;
-    const k = (a, b) => (open ? [a, b] : [b, a]), opt = { duration: open ? 900 : 700, easing: open ? "cubic-bezier(.2,1.1,.3,1)" : "cubic-bezier(.4,0,.2,1)", fill: "both" };
+    const k = (a, b) => (open ? [a, b] : [b, a]), opt = { duration: open ? (calm ? 1700 : 900) : 700, easing: open ? (calm ? "cubic-bezier(.3,.9,.25,1)" : "cubic-bezier(.2,1.1,.3,1)") : "cubic-bezier(.4,0,.2,1)", fill: "both" };
     disc?.animate(k({ opacity: 1 }, { opacity: 0 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
     cv?.animate(k({ opacity: 0 }, { opacity: 1 }), { ...opt, duration: opt.duration * 0.8, delay: open ? 180 : 0 });
     if (vis && open) from.style.visibility = "hidden";   // الدايرة نفسها هي اللي اتحولت للكرة
@@ -418,6 +419,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   async function run(force, el) {
     if (!(await gate(force))) return false;
+    calm = !!el?.classList?.contains("fu-call") || document.body.classList.contains("fu-cine");
     from = el || document.querySelector('[data-n="quiz"]');
     dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
     await new Promise((res) => { S_done = res; call(); });

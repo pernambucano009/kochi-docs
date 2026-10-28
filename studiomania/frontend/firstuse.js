@@ -130,6 +130,65 @@ const FirstUse = (() => {
     return q() || null;
   }
 
+  // 🎬 أول دخول بعد التسجيل: انتقال هادي بدل ما الصفحات «تجري». ستارة ناعمة ← العقل بيظهر من الضباب ← نقاطه واحدة ورا التانية ←
+  // جملتين قصيرتين ← دايرة المساعدة بتنوّر وتنبض ← وبعدها الكرة تكبر منها على مهلها. أي ضغطة على الشاشة بتختصر الانتظار.
+  const CINE = `
+.fu-veil{position:fixed;inset:0;z-index:85;background:var(--nh-bg,#F4F2EE);opacity:0;transition:opacity .7s ease;pointer-events:none}
+.fu-veil.on{opacity:1;pointer-events:auto}.fu-veil.out{opacity:0;transition:opacity 1.6s cubic-bezier(.4,0,.2,1)}
+:root[data-nh-theme="dark"] .fu-veil{background:var(--nh-bg,#141314)}
+body.fu-cine #nh .bm-world>*{animation:fuFog 2s cubic-bezier(.2,.8,.2,1) both}
+body.fu-cine #nh .bm-lines{animation-delay:1.1s!important;animation-duration:1.6s!important}
+body.fu-cine #nh .bm-n{animation:fuIn .9s ease both;animation-delay:calc(.8s + var(--fu-i,0) * 110ms)}
+body.fu-cine #nh .bm-n>*{animation:fuPop 1s cubic-bezier(.2,1.2,.3,1) both;animation-delay:calc(.8s + var(--fu-i,0) * 110ms)}
+body.fu-cine #nh .bm-center .bm-brain{animation:fuBrain 2.2s cubic-bezier(.2,.9,.2,1) both}
+@keyframes fuFog{from{opacity:0;filter:blur(16px)}}@keyframes fuIn{from{opacity:0}}@keyframes fuPop{from{transform:scale(.55)}}
+@keyframes fuBrain{0%{transform:scale(.82);filter:blur(10px);opacity:0}60%{transform:scale(1.04);filter:none;opacity:1}100%{transform:none}}
+.fu-cap{position:fixed;inset-inline:0;bottom:22px;z-index:84;display:grid;place-items:center;pointer-events:none;text-align:center;padding:0 16px}
+.fu-cap>div{display:grid;gap:4px;padding:14px 26px;border-radius:22px;background:color-mix(in srgb,var(--nh-bg,#F4F2EE) 78%,transparent);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 14px 40px -18px rgba(0,0,0,.25);opacity:0;transition:opacity .9s ease}
+.fu-cap.on>div{opacity:1}.fu-cap.out>div{opacity:0;transition-duration:.8s}
+body.fu-cine #nh .bm-hint,body.fu-cine .hp-fab,body.fu-cine .hp-tease{opacity:0!important;pointer-events:none!important;transition:opacity .6s}
+.fu-cap p{margin:0;font-size:clamp(17px,2.1vw,23px);line-height:1.6;color:var(--nh-ink,#181718);opacity:0;transform:translateY(10px);filter:blur(4px);
+  transition:opacity 1.1s ease,transform 1.1s cubic-bezier(.2,.8,.2,1),filter 1.1s ease}
+.fu-cap p.on{opacity:.92;transform:none;filter:none}.fu-cap p.sub{font-size:clamp(14px,1.5vw,16px)}.fu-cap p.sub.on{opacity:.62}
+.fu-cap.out p{opacity:0;transform:translateY(-6px);transition-duration:.8s}
+#nh .bm-quiz.fu-call>i{animation:fuGlow 1.8s ease-in-out 2;position:relative}
+#nh .bm-quiz.fu-call>i::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #E5613E;animation:fuRing 1.8s ease-out 2;pointer-events:none}
+@keyframes fuGlow{0%,100%{box-shadow:0 0 0 0 rgba(229,97,62,0)}50%{box-shadow:0 0 34px 8px rgba(229,97,62,.45)}}
+@keyframes fuRing{from{transform:scale(1);opacity:.9}to{transform:scale(2.3);opacity:0}}
+@media (prefers-reduced-motion:reduce){body.fu-cine #nh .bm-world>*,body.fu-cine #nh .bm-n,body.fu-cine #nh .bm-n>*,body.fu-cine #nh .bm-center .bm-brain,#nh .bm-quiz.fu-call>i,#nh .bm-quiz.fu-call>i::after{animation:none}}`;
+  async function ceremony() {
+    if (!document.getElementById("fu-cine-css")) { const st = document.createElement("style"); st.id = "fu-cine-css"; st.textContent = CINE; document.head.appendChild(st); }
+    let skip = false, wake = null;
+    const wait = (ms) => new Promise((r) => { if (skip) return r(); const t = setTimeout(r, ms); wake = () => { clearTimeout(t); r(); }; });
+    const hurry = () => { skip = true; wake?.(); };
+    const veil = document.createElement("div"); veil.className = "fu-veil"; document.body.appendChild(veil);
+    requestAnimationFrame(() => requestAnimationFrame(() => veil.classList.add("on")));
+    await wait(750);
+    const el = await openBrain();
+    // النقاط بالترتيب: المخ الأول، وبعده الأقرب فالأبعد (ترتيبها في الصفحة)
+    document.querySelectorAll("#nh .bm .bm-n").forEach((n, i) => n.style.setProperty("--fu-i", String(i)));
+    document.body.classList.add("fu-cine");
+    veil.classList.add("out"); veil.classList.remove("on");
+    setTimeout(() => veil.remove(), 1800);
+    const agent = (el?.querySelector("b")?.textContent || "").trim();
+    const cap = document.createElement("div"); cap.className = "fu-cap"; cap.dir = "rtl";
+    cap.innerHTML = `<div><p>${esc(I18N.t("هذا عقل علامتك، وهو فارغ الآن"))}</p><p class="sub">${esc(agent && agent !== "أكمل العقل" ? I18N.t(`ستملؤه معك ${agent} في محادثة قصيرة`) : I18N.t("سنملؤه معًا في محادثة قصيرة"))}</p></div>`;
+    document.body.appendChild(cap);
+    addEventListener("pointerdown", hurry, { once: true });
+    const ln = cap.querySelectorAll("p");
+    await wait(1400); cap.classList.add("on"); ln[0].classList.add("on");
+    await wait(1900); ln[1].classList.add("on");
+    await wait(2100);
+    el?.classList.add("fu-call");   // دايرة المساعدة بتنوّر مرتين قبل ما الكرة تطلع منها
+    await wait(2300);
+    cap.classList.add("out"); setTimeout(() => cap.remove(), 900);
+    await wait(500);
+    removeEventListener("pointerdown", hurry);
+    setTimeout(() => { el?.classList.remove("fu-call"); document.body.classList.remove("fu-cine"); }, 4000);
+    return el;
+  }
+
   async function check() {
     if (asked || (typeof APP !== "undefined" && APP === "kochi")) return;
     asked = true;
@@ -139,7 +198,7 @@ const FirstUse = (() => {
     // 🎙️ المساعد الصوتي (بعد ما اللهجة تبقى معروفة): بيملا العقل بالكلام بدل الأسئلة المكتوبة
     // 🧠 المساعدة بتفتح جوه صفحة العقل (من دايرة «؟»)، عشان العميل يشوف العقل بيتبني وهو بيتكلم
     let talked = false;
-    if (typeof Assistant !== "undefined" && (await Assistant.can())) talked = await Assistant.maybe(false, await openBrain());
+    if (typeof Assistant !== "undefined" && (await Assistant.can())) talked = await Assistant.maybe(false, await ceremony());
     // المساعدة بتطلب الشعار بنفسها: شاشة الشعار المنفصلة بس لو المساعدة ماطلعتش
     if (!talked && state && !state.need && !state.logo && !state.logo_asked) await askLogo();
     if (state?.job?.status === "run") watch(false);
@@ -344,5 +403,5 @@ const FirstUse = (() => {
   }
 
   document.addEventListener("click", (e) => { if (e.target.closest?.("[data-first]")) { e.preventDefault(); e.stopPropagation(); startFirst(); } }, true);
-  return { check, startFirst, state: () => state };
+  return { check, startFirst, ceremony, state: () => state };
 })();
