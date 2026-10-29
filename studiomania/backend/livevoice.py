@@ -105,9 +105,16 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "none"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "myvideo", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
-                        "intro: a short video that opens their videos. none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
+                        "intro: a short video that opens their videos. myvideo: a short video of themselves talking (for the showcase reel). "
+                        "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
+    {"type": "function", "name": "start_showcase", "description": "Start making the showcase reel from the user's own video (only after they agreed). "
+     "It renders in the background for a few minutes.", "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "get_showcase", "description": "Check whether the showcase reel is ready (and how far it got).",
+     "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "play_showcase", "description": "Show the ready showcase reel on the user's screen and start playing it.",
+     "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "find_competitors", "description": "Search for the competitor accounts the user named (by voice or typed). "
      "The team looks them up in the background and sends the user a notification to confirm the ones found.",
      "parameters": {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"},
@@ -185,6 +192,20 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in known.items())
     if kn:
         qs += "\nAlready in their brand brain (never ask these again; you may refer to them naturally):\n" + kn
+    # 🎬 الفيديو الاستعراضي من فيديوهم: كل جزء فيه ميزة، وهي بتشرح كل جزء وهو بيتعرض
+    if not tools:
+        showcase_goal = "Skip this step."
+    elif have.get("showcase") == "done" and have.get("showcase_used"):
+        showcase_goal = "Their showcase reel was already made and shown: skip this step (they find it in their ready videos)."
+    elif have.get("showcase") == "working":
+        showcase_goal = "Their showcase reel is being made right now: check get_showcase, and play it when it is ready."
+    elif have.get("showcase") == "done":
+        showcase_goal = "Their showcase reel is ready: ask if they want to watch it now, and if yes call play_showcase."
+    else:
+        showcase_goal = ("Offer a gift: a short reel made from " + ("one of their own videos from their account" if have.get("video") else "a short video of themselves talking")
+                         + ", where every few seconds shows a different thing the platform can do (captions, moving text, zoom, text behind them, a new "
+                         "background, colors, a second camera angle, dubbing in their own voice, music and footage), and you explain each part while it plays. "
+                         "Ask if they would like it; if yes, call start_showcase. If they say no or later, move on.")
     tool_txt = ("""
 Tools (use them silently, never read them out loud):
 - After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
@@ -200,6 +221,15 @@ Tools (use them silently, never read them out loud):
   and tell them in one short sentence that you will look them up and they will get a notification to confirm the ones you found.
 - After the last question, call get_account_analysis. If it is ready, tell the user 2–3 short, specific findings from it in the dialect.
   If it is not ready yet, tell them the results will appear on their screen in a few minutes.
+- The showcase reel (see goal 5): call start_showcase only after they agreed. If it answers no_video, ask them for a short video of
+  themselves talking and call show_input with kind "myvideo" in the same turn; when the screen says it was uploaded, call start_showcase.
+  While it renders, keep the conversation going (the account findings, their questions). Call get_showcase at most once a minute and
+  never invent its progress. The screen also tells you when it is ready: then tell them in one short sentence and call play_showcase.
+- During the reel the screen pauses after each part and sends you (SYSTEM: …) with what was done in that part and what else is
+  possible. Explain it in 1–2 short, lively sentences in the dialect (what we did here, and what else they can do with it), in their
+  terms (their field, their clients), then stop talking: the reel continues by itself. Do not ask a question after each part.
+  For the dubbing part, add that they can run a channel in every dialect and every language if they want.
+  After the last part, ask what they thought of it.
 - Then thank them, say goodbye in one sentence, and call finish.""" if tools else "")
     return f"""You are {agent}, the personal assistant of SimsimKit, a platform that makes social-media videos for businesses.
 The user, {user or "(name unknown)"}, just signed up. Speak ONLY in {lang} ({label}), exactly like a native speaker from there talks in daily life:
@@ -236,7 +266,8 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting.
 4. {"Skip this step: their logo and product photos are already uploaded." if have.get("logo") and have.get("products") else ("Ask them to upload a few photos of their products or work (their logo is already uploaded)" if have.get("logo") else "Ask them to upload their logo" + ("" if have.get("products") else ", then a few photos of their products or work") + " (product photos are already uploaded)" * bool(have.get("products"))) + " (one request per turn; if they have none or say later, move on without insisting)."}
-5. When done, thank them and tell them you are preparing what you found.
+5. {showcase_goal}
+6. When done, thank them and tell them you are preparing what you found.
 {tool_txt}
 Rules:
 - Never end a turn on a plain statement: if you are not asking anything, keep going in the same turn to your next question.

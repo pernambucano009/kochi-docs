@@ -12522,6 +12522,12 @@ def run_brain_social(bid: str, sid: str) -> None:
                     frames.append(out)
             videos.append({"id": pid, "rank": "best" if pid in st.get("best", []) else "worst", "views": p["views"], "seconds": round(vd, 1),
                            "transcript": words[:1500]})
+            # 🎬 أكتر فيديو بيتكلم فيه بيتحفظ (لو مفيش واحد قبل كده) عشان الفيديو الاستعراضي يتعمل منه
+            keep = brain_dir(bid) / "showcase" / "src.mp4"
+            if vd >= 8 and len(words.split()) >= 12 and (not keep.exists() or len(words.split()) > int(s.get("sc_words") or 0)):
+                keep.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy(mp4, keep)
+                s["sc_words"] = len(words.split())
         finally:
             mp4.unlink(missing_ok=True)
     # 🖼️ صور الأغلفة وصورة البروفايل: المخ هيقول كل واحدة مكانها فين في العقل
@@ -32901,6 +32907,8 @@ def assistant_token(request: Request):
         lessons = [x["text"] for x in json.loads((ASSIST_LOG_DIR.parent / "assistant_lessons.json").read_text("utf-8")) if x.get("status") == "approved"]
     except (OSError, ValueError, KeyError, TypeError):
         lessons = []
+    sc = showcase_state(b)   # 🎬 الفيديو الاستعراضي: عندنا فيديو له؟ اتعمل قبل كده؟
+    have.update(video=sc["has_video"], showcase=sc["status"], showcase_used=sc["used"])
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
@@ -33072,6 +33080,241 @@ def assistant_done(request: Request):
     if bid:
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(done=True, done_at=now()))
     return assistant_state(request)
+
+
+# ---------------------------------------------------------------- 🎬 الفيديو الاستعراضي من فيديو العميل نفسه (showcase.py)
+# فيديو من حسابه (بيتحفظ وقت تحليل الحساب) أو فيديو يرفعه في المكالمة ← قطع صغيرة، في كل قطعة ميزة، وسعاد بتشرح كل قطعة.
+# على المنصة (هدية ترويجية): مرة واحدة لكل عميل، ويتسجل في عدّاد الصرف كترويج. الأدمن يقدر يعيده للتجربة.
+import showcase  # noqa: E402
+
+SHOWCASE_LOCK = threading.Lock()
+
+
+def showcase_dir(bid: str) -> Path:
+    return brain_dir(bid) / "showcase"
+
+
+def showcase_src(bid: str) -> Path | None:
+    f = showcase_dir(bid) / "src.mp4"
+    return f if f.exists() and f.stat().st_size > 50_000 else None
+
+
+def showcase_set(bid: str, **kw) -> None:
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("showcase", {}).update(kw))
+
+
+def showcase_dub_lang(words: str) -> tuple[str, str, str]:
+    """الجملة المدبلجة: إنجليزي لو كلامه عربي، وخليجي لو كلامه بلغة تانية."""
+    if re.search(r"[؀-ۿ]", words or "") or not words:
+        return "en", "English", "natural conversational American English"
+    return "ar-gulf", "خليجي", "natural Gulf Arabic dialect (not Modern Standard Arabic)"
+
+
+def run_showcase(bid: str) -> None:
+    b = brain_row(bid) or {}
+    a = b.get("assistant") or {}
+    src = showcase_src(bid)
+    work = showcase_dir(bid) / "work"
+    shutil.rmtree(work, ignore_errors=True)
+    spent = {"usd": 0.0}
+    mock = atlas.mock_mode()
+    ffm = ffmpeg_exe()
+    gender = a.get("gender") or (onboard_load() or {}).get("gender") or "m"
+    heard = {"text": ""}
+
+    def add(usd: float) -> None:
+        spent["usd"] += max(0.0, usd)
+
+    def transcribe(wav: Path, dur: float) -> list[dict]:
+        words = atlas.transcribe(wav, dur)
+        heard["text"] = " ".join(str(w.get("w") or "") for w in words)
+        if not mock:
+            add(wallet.est(stt_min=dur / 60))
+        lang = showcase_dub_lang(heard["text"])
+        cfg["dub_lang"] = lang
+        return words
+
+    def plan(msgs: list[dict]) -> dict:
+        if mock:
+            return {}
+        reply = atlas.chat(msgs, series_settings()["text_model"], temperature=0.5, max_tokens=1500, json_mode=True, timeout=60)
+        add(wallet.est(chars=sum(len(str(m.get("content") or "")) for m in msgs) + len(reply)))
+        return az.parse_json(reply, "خطة الفيديو الاستعراضي")
+
+    def angle(part: Path, prompt: str, d: float, out: Path) -> Path:
+        if mock:
+            showcase.run(showcase.ff(ffm) + ["-i", str(part), "-vf", "hflip,crop=iw*0.8:ih*0.8", "-an", str(out)])
+            return out
+        m = lab.VEDIT_MODELS["gemini"]
+        atlas.download(atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(part), "prompt": prompt},
+                                       "زاوية الكاميرا", max_seconds=1500, interval=6), out)
+        add(m["per_sec"] * d)
+        return out
+
+    def speak(text: str, dest: Path, d: float) -> Path:
+        """الجملة بصوته هو (نسخة فورية من صوته، بتتمسح بعدها)، ولو النسخ مش متاح: صوت جاهز من نفس النوع."""
+        if mock:
+            showcase.run(showcase.ff(ffm) + ["-f", "lavfi", "-i", f"sine=frequency=480:duration={max(1.0, d - 0.6):.2f}", str(dest)])
+            return dest
+        mp3 = dest.with_suffix(".mp3")
+        if voicelab.eleven_key():
+            sample = work / "voice_sample.mp3"
+            vid = None
+            try:
+                showcase.run(showcase.ff(ffm) + ["-i", str(work / "norm.mp4"), "-vn", "-t", "60", "-ac", "1", "-b:a", "128k", str(sample)])
+                vid = voicelab.eleven_clone(sample, f"showcase-{bid}")
+                voicelab.eleven_say(text, vid, mp3)
+                add(len(text) / 1000 * 0.30)
+                return mp3
+            except Exception as exc:  # noqa: BLE001
+                print(f"showcase clone: {str(exc)[:300]}", flush=True)
+            finally:
+                if vid:
+                    voicelab.eleven_delete(vid)
+        ar_speak(dub.VOICES["eleven_jessica" if gender == "f" else "eleven_liam"], text, mp3)
+        add(len(text) / 1000 * dub.VOICES["eleven_liam"]["per_1k"])
+        return mp3
+
+    def lipsync(clip: Path, audio: Path, out: Path, d: float) -> Path:
+        if mock:
+            shutil.copy(clip, out)
+            return out
+        vurl, aurl = atlas.upload_media(clip), atlas.upload_media(audio)
+        lip = dub.LIPSYNC["sync"]   # 👄 الأجود (صاحب المنصة اختاره): جملة واحدة بس فالتكلفة قليلة
+        atlas.download(atlas.run_model("Video", {"model": lip["model"], "video_url": vurl, "audio_url": aurl, "video": vurl, "audio": aurl,
+                                                 "sync_mode": "cut_off"}, "الليب سينك", max_seconds=2400, interval=6), out)
+        add(lip["per_sec"] * d)
+        return out
+
+    def person_fn(clip: Path, folder: Path, d: float) -> dict | None:
+        info = person.analyze(ffm, clip, folder, Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models")), showcase.FPS, d, mask_width=1080)
+        heads = [f["head"][1] for f in info.get("frames") or [] if f and f.get("head")]
+        if heads:
+            cfg["head_y"] = sorted(heads)[len(heads) // 2]
+        return info
+
+    def stock_get(kind: str, q: str, base: Path) -> Path | None:
+        try:
+            if kind == "music":
+                hit = next(iter(stock.music_search(q)), None)
+                dest = base.with_suffix("." + (hit or {}).get("ext", "mp3"))
+            else:
+                if not stock.live():
+                    return None
+                items = stock.search(q, "photo" if kind == "bg" else "video", "portrait")["items"]
+                hit = next((x for x in items if kind == "bg" or (x.get("dur") or 0) >= 3), None)
+                dest = base.with_suffix(".jpg" if kind == "bg" else ".mp4")
+            return dest if hit and brain_fetch(hit["file"], dest, 60 * 1024 * 1024) else None
+        except Exception as exc:  # noqa: BLE001  (من غيرها القطعة بتكمل)
+            print(f"showcase stock {kind}: {str(exc)[:200]}", flush=True)
+            return None
+
+    cols = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
+    cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E",
+           "brand": first_brand_name(b), "niche": str(b.get("niche") or "")[:200], "logo": logo_path(bid),
+           "dub_lang": showcase_dub_lang(""),
+           "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync,
+                   "person": person_fn if person.available() else None,
+                   "broll": lambda q, base: stock_get("broll", q, base), "bg": lambda q, base: stock_get("bg", q, base),
+                   "music": lambda q, base: stock_get("music", q, base)}}
+    try:
+        if not src:
+            raise showcase.ShowcaseError("لا يوجد فيديو")
+        r = showcase.build(cfg, src, lambda s, p: showcase_set(bid, step=s, progress=p))
+        export_id = uuid.uuid4().hex[:12]
+        filename = f"showcase_{export_id}.mp4"
+        shutil.copy(r["video"], EXPORTS_DIR / filename)
+        with closing(db()) as conn, conn:
+            old = (a.get("showcase") or {}).get("export_id")
+            if old:   # النسخة القديمة (لو الأدمن أعاده) بتتشال
+                row = conn.execute("SELECT filename FROM exports WHERE id = ?", (old,)).fetchone()
+                if row:
+                    (EXPORTS_DIR / row["filename"]).unlink(missing_ok=True)
+                    conn.execute("DELETE FROM exports WHERE id = ?", (old,))
+            conn.execute("INSERT INTO exports (id, name, filename, duration, source, project_id, created_at) VALUES (?, ?, ?, ?, 'showcase', NULL, ?)",
+                         (export_id, "🎬 فيديو استعراضي من فيديوك", filename, r["duration"], now()))
+        if spent["usd"]:   # 🎁 على المنصة: مصاريف ترويج
+            wallet.cost(spent["usd"], "ترويج: الفيديو الاستعراضي من فيديو العميل", promo=True, ref="showcase")
+        showcase_set(bid, status="done", step=None, progress=100, error=None, export_id=export_id, video=f"/media/exports/{filename}",
+                     duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"], usd=round(spent["usd"], 3), done_at=now())
+        who = livevoice.agent_name(assist_dialect(), "f")
+        notify("showcase", "ok", f"{who}: الفيديو الاستعراضي من فيديوك جاهز", "تجده في الفيديوهات الجاهزة، وفيه كل ما يمكن أن نفعله بفيديوهاتك.", "7")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[showcase] {bid}: {str(exc)[:600]}", flush=True)
+        if spent["usd"]:
+            wallet.cost(spent["usd"], "ترويج: الفيديو الاستعراضي (لم يكتمل)", promo=True, ref="showcase")
+        msg = str(exc) if isinstance(exc, showcase.ShowcaseError) and re.search(r"[؀-ۿ]", str(exc)) else "تعذّر تجهيز الفيديو الاستعراضي"
+        # فشل: الهدية ماتتحسبش، يقدر يجرّب تاني بفيديو تاني
+        showcase_set(bid, status="failed", step=None, error=msg[:300])
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).pop("showcase_used", None))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def showcase_state(b: dict) -> dict:
+    a = b.get("assistant") or {}
+    sc = a.get("showcase") or {}
+    bid = b.get("id") or active_client_id()
+    return {"status": sc.get("status") or "none", "step": sc.get("step"), "progress": sc.get("progress") or 0, "error": sc.get("error"),
+            "video": sc.get("video"), "duration": sc.get("duration"), "chapters": sc.get("chapters") or [],
+            "has_video": bool(bid and showcase_src(bid)), "used": bool(a.get("showcase_used")) and TENANT_ROLE == "customer"}
+
+
+@app.get("/api/assistant/showcase")
+def assistant_showcase_state():
+    _bid, b, _a = assist_info()
+    return showcase_state(b)
+
+
+@app.post("/api/assistant/showcase/start")
+def assistant_showcase_start():
+    bid, b, a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    st = showcase_state(b)
+    if st["status"] == "working":
+        return {"ok": True, "started": False, "note": "already rendering", **st}
+    if st["status"] == "done" and TENANT_ROLE == "customer":
+        return {"ok": True, "started": False, "note": "already ready", **st}
+    if not st["has_video"]:
+        social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
+        if social and social.get("status") == "working":   # تحليل الحساب لسه بينزّل فيديوهاته: ممكن يلاقي واحد فيه كلام
+            return {"ok": False, "error": "wait", "note": "Their account videos are still being downloaded. Keep talking and call start_showcase again in a minute or two."}
+        return {"ok": False, "error": "no_video", "note": "No video of the user is available. Ask them to upload a short video of themselves talking."}
+    with SHOWCASE_LOCK:
+        if a.get("showcase_used") and TENANT_ROLE == "customer":
+            return {"ok": False, "error": "used", "note": "The free showcase was already made for this account."}
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(showcase_used=True))
+        showcase_set(bid, status="working", step="🎞️ يجهّز الفيديو", progress=1, error=None, started=now())
+    threading.Thread(target=run_showcase, args=(bid,), daemon=True).start()
+    return {"ok": True, "started": True, "note": "Rendering started. It takes a few minutes."}
+
+
+@app.post("/api/assistant/showcase/upload")
+def assistant_showcase_upload(file: UploadFile = File(...)):
+    """فيديو يرفعه العميل في المكالمة (هو بيتكلم فيه) عشان نعمل منه الفيديو الاستعراضي."""
+    bid, _b, _a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    if Path(file.filename or "").suffix.lower() not in (".mp4", ".mov", ".webm", ".m4v"):
+        raise HTTPException(400, "ارفع فيديو (MP4 / MOV / WEBM)")
+    folder = showcase_dir(bid)
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = folder / f"up-{uuid.uuid4().hex[:6]}{Path(file.filename).suffix.lower()}"
+    with tmp.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    try:
+        dur = probe_duration(tmp)
+        if dur < 8:
+            raise HTTPException(400, "الفيديو قصير: ارفع فيديو مدته ٨ ثوانٍ على الأقل")
+        tmp.replace(folder / "src.mp4") if tmp.suffix == ".mp4" else showcase.normalize(ffmpeg_exe(), tmp, folder / "src.mp4")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, "هذا الملف ليس فيديو سليمًا") from exc
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {"ok": True}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")

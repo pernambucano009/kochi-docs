@@ -56,6 +56,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
+.as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
+.as-ov.dock .as-show video{height:min(46vh,440px)}.as-chs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:100%}
+.as-chs span{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(127,127,127,.16);opacity:.6;transition:all .3s}.as-chs span.on{background:#E5613E;color:#fff;opacity:1}.as-chs span.done{opacity:.9}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
   let S = null, state = null, orb = null, ov = null, from = null, dock = false;
   // 📣 العقل اتغيّر (إجابة اتحفظت، صورة اترفعت، حساب بيتحلل): الخريطة تعيد رسم نفسها والفرع يطلع قدام العميل
@@ -110,7 +113,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function caption(t) { const c = q(".as-cap"); if (c) c.textContent = t.slice(-170); }
   // 📝 المكتوب جملة جملة على قد الكلام: النص بيوصل أسرع من الصوت، فكل جملة بتفضل ظاهرة على قد طولها وبعدين اللي بعدها.
   // والمربع اللي المساعد طلبه بيظهر لما الجملة اللي فيها اسمه تتقال (أو في آخر الرد لو الكلمة ماتقالتش)
-  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i };
+  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i, myvideo: /فيديو|فديو|video/i };
   // جملة جملة، والجملة الطويلة بتتقسم عند الفاصلة عشان المكتوب مايزيدش عن سطرين ويغطي على خانة الكتابة
   // كل حتة ≤ ٦٠ حرف تقريبًا (عند الفاصلة لو فيه، وإلا عند آخر كلمة) عشان تتقري كاملة في سطرين من غير ما تتقطع بنقط
   const chunk = (x) => {
@@ -165,6 +168,16 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return r;
     }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
+    if (name === "start_showcase") {
+      const r = await api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
+      if (r.ok) { showChip(r); pollShow(); }
+      return r;
+    }
+    if (name === "get_showcase") {
+      const r = await api("/api/assistant/showcase").catch(() => ({ status: "unknown" }));
+      return { status: r.status, progress: r.progress, step: r.step, error: r.error, parts: (r.chapters || []).length };
+    }
+    if (name === "play_showcase") return play();
     if (name === "show_input") {
       if (args.kind === "none") { later(); return { ok: true, closed: true }; }
       if (BOX[args.kind]) {
@@ -184,6 +197,78 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     return { ok: false, error: "unknown tool" };
   }
+  // 🛰️ رسالة من المنصة لسعاد (مش كلام العميل): مابتتحسبش كتابة منه، وهي بترد عليها لما تخلّص كلامها
+  function note(text) {
+    if (!S?.dc || S.dc.readyState !== "open") return;
+    lg("sys", text);
+    S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
+    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
+  }
+  // 🎬 الفيديو الاستعراضي: بيتعمل في الخلفية (دقايق)، والكارت على الجنب بيقول وصل لفين، ولما يجهز سعاد تعرف وتعرضه
+  function showChip(r) {
+    if (!S) return;
+    const t = r.status === "done" ? `✓ <span><b>جاهز: فيديو استعراضي من فيديوك</b></span>` : r.status === "failed" ? `⚠️ <span><b>تعذّر الفيديو الاستعراضي</b><br>${esc(r.error || "")}</span>`
+      : `🎬 <span><b>نجهّز فيديو استعراضيًا من فيديوك</b><br>${esc(r.step || "")}${r.progress ? ` · ${r.progress}٪` : ""}</span>`;
+    if (S.showChip) S.showChip.innerHTML = t; else S.showChip = chip(t);
+  }
+  function pollShow() {
+    if (!S || S.showT) return;
+    S.showT = setInterval(async () => {
+      const r = await api("/api/assistant/showcase").catch(() => null);
+      if (!S || !r) return;
+      showChip(r);
+      if (r.status === "done" || r.status === "failed") {
+        clearInterval(S.showT); S.showT = null;
+        if (r.status === "done") note("(SYSTEM: the showcase reel is ready now. When you finish what you are saying, tell the user in one short sentence and call play_showcase.)");
+        else note(`(SYSTEM: the showcase reel could not be made (${r.error || "error"}). Tell them kindly in one sentence and go on.)`);
+      }
+    }, 8000);
+  }
+  // ▶️ العرض: كل جزء بيشتغل، وفي آخره الفيديو بيقف وسعاد بتشرح اللي اتعمل فيه، ولما تخلّص الجزء اللي بعده يكمل لوحده.
+  // الميكروفون بيتقفل وهو شغال (صوت الفيديو من السماعة مايتسمعش على إنه كلام العميل) وبيرجع وهي بتشرح.
+  async function play() {
+    const r = await api("/api/assistant/showcase").catch(() => null);
+    if (!S || !ov || r?.status !== "done" || !r.video) return { ok: false, error: "not ready yet", status: r?.status };
+    q(".as-box")?.remove(); acct(false);
+    const d = document.createElement("div"); d.className = "as-box as-show";
+    d.innerHTML = `<b>🎬 فيديو استعراضي من فيديوك</b><video playsinline controls preload="auto" src="${esc(r.video)}"></video>
+      <div class="as-chs">${r.chapters.map((c, i) => `<span data-ch="${i}">${esc(c.title)}</span>`).join("")}</div>
+      <div class="row"><button type="button" class="as-btn" data-sclose>إغلاق</button></div>`;
+    q(".as-acts").before(d);
+    const v = d.querySelector("video"), ch = r.chapters, sh = { v, ch, i: 0, wait: true, at: performance.now(), spoke: false };
+    S.show = sh; S.wait = "showcase"; S.box = null;
+    const mark = () => d.querySelectorAll("[data-ch]").forEach((x, k) => { x.classList.toggle("on", k === sh.i); x.classList.toggle("done", k < sh.i); });
+    const mic = (on) => { const t = S?.mic?.getTracks()[0]; if (t && !S.muted) t.enabled = on; };
+    const stop = () => { if (S?.show !== sh) return; S.show = null; S.wait = null; mic(true); clearInterval(sh.t); };
+    d.querySelector("[data-sclose]").onclick = () => { v.pause(); stop(); d.remove(); note("(SYSTEM: the user closed the showcase reel. Ask briefly what they thought of it.)"); };
+    v.onplay = () => { sh.wait = false; mic(false); };
+    v.onpause = () => mic(true);
+    v.onseeked = () => { const k = ch.findIndex((c) => v.currentTime < c.t1 - 0.1); if (k >= 0) { sh.i = k; mark(); } };
+    v.ontimeupdate = () => {
+      if (sh.wait || S?.show !== sh) return;
+      const c = ch[sh.i]; if (!c || v.currentTime < c.t1 - 0.08) return;
+      v.pause(); sh.wait = true; sh.at = performance.now(); sh.spoke = false;
+      const last = sh.i === ch.length - 1;
+      note(`(SYSTEM: part ${sh.i + 1} of ${ch.length} of the showcase just played: "${c.title}". What we did here: ${c.did}. What else is possible: ${c.can}. `
+        + (last ? "This was the last part: explain it, then ask what they thought of the whole reel.)" : "Explain it now in 1–2 short sentences, then stop talking (the next part plays by itself).)"));
+      if (last) sh.end = true;
+      sh.i = Math.min(ch.length - 1, sh.i + 1);
+    };
+    v.onended = () => { if (!sh.wait) v.ontimeupdate(); };
+    // الجزء اللي بعده يكمّل لما سعاد تخلّص شرحها (أو بعد ١٥ ثانية لو ماردتش)
+    sh.t = setInterval(() => {
+      if (!S || S.show !== sh || !sh.wait) return;
+      const now = performance.now();
+      if (S.speaking) { sh.spoke = true; sh.quiet = 0; return; }
+      sh.quiet = sh.quiet || now;
+      if (((sh.spoke && !S.busy && now - sh.quiet > 700) || now - sh.at > 15000) && now - sh.at > 1200) {
+        if (sh.end) { mark(); d.querySelectorAll("[data-ch]").forEach((x) => x.classList.add("done")); stop(); return; }
+        mark(); v.play().catch(() => {});
+      }
+    }, 200);
+    mark(); v.load();
+    return { ok: true, playing: true, parts: ch.map((c) => c.title), note: "The reel is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish." };
+  }
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
@@ -198,6 +283,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     logo: { t: "ارفع شعارك", accept: "image/png,image/jpeg,image/webp", kind: "logos", done: "رفعت الشعار" },
     products: { t: "ارفع صور منتجاتك أو أعمالك", accept: "image/png,image/jpeg,image/webp", multi: true, kind: "products", done: "رفعت صور المنتجات" },
     intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
+    myvideo: { t: "ارفع فيديو قصيرًا تتحدث فيه (من ١٥ ثانية إلى دقيقة)", accept: "video/*", video: true, url: "/api/assistant/showcase/upload", done: "رفعت فيديو أتحدث فيه" },
   };
   function box(kind) {
     if (kind === "account") { q(".as-box")?.remove(); return acct(true); }
@@ -222,11 +308,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       files = [...files].slice(0, k.multi ? 30 : 1); if (!files.length) return;
       err(""); drop.querySelector("span").textContent = "⏳ جارٍ الرفع…";
       const f = new FormData();
-      if (k.video) { f.append("kind", "intro"); f.append("file", files[0]); } else { f.append("kind", k.kind); files.forEach((x) => f.append("files", x)); }
+      if (k.url) f.append("file", files[0]); else if (k.video) { f.append("kind", "intro"); f.append("file", files[0]); } else { f.append("kind", k.kind); files.forEach((x) => f.append("files", x)); }
       try {
-        const r = await fetch(`/api/ad-brains/${encodeURIComponent(state.brand)}/${k.video ? "brand-video" : "assets"}`, { method: "POST", body: f, credentials: "same-origin" });
+        const r = await fetch(k.url || `/api/ad-brains/${encodeURIComponent(state.brand)}/${k.video ? "brand-video" : "assets"}`, { method: "POST", body: f, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
-        d.remove(); changed(); step(k.kind === "logos" ? "logo" : k.kind === "products" ? "photos" : "intro"); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
+        d.remove(); if (!k.url) changed(); step(k.kind === "logos" ? "logo" : k.kind === "products" ? "photos" : k.url ? "myvideo" : "intro"); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
       } catch (e) { err(e.message); drop.querySelector("span").textContent = "جرّب مرة أخرى"; }
     };
     fin.onchange = () => up(fin.files);
@@ -359,7 +445,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           lg("agent", e.transcript || "");
           // 📥 طلبت رفع حاجة بالكلام من غير ما تفتح الخانة (نسيت الأداة): الخانة تظهر لوحدها
           const tx = e.transcript || "", ask = /ارفع|ترفع|ترفعها|ترفعلي|رفع|حمّل|حمل|ابعت|أرسل|ارسل|upload/i.test(tx);
-          const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : "");
+          const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : KW.myvideo.test(tx) ? "myvideo" : "");
           if (kind && !q(".as-box") && S.wait !== kind) { S.wait = kind; S.waitResp = e.response_id || "x"; lg("sys", `box opened from speech: ${kind}`); setTimeout(() => S && box(kind), 300); }
         }
         else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error"); }
@@ -387,7 +473,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function status() {
     if (!S || !S.agent) return;
     const st = q(".as-st"); if (!st) return;
-    const what = S.speaking ? "تتحدث" : S.thinking ? "لحظة…" : S.muted ? "الميكروفون مكتوم: اكتب ردك أو شغّله" : S.lastQ ? "في انتظار ردك" : "";
+    const what = S.speaking ? "تتحدث" : S.show && !S.show.wait ? "📺 يُعرض الفيديو" : S.thinking ? "لحظة…" : S.muted ? "الميكروفون مكتوم: اكتب ردك أو شغّله" : S.lastQ ? "في انتظار ردك" : "";
     st.textContent = S.agent + (what ? ` · ${what}` : "") + (S.accTimer ? " · ⏳ حسابك قيد التحليل" : "");
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
@@ -455,7 +541,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
+    clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
     { const keep = S; S = s; lg("sys", finished ? "end: finished" : "end: closed"); flush(true); S = keep; }
     // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
     if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});
