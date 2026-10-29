@@ -262,7 +262,7 @@ const BrandPage = (() => {
     draw();
   }
   // ---------- الزوم والسحب ----------
-  function fit(force) {
+  function fit(force, ms = 0) {
     const w = S.el, W = w.clientWidth, H = w.clientHeight;
     if (S.view?.user && !force) return applyView();
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -277,8 +277,18 @@ const BrandPage = (() => {
     const top = topInset(), hh = H - top - 40;
     // المساعدة مفتوحة على اليمين: الخريطة بتتحط في الباقي من الشاشة
     const R = S.reserve || 0, s = Math.max(.35, Math.min(1.05, (W - R - 32) / (x1 - x0), hh / (y1 - y0)));
-    S.view = { s, x: (W - R) / 2 - (x0 + x1) / 2 * s, y: top + hh / 2 - (y0 + y1) / 2 * s, user: false };
-    applyView();
+    const to = { s, x: (W - R) / 2 - (x0 + x1) / 2 * s, y: top + hh / 2 - (y0 + y1) / 2 * s, user: false };
+    cancelAnimationFrame(S.tw);
+    if (!ms || !S.view || reduce.matches) { S.view = to; return applyView(); }
+    // انتقال ناعم (ease-in-out): الحجم والمكان مع بعض، والنقط اللي في الخلفية ماشية معاه
+    const from = { ...S.view }, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / ms), k = p < .5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+      S.view = { s: from.s + (to.s - from.s) * k, x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, user: false };
+      applyView();
+      if (p < 1) S.tw = requestAnimationFrame(step);
+    };
+    S.tw = requestAnimationFrame(step);
   }
   // الخريطة مالية الصفحة كلها، والشريط اللي فوق وعنوان الصفحة طايرين فوقها: المحتوى بيتحط تحتهم
   function topInset() {
@@ -1407,7 +1417,8 @@ const BrandPage = (() => {
       try { const b = await bAPI(""); S.brains = S.brains.map((x) => (x.id === b.id ? b : x)); layout(); if (busy(b)) watch(); } catch { /* الخريطة هتتحدث المرة الجاية */ }
     }, 400);
   });
-  window.addEventListener("assistant:dock", (e) => { S.reserve = e.detail?.w || 0; S.docked = !!e.detail?.on; if (S.el?.isConnected && S.nodes) fit(true); });
+  // 🎙️ المساعدة بتفتح/تقفل على اليمين: الخريطة بتتزحلق وتصغر/تكبر على مهلها مع الكرة (مش نطّة واحدة)
+  window.addEventListener("assistant:dock", (e) => { S.reserve = e.detail?.w || 0; S.docked = !!e.detail?.on; if (S.el?.isConnected && S.nodes) fit(true, 1100); });
   async function mount(root, id) {
     const w = root.querySelector("#nbWrap");
     if (!w) return;

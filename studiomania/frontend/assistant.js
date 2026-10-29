@@ -216,9 +216,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
     if (name === "set_user_gender") return api("/api/assistant/gender", { method: "POST", ...jsonBody({ gender: args.gender }) }).catch(() => ({ ok: false }));
     if (name === "finish") {
-      S.finishing = true; S.endDone = !args.later;
-      setTimeout(() => S?.finishing && end(S.endDone), 9000);   // احتياط لو الصوت ماوصلش
-      if (!S.speaking) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 1500);
+      // 👋 المكالمة بتقفل بعد ما جملة الوداع تتقال كلها (مش أول ما الأداة توصل، الأداة بتوصل قبل الصوت)
+      S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now();
+      setTimeout(() => S?.finishing && end(S.endDone), 20000);   // احتياط لو الصوت ماوصلش
       return { ok: true };
     }
     return { ok: false, error: "unknown tool" };
@@ -561,6 +561,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
+          if (S.finishing) {
+            if (r.msg) { S.finishReady = true; setTimeout(() => S?.finishing && !S.busy && !S.speaking && performance.now() - (S.lastTalk || 0) > 800 && end(S.endDone), 1500); }
+            else if (!S.byeAsked && !r.pending) { S.byeAsked = true; S.dc.send(JSON.stringify({ type: "response.create", response: { instructions: "Say a warm, short goodbye in the same dialect (one or two sentences): thank them, and tell them they can continue any time from your circle on the brain page. Do not call any tool." } })); }
+          }
           // ردها كان كلام مش سؤال: لو العميل فضل ساكت ثانية بعد ما تخلّص، تكمّل هي (التقدير على طول الكلام لو حدث نهاية الصوت ماوصلش)
           // «في انتظار ردك» بس لو آخر جملة قالتها سؤال، أو طلبت حاجة وخانتها ظاهرة فعلًا. أي جملة تانية (زي «خلينا نكمل…») هي اللي تكمّل
           if (r.msg && (id === S.capId || !S.capId)) {
@@ -587,6 +591,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           const tx = e.transcript || "", ask = /ارفع|ترفع|ترفعها|ترفعلي|رفع|حمّل|حمل|ابعت|أرسل|ارسل|upload/i.test(tx);
           const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : KW.myvideo.test(tx) ? "myvideo" : "");
           if (kind && !q(".as-box") && S.wait !== kind) { S.wait = kind; S.waitResp = e.response_id || "x"; lg("sys", `box opened from speech: ${kind}`); setTimeout(() => S && box(kind), 300); }
+          // ✍️ طلبت الحساب بالكلام («عطني حسابك واكتبه في الصندوق») من غير ما تفتح الخانة: الخانة تنوّر لوحدها (أي لهجة)
+          const askType = /اكتب|تكتب|اكتبه|اكتبي|عطني|اعطني|أعطني|عطيني|ابعت|ابعث|أرسل|ارسل|حط|حطه|شاركني|الصندوق|المربع|الخانة/.test(tx);
+          if (askType && KW.account.test(tx) && !S.acct && !q(".as-box") && !(state?.account) && !S.accChip) { S.wait = "account"; S.waitResp = e.response_id || "x"; lg("sys", "account box opened from speech"); acct(true); }
         }
         else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error"); }
       };
@@ -640,7 +647,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function acct(on) {
     if (!S) return; S.acct = on; if (on) S.wait = "account";
     const h = q("[data-hint]"), t = q(".as-type"), inp = q("[data-type]");
-    t?.classList.toggle("acct", on); if (h) { h.hidden = !on; h.textContent = on ? "اكتب رابط حسابك على إنستغرام أو تيك توك، أو اسم المستخدم (مثلًا @studio)، ثم اضغط ➤" : ""; }
+    ov?.classList.add("talked"); t?.classList.toggle("acct", on); if (h) { h.hidden = !on; h.textContent = on ? "اكتب رابط حسابك على إنستغرام أو تيك توك، أو اسم المستخدم (مثلًا @studio)، ثم اضغط ➤" : ""; }
     if (inp) { inp.dir = on ? "ltr" : "auto"; inp.placeholder = on ? "instagram.com/… أو @اسم_الحساب" : "أو اكتب هنا واضغط Enter"; if (on) setTimeout(() => inp.focus(), 200); }
   }
   // «بعدين» بالكلام = زرار «لاحقًا»
@@ -675,7 +682,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const sp = talk || (!!S.lastTalk && now - S.lastTalk < 650);
     if (sp !== S.speaking) {
       S.speaking = sp;
-      if (sp) { S.thinking = false; S.talkAt = now; if (!S.capAt) S.capAt = now; if (!S.spFirst) S.spFirst = now; ov?.classList.add("talked"); } else { S.spLast = now; S.agentMs = (S.agentMs || 0) + (now - (S.talkAt || now)); nudge(1200); if (S.finishing) setTimeout(() => S?.finishing && !S.speaking && end(S.endDone), 700); }   // قالت مع السلامة وسكتت: تقفل
+      if (sp) { S.thinking = false; S.talkAt = now; if (!S.capAt) S.capAt = now; if (!S.spFirst) S.spFirst = now; ov?.classList.add("talked"); } else { S.spLast = now; S.agentMs = (S.agentMs || 0) + (now - (S.talkAt || now)); nudge(1200); if (S.finishing) setTimeout(() => S?.finishing && S.finishReady && !S.busy && !S.speaking && end(S.endDone), 900); }   // قالت مع السلامة وسكتت: تقفل
       status();
     }
     requestAnimationFrame(loop);
