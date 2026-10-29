@@ -216,8 +216,8 @@ const BrandPage = (() => {
     const ex = Math.max(1.2, Math.min(2.1, (W / H) * 1.15)), ey = .78;
     S.ex = ex;
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
-    // «+» تحت المخ (ترمي فيه أي حاجة)، و«ضيف للعقل بكويز» البرتقاني فوقه
-    nodes.push({ id: "add", kind: "add", x: 0, y: 214, from: "c" }, { id: "quiz", kind: "quiz", x: 0, y: -206, from: "c" });
+    // «ضيف للعقل بكويز» البرتقاني فوق المخ. (نقطة «أضف للعقل» اتشالت: الإضافة بقت جوه كل فرع)
+    nodes.push({ id: "quiz", kind: "quiz", x: 0, y: -206, from: "c" });
     list.forEach((br, i) => {
       // نص الفروع يمين ونصها شمال، وفوق المخ وتحته فاضيين دايمًا للكويز و«+» (حتى لو عدد الفروع فردي)
       const nr = Math.ceil(list.length / 2), nl = list.length - nr;
@@ -715,19 +715,12 @@ const BrandPage = (() => {
     move();
   }
 
-  function cardHTML(n) {
-    const b = cur();
-    if (n.kind === "center") {
-      return `<div class="bm-ch"><span class="latin en-k">BRANDS</span><b>العلامات</b></div>
-        <div class="bm-pills">${S.brains.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-brain="${x.id}">${esc(x.name)}</button>`).join("")}</div>
-        <div class="bm-new">${editable("@new", "", "اكتب اسم علامة جديدة واضغط Enter")}</div>
-        ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
-    }
-    if (n.kind === "add") {
+  // ➕ الإضافة للعقل (ملف، حساب تواصل، كتابة، تسجيل، موقع): في آخر كارت كل فرع، والعقل بيقرا اللي يتضاف ويحط كل معلومة في فرعها
+  function addHTML(b) {
       const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse(), rec = S.rec;
       const TABS = [["file", "📎 ملف"], ["social", "📱 حساب تواصل"], ["text", "✍️ اكتب"], ["rec", "🎙️ سجّل"], ["url", "🔗 موقع"]];
-      return `<div class="bm-ch"><span class="latin en-k">ADD TO BRAIN</span><b>أضف للعقل</b></div>
-        <p class="bm-note">أضف أي شيء عن العلامة، وسيقرؤه العقل ويحلّله: تظهر كل معلومة نقطةً مضيئة في فرعها لتوافق عليها.</p>
+      return `<details class="bm-addin"${S.addOpen ? " open" : ""}><summary>＋ أضف إلى العقل</summary>
+        <p class="bm-note">ملف أو حساب أو موقع أو كلام بصوتك: يقرؤه العقل ويضع كل معلومة نقطةً مضيئة في فرعها لتوافق عليها.</p>
         <div class="bm-pills bm-tabs">${TABS.map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
         ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>أفلت الملف هنا أو اضغط للاختيار (أو أفلته في أي مكان على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
           : tab === "social" ? `${editable("@social", "", "رابط الحساب أو @اسم_المستخدم · واضغط Enter", true)}
@@ -739,13 +732,21 @@ const BrandPage = (() => {
           : editable("@url", "", "example.com · واضغط Enter", true)}
         ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
           <span><b>${esc(s.name)}</b><small>${s.status === "working" ? esc(s.step || "جارٍ القراءة…") : s.status === "failed" ? esc(s.error || "فشل") : `${s.count ? `انتهى · ${s.count} اقتراح` : "انتهى · لا جديد"}${s.credits ? ` · ${s.credits} نقطة` : ""}`}</small></span>
-          <button data-sdel="${s.id}" title="أزله">✕</button></li>`).join("")}</ul>` : ""}`;
+          <button data-sdel="${s.id}" title="أزله">✕</button></li>`).join("")}</ul>` : ""}</details>`;
+  }
+  function cardHTML(n) {
+    const b = cur();
+    if (n.kind === "center") {
+      return `<div class="bm-ch"><span class="latin en-k">BRANDS</span><b>العلامات</b></div>
+        <div class="bm-pills">${S.brains.map((x) => `<button class="bm-pill${x.id === S.id ? " on" : ""}" data-brain="${x.id}">${esc(x.name)}</button>`).join("")}</div>
+        <div class="bm-new">${editable("@new", "", "اكتب اسم علامة جديدة واضغط Enter")}</div>
+        ${S.brains.length > 1 ? `<button class="bm-link bad" data-del>احذف «${esc(b?.name || "")}» بكل صوره</button>` : ""}`;
     }
     if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. أضف ملفًا أو رابطًا من «أضف للعقل» وستظهر المعرفة هنا.</p>` : ""}
-        <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
+      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. أضف ملفًا أو رابطًا من «أضف إلى العقل» في الأسفل، وستظهر المعرفة هنا.</p>` : ""}
+        <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>` + addHTML(b);
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
     switch (l.type) {
@@ -986,7 +987,7 @@ const BrandPage = (() => {
         S.brains = S.brains.map((x) => (x.id === b.id ? b : x));
         if (!busy(b)) { clearInterval(S.poll); S.qaFor = null; loadClients(); layout(); if (S.open && !S.el.querySelector(".bm-card").contains(document.activeElement)) refreshCard(); return; }
         layout();
-        if (S.open?.id === "add" || (S.open?.id === "quiz" && !S.el.querySelector(".bm-card").contains(document.activeElement))) refreshCard();   // خطوة التحليل الحالية
+        if ((S.open?.n?.kind === "branch" && !S.el.querySelector(".bm-card").contains(document.activeElement)) || (S.open?.id === "quiz" && !S.el.querySelector(".bm-card").contains(document.activeElement))) refreshCard();   // خطوة التحليل الحالية
       } catch { clearInterval(S.poll); }
     }, 3000);
   }
@@ -1162,6 +1163,7 @@ const BrandPage = (() => {
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
     w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; S.mw = null; setHot(null); });
+    w.addEventListener("toggle", (e) => { if (e.target.matches?.(".bm-addin")) S.addOpen = e.target.open; }, true);   // «أضف إلى العقل» مفتوح؟ يفضل زي ما هو مع كل تحديث للكارت
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
@@ -1224,7 +1226,7 @@ const BrandPage = (() => {
       if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
       const tdl = t.closest("[data-tdel]");
       if (tdl) { if ((await uiConfirm("أتزيل هذه النقطة؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
-      if (t.closest("[data-socialgo]")) { S.addTab = "social"; const a = S.nodes.find((x) => x.id === "add"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
+      if (t.closest("[data-socialgo]")) { S.addTab = "social"; S.addOpen = true; const a = S.nodes.find((x) => x.kind === "branch"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
       const itg = t.closest("[data-itgt]");
       if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
       const bk = t.closest("[data-back]");
@@ -1245,7 +1247,7 @@ const BrandPage = (() => {
         return;
       }
       const tab = t.closest("[data-tab]");
-      if (tab) { S.addTab = tab.dataset.tab; refreshCard(); S.el.querySelector(".bm-card .bm-write")?.focus(); return; }
+      if (tab) { S.addTab = tab.dataset.tab; S.addOpen = true; refreshCard(); S.el.querySelector(".bm-card .bm-write")?.focus(); return; }
       const ok = t.closest("[data-ok]");
       if (ok) {
         const card = S.el.querySelector(".bm-card"), val = card.querySelector('[data-k="@val"], [data-k="@ans"]')?.innerText.trim(), ttl = card.querySelector('[data-k="@ttl"]')?.innerText.trim();

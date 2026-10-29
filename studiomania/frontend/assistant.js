@@ -223,6 +223,26 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     return { ok: false, error: "unknown tool" };
   }
+  // 🗒️ معلومة من المنصة تدخل في سياق المكالمة من غير ما تخليها تتكلم دلوقتي (بتستخدمها في ردها الجاي)
+  function sysItem(text) {
+    if (!S?.dc || S.dc.readyState !== "open") return;
+    lg("sys", text);
+    S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "system", content: [{ type: "input_text", text }] } }));
+  }
+  // ⏳ العميل ساكت وهي مستنياه: بعد ٤٥ ثانية تسأله «بعدك معاي؟»، وبعد ٤٥ كمان تستأذن وتقفل (يكمّل وقت ما يفضى)
+  function idle(now) {
+    if (!S || !S.dc || S.dc.readyState !== "open" || S.finishing || S.busy || S.speaking || S.lastQ !== true) return;
+    if (S.show && !S.show.wait) return;   // بيتفرج على الفيديو
+    if (document.querySelector(".ui-dlg")) return;   // بيملا نافذة (المعطيات الحقيقية لأول فيديو)
+    const quiet = now - Math.max(S.lastAct || S.t0, S.lastTalk || 0), lim = q(".as-box:not(.as-card)") || S.acct ? 90000 : 45000;
+    if (quiet < lim) return;
+    S.lastAct = now; S.idleN = (S.idleN || 0) + 1;
+    lg("sys", `idle ${S.idleN}`);
+    sysItem(S.idleN === 1
+      ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (for example in Saudi: «ها يا إسلام، بعدك معاي؟ ولو مشغول عادي نكمل وقت ثاني»). Then wait.)"
+      : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (for example in Saudi: «شكلك مشغول الحين، أنا بروح الحين، ولما تفضى كلمني»), then call finish with later=true.)");
+    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
+  }
   // 🛰️ رسالة من المنصة لسعاد (مش كلام العميل): مابتتحسبش كتابة منه، وهي بترد عليها لما تخلّص كلامها
   function note(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
@@ -409,7 +429,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    S.typed += " " + text; S.wait = null; S.nudged = 0; clearTimeout(S.nudgeT); lg("user", text, { typed: 1 });
+    S.typed += " " + text; S.wait = null; S.nudged = 0; S.lastAct = performance.now(); S.idleN = 0; clearTimeout(S.nudgeT); lg("user", text, { typed: 1 });
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
@@ -480,6 +500,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (r.ready || r.status === "failed") {
         clearInterval(S.accTimer); S.accTimer = null;
         changed(); status();
+        // 📬 التحليل وصل وهي في نص المكالمة: تعرف دلوقتي، وتقوله في ردها الجاي (من غير ما تقطع سؤال مستني إجابته)
+        if (r.ready) sysItem("(SYSTEM: the analysis of the user's account has just arrived. In your NEXT turn, after reacting to what they say, tell them in one short "
+          + "sentence in the dialect that you just received their page's analysis and there are many things in it you want to talk with them about, "
+          + "but you will finish your questions first so the picture is complete. If the questions are already finished, go to the analysis stop instead. Say it only once.)");
         if (S.accChip) S.accChip.innerHTML = r.ready ? `✓ <span><b>حُلّل حسابك</b><br>${esc(r.account || "")}</span>` : `⚠️ <span><b>تعذّر تحليل الحساب</b></span>`;
       }
     }, 6000);
@@ -497,6 +521,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       usage: { text_in: 0, audio_in: 0, text_cached: 0, audio_cached: 0, text_out: 0, audio_out: 0 } };
     prog();
     S.logT = setInterval(() => flush(false), 15000);
+    ["input", "pointerdown", "change"].forEach((ev) => ov.addEventListener(ev, () => { if (S) { S.lastAct = performance.now(); S.idleN = 0; } }, true));   // بيكتب أو بيختار حاجة: مش ساكت
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
     if (dock) { let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false); } }, 400); }
     S.capT = setInterval(capTick, 120);
@@ -550,7 +575,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.completed") { lg("user", e.transcript || "", { voice: 1 }); if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
@@ -681,6 +706,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   function loop() {
     if (!S) return;
+    idle(performance.now());
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
