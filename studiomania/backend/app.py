@@ -33354,18 +33354,51 @@ def assistant_showcase_start():
         return {"ok": True, "started": False, "note": "already rendering", **st}
     if st["status"] == "done" and TENANT_ROLE == "customer":
         return {"ok": True, "started": False, "note": "already ready", **st}
+    social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     if not st["has_video"]:
-        social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
         if social and social.get("status") == "working":   # تحليل الحساب لسه بينزّل فيديوهاته: ممكن يلاقي واحد فيه كلام
             return {"ok": False, "error": "wait", "note": "Their account videos are still being downloaded. Keep talking and call start_showcase again in a minute or two."}
-        return {"ok": False, "error": "no_video", "note": "No video of the user is available. Ask them to upload a short video of themselves talking."}
+        if not social:
+            return {"ok": False, "error": "no_account", "note": "We do not have their account yet. Ask for their Instagram or TikTok account first (typed), then try again."}
     with SHOWCASE_LOCK:
         if a.get("showcase_used") and TENANT_ROLE == "customer":
             return {"ok": False, "error": "used", "note": "The free showcase was already made for this account."}
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(showcase_used=True))
         showcase_set(bid, status="working", step="🎞️ يجهّز الفيديو", progress=1, error=None, started=now())
-    threading.Thread(target=run_showcase, args=(bid,), daemon=True).start()
-    return {"ok": True, "started": True, "note": "Rendering started. It takes a few minutes."}
+    threading.Thread(target=showcase_go, args=(bid, None if st["has_video"] else social), daemon=True).start()
+    return {"ok": True, "started": True, "note": "Rendering started from one of their own videos on their page. It takes a few minutes."}
+
+
+def showcase_go(bid: str, social: dict | None) -> None:
+    """الفيديو من صفحته: لو مااتحفظش واحد وقت التحليل (حساب اتحلل قبل كده)، بنجيب فيديوهات صفحته ونختار أكتر واحد بيتكلم فيه."""
+    if social:
+        try:
+            showcase_set(bid, step="🎞️ يختار فيديو من صفحتك", progress=2)
+            showcase_from_page(bid, social["platform"], social["handle"])
+        except Exception as exc:  # noqa: BLE001
+            print(f"[showcase] page fetch {bid}: {str(exc)[:300]}", flush=True)
+    run_showcase(bid)
+
+
+def showcase_from_page(bid: str, plat: str, handle: str) -> None:
+    posts = brainsocial.posts(plat, handle) if rivals.live() else []
+    calls = 1
+    folder = showcase_dir(bid)
+    folder.mkdir(parents=True, exist_ok=True)
+    best, best_n = None, -1
+    for p in sorted([x for x in posts if x.get("video")], key=lambda x: -(x.get("views") or 0))[:4]:
+        tmp = folder / "cand.mp4"
+        if not brain_fetch(p["video"], tmp, 80 * 1024 * 1024) or probe_duration(tmp) < 10:
+            continue
+        words = len((rivals.transcript(plat, p["url"]) or "").split())   # بيتكلم فيه؟ (الكلام بيخلّي القطع والدبلجة ليها معنى)
+        calls += 1
+        if words > best_n:
+            best_n = words
+            shutil.copy(tmp, folder / "src.mp4")
+        tmp.unlink(missing_ok=True)
+        if words >= 25:
+            break
+    wallet.cost(wallet.est(scrape=calls), "ترويج: اختيار فيديو من صفحة العميل للفيديو الاستعراضي", promo=True)
 
 
 @app.post("/api/assistant/showcase/upload")

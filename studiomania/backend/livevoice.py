@@ -127,14 +127,13 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "myvideo", "rival", "none"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "rival", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
-                        "intro: a short video that opens their videos. myvideo: a short video of themselves talking (for the showcase reel). "
+                        "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
                         "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
      "you start talking about that stop). Returns real data and facts to talk about; if ok is false, skip that stop.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis", "types", "phone", "avatar", "templates",
-                                                                                          "firstvideo", "process", "custom", "autopilot"]}},
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis", "types", "phone", "avatar", "process", "custom", "autopilot"]}},
                     "required": ["kind"]}},
     {"type": "function", "name": "suggest_competitor", "description": "Find ONE real account in the user's field and area (a possible competitor) "
      "and show it on their screen with its real numbers. Each call shows a different account. Takes a few seconds.",
@@ -269,9 +268,6 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                   "while they film, then we edit it. Ask if they like appearing in their videos."),
         ("avatar", "The avatar: call show_card avatar. Explain the digital copy of them (only with their permission) that talks with new "
                    "words without filming. Ask if that interests them."),
-        ("templates", "Templates: call show_card templates. Tell them these are ready templates for their field, ask them to pick one on the "
-                      "screen and press the button to make it: we make it with their brand name and logo, as a gift. Then wait; the screen tells "
-                      "you what they picked and when it starts. While it renders, continue the tour; when the screen says it is ready, call show_card firstvideo."),
         ("showcase", None),
         ("process", "How a video is made: call show_card process. Explain idea → script → editing → voice → publishing, and that at each step "
                     "they choose fully automatic, approve each step, or do it themselves. Ask which level of control they prefer and save it (topic process)."),
@@ -290,8 +286,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     elif have.get("showcase") == "done":
         showcase_goal = "Their showcase reel is ready: ask if they want to watch it now, and if yes call play_showcase."
     else:
-        showcase_goal = ("Offer a gift: a short reel made from " + ("one of their own videos from their account" if have.get("video") else "a short video of themselves talking")
-                         + ", where every few seconds shows a different thing the platform can do (captions, moving text, zoom, text behind them, a new "
+        showcase_goal = ("Offer a gift, and ask their permission: we take one of the videos from their own page (they upload nothing) and make a short reel"
+                         + " from it, where every few seconds shows a different thing the platform can do (captions, moving text, zoom, text behind them, a new "
                          "background, colors, a second camera angle, dubbing in their own voice, music and footage), and you explain each part while it plays. "
                          "Ask if they would like it; if yes, call start_showcase. If they say no or later, move on.")
     for k, txt in stops:
@@ -304,8 +300,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     tour = ("A guided tour of what the platform can do for them, one stop at a time, in this order (it is long and that is fine: they can stop "
             "any time and continue later from where you stopped). At each stop: call the tool in the same turn, explain in 1–3 short sentences "
             "in their terms, ask ONE short question and wait. Never read the card out loud; talk about it."
-            + (" The showcase reel takes several minutes to make: offer it (and start it if they agree) right after the first stop, "
-               "then play it when you reach its stop." if "Offer a gift" in showcase_goal else "")
+            + (" The showcase reel is the heart of this tour and takes several minutes to make: offer it right after the analysis stop "
+               "(start it if they agree), then play it as soon as the screen says it is ready." if "Offer a gift" in showcase_goal else "")
+            + " Do not suggest video ideas or scripts unless they ask you."
             + "\n" + "\n".join(tour_lines)
             ) if tools and tour_lines else "Skip this step."
     tool_txt = ("""
@@ -324,8 +321,9 @@ Tools (use them silently, never read them out loud):
   and tell them in one short sentence that you will look them up and they will get a notification to confirm the ones you found.
 - If the account analysis is not ready when you reach that stop, say the results will appear on their screen in a few minutes, move on,
   and come back to it later in the tour (call get_account_analysis again).
-- The showcase reel (see goal 5): call start_showcase only after they agreed. If it answers no_video, ask them for a short video of
-  themselves talking and call show_input with kind "myvideo" in the same turn; when the screen says it was uploaded, call start_showcase.
+- The showcase reel: ask their permission to take one of the videos from their own page; call start_showcase only after they agreed.
+  We take the video from their page ourselves: NEVER ask them to upload or send a video. If it fails, say kindly you could not find
+  a suitable video on their page and move on.
   While it renders, keep the conversation going (the account findings, their questions). Call get_showcase at most once a minute and
   never invent its progress. The screen also tells you when it is ready: then tell them in one short sentence and call play_showcase.
 - During the reel the screen pauses after each part and sends you (SYSTEM: …) with what was done in that part and what else is

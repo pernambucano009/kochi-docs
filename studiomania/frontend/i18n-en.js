@@ -3198,6 +3198,7 @@ window.I18N_EN = {
   "قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.": "Until a quote arrives we estimate it: our cheapest unit price minus the expected discount. Once you enter the quoted price we use it directly.",
   "اكتب سعر العرض وعدد الوحدات معًا": "Enter the quoted price and units together",
   "✅ حُفظت الباقة المخصصة": "✅ Custom pack saved",
+  "🎞️ يختار فيديو من صفحتك": "🎞️ Picking a video from your page",
   "رأينا في فيديوهاتك": "Our take on your videos",
   "تحسينات للحساب": "Account improvements",
   "🔗 افتح صفحته وشاهدها": "🔗 Open their page",
