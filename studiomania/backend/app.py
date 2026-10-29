@@ -32772,6 +32772,9 @@ def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
     for qid in (b.get("assistant") or {}).get("saved") or []:
         if qid not in known and qid not in livevoice.SKIP_Q:
             known[qid] = "(أجاب عنه في مكالمة سابقة)"
+    for qid in (b.get("assistant") or {}).get("skipped") or []:   # طلب يعدّيه: مايتسألش تاني
+        if qid not in known and qid not in livevoice.SKIP_Q:
+            known[qid] = "(skipped by the user: do not ask it again)"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
     steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known] \
@@ -32950,6 +32953,20 @@ def assistant_answer(body: AssistAnswerIn):
     update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("saved", []).append(body.qid)
                  if body.qid not in (d.get("assistant") or {}).get("saved", []) else None)
     return {"ok": True, "saved": q["ar"]}
+
+
+class AssistSkipIn(BaseModel):
+    qid: str
+
+
+@app.post("/api/assistant/skip")
+def assistant_skip(body: AssistSkipIn):
+    bid, _b, _a = assist_info()
+    if not bid or body.qid not in brainquiz.BY_ID:
+        return {"ok": False, "error": "unknown question"}
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("skipped", []).append(body.qid)
+                 if body.qid not in (d.get("assistant") or {}).get("skipped", []) else None)
+    return {"ok": True}
 
 
 class AssistAccountIn(BaseModel):
@@ -33417,7 +33434,8 @@ def assistant_card(kind: str):
 # كل ده جزء من مكالمة أول مرة: على المنصة (ترويج).
 def rival_card(it: dict, why: str = "") -> dict:
     v = rivals.verdict(it)
-    return {"platform": it["platform"], "handle": it["handle"], "name": it.get("name") or it["handle"], "followers": it.get("followers"),
+    url = f"https://www.tiktok.com/@{it['handle']}" if it["platform"] == "tiktok" else f"https://www.instagram.com/{it['handle']}/"
+    return {"platform": it["platform"], "handle": it["handle"], "name": it.get("name") or it["handle"], "url": url, "followers": it.get("followers"),
             "median_views": it.get("median_views"), "recent": it.get("recent_count"), "days": v["days_since_post"], "top_views": it.get("top_views"),
             "level": v["level"], "why": why, "posts": [{"url": p.get("url"), "views": p.get("views"), "multiple": p.get("multiple"),
                                                         "caption": str(p.get("caption") or "")[:140]} for p in (it.get("posts") or [])[:3]]}, v

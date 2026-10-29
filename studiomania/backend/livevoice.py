@@ -117,6 +117,9 @@ TOOLS = [
          "qid": {"type": "string", "description": "The question id from the list in the instructions."},
          "answer": {"type": "string", "description": "The answer, written clearly in Arabic, keeping the user's own facts and words. No invented details."}},
          "required": ["qid", "answer"]}},
+    {"type": "function", "name": "skip_question", "description": "The user asked to skip this question (or move to the next one, or answer it "
+     "later). Call it with the question id, then go on to the next question.",
+     "parameters": {"type": "object", "properties": {"qid": {"type": "string"}}, "required": ["qid"]}},
     {"type": "function", "name": "start_account_analysis", "description": "Start analysing the user's Instagram or TikTok account in the background.",
      "parameters": {"type": "object", "properties": {"account": {"type": "string", "description": "The @handle or profile link exactly as the user gave it."}},
                     "required": ["account"]}},
@@ -246,7 +249,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                   "these or also try other kinds. Save their answer with save_preference (topic types)."),
         ("rivals", "COMPETITORS: the most important stop of the whole call. Take your time, never rush it, never skip it. Goal: agree together "
                    "on at least one real competitor (ideally 2–3) for their competitors page.\n"
-                   "      1) Call suggest_competitor. Tell them in one or two sentences who it is (name, what they post, a real number), say you found "
+                   "      1) Call suggest_competitor. While it searches say at most 'let me look for one' and nothing else: never ask whether to "
+                   "add an account, or describe one, before its card is on the screen (the result arrives in a few seconds and you will speak "
+                   "again). Then tell them in one or two sentences who it is (name, what they post, a real number), say you found "
                    "it in their field and area, and ask: is this really one of the pages we should add to your competitors?\n"
                    "      2) Yes → decide_competitor add=true, then say in one sentence what works for them (from their best videos).\n"
                    "      3) No → decide_competitor add=false, then ask if they know a page they consider a competitor and can type its link "
@@ -304,6 +309,7 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
 Tools (use them silently, never read them out loud):
 - After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
   the next question. If one answer covers several questions, save each one.
+- If they ask to skip a question, move to the next one, or answer it later, call skip_question with its id (never save_answer for it).
 - Only in the turn where you actually ask for the account, the logo, product photos or the intro video (and you say that word),
   call show_input with that kind,
   and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
@@ -349,7 +355,9 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
    Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! عامل إيه؟» … «جاهز نكمّل أسئلتنا؟ فاضلنا حاجات بسيطة»" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name (like: hello again, how are you?), then ask if they are ready to continue our questions where we stopped, saying how little is left") if returning else "«" + t1 + "» … «" + t2 + "»"}
    Each of these is its own turn: say one, then STOP and wait for their reply and respond to it. Never put the greeting, "ready to chat?"
-   and "let's start" in the same turn: after asking if they are ready, wait for their answer before starting.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
+   and "let's start" in the same turn: after asking if they are ready, wait for their answer before starting.
+   When they say yes, react in a few words and ask your FIRST real question in that same turn. Never say only "let's start step by step"
+   (or anything like it) and stop: that sentence alone is forbidden.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
 {fill_line}
 {("   What is left, in this order (continue from the first one; everything else is done, never redo it): " + ", ".join(STEP_NAMES.get(x, x) for x in steps) + ".") if steps else ""}
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}

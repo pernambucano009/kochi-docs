@@ -175,6 +175,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (r.ok) chip(`🔎 <span><b>نبحث عن منافسيك</b><br>${esc((r.searching || []).join("، "))}</span>`);
       return r;
     }
+    if (name === "skip_question") {
+      const r = await api("/api/assistant/skip", { method: "POST", ...jsonBody({ qid: args.qid }) }).catch(() => ({ ok: false }));
+      step(args.qid); return r;
+    }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
     if (name === "start_showcase") {
       const r = await api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
@@ -210,7 +214,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return r;
     }
     if (name === "show_input") {
-      if (args.kind === "none") { later(); return { ok: true, closed: true }; }
+      if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -368,6 +372,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     q(".as-box")?.remove(); acct(false);
     const d = document.createElement("div"); d.className = "as-box as-card"; d.dataset.card = "rival";
     d.innerHTML = `<b>🏆 ${esc(c.name)} <small dir="ltr">@${esc(c.handle)} · ${c.platform === "tiktok" ? "TikTok" : "Instagram"}</small></b>
+      ${c.url ? `<a class="as-btn" href="${esc(c.url)}" target="_blank" rel="noopener">🔗 افتح صفحته وشاهدها</a>` : ""}
       <div class="as-kpis"><span><b>${fmt(c.followers)}</b>متابع</span><span><b>${fmt(c.median_views)}</b>متوسط المشاهدات</span><span><b>${fmt(c.recent)}</b>منشور في آخر ٣٠ يومًا</span>
       ${c.days != null ? `<span><b>${fmt(c.days)}</b>يوم منذ آخر منشور</span>` : ""}</div><p>${esc(LEVEL[c.level] || "")}</p>
       ${(c.posts || []).map((p) => `<div class="as-rv">• ${esc(p.caption || "فيديو")} — ${fmt(p.views)} مشاهدة ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</div>`).join("")}
@@ -459,7 +464,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       + `<div class="row"><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
     q(".as-acts").before(d);
     const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
-    d.querySelector("[data-later]").onclick = () => { d.remove(); say("سأرسله لاحقًا"); };
+    d.querySelector("[data-later]").onclick = () => { d.remove(); step({ logos: "logo", products: "photos" }[k.kind] || ""); say("سأرسله لاحقًا"); };
     if (k.ph) {
       const inp = d.querySelector("input"), send = () => { const v = inp.value.trim(); if (!v) return; d.remove(); if (k.pre) return rivalCheck(v); say(`حسابي: ${v}`); };
       d.querySelector("[data-send]").onclick = send; inp.onkeydown = (e) => { if (e.key === "Enter") send(); };
@@ -571,7 +576,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const R = (id) => S.resp[id] || (S.resp[id] = { msg: false, calls: 0, pending: 0, done: false });
       const follow = (id) => {
         const r = S?.resp[id];
-        if (!r || !r.done || r.pending || !r.calls || r.msg || S.finishing) return;
+        if (!r || !r.done || r.pending || !r.calls || (r.msg && !r.force) || S.finishing) return;
         delete S.resp[id]; S.dc.send(JSON.stringify({ type: "response.create" }));
       };
       dc.onmessage = async (m) => {
@@ -605,14 +610,15 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (r.msg && (id === S.capId || !S.capId)) {
             const last = sentences(S.aBuf).pop() || "";
             // بتستنى بهدوء بس لو طلبت حاجة وخانتها ظاهرة فعلًا قدام العميل (الأداة لوحدها من غير ما تطلبها بالكلام مش انتظار)
-            // سؤال في أي حتة من ردها (مش آخر جملة بس)، أو أول ردّين (التحية وسؤال «جاهز نتكلم؟»): تستنى العميل ومابتكمّلش لوحدها
-            S.turns = (S.turns || 0) + 1;
-            S.lastQ = isQ(last) || /[؟?]/.test(S.aBuf) || sentences(S.aBuf).some(isQ) || S.turns <= 2 || (!!S.wait && !!(q(".as-box") || S.acct));
+            // سؤال في آخر جملتين من ردها: تستنى العميل. جملة عادية في الآخر («خلينا نبدأ خطوة بخطوة») = تكمّل هي بالسؤال
+            const tail = sentences(S.aBuf).slice(-2);
+            S.lastQ = isQ(last) || tail.some((x) => /[؟?]/.test(x) || isQ(x)) || (!!S.wait && !!(q(".as-box") || S.acct));
             nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
           }
           if (!r.msg) { S.thinking = false; status(); }
         } else if (e.type === "response.function_call_arguments.done") {
           const r = R(e.response_id); r.calls++; r.pending++;
+          if (["suggest_competitor", "check_competitor"].includes(e.name)) r.force = true;   // تتكلم عن الحساب بعد ما يظهر، مش قبله
           let args = {}; try { args = JSON.parse(e.arguments || "{}"); } catch { /* أرجومنت مش JSON */ }
           const out = await tool(e.name, args);
           lg("tool", e.name, { args, out });
