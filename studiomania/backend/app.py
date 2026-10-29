@@ -33697,6 +33697,9 @@ def assistant_preference(body: AssistPrefIn):
         return {"ok": False}
     titles = {"types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
               "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم"}
+    if body.topic in TOUR:   # قال «كفاية» على المحطة دي: تتقفل ومابترجعش (حتى لو رجع للمكالمة بعدين)
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append(body.topic)
+                     if body.topic not in (d.get("assistant") or {}).get("tour", []) else None)
     update_brain(bid, lambda d: d.setdefault("notes", []).append({"id": uuid.uuid4().hex[:10], "section": "other",
                                                                   "title": titles.get(body.topic, "تفضيل من المكالمة"), "summary": text[:300],
                                                                   "body": "", "source": "assistant"}))

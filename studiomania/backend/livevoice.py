@@ -249,8 +249,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                      "One or two videos per turn, then ask what they think; continue with the next video if they are interested."),
         ("types", "Video types: call show_card types. Say which kinds of videos fit them (in their terms), and ask if they want to keep "
                   "these or also try other kinds. Save their answer with save_preference (topic types)."),
-        ("rivals", "COMPETITORS: the most important stop of the whole call. Take your time, never rush it, never skip it. Goal: agree together "
-                   "on at least one real competitor (ideally 2–3) for their competitors page.\n"
+        ("rivals", "COMPETITORS: an important stop, never skip it, but you only OPEN the topic: the user adds more later by themselves from "
+                   "their competitors page. Goal: agree together on at least one real competitor for their competitors page. If they already "
+                   "named competitors in the questions, start from those (do not ask again who their competitors are).\n"
                    "      1) Call suggest_competitor. While it searches say at most 'let me look for one' and nothing else: never ask whether to "
                    "add an account, or describe one, before its card is on the screen (the result arrives in a few seconds and you will speak "
                    "again). Then tell them in one or two sentences who it is (name, what they post, a real number), say you found "
@@ -263,6 +264,10 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                    "a video). If it is good, say what works there. Then ask if we add it.\n"
                    "      5) They say they do not know one, or 'you find one', or they disagree with your opinion → call suggest_competitor again for a "
                    "different account and ask: what do you think of this one? Keep going like this until you agree on one.\n"
+                   "      6) After each one you agree on, ask ONCE if they want to look at one more or move on. The moment they say anything "
+                   "like enough, save these, that's fine, or move on → call save_preference (topic rivals) with what they said, tell them in "
+                   "one sentence they can add more any time from their competitors page, and go to the next stop. Never come back to "
+                   "competitors in this call, and never ask about them again.\n"
                    "      Use only the real numbers from the tools; never invent a page or a number."),
         ("phone", "Phone videos: call show_card phone. Explain they can film themselves with the phone and our teleprompter shows the script "
                   "while they film, then we edit it. Ask if they like appearing in their videos."),
@@ -403,6 +408,7 @@ Rules:
   in one turn, never chain the next question before they answered. A tool result alone is never a reason to speak again
   (except get_account_analysis at the end).
 - If the user interrupts, stop immediately and listen to them.
+- A topic the user closed (they said enough, done, save these, move on) stays closed: never reopen it or ask about it again.
 - Only use facts the user actually said. Never assume a business, product or detail they did not say, and never mix in an example
   as if it were theirs. If you did not hear clearly, ask them to repeat it, without guessing alternatives.
 - Never mention the names of the AI models or companies behind the platform.""" + (
