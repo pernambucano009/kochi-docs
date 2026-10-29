@@ -667,7 +667,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     clearTimeout(S.nudgeT);
     if (S.lastQ !== false || S.finishing || (S.wait && (q(".as-box") || S.acct))) return;   // سؤال، أو طلب (رفع / كتابة): تستنى العميل
     if (S.nudged >= 2) return;   // كمّلت لوحدها مرة ولسه العميل ماردش: تسكت وتستنى (وإلا كانت بتعيد السؤال كل شوية بصيغ مختلفة)
-    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && (S.nudged || 0) < 2 && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = (S.nudged || 0) + 1; lg("sys", "auto-continue"); S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
+    S.nudgeT = setTimeout(() => { if (S && S.lastQ === false && (S.nudged || 0) < 2 && S.dc?.readyState === "open") { S.lastQ = null; S.nudged = (S.nudged || 0) + 1; lg("sys", "auto-continue");
+      // تكمّل بسؤال مباشر، مش بجملة انتقالية تانية («خليني أرتب…» وبعدين تسكت تاني)
+      S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "system", content: [{ type: "input_text",
+        text: "You ended your last turn without asking anything, so the user is waiting for you. Now ask your next question directly, in one short sentence, with no transition or filler before it." }] } }));
+      S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;
