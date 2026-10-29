@@ -32817,8 +32817,8 @@ def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
             known[qid] = "(skipped by the user: do not ask it again)"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
-    steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known] \
-        + ([] if have["logo"] else ["logo"]) + ([] if have["products"] else ["photos"])
+    # الشعار والصور مابيتطلبوش في المكالمة (بنفكّره في الآخر يملا مكتبة المحتويات)
+    steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known]
     return known, have, steps
 
 
@@ -33486,6 +33486,8 @@ def tour_card(bid: str, b: dict, kind: str) -> dict:
         "process": "Every video goes through: idea → script → editing → voice → publishing. At each step they choose: fully automatic, we prepare and "
                    "they approve, or they do it themselves. They can change this any time.",
         "showcase": "The showcase reel made from their own video.",
+        "library": "Their content library: the more photos and videos they add (logo, their work, cases, place, team), the better and more "
+                   "personal the videos we make for them. They can add them any time after the call from the library page.",
         "custom": "Custom templates: they arrange the steps once (their intro, cuts, captions style, music, outro) and every run makes a new video the same way.",
     }
     if kind in facts:

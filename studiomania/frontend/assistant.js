@@ -352,6 +352,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     process: () => `<b>🛠️ من الفكرة إلى النشر</b><div class="as-steps"><span>الفكرة</span><span>النص</span><span>المونتاج</span><span>الصوت</span><span>النشر</span></div>
       <p>في كل خطوة تختار مستوى التحكم:</p><ul><li>تلقائي بالكامل</li><li>نجهّزها وأنت توافق</li><li>تفعلها بنفسك</li></ul>`,
     custom: () => `<b>🧱 القالب المخصص</b><img src="/gallery/editor.jpg" alt=""><ul><li>ترتّب الخطوات مرة واحدة: المقدمة والقطع والترجمة والموسيقى والخاتمة</li><li>كل تشغيل يصنع فيديو جديدًا بنفس الطريقة</li></ul>`,
+    library: () => `<b>📚 مكتبة المحتويات</b><p>كلما أضفت صورًا وفيديوهات أكثر، صارت فيديوهاتك أقرب إليك.</p>
+      <ul><li>شعارك</li><li>صور أعمالك وحالاتك</li><li>صور المكان والفريق</li><li>فيديوهات تصوّرها بنفسك</li></ul>
+      <div class="row"><button type="button" class="as-go" data-golib>افتح المكتبة بعد المكالمة</button></div>`,
     autopilot: (d) => `<b>🚀 الأوتوبايلوت</b><ul><li>تحدد عدد المنشورات في اليوم والقوالب</li><li>ينشر في أفضل الأوقات تلقائيًا</li><li>أو ينتظر موافقتك قبل كل منشور</li></ul>
       <p>${d.on ? "✓ يعمل الآن في حسابك" : "يمكنك تشغيله من صفحة الأوتوبايلوت بعد المكالمة"}</p>`,
   };
@@ -366,6 +369,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     q(".as-acts").before(d);
     d.querySelector("[data-cclose]").onclick = () => d.remove();
     if (kind === "templates") tplCard(d);
+    d.querySelector("[data-golib]")?.addEventListener("click", async () => { await end(true); window.NHGo?.("brainlib"); });
     return { ok: true, facts: r.facts || "", data: r.data };
   }
   // 🏆 كارت المنافس: أرقامه الحقيقية ورأينا فيه، وزرارين (هو منافس / مش منافس). الزرار والكلام بيعملوا نفس الحاجة
