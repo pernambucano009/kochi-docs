@@ -75,6 +75,7 @@
     <button data-t="issues" class="on">🚨 صندوق الأخطاء <b id="issN"></b></button>
     <button data-t="cust">👥 العملاء والاستهلاك</button>
     <button data-t="calls">🎙️ معمل سعاد</button>
+    <button data-t="sclab">🎬 معمل الاستعراض</button>
     <button data-t="runs">الفحص الشامل</button>
     <button data-t="steps">الخطوات</button>
     <button data-t="outs">النتائج للمراجعة</button>
@@ -95,6 +96,13 @@
       <p class="mute" style="margin:8px 0 0">بهذا المفتاح تسحب جلسة Claude الأخطاء الجديدة وتصلحها وتغلقها بنفسها. يظهر مرة واحدة: انسخه وضعه في أسرار بيئة Claude باسم SIMSIM_FEED_KEY، ولا تلصقه في المحادثة. إنشاء مفتاح جديد يلغي القديم.</p>
       <div class="row" id="feedOut" hidden><input id="feedKey" readonly dir="ltr" style="flex:1;min-width:220px"><button class="btn pri" id="feedCopy">انسخ</button></div></div>
     <div id="iss"></div>
+  </section>
+  <section data-p="sclab" hidden>
+    <div class="card"><div class="row"><b>🎬 معمل الفيديو الاستعراضي</b><span class="mute">جرّب الفيديو الاستعراضي على أي فيديو أو حساب دون مكالمة سعاد (لا تكلفة للصوت اللحظي). تظهر النتيجة مع نوع الفيديو، وما يظهر فيه، وكل جزء وما كانت سعاد ستقوله عنه.</span></div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="slAcc" dir="ltr" placeholder="@account أو رابط الحساب" style="min-width:220px">
+        <label class="btn">📎 أو ارفع فيديو<input type="file" id="slFile" accept="video/*" hidden></label><span class="mute" id="slFn"></span>
+        <button class="btn" id="slGo">▶ اصنع الفيديو الاستعراضي</button><button class="btn" id="slReload">↻ حدّث</button><span class="mute" id="slMsg"></span></div></div>
+    <div id="slRows"></div>
   </section>
   <section data-p="calls" hidden>
     <div class="card"><div class="row"><b>🎙️ معمل سعاد</b><span class="mute">كل مكالمة مع المساعدة مكتوبة سطرًا سطرًا: كلامها، وكلام العميل (من الصوت أو الكتابة)، والأدوات التي استخدمتها ونتائجها، وكل مرة أكملت فيها وحدها، وكتم الميكروفون. الكتابة فقط، دون تسجيل صوت.</span></div>
@@ -310,7 +318,37 @@ function tab(t) {
   if (t === "lmap") loadLm();
   if (t === "cust") { loadCosts(); loadCust(); loadCoupons(); }
   if (t === "calls") loadCalls();
+  if (t === "sclab") loadLab();
 }
+// 🎬 معمل الاستعراض: كل تجربة بنوع الفيديو ووصفه، والفيديو، وكل جزء: اللي اتعمل فيه واللي ممكن يتعمل (ده اللي سعاد بتشرحه)
+async function loadLab() {
+  const d = await api("/api/admin/showcase-lab").catch((e) => ({ items: [], err: e.message }));
+  $("slRows").innerHTML = d.err ? `<div class="card mute">${esc(d.err)}</div>` : (d.items || []).map((x) => `<div class="card" data-sl="${esc(x.id)}">
+    <div class="row"><b>${esc(x.name || x.id)}</b><span class="mute">${x.status === "working" ? `⏳ ${esc(x.step || "")} · ${x.progress || 0}٪` : x.status === "failed" ? `⚠️ ${esc(x.error || "")}` : `✓ ${x.duration || ""} ثانية${x.usd != null ? ` · $${Number(x.usd).toFixed(2)}` : ""}`}</span>
+      <button class="btn" data-sldel>حذف</button></div>
+    ${x.status === "done" ? `<div class="row" style="align-items:flex-start;gap:14px;margin-top:8px"><video src="${esc(x.video)}" controls playsinline style="height:420px;max-width:240px;background:#000;border-radius:10px"></video>
+      <div style="flex:1;min-width:260px"><p><b>نوع الفيديو:</b> ${esc(x.vtype_label || "")}<br><b>ما يظهر فيه:</b> ${esc(x.what || "—")}${(x.skipped || []).length ? `<br><b>أجزاء لم تكتمل:</b> ${esc(x.skipped.join("، "))}` : ""}</p>
+      <ol>${(x.chapters || []).map((c) => `<li><b>${esc(c.title)}</b> <span class="mute num">${c.t0}–${c.t1}ث</span><div class="mute">ما فعلناه: ${esc(c.did)}</div><div class="mute">ما يمكن أيضًا: ${esc(c.can)}</div></li>`).join("")}</ol></div></div>` : ""}</div>`).join("") || `<div class="card mute">لا توجد تجارب بعد.</div>`;
+  if ((d.items || []).some((x) => x.status === "working")) { clearTimeout(S.slT); S.slT = setTimeout(() => document.querySelector('[data-p="sclab"]:not([hidden])') && loadLab(), 6000); }
+}
+$("slFile").onchange = (e) => { $("slFn").textContent = e.target.files[0]?.name || ""; };
+$("slReload").onclick = loadLab;
+$("slGo").onclick = async () => {
+  const f = new FormData(), file = $("slFile").files[0];
+  if (file) f.append("file", file); f.append("account", $("slAcc").value.trim());
+  if (!file && !$("slAcc").value.trim()) { $("slMsg").textContent = "ارفع فيديو أو اكتب حسابًا"; return; }
+  $("slGo").disabled = true; $("slMsg").textContent = file ? "⏳ جارٍ الرفع…" : "⏳ يبدأ…";
+  try {
+    const r = await fetch("/api/admin/showcase-lab", { method: "POST", body: f, credentials: "same-origin" });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+    $("slMsg").textContent = "بدأ ✓ (يستغرق بضع دقائق)"; $("slFile").value = ""; $("slFn").textContent = ""; loadLab();
+  } catch (e) { $("slMsg").textContent = "⚠️ " + e.message; } finally { $("slGo").disabled = false; }
+};
+$("slRows").onclick = async (e) => {
+  const c = e.target.closest("[data-sl]"); if (!c || !e.target.closest("[data-sldel]")) return;
+  if (!confirm("أتحذف هذه التجربة؟")) return;
+  await api(`/api/admin/showcase-lab/${c.dataset.sl}`, { method: "DELETE" }).catch(() => {}); loadLab();
+};
 
 $("start").onclick = async () => {
   const niches = [...document.querySelectorAll("#niches input:checked")].map((x) => x.value);

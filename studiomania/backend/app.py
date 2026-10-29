@@ -33188,11 +33188,13 @@ def showcase_dub_lang(words: str) -> tuple[str, str, str]:
     return "ar-gulf", "خليجي", "natural Gulf Arabic dialect (not Modern Standard Arabic)"
 
 
-def run_showcase(bid: str) -> None:
+def run_showcase(bid: str, lab: str | None = None) -> None:
+    """lab: تجربة من «معمل الاستعراض» في لوحة الأدمن (فيديو مرفوع أو من حساب)، من غير المكالمة: النتيجة بتتحفظ في المعمل بس."""
     b = brain_row(bid) or {}
     a = b.get("assistant") or {}
-    src = showcase_src(bid)
-    work = showcase_dir(bid) / "work"
+    src = (SC_LAB / lab / "src.mp4") if lab else showcase_src(bid)
+    work = (SC_LAB / lab / "work") if lab else showcase_dir(bid) / "work"
+    setst = (lambda **kw: sc_lab_set(lab, **kw)) if lab else (lambda **kw: showcase_set(bid, **kw))
     shutil.rmtree(work, ignore_errors=True)
     spent = {"usd": 0.0}
     mock = atlas.mock_mode()
@@ -33308,9 +33310,15 @@ def run_showcase(bid: str) -> None:
                    "broll": lambda q, base: stock_get("broll", q, base), "bg": lambda q, base: stock_get("bg", q, base),
                    "music": lambda q, base: stock_get("music", q, base)}}
     try:
-        if not src:
+        if not src or not src.exists():
             raise showcase.ShowcaseError("لا يوجد فيديو")
-        r = showcase.build(cfg, src, lambda s, p: showcase_set(bid, step=s, progress=p))
+        r = showcase.build(cfg, src, lambda s, p: setst(step=s, progress=p))
+        if lab:   # 🧪 المعمل: الفيديو والقطع ونوع الفيديو بس (من غير الفيديوهات الجاهزة ولا الإشعار)
+            shutil.copy(r["video"], SC_LAB / lab / "out.mp4")
+            wallet.cost(spent["usd"], "تجربة الأدمن: معمل الفيديو الاستعراضي", ref="showcase-lab")
+            setst(status="done", step=None, progress=100, error=None, duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"],
+                  usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], done_at=now())
+            return
         export_id = uuid.uuid4().hex[:12]
         filename = f"showcase_{export_id}.mp4"
         shutil.copy(r["video"], EXPORTS_DIR / filename)
@@ -33335,11 +33343,103 @@ def run_showcase(bid: str) -> None:
         if spent["usd"]:
             wallet.cost(spent["usd"], "ترويج: الفيديو الاستعراضي (لم يكتمل)", promo=True, ref="showcase")
         msg = str(exc) if isinstance(exc, showcase.ShowcaseError) and re.search(r"[؀-ۿ]", str(exc)) else "تعذّر تجهيز الفيديو الاستعراضي"
+        if lab:
+            setst(status="failed", step=None, error=msg[:300], detail=str(exc)[:500])
+            return
         # فشل: الهدية ماتتحسبش، يقدر يجرّب تاني بفيديو تاني
         showcase_set(bid, status="failed", step=None, error=msg[:300])
         update_brain(bid, lambda d: d.setdefault("assistant", {}).pop("showcase_used", None))
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+# 🧪 معمل الفيديو الاستعراضي (للأدمن): جرّب على أي فيديو أو حساب من غير مكالمة سعاد (مفيش أي تكلفة صوت لحظي)
+SC_LAB = DATA_DIR / "showcase_lab"
+SC_LAB_LOCK = threading.Lock()
+
+
+def sc_lab_set(lid: str, **kw) -> None:
+    with SC_LAB_LOCK:
+        f = SC_LAB / lid / "job.json"
+        try:
+            d = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            d = {"id": lid}
+        d.update(kw)
+        f.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
+
+
+def sc_lab_admin() -> None:
+    if TENANT_ROLE == "customer":
+        raise HTTPException(403, "للأدمن فقط")
+
+
+@app.get("/api/admin/showcase-lab")
+def sc_lab_list():
+    sc_lab_admin()
+    out = []
+    for f in sorted(SC_LAB.glob("*/job.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:40]:
+        try:
+            d = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            continue
+        d["video"] = f"/api/admin/showcase-lab/{d['id']}/video" if (f.parent / "out.mp4").exists() else None
+        out.append(d)
+    return {"items": out}
+
+
+@app.post("/api/admin/showcase-lab")
+def sc_lab_new(account: str = Form(""), name: str = Form(""), file: UploadFile | None = File(None)):
+    """فيديو مرفوع، أو حساب إنستجرام / تيك توك (بنختار منه أكتر فيديو فيه كلام زي المكالمة بالظبط)."""
+    sc_lab_admin()
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    lid = uuid.uuid4().hex[:10]
+    folder = SC_LAB / lid
+    folder.mkdir(parents=True, exist_ok=True)
+    plat, handle = brainsocial.parse(account) if account.strip() else ("", "")
+    if file is not None and file.filename:
+        raw = folder / f"up{Path(file.filename).suffix.lower() or '.mp4'}"
+        with raw.open("wb") as fo:
+            shutil.copyfileobj(file.file, fo)
+        if probe_duration(raw) < 8:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise HTTPException(400, "الفيديو قصير: ارفع فيديو مدته ٨ ثوانٍ على الأقل")
+        raw.replace(folder / "src.mp4")
+    elif not handle:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(400, "ارفع فيديو أو اكتب حسابًا")
+    sc_lab_set(lid, name=(name or (f"@{handle}" if handle else (file.filename if file else "")))[:80], status="working",
+               step="🎞️ يجهّز الفيديو", progress=1, created=now())
+
+    def go():
+        if handle and not (folder / "src.mp4").exists():
+            try:
+                sc_lab_set(lid, step="🎞️ يختار فيديو من الصفحة")
+                showcase_from_page_to(folder, plat, handle)
+            except Exception as exc:  # noqa: BLE001
+                sc_lab_set(lid, status="failed", error=f"تعذّر جلب فيديو من الحساب: {str(exc)[:200]}")
+                return
+        run_showcase(bid, lab=lid)
+    threading.Thread(target=go, daemon=True).start()
+    return {"ok": True, "id": lid}
+
+
+@app.get("/api/admin/showcase-lab/{lid}/video")
+def sc_lab_video(lid: str):
+    sc_lab_admin()
+    f = SC_LAB / re.sub(r"[^a-f0-9]", "", lid) / "out.mp4"
+    if not f.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="video/mp4")
+
+
+@app.delete("/api/admin/showcase-lab/{lid}")
+def sc_lab_delete(lid: str):
+    sc_lab_admin()
+    shutil.rmtree(SC_LAB / re.sub(r"[^a-f0-9]", "", lid), ignore_errors=True)
+    return {"ok": True}
 
 
 def showcase_state(b: dict) -> dict:
@@ -33395,9 +33495,14 @@ def showcase_go(bid: str, social: dict | None) -> None:
 
 
 def showcase_from_page(bid: str, plat: str, handle: str) -> None:
-    posts = brainsocial.posts(plat, handle) if rivals.live() else []
+    showcase_from_page_to(showcase_dir(bid), plat, handle)
+
+
+def showcase_from_page_to(folder: Path, plat: str, handle: str) -> None:
+    if not rivals.live():
+        raise RuntimeError("خدمة سحب الصفحات غير متاحة")
+    posts = brainsocial.posts(plat, handle)
     calls = 1
-    folder = showcase_dir(bid)
     folder.mkdir(parents=True, exist_ok=True)
     best, best_n = None, -1
     for p in sorted([x for x in posts if x.get("video")], key=lambda x: -(x.get("views") or 0))[:4]:
