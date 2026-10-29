@@ -468,7 +468,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S?.log || (!S.log.length && !final)) return;
     if (S.nolog || !state?.log) { S.log.length = 0; return; }   // التسجيل مقفول، أو العميل قال «لا تحفظها»
     const body = JSON.stringify({ call: S.call, events: S.log.splice(0), final: !!final,
-      meta: { agent: S.agent || "", saved: S.saved, steps: S.steps.length, done: S.done.size, sec: Math.round((performance.now() - S.t0) / 1000), noMic: !S.mic } });
+      meta: { agent: S.agent || "", saved: S.saved, steps: S.steps.length, done: S.done.size, sec: Math.round((performance.now() - S.t0) / 1000), noMic: !S.mic,
+        model: S.model || "", usage: S.usage, ...(S.usd != null ? { usd: S.usd } : {}) } });
     fetch("/api/assistant/log", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
   }
   async function pollAccount() {
@@ -492,7 +493,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
       ${state?.log && window.IS_CUSTOMER ? `<p class="as-lognote" data-lognote>📝 تُحفظ هذه المحادثة نصًا فقط (دون صوت) لمدة 30 يومًا لتحسين المساعدة، دون اسمك أو بيانات تواصلك. <button type="button" data-nolog>لا تحفظها</button></p>` : ""}`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
-      call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [] };
+      call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [],
+      usage: { text_in: 0, audio_in: 0, text_cached: 0, audio_cached: 0, text_out: 0, audio_out: 0 } };
     prog();
     S.logT = setInterval(() => flush(false), 15000);
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
@@ -556,6 +558,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true; S.busy = false;
+          // 💵 الاستهلاك الحقيقي من المزوّد (توكنات الصوت والنص، والمتخزّن منها) ← تكلفة المكالمة بالظبط
+          const u = e.response?.usage, it = u?.input_token_details || {}, ot = u?.output_token_details || {}, ct = it.cached_tokens_details || {};
+          if (u) { const a = S.usage; a.text_in += it.text_tokens || 0; a.audio_in += it.audio_tokens || 0; a.text_cached += ct.text_tokens || 0; a.audio_cached += ct.audio_tokens || 0; a.text_out += ot.text_tokens || 0; a.audio_out += ot.audio_tokens || 0; }
           if (S.wait && S.waitResp && id && id !== S.waitResp && r.msg && !q(".as-box")?.isConnected && !S.acct) { S.wait = null; S.waitResp = null; }
           if (S.queued) { S.queued = false; S.dc.send(JSON.stringify({ type: "response.create" })); }
           if (id === S.capId || !S.capId) S.capDone = true;
@@ -601,7 +606,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
       if (!r.ok) throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل");
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
-      S.agent = tok.agent || ""; status();
+      S.agent = tok.agent || ""; S.model = tok.model || ""; status();
       if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
       q("[data-tsend]").onclick = () => { const i = q("[data-type]"), v = i.value.trim(); if (!v) return i.focus(); i.value = ""; submit(v); };
       q("[data-type]").onkeydown = (ev) => {
@@ -691,9 +696,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S) return;
     const s = S; S = null;
     clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
+    // 💸 تكلفة المكالمة (ببلاش على العميل، بس علينا) ← عدّاد الصرف، وبتتكتب في سجل المكالمة في «معمل سعاد»
+    if (s.greeted) {
+      const u = await api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000, model: s.model || "", usage: s.usage }) }).catch(() => null);
+      if (u?.usd != null) s.usd = u.usd;
+    }
     { const keep = S; S = s; lg("sys", finished ? "end: finished" : "end: closed"); flush(true); S = keep; }
-    // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
-    if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});
     if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية

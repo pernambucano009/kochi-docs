@@ -32863,7 +32863,7 @@ def assistant_log(body: AssistLogIn, request: Request):
                 if isinstance(e.get("data"), dict):
                     e["data"] = json.loads(red(json.dumps(e["data"], ensure_ascii=False)))
         d["events"] = (d["events"] + ev)[-3000:]
-        d["meta"] = {**d.get("meta", {}), **{k: v for k, v in (body.meta or {}).items() if k in ("agent", "saved", "steps", "done", "sec", "noMic")}}
+        d["meta"] = {**d.get("meta", {}), **{k: v for k, v in (body.meta or {}).items() if k in ("agent", "saved", "steps", "done", "sec", "noMic", "usd", "model", "usage")}}
         d["updated"] = time.time()
         if body.final:
             d["ended"] = time.time()
@@ -32913,14 +32913,19 @@ def assistant_token(request: Request):
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
-    model = os.environ.get("LIVE_MODEL") or livevoice.models()["openai"]["models"][0]
+    try:   # 🎚️ النموذج من «معمل سعاد»: الكامل (أجود في اللهجات) أو mini (أرخص نحو ٣ مرات)
+        pick = json.loads((ASSIST_LOG_DIR.parent / "assist_log.json").read_text("utf-8")).get("model") or "full"
+    except (OSError, ValueError):
+        pick = "full"
+    ms = livevoice.models()["openai"]["models"]
+    model = os.environ.get("LIVE_MODEL") or next((m for m in ms if livevoice.tier(m) == pick), ms[0])
     try:
         tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS)
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
         raise HTTPException(503, "المساعد غير متاح الآن. جرّب مرة أخرى بعد قليل") from exc
     update_brain(bid, lambda d: d.setdefault("assistant", {}).update(started=now(), calls=int((d.get("assistant") or {}).get("calls") or 0) + 1))
-    return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag)}
+    return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag), "model": model}
 
 
 class AssistAnswerIn(BaseModel):
@@ -33063,6 +33068,8 @@ def assistant_account_state():
 class AssistUsageIn(BaseModel):
     call_s: float = 0     # طول المكالمة
     agent_s: float = 0    # سعاد كانت بتتكلم قد إيه منها
+    model: str = ""
+    usage: dict = {}      # أرقام الاستهلاك الحقيقية من المزوّد (مجموع كل الردود)
 
 
 @app.post("/api/assistant/usage")
@@ -33070,9 +33077,13 @@ def assistant_usage(body: AssistUsageIn):
     """💸 تكلفة مكالمة سعاد (ببلاش على العميل، بس علينا): الصوت الداخل بسعره والخارج بسعره من الدقايق،
     والداخل ×٢ لأن كلام المكالمة كله بيتبعت تاني مع كل رد."""
     call_m, agent_m = max(0.0, min(body.call_s, 3600)) / 60, max(0.0, min(body.agent_s, body.call_s, 3600)) / 60
-    pin, pout = livevoice.PRICE_PER_MIN["openai"]
-    wallet.cost((call_m - agent_m) * pin * 2 + agent_m * pout, f"ترويج: مكالمة المساعدة الصوتية ({max(1, round(call_m))} دقيقة)", promo=True)
-    return {"ok": True}
+    if any(body.usage.get(k) for k in ("text_in", "audio_in", "audio_out")):   # الحقيقي بالتوكن (أدق بكتير من التقدير بالدقيقة)
+        usd = min(50.0, livevoice.usage_usd(body.model, body.usage))
+    else:
+        pin, pout = livevoice.PRICE_PER_MIN["openai"]
+        usd = (call_m - agent_m) * pin * 2 + agent_m * pout
+    wallet.cost(usd, f"ترويج: مكالمة المساعدة الصوتية ({max(1, round(call_m))} دقيقة)", promo=True)
+    return {"ok": True, "usd": round(usd, 3)}
 
 
 @app.post("/api/assistant/done")

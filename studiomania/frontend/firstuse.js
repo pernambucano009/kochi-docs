@@ -201,7 +201,8 @@ body.fu-cine #nh .bm-hint,body.fu-cine .hp-fab,body.fu-cine .hp-tease{opacity:0!
     let talked = false;
     if (typeof Assistant !== "undefined" && (await Assistant.can())) talked = await Assistant.maybe(false, await ceremony());
     // المساعدة بتطلب الشعار بنفسها: شاشة الشعار المنفصلة بس لو المساعدة ماطلعتش
-    if (!talked && state && !state.need && !state.logo && !state.logo_asked) await askLogo();
+    // (لو المساعدة موجودة في البرنامج، هي اللي بتطلبه في المكالمة، حتى لو المكالمة ماطلعتش دلوقتي بعد ريلود)
+    if (!talked && typeof Assistant === "undefined" && state && !state.need && !state.logo && !state.logo_asked) await askLogo();
     if (state?.job?.status === "run") watch(false);
   }
 

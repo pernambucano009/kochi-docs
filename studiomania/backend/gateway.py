@@ -1988,10 +1988,10 @@ def acalls_list(request: Request, limit: int = 100):
         _acall_rev_busy.update(todo)
         acall_review_bg(todo)
     try:
-        cust = bool(json.loads((PLATFORM / "assist_log.json").read_text("utf-8")).get("customers"))
+        st = json.loads((PLATFORM / "assist_log.json").read_text("utf-8"))
     except (OSError, ValueError):
-        cust = False
-    return {"items": out, "customers": cust}
+        st = {}
+    return {"items": out, "customers": bool(st.get("customers")), "model": st.get("model") or "full"}
 
 
 def _acall_file(cid: str) -> Path:
@@ -2171,15 +2171,25 @@ def alesson_set(lid: str, body: ALessonIn, request: Request):
 
 
 class ACallSetIn(BaseModel):
-    customers: bool = False
+    customers: bool | None = None
+    model: str | None = None   # full | mini
 
 
 @app.put("/api/platform/assistant-calls-settings")
 def acalls_settings(body: ACallSetIn, request: Request):
     """تسجيل مكالمات العملاء (كتابة بس): مقفول افتراضيًا. مكالمات الأدمن بتتسجل دايمًا."""
     admin(request)
-    (PLATFORM / "assist_log.json").write_text(json.dumps({"customers": body.customers}), "utf-8")
-    return {"customers": body.customers}
+    f = PLATFORM / "assist_log.json"
+    try:
+        cur = json.loads(f.read_text("utf-8"))
+    except (OSError, ValueError):
+        cur = {}
+    if body.customers is not None:
+        cur["customers"] = bool(body.customers)
+    if body.model in ("full", "mini"):
+        cur["model"] = body.model
+    f.write_text(json.dumps(cur), "utf-8")
+    return cur
 
 
 class GiftIn(BaseModel):

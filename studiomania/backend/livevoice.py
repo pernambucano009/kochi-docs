@@ -22,6 +22,25 @@ OPENAI_VOICES = ["marin", "cedar", "coral", "sage", "shimmer", "ash", "ballad", 
 OPENAI_MODELS = ["gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime", "gpt-realtime-mini"]
 # دولار في الدقيقة تقريبًا (دخل وقت ما العميل بيتكلم، خرج وقت ما المساعد بيتكلم): تقدير للعرض بس، مش للفوترة
 PRICE_PER_MIN = {"openai": (0.02, 0.08), "openai-mini": (0.006, 0.024)}
+# 💵 السعر الحقيقي بالتوكن (دولار لكل مليون، من صفحة أسعار المزوّد: حدّثها لو اتغيرت). المكالمة بتتحسب من أرقام الاستهلاك اللي المزوّد نفسه بيرجعها
+TOKEN_PRICE = {
+    "full": {"text_in": 4.0, "text_cached": 0.4, "text_out": 16.0, "audio_in": 32.0, "audio_cached": 0.4, "audio_out": 64.0},
+    "mini": {"text_in": 0.6, "text_cached": 0.06, "text_out": 2.4, "audio_in": 10.0, "audio_cached": 0.3, "audio_out": 20.0},
+}
+
+
+def tier(model: str) -> str:
+    return "mini" if "mini" in (model or "") else "full"
+
+
+def usage_usd(model: str, u: dict) -> float:
+    """u: مجموع أرقام الاستهلاك من كل الردود (text_in, audio_in, text_cached, audio_cached, text_out, audio_out)."""
+    p = TOKEN_PRICE[tier(model)]
+    n = lambda k: max(0.0, float(u.get(k) or 0))  # noqa: E731
+    tokens = (n("text_out") * p["text_out"] + n("audio_out") * p["audio_out"]
+              + max(0.0, n("text_in") - n("text_cached")) * p["text_in"] + n("text_cached") * p["text_cached"]
+              + max(0.0, n("audio_in") - n("audio_cached")) * p["audio_in"] + n("audio_cached") * p["audio_cached"])
+    return round(tokens / 1e6, 4)
 
 # كل لهجة: اسمها، ووصفها للموديل، وجملة الافتتاح بلهجتها (صاحب المنصة كتب المصري، والباقي على نفس المعنى)
 # الجملة فيها {name} (اسم العميل) و{agent} (اسم المساعد)، وبصيغة المساعدة البنت؛ الموديل بيعدّل الضماير لو المساعد ولد أو العميل بنت

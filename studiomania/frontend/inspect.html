@@ -99,6 +99,7 @@
   <section data-p="calls" hidden>
     <div class="card"><div class="row"><b>🎙️ معمل سعاد</b><span class="mute">كل مكالمة مع المساعدة مكتوبة سطرًا سطرًا: كلامها، وكلام العميل (من الصوت أو الكتابة)، والأدوات التي استخدمتها ونتائجها، وكل مرة أكملت فيها وحدها، وكتم الميكروفون. الكتابة فقط، دون تسجيل صوت.</span></div>
       <div class="row" style="margin-top:10px"><label class="chip"><input type="checkbox" id="acCust"> سجّل مكالمات العملاء أيضًا (يظهر لهم تنبيه ويمكنهم إيقافه، ودون أسماء أو بيانات تواصل، وتُحذف بعد 30 يومًا)</label>
+        <label class="chip">نموذج المكالمة: <select id="acModel"><option value="full">الكامل (أجود في اللهجات وأغلى)</option><option value="mini">Mini (أرخص نحو ٣ مرات)</option></select></label>
         <a class="btn" href="/?assistant=1" target="_blank" rel="noopener">▶ ابدأ مكالمة تجريبية ↗</a><button class="btn" id="acReload">↻ حدّث</button></div></div>
     <div class="card"><div class="row"><b>📚 دروس سعاد</b><span class="mute">بعد كل مكالمة يراجعها مراجِع آلي ويقترح دروسًا من أخطائها. الدرس الذي تعتمده يُضاف إلى تعليماتها من المكالمة القادمة، فتتحسن مع الوقت دون أن تتغير وحدها.</span></div>
       <div id="acLessons" style="margin-top:10px"></div></div>
@@ -255,9 +256,9 @@ $("acLessons").onclick = async (e) => {
 async function loadCalls() {
   loadLessons();
   const d = await api("/api/platform/assistant-calls").catch((e) => ({ items: [], err: e.message }));
-  AC.items = d.items || []; $("acCust").checked = !!d.customers;
+  AC.items = d.items || []; $("acCust").checked = !!d.customers; $("acModel").value = d.model || "full";
   $("acRows").innerHTML = AC.items.map((c) => `<tr data-ac="${esc(c.id)}" class="${AC.cur === c.id ? "on" : ""}" style="cursor:pointer"><td>${acTime(c.started)}</td>
-    <td>${c.role === "customer" ? `عميل <span class="mute num">#${esc(String(c.id).split("-")[0].slice(0, 6))}</span><div class="mute">بلا اسم أو بيانات تواصل · تُحذف بعد 30 يومًا</div>` : `${esc(c.name || "")}<div class="mute">${esc(c.email || "")} · أدمن</div>`}</td><td>${acDur(c.meta?.sec)}</td>
+    <td>${c.role === "customer" ? `عميل <span class="mute num">#${esc(String(c.id).split("-")[0].slice(0, 6))}</span><div class="mute">بلا اسم أو بيانات تواصل · تُحذف بعد 30 يومًا</div>` : `${esc(c.name || "")}<div class="mute">${esc(c.email || "")} · أدمن</div>`}</td><td>${acDur(c.meta?.sec)}${c.meta?.usd != null ? `<div class="mute num">$${Number(c.meta.usd).toFixed(2)}${/mini/.test(c.meta.model || "") ? " · mini" : ""}</div>` : ""}</td>
     <td>${c.turns.agent} / ${c.turns.user}</td><td>${c.turns.saved}</td><td>${c.turns.auto || ""}</td>
     <td>${(c.flags || []).map((f) => `<span class="chip">${esc(f)}</span>`).join(" ")}</td><td>${c.auto?.score != null ? `<b class="ac-sc ${c.auto.score >= 80 ? "ok" : c.auto.score >= 60 ? "mid" : "bad"}">${c.auto.score}</b>` : c.ended ? '<span class="mute">⏳</span>' : ""}</td>
     <td>${c.review?.stars ? "★".repeat(c.review.stars) : ""}</td></tr>`).join("")
@@ -287,6 +288,7 @@ async function openCall(id) {
 }
 $("acRows").onclick = (e) => { const r = e.target.closest("[data-ac]"); if (r) openCall(r.dataset.ac); };
 $("acReload").onclick = loadCalls;
+$("acModel").onchange = async (e) => { await api("/api/platform/assistant-calls-settings", { method: "PUT", body: JSON.stringify({ model: e.target.value }) }).catch(() => {}); };
 $("acCust").onchange = async (e) => { await api("/api/platform/assistant-calls-settings", { method: "PUT", body: JSON.stringify({ customers: e.target.checked }) }).catch(() => {}); };
 $("acView").onclick = async (e) => {
   const d = AC.d; if (!d) return;
