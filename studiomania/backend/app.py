@@ -12492,13 +12492,14 @@ def run_brain_social(bid: str, sid: str) -> None:
         raise ValueError("هذا الحساب فارغ أو خاص (private)")
     st = brainsocial.stats(items)
     by = {p["id"]: p for p in items}
-    # 🎬 أحسن فيديوهين وأضعف واحد: الكلام اللي اتقال + ٤ لقطات من كل فيديو
+    # 🎬 أحسن ٣ فيديوهات وأضعف اتنين: الكلام اللي اتقال + ٤ لقطات من كل فيديو + أرقام جودته (الإضاءة والألوان والوضوح والصوت)
     videos, frames = [], []
-    for pid in [*st.get("best", [])[:2], *st.get("worst", [])[:1]]:
+    picks = [*st.get("best", [])[:3], *st.get("worst", [])[:2]]
+    for pid in picks:
         p = by.get(pid)
         if not p or not p.get("video"):
             continue
-        brain_src_step(bid, sid, f"يحلل فيديو ({len(videos) + 1}/3)")
+        brain_src_step(bid, sid, f"يشاهد فيديوهاتك ({len(videos) + 1}/{len(picks)})")
         mp4 = folder / f"{sid}-v{len(videos)}.mp4"
         if not brain_fetch(p["video"], mp4):
             continue
@@ -12514,14 +12515,29 @@ def run_brain_social(bid: str, sid: str) -> None:
                 stt += d_
                 wav.unlink(missing_ok=True)
             vd = probe_duration(mp4)
+            vf = []
             for k, f in enumerate((.04, .3, .6, .9)):
                 out = folder / f"{sid}-v{len(videos)}-{k}.jpg"
                 r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{vd * f:.2f}", "-i", str(mp4), "-frames:v", "1",
                                     "-vf", "scale=512:-2", "-q:v", "5", str(out)], capture_output=True, timeout=60)
                 if r.returncode == 0 and out.exists():
                     frames.append(out)
+                    vf.append(out)
+            try:
+                mi = media_info(mp4)
+                met = vidreview.metrics(ffmpeg_exe(), mp4, vf, (mi.width, mi.height) if mi.width else None)
+            except Exception:  # noqa: BLE001
+                met = {"flags": []}
+            # غلاف الفيديو للكارت (لقطة من نصه) بيفضل محفوظ
+            cover = None
+            if len(vf) > 1:
+                cdir = brain_dir(bid) / "vreview"
+                cdir.mkdir(parents=True, exist_ok=True)
+                cover = f"{sid}-{len(videos)}.jpg"
+                shutil.copy(vf[1], cdir / cover)
             videos.append({"id": pid, "rank": "best" if pid in st.get("best", []) else "worst", "views": p["views"], "seconds": round(vd, 1),
-                           "transcript": words[:1500]})
+                           "transcript": words[:1500], "caption": str(p.get("caption") or "")[:300], "url": p.get("url") or "",
+                           "metrics": met, "frames": len(vf), "_vf": vf, "cover": cover})
             # 🎬 أكتر فيديو بيتكلم فيه بيتحفظ (لو مفيش واحد قبل كده) عشان الفيديو الاستعراضي يتعمل منه
             keep = brain_dir(bid) / "showcase" / "src.mp4"
             if vd >= 8 and len(words.split()) >= 12 and (not keep.exists() or len(words.split()) > int(s.get("sc_words") or 0)):
@@ -12538,6 +12554,29 @@ def run_brain_social(bid: str, sid: str) -> None:
             f = folder / f"{sid}-c{i}.jpg"
             if brain_fetch(url, f, 8 * 1024 * 1024):
                 covers.append(f)
+    # 🎥 رأي في كل فيديو نفسه: اللي حلو فيه واللي ممكن يتحسن (الإضاءة، الألوان، الجودة، الصوت، الهوك…) بالدليل من اللقطات والأرقام
+    reviews, overall = [], ""
+    if videos:
+        brain_src_step(bid, sid, "يقيّم فيديوهاتك")
+        try:
+            if atlas.mock_mode():
+                raw = vidreview.mock(videos)
+            else:
+                rp = [{"type": "text", "text": vidreview.prompt(first_brand_name(b), videos)}]
+                for v in videos:
+                    for im in v["_vf"]:
+                        rp.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
+                raw = ad_json(ad_media_chat([{"role": "user", "content": rp}], 6000, meter=meter), "تقييم الفيديوهات")
+            rv, overall = vidreview.clean(raw, videos)
+            base = f"/media/ads/brains/{bid}/vreview"
+            for x in rv:
+                v = videos[x["i"]]
+                reviews.append({**x, "views": v["views"], "rank": v["rank"], "url": v["url"], "seconds": v["seconds"], "caption": v["caption"][:140],
+                                "cover": f"{base}/{v['cover']}" if v.get("cover") else None, "flags": v["metrics"].get("flags") or []})
+        except Exception as exc:  # noqa: BLE001  (التحليل يكمّل من غيره)
+            print(f"[vreview] {bid}: {str(exc)[:300]}", flush=True)
+    for v in videos:
+        v.pop("_vf", None)
     brain_src_step(bid, sid, "يحلل الحساب")
     imgs = frames[:12] + covers[:9]
     prompt = brainsocial.analyze_prompt(prof, st, items, videos, len(imgs), az.brain_text(b), brainsrc.FIELDS)
@@ -12585,7 +12624,8 @@ def run_brain_social(bid: str, sid: str) -> None:
         d.setdefault("todos", []).extend(t for t in todos if t["title"] not in have)
         if niche and not str(d.get("niche") or "").strip():
             d["niche"] = niche
-        d["social"] = {"platform": plat, "handle": handle, "followers": prof.get("followers"), "stats": st, "at": now()}
+        d["social"] = {"platform": plat, "handle": handle, "followers": prof.get("followers"), "stats": st, "at": now(),
+                       "videos": reviews, "videos_overall": overall}
         d["social_name"] = str(prof.get("name") or handle)[:80]
         for x in d.get("sources") or []:
             if x["id"] == sid:
@@ -33086,6 +33126,7 @@ def assistant_account_state():
     return {"ready": True, "account": s.get("name"), "followers": so.get("followers"), "niche": b.get("niche") or "",
             "avg_views": st.get("avg_views"), "median_views": st.get("median_views"), "engagement_pct": st.get("engagement"),
             "posts_every_days": st.get("every_days"), "improvements": todos,
+            "videos": so.get("videos") or [], "videos_overall": so.get("videos_overall") or "",
             "suggestions_waiting": len([p for p in b.get("pending") or [] if p.get("source") == s["id"]])}
 
 
@@ -33122,6 +33163,7 @@ def assistant_done(request: Request):
 # فيديو من حسابه (بيتحفظ وقت تحليل الحساب) أو فيديو يرفعه في المكالمة ← قطع صغيرة، في كل قطعة ميزة، وسعاد بتشرح كل قطعة.
 # على المنصة (هدية ترويجية): مرة واحدة لكل عميل، ويتسجل في عدّاد الصرف كترويج. الأدمن يقدر يعيده للتجربة.
 import showcase  # noqa: E402
+import vidreview  # noqa: E402  (رأي في فيديوهات العميل نفسها)
 
 SHOWCASE_LOCK = threading.Lock()
 
@@ -33367,7 +33409,8 @@ def tour_card(bid: str, b: dict, kind: str) -> dict:
         st = assistant_account_state()
         if not st.get("ready"):
             return {"ok": False, "error": "analysis not ready", "status": st.get("status")}
-        return {"ok": True, "kind": kind, "data": st, "facts": "Use these real numbers and improvements to give your honest opinion."}
+        return {"ok": True, "kind": kind, "data": st, "facts": "videos = our review of each of their own videos (good / improve, measured issues). "
+                "Talk about specific videos first, then the account numbers and improvements. Only use what is here."}
     if kind == "types":
         # من بروفايل المجال، ولو مجاله مش من المجالات الجاهزة: الأنواع اللي بتنجح في أغلب المجالات
         angles = [x.strip() for x in re.split(r"[،,]", str(fp.get("angles") or "")) if x.strip()] or \

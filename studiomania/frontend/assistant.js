@@ -66,6 +66,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-tpls{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%}.as-tpls button{border:2px solid transparent;border-radius:12px;padding:0;background:none;color:inherit;cursor:pointer;font:inherit;font-size:11.5px}
 .as-tpls button.on{border-color:#E5613E}.as-tpls video{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;display:block}
 .as-steps{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;font-size:12.5px}.as-steps span{padding:5px 9px;border-radius:999px;background:rgba(229,97,62,.15)}
+.as-vr{display:flex;gap:8px;align-items:flex-start}.as-vr img{width:54px;height:96px;object-fit:cover;border-radius:8px;flex:none;max-height:none}
 .as-rv{text-align:start;font-size:12.5px;line-height:1.6;padding:8px 10px;border-radius:12px;background:rgba(127,127,127,.1);width:100%;box-sizing:border-box}.as-rv a{color:#E5613E}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
   let S = null, state = null, orb = null, ov = null, from = null, dock = false;
@@ -329,7 +330,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   const CARD = {
     analysis: (d) => `<b>📊 تحليل حسابك ${esc(d.account || "")}</b><div class="as-kpis"><span><b>${fmt(d.followers)}</b>متابع</span><span><b>${fmt(d.avg_views)}</b>متوسط المشاهدات</span>
       <span><b>${d.engagement_pct != null ? fmt(d.engagement_pct) + "٪" : "—"}</b>التفاعل</span><span><b>${fmt(d.posts_every_days)}</b>يوم بين كل منشور</span></div>
-      ${(d.improvements || []).length ? `<ul>${d.improvements.map((x) => `<li>${esc(x.title)}</li>`).join("")}</ul>` : ""}`,
+      ${(d.videos || []).length ? `<p>رأينا في فيديوهاتك</p>${d.videos.map((v) => `<div class="as-rv as-vr">${v.cover ? `<img src="${esc(v.cover)}" alt="">` : ""}<div>
+        <b>${esc(v.line || v.caption || "فيديو")}</b> <small>${fmt(v.views)} مشاهدة ${v.url ? `· <a href="${esc(v.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</small>
+        ${(v.good || []).map((x) => `<div>✓ ${esc(x)}</div>`).join("")}${(v.improve || []).map((x) => `<div>• ${esc(x)}</div>`).join("")}</div></div>`).join("")}` : ""}
+      ${(d.improvements || []).length ? `<p>تحسينات للحساب</p><ul>${d.improvements.map((x) => `<li>${esc(x.title)}</li>`).join("")}</ul>` : ""}`,
     types: (d) => `<b>🎬 أنواع الفيديوهات المناسبة لك</b><div class="as-steps">${(d.types || []).map((x) => `<span>${esc(x)}</span>`).join("")}</div>
       ${(d.ideas || []).length ? `<p>أفكار جاهزة:</p><ul>${d.ideas.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`,
     rivals: (d) => `<b>🏆 ما ينجح عند منافسيك</b>${(d.items || []).map((i) => `<div class="as-rv"><b>${esc(i.name || "")}</b> <small dir="ltr">@${esc(i.handle || "")}</small>

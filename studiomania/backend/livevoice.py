@@ -243,8 +243,11 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     # 🧭 الجولة بعد الأسئلة: محطة محطة، كل واحدة بكارت على الشاشة. اللي اتعرض في مكالمة قبل كده مابيتعادش
     seen = set(have.get("tour") or [])
     stops = [
-        ("analysis", "Their account analysis: call get_account_analysis; if ready, call show_card analysis and give your honest opinion: 2–3 "
-                     "specific strengths or weaknesses with the real numbers, and the most important improvements. Ask what they think."),
+        ("analysis", "Their account analysis: call get_account_analysis; if ready, call show_card analysis. Talk about THEIR VIDEOS themselves, "
+                     "not only the numbers: name a specific video (what it is about, its views) and what is really good in it (be warm and "
+                     "generous, e.g. the cases they show look great), then what could be better in it (lighting, color grading, quality, sound, "
+                     "the first seconds, text on screen) from the review. Then 1–2 account-level points (posting rhythm, bio, call to action). "
+                     "One or two videos per turn, then ask what they think; continue with the next video if they are interested."),
         ("types", "Video types: call show_card types. Say which kinds of videos fit them (in their terms), and ask if they want to keep "
                   "these or also try other kinds. Save their answer with save_preference (topic types)."),
         ("rivals", "COMPETITORS: the most important stop of the whole call. Take your time, never rush it, never skip it. Goal: agree together "
