@@ -3198,6 +3198,8 @@ window.I18N_EN = {
   "قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.": "Until a quote arrives we estimate it: our cheapest unit price minus the expected discount. Once you enter the quoted price we use it directly.",
   "اكتب سعر العرض وعدد الوحدات معًا": "Enter the quoted price and units together",
   "✅ حُفظت الباقة المخصصة": "✅ Custom pack saved",
+  "ما زالت فارغة. تحدّث مع المساعدة (الدائرة البرتقالية فوق العقل)، وستظهر المعرفة هنا.": "Still empty. Talk with the assistant (the orange circle above the brain), and the knowledge will appear here.",
+  "اضغط الزر واكتب للمساعدة رابط حسابك على إنستغرام أو تيك توك، وسيحلل العقل المنشورات والفيديوهات ويكتب هنا النقاط التي يجب العمل عليها.": "Press the button and type your Instagram or TikTok link for the assistant: the brain analyses the posts and videos and writes here the points to work on.",
   "عُدّل مجالك في حسابك": "Your field was corrected in your account",
   "＋ أضف إلى العقل": "＋ Add to the brain",
   "ملف أو حساب أو موقع أو كلام بصوتك: يقرؤه العقل ويضع كل معلومة نقطةً مضيئة في فرعها لتوافق عليها.": "A file, an account, a website or your voice: the brain reads it and puts each piece of information as a glowing point in its branch for you to approve.",

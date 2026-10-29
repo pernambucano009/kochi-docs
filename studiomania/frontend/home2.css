@@ -929,10 +929,6 @@ body.nh-cl #nh .nh-ptop { grid-template-areas: "row row" "tabs head"; grid-templ
 #nh .bm-tabs .bm-pill { padding: 7px 14px; font-size: 13px; }
 #nh .bm-drop { aspect-ratio: auto; padding: 22px 12px; gap: 4px; }
 #nh .bm-types { opacity: .7; }
-#nh .bm-addin { margin-top: 12px; border-top: 1px solid rgba(24, 23, 24, .08); padding-top: 10px; }
-#nh .bm-addin > summary { cursor: pointer; list-style: none; font-weight: 600; font-size: 13.5px; color: var(--nh-accent, #E5613E); padding: 4px 0; }
-#nh .bm-addin > summary::-webkit-details-marker { display: none; }
-#nh .bm-addin[open] > summary { margin-bottom: 6px; }
 #nh .bm-srcs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid rgba(24, 23, 24, .07); padding-top: 8px; }
 #nh .bm-srcs li { display: flex; align-items: center; gap: 10px; padding: 6px 2px; }
 #nh .bm-srcs li > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; }

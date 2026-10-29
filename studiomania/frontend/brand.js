@@ -715,25 +715,6 @@ const BrandPage = (() => {
     move();
   }
 
-  // ➕ الإضافة للعقل (ملف، حساب تواصل، كتابة، تسجيل، موقع): في آخر كارت كل فرع، والعقل بيقرا اللي يتضاف ويحط كل معلومة في فرعها
-  function addHTML(b) {
-      const tab = S.addTab || "file", srcs = [...(b?.sources || [])].reverse(), rec = S.rec;
-      const TABS = [["file", "📎 ملف"], ["social", "📱 حساب تواصل"], ["text", "✍️ اكتب"], ["rec", "🎙️ سجّل"], ["url", "🔗 موقع"]];
-      return `<details class="bm-addin"${S.addOpen ? " open" : ""}><summary>＋ أضف إلى العقل</summary>
-        <p class="bm-note">ملف أو حساب أو موقع أو كلام بصوتك: يقرؤه العقل ويضع كل معلومة نقطةً مضيئة في فرعها لتوافق عليها.</p>
-        <div class="bm-pills bm-tabs">${TABS.map(([k, t]) => `<button class="bm-pill${tab === k ? " on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
-        ${tab === "file" ? `<label class="bm-up wide bm-drop">+<small>أفلت الملف هنا أو اضغط للاختيار (أو أفلته في أي مكان على الخريطة)</small><small class="bm-types">PDF · Word · صور · نص · صوت · فيديو</small><input type="file" multiple accept="${SRC_ACCEPT}" data-src hidden></label>`
-          : tab === "social" ? `${editable("@social", "", "رابط الحساب أو @اسم_المستخدم · واضغط Enter", true)}
-            <p class="bm-note">إنستغرام أو تيك توك. يأخذ العقل النبذة والمعلومات والتخصص، وينزّل الصور ويضع كلًّا منها في مكانه، ويحلل المنشورات والمشاهدات وأفضل الفيديوهات وأضعفها، وتُسجَّل الأخطاء والنواقص في «نقاط للتحسين».</p>
-            <p class="bm-note bm-cost">💳 يُخصم من نقاطك بقدر العمل المنجز فعلًا (عادةً بين ١٠ و٦٠ نقطة).</p>`
-          : tab === "text" ? editable("@text", "", "اكتب أي شيء عن العلامة: الجمهور، النبرة، العروض، الممنوعات… واضغط Enter")
-          : tab === "rec" ? `<div class="bm-rec"><button class="bm-recb${rec ? " on" : ""}" data-ibrec>${rec ? "⏹" : "🎙️"}</button>
-            <div><b>${rec ? `جارٍ التسجيل <span class="num" data-rect>0:00</span>` : "سجّل وتحدّث عن العلامة بصوتك"}</b><small class="muted">${rec ? "اضغط مرة أخرى عند الانتهاء، وسيُرسل التسجيل إلى العقل تلقائيًا" : "تحدّث براحتك: ماذا تقدّم، ولمن، وما الذي يميزك. حتى ١٠ دقائق."}</small></div></div>`
-          : editable("@url", "", "example.com · واضغط Enter", true)}
-        ${srcs.length ? `<ul class="bm-srcs">${srcs.map((s) => `<li class="${s.status}"><span class="bm-dot ${s.status === "done" ? "full" : s.status === "failed" ? "bad" : "busy"}"></span>
-          <span><b>${esc(s.name)}</b><small>${s.status === "working" ? esc(s.step || "جارٍ القراءة…") : s.status === "failed" ? esc(s.error || "فشل") : `${s.count ? `انتهى · ${s.count} اقتراح` : "انتهى · لا جديد"}${s.credits ? ` · ${s.credits} نقطة` : ""}`}</small></span>
-          <button data-sdel="${s.id}" title="أزله">✕</button></li>`).join("")}</ul>` : ""}</details>`;
-  }
   function cardHTML(n) {
     const b = cur();
     if (n.kind === "center") {
@@ -745,8 +726,8 @@ const BrandPage = (() => {
     if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. أضف ملفًا أو رابطًا من «أضف إلى العقل» في الأسفل، وستظهر المعرفة هنا.</p>` : ""}
-        <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>` + addHTML(b);
+      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. تحدّث مع المساعدة (الدائرة البرتقالية فوق العقل)، وستظهر المعرفة هنا.</p>` : ""}
+        <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
     switch (l.type) {
@@ -791,7 +772,7 @@ const BrandPage = (() => {
           + `<div class="bm-acts"><button class="bm-go" data-tdone="${x.id}" data-v="${x.done ? "" : "1"}">${x.done ? "↩︎ لم تُنجز بعد" : "✓ أُنجزت"}</button><button class="bm-pill" data-tdel="${x.id}">أزلها</button></div>`
           + (srcName(x.source) ? `<p class="bm-note">من تحليل «${esc(srcName(x.source))}»</p>` : "");
       }
-      case "social-go": return head + `<p class="bm-note">ضع رابط حساب العلامة على إنستغرام أو تيك توك، وسيحلل العقل المنشورات والفيديوهات ويكتب هنا النقاط التي يجب العمل عليها.</p>
+      case "social-go": return head + `<p class="bm-note">اضغط الزر واكتب للمساعدة رابط حسابك على إنستغرام أو تيك توك، وسيحلل العقل المنشورات والفيديوهات ويكتب هنا النقاط التي يجب العمل عليها.</p>
         <button class="bm-go" data-socialgo>📱 حلّل حسابًا</button>`;
       case "pending": {
         const p = l.p, from = srcName(p.source);
@@ -1163,7 +1144,6 @@ const BrandPage = (() => {
       if (d.moved) { S.noClick = true; setTimeout(() => (S.noClick = false), 0); w.classList.remove("dragging"); d.el.classList.remove("held"); }
     };
     w.addEventListener("pointerleave", () => { if (S.dv) S.dv.ta = 0; S.mw = null; setHot(null); });
-    w.addEventListener("toggle", (e) => { if (e.target.matches?.(".bm-addin")) S.addOpen = e.target.open; }, true);   // «أضف إلى العقل» مفتوح؟ يفضل زي ما هو مع كل تحديث للكارت
     w.addEventListener("pointerup", drop);
     w.addEventListener("pointercancel", drop);
     w.addEventListener("click", async (e) => {
@@ -1226,7 +1206,7 @@ const BrandPage = (() => {
       if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
       const tdl = t.closest("[data-tdel]");
       if (tdl) { if ((await uiConfirm("أتزيل هذه النقطة؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
-      if (t.closest("[data-socialgo]")) { S.addTab = "social"; S.addOpen = true; const a = S.nodes.find((x) => x.kind === "branch"); if (a) { openCard(a); S.el.querySelector('.bm-card [data-k="@social"]')?.focus(); } return; }
+      if (t.closest("[data-socialgo]")) { openCard(null); if (typeof Assistant !== "undefined") Assistant.open(S.el.querySelector('[data-n="quiz"]')); return; }   // حساب التواصل بيتاخد في المكالمة
       const itg = t.closest("[data-itgt]");
       if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
       const bk = t.closest("[data-back]");
