@@ -32933,12 +32933,19 @@ class AssistAnswerIn(BaseModel):
     answer: str
 
 
+# أسئلة إجابتها لازم تبقى جملة فيها معنى (مش كلمة واحدة اتقالت بالصدفة أو صوت في الأوضة)
+ASSIST_LONG_Q = {"about", "audience", "pain", "products", "faq"}
+
+
 @app.post("/api/assistant/answer")
 def assistant_answer(body: AssistAnswerIn):
     bid, _b, _a = assist_info()
     q = brainquiz.BY_ID.get(body.qid)
     if not bid or not q:
         return {"ok": False, "error": "unknown question"}
+    if body.qid in ASSIST_LONG_Q and len(re.findall(r"\w+", body.answer)) < 3:
+        return {"ok": False, "error": "This is not a real answer to this question (too short or unrelated). Do not save it: ask the question again "
+                                      "in other words, maybe with a short example, and wait for a real answer."}
     brain_quiz_answer(bid, QuizIn(qid=body.qid, answer=body.answer))
     update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("saved", []).append(body.qid)
                  if body.qid not in (d.get("assistant") or {}).get("saved", []) else None)
@@ -33535,6 +33542,49 @@ def assistant_rival_decide(body: AssistRivalDecideIn):
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append("rivals")
                      if "rivals" not in (d.get("assistant") or {}).get("tour", []) else None)
     return {"ok": True, "added": bool(body.add and it), "approved_count": n}
+
+
+class AssistFieldIn(BaseModel):
+    field: str          # مفتاح من مجالات التسجيل، أو other
+    what: str = ""      # مجاله بكلامه (لو other)
+
+
+@app.post("/api/assistant/field")
+def assistant_field(body: AssistFieldIn):
+    """🧭 المجال اللي اختاره في التسجيل طلع غلط (اتفقوا في المكالمة على الصح): بيتعدّل في حسابه، وكل اللي اتملى لوحده من بروفايل
+    المجال القديم (الجمهور والقواعد والنبرة والأفكار وخطة الشهر المسودة) بيتشال ويتملى من الجديد. اللي كتبه العميل بنفسه مابيتلمسش."""
+    bid, b, _a = assist_info()
+    if not bid:
+        return {"ok": False}
+    new = body.field if body.field in fieldpacks.FIELDS else ""
+    ob = onboard_load() or {}
+    old = ob.get("field") or b.get("field") or ""
+
+    def fn(d):
+        pre = d.get("prefilled") or {}
+        for k, v in list(pre.items()):
+            if str(d.get(k) or "").strip() == str(v).strip():
+                d[k] = ""
+        d["prefilled"] = {}
+        d["notes"] = [n for n in d.get("notes") or [] if n.get("source") != "field"]
+        d.pop("type_set", None)
+        if (d.get("month") or {}).get("from_field") == old and (d.get("month") or {}).get("status") == "draft":
+            d.pop("month", None)
+        d["field"] = new
+        if not new and body.what.strip():
+            d["domain"] = body.what.strip()[:300]
+    update_brain(bid, fn)
+    if old and old != new:   # أفكار المجال القديم من مجلد الأفكار
+        mem_update(SHARED_LIB if "ideas" in share_keys() else bid,
+                   lambda m: m.update(saved=[x for x in m.get("saved") or [] if x.get("origin") != f"field:{old}"]))
+    ob["field"] = new
+    try:
+        (DATA_DIR / "onboard.json").write_text(json.dumps({**(onboard_load() or {}), "field": new}, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+    field_pack_apply(bid, ob)
+    changed_to = fieldpacks.FIELDS[new]["name"] if new else body.what.strip()
+    return {"ok": True, "field": changed_to, "note": "Fixed in their account. Continue the conversation with the correct field."}
 
 
 class AssistPrefIn(BaseModel):

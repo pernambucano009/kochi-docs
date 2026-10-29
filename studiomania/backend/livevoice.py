@@ -143,6 +143,13 @@ TOOLS = [
      "competitors page, add=false means it is not a competitor (never suggested again).",
      "parameters": {"type": "object", "properties": {"platform": {"type": "string"}, "handle": {"type": "string"}, "add": {"type": "boolean"}},
                     "required": ["platform", "handle", "add"]}},
+    {"type": "function", "name": "set_field", "description": "Fix the user's field in their account, once you and the user agreed which field is right "
+     "(when what they say differs from the field they chose at signup).",
+     "parameters": {"type": "object", "properties": {
+         "field": {"type": "string", "enum": ["food", "beauty", "ecom", "realestate", "edu", "fitness", "home", "shops", "other"],
+                   "description": "food: restaurants and cafes. beauty: clinics and beauty. ecom: online stores. realestate: real estate. edu: education and "
+                                  "coaching. fitness: sports and fitness. home: home services and contracting. shops: local shops and retail. other: none of these."},
+         "what": {"type": "string", "description": "Their field in their own words, in Arabic (always fill it)."}}, "required": ["field", "what"]}},
     {"type": "function", "name": "save_preference", "description": "Save what the user said about a tour stop (e.g. keep these video types or try "
      "others, they like filming themselves or not, they want autopilot or not) into their brand profile.",
      "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot"]},
@@ -335,6 +342,8 @@ actually said, and only then (if it fits) move toward your next goal. Examples o
   then call finish with later=true. Never call finish without saying goodbye out loud first.
 - They ask a question, joke, or go off-topic → reply to it naturally first. Never ignore what they said.
 - Their answer is unclear or unrelated to your question → ask again in other words; do not save it and do not move on.
+  Before every save_answer, check that what they said really answers THAT question logically (a random word, "ok", "yes", a name, or
+  something about another topic is not an answer to "describe your work" or "who is your ideal client"). If not, ask again.
 
 Your goals, in this order (each is a goal to reach naturally, not a line to recite):
 1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
@@ -346,7 +355,10 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
 3. Get to know them and their work. The list below is ONLY the information you need (a checklist), NOT a script to read:
 {qs}
-   {("What they chose when signing up (a hint, confirm it naturally, it may be inaccurate): " + ctx) if ctx else ""}
+   {("What they chose when signing up: " + ctx + ". If what they tell you about their work does not match the field they chose "
+     "(for example they chose restaurants but say they are a dentist), you MUST resolve it before any other question: tell them kindly that "
+     "at signup they chose that field, ask which one is right so you fix it in their account, then call set_field with the right one, and "
+     "only then continue. Never continue with two different fields.") if ctx and tools else ("What they chose when signing up (a hint): " + ctx) if ctx else ""}
    - Never assume they have a "project", "business", "company", "shop" or "products". If you do not know yet, first ask what they do.
      Then talk in THEIR terms: a dentist has a clinic, patients and treatments (عيادتك، مرضاك، خدماتك), a freelancer has clients and
      work, a restaurant has dishes and guests.

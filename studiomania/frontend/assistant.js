@@ -199,6 +199,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return rivalCheck(args.link, true);
     }
     if (name === "decide_competitor") return decide(args.platform, args.handle, !!args.add);
+    if (name === "set_field") {
+      const r = await api("/api/assistant/field", { method: "POST", ...jsonBody({ field: args.field || "other", what: args.what || "" }) }).catch((e) => ({ ok: false, error: e.message }));
+      if (r.ok) { changed(); chip(`✓ <span><b>عُدّل مجالك في حسابك</b><br>${esc(r.field || "")}</span>`); }
+      return r;
+    }
     if (name === "save_preference") {
       const r = await api("/api/assistant/preference", { method: "POST", ...jsonBody({ topic: args.topic || "", text: args.text || "" }) }).catch(() => ({ ok: false }));
       if (r.ok) { changed(); chip(`✓ <span><b>حُفظ رأيك</b><br>${esc(String(args.text || "").slice(0, 90))}</span>`); }
