@@ -242,7 +242,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // ⏳ العميل ساكت وهي مستنياه: بعد ٤٥ ثانية تسأله «بعدك معاي؟»، وبعد ٤٥ كمان تستأذن وتقفل (يكمّل وقت ما يفضى)
   function idle(now) {
     if (!S || !S.dc || S.dc.readyState !== "open" || S.finishing || S.busy || S.speaking || S.lastQ !== true) return;
-    if (S.show && !S.show.wait) return;   // بيتفرج على الفيديو
+    if (S.show) return;   // الفيديو الاستعراضي شغال (بيتفرج أو هي بتشرح جزء)
     if (document.querySelector(".ui-dlg")) return;   // بيملا نافذة (المعطيات الحقيقية لأول فيديو)
     const quiet = now - Math.max(S.lastAct || S.t0, S.lastTalk || 0), lim = q(".as-box:not(.as-card)") || S.acct ? 90000 : 45000;
     if (quiet < lim) return;
@@ -305,7 +305,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const c = ch[sh.i]; if (!c || v.currentTime < c.t1 - 0.08) return;
       v.pause(); sh.wait = true; sh.at = performance.now(); sh.spoke = false;
       const last = sh.i === ch.length - 1;
-      note(`(SYSTEM: part ${sh.i + 1} of ${ch.length} of the showcase just played: "${c.title}". What we did here: ${c.did}. What else is possible: ${c.can}. `
+      note(`(SYSTEM: part ${sh.i + 1} of ${ch.length} of the showcase just played: "${c.title}". The video shows: ${r.what || "-"} (${r.type || "-"}). What we did here: ${c.did}. What else is possible: ${c.can}. Say only what is true for this video. `
         + (last ? "This was the last part: explain it, then ask what they thought of the whole reel.)" : "Explain it now in 1–2 short sentences, then stop talking (the next part plays by itself).)"));
       if (last) sh.end = true;
       sh.i = Math.min(ch.length - 1, sh.i + 1);
@@ -323,7 +323,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       }
     }, 200);
     mark(); v.load(); api("/api/assistant/card/showcase").catch(() => {});
-    return { ok: true, playing: true, parts: ch.map((c) => c.title), note: "The reel is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish." };
+    return { ok: true, playing: true, parts: ch.map((c) => c.title), video: { shows: r.what || "", type: r.type || "" },
+      note: "The reel is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish. When you explain each part, "
+        + "describe ONLY what the SYSTEM message says was done in it and what this video really shows; never mention a person, speech or captions if the video has none." };
   }
   // 🧭 كروت الجولة: كل محطة بكارت (بيانات حقيقية من البرنامج)، وسعاد بتتكلم عنه
   const fmt = (n) => (n == null || n === "" ? "—" : Number(n).toLocaleString("ar-EG"));

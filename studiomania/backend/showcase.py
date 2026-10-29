@@ -50,8 +50,50 @@ CHAPTERS = {
               "did": "an ending with their logo and brand name",
               "can": "ready templates with their name and logo for every video in their field"},
 }
+CHAPTERS["titles"] = {"title": "عناوين متحركة على الفيديو",
+                      "did": "animated titles with their message on top of the video (this video has no speech, so we wrote short titles)",
+                      "can": "titles, prices and offers that move with the music, in their brand colors and fonts"}
+CHAPTERS["dub_voice"] = {"title": "دبلجة التعليق الصوتي إلى لغة أخرى",
+                         "did": "we dubbed the voice-over of this part into another language with a natural voice",
+                         "can": "they can run a channel in every Arabic dialect and every language if they want"}
 ORDER = ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "dub", "finish"]
+# 🧭 الفيديو نوعه إيه؟ كل نوع ليه التعديلات اللي ليها معنى فيه بس (فيديو موسيقى بس مالوش ترجمة، ومن غير شخص مافيش «نص خلفك»)
+TYPES = {
+    "talking": {"label": "a person talking to the camera", "kinds": ORDER},
+    "voiceover": {"label": "footage with a voice-over (no one talking to the camera)",
+                  "kinds": ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "dub_voice", "finish"]},
+    "people_music": {"label": "people on screen but no speech (music only)", "kinds": ["titles", "zoom", "behind", "bg", "grade", "angle", "finish"]},
+    "broll_music": {"label": "no people and no speech (product/place footage with music)", "kinds": ["titles", "zoom", "grade", "angle", "finish"]},
+}
+# الزووم من غير كلام: على اللحظة المهمة في الصورة مش على كلمة
+ZOOM_NO_SPEECH = "a punch-in zoom on the key moment of the shot"
 NEEDS_PERSON = {"behind", "bg"}
+SPEECH = {"captions", "typo", "dub", "dub_voice"}
+
+
+def video_type(has_speech: bool, people: bool, talking: bool) -> str:
+    if has_speech and people and talking:
+        return "talking"
+    if has_speech:
+        return "voiceover"
+    return "people_music" if people else "broll_music"
+
+
+def sample_frames(ffmpeg: str, src: Path, dur: float, folder: Path, n: int = 6) -> list[Path]:
+    out = []
+    for k in range(n):
+        f = folder / f"cls_{k}.jpg"
+        r = subprocess.run(ff(ffmpeg) + ["-ss", f"{dur * (k + .5) / n:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=384:-2", "-q:v", "5", str(f)],
+                           capture_output=True, timeout=60)
+        if r.returncode == 0 and f.exists():
+            out.append(f)
+    return out
+
+
+CLASSIFY_PROMPT = ("These are frames from one short social-media video, in order, plus what is said in it (may be empty). Answer JSON only: "
+                   '{"people": true/false (a real person is clearly visible in most frames), '
+                   '"talking_person": true/false (a visible person speaks to the camera, not only a voice-over), '
+                   '"what": "one short English sentence: what the video shows"}. Spoken: ')
 AR_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 
 
@@ -223,13 +265,14 @@ def key_words(words: list[dict], n: int = 3) -> list[dict]:
     return sorted(sorted(words, key=lambda w: -len(_plain(w["w"])))[:n], key=lambda w: w["s"])
 
 
-def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str) -> list[dict]:
-    rows = "\n".join(f"- {k}: «{v}»" for k, v in texts.items())
+def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, what: str = "", speech: bool = True) -> list[dict]:
+    rows = "\n".join(f"- {k}: «{v}»" for k, v in texts.items()) if speech else "(this video has no speech)"
     return [{"role": "user", "content": (
         "We are editing a short showcase reel from a creator's own video. Each part below is a few seconds of what they say.\n"
-        f"Brand: {brand or '-'}. Field: {niche or '-'}.\nParts:\n{rows}\n\n"
+        f"Brand: {brand or '-'}. Field: {niche or '-'}. The video shows: {what or '-'}.\nParts:\n{rows}\n\n"
         "Return JSON only:\n"
-        '{"typo": ["2-4 key words copied EXACTLY from the typo part, in spoken order"],\n'
+        '{"titles": ["2-4 very short on-screen titles (2-4 words each) in Arabic about what the video shows and the brand (only used if there is no speech)"],\n'
+        ' "typo": ["2-4 key words copied EXACTLY from the typo part, in spoken order"],\n'
         ' "zoom": "the single most important word copied EXACTLY from the zoom part",\n'
         ' "behind": "1-2 short words to show huge behind the person (from the behind part, or the brand name), in the same language",\n'
         f' "dub": "the dub part translated into {dub_lang}, natural spoken style, about the same length",\n'
@@ -241,7 +284,8 @@ def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str) 
 def clean_plan(raw: dict) -> dict:
     s = lambda k, n: str(raw.get(k) or "").strip()[:n]  # noqa: E731
     typo = [str(x).strip()[:40] for x in raw.get("typo") or [] if str(x).strip()][:4] if isinstance(raw.get("typo"), list) else []
-    return {"typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300),
+    titles = [str(x).strip()[:40] for x in raw.get("titles") or [] if str(x).strip()][:4] if isinstance(raw.get("titles"), list) else []
+    return {"titles": titles, "typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300),
             "broll": s("broll", 60), "bg": s("bg", 60), "music": s("music", 60)}
 
 
@@ -266,6 +310,20 @@ def fx_typo(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: Pa
     t = textlayer.build_ass(items, d, W, H)
     vf = sub(lab, c["fonts"]) if not t else f"{sub(write(c['work'] / 'typo.ass', t), c['fonts'])},{sub(lab, c['fonts'])}"
     ins, af, _ = sfx_mix(c["sfx"], [("pop", w["s"], 0.55) for w in ws], 1)
+    run(ff(c["ffmpeg"]) + ["-i", str(clip), *ins, "-filter_complex", f"[0:v]{vf}[v];{af}", "-map", "[v]", "-map", "[a]", "-t", f"{d:.3f}", *ENC, str(out)])
+
+
+def fx_titles(c: dict, clip: Path, out: Path, d: float, lab: Path, titles: list[str]) -> None:
+    """فيديو من غير كلام: عناوين قصيرة برسالته بتظهر ورا بعض على الإيقاع (مع صوت بوب)."""
+    color = c["colors"][0] if c["colors"] else "#FFD400"
+    n = max(1, len(titles))
+    step_t = (d - 0.5) / n
+    items = [{"text": tt, "t0": 0.4 + k * step_t, "dur": step_t, "font": "SM Lalezar", "size": 150 if len(tt) < 14 else 105,
+              "color": "#FFFFFF" if k % 2 == 0 else color, "y": 0.5, "x": 0.5, "stroke": {"w": 10, "color": "#000000"}, "shadow": True,
+              "anim_in": {"type": "pop", "dur": 0.3}, "anim_out": {"type": "fade", "dur": 0.2}} for k, tt in enumerate(titles)]
+    t = textlayer.build_ass(items, d, W, H)
+    vf = sub(lab, c["fonts"]) if not t else f"{sub(write(c['work'] / 'titles.ass', t), c['fonts'])},{sub(lab, c['fonts'])}"
+    ins, af, _ = sfx_mix(c["sfx"], [("pop", x["t0"], 0.5) for x in items], 1)
     run(ff(c["ffmpeg"]) + ["-i", str(clip), *ins, "-filter_complex", f"[0:v]{vf}[v];{af}", "-map", "[v]", "-map", "[a]", "-t", f"{d:.3f}", *ENC, str(out)])
 
 
@@ -365,19 +423,19 @@ def fx_angle(c: dict, clip: Path, out: Path, d: float, lab: Path) -> None:
     run(ff(c["ffmpeg"]) + ["-i", str(clip), "-i", str(gen), *ins, "-filter_complex", fc, "-map", "[v]", "-map", "[a]", "-t", f"{d:.3f}", *ENC, str(out)])
 
 
-def fx_dub(c: dict, clip: Path, out: Path, d: float, lab: Path, text: str, lang_label: str) -> None:
-    """الجملة بلغة تانية بصوته هو (نسخة من صوته)، والشفايف بتتحرك على الكلام الجديد."""
+def fx_dub(c: dict, clip: Path, out: Path, d: float, lab: Path, text: str, lang_label: str, lip: bool = True) -> None:
+    """الجملة بلغة تانية بصوته هو (نسخة من صوته)، والشفايف بتتحرك على الكلام الجديد. lip=False: تعليق صوتي (مفيش شفايف)."""
     voice = c["ext"]["speak"](text, c["work"] / "dub_voice.wav", d)
     fit = c["work"] / "dub_fit.wav"
     vd, _ = probe(c["ffmpeg"], voice)
     tempo = min(1.35, vd / max(0.5, d - 0.15)) if vd > d - 0.15 else 1.0
     run(ff(c["ffmpeg"]) + ["-i", str(voice), "-af", f"atempo={tempo:.3f},adelay=80|80,apad=whole_dur={d:.3f},atrim=0:{d:.3f}",
                            "-ac", "2", "-ar", "48000", str(fit)])
-    lip = c["ext"]["lipsync"](clip, fit, c["work"] / "dub_lip.mp4", d)
+    lip = c["ext"]["lipsync"](clip, fit, c["work"] / "dub_lip.mp4", d) if lip else clip
     words = captions.words_from_text(text, 0.15, max(0.6, min(d, vd / tempo + 0.1)))
     caps = write(c["work"] / "dub_caps.ass", captions.build_ass(words, {"template": "classic"}, d, (W, H)))
     st = "Style: G,SM Tajawal,50,&H00FFFFFF,&H00FFFFFF,&H8CE5613E,&H8CE5613E,-1,0,0,0,100,100,0,0,3,14,0,5,0,0,0,1"
-    lab2 = write(c["work"] / "dub_lab.ass", label_ass(c["n"], c["total"], CHAPTERS["dub"]["title"], c["accent"],
+    lab2 = write(c["work"] / "dub_lab.ass", label_ass(c["n"], c["total"], CHAPTERS["dub" if lip is not clip else "dub_voice"]["title"], c["accent"],
                                                        [f"Dialogue: 3,{_ts(0.3)},{_ts(d)},G,,0,0,0,,{{\\pos({W // 2},330)\\fad(250,0)}}{lang_label}"], [st]))
     run(ff(c["ffmpeg"]) + ["-i", str(lip), "-i", str(fit), "-filter_complex",
                            f"[0:v]{COVER},fps={FPS},tpad=stop_mode=clone:stop_duration=2,trim=0:{d:.3f},setpts=PTS-STARTPTS,{sub(caps, c['fonts'])},{sub(lab2, c['fonts'])}[v]",
@@ -438,21 +496,44 @@ def build(c: dict, src: Path, step) -> dict:
     wav = work / "speech.wav"
     run(ff(ffm) + ["-i", str(norm), "-vn", "-ac", "1", "-ar", "16000", str(wav)])
     words = [w for w in (c["ext"]["transcribe"](wav, dur) or []) if str(w.get("w") or "").strip()]
-    kinds = [k for k in ORDER if k != "dub" or len(words) >= 4]
-    if c["ext"].get("person") is None:
+    # 🧭 قبل أي تعديل: الفيديو ده فيه كلام؟ فيه شخص؟ الشخص بيتكلم للكاميرا؟ وعلى أساسه بنختار التعديلات اللي ليها معنى
+    step("👁️ يتعرّف على محتوى الفيديو", 10)
+    spoken = sum(max(0.0, w["e"] - w["s"]) for w in words)
+    has_speech = len(words) >= 6 and spoken / dur >= 0.18
+    info = {}
+    try:
+        if c["ext"].get("classify"):
+            info = c["ext"]["classify"](sample_frames(ffm, norm, dur, work), " ".join(w["w"] for w in words)[:600]) or {}
+    except Exception as exc:  # noqa: BLE001
+        print(f"showcase classify: {exc}", flush=True)
+    people = bool(info.get("people", has_speech))
+    vtype = video_type(has_speech, people, bool(info.get("talking_person", has_speech)))
+    c["vtype"], c["what"] = vtype, str(info.get("what") or "")[:200]
+    kinds = list(TYPES[vtype]["kinds"])
+    if c["ext"].get("person") is None or not people:
         kinds = [k for k in kinds if k not in NEEDS_PERSON]
-    win = windows(words, dur, kinds)
-    if "dub" in kinds and "dub" not in win:
+    if not has_speech:
+        words = []
+    if "dub" in kinds and len(words) < 4:
         kinds.remove("dub")
+    dub_k = "dub" if "dub" in kinds else "dub_voice" if "dub_voice" in kinds else None
+    win = windows(words, dur, [("dub" if k == "dub_voice" else k) for k in kinds])
+    if dub_k == "dub_voice" and "dub" in win:
+        win["dub_voice"] = win.pop("dub")
+    if dub_k and dub_k not in win:
+        kinds.remove(dub_k)
     texts = {k: " ".join(w["w"] for w in rel(words, *win[k])) for k in kinds}
     step("🧠 يختار اللحظات", 12)
     try:
-        plan = clean_plan(c["ext"]["plan"](plan_messages(texts, c.get("brand", ""), c.get("niche", ""), c["dub_lang"][2])) or {})
+        plan = clean_plan(c["ext"]["plan"](plan_messages({("dub" if k == "dub_voice" else k): v for k, v in texts.items()}, c.get("brand", ""),
+                                                         c.get("niche", ""), c["dub_lang"][2], c["what"], has_speech)) or {})
     except Exception as exc:  # noqa: BLE001  (من غير العقل: أطول الكلمات، ومن غير دبلجة)
         print(f"showcase plan: {exc}", flush=True)
         plan = clean_plan({})
-    if not plan["dub"] and "dub" in kinds:
-        kinds.remove("dub")
+    if not plan["dub"] and dub_k in kinds:
+        kinds.remove(dub_k)
+    if "titles" in kinds and not plan["titles"]:
+        plan["titles"] = [x for x in (c.get("brand") or "", c.get("niche") or "") if x][:2] or ["✓"]
     has_outro = bool(c.get("logo") or c.get("brand"))
     total = len(kinds) + int(has_outro)
     parts, chapters, skipped, t = [], [], [], 0.0
@@ -489,6 +570,10 @@ def build(c: dict, src: Path, step) -> dict:
                 fx_angle(c, clip, out, d, lab)
             elif kind == "dub":
                 fx_dub(c, clip, out, d, lab, plan["dub"], c["dub_lang"][1])
+            elif kind == "dub_voice":
+                fx_dub(c, clip, out, d, lab, plan["dub"], c["dub_lang"][1], lip=False)
+            elif kind == "titles":
+                fx_titles(c, clip, out, d, lab, plan["titles"])
             elif kind == "finish":
                 fx_finish(c, clip, out, d, ws, lab, fetch("broll", plan["broll"]), fetch("music", plan["music"]))
         except Exception as exc:  # noqa: BLE001  (قطعة وقعت: الباقي بيكمل، وبنقول إنها اتشالت)
@@ -497,8 +582,9 @@ def build(c: dict, src: Path, step) -> dict:
             continue
         od, _ = probe(ffm, out)
         parts.append(out)
+        did = ZOOM_NO_SPEECH if kind == "zoom" and not has_speech else CHAPTERS[kind]["did"]
         chapters.append({"kind": kind, "title": CHAPTERS[kind]["title"], "t0": round(t, 2), "t1": round(t + od, 2),
-                         "did": CHAPTERS[kind]["did"], "can": CHAPTERS[kind]["can"]})
+                         "did": did, "can": CHAPTERS[kind]["can"]})
         t += od
     if has_outro:
         try:
@@ -517,7 +603,8 @@ def build(c: dict, src: Path, step) -> dict:
     lst = write(work / "list.txt", "".join(f"file '{p.as_posix()}'\n" for p in parts))
     final = work / "showcase.mp4"
     run(ff(ffm) + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(final)], 600)
-    return {"video": final, "duration": round(t, 2), "chapters": chapters, "skipped": skipped, "plan": plan}
+    return {"video": final, "duration": round(t, 2), "chapters": chapters, "skipped": skipped, "plan": plan,
+            "type": vtype, "type_label": TYPES[vtype]["label"], "what": c["what"]}
 
 
 def to_json(d: dict) -> str:
