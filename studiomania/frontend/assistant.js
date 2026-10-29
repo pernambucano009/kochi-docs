@@ -239,8 +239,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     S.lastAct = now; S.idleN = (S.idleN || 0) + 1;
     lg("sys", `idle ${S.idleN}`);
     sysItem(S.idleN === 1
-      ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (for example in Saudi: «ها يا إسلام، بعدك معاي؟ ولو مشغول عادي نكمل وقت ثاني»). Then wait.)"
-      : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (for example in Saudi: «شكلك مشغول الحين، أنا بروح الحين، ولما تفضى كلمني»), then call finish with later=true.)");
+      ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (like: are you still with me? and if you are busy, no problem, we can continue another time). Then wait.)"
+      : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (like: you seem busy now, I will go now, and talk to me whenever you are free), then call finish with later=true.)");
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
   }
   // 🛰️ رسالة من المنصة لسعاد (مش كلام العميل): مابتتحسبش كتابة منه، وهي بترد عليها لما تخلّص كلامها
