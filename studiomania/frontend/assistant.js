@@ -59,6 +59,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
 .as-ov.dock .as-show video{height:min(46vh,440px)}.as-chs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:100%}
 .as-chs span{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(127,127,127,.16);opacity:.6;transition:all .3s}.as-chs span.on{background:#E5613E;color:#fff;opacity:1}.as-chs span.done{opacity:.9}
+.as-card{gap:8px;max-height:min(62vh,600px);overflow:auto;text-align:center}.as-card p{margin:0;font-size:13.5px;line-height:1.7;opacity:.85}
+.as-card ul{margin:0;padding:0 18px 0 0;text-align:start;font-size:13.5px;line-height:1.8}.as-kpis{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.as-kpis span{padding:6px 10px;border-radius:12px;background:rgba(127,127,127,.14);font-size:12.5px}.as-kpis span b{display:block;font-size:16px;color:#E5613E}
+.as-card img,.as-card video.pv{width:100%;max-height:30vh;object-fit:cover;border-radius:12px}
+.as-tpls{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%}.as-tpls button{border:2px solid transparent;border-radius:12px;padding:0;background:none;color:inherit;cursor:pointer;font:inherit;font-size:11.5px}
+.as-tpls button.on{border-color:#E5613E}.as-tpls video{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;display:block}
+.as-steps{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;font-size:12.5px}.as-steps span{padding:5px 9px;border-radius:999px;background:rgba(229,97,62,.15)}
+.as-rv{text-align:start;font-size:12.5px;line-height:1.6;padding:8px 10px;border-radius:12px;background:rgba(127,127,127,.1);width:100%;box-sizing:border-box}.as-rv a{color:#E5613E}
 @media (max-width:720px){.as-side{position:static;transform:none;width:min(92vw,420px);max-height:22vh;inset:auto}}`;
   let S = null, state = null, orb = null, ov = null, from = null, dock = false;
   // 📣 العقل اتغيّر (إجابة اتحفظت، صورة اترفعت، حساب بيتحلل): الخريطة تعيد رسم نفسها والفرع يطلع قدام العميل
@@ -178,6 +186,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return { status: r.status, progress: r.progress, step: r.step, error: r.error, parts: (r.chapters || []).length };
     }
     if (name === "play_showcase") return play();
+    if (name === "show_card") return card(args.kind);
+    if (name === "save_preference") {
+      const r = await api("/api/assistant/preference", { method: "POST", ...jsonBody({ topic: args.topic || "", text: args.text || "" }) }).catch(() => ({ ok: false }));
+      if (r.ok) { changed(); chip(`✓ <span><b>حُفظ رأيك</b><br>${esc(String(args.text || "").slice(0, 90))}</span>`); }
+      return r;
+    }
     if (name === "show_input") {
       if (args.kind === "none") { later(); return { ok: true, closed: true }; }
       if (BOX[args.kind]) {
@@ -266,8 +280,83 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         mark(); v.play().catch(() => {});
       }
     }, 200);
-    mark(); v.load();
+    mark(); v.load(); api("/api/assistant/card/showcase").catch(() => {});
     return { ok: true, playing: true, parts: ch.map((c) => c.title), note: "The reel is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish." };
+  }
+  // 🧭 كروت الجولة: كل محطة بكارت (بيانات حقيقية من البرنامج)، وسعاد بتتكلم عنه
+  const fmt = (n) => (n == null || n === "" ? "—" : Number(n).toLocaleString("ar-EG"));
+  const CARD = {
+    analysis: (d) => `<b>📊 تحليل حسابك ${esc(d.account || "")}</b><div class="as-kpis"><span><b>${fmt(d.followers)}</b>متابع</span><span><b>${fmt(d.avg_views)}</b>متوسط المشاهدات</span>
+      <span><b>${d.engagement_pct != null ? fmt(d.engagement_pct) + "٪" : "—"}</b>التفاعل</span><span><b>${fmt(d.posts_every_days)}</b>يوم بين كل منشور</span></div>
+      ${(d.improvements || []).length ? `<ul>${d.improvements.map((x) => `<li>${esc(x.title)}</li>`).join("")}</ul>` : ""}`,
+    types: (d) => `<b>🎬 أنواع الفيديوهات المناسبة لك</b><div class="as-steps">${(d.types || []).map((x) => `<span>${esc(x)}</span>`).join("")}</div>
+      ${(d.ideas || []).length ? `<p>أفكار جاهزة:</p><ul>${d.ideas.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`,
+    rivals: (d) => `<b>🏆 ما ينجح عند منافسيك</b>${(d.items || []).map((i) => `<div class="as-rv"><b>${esc(i.name || "")}</b> <small dir="ltr">@${esc(i.handle || "")}</small>
+      ${(i.posts || []).map((p) => `<div>• ${esc(p.caption || "فيديو")} — ${fmt(p.views)} مشاهدة${p.multiple ? ` (×${esc(p.multiple)} من المعتاد)` : ""} ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</div>`).join("")}</div>`).join("")}`,
+    phone: () => `<b>📱 صوّر بجوالك، والملقّن يعرض لك النص</b><video class="pv" src="/gallery/phone.mp4" muted loop autoplay playsinline></video>
+      <ul><li>النص يظهر على شاشة الجوال وأنت تصوّر</li><li>الفيديو يعود إلى المنصة تلقائيًا</li><li>ونجري له المونتاج: ترجمة وقطع وزووم وموسيقى</li></ul>`,
+    avatar: () => `<b>🧑 الأفاتار: نسخة رقمية منك</b><img src="/gallery/avatar.jpg" alt=""><ul><li>من تسجيل قصير حقيقي، وبإذنك فقط</li><li>يقول كلامًا جديدًا بصوتك دون تصوير</li></ul>`,
+    templates: (d) => {
+      const names = typeof Gallery !== "undefined" ? Gallery.list() : [];
+      return `<b>🧩 قوالب مناسبة لمجالك</b><p>اختر قالبًا، ثم اضغط «اصنعه»، ونصنع أول فيديو باسمك وشعارك هدية.</p><div class="as-tpls">${(d.reels || []).map((id, i) => {
+        const fm = (d.field_media || []).includes(id), v = fm ? `/gallery/f/${d.field}/${id}.mp4` : `/gallery/${id}.mp4`, c = fm ? `/gallery/f/${d.field}/${id}.jpg` : `/gallery/${id}.jpg?v=2`;
+        return `<button type="button" data-tpl="${esc(id)}" data-v="${esc(v)}" data-c="${esc(c)}" class="${i ? "" : "on"}"><video src="${esc(v)}" poster="${esc(c)}" muted loop autoplay playsinline preload="metadata"></video>${esc((names.find((x) => x.id === id) || {}).name || id)}</button>`;
+      }).join("")}</div><div class="row"><button type="button" class="as-go" data-mk>اصنعه باسمي وشعاري</button></div>`;
+    },
+    firstvideo: (d) => `<b>🎬 أول فيديو لك جاهز</b><video src="${esc(d.video || "")}" controls playsinline style="width:100%;max-height:46vh;border-radius:12px;background:#000"></video>`,
+    process: () => `<b>🛠️ من الفكرة إلى النشر</b><div class="as-steps"><span>الفكرة</span><span>النص</span><span>المونتاج</span><span>الصوت</span><span>النشر</span></div>
+      <p>في كل خطوة تختار مستوى التحكم:</p><ul><li>تلقائي بالكامل</li><li>نجهّزها وأنت توافق</li><li>تفعلها بنفسك</li></ul>`,
+    custom: () => `<b>🧱 القالب المخصص</b><img src="/gallery/editor.jpg" alt=""><ul><li>ترتّب الخطوات مرة واحدة: المقدمة والقطع والترجمة والموسيقى والخاتمة</li><li>كل تشغيل يصنع فيديو جديدًا بنفس الطريقة</li></ul>`,
+    autopilot: (d) => `<b>🚀 الأوتوبايلوت</b><ul><li>تحدد عدد المنشورات في اليوم والقوالب</li><li>ينشر في أفضل الأوقات تلقائيًا</li><li>أو ينتظر موافقتك قبل كل منشور</li></ul>
+      <p>${d.on ? "✓ يعمل الآن في حسابك" : "يمكنك تشغيله من صفحة الأوتوبايلوت بعد المكالمة"}</p>`,
+  };
+  async function card(kind) {
+    if (!S || !ov || !CARD[kind]) return { ok: false, error: "unknown card" };
+    const r = await api(`/api/assistant/card/${encodeURIComponent(kind)}`).catch((e) => ({ ok: false, error: e.message }));
+    if (!r.ok || !S) return r;
+    if (S.show) { S.show.v.pause(); S.show = null; S.wait = null; }
+    q(".as-box")?.remove(); acct(false);
+    const d = document.createElement("div"); d.className = "as-box as-card"; d.dataset.card = kind;
+    d.innerHTML = CARD[kind](r.data || {}) + `<div class="row"><button type="button" class="as-btn" data-cclose>إخفاء</button></div>`;
+    q(".as-acts").before(d);
+    d.querySelector("[data-cclose]").onclick = () => d.remove();
+    if (kind === "templates") tplCard(d);
+    return { ok: true, facts: r.facts || "", data: r.data };
+  }
+  // 🧩 القالب: يختاره من الكارت، ونافذة المعطيات الحقيقية (الأسعار والأسماء) بتفتح فوق المكالمة، والفيديو بيتعمل في الخلفية وهي بتكمّل الجولة
+  function tplCard(d) {
+    let cur = d.querySelector("[data-tpl].on");
+    d.querySelector(".as-tpls").onclick = (e) => {
+      const b = e.target.closest("[data-tpl]"); if (!b) return;
+      cur = b; d.querySelectorAll("[data-tpl]").forEach((x) => x.classList.toggle("on", x === b));
+      note(`(SYSTEM: the user is looking at the template "${b.textContent.trim()}". React in one short sentence at most, then wait for them to press the make button.)`);
+    };
+    d.querySelector("[data-mk]").onclick = async () => {
+      if (!cur || typeof FirstUse === "undefined") return;
+      const tpl = { id: cur.dataset.tpl, name: cur.textContent.trim(), video: cur.dataset.v, cover: cur.dataset.c };
+      S.wait = "facts";
+      const ok = await FirstUse.startFirst({ tpl, quiet: true }).catch(() => false);
+      if (!S) return;
+      S.wait = null;
+      if (ok === true || ok === "running") {
+        d.remove(); S.fvChip = chip(`🎬 <span><b>نصنع أول فيديو لك</b><br>${esc(tpl.name)}</span>`); pollFirst();
+        note(`(SYSTEM: the user picked "${tpl.name}" and typed the real details. Their first video with their brand name and logo is being made now (a few minutes). Tell them in one short sentence, then continue the tour with the next stop.)`);
+      } else if (ok === "done") note("(SYSTEM: their first video was already made before. Call show_card firstvideo to show it, then continue the tour.)");
+      else note("(SYSTEM: the user closed the details form without making the video. Ask if they want to do it later, then continue the tour.)");
+    };
+  }
+  function pollFirst() {
+    if (!S || S.fvT) return;
+    S.fvT = setInterval(async () => {
+      const r = await api("/api/onboard").catch(() => null);
+      const j = r?.job; if (!S || !j) return;
+      if (j.status === "done" || j.status === "failed") {
+        clearInterval(S.fvT); S.fvT = null;
+        if (S.fvChip) S.fvChip.innerHTML = j.status === "done" ? `✓ <span><b>أول فيديو لك جاهز</b></span>` : `⚠️ <span><b>تعذّر أول فيديو</b></span>`;
+        note(j.status === "done" ? "(SYSTEM: their first video is ready. When you finish what you are saying, tell them and call show_card firstvideo.)"
+          : `(SYSTEM: their first video could not be made (${j.error || "error"}). Tell them kindly in one sentence; they can try again from the home page.)`);
+      }
+    }, 9000);
   }
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
   function say(text) {
@@ -541,7 +630,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished) {
     if (!S) return;
     const s = S; S = null;
-    clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
+    clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
     { const keep = S; S = s; lg("sys", finished ? "end: finished" : "end: closed"); flush(true); S = keep; }
     // 💸 طول المكالمة وكلام سعاد فيها ← عدّاد الصرف (ببلاش على العميل، بس علينا)
     if (s.greeted) api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000 }) }).catch(() => {});

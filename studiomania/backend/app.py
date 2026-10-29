@@ -32908,7 +32908,8 @@ def assistant_token(request: Request):
     except (OSError, ValueError, KeyError, TypeError):
         lessons = []
     sc = showcase_state(b)   # 🎬 الفيديو الاستعراضي: عندنا فيديو له؟ اتعمل قبل كده؟
-    have.update(video=sc["has_video"], showcase=sc["status"], showcase_used=sc["used"])
+    have.update(video=sc["has_video"], showcase=sc["status"], showcase_used=sc["used"], tour=list(a.get("tour") or []),
+                rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "")
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
@@ -33314,6 +33315,102 @@ def assistant_showcase_upload(file: UploadFile = File(...)):
         raise HTTPException(400, "هذا الملف ليس فيديو سليمًا") from exc
     finally:
         tmp.unlink(missing_ok=True)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- 🧭 جولة سعاد بعد الأسئلة: كارت على الشاشة لكل محطة وهي بتشرح
+# رأيها في التحليل ← أنواع الفيديوهات ← فيديوهات المنافسين الناجحة ← التصوير بالجوال والملقّن ← الأفاتار ← القوالب (وأول فيديو باسمه وشعاره)
+# ← الفيديو الاستعراضي ← الخطوات من الفكرة للنشر ومستوى التحكم ← القالب المخصص ← الأوتوبايلوت. كل محطة بتتسجل، فلو خرج ورجع بتكمّل من مكانها.
+TOUR = ["analysis", "types", "rivals", "phone", "avatar", "templates", "showcase", "process", "custom", "autopilot"]
+
+
+def tour_card(bid: str, b: dict, kind: str) -> dict:
+    """بيانات الكارت (للشاشة) + facts بالإنجليزي لسعاد عشان تتكلم عن حاجات حقيقية بس."""
+    ob = onboard_load() or {}
+    fp = fieldpacks.FIELDS.get(ob.get("field") or b.get("field") or "") or {}
+    if kind == "analysis":
+        st = assistant_account_state()
+        if not st.get("ready"):
+            return {"ok": False, "error": "analysis not ready", "status": st.get("status")}
+        return {"ok": True, "kind": kind, "data": st, "facts": "Use these real numbers and improvements to give your honest opinion."}
+    if kind == "types":
+        # من بروفايل المجال، ولو مجاله مش من المجالات الجاهزة: الأنواع اللي بتنجح في أغلب المجالات
+        angles = [x.strip() for x in re.split(r"[،,]", str(fp.get("angles") or "")) if x.strip()] or \
+            ["نصيحة سريعة", "قبل وبعد", "سؤال وجواب", "وراء الكواليس", "رأي عميل", "قصة نجاح", "عرض خاص"]
+        ideas = [i["title"] for i in fp.get("ideas") or []][:6]
+        return {"ok": True, "kind": kind, "data": {"types": angles[:8], "ideas": ideas, "field": fp.get("name") or ""},
+                "facts": "These are the video types that fit their field (from our field playbook). Ask if they keep these or want to try other types."}
+    if kind == "rivals":
+        c = b.get("competitors") or {}
+        items = [i for i in c.get("items") or [] if i.get("state") != "rejected"][:4]
+        rows = [{"name": i.get("name") or i.get("handle"), "handle": i.get("handle"), "platform": i.get("platform"), "followers": i.get("followers"),
+                 "median_views": i.get("median_views"), "posts": [{k: p.get(k) for k in ("url", "views", "multiple")} | {"caption": str(p.get("caption") or "")[:140]}
+                                                                  for p in (i.get("posts") or [])[:3]]} for i in items]
+        if not rows:
+            return {"ok": False, "error": "no competitors yet: skip this part, or say we will find them and show their best videos later"}
+        return {"ok": True, "kind": kind, "data": {"items": rows},
+                "facts": "Their best posts with views and how many times better than their usual (multiple). Explain what works and why, briefly."}
+    if kind == "templates":
+        reels = fieldpacks.field_reels(ob.get("field") or "")
+        field = ob.get("field") or ""
+        media = [r for r in reels if field and (FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.jpg").exists()]
+        return {"ok": True, "kind": kind, "data": {"reels": reels, "field": field, "field_media": media, "brand": first_brand_name(b), "logo": bool(logo_path(bid))},
+                "facts": "Ready templates for their field. They pick one on the screen and press the make button; they type the real details "
+                         "(prices, names) and we make their first video with their brand name and logo, free. The screen tells you what they picked."}
+    if kind == "firstvideo":
+        j = b.get("first_job") or {}
+        if j.get("status") != "done":
+            return {"ok": False, "error": "not ready", "status": j.get("status")}
+        r = onboard_state()
+        return {"ok": True, "kind": kind, "data": {"video": (r.get("job") or {}).get("video_url"), "title": j.get("title") or ""}}
+    if kind == "autopilot":
+        ps = pilot_state()
+        return {"ok": True, "kind": kind, "data": {"on": bool(ps["settings"].get("on")), "best": ps.get("best")},
+                "facts": "Autopilot: they choose how many posts a day and which templates; it posts at the best times by itself, or waits for their approval first."}
+    facts = {
+        "phone": "They can film themselves with their phone: our app shows their script on a teleprompter while they film, the video comes back to the "
+                 "platform by itself, and we edit it (captions, cuts, zooms, music). Good for people who like to appear themselves.",
+        "avatar": "An avatar: a digital copy of them (made only with their permission, from a short real recording) that says new words in their voice, "
+                  "so they can publish videos of themselves without filming every time.",
+        "process": "Every video goes through: idea → script → editing → voice → publishing. At each step they choose: fully automatic, we prepare and "
+                   "they approve, or they do it themselves. They can change this any time.",
+        "showcase": "The showcase reel made from their own video.",
+        "custom": "Custom templates: they arrange the steps once (their intro, cuts, captions style, music, outro) and every run makes a new video the same way.",
+    }
+    if kind in facts:
+        return {"ok": True, "kind": kind, "data": {}, "facts": facts[kind]}
+    return {"ok": False, "error": "unknown card"}
+
+
+@app.get("/api/assistant/card/{kind}")
+def assistant_card(kind: str):
+    bid, b, _a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    r = tour_card(bid, b, kind)
+    if r.get("ok") and kind in TOUR:
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append(kind)
+                     if kind not in (d.get("assistant") or {}).get("tour", []) else None)
+    return r
+
+
+class AssistPrefIn(BaseModel):
+    topic: str
+    text: str
+
+
+@app.post("/api/assistant/preference")
+def assistant_preference(body: AssistPrefIn):
+    """رأي العميل في الجولة (يكمّل بالأنواع دي ولا يجرّب غيرها، يصوّر نفسه ولا لأ…) ← معلومة في العقل."""
+    bid, _b, _a = assist_info()
+    text = body.text.strip()[:600]
+    if not bid or not text:
+        return {"ok": False}
+    titles = {"types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
+              "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم"}
+    update_brain(bid, lambda d: d.setdefault("notes", []).append({"id": uuid.uuid4().hex[:10], "section": "other",
+                                                                  "title": titles.get(body.topic, "تفضيل من المكالمة"), "summary": text[:300],
+                                                                  "body": "", "source": "assistant"}))
     return {"ok": True}
 
 

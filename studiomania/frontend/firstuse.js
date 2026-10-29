@@ -388,19 +388,21 @@ body.fu-cine #nh .bm-hint,body.fu-cine .hp-fab,body.fu-cine .hp-tease{opacity:0!
   }
 
   // 🎬 أول فيديو: قالب من قوالب المجال ← فكرة الإعلان ومعطياته ← الفيديو يتعمل لوحده
-  async function startFirst() {
-    const s = state || (await load());
-    if (!s) return;
-    if (s.need) { await askBasics(); if (state?.need) return; }
-    if (state.job && state.job.status !== "failed") return watch();
-    if (!state.logo && !state.logo_asked) await askLogo();
-    const tpl = await pickTemplate();
-    if (!tpl) return;
+  // opts (من مكالمة سعاد): tpl = القالب اللي اختاره من كارتها، quiet = من غير نافذة المتابعة (هي بتقوله لما يجهز). بترجع true لو بدأ
+  async function startFirst(opts = {}) {
+    const s = opts.tpl ? await load() : state || (await load());
+    if (!s) return false;
+    if (s.need) { await askBasics(); if (state?.need) return false; }
+    if (state.job && state.job.status !== "failed") { if (!opts.quiet) watch(); return state.job.status === "run" ? "running" : "done"; }
+    if (!opts.tpl && !state.logo && !state.logo_asked) await askLogo();
+    const tpl = opts.tpl || await pickTemplate();
+    if (!tpl) return false;
     const r = await askFacts(tpl);
-    if (!r) return;
+    if (!r) return false;
     state = r;
     refresh();
-    watch();
+    if (!opts.quiet) watch(); else watch(false);
+    return true;
   }
 
   document.addEventListener("click", (e) => { if (e.target.closest?.("[data-first]")) { e.preventDefault(); e.stopPropagation(); startFirst(); } }, true);
