@@ -105,15 +105,25 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "myvideo", "none"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "myvideo", "rival", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
                         "intro: a short video that opens their videos. myvideo: a short video of themselves talking (for the showcase reel). "
                         "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
      "you start talking about that stop). Returns real data and facts to talk about; if ok is false, skip that stop.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "templates",
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis", "types", "phone", "avatar", "templates",
                                                                                           "firstvideo", "process", "custom", "autopilot"]}},
                     "required": ["kind"]}},
+    {"type": "function", "name": "suggest_competitor", "description": "Find ONE real account in the user's field and area (a possible competitor) "
+     "and show it on their screen with its real numbers. Each call shows a different account. Takes a few seconds.",
+     "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "check_competitor", "description": "Check a page the user TYPED (link or @handle) and show its real numbers and "
+     "an honest verdict on screen. Only with exactly what they typed, never from speech.",
+     "parameters": {"type": "object", "properties": {"link": {"type": "string"}}, "required": ["link"]}},
+    {"type": "function", "name": "decide_competitor", "description": "Record the decision on the account shown: add=true adds it to their "
+     "competitors page, add=false means it is not a competitor (never suggested again).",
+     "parameters": {"type": "object", "properties": {"platform": {"type": "string"}, "handle": {"type": "string"}, "add": {"type": "boolean"}},
+                    "required": ["platform", "handle", "add"]}},
     {"type": "function", "name": "save_preference", "description": "Save what the user said about a tour stop (e.g. keep these video types or try "
      "others, they like filming themselves or not, they want autopilot or not) into their brand profile.",
      "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot"]},
@@ -208,8 +218,19 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                      "specific strengths or weaknesses with the real numbers, and the most important improvements. Ask what they think."),
         ("types", "Video types: call show_card types. Say which kinds of videos fit them (in their terms), and ask if they want to keep "
                   "these or also try other kinds. Save their answer with save_preference (topic types)."),
-        ("rivals", "Successful competitor videos: call show_card rivals. If ok, tell them what works for them and why (1–2 sentences) and ask "
-                   "if they would like videos inspired by that. If not ok, skip this stop silently."),
+        ("rivals", "COMPETITORS: the most important stop of the whole call. Take your time, never rush it, never skip it. Goal: agree together "
+                   "on at least one real competitor (ideally 2–3) for their competitors page.\n"
+                   "      1) Call suggest_competitor. Tell them in one or two sentences who it is (name, what they post, a real number), say you found "
+                   "it in their field and area, and ask: is this really one of the pages we should add to your competitors?\n"
+                   "      2) Yes → decide_competitor add=true, then say in one sentence what works for them (from their best videos).\n"
+                   "      3) No → decide_competitor add=false, then ask if they know a page they consider a competitor and can type its link "
+                   "(call show_input kind rival). When they type it, it is checked automatically and you get the result.\n"
+                   "      4) Their page: give your honest opinion with the evidence. If it is weak, say kindly but clearly that it does not look "
+                   "like an active or strong page, and why (for example: one post in the last month, last post 40 days ago, around 300 views "
+                   "a video). If it is good, say what works there. Then ask if we add it.\n"
+                   "      5) They say they do not know one, or 'you find one', or they disagree with your opinion → call suggest_competitor again for a "
+                   "different account and ask: what do you think of this one? Keep going like this until you agree on one.\n"
+                   "      Use only the real numbers from the tools; never invent a page or a number."),
         ("phone", "Phone videos: call show_card phone. Explain they can film themselves with the phone and our teleprompter shows the script "
                   "while they film, then we edit it. Ask if they like appearing in their videos."),
         ("avatar", "The avatar: call show_card avatar. Explain the digital copy of them (only with their permission) that talks with new "

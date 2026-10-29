@@ -33394,6 +33394,138 @@ def assistant_card(kind: str):
     return r
 
 
+# 🏆 المنافسين في المكالمة (أهم محطة): سعاد بتجيب حساب حقيقي في نفس المجال والمنطقة وتسأله «ده منافس فعلًا؟»،
+# ولو لأ تطلب منه لينك صفحة هو شايفها منافس وتقول رأيها بصراحة بالدليل، ولو قال «شوفي إنتي» تجيب واحد تاني… لحد ما يتفقوا.
+# كل ده جزء من مكالمة أول مرة: على المنصة (ترويج).
+def rival_card(it: dict, why: str = "") -> dict:
+    v = rivals.verdict(it)
+    return {"platform": it["platform"], "handle": it["handle"], "name": it.get("name") or it["handle"], "followers": it.get("followers"),
+            "median_views": it.get("median_views"), "recent": it.get("recent_count"), "days": v["days_since_post"], "top_views": it.get("top_views"),
+            "level": v["level"], "why": why, "posts": [{"url": p.get("url"), "views": p.get("views"), "multiple": p.get("multiple"),
+                                                        "caption": str(p.get("caption") or "")[:140]} for p in (it.get("posts") or [])[:3]]}, v
+
+
+def rival_pool(bid: str, b: dict) -> list[dict]:
+    """المرشحين (مرة واحدة لكل مكالمة تقريبًا): بحث في المجال والمنطقة، والعقل بيرتّبهم الأقرب للأبعد."""
+    a = b.get("assistant") or {}
+    pool = a.get("rival_pool") or {}
+    if pool.get("cands") and time.time() - (pool.get("at") or 0) < 6 * 3600:
+        return pool["cands"]
+    c = b.get("competitors") or {}
+    exclude = set(c.get("excluded") or []) | {rivals_key(i) for i in c.get("items") or []}
+    posts, qs = rivals_search(bid, b)
+    usd = wallet.est(scrape=len(qs) * len(rivals.PLATFORMS), chars=3000)
+    cands = rivals.candidates(posts, exclude)[:25]
+    if len(cands) > 3 and not atlas.mock_mode() and rivals.live():
+        try:
+            order = [int(p.get("i")) for p in rivals_llm(rivals.pick_messages(b, cands, 10), "اختيار المنافسين").get("picks") or []]
+            order = [k for k in dict.fromkeys(order) if 0 <= k < len(cands)]
+            cands = [cands[k] for k in order] + [x for k, x in enumerate(cands) if k not in order]
+            usd += wallet.est(chars=9000)
+        except (rivals.RivalsError, ValueError, TypeError):
+            pass
+    if rivals.live():
+        wallet.cost(usd, "ترويج: البحث عن منافسين في المكالمة", promo=True)
+    cands = [{k: x[k] for k in ("platform", "handle", "name", "followers", "top_views")} for x in cands]
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(rival_pool={"cands": cands, "at": time.time()}))
+    return cands
+
+
+@app.post("/api/assistant/rival/suggest")
+def assistant_rival_suggest():
+    bid, b, a = assist_info()
+    if not bid:
+        raise HTTPException(404, "لا توجد علامة")
+    if not rivals.live() and not atlas.mock_mode():
+        return {"ok": False, "error": "competitor search unavailable right now: ask them to type a competitor's link instead"}
+    try:
+        cands = rival_pool(bid, b)
+    except rivals.RivalsError as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+    b = brain_row(bid) or {}
+    c = b.get("competitors") or {}
+    seen = set((b.get("assistant") or {}).get("rival_seen") or []) | set(c.get("excluded") or []) | {rivals_key(i) for i in c.get("items") or []}
+    for cd in cands:
+        k = rivals_key(cd)
+        if k in seen:
+            continue
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("rival_seen", []).append(k))
+        try:
+            it = rivals_fetch(cd["platform"], cd["handle"])
+        except rivals.RivalsError:
+            continue
+        if rivals.live():
+            wallet.cost(wallet.est(scrape=3), "ترويج: منشورات منافس مقترح في المكالمة", promo=True)
+        card, v = rival_card(it, "same field and area, from the search")
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("rival_cache", {}).update({k: it}))
+        return {"ok": True, "card": card, "facts": "A real account found in their field and area. Evidence: " + "; ".join(v["evidence"])
+                + f". Overall: {v['level']}. Ask if this really is a competitor we should add to their competitors page."}
+    return {"ok": False, "error": "no more candidates found: ask them to type the link of a page they consider a competitor"}
+
+
+class AssistRivalCheckIn(BaseModel):
+    link: str
+
+
+@app.post("/api/assistant/rival/check")
+def assistant_rival_check(body: AssistRivalCheckIn):
+    """لينك صفحة كتبه العميل: بنجيب أرقامها ونقول رأينا بصراحة (نشيطة؟ قوية؟) بالدليل."""
+    bid, _b, _a = assist_info()
+    h = rivals.clean_handle(body.link)
+    if not bid or not h:
+        return {"ok": False, "error": "no handle"}
+    plat = rivals.guess_platform(body.link) if "/" in body.link else "instagram"
+    it = None
+    for p in dict.fromkeys([plat, "instagram", "tiktok"]):
+        try:
+            it = rivals_fetch(p, h)
+            break
+        except rivals.RivalsError:
+            continue
+    if rivals.live():
+        wallet.cost(wallet.est(scrape=3), "ترويج: فحص صفحة منافس في المكالمة", promo=True)
+    if not it:
+        return {"ok": False, "error": f"could not find posts for @{h} (private, wrong link, or no videos). Ask them to check the link."}
+    k = rivals_key(it)
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("rival_cache", {}).update({k: it}))
+    card, v = rival_card(it, "the user gave this page")
+    return {"ok": True, "card": card, "facts": "Evidence: " + "; ".join(v["evidence"]) + f". Overall: {v['level']}. "
+            + ("Be honest and kind: it does not look like a strong/active page; say why with this evidence, and offer to look for a better one."
+               if v["level"] == "weak" else "Tell them what works on this page, then ask if we add it to their competitors.")}
+
+
+class AssistRivalDecideIn(BaseModel):
+    platform: str
+    handle: str
+    add: bool
+
+
+@app.post("/api/assistant/rival/decide")
+def assistant_rival_decide(body: AssistRivalDecideIn):
+    """اتفقوا: يتضاف لصفحة المنافسين معتمد. أو لأ: مايتقترحش تاني."""
+    bid, b, _a = assist_info()
+    if not bid:
+        return {"ok": False}
+    k = f"{body.platform}:{rivals.clean_handle(body.handle).lower()}"
+    it = ((b.get("assistant") or {}).get("rival_cache") or {}).get(k)
+
+    def fn(d):
+        cc = d.setdefault("competitors", {})
+        lst = cc.get("items") or []
+        if body.add and it and k not in {rivals_key(i) for i in lst}:
+            cc["items"] = lst + [{**it, "id": uuid.uuid4().hex[:8], "why": "اتفقتما عليه في المكالمة", "state": "approved", "updated": time.time()}]
+        elif not body.add:
+            cc["excluded"] = list({*(cc.get("excluded") or []), k})[-300:]
+            cc["items"] = [i for i in lst if rivals_key(i) != k]
+        cc["reviewed_at"] = time.time()
+    update_brain(bid, fn)
+    n = sum(rivals.is_ok(i) for i in ((brain_row(bid) or {}).get("competitors") or {}).get("items") or [])
+    if body.add and it:   # محطة المنافسين خلصت لما يتفقوا على واحد على الأقل (لو رجع تاني مابتتعادش)
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append("rivals")
+                     if "rivals" not in (d.get("assistant") or {}).get("tour", []) else None)
+    return {"ok": True, "added": bool(body.add and it), "approved_count": n}
+
+
 class AssistPrefIn(BaseModel):
     topic: str
     text: str

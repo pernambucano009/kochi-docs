@@ -121,7 +121,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function caption(t) { const c = q(".as-cap"); if (c) c.textContent = t.slice(-170); }
   // 📝 المكتوب جملة جملة على قد الكلام: النص بيوصل أسرع من الصوت، فكل جملة بتفضل ظاهرة على قد طولها وبعدين اللي بعدها.
   // والمربع اللي المساعد طلبه بيظهر لما الجملة اللي فيها اسمه تتقال (أو في آخر الرد لو الكلمة ماتقالتش)
-  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i, myvideo: /فيديو|فديو|video/i };
+  const KW = { account: /انست|إنست|instagram|تيك ?توك|tiktok|لينك|رابط/i, logo: /شعار|لوجو|لوغو|logo/i, products: /صور|منتج|أعمال/i, intro: /إنترو|انترو|intro/i, rival: /لينك|رابط|صفحة|اكتب/i, myvideo: /فيديو|فديو|video/i };
   // جملة جملة، والجملة الطويلة بتتقسم عند الفاصلة عشان المكتوب مايزيدش عن سطرين ويغطي على خانة الكتابة
   // كل حتة ≤ ٦٠ حرف تقريبًا (عند الفاصلة لو فيه، وإلا عند آخر كلمة) عشان تتقري كاملة في سطرين من غير ما تتقطع بنقط
   const chunk = (x) => {
@@ -187,6 +187,18 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     if (name === "play_showcase") return play();
     if (name === "show_card") return card(args.kind);
+    if (name === "suggest_competitor") {
+      chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
+      const r = await api("/api/assistant/rival/suggest", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
+      if (r.ok) rivalCard(r.card);
+      return r.ok ? { ok: true, account: r.card, facts: r.facts } : r;
+    }
+    if (name === "check_competitor") {
+      const norm = (x) => String(x || "").toLowerCase().replace(/https?:\/\/|www\.|instagram\.com\/|tiktok\.com\/|[@\s/]/g, "");
+      if (!norm(args.link) || !norm(S.typed).includes(norm(args.link))) { box("rival"); return { ok: false, error: "The user has not typed this link. Ask them to type it in the box." }; }
+      return rivalCheck(args.link, true);
+    }
+    if (name === "decide_competitor") return decide(args.platform, args.handle, !!args.add);
     if (name === "save_preference") {
       const r = await api("/api/assistant/preference", { method: "POST", ...jsonBody({ topic: args.topic || "", text: args.text || "" }) }).catch(() => ({ ok: false }));
       if (r.ok) { changed(); chip(`✓ <span><b>حُفظ رأيك</b><br>${esc(String(args.text || "").slice(0, 90))}</span>`); }
@@ -323,6 +335,42 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (kind === "templates") tplCard(d);
     return { ok: true, facts: r.facts || "", data: r.data };
   }
+  // 🏆 كارت المنافس: أرقامه الحقيقية ورأينا فيه، وزرارين (هو منافس / مش منافس). الزرار والكلام بيعملوا نفس الحاجة
+  const LEVEL = { strong: "💪 صفحة نشطة وقوية", ok: "👌 صفحة متوسطة", weak: "⚠️ صفحة ضعيفة أو غير نشطة" };
+  function rivalCard(c) {
+    if (!S || !ov || !c) return;
+    if (S.show) { S.show.v.pause(); S.show = null; S.wait = null; }
+    q(".as-box")?.remove(); acct(false);
+    const d = document.createElement("div"); d.className = "as-box as-card"; d.dataset.card = "rival";
+    d.innerHTML = `<b>🏆 ${esc(c.name)} <small dir="ltr">@${esc(c.handle)} · ${c.platform === "tiktok" ? "TikTok" : "Instagram"}</small></b>
+      <div class="as-kpis"><span><b>${fmt(c.followers)}</b>متابع</span><span><b>${fmt(c.median_views)}</b>متوسط المشاهدات</span><span><b>${fmt(c.recent)}</b>منشور في آخر ٣٠ يومًا</span>
+      ${c.days != null ? `<span><b>${fmt(c.days)}</b>يوم منذ آخر منشور</span>` : ""}</div><p>${esc(LEVEL[c.level] || "")}</p>
+      ${(c.posts || []).map((p) => `<div class="as-rv">• ${esc(p.caption || "فيديو")} — ${fmt(p.views)} مشاهدة ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</div>`).join("")}
+      <div class="row"><button type="button" class="as-go" data-ry>✓ نعم، منافس لي</button><button type="button" class="as-btn" data-rn>✕ ليس منافسًا</button></div>`;
+    q(".as-acts").before(d);
+    d.querySelector("[data-ry]").onclick = async () => { await decide(c.platform, c.handle, true); note(`(SYSTEM: the user pressed YES: @${c.handle} is a competitor and was added to their competitors page. Say what works for them in one sentence, then ask if they want to look for one more or move on.)`); };
+    d.querySelector("[data-rn]").onclick = async () => { await decide(c.platform, c.handle, false); note(`(SYSTEM: the user pressed NO: @${c.handle} is not a competitor. Ask if they know a page they consider a competitor and can type its link (show_input kind rival), or offer to find another one.)`); };
+  }
+  async function decide(platform, handle, add) {
+    const r = await api("/api/assistant/rival/decide", { method: "POST", ...jsonBody({ platform, handle, add }) }).catch(() => ({ ok: false }));
+    if (!S) return r;
+    q('[data-card="rival"]')?.remove();
+    if (r.ok && r.added) { changed(); chip(`✓ <span><b>أُضيف إلى منافسيك</b><br>@${esc(handle)}</span>`); }
+    return r;
+  }
+  // اللينك اللي كتبه العميل: بيتفحص على طول، وسعاد بتاخد النتيجة وتقول رأيها بصراحة
+  async function rivalCheck(link, fromTool) {
+    if (!S) return { ok: false };
+    S.typed += " " + link; lg("user", `صفحة منافس: ${link}`, { typed: 1 });
+    const c = chip(`🔎 <span><b>نفحص الصفحة</b><br>${esc(link)}</span>`);
+    const r = await api("/api/assistant/rival/check", { method: "POST", ...jsonBody({ link }) }).catch((e) => ({ ok: false, error: e.message }));
+    c.remove();
+    if (r.ok) rivalCard(r.card);
+    if (fromTool) return r.ok ? { ok: true, account: r.card, facts: r.facts } : r;
+    note(r.ok ? `(SYSTEM: the user typed a competitor page: ${link}. Its numbers are on the screen: ${JSON.stringify(r.card)}. ${r.facts})`
+      : `(SYSTEM: the user typed ${link} but it could not be checked (${r.error || "error"}). Tell them kindly and ask them to check the link, or offer to find one yourself.)`);
+    return r;
+  }
   // 🧩 القالب: يختاره من الكارت، ونافذة المعطيات الحقيقية (الأسعار والأسماء) بتفتح فوق المكالمة، والفيديو بيتعمل في الخلفية وهي بتكمّل الجولة
   function tplCard(d) {
     let cur = d.querySelector("[data-tpl].on");
@@ -369,6 +417,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
   const BOX = {
     account: { t: "رابط حسابك على إنستغرام أو تيك توك", ph: "instagram.com/… أو @اسم_الحساب" },
+    rival: { t: "رابط صفحة تراها منافسًا لك", ph: "instagram.com/… أو tiktok.com/@…", pre: "صفحة منافس: " },
     logo: { t: "ارفع شعارك", accept: "image/png,image/jpeg,image/webp", kind: "logos", done: "رفعت الشعار" },
     products: { t: "ارفع صور منتجاتك أو أعمالك", accept: "image/png,image/jpeg,image/webp", multi: true, kind: "products", done: "رفعت صور المنتجات" },
     intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
@@ -387,7 +436,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
     d.querySelector("[data-later]").onclick = () => { d.remove(); say("سأرسله لاحقًا"); };
     if (k.ph) {
-      const inp = d.querySelector("input"), send = () => { const v = inp.value.trim(); if (!v) return; d.remove(); say(`حسابي: ${v}`); };
+      const inp = d.querySelector("input"), send = () => { const v = inp.value.trim(); if (!v) return; d.remove(); if (k.pre) return rivalCheck(v); say(`حسابي: ${v}`); };
       d.querySelector("[data-send]").onclick = send; inp.onkeydown = (e) => { if (e.key === "Enter") send(); };
       setTimeout(() => inp.focus(), 300);
       return;
@@ -577,6 +626,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // ⏎ اللي اتكتب في الخانة (بزرار السهم أو Enter). الحساب: المنصة نفسها بتبدأ تحليله على طول، وسعاد بتعرف إنه بدأ وتكمّل
   async function submit(v) {
     if (!S || !v) return;
+    if (S.wait === "rival" && /instagram|tiktok|@|\.com|^[\w.]{3,30}$/i.test(v)) { q(".as-box")?.remove(); S.wait = null; return rivalCheck(v); }
     if (!S.acct && S.wait !== "account") return say(v);
     acct(false); S.typed += " " + v;
     const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: v }) }).catch((e) => ({ ok: false, error: e.message }));

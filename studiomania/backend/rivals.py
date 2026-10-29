@@ -228,7 +228,22 @@ def summarize(platform: str, handle: str, posts: list[dict], now: float | None =
     first = posts[0] if posts else {}
     return {"platform": platform, "handle": handle, "name": first.get("name") or handle, "followers": first.get("followers", 0),
             "median_views": med, "posts_count": len(rows), "recent_count": sum(r["recent"] for r in rows),
-            "top_views": max(views or [0]), "posts": best}
+            "top_views": max(views or [0]), "posts": best, "last_ts": max((p["ts"] for p in posts if p.get("ts")), default=0)}
+
+
+def verdict(it: dict, now: float | None = None) -> dict:
+    """رأي صريح في الحساب بالدليل (لمكالمة سعاد): نشيط وقوي؟ ولا ضعيف؟ ← {level: strong|ok|weak, evidence: [...]}."""
+    now = now or time.time()
+    days = int((now - it["last_ts"]) / 86400) if it.get("last_ts") else None
+    recent, med, fol = it.get("recent_count") or 0, it.get("median_views") or 0, it.get("followers") or 0
+    ev = [f"{recent} posts in the last 30 days", f"median {med} views per video", f"{fol} followers"]
+    if days is not None:
+        ev.append(f"last post {days} days ago")
+    if it.get("top_views"):
+        ev.append(f"best video {it['top_views']} views")
+    weak = recent <= 1 or (days is not None and days > 30) or med < 300
+    strong = recent >= 4 and (med >= 3000 or (fol and med >= fol * 0.05))
+    return {"level": "weak" if weak else "strong" if strong else "ok", "evidence": ev, "days_since_post": days}
 
 
 def trending(posts: list[dict], now: float | None = None, n: int = 15) -> list[dict]:
