@@ -56,7 +56,10 @@ CHAPTERS["titles"] = {"title": "عناوين متحركة على الفيديو"
 CHAPTERS["dub_voice"] = {"title": "دبلجة التعليق الصوتي إلى لغة أخرى",
                          "did": "we dubbed the voice-over of this part into another language with a natural voice",
                          "can": "they can run a channel in every Arabic dialect and every language if they want"}
+CHAPTERS["templates"] = {"title": "من قوالب سمسمكيت لمجالك", "did": "", "can": "we use these signature templates with them, with their name, logo and real offers"}
 ORDER = ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "dub", "finish"]
+# 🎞️ اللقطات الداعمة (على كلمة قالها، وصوته شغال عليها) بتدخل في الأجزاء دي بس: اللي الميزة فيها مش محتاجة وشه طول الوقت
+CUTAWAY_KINDS = {"captions", "typo", "zoom", "finish", "titles", "grade"}
 # 🧭 الفيديو نوعه إيه؟ كل نوع ليه التعديلات اللي ليها معنى فيه بس (فيديو موسيقى بس مالوش ترجمة، ومن غير شخص مافيش «نص خلفك»)
 TYPES = {
     "talking": {"label": "a person talking to the camera", "kinds": ORDER},
@@ -292,6 +295,9 @@ def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, 
         f"Brand: {brand or '-'}. Field: {niche or '-'}. The video shows: {what or '-'}.\nParts:\n{rows}\n\n"
         "Return JSON only:\n"
         '{"titles": ["2-4 very short on-screen titles (2-4 words each) in Arabic about what the video shows and the brand (only used if there is no speech)"],\n'
+        ' "cutaways": [{"part": "one of: captions, typo, zoom, grade, finish, titles", "word": "a concrete word copied EXACTLY from that part '
+        '(empty if no speech)", "query": "an English description of a real, concrete shot that illustrates that word in the context of their field '
+        '(e.g. a coach checking a stopwatch in a gym); adults, no text, no children"}] (one per part, for as many of those parts as possible),\n'
         ' "typo": ["2-4 key words copied EXACTLY from the typo part, in spoken order"],\n'
         ' "zoom": "the single most important word copied EXACTLY from the zoom part",\n'
         ' "behind": "1-2 short words to show huge behind the person (from the behind part, or the brand name), in the same language",\n'
@@ -305,16 +311,27 @@ def clean_plan(raw: dict) -> dict:
     s = lambda k, n: str(raw.get(k) or "").strip()[:n]  # noqa: E731
     typo = [str(x).strip()[:40] for x in raw.get("typo") or [] if str(x).strip()][:4] if isinstance(raw.get("typo"), list) else []
     titles = [str(x).strip()[:40] for x in raw.get("titles") or [] if str(x).strip()][:4] if isinstance(raw.get("titles"), list) else []
-    return {"titles": titles, "typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300),
+    cws = []
+    for x in raw.get("cutaways") or []:
+        if isinstance(x, dict) and x.get("part") in CUTAWAY_KINDS and str(x.get("query") or "").strip() and x["part"] not in [c["part"] for c in cws]:
+            cws.append({"part": x["part"], "word": str(x.get("word") or "").strip()[:40], "query": str(x["query"]).strip()[:200]})
+    return {"cutaways": cws, "titles": titles, "typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300),
             "broll": s("broll", 60), "bg": s("bg", 60), "music": s("music", 60)}
 
 
 # ---------------------------------------------------------------- كل ميزة
+def punch(d: float, hy: float, a: float, b: float, k: float = 1.35) -> str:
+    """✂️ قطع على «كاميرا تانية» قريبة (كلوز أب على الوش) من a لـ b، وبعدين رجوع للواسعة: إحساس تصوير بكاميرتين من غير أي تكلفة."""
+    return (f"split=2[pa][pb];[pb]crop=iw/{k}:ih/{k}:(iw-iw/{k})/2:max(0\\,min(ih-ih/{k}\\,ih*{hy:.3f}-ih/{k}/2)),scale={W}:{H},setsar=1[pc];"
+            f"[pa][pc]overlay=0:0:enable='between(t,{a:.2f},{b:.2f})'")
+
+
 def fx_captions(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: str) -> None:
     caps = write(c["work"] / "cap_captions.ass", captions.build_ass(words, {"template": "kochi"}, d, (W, H)))
     vf = f"{sub(caps, c['fonts'])},{sub(lab, c['fonts'])}" if words else sub(lab, c["fonts"])
     af = "highpass=f=90,afftdn=nf=-25,acompressor=threshold=-22dB:ratio=3:attack=5:release=120"   # العلو بيتظبط مع باقي القطع في الآخر
-    run(ff(c["ffmpeg"]) + ["-i", str(clip), "-vf", vf, "-af", af, "-t", f"{d:.3f}", *ENC, str(out)])
+    cam = f"{punch(d, c.get('head_y') or 0.38, d * 0.5, d)}," if c.get("vtype") == "talking" and d >= 3 else ""
+    run(ff(c["ffmpeg"]) + ["-i", str(clip), "-filter_complex", f"[0:v]{cam}{vf}[v]", "-map", "[v]", "-map", "0:a", "-af", af, "-t", f"{d:.3f}", *ENC, str(out)])
 
 
 def fx_typo(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: Path, pick: list[str]) -> None:
@@ -330,7 +347,45 @@ def fx_typo(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: Pa
     t = textlayer.build_ass(items, d, W, H)
     vf = sub(lab, c["fonts"]) if not t else f"{sub(write(c['work'] / 'typo.ass', t), c['fonts'])},{sub(lab, c['fonts'])}"
     ins, af, _ = sfx_mix(c["sfx"], [("pop", w["s"], 0.55) for w in ws], 1)
-    run(ff(c["ffmpeg"]) + ["-i", str(clip), *ins, "-filter_complex", f"[0:v]{vf}[v];{af}", "-map", "[v]", "-map", "[a]", "-t", f"{d:.3f}", *ENC, str(out)])
+    cam = f"{punch(d, c.get('head_y') or 0.38, 0, d * 0.45)}," if c.get("vtype") == "talking" and d >= 3 else ""
+    run(ff(c["ffmpeg"]) + ["-i", str(clip), *ins, "-filter_complex", f"[0:v]{cam}{vf}[v];{af}", "-map", "[v]", "-map", "[a]", "-t", f"{d:.3f}", *ENC, str(out)])
+
+
+def with_cutaway(c: dict, clip: Path, d: float, t0: float, media: Path, is_video: bool, dur: float = 1.5) -> Path:
+    """لقطة داعمة جوه الجزء: من t0 لمدة ثانية ونص الصورة بتبقى اللقطة (بحركة كاميرا هادية لو صورة)، وصوته شغال عليها."""
+    t0 = max(0.3, min(t0, d - dur - 0.3))
+    out = clip.with_name(clip.stem + "_cw.mp4")
+    if is_video:
+        src = ["-i", str(media)]
+        br = f"[1:v]{COVER},fps={FPS},trim=0:{dur:.2f},setpts=PTS-STARTPTS+{t0:.3f}/TB[br]"
+    else:   # صورة: زووم بطيء عشان تبان لقطة مش صورة ثابتة
+        n = int(dur * FPS)
+        src = ["-loop", "1", "-t", f"{dur:.2f}", "-i", str(media)]
+        br = (f"[1:v]{COVER},fps={FPS},zoompan=z='1+0.08*on/{n}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={W}x{H}:fps={FPS},"
+              f"setpts=PTS-STARTPTS+{t0:.3f}/TB[br]")
+    run(ff(c["ffmpeg"]) + ["-i", str(clip), *src, "-filter_complex",
+                           f"{br};[0:v][br]overlay=0:0:eof_action=pass:enable='between(t,{t0:.3f},{t0 + dur:.3f})'[v]",
+                           "-map", "[v]", "-map", "0:a", "-t", f"{d:.3f}", *ENC, str(out)])
+    return out
+
+
+def fx_templates(c: dict, out: Path, items: list[dict]) -> float:
+    """وقفة في نص الفيديو: أمثلة من قوالبنا المميزة لمجاله، كل قالب ٣ ثواني باسمه."""
+    parts, each = [], 3.2
+    for k, it in enumerate(items):
+        st = ["Style: T,SM Tajawal,58,&H00FFFFFF,&H00FFFFFF,&H8C000000,&H8C000000,-1,0,0,0,100,100,0,0,3,16,0,5,40,40,0,1"]
+        ev = [f"Dialogue: 3,{_ts(0.1)},{_ts(each)},T,,0,0,0,,{{\\pos({W // 2},{int(H * 0.86)})\\fad(150,150)}}{it['name']}"]
+        lab = write(c["work"] / f"tpl_{k}.ass", label_ass(0, 0, "", c["accent"], ev, st))
+        q = c["work"] / f"tpl_{k}.mp4"
+        dur, has_a = probe(c["ffmpeg"], Path(it["video"]))
+        ss = max(0.0, min(dur - each, dur * 0.25))
+        audio = ["-map", "0:a"] if has_a else ["-map", "1:a"]
+        run(ff(c["ffmpeg"]) + ["-ss", f"{ss:.2f}", "-i", str(it["video"]), "-f", "lavfi", "-t", f"{each}", "-i", "anullsrc=r=48000:cl=stereo",
+                               "-vf", f"{COVER},fps={FPS},{sub(lab, c['fonts'])}", "-map", "0:v", *audio, "-af", "volume=0.5", "-t", f"{each}", *ENC, str(q)])
+        parts.append(q)
+    lst = write(c["work"] / "tpl_list.txt", "".join(f"file '{p.as_posix()}'\n" for p in parts))
+    run(ff(c["ffmpeg"]) + ["-f", "concat", "-safe", "0", "-i", str(lst), *ENC, str(out)])
+    return probe(c["ffmpeg"], out)[0]
 
 
 def fx_titles(c: dict, clip: Path, out: Path, d: float, lab: Path, titles: list[str]) -> None:
@@ -579,18 +634,54 @@ def build(c: dict, src: Path, step) -> dict:
         kinds.remove(dub_k)
     if "titles" in kinds and not plan["titles"]:
         plan["titles"] = [x for x in (c.get("brand") or "", c.get("niche") or "") if x][:2] or ["✓"]
+    # 🧩 وقفة القوالب في نص الفيديو (أمثلة من قوالبنا لمجاله)
+    if c.get("templates"):
+        kinds.insert(min(4, len(kinds)), "templates")
     has_outro = bool(c.get("logo") or c.get("brand"))
     total = len(kinds) + int(has_outro)
     parts, chapters, skipped, t = [], [], [], 0.0
     # الحاجات الخارجية (الصور والموسيقى) بتتجاب الأول، ولو فشلت القطعة بتكمل من غيرها
     ext = c["ext"]
     fetch = lambda key, q: (ext[key](q, work / f"stock_{key}") if ext.get(key) and q else None)  # noqa: E731
+    cuts = {x["part"]: x for x in plan.get("cutaways") or []}
     for n, kind in enumerate(kinds, 1):
+        step(f"✨ {CHAPTERS[kind]['title']} ({n} من {total})", 15 + int(75 * (n - 1) / total))
+        out = work / f"seg_{n:02d}_{kind}.mp4"
+        if kind == "templates":
+            try:
+                od = fx_templates(c, out, c["templates"])
+                parts.append(out)
+                chapters.append({"kind": kind, "title": CHAPTERS[kind]["title"], "t0": round(t, 2), "t1": round(t + od, 2), "can": CHAPTERS[kind]["can"],
+                                 "did": f"we paused their video to show examples of SimsimKit signature templates for their field ({c.get('field_name') or '-'}): "
+                                        + "; ".join(f"«{x['name']}»: {x['idea']}" for x in c["templates"])
+                                        + ". Say: since they work in this field, they will find us using templates like these with them."})
+                t += od
+            except Exception as exc:  # noqa: BLE001
+                print(f"showcase templates: {str(exc)[:300]}", flush=True)
+                skipped.append({"kind": kind, "title": CHAPTERS[kind]["title"], "error": str(exc)[-300:]})
+            continue
         s, e = win[kind]
         d = round(e - s, 3)
-        step(f"✨ {CHAPTERS[kind]['title']} ({n} من {total})", 15 + int(75 * (n - 1) / total))
         clip = cut(ffm, norm, s, d, work / f"clip_{kind}.mp4")
-        out = work / f"seg_{n:02d}_{kind}.mp4"
+        # 🎞️ لقطة داعمة على كلمة قالها (من مكتبة الفيديوهات، أو صورة متولّدة بحركة كاميرا)
+        cw_note = ""
+        cw = cuts.get(kind)
+        if cw and ext.get("cutaway"):
+            try:
+                ws0 = rel(words, s, e)
+                hit = find(ws0, [cw["word"]]) if cw["word"] else []
+                t0 = hit[0]["s"] if hit else d * 0.35
+                if kind == "zoom":   # قبل لحظة الزووم بكتير، عشان الزووم يبان على وشه
+                    zk = (find(ws0, [plan["zoom"]]) or key_words(ws0, 1) or [{"s": d * 0.4}])[0]["s"]
+                    t0 = 0.3 if zk - 0.4 >= 1.8 else -1
+                if kind == "grade":   # بعد ما الخط بتاع قبل/بعد يعدّي
+                    t0 = 2.7 if d - 2.7 >= 1.5 else -1
+                media = ext["cutaway"](cw["query"], work / f"cw_{kind}") if t0 >= 0 else None
+                if media:
+                    clip = with_cutaway(c, clip, d, t0, media[0], media[1])
+                    cw_note = f" Also a quick cutaway shot illustrating «{cw['word'] or cw['query']}» while the audio continues."
+            except Exception as exc:  # noqa: BLE001
+                print(f"showcase cutaway {kind}: {str(exc)[:300]}", flush=True)
         lab = write(work / f"lab_{kind}.ass", label_ass(0, 0, "", c["accent"]))
         ws = rel(words, s, e)
         try:
@@ -619,14 +710,16 @@ def build(c: dict, src: Path, step) -> dict:
             elif kind == "titles":
                 fx_titles(c, clip, out, d, lab, plan["titles"])
             elif kind == "finish":
-                fx_finish(c, clip, out, d, ws, lab, fetch("broll", plan["broll"]), fetch("music", plan["music"]))
+                fx_finish(c, clip, out, d, ws, lab, None if cw_note else fetch("broll", plan["broll"]), fetch("music", plan["music"]))
         except Exception as exc:  # noqa: BLE001  (قطعة وقعت: الباقي بيكمل، وبنقول إنها اتشالت)
             print(f"showcase {kind}: {str(exc)[:500]}", flush=True)
             skipped.append({"kind": kind, "title": CHAPTERS[kind]["title"], "error": str(exc)[-300:]})
             continue
         od, _ = probe(ffm, out)
         parts.append(out)
-        did = ZOOM_NO_SPEECH if kind == "zoom" and not has_speech else CHAPTERS[kind]["did"]
+        if kind in ("captions", "typo") and vtype == "talking" and d >= 3:
+            cw_note += " Plus a cut to a close-up camera angle on their face (like a second camera)."
+        did = (ZOOM_NO_SPEECH if kind == "zoom" and not has_speech else CHAPTERS[kind]["did"]) + cw_note
         chapters.append({"kind": kind, "title": CHAPTERS[kind]["title"], "t0": round(t, 2), "t1": round(t + od, 2),
                          "did": did, "can": CHAPTERS[kind]["can"]})
         t += od

@@ -33188,6 +33188,29 @@ def showcase_dub_lang(words: str) -> tuple[str, str, str]:
     return "ar-gulf", "خليجي", "natural Gulf Arabic dialect (not Modern Standard Arabic)"
 
 
+def tpl_names() -> dict[str, str]:
+    """أسامي القوالب زي ما ظاهرة في المعرض (من gallery.js)."""
+    try:
+        return dict(re.findall(r'\["(t-[a-z0-9]+)", "([^"]+)"', (FRONTEND_DIR / "gallery.js").read_text("utf-8")))
+    except OSError:
+        return {}
+
+
+def showcase_templates(b: dict) -> list[dict]:
+    """🧩 ٣ قوالب من قوالب مجاله بفيديو مثال (اللي متصوّر لمجاله نفسه الأول) واسمه وطريقة استخدامه معاه."""
+    field = b.get("field") or (onboard_load() or {}).get("field") or ""
+    names, out = tpl_names(), []
+    for r in fieldpacks.field_reels(field):
+        v = FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.mp4" if field else None
+        v = v if v and v.exists() else FRONTEND_DIR / "gallery" / f"{r}.mp4"
+        br = tplbrief.brief(r, field, first_brand_name(b))
+        if v.exists() and br:
+            out.append({"id": r, "name": names.get(r, r), "idea": br["idea"], "video": str(v)})
+        if len(out) >= 3:
+            break
+    return out
+
+
 def run_showcase(bid: str, lab: str | None = None) -> None:
     """lab: تجربة من «معمل الاستعراض» في لوحة الأدمن (فيديو مرفوع أو من حساب)، من غير المكالمة: النتيجة بتتحفظ في المعمل بس."""
     b = brain_row(bid) or {}
@@ -33225,11 +33248,20 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         if mock:
             showcase.run(showcase.ff(ffm) + ["-i", str(part), "-vf", "hflip,crop=iw*0.8:ih*0.8", "-an", str(out)])
             return out
-        m = lab.VEDIT_MODELS["gemini"]
-        atlas.download(atlas.run_model("Video", {"model": m["model"], "video": atlas.upload_media(part), "prompt": prompt},
-                                       "زاوية الكاميرا", max_seconds=1500, interval=6), out)
-        add(m["per_sec"] * d)
-        return out
+        # 📐 أصغر (720 طولي) عشان الموديلات ماترفضش الحجم، وبنجرّب ٣ موديلات ورا بعض لحد ما واحد ينجح
+        small = out.with_name("angle_in720.mp4")
+        showcase.run(showcase.ff(ffm) + ["-i", str(part), "-vf", "scale=720:1280", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                                         "-pix_fmt", "yuv420p", "-an", str(small)])
+        url, errs = atlas.upload_media(small), []
+        for key in ("gemini", "kling", "flux"):
+            m = lab.VEDIT_MODELS[key]
+            try:
+                atlas.download(atlas.run_model("Video", {"model": m["model"], "video": url, "prompt": prompt}, "زاوية الكاميرا", max_seconds=1500, interval=6), out)
+                add(m["per_sec"] * d)
+                return out
+            except Exception as exc:  # noqa: BLE001
+                errs.append(f"{key}: {str(exc)[:160]}")
+        raise RuntimeError("camera angle failed: " + " | ".join(errs))
 
     def speak(text: str, dest: Path, d: float) -> Path:
         """الجملة بصوته هو (نسخة فورية من صوته، بتتمسح بعدها)، ولو النسخ مش متاح: صوت جاهز من نفس النوع."""
@@ -33295,6 +33327,19 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         add(m["usd"] or wallet.est(images=len(frames), chars=1500))
         return out
 
+    def cutaway(query: str, base: Path) -> tuple[Path, bool] | None:
+        """🎞️ لقطة داعمة: فيديو من مكتبة الفيديوهات لو متاحة، وإلا صورة واقعية متولّدة (بتتحرك بزووم بطيء)."""
+        got = stock_get("broll", query, base)
+        if got:
+            return got, True
+        if mock:
+            return None
+        dest = base.with_suffix(".png")
+        atlas.download(atlas.generate_image("nano2", f"Photorealistic vertical 9:16 photo, natural light, real people and places: {query}. "
+                                                     "No text, no letters, no logos, no children.", "1024x1536", "medium"), dest)
+        add(0.045)
+        return dest, False
+
     def stock_get(kind: str, q: str, base: Path) -> Path | None:
         try:
             if kind == "music":
@@ -33314,8 +33359,8 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
     cols = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
     cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E",
            "brand": first_brand_name(b), "niche": str(b.get("niche") or "")[:200], "logo": logo_path(bid),
-           "dub_lang": showcase_dub_lang(""),
-           "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify, "qa": qa_look,
+           "dub_lang": showcase_dub_lang(""), "templates": showcase_templates(b), "field_name": (fieldpacks.FIELDS.get(b.get("field") or "") or {}).get("name") or "",
+           "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify, "qa": qa_look, "cutaway": cutaway,
                    "person": person_fn if person.available() else None,
                    "broll": lambda q, base: stock_get("broll", q, base), "bg": lambda q, base: stock_get("bg", q, base),
                    "music": lambda q, base: stock_get("music", q, base)}}
