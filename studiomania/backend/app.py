@@ -33285,6 +33285,16 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         add(m["usd"] or wallet.est(images=len(frames), chars=1500))
         return out
 
+    def qa_look(frames: list[Path], prompt: str) -> dict:
+        """🔎 المراجع بالعين: لقطات من الجزء قصاد اللي المفروض اتعمل فيه."""
+        if mock or not frames:
+            return {}
+        parts = [{"type": "text", "text": prompt}] + [{"type": "image_url", "image_url": {"url": data_url(model_image(f, 384), "image/jpeg")}} for f in frames]
+        m = {"usd": 0.0}
+        out = ad_json(ad_media_chat([{"role": "user", "content": parts}], 800, meter=m), "مراجعة الجزء")
+        add(m["usd"] or wallet.est(images=len(frames), chars=1500))
+        return out
+
     def stock_get(kind: str, q: str, base: Path) -> Path | None:
         try:
             if kind == "music":
@@ -33305,7 +33315,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
     cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E",
            "brand": first_brand_name(b), "niche": str(b.get("niche") or "")[:200], "logo": logo_path(bid),
            "dub_lang": showcase_dub_lang(""),
-           "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify,
+           "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify, "qa": qa_look,
                    "person": person_fn if person.available() else None,
                    "broll": lambda q, base: stock_get("broll", q, base), "bg": lambda q, base: stock_get("bg", q, base),
                    "music": lambda q, base: stock_get("music", q, base)}}
@@ -33317,7 +33327,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
             shutil.copy(r["video"], SC_LAB / lab / "out.mp4")
             wallet.cost(spent["usd"], "تجربة الأدمن: معمل الفيديو الاستعراضي", ref="showcase-lab")
             setst(status="done", step=None, progress=100, error=None, duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"],
-                  usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], done_at=now())
+                  usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"], done_at=now())
             return
         export_id = uuid.uuid4().hex[:12]
         filename = f"showcase_{export_id}.mp4"
@@ -33335,7 +33345,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
             wallet.cost(spent["usd"], "ترويج: الفيديو الاستعراضي من فيديو العميل", promo=True, ref="showcase")
         showcase_set(bid, status="done", step=None, progress=100, error=None, export_id=export_id, video=f"/media/exports/{filename}",
                      duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"], usd=round(spent["usd"], 3), done_at=now(),
-                     vtype=r["type"], vtype_label=r["type_label"], what=r["what"])
+                     vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"])
         who = livevoice.agent_name(assist_dialect(), "f")
         notify("showcase", "ok", f"{who}: الفيديو الاستعراضي من فيديوك جاهز", "تجده في الفيديوهات الجاهزة، وفيه كل ما يمكن أن نفعله بفيديوهاتك.", "7")
     except Exception as exc:  # noqa: BLE001

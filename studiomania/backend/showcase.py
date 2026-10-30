@@ -192,8 +192,13 @@ def write(path: Path, text: str) -> Path:
 
 
 # ---------------------------------------------------------------- الصوت: مؤثرات على مكانها
+SFX_ON = False   # 🔇 المؤثرات (ووش، بوب…) مقفولة: صاحب المنصة شايفها مزعجة. الموسيقى بس في آخر قطعة
+
+
 def sfx_mix(sfx_dir: Path, events: list[tuple[str, float, float]], first: int) -> tuple[list[str], str, int]:
     """events: (الاسم، الوقت، الصوت) ← مدخلات إضافية + فلتر بيدمجهم مع [0:a] في [a]."""
+    if not SFX_ON:
+        events = []
     ins, parts = [], []
     for k, (name, t, vol) in enumerate(events):
         ins += ["-i", str(sfxlib.ensure(sfx_dir, name))]
@@ -430,7 +435,7 @@ def grade_for(y: float) -> str:
                 "unsharp=5:5:0.5")
     if y > 175:
         return "eq=gamma=0.94:contrast=1.1:saturation=1.2,colorbalance=rs=-0.03:bs=0.05:rh=0.05:bh=-0.05,unsharp=5:5:0.4"
-    return "eq=gamma=1.04:contrast=1.1:saturation=1.22,colorbalance=rs=-0.03:bs=0.05:rh=0.05:bh=-0.05,unsharp=5:5:0.4,vignette=PI/7"
+    return "eq=gamma=1.1:contrast=1.08:saturation=1.2,colorbalance=rs=-0.02:bs=0.03:rh=0.04:bh=-0.03,unsharp=5:5:0.4"
 
 
 def fx_grade(c: dict, clip: Path, out: Path, d: float, lab: Path) -> None:
@@ -635,9 +640,21 @@ def build(c: dict, src: Path, step) -> dict:
             t += od
         except Exception as exc:  # noqa: BLE001
             print(f"showcase outro: {exc}", flush=True)
+    # 🔎 المراجع: كل قطعة بتتفحص بالأرقام (الصوت، الإضاءة، الصورة واقفة/سودا) وبالعين (لقطات منها قصاد اللي المفروض اتعمل فيها)،
+    # واللي فيها مشكلة كبيرة بتتشال قبل ما الفيديو يتعرض على العميل
+    step("🔎 يراجع كل جزء", 90)
+    review = qa(c, parts, chapters, has_speech)
+    keep = [i for i, r in enumerate(review["parts"]) if not r.get("drop")]
+    if len(keep) >= 3 and len(keep) < len(parts):
+        parts, chapters = [parts[i] for i in keep], [chapters[i] for i in keep]
+        t = 0.0
+        for ch, p in zip(chapters, parts):   # الأوقات من جديد بعد ما قطع اتشالت
+            od, _ = probe(ffm, p)
+            ch["t0"], ch["t1"] = round(t, 2), round(t + od, 2)
+            t += od
     if len(parts) < 3:
         raise ShowcaseError("تعذّر تجهيز الفيديو الاستعراضي من هذا الفيديو")
-    step("🎬 يجمع القطع", 93)
+    step("🎬 يجمع القطع", 94)
     # اسم كل ميزة ورقمها (على عدد القطع اللي نجحت فعلًا)، وعلو الصوت واحد في كل القطع
     done = []
     for i, (p, ch) in enumerate(zip(parts, chapters), 1):
@@ -650,8 +667,80 @@ def build(c: dict, src: Path, step) -> dict:
     lst = write(work / "list.txt", "".join(f"file '{p.as_posix()}'\n" for p in parts))
     final = work / "showcase.mp4"
     run(ff(ffm) + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(final)], 600)
-    return {"video": final, "duration": round(t, 2), "chapters": chapters, "skipped": skipped, "plan": plan,
+    return {"video": final, "duration": round(t, 2), "chapters": chapters, "skipped": skipped, "plan": plan, "qa": review,
             "type": vtype, "type_label": TYPES[vtype]["label"], "what": c["what"]}
+
+
+# ---------------------------------------------------------------- 🔎 المراجع
+def detect(ffmpeg: str, path: Path) -> dict:
+    """صورة سودا أو واقفة (فريز) جوه القطعة."""
+    r = subprocess.run([ffmpeg, "-hide_banner", "-i", str(path), "-vf", "blackdetect=d=0.5:pix_th=0.08,freezedetect=n=0.003:d=1.2", "-an", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=180)
+    e = r.stderr or ""
+    return {"black": len(re.findall(r"black_start", e)), "frozen": len(re.findall(r"freeze_start", e))}
+
+
+QA_PROMPT = ("You are a strict video editor reviewing ONE part of a showcase reel that a platform made from a client's own video, to impress "
+             "the client. The part is supposed to show this feature: «{title}» — what was done: {did}. The video type: {vtype}. "
+             "Frames from this part are attached in order (the orange label at the top is the feature name, ignore it). Check: is the feature "
+             "really visible and correct? Any visual problem: text cut off or outside the frame, mixed languages, unreadable text, broken "
+             "person cut-out edges, a weird/irrelevant image (e.g. a background or footage unrelated to the client), too dark/washed colors, "
+             "a distorted face, artifacts? Measured: {measured}. Answer JSON only: "
+             '{{"score": 1-5 (5 = looks professional and clearly shows the feature), "ok": true/false (false only if a client would find it bad), '
+             '"issues": ["short concrete problems, in Arabic"], "fix": "one short suggestion, in Arabic"}}')
+
+
+def qa(c: dict, parts: list[Path], chapters: list[dict], has_speech: bool) -> dict:
+    ffm, work = c["ffmpeg"], c["work"]
+    vols = [mean_volume(ffm, p) for p in parts]
+    speech_vols = sorted(v for v, ch in zip(vols, chapters) if v is not None and ch["kind"] != "outro")
+    med = speech_vols[len(speech_vols) // 2] if speech_vols else None
+    out = []
+    for i, (p, ch) in enumerate(zip(parts, chapters)):
+        d, _ = probe(ffm, p)
+        issues, measured = [], {}
+        if med is not None and vols[i] is not None and ch["kind"] != "outro" and abs(vols[i] - med) > 6:
+            issues.append("علو الصوت مختلف كثيرًا عن باقي الأجزاء")
+        det = detect(ffm, p)
+        if det["black"]:
+            issues.append("فيه صورة سوداء")
+        if det["frozen"] and ch["kind"] != "outro":
+            issues.append("الصورة متوقفة جزءًا من الوقت")
+        if d < 2:
+            issues.append("الجزء قصير جدًا")
+        if ch["kind"] == "grade":
+            at = max(0.1, d - 0.3)   # نفس اللحظة قبل وبعد (بعد ما الخط عدّى على الكادر كله)
+            before, after = luma(ffm, work / "clip_grade.mp4", at), luma(ffm, p, at)
+            measured["brightness"] = {"before": round(before), "after": round(after)}
+            if before < 150 and after < before - 10:   # الفيديو مش فاتح أصلًا والتصحيح غمّقه
+                issues.append("التصحيح جعل الصورة أغمق")
+        measured.update(det)
+        row = {"kind": ch["kind"], "title": ch["title"], "issues": issues, "score": None, "fix": ""}
+        look = c["ext"].get("qa")
+        if look:
+            frames = []
+            for k, f in enumerate((0.3, 0.6, 0.9)):
+                fp = work / f"qa_{i}_{k}.jpg"
+                r = subprocess.run(ff(ffm) + ["-ss", f"{d * f:.2f}", "-i", str(p), "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "5", str(fp)],
+                                   capture_output=True, timeout=60)
+                if r.returncode == 0 and fp.exists():
+                    frames.append(fp)
+            try:
+                v = look(frames, QA_PROMPT.format(title=ch["title"], did=ch["did"], vtype=c.get("vtype") or "-", measured=json.dumps(measured))) or {}
+                row["score"] = int(v.get("score")) if str(v.get("score") or "").isdigit() else None
+                row["issues"] += [str(x)[:160] for x in v.get("issues") or [] if str(x).strip()][:3]
+                row["fix"] = str(v.get("fix") or "")[:200]
+                if v.get("ok") is False and (row["score"] or 3) <= 2 and ch["kind"] != "outro":
+                    row["drop"] = True   # العميل هيشوفها وحشة: تتشال
+            except Exception as exc:  # noqa: BLE001
+                print(f"showcase qa {ch['kind']}: {exc}", flush=True)
+        if det["black"] > 1 and ch["kind"] != "outro":
+            row["drop"] = True
+        row["ok"] = not row.get("drop") and not issues and (row["score"] or 5) >= 3
+        out.append(row)
+    scores = [r["score"] for r in out if r["score"]]
+    return {"parts": out, "score": round(sum(scores) / len(scores), 1) if scores else None,
+            "dropped": [r["title"] for r in out if r.get("drop")]}
 
 
 def to_json(d: dict) -> str:
