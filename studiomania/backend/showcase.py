@@ -440,8 +440,7 @@ def fx_templates(c: dict, out: Path, items: list[dict]) -> float:
     parts, each = [], 3.2
     for k, it in enumerate(items):
         st = ["Style: T,SM Tajawal,58,&H00FFFFFF,&H00FFFFFF,&H8C000000,&H8C000000,-1,0,0,0,100,100,0,0,3,16,0,5,40,40,0,1"]
-        ev = [f"Dialogue: 3,{_ts(0.1)},{_ts(each)},T,,0,0,0,,{{\\pos({W // 2},{int(H * 0.86)})\\fad(150,150)}}{it['name']}",
-              f"Dialogue: 3,{_ts(0.1)},{_ts(each)},U,,0,0,0,,{{\\pos({W // 2},235)}}{CHAPTERS['templates']['title']}"]
+        ev = []   # من غير كتابة: سعاد بتقدّم كل قالب بصوتها
         st.append(f"Style: U,SM Tajawal,60,&H00FFFFFF,&H00FFFFFF,{textlayer.ass_color(c['accent'])},{textlayer.ass_color(c['accent'])},-1,0,0,0,100,100,0,0,3,22,0,5,40,40,0,1")
         lab = write(c["work"] / f"tpl_{k}.ass", label_ass(0, 0, "", c["accent"], ev, st))
         q = c["work"] / f"tpl_{k}.mp4"
@@ -606,7 +605,7 @@ def fx_dub(c: dict, clip: Path, out: Path, d: float, lab: Path, text: str, lang_
     caps = write(c["work"] / "dub_caps.ass", captions.build_ass(words, {"template": "classic"}, d, (W, H)))
     st = "Style: G,SM Tajawal,50,&H00FFFFFF,&H00FFFFFF,&H8CE5613E,&H8CE5613E,-1,0,0,0,100,100,0,0,3,14,0,5,0,0,0,1"
     lab2 = write(c["work"] / "dub_lab.ass", label_ass(0, 0, "", c["accent"],
-                                                       [f"Dialogue: 3,{_ts(0.3)},{_ts(d)},G,,0,0,0,,{{\\pos({W // 2},330)\\fad(250,0)}}{lang_label}"], [st]))
+                                                       [], [st]))
     run(ff(c["ffmpeg"]) + ["-i", str(lip), "-i", str(fit), "-filter_complex",
                            f"[0:v]{COVER},fps={FPS},tpad=stop_mode=clone:stop_duration=2,trim=0:{d:.3f},setpts=PTS-STARTPTS,{sub(caps, c['fonts'])},{sub(lab2, c['fonts'])}[v]",
                            "-map", "[v]", "-map", "1:a", "-t", f"{d:.3f}", *ENC, str(out)])
@@ -818,7 +817,7 @@ def build(c: dict, src: Path, step) -> dict:
     # اسم كل ميزة ورقمها (على عدد القطع اللي نجحت فعلًا)، وعلو الصوت واحد في كل القطع
     done = []
     for i, (p, ch) in enumerate(zip(parts, chapters), 1):
-        lab = write(work / f"final_{i}.ass", label_ass(i, len(parts), ch["title"], c["accent"]))
+        lab = write(work / f"final_{i}.ass", label_ass(0, 0, "", c["accent"]))   # مفيش اسم ميزة على الشاشة: سعاد هي اللي بتحكي
         gain = 0.0 if ch["kind"] == "outro" else max(-8.0, min(14.0, -18.0 - (mean_volume(ffm, p) or -18.0)))
         q = work / f"final_{i:02d}.mp4"
         run(ff(ffm) + ["-i", str(p), "-vf", sub(lab, c["fonts"]), "-af", f"volume={gain:.1f}dB,alimiter=limit=0.95", *ENC, str(q)])

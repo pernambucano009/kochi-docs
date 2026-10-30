@@ -288,7 +288,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     q(".as-box")?.remove(); acct(false);
     const d = document.createElement("div"); d.className = "as-box as-show";
     d.innerHTML = `<b>🎬 فيديو استعراضي من فيديوك</b><video playsinline controls preload="auto" src="${esc(r.video)}"></video>
-      <div class="as-chs">${r.chapters.map((c, i) => `<span data-ch="${i}">${esc(c.title)}</span>`).join("")}</div>
+      <div class="as-chs" hidden>${r.chapters.map((c, i) => `<span data-ch="${i}">${esc(c.title)}</span>`).join("")}</div>
       <div class="row"><button type="button" class="as-btn" data-sclose>إغلاق</button></div>`;
     q(".as-acts").before(d);
     const v = d.querySelector("video"), ch = r.chapters, sh = { v, ch, i: 0, wait: true, at: performance.now(), spoke: false };
@@ -743,6 +743,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function loop() {
     if (!S) return;
     idle(performance.now());
+    // 🔉 صوت سعاد هو الأهم: لو اتكلمت والفيديو الاستعراضي شغال، صوته بيوطى تحتها ويرجع لما تسكت
+    if (S.show?.v) { const want = S.speaking ? 0.12 : 1; const v = S.show.v; if (Math.abs(v.volume - want) > 0.01) v.volume += (want - v.volume) * 0.15; }
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
