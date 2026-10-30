@@ -524,7 +524,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const body = JSON.stringify({ call: S.call, events: S.log.splice(0), final: !!final,
       meta: { agent: S.agent || "", saved: S.saved, steps: S.steps.length, done: S.done.size, sec: Math.round((performance.now() - S.t0) / 1000), noMic: !S.mic,
         model: S.model || "", usage: S.usage, ...(S.usd != null ? { usd: S.usd } : {}) } });
-    fetch("/api/assistant/log", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+    // keepalive بيرفض أي حاجة أكبر من ٦٤ كيلو: الكبير بيتبعت عادي. ولو الإرسال فشل: يبان في صندوق الأخطاء (مرة لكل مكالمة)
+    const fail = (why) => { if (S && !S.logErr) { S.logErr = true; fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "سجل مكالمة سعاد لم يُرسل", raw: String(why).slice(0, 300) }) }).catch(() => {}); } };
+    fetch("/api/assistant/log", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: body.length < 60000 })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))).then((j) => { if (j && j.ok === false && !j.off) fail(j.error || "not saved"); })
+      .catch((e) => fail(e.message || e));
   }
   async function pollAccount() {
     if (!S || S.accTimer) return;
@@ -581,7 +586,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
       S.mic = mic; if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
-      const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({}) });
+      const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({ call: S.call }) });
       if (!S || (dock && !onBrain())) { if (S) end(false); return; }   // خرج من العقل وهي بتتصل
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;

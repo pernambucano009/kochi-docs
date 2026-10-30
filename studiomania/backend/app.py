@@ -32883,6 +32883,14 @@ class AssistLogIn(BaseModel):
 def assistant_log(body: AssistLogIn, request: Request):
     if not assist_log_on():
         return {"ok": False, "off": True}
+    try:
+        return assist_log_write(body, request)
+    except Exception as exc:  # noqa: BLE001  (لو الحفظ وقع: يبان في صندوق الأخطاء بدل ما المكالمة تضيع في صمت)
+        issues.record("api", "assistant/log", "سجل مكالمة سعاد لم يُحفظ", f"{type(exc).__name__}: {str(exc)[:300]} · {ASSIST_LOG_DIR}", 500)
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def assist_log_write(body: AssistLogIn, request: Request) -> dict:
     cid = re.sub(r"[^a-z0-9]", "", body.call.lower())[:24]
     if not cid:
         return {"ok": False}
@@ -32929,8 +32937,12 @@ def assistant_gender(body: AssistGenderIn):  # (بيقفل كمان سؤال «�
     return {"ok": True}
 
 
+class AssistTokenIn(BaseModel):
+    call: str = ""   # رقم المكالمة: السجل بيتعمل من أول ثانية (حتى لو المتصفح ماقدرش يبعت الكلام بعدين، المكالمة نفسها تبان في المعمل)
+
+
 @app.post("/api/assistant/token")
-def assistant_token(request: Request):
+def assistant_token(request: Request, body: AssistTokenIn | None = None):
     bid, b, a = assist_info()
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
@@ -32969,6 +32981,12 @@ def assistant_token(request: Request):
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
         raise HTTPException(503, "المساعد غير متاح الآن. جرّب مرة أخرى بعد قليل") from exc
     update_brain(bid, lambda d: d.setdefault("assistant", {}).update(started=now(), calls=int((d.get("assistant") or {}).get("calls") or 0) + 1))
+    if body and body.call and assist_log_on():
+        try:
+            assistant_log(AssistLogIn(call=body.call, events=[{"t": 0, "who": "sys", "text": f"call started (server) · model {model} · dialect {dia}"}],
+                                      meta={"agent": livevoice.agent_name(dia, ag)}), request)
+        except Exception:  # noqa: BLE001
+            pass
     return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag), "model": model}
 
 
