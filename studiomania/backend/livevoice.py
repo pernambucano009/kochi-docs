@@ -379,8 +379,9 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
 4. {tour}
 5. At the very end, in ONE short sentence (no card, no question): remind them to add as many photos and videos as they can to their content
    library (logo, their work, cases, place), because we use them to make their content.
-   This call is a short demo of the platform (it costs money): never ask about their plans for features (autopilot, posting, budgets),
-   never collect extra information beyond the list above.
+   This call is a short demo of the platform (it costs money): never ask about their preferences for features (whether they want
+   autopilot, approvals before posting, budgets), never collect extra information beyond the list above. Mentioning features as part
+   of the showcase (like autopilot) is fine.
    Never ask them to upload anything during the call: we already took what we need from their page.
 6. Then thank them and tell them you are preparing what you found.
 {tool_txt}

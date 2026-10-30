@@ -289,6 +289,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       }
     }, 8000);
   }
+  // 🎬 آخر الاستعراض: سعاد بتذكر (كاستعراض بس) القالب المخصص والأوتوبايلوت، من غير ما تسأل عن تفضيلاته فيهم
+  const SHOW_END = "(SYSTEM: the showcase is over. As part of the showcase, add in 1–2 short sentences that the platform can also make videos "
+    + "from their own custom template, and that autopilot can post their videos every day at the best times. Do NOT ask whether they want "
+    + "autopilot, approvals or posting by themselves. Then ask briefly what they thought of the showcase.)";
   // ▶️ العرض: كل جزء بيشتغل، وفي آخره الفيديو بيقف وسعاد بتشرح اللي اتعمل فيه، ولما تخلّص الجزء اللي بعده يكمل لوحده.
   // الميكروفون بيتقفل وهو شغال (صوت الفيديو من السماعة مايتسمعش على إنه كلام العميل) وبيرجع وهي بتشرح.
   async function play() {
@@ -320,7 +324,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       sh.i = Math.min(ch.length - 1, sh.i + 1);
     };
     v.onended = () => {
-      if (sh.tpl) { stop(); note("(SYSTEM: the template examples finished. Ask briefly what they think, then continue the tour (custom templates, then autopilot).)"); return; }
+      if (sh.tpl) { stop(); note(SHOW_END); return; }
       if (!sh.wait) v.ontimeupdate();
     };
     // الجزء اللي بعده يكمّل لما سعاد تخلّص شرحها (أو بعد ١٥ ثانية لو ماردتش)
@@ -341,7 +345,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           return;
         }
         if (sh.tpl) { if (!sh.tplOn) { sh.tplOn = true; v.play().catch(() => {}); } return; }   // سعاد قدّمت القوالب: الأمثلة تشتغل
-        if (sh.end) { mark(); d.querySelectorAll("[data-ch]").forEach((x) => x.classList.add("done")); stop(); return; }
+        if (sh.end) { mark(); d.querySelectorAll("[data-ch]").forEach((x) => x.classList.add("done")); stop(); note(SHOW_END); return; }
         mark(); v.play().catch(() => {});
       }
     }, 200);
