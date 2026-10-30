@@ -327,7 +327,7 @@ async function loadLab() {
     <div class="row"><b>${esc(x.name || x.id)}</b><span class="mute">${x.status === "working" ? `⏳ ${esc(x.step || "")} · ${x.progress || 0}٪` : x.status === "failed" ? `⚠️ ${esc(x.error || "")}` : `✓ ${x.duration || ""} ثانية${x.usd != null ? ` · $${Number(x.usd).toFixed(2)}` : ""}`}</span>
       <button class="btn" data-sldel>حذف</button></div>
     ${x.status === "done" ? `<div class="row" style="align-items:flex-start;gap:14px;margin-top:8px"><video src="${esc(x.video)}" controls playsinline style="height:420px;max-width:240px;background:#000;border-radius:10px"></video>
-      <div style="flex:1;min-width:260px"><p><b>نوع الفيديو:</b> ${esc(x.vtype_label || "")}<br><b>ما يظهر فيه:</b> ${esc(x.what || "—")}${(x.skipped || []).length ? `<br><b>أجزاء لم تكتمل:</b> ${esc(x.skipped.join("، "))}` : ""}</p>
+      <div style="flex:1;min-width:260px"><p><b>نوع الفيديو:</b> ${esc(x.vtype_label || "")}<br><b>ما يظهر فيه:</b> ${esc(x.what || "—")}${(x.skipped || []).length ? `<br><b>أجزاء لم تكتمل:</b> ${x.skipped.map((k) => typeof k === "string" ? esc(k) : `${esc(k.title)} <span class="mute" dir="ltr">(${esc(k.error || "")})</span>`).join("، ")}` : ""}</p>
       <ol>${(x.chapters || []).map((c) => `<li><b>${esc(c.title)}</b> <span class="mute num">${c.t0}–${c.t1}ث</span><div class="mute">ما فعلناه: ${esc(c.did)}</div><div class="mute">ما يمكن أيضًا: ${esc(c.can)}</div></li>`).join("")}</ol></div></div>` : ""}</div>`).join("") || `<div class="card mute">لا توجد تجارب بعد.</div>`;
   if ((d.items || []).some((x) => x.status === "working")) { clearTimeout(S.slT); S.slT = setTimeout(() => document.querySelector('[data-p="sclab"]:not([hidden])') && loadLab(), 6000); }
 }

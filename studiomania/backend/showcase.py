@@ -136,6 +136,19 @@ def normalize(ffmpeg: str, src: Path, out: Path, max_s: float = 90) -> float:
     return t
 
 
+def mean_volume(ffmpeg: str, path: Path) -> float | None:
+    r = subprocess.run([ffmpeg, "-hide_banner", "-i", str(path), "-vn", "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True, timeout=120)
+    m = re.search(r"mean_volume:\s*(-?[\d.]+) dB", r.stderr or "")
+    return float(m.group(1)) if m else None
+
+
+def luma(ffmpeg: str, path: Path, t: float) -> float:
+    """متوسط الإضاءة في لقطة (0-255): التصحيح بيفتّح الفيديو الغامق بدل ما يغمّقه أكتر."""
+    r = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(path), "-frames:v", "1", "-vf", "scale=64:-2,format=gray",
+                        "-f", "rawvideo", "-"], capture_output=True, timeout=60)
+    return sum(r.stdout) / len(r.stdout) if r.stdout else 128.0
+
+
 def cut(ffmpeg: str, src: Path, s: float, d: float, out: Path) -> Path:
     run(ff(ffmpeg) + ["-ss", f"{s:.3f}", "-i", str(src), "-t", f"{d:.3f}", *ENC, str(out)])
     return out
@@ -166,6 +179,8 @@ def label_ass(n: int, total: int, title: str, color: str = "#E5613E", extra: lis
               "Style: N,SM Tajawal,40,&H00FFFFFF,&H00FFFFFF,&H64000000,&H64000000,-1,0,0,0,100,100,0,0,3,12,0,5,40,40,0,1",
               "Style: B,SM Tajawal,52,&H00FFFFFF,&H00FFFFFF,&H8C000000,&H8C000000,-1,0,0,0,100,100,0,0,3,14,0,5,40,40,0,1"]
     num = f"{n}/{total}".translate(AR_DIGITS)
+    if not title:   # جوه القطعة: الإضافات بس (قبل/بعد، اللغة). الاسم والرقم بيتكتبوا في الآخر بعد ما نعرف كام قطعة نجحت
+        return ass_doc(base + (styles or []), extra or [])
     ev = [f"Dialogue: 2,{_ts(0.15)},{_ts(2.6)},N,,0,0,0,,{{\\pos({W // 2},140)\\fad(200,250)}}{num}",
           f"Dialogue: 2,{_ts(0.15)},{_ts(2.6)},L,,0,0,0,,{{\\pos({W // 2},235)\\fad(200,250)\\fscx88\\fscy88\\t(0,180,\\fscx100\\fscy100)}}{title}"]
     return ass_doc(base + (styles or []), ev + (extra or []))
@@ -276,8 +291,8 @@ def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, 
         ' "zoom": "the single most important word copied EXACTLY from the zoom part",\n'
         ' "behind": "1-2 short words to show huge behind the person (from the behind part, or the brand name), in the same language",\n'
         f' "dub": "the dub part translated into {dub_lang}, natural spoken style, about the same length",\n'
-        ' "broll": "an English stock-video search query (2-4 words) that illustrates the finish part",\n'
-        ' "bg": "an English stock-photo search query (2-4 words) for a nice background that fits their field (a place, no people)",\n'
+        ' "broll": "an English stock-video search query (2-4 words) that illustrates the IDEA of the finish part in the context of their field (not a literal word; adults, no children or schools unless the field is about them)",\n'
+        ' "bg": "an English stock-photo search query (2-4 words) for a nice, clean place that fits THEIR field (e.g. a modern gym, a dental clinic, a cafe); no people",\n'
         ' "music": "an English music search query (2-3 words) for a fitting upbeat background track"}')}]
 
 
@@ -293,7 +308,7 @@ def clean_plan(raw: dict) -> dict:
 def fx_captions(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: str) -> None:
     caps = write(c["work"] / "cap_captions.ass", captions.build_ass(words, {"template": "kochi"}, d, (W, H)))
     vf = f"{sub(caps, c['fonts'])},{sub(lab, c['fonts'])}" if words else sub(lab, c["fonts"])
-    af = "highpass=f=90,afftdn=nf=-28,acompressor=threshold=-20dB:ratio=3:attack=5:release=120,loudnorm=I=-15:TP=-1.5:LRA=9"
+    af = "highpass=f=90,afftdn=nf=-25,acompressor=threshold=-22dB:ratio=3:attack=5:release=120"   # العلو بيتظبط مع باقي القطع في الآخر
     run(ff(c["ffmpeg"]) + ["-i", str(clip), "-vf", vf, "-af", af, "-t", f"{d:.3f}", *ENC, str(out)])
 
 
@@ -359,12 +374,26 @@ def _person_layer(mask_dir: Path) -> list[str]:
     return ["-framerate", str(FPS), "-i", str(mask_dir / "m_%05d.webp")]
 
 
+def behind_text(text: str, brand: str, words: list[dict]) -> str:
+    """كلمة أو اتنين بس، بلغة واحدة (من غير خلط عربي وإنجليزي)، وقصيرة كفاية تبان في عرض الكادر."""
+    def ok(x: str) -> str:
+        x = re.sub(r"\s+", " ", str(x or "")).strip()
+        ar, lat = bool(re.search(r"[\u0600-\u06ff]", x)), bool(re.search(r"[A-Za-z]", x))
+        if ar and lat:   # خليط: الجزء العربي بس
+            x = " ".join(w for w in x.split() if re.search(r"[\u0600-\u06ff]", w) and not re.search(r"[A-Za-z]", w))
+        x = " ".join([w for w in x.split() if len(w) > 1][:2])
+        return x if 2 <= len(x) <= 12 else ""
+    return ok(text) or ok(brand) or ok((key_words(words, 1) or [{"w": ""}])[0]["w"]) or "✦"
+
+
 def fx_behind(c: dict, clip: Path, out: Path, d: float, words: list[dict], lab: Path, text: str, masks: tuple[Path, dict]) -> None:
     folder, info = masks
-    text = text or c.get("brand") or (key_words(words, 1) or [{"w": ""}])[0]["w"]
+    text = behind_text(text, c.get("brand") or "", words)
     hy = c.get("head_y") or 0.32
     color = c["colors"][0] if c["colors"] else "#FFD400"
-    t = textlayer.build_ass([{"text": text, "t0": 0.25, "dur": d - 0.25, "font": "SM Lalezar", "size": 330 if len(text) < 8 else 230,
+    # الكلمة كلها لازم تبان في عرض الكادر (الحرف العريض تقريبًا نص حجم الخط)
+    size = max(120, min(330, int(W * 0.9 / max(1, len(text)) / 0.52)))
+    t = textlayer.build_ass([{"text": text, "t0": 0.25, "dur": d - 0.25, "font": "SM Lalezar", "size": size,
                               "color": color, "y": max(0.2, min(0.45, hy)), "x": 0.5, "shadow": True,
                               "anim_in": {"type": "zoom", "dur": 0.6}}], d, W, H)
     big = write(c["work"] / "behind.ass", t or "")
@@ -394,6 +423,16 @@ def fx_bg(c: dict, clip: Path, out: Path, d: float, lab: Path, masks: tuple[Path
 GRADE = "eq=contrast=1.13:saturation=1.28:gamma=0.97,colorbalance=rs=-0.05:gs=-0.01:bs=0.07:rh=0.06:gh=0.01:bh=-0.07,vignette=PI/5"
 
 
+def grade_for(y: float) -> str:
+    """التصحيح على قد الفيديو: الغامق بيفتح (من غير فينيت يغمّق الأطراف)، والفاتح بياخد عمق، وكله ألوان أنضف وحدّة خفيفة."""
+    if y < 105:
+        return ("eq=gamma=1.22:brightness=0.03:contrast=1.06:saturation=1.15,colorbalance=rs=-0.02:bs=0.03:rh=0.04:bh=-0.03,"
+                "unsharp=5:5:0.5")
+    if y > 175:
+        return "eq=gamma=0.94:contrast=1.1:saturation=1.2,colorbalance=rs=-0.03:bs=0.05:rh=0.05:bh=-0.05,unsharp=5:5:0.4"
+    return "eq=gamma=1.04:contrast=1.1:saturation=1.22,colorbalance=rs=-0.03:bs=0.05:rh=0.05:bh=-0.05,unsharp=5:5:0.4,vignette=PI/7"
+
+
 def fx_grade(c: dict, clip: Path, out: Path, d: float, lab: Path) -> None:
     """قبل وبعد في نفس الكادر: خط بيمشي من اليمين للشمال، اللي عدّى عليه بقى بالألوان الجديدة."""
     a, b = 0.7, min(d - 0.6, 2.6)
@@ -401,10 +440,11 @@ def fx_grade(c: dict, clip: Path, out: Path, d: float, lab: Path) -> None:
     st = ["Style: S,SM Tajawal,54,&H00FFFFFF,&H00FFFFFF,&H8C000000,&H8C000000,-1,0,0,0,100,100,0,0,3,14,0,5,0,0,0,1"]
     extra = [f"Dialogue: 3,{_ts(0.4)},{_ts(d)},S,,0,0,0,,{{\\pos({int(W * 0.18)},{int(H * 0.86)})\\fad(200,0)}}قبل",
              f"Dialogue: 3,{_ts(0.4)},{_ts(d)},S,,0,0,0,,{{\\pos({int(W * 0.82)},{int(H * 0.86)})\\fad(200,0)}}بعد"]
-    lab2 = write(c["work"] / "grade_lab.ass", label_ass(c["n"], c["total"], CHAPTERS["grade"]["title"], c["accent"], extra, st))
+    lab2 = write(c["work"] / "grade_lab.ass", label_ass(0, 0, "", c["accent"], extra, st))
     fc = (f"[0:v]split=2[o][g];[g]{GRADE}[gg];[o][gg]blend=all_expr='if(gte(X,W*(1-{p})),B,A)',"
           f"drawbox=x='iw*(1-clip((t-{a})/{b - a:.2f},0,1))-3':y=0:w=6:h=ih:color=white@0.9:t=fill,{sub(lab2, c['fonts'])}[v]")
-    run(ff(c["ffmpeg"]) + ["-i", str(clip), "-filter_complex", fc, "-map", "[v]", "-map", "0:a", "-t", f"{d:.3f}", *ENC, str(out)])
+    run(ff(c["ffmpeg"]) + ["-i", str(clip), "-filter_complex", fc.replace(GRADE, grade_for(luma(c["ffmpeg"], clip, d / 2))), "-map", "[v]", "-map", "0:a",
+                           "-t", f"{d:.3f}", *ENC, str(out)])
 
 
 ANGLE_PROMPT = ("Show this exact same moment filmed by a second camera from a different angle: a three-quarter side view from the "
@@ -435,7 +475,7 @@ def fx_dub(c: dict, clip: Path, out: Path, d: float, lab: Path, text: str, lang_
     words = captions.words_from_text(text, 0.15, max(0.6, min(d, vd / tempo + 0.1)))
     caps = write(c["work"] / "dub_caps.ass", captions.build_ass(words, {"template": "classic"}, d, (W, H)))
     st = "Style: G,SM Tajawal,50,&H00FFFFFF,&H00FFFFFF,&H8CE5613E,&H8CE5613E,-1,0,0,0,100,100,0,0,3,14,0,5,0,0,0,1"
-    lab2 = write(c["work"] / "dub_lab.ass", label_ass(c["n"], c["total"], CHAPTERS["dub" if lip is not clip else "dub_voice"]["title"], c["accent"],
+    lab2 = write(c["work"] / "dub_lab.ass", label_ass(0, 0, "", c["accent"],
                                                        [f"Dialogue: 3,{_ts(0.3)},{_ts(d)},G,,0,0,0,,{{\\pos({W // 2},330)\\fad(250,0)}}{lang_label}"], [st]))
     run(ff(c["ffmpeg"]) + ["-i", str(lip), "-i", str(fit), "-filter_complex",
                            f"[0:v]{COVER},fps={FPS},tpad=stop_mode=clone:stop_duration=2,trim=0:{d:.3f},setpts=PTS-STARTPTS,{sub(caps, c['fonts'])},{sub(lab2, c['fonts'])}[v]",
@@ -546,8 +586,7 @@ def build(c: dict, src: Path, step) -> dict:
         step(f"✨ {CHAPTERS[kind]['title']} ({n} من {total})", 15 + int(75 * (n - 1) / total))
         clip = cut(ffm, norm, s, d, work / f"clip_{kind}.mp4")
         out = work / f"seg_{n:02d}_{kind}.mp4"
-        c.update(n=n - len(skipped), total=total - len(skipped))
-        lab = write(work / f"lab_{kind}.ass", label_ass(c["n"], c["total"], CHAPTERS[kind]["title"], c["accent"]))
+        lab = write(work / f"lab_{kind}.ass", label_ass(0, 0, "", c["accent"]))
         ws = rel(words, s, e)
         try:
             if kind == "captions":
@@ -578,7 +617,7 @@ def build(c: dict, src: Path, step) -> dict:
                 fx_finish(c, clip, out, d, ws, lab, fetch("broll", plan["broll"]), fetch("music", plan["music"]))
         except Exception as exc:  # noqa: BLE001  (قطعة وقعت: الباقي بيكمل، وبنقول إنها اتشالت)
             print(f"showcase {kind}: {str(exc)[:500]}", flush=True)
-            skipped.append(kind)
+            skipped.append({"kind": kind, "title": CHAPTERS[kind]["title"], "error": str(exc)[-300:]})
             continue
         od, _ = probe(ffm, out)
         parts.append(out)
@@ -588,9 +627,8 @@ def build(c: dict, src: Path, step) -> dict:
         t += od
     if has_outro:
         try:
-            c.update(n=len(parts) + 1, total=len(parts) + 1)
             out = work / "seg_99_outro.mp4"
-            od = fx_outro(c, out, write(work / "lab_outro.ass", label_ass(c["n"], c["total"], CHAPTERS["outro"]["title"], c["accent"])))
+            od = fx_outro(c, out, write(work / "lab_outro.ass", label_ass(0, 0, "", c["accent"])))
             parts.append(out)
             chapters.append({"kind": "outro", "title": CHAPTERS["outro"]["title"], "t0": round(t, 2), "t1": round(t + od, 2),
                              "did": CHAPTERS["outro"]["did"], "can": CHAPTERS["outro"]["can"]})
@@ -600,6 +638,15 @@ def build(c: dict, src: Path, step) -> dict:
     if len(parts) < 3:
         raise ShowcaseError("تعذّر تجهيز الفيديو الاستعراضي من هذا الفيديو")
     step("🎬 يجمع القطع", 93)
+    # اسم كل ميزة ورقمها (على عدد القطع اللي نجحت فعلًا)، وعلو الصوت واحد في كل القطع
+    done = []
+    for i, (p, ch) in enumerate(zip(parts, chapters), 1):
+        lab = write(work / f"final_{i}.ass", label_ass(i, len(parts), ch["title"], c["accent"]))
+        gain = 0.0 if ch["kind"] == "outro" else max(-8.0, min(14.0, -18.0 - (mean_volume(ffm, p) or -18.0)))
+        q = work / f"final_{i:02d}.mp4"
+        run(ff(ffm) + ["-i", str(p), "-vf", sub(lab, c["fonts"]), "-af", f"volume={gain:.1f}dB,alimiter=limit=0.95", *ENC, str(q)])
+        done.append(q)
+    parts = done
     lst = write(work / "list.txt", "".join(f"file '{p.as_posix()}'\n" for p in parts))
     final = work / "showcase.mp4"
     run(ff(ffm) + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(final)], 600)
