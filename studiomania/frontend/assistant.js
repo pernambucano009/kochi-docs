@@ -227,6 +227,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     // later: العميل قال «بعدين»: تقفل من غير ما المكالمة تتحسب خلصت (تقدر ترجعلها من دايرة سعاد)
     if (name === "set_user_gender") return api("/api/assistant/gender", { method: "POST", ...jsonBody({ gender: args.gender }) }).catch(() => ({ ok: false }));
+    if (name === "finish" && !S.finishAsked) {   // 🎬 الفيديو الاستعراضي لسه بيتعمل: تقوله قبل ما تقفل (مرة واحدة)
+      const sc = await api("/api/assistant/showcase").catch(() => null);
+      if (sc?.status === "working") { S.finishAsked = true; return { ok: false, error: `The showcase reel is still being made (${sc.progress || 0}%). Tell them it will appear on their screen and in their ready videos in a few minutes, ask if they want to wait for it now, then call finish again if they want to leave.` }; }
+    }
     if (name === "finish") {
       // 👋 المكالمة بتقفل بعد ما جملة الوداع تتقال كلها (مش أول ما الأداة توصل، الأداة بتوصل قبل الصوت)
       S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now();
@@ -614,7 +618,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const follow = (id) => {
         const r = S?.resp[id];
         if (!r || !r.done || r.pending || !r.calls || (r.msg && !r.force) || S.finishing) return;
-        delete S.resp[id]; S.dc.send(JSON.stringify({ type: "response.create" }));
+        delete S.resp[id];
+        if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));   // ردها لسه شغال: يستنى (كان بيرفض: active response in progress)
       };
       dc.onmessage = async (m) => {
         let e; try { e = JSON.parse(m.data); } catch { return; }
@@ -718,7 +723,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     acct(false); S.typed += " " + v;
     const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: v }) }).catch((e) => ({ ok: false, error: e.message }));
     if (r.ok) { changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount(); }
-    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly and go on with the next question.)`
+    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly, ask in one sentence for permission to make the showcase reel gift from one of their page's videos, and after their answer go on with the next question.)`
       : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);
   }
   // ✍️ الحساب بيتكتب في نفس خانة الكتابة: الخانة بتنوّر وتحتها سطر بيقول المطلوب

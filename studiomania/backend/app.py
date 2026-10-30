@@ -5564,12 +5564,18 @@ def rivals_search(bid: str, brain: dict, queries: list[str] | None = None) -> tu
         raw = {} if atlas.mock_mode() else rivals_llm(rivals.queries_messages(brain), "كلمات البحث")
         qs = [str(q).strip()[:60] for q in raw.get("queries") or [] if str(q).strip()][:6] or [brain.get("domain") or brain.get("name") or ""]
     posts, errs = [], []
-    for q in qs:
-        for plat in rivals.PLATFORMS:
-            try:
-                posts += rivals.search(plat, q)
-            except rivals.RivalsError as exc:
-                errs.append(str(exc))
+    from concurrent.futures import ThreadPoolExecutor   # ⚡ كل كلمات البحث على المنصتين في نفس الوقت (كانت ورا بعض: دقايق)
+
+    def one(job):
+        try:
+            return rivals.search(*job), None
+        except rivals.RivalsError as exc:
+            return [], str(exc)
+    with ThreadPoolExecutor(8) as pool:
+        for got, err in pool.map(one, [(plat, q) for q in qs for plat in rivals.PLATFORMS]):
+            posts += got
+            if err:
+                errs.append(err)
     if not posts and errs:
         raise rivals.RivalsError(errs[0])
     return posts, qs
@@ -32976,7 +32982,8 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ms = livevoice.models()["openai"]["models"]
     model = os.environ.get("LIVE_MODEL") or next((m for m in ms if livevoice.tier(m) == pick), ms[0])
     try:
-        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS)
+        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS, lang=livevoice.stt_lang(dia),
+                                      hint=livevoice.stt_hint(dia, who, first_brand_name(b) if b else ""))
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
         raise HTTPException(503, "المساعد غير متاح الآن. جرّب مرة أخرى بعد قليل") from exc
@@ -32995,6 +33002,11 @@ class AssistAnswerIn(BaseModel):
     answer: str
 
 
+def qid_clean(qid: str) -> str:
+    """الموديل ساعات بيبعت رقم السؤال زي ما مكتوب في التعليمات «[domain]» بالأقواس: من غيرها كل الإجابات كانت بتترفض."""
+    return re.sub(r"[^a-z_]", "", str(qid or "").lower())
+
+
 # أسئلة إجابتها لازم تبقى جملة فيها معنى (مش كلمة واحدة اتقالت بالصدفة أو صوت في الأوضة)
 ASSIST_LONG_Q = {"about", "audience", "pain", "products", "faq"}
 
@@ -33002,6 +33014,7 @@ ASSIST_LONG_Q = {"about", "audience", "pain", "products", "faq"}
 @app.post("/api/assistant/answer")
 def assistant_answer(body: AssistAnswerIn):
     bid, _b, _a = assist_info()
+    body.qid = qid_clean(body.qid)
     q = brainquiz.BY_ID.get(body.qid)
     if not bid or not q:
         return {"ok": False, "error": "unknown question"}
@@ -33021,6 +33034,7 @@ class AssistSkipIn(BaseModel):
 @app.post("/api/assistant/skip")
 def assistant_skip(body: AssistSkipIn):
     bid, _b, _a = assist_info()
+    body.qid = qid_clean(body.qid)
     if not bid or body.qid not in brainquiz.BY_ID:
         return {"ok": False, "error": "unknown question"}
     update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("skipped", []).append(body.qid)
@@ -33057,6 +33071,7 @@ def assistant_account(body: AssistAccountIn):
         d.setdefault("assistant", {})["free_used"] = True
     update_brain(bid, fn)
     threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
+    threading.Thread(target=rival_prefetch, args=(bid,), daemon=True).start()   # المنافسين يبقوا جاهزين قبل ما المكالمة توصل لمحطتهم
     return {"ok": True, "started": True}
 
 
@@ -33593,8 +33608,6 @@ def assistant_showcase_start():
         return {"ok": True, "started": False, "note": "already ready", **st}
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     if not st["has_video"]:
-        if social and social.get("status") == "working":   # تحليل الحساب لسه بينزّل فيديوهاته: ممكن يلاقي واحد فيه كلام
-            return {"ok": False, "error": "wait", "note": "Their account videos are still being downloaded. Keep talking and call start_showcase again in a minute or two."}
         if not social:
             return {"ok": False, "error": "no_account", "note": "We do not have their account yet. Ask for their Instagram or TikTok account first (typed), then try again."}
     with SHOWCASE_LOCK:
@@ -33602,12 +33615,28 @@ def assistant_showcase_start():
             return {"ok": False, "error": "used", "note": "The free showcase was already made for this account."}
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(showcase_used=True))
         showcase_set(bid, status="working", step="🎞️ يجهّز الفيديو", progress=1, error=None, started=now())
-    threading.Thread(target=showcase_go, args=(bid, None if st["has_video"] else social), daemon=True).start()
+    threading.Thread(target=showcase_go, args=(bid, None if st["has_video"] else social, sid_working(b)), daemon=True).start()
     return {"ok": True, "started": True, "note": "Rendering started from one of their own videos on their page. It takes a few minutes."}
 
 
-def showcase_go(bid: str, social: dict | None) -> None:
-    """الفيديو من صفحته: لو مااتحفظش واحد وقت التحليل (حساب اتحلل قبل كده)، بنجيب فيديوهات صفحته ونختار أكتر واحد بيتكلم فيه."""
+def sid_working(b: dict) -> str | None:
+    s = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
+    return s["id"] if s and s.get("status") == "working" else None
+
+
+def showcase_go(bid: str, social: dict | None, wait_sid: str | None = None) -> None:
+    """الفيديو من صفحته: لو مااتحفظش واحد وقت التحليل (حساب اتحلل قبل كده)، بنجيب فيديوهات صفحته ونختار أكتر واحد بيتكلم فيه.
+    لو تحليل الحساب لسه شغال (وافق أول ما كتب حسابه): بنستنى التحليل يخلص الأول (هو اللي بيحفظ أحسن فيديو)."""
+    if wait_sid:
+        showcase_set(bid, step="🎞️ ينتظر تحليل صفحتك", progress=1)
+        t0 = time.time()
+        while time.time() - t0 < 900:
+            src = next((x for x in (brain_row(bid) or {}).get("sources") or [] if x.get("id") == wait_sid), None)
+            if not src or src.get("status") != "working":
+                break
+            time.sleep(5)
+        if showcase_src(bid):
+            social = None
     if social:
         try:
             showcase_set(bid, step="🎞️ يختار فيديو من صفحتك", progress=2)
@@ -33787,6 +33816,15 @@ def rival_pool(bid: str, b: dict) -> list[dict]:
     return cands
 
 
+def rival_prefetch(bid: str) -> None:
+    try:
+        time.sleep(20)   # بعد ما الأسئلة الأولى تتقال (المجال بيبقى اتعرف)
+        if rivals.live() or atlas.mock_mode():
+            rival_pool(bid, brain_row(bid) or {})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[rival prefetch] {bid}: {str(exc)[:200]}", flush=True)
+
+
 @app.post("/api/assistant/rival/suggest")
 def assistant_rival_suggest():
     bid, b, a = assist_info()
@@ -33806,8 +33844,11 @@ def assistant_rival_suggest():
         if k in seen:
             continue
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("rival_seen", []).append(k))
-        try:
-            it = rivals_fetch(cd["platform"], cd["handle"])
+        try:   # في المكالمة: المنشورات والأرقام بس (من غير تفريغ كلام الفيديوهات، ده بياخد دقيقة)
+            posts = rivals.mock_posts(cd["platform"], cd["handle"]) if not rivals.live() else rivals.profile_posts(cd["platform"], cd["handle"])
+            if not posts:
+                continue
+            it = rivals.summarize(cd["platform"], cd["handle"], posts)
         except rivals.RivalsError:
             continue
         if rivals.live():

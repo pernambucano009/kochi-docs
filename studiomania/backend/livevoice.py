@@ -306,8 +306,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     tour = ("A guided tour of what the platform can do for them, one stop at a time, in this order (it is long and that is fine: they can stop "
             "any time and continue later from where you stopped). At each stop: call the tool in the same turn, explain in 1–3 short sentences "
             "in their terms, ask ONE short question and wait. Never read the card out loud; talk about it."
-            + (" The showcase reel is the heart of this tour and takes several minutes to make: offer it right after the analysis stop "
-               "(start it if they agree), then play it as soon as the screen says it is ready." if "Offer a gift" in showcase_goal else "")
+            + (" The showcase reel is the heart of this tour and takes several minutes to make: if they did not agree to it yet when they typed "
+               "their account, offer it right after the analysis stop (start it if they agree); play it as soon as the screen says it is ready." if "Offer a gift" in showcase_goal else "")
             + " Do not suggest video ideas or scripts unless they ask you."
             + "\n" + "\n".join(tour_lines)
             ) if tools and tour_lines else "Skip this step."
@@ -320,6 +320,9 @@ Tools (use them silently, never read them out loud):
   call show_input with that kind,
   and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
   If they say later, not now, or that they have none, call show_input with kind "none" and move on.
+- Right after they typed their account and its analysis started, ask in one short sentence for their permission to make a gift: a short
+  showcase reel from one of the videos on their own page (they upload nothing). If they agree, call start_showcase right away (it waits for
+  the analysis by itself and takes several minutes), then continue with the questions. It plays later in the tour when it is ready.
 - The account link must be TYPED by the user in the box (spoken links are not accepted). If they say it by voice, thank them and
   ask them to type it in the box. Only after they typed it, call start_account_analysis with exactly what they typed. NEVER guess or make up an account (not from the brand name, not from anything else). If they say later, do not
   call it and do not say you are checking it: just say no problem and move on.
@@ -412,7 +415,13 @@ Rules:
 - A topic the user closed (they said enough, done, save these, move on) stays closed: never reopen it or ask about it again.
 - Only use facts the user actually said. Never assume a business, product or detail they did not say, and never mix in an example
   as if it were theirs. If you did not hear clearly, ask them to repeat it, without guessing alternatives.
-- Never mention the names of the AI models or companies behind the platform.""" + (
+- Never mention the names of the AI models or companies behind the platform.
+- No filler turns or preambles: never say things like "let me organise", "let me think", "I'll save that", "one moment", "let me prepare
+  the next step". Call tools silently and say only your real reaction and your next question.
+- Your very first turn is only the greeting (no tools, no request for the account yet).
+- The end: when the tour is done, thank them warmly and say goodbye out loud in the same turn, then call finish with later=false
+  (later=true ONLY if they asked to stop and continue another time). If the showcase reel is still being made, tell them it will
+  appear on their screen and in their ready videos in a few minutes, before saying goodbye.""" + (
         "\nLessons from reviewing your past calls (follow them strictly):\n" + "\n".join(f"- {x}" for x in lessons[:30]) if lessons else "")
 
 
@@ -430,12 +439,24 @@ def _fail(r: httpx.Response, who: str) -> None:
         raise LiveError(f"{who} رد بخطأ {r.status_code}: {r.text[:400]}")
 
 
-def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", tools: list | None = None) -> dict:
+def stt_lang(dialect: str) -> str:
+    """لغة كلام العميل لخدمة تحويل الكلام لنص: من غيرها الكلام العربي كان بيتكتب صيني وكوري وتركي."""
+    return "ar" if dialect.startswith("ar") else (dialect.split("-")[0] or "ar")
+
+
+def stt_hint(dialect: str, name: str = "", brand: str = "") -> str:
+    label = (DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"])[1]
+    return (f"Arabic, {label} dialect, a phone-style conversation about their business and social media"
+            + (f". Names: {name}" if name else "") + (f", {brand}" if brand else "") + ". Instagram, TikTok, SimsimKit.")
+
+
+def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", tools: list | None = None, lang: str = "", hint: str = "") -> dict:
     key = openai_key()
     if not key:
         raise LiveError("مفتاح OpenAI غير مسجل. ضعه من ⚙️ الإعدادات ← بقية مفاتيح المنصة")
     session = {"type": "realtime", "model": model, "instructions": instr,
-               "audio": {"input": {"transcription": {"model": "gpt-4o-mini-transcribe"}, "noise_reduction": {"type": "near_field"},
+               "audio": {"input": {"transcription": {"model": "gpt-4o-transcribe", **({"language": lang} if lang else {}), **({"prompt": hint} if hint else {})},
+                                   "noise_reduction": {"type": "near_field"},
                                    "turn_detection": {"type": "semantic_vad", "eagerness": eagerness, "interrupt_response": True, "create_response": True}},
                          "output": {"voice": voice}}}
     if tools:
