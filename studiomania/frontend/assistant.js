@@ -521,6 +521,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         clearInterval(S.accTimer); S.accTimer = null;
         changed(); status();
         // 📬 التحليل وصل وهي في نص المكالمة: تعرف دلوقتي، وتقوله في ردها الجاي (من غير ما تقطع سؤال مستني إجابته)
+        if (r.ready && r.gender_check?.mismatch) sysItem(`(SYSTEM: important, resolve it in your NEXT turn after reacting to what they say: ${r.gender_check.note})`);
         if (r.ready) sysItem("(SYSTEM: the analysis of the user's account has just arrived. In your NEXT turn, after reacting to what they say, tell them in one short "
           + "sentence in the dialect that you just received their page's analysis and there are many things in it you want to talk with them about, "
           + "but you will finish your questions first so the picture is complete. If the questions are already finished, go to the analysis stop instead. Say it only once.)");

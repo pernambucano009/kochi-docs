@@ -154,7 +154,7 @@ TOOLS = [
          "what": {"type": "string", "description": "Their field in their own words, in Arabic (always fill it)."}}, "required": ["field", "what"]}},
     {"type": "function", "name": "save_preference", "description": "Save what the user said about a tour stop (e.g. keep these video types or try "
      "others, they like filming themselves or not, they want autopilot or not) into their brand profile.",
-     "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot"]},
+     "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot", "presenter"]},
                                                      "text": {"type": "string", "description": "Their answer, clearly, in Arabic."}}, "required": ["topic", "text"]}},
     {"type": "function", "name": "start_showcase", "description": "Start making the showcase reel from the user's own video (only after they agreed). "
      "It renders in the background for a few minutes.", "parameters": {"type": "object", "properties": {}}},
@@ -242,7 +242,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     # 🧭 الجولة بعد الأسئلة: محطة محطة، كل واحدة بكارت على الشاشة. اللي اتعرض في مكالمة قبل كده مابيتعادش
     seen = set(have.get("tour") or [])
     stops = [
-        ("analysis", "Their account analysis: call get_account_analysis; if ready, call show_card analysis. Talk about THEIR VIDEOS themselves, "
+        ("analysis", "Their account analysis: call get_account_analysis; if ready, call show_card analysis. If it has gender_check.mismatch, "
+                     "resolve that FIRST as its note says, before anything else. Then talk about THEIR VIDEOS themselves, "
                      "not only the numbers: name a specific video (what it is about, its views) and what is really good in it (be warm and "
                      "generous, e.g. the cases they show look great), then what could be better in it (lighting, color grading, quality, sound, "
                      "the first seconds, text on screen) from the review. Then 1–2 account-level points (posting rhythm, bio, call to action). "

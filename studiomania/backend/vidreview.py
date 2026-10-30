@@ -87,7 +87,9 @@ def prompt(brand: str, videos: list[dict]) -> str:
             "Never invent things you cannot see. Write in clear simple Modern Standard Arabic.\n"
             f"Videos (images come after this text, grouped per video in this same order):\n" + "\n".join(rows) +
             '\nReturn JSON only: {"videos": [{"i": 0, "line": "...", "good": ["..."], "improve": ["..."]}], '
-            '"overall": "one or two sentences on the overall production quality of their videos and the single most important fix"}')
+            '"overall": "one or two sentences on the overall production quality of their videos and the single most important fix", '
+            '"presenter": {"gender": "m, f, mixed (both appear a lot) or none (nobody appears/talks)", '
+            '"who": "short English description of the main person who appears or talks in most videos"}}')
 
 
 def clean(raw: dict, videos: list[dict]) -> tuple[list[dict], str]:
@@ -102,6 +104,13 @@ def clean(raw: dict, videos: list[dict]) -> tuple[list[dict], str]:
         strs = lambda k, n: [str(s).strip()[:220] for s in (x.get(k) or []) if str(s).strip()][:n]  # noqa: E731
         out.append({"i": i, "line": str(x.get("line") or "").strip()[:200], "good": strs("good", 2), "improve": strs("improve", 3)})
     return out, str(raw.get("overall") or "").strip()[:400]
+
+
+def presenter(raw: dict) -> dict:
+    """مين اللي بيظهر في فيديوهات الصفحة (راجل / ست / الاتنين / محدش)، عشان لو مختلف عن نوع العميل في التسجيل سعاد تسأله."""
+    p = raw.get("presenter") if isinstance(raw.get("presenter"), dict) else {}
+    g = str(p.get("gender") or "").strip().lower()
+    return {"gender": g if g in ("m", "f", "mixed", "none") else "", "who": str(p.get("who") or "").strip()[:160]}
 
 
 def mock(videos: list[dict]) -> dict:

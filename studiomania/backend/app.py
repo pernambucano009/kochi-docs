@@ -12555,7 +12555,7 @@ def run_brain_social(bid: str, sid: str) -> None:
             if brain_fetch(url, f, 8 * 1024 * 1024):
                 covers.append(f)
     # 🎥 رأي في كل فيديو نفسه: اللي حلو فيه واللي ممكن يتحسن (الإضاءة، الألوان، الجودة، الصوت، الهوك…) بالدليل من اللقطات والأرقام
-    reviews, overall = [], ""
+    reviews, overall, pres = [], "", {}
     if videos:
         brain_src_step(bid, sid, "يقيّم فيديوهاتك")
         try:
@@ -12568,6 +12568,7 @@ def run_brain_social(bid: str, sid: str) -> None:
                         rp.append({"type": "image_url", "image_url": {"url": data_url(model_image(im), "image/jpeg")}})
                 raw = ad_json(ad_media_chat([{"role": "user", "content": rp}], 6000, meter=meter), "تقييم الفيديوهات")
             rv, overall = vidreview.clean(raw, videos)
+            pres = vidreview.presenter(raw)
             base = f"/media/ads/brains/{bid}/vreview"
             for x in rv:
                 v = videos[x["i"]]
@@ -12625,7 +12626,7 @@ def run_brain_social(bid: str, sid: str) -> None:
         if niche and not str(d.get("niche") or "").strip():
             d["niche"] = niche
         d["social"] = {"platform": plat, "handle": handle, "followers": prof.get("followers"), "stats": st, "at": now(),
-                       "videos": reviews, "videos_overall": overall}
+                       "videos": reviews, "videos_overall": overall, "presenter": pres}
         d["social_name"] = str(prof.get("name") or handle)[:80]
         for x in d.get("sources") or []:
             if x["id"] == sid:
@@ -32919,12 +32920,12 @@ class AssistGenderIn(BaseModel):
 
 
 @app.post("/api/assistant/gender")
-def assistant_gender(body: AssistGenderIn):
+def assistant_gender(body: AssistGenderIn):  # (بيقفل كمان سؤال «الصفحة بتاعتك؟» لو كان مفتوح)
     """العميل قال للمساعدة إنه راجل / ست (أو صحّحها): بيتحفظ، والمكالمات الجاية تبدأ بيه."""
     bid, _b, _a = assist_info()
     if not bid:
         return {"ok": False}
-    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(gender="f" if body.gender == "f" else "m"))
+    update_brain(bid, lambda d: d.setdefault("assistant", {}).update(gender="f" if body.gender == "f" else "m", presenter_ok=True))
     return {"ok": True}
 
 
@@ -33111,6 +33112,20 @@ def assistant_rivals(body: AssistRivalsIn):
     return {"ok": True, "searching": names}
 
 
+def gender_check(b: dict) -> dict:
+    """👤 اللي بيظهر في فيديوهات الصفحة نوعه غير اللي العميل اختاره في التسجيل؟ (زي تعارض المجال: لازم يتحل قبل ما نكمّل)"""
+    pg = ((b.get("social") or {}).get("presenter") or {})
+    reg = (b.get("assistant") or {}).get("gender") or (onboard_load() or {}).get("gender") or ""
+    if (b.get("assistant") or {}).get("presenter_ok") or pg.get("gender") not in ("m", "f") or reg not in ("m", "f") or pg["gender"] == reg:
+        return {"mismatch": False}
+    return {"mismatch": True, "page_person": pg["gender"], "who": pg.get("who") or "", "registered": reg,
+            "note": "The person who appears in most of their page's videos is a " + ("woman" if pg["gender"] == "f" else "man")
+                    + ", but the user registered as a " + ("woman" if reg == "f" else "man") + ". Before talking about the videos, ask kindly "
+                    "whether this page is theirs or they run it for someone else (e.g. the doctor or owner). If it is them, call set_user_gender "
+                    "to fix it. If it is someone else, call save_preference with topic presenter (who appears in the videos and their relation). "
+                    "Do not continue until this is clear."}
+
+
 @app.get("/api/assistant/account")
 def assistant_account_state():
     """للمساعد: التحليل خلص؟ وأهم اللي لقاه (عشان يقوله للعميل بلهجته)."""
@@ -33127,6 +33142,7 @@ def assistant_account_state():
             "avg_views": st.get("avg_views"), "median_views": st.get("median_views"), "engagement_pct": st.get("engagement"),
             "posts_every_days": st.get("every_days"), "improvements": todos,
             "videos": so.get("videos") or [], "videos_overall": so.get("videos_overall") or "",
+            "gender_check": gender_check(b),
             "suggestions_waiting": len([p for p in b.get("pending") or [] if p.get("source") == s["id"]])}
 
 
@@ -33867,7 +33883,9 @@ def assistant_preference(body: AssistPrefIn):
     text = body.text.strip()[:600]
     if not bid or not text:
         return {"ok": False}
-    titles = {"types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
+    if body.topic == "presenter":   # اتحل: مايتسألش تاني
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(presenter_ok=True))
+    titles = {"presenter": "من يظهر في الفيديوهات", "types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
               "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم"}
     if body.topic in TOUR:   # قال «كفاية» على المحطة دي: تتقفل ومابترجعش (حتى لو رجع للمكالمة بعدين)
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append(body.topic)
