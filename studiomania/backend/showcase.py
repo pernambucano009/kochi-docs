@@ -469,9 +469,11 @@ def fx_bg(c: dict, clip: Path, out: Path, d: float, lab: Path, masks: tuple[Path
     if bg:
         bg_in = ["-loop", "1", "-t", f"{d:.3f}", "-i", str(bg)]
         bgf = f"[2:v]{COVER},fps={FPS},zoompan=z='1.04+0.03*on/{int(d * FPS)}':d=1:s={W}x{H}:fps={FPS},eq=brightness=-0.04[bg]"
-    else:   # من غير مكتبة الصور: تدرّج بألوان العلامة
+    elif c.get("mock"):   # التجربة بس (من غير الخدمات): تدرّج
         bg_in = ["-f", "lavfi", "-t", f"{d:.3f}", "-i", f"gradients=s={W}x{H}:c0=0x{cols[0][1:]}:c1=0x{cols[1][1:]}:x0=0:y0=0:x1={W}:y1={H}:speed=0.02:r={FPS}"]
         bgf = "[2:v]format=yuv420p,vignette=PI/5[bg]"
+    else:   # مفيش صورة مكان حقيقية لمجاله: الجزء ده مايتعملش بدل ما يطلع بخلفية ألوان
+        raise ShowcaseError("no real background photo found")
     ins, af, _ = sfx_mix(c["sfx"], [("swipe", 0.1, 0.45)], 3)
     fc = (f"{bgf};[1:v]format=rgba,alphaextract,scale={W}:{H},format=gray[m];[0:v]format=yuv420p[p0];[p0][m]alphamerge[p];"
           f"[bg][p]overlay=0:0:eof_action=pass:format=auto,format=yuv420p,{sub(lab, c['fonts'])}[v];{af}")

@@ -33253,7 +33253,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         showcase.run(showcase.ff(ffm) + ["-i", str(part), "-vf", "scale=720:1280", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
                                          "-pix_fmt", "yuv420p", "-an", str(small)])
         url, errs = atlas.upload_media(small), []
-        for key in ("gemini", "kling", "flux"):
+        for key in ("gemini", "kling"):   # نفس مستوى الجودة بس (FLUX أرخص وأضعف فمش بنستخدمه هنا)
             m = lab.VEDIT_MODELS[key]
             try:
                 atlas.download(atlas.run_model("Video", {"model": m["model"], "video": url, "prompt": prompt}, "زاوية الكاميرا", max_seconds=1500, interval=6), out)
@@ -33279,13 +33279,11 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
                 add(len(text) / 1000 * 0.30)
                 return mp3
             except Exception as exc:  # noqa: BLE001
-                print(f"showcase clone: {str(exc)[:300]}", flush=True)
+                raise RuntimeError(f"voice clone failed (needs ElevenLabs Starter or higher): {str(exc)[:200]}") from exc
             finally:
                 if vid:
                     voicelab.eleven_delete(vid)
-        ar_speak(dub.VOICES["eleven_jessica" if gender == "f" else "eleven_liam"], text, mp3)
-        add(len(text) / 1000 * dub.VOICES["eleven_liam"]["per_1k"])
-        return mp3
+        raise RuntimeError("ElevenLabs key missing: the dub must be in the user's own voice")
 
     def lipsync(clip: Path, audio: Path, out: Path, d: float) -> Path:
         if mock:
@@ -33329,16 +33327,9 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
 
     def cutaway(query: str, base: Path) -> tuple[Path, bool] | None:
         """🎞️ لقطة داعمة: فيديو من مكتبة الفيديوهات لو متاحة، وإلا صورة واقعية متولّدة (بتتحرك بزووم بطيء)."""
-        got = stock_get("broll", query, base)
-        if got:
-            return got, True
-        if mock:
-            return None
-        dest = base.with_suffix(".png")
-        atlas.download(atlas.generate_image("nano2", f"Photorealistic vertical 9:16 photo, natural light, real people and places: {query}. "
-                                                     "No text, no letters, no logos, no children.", "1024x1536", "medium"), dest)
-        add(0.045)
-        return dest, False
+        # فيديو حقيقي بس (مفيش بديل أقل جودة): لو الوصف الطويل مالقاش، بنجرّب أول كلمتين منه
+        got = stock_get("broll", query, base) or stock_get("broll", " ".join(query.split()[:2]), base)
+        return (got, True) if got else None
 
     def stock_get(kind: str, q: str, base: Path) -> Path | None:
         try:
@@ -33357,7 +33348,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
             return None
 
     cols = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
-    cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E",
+    cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E", "mock": mock,
            "brand": first_brand_name(b), "niche": str(b.get("niche") or "")[:200], "logo": logo_path(bid),
            "dub_lang": showcase_dub_lang(""), "templates": showcase_templates(b), "field_name": (fieldpacks.FIELDS.get(b.get("field") or "") or {}).get("name") or "",
            "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify, "qa": qa_look, "cutaway": cutaway,
@@ -33367,6 +33358,13 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
     try:
         if not src or not src.exists():
             raise showcase.ShowcaseError("لا يوجد فيديو")
+        # 🔑 أعلى جودة بس: لو مفتاح ناقص بنقول بالظبط أنهي واحد بدل ما نطلع فيديو أقل
+        if not mock:
+            miss = [n for n, ok in (("Pexels (اللقطات الداعمة والخلفيات)", stock.live()), ("Atlas Cloud", bool(atlas.api_key())),
+                                    ("ElevenLabs (صوته في الدبلجة)", bool(voicelab.eleven_key()))) if not ok]
+            if miss:
+                issues.record("api", "showcase", "الفيديو الاستعراضي: مفاتيح ناقصة", "، ".join(miss), 400)
+                raise showcase.ShowcaseError("ضع هذه المفاتيح من ⚙️ الإعدادات ← 🔑 بقية مفاتيح المنصة: " + "، ".join(miss))
         r = showcase.build(cfg, src, lambda s, p: setst(step=s, progress=p))
         if lab:   # 🧪 المعمل: الفيديو والقطع ونوع الفيديو بس (من غير الفيديوهات الجاهزة ولا الإشعار)
             shutil.copy(r["video"], SC_LAB / lab / "out.mp4")
