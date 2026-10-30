@@ -33384,6 +33384,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         r = showcase.build(cfg, src, lambda s, p: setst(step=s, progress=p))
         if lab:   # 🧪 المعمل: الفيديو والقطع ونوع الفيديو بس (من غير الفيديوهات الجاهزة ولا الإشعار)
             shutil.copy(r["video"], SC_LAB / lab / "out.mp4")
+            (SC_LAB / lab / "src.mp4").unlink(missing_ok=True)   # الفيديو الاستعراضي هو اللي بيتحفظ بس
             wallet.cost(spent["usd"], "تجربة الأدمن: معمل الفيديو الاستعراضي", ref="showcase-lab")
             setst(status="done", step=None, progress=100, error=None, duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"],
                   usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"], done_at=now())
@@ -33475,7 +33476,11 @@ def sc_lab_new(account: str = Form(""), name: str = Form(""), file: UploadFile |
         if probe_duration(raw) < 8:
             shutil.rmtree(folder, ignore_errors=True)
             raise HTTPException(400, "الفيديو قصير: ارفع فيديو مدته ٨ ثوانٍ على الأقل")
-        raw.replace(folder / "src.mp4")
+        # 💾 الأصلي ممكن يبقى مئات الميجات: بنحفظه بالمقاس اللي بنشتغل بيه بس (طولي ١٠٨٠، أول ٩٠ ثانية) ونمسح الأصلي
+        try:
+            showcase.normalize(ffmpeg_exe(), raw, folder / "src.mp4")
+        finally:
+            raw.unlink(missing_ok=True)
     elif not handle:
         shutil.rmtree(folder, ignore_errors=True)
         raise HTTPException(400, "ارفع فيديو أو اكتب حسابًا")

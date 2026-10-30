@@ -105,7 +105,7 @@ function renderDisk(d) {
     ${(d.system || []).length ? `<h4>على نفس القرص خارج البرنامج</h4><ul>${d.system.map((x) => `<li><span>${escapeHtml(DSK_SYS[x.path] || x.path)} <small class="muted" dir="ltr">${escapeHtml(x.path)}</small></span><b>${fmtMb(x.mb)}</b></li>`).join("")}</ul>` : ""}
     <h4>حسب القسم (كل الحسابات)</h4><ul>${d.cats.filter((c) => c.mb >= 1).map((c) => `<li><span>${escapeHtml(DSK_CAT[c.cat] || c.cat)}</span><b>${fmtMb(c.mb)}</b></li>`).join("")}</ul>
     <h4>حسب الحساب</h4><ul>${d.accounts.filter((a) => a.mb >= 1).map((a) => `<li><span>${escapeHtml(a.name || a.id)}${a.email ? ` <small class="muted" dir="ltr">${escapeHtml(a.email)}</small>` : ""}${a.tmp_mb >= 1 ? ` <small class="muted">(منها مؤقت ${fmtMb(a.tmp_mb)})</small>` : ""}</span><b>${fmtMb(a.mb)}</b></li>`).join("")}</ul>
-    ${d.big.length ? `<h4>أكبر الملفات</h4><ul>${d.big.map((f) => `<li><span dir="ltr" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${escapeHtml(f.path)}</span><b>${fmtMb(f.mb)}</b></li>`).join("")}</ul>` : ""}`;
+    ${d.big.length ? `<h4>أكبر الملفات</h4><ul>${d.big.map((f) => `<li><span class="dsk-path" dir="ltr" title="${escapeHtml(f.path)}">${escapeHtml(f.path.split("/").length > 3 ? "…/" + f.path.split("/").slice(-3).join("/") : f.path)}</span><b>${fmtMb(f.mb)}</b></li>`).join("")}</ul>` : ""}`;
 }
 $("dskLoad")?.addEventListener("click", async () => {
   $("dskLoad").disabled = true; $("dskBox").innerHTML = `<p class="hint">⏳ جارٍ حساب المساحة (قد يستغرق دقيقة)…</p>`;
