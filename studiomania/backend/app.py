@@ -33212,13 +33212,30 @@ def tpl_names() -> dict[str, str]:
         return {}
 
 
+FIELD_HINTS = [("beauty", r"اسنان|أسنان|سنان|dent|عياد|clinic|تجميل|بشر|جلدية|derma|skin|ليزر|صالون"),
+               ("fitness", r"جيم|لياق|رياض|fitness|gym|كوتش|coach|تمارين|تغذية|nutrition"),
+               ("food", r"مطعم|كافي|مقهى|اكل|أكل|طبخ|حلويات|food|restaurant|cafe"),
+               ("realestate", r"عقار|شقق|فلل|real ?estate|property"), ("edu", r"تعليم|دورة|دورات|كورس|course|تدريس|teach|اكاديمي|أكاديمي"),
+               ("home", r"صيانة|مقاولات|تنظيف|سباكة|كهرباء|ديكور"), ("shops", r"محل|معرض"), ("ecom", r"متجر|store|اونلاين|أونلاين|shop")]
+
+
+def field_guess(b: dict) -> str:
+    """مجال العميل: اللي اختاره، وإلا من كلامه عن نفسه (المجال والتخصص وعن العلامة)."""
+    f = b.get("field") or (onboard_load() or {}).get("field") or ""
+    if f in fieldpacks.FIELDS:
+        return f
+    txt = " ".join(str(b.get(k) or "") for k in ("domain", "niche", "about")).lower()
+    return next((k for k, rx in FIELD_HINTS if re.search(rx, txt)), "")
+
+
 def showcase_templates(b: dict) -> list[dict]:
-    """🧩 ٣ قوالب من قوالب مجاله بفيديو مثال (اللي متصوّر لمجاله نفسه الأول) واسمه وطريقة استخدامه معاه."""
-    field = b.get("field") or (onboard_load() or {}).get("field") or ""
+    """🧩 ٣ قوالب من قوالب مجاله هو بس، بفيديو مثال متصوّر لمجاله نفسه (مفيش أمثلة عامة من مجال تاني) واسمه وطريقة استخدامه معاه."""
+    field = field_guess(b)
+    if not field:
+        return []
     names, out = tpl_names(), []
     for r in fieldpacks.field_reels(field):
-        v = FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.mp4" if field else None
-        v = v if v and v.exists() else FRONTEND_DIR / "gallery" / f"{r}.mp4"
+        v = FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.mp4"
         br = tplbrief.brief(r, field, first_brand_name(b))
         if v.exists() and br:
             out.append({"id": r, "name": names.get(r, r), "idea": br["idea"], "video": str(v)})
@@ -33251,6 +33268,10 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
             add(wallet.est(stt_min=dur / 60))
         lang = showcase_dub_lang(heard["text"])
         cfg["dub_lang"] = lang
+        # 🗣️ الدبلجة التانية: نفس كلامه بلهجة عربية تانية (المصري ← سعودي، وأي لهجة تانية ← مصري)
+        if lang[0] == "en":
+            cfg["dub_dialect"] = ("ar-sa-najdi", "سعودي", "Saudi Najdi Arabic dialect") if assist_dialect().startswith("ar-eg") \
+                else ("ar-eg-cairo", "مصري", "Egyptian Arabic (Cairo) dialect")
         return words
 
     def plan(msgs: list[dict]) -> dict:
@@ -33366,7 +33387,7 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
     cols = re.findall(r"#[0-9a-fA-F]{6}\b", str(b.get("palette") or ""))
     cfg = {"ffmpeg": ffm, "work": work, "fonts": FONTS_DIR, "font": FIRST_FONT, "sfx": SFXLIB_DIR, "colors": cols, "accent": "#E5613E", "mock": mock,
            "brand": first_brand_name(b), "niche": str(b.get("niche") or "")[:200], "logo": logo_path(bid),
-           "dub_lang": showcase_dub_lang(""), "templates": showcase_templates(b), "field_name": (fieldpacks.FIELDS.get(b.get("field") or "") or {}).get("name") or "",
+           "dub_lang": showcase_dub_lang(""), "templates": showcase_templates(b), "field_name": (fieldpacks.FIELDS.get(field_guess(b)) or {}).get("name") or "",
            "ext": {"transcribe": transcribe, "plan": plan, "angle": angle, "speak": speak, "lipsync": lipsync, "classify": classify, "qa": qa_look, "cutaway": cutaway,
                    "person": person_fn if person.available() else None,
                    "broll": lambda q, base: stock_get("broll", q, base), "bg": lambda q, base: stock_get("bg", q, base),
@@ -33384,14 +33405,21 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
         r = showcase.build(cfg, src, lambda s, p: setst(step=s, progress=p))
         if lab:   # 🧪 المعمل: الفيديو والقطع ونوع الفيديو بس (من غير الفيديوهات الجاهزة ولا الإشعار)
             shutil.copy(r["video"], SC_LAB / lab / "out.mp4")
+            if r.get("templates_video"):
+                shutil.copy(r["templates_video"], SC_LAB / lab / "out_tpl.mp4")
             (SC_LAB / lab / "src.mp4").unlink(missing_ok=True)   # الفيديو الاستعراضي هو اللي بيتحفظ بس
             wallet.cost(spent["usd"], "تجربة الأدمن: معمل الفيديو الاستعراضي", ref="showcase-lab")
             setst(status="done", step=None, progress=100, error=None, duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"],
-                  usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"], done_at=now())
+                  usd=round(spent["usd"], 3), vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"], templates=r["templates"],
+                  field_name=cfg["field_name"], done_at=now())
             return
         export_id = uuid.uuid4().hex[:12]
         filename = f"showcase_{export_id}.mp4"
         shutil.copy(r["video"], EXPORTS_DIR / filename)
+        tpl_url = None
+        if r.get("templates_video"):   # أمثلة القوالب: فيديو لوحده بيتعرض بعد الاستعراضي
+            shutil.copy(r["templates_video"], EXPORTS_DIR / f"showcase_tpl_{export_id}.mp4")
+            tpl_url = f"/media/exports/showcase_tpl_{export_id}.mp4"
         with closing(db()) as conn, conn:
             old = (a.get("showcase") or {}).get("export_id")
             if old:   # النسخة القديمة (لو الأدمن أعاده) بتتشال
@@ -33405,7 +33433,8 @@ def run_showcase(bid: str, lab: str | None = None) -> None:
             wallet.cost(spent["usd"], "ترويج: الفيديو الاستعراضي من فيديو العميل", promo=True, ref="showcase")
         showcase_set(bid, status="done", step=None, progress=100, error=None, export_id=export_id, video=f"/media/exports/{filename}",
                      duration=r["duration"], chapters=r["chapters"], skipped=r["skipped"], usd=round(spent["usd"], 3), done_at=now(),
-                     vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"])
+                     vtype=r["type"], vtype_label=r["type_label"], what=r["what"], qa=r["qa"],
+                     templates_video=tpl_url, templates=r["templates"], field_name=cfg["field_name"])
         who = livevoice.agent_name(assist_dialect(), "f")
         notify("showcase", "ok", f"{who}: الفيديو الاستعراضي من فيديوك جاهز", "تجده في الفيديوهات الجاهزة، وفيه كل ما يمكن أن نفعله بفيديوهاتك.", "7")
     except Exception as exc:  # noqa: BLE001
@@ -33454,6 +33483,7 @@ def sc_lab_list():
         except (OSError, ValueError):
             continue
         d["video"] = f"/api/admin/showcase-lab/{d['id']}/video" if (f.parent / "out.mp4").exists() else None
+        d["templates_video"] = f"/api/admin/showcase-lab/{d['id']}/video?tpl=1" if (f.parent / "out_tpl.mp4").exists() else None
         out.append(d)
     return {"items": out}
 
@@ -33501,9 +33531,9 @@ def sc_lab_new(account: str = Form(""), name: str = Form(""), file: UploadFile |
 
 
 @app.get("/api/admin/showcase-lab/{lid}/video")
-def sc_lab_video(lid: str):
+def sc_lab_video(lid: str, tpl: int = 0):
     sc_lab_admin()
-    f = SC_LAB / re.sub(r"[^a-f0-9]", "", lid) / "out.mp4"
+    f = SC_LAB / re.sub(r"[^a-f0-9]", "", lid) / ("out_tpl.mp4" if tpl else "out.mp4")
     if not f.exists():
         raise HTTPException(404, "غير موجود")
     return FileResponse(f, media_type="video/mp4")
@@ -33523,6 +33553,7 @@ def showcase_state(b: dict) -> dict:
     return {"status": sc.get("status") or "none", "step": sc.get("step"), "progress": sc.get("progress") or 0, "error": sc.get("error"),
             "video": sc.get("video"), "duration": sc.get("duration"), "chapters": sc.get("chapters") or [],
             "what": sc.get("what") or "", "type": sc.get("vtype_label") or "",
+            "templates_video": sc.get("templates_video"), "templates": sc.get("templates") or [], "field_name": sc.get("field_name") or "",
             "has_video": bool(bid and showcase_src(bid)), "used": bool(a.get("showcase_used")) and TENANT_ROLE == "customer"}
 
 

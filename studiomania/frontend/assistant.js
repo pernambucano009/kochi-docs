@@ -301,7 +301,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     v.onpause = () => mic(true);
     v.onseeked = () => { const k = ch.findIndex((c) => v.currentTime < c.t1 - 0.1); if (k >= 0) { sh.i = k; mark(); } };
     v.ontimeupdate = () => {
-      if (sh.wait || S?.show !== sh) return;
+      if (sh.wait || S?.show !== sh || sh.tpl) return;
       const c = ch[sh.i]; if (!c || v.currentTime < c.t1 - 0.08) return;
       v.pause(); sh.wait = true; sh.at = performance.now(); sh.spoke = false;
       const last = sh.i === ch.length - 1;
@@ -310,7 +310,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (last) sh.end = true;
       sh.i = Math.min(ch.length - 1, sh.i + 1);
     };
-    v.onended = () => { if (!sh.wait) v.ontimeupdate(); };
+    v.onended = () => {
+      if (sh.tpl) { stop(); note("(SYSTEM: the template examples finished. Ask briefly what they think, then continue the tour (custom templates, then autopilot).)"); return; }
+      if (!sh.wait) v.ontimeupdate();
+    };
     // الجزء اللي بعده يكمّل لما سعاد تخلّص شرحها (أو بعد ١٥ ثانية لو ماردتش)
     sh.t = setInterval(() => {
       if (!S || S.show !== sh || !sh.wait) return;
@@ -318,6 +321,17 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (S.speaking) { sh.spoke = true; sh.quiet = 0; return; }
       sh.quiet = sh.quiet || now;
       if (((sh.spoke && !S.busy && now - sh.quiet > 700) || now - sh.at > 15000) && now - sh.at > 1200) {
+        if (sh.end && !sh.tpl && r.templates_video && (r.templates || []).length) {
+          // 🧩 فيديوه خلص: القوالب لوحدها (من مجاله)، سعاد تقدّمها الأول وبعدين الأمثلة تشتغل
+          sh.tpl = true; sh.at = performance.now(); sh.spoke = false;
+          d.querySelectorAll("[data-ch]").forEach((x) => x.classList.add("done"));
+          v.src = r.templates_video; v.load();
+          note(`(SYSTEM: the reel of their own video is finished. Now introduce SimsimKit templates for their field${r.field_name ? ` (${r.field_name})` : ""} in 2–3 short sentences, `
+            + `like: and based on your field we can use templates such as: ${r.templates.map((x) => `«${x.name}»: ${x.idea}`).join("; ")}. `
+            + "Explain that we use templates to make content that fits their field. The examples play right after you finish.)");
+          return;
+        }
+        if (sh.tpl) { if (!sh.tplOn) { sh.tplOn = true; v.play().catch(() => {}); } return; }   // سعاد قدّمت القوالب: الأمثلة تشتغل
         if (sh.end) { mark(); d.querySelectorAll("[data-ch]").forEach((x) => x.classList.add("done")); stop(); return; }
         mark(); v.play().catch(() => {});
       }

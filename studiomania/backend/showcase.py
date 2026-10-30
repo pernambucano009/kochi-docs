@@ -56,22 +56,30 @@ CHAPTERS["titles"] = {"title": "عناوين متحركة على الفيديو"
 CHAPTERS["dub_voice"] = {"title": "دبلجة التعليق الصوتي إلى لغة أخرى",
                          "did": "we dubbed the voice-over of this part into another language with a natural voice",
                          "can": "they can run a channel in every Arabic dialect and every language if they want"}
+CHAPTERS["dub2"] = {"title": "دبلجة بصوتك إلى لهجة أخرى",
+                    "did": "we made them say the same kind of sentence in another Arabic dialect, in their OWN voice, with the lips moving with it",
+                    "can": "they can publish their videos on several pages, each page in a different dialect or language"}
+CHAPTERS["dub_voice2"] = {"title": "دبلجة التعليق الصوتي إلى لهجة أخرى",
+                          "did": "we dubbed the voice-over of this part into another Arabic dialect",
+                          "can": "they can publish their videos on several pages, each page in a different dialect or language"}
+CHAPTERS["dub"]["can"] = "they can publish their videos on several pages, each page in a different dialect or language, all in their own voice"
 CHAPTERS["templates"] = {"title": "من قوالب سمسمكيت لمجالك", "did": "", "can": "we use these signature templates with them, with their name, logo and real offers"}
-ORDER = ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "dub", "finish"]
+ORDER = ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "finish", "dub2", "dub"]
 # 🎞️ اللقطات الداعمة (على كلمة قالها، وصوته شغال عليها) بتدخل في الأجزاء دي بس: اللي الميزة فيها مش محتاجة وشه طول الوقت
 CUTAWAY_KINDS = {"captions", "typo", "zoom", "finish", "titles", "grade"}
 # 🧭 الفيديو نوعه إيه؟ كل نوع ليه التعديلات اللي ليها معنى فيه بس (فيديو موسيقى بس مالوش ترجمة، ومن غير شخص مافيش «نص خلفك»)
 TYPES = {
     "talking": {"label": "a person talking to the camera", "kinds": ORDER},
     "voiceover": {"label": "footage with a voice-over (no one talking to the camera)",
-                  "kinds": ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "dub_voice", "finish"]},
+                  "kinds": ["captions", "typo", "zoom", "behind", "bg", "grade", "angle", "finish", "dub_voice2", "dub_voice"]},
     "people_music": {"label": "people on screen but no speech (music only)", "kinds": ["titles", "zoom", "behind", "bg", "grade", "angle", "finish"]},
     "broll_music": {"label": "no people and no speech (product/place footage with music)", "kinds": ["titles", "zoom", "grade", "angle", "finish"]},
 }
 # الزووم من غير كلام: على اللحظة المهمة في الصورة مش على كلمة
 ZOOM_NO_SPEECH = "a punch-in zoom on the key moment of the shot"
 NEEDS_PERSON = {"behind", "bg"}
-SPEECH = {"captions", "typo", "dub", "dub_voice"}
+SPEECH = {"captions", "typo", "dub", "dub_voice", "dub2", "dub_voice2"}
+DUBS = {"dub", "dub_voice", "dub2", "dub_voice2"}
 
 
 def video_type(has_speech: bool, people: bool, talking: bool) -> str:
@@ -265,6 +273,63 @@ def windows(words: list[dict], dur: float, kinds: list[str]) -> dict[str, tuple[
     return out
 
 
+def windows_seq(words: list[dict], dur: float, kinds: list[str]) -> tuple[list[str], dict[str, tuple[float, float]]]:
+    """🎬 فيديوه بيمشي متصل زي ما اتصوّر: القطع ورا بعض من أول جملة، كل قطعة جملة أو أكتر كاملة (٣-٦ ثواني)، والحد بين قطعتين
+    في نص السكتة بين الجملتين (مفيش جملة بتتقطع في نصها ولا قفزة في الكلام). الدبلجة (آخر قطعتين): جملة واحدة كاملة.
+    لو الفيديو مايكفيش كل الميزات: بنشيل من النص ونسيب الأول والدبلجة. بيرجع (الميزات بالترتيب، أوقاتها)."""
+    if not words:   # من غير كلام: ٤ ثواني ورا بعض
+        n = max(1, min(len(kinds), int(dur // SEG)))
+        ks = kinds[:n]
+        return ks, {k: (round(i * SEG, 3), round(min(dur, (i + 1) * SEG), 3)) for i, k in enumerate(ks)}
+    sents = []
+    for a, b in sentences(words):   # جملة أطول من ٦ ثواني بتتقسم عند أطول سكتة جواها
+        stack = [(a, b)]
+        while stack:
+            x, y = stack.pop(0)
+            if words[y]["e"] - words[x]["s"] > 6.0 and y - x >= 3:
+                j = max(range(x, y), key=lambda k: words[k + 1]["s"] - words[k]["e"] - abs(k - (x + y) / 2) * 0.01)
+                stack[:0] = [(x, j), (j + 1, y)]
+            else:
+                sents.append((x, y))
+    span = lambda a, b: words[b]["e"] - words[a]["s"]  # noqa: E731
+    want_dubs = [k for k in kinds if k in DUBS]
+    rest = [k for k in kinds if k not in DUBS]
+    # من أول الكلام: جمل متجمّعة (٢.٥ ثانية على الأقل) لكل ميزة، وبعدها على طول الجمل اللي جاية للدبلجة (كل واحدة جملة لوحدها)
+    ok_dub = [k for k in range(len(sents)) if 1.8 <= span(*sents[k]) <= 6.5]
+
+    def build(stop: int) -> tuple[list, list]:
+        chunks, i = [], 0
+        while i < stop and len(chunks) < len(rest):
+            a = i
+            while i < stop - 1 and span(sents[a][0], sents[i][1]) < 2.5:
+                i += 1
+            chunks.append((sents[a][0], sents[i][1]))
+            i += 1
+        return chunks, [k for k in ok_dub if k >= i][:len(want_dubs)]
+    chunks, dub_s = build(len(sents))
+    need = min(len(want_dubs), len(ok_dub))
+    if len(dub_s) < need:   # الدبلجة مهمة: لو الكلام قليل بنسيبلها آخر جملتين وبنقلل الميزات اللي قبلها
+        chunks, dub_s = build(ok_dub[-need])
+    want_dubs = want_dubs[:len(dub_s)]
+    if len(chunks) < len(rest):   # كلام أقل: بنشيل ميزات من النص (الأولى والختام بيفضلوا)
+        keep = rest[:1] + [k for k in rest[1:-1] if k not in ("behind", "bg", "angle", "grade")][:max(0, len(chunks) - 2)] + rest[-1:]
+        extra = [k for k in rest[1:-1] if k not in keep]
+        while len(keep) < len(chunks) and extra:
+            keep.insert(-1, extra.pop(0))
+        rest = keep[:len(chunks)]
+    seq = list(zip(rest, chunks)) + [(k, (sents[j][0], sents[j][1])) for k, j in zip(want_dubs, dub_s)]
+    ks, out = [], {}
+    for n, (k, (a, b)) in enumerate(seq):
+        s0 = words[a]["s"] - 0.12 if n == 0 else out[ks[-1]][1]
+        nxt = seq[n + 1][1][0] if n + 1 < len(seq) else None
+        e0 = (words[b]["e"] + words[nxt]["s"]) / 2 if nxt is not None and words[nxt]["s"] - words[b]["e"] < 1.2 else words[b]["e"] + 0.25
+        if k in DUBS:   # الجملة المدبلجة لوحدها (مش لازم تكمّل من اللي قبلها)
+            s0 = words[a]["s"] - 0.12
+        ks.append(k)
+        out[k] = (round(max(0.0, s0), 3), round(min(dur, e0), 3))
+    return ks, out
+
+
 def rel(words: list[dict], s: float, e: float) -> list[dict]:
     return [{"w": w["w"], "s": round(max(0.0, w["s"] - s), 3), "e": round(min(e, w["e"]) - s, 3)} for w in words if w["s"] >= s - 0.05 and w["s"] < e - 0.1]
 
@@ -288,7 +353,7 @@ def key_words(words: list[dict], n: int = 3) -> list[dict]:
     return sorted(sorted(words, key=lambda w: -len(_plain(w["w"])))[:n], key=lambda w: w["s"])
 
 
-def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, what: str = "", speech: bool = True) -> list[dict]:
+def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, what: str = "", speech: bool = True, dub_dialect: str = "") -> list[dict]:
     rows = "\n".join(f"- {k}: «{v}»" for k, v in texts.items()) if speech else "(this video has no speech)"
     return [{"role": "user", "content": (
         "We are editing a short showcase reel from a creator's own video. Each part below is a few seconds of what they say.\n"
@@ -302,6 +367,7 @@ def plan_messages(texts: dict[str, str], brand: str, niche: str, dub_lang: str, 
         ' "zoom": "the single most important word copied EXACTLY from the zoom part",\n'
         ' "behind": "1-2 short words to show huge behind the person (from the behind part, or the brand name), in the same language",\n'
         f' "dub": "the dub part translated into {dub_lang}, natural spoken style, about the same length",\n'
+        + (f' "dub2": "the dub2 part rewritten in {dub_dialect} exactly as people there speak (not Modern Standard Arabic), about the same length",\n' if dub_dialect else "") +
         ' "broll": "an English stock-video search query (2-4 words) that illustrates the IDEA of the finish part in the context of their field (not a literal word; adults, no children or schools unless the field is about them)",\n'
         ' "bg": "an English stock-photo search query (2-4 words) for a nice, clean place that fits THEIR field (e.g. a modern gym, a dental clinic, a cafe); no people",\n'
         ' "music": "an English music search query (2-3 words) for a fitting upbeat background track"}')}]
@@ -315,7 +381,7 @@ def clean_plan(raw: dict) -> dict:
     for x in raw.get("cutaways") or []:
         if isinstance(x, dict) and x.get("part") in CUTAWAY_KINDS and str(x.get("query") or "").strip() and x["part"] not in [c["part"] for c in cws]:
             cws.append({"part": x["part"], "word": str(x.get("word") or "").strip()[:40], "query": str(x["query"]).strip()[:200]})
-    return {"cutaways": cws, "titles": titles, "typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300),
+    return {"cutaways": cws, "titles": titles, "typo": typo, "zoom": s("zoom", 40), "behind": s("behind", 24), "dub": s("dub", 300), "dub2": s("dub2", 300),
             "broll": s("broll", 60), "bg": s("bg", 60), "music": s("music", 60)}
 
 
@@ -374,7 +440,9 @@ def fx_templates(c: dict, out: Path, items: list[dict]) -> float:
     parts, each = [], 3.2
     for k, it in enumerate(items):
         st = ["Style: T,SM Tajawal,58,&H00FFFFFF,&H00FFFFFF,&H8C000000,&H8C000000,-1,0,0,0,100,100,0,0,3,16,0,5,40,40,0,1"]
-        ev = [f"Dialogue: 3,{_ts(0.1)},{_ts(each)},T,,0,0,0,,{{\\pos({W // 2},{int(H * 0.86)})\\fad(150,150)}}{it['name']}"]
+        ev = [f"Dialogue: 3,{_ts(0.1)},{_ts(each)},T,,0,0,0,,{{\\pos({W // 2},{int(H * 0.86)})\\fad(150,150)}}{it['name']}",
+              f"Dialogue: 3,{_ts(0.1)},{_ts(each)},U,,0,0,0,,{{\\pos({W // 2},235)}}{CHAPTERS['templates']['title']}"]
+        st.append(f"Style: U,SM Tajawal,60,&H00FFFFFF,&H00FFFFFF,{textlayer.ass_color(c['accent'])},{textlayer.ass_color(c['accent'])},-1,0,0,0,100,100,0,0,3,22,0,5,40,40,0,1")
         lab = write(c["work"] / f"tpl_{k}.ass", label_ass(0, 0, "", c["accent"], ev, st))
         q = c["work"] / f"tpl_{k}.mp4"
         dur, has_a = probe(c["ffmpeg"], Path(it["video"]))
@@ -616,30 +684,23 @@ def build(c: dict, src: Path, step) -> dict:
         kinds = [k for k in kinds if k not in NEEDS_PERSON]
     if not has_speech:
         words = []
-    if "dub" in kinds and len(words) < 4:
-        kinds.remove("dub")
-    dub_k = "dub" if "dub" in kinds else "dub_voice" if "dub_voice" in kinds else None
-    win = windows(words, dur, [("dub" if k == "dub_voice" else k) for k in kinds])
-    if dub_k == "dub_voice" and "dub" in win:
-        win["dub_voice"] = win.pop("dub")
-    if dub_k and dub_k not in win:
-        kinds.remove(dub_k)
+    if len(words) < 4:
+        kinds = [k for k in kinds if k not in DUBS]
+    kinds, win = windows_seq(words, dur, kinds)
     texts = {k: " ".join(w["w"] for w in rel(words, *win[k])) for k in kinds}
     step("🧠 يختار اللحظات", 12)
     try:
-        plan = clean_plan(c["ext"]["plan"](plan_messages({("dub" if k == "dub_voice" else k): v for k, v in texts.items()}, c.get("brand", ""),
-                                                         c.get("niche", ""), c["dub_lang"][2], c["what"], has_speech)) or {})
+        plan = clean_plan(c["ext"]["plan"](plan_messages({{"dub_voice": "dub", "dub_voice2": "dub2"}.get(k, k): v for k, v in texts.items()}, c.get("brand", ""),
+                                                         c.get("niche", ""), c["dub_lang"][2], c["what"], has_speech, (c.get("dub_dialect") or ("", "", ""))[2])) or {})
     except Exception as exc:  # noqa: BLE001  (من غير العقل: أطول الكلمات، ومن غير دبلجة)
         print(f"showcase plan: {exc}", flush=True)
         plan = clean_plan({})
-    if not plan["dub"] and dub_k in kinds:
-        kinds.remove(dub_k)
+    for k, key in (("dub", "dub"), ("dub_voice", "dub"), ("dub2", "dub2"), ("dub_voice2", "dub2")):
+        if k in kinds and (not plan.get(key) or (key == "dub2" and not c.get("dub_dialect"))):
+            kinds.remove(k)
     if "titles" in kinds and not plan["titles"]:
         plan["titles"] = [x for x in (c.get("brand") or "", c.get("niche") or "") if x][:2] or ["✓"]
-    # 🧩 وقفة القوالب في نص الفيديو (أمثلة من قوالبنا لمجاله)
-    if c.get("templates"):
-        kinds.insert(min(4, len(kinds)), "templates")
-    has_outro = bool(c.get("logo") or c.get("brand"))
+    has_outro = False   # آخر جزء في فيديوه هو الدبلجة (صاحب المنصة)، والقوالب بعده لوحدها
     total = len(kinds) + int(has_outro)
     parts, chapters, skipped, t = [], [], [], 0.0
     # الحاجات الخارجية (الصور والموسيقى) بتتجاب الأول، ولو فشلت القطعة بتكمل من غيرها
@@ -709,6 +770,10 @@ def build(c: dict, src: Path, step) -> dict:
                 fx_dub(c, clip, out, d, lab, plan["dub"], c["dub_lang"][1])
             elif kind == "dub_voice":
                 fx_dub(c, clip, out, d, lab, plan["dub"], c["dub_lang"][1], lip=False)
+            elif kind == "dub2":
+                fx_dub(c, clip, out, d, lab, plan["dub2"], c["dub_dialect"][1])
+            elif kind == "dub_voice2":
+                fx_dub(c, clip, out, d, lab, plan["dub2"], c["dub_dialect"][1], lip=False)
             elif kind == "titles":
                 fx_titles(c, clip, out, d, lab, plan["titles"])
             elif kind == "finish":
@@ -762,7 +827,19 @@ def build(c: dict, src: Path, step) -> dict:
     lst = write(work / "list.txt", "".join(f"file '{p.as_posix()}'\n" for p in parts))
     final = work / "showcase.mp4"
     run(ff(ffm) + ["-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(final)], 600)
+    # 🧩 القوالب لوحدها بعد ما فيديوه يخلص (مش في نصه): أمثلة من قوالب مجاله هو بس
+    tpl_video, tpl_info = None, []
+    if c.get("templates"):
+        try:
+            step("🧩 يجهّز أمثلة القوالب", 98)
+            tpl_video = work / "templates.mp4"
+            fx_templates(c, tpl_video, c["templates"])
+            tpl_info = [{"name": x["name"], "idea": x["idea"]} for x in c["templates"]]
+        except Exception as exc:  # noqa: BLE001
+            print(f"showcase templates: {str(exc)[:300]}", flush=True)
+            tpl_video = None
     return {"video": final, "duration": round(t, 2), "chapters": chapters, "skipped": skipped, "plan": plan, "qa": review,
+            "templates_video": tpl_video, "templates": tpl_info,
             "type": vtype, "type_label": TYPES[vtype]["label"], "what": c["what"]}
 
 
