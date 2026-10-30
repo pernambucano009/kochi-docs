@@ -33581,8 +33581,103 @@ def sc_lab_delete(lid: str):
     return {"ok": True}
 
 
+# 🏆 الفيديوهات الاستعراضية الجاهزة لكل مجال (قرار صاحب المنصة): بتتعمل في «معمل الاستعراض» وبتتعتمد بعينه، ومشتركة لكل العملاء.
+# في المكالمة بيتعرض المعتمد لمجال العميل على طول (من غير انتظار ولا أعطال ولا تكلفة لكل عميل). الفيديو اللي من صفحته اتوقف.
+SC_LIB = providers.state_file(DATA_DIR).parent / "showcase_lib"
+
+
+def sc_lib(field: str) -> dict | None:
+    f = SC_LIB / f"{re.sub(r'[^a-z]', '', field or '')}.json"
+    try:
+        d = json.loads(f.read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    return d if (SC_LIB / d.get("video", "-")).exists() else None
+
+
+class ScApproveIn(BaseModel):
+    field: str
+
+
+@app.post("/api/admin/showcase-lab/{lid}/approve")
+def sc_lab_approve(lid: str, body: ScApproveIn):
+    """✓ تجربة من المعمل ← الفيديو الاستعراضي الرسمي لمجال (بيستبدل القديم)، ومعاه أمثلة قوالب المجال ده."""
+    sc_lab_admin()
+    lid = re.sub(r"[^a-f0-9]", "", lid)
+    if body.field not in fieldpacks.FIELDS:
+        raise HTTPException(400, "اختر المجال")
+    folder = SC_LAB / lid
+    try:
+        job = json.loads((folder / "job.json").read_text("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(404, "التجربة غير موجودة") from exc
+    if job.get("status") != "done" or not (folder / "out.mp4").exists():
+        raise HTTPException(400, "التجربة لم تكتمل")
+    SC_LIB.mkdir(parents=True, exist_ok=True)
+    stamp = uuid.uuid4().hex[:6]
+    vid = f"{body.field}-{stamp}.mp4"
+    shutil.copy(folder / "out.mp4", SC_LIB / vid)
+    # أمثلة القوالب للمجال ده نفسه (مش مجال حساب الأدمن)
+    tpl_name, tpls = None, showcase_templates({"field": body.field})
+    if tpls:
+        work = folder / "tplwork"
+        work.mkdir(exist_ok=True)
+        try:
+            showcase.fx_templates({"ffmpeg": ffmpeg_exe(), "work": work, "fonts": FONTS_DIR, "accent": "#E5613E"}, work / "t.mp4", tpls)
+            tpl_name = f"{body.field}-{stamp}-tpl.mp4"
+            shutil.copy(work / "t.mp4", SC_LIB / tpl_name)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[showcase lib] templates {body.field}: {exc}", flush=True)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    old = sc_lib(body.field)
+    meta = {"field": body.field, "field_name": fieldpacks.FIELDS[body.field]["name"], "video": vid, "templates_video": tpl_name,
+            "templates": [{"name": x["name"], "idea": x["idea"]} for x in tpls] if tpl_name else [], "chapters": job.get("chapters") or [],
+            "duration": job.get("duration"), "what": job.get("what") or "", "type": job.get("vtype_label") or "", "lab": lid, "approved_at": now()}
+    (SC_LIB / f"{body.field}.json").write_text(json.dumps(meta, ensure_ascii=False), "utf-8")
+    for k in ("video", "templates_video"):   # النسخة القديمة بتتشال
+        if old and old.get(k) and old[k] != meta.get(k):
+            (SC_LIB / old[k]).unlink(missing_ok=True)
+    return {"ok": True, **meta}
+
+
+@app.get("/api/admin/showcase-lib")
+def sc_lib_list():
+    sc_lab_admin()
+    return {"items": [x for x in (sc_lib(f) for f in fieldpacks.FIELDS) if x],
+            "fields": [{"key": k, "name": v["name"]} for k, v in fieldpacks.FIELDS.items()]}
+
+
+@app.delete("/api/admin/showcase-lib/{field}")
+def sc_lib_delete(field: str):
+    sc_lab_admin()
+    d = sc_lib(field)
+    if d:
+        for k in ("video", "templates_video"):
+            if d.get(k):
+                (SC_LIB / d[k]).unlink(missing_ok=True)
+        (SC_LIB / f"{d['field']}.json").unlink(missing_ok=True)
+    return {"ok": True}
+
+
+@app.get("/api/showcase-lib/{name}")
+def sc_lib_file(name: str):
+    """الفيديو الاستعراضي المعتمد (لأي عميل في المكالمة)."""
+    f = SC_LIB / re.sub(r"[^a-z0-9.-]", "", name)
+    if f.suffix != ".mp4" or not f.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="video/mp4")
+
+
 def showcase_state(b: dict) -> dict:
     a = b.get("assistant") or {}
+    lib = sc_lib(field_guess(b))
+    if lib:   # الجاهز المعتمد لمجاله: جاهز فورًا
+        return {"status": "done", "step": None, "progress": 100, "error": None, "ready_made": True,
+                "video": f"/api/showcase-lib/{lib['video']}", "duration": lib.get("duration"), "chapters": lib.get("chapters") or [],
+                "what": lib.get("what") or "", "type": lib.get("type") or "",
+                "templates_video": f"/api/showcase-lib/{lib['templates_video']}" if lib.get("templates_video") else None,
+                "templates": lib.get("templates") or [], "field_name": lib.get("field_name") or "", "has_video": True, "used": False}
     sc = a.get("showcase") or {}
     bid = b.get("id") or active_client_id()
     return {"status": sc.get("status") or "none", "step": sc.get("step"), "progress": sc.get("progress") or 0, "error": sc.get("error"),

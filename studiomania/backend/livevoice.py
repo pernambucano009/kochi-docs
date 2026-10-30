@@ -158,8 +158,6 @@ TOOLS = [
      "others, they like filming themselves or not, they want autopilot or not) into their brand profile.",
      "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot", "presenter"]},
                                                      "text": {"type": "string", "description": "Their answer, clearly, in Arabic."}}, "required": ["topic", "text"]}},
-    {"type": "function", "name": "start_showcase", "description": "Start making the showcase reel from the user's own video (only after they agreed). "
-     "It renders in the background for a few minutes.", "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "get_showcase", "description": "Check whether the showcase reel is ready (and how far it got).",
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "play_showcase", "description": "Show the ready showcase reel on the user's screen and start playing it.",
@@ -278,22 +276,17 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     ]
     tour_lines = []
     # 🎬 الفيديو الاستعراضي من فيديوهم: كل جزء فيه ميزة، وهي بتشرح كل جزء وهو بيتعرض
-    if not tools:
-        showcase_goal = "Skip this step."
-    elif have.get("showcase") == "done" and have.get("showcase_used"):
-        showcase_goal = "Their showcase reel was already made and shown: skip this step (they find it in their ready videos)."
-    elif have.get("showcase") == "working":
-        showcase_goal = "Their showcase reel is being made right now: check get_showcase, and play it when it is ready."
-    elif have.get("showcase") == "done":
-        showcase_goal = "Their showcase reel is ready: ask if they want to watch it now, and if yes call play_showcase."
+    # 🏆 فيديو استعراضي جاهز ومعتمد لمجاله (مش من صفحته): بيتعرض على طول، ولو مجاله مالوش فيديو المحطة دي بتتشال
+    if tools and have.get("showcase") == "done":
+        showcase_goal = ("We have a polished example reel made for their field, where every few seconds shows a different thing the platform can do. "
+                         "Ask in one sentence if they would like to see a practical example of our work in their field; if yes call play_showcase "
+                         "and explain each part while it plays (the screen sends you what each part shows). It is an example, not their own video: "
+                         "never say it is made from their video. If they say no, move on.")
     else:
-        showcase_goal = ("We prepare in the background a short reel from one of the videos on their own page, where every few seconds shows a "
-                         "different thing the platform can do. When the screen says it is ready (or get_showcase says done), ask in one sentence if they "
-                         "would like to see a practical example of our work on one of their own videos; if yes call play_showcase and explain each part "
-                         "while it plays. If it is not ready yet, skip this stop without mentioning it; if they say no, move on.")
+        showcase_goal = "Skip this step."
     for k, txt in stops:
         if k == "showcase":
-            txt = None if "Skip this step" in showcase_goal or "skip this step" in showcase_goal else "The showcase reel: " + showcase_goal
+            txt = None if showcase_goal == "Skip this step." else "The showcase reel: " + showcase_goal
         elif k in seen:
             continue
         if txt:
@@ -320,11 +313,7 @@ Tools (use them silently, never read them out loud):
   and tell them in one short sentence that you will look them up and they will get a notification to confirm the ones you found.
 - If the account analysis is not ready when you reach that stop, say the results will appear on their screen in a few minutes, move on,
   and come back to it later in the tour (call get_account_analysis again).
-- The showcase reel: ask their permission to take one of the videos from their own page; call start_showcase only after they agreed.
-  We take the video from their page ourselves: NEVER ask them to upload or send a video. If it fails, say kindly you could not find
-  a suitable video on their page and move on.
-  While it renders, keep the conversation going (the account findings, their questions). Call get_showcase at most once a minute and
-  never invent its progress. The screen also tells you when it is ready: then tell them in one short sentence and call play_showcase.
+- Never ask them to upload or send a video.
 - During the reel the screen pauses after each part and sends you (SYSTEM: …) with what was done in that part and what else is
   possible. Explain it in 1–2 short, lively sentences in the dialect (what we did here, and what else they can do with it), in their
   terms (their field, their clients), then stop talking: the reel continues by itself. Do not ask a question after each part.

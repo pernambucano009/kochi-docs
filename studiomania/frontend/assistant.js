@@ -172,7 +172,6 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: args.account || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) {
         changed(); step("account"); acct(false); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount();
-        api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).then((x) => { if (x?.ok) pollShow(); }).catch(() => {});
       }
       return r;
     }
@@ -351,7 +350,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }, 200);
     mark(); v.load(); api("/api/assistant/card/showcase").catch(() => {});
     return { ok: true, playing: true, parts: ch.map((c) => c.title), video: { shows: r.what || "", type: r.type || "" },
-      note: "The reel is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish. When you explain each part, "
+      note: "The example reel for their field is on their screen. Say one short sentence like 'watch', then stop talking: it starts when you finish. When you explain each part, "
         + "describe ONLY what the SYSTEM message says was done in it and what this video really shows; never mention a person, speech or captions if the video has none." };
   }
   // 🧭 كروت الجولة: كل محطة بكارت (بيانات حقيقية من البرنامج)، وسعاد بتتكلم عنه
@@ -732,8 +731,6 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: v }) }).catch((e) => ({ ok: false, error: e.message }));
     if (r.ok) {
       changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount();
-      // 🎬 الفيديو الاستعراضي بيتجهّز في الخلفية من دلوقتي (بياخد دقايق)، وسعاد بتعرضه عليه لما يجهز
-      api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).then((x) => { if (x?.ok) pollShow(); }).catch(() => {});
     }
     say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly and go on with the next question.)`
       : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);

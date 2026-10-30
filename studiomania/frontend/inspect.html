@@ -102,6 +102,7 @@
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="slAcc" dir="ltr" placeholder="@account أو رابط الحساب" style="min-width:220px">
         <label class="btn">📎 أو ارفع فيديو<input type="file" id="slFile" accept="video/*" hidden></label><span class="mute" id="slFn"></span>
         <button class="btn" id="slGo">▶ اصنع الفيديو الاستعراضي</button><button class="btn" id="slReload">↻ حدّث</button><span class="mute" id="slMsg"></span></div></div>
+    <div class="card"><div class="row"><b>🏆 الفيديوهات المعتمدة لكل مجال</b><span class="mute">هذا ما يُعرض على العميل في المكالمة حسب مجاله. اعتمد تجربة من الأسفل لمجالها.</span></div><div id="slLib" style="margin-top:8px"></div></div>
     <div id="slRows"></div>
   </section>
   <section data-p="calls" hidden>
@@ -321,10 +322,21 @@ function tab(t) {
   if (t === "sclab") loadLab();
 }
 // 🎬 معمل الاستعراض: كل تجربة بنوع الفيديو ووصفه، والفيديو، وكل جزء: اللي اتعمل فيه واللي ممكن يتعمل (ده اللي سعاد بتشرحه)
+const SL = { fields: [] };
+async function loadLib() {
+  const d = await api("/api/admin/showcase-lib").catch(() => ({ items: [], fields: [] }));
+  SL.fields = d.fields || [];
+  $("slLib").innerHTML = (d.items || []).map((x) => `<div class="row" data-libf="${esc(x.field)}" style="gap:10px;align-items:flex-start;margin-bottom:8px">
+    <video src="/api/showcase-lib/${esc(x.video)}" controls playsinline style="height:220px;max-width:125px;background:#000;border-radius:8px"></video>
+    <div><b>${esc(x.field_name)}</b><div class="mute">${esc(x.duration || "")} ثانية · ${(x.chapters || []).length} أجزاء${(x.templates || []).length ? ` · ${x.templates.length} قوالب` : ""}</div>
+    <button class="btn" data-libdel>إزالة</button></div></div>`).join("") || `<span class="mute">لا يوجد فيديو معتمد بعد: لن تعرض سعاد فيديو استعراضيًا حتى تعتمد واحدًا لمجال العميل.</span>`;
+}
 async function loadLab() {
+  if (!SL.fields.length) await loadLib();
   const d = await api("/api/admin/showcase-lab").catch((e) => ({ items: [], err: e.message }));
   $("slRows").innerHTML = d.err ? `<div class="card mute">${esc(d.err)}</div>` : (d.items || []).map((x) => `<div class="card" data-sl="${esc(x.id)}">
     <div class="row"><b>${esc(x.name || x.id)}</b><span class="mute">${x.status === "working" ? `⏳ ${esc(x.step || "")} · ${x.progress || 0}٪` : x.status === "failed" ? `⚠️ ${esc(x.error || "")}` : `✓ ${x.duration || ""} ثانية${x.usd != null ? ` · $${Number(x.usd).toFixed(2)}` : ""}`}</span>
+      ${x.status === "done" ? `<select data-slf>${(SL.fields || []).map((f) => `<option value="${esc(f.key)}">${esc(f.name)}</option>`).join("")}</select><button class="btn" data-slok>✓ اعتمده لهذا المجال</button>` : ""}
       <button class="btn" data-sldel>حذف</button></div>
     ${x.status === "done" ? `<div class="row" style="align-items:flex-start;gap:14px;margin-top:8px"><video src="${esc(x.video)}" controls playsinline style="height:420px;max-width:240px;background:#000;border-radius:10px"></video>
       <div style="flex:1;min-width:260px"><p><b>نوع الفيديو:</b> ${esc(x.vtype_label || "")}<br><b>ما يظهر فيه:</b> ${esc(x.what || "—")}${(x.skipped || []).length ? `<br><b>أجزاء لم تكتمل:</b> ${x.skipped.map((k) => typeof k === "string" ? esc(k) : `${esc(k.title)} <span class="mute" dir="ltr">(${esc(k.error || "")})</span>`).join("، ")}` : ""}</p>
@@ -348,8 +360,20 @@ $("slGo").onclick = async () => {
     $("slMsg").textContent = "بدأ ✓ (يستغرق بضع دقائق)"; $("slFile").value = ""; $("slFn").textContent = ""; loadLab();
   } catch (e) { $("slMsg").textContent = "⚠️ " + e.message; } finally { $("slGo").disabled = false; }
 };
+$("slLib").onclick = async (e) => {
+  const r = e.target.closest("[data-libf]"); if (!r || !e.target.closest("[data-libdel]") || !confirm("أتزيل الفيديو المعتمد لهذا المجال؟")) return;
+  await api(`/api/admin/showcase-lib/${r.dataset.libf}`, { method: "DELETE" }).catch(() => {}); loadLib();
+};
 $("slRows").onclick = async (e) => {
-  const c = e.target.closest("[data-sl]"); if (!c || !e.target.closest("[data-sldel]")) return;
+  const c = e.target.closest("[data-sl]"); if (!c) return;
+  if (e.target.closest("[data-slok]")) {
+    const field = c.querySelector("[data-slf]").value, b = e.target.closest("[data-slok]");
+    b.disabled = true; b.textContent = "⏳ يعتمد…";
+    try { await api(`/api/admin/showcase-lab/${c.dataset.sl}/approve`, { method: "POST", body: JSON.stringify({ field }) }); b.textContent = "✓ اعتُمد"; loadLib(); }
+    catch (err) { b.disabled = false; b.textContent = "✓ اعتمده لهذا المجال"; alert(err.message); }
+    return;
+  }
+  if (!e.target.closest("[data-sldel]")) return;
   if (!confirm("أتحذف هذه التجربة؟")) return;
   await api(`/api/admin/showcase-lab/${c.dataset.sl}`, { method: "DELETE" }).catch(() => {}); loadLab();
 };
