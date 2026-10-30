@@ -54,7 +54,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-send:hover{filter:brightness(1.08)}
 .as-btn[data-mute].on{background:#E5613E;color:#fff;border-color:#E5613E}
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
-.as-ov.dock .as-orb{width:min(240px,36vh)}.as-ov.dock .as-type input{width:min(80vw,300px)}
+.as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
 .as-ov.dock .as-show video{height:min(46vh,440px)}.as-chs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:100%}
@@ -104,11 +104,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (vis && open) from.style.visibility = "hidden";   // الدايرة نفسها هي اللي اتحولت للكرة
     return o.animate(k({ transform: small }, { transform: "none" }), opt);
   }
-  function close() {
+  // instant: خرج من صفحة العقل (رجوع / الرئيسية): المساعدة بتختفي في نفس اللحظة، من غير حركة القفل اللي كانت بتتركب فوق الصفحة الجديدة
+  function close(instant = false) {
     return new Promise((res) => {
       if (!ov) return res();
       const o = ov; ov = null;
       const done = () => { orb?.stop(); orb = null; o.remove(); if (from) from.style.visibility = ""; res(); };
+      if (instant) { if (dock) docked(false); done(); return; }
       // الخريطة بترجع لمكانها الأول، وبعدها الكرة تصغر ناحية دايرة سعاد في مكانها الجديد (مش القديم)
       const go = () => { const a = grow(false, o); o.classList.remove("on"); if (a) a.onfinish = done; else done(); setTimeout(() => o.isConnected && done(), 1200); };
       if (dock) { docked(false); requestAnimationFrame(() => requestAnimationFrame(go)); } else go();
@@ -563,7 +565,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     S.logT = setInterval(() => flush(false), 15000);
     ["input", "pointerdown", "change"].forEach((ev) => ov.addEventListener(ev, () => { if (S) { S.lastAct = performance.now(); S.idleN = 0; } }, true));   // بيكتب أو بيختار حاجة: مش ساكت
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
-    if (dock) { let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false); } }, 400); }
+    if (dock) {
+      let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false, true); } }, 400);
+      // الصفحة اتغيّرت (زرار «رجوع» أو الرئيسية): المكالمة تقفل في نفس اللحظة قبل ما الصفحة الجديدة ترسم نفسها
+      S.onHash = () => { if (S && !/^#brand/.test(location.hash)) { lg("sys", "left brain page"); end(false, true); } };
+      addEventListener("hashchange", S.onHash);
+    }
     S.capT = setInterval(capTick, 120);
     // ⬅️ زرار الرجوع بيقفل المساعد (والكرة تصغر وترجع) بدل ما يسيبها على الشاشة: خطوة في التاريخ بنفس العنوان
     history.pushState({ ...(history.state || {}), assistant: 1 }, "", location.href); S.hist = true;
@@ -765,9 +772,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     requestAnimationFrame(loop);
   }
-  async function end(finished) {
+  async function end(finished, instant = false) {
     if (!S) return;
     const s = S; S = null;
+    removeEventListener("hashchange", s.onHash);
     clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
     // 💸 تكلفة المكالمة (ببلاش على العميل، بس علينا) ← عدّاد الصرف، وبتتكتب في سجل المكالمة في «معمل سعاد»
     if (s.greeted) {
@@ -781,12 +789,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
     // التأجيل لنفس العلامة بس: حساب جديد على نفس المتصفح (أو علامة تانية) المساعدة بتطلعله عادي
     else try { localStorage.setItem(SKIP_KEY, JSON.stringify({ b: state?.brand || "", t: Date.now() })); } catch { /* التخزين مقفول */ }
-    await close();
+    await close(instant);
     if (typeof NH !== "undefined") NH?.refresh?.();
     S_done?.();
   }
   let S_done = null;
-  addEventListener("popstate", () => { if (S) { S.hist = false; end(false); } });
+  addEventListener("popstate", () => { if (S) { S.hist = false; end(false, dock); } });
 
   // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص
   // 🔒 مكالمة واحدة بس: ضغطتين ورا بعض (أو الفتح التلقائي مع ضغطة) كانوا بيفتحوا مكالمتين بيتكلموا مع بعض
