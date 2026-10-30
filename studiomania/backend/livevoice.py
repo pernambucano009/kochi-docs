@@ -93,6 +93,8 @@ VOICE_GENDER = {"marin": "f", "cedar": "m", "coral": "f", "sage": "f", "shimmer"
                 "Achird": "m", "Zubenelgenubi": "m", "Vindemiatrix": "f", "Sadachbia": "m", "Sadaltager": "m", "Sulafat": "f"}
 # أسئلة العقل اللي الموديل بيسألها بالترتيب (من نفس كويز العقل، عشان كل إجابة تروح خانتها)
 SKIP_Q = {"language", "link", "type"}   # اللهجة معروفة من التسجيل، والحساب بيتطلب الأول، والنوع بيبان من الوصف
+# 💸 المكالمة استعراض (وبتتكلف فلوس): بنسأل بس اللي محتاجينه عشان نحلل ونجيب منافسين ونعمل الفيديو. الباقي العقل بيسأله بعدين
+CALL_Q = ["domain", "about", "audience", "market"]
 
 
 def agent_name(dialect: str, gender: str) -> str:
@@ -104,7 +106,7 @@ def quiz_questions() -> list[tuple[str, str]]:
     """(رقم السؤال في كويز العقل، نصه) بالترتيب."""
     try:
         import brainquiz  # noqa: PLC0415
-        return [(q["id"], q["ar"]) for q in brainquiz.Q if q["id"] not in SKIP_Q]
+        return [(q["id"], q["ar"]) for q in brainquiz.Q if q["id"] in CALL_Q]
     except Exception:  # noqa: BLE001
         return [("domain", "ما مجال عملك؟"), ("about", "صِف مشروعك: ماذا تقدم، وما الذي يميزك؟"), ("audience", "من هو عميلك المثالي؟"),
                 ("market", "في أي مدينة أو دولة عملاؤك؟")]
@@ -133,7 +135,7 @@ TOOLS = [
                         "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
      "you start talking about that stop). Returns real data and facts to talk about; if ok is false, skip that stop.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis", "types", "phone", "avatar", "process", "custom", "autopilot", "library"]}},
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis"]}},
                     "required": ["kind"]}},
     {"type": "function", "name": "suggest_competitor", "description": "Find ONE real account in the user's field and area (a possible competitor) "
      "and show it on their screen with its real numbers. Each call shows a different account. Takes a few seconds.",
@@ -248,8 +250,6 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                      "generous, e.g. the cases they show look great), then what could be better in it (lighting, color grading, quality, sound, "
                      "the first seconds, text on screen) from the review. Then 1–2 account-level points (posting rhythm, bio, call to action). "
                      "One or two videos per turn, then ask what they think; continue with the next video if they are interested."),
-        ("types", "Video types: call show_card types. Say which kinds of videos fit them (in their terms), and ask if they want to keep "
-                  "these or also try other kinds. Save their answer with save_preference (topic types)."),
         ("rivals", "COMPETITORS: an important stop, never skip it, but you only OPEN the topic: the user adds more later by themselves from "
                    "their competitors page. Goal: agree together on at least one real competitor for their competitors page. If they already "
                    "named competitors in the questions, start from those (do not ask again who their competitors are).\n"
@@ -270,16 +270,11 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                    "one sentence they can add more any time from their competitors page, and go to the next stop. Never come back to "
                    "competitors in this call, and never ask about them again.\n"
                    "      Use only the real numbers from the tools; never invent a page or a number."),
-        ("phone", "Phone videos: call show_card phone. Explain they can film themselves with the phone and our teleprompter shows the script "
-                  "while they film, then we edit it. Ask if they like appearing in their videos."),
-        ("avatar", "The avatar: call show_card avatar. Explain the digital copy of them (only with their permission) that talks with new "
-                   "words without filming. Ask if that interests them."),
+        ("filming", "Filming: ask ONE simple question in their terms: do they like to film their videos themselves (with their phone)? Save the "
+                    "answer (save_preference topic phone). If they say no, ask: would they be interested in an avatar, a digital copy of them "
+                    "(only with their permission) that we use to make their videos without filming? Save it (topic avatar). No cards, no long "
+                    "explanations: one or two sentences each."),
         ("showcase", None),
-        ("process", "How a video is made: call show_card process. Explain idea → script → editing → voice → publishing, and that at each step "
-                    "they choose fully automatic, approve each step, or do it themselves. Ask which level of control they prefer and save it (topic process)."),
-        ("custom", "Custom templates: call show_card custom. Explain they can build their own template once and run it any time. One short question."),
-        ("autopilot", "The finale, autopilot: call show_card autopilot. Explain it posts every day at the best times from the templates they "
-                      "choose, by itself or after their approval. Ask if they would like to turn it on, and save their answer (topic autopilot)."),
     ]
     tour_lines = []
     # 🎬 الفيديو الاستعراضي من فيديوهم: كل جزء فيه ميزة، وهي بتشرح كل جزء وهو بيتعرض
@@ -292,10 +287,10 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     elif have.get("showcase") == "done":
         showcase_goal = "Their showcase reel is ready: ask if they want to watch it now, and if yes call play_showcase."
     else:
-        showcase_goal = ("Offer a gift, and ask their permission: we take one of the videos from their own page (they upload nothing) and make a short reel"
-                         + " from it, where every few seconds shows a different thing the platform can do (captions, moving text, zoom, text behind them, a new "
-                         "background, colors, a second camera angle, dubbing in their own voice, music and footage), and you explain each part while it plays. "
-                         "Ask if they would like it; if yes, call start_showcase. If they say no or later, move on.")
+        showcase_goal = ("We prepare in the background a short reel from one of the videos on their own page, where every few seconds shows a "
+                         "different thing the platform can do. When the screen says it is ready (or get_showcase says done), ask in one sentence if they "
+                         "would like to see a practical example of our work on one of their own videos; if yes call play_showcase and explain each part "
+                         "while it plays. If it is not ready yet, skip this stop without mentioning it; if they say no, move on.")
     for k, txt in stops:
         if k == "showcase":
             txt = None if "Skip this step" in showcase_goal or "skip this step" in showcase_goal else "The showcase reel: " + showcase_goal
@@ -303,11 +298,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
             continue
         if txt:
             tour_lines.append(f"   {chr(97 + len(tour_lines))}. {txt}")
-    tour = ("A guided tour of what the platform can do for them, one stop at a time, in this order (it is long and that is fine: they can stop "
-            "any time and continue later from where you stopped). At each stop: call the tool in the same turn, explain in 1–3 short sentences "
-            "in their terms, ask ONE short question and wait. Never read the card out loud; talk about it."
-            + (" The showcase reel is the heart of this tour and takes several minutes to make: if they did not agree to it yet when they typed "
-               "their account, offer it right after the analysis stop (start it if they agree); play it as soon as the screen says it is ready." if "Offer a gift" in showcase_goal else "")
+    tour = ("A SHORT tour, one stop at a time, in this order. Keep the whole call short: never add topics that are not in this list, never "
+            "talk about templates, video downloading or features they did not ask about. At each stop: 1–2 short sentences in their terms, "
+            "ONE short question, then wait. Never read a card out loud; talk about it."
             + " Do not suggest video ideas or scripts unless they ask you."
             + "\n" + "\n".join(tour_lines)
             ) if tools and tour_lines else "Skip this step."
@@ -320,9 +313,6 @@ Tools (use them silently, never read them out loud):
   call show_input with that kind,
   and tell them they can type it or upload it in the box that appeared. The screen tells you when they uploaded something.
   If they say later, not now, or that they have none, call show_input with kind "none" and move on.
-- Right after they typed their account and its analysis started, ask in one short sentence for their permission to make a gift: a short
-  showcase reel from one of the videos on their own page (they upload nothing). If they agree, call start_showcase right away (it waits for
-  the analysis by itself and takes several minutes), then continue with the questions. It plays later in the tour when it is ready.
 - The account link must be TYPED by the user in the box (spoken links are not accepted). If they say it by voice, thank them and
   ask them to type it in the box. Only after they typed it, call start_account_analysis with exactly what they typed. NEVER guess or make up an account (not from the brand name, not from anything else). If they say later, do not
   call it and do not say you are checking it: just say no problem and move on.
@@ -387,8 +377,10 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting.
 4. {tour}
-5. At the very end, before saying goodbye: call show_card library and remind them warmly not to forget to add to their content library as
-   many photos and videos as they can (their logo, their work, cases, place, team), because we use them to make their content.
+5. At the very end, in ONE short sentence (no card, no question): remind them to add as many photos and videos as they can to their content
+   library (logo, their work, cases, place), because we use them to make their content.
+   This call is a short demo of the platform (it costs money): never ask about their plans for features (autopilot, posting, budgets),
+   never collect extra information beyond the list above.
    Never ask them to upload anything during the call: we already took what we need from their page.
 6. Then thank them and tell them you are preparing what you found.
 {tool_txt}

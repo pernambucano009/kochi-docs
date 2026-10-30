@@ -158,7 +158,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function tool(name, args) {
     if (name === "save_answer") {
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
-      if (r.ok) { S.saved++; S.wait = null; changed(); step(args.qid); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
+      if (r.ok) { S.saved++; S.wait = null; changed(); step(String(args.qid || "").replace(/[^a-z_]/g, "")); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
       return r;
     }
     if (name === "start_account_analysis") {
@@ -170,7 +170,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         return { ok: false, error: "The user has NOT typed this account. Accounts must be typed, never taken from speech or guessed. Ask them to type it in the box on the screen, or move on if they want to give it later." };
       }
       const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: args.account || "" }) }).catch((e) => ({ ok: false, error: e.message }));
-      if (r.ok) { changed(); step("account"); acct(false); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount(); }
+      if (r.ok) {
+        changed(); step("account"); acct(false); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(args.account || "")}</span>`); pollAccount();
+        api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).then((x) => { if (x?.ok) pollShow(); }).catch(() => {});
+      }
       return r;
     }
     if (name === "find_competitors") {
@@ -180,7 +183,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     if (name === "skip_question") {
       const r = await api("/api/assistant/skip", { method: "POST", ...jsonBody({ qid: args.qid }) }).catch(() => ({ ok: false }));
-      step(args.qid); return r;
+      step(String(args.qid || "").replace(/[^a-z_]/g, "")); return r;
     }
     if (name === "get_account_analysis") return api("/api/assistant/account").catch(() => ({ ready: false }));
     if (name === "start_showcase") {
@@ -281,7 +284,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       showChip(r);
       if (r.status === "done" || r.status === "failed") {
         clearInterval(S.showT); S.showT = null;
-        if (r.status === "done") note("(SYSTEM: the showcase reel is ready now. When you finish what you are saying, tell the user in one short sentence and call play_showcase.)");
+        if (r.status === "done") sysItem("(SYSTEM: the showcase reel is ready. When you reach its stop in the tour (after the filming question), ask if they would like to see a practical example of our work on one of their own videos, and if yes call play_showcase. Do not interrupt the questions for it.)");
         else note(`(SYSTEM: the showcase reel could not be made (${r.error || "error"}). Tell them kindly in one sentence and go on.)`);
       }
     }, 8000);
@@ -708,11 +711,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
   function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); }
+  // العداد على الأسئلة بس (الحساب + أسئلة العقل)، والكلي ثابت: اللي اتجاوب في مكالمة قبل كده محسوب
   function prog() {
-    const n = S?.steps.length, p = q(".as-prog"); if (!p) return;
-    p.hidden = !n; if (!n) return;
-    const d = Math.min(n, S.done.size);
-    q("[data-pt]").textContent = d >= n ? "اكتملت المحادثة تقريبًا" : `الخطوة ${d + 1} من ${n}`;
+    const left = S?.steps.length || 0, n = Math.max(left, state?.steps_total || left), p = q(".as-prog"); if (!p) return;
+    const d = Math.min(n, n - left + S.done.size);
+    p.hidden = !n || d >= n; if (p.hidden) return;   // الأسئلة خلصت: العداد بيختفي (الباقي كلام مش أسئلة)
+    q("[data-pt]").textContent = `السؤال ${d + 1} من ${n}`;
     q("[data-pb]").style.width = `${Math.round((100 * d) / n)}%`;
   }
   // ⏎ اللي اتكتب في الخانة (بزرار السهم أو Enter). الحساب: المنصة نفسها بتبدأ تحليله على طول، وسعاد بتعرف إنه بدأ وتكمّل
@@ -722,8 +726,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S.acct && S.wait !== "account") return say(v);
     acct(false); S.typed += " " + v;
     const r = await api("/api/assistant/account", { method: "POST", ...jsonBody({ account: v }) }).catch((e) => ({ ok: false, error: e.message }));
-    if (r.ok) { changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount(); }
-    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly, ask in one sentence for permission to make the showcase reel gift from one of their page's videos, and after their answer go on with the next question.)`
+    if (r.ok) {
+      changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount();
+      // 🎬 الفيديو الاستعراضي بيتجهّز في الخلفية من دلوقتي (بياخد دقايق)، وسعاد بتعرضه عليه لما يجهز
+      api("/api/assistant/showcase/start", { method: "POST", ...jsonBody({}) }).then((x) => { if (x?.ok) pollShow(); }).catch(() => {});
+    }
+    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly and go on with the next question.)`
       : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);
   }
   // ✍️ الحساب بيتكتب في نفس خانة الكتابة: الخانة بتنوّر وتحتها سطر بيقول المطلوب

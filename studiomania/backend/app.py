@@ -32841,7 +32841,9 @@ def assistant_state(request: Request):
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
-            "steps": assist_plan(b)[2] if bid else []}
+            "steps": assist_plan(b)[2] if bid else [],
+            # العدد الكلي ثابت (الحساب + كل أسئلة العقل): لو خرج ورجع العداد بيكمّل من مكانه («٩ من ١٤» مش «١ من ٥»)
+            "steps_total": 1 + len(livevoice.quiz_questions())}
 
 
 class AssistProfileIn(BaseModel):
@@ -33702,7 +33704,7 @@ def assistant_showcase_upload(file: UploadFile = File(...)):
 # ---------------------------------------------------------------- 🧭 جولة سعاد بعد الأسئلة: كارت على الشاشة لكل محطة وهي بتشرح
 # رأيها في التحليل ← أنواع الفيديوهات ← فيديوهات المنافسين الناجحة ← التصوير بالجوال والملقّن ← الأفاتار ← القوالب (وأول فيديو باسمه وشعاره)
 # ← الفيديو الاستعراضي ← الخطوات من الفكرة للنشر ومستوى التحكم ← القالب المخصص ← الأوتوبايلوت. كل محطة بتتسجل، فلو خرج ورجع بتكمّل من مكانها.
-TOUR = ["analysis", "types", "rivals", "phone", "avatar", "templates", "showcase", "process", "custom", "autopilot"]
+TOUR = ["analysis", "types", "rivals", "phone", "avatar", "filming", "templates", "showcase", "process", "custom", "autopilot"]
 
 
 def tour_card(bid: str, b: dict, kind: str) -> dict:
@@ -33982,6 +33984,9 @@ def assistant_preference(body: AssistPrefIn):
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(presenter_ok=True))
     titles = {"presenter": "من يظهر في الفيديوهات", "types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
               "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم"}
+    if body.topic in ("phone", "avatar"):   # سؤال التصوير اتجاوب: المحطة خلصت
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append("filming")
+                     if "filming" not in (d.get("assistant") or {}).get("tour", []) else None)
     if body.topic in TOUR:   # قال «كفاية» على المحطة دي: تتقفل ومابترجعش (حتى لو رجع للمكالمة بعدين)
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append(body.topic)
                      if body.topic not in (d.get("assistant") or {}).get("tour", []) else None)
