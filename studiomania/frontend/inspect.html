@@ -76,6 +76,7 @@
     <button data-t="cust">👥 العملاء والاستهلاك</button>
     <button data-t="calls">🎙️ معمل سعاد</button>
     <button data-t="sclab">🎬 معمل الاستعراض</button>
+    <button data-t="elite">🏆 صفوة المجال</button>
     <button data-t="runs">الفحص الشامل</button>
     <button data-t="steps">الخطوات</button>
     <button data-t="outs">النتائج للمراجعة</button>
@@ -104,6 +105,20 @@
         <button class="btn" id="slGo">▶ اصنع الفيديو الاستعراضي</button><button class="btn" id="slReload">↻ حدّث</button><span class="mute" id="slMsg"></span></div></div>
     <div class="card"><div class="row"><b>🏆 الفيديوهات المعتمدة لكل مجال</b><span class="mute">هذا ما يُعرض على العميل في المكالمة حسب مجاله. اعتمد تجربة من الأسفل لمجالها.</span></div><div id="slLib" style="margin-top:8px"></div></div>
     <div id="slRows"></div>
+  </section>
+  <section data-p="elite" hidden>
+    <div class="card"><div class="row"><b>🏆 صفوة المجال</b><span class="mute">أفضل الصفحات في المجال وأكثر فيديوهاتها إبداعًا. المقياس: كم مرة تجاوز الفيديو متوسط مشاهدات صفحته، وليس المشاهدات وحدها. اختر الفيديوهات التي تستحق أن نفككها ونصنع منها قوالب.</span></div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:flex-start"><select id="elN"></select>
+        <textarea id="elSeeds" dir="ltr" rows="3" placeholder="@page or link, one per line" style="flex:1;min-width:240px;font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)"></textarea>
+        <label class="chip"><input type="checkbox" id="elSearch" checked> ابحث أيضًا بكلمات المجال</label>
+        <button class="btn pri" id="elGo">🔎 ابحث عن الصفوة</button><button class="btn" id="elReload">↻ حدّث</button></div>
+      <div class="row" style="margin-top:8px"><span class="mute" id="elMsg"></span></div>
+      <details style="margin-top:6px"><summary class="mute">كلمات البحث</summary><div class="mute ltr" id="elQs"></div></details></div>
+    <div class="card"><div class="row" style="gap:6px"><b id="elCount"></b>
+      <label class="chip"><input type="radio" name="elF" value="" checked> الكل</label><label class="chip"><input type="radio" name="elF" value="picked"> المختارة</label><label class="chip"><input type="radio" name="elF" value="skipped"> المستبعدة</label>
+      <select id="elSort"><option value="score">الأكثر تميزًا</option><option value="multiple">الأعلى مقارنة بصفحته</option><option value="views">الأكثر مشاهدة</option><option value="ts">الأحدث</option></select></div>
+      <div id="elGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-top:12px"></div></div>
+    <div class="card"><details><summary><b>الصفحات</b> <span class="mute" id="elPN"></span></summary><div id="elPages" style="margin-top:8px"></div></details></div>
   </section>
   <section data-p="calls" hidden>
     <div class="card"><div class="row"><b>🎙️ معمل سعاد</b><span class="mute">كل مكالمة مع المساعدة مكتوبة سطرًا سطرًا: كلامها، وكلام العميل (من الصوت أو الكتابة)، والأدوات التي استخدمتها ونتائجها، وكل مرة أكملت فيها وحدها، وكتم الميكروفون. الكتابة فقط، دون تسجيل صوت.</span></div>
@@ -320,7 +335,56 @@ function tab(t) {
   if (t === "cust") { loadCosts(); loadCust(); loadCoupons(); }
   if (t === "calls") loadCalls();
   if (t === "sclab") loadLab();
+  if (t === "elite") loadElite();
 }
+// 🏆 صفوة المجال
+const EL = { d: null, niche: "dental" };
+const nfmt = (n) => (n = +n || 0) >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n);
+const EL_STEP = { search: "يبحث بكلمات المجال", pages: "يجلب فيديوهات الصفحات", thumbs: "يحمّل الصور المصغرة" };
+async function loadElite() {
+  if (!$("elN").options.length) {
+    const n = await api("/api/admin/elite").catch(() => ({ niches: [] }));
+    $("elN").innerHTML = (n.niches || []).map((x) => `<option value="${esc(x.key)}">${esc(x.name)}</option>`).join("");
+  }
+  EL.niche = $("elN").value || EL.niche;
+  const d = EL.d = await api(`/api/admin/elite/${EL.niche}`).catch((e) => ({ err: e.message, videos: [], pages: [] }));
+  const j = d.job || {};
+  $("elMsg").innerHTML = d.err ? `<span class="bad">${esc(d.err)}</span>` : j.status === "running" ? `⏳ ${EL_STEP[j.step] || "يعمل"}… ${j.total ? `${j.done} من ${j.total}` : ""}`
+    : j.status === "failed" ? `<span class="bad">${esc(j.error)}</span>` : d.updated_at ? `آخر تحديث: ${when(d.updated_at)}${j.error ? ` · <span class="bad">${esc(j.error)}</span>` : ""}` : "لم يبدأ البحث بعد";
+  $("elQs").textContent = (d.queries || []).join(" · ");
+  $("elGo").disabled = j.status === "running";
+  renderElite();
+  clearTimeout(loadElite.t); if (j.status === "running") loadElite.t = setTimeout(loadElite, 4000);
+}
+function renderElite() {
+  const d = EL.d || { videos: [], pages: [] }, f = document.querySelector('[name="elF"]:checked').value, srt = $("elSort").value;
+  let list = d.videos.filter((v) => f ? v.state === f : v.state !== "skipped");
+  if (srt !== "score") list = [...list].sort((a, b) => (b[srt] || 0) - (a[srt] || 0));
+  $("elCount").textContent = `${list.length} فيديو · المختارة ${d.counts?.picked || 0}`;
+  $("elGrid").innerHTML = list.map((v) => `<div data-ek="${esc(v.key)}" style="border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)${v.state === "picked" ? ";outline:3px solid #2e9e5b" : ""}">
+    <a href="${esc(v.url)}" target="_blank" rel="noopener" style="display:block;aspect-ratio:9/16;background:#111">${v.thumb_file ? `<img loading="lazy" src="/api/admin/elite/${EL.niche}/thumb/${esc(v.thumb_file)}" style="width:100%;height:100%;object-fit:cover">` : `<span class="mute" style="display:grid;place-items:center;height:100%">▶</span>`}</a>
+    <div style="padding:6px 8px;font-size:12px"><div class="ltr"><b>@${esc(v.handle)}</b> <span class="mute">${v.platform === "tiktok" ? "TT" : "IG"}</span></div>
+      <div>👁 ${nfmt(v.views)} · <b title="مقارنة بمتوسط صفحته">×${v.multiple}</b> · 👥 ${nfmt(v.followers)}</div>
+      <div class="mute" style="max-height:3.2em;overflow:hidden" dir="auto">${esc((v.caption || "").slice(0, 120))}</div>
+      <div class="row" style="gap:4px;margin-top:6px"><button class="btn${v.state === "picked" ? " pri" : ""}" data-es="picked">✓ اختر</button><button class="btn" data-es="skipped">✗ استبعد</button>${v.state ? `<button class="btn" data-es="">↺</button>` : ""}</div></div></div>`).join("")
+    || `<span class="mute">لا توجد فيديوهات هنا بعد.</span>`;
+  $("elPN").textContent = `(${d.pages.length})`;
+  $("elPages").innerHTML = d.pages.map((p) => `<div class="row" data-ep="${esc(p.key)}" style="gap:8px;padding:4px 0;border-bottom:1px solid var(--line)${p.state === "rejected" ? ";opacity:.5" : ""}">
+    <a class="ltr" href="${p.platform === "tiktok" ? "https://www.tiktok.com/@" : "https://www.instagram.com/"}${esc(p.handle)}" target="_blank" rel="noopener">@${esc(p.handle)}</a>
+    <span class="mute">${p.platform === "tiktok" ? "TT" : "IG"} · 👥 ${nfmt(p.followers)} · متوسط ${nfmt(p.median)} · ${p.count} فيديو${p.seed ? " · أضفتها أنت" : ""}</span>
+    <span style="margin-inline-start:auto">${p.state === "rejected" ? `<button class="btn" data-eps="">أرجعها</button>` : `<button class="btn" data-eps="rejected">✗ استبعد الصفحة</button>`}</span></div>`).join("");
+}
+$("elGo").onclick = async () => {
+  $("elGo").disabled = true;
+  try { await api(`/api/admin/elite/${$("elN").value}/discover`, { method: "POST", body: JSON.stringify({ seeds: $("elSeeds").value, search: $("elSearch").checked }) }); $("elSeeds").value = ""; }
+  catch (e) { $("elMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  loadElite();
+};
+$("elReload").onclick = loadElite; $("elN").onchange = loadElite; $("elSort").onchange = renderElite;
+document.querySelectorAll('[name="elF"]').forEach((r) => r.onchange = renderElite);
+const elMark = async (kind, key, state) => { await api(`/api/admin/elite/${EL.niche}/mark`, { method: "POST", body: JSON.stringify({ kind, key, state }) }).catch((e) => alert(e.message)); loadElite(); };
+$("elGrid").onclick = (e) => { const b = e.target.closest("[data-es]"); if (b) elMark("video", b.closest("[data-ek]").dataset.ek, b.dataset.es); };
+$("elPages").onclick = (e) => { const b = e.target.closest("[data-eps]"); if (b) elMark("page", b.closest("[data-ep]").dataset.ep, b.dataset.eps); };
 // 🎬 معمل الاستعراض: كل تجربة بنوع الفيديو ووصفه، والفيديو، وكل جزء: اللي اتعمل فيه واللي ممكن يتعمل (ده اللي سعاد بتشرحه)
 const SL = { fields: [] };
 async function loadLib() {

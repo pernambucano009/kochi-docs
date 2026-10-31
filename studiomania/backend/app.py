@@ -33669,6 +33669,75 @@ def sc_lib_file(name: str):
     return FileResponse(f, media_type="video/mp4")
 
 
+# ---------------------------------------------------------------- 🏆 صفوة المجال: أحسن الصفحات وأكتر فيديوهاتها إبداعًا، وصاحب المنصة بيختار منها
+import elite  # noqa: E402
+
+PLATFORM_DIR = providers.state_file(DATA_DIR).parent
+
+
+def elite_niche(niche: str) -> str:
+    sc_lab_admin()
+    if niche not in elite.NICHES:
+        raise HTTPException(404, "المجال غير موجود")
+    return niche
+
+
+class EliteGoIn(BaseModel):
+    seeds: str = ""
+    search: bool = True
+
+
+class EliteMarkIn(BaseModel):
+    kind: str = "video"
+    key: str
+    state: str = ""
+    note: str = ""
+
+
+@app.get("/api/admin/elite")
+def elite_list():
+    sc_lab_admin()
+    return {"niches": [{"key": k, "name": v["name"]} for k, v in elite.NICHES.items()]}
+
+
+@app.get("/api/admin/elite/{niche}")
+def elite_get(niche: str):
+    return elite.view(PLATFORM_DIR, elite_niche(niche))
+
+
+@app.post("/api/admin/elite/{niche}/discover")
+def elite_go(niche: str, body: EliteGoIn):
+    niche = elite_niche(niche)
+    mock = not rivals.live() and atlas.mock_mode()
+    if not rivals.live() and not mock:
+        raise HTTPException(400, rivals.missing_msg())
+    if elite.job(niche).get("status") == "running":
+        raise HTTPException(409, "البحث يعمل الآن، انتظر حتى ينتهي")
+    seeds = elite.clean_seeds(body.seeds)
+    if not seeds and not body.search:
+        raise HTTPException(400, "أضف صفحة واحدة على الأقل أو فعّل البحث")
+    threading.Thread(target=elite.discover, args=(PLATFORM_DIR, niche, seeds, body.search, mock), daemon=True).start()
+    return {"ok": True, "seeds": len(seeds)}
+
+
+@app.post("/api/admin/elite/{niche}/mark")
+def elite_mark(niche: str, body: EliteMarkIn):
+    niche = elite_niche(niche)
+    if body.kind not in ("video", "page") or body.state not in ("", "picked", "skipped", "rejected"):
+        raise HTTPException(400, "اختيار غير صحيح")
+    if not elite.mark(PLATFORM_DIR, niche, body.kind, body.key, body.state, body.note):
+        raise HTTPException(404, "غير موجود")
+    return {"ok": True}
+
+
+@app.get("/api/admin/elite/{niche}/thumb/{name}")
+def elite_thumb(niche: str, name: str):
+    f = elite.root(PLATFORM_DIR, elite_niche(niche)) / "thumbs" / re.sub(r"[^A-Za-z0-9_.-]", "", name)
+    if not f.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="image/jpeg")
+
+
 def showcase_state(b: dict) -> dict:
     a = b.get("assistant") or {}
     lib = sc_lib(field_guess(b))
