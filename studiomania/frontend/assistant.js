@@ -256,6 +256,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (quiet < lim) return;
     S.lastAct = now; S.idleN = (S.idleN || 0) + 1;
     lg("sys", `idle ${S.idleN}`);
+    lg("sys", !S.mic ? "mic: none" : S.muted ? "mic: muted" : `mic peak ${(S.micPeak || 0).toFixed(3)}`); S.micPeak = 0;
     sysItem(S.idleN === 1
       ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (like: are you still with me? and if you are busy, no problem, we can continue another time). Then wait.)"
       : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (like: you seem busy now, I will go now, and talk to me whenever you are free), then call finish with later=true.)");
@@ -601,7 +602,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
-      S.mic = mic; if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+      S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({ call: S.call }) });
       if (!S || (dock && !onBrain())) { if (S) end(false); return; }   // خرج من العقل وهي بتتصل
@@ -635,7 +636,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
         else if (e.type === "input_audio_buffer.speech_started") { S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
-        else if (e.type === "conversation.item.input_audio_transcription.completed") { lg("user", e.transcript || "", { voice: 1 }); if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
+        else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
+        else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else lg("user", e.transcript, { voice: 1 }); if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
@@ -763,8 +765,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function unmute() {
     if (!S || q("[data-unmute]")) return;
     const b = document.createElement("button"); b.type = "button"; b.className = "as-go"; b.dataset.unmute = "1"; b.textContent = "🔊 اضغط لسماع المساعدة";
-    q(".as-acts")?.prepend(b);
-    b.onclick = () => { S?.ctx?.resume(); S?.el?.play().catch(() => {}); b.remove(); };
+    q(".as-acts")?.prepend(b); lg("sys", "audio blocked");
+    b.onclick = () => { S?.ctx?.resume(); S?.el?.play().catch(() => {}); b.remove(); lg("sys", "audio unblocked"); };
   }
   function loop() {
     if (!S) return;
@@ -774,6 +776,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
+    S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
     orb?.set(talk ? Math.min(1, ag * 7) : user ? Math.min(0.35, mu * 2) : 0, user);
     // بتتكلم ولا سكتت: من مستوى صوتها نفسه (السكتة الصغيرة بين الكلمات ماتتحسبش). المكتوب بيبدأ مع الصوت، ولما تسكت يتقرر تكمّل ولا تستنى
     const now = performance.now();

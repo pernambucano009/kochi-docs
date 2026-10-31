@@ -261,8 +261,12 @@ if (location.hash === "#calls") setTimeout(() => tab("calls"), 0);
 
 // 🎙️ معمل سعاد: المكالمات المتسجلة، وكل مكالمة سطر بسطر، وتقييمها بملاحظة (عشان نطوّر منطقها)
 const AC_WHO = { agent: "سعاد", user: "العميل", tool: "أداة", sys: "النظام", err: "خطأ" };
-const AC_SYS = { "speech_started": "التقط الميكروفون صوتًا", "auto-continue": "أكملت وحدها بعد جملة ليست سؤالًا", "mic muted": "كتم الميكروفون", "mic on": "شغّل الميكروفون",
+const AC_SYS = { "speech_started": "التقط الميكروفون صوتًا", "audio blocked": "المتصفح منع صوت سعاد عند العميل (ظهر له زر تشغيل الصوت)", "audio unblocked": "ضغط العميل زر تشغيل الصوت",
+  "transcript empty": "سُمع صوت لكن لم يُفهم منه كلام", "mic: muted": "الميكروفون مكتوم وقت السكوت", "mic: none": "لا يوجد ميكروفون", "auto-continue": "أكملت وحدها بعد جملة ليست سؤالًا", "mic muted": "كتم الميكروفون", "mic on": "شغّل الميكروفون",
   "end: finished": "انتهت المكالمة (أنهتها سعاد)", "end: closed": "أُغلقت المكالمة" };
+const acSys = (t) => AC_SYS[t] || (t.startsWith("mic ok") ? `الميكروفون يعمل (${t.slice(8)})` : t.startsWith("mic: none (") ? `لا يوجد ميكروفون: ${t.slice(11, -1)}`
+  : t.startsWith("mic peak ") ? (+t.slice(9) < 0.01 ? "لم يلتقط الميكروفون أي صوت في فترة السكوت" : +t.slice(9) < 0.03 ? `التقط الميكروفون صوتًا خافتًا فقط (${t.slice(9)})` : `التقط الميكروفون صوتًا واضحًا ولم يُحوَّل إلى كلام (${t.slice(9)})`)
+  : t.startsWith("transcription failed") ? `فشل تحويل كلام العميل إلى نص: ${t.slice(21)}` : t);
 const acTime = (t) => new Date(t * 1000).toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const acDur = (sec) => sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "—";
 let AC = { items: [], cur: null };
@@ -293,7 +297,7 @@ async function loadCalls() {
 function acLine(e) {
   const t = `<small class="mute num">${acDur(Math.round((e.t || 0) / 1000))}</small>`;
   if (e.who === "tool") return `<div class="ac-l tool">${t} 🔧 <b dir="ltr">${esc(e.text)}</b> <code dir="ltr">${esc(JSON.stringify(e.data?.args || {}))}</code><div class="mute" dir="ltr">← ${esc(JSON.stringify(e.data?.out || {}).slice(0, 300))}</div></div>`;
-  if (e.who === "sys" || e.who === "err") return `<div class="ac-l sys${e.who === "err" ? " err" : ""}">${t} ${esc(AC_SYS[e.text] || e.text)}</div>`;
+  if (e.who === "sys" || e.who === "err") return `<div class="ac-l sys${e.who === "err" ? " err" : ""}">${t} ${esc(acSys(e.text))}</div>`;
   return `<div class="ac-l ${e.who}">${t} <b>${AC_WHO[e.who] || e.who}${e.data?.typed ? " (كتابة)" : ""}</b><p>${esc(e.text) || '<span class="mute">(صوت غير مفهوم أو ضوضاء)</span>'}</p></div>`;
 }
 async function openCall(id) {
@@ -325,7 +329,8 @@ $("acView").onclick = async (e) => {
   if (e.target.closest("#acNoise")) { $("acView").dataset.noise = $("acView").dataset.noise === "1" ? "" : "1"; openCall(d.id); }
   if (e.target.closest("#acDel") && confirm("أتحذف هذه المكالمة من المعمل؟")) { await api(`/api/platform/assistant-calls/${d.id}`, { method: "DELETE" }).catch(() => {}); AC.cur = null; $("acView").innerHTML = ""; loadCalls(); }
   if (e.target.closest("#acCopy")) {
-    const txt = (d.events || []).filter((x) => x.who !== "sys" || x.text !== "speech_started").map((x) => `[${acDur(Math.round((x.t || 0) / 1000))}] ${AC_WHO[x.who] || x.who}: ${x.who === "tool" ? `${x.text} ${JSON.stringify(x.data?.args || {})} → ${JSON.stringify(x.data?.out || {}).slice(0, 200)}` : AC_SYS[x.text] || x.text}`).join("\n");
+    const evs = (d.events || []).filter((x, i, a) => !(x.who === "sys" && x.text === "speech_started" && a[i - 1]?.who === "sys" && a[i - 1]?.text === "speech_started"));
+    const txt = evs.map((x) => `[${acDur(Math.round((x.t || 0) / 1000))}] ${AC_WHO[x.who] || x.who}: ${x.who === "tool" ? `${x.text} ${JSON.stringify(x.data?.args || {})} → ${JSON.stringify(x.data?.out || {}).slice(0, 200)}` : x.who === "sys" ? acSys(x.text) : x.text}`).join("\n");
     navigator.clipboard.writeText(txt).then(() => { e.target.textContent = "✓ نُسخ"; }).catch(() => {});
   }
 };
