@@ -3198,6 +3198,7 @@ window.I18N_EN = {
   "قبل وصول عرض نحسبها تقديرًا: أرخص سعر وحدة عندنا ناقص الخصم المتوقع. ولو كتبت سعر العرض نحسب به مباشرة.": "Until a quote arrives we estimate it: our cheapest unit price minus the expected discount. Once you enter the quoted price we use it directly.",
   "اكتب سعر العرض وعدد الوحدات معًا": "Enter the quoted price and units together",
   "✅ حُفظت الباقة المخصصة": "✅ Custom pack saved",
+  "تعذّر تحميل الفيديو، افتحه من رابطه": "Could not load the video, open it from its link",
   "المجال غير موجود": "Field not found",
   "البحث يعمل الآن، انتظر حتى ينتهي": "The search is running, wait until it finishes",
   "أضف صفحة واحدة على الأقل أو فعّل البحث": "Add at least one page or turn on search",

@@ -33730,6 +33730,15 @@ def elite_mark(niche: str, body: EliteMarkIn):
     return {"ok": True}
 
 
+@app.get("/api/admin/elite/{niche}/video")
+def elite_video(niche: str, key: str):
+    """الفيديو نفسه يشتغل في اللوحة (بيتحمّل أول مرة ويتخزن)."""
+    f = elite.media_file(PLATFORM_DIR, elite_niche(niche), key)
+    if not f:
+        raise HTTPException(404, "تعذّر تحميل الفيديو، افتحه من رابطه")
+    return FileResponse(f, media_type="video/mp4")
+
+
 @app.get("/api/admin/elite/{niche}/thumb/{name}")
 def elite_thumb(niche: str, name: str):
     f = elite.root(PLATFORM_DIR, elite_niche(niche)) / "thumbs" / re.sub(r"[^A-Za-z0-9_.-]", "", name)

@@ -217,6 +217,84 @@ def discover(base: Path, niche: str, seeds: list[dict], use_search: bool, mock: 
         J.update(status="failed", error=str(exc)[:300])
 
 
+# ---------------------------------------------------------------- 🎞️ الفيديو نفسه يشتغل جوه اللوحة (بيتحمّل أول مرة يظهر ويتخزن)
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
+MAX_MB = 80
+
+
+def _safe(key: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", key)
+
+
+def _download(url: str, dest: Path, platform: str) -> bool:
+    """من غير Referer الأول (بعض الـ CDN بيرفضه)، وبعدين بـ Referer المنصة (تيك توك أحيانًا بيطلبه)."""
+    if not url:
+        return False
+    ref = "https://www.tiktok.com/" if platform == "tiktok" else "https://www.instagram.com/"
+    return any(_get_file(url, dest, h) for h in (UA, {**UA, "Referer": ref}))
+
+
+def _get_file(url: str, dest: Path, h: dict) -> bool:
+    tmp = dest.with_suffix(".part")
+    try:
+        with httpx.Client(timeout=60, follow_redirects=True) as c, c.stream("GET", url, headers=h) as r:
+            if r.status_code >= 400:
+                return False
+            n = 0
+            with tmp.open("wb") as f:
+                for chunk in r.iter_bytes(1 << 16):
+                    n += len(chunk)
+                    if n > MAX_MB << 20:
+                        raise ValueError("too big")
+                    f.write(chunk)
+        head = tmp.read_bytes()[:12]
+        if n < 20000 or head[4:8] != b"ftyp":
+            tmp.unlink(missing_ok=True)
+            return False
+        tmp.replace(dest)
+        return True
+    except (httpx.HTTPError, OSError, ValueError):
+        tmp.unlink(missing_ok=True)
+        return False
+
+
+def fresh_media(v: dict) -> str:
+    """لينكات الفيديو بتنتهي بعد شوية: بنجيب لينك جديد للبوست نفسه."""
+    try:
+        if v["platform"] == "tiktok":
+            d = rivals._get("/v2/tiktok/video", {"url": v["url"]}, 40)
+            raw = d.get("aweme_detail") or d.get("data") or d
+        else:
+            d = rivals._get("/v1/instagram/post", {"url": v["url"]}, 40)
+            raw = (d.get("data") or {}).get("xdt_shortcode_media") or d.get("data") or d
+        p = norm(v["platform"], raw) if isinstance(raw, dict) else None
+        return (p or {}).get("media") or (raw.get("video_url") if isinstance(raw, dict) else "") or ""
+    except rivals.RivalsError:
+        return ""
+
+
+def media_file(base: Path, niche: str, key: str) -> Path | None:
+    d = root(base, niche) / "media"
+    d.mkdir(exist_ok=True)
+    f = d / (_safe(key) + ".mp4")
+    if f.exists():
+        return f
+    v = load(base, niche)["videos"].get(key)
+    if not v:
+        return None
+    if _download(v.get("media") or "", f, v["platform"]):
+        return f
+    url = fresh_media(v) if rivals.live() else ""
+    if url and _download(url, f, v["platform"]):
+        with _lock:
+            st = load(base, niche)
+            if key in st["videos"]:
+                st["videos"][key]["media"] = url
+                save(base, niche, st)
+        return f
+    return None
+
+
 def mark(base: Path, niche: str, kind: str, key: str, state: str, note: str = "") -> dict:
     with _lock:
         st = load(base, niche)
@@ -232,6 +310,8 @@ def mark(base: Path, niche: str, kind: str, key: str, state: str, note: str = ""
             if not v:
                 return {}
             v["state"] = state
+            if state == "skipped":   # المستبعد ملوش لازمة يفضل واخد مساحة
+                (root(base, niche) / "media" / (_safe(key) + ".mp4")).unlink(missing_ok=True)
             if note:
                 v["note"] = note[:500]
         save(base, niche, st)

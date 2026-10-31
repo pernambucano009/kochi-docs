@@ -25,6 +25,9 @@ PROMPT = (
     "- physics/motion: non-human or illogical movement, jumps, sudden zooms, the camera leaving the planned framing\n"
     "- framing drift: the shot stops being the shot in the source (e.g. a macro becomes a wide shot, new body parts appear)\n"
     "- artifacts: text/letters that appear, flicker, smearing, blur bursts\n"
+    "Judge like a real viewer: things that make sense in the scene are NOT problems (a hand or tool naturally entering or leaving the frame, "
+    "a normal blink, a slight planned zoom). Only report what looks impossible, broken or uncanny (things appearing from nothing or melting away, "
+    "wrong anatomy, a face turning into another face).\n"
     "Measured by code: {measured}.\n"
     'Answer JSON only: {{"score": 1-10 (10 = indistinguishable from real footage), "pass": true/false (false if ANY clear problem a '
     'normal viewer would notice), "issues": [{{"type": "anatomy|identity|morphing|motion|framing|artifact", "frame": number, '
