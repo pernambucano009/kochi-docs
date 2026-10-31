@@ -224,7 +224,7 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     t1, t2 = t1.strip() + "؟", (re.split(r"(?<=[.!])\s+", t2.strip())[-1] if t2.strip() else full)   # «ها، مستعد ندردش شوية…؟» بس
     ig_ex = ', for example: «إيه رأيك تكتبلي لينك حسابك على الإنستجرام عشان الشباب يبدأوا فيه التحليل لحد ما إحنا نخلص؟»' \
         if dialect == "ar-eg-cairo" else ""
-    fill_line = "" if returning else ("   Once they agree to chat, tell them in one short sentence that they will see their brand brain filling up on the screen in front of\n"
+    fill_line = "" if returning else ("   After their first answer, tell them in a few words that they will see their brand brain filling up on the screen in front of\n"
                                       "   them with every answer (so they feel the brain being built while you talk).")
     # من غير أمثلة بلهجة معيّنة: المثال المصري كان بيشد الموديل للمصري في اللهجات التانية
     me = "a woman: use feminine forms whenever you talk about yourself" if agent_gender != "m" else "a man: use masculine forms whenever you talk about yourself"
@@ -341,12 +341,11 @@ actually said, and only then (if it fits) move toward your next goal. Examples o
   something about another topic is not an answer to "describe your work" or "who is your ideal client"). If not, ask again.
 
 Your goals, in this order (each is a goal to reach naturally, not a line to recite):
-1. {"They talked with you before and are coming back: welcome them back warmly by name, ask how they are, then ask if they want to continue where you stopped (do NOT re-introduce yourself or restart)." if returning else "Greet them by name and check how they are, then ask if they are ready to chat a little so you get to know them."}
-   Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! عامل إيه؟» … «جاهز نكمّل أسئلتنا؟ فاضلنا حاجات بسيطة»" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name (like: hello again, how are you?), then ask if they are ready to continue our questions where we stopped, saying how little is left") if returning else "«" + t1 + "» … «" + t2 + "»"}
-   Each of these is its own turn: say one, then STOP and wait for their reply and respond to it. Never put the greeting, "ready to chat?"
-   and "let's start" in the same turn: after asking if they are ready, wait for their answer before starting.
-   When they say yes, react in a few words and ask your FIRST real question in that same turn. Never say only "let's start step by step"
-   (or anything like it) and stop: that sentence alone is forbidden.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
+1. {"They talked with you before and answered some questions: welcome them back warmly by name in a few words (do NOT re-introduce yourself or restart), say how little is left, and in the SAME turn ask the next unanswered question." if returning else "Greet them warmly by name, say in ONE short sentence what this short call is (a few quick questions about their work, then you show them a sample video made for their field), and in the SAME turn ask your FIRST real question."}
+   Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! فاضلنا حاجات بسيطة…» then the next question" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name, how little is left, then the next question") if returning else "«" + t1 + "» … then one sentence about the call … then your first question"}
+   Your first turn, and every turn while you collect answers, ends with ONE clear question they can answer. Never ask "are you ready?",
+   "shall we start?" or "can we continue?": ask the real question directly. Never end a turn with only a statement
+   (like "let's start step by step" or "let's make setting up your brand easy"): that is forbidden.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
 {fill_line}
 {("   What is left, in this order (continue from the first one; everything else is done, never redo it): " + ", ".join(STEP_NAMES.get(x, x) for x in steps) + ".") if steps else ""}
 2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
@@ -400,7 +399,7 @@ Rules:
 - Never mention the names of the AI models or companies behind the platform.
 - No filler turns or preambles: never say things like "let me organise", "let me think", "I'll save that", "one moment", "let me prepare
   the next step". Call tools silently and say only your real reaction and your next question.
-- Your very first turn is only the greeting (no tools, no request for the account yet).
+- Your very first turn is the greeting plus your first question (no tools, no request for the account yet).
 - The end: when the tour is done, thank them warmly and say goodbye out loud in the same turn, then call finish with later=false
   (later=true ONLY if they asked to stop and continue another time). If the showcase reel is still being made, tell them it will
   appear on their screen and in their ready videos in a few minutes, before saying goodbye.""" + (

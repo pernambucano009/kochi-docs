@@ -262,11 +262,11 @@ if (location.hash === "#calls") setTimeout(() => tab("calls"), 0);
 // 🎙️ معمل سعاد: المكالمات المتسجلة، وكل مكالمة سطر بسطر، وتقييمها بملاحظة (عشان نطوّر منطقها)
 const AC_WHO = { agent: "سعاد", user: "العميل", tool: "أداة", sys: "النظام", err: "خطأ" };
 const AC_SYS = { "speech_started": "التقط الميكروفون صوتًا", "audio blocked": "المتصفح منع صوت سعاد عند العميل (ظهر له زر تشغيل الصوت)", "audio unblocked": "ضغط العميل زر تشغيل الصوت",
-  "transcript empty": "سُمع صوت لكن لم يُفهم منه كلام", "mic: muted": "الميكروفون مكتوم وقت السكوت", "mic: none": "لا يوجد ميكروفون", "auto-continue": "أكملت وحدها بعد جملة ليست سؤالًا", "mic muted": "كتم الميكروفون", "mic on": "شغّل الميكروفون",
+  "transcript empty": "سُمع صوت لكن لم يُفهم منه كلام", "unsent text auto-sent": "كتب العميل ردًا ولم يرسله، فأُرسل تلقائيًا", "mic: muted": "الميكروفون مكتوم وقت السكوت", "mic: none": "لا يوجد ميكروفون", "auto-continue": "أكملت وحدها بعد جملة ليست سؤالًا", "mic muted": "كتم الميكروفون", "mic on": "شغّل الميكروفون",
   "end: finished": "انتهت المكالمة (أنهتها سعاد)", "end: closed": "أُغلقت المكالمة" };
 const acSys = (t) => AC_SYS[t] || (t.startsWith("mic ok") ? `الميكروفون يعمل (${t.slice(8)})` : t.startsWith("mic: none (") ? `لا يوجد ميكروفون: ${t.slice(11, -1)}`
   : t.startsWith("mic peak ") ? (+t.slice(9) < 0.01 ? "لم يلتقط الميكروفون أي صوت في فترة السكوت" : +t.slice(9) < 0.03 ? `التقط الميكروفون صوتًا خافتًا فقط (${t.slice(9)})` : `التقط الميكروفون صوتًا واضحًا ولم يُحوَّل إلى كلام (${t.slice(9)})`)
-  : t.startsWith("transcription failed") ? `فشل تحويل كلام العميل إلى نص: ${t.slice(21)}` : t);
+  : t.startsWith("queued sent: ") ? `أُرسلت ${t.slice(13)} رسالة كتبها العميل قبل اكتمال الاتصال` : t.startsWith("transcription failed") ? `فشل تحويل كلام العميل إلى نص: ${t.slice(21)}` : t);
 const acTime = (t) => new Date(t * 1000).toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const acDur = (sec) => sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : "—";
 let AC = { items: [], cur: null };

@@ -47,7 +47,7 @@ const Assistant = (() => {
 body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as-docked #nhCorner,body.as-docked .bm-hint{opacity:0!important;pointer-events:none!important;transition:opacity .4s}
 .as-prog{width:min(260px,80vw);display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12.5px;opacity:.75}
 .as-prog i{display:block;width:100%;height:4px;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}.as-prog i b{display:block;height:100%;width:0;background:#E5613E;transition:width .6s}
-.as-type{flex-direction:column;align-items:center;visibility:hidden;opacity:0;transition:opacity .5s}.as-ov.talked .as-type{visibility:visible;opacity:1}.as-hint{font-size:12.5px;opacity:.8;min-height:0;text-align:center}.as-type.acct input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.18)}
+.as-type{flex-direction:column;align-items:center;margin:0;transition:opacity .5s}.as-sent{font-size:12px;opacity:.75;min-height:1em;margin:2px 0 0}.as-tw.pulse input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.35)}.as-hint{font-size:12.5px;opacity:.8;min-height:0;text-align:center}.as-type.acct input{border-color:#E5613E;box-shadow:0 0 0 3px rgba(229,97,62,.18)}
 .as-ov.dock.on{-webkit-backdrop-filter:none;backdrop-filter:none}.as-ov.dock>*{pointer-events:auto}.as-ov.dock .as-side{display:none}
 .as-tw{position:relative;display:flex;align-items:center}.as-tw input{padding-right:46px!important}
 .as-send{position:absolute;right:5px;width:34px;height:34px;border-radius:50%;border:0;background:#E5613E;color:#fff;font-size:14px;cursor:pointer;display:grid;place-items:center}
@@ -254,10 +254,21 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (document.querySelector(".ui-dlg")) return;   // بيملا نافذة (المعطيات الحقيقية لأول فيديو)
     const quiet = now - Math.max(S.lastAct || S.t0, S.lastTalk || 0), lim = q(".as-box:not(.as-card)") || S.acct ? 90000 : 45000;
     if (quiet < lim) return;
-    S.lastAct = now; S.idleN = (S.idleN || 0) + 1;
+    S.lastAct = now;
+    // ✍️ كتب في الخانة ومابعتش (Enter ماشتغلش، أو افتكر إنها اتبعتت): نبعتها نيابة عنه بدل ما الاتنين يفضلوا مستنيين بعض
+    const unsent = q("[data-type]")?.value.trim();
+    if (unsent) { lg("sys", "unsent text auto-sent"); q("[data-type]").value = ""; return say(unsent); }
+    S.idleN = (S.idleN || 0) + 1;
     lg("sys", `idle ${S.idleN}`);
     lg("sys", !S.mic ? "mic: none" : S.muted ? "mic: muted" : `mic peak ${(S.micPeak || 0).toFixed(3)}`); S.micPeak = 0;
-    sysItem(S.idleN === 1
+    // 🙉 من أول المكالمة ماقالش ولا كتب حاجة: غالبًا الميكروفون، مش مشغول. الخانة تنوّر، وماتقفلش إلا بعد ما تقوله يكتب
+    const never = !S.heard;
+    if (never) { q(".as-tw")?.classList.add("pulse"); sent("لا نسمعك؟ تأكد من الميكروفون، أو اكتب ردك هنا ثم اضغط ➤"); clearTimeout(sent.t); }
+    sysItem(never && S.idleN === 2
+      ? "(SYSTEM: the user has not said or typed anything since the call started; maybe their microphone does not work. In ONE short sentence in the dialect, tell them kindly that you cannot hear them and that they can write their answer in the box under you. Then wait.)"
+      : never && S.idleN === 1
+      ? "(SYSTEM: the user has not said anything yet. In ONE short sentence in the dialect, using their name, ask if they can hear you, and say they can also write in the box under you. Then wait.)"
+      : S.idleN === 1
       ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (like: are you still with me? and if you are busy, no problem, we can continue another time). Then wait.)"
       : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (like: you seem busy now, I will go now, and talk to me whenever you are free), then call finish with later=true.)");
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
@@ -474,9 +485,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }, 9000);
   }
   // 💬 كلام من الشاشة للمساعد (كتابة، أو «رفعت الشعار»): بيتبعت كأن العميل قاله، والمساعد يرد عليه
+  function sent(t) { const p = q("[data-sent]"); if (!p) return; p.textContent = t; clearTimeout(sent.t); sent.t = setTimeout(() => { if (p.isConnected) p.textContent = ""; }, 3500); }
   function say(text) {
-    if (!S?.dc || S.dc.readyState !== "open") return;
-    S.typed += " " + text; S.wait = null; S.nudged = 0; S.lastAct = performance.now(); S.idleN = 0; clearTimeout(S.nudgeT); lg("user", text, { typed: 1 });
+    if (!S) return;
+    S.typed += " " + text; S.wait = null; S.nudged = 0; S.lastAct = performance.now(); S.idleN = 0; S.heard = true; clearTimeout(S.nudgeT);
+    if (!S.dc || S.dc.readyState !== "open" || !S.greeted) {   // لسه بيتصل: تستنى وتتبعت مع أول كلامها
+      (S.pend ||= []).push(text); lg("user", text, { typed: 1, queued: 1 }); sent("⏳ ستصل رسالتك عند بدء الاتصال"); return;
+    }
+    lg("user", text, { typed: 1 }); sent("✓ وصلت رسالتك");
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
     if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
@@ -566,7 +582,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (S) await end(false);   // احتياط: أي مكالمة قديمة تتقفل قبل الجديدة
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
-      <div class="as-type"><div class="as-tw"><input data-type placeholder="أو اكتب هنا واضغط Enter"><button type="button" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-hint" data-hint hidden></p></div>
+      <form class="as-type" data-tform><div class="as-tw"><input data-type enterkeyhint="send" autocomplete="off" placeholder="أو اكتب هنا واضغط Enter"><button type="submit" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-sent" data-sent></p><p class="as-hint" data-hint hidden></p></form>
       <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
       ${state?.log && window.IS_CUSTOMER ? `<p class="as-lognote" data-lognote>📝 تُحفظ هذه المحادثة نصًا فقط (دون صوت) لمدة 30 يومًا لتحسين المساعدة، دون اسمك أو بيانات تواصلك. <button type="button" data-nolog>لا تحفظها</button></p>` : ""}`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
@@ -574,6 +590,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       usage: { text_in: 0, audio_in: 0, text_cached: 0, audio_cached: 0, text_out: 0, audio_out: 0 } };
     prog();
     S.logT = setInterval(() => flush(false), 15000);
+    // ✍️ خانة الكتابة شغالة من أول لحظة: اللي يتكتب قبل ما الاتصال يجهز بيستنى ويتبعت أول ما يجهز (كان بيضيع من غير ما يتسجل)
+    q("[data-tform]").onsubmit = (ev) => { ev.preventDefault(); const i = q("[data-type]"), v = i.value.trim(); if (!v) return i.focus(); i.value = ""; q(".as-tw")?.classList.remove("pulse"); submit(v); };
     ["input", "pointerdown", "change"].forEach((ev) => ov.addEventListener(ev, () => { if (S) { S.lastAct = performance.now(); S.idleN = 0; } }, true));   // بيكتب أو بيختار حاجة: مش ساكت
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
     if (dock) {
@@ -599,12 +617,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       // 🎙️ من غير ميكروفون (مش موجود، أو العميل رفض الإذن) المكالمة بتكمل: المساعد بيتكلم والعميل بيكتب
       let mic = null, noMic = "";
+      const tokP = api("/api/assistant/token", { method: "POST", ...jsonBody({ call: S.call }) }); tokP.catch(() => {});
       try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
-      const tok = await api("/api/assistant/token", { method: "POST", ...jsonBody({ call: S.call }) });
+      const tok = await tokP;
       if (!S || (dock && !onBrain())) { if (S) end(false); return; }   // خرج من العقل وهي بتتصل
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;
@@ -617,8 +636,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (mic) pc.addTrack(mic.getTracks()[0], mic); else pc.addTransceiver("audio", { direction: "recvonly" });
       const dc = pc.createDataChannel("oai-events"); S.dc = dc;
       // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
-      const greet = () => { if (S && !S.greeted && dc.readyState === "open") { S.greeted = true; dc.send(JSON.stringify({ type: "response.create" })); } };
-      dc.onopen = () => setTimeout(greet, 2500);
+      const greet = () => {
+        if (!S || S.greeted || dc.readyState !== "open") return;
+        S.greeted = true;
+        for (const t of S.pend || []) dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: t }] } }));
+        if (S.pend?.length) { lg("sys", `queued sent: ${S.pend.length}`); sent("✓ وصلت رسالتك"); } S.pend = [];
+        dc.send(JSON.stringify({ type: "response.create" }));
+      };
+      dc.onopen = () => setTimeout(greet, 900);   // احتياط لو حدث «الجلسة جاهزة» اتأخر (كان ٢٫٥ ثانية زيادة قبل أول كلمة)
       // ⏸️ كل رد = سؤال واحد ويستنى العميل: بعد نتيجة الأداة المساعد مابيتكلمش تاني إلا لو الرد كان أداة بس من غير كلام
       S.resp = {};
       const R = (id) => S.resp[id] || (S.resp[id] = { msg: false, calls: 0, pending: 0, done: false });
@@ -637,7 +662,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         else if (e.type === "input_audio_buffer.speech_started") { S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
-        else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else lg("user", e.transcript, { voice: 1 }); if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
+        else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
         else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
@@ -692,14 +717,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
       if (!r.ok) throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل");
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
-      S.agent = tok.agent || ""; S.model = tok.model || ""; status();
+      S.agent = tok.agent || ""; S.model = tok.model || ""; if (!S.greeted) S.thinking = true; status();   // «لحظة…» لحد ما تبدأ تتكلم
       if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
-      q("[data-tsend]").onclick = () => { const i = q("[data-type]"), v = i.value.trim(); if (!v) return i.focus(); i.value = ""; submit(v); };
-      q("[data-type]").onkeydown = (ev) => {
-        if (ev.key !== "Enter" || !ev.target.value.trim()) return;
-        const v = ev.target.value.trim(); ev.target.value = "";
-        submit(v);
-      };
       loop();
     } catch (e) {
       if (!ov) return;   // اتقفلت وهي لسه بتتصل

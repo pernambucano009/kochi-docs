@@ -32959,7 +32959,8 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
     known, have, steps = assist_plan(b)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
-    returning = bool(int(a.get("calls") or 0) or a.get("saved"))   # كلّمها قبل كده: ترحيب بالرجوع ونكمّل من مكان ما وقفنا
+    # «راجع» بس لو فعلًا جاوب أو عدّى أسئلة في مكالمة قبل كده؛ مجرد إنه فتح المكالمة وقفلها مايخليهاش تقول «نكمّل من مكان ما وقفنا»
+    returning = bool(a.get("saved") or a.get("skipped"))
     who = a.get("name") or signup_name(request)
     # 👤 النوع: اللي اختاره في التسجيل، وإلا من اسمه الأول، وإلا مذكر. ولو صحّح المساعدة بيتحفظ (set_user_gender)
     ug = a.get("gender") or (ob.get("gender") if ob.get("gender") in ("m", "f") else "") or livevoice.name_gender(who) or "m"
