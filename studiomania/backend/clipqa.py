@@ -95,7 +95,8 @@ def review(ffmpeg: str, clip: Path, still: Path | None, desc: str, look, work: P
     except (TypeError, ValueError):
         score = None
     issues = [i for i in v.get("issues") or [] if isinstance(i, dict)][:6]
-    hard = len(m.get("flags") or []) >= 1 and (m.get("end_similarity") or 1) < 0.2   # الكود لوحده متأكد إنها بعدت خالص
+    # أرقام الكود بتروح للنموذج كدليل بس: تقريب الكاميرا المخطط بيقلّل التشابه برضه، فمش بنرفض بيها لوحدها
+    hard = False
     if "pass" in v:   # رفض من غير ولا مشكلة محددة = مش رفض؛ والنجاح لازم درجة ٦ على الأقل
         ok = (bool(v.get("pass")) or not issues) and (score or 0) >= 6 and not hard
     else:
