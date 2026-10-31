@@ -348,6 +348,26 @@ def media_file(base: Path, niche: str, key: str) -> Path | None:
     return None
 
 
+def export_zip(base: Path, niche: str) -> tuple[Path, int, list[str]]:
+    """الفيديوهات المختارة كلها في ملف واحد (zip) + ملف بياناتها، عشان تتبعت لـ Claude يفكّكها بنفسه."""
+    import zipfile
+    st = load(base, niche)
+    picked = [(k, v) for k, v in st["videos"].items() if v.get("state") == "picked"]
+    out = root(base, niche) / "picked.zip"
+    rows, missing = [], []
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:   # الفيديو مضغوط أصلًا
+        for n, (k, v) in enumerate(picked, 1):
+            name = f"{n:02d}_{v['handle']}_{v['id']}.mp4"
+            f = media_file(base, niche, k)
+            if f:
+                z.write(f, name)
+            else:
+                missing.append(v.get("url") or k)
+            rows.append({"n": n, "file": name if f else "", **{x: v.get(x) for x in ("handle", "url", "caption", "views", "multiple", "followers", "craft", "kind", "note")}})
+        z.writestr("videos.json", json.dumps(rows, ensure_ascii=False, indent=1))
+    return out, len(picked), missing
+
+
 def mark(base: Path, niche: str, kind: str, key: str, state: str, note: str = "") -> dict:
     with _lock:
         st = load(base, niche)

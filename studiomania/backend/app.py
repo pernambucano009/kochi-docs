@@ -33756,6 +33756,16 @@ def elite_video(niche: str, key: str):
     return FileResponse(f, media_type="video/mp4")
 
 
+@app.get("/api/admin/elite/{niche}/picked.zip")
+def elite_zip(niche: str):
+    """⬇️ كل الفيديوهات المختارة في ملف واحد."""
+    niche = elite_niche(niche)
+    f, n, missing = elite.export_zip(PLATFORM_DIR, niche)
+    if not n:
+        raise HTTPException(400, "لم تختر أي فيديو بعد")
+    return FileResponse(f, media_type="application/zip", filename=f"{niche}-picked-{n}.zip")
+
+
 @app.get("/api/admin/elite/{niche}/thumb/{name}")
 def elite_thumb(niche: str, name: str):
     f = elite.root(PLATFORM_DIR, elite_niche(niche)) / "thumbs" / re.sub(r"[^A-Za-z0-9_.-]", "", name)

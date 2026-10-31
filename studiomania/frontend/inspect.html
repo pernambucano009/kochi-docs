@@ -115,7 +115,7 @@
         <button class="btn pri" id="elGo">🔎 ابحث عن الصفوة</button><button class="btn" id="elReload">↻ حدّث</button><button class="btn" id="elReset">🗑 امسح النتائج (يبقى المختار)</button></div>
       <div class="row" style="margin-top:8px"><span class="mute" id="elMsg"></span></div>
       <details style="margin-top:6px"><summary class="mute">كلمات البحث</summary><div class="mute ltr" id="elQs"></div></details></div>
-    <div class="card"><div class="row" style="gap:6px"><b id="elCount"></b>
+    <div class="card"><div class="row" style="gap:6px"><b id="elCount"></b><a class="btn pri" id="elZip" href="#" download>⬇️ نزّل المختارة (ملف واحد)</a>
       <label class="chip"><input type="radio" name="elF" value="" checked> الكل</label><label class="chip"><input type="radio" name="elF" value="picked"> المختارة</label><label class="chip"><input type="radio" name="elF" value="skipped"> المستبعدة</label>
       <label class="chip"><input type="checkbox" id="elWeak" checked> أخفِ الضعيف فنيًا</label>
       <select id="elSort"><option value="score">الأجمل فنيًا</option><option value="multiple">الأعلى مقارنة بصفحته</option><option value="views">الأكثر مشاهدة</option><option value="ts">الأحدث</option></select></div>
@@ -405,6 +405,7 @@ $("elGo").onclick = async () => {
   catch (e) { $("elMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
   loadElite();
 };
+$("elZip").onclick = (e) => { e.preventDefault(); const b = e.target; b.textContent = "⏳ يجهّز الملف… (قد يأخذ دقائق)"; location.href = `/api/admin/elite/${EL.niche}/picked.zip`; setTimeout(() => { b.textContent = "⬇️ نزّل المختارة (ملف واحد)"; }, 60000); };
 $("elReload").onclick = loadElite; $("elWeak").onchange = renderElite;
 $("elReset").onclick = async () => {
   if (!confirm("ستُمسح كل النتائج ما عدا الفيديوهات المختارة والصفحات التي أضفتها. هل تريد المتابعة؟")) return;
