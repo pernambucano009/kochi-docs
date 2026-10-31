@@ -381,17 +381,24 @@ function renderElite() {
     <span class="mute">${p.platform === "tiktok" ? "TT" : "IG"} · 👥 ${nfmt(p.followers)} · متوسط ${nfmt(p.median)} · ${p.count} فيديو${p.seed ? " · أضفتها أنت" : ""}</span>
     <span style="margin-inline-start:auto">${p.state === "rejected" ? `<button class="btn" data-eps="">أرجعها</button>` : `<button class="btn" data-eps="rejected">✗ استبعد الصفحة</button>`}</span></div>`).join("");
 }
-// الفيديو بيشتغل من غير صوت أول ما يظهر في الشاشة، ويقف لما يختفي؛ دوسة عليه تشغّل الصوت
-const elIO = "IntersectionObserver" in window ? new IntersectionObserver((es) => es.forEach((e) => {
-  const v = e.target;
-  if (e.isIntersecting) {
-    if (!v.src) { const m = v.parentElement.querySelector("[data-evm]"); m.hidden = false; m.textContent = "⏳ يحمّل…";
-      v.onplaying = () => { m.hidden = true; }; v.onerror = () => { m.hidden = false; m.textContent = "تعذّر التشغيل هنا، افتحه من ↗"; };
-      v.src = `/api/admin/elite/${EL.niche}/video?key=${encodeURIComponent(v.closest("[data-ek]").dataset.ek)}`; }
-    v.play().catch(() => {});
-  } else v.pause();
-}), { threshold: 0.5 }) : null;
-function elWatch() { document.querySelectorAll("#elGrid [data-ev]").forEach((v) => { elIO?.observe(v); v.onclick = () => { v.muted = !v.muted; if (v.paused) v.play().catch(() => {}); }; }); }
+// الفيديو بيشتغل بس لما الماوس يقف عليه (أو دوسة على الموبايل)، وفيديو واحد بس في المرة؛ دوسة وهو شغال تشغّل الصوت
+let elCur = null;
+function elPlay(v) {
+  if (elCur && elCur !== v) { elCur.pause(); elCur.muted = true; }
+  elCur = v;
+  if (!v.src) { const m = v.parentElement.querySelector("[data-evm]"); m.hidden = false; m.textContent = "⏳ يحمّل…";
+    v.onplaying = () => { m.hidden = true; }; v.onerror = () => { m.hidden = false; m.textContent = "تعذّر التشغيل هنا، افتحه من ↗"; };
+    v.src = `/api/admin/elite/${EL.niche}/video?key=${encodeURIComponent(v.closest("[data-ek]").dataset.ek)}`; }
+  v.play().catch(() => {});
+}
+function elWatch() {
+  elCur = null;
+  document.querySelectorAll("#elGrid [data-ev]").forEach((v) => {
+    v.onmouseenter = () => elPlay(v);
+    v.onmouseleave = () => { v.pause(); v.muted = true; };
+    v.onclick = () => { if (elCur === v && !v.paused) v.muted = !v.muted; else elPlay(v); };
+  });
+}
 $("elGo").onclick = async () => {
   $("elGo").disabled = true;
   try { await api(`/api/admin/elite/${$("elN").value}/discover`, { method: "POST", body: JSON.stringify({ seeds: $("elSeeds").value, search: $("elSearch").checked, platforms: [...document.querySelectorAll("[data-elp]:checked")].map((x) => x.value) }) }); $("elSeeds").value = ""; }
