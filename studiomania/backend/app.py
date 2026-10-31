@@ -33685,6 +33685,13 @@ def elite_niche(niche: str) -> str:
 class EliteGoIn(BaseModel):
     seeds: str = ""
     search: bool = True
+    platforms: list[str] = ["instagram"]
+
+
+def elite_look(images: list[Path], prompt: str) -> dict:
+    """🎨 التقييم الفني لصور الفيديوهات (نموذج رؤية رخيص)."""
+    parts = [{"type": "text", "text": prompt}] + [{"type": "image_url", "image_url": {"url": data_url(model_image(f, 384), "image/jpeg")}} for f in images]
+    return ad_json(ad_media_chat([{"role": "user", "content": parts}], 2000, models=["google/gemini-3.8-flash", "google/gemini-2.5-flash"]), "التقييم الفني")
 
 
 class EliteMarkIn(BaseModel):
@@ -33716,8 +33723,18 @@ def elite_go(niche: str, body: EliteGoIn):
     seeds = elite.clean_seeds(body.seeds)
     if not seeds and not body.search:
         raise HTTPException(400, "أضف صفحة واحدة على الأقل أو فعّل البحث")
-    threading.Thread(target=elite.discover, args=(PLATFORM_DIR, niche, seeds, body.search, mock), daemon=True).start()
+    plats = tuple(p for p in body.platforms if p in ("instagram", "tiktok")) or ("instagram",)
+    threading.Thread(target=elite.discover, args=(PLATFORM_DIR, niche, seeds, body.search, mock, plats, elite_look), daemon=True).start()
     return {"ok": True, "seeds": len(seeds)}
+
+
+@app.delete("/api/admin/elite/{niche}")
+def elite_reset(niche: str):
+    """يمسح النتائج (المختار بس بيفضل، والصفحات اللي أضفتها انت)."""
+    niche = elite_niche(niche)
+    if elite.job(niche).get("status") == "running":
+        raise HTTPException(409, "البحث يعمل الآن، انتظر حتى ينتهي")
+    return {"ok": True, **elite.reset(PLATFORM_DIR, niche)}
 
 
 @app.post("/api/admin/elite/{niche}/mark")

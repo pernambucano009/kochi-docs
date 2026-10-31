@@ -16,13 +16,15 @@ import httpx
 import rivals
 
 NICHES = {
+    # كلمات الصنعة نفسها (مصورين ووكالات وأفلام عيادات)، مش كلمات المجال العامة اللي بتجيب ترند وكلام للكاميرا
     "dental": {"name": "طب الأسنان", "queries": [
-        "dentist", "cosmetic dentistry", "smile makeover", "veneers", "dental veneers", "dental implants", "teeth whitening",
-        "dentistry", "dental clinic", "orthodontics", "تجميل الاسنان", "ابتسامة هوليود", "دكتور اسنان", "عيادة اسنان",
-        "odontologia", "dentista", "lentes de contato dental", "estetica dental", "carillas dentales", "diş hekimi"]},
+        "dental cinematography", "dentalcinematography", "dental videography", "dentalvideography", "dental commercial",
+        "dental clinic commercial", "dental brand film", "cinematic dentistry", "dental photography", "dentalphotography",
+        "aesthetic dentistry", "dental art", "smile design", "dental marketing video", "odontologia estetica", "video odontologia"]},
 }
 SEARCH_PAGES = 30   # كام صفحة من نتايج البحث بنجيب فيديوهاتها كلها
-MIN_VIEWS = 10000
+MIN_VIEWS = 2000
+PER_PAGE = 8
 _lock = threading.Lock()
 _jobs: dict[str, dict] = {}
 
@@ -104,7 +106,9 @@ def mock_page(platform: str, handle: str) -> list[dict]:
 
 # ---------------------------------------------------------------- الترتيب: فيديو عدّى متوسط صفحته بكتير + مشاهداته عالية
 def score(v: dict) -> float:
-    return round(math.log10(max(v.get("views") or 1, 1)) * min(max(v.get("multiple") or 1, 1), 12), 2)
+    """الجمال الفني أولًا (لو اتقيّم)، والانتشار بعده."""
+    spread = math.log10(max(v.get("views") or 1, 1)) * min(max(v.get("multiple") or 1, 1), 12)
+    return round(v["craft"] * 10 + spread / 10, 2) if v.get("craft") else round(spread, 2)
 
 
 def add_page(st: dict, platform: str, handle: str, vids: list[dict], seed: bool) -> None:
@@ -119,18 +123,18 @@ def add_page(st: dict, platform: str, handle: str, vids: list[dict], seed: bool)
     for v in mine:
         vid = f"{platform}:{v['id']}"
         mult = round(v["views"] / med, 1) if med else 0
-        keep = seed or (v["views"] >= MIN_VIEWS and mult >= 1.5)
+        keep = seed or v["views"] >= MIN_VIEWS
         if not keep and vid not in st["videos"]:
             continue
         o = st["videos"].get(vid) or {}
         st["videos"][vid] = {**{k: v.get(k) for k in ("platform", "id", "handle", "url", "caption", "views", "likes", "comments", "ts", "thumb", "media", "seconds")},
                              "page": key, "followers": st["pages"][key]["followers"], "multiple": mult, "state": o.get("state", ""), "note": o.get("note", ""),
-                             "thumb_file": o.get("thumb_file", "")}
+                             "thumb_file": o.get("thumb_file", ""), **{k: o[k] for k in ("craft", "kind", "why") if k in o}}
         st["videos"][vid]["score"] = score(st["videos"][vid])
-    # من كل صفحة مش مزروعة بنسيب أعلى ٦ بس (اللي مختار أو مستبعد بيفضل زي ما هو)
+    # من كل صفحة مش مزروعة بنسيب أعلى ٨ بس (اللي مختار أو مستبعد بيفضل زي ما هو)
     if not seed:
         rows = sorted((x for x in st["videos"].values() if x["page"] == key and not x["state"]), key=lambda x: -x["score"])
-        for x in rows[6:]:
+        for x in rows[PER_PAGE:]:
             st["videos"].pop(f"{x['platform']}:{x['id']}", None)
 
 
@@ -165,7 +169,54 @@ def job(niche: str) -> dict:
     return _jobs.get(niche) or {}
 
 
-def discover(base: Path, niche: str, seeds: list[dict], use_search: bool, mock: bool) -> None:
+CRAFT_PROMPT = (
+    "You curate a library of the most ARTISTIC, cinematic short videos in the field of {field}, to learn how to make them. "
+    "Each image is the cover frame of one video (numbered from 0 in order). Rate each one for visual craft only: lighting, composition, "
+    "macro/detail shots, color grading, art direction, production value, like a brand film or a commercial. Low scores for: a person talking "
+    "to a phone camera, memes, screenshots, text slides, cluttered or badly lit phone footage, reposted content, cartoons/AI-looking images.\n"
+    'Answer JSON only: {{"items": [{{"i": 0, "craft": 1-10, "kind": "cinematic|before-after|talking|tutorial|meme|slides|other", '
+    '"why": "few words in English"}}]}}')
+
+
+def craft(base: Path, niche: str, look, job_state: dict | None = None, batch: int = 8) -> None:
+    """🎨 عقل سمسمكيت بيقيّم صورة كل فيديو فنيًا (٨ صور في الطلب الواحد عشان يبقى رخيص)."""
+    d = root(base, niche) / "thumbs"
+    with _lock:
+        todo = [(k, v) for k, v in load(base, niche)["videos"].items() if v.get("thumb_file") and not v.get("craft")]
+    if job_state is not None:
+        job_state.update(step="craft", done=0, total=len(todo))
+    for i in range(0, len(todo), batch):
+        part = todo[i:i + batch]
+        try:
+            res = look([d / v["thumb_file"] for _, v in part], CRAFT_PROMPT.format(field=NICHES[niche]["name"])) or {}
+        except Exception as exc:  # noqa: BLE001
+            if job_state is not None:
+                job_state["error"] = f"craft: {str(exc)[:160]}"
+            continue
+        got = {}
+        for x in res.get("items") or []:
+            try:
+                got[int(x.get("i"))] = x
+            except (TypeError, ValueError, AttributeError):
+                continue
+        with _lock:
+            st = load(base, niche)
+            for j, (k, _) in enumerate(part):
+                x = got.get(j)
+                if x and k in st["videos"]:
+                    try:
+                        c = max(1, min(10, int(float(x.get("craft")))))
+                    except (TypeError, ValueError):
+                        continue
+                    v = st["videos"][k]
+                    v.update(craft=c, kind=str(x.get("kind") or "")[:20], why=str(x.get("why") or "")[:120])
+                    v["score"] = score(v)
+            save(base, niche, st)
+        if job_state is not None:
+            job_state["done"] += len(part)
+
+
+def discover(base: Path, niche: str, seeds: list[dict], use_search: bool, mock: bool, platforms: tuple = ("instagram",), look=None) -> None:
     """بيشتغل في الخلفية: الصفحات المزروعة كلها + البحث بكلمات المجال ← أعلى الصفحات ← فيديوهاتها ← الصور المصغرة."""
     J = _jobs[niche] = {"status": "running", "step": "", "done": 0, "total": 0, "error": "", "at": int(time.time())}
     try:
@@ -177,9 +228,9 @@ def discover(base: Path, niche: str, seeds: list[dict], use_search: bool, mock: 
         if use_search:
             hits: list[dict] = []
             qs = NICHES[niche]["queries"]
-            J.update(step="search", total=len(qs) * 2)
+            J.update(step="search", total=len(qs) * len(platforms))
             for q in qs:
-                for plat in ("instagram", "tiktok"):
+                for plat in platforms:
                     try:
                         hits += rivals.mock_posts(plat, f"{re.sub(r'[^a-z]', '', q)[:8] or 'dent'}_{plat[:2]}") if mock else search(plat, q)
                     except rivals.RivalsError as exc:
@@ -212,6 +263,8 @@ def discover(base: Path, niche: str, seeds: list[dict], use_search: bool, mock: 
                     cur["videos"][vid]["thumb_file"] = v["thumb_file"]
             cur["updated_at"] = int(time.time())
             save(base, niche, cur)
+        if look and not mock:
+            craft(base, niche, look, J)
         J.update(status="done", step="")
     except Exception as exc:  # noqa: BLE001
         J.update(status="failed", error=str(exc)[:300])
@@ -316,6 +369,21 @@ def mark(base: Path, niche: str, kind: str, key: str, state: str, note: str = ""
                 v["note"] = note[:500]
         save(base, niche, st)
         return st
+
+
+def reset(base: Path, niche: str) -> dict:
+    with _lock:
+        st = load(base, niche)
+        keep = {k: v for k, v in st["videos"].items() if v.get("state") == "picked"}
+        pages = {k: p for k, p in st["pages"].items() if p.get("seed") or p.get("state") == "rejected" or any(v["page"] == k for v in keep.values())}
+        gone = set(st["videos"]) - set(keep)
+        st.update(videos=keep, pages=pages)
+        save(base, niche, st)
+    r = root(base, niche)
+    for k in gone:
+        (r / "media" / (_safe(k) + ".mp4")).unlink(missing_ok=True)
+        (r / "thumbs" / (_safe(k) + ".jpg")).unlink(missing_ok=True)
+    return {"removed": len(gone), "kept": len(keep)}
 
 
 def view(base: Path, niche: str) -> dict:
