@@ -33767,6 +33767,37 @@ def elite_zip(niche: str):
     return FileResponse(f, media_type="application/zip", filename=f"{niche}-picked-{n}.zip")
 
 
+class ElitePageIn(BaseModel):
+    key: str = ""
+    handle: str = ""   # اسم الصفحة أو رابطها مباشرة (من غير ما تكون في القايمة)
+
+
+@app.post("/api/admin/elite/{niche}/page-dump")
+def elite_page_dump(niche: str, body: ElitePageIn):
+    """⬇️ كل فيديوهات صفحة واحدة في ملف واحد (بيشتغل في الخلفية)."""
+    niche = elite_niche(niche)
+    mock = not rivals.live() and atlas.mock_mode()
+    if not rivals.live() and not mock:
+        raise HTTPException(400, rivals.missing_msg())
+    if body.handle.strip():
+        h = rivals.clean_handle(body.handle).lower()
+        body.key = f"{'tiktok' if 'tiktok.com' in body.handle else 'instagram'}:{h}" if h else ""
+    if not re.fullmatch(r"(instagram|tiktok):[a-z0-9._]{1,40}", body.key or ""):
+        raise HTTPException(400, "اختيار غير صحيح")
+    if elite.page_job(body.key).get("status") == "running":
+        raise HTTPException(409, "البحث يعمل الآن، انتظر حتى ينتهي")
+    threading.Thread(target=elite.page_dump, args=(PLATFORM_DIR, niche, body.key, mock), daemon=True).start()
+    return {"ok": True, "key": body.key}
+
+
+@app.get("/api/admin/elite/{niche}/page-zip")
+def elite_page_zip(niche: str, key: str):
+    f = elite.root(PLATFORM_DIR, elite_niche(niche)) / "pages" / f"{elite._safe(key)}.zip"
+    if not f.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="application/zip", filename=f"{elite._safe(key)}.zip")
+
+
 @app.get("/api/admin/elite/{niche}/thumb/{name}")
 def elite_thumb(niche: str, name: str):
     f = elite.root(PLATFORM_DIR, elite_niche(niche)) / "thumbs" / re.sub(r"[^A-Za-z0-9_.-]", "", name)

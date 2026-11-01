@@ -114,6 +114,8 @@
         <label class="chip"><input type="checkbox" data-elp value="instagram" checked> إنستجرام</label><label class="chip"><input type="checkbox" data-elp value="tiktok"> تيك توك</label>
         <button class="btn pri" id="elGo">🔎 ابحث عن الصفوة</button><button class="btn" id="elReload">↻ حدّث</button><button class="btn" id="elReset">🗑 امسح النتائج (يبقى المختار)</button></div>
       <div class="row" style="margin-top:8px"><span class="mute" id="elMsg"></span></div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><b>⬇️ نزّل كل فيديوهات صفحة</b><input id="elDH" dir="ltr" placeholder="@page or link" style="min-width:220px"><button class="btn" id="elDGo">نزّل</button></div>
+      <div id="elDumps" style="margin-top:6px"></div>
       <details style="margin-top:6px"><summary class="mute">كلمات البحث</summary><div class="mute ltr" id="elQs"></div></details></div>
     <div class="card"><div class="row" style="gap:6px"><b id="elCount"></b><a class="btn pri" id="elZip" href="#" download>⬇️ نزّل المختارة (ملف واحد)</a>
       <label class="chip"><input type="radio" name="elF" value="" checked> الكل</label><label class="chip"><input type="radio" name="elF" value="picked"> المختارة</label><label class="chip"><input type="radio" name="elF" value="skipped"> المستبعدة</label>
@@ -362,7 +364,7 @@ async function loadElite() {
   $("elQs").textContent = (d.queries || []).join(" · ");
   $("elGo").disabled = j.status === "running";
   renderElite();
-  clearTimeout(loadElite.t); if (j.status === "running") loadElite.t = setTimeout(loadElite, 4000);
+  clearTimeout(loadElite.t); if ((d.dumps || []).some((x) => x.status === "running") || j.status === "running") loadElite.t = setTimeout(loadElite, 4000);
 }
 function renderElite() {
   const d = EL.d || { videos: [], pages: [] }, f = document.querySelector('[name="elF"]:checked').value, srt = $("elSort").value;
@@ -380,11 +382,13 @@ function renderElite() {
       <div class="row" style="gap:4px;margin-top:6px"><button class="btn${v.state === "picked" ? " pri" : ""}" data-es="picked">✓ اختر</button><button class="btn" data-es="skipped">✗ استبعد</button>${v.state ? `<button class="btn" data-es="">↺</button>` : ""}</div></div></div>`).join("")
     || `<span class="mute">لا توجد فيديوهات هنا بعد.</span>`;
   elWatch();
+  $("elDumps").innerHTML = (d.dumps || []).map((j) => `<div class="row" style="gap:8px;padding:3px 0"><span class="ltr">@${esc(j.key.split(":")[1])} <span class="mute">${j.key.startsWith("tiktok") ? "TT" : "IG"}</span></span>
+    ${elDump({ key: j.key, dump: j }).replace(/<button class="btn" data-edump>.*?<\/button>/, "")}</div>`).join("");
   $("elPN").textContent = `(${d.pages.length})`;
   $("elPages").innerHTML = d.pages.map((p) => `<div class="row" data-ep="${esc(p.key)}" style="gap:8px;padding:4px 0;border-bottom:1px solid var(--line)${p.state === "rejected" ? ";opacity:.5" : ""}">
     <a class="ltr" href="${p.platform === "tiktok" ? "https://www.tiktok.com/@" : "https://www.instagram.com/"}${esc(p.handle)}" target="_blank" rel="noopener">@${esc(p.handle)}</a>
     <span class="mute">${p.platform === "tiktok" ? "TT" : "IG"} · 👥 ${nfmt(p.followers)} · متوسط ${nfmt(p.median)} · ${p.count} فيديو${p.seed ? " · أضفتها أنت" : ""}</span>
-    <span style="margin-inline-start:auto">${p.state === "rejected" ? `<button class="btn" data-eps="">أرجعها</button>` : `<button class="btn" data-eps="rejected">✗ استبعد الصفحة</button>`}</span></div>`).join("");
+    <span style="margin-inline-start:auto;display:flex;gap:6px;align-items:center">${elDump(p)}${p.state === "rejected" ? `<button class="btn" data-eps="">أرجعها</button>` : `<button class="btn" data-eps="rejected">✗ استبعد الصفحة</button>`}</span></div>`).join("");
 }
 // الفيديو بيشتغل بس لما الماوس يقف عليه (أو دوسة على الموبايل)، وفيديو واحد بس في المرة؛ دوسة وهو شغال تشغّل الصوت
 let elCur = null;
@@ -404,6 +408,26 @@ function elWatch() {
     v.onclick = () => { if (elCur === v && !v.paused) v.muted = !v.muted; else elPlay(v); };
   });
 }
+// ⬇️ كل فيديوهات صفحة في ملف واحد (للمذاكرة)
+const EL_DSTEP = { list: "يجمع قائمة الفيديوهات", download: "يحمّل الفيديوهات", zip: "يجهّز الملف" };
+function elDump(p) {
+  const j = p.dump || {};
+  if (j.status === "running") return `<span class="mute">⏳ ${EL_DSTEP[j.step] || ""} ${j.total ? `${j.done} من ${j.total}` : ""}</span>`;
+  const dl = j.status === "done" ? `<a class="btn pri" href="/api/admin/elite/${EL.niche}/page-zip?key=${encodeURIComponent(p.key)}">⬇️ الملف (${j.count} فيديو${j.missing ? ` · ${j.missing} تعذّر` : ""})</a>` : "";
+  return `${dl}${j.status === "failed" ? `<span class="bad" style="font-size:11px">${esc(j.error)}</span>` : ""}<button class="btn" data-edump>⬇️ نزّل كل فيديوهاتها</button>`;
+}
+$("elDGo").onclick = async () => {
+  const h = $("elDH").value.trim(); if (!h) return $("elDH").focus();
+  $("elDGo").disabled = true;
+  await api(`/api/admin/elite/${EL.niche}/page-dump`, { method: "POST", body: JSON.stringify({ handle: h }) }).then(() => { $("elDH").value = ""; }).catch((er) => alert(er.message));
+  $("elDGo").disabled = false; loadElite();
+};
+$("elPages").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-edump]"); if (!b) return;
+  b.disabled = true;
+  await api(`/api/admin/elite/${EL.niche}/page-dump`, { method: "POST", body: JSON.stringify({ key: b.closest("[data-ep]").dataset.ep }) }).catch((er) => alert(er.message));
+  loadElite();
+});
 $("elGo").onclick = async () => {
   $("elGo").disabled = true;
   try { await api(`/api/admin/elite/${$("elN").value}/discover`, { method: "POST", body: JSON.stringify({ seeds: $("elSeeds").value, search: $("elSearch").checked, platforms: [...document.querySelectorAll("[data-elp]:checked")].map((x) => x.value) }) }); $("elSeeds").value = ""; }

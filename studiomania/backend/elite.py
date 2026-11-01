@@ -100,6 +100,64 @@ def page_videos(platform: str, handle: str) -> list[dict]:
     return [p for p in (norm(platform, r) for r in raw if isinstance(r, dict)) if p]
 
 
+def all_page_videos(platform: str, handle: str, limit: int = 300) -> list[dict]:
+    """كل فيديوهات الصفحة (صفحة ورا صفحة لحد ما تخلص أو نوصل للحد)، مش أول دفعة بس."""
+    out, seen, cur = [], set(), None
+    for _ in range(40):
+        if platform == "tiktok":
+            d = rivals._get("/v3/tiktok/profile/videos", {"handle": handle, "sort_by": "latest", **({"max_cursor": cur} if cur else {})})
+            raw = d.get("aweme_list") or d.get("data") or []
+            cur, more = d.get("max_cursor"), bool(d.get("has_more"))
+        else:
+            d = rivals._get("/v1/instagram/user/reels", {"handle": handle, **({"max_id": cur} if cur else {})})
+            raw = d.get("items") or d.get("data") or []
+            pg = d.get("paging_info") if isinstance(d.get("paging_info"), dict) else {}
+            cur, more = pg.get("max_id") or d.get("max_id") or d.get("next_max_id"), bool(pg.get("more_available", d.get("more_available")))
+        new = [p for p in (norm(platform, r) for r in raw if isinstance(r, dict)) if p and p["id"] not in seen]
+        for p in new: seen.add(p["id"])
+        out += new
+        if not new or not more or not cur or len(out) >= limit: break
+    return out[:limit]
+
+
+_pjobs: dict[str, dict] = {}
+
+
+def page_job(key: str) -> dict:
+    return _pjobs.get(key) or {}
+
+
+def page_dir(base: Path, niche: str, key: str) -> Path:
+    d = root(base, niche) / "pages" / _safe(key); d.mkdir(parents=True, exist_ok=True); return d
+
+
+def page_dump(base: Path, niche: str, key: str, mock: bool = False) -> None:
+    """⬇️ كل فيديوهات الصفحة في ملف واحد (zip) + بياناتها، عشان نذاكرها."""
+    import zipfile
+    platform, handle = key.split(":", 1)
+    J = _pjobs[key] = {"status": "running", "step": "list", "done": 0, "total": 0, "error": "", "missing": 0}
+    try:
+        vids = mock_page(platform, handle) if mock else all_page_videos(platform, handle)
+        d = page_dir(base, niche, key); J.update(step="download", total=len(vids))
+        rows = []
+        for n, v in enumerate(sorted(vids, key=lambda v: -(v.get("views") or 0)), 1):
+            name = f"{n:03d}_{v['id']}.mp4"; f = d / name
+            ok = f.exists() or (not mock and (_download(v.get("media") or "", f, platform) or _download(fresh_media(v) if rivals.live() else "", f, platform)))
+            if not ok: J["missing"] += 1
+            rows.append({"n": n, "file": name if ok else "", **{k: v.get(k) for k in ("url", "caption", "views", "likes", "comments", "ts", "seconds")}})
+            J["done"] = n
+        (d / "videos.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), "utf-8")
+        J["step"] = "zip"
+        z = root(base, niche) / "pages" / f"{_safe(key)}.zip"
+        with zipfile.ZipFile(z, "w", zipfile.ZIP_STORED) as zf:
+            for r in rows:
+                if r["file"]: zf.write(d / r["file"], r["file"])
+            zf.write(d / "videos.json", "videos.json")
+        J.update(status="done", step="", count=len(rows))
+    except Exception as exc:  # noqa: BLE001
+        J.update(status="failed", error=str(exc)[:300])
+
+
 def mock_page(platform: str, handle: str) -> list[dict]:
     return [{**p, "thumb": "", "media": "", "seconds": 20 + i} for i, p in enumerate(rivals.mock_posts(platform, handle))]
 
@@ -411,6 +469,6 @@ def view(base: Path, niche: str) -> dict:
     vids = sorted(st["videos"].values(), key=lambda v: (v.get("state") != "picked", v.get("state") == "skipped", -v.get("score", 0)))
     pages = sorted(st["pages"].items(), key=lambda kv: (kv[1].get("state") == "rejected", not kv[1].get("seed"), -kv[1].get("median", 0)))
     return {"niche": niche, "name": NICHES[niche]["name"], "queries": NICHES[niche]["queries"], "job": job(niche),
-            "videos": [{**v, "key": f"{v['platform']}:{v['id']}"} for v in vids], "pages": [{**p, "key": k} for k, p in pages],
+            "videos": [{**v, "key": f"{v['platform']}:{v['id']}"} for v in vids], "pages": [{**p, "key": k, "dump": page_job(k)} for k, p in pages], "dumps": [{"key": k, **j} for k, j in _pjobs.items()],
             "seeds": st.get("seeds") or [], "updated_at": st.get("updated_at"),
             "counts": {"videos": len(vids), "picked": sum(v.get("state") == "picked" for v in vids), "pages": len(pages)}}
