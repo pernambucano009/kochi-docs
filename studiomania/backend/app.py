@@ -34228,4 +34228,108 @@ def assistant_preference(body: AssistPrefIn):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- 🦷 قوالب الأسنان (نسخة تجريبية): صور حالة حقيقية ← فيديو بقالب
+import dental  # noqa: E402
+
+
+def dental_on():
+    if not dental.enabled():
+        raise HTTPException(404, "قوالب الأسنان غير متاحة")
+
+
+@app.get("/api/dental")
+def dental_home():
+    dental_on()
+    return {"templates": dental.TEMPLATES, "shots": dental.SHOTS, "cases": dental.cases(DATA_DIR)}
+
+
+@app.post("/api/dental/cases")
+async def dental_new(files: list[UploadFile] = File(...), title: str = Form("")):
+    """صور الحالة (أي ترتيب): المحرك بيصنّفها ويعدّل اتجاهها، وبعدين يحلل السنان ويجهز العناصر في الخلفية."""
+    dental_on()
+    if len(files) > 12:
+        raise HTTPException(400, "الحد الأقصى ١٢ صورة للحالة")
+    got = []
+    for f in files:
+        data = await f.read()
+        if len(data) > 25 * 1024 * 1024:
+            raise HTTPException(400, f"الصورة {f.filename} أكبر من ٢٥ ميجا")
+        got.append((f.filename or "", data))
+    try:
+        cid = dental.create(DATA_DIR, got, title)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return dental.view(DATA_DIR, cid)
+
+
+@app.get("/api/dental/cases/{cid}")
+def dental_case(cid: str):
+    dental_on()
+    v = dental.view(DATA_DIR, cid)
+    if not v:
+        raise HTTPException(404, "الحالة غير موجودة")
+    return v
+
+
+class DentalDecideIn(BaseModel):
+    name: str
+    ok: bool
+    reason: str = ""
+
+
+@app.post("/api/dental/cases/{cid}/decide")
+def dental_decide(cid: str, body: DentalDecideIn):
+    """موافقة الطبيب (أو رفضه) على صورة مشتقة فيها وش المريض."""
+    dental_on()
+    try:
+        return dental.decide(DATA_DIR, cid, body.name, body.ok, body.reason)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.post("/api/dental/cases/{cid}/redo")
+def dental_redo(cid: str):
+    dental_on()
+    try:
+        dental.redo(DATA_DIR, cid)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    return dental.view(DATA_DIR, cid)
+
+
+class DentalRenderIn(BaseModel):
+    template: str
+
+
+@app.post("/api/dental/cases/{cid}/render")
+def dental_render(cid: str, body: DentalRenderIn):
+    dental_on()
+    try:
+        dental.render(DATA_DIR, cid, body.template)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+    return dental.view(DATA_DIR, cid)
+
+
+@app.get("/api/dental/cases/{cid}/file/{rel:path}")
+def dental_file(cid: str, rel: str):
+    dental_on()
+    p = dental.file(DATA_DIR, cid, rel)
+    if not p:
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(p, media_type="video/mp4" if p.suffix == ".mp4" else "image/png")
+
+
+@app.delete("/api/dental/cases/{cid}")
+def dental_delete(cid: str):
+    dental_on()
+    if not dental.delete(DATA_DIR, cid):
+        raise HTTPException(409, "تعذّر الحذف (الحالة تعمل الآن أو غير موجودة)")
+    return {"ok": True}
+
+
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")

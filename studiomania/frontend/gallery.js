@@ -20,6 +20,9 @@ const Gallery = (() => {
     // ✏️ Hairline: سجّل صوتك (أو ارفع فيديو، بناخد صوته بس) ← كلام بخط رفيع على أسود ورسومات أيزومتريك على قد الكلام
     { id: "hairline", name: "خطوط رفيعة على الأسود", icon: "✏️", sample_url: "/gallery/hairline.mp4", cover_url: "/gallery/hairline.jpg", cat: "explain",
     desc: "سجّل صوتك، ويكتب البرنامج كلامك بخط رفيع على الأسود، ويرسم بجانبه رسومات أيزومترية تناسب النص (حاسوب، قفل، مال…)، وإن لم توجد رسمة جاهزة يرسم واحدة." },
+    // 🦷 قوالب الأسنان (نسخة تجريبية): من صور حالة حقيقية (قبل/بعد) لفيديو — المحرك على السيرفر (dental.js)
+    { id: "dental", name: "فيديو حالة أسنان (قبل وبعد)", icon: "🦷", cat: "dental", pin: 6,
+    desc: "ارفع صور حالة حقيقية لمريض (قبل وبعد بالمبعد، ووجهه قبل، وابتسامته بعد)، واختر قالبًا: تصميم الابتسامة، أو المسح الرقمي، أو الزراعة… وتبقى الأسنان أسنان المريض الحقيقية." },
     { id: "typo", name: "تايبوجرافي", icon: "🔤", sample_url: "/gallery/typo.mp4", cover_url: "/gallery/typo.jpg", cat: "motion",
     desc: "نص يتحرك على الإيقاع من صوتك أو نصك، بأكثر من 300 حركة جاهزة." },
     // قوالب موشن بالكود (library/motion/r/t-*): بتترسم من غير توليد، والكلام والألوان بيتغيروا
@@ -92,6 +95,7 @@ const Gallery = (() => {
   // فاللي رسمته بعيدة عن مجال العميل بيظهر بعد المناسب. مجال العميل بيتعرف من العقل (/api/tpl-niche).
   const FIT = {
     "phone": "*",
+    "dental": "beauty",
     "avatar": "*",
     "carousel": "*",
     "typo": "*",
@@ -163,7 +167,7 @@ const Gallery = (() => {
   };
   const fits = (x) => !S.niche.key || FIT[x.id] === "*" || (FIT[x.id] || "").split(" ").includes(S.niche.key);
   // تصنيفات القوالب اللي مش جاية من السيرفر
-  const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "other", ar: "قوالبي" }];
+  const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "طب الأسنان" }, { id: "other", ar: "قوالبي" }];
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
@@ -757,6 +761,7 @@ const Gallery = (() => {
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
     if (x.id === "editor") return openEditor();
+    if (x.id === "dental") return window.Dental?.open();
     return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
   }
   // المعاينة فوق الشاشة كلها (برّه الصفحة نفسها)
