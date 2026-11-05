@@ -34232,6 +34232,11 @@ def assistant_preference(body: AssistPrefIn):
 import dental  # noqa: E402
 
 
+def dental_max(name: str | None) -> int:
+    """حجم الملف المسموح: الفيديو أكبر من الصورة."""
+    return (300 if os.path.splitext(name or "")[1].lower() in dental.VID_EXT else 25) * 1024 * 1024
+
+
 def dental_on():
     if not dental.enabled():
         raise HTTPException(404, "قوالب الأسنان غير متاحة")
@@ -34258,16 +34263,16 @@ async def dental_new(files: list[UploadFile] = File([]), title: str = Form(""),
                  ("after_face_retracted", after_face_retracted)):
         if f is not None:
             data = await f.read()
-            if len(data) > 25 * 1024 * 1024:
-                raise HTTPException(400, f"الصورة {f.filename} أكبر من ٢٥ ميجا")
+            if len(data) > dental_max(f.filename):
+                raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح (٢٥ ميجا للصورة، ٣٠٠ ميجا للفيديو)")
             slots[k] = (f.filename or "", data)
     if len(files) > 30:
         raise HTTPException(400, "الحد الأقصى ٣٠ صورة للحالة")
     got = []
     for f in files:
         data = await f.read()
-        if len(data) > 25 * 1024 * 1024:
-            raise HTTPException(400, f"الصورة {f.filename} أكبر من ٢٥ ميجا")
+        if len(data) > dental_max(f.filename):
+            raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح (٢٥ ميجا للصورة، ٣٠٠ ميجا للفيديو)")
         got.append((f.filename or "", data))
     try:
         cid = dental.create(DATA_DIR, got, title, slots or None)
@@ -34320,8 +34325,8 @@ async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), 
     up = None
     if file is not None:
         data = await file.read()
-        if len(data) > 25 * 1024 * 1024:
-            raise HTTPException(400, f"الصورة {file.filename} أكبر من ٢٥ ميجا")
+        if len(data) > dental_max(file.filename):
+            raise HTTPException(400, f"الملف {file.filename} أكبر من الحد المسموح (٢٥ ميجا للصورة، ٣٠٠ ميجا للفيديو)")
         up = (file.filename or "", data)
     try:
         return dental.assign(DATA_DIR, cid, slot, photo, up)
@@ -34354,6 +34359,16 @@ def dental_file(cid: str, rel: str):
     if not p:
         raise HTTPException(404, "غير موجود")
     return FileResponse(p, media_type=mimetypes.guess_type(p.name)[0] or "application/octet-stream")
+
+
+@app.get("/api/dental/cases/{cid}/assets.zip")
+def dental_assets_zip(cid: str):
+    """فولدر المريض كله (الصور والفيديوهات الأصلية + كل اللي اتعمل منها) في ملف واحد."""
+    dental_on()
+    z = dental.assets_zip(DATA_DIR, cid)
+    if not z:
+        raise HTTPException(404, "الحالة غير موجودة")
+    return FileResponse(z, media_type="application/zip", filename=f"dental_case_{cid}.zip")
 
 
 @app.delete("/api/dental/cases/{cid}")

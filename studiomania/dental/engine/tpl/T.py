@@ -1621,7 +1621,7 @@ def a12():
     CL_ = {}
     def clip(n): 
         n = _live(n)   # الفيديو الحي من العنصر المعتمد (مش لزق)
-        if n not in CL_: CL_[n] = Clip(AV + n + ".mp4", loop=True)
+        if n not in CL_: CL_[n] = Clip(_vpath(n), loop=True)   # فولدر الحالة الأول (فيديو المريض الحقيقي)
         return CL_[n]
     def s5(t): return clip("smile_after_lock").at(t)
     AF12 = A(1.12)

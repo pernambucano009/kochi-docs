@@ -32,10 +32,17 @@ TEMPLATES = [
      "desc": "مسح الأسنان بالضوء، ويخرج الفك من الكادر، ثم قبل وبعد على الصورة القريبة والوجه."},
     {"id": "a17", "name": "إضافة أم تشذيب؟", "dur": 27.7,
      "desc": "مقارنة الأسنان قبل وبعد مع شرح نوع العلاج على الأسنان نفسها."},
+    {"id": "a12", "name": "تركيب العدسات على الوجه", "dur": 27.0, "needs": ["after_live"],
+     "desc": "تطير العدسات وتستقر كل واحدة على سنّها في وجه المريض، ثم فيديو المريض الحقيقي بعد العلاج، ووجوهه من الزوايا."},
     {"id": "a24", "name": "الزراعة والتركيبات", "dur": 28.6,
      "desc": "خطوط الوجه، ودخول الزرعات أماكنها، ومخطط نسب عرض الأسنان، وفي النهاية ابتسامة ما بعد العلاج."},
 ]
 TPL_IDS = [t["id"] for t in TEMPLATES]
+
+
+def _tpl_ok(case: Path, t: dict) -> bool:
+    """القالب متاح للحالة دي؟ (القوالب اللي محتاجة فيديو حي بتتفتح بس لو الطبيب رفع فيديو حقيقي)"""
+    return all((case / "elements" / "v" / f"{v}.mp4").exists() for v in t.get("needs", []))
 
 # الصور: ٤ أنواع × قبل/بعد (نفس خانات المحرك). المطلوب فعلًا ٤ مجموعات، وكل مجموعة ليها بديل بنقصّه من صورة تانية حقيقية
 # (عمرنا ما بنولّد سنان: القص بينقل بكسلات حقيقية بس)
@@ -276,9 +283,111 @@ c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f, _ in p
 """
 
 
+IMG_EXT = (".jpg", ".jpeg", ".png", ".webp", ".heic")
+VID_EXT = (".mp4", ".mov", ".m4v", ".webm", ".avi", ".3gp")
+# فيديو الوجه ← الفيديو الحي اللي القوالب محتاجاه (بدل ما يتولّد بالذكاء الاصطناعي)
+LIVE_OF = {"after_face": "after_live", "before_face": "before_live"}
+_VIDEO = """
+import sys, os, json, subprocess, cv2, numpy as np
+src, kind, out_frame, live_out = sys.argv[1], sys.argv[2], sys.argv[3], (sys.argv[4] if len(sys.argv) > 4 else "")
+import mediapipe as mp
+from mediapipe.tasks.python import vision, BaseOptions
+S_ = os.environ.get("DENTAL_ROOT") or os.path.dirname(os.getcwd())
+det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=BaseOptions(model_asset_path=S_ + "/face/face_landmarker.task"), num_faces=1))
+cap = cv2.VideoCapture(src); fps = cap.get(cv2.CAP_PROP_FPS) or 30; n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+step = max(1, int(fps / 4)); best = (-1, None, 0, None); faces = []
+i = 0
+while True:
+    ok, fr = cap.read()
+    if not ok or i > 20 * 60 * fps: break
+    if i % step == 0:
+        h, w = fr.shape[:2]; sm = cv2.resize(fr, (480, int(480 * h / w))); g = cv2.cvtColor(sm, cv2.COLOR_BGR2GRAY)
+        sharp = cv2.Laplacian(g, cv2.CV_64F).var()
+        hsv = cv2.cvtColor(sm, cv2.COLOR_BGR2HSV); ch, cw = hsv.shape[0] // 4, hsv.shape[1] // 4
+        teeth = float(((hsv[ch:-ch, cw:-cw, 2] > 150) & (hsv[ch:-ch, cw:-cw, 1] < 70)).mean())
+        r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(cv2.cvtColor(sm, cv2.COLOR_BGR2RGB))))
+        lm = r.face_landmarks[0] if r.face_landmarks else None
+        opn = (lm[14].y - lm[13].y) / max(1e-3, lm[152].y - lm[10].y) if lm else 0
+        if kind in ("face", "faceret", "smile") and lm is None and kind != "smile": score = 0
+        else: score = (sharp ** .5) * (0.3 + teeth * 6 + opn * 4)
+        faces.append((i / fps, lm[1].x if lm else None, score))
+        if score > best[0]: best = (score, fr.copy(), i / fps, lm)
+    i += 1
+cap.release()
+if best[1] is None: raise SystemExit("لم نجد كادرًا واضحًا في الفيديو")
+cv2.imwrite(out_frame, best[1], [cv2.IMWRITE_JPEG_QUALITY, 95])
+res = {"frame": out_frame, "t": round(best[2], 2), "dur": round(i / fps, 2)}
+if live_out:   # مقطع ٦ ثواني حوالين أوضح لحظة، مقصوص 9:16 على الوش
+    H, W = best[1].shape[:2]; t0 = max(0.0, min(best[2] - 2.0, i / fps - 6.0)); d = min(6.0, i / fps - t0)
+    xs = [x for t, x, sc in faces if x is not None and t0 <= t <= t0 + d] or [0.5]; cx = float(np.median(xs)) * W
+    if W / H > 9 / 16: cw_ = int(H * 9 / 16) // 2 * 2; x0 = int(min(max(0, cx - cw_ / 2), W - cw_)); vf = f"crop={cw_}:{H}:{x0}:0"
+    else: chh = int(W * 16 / 9) // 2 * 2; vf = f"crop={W}:{min(H, chh)}:0:{max(0, (H - chh) // 4)}"
+    os.makedirs(os.path.dirname(live_out), exist_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t0), "-i", src, "-t", str(d), "-vf", vf + ",scale=1080:1920,fps=30", "-an",
+                    "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", live_out], check=True)
+    res["live"] = live_out
+print(json.dumps(res))
+"""
+
+
+def _video_frame(case: Path, video: str, kind: str, frame: str, live: str = "") -> None:
+    """أوضح كادر في الفيديو (الأسنان باينة والصورة حادة) ← صورة للخانة. ولو live: مقطع حي 9:16 للقوالب."""
+    args = ["-c", _VIDEO, str(case / "input" / video), kind, str(frame)] + ([live] if live else [])
+    r = _run(case, args, "video.log", 1200)
+    if r.returncode != 0:
+        raise RuntimeError("تعذّر قراءة الفيديو. " + _tail(case, "video.log", 1))
+
+
+def _link_live(case: Path) -> None:
+    """أي خانة وجه صورتها جاية من فيديو: الفيديو نفسه يبقى الفيديو الحي المعتمد (فيديو حقيقي، مش متولد)."""
+    m, cj = _meta(case), _engine_json(case)
+    src_of = {**{v["frame"]: v["video"] for v in m.get("video_frames", [])}}
+    for slot, live in LIVE_OF.items():
+        f = cj.get("slots", {}).get(slot, {}).get("file")
+        vid = src_of.get(f)
+        out = case / "elements" / "v" / f"{live}.mp4"
+        if not vid:
+            continue
+        _video_frame(case, vid, "face", str(case / "input" / f"_tmp_{live}.jpg"), str(out))
+        (case / "input" / f"_tmp_{live}.jpg").unlink(missing_ok=True)
+        _run(case, ["run.py", "approve", str(case), f"v/{live}.mp4", "real video from the doctor"], "approve.log", 120)
+        with _LOCK:
+            mm = _meta(case)
+            mm.setdefault("live", {})[live] = {"from": vid, "at": time.time()}
+            _save_meta(case, mm)
+
+
+def _prep_videos(case: Path) -> None:
+    """الفيديوهات اللي الطبيب رفعها: كادر من كل فيديو يتعامل كصورة (في خانته أو في التصنيف التلقائي)، والفيديو نفسه بيتحفظ."""
+    m = _meta(case)
+    frames = list(m.get("video_frames", []))
+    kinds = {s["slot"]: s["kind"] for s in SHOTS}
+    for slot, f in list(m.get("upload_slots", {}).items()):
+        if f.lower().endswith(VID_EXT):
+            fr = f"{slot}_frame.jpg"
+            _set_job(case, stage="video")
+            _video_frame(case, f, kinds.get(slot, "any"), str(case / "input" / fr))
+            m["upload_slots"][slot] = fr
+            frames.append({"frame": fr, "video": f})
+    up = case / "_up"
+    if up.is_dir():
+        for v in sorted(up.iterdir()):
+            if v.suffix.lower() in VID_EXT:
+                _set_job(case, stage="video")
+                shutil.move(str(v), str(case / "input" / v.name))
+                fr = f"{v.stem}_frame.jpg"
+                _video_frame(case, v.name, "any", str(up / fr))
+                frames.append({"frame": fr, "video": v.name})
+    with _LOCK:
+        mm = _meta(case)
+        mm["upload_slots"], mm["video_frames"] = m.get("upload_slots", {}), frames
+        _save_meta(case, mm)
+
+
 def _slots_intake(case: Path):
     """الطبيب رفع كل صورة في خانتها: نعدّل اتجاه الصور (كلها في نفس الوقت) ونحطها مكانها، ونحلل الأسنان، ونكمّل.
     أسرع وأدق من التصنيف التلقائي لأن الخانة معروفة."""
+    _prep_videos(case)
     m = _meta(case)
     if (case / "_up").is_dir() and any((case / "_up").iterdir()):   # صور بالجملة (فولدر/كل الصور): التصنيف التلقائي الأول
         _set_job(case, stage="intake")
@@ -298,6 +407,7 @@ def _slots_intake(case: Path):
     r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
     if r.returncode != 0:
         raise RuntimeError("تعذّر تحليل الأسنان في الصور. " + _tail(case, "analysis.log", 1))
+    _link_live(case)
     return _continue(case)
 
 
@@ -326,7 +436,7 @@ def _elements(case: Path) -> None:
     """العناصر اللي القوالب التجريبية محتاجاها. الداخلية (أقنعة، حدود السنان، خلفية اللثة) بتتعتمد لو عدّت الفلتر،
     واللي فيها وش المريض بتستنى موافقة الطبيب."""
     _set_job(case, stage="elements")
-    r = _run(case, ["run.py", "elements", str(case), *TPL_IDS], "elements.log", 3600)
+    r = _run(case, ["run.py", "elements", str(case), *[t["id"] for t in TEMPLATES if _tpl_ok(case, t)]], "elements.log", 3600)
     if r.returncode != 0:
         raise RuntimeError("تعذّر تجهيز العناصر. " + _tail(case, "elements.log", 1))
     cj = _engine_json(case)
@@ -338,10 +448,12 @@ def _elements(case: Path) -> None:
 def _render(tpl: str):
     def go(case: Path) -> None:
         out = case / "out" / f"{tpl}.mp4"
-        if out.exists():
-            out.unlink()
+        if out.exists():   # النسخة القديمة بتتحفظ (أصول المريض مابتتمسحش)
+            (case / "out" / "old").mkdir(exist_ok=True)
+            os.replace(out, case / "out" / "old" / f"{tpl}_{int(out.stat().st_mtime)}.mp4")
         r = _run(case, ["T.py", tpl], f"render_{tpl}.log", 3600, cwd="tpl")
         if r.returncode != 0 or not out.exists():
+            out.unlink(missing_ok=True)   # ملف ناقص من ريندر فاشل مايتحفظش
             raise RuntimeError("تعذّر إنشاء الفيديو. " + _tail(case, f"render_{tpl}.log", 1))
         with _LOCK:
             m = _meta(case)
@@ -352,39 +464,27 @@ def _render(tpl: str):
 
 # ---------------------------------------------------------------- الواجهة
 def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None) -> str:
-    """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة في خانتها (من شاشة الرفع). files = صور بأي ترتيب (تصنيف تلقائي)."""
-    if slots:
-        miss = [s["name"] for s in SHOTS if s["req"] and s["slot"] not in slots and not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in slots)]
-        if miss and not files:
-            raise ValueError("ارفع صورة لكل خانة مطلوبة: " + "، ".join(miss))
-        cid = uuid.uuid4().hex[:12]
-        case = root(data_dir) / cid
-        (case / "input").mkdir(parents=True)
-        (case / "_up").mkdir()
-        up = {}
-        for slot, (name, data) in slots.items():
-            ext = os.path.splitext(name or "")[1].lower()
-            ext = ext if ext in (".jpg", ".jpeg", ".png", ".webp", ".heic") else ".jpg"
-            (case / "input" / f"{slot}{ext}").write_bytes(data)
-            up[slot] = f"{slot}{ext}"
-        for i, (name, data) in enumerate(files):   # صور بالجملة: بتتصنف تلقائيًا وتتحط في الخانات الفاضية
-            ext = os.path.splitext(name or "")[1].lower()
-            (case / "_up" / f"p{i + 1:02d}{ext if ext in ('.jpg', '.jpeg', '.png', '.webp', '.heic') else '.jpg'}").write_bytes(data)
-        _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up})
-        _enqueue(case, "slots", _slots_intake)
-        return cid
-    if len(files) < 4:
-        raise ValueError("ارفع ٤ صور على الأقل: الأسنان قبل العلاج وبعده بالمبعد، ووجه المريض قبل العلاج، وابتسامته بعده.")
+    """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة (أو فيديو) في خانتها. files = صور/فيديوهات بأي ترتيب (تصنيف تلقائي).
+    كل اللي الطبيب رفعه بيفضل محفوظ في فولدر المريض (input/) لأي قالب بعدين."""
+    slots = slots or {}
+    miss = [s["name"] for s in SHOTS if s["req"] and s["slot"] not in slots and not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in slots)]
+    if miss and not files:
+        raise ValueError("ارفع صورة لكل خانة مطلوبة: " + "، ".join(miss))
     cid = uuid.uuid4().hex[:12]
     case = root(data_dir) / cid
-    (case / "_up").mkdir(parents=True)
-    for i, (name, data) in enumerate(files):
-        ext = os.path.splitext(name or "")[1].lower()
-        if ext not in (".jpg", ".jpeg", ".png", ".webp", ".heic"):
-            ext = ".jpg"
-        (case / "_up" / f"p{i + 1:02d}{ext}").write_bytes(data)
-    _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}})
-    _enqueue(case, "intake", _intake)
+    (case / "input").mkdir(parents=True)
+    (case / "_up").mkdir()
+    ok_ext = lambda e: e if e in IMG_EXT + VID_EXT else ".jpg"
+    up = {}
+    for slot, (name, data) in slots.items():
+        ext = ok_ext(os.path.splitext(name or "")[1].lower())
+        (case / "input" / f"{slot}{ext}").write_bytes(data)
+        up[slot] = f"{slot}{ext}"
+    for i, (name, data) in enumerate(files):   # بالجملة: بتتصنف تلقائيًا وتتحط في الخانات الفاضية
+        ext = ok_ext(os.path.splitext(name or "")[1].lower())
+        (case / "_up" / f"{'v' if ext in VID_EXT else 'p'}{i + 1:02d}{ext}").write_bytes(data)
+    _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up})
+    _enqueue(case, "slots", _slots_intake)
     return cid
 
 
@@ -425,10 +525,45 @@ def view(data_dir: Path, cid: str) -> dict | None:
     names = {**{k: v["name"] for k, v in SLOT_NAMES.items()}, **{s["slot"]: s["name"] for s in SHOTS}}
     photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
                "slot_name": names.get(used.get(f.name, ""), "")}
-              for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_")] if (case / "input").is_dir() else []
+              for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_") and f.suffix.lower() in IMG_EXT] if (case / "input").is_dir() else []
     return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
             "slots": slots, "slot_info": slot_info, "need": _missing(case), "photos": photos, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
-            "ready": ready, "videos": vids, "templates": TEMPLATES}
+            "ready": ready, "videos": vids, "templates": [{**t, "available": _tpl_ok(case, t)} for t in TEMPLATES],
+            "assets": _assets(case, cid)}
+
+
+def _assets(case: Path, cid: str) -> list[dict]:
+    """فولدر المريض: كل اللي اترفع واتعمل (صور، فيديوهات، صور الخانات، الصور المشتقة، الفيديوهات الحية، الفيديوهات النهائية)
+    بيفضل محفوظ لأي قالب جديد بعدين."""
+    u = lambda rel: f"/api/dental/cases/{cid}/file/{rel}"
+    out = []
+    for f in sorted((case / "input").glob("*")) if (case / "input").is_dir() else []:
+        if f.is_file() and not f.name.startswith("_"):
+            out.append({"group": "uploads", "name": f.name, "url": u(f"input/{f.name}"), "video": f.suffix.lower() in VID_EXT})
+    for f in sorted((case / "elements").glob("*")) if (case / "elements").is_dir() else []:
+        if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg") and not f.name.endswith(("_chk.jpg",)):
+            out.append({"group": "derived", "name": f.name, "url": u(f"elements/{f.name}"), "video": False})
+    for f in sorted((case / "elements" / "v").glob("*.mp4")) if (case / "elements" / "v").is_dir() else []:
+        out.append({"group": "live", "name": f.name, "url": u(f"elements/v/{f.name}"), "video": True})
+    for f in sorted((case / "out").rglob("*.mp4")) if (case / "out").is_dir() else []:
+        rel = f.relative_to(case).as_posix()
+        out.append({"group": "videos", "name": f.name, "url": u(rel), "video": True})
+    return out
+
+
+def assets_zip(data_dir: Path, cid: str) -> Path | None:
+    """تنزيل فولدر المريض كله (الأصلي + اللي اتعمل) في ملف واحد."""
+    import zipfile
+    case = case_dir(data_dir, cid)
+    if not case:
+        return None
+    z = case / "_assets.zip"
+    with zipfile.ZipFile(z, "w", zipfile.ZIP_STORED) as zf:
+        for sub in ("input", "canon", "elements", "out"):
+            for f in sorted((case / sub).rglob("*")) if (case / sub).is_dir() else []:
+                if f.is_file() and not f.name.startswith("_"):
+                    zf.write(f, f.relative_to(case).as_posix())
+    return z
 
 
 def _note(n: str) -> str:
@@ -500,12 +635,28 @@ def assign(data_dir: Path, cid: str, slot: str, photo: str = "", upload: tuple[s
     if busy(case):
         raise RuntimeError("الحالة تعمل الآن، انتظر حتى تنتهي الخطوة الحالية")
     (case / "input").mkdir(exist_ok=True)
+    video = ""
     if upload:
         ext = os.path.splitext(upload[0] or "")[1].lower()
-        ext = ext if ext in (".jpg", ".jpeg", ".png", ".webp", ".heic") else ".jpg"
+        ext = ext if ext in IMG_EXT + VID_EXT else ".jpg"
         n = len(list((case / "input").glob("*"))) + 1
         photo = f"m{n:02d}{ext}"
         (case / "input" / photo).write_bytes(upload[1])
+        if ext in VID_EXT:   # فيديو للخانة: أوضح كادر فيه هو الصورة، والفيديو نفسه بيتحفظ (وبيبقى فيديو حي لو للوجه)
+            video, photo = photo, f"m{n:02d}_frame.jpg"
+            kind = next((x["kind"] for x in SHOTS if x["slot"] == slot), "any")
+
+            def go(c: Path, slot=slot, video=video, photo=photo, kind=kind):
+                _video_frame(c, video, kind, str(c / "input" / photo))
+                with _LOCK:
+                    mm = _meta(c)
+                    mm.setdefault("video_frames", []).append({"frame": photo, "video": video})
+                    _save_meta(c, mm)
+                res = _assign_job(slot, photo, then=False)(c)
+                _link_live(c)
+                return _continue(c)
+            _enqueue(case, "video", go)
+            return view(data_dir, cid)
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", photo or "") or not (case / "input" / photo).is_file():
         raise ValueError("الصورة غير موجودة")
     _enqueue(case, "assign", _assign_job(slot, photo))
@@ -516,8 +667,11 @@ def render(data_dir: Path, cid: str, tpl: str) -> None:
     case = case_dir(data_dir, cid)
     if not case:
         raise ValueError("غير موجود")
-    if tpl not in TPL_IDS:
+    t = next((x for x in TEMPLATES if x["id"] == tpl), None)
+    if not t:
         raise ValueError("القالب غير متاح في النسخة التجريبية")
+    if not _tpl_ok(case, t):
+        raise RuntimeError("هذا القالب يحتاج فيديو حقيقيًا للمريض بعد العلاج")
     if busy(case):
         raise RuntimeError("الحالة تعمل الآن، انتظر حتى تنتهي الخطوة الحالية")
     if not view(data_dir, cid)["ready"]:
@@ -533,7 +687,8 @@ def file(data_dir: Path, cid: str, rel: str) -> Path | None:
     if rel.startswith("slot/") and rel[5:] in CANON:   # الصورة اللي في الخانة (بعد تعديل الاتجاه/القص)
         p = case / "canon" / CANON[rel[5:]]
         return p if p.is_file() else None
-    ok = (rel.startswith("elements/") and rel[9:] in DOCTOR_REVIEW) or re.fullmatch(r"out/a\d\d\.mp4", rel) \
+    ok = re.fullmatch(r"elements/[A-Za-z0-9_.-]{1,80}\.(png|jpe?g)", rel) or re.fullmatch(r"elements/v/[A-Za-z0-9_.-]{1,80}\.mp4", rel) \
+        or re.fullmatch(r"out/(old/)?[A-Za-z0-9_.-]{1,80}\.mp4", rel) \
         or re.fullmatch(r"input/[A-Za-z0-9_.-]{1,64}", rel)   # صور الطبيب نفسه (علشان يشوف كل صورة اتحطت فين)
     p = (case / rel).resolve()
     return p if ok and p.is_file() and str(p).startswith(str(case.resolve())) else None

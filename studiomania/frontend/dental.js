@@ -50,7 +50,7 @@
 .dn-slot:hover,.dn-slot.on,.dn-slot:focus-within{border-color:var(--dn-acc)}.dn-slot.done{border-style:solid;border-color:var(--dn-ok)}
 .dn-slot .art{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#fff;display:grid;place-items:center}
 :root[data-nh-theme="dark"] .dn-slot .art{background:#2a2a30}
-.dn-slot .art svg{width:88%;height:88%}.dn-slot .art img{width:100%;height:100%;object-fit:cover}
+.dn-slot .art svg{width:88%;height:88%}.dn-slot .art img,.dn-slot .art video{width:100%;height:100%;object-fit:cover}
 .dn-slot .art.filled svg{position:absolute;bottom:6px;inset-inline-end:6px;width:36%;height:auto;background:rgba(255,255,255,.94);border-radius:10px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .dn-slot.miss{border-style:solid;border-color:var(--dn-bad)}.dn-slot.miss .act{color:var(--dn-bad)}.dn-slot.static{cursor:default}
 .dn-slot .req{font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:rgba(229,97,62,.12);color:var(--dn-acc);vertical-align:middle;white-space:nowrap}
@@ -66,7 +66,7 @@
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const call = (p, o) => (window.api ? window.api(p, o) : fetch(p, o).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || r.status); return d; }));
-  const STAGE = { slots: "تجهيز الصور وتحليل الأسنان", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
+  const STAGE = { video: "قراءة الفيديو واختيار أوضح لقطة", slots: "تجهيز الصور وتحليل الأسنان", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
   const stageName = (s) => s?.startsWith("render:") ? `${STAGE.render} (${s.slice(7)})` : (STAGE[s] || s || "");
   let root = null, home = null, cur = null, timer = null, files = [], picked = {};
   // 🖼️ رسمة توضيحية لكل صورة مطلوبة (أفاتار أسود): الطبيب يعرف بالظبط يصوّر إيه
@@ -100,6 +100,8 @@
   };
   const ALT = { before_retracted: "before_face_retracted", after_retracted: "after_face_retracted", after_smile: "after_face", before_smile: "before_face" };
   const altSrc = (slot) => ALT[slot];
+  const isVideo = (f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|avi|3gp)$/i.test(f.name);
+  const isMedia = (f) => f.type.startsWith("image/") || isVideo(f) || /\.(jpe?g|png|webp|heic)$/i.test(f.name);
   const artOf = (s) => [s.kind || "ret", s.phase === "before" ? 1 : 0];
 
   function shell(title, back) {
@@ -116,15 +118,16 @@
     try { home = await call("/api/dental"); } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p></div>`; return; }
     picked = {};
     const slotsHtml = home.shots.map((s) => { const [k, b] = artOf(s);
-      return `<label class="dn-slot" data-slot="${esc(s.slot)}"><input type="file" accept="image/*" hidden><div class="art">${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
-        <b>${esc(s.name)} <span class="req${s.req ? "" : " opt"}">${s.req ? "مطلوبة" : "اختيارية"}</span></b><small>${esc(s.hint)}${s.alt ? `<br>${esc(s.alt.text)}` : ""}</small><span class="act">اضغط أو اسحب الصورة هنا</span></label>`; }).join("");
+      return `<label class="dn-slot" data-slot="${esc(s.slot)}"><input type="file" accept="image/*,video/*" hidden><div class="art">${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
+        <b>${esc(s.name)} <span class="req${s.req ? "" : " opt"}">${s.req ? "مطلوبة" : "اختيارية"}</span></b><small>${esc(s.hint)}${s.alt ? `<br>${esc(s.alt.text)}` : ""}</small><span class="act">اضغط أو اسحب صورة أو فيديو هنا</span></label>`; }).join("");
     const cases = home.cases.map((c) => `<button class="dn-case" data-case="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.job?.status === "running" || c.job?.status === "queued" ? "يعمل الآن…" : c.job?.status === "failed" ? "تحتاج إعادة" : `${c.videos} فيديو`}</small></button>`).join("");
     w.innerHTML = `
       <div class="dn-card"><h3>حالة جديدة</h3>
         <p>ارفع صورة حقيقية في كل خانة كما في الرسمة. الأسنان في الفيديو هي أسنان المريض الحقيقية: لا نبيّض «قبل» ولا نعدّل «بعد».</p>
         <div class="dn-slots">${slotsHtml}</div>
-        <div class="dn-bulk"><span>أو ارفع كل صور الحالة مرة واحدة، وسنضع كل صورة في خانتها:</span>
-          <label class="dn-btn ghost">اختر الصور<input type="file" accept="image/*" multiple hidden data-bulk></label>
+        <p style="margin-top:10px">يمكنك رفع فيديو بدل الصورة في أي خانة: نختار منه أوضح لقطة. وفيديو وجه المريض بعد العلاج يُستخدم كما هو في القوالب التي تعرض المريض متحركًا بدل توليد فيديو.</p>
+        <div class="dn-bulk"><span>أو ارفع كل صور الحالة وفيديوهاتها مرة واحدة، وسنضع كل صورة في خانتها:</span>
+          <label class="dn-btn ghost">اختر الصور<input type="file" accept="image/*,video/*" multiple hidden data-bulk></label>
           <label class="dn-btn ghost">اختر مجلدًا<input type="file" multiple webkitdirectory hidden data-bulk></label>
           <span data-bulkn></span></div>
         <div class="dn-row"><input class="dn-in" data-title placeholder="اسم الحالة (مثلًا: عدسات — أحمد)" maxlength="80"></div>
@@ -134,9 +137,10 @@
       ${cases ? `<div class="dn-card"><h3>حالاتك</h3><div class="dn-list">${cases}</div></div>` : ""}`;
     w.querySelectorAll(".dn-slot").forEach((box) => {
       const inp = box.querySelector("input"), slot = box.dataset.slot;
-      const take = (f) => { if (!f || !f.type.startsWith("image/")) return; picked[slot] = f;
-        const art = box.querySelector(".art"); art.querySelector("img")?.remove(); art.classList.add("filled");   // الأفاتار يفضل في الركن
-        const i = new Image(); i.src = URL.createObjectURL(f); i.alt = ""; art.prepend(i);
+      const take = (f) => { if (!f || !isMedia(f)) return; picked[slot] = f;
+        const art = box.querySelector(".art"); art.querySelector("img,video")?.remove(); art.classList.add("filled");   // الأفاتار يفضل في الركن
+        const vid = isVideo(f), i = vid ? Object.assign(document.createElement("video"), { muted: true, autoplay: true, loop: true, playsInline: true }) : new Image();
+        i.src = URL.createObjectURL(f); i.alt = ""; art.prepend(i);
         box.classList.add("done"); box.querySelector(".act").textContent = "✓ تم اختيار الصورة (اضغط للتغيير)"; valid(); };
       inp.onchange = () => take(inp.files[0]);
       box.ondragover = (e) => { e.preventDefault(); box.classList.add("on"); };
@@ -144,8 +148,8 @@
       box.ondrop = (e) => { e.preventDefault(); box.classList.remove("on"); take(e.dataTransfer.files[0]); };
     });
     w.querySelectorAll("[data-bulk]").forEach((inp) => inp.onchange = () => {
-      files = [...files, ...[...inp.files].filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name))].slice(0, 30);
-      w.querySelector("[data-bulkn]").textContent = files.length ? `${files.length} صورة ستُوزَّع تلقائيًا` : ""; valid();
+      files = [...files, ...[...inp.files].filter(isMedia)].slice(0, 30);
+      w.querySelector("[data-bulkn]").textContent = files.length ? `${files.length} ملفًا سيُوزَّع تلقائيًا` : ""; valid();
     });
     w.querySelector("[data-consent]").onchange = valid;
     files = []; valid();
@@ -182,7 +186,7 @@
     // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
     const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>
       ${spare.length ? `<div class="dn-pics">${spare.map((p) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : "<span>غير مستخدمة</span>"}<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button></figure>`).join("")}</div>` : ""}
-      <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة لهذه الخانة<input type="file" accept="image/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
+      <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة أو فيديو لهذه الخانة<input type="file" accept="image/*,video/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
     const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<b>${esc(p.slot_name)}</b>` : "غير مستخدمة"}</figure>`).join("")}</div></details>` : "";
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
       ? `<div class="dn-slots">${slots.map((s) => { const [k, b] = artOf(s), si = (v.slot_info || {})[s.slot], ok = v.slots[s.slot], need = (v.need || []).includes(s.slot);
@@ -200,8 +204,14 @@
     const tpls = `<div class="dn-card"><h3>القوالب</h3><p>${v.ready ? "اختر قالبًا لإنشاء الفيديو. كل فيديو يأخذ عدة دقائق." : "تفتح القوالب بعد موافقتك على الصور المشتقة."}</p>
       <div class="dn-tpls">${v.templates.map((t) => { const vid = v.videos[t.id], doing = running && j.stage === "render:" + t.id;
         return `<div class="dn-tpl"><b>${esc(t.name)}</b><p>${esc(t.desc)}</p>${vid ? `<video src="${esc(vid.url)}" controls playsinline preload="metadata"></video><a class="dn-btn ghost" href="${esc(vid.url)}" download="${esc(t.id)}.mp4" style="text-align:center;text-decoration:none">تنزيل</a>` : ""}
-        <button class="dn-btn${vid ? " ghost" : ""}" data-render="${esc(t.id)}" ${!v.ready || running ? "disabled" : ""}>${doing ? "يعمل الآن…" : vid ? "أنشئه من جديد" : "أنشئ الفيديو"}</button></div>`; }).join("")}</div></div>`;
-    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${cropHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}
+        ${t.available === false ? `<p class="dn-st">يحتاج فيديو حقيقيًا لوجه المريض بعد العلاج: ارفعه في خانة «وجه المريض بعد العلاج».</p>` : ""}
+        <button class="dn-btn${vid ? " ghost" : ""}" data-render="${esc(t.id)}" ${!v.ready || running || t.available === false ? "disabled" : ""}>${doing ? "يعمل الآن…" : vid ? "أنشئه من جديد" : "أنشئ الفيديو"}</button></div>`; }).join("")}</div></div>`;
+    const GROUPS = { uploads: "ما رفعته (صور وفيديوهات)", derived: "صور مشتقة ومقصوصة", live: "فيديوهات حية للقوالب", videos: "الفيديوهات النهائية (والنسخ السابقة)" };
+    const assets = v.assets?.length ? `<div class="dn-card"><h3>ملف المريض</h3><p>كل ما رفعته وكل ما صُنع منه محفوظ هنا، ويُستخدم في أي قالب جديد لاحقًا دون رفعه مرة أخرى.</p>
+      ${Object.entries(GROUPS).map(([g, label]) => { const xs = v.assets.filter((a) => a.group === g); return xs.length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:14px">${esc(label)} (${xs.length})</summary>
+        <div class="dn-pics">${xs.map((a) => `<figure class="dn-pic">${a.video ? `<video src="${esc(a.url)}" muted playsinline preload="metadata" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"></video>` : `<img src="${esc(a.url)}" alt="" loading="lazy">`}<a href="${esc(a.url)}" download="${esc(a.name)}" style="font-size:12px;color:var(--dn-acc)">تنزيل</a></figure>`).join("")}</div></details>` : ""; }).join("")}
+      <div class="dn-row"><a class="dn-btn ghost" href="/api/dental/cases/${esc(v.id)}/assets.zip" download style="text-decoration:none">تنزيل ملف المريض كاملًا</a></div></div>` : "";
+    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${cropHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}${assets}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;
     if (running) timer = setTimeout(() => showCase(id), 5000);
     w.querySelectorAll("[data-upslot]").forEach((inp) => inp.onchange = async () => {
