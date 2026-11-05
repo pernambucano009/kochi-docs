@@ -45,14 +45,51 @@
 .dn-pic{margin:0;display:grid;gap:4px;font-size:12px;color:var(--dn-mute);text-align:center}
 .dn-pic img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--dn-bg)}
 .dn-pic.used b{color:var(--dn-ok);font-weight:600}.dn-pic button{border:0;border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;background:var(--dn-acc);color:#fff}
+.dn-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
+.dn-slot{position:relative;display:grid;gap:6px;align-content:start;padding:12px;border-radius:16px;background:var(--dn-bg);border:2px dashed var(--dn-line);cursor:pointer;transition:border-color .15s}
+.dn-slot:hover,.dn-slot.on,.dn-slot:focus-within{border-color:var(--dn-acc)}.dn-slot.done{border-style:solid;border-color:var(--dn-ok)}
+.dn-slot .art{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#fff;display:grid;place-items:center}
+:root[data-nh-theme="dark"] .dn-slot .art{background:#2a2a30}
+.dn-slot .art svg{width:88%;height:88%}.dn-slot .art img{width:100%;height:100%;object-fit:cover}
+.dn-slot .art.filled svg{position:absolute;bottom:6px;inset-inline-end:6px;width:36%;height:auto;background:rgba(255,255,255,.94);border-radius:10px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.dn-slot.miss{border-style:solid;border-color:var(--dn-bad)}.dn-slot.miss .act{color:var(--dn-bad)}.dn-slot.static{cursor:default}
+.dn-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--dn-mute)}
+.dn-bulk label{cursor:pointer}
+.dn-slot .tag{position:absolute;top:8px;inset-inline-start:8px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;color:#fff;background:#4a4a52}
+.dn-slot .tag.after{background:var(--dn-acc)}
+.dn-slot b{font-size:14px}.dn-slot small{font-size:12px;color:var(--dn-mute);line-height:1.6}
+.dn-slot .act{font-size:12px;color:var(--dn-acc);font-weight:600}.dn-slot.done .act{color:var(--dn-ok)}
 @keyframes dnIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes dnSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.dn,.dn-spin{animation:none}}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const call = (p, o) => (window.api ? window.api(p, o) : fetch(p, o).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || r.status); return d; }));
-  const STAGE = { assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
+  const STAGE = { slots: "تجهيز الصور وتحليل الأسنان", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
   const stageName = (s) => s?.startsWith("render:") ? `${STAGE.render} (${s.slice(7)})` : (STAGE[s] || s || "");
-  let root = null, home = null, cur = null, timer = null, files = [];
+  let root = null, home = null, cur = null, timer = null, files = [], picked = {};
+  // 🖼️ رسمة توضيحية لكل صورة مطلوبة (أفاتار أسود): الطبيب يعرف بالظبط يصوّر إيه
+  const INK = "#1b1b1f";
+  const teethRow = (y, h, n, fill, uneven) => { let o = ""; const w = 84 / n; for (let i = 0; i < n; i++) { const dy = uneven ? [2, -1, 3, 0, -2, 2, 1, -1][i % 8] : 0; o += `<rect x="${38 + i * w + 1}" y="${y + dy}" width="${w - 2}" height="${h - Math.abs(i - (n - 1) / 2) * (h / n / 1.6)}" rx="3" fill="${fill}"/>`; } return o; };
+  const ART = {
+    ret: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
+      <ellipse cx="80" cy="62" rx="66" ry="44" fill="${INK}"/>
+      <ellipse cx="80" cy="62" rx="50" ry="30" fill="#2c2c33"/>
+      <path d="M30 62 q50 -34 100 0" fill="#d98c97" opacity=".85"/><path d="M30 62 q50 30 100 0" fill="#d98c97" opacity=".55"/>
+      ${teethRow(44, 18, 8, before ? "#e8d6a4" : "#fff", before)}${teethRow(64, 13, 8, before ? "#ddc994" : "#f4f4f4", before)}
+      <path d="M14 30 q-10 32 0 64 M146 30 q10 32 0 64" stroke="#9a9aa3" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M14 30 q30 -8 40 4 M14 94 q30 8 40 -4 M146 30 q-30 -8 -40 4 M146 94 q-30 8 -40 -4" stroke="#9a9aa3" stroke-width="5" fill="none" stroke-linecap="round"/></svg>`,
+    face: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
+      <path d="M30 120 q2 -34 50 -36 q48 2 50 36z" fill="${INK}"/>
+      <ellipse cx="80" cy="52" rx="30" ry="36" fill="${INK}"/>
+      <path d="M62 62 q18 18 36 0 q-18 6 -36 0z" fill="${before ? "#e8d6a4" : "#fff"}"/>
+      <circle cx="68" cy="46" r="3" fill="#fff"/><circle cx="92" cy="46" r="3" fill="#fff"/></svg>`,
+    smile: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
+      <path d="M18 58 q30 -30 62 -18 q32 -12 62 18 q-62 60 -124 0z" fill="${INK}"/>
+      <path d="M32 58 q48 -16 96 0 q-48 34 -96 0z" fill="#2c2c33"/>
+      ${teethRow(48, 16, 8, before ? "#e8d6a4" : "#fff", before)}
+      <path d="M18 58 q62 18 124 0" stroke="${INK}" stroke-width="3" fill="none"/></svg>`,
+  };
+  const SHOT_ART = { before_retracted: ["ret", 1], after_retracted: ["ret", 0], before_face: ["face", 1], after_smile: ["smile", 0] };
 
   function shell(title, back) {
     if (!root) { root = document.createElement("div"); root.className = "dn"; root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true"); document.body.appendChild(root); }
@@ -66,44 +103,54 @@
     const w = shell("فيديوهات الأسنان من حالاتك");
     w.innerHTML = `<div class="dn-card"><p>جارٍ التحميل…</p></div>`;
     try { home = await call("/api/dental"); } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p></div>`; return; }
-    const shots = home.shots.map((s) => `<div class="dn-shot"><b>${esc(s.name)}</b>${esc(s.hint)}</div>`).join("");
+    picked = {};
+    const slotsHtml = home.shots.map((s) => { const [k, b] = SHOT_ART[s.slot] || ["ret", 0];
+      return `<label class="dn-slot" data-slot="${esc(s.slot)}"><input type="file" accept="image/*" hidden><div class="art">${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
+        <b>${esc(s.name)}</b><small>${esc(s.hint)}</small><span class="act">اضغط أو اسحب الصورة هنا</span></label>`; }).join("");
     const cases = home.cases.map((c) => `<button class="dn-case" data-case="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.job?.status === "running" || c.job?.status === "queued" ? "يعمل الآن…" : c.job?.status === "failed" ? "تحتاج إعادة" : `${c.videos} فيديو`}</small></button>`).join("");
     w.innerHTML = `
       <div class="dn-card"><h3>حالة جديدة</h3>
-        <p>ارفع صور حالة حقيقية لمريض واحد (بأي ترتيب). البرنامج يتعرّف على كل صورة ويعدّل اتجاهها، ثم يصنع فيديوهات بقوالب الأسنان. الأسنان في الفيديو هي أسنان المريض الحقيقية: لا نبيّض «قبل» ولا نعدّل «بعد».</p>
-        <div class="dn-shots">${shots}</div>
-        <label class="dn-drop" tabindex="0"><input type="file" accept="image/*" multiple hidden>اسحب الصور هنا أو اضغط للاختيار (٤ صور على الأقل)</label>
-        <div class="dn-thumbs"></div>
+        <p>ارفع صورة حقيقية في كل خانة كما في الرسمة. الأسنان في الفيديو هي أسنان المريض الحقيقية: لا نبيّض «قبل» ولا نعدّل «بعد».</p>
+        <div class="dn-slots">${slotsHtml}</div>
+        <div class="dn-bulk"><span>أو ارفع كل صور الحالة مرة واحدة، وسنضع كل صورة في خانتها:</span>
+          <label class="dn-btn ghost">اختر الصور<input type="file" accept="image/*" multiple hidden data-bulk></label>
+          <label class="dn-btn ghost">اختر مجلدًا<input type="file" multiple webkitdirectory hidden data-bulk></label>
+          <span data-bulkn></span></div>
         <div class="dn-row"><input class="dn-in" data-title placeholder="اسم الحالة (مثلًا: عدسات — أحمد)" maxlength="80"></div>
         <label class="dn-ck"><input type="checkbox" data-consent> لدي موافقة مكتوبة من المريض على استخدام صوره قبل وبعد في المحتوى.</label>
         <div class="dn-row"><button class="dn-btn" data-dn="create" disabled>ابدأ</button><span class="dn-msg" style="font-size:13px;color:var(--dn-mute)"></span></div>
       </div>
       ${cases ? `<div class="dn-card"><h3>حالاتك</h3><div class="dn-list">${cases}</div></div>` : ""}`;
-    const inp = w.querySelector("input[type=file]"), drop = w.querySelector(".dn-drop");
-    const take = (list) => { files = [...files, ...[...list].filter((f) => f.type.startsWith("image/"))].slice(0, 12); thumbs(); };
-    inp.onchange = () => take(inp.files);
-    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("on"); };
-    drop.ondragleave = () => drop.classList.remove("on");
-    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("on"); take(e.dataTransfer.files); };
-    drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inp.click(); } };
+    w.querySelectorAll(".dn-slot").forEach((box) => {
+      const inp = box.querySelector("input"), slot = box.dataset.slot;
+      const take = (f) => { if (!f || !f.type.startsWith("image/")) return; picked[slot] = f;
+        const art = box.querySelector(".art"); art.querySelector("img")?.remove(); art.classList.add("filled");   // الأفاتار يفضل في الركن
+        const i = new Image(); i.src = URL.createObjectURL(f); i.alt = ""; art.prepend(i);
+        box.classList.add("done"); box.querySelector(".act").textContent = "✓ تم اختيار الصورة (اضغط للتغيير)"; valid(); };
+      inp.onchange = () => take(inp.files[0]);
+      box.ondragover = (e) => { e.preventDefault(); box.classList.add("on"); };
+      box.ondragleave = () => box.classList.remove("on");
+      box.ondrop = (e) => { e.preventDefault(); box.classList.remove("on"); take(e.dataTransfer.files[0]); };
+    });
+    w.querySelectorAll("[data-bulk]").forEach((inp) => inp.onchange = () => {
+      files = [...files, ...[...inp.files].filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|heic)$/i.test(f.name))].slice(0, 30);
+      w.querySelector("[data-bulkn]").textContent = files.length ? `${files.length} صورة ستُوزَّع تلقائيًا` : ""; valid();
+    });
     w.querySelector("[data-consent]").onchange = valid;
-    thumbs();
-  }
-  function thumbs() {
-    const t = root?.querySelector(".dn-thumbs"); if (!t) return;
-    t.innerHTML = ""; files.forEach((f) => { const i = new Image(); i.src = URL.createObjectURL(f); i.alt = f.name; t.appendChild(i); });
-    valid();
+    files = []; valid();
   }
   function valid() {
     const b = root?.querySelector("[data-dn=create]"); if (!b) return;
-    const ok = files.length >= 4 && root.querySelector("[data-consent]")?.checked;
+    const n = Object.keys(picked).length, all = (home?.shots || []).length, enough = n === all || n + files.length >= all;
+    const ok = enough && root.querySelector("[data-consent]")?.checked;
     b.disabled = !ok;
-    root.querySelector(".dn-msg").textContent = files.length < 4 ? `${files.length} من ٤ صور على الأقل` : (ok ? "" : "أكّد موافقة المريض");
+    root.querySelector(".dn-msg").textContent = !enough ? `${n + files.length} من ${all} صور` : (ok ? "" : "أكّد موافقة المريض");
   }
   async function create() {
     const b = root.querySelector("[data-dn=create]"); b.disabled = true; root.querySelector(".dn-msg").textContent = "جارٍ الرفع…";
-    const fd = new FormData(); files.forEach((f) => fd.append("files", f, f.name)); fd.append("title", root.querySelector("[data-title]").value || "");
-    try { const v = await call("/api/dental/cases", { method: "POST", body: fd }); files = []; showCase(v.id, v); }
+    const fd = new FormData(); Object.entries(picked).forEach(([k, f]) => fd.append(k, f, f.name)); files.forEach((f) => fd.append("files", f, f.name));
+    fd.append("title", root.querySelector("[data-title]").value || "");
+    try { const v = await call("/api/dental/cases", { method: "POST", body: fd }); picked = {}; files = []; showCase(v.id, v); }
     catch (e) { b.disabled = false; root.querySelector(".dn-msg").textContent = e.message; }
   }
 
@@ -121,11 +168,13 @@
     const spare = [...(v.photos || [])].sort((a, b) => !!a.slot - !!b.slot);   // غير المستخدمة الأول، والمستخدمة كمان (لو اتصنفت غلط في خانة تانية)
     // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
     const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>
-      ${spare.length ? `<div class="dn-pics">${spare.map((p) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : ""}<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button></figure>`).join("")}</div>` : ""}
+      ${spare.length ? `<div class="dn-pics">${spare.map((p) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : "<span>غير مستخدمة</span>"}<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button></figure>`).join("")}</div>` : ""}
       <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة لهذه الخانة<input type="file" accept="image/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
     const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<b>${esc(p.slot_name)}</b>` : "غير مستخدمة"}</figure>`).join("")}</div></details>` : "";
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
-      ? `<div class="dn-shots">${slots.map((s) => `<div class="dn-shot ${v.slots[s.slot] ? "ok" : "miss"}"><b>${esc(s.name)}</b></div>`).join("")}</div>` : "";
+      ? `<div class="dn-slots">${slots.map((s) => { const [k, b] = SHOT_ART[s.slot] || ["ret", 0], ph = (v.photos || []).find((p) => p.slot === s.slot), ok = v.slots[s.slot];
+          return `<div class="dn-slot static ${ok ? "done" : "miss"}"><div class="art${ph ? " filled" : ""}">${ph ? `<img src="${esc(ph.url)}" alt="" loading="lazy">` : ""}${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
+            <b>${esc(s.name)}</b><span class="act">${ok ? "✓ تمت تعبئتها" : "✗ لم تُعبّأ بعد"}</span></div>`; }).join("")}</div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
       <div class="dn-rev">${v.review.map((r) => `<figure>${r.url ? `<img src="${esc(r.url)}" alt="${esc(r.why)}">` : ""}<figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span>${r.note ? `<br>${esc(r.note)}` : ""}</figcaption>
         ${r.state === "pending" ? `<div class="dn-row" style="margin:0"><button class="dn-btn" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>موافق</button><button class="dn-btn ghost" data-no="${esc(r.name)}" ${running ? "disabled" : ""}>ارفض</button></div>`

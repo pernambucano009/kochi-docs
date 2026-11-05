@@ -222,39 +222,71 @@ def _continue(case: Path):
 
 SLOT_TAG = {"before_retracted": "before", "after_retracted": "after", "after_smile": "smile"}
 _ASSIGN = """
-import os, sys, json
+import os, sys, json, concurrent.futures as cf
 from case import Case
 from intake import view_of, upright
-c = Case(sys.argv[1]); slot, f = sys.argv[2], sys.argv[3]; src = c.d + "/input/" + f
-v = c.m.get("intake", {}).get("views", {}).get(f) or view_of(src)
-im = upright(src, v)
-if slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face"):
+c = Case(sys.argv[1]); pairs = [a.split("=", 1) for a in sys.argv[2:]]
+views = c.m.setdefault("intake", {}).setdefault("views", {})
+need = sorted({f for _, f in pairs if f not in views})
+with cf.ThreadPoolExecutor(max(1, len(need))) as ex:   # اتجاه كل صورة ونوعها (موديل) — كل الصور في نفس الوقت
+    for f, v in zip(need, ex.map(lambda f: view_of(c.d + "/input/" + f), need)): views[f] = v
+_DET = {}
+def crop_mouth(im):
     # وجه كامل بالمبعد ← صورة قريبة للأسنان: قص حوالين البق بنقط الوش (نفس نسبة صورة الماكرو 3:2)
     import numpy as np, mediapipe as mp
     from mediapipe.tasks.python import vision, BaseOptions
     S_ = os.environ.get("DENTAL_ROOT") or os.path.dirname(os.getcwd())
-    det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=BaseOptions(model_asset_path=S_ + "/face/face_landmarker.task"), num_faces=1))
-    a = np.ascontiguousarray(np.array(im)); r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=a))
+    if "d" not in _DET: _DET["d"] = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=BaseOptions(model_asset_path=S_ + "/face/face_landmarker.task"), num_faces=1))
+    a = np.ascontiguousarray(np.array(im)); r = _DET["d"].detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=a))
     if not r.face_landmarks: raise SystemExit("لم نجد الوجه في الصورة لقص الأسنان منها")
     lm = r.face_landmarks[0]; W, H = im.size
     xs = [lm[i].x * W for i in (61, 291, 78, 308)]; ys = [lm[i].y * H for i in (0, 17, 13, 14)]
     cx, cy = sum(xs) / 4, sum(ys) / 4; w = (max(xs) - min(xs)) * 1.15; h = w * 2 / 3
-    x0, y0 = max(0, cx - w / 2), max(0, cy - h / 2); im = im.crop((int(x0), int(y0), int(min(W, x0 + w)), int(min(H, y0 + h))))
-out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
-if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
-for k, x in list(c.m["slots"].items()):
-    if k != slot and x.get("file") == f and not k.endswith("face_retracted"): del c.m["slots"][k]
-c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True,
-                      "cropped": slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face")}
-it = c.m.setdefault("intake", {}); it.setdefault("views", {})[f] = v
-it["unused"] = [u for u in it.get("unused", []) if u != f]; c.save(); c.log(f"الطبيب حدد {slot} ← {f}")
+    x0, y0 = max(0, cx - w / 2), max(0, cy - h / 2); return im.crop((int(x0), int(y0), int(min(W, x0 + w)), int(min(H, y0 + h))))
+for slot, f in pairs:
+    src = c.d + "/input/" + f; v = views[f]; im = upright(src, v)
+    crop = slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face")
+    if crop: im = crop_mouth(im)
+    out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
+    if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
+    for k, x in list(c.m["slots"].items()):
+        if k != slot and x.get("file") == f and not k.endswith("face_retracted"): del c.m["slots"][k]
+    c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True, "cropped": crop}
+    if slot == "before_face" and v.get("gender") in ("male", "female"): c.m["patient"]["gender"] = v["gender"]
+    it = c.m["intake"]; it["unused"] = [u for u in it.get("unused", []) if u != f]
+c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f in pairs))
 """
+
+
+def _slots_intake(case: Path):
+    """الطبيب رفع كل صورة في خانتها: نعدّل اتجاه الصور (كلها في نفس الوقت) ونحطها مكانها، ونحلل الأسنان، ونكمّل.
+    أسرع وأدق من التصنيف التلقائي لأن الخانة معروفة."""
+    m = _meta(case)
+    if (case / "_up").is_dir() and any((case / "_up").iterdir()):   # صور بالجملة (فولدر/كل الصور): التصنيف التلقائي الأول
+        _set_job(case, stage="intake")
+        r = _run(case, ["run.py", "new", str(case / "_up"), str(case)], "intake.log", 1800)
+        if r.returncode != 0:
+            raise RuntimeError("تعذّر تصنيف الصور. " + _tail(case, "intake.log", 1))
+        _set_job(case, stage="slots")
+    pairs = [f"{s}={f}" for s, f in m.get("upload_slots", {}).items()]
+    if pairs:   # اللي الطبيب حطه في خانته بنفسه هو اللي يتعتمد (حتى لو التصنيف التلقائي حط صورة تانية)
+        r = _run(case, ["-c", _ASSIGN, str(case), *pairs], "assign.log", 900)
+        if r.returncode != 0:
+            raise RuntimeError("تعذّر تجهيز الصور. " + _tail(case, "assign.log", 1))
+        for s_ in m.get("upload_slots", {}):
+            tag = SLOT_TAG.get(s_)
+            for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):
+                (case / "ana" / f).unlink(missing_ok=True)
+    r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
+    if r.returncode != 0:
+        raise RuntimeError("تعذّر تحليل الأسنان في الصور. " + _tail(case, "analysis.log", 1))
+    return _continue(case)
 
 
 def _assign_job(slot: str, fname: str, then: bool = True):
     """الطبيب حدد صورة لخانة بنفسه: نعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
     def go(case: Path):
-        r = _run(case, ["-c", _ASSIGN, str(case), slot, fname], "assign.log", 600)
+        r = _run(case, ["-c", _ASSIGN, str(case), f"{slot}={fname}"], "assign.log", 600)
         if r.returncode != 0:
             raise RuntimeError("تعذّر استخدام الصورة. " + _tail(case, "assign.log", 1))
         tag = SLOT_TAG.get(slot)
@@ -301,7 +333,28 @@ def _render(tpl: str):
 
 
 # ---------------------------------------------------------------- الواجهة
-def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "") -> str:
+def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None) -> str:
+    """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة في خانتها (من شاشة الرفع). files = صور بأي ترتيب (تصنيف تلقائي)."""
+    if slots:
+        miss = [s["name"] for s in SHOTS if s["slot"] not in slots]
+        if miss and len(slots) + len(files) < 4:
+            raise ValueError("ارفع صورة لكل خانة: " + "، ".join(miss))
+        cid = uuid.uuid4().hex[:12]
+        case = root(data_dir) / cid
+        (case / "input").mkdir(parents=True)
+        (case / "_up").mkdir()
+        up = {}
+        for slot, (name, data) in slots.items():
+            ext = os.path.splitext(name or "")[1].lower()
+            ext = ext if ext in (".jpg", ".jpeg", ".png", ".webp", ".heic") else ".jpg"
+            (case / "input" / f"{slot}{ext}").write_bytes(data)
+            up[slot] = f"{slot}{ext}"
+        for i, (name, data) in enumerate(files):   # صور بالجملة: بتتصنف تلقائيًا وتتحط في الخانات الفاضية
+            ext = os.path.splitext(name or "")[1].lower()
+            (case / "_up" / f"p{i + 1:02d}{ext if ext in ('.jpg', '.jpeg', '.png', '.webp', '.heic') else '.jpg'}").write_bytes(data)
+        _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up})
+        _enqueue(case, "slots", _slots_intake)
+        return cid
     if len(files) < 4:
         raise ValueError("ارفع ٤ صور على الأقل: الأسنان قبل العلاج وبعده بالمبعد، ووجه المريض قبل العلاج، وابتسامته بعده.")
     cid = uuid.uuid4().hex[:12]

@@ -34244,11 +34244,21 @@ def dental_home():
 
 
 @app.post("/api/dental/cases")
-async def dental_new(files: list[UploadFile] = File(...), title: str = Form("")):
-    """صور الحالة (أي ترتيب): المحرك بيصنّفها ويعدّل اتجاهها، وبعدين يحلل السنان ويجهز العناصر في الخلفية."""
+async def dental_new(files: list[UploadFile] = File([]), title: str = Form(""),
+                     before_retracted: UploadFile | None = File(None), after_retracted: UploadFile | None = File(None),
+                     before_face: UploadFile | None = File(None), after_smile: UploadFile | None = File(None)):
+    """صور الحالة: كل صورة في خانتها (before_retracted…)، أو صور بأي ترتيب (files) والمحرك بيصنّفها.
+    بعدها يعدّل الاتجاه ويحلل السنان ويجهز العناصر في الخلفية."""
     dental_on()
-    if len(files) > 12:
-        raise HTTPException(400, "الحد الأقصى ١٢ صورة للحالة")
+    slots = {}
+    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("before_face", before_face), ("after_smile", after_smile)):
+        if f is not None:
+            data = await f.read()
+            if len(data) > 25 * 1024 * 1024:
+                raise HTTPException(400, f"الصورة {f.filename} أكبر من ٢٥ ميجا")
+            slots[k] = (f.filename or "", data)
+    if len(files) > 30:
+        raise HTTPException(400, "الحد الأقصى ٣٠ صورة للحالة")
     got = []
     for f in files:
         data = await f.read()
@@ -34256,7 +34266,7 @@ async def dental_new(files: list[UploadFile] = File(...), title: str = Form(""))
             raise HTTPException(400, f"الصورة {f.filename} أكبر من ٢٥ ميجا")
         got.append((f.filename or "", data))
     try:
-        cid = dental.create(DATA_DIR, got, title)
+        cid = dental.create(DATA_DIR, got, title, slots or None)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return dental.view(DATA_DIR, cid)
