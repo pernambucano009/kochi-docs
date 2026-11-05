@@ -34299,6 +34299,24 @@ def dental_redo(cid: str):
     return dental.view(DATA_DIR, cid)
 
 
+@app.post("/api/dental/cases/{cid}/assign")
+async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), file: UploadFile | None = File(None)):
+    """الطبيب يحدد صورة لخانة ناقصة: من صوره اللي رفعها، أو صورة جديدة."""
+    dental_on()
+    up = None
+    if file is not None:
+        data = await file.read()
+        if len(data) > 25 * 1024 * 1024:
+            raise HTTPException(400, f"الصورة {file.filename} أكبر من ٢٥ ميجا")
+        up = (file.filename or "", data)
+    try:
+        return dental.assign(DATA_DIR, cid, slot, photo, up)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(409, str(e))
+
+
 class DentalRenderIn(BaseModel):
     template: str
 
@@ -34321,7 +34339,7 @@ def dental_file(cid: str, rel: str):
     p = dental.file(DATA_DIR, cid, rel)
     if not p:
         raise HTTPException(404, "غير موجود")
-    return FileResponse(p, media_type="video/mp4" if p.suffix == ".mp4" else "image/png")
+    return FileResponse(p, media_type=mimetypes.guess_type(p.name)[0] or "application/octet-stream")
 
 
 @app.delete("/api/dental/cases/{cid}")

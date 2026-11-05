@@ -39,12 +39,18 @@
 .dn-tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
 .dn-tpl{background:var(--dn-bg);border-radius:14px;padding:12px;display:grid;gap:8px;align-content:start}
 .dn-tpl b{font-size:15px}.dn-tpl p{font-size:13px}.dn-tpl video{width:100%;border-radius:10px;background:#000;aspect-ratio:9/16;max-height:420px}
+.dn-need{margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(217,68,58,.07);display:grid;gap:10px}
+.dn-need b{font-size:14px}.dn-need p{font-size:13px}
+.dn-pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px}
+.dn-pic{margin:0;display:grid;gap:4px;font-size:12px;color:var(--dn-mute);text-align:center}
+.dn-pic img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--dn-bg)}
+.dn-pic.used b{color:var(--dn-ok);font-weight:600}.dn-pic button{border:0;border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;background:var(--dn-acc);color:#fff}
 @keyframes dnIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes dnSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.dn,.dn-spin{animation:none}}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const call = (p, o) => (window.api ? window.api(p, o) : fetch(p, o).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || r.status); return d; }));
-  const STAGE = { intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
+  const STAGE = { assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
   const stageName = (s) => s?.startsWith("render:") ? `${STAGE.render} (${s.slice(7)})` : (STAGE[s] || s || "");
   let root = null, home = null, cur = null, timer = null, files = [];
 
@@ -109,8 +115,15 @@
     const w = shell(v.title, true);
     const j = v.job || {}, running = j.status === "running" || j.status === "queued";
     const jobHtml = running ? `<div class="dn-job"><span class="dn-spin"></span><span>${j.status === "queued" ? "في الطابور" : "يعمل الآن"}: ${esc(stageName(j.stage))}… (قد يستغرق بضع دقائق، ويمكنك إغلاق النافذة)</span></div>`
-      : j.status === "failed" ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
+      : j.status === "failed" && !Object.values(v.slots || {}).some((x) => !x) ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
     const slots = home?.shots || [];
+    const missing = !running && v.photos?.length ? slots.filter((s) => !v.slots[s.slot]) : [];
+    const spare = [...(v.photos || [])].sort((a, b) => !!a.slot - !!b.slot);   // غير المستخدمة الأول، والمستخدمة كمان (لو اتصنفت غلط في خانة تانية)
+    // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
+    const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>
+      ${spare.length ? `<div class="dn-pics">${spare.map((p) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : ""}<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button></figure>`).join("")}</div>` : ""}
+      <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة لهذه الخانة<input type="file" accept="image/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
+    const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<b>${esc(p.slot_name)}</b>` : "غير مستخدمة"}</figure>`).join("")}</div></details>` : "";
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
       ? `<div class="dn-shots">${slots.map((s) => `<div class="dn-shot ${v.slots[s.slot] ? "ok" : "miss"}"><b>${esc(s.name)}</b></div>`).join("")}</div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
@@ -121,13 +134,20 @@
       <div class="dn-tpls">${v.templates.map((t) => { const vid = v.videos[t.id], doing = running && j.stage === "render:" + t.id;
         return `<div class="dn-tpl"><b>${esc(t.name)}</b><p>${esc(t.desc)}</p>${vid ? `<video src="${esc(vid.url)}" controls playsinline preload="metadata"></video><a class="dn-btn ghost" href="${esc(vid.url)}" download="${esc(t.id)}.mp4" style="text-align:center;text-decoration:none">تنزيل</a>` : ""}
         <button class="dn-btn${vid ? " ghost" : ""}" data-render="${esc(t.id)}" ${!v.ready || running ? "disabled" : ""}>${doing ? "يعمل الآن…" : vid ? "أنشئه من جديد" : "أنشئ الفيديو"}</button></div>`; }).join("")}</div></div>`;
-    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}</div>${rev}${tpls}
+    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${needHtml}${picsHtml}</div>${rev}${tpls}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;
     if (running) timer = setTimeout(() => showCase(id), 5000);
+    w.querySelectorAll("[data-upslot]").forEach((inp) => inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      const fd = new FormData(); fd.append("slot", inp.dataset.upslot); fd.append("file", f, f.name);
+      inp.closest("label").style.opacity = ".5";
+      try { showCase(id, await call(`/api/dental/cases/${id}/assign`, { method: "POST", body: fd })); }
+      catch (err) { inp.closest("label").style.opacity = ""; if (window.uiAlert) uiAlert(err.message); else alert(err.message); }
+    });
   }
 
   async function onClick(e) {
-    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render]"); if (!t) return;
+    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render],[data-assign]"); if (!t) return;
     const a = t.dataset.dn;
     try {
       if (a === "close") return close();
@@ -140,6 +160,10 @@
         if (t.dataset.no) { reason = window.uiPrompt ? await uiPrompt("ما المشكلة في الصورة؟ (مثلًا: الأسنان مختلفة)") : ""; if (reason === null) return; }
         t.disabled = true;
         return showCase(cur, await call(`/api/dental/cases/${cur}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: t.dataset.ok || t.dataset.no, ok: !!t.dataset.ok, reason }) }));
+      }
+      if (t.dataset.assign) {
+        t.disabled = true; const fd = new FormData(); fd.append("slot", t.dataset.assign); fd.append("photo", t.dataset.photo);
+        return showCase(cur, await call(`/api/dental/cases/${cur}/assign`, { method: "POST", body: fd }));
       }
       if (t.dataset.render) { t.disabled = true; return showCase(cur, await call(`/api/dental/cases/${cur}/render`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.dataset.render }) })); }
       if (a === "delete") {

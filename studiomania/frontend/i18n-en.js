@@ -15488,4 +15488,12 @@ window.I18N_EN = {
   "أكّد موافقة المريض": "Confirm the patient's consent",
   "فيديو حالة أسنان (قبل وبعد)": "Dental case video (before and after)",
   "ارفع صور حالة حقيقية لمريض (قبل وبعد بالمبعد، ووجهه قبل، وابتسامته بعد)، واختر قالبًا: تصميم الابتسامة، أو المسح الرقمي، أو الزراعة… وتبقى الأسنان أسنان المريض الحقيقية.": "Upload real case photos of a patient (before and after with retractor, the face before, and the smile after), and choose a template: smile design, digital scan, implants… The teeth stay the patient's real teeth.",
+  "لم نتعرّف على صورة «{0}»": "We could not find the \"{0}\" photo",
+  "{0} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.": "{0} Choose the right photo from your photos, or upload a new one.",
+  "استخدم هذه": "Use this one",
+  "ارفع صورة لهذه الخانة": "Upload a photo for this slot",
+  "غير مستخدمة": "Not used",
+  "تجهيز الصورة التي حددتها وتحليلها": "Preparing and analysing the photo you chose",
+  "صورك ({0}) وأين استُخدمت كل صورة": "Your photos ({0}) and where each one was used",
+  "مستخدمة في: {0}": "Used for: {0}",
 };

@@ -143,7 +143,8 @@ def _run(case: Path, args: list[str], log_name: str, timeout: int, cwd: str = "p
 def _tail(case: Path, log_name: str, n: int = 6) -> str:
     try:
         lines = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore").splitlines()
-        lines = [l for l in lines if l.strip() and not l.startswith(("W0", "I0", "INFO:", "WARNING:"))]
+        noise = ("mediapipe", "Exception ignored", "object is not callable", "Traceback", 'File "/usr', "TensorFlow Lite", "InitGoogle")
+        lines = [l for l in lines if l.strip() and not l.startswith(("W0", "I0", "INFO:", "WARNING:")) and not any(x in l for x in noise)]
         return "\n".join(lines[-n:])[-600:]
     except Exception:
         return ""
@@ -154,9 +155,9 @@ def _worker() -> None:
     while True:
         fn, case, stage = _Q.get()
         try:
-            _set_job(case, stage=stage, status="running", started=time.time(), error="")
-            fn(case)
-            _set_job(case, status="done")
+            _set_job(case, stage=stage, status="running", started=time.time(), error="", missing=[])
+            res = fn(case) or {}
+            _set_job(case, status=res.get("status", "done"), missing=res.get("missing", []))
         except Exception as e:  # الخطوة فشلت: الطبيب يشوف السبب ويقدر يعيد
             _set_job(case, status="failed", error=str(e)[:400])
         finally:
@@ -182,11 +183,59 @@ def _intake(case: Path) -> None:
     tmp = case / "_up"
     r = _run(case, ["run.py", "new", str(tmp), str(case)], "intake.log", 1800)
     if r.returncode != 0:
-        raise RuntimeError("تعذّر تصنيف الصور وتحليلها. " + _tail(case, "intake.log", 3))
-    missing = [s["name"] for s in SHOTS if s["slot"] not in _engine_json(case).get("slots", {})]
-    if missing:
-        raise RuntimeError("لم نجد بين الصور: " + "، ".join(missing) + ". أضفها وأعد المحاولة.")
+        raise RuntimeError("تعذّر تصنيف الصور وتحليلها. " + _tail(case, "intake.log", 1))
+    return _continue(case)
+
+
+def _missing(case: Path) -> list[str]:
+    have = _engine_json(case).get("slots", {})
+    return [s["slot"] for s in SHOTS if s["slot"] not in have]
+
+
+def _continue(case: Path):
+    """لو كل الصور المطلوبة موجودة نكمّل للعناصر، وإلا نستنى الطبيب يحدد الصورة الناقصة بنفسه."""
+    miss = _missing(case)
+    if miss:
+        return {"status": "needs", "missing": miss}
     _elements(case)
+
+
+SLOT_TAG = {"before_retracted": "before", "after_retracted": "after", "after_smile": "smile"}
+_ASSIGN = """
+import os, sys, json
+from case import Case
+from intake import view_of, upright
+c = Case(sys.argv[1]); slot, f = sys.argv[2], sys.argv[3]; src = c.d + "/input/" + f
+v = c.m.get("intake", {}).get("views", {}).get(f) or view_of(src)
+im = upright(src, v); out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
+if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
+for k, x in list(c.m["slots"].items()):
+    if k != slot and x.get("file") == f: del c.m["slots"][k]
+c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True}
+it = c.m.setdefault("intake", {}); it.setdefault("views", {})[f] = v
+it["unused"] = [u for u in it.get("unused", []) if u != f]; c.save(); c.log(f"الطبيب حدد {slot} ← {f}")
+"""
+
+
+def _assign_job(slot: str, fname: str):
+    """الطبيب حدد صورة لخانة بنفسه: نعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
+    def go(case: Path):
+        r = _run(case, ["-c", _ASSIGN, str(case), slot, fname], "assign.log", 600)
+        if r.returncode != 0:
+            raise RuntimeError("تعذّر استخدام الصورة. " + _tail(case, "assign.log", 1))
+        tag = SLOT_TAG.get(slot)
+        for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):   # تحليل الصورة القديمة مايتستخدمش
+            (case / "ana" / f).unlink(missing_ok=True)
+        cj = _engine_json(case)
+        if cj.get("elements"):   # العناصر اتعملت من الصور القديمة: تتعمل من جديد
+            for e in cj["elements"].values():
+                e["status"] = MISSING
+            (case / "case.json").write_text(json.dumps(cj, ensure_ascii=False, indent=1), encoding="utf-8")
+        r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
+        if r.returncode != 0:
+            raise RuntimeError("تعذّر تحليل الأسنان في الصورة. " + _tail(case, "analysis.log", 1))
+        return _continue(case)
+    return go
 
 
 def _elements(case: Path) -> None:
@@ -195,7 +244,7 @@ def _elements(case: Path) -> None:
     _set_job(case, stage="elements")
     r = _run(case, ["run.py", "elements", str(case), *TPL_IDS], "elements.log", 3600)
     if r.returncode != 0:
-        raise RuntimeError("تعذّر تجهيز العناصر. " + _tail(case, "elements.log", 3))
+        raise RuntimeError("تعذّر تجهيز العناصر. " + _tail(case, "elements.log", 1))
     cj = _engine_json(case)
     for name, e in cj.get("elements", {}).items():
         if name not in DOCTOR_REVIEW and e.get("status") == QA_PASS:
@@ -209,7 +258,7 @@ def _render(tpl: str):
             out.unlink()
         r = _run(case, ["T.py", tpl], f"render_{tpl}.log", 3600, cwd="tpl")
         if r.returncode != 0 or not out.exists():
-            raise RuntimeError("تعذّر إنشاء الفيديو. " + _tail(case, f"render_{tpl}.log", 3))
+            raise RuntimeError("تعذّر إنشاء الفيديو. " + _tail(case, f"render_{tpl}.log", 1))
         with _LOCK:
             m = _meta(case)
             m.setdefault("videos", {})[tpl] = {"at": time.time(), "size": out.stat().st_size}
@@ -252,8 +301,13 @@ def view(data_dir: Path, cid: str) -> dict | None:
     vids = {k: {**v, "url": f"/api/dental/cases/{cid}/file/out/{k}.mp4?v={int(v.get('at', 0))}"}
             for k, v in m.get("videos", {}).items() if (case / "out" / f"{k}.mp4").exists()}
     slots = {s["slot"]: s["slot"] in cj.get("slots", {}) for s in SHOTS}
+    used = {v.get("file"): k for k, v in cj.get("slots", {}).items()}
+    names = {s["slot"]: s["name"] for s in SHOTS}
+    photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
+               "slot_name": names.get(used.get(f.name, ""), "")}
+              for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_")] if (case / "input").is_dir() else []
     return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
-            "slots": slots, "gender": cj.get("patient", {}).get("gender"), "review": review,
+            "slots": slots, "photos": photos, "gender": cj.get("patient", {}).get("gender"), "review": review,
             "ready": ready, "videos": vids, "templates": TEMPLATES}
 
 
@@ -283,8 +337,10 @@ def redo(data_dir: Path, cid: str) -> None:
     if busy(case):
         raise RuntimeError("الحالة تعمل الآن")
     cj = _engine_json(case)
-    if not all(s["slot"] in cj.get("slots", {}) for s in SHOTS):
+    if not cj.get("slots"):
         _enqueue(case, "intake", _intake)
+    elif _missing(case):
+        raise RuntimeError("حدّد الصورة الناقصة أولًا")
     else:
         _enqueue(case, "elements", _elements_redo)
 
@@ -296,6 +352,28 @@ def _elements_redo(case: Path) -> None:
             e["status"] = MISSING
     (case / "case.json").write_text(json.dumps(cj, ensure_ascii=False, indent=1), encoding="utf-8")
     _elements(case)
+
+
+def assign(data_dir: Path, cid: str, slot: str, photo: str = "", upload: tuple[str, bytes] | None = None) -> dict:
+    """الطبيب يحدد صورة لخانة: من صوره اللي رفعها (photo) أو صورة جديدة (upload)."""
+    case = case_dir(data_dir, cid)
+    if not case:
+        raise ValueError("غير موجود")
+    if slot not in {s["slot"] for s in SHOTS}:
+        raise ValueError("خانة غير معروفة")
+    if busy(case):
+        raise RuntimeError("الحالة تعمل الآن، انتظر حتى تنتهي الخطوة الحالية")
+    (case / "input").mkdir(exist_ok=True)
+    if upload:
+        ext = os.path.splitext(upload[0] or "")[1].lower()
+        ext = ext if ext in (".jpg", ".jpeg", ".png", ".webp", ".heic") else ".jpg"
+        n = len(list((case / "input").glob("*"))) + 1
+        photo = f"m{n:02d}{ext}"
+        (case / "input" / photo).write_bytes(upload[1])
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", photo or "") or not (case / "input" / photo).is_file():
+        raise ValueError("الصورة غير موجودة")
+    _enqueue(case, "assign", _assign_job(slot, photo))
+    return view(data_dir, cid)
 
 
 def render(data_dir: Path, cid: str, tpl: str) -> None:
@@ -316,7 +394,8 @@ def file(data_dir: Path, cid: str, rel: str) -> Path | None:
     case = case_dir(data_dir, cid)
     if not case:
         return None
-    ok = (rel.startswith("elements/") and rel[9:] in DOCTOR_REVIEW) or re.fullmatch(r"out/a\d\d\.mp4", rel)
+    ok = (rel.startswith("elements/") and rel[9:] in DOCTOR_REVIEW) or re.fullmatch(r"out/a\d\d\.mp4", rel) \
+        or re.fullmatch(r"input/[A-Za-z0-9_.-]{1,64}", rel)   # صور الطبيب نفسه (علشان يشوف كل صورة اتحطت فين)
     p = (case / rel).resolve()
     return p if ok and p.is_file() and str(p).startswith(str(case.resolve())) else None
 
