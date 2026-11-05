@@ -37,22 +37,33 @@ TEMPLATES = [
 ]
 TPL_IDS = [t["id"] for t in TEMPLATES]
 
-# الصور المطلوبة من الطبيب (نفس خانات المحرك)
+# الصور: ٤ أنواع × قبل/بعد (نفس خانات المحرك). المطلوب فعلًا ٤ مجموعات، وكل مجموعة ليها بديل بنقصّه من صورة تانية حقيقية
+# (عمرنا ما بنولّد سنان: القص بينقل بكسلات حقيقية بس)
 SHOTS = [
-    {"slot": "before_retracted", "name": "الأسنان قبل العلاج بالمبعد", "hint": "صورة قريبة من الأمام والمبعد في الفم."},
-    {"slot": "after_retracted", "name": "الأسنان بعد العلاج بالمبعد", "hint": "الزاوية نفسها بعد العلاج."},
-    {"slot": "before_face", "name": "وجه المريض قبل العلاج", "hint": "المريض يبتسم دون مبعد، من الأمام."},
-    {"slot": "after_smile", "name": "الابتسامة بعد العلاج", "hint": "ابتسامة قريبة بعد العلاج دون مبعد (الشفتان والأسنان)."},
+    {"slot": "before_retracted", "kind": "ret", "phase": "before", "name": "الأسنان قبل العلاج بالمبعد", "hint": "صورة قريبة من الأمام والمبعد في الفم.", "req": True},
+    {"slot": "after_retracted", "kind": "ret", "phase": "after", "name": "الأسنان بعد العلاج بالمبعد", "hint": "الزاوية نفسها بعد العلاج.", "req": True},
+    {"slot": "before_smile", "kind": "smile", "phase": "before", "name": "الابتسامة قبل العلاج", "hint": "ابتسامة قريبة قبل العلاج دون مبعد (الشفتان والأسنان).", "req": False},
+    {"slot": "after_smile", "kind": "smile", "phase": "after", "name": "الابتسامة بعد العلاج", "hint": "ابتسامة قريبة بعد العلاج دون مبعد (الشفتان والأسنان).", "req": True},
+    {"slot": "before_face", "kind": "face", "phase": "before", "name": "وجه المريض قبل العلاج", "hint": "المريض يبتسم دون مبعد، من الأمام.", "req": True},
+    {"slot": "after_face", "kind": "face", "phase": "after", "name": "وجه المريض بعد العلاج", "hint": "المريض يبتسم دون مبعد، من الأمام.", "req": False},
+    {"slot": "before_face_retracted", "kind": "faceret", "phase": "before", "name": "وجه المريض قبل العلاج بالمبعد", "hint": "الوجه كاملًا والمبعد في الفم.", "req": False},
+    {"slot": "after_face_retracted", "kind": "faceret", "phase": "after", "name": "وجه المريض بعد العلاج بالمبعد", "hint": "الوجه كاملًا والمبعد في الفم.", "req": False},
 ]
+# الخانة المطلوبة ← الصورة اللي نقدر نقصّها منها لو ناقصة (ونوع القص)
+DERIVE = {"before_retracted": ("before_face_retracted", "teeth"), "after_retracted": ("after_face_retracted", "teeth"),
+          "after_smile": ("after_face", "lips"), "before_smile": ("before_face", "lips")}
+ALT_TEXT = {"before_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض قبل العلاج بالمبعد»"},
+            "after_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض بعد العلاج بالمبعد»"},
+            "after_smile": {"text": "أو نقصّها تلقائيًا من «وجه المريض بعد العلاج»"},
+            "before_smile": {"text": "أو نقصّها تلقائيًا من «وجه المريض قبل العلاج»"}}
+for _s in SHOTS:
+    _s["alt"] = ALT_TEXT.get(_s["slot"])
 
 # كل خانات المحرك (بما فيها الإضافية اللي بيحط فيها الصور الزيادة) بأسماء للطبيب
-SLOT_NAMES = {"before_face_retracted": {"name": "وجه المريض قبل العلاج بالمبعد"}, "after_face_retracted": {"name": "وجه المريض بعد العلاج بالمبعد"},
-              "after_face": {"name": "وجه المريض بعد العلاج"}, "after_retracted_close": {"name": "الأسنان بعد العلاج بالمبعد عن قرب"},
+SLOT_NAMES = {"after_retracted_close": {"name": "الأسنان بعد العلاج بالمبعد عن قرب"},
               "after_retracted_side1": {"name": "الأسنان بعد العلاج من الجانب الأيمن"}, "after_retracted_side2": {"name": "الأسنان بعد العلاج من الجانب الأيسر"},
               "after_smile_side_r": {"name": "الابتسامة بعد العلاج من الجانب الأيمن"}, "after_smile_side_l": {"name": "الابتسامة بعد العلاج من الجانب الأيسر"},
               "prep": {"name": "الأسنان المحضّرة"}, "veneers": {"name": "العدسات خارج الفم"}, "cast": {"name": "التركيبات على النموذج"}, "doctor": {"name": "صورة الطبيب"}}
-# صورة الأسنان القريبة ممكن تتقص من صورة الوجه بالمبعد (لو الطبيب صوّر الوجه كله)
-DERIVE = {"before_retracted": "before_face_retracted", "after_retracted": "after_face_retracted"}
 
 # العناصر المشتقة اللي الطبيب لازم يشوفها ويوافق عليها بنفسه (فيها وش المريض)، والباقي داخلي بيتعتمد لو عدّى الفلتر
 DOCTOR_REVIEW = {
@@ -201,37 +212,43 @@ def _intake(case: Path) -> None:
     return _continue(case)
 
 
-def _missing(case: Path) -> list[str]:
+def _missing(case: Path, derivable: bool = False) -> list[str]:
+    """الخانات المطلوبة الناقصة. derivable=False: اللي مالهاش بديل كمان (لازم الطبيب يرفعها)."""
     have = _engine_json(case).get("slots", {})
-    return [s["slot"] for s in SHOTS if s["slot"] not in have]
+    return [s["slot"] for s in SHOTS if s["req"] and s["slot"] not in have
+            and (derivable or not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in have))]
 
 
 def _continue(case: Path):
     """لو كل الصور المطلوبة موجودة نكمّل للعناصر، وإلا نستنى الطبيب يحدد الصورة الناقصة بنفسه."""
     have = _engine_json(case).get("slots", {})
-    for slot in _missing(case):   # الطبيب صوّر الوجه كله بالمبعد بدل الصورة القريبة: نقص الأسنان منها
-        src = have.get(DERIVE.get(slot, ""), {}).get("file")
-        if src:
+    for slot, (srcslot, mode) in DERIVE.items():   # الخانة ناقصة وصورتها البديلة موجودة: نقصّها منها (الأسنان من الوجه بالمبعد، الابتسامة من الوجه)
+        src = have.get(srcslot, {}).get("file")
+        if slot not in have and src:
             _set_job(case, stage="assign")
-            _assign_job(slot, src, then=False)(case)
-    miss = _missing(case)
+            _assign_job(slot, src, then=False, mode=mode)(case)
+            have = _engine_json(case).get("slots", {})
+    miss = _missing(case, derivable=True)
     if miss:
         return {"status": "needs", "missing": miss}
     _elements(case)
 
 
 SLOT_TAG = {"before_retracted": "before", "after_retracted": "after", "after_smile": "smile"}
+CANON = {k: v[0] for k, v in _EC.SLOTS.items()}
 _ASSIGN = """
 import os, sys, json, concurrent.futures as cf
 from case import Case
 from intake import view_of, upright
-c = Case(sys.argv[1]); pairs = [a.split("=", 1) for a in sys.argv[2:]]
+c = Case(sys.argv[1]); pairs = []
+for a in sys.argv[2:]:   # slot=file أو slot=file:mode (mode = teeth/lips: قص من صورة الوجه)
+    s_, rest = a.split("=", 1); f_, _, md = rest.partition(":"); pairs.append((s_, f_, md))
 views = c.m.setdefault("intake", {}).setdefault("views", {})
-need = sorted({f for _, f in pairs if f not in views})
+need = sorted({f for _, f, _ in pairs if f not in views})
 with cf.ThreadPoolExecutor(max(1, len(need))) as ex:   # اتجاه كل صورة ونوعها (موديل) — كل الصور في نفس الوقت
     for f, v in zip(need, ex.map(lambda f: view_of(c.d + "/input/" + f), need)): views[f] = v
 _DET = {}
-def crop_mouth(im):
+def crop_mouth(im, k):
     # وجه كامل بالمبعد ← صورة قريبة للأسنان: قص حوالين البق بنقط الوش (نفس نسبة صورة الماكرو 3:2)
     import numpy as np, mediapipe as mp
     from mediapipe.tasks.python import vision, BaseOptions
@@ -241,20 +258,21 @@ def crop_mouth(im):
     if not r.face_landmarks: raise SystemExit("لم نجد الوجه في الصورة لقص الأسنان منها")
     lm = r.face_landmarks[0]; W, H = im.size
     xs = [lm[i].x * W for i in (61, 291, 78, 308)]; ys = [lm[i].y * H for i in (0, 17, 13, 14)]
-    cx, cy = sum(xs) / 4, sum(ys) / 4; w = (max(xs) - min(xs)) * 1.15; h = w * 2 / 3
+    cx, cy = sum(xs) / 4, sum(ys) / 4; w = (max(xs) - min(xs)) * k; h = w * 2 / 3
     x0, y0 = max(0, cx - w / 2), max(0, cy - h / 2); return im.crop((int(x0), int(y0), int(min(W, x0 + w)), int(min(H, y0 + h))))
-for slot, f in pairs:
+for slot, f, md in pairs:
     src = c.d + "/input/" + f; v = views[f]; im = upright(src, v)
-    crop = slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face")
-    if crop: im = crop_mouth(im)
+    face = str(v.get("view", "")).startswith("face")
+    crop = md or ("teeth" if slot in ("before_retracted", "after_retracted") and face else "lips" if slot in ("before_smile", "after_smile") and face else "")
+    if crop: im = crop_mouth(im, 1.15 if crop == "teeth" else 1.45)
     out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
     if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
     for k, x in list(c.m["slots"].items()):
-        if k != slot and x.get("file") == f and not k.endswith("face_retracted"): del c.m["slots"][k]
+        if k != slot and x.get("file") == f and not k.endswith(("face_retracted", "_face")): del c.m["slots"][k]
     c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True, "cropped": crop}
     if slot == "before_face" and v.get("gender") in ("male", "female"): c.m["patient"]["gender"] = v["gender"]
     it = c.m["intake"]; it["unused"] = [u for u in it.get("unused", []) if u != f]
-c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f in pairs))
+c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f, _ in pairs))
 """
 
 
@@ -283,10 +301,10 @@ def _slots_intake(case: Path):
     return _continue(case)
 
 
-def _assign_job(slot: str, fname: str, then: bool = True):
+def _assign_job(slot: str, fname: str, then: bool = True, mode: str = ""):
     """الطبيب حدد صورة لخانة بنفسه: نعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
     def go(case: Path):
-        r = _run(case, ["-c", _ASSIGN, str(case), f"{slot}={fname}"], "assign.log", 600)
+        r = _run(case, ["-c", _ASSIGN, str(case), f"{slot}={fname}" + (f":{mode}" if mode else "")], "assign.log", 600)
         if r.returncode != 0:
             raise RuntimeError("تعذّر استخدام الصورة. " + _tail(case, "assign.log", 1))
         tag = SLOT_TAG.get(slot)
@@ -336,9 +354,9 @@ def _render(tpl: str):
 def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None) -> str:
     """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة في خانتها (من شاشة الرفع). files = صور بأي ترتيب (تصنيف تلقائي)."""
     if slots:
-        miss = [s["name"] for s in SHOTS if s["slot"] not in slots]
-        if miss and len(slots) + len(files) < 4:
-            raise ValueError("ارفع صورة لكل خانة: " + "، ".join(miss))
+        miss = [s["name"] for s in SHOTS if s["req"] and s["slot"] not in slots and not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in slots)]
+        if miss and not files:
+            raise ValueError("ارفع صورة لكل خانة مطلوبة: " + "، ".join(miss))
         cid = uuid.uuid4().hex[:12]
         case = root(data_dir) / cid
         (case / "input").mkdir(parents=True)
@@ -395,14 +413,21 @@ def view(data_dir: Path, cid: str) -> dict | None:
     ready = all(els.get(n, {}).get("status") == APPROVED for n in DOCTOR_REVIEW) and bool(els)
     vids = {k: {**v, "url": f"/api/dental/cases/{cid}/file/out/{k}.mp4?v={int(v.get('at', 0))}"}
             for k, v in m.get("videos", {}).items() if (case / "out" / f"{k}.mp4").exists()}
-    slots = {s["slot"]: s["slot"] in cj.get("slots", {}) for s in SHOTS}
-    used = {v.get("file"): k for k, v in cj.get("slots", {}).items()}
+    have = cj.get("slots", {})
+    slots = {s["slot"]: s["slot"] in have for s in SHOTS}
+    slot_info = {s["slot"]: {"url": f"/api/dental/cases/{cid}/file/slot/{s['slot']}?t={int((case / 'canon' / CANON[s['slot']]).stat().st_mtime)}",
+                             "cropped": bool(have[s["slot"]].get("cropped"))}
+                 for s in SHOTS if s["slot"] in have and (case / "canon" / CANON[s["slot"]]).exists()}
+    used = {}
+    for k, v in have.items():   # صورة واحدة ممكن تبقى في خانتين (الوجه + الابتسامة المقصوصة منه): الأولوية لخانة الصورة نفسها
+        if v.get("file") and (v["file"] not in used or not v.get("cropped")):
+            used[v["file"]] = k
     names = {**{k: v["name"] for k, v in SLOT_NAMES.items()}, **{s["slot"]: s["name"] for s in SHOTS}}
     photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
                "slot_name": names.get(used.get(f.name, ""), "")}
               for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_")] if (case / "input").is_dir() else []
     return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
-            "slots": slots, "photos": photos, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
+            "slots": slots, "slot_info": slot_info, "need": _missing(case), "photos": photos, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
             "ready": ready, "videos": vids, "templates": TEMPLATES}
 
 
@@ -449,9 +474,8 @@ def redo(data_dir: Path, cid: str) -> None:
     if not cj.get("slots"):
         _enqueue(case, "intake", _intake)
     elif _missing(case):
-        have = cj.get("slots", {})
-        if not any(have.get(DERIVE.get(s, "")) for s in _missing(case)):
-            raise RuntimeError("حدّد الصورة الناقصة أولًا")
+        raise RuntimeError("حدّد الصورة الناقصة أولًا")
+    elif _missing(case, derivable=True):   # ناقصة بس ليها بديل: نقصّها ونكمّل
         _enqueue(case, "assign", _continue)
     else:
         _enqueue(case, "elements", _elements_redo)
@@ -506,6 +530,9 @@ def file(data_dir: Path, cid: str, rel: str) -> Path | None:
     case = case_dir(data_dir, cid)
     if not case:
         return None
+    if rel.startswith("slot/") and rel[5:] in CANON:   # الصورة اللي في الخانة (بعد تعديل الاتجاه/القص)
+        p = case / "canon" / CANON[rel[5:]]
+        return p if p.is_file() else None
     ok = (rel.startswith("elements/") and rel[9:] in DOCTOR_REVIEW) or re.fullmatch(r"out/a\d\d\.mp4", rel) \
         or re.fullmatch(r"input/[A-Za-z0-9_.-]{1,64}", rel)   # صور الطبيب نفسه (علشان يشوف كل صورة اتحطت فين)
     p = (case / rel).resolve()

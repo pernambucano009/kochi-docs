@@ -34246,12 +34246,16 @@ def dental_home():
 @app.post("/api/dental/cases")
 async def dental_new(files: list[UploadFile] = File([]), title: str = Form(""),
                      before_retracted: UploadFile | None = File(None), after_retracted: UploadFile | None = File(None),
-                     before_face: UploadFile | None = File(None), after_smile: UploadFile | None = File(None)):
+                     before_face: UploadFile | None = File(None), after_smile: UploadFile | None = File(None),
+                     before_smile: UploadFile | None = File(None), after_face: UploadFile | None = File(None),
+                     before_face_retracted: UploadFile | None = File(None), after_face_retracted: UploadFile | None = File(None)):
     """صور الحالة: كل صورة في خانتها (before_retracted…)، أو صور بأي ترتيب (files) والمحرك بيصنّفها.
     بعدها يعدّل الاتجاه ويحلل السنان ويجهز العناصر في الخلفية."""
     dental_on()
     slots = {}
-    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("before_face", before_face), ("after_smile", after_smile)):
+    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("before_face", before_face), ("after_smile", after_smile),
+                 ("before_smile", before_smile), ("after_face", after_face), ("before_face_retracted", before_face_retracted),
+                 ("after_face_retracted", after_face_retracted)):
         if f is not None:
             data = await f.read()
             if len(data) > 25 * 1024 * 1024:

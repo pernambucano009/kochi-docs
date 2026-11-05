@@ -20,6 +20,7 @@ SLOTS = {
     "after_retracted_side1": ("after/side1.jpg",        "سنان البعد بالمبعد من الجنب (يمين)", False),
     "after_retracted_side2": ("after/side2.jpg",        "سنان البعد بالمبعد من الجنب (شمال)", False),
     "after_smile":        ("ret/smile_front_ret4.jpg",  "ابتسامة البعد قريبة من غير مبعد (شفايف + سنان)", True),
+    "before_smile":       ("before/smile.jpg",          "ابتسامة القبل قريبة من غير مبعد (شفايف + سنان)", False),
     "after_smile_side_r": ("ret/smile_side_r_ret4.jpg", "ابتسامة البعد من الجنب اليمين من غير مبعد", False),
     "after_smile_side_l": ("ret/smile_side_l_ret4.jpg", "ابتسامة البعد من الجنب الشمال من غير مبعد", False),
     "after_face":         ("after/face.jpg",            "وش المريض بعد العلاج بيبتسم من غير مبعد", False),

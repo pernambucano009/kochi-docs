@@ -15,6 +15,7 @@ EN = {  # وصف إنجليزي لكل خانة للموديل
     "after_retracted_side1": "lateral (angled) intraoral AFTER photo with retractor, WIDER framing (more of the retractor visible). If only one lateral retracted photo exists, use this key",
     "after_retracted_side2": "a SECOND lateral intraoral AFTER photo with retractor: a CLOSER framing than side1 or the opposite side",
     "after_smile": "close-up of the smile AFTER treatment, lips visible, NO retractor, frontal",
+    "before_smile": "close-up of the smile BEFORE treatment (old/stained/damaged teeth), lips visible, NO retractor, frontal",
     "after_smile_side_r": "close-up angled smile AFTER treatment, no retractor, where the front (central) teeth are in the RIGHT half of the image and the back teeth recede to the LEFT",
     "after_smile_side_l": "close-up angled smile AFTER treatment, no retractor, where the front (central) teeth are in the LEFT half of the image and the back teeth recede to the RIGHT",
     "after_face": "full face portrait AFTER treatment, smiling, NO retractor",

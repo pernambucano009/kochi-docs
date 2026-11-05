@@ -70,7 +70,9 @@ def retract(c):
         from elements import nb, _he
         he, his, man = _he(c); nb(RETRACT_P.format(man=man, his=his), [c.canon("before_face")], f)
     F = cv2.imread(f); H, W = F.shape[:2]; hsv = cv2.cvtColor(F, cv2.COLOR_BGR2HSV)
-    # فتحة المبعد = بين حافتي الحلقتين السودا من جوه
+    op = _open_from_landmarks(F)   # فتحة البق من نقط الوش: بتشتغل مع أي لون مبعد (شفاف/أبيض/إسود)
+    if op is not None: return _retract_rest(c, E, F, hsv, op)
+    # احتياطي: فتحة المبعد = بين حافتي الحلقتين السودا من جوه (المبعد الإسود بس)
     dark = (hsv[..., 2] < 55).astype(np.uint8); dark[:int(H * .5)] = 0
     n, lb, st, _ = cv2.connectedComponentsWithStats(dark); big = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 3000]
     ring = np.isin(lb, big).astype(np.uint8); cx = W // 2; ys = np.where(ring.any(1))[0]; pl, pr = [], []
@@ -79,7 +81,27 @@ def retract(c):
         if len(L) and len(R): pl.append((L.max(), y)); pr.append((cx + R.min(), y))
     wid = np.array([r[0] - l[0] for l, r in zip(pl, pr)]); keep = wid > wid.max() * .6
     pl = [p for p, k in zip(pl, keep) if k]; pr = [p for p, k in zip(pr, keep) if k]
-    op = np.zeros((H, W), np.uint8); cv2.fillPoly(op, [np.int32(pl + pr[::-1])], 255); op = cv2.erode(op, np.ones((7, 7), np.uint8)); cv2.imwrite(E + "retract_open.png", op)
+    op = np.zeros((H, W), np.uint8); cv2.fillPoly(op, [np.int32(pl + pr[::-1])], 255); op = cv2.erode(op, np.ones((7, 7), np.uint8))
+    return _retract_rest(c, E, F, hsv, op)
+
+
+OUTER_LIPS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
+def _open_from_landmarks(F):
+    """فتحة البق = حدود الشفايف الخارجية (نقط الوش) — المبعد بيمطها، فالسنان واللثة كلها جواها مهما كان لون المبعد أو شكله.
+    الشفايف نفسها مابتتحسبش سنان (السنان = فاتح وقليل التشبع جوه الفتحة)."""
+    try:
+        from derive import _lmk
+        P = _lmk(cv2.cvtColor(F, cv2.COLOR_BGR2RGB))
+    except Exception:
+        return None
+    H, W = F.shape[:2]; op = np.zeros((H, W), np.uint8); cv2.fillPoly(op, [np.int32(P[OUTER_LIPS])], 255)
+    if op.sum() / 255 < H * W * .002: return None   # الفتحة صغيرة جدًا: النقط غلط
+    k = max(3, int(np.sqrt(op.sum() / 255) * .06)) | 1
+    return cv2.dilate(op, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+
+
+def _retract_rest(c, E, F, hsv, op):
+    H, W = F.shape[:2]; cv2.imwrite(E + "retract_open.png", op)
     tm = ((hsv[..., 2] > 140) & (hsv[..., 1] < 120) & (op > 0)).astype(np.uint8); tm = cv2.morphologyEx(tm, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
     x, y, w, h = cv2.boundingRect(tm); pad = int(.08 * w); x, y = max(0, x - pad), max(0, y - pad); w, h = min(W - x, w + 2 * pad), min(H - y, h + 2 * pad)
     cv2.imwrite(E + "rcrop.png", F[y:y + h, x:x + w]); np.save(E + "retract_crop.npy", np.array([x, y]))

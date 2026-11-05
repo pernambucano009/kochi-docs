@@ -53,6 +53,8 @@
 .dn-slot .art svg{width:88%;height:88%}.dn-slot .art img{width:100%;height:100%;object-fit:cover}
 .dn-slot .art.filled svg{position:absolute;bottom:6px;inset-inline-end:6px;width:36%;height:auto;background:rgba(255,255,255,.94);border-radius:10px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .dn-slot.miss{border-style:solid;border-color:var(--dn-bad)}.dn-slot.miss .act{color:var(--dn-bad)}.dn-slot.static{cursor:default}
+.dn-slot .req{font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:rgba(229,97,62,.12);color:var(--dn-acc);vertical-align:middle;white-space:nowrap}
+.dn-slot .req.opt{background:rgba(127,127,127,.14);color:var(--dn-mute)}.dn-slot.optional{border-style:dashed;border-color:var(--dn-line)}.dn-slot.optional .act{color:var(--dn-mute)}
 .dn-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--dn-mute)}
 .dn-bulk label{cursor:pointer}
 .dn-slot .tag{position:absolute;top:8px;inset-inline-start:8px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;color:#fff;background:#4a4a52}
@@ -83,13 +85,22 @@
       <ellipse cx="80" cy="52" rx="30" ry="36" fill="${INK}"/>
       <path d="M62 62 q18 18 36 0 q-18 6 -36 0z" fill="${before ? "#e8d6a4" : "#fff"}"/>
       <circle cx="68" cy="46" r="3" fill="#fff"/><circle cx="92" cy="46" r="3" fill="#fff"/></svg>`,
+    faceret: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
+      <path d="M30 120 q2 -34 50 -36 q48 2 50 36z" fill="${INK}"/>
+      <ellipse cx="80" cy="50" rx="30" ry="36" fill="${INK}"/>
+      <circle cx="68" cy="40" r="3" fill="#fff"/><circle cx="92" cy="40" r="3" fill="#fff"/>
+      <ellipse cx="80" cy="64" rx="17" ry="10" fill="#2c2c33"/>
+      ${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${67 + i * 4.6}" y="58" width="3.8" height="6" rx="1" fill="${before ? "#e8d6a4" : "#fff"}"/>`).join("")}
+      <path d="M58 54 q-6 10 0 20 M102 54 q6 10 0 20" stroke="#9a9aa3" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`,
     smile: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
       <path d="M18 58 q30 -30 62 -18 q32 -12 62 18 q-62 60 -124 0z" fill="${INK}"/>
       <path d="M32 58 q48 -16 96 0 q-48 34 -96 0z" fill="#2c2c33"/>
       ${teethRow(48, 16, 8, before ? "#e8d6a4" : "#fff", before)}
       <path d="M18 58 q62 18 124 0" stroke="${INK}" stroke-width="3" fill="none"/></svg>`,
   };
-  const SHOT_ART = { before_retracted: ["ret", 1], after_retracted: ["ret", 0], before_face: ["face", 1], after_smile: ["smile", 0] };
+  const ALT = { before_retracted: "before_face_retracted", after_retracted: "after_face_retracted", after_smile: "after_face", before_smile: "before_face" };
+  const altSrc = (slot) => ALT[slot];
+  const artOf = (s) => [s.kind || "ret", s.phase === "before" ? 1 : 0];
 
   function shell(title, back) {
     if (!root) { root = document.createElement("div"); root.className = "dn"; root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true"); document.body.appendChild(root); }
@@ -104,9 +115,9 @@
     w.innerHTML = `<div class="dn-card"><p>جارٍ التحميل…</p></div>`;
     try { home = await call("/api/dental"); } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p></div>`; return; }
     picked = {};
-    const slotsHtml = home.shots.map((s) => { const [k, b] = SHOT_ART[s.slot] || ["ret", 0];
+    const slotsHtml = home.shots.map((s) => { const [k, b] = artOf(s);
       return `<label class="dn-slot" data-slot="${esc(s.slot)}"><input type="file" accept="image/*" hidden><div class="art">${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
-        <b>${esc(s.name)}</b><small>${esc(s.hint)}</small><span class="act">اضغط أو اسحب الصورة هنا</span></label>`; }).join("");
+        <b>${esc(s.name)} <span class="req${s.req ? "" : " opt"}">${s.req ? "مطلوبة" : "اختيارية"}</span></b><small>${esc(s.hint)}${s.alt ? `<br>${esc(s.alt.text)}` : ""}</small><span class="act">اضغط أو اسحب الصورة هنا</span></label>`; }).join("");
     const cases = home.cases.map((c) => `<button class="dn-case" data-case="${esc(c.id)}"><b>${esc(c.title)}</b><small>${c.job?.status === "running" || c.job?.status === "queued" ? "يعمل الآن…" : c.job?.status === "failed" ? "تحتاج إعادة" : `${c.videos} فيديو`}</small></button>`).join("");
     w.innerHTML = `
       <div class="dn-card"><h3>حالة جديدة</h3>
@@ -141,10 +152,12 @@
   }
   function valid() {
     const b = root?.querySelector("[data-dn=create]"); if (!b) return;
-    const n = Object.keys(picked).length, all = (home?.shots || []).length, enough = n === all || n + files.length >= all;
+    const sh = home?.shots || [], has = (slot) => !!picked[slot];
+    const lack = sh.filter((s) => s.req && !has(s.slot) && !(s.alt && sh.some((x) => s.alt && has(altSrc(s.slot)))));
+    const n = sh.filter((s) => s.req).length - lack.length, all = sh.filter((s) => s.req).length, enough = !lack.length || files.length > 0;
     const ok = enough && root.querySelector("[data-consent]")?.checked;
     b.disabled = !ok;
-    root.querySelector(".dn-msg").textContent = !enough ? `${n + files.length} من ${all} صور` : (ok ? "" : "أكّد موافقة المريض");
+    root.querySelector(".dn-msg").textContent = !enough ? `ناقص: ${lack.map((s) => s.name).join("، ")}` : (ok ? "" : "أكّد موافقة المريض");
   }
   async function create() {
     const b = root.querySelector("[data-dn=create]"); b.disabled = true; root.querySelector(".dn-msg").textContent = "جارٍ الرفع…";
@@ -162,9 +175,9 @@
     const w = shell(v.title, true);
     const j = v.job || {}, running = j.status === "running" || j.status === "queued";
     const jobHtml = running ? `<div class="dn-job"><span class="dn-spin"></span><span>${j.status === "queued" ? "في الطابور" : "يعمل الآن"}: ${esc(stageName(j.stage))}… (قد يستغرق بضع دقائق، ويمكنك إغلاق النافذة)</span></div>`
-      : j.status === "failed" && !Object.values(v.slots || {}).some((x) => !x) ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
+      : j.status === "failed" && !(v.need || []).length ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
     const slots = home?.shots || [];
-    const missing = !running && v.photos?.length ? slots.filter((s) => !v.slots[s.slot]) : [];
+    const missing = !running && v.photos?.length ? slots.filter((s) => (v.need || []).includes(s.slot)) : [];
     const spare = [...(v.photos || [])].sort((a, b) => !!a.slot - !!b.slot);   // غير المستخدمة الأول، والمستخدمة كمان (لو اتصنفت غلط في خانة تانية)
     // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
     const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>
@@ -172,9 +185,12 @@
       <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة لهذه الخانة<input type="file" accept="image/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
     const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<b>${esc(p.slot_name)}</b>` : "غير مستخدمة"}</figure>`).join("")}</div></details>` : "";
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
-      ? `<div class="dn-slots">${slots.map((s) => { const [k, b] = SHOT_ART[s.slot] || ["ret", 0], ph = (v.photos || []).find((p) => p.slot === s.slot), ok = v.slots[s.slot];
-          return `<div class="dn-slot static ${ok ? "done" : "miss"}"><div class="art${ph ? " filled" : ""}">${ph ? `<img src="${esc(ph.url)}" alt="" loading="lazy">` : ""}${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
-            <b>${esc(s.name)}</b><span class="act">${ok ? "✓ تمت تعبئتها" : "✗ لم تُعبّأ بعد"}</span></div>`; }).join("")}</div>` : "";
+      ? `<div class="dn-slots">${slots.map((s) => { const [k, b] = artOf(s), si = (v.slot_info || {})[s.slot], ok = v.slots[s.slot], need = (v.need || []).includes(s.slot);
+          const st = ok ? (si?.cropped ? "✓ مقصوصة تلقائيًا من صورة الوجه" : "✓ تمت تعبئتها") : need ? "✗ مطلوبة ولم تُعبّأ بعد" : s.req ? "ستُقص تلقائيًا" : "اختيارية — لم تُرفع";
+          return `<div class="dn-slot static ${ok ? "done" : need ? "miss" : "optional"}"><div class="art${si ? " filled" : ""}">${si ? `<img src="${esc(si.url)}" alt="" loading="lazy">` : ""}${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
+            <b>${esc(s.name)}</b><span class="act">${st}</span></div>`; }).join("")}</div>` : "";
+    const canCrop = !running && !(v.need || []).length && slots.some((s) => s.req && !v.slots[s.slot]);
+    const cropHtml = canCrop ? `<div class="dn-row"><button class="dn-btn" data-dn="redo">أكمل: قصّ الصور الناقصة تلقائيًا</button></div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
       <div class="dn-rev">${v.review.map((r) => `<figure>${r.url ? `<img src="${esc(r.url)}" alt="${esc(r.why)}">` : ""}<figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span>${r.note ? `<br>${esc(r.note)}` : ""}</figcaption>
         ${r.state === "pending" ? `<div class="dn-row" style="margin:0"><button class="dn-btn" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>موافق</button><button class="dn-btn ghost" data-no="${esc(r.name)}" ${running ? "disabled" : ""}>ارفض</button></div>`
@@ -185,7 +201,7 @@
       <div class="dn-tpls">${v.templates.map((t) => { const vid = v.videos[t.id], doing = running && j.stage === "render:" + t.id;
         return `<div class="dn-tpl"><b>${esc(t.name)}</b><p>${esc(t.desc)}</p>${vid ? `<video src="${esc(vid.url)}" controls playsinline preload="metadata"></video><a class="dn-btn ghost" href="${esc(vid.url)}" download="${esc(t.id)}.mp4" style="text-align:center;text-decoration:none">تنزيل</a>` : ""}
         <button class="dn-btn${vid ? " ghost" : ""}" data-render="${esc(t.id)}" ${!v.ready || running ? "disabled" : ""}>${doing ? "يعمل الآن…" : vid ? "أنشئه من جديد" : "أنشئ الفيديو"}</button></div>`; }).join("")}</div></div>`;
-    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}
+    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${cropHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;
     if (running) timer = setTimeout(() => showCase(id), 5000);
     w.querySelectorAll("[data-upslot]").forEach((inp) => inp.onchange = async () => {
