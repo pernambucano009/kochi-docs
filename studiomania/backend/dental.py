@@ -45,6 +45,15 @@ SHOTS = [
     {"slot": "after_smile", "name": "الابتسامة بعد العلاج", "hint": "ابتسامة قريبة بعد العلاج دون مبعد (الشفتان والأسنان)."},
 ]
 
+# كل خانات المحرك (بما فيها الإضافية اللي بيحط فيها الصور الزيادة) بأسماء للطبيب
+SLOT_NAMES = {"before_face_retracted": {"name": "وجه المريض قبل العلاج بالمبعد"}, "after_face_retracted": {"name": "وجه المريض بعد العلاج بالمبعد"},
+              "after_face": {"name": "وجه المريض بعد العلاج"}, "after_retracted_close": {"name": "الأسنان بعد العلاج بالمبعد عن قرب"},
+              "after_retracted_side1": {"name": "الأسنان بعد العلاج من الجانب الأيمن"}, "after_retracted_side2": {"name": "الأسنان بعد العلاج من الجانب الأيسر"},
+              "after_smile_side_r": {"name": "الابتسامة بعد العلاج من الجانب الأيمن"}, "after_smile_side_l": {"name": "الابتسامة بعد العلاج من الجانب الأيسر"},
+              "prep": {"name": "الأسنان المحضّرة"}, "veneers": {"name": "العدسات خارج الفم"}, "cast": {"name": "التركيبات على النموذج"}, "doctor": {"name": "صورة الطبيب"}}
+# صورة الأسنان القريبة ممكن تتقص من صورة الوجه بالمبعد (لو الطبيب صوّر الوجه كله)
+DERIVE = {"before_retracted": "before_face_retracted", "after_retracted": "after_face_retracted"}
+
 # العناصر المشتقة اللي الطبيب لازم يشوفها ويوافق عليها بنفسه (فيها وش المريض)، والباقي داخلي بيتعتمد لو عدّى الفلتر
 DOCTOR_REVIEW = {
     "after_portrait_v3.png": {"why": "وجه المريض بعد العلاج: الابتسامة الحقيقية من صورة ما بعد العلاج على وجهه. تأكّد أن الأسنان هي أسنانه نفسها."},
@@ -199,6 +208,12 @@ def _missing(case: Path) -> list[str]:
 
 def _continue(case: Path):
     """لو كل الصور المطلوبة موجودة نكمّل للعناصر، وإلا نستنى الطبيب يحدد الصورة الناقصة بنفسه."""
+    have = _engine_json(case).get("slots", {})
+    for slot in _missing(case):   # الطبيب صوّر الوجه كله بالمبعد بدل الصورة القريبة: نقص الأسنان منها
+        src = have.get(DERIVE.get(slot, ""), {}).get("file")
+        if src:
+            _set_job(case, stage="assign")
+            _assign_job(slot, src, then=False)(case)
     miss = _missing(case)
     if miss:
         return {"status": "needs", "missing": miss}
@@ -212,17 +227,31 @@ from case import Case
 from intake import view_of, upright
 c = Case(sys.argv[1]); slot, f = sys.argv[2], sys.argv[3]; src = c.d + "/input/" + f
 v = c.m.get("intake", {}).get("views", {}).get(f) or view_of(src)
-im = upright(src, v); out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
+im = upright(src, v)
+if slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face"):
+    # وجه كامل بالمبعد ← صورة قريبة للأسنان: قص حوالين البق بنقط الوش (نفس نسبة صورة الماكرو 3:2)
+    import numpy as np, mediapipe as mp
+    from mediapipe.tasks.python import vision, BaseOptions
+    S_ = os.environ.get("DENTAL_ROOT") or os.path.dirname(os.getcwd())
+    det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(base_options=BaseOptions(model_asset_path=S_ + "/face/face_landmarker.task"), num_faces=1))
+    a = np.ascontiguousarray(np.array(im)); r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=a))
+    if not r.face_landmarks: raise SystemExit("لم نجد الوجه في الصورة لقص الأسنان منها")
+    lm = r.face_landmarks[0]; W, H = im.size
+    xs = [lm[i].x * W for i in (61, 291, 78, 308)]; ys = [lm[i].y * H for i in (0, 17, 13, 14)]
+    cx, cy = sum(xs) / 4, sum(ys) / 4; w = (max(xs) - min(xs)) * 1.15; h = w * 2 / 3
+    x0, y0 = max(0, cx - w / 2), max(0, cy - h / 2); im = im.crop((int(x0), int(y0), int(min(W, x0 + w)), int(min(H, y0 + h))))
+out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
 if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
 for k, x in list(c.m["slots"].items()):
-    if k != slot and x.get("file") == f: del c.m["slots"][k]
-c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True}
+    if k != slot and x.get("file") == f and not k.endswith("face_retracted"): del c.m["slots"][k]
+c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True,
+                      "cropped": slot in ("before_retracted", "after_retracted") and str(v.get("view", "")).startswith("face")}
 it = c.m.setdefault("intake", {}); it.setdefault("views", {})[f] = v
 it["unused"] = [u for u in it.get("unused", []) if u != f]; c.save(); c.log(f"الطبيب حدد {slot} ← {f}")
 """
 
 
-def _assign_job(slot: str, fname: str):
+def _assign_job(slot: str, fname: str, then: bool = True):
     """الطبيب حدد صورة لخانة بنفسه: نعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
     def go(case: Path):
         r = _run(case, ["-c", _ASSIGN, str(case), slot, fname], "assign.log", 600)
@@ -239,7 +268,7 @@ def _assign_job(slot: str, fname: str):
         r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
         if r.returncode != 0:
             raise RuntimeError("تعذّر تحليل الأسنان في الصورة. " + _tail(case, "analysis.log", 1))
-        return _continue(case)
+        return _continue(case) if then else None
     return go
 
 
@@ -315,7 +344,7 @@ def view(data_dir: Path, cid: str) -> dict | None:
             for k, v in m.get("videos", {}).items() if (case / "out" / f"{k}.mp4").exists()}
     slots = {s["slot"]: s["slot"] in cj.get("slots", {}) for s in SHOTS}
     used = {v.get("file"): k for k, v in cj.get("slots", {}).items()}
-    names = {s["slot"]: s["name"] for s in SHOTS}
+    names = {**{k: v["name"] for k, v in SLOT_NAMES.items()}, **{s["slot"]: s["name"] for s in SHOTS}}
     photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
                "slot_name": names.get(used.get(f.name, ""), "")}
               for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_")] if (case / "input").is_dir() else []
@@ -367,7 +396,10 @@ def redo(data_dir: Path, cid: str) -> None:
     if not cj.get("slots"):
         _enqueue(case, "intake", _intake)
     elif _missing(case):
-        raise RuntimeError("حدّد الصورة الناقصة أولًا")
+        have = cj.get("slots", {})
+        if not any(have.get(DERIVE.get(s, "")) for s in _missing(case)):
+            raise RuntimeError("حدّد الصورة الناقصة أولًا")
+        _enqueue(case, "assign", _continue)
     else:
         _enqueue(case, "elements", _elements_redo)
 
