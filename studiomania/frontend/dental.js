@@ -87,11 +87,14 @@
       <circle cx="68" cy="46" r="3" fill="#fff"/><circle cx="92" cy="46" r="3" fill="#fff"/></svg>`,
     faceret: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
       <path d="M30 120 q2 -34 50 -36 q48 2 50 36z" fill="${INK}"/>
-      <ellipse cx="80" cy="50" rx="30" ry="36" fill="${INK}"/>
-      <circle cx="68" cy="40" r="3" fill="#fff"/><circle cx="92" cy="40" r="3" fill="#fff"/>
-      <ellipse cx="80" cy="64" rx="17" ry="10" fill="#2c2c33"/>
-      ${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${67 + i * 4.6}" y="58" width="3.8" height="6" rx="1" fill="${before ? "#e8d6a4" : "#fff"}"/>`).join("")}
-      <path d="M58 54 q-6 10 0 20 M102 54 q6 10 0 20" stroke="#9a9aa3" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`,
+      <ellipse cx="80" cy="48" rx="32" ry="38" fill="${INK}"/>
+      <circle cx="67" cy="34" r="3.2" fill="#fff"/><circle cx="93" cy="34" r="3.2" fill="#fff"/>
+      <ellipse cx="80" cy="62" rx="23" ry="13" fill="#2c2c33"/>
+      <path d="M59 58 q21 -9 42 0" fill="#d98c97" opacity=".85"/>
+      ${[0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="${64.5 + i * 4.5}" y="${57 + (before ? [1, -1, 1, 0, -1, 1, 0][i] : 0)}" width="3.7" height="6.5" rx="1" fill="${before ? "#e8d6a4" : "#fff"}"/>`).join("")}
+      ${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${67 + i * 4.5}" y="64.5" width="3.7" height="5" rx="1" fill="${before ? "#ddc994" : "#f4f4f4"}"/>`).join("")}
+      <path d="M55 50 q-9 12 0 24 M105 50 q9 12 0 24" stroke="#c4c4cc" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M55 50 q6 -4 12 -2 M55 74 q6 4 12 2 M105 50 q-6 -4 -12 -2 M105 74 q-6 4 -12 2" stroke="#c4c4cc" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>`,
     smile: (before) => `<svg viewBox="0 0 160 120" aria-hidden="true">
       <path d="M18 58 q30 -30 62 -18 q32 -12 62 18 q-62 60 -124 0z" fill="${INK}"/>
       <path d="M32 58 q48 -16 96 0 q-48 34 -96 0z" fill="#2c2c33"/>
