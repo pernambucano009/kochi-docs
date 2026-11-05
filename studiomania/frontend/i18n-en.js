@@ -15496,4 +15496,13 @@ window.I18N_EN = {
   "تجهيز الصورة التي حددتها وتحليلها": "Preparing and analysing the photo you chose",
   "صورك ({0}) وأين استُخدمت كل صورة": "Your photos ({0}) and where each one was used",
   "مستخدمة في: {0}": "Used for: {0}",
+  "تحديد الشفتين في صورة الابتسامة": "Marking the lips in the smile photo",
+  "حدود كل سنّ على الوجه": "Each tooth's outline on the face",
+  "خلفية اللثة": "Gum background",
+  "الصورة سليمة، أوافق عليها": "The photo is fine, I approve it",
+  "تعذّر تجهيز بعض الخطوات": "Some steps could not be prepared",
+  "لم تُصنع لأن خطوة «{0}» لم تكتمل.": "Not made because the \"{0}\" step did not finish.",
+  "تعذّر صنعها: {0}": "Could not make it: {0}",
+  "تنقصها صورة من صور الحالة.": "A case photo is missing for it.",
+  "وجه المريض بعد العلاج": "The patient's face after treatment",
 };

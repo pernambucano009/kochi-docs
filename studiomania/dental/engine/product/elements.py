@@ -290,6 +290,19 @@ def make(c, names=None, force=False):
         c.set_el(name, status=st, files=[os.path.relpath(o, c.d) for o in outs], qa=res, note=res.get("reason_ar", ""), tries=attempt + 1); report[name] = st
     return report
 
+def make_parallel(c, names, workers=4):
+    """نفس make، بس العناصر اللي مش معتمدة على بعض بتتعمل في نفس الوقت (كل مستوى من الاعتماديات مع بعض).
+    أغلب الوقت بيضيع في انتظار موديلات الصور والفحص، فالتوازي بيقصّر الخطوة من غير ما يغيّر الناتج."""
+    import concurrent.futures as cf
+    todo, done, report = [n for n in RECIPES if n in set(names)], set(), {}
+    while todo:
+        lvl = [n for n in todo if not any(d in todo for d in RECIPES[n][0] if not d.startswith("slot:"))]
+        if not lvl: lvl = todo[:1]
+        with cf.ThreadPoolExecutor(min(workers, len(lvl))) as ex:
+            for r in ex.map(lambda n: make(c, [n]), lvl): report.update(r)
+        todo = [n for n in todo if n not in lvl]
+    return report
+
 VIDEO_TRIES = 2
 def _qa(c, name, outs, q, tchecks):
     if True:

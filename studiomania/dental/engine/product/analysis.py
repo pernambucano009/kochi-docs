@@ -13,14 +13,17 @@ from teethlib import analyze
 JOBS = [("before_retracted", "before"), ("after_retracted", "after"), ("after_smile", "smile")]
 
 def run(case_dir):
-    c = Case(case_dir); A = c.d + "/ana/"; res = {}
-    for slot, tag in JOBS:
-        if not c.has(slot): res[tag] = "الصورة مش موجودة"; continue
+    import concurrent.futures as cf
+    c = Case(case_dir); A = c.d + "/ana/"
+    def one(job):   # كل صورة لوحدها (موديل القناع + الترقيم + قناع اللثة) — التلاتة في نفس الوقت
+        slot, tag = job
+        if not c.has(slot): return tag, "الصورة مش موجودة"
         src = c.canon(slot)
         if not os.path.exists(A + f"ai_{tag}.png"): aimask.one(src, A + f"ai_{tag}.png")
         _, teeth = analyze(src, A + f"ai_{tag}.png", A + f"lab_{tag}.json")
-        res[tag] = f"{len(teeth)} سنة: " + " ".join(str(t['fdi']) for t in sorted(teeth, key=lambda t: t['fdi']))
         if tag in ("before", "after") and not os.path.exists(A + f"gm_{tag}.png"): gummask.make(src, A + f"gm_{tag}.png")
+        return tag, f"{len(teeth)} سنة: " + " ".join(str(t['fdi']) for t in sorted(teeth, key=lambda t: t['fdi']))
+    with cf.ThreadPoolExecutor(len(JOBS)) as ex: res = dict(ex.map(one, JOBS))
     c.m["analysis"] = res; c.save(); c.log("تحليل السنان: " + str(res)); return res
 
 if __name__ == "__main__": print(run(sys.argv[1]))

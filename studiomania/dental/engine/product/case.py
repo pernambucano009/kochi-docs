@@ -8,7 +8,8 @@
     <case>/out/        الفيديوهات الناتجة
     <case>/case.json   كل حاجة فوق: مين اتصنف فين، كل عنصر حالته (ناقص/اتعمل/عدّى الفلتر/اتعتمد/اترفض)
 """
-import json, os, time
+import json, os, time, threading
+_LK = threading.RLock()   # العناصر المستقلة بتتعمل في threads مع بعض: الحفظ واحد واحد
 
 # الصور الحقيقية اللي ممكن الطبيب يرفعها — كل واحدة ليها مكان ثابت في canon/
 SLOTS = {
@@ -41,8 +42,12 @@ class Case:
         self.path = f"{self.d}/case.json"
         self.m = json.load(open(self.path)) if os.path.exists(self.path) else {"slots": {}, "elements": {}, "patient": {}, "settings": {}, "log": []}
 
-    def save(self): json.dump(self.m, open(self.path, "w"), ensure_ascii=False, indent=1)
-    def log(self, msg): self.m["log"].append([time.strftime("%Y-%m-%d %H:%M"), msg]); self.save()
+    def save(self):
+        with _LK:
+            s = json.dumps(self.m, ensure_ascii=False, indent=1)
+            open(self.path + ".tmp", "w").write(s); os.replace(self.path + ".tmp", self.path)
+    def log(self, msg):
+        with _LK: self.m["log"].append([time.strftime("%Y-%m-%d %H:%M"), msg]); self.save()
 
     # ---- الصور الحقيقية ----
     def canon(self, slot): return f"{self.d}/canon/{SLOTS[slot][0]}"
@@ -52,7 +57,7 @@ class Case:
     def el_path(self, name): return f"{self.d}/elements/{name}"
     def el(self, name): return self.m["elements"].get(name, {"status": MISSING})
     def set_el(self, name, **kw):
-        e = self.m["elements"].setdefault(name, {"status": MISSING}); e.update(kw); e["updated"] = time.strftime("%Y-%m-%d %H:%M"); self.save()
+        with _LK: e = self.m["elements"].setdefault(name, {"status": MISSING}); e.update(kw); e["updated"] = time.strftime("%Y-%m-%d %H:%M"); self.save()
     def approved(self, name): return self.el(name).get("status") == APPROVED
 
     def env(self): e = dict(os.environ); e["CASE_DIR"] = self.d; return e

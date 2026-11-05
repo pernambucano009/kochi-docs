@@ -52,6 +52,11 @@ DOCTOR_REVIEW = {
 }
 
 
+# العناصر الداخلية (مش بيشوفها الطبيب لو نجحت): لو فشلت لازم يعرف، لأن العناصر اللي بعدها بتستناها
+INTERNAL = {"ms/smile_masks": {"label": "تحديد الشفتين في صورة الابتسامة"}, "ap_teeth": {"label": "حدود كل سنّ على الوجه"},
+            "gum_back_after.png": {"label": "خلفية اللثة"}}
+
+
 def _engine_consts():
     """حالات العناصر من المحرك نفسه (نفس الكلمات اللي بيكتبها في case.json)."""
     import importlib.util
@@ -290,13 +295,21 @@ def view(data_dir: Path, cid: str) -> dict | None:
     m, cj = _meta(case), _engine_json(case)
     els = cj.get("elements", {})
     review = []
+    started, running = bool(els), m.get("job", {}).get("status") in ("queued", "running")
     for name, info in DOCTOR_REVIEW.items():
         e = els.get(name)
-        if not e or not (case / "elements" / name).exists():
+        if not started:
             continue
-        state = STATE.get(e.get("status"), "making")
+        f = case / "elements" / name
+        state = STATE.get((e or {}).get("status"), "making")
+        if not f.exists() and (state != "making" or not running):
+            state = "failed"
+        # الفلتر رفضها: الطبيب يشوف السبب، ويقرر هو (يوافق رغم ذلك أو تتعمل من جديد)
         review.append({"name": name, "why": info["why"], "state": state, "label": STATE_LABEL[state]["label"],
-                       "url": f"/api/dental/cases/{cid}/file/elements/{name}?t={int((case / 'elements' / name).stat().st_mtime)}"})
+                       "note": _note((e or {}).get("note", "")) if state in ("failed", "rejected") else "",
+                       "url": f"/api/dental/cases/{cid}/file/elements/{name}?t={int(f.stat().st_mtime)}" if f.exists() else ""})
+    problems = [{"name": n, "label": INTERNAL[n]["label"], "note": _note(e.get("note", ""))} for n, e in els.items()
+                if n in INTERNAL and e.get("status") in (QA_FAIL, MISSING) and e.get("note")]
     ready = all(els.get(n, {}).get("status") == APPROVED for n in DOCTOR_REVIEW) and bool(els)
     vids = {k: {**v, "url": f"/api/dental/cases/{cid}/file/out/{k}.mp4?v={int(v.get('at', 0))}"}
             for k, v in m.get("videos", {}).items() if (case / "out" / f"{k}.mp4").exists()}
@@ -307,8 +320,22 @@ def view(data_dir: Path, cid: str) -> dict | None:
                "slot_name": names.get(used.get(f.name, ""), "")}
               for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_")] if (case / "input").is_dir() else []
     return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
-            "slots": slots, "photos": photos, "gender": cj.get("patient", {}).get("gender"), "review": review,
+            "slots": slots, "photos": photos, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
             "ready": ready, "videos": vids, "templates": TEMPLATES}
+
+
+def _note(n: str) -> str:
+    """ملاحظة المحرك (مكتوبة للمطوّر) ← جملة للطبيب."""
+    n = (n or "").strip()
+    if n.startswith("مستني العنصر:"):
+        dep = n.split(":", 1)[1].strip()
+        lab = (INTERNAL.get(dep) or {}).get("label") or ("وجه المريض بعد العلاج" if dep.startswith("after_portrait") else dep)
+        return f"لم تُصنع لأن خطوة «{lab}» لم تكتمل."
+    if n.startswith("فشل التصنيع:"):
+        return "تعذّر صنعها: " + n.split(":", 1)[1].strip()[:160]
+    if n.startswith("الصورة الحقيقية ناقصة"):
+        return "تنقصها صورة من صور الحالة."
+    return n[:240]
 
 
 def cases(data_dir: Path) -> list[dict]:

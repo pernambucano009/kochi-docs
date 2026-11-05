@@ -22,7 +22,7 @@ def cmd_new(src, d):
 
 def cmd_elements(d, tpls=None):
     from needs import needs_all
-    from elements import make, RECIPES
+    from elements import make_parallel as make, RECIPES
     c = Case(d); want = set()
     for name, n in needs_all().items():
         if not tpls or name in tpls: want |= set(n["elements"])

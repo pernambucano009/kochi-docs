@@ -127,14 +127,16 @@
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
       ? `<div class="dn-shots">${slots.map((s) => `<div class="dn-shot ${v.slots[s.slot] ? "ok" : "miss"}"><b>${esc(s.name)}</b></div>`).join("")}</div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
-      <div class="dn-rev">${v.review.map((r) => `<figure><img src="${esc(r.url)}" alt="${esc(r.why)}"><figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span></figcaption>
-        ${r.state === "pending" ? `<div class="dn-row" style="margin:0"><button class="dn-btn" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>موافق</button><button class="dn-btn ghost" data-no="${esc(r.name)}" ${running ? "disabled" : ""}>ارفض</button></div>` : ""}</figure>`).join("")}</div>
-      ${v.review.some((r) => r.state === "rejected" || r.state === "failed") && !running ? `<div class="dn-row"><button class="dn-btn ghost" data-dn="redo">أعد صنع المرفوض</button></div>` : ""}</div>` : "";
+      <div class="dn-rev">${v.review.map((r) => `<figure>${r.url ? `<img src="${esc(r.url)}" alt="${esc(r.why)}">` : ""}<figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span>${r.note ? `<br>${esc(r.note)}` : ""}</figcaption>
+        ${r.state === "pending" ? `<div class="dn-row" style="margin:0"><button class="dn-btn" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>موافق</button><button class="dn-btn ghost" data-no="${esc(r.name)}" ${running ? "disabled" : ""}>ارفض</button></div>`
+          : r.state === "failed" && r.url ? `<div class="dn-row" style="margin:0"><button class="dn-btn ghost" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>الصورة سليمة، أوافق عليها</button></div>` : ""}</figure>`).join("")}</div>
+      ${(v.review.some((r) => r.state === "rejected" || r.state === "failed") || v.problems?.length) && !running ? `<div class="dn-row"><button class="dn-btn ghost" data-dn="redo">أعد صنع المرفوض</button></div>` : ""}</div>` : "";
+    const probs = v.problems?.length && !running ? `<div class="dn-need"><b>تعذّر تجهيز بعض الخطوات</b>${v.problems.map((p) => `<p>${esc(p.label)}: ${esc(p.note)}</p>`).join("")}<div class="dn-row" style="margin:0"><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div></div>` : "";
     const tpls = `<div class="dn-card"><h3>القوالب</h3><p>${v.ready ? "اختر قالبًا لإنشاء الفيديو. كل فيديو يأخذ عدة دقائق." : "تفتح القوالب بعد موافقتك على الصور المشتقة."}</p>
       <div class="dn-tpls">${v.templates.map((t) => { const vid = v.videos[t.id], doing = running && j.stage === "render:" + t.id;
         return `<div class="dn-tpl"><b>${esc(t.name)}</b><p>${esc(t.desc)}</p>${vid ? `<video src="${esc(vid.url)}" controls playsinline preload="metadata"></video><a class="dn-btn ghost" href="${esc(vid.url)}" download="${esc(t.id)}.mp4" style="text-align:center;text-decoration:none">تنزيل</a>` : ""}
         <button class="dn-btn${vid ? " ghost" : ""}" data-render="${esc(t.id)}" ${!v.ready || running ? "disabled" : ""}>${doing ? "يعمل الآن…" : vid ? "أنشئه من جديد" : "أنشئ الفيديو"}</button></div>`; }).join("")}</div></div>`;
-    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${needHtml}${picsHtml}</div>${rev}${tpls}
+    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;
     if (running) timer = setTimeout(() => showCase(id), 5000);
     w.querySelectorAll("[data-upslot]").forEach((inp) => inp.onchange = async () => {
