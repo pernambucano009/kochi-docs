@@ -58,6 +58,8 @@ def r_smile_masks(c):
 def r_after_portrait(c):
     out = c.el_path("after_portrait_v3.png")
     if c.has("after_face"): shutil.copy(c.canon("after_face"), out); return [out]   # الطبيب رفع صورة البعد بالوش: حقيقية، مفيش تصنيع
+    if os.path.exists(out): os.remove(out)   # صورة قديمة فاشلة ماتفضلش معروضة
+    if str(c.m["slots"].get("after_smile", {}).get("view", "")).endswith("lateral"): raise ValueError("SMILE_NOT_FRONTAL lateral")
     from mouth_swap import swap
     ms = c.d + "/elements/ms/"
     swap(c.canon("before_face"), out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png")   # البق كله بالشفايف من صورة الابتسامة الحقيقية
@@ -67,6 +69,8 @@ def r_pose(c):   # الوضعية حسب النوع: راجل = قبضة تحت 
     g = c.m["patient"].get("gender", "male"); base = c.el_path("pose_base.png"); out = c.el_path("after_portrait_pose_m.png" if g == "male" else "after_portrait_hands.png")
     pose = "resting his chin on his closed fist (fist under the chin), confident" if g == "male" else "gently placing both hands on her cheeks"
     nb(f"Same photo of the same person, same face, same lighting and background, now {pose}. Keep the head angle and the smile exactly the same.", [c.el_path("after_portrait_v3.png")], base)
+    if os.path.exists(out): os.remove(out)   # صورة قديمة فاشلة ماتفضلش معروضة
+    if str(c.m["slots"].get("after_smile", {}).get("view", "")).endswith("lateral"): raise ValueError("SMILE_NOT_FRONTAL lateral")
     from mouth_swap import swap
     ms = c.d + "/elements/ms/"; swap(base, out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png"); return [out]
 

@@ -20,6 +20,11 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None):
     R = s * np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]); c1 = (sl + sr) / 2; c2 = (bl + br) / 2
     # نظبط الرأسي على نص فتحة البق في الوش
     ys = np.where(ml.any(1))[0]; so = np.float32([c1[0], (ys.min() + ys.max()) / 2]); yb = fo[:, 1]; bo = np.float32([c2[0], (yb.min() + yb.max()) / 2])
+    # حماية: صورة ابتسامة مش من الأمام (أو فتحة غلط) بتطلّع بق مقلوب أو عملاق على الوش، فمانركّبش أصلًا
+    xs_ = np.where(ml.any(0))[0]; ys_ = np.where(ml.any(1))[0]; asp = (xs_.max() - xs_.min()) / max(1, ys_.max() - ys_.min())
+    fh = np.linalg.norm(P[152] - P[10])
+    if asp < 1.35 or abs(a) > np.radians(20) or not (.18 < np.linalg.norm(v2) / fh < .75) or (ys_.max() - ys_.min()) * s > .45 * fh:
+        raise ValueError(f"SMILE_NOT_FRONTAL asp={asp:.2f} ang={np.degrees(a):.0f} h={(ys_.max() - ys_.min()) * s / fh:.2f}")
     t = bo - R @ so; M = np.hstack([R, t[:, None]]).astype(np.float32); H, W = B.shape[:2]
     Sw = cv2.warpAffine(Sm, M, (W, H), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REFLECT); mlw = cv2.warpAffine(ml, M, (W, H)); mow = cv2.warpAffine(mo, M, (W, H))
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
