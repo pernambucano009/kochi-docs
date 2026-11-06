@@ -15569,4 +15569,5 @@ window.I18N_EN = {
   "⚠️ يلزم ضبط GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في ملف المفاتيح على الخادم أولًا (وهما نفسهما المستخدمان للدخول بجوجل).": "⚠️ GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in the server's key file first (the same ones used for Google sign-in).",
   "أو كبّر مساحة القرص على الخادم.": "or grow the server's disk.",
   "لم نقبل الصورة التي رفعتها لهذه الخانة: {0}": "We didn't accept the photo you uploaded for this slot: {0}",
+  "تنتظر مراجعتك لصورة وجه المريض في قسم «راجع الصور المشتقة» بالأسفل: وافق عليها ثم اضغط «أعد المحاولة».": "Waiting for you to review the patient's face photo in «Review the derived photos» below: approve it, then press «Try again».",
 };

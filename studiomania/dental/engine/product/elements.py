@@ -195,7 +195,11 @@ def r_gum_back(c):   # خلفية لثة ممتدة لحد حافة الشاشة
     import subprocess
     code = ("import sys; sys.argv=['T.py']; import T, shutil; from tl import shift_x, right_gap; f = T.morph_frame(1, 1.0); dx = right_gap(f) + 6; "
             "p = T.gum_backdrop(shift_x(f, dx), 'after_dx%d' % dx); shutil.copy(T.TO + 'gum_back_after_dx%d.png' % dx, T.TO + 'gum_back_after.png')")
-    subprocess.run(["python3", "-c", code], cwd=S + "tpl", env=dict(os.environ, CASE_DIR=c.d), check=True); return [c.el_path("gum_back_after.png")]
+    r = subprocess.run(["python3", "-c", code], cwd=S + "tpl", env=dict(os.environ, CASE_DIR=c.d), capture_output=True, text=True)
+    if r.returncode != 0:   # السبب الحقيقي (آخر سطر في الخطأ) بدل نص الأمر نفسه
+        ls = [l for l in r.stderr.splitlines() if l.strip() and not l.startswith(("W0000", "I0000", "INFO"))]
+        raise RuntimeError(ls[-1][:300] if ls else f"exit {r.returncode}")
+    return [c.el_path("gum_back_after.png")]
 
 RECIPES = {
     "ms/smile_masks":        (["slot:after_smile"], r_smile_masks, None, []),

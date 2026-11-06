@@ -644,6 +644,8 @@ def _note(n: str) -> str:
     n = (n or "").strip()
     if n.startswith("مستني العنصر:"):
         dep = n.split(":", 1)[1].strip()
+        if dep in DOCTOR_REVIEW:   # مستنية صورة لازم الطبيب يشوفها ويوافق عليها (أو اتعملت ولم تجتز الفحص)
+            return "تنتظر مراجعتك لصورة وجه المريض في قسم «راجع الصور المشتقة» بالأسفل: وافق عليها ثم اضغط «أعد المحاولة»."
         lab = (INTERNAL.get(dep) or {}).get("label") or ("وجه المريض بعد العلاج" if dep.startswith("after_portrait") else dep)
         return f"لم تُصنع لأن خطوة «{lab}» لم تكتمل."
     if n.startswith("فشل التصنيع:"):
