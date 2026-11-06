@@ -62,9 +62,43 @@ def upside_down(lips_p, open_p):
     corner = ((ys[l] + ys[r]) / 2 - top) / h; oy = np.where(mo > 128)[0]; opn = (oy.mean() - top) / h if len(oy) else .5
     return corner > .5 and opn < .5
 
+FLIP_Q = """TOP: a crop of this patient's full face photo, correctly upright (nose above the mouth). It is the reference.
+BOTTOM LEFT and BOTTOM RIGHT: the same close-up smile photo of the same patient; one of them is rotated 180 degrees (upside down).
+Which bottom image has the SAME orientation as the reference? Compare the lips: the upper lip (under the nose, with the cupid's bow and philtrum) must be on top, the fuller lower lip below, the upper teeth (bigger central incisors) on top.
+Answer ONLY JSON: {"same": "LEFT"|"RIGHT", "why": "short"}"""
+
+def _flip_votes(c, photo, votes=3):
+    """الموديل يقارن الابتسامة (معدولة ومقلوبة) بوش المريض نفسه قبل العلاج (اتجاهه أكيد صح من نقط الوش). رجوع: عدد الأصوات اللي بتقول مقلوبة، وعدد الأصوات."""
+    import concurrent.futures as cf, base64, io
+    from PIL import Image
+    from derive import _lmk
+    from explainer import chat
+    B = np.array(Image.open(c.canon("before_face")).convert("RGB")); P = _lmk(B)
+    x0, y0 = P[[61, 291, 0, 17]].min(0); x1, y1 = P[[61, 291, 0, 17]].max(0); w = x1 - x0
+    ref = Image.fromarray(B[int(max(0, y0 - w * .9)):int(y1 + w * .5), int(max(0, x0 - w * .4)):int(x1 + w * .4)])
+    sm = Image.open(photo).convert("RGB"); sm.thumbnail((560, 560)); ref.thumbnail((560, 400)); fl = sm.rotate(180)
+    g = Image.new("RGB", (sm.width * 2 + 20, ref.height + sm.height + 20), (255, 255, 255))
+    g.paste(ref, ((g.width - ref.width) // 2, 0)); g.paste(sm, (0, ref.height + 20)); g.paste(fl, (sm.width + 20, ref.height + 20))
+    b = io.BytesIO(); g.save(b, "JPEG", quality=88); u = "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
+    def q(_):
+        try: return str(chat([{"type": "text", "text": FLIP_Q}, {"type": "image_url", "image_url": {"url": u}}], model="google/gemini-2.5-pro", mt=2000).get("same", "")).upper()[:1]
+        except BaseException: return ""
+    with cf.ThreadPoolExecutor(votes) as ex: rs = [r for r in ex.map(q, range(votes)) if r in ("L", "R")]
+    return sum(r == "R" for r in rs), len(rs)
+
+def smile_flipped(c, m):
+    """القرار من أكتر من علامة (مش الموديل لوحده): شكل زوايا البق، ومقارنة الموديل بوش المريض نفسه."""
+    geo = upside_down(m["lips"], m["open"])
+    if not c.has("before_face"): return geo
+    try: fl, n = _flip_votes(c, c.canon("after_smile"))
+    except Exception: return geo
+    if n == 0: return geo
+    if fl == n or fl == 0: return fl == n   # الموديل متفق تمامًا ومعاه المرجع: نمشي وراه
+    return geo if fl * 2 == n else (fl * 2 > n)
+
 def fix_smile_flip(c, m):
     """لو ابتسامة البعد مقلوبة: نعدل الصورة وأقنعتها ونعيد تحليل سنانها (مرة واحدة، قبل ما أي حاجة تتعمل منها)."""
-    if upside_down(m["lips"], m["open"]):   # الموديل ماعرفش إنها مقلوبة: نعدلها هنا قبل ما أي حاجة تتعمل منها
+    if smile_flipped(c, m):   # الموديل ماعرفش إنها مقلوبة: نعدلها هنا قبل ما أي حاجة تتعمل منها
         for f in (c.canon("after_smile"), c.d + "/canon/after/smile_front.jpg", m["lips"], m["open"]):
             if os.path.exists(f): cv2.imwrite(f, cv2.rotate(cv2.imread(f, cv2.IMREAD_UNCHANGED), cv2.ROTATE_180))
         sl = c.m["slots"].get("after_smile", {}); sl["rotate"] = (int(sl.get("rotate", 0)) + 180) % 360
