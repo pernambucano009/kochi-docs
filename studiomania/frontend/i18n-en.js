@@ -15591,4 +15591,7 @@ window.I18N_EN = {
   "وجه بالمبعد": "Face with retractor",
   "وجه مبتسم دون مبعد": "Smiling face, no retractor",
   "تُفحص عند اختيارها": "Checked when you pick it",
+  "تصنيف الصور": "Sorting the photos",
+  "تحليل الأسنان: تحديد كل سن وترقيمه": "Analyzing the teeth: outlining and numbering each tooth",
+  "تجهيز الصور في خاناتها": "Placing the photos in their slots",
 };

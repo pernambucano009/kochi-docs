@@ -494,6 +494,7 @@ def _slots_intake(case: Path):
             tag = SLOT_TAG.get(s_)
             for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):
                 (case / "ana" / f).unlink(missing_ok=True)
+    _set_job(case, stage="analysis")
     r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
     if r.returncode != 0:
         raise RuntimeError("تعذّر تحليل الأسنان في الصور. " + _tail(case, "analysis.log", 1))
@@ -599,7 +600,7 @@ def view(data_dir: Path, cid: str) -> dict | None:
         # الفلتر رفضها: الطبيب يشوف السبب، ويقرر هو (يوافق رغم ذلك أو تتعمل من جديد)
         review.append({"name": name, "why": info["why"], "state": state, "label": STATE_LABEL[state]["label"],
                        "note": _note((e or {}).get("note", "")) if state in ("failed", "rejected") else "",
-                       "url": f"/api/dental/cases/{cid}/file/elements/{name}?t={int(f.stat().st_mtime)}" if f.exists() else ""})
+                       "url": f"/api/dental/cases/{cid}/file/elements/{name}?t={int(f.stat().st_mtime)}&w=900" if f.exists() else ""})
     problems = [{"name": n, "label": INTERNAL[n]["label"], "note": _note(e.get("note", ""))} for n, e in els.items()
                 if n in INTERNAL and e.get("status") in (QA_FAIL, MISSING) and e.get("note")]
     ready = all(els.get(n, {}).get("status") == APPROVED for n in DOCTOR_REVIEW) and bool(els)
@@ -607,7 +608,7 @@ def view(data_dir: Path, cid: str) -> dict | None:
             for k, v in m.get("videos", {}).items() if (case / "out" / f"{k}.mp4").exists()}
     have = cj.get("slots", {})
     slots = {s["slot"]: s["slot"] in have for s in SHOTS}
-    slot_info = {s["slot"]: {"url": f"/api/dental/cases/{cid}/file/slot/{s['slot']}?t={int((case / 'canon' / CANON[s['slot']]).stat().st_mtime)}",
+    slot_info = {s["slot"]: {"url": f"/api/dental/cases/{cid}/file/slot/{s['slot']}?t={int((case / 'canon' / CANON[s['slot']]).stat().st_mtime)}&w=480",
                              "cropped": bool(have[s["slot"]].get("cropped"))}
                  for s in SHOTS if s["slot"] in have and (case / "canon" / CANON[s["slot"]]).exists()}
     used = {}
@@ -616,13 +617,16 @@ def view(data_dir: Path, cid: str) -> dict | None:
             used[v["file"]] = k
     names = {**{k: v["name"] for k, v in SLOT_NAMES.items()}, **{s["slot"]: s["name"] for s in SHOTS}}
     it = cj.get("intake", {})
-    photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
+    photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}?w=360", "slot": used.get(f.name, ""),
                "slot_name": names.get(used.get(f.name, ""), ""), **_photo_info(cj, have, f.name)}
               for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_") and f.suffix.lower() in IMG_EXT] if (case / "input").is_dir() else []
-    rejected = [{"slot": k, "slot_name": names.get(k, k), "file": x["file"], "url": f"/api/dental/cases/{cid}/file/input/{x['file']}",
+    rejected = [{"slot": k, "slot_name": names.get(k, k), "file": x["file"], "url": f"/api/dental/cases/{cid}/file/input/{x['file']}?w=360",
                  "why": REASON.get(x.get("why"), REASON["kind"])["text"], "code": x.get("why"), "view_label": VIEW_LABEL.get(x.get("view"), {}).get("label", "")}
                 for k, x in it.get("rejected", {}).items() if k in KIND_OF and k not in have]
-    return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
+    job = dict(m.get("job", {}))
+    if job.get("status") == "running" and job.get("stage") in ("intake", "slots") and have and it.get("views"):
+        job["stage"] = "analysis"   # التصنيف خلص والصور في خاناتها: اللي شغال دلوقتي تحليل الأسنان (القناع والترقيم)
+    return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": job,
             "slots": slots, "slot_info": slot_info, "need": _missing(case), "photos": photos, "rejected": rejected, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
             "ready": ready, "videos": vids, "templates": [{**t, "available": _tpl_ok(case, t)} for t in TEMPLATES],
             "assets": _assets(case, cid)}
@@ -798,6 +802,23 @@ def render(data_dir: Path, cid: str, tpl: str) -> None:
     if not view(data_dir, cid)["ready"]:
         raise RuntimeError("وافق على الصور المشتقة أولًا")
     _enqueue(case, "render:" + tpl, _render(tpl))
+
+
+def thumb(data_dir: Path, cid: str, rel: str, w: int) -> Path | None:
+    """نسخة صغيرة من الصورة للعرض (الصور الأصلية بتبقى كبيرة جدًا والصفحة بتتقل). بتتعمل مرة وتتخزن."""
+    p = file(data_dir, cid, rel)
+    if not p or p.suffix.lower() not in IMG_EXT or w <= 0:
+        return p
+    w = min(max(w, 120), 1200)
+    case = case_dir(data_dir, cid)
+    out = case / "_thumb" / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', rel)}_{int(p.stat().st_mtime)}_{w}.jpg"
+    if not out.exists():
+        from PIL import Image, ImageOps
+        out.parent.mkdir(exist_ok=True)
+        im = ImageOps.exif_transpose(Image.open(p)).convert("RGB")
+        im.thumbnail((w, w * 2))
+        im.save(out, "JPEG", quality=82)
+    return out
 
 
 def file(data_dir: Path, cid: str, rel: str) -> Path | None:

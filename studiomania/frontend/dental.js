@@ -66,9 +66,9 @@
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const call = (p, o) => (window.api ? window.api(p, o) : fetch(p, o).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || r.status); return d; }));
-  const STAGE = { video: "قراءة الفيديو واختيار أوضح لقطة", slots: "تجهيز الصور وتحليل الأسنان", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
+  const STAGE = { video: "قراءة الفيديو واختيار أوضح لقطة", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور", analysis: "تحليل الأسنان: تحديد كل سن وترقيمه", slots: "تجهيز الصور في خاناتها", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
   const stageName = (s) => s?.startsWith("render:") ? `${STAGE.render} (${s.slice(7)})` : (STAGE[s] || s || "");
-  let root = null, home = null, cur = null, timer = null, files = [], picked = {};
+  let root = null, home = null, cur = null, timer = null, files = [], picked = {}, last = "";
   // 🖼️ رسمة توضيحية لكل صورة مطلوبة (أفاتار أسود): الطبيب يعرف بالظبط يصوّر إيه
   const INK = "#1b1b1f";
   const teethRow = (y, h, n, fill, uneven) => { let o = ""; const w = 84 / n; for (let i = 0; i < n; i++) { const dy = uneven ? [2, -1, 3, 0, -2, 2, 1, -1][i % 8] : 0; o += `<rect x="${38 + i * w + 1}" y="${y + dy}" width="${w - 2}" height="${h - Math.abs(i - (n - 1) / 2) * (h / n / 1.6)}" rx="3" fill="${fill}"/>`; } return o; };
@@ -179,6 +179,10 @@
     let v = data;
     if (!v) { try { v = await call(`/api/dental/cases/${id}`); } catch (e) { return open(); } }
     if (cur !== id || !root) return;
+    // التحديث الدوري: لو مفيش حاجة اتغيرت ماتعيدش رسم الصفحة (الصور والفيديوهات مابتتحملش تاني)
+    const sig = JSON.stringify(v), j0 = v.job || {};
+    if (!data && sig === last && root.querySelector(".dn-card")) { if (j0.status === "running" || j0.status === "queued") timer = setTimeout(() => showCase(id), 5000); return; }
+    last = sig;
     const w = shell(v.title, true);
     const j = v.job || {}, running = j.status === "running" || j.status === "queued";
     const jobHtml = running ? `<div class="dn-job"><span class="dn-spin"></span><span>${j.status === "queued" ? "في الطابور" : "يعمل الآن"}: ${esc(stageName(j.stage))}… (قد يستغرق بضع دقائق، ويمكنك إغلاق النافذة)</span></div>`
@@ -212,7 +216,7 @@
     const GROUPS = { uploads: "ما رفعته (صور وفيديوهات)", derived: "صور مشتقة ومقصوصة", live: "فيديوهات حية للقوالب", videos: "الفيديوهات النهائية (والنسخ السابقة)" };
     const assets = v.assets?.length ? `<div class="dn-card"><h3>ملف المريض</h3><p>كل ما رفعته وكل ما صُنع منه محفوظ هنا، ويُستخدم في أي قالب جديد لاحقًا دون رفعه مرة أخرى.</p>
       ${Object.entries(GROUPS).map(([g, label]) => { const xs = v.assets.filter((a) => a.group === g); return xs.length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:14px">${esc(label)} (${xs.length})</summary>
-        <div class="dn-pics">${xs.map((a) => `<figure class="dn-pic">${a.video ? `<video src="${esc(a.url)}" muted playsinline preload="metadata" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"></video>` : `<img src="${esc(a.url)}" alt="" loading="lazy">`}<a href="${esc(a.url)}" download="${esc(a.name)}" style="font-size:12px;color:var(--dn-acc)">تنزيل</a></figure>`).join("")}</div></details>` : ""; }).join("")}
+        <div class="dn-pics">${xs.map((a) => `<figure class="dn-pic">${a.video ? `<video src="${esc(a.url)}" muted playsinline preload="none" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"></video>` : `<img src="${esc(a.url)}${a.url.includes("?") ? "&" : "?"}w=360" alt="" loading="lazy">`}<a href="${esc(a.url)}" download="${esc(a.name)}" style="font-size:12px;color:var(--dn-acc)">تنزيل</a></figure>`).join("")}</div></details>` : ""; }).join("")}
       <div class="dn-row"><a class="dn-btn ghost" href="/api/dental/cases/${esc(v.id)}/assets.zip" download style="text-decoration:none">تنزيل ملف المريض كاملًا</a></div></div>` : "";
     w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${cropHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}${assets}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;

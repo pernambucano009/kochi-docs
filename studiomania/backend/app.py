@@ -34353,12 +34353,13 @@ def dental_render(cid: str, body: DentalRenderIn):
 
 
 @app.get("/api/dental/cases/{cid}/file/{rel:path}")
-def dental_file(cid: str, rel: str):
+def dental_file(cid: str, rel: str, w: int = 0):
     dental_on()
-    p = dental.file(DATA_DIR, cid, rel)
+    p = dental.thumb(DATA_DIR, cid, rel, w) if w else dental.file(DATA_DIR, cid, rel)
     if not p:
         raise HTTPException(404, "غير موجود")
-    return FileResponse(p, media_type=mimetypes.guess_type(p.name)[0] or "application/octet-stream")
+    # الرابط فيه وقت التعديل (أو الملف مابيتغيرش)، فالمتصفح يحتفظ بيه ومايحمّلوش تاني مع كل تحديث للصفحة
+    return FileResponse(p, media_type=mimetypes.guess_type(p.name)[0] or "application/octet-stream", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.get("/api/dental/cases/{cid}/assets.zip")
