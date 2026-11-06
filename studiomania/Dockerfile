@@ -1,4 +1,4 @@
-# StudioMania على أي سيرفر بيشغّل Docker (Railway أو Render أو Fly.io أو VPS)
+# StudioMania على أي سيرفر بيشغّل Docker (السيرفر الحالي على Oracle: deploy/oracle)
 FROM python:3.12-slim
 
 WORKDIR /app

@@ -39,7 +39,7 @@ def canvas(w: int, h: int, fps: int = FPS, crf: int = 20):
     finally:
         _canvas.size = old
 MUSIC_FADE_SECONDS = 1.5
-# عدد الـ threads ثابت: FFmpeg لوحده بيفتح thread لكل core في السيرفر، وعلى Railway
+# عدد الـ threads ثابت: FFmpeg لوحده بيفتح thread لكل core في السيرفر، وعلى السيرفر
 # ده ممكن يبقى عشرات، وكل واحد بيحجز فريمات في الذاكرة لحد ما الذاكرة تخلص
 THREADS = max(1, int(os.environ.get("RENDER_THREADS", "2")))
 

@@ -109,7 +109,7 @@ FONTS_DIR = ROOT / "fonts"
 for d in (RAW_DIR, CLIPS_DIR, COACHES_DIR, GENERATED_DIR, AUDIO_DIR, EXPORTS_DIR, BRAND_DIR, TMP_DIR, CAROUSELS_DIR, BRAND_REFS_DIR, LIBRARY_DIR, SERIES_DIR, ADS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
-# الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر (Railway) مفيهوش إعداداته خالص.
+# الكابشن بيدوّر على الخطوط عن طريق fontconfig، والسيرفر مفيهوش إعداداته خالص.
 # فبنعمل ملف إعدادات صغير يشاور على فولدر الخطوط بتاعنا، وكل أوامر FFmpeg بتستخدمه.
 FONTCONFIG_FILE = TMP_DIR / "fonts.conf"
 # خط الإيموجي الملوّن بتاع السيستم (عنصر الإيموجي في التايبوجرافي): فولدره بس، عشان باقي الخطوط تفضل بتاعتنا
@@ -601,7 +601,7 @@ def gzipped_asset(request: Request) -> Response | None:
 
 
 def export_token_ok(request: Request) -> bool:
-    """مفتاح قراءة فقط لنسخ «الصورة + المؤثرات» في المعمل (LAB_EXPORT_TOKEN على Railway)، لكي تتسحب من برا بدون كلمة مرور."""
+    """مفتاح قراءة فقط لنسخ «الصورة + المؤثرات» في المعمل (LAB_EXPORT_TOKEN في ملف المفاتيح على السيرفر)، لكي تتسحب من برا بدون كلمة مرور."""
     want = (os.environ.get("LAB_EXPORT_TOKEN") or "").strip()
     got = request.headers.get("x-export-token") or ""
     path = request.url.path
@@ -687,8 +687,8 @@ def tenant_busy():
 
 @app.get("/health")
 def health():
-    # رقم النسخة (من Railway) وموديل قراءة الشخص: عشان نعرف التحديث نزل ولا لأ من غير ما ندخل السيرفر
-    return {"ok": True, "build": (os.environ.get("RAILWAY_GIT_COMMIT_SHA") or "")[:7],
+    # رقم النسخة وموديل قراءة الشخص: عشان نعرف التحديث نزل ولا لأ من غير ما ندخل السيرفر
+    return {"ok": True, "build": (os.environ.get("BUILD_SHA") or "")[:7],
             "person": person.model_status(Path(os.environ.get("PERSON_MODELS") or (DATA_DIR / "models"))),
             "sfx": {k: len(v) for k, v in sfx.library(TYPO_SFX).items()}}
 
@@ -3061,7 +3061,7 @@ def space_message(need: int | None, free: int) -> str:
     return (
         f"مساحة الخادم غير كفاية للتصدير: {what}. "
         "احذف فيديوهات جاهزة قديمة (الخطوة 7) أو فيديوهات خام خلصت منها، أو اضغط «احذف الملفات المؤقتة» في ⚙️ الإعدادات، "
-        "أو كبّر مساحة الـ Volume من إعدادات Railway."
+        "أو كبّر مساحة القرص على الخادم."
     )
 
 
@@ -27650,7 +27650,7 @@ def run_comics_harvest(queries: list[str], kinds: list[str], pages: int, cap: in
                 comics_state_set(last_error=f"Imgflip: {exc}")
         jobs = [(q, src, kind, pg) for q in queries for src, v in srcs.items() if src != "imgflip" for kind in kinds if kind in v["kinds"] for pg in range(pages)]
         if not jobs and not atlas.mock_mode():
-            comics_state_set(last_error="لا يوجد مصدر يعمل: ضع KLIPY_API_KEY أو GIPHY_API_KEY في Railway")
+            comics_state_set(last_error="لا يوجد مصدر يعمل: ضع KLIPY_API_KEY أو GIPHY_API_KEY في ملف المفاتيح على الخادم")
         if atlas.mock_mode():
             jobs = [(q, "mock", kind, 0) for q in queries[:12] for kind in kinds[:2]]
         for n, (q, src, kind, pg) in enumerate(jobs):
@@ -34319,7 +34319,7 @@ def dental_redo(cid: str):
 
 
 @app.post("/api/dental/cases/{cid}/assign")
-async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), verify: str = Form(""), file: UploadFile | None = File(None)):
+async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), file: UploadFile | None = File(None)):
     """الطبيب يحدد صورة لخانة ناقصة: من صوره اللي رفعها، أو صورة جديدة."""
     dental_on()
     up = None
@@ -34329,7 +34329,7 @@ async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), 
             raise HTTPException(400, f"الملف {file.filename} أكبر من الحد المسموح (٢٥ ميجا للصورة، ٣٠٠ ميجا للفيديو)")
         up = (file.filename or "", data)
     try:
-        return dental.assign(DATA_DIR, cid, slot, photo, up, verify=verify == "1")
+        return dental.assign(DATA_DIR, cid, slot, photo, up)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except RuntimeError as e:

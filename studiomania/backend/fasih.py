@@ -5,7 +5,7 @@
 - الصوت لازم يتبعت مع dialect = dialectId بتاعه بالظبط، وإلا اللهجة بتطلع غلط.
 - الواجهة القديمة /v1/tts للأصوات القديمة «-1» بس، وصوتها أوحش، فمبقيناش نستخدمها.
 - كتالوج الأصوات GET /v1/voices من غير مفتاح، بنحفظه ٢٤ ساعة.
-المفتاح في متغير البيئة FASIH_API_KEY (أو FASIHTTS_API_KEY) على Railway، وبيتبعت في هيدر x-api-key من السيرفر بس."""
+المفتاح في متغير البيئة FASIH_API_KEY (أو FASIHTTS_API_KEY) في ملف المفاتيح على السيرفر، وبيتبعت في هيدر x-api-key من السيرفر بس."""
 from __future__ import annotations
 
 import os
@@ -146,7 +146,7 @@ class _JobFailed(FasihError):
 def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
     key = api_key()
     if not key:
-        raise FasihError("مفتاح فصيح مش متسجل: ضيف FASIH_API_KEY في متغيرات Railway")
+        raise FasihError("مفتاح فصيح مش متسجل: ضيف FASIH_API_KEY في ملف المفاتيح على السيرفر")
     text = (text or "").strip()
     if not text:
         raise FasihError("مفيش كلام يتقال")

@@ -210,7 +210,7 @@ def failed(*keys: str) -> None:
 
 
 def client_ip(request: Request) -> str:
-    # آخر عنوان هو اللي البروكسي بتاع Railway ضافه؛ الأول الزائر يقدر يكتبه بنفسه ويتهرب من حد المحاولات
+    # آخر عنوان هو اللي البروكسي اللي قدام البرنامج ضافه؛ الأول الزائر يقدر يكتبه بنفسه ويتهرب من حد المحاولات
     fwd = [x.strip() for x in (request.headers.get("x-forwarded-for") or "").split(",") if x.strip()]
     return fwd[-1] if fwd else (request.client.host if request.client else "")
 

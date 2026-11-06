@@ -78,7 +78,7 @@ function renderBackup(b) {
   const box = $("bkBox");
   if (!box) return;
   const last = b.last?.at ? `${new Date(b.last.at * 1000).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${(b.last.size / 1048576).toFixed(1)} ميجا · ${b.last.files} ملف` : "لم تُنشأ بعد";
-  box.innerHTML = !b.google ? `<p class="hint">⚠️ يلزم ضبط GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في Railway أولًا (وهما نفسهما المستخدمان للدخول بجوجل).</p>`
+  box.innerHTML = !b.google ? `<p class="hint">⚠️ يلزم ضبط GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في ملف المفاتيح على الخادم أولًا (وهما نفسهما المستخدمان للدخول بجوجل).</p>`
     : !b.connected ? `<div class="row wrap"><a class="btn primary" href="/auth/drive">🔗 اربط جوجل درايف</a></div><p class="hint">ستسجّل الدخول ببريد الشركة. لا يرى البرنامج إلا الملفات التي أنشأها هو.</p>${b.error ? `<p class="hint bad">⚠️ ${escapeHtml(b.error)}</p>` : ""}
        ${b.redirect ? `<p class="hint">إذا ظهر لك من جوجل «redirect_uri_mismatch»: أضف هذا العنوان في Google Cloud ← Credentials ← OAuth Client ← Authorized redirect URIs:</p>
        <div class="row"><input readonly dir="ltr" value="${escapeHtml(b.redirect)}" style="flex:1;min-width:220px" onclick="this.select()"><button type="button" class="btn sm" data-copy="${escapeHtml(b.redirect)}">انسخ</button></div>` : ""}`

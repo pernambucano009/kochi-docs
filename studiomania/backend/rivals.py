@@ -48,7 +48,7 @@ def missing_msg() -> str:
     """رسالة لصاحب البرنامج عندما المفتاح غير واصل للبرنامج: تقول لقينا أي أسماء (بدون القيم)."""
     names = key_names()
     if names:
-        return f"لقيت متغير باسم {', '.join(names)} فقط قيمته فارغة. ضع المفتاح فيه في Railway"
+        return f"لقيت متغير باسم {', '.join(names)} فقط قيمته فارغة. ضع المفتاح فيه في ملف المفاتيح على الخادم"
     return "مفتاح ScrapeCreators غير واصل للبرنامج. ضعه من الإعدادات ← المفاتيح والرصيد ← مفتاح ScrapeCreators"
 
 
@@ -66,7 +66,7 @@ def _get(path: str, params: dict, timeout: float = 40) -> dict:
         try:
             r = httpx.get(API + path, params=params, headers={"x-api-key": key()}, timeout=timeout)
             if r.status_code in (401, 403):
-                raise RivalsError("مفتاح ScrapeCreators لا يعمل، راجعه في Railway")
+                raise RivalsError("مفتاح ScrapeCreators لا يعمل، راجعه في ملف المفاتيح على الخادم")
             if r.status_code == 402:
                 import providers
                 providers.note_error("scrape", "402 payment required: credits")

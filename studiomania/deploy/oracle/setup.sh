@@ -49,7 +49,7 @@ fi
 echo "== 4) ملف المفاتيح"
 if [ ! -f "$ROOT/app.env" ]; then
   cat > "$ROOT/app.env" <<EOF
-# حط المفاتيح الجديدة هنا (سطر لكل مفتاح: NAME=value). متحطش المفاتيح القديمة اللي كانت على Railway.
+# حط المفاتيح الجديدة هنا (سطر لكل مفتاح: NAME=value). متحطش مفاتيح قديمة اتلغت.
 PUBLIC_URL=https://$DOMAIN
 GATEWAY_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc A-Za-z0-9 | head -c 40)
 EOF
