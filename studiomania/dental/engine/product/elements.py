@@ -52,8 +52,34 @@ KEEP = " Keep his/her face, lips, smile shape and EVERY tooth exactly as in the 
 
 # ---------------- الوصفات ----------------
 # كل وصفة: (العناصر/الصور المطلوبة، دالة التصنيع، سؤال الفلتر بالموديل، مقارنة السنان: [(صورة العنصر، صورة الأصل)])
+def upside_down(lips_p, open_p):
+    """صورة ابتسامة مقلوبة ١٨٠؟ في الابتسامة الطبيعية زوايا البق فوق (قريبة من الشفة العليا) والشفة التحتانية نازلة لتحت.
+    زوايا البق تحت + فتحة البق في النص العلوي = مقلوبة (مقاس على صور حقيقية: معدولة ≤ 0.19، مقلوبة ≥ 0.64)."""
+    ml = cv2.imread(lips_p, 0); mo = cv2.imread(open_p, 0)
+    ys, xs = np.where(ml > 128)
+    if len(xs) < 100: return False
+    top, bot = ys.min(), ys.max(); l, r = np.argmin(xs), np.argmax(xs); h = max(1, bot - top)
+    corner = ((ys[l] + ys[r]) / 2 - top) / h; oy = np.where(mo > 128)[0]; opn = (oy.mean() - top) / h if len(oy) else .5
+    return corner > .5 and opn < .5
+
+def fix_smile_flip(c, m):
+    """لو ابتسامة البعد مقلوبة: نعدل الصورة وأقنعتها ونعيد تحليل سنانها (مرة واحدة، قبل ما أي حاجة تتعمل منها)."""
+    if upside_down(m["lips"], m["open"]):   # الموديل ماعرفش إنها مقلوبة: نعدلها هنا قبل ما أي حاجة تتعمل منها
+        for f in (c.canon("after_smile"), c.d + "/canon/after/smile_front.jpg", m["lips"], m["open"]):
+            if os.path.exists(f): cv2.imwrite(f, cv2.rotate(cv2.imread(f, cv2.IMREAD_UNCHANGED), cv2.ROTATE_180))
+        sl = c.m["slots"].get("after_smile", {}); sl["rotate"] = (int(sl.get("rotate", 0)) + 180) % 360
+        v = c.m.get("intake", {}).get("views", {}).get(sl.get("file"))
+        if v is not None: v["rotate"] = sl["rotate"]; v["by"] = "lips"
+        for f in ("ai_smile.png", "lab_smile.json"):   # تحليل السنان اتعمل على الصورة المقلوبة
+            if os.path.exists(c.d + "/ana/" + f): os.remove(c.d + "/ana/" + f)
+        c.save(); c.log("ابتسامة البعد كانت مقلوبة ١٨٠: اتعدلت")
+        import subprocess; subprocess.run([sys.executable, S + "product/analysis.py", c.d], check=True, env=c.env())
+        return True
+    return False
+
 def r_smile_masks(c):
-    m = mouth_masks(c.canon("after_smile"), c.d + "/elements/ms", "smile"); return [m["open"], m["lips"]]
+    m = mouth_masks(c.canon("after_smile"), c.d + "/elements/ms", "smile"); fix_smile_flip(c, m)
+    return [m["open"], m["lips"]]
 
 def r_after_portrait(c):
     out = c.el_path("after_portrait_v3.png")
@@ -62,6 +88,7 @@ def r_after_portrait(c):
     if str(c.m["slots"].get("after_smile", {}).get("view", "")).endswith("lateral"): raise ValueError("SMILE_NOT_FRONTAL lateral")
     from mouth_swap import swap
     ms = c.d + "/elements/ms/"
+    if os.path.exists(ms + "smile_lips.png"): fix_smile_flip(c, {"lips": ms + "smile_lips.png", "open": ms + "smile_open.png"})   # حالات قديمة: الأقنعة اتعملت قبل الفحص ده
     swap(c.canon("before_face"), out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png")   # البق كله بالشفايف من صورة الابتسامة الحقيقية
     return [out]
 
@@ -72,7 +99,8 @@ def r_pose(c):   # الوضعية حسب النوع: راجل = قبضة تحت 
     if os.path.exists(out): os.remove(out)   # صورة قديمة فاشلة ماتفضلش معروضة
     if str(c.m["slots"].get("after_smile", {}).get("view", "")).endswith("lateral"): raise ValueError("SMILE_NOT_FRONTAL lateral")
     from mouth_swap import swap
-    ms = c.d + "/elements/ms/"; swap(base, out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png"); return [out]
+    ms = c.d + "/elements/ms/"
+    if os.path.exists(ms + "smile_lips.png"): fix_smile_flip(c, {"lips": ms + "smile_lips.png", "open": ms + "smile_open.png"})   # حالات قديمة: الأقنعة اتعملت قبل الفحص ده; swap(base, out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png"); return [out]
 
 def r_profile(c):
     out = c.el_path("profile_right.png")
