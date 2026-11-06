@@ -228,7 +228,21 @@ def _missing(case: Path, derivable: bool = False) -> list[str]:
 
 def _continue(case: Path):
     """لو كل الصور المطلوبة موجودة نكمّل للعناصر، وإلا نستنى الطبيب يحدد الصورة الناقصة بنفسه."""
-    have = _engine_json(case).get("slots", {})
+    cj = _engine_json(case)
+    have, it = cj.get("slots", {}), cj.get("intake", {})
+    used = {x.get("file") for x in have.values()}
+    for s in SHOTS:   # خانة فاضية وفيه صورة متبقية نوعها بالظبط ده وعدّت الفحص: تتحط فيها (قبل ما نقص من صورة تانية)
+        if s["slot"] in have:
+            continue
+        cands = [f for f, v in it.get("views", {}).items() if f not in used and v.get("view") == FIT_VIEWS[s["kind"]][0]
+                 and not _precheck(cj, s["slot"], f) and (case / "input" / f).is_file()]
+        if cands:
+            f = max(cands, key=lambda f: it["views"][f].get("quality") or 0)
+            _set_job(case, stage="assign")
+            _assign_job(s["slot"], f, then=False)(case)
+            cj = _engine_json(case)
+            have, it = cj.get("slots", {}), cj.get("intake", {})
+            used = {x.get("file") for x in have.values()}
     for slot, (srcslot, mode) in DERIVE.items():   # الخانة ناقصة وصورتها البديلة موجودة: نقصّها منها (الأسنان من الوجه بالمبعد، الابتسامة من الوجه)
         src = have.get(srcslot, {}).get("file")
         if slot not in have and src:
@@ -242,16 +256,52 @@ def _continue(case: Path):
 
 
 SLOT_TAG = {"before_retracted": "before", "after_retracted": "after", "after_smile": "smile"}
+# النوع اللي المحرك اتعرف عليه في كل صورة، بالفصحى للطبيب
+VIEW_LABEL = {"face_smile": {"label": "وجه مبتسم دون مبعد"}, "face_retracted": {"label": "وجه بالمبعد"},
+              "retracted_front": {"label": "أسنان بالمبعد من الأمام"}, "retracted_lateral": {"label": "أسنان بالمبعد من الجانب"},
+              "smile_front": {"label": "ابتسامة قريبة من الأمام"}, "smile_lateral": {"label": "ابتسامة قريبة من الجانب"},
+              "prep": {"label": "أسنان محضّرة"}, "veneers": {"label": "عدسات خارج الفم"}, "cast": {"label": "تركيبات على نموذج"},
+              "doctor": {"label": "صورة الطبيب"}, "other": {"label": "ليست صورة أسنان أو وجه"}}
+PHASE_LABEL = {"before": {"label": "قبل العلاج"}, "after": {"label": "بعد العلاج"}, "during": {"label": "أثناء العلاج"}}
+# الأنواع اللي تنفع لكل نوع خانة (الوجه ينفع للخانة القريبة لأننا بنقص منه)
+FIT_VIEWS = {"ret": ("retracted_front", "face_retracted"), "smile": ("smile_front", "face_smile"), "face": ("face_smile",), "faceret": ("face_retracted",)}
+# ليه الصورة اترفضت (أو ليه مااتستخدمتش): البرنامج مابيقبلش صورة هتبوّظ النتيجة
+REASON = {"kind": {"text": "نوع الصورة لا يناسب هذه الخانة (مثلًا صورة من الجانب والخانة تحتاج صورة من الأمام)."},
+          "phase": {"text": "هذه الصورة من مرحلة أخرى حسب المقارنة بين صور الحالة (قبل العلاج أو بعده)."},
+          "blur": {"text": "الصورة غير واضحة بما يكفي، وستُضعف النتيجة."},
+          "angle": {"text": "الوجه ليس من الأمام، والقالب يحتاج صورة أمامية."},
+          "verify": {"text": "أعدنا فحص الصورة: لا تناسب هذه الخانة (النوع أو الزاوية أو الوضوح)."},
+          "taken": {"text": "الخانة المناسبة لها أخذت صورة أوضح منها."},
+          "nofit": {"text": "لا توجد خانة لهذا النوع من الصور في القوالب الحالية، لكنها محفوظة في ملف المريض."},
+          "other": {"text": "لم نتعرّف عليها على أنها صورة أسنان أو وجه."}}
+KIND_OF = {s["slot"]: s["kind"] for s in SHOTS}
+
+
+def _precheck(cj: dict, slot: str, photo: str) -> str:
+    """فحص سريع من نتيجة التصنيف (من غير موديل): النوع + المرحلة + الوضوح. "" = تنفع (أو مش معروفة لسه)."""
+    it = cj.get("intake", {})
+    v = it.get("views", {}).get(photo)
+    if not v:
+        return ""
+    if v.get("view") not in FIT_VIEWS[KIND_OF[slot]]:
+        return "kind"
+    ph = it.get("phase_of", {}).get(photo)
+    if ph in ("before", "after") and ph != slot.split("_")[0]:
+        return "phase"
+    if (v.get("quality") or 10) < 4:
+        return "blur"
+    return ""
 CANON = {k: v[0] for k, v in _EC.SLOTS.items()}
 _ASSIGN = """
 import os, sys, json, concurrent.futures as cf
 from case import Case
 from intake import view_of, upright
 c = Case(sys.argv[1]); pairs = []
-for a in sys.argv[2:]:   # slot=file أو slot=file:mode (mode = teeth/lips: قص من صورة الوجه)
-    s_, rest = a.split("=", 1); f_, _, md = rest.partition(":"); pairs.append((s_, f_, md))
+for a in sys.argv[2:]:   # slot=file[:mode][:verify] (mode = teeth/lips: قص من صورة الوجه، verify = الطبيب طلب فحص الصورة من جديد)
+    s_, rest = a.split("=", 1); p_ = rest.split(":") + ["", ""]; pairs.append((s_, p_[0], p_[1], p_[2] == "verify"))
 views = c.m.setdefault("intake", {}).setdefault("views", {})
-need = sorted({f for _, f, _ in pairs if f not in views})
+phase_of = c.m["intake"].get("phase_of", {}); rejected = c.m["intake"].setdefault("rejected", {})
+need = sorted({f for _, f, _, _ in pairs if f not in views})
 with cf.ThreadPoolExecutor(max(1, len(need))) as ex:   # اتجاه كل صورة ونوعها (موديل) — كل الصور في نفس الوقت
     for f, v in zip(need, ex.map(lambda f: view_of(c.d + "/input/" + f), need)): views[f] = v
 _DET = {}
@@ -264,12 +314,49 @@ def crop_mouth(im, k):
     a = np.ascontiguousarray(np.array(im)); r = _DET["d"].detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=a))
     if not r.face_landmarks: raise SystemExit("لم نجد الوجه في الصورة لقص الأسنان منها")
     lm = r.face_landmarks[0]; W, H = im.size
+    if k is None: return lm
     xs = [lm[i].x * W for i in (61, 291, 78, 308)]; ys = [lm[i].y * H for i in (0, 17, 13, 14)]
     cx, cy = sum(xs) / 4, sum(ys) / 4; w = (max(xs) - min(xs)) * k; h = w * 2 / 3
     x0, y0 = max(0, cx - w / 2), max(0, cy - h / 2); return im.crop((int(x0), int(y0), int(min(W, x0 + w)), int(min(H, y0 + h))))
-for slot, f, md in pairs:
+# الصورة المناسبة لكل نوع خانة (والصورة اللي ينفع نقص منها)
+OK = {"ret": ("retracted_front", "face_retracted"), "smile": ("smile_front", "face_smile"), "face": ("face_smile",), "faceret": ("face_retracted",)}
+KIND = {"ret": "an intraoral photo WITH a lip retractor taken from the FRONT (the midline between the upper central incisors near the middle, both sides of the arch equally visible), or a full face wearing a retractor looking straight at the camera",
+        "smile": "a close-up smile WITHOUT a retractor taken from the FRONT (symmetric, the midline near the middle), or a full face smiling looking straight at the camera",
+        "face": "a full face (or head and shoulders) smiling WITHOUT a retractor, looking straight at the camera (not turned to the side)",
+        "faceret": "a full face wearing a lip retractor, looking straight at the camera (not turned to the side)"}
+def kind_of(slot): return "faceret" if slot.endswith("face_retracted") else "face" if slot.endswith("_face") else "ret" if slot.endswith("_retracted") else "smile"
+def yaw_ok(im):
+    # الوش لازم يكون من الأمام: المناخير في نص المسافة بين جنبين الوش (لو مالقيناش وش: صورة قريبة، مانحكمش)
+    try: lm = crop_mouth(im, None)
+    except SystemExit: return True
+    a, b, n = lm[234].x, lm[454].x, lm[1].x
+    return abs((n - a) / max(1e-3, b - a) - 0.5) < 0.17
+def verify(im, kind):
+    from intake import _b64, _json
+    from explainer import chat
+    q = "Does this photo show " + KIND[kind] + ', with the teeth sharp (not blurry)? Answer ONLY JSON: {"fits": true|false, "why": "short"}'
+    r = _json(chat([{"type": "text", "text": q}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(im, 1000)}}], model="google/gemini-2.5-pro", mt=2000))
+    return bool(r.get("fits"))
+def check(slot, f, v, im, ver):
+    k = kind_of(slot); face = str(v.get("view", "")).startswith("face")
+    if ver:
+        if not verify(im, k): return "verify"
+    else:
+        if v.get("view") not in OK[k]: return "kind"
+        ph = phase_of.get(f); sp = slot.split("_")[0]
+        if ph in ("before", "after") and ph != sp: return "phase"
+        if (v.get("quality") or 10) < 4: return "blur"
+    if (face or k in ("face", "faceret")) and not yaw_ok(im): return "angle"
+    return ""
+done = []
+for slot, f, md, ver in pairs:
     src = c.d + "/input/" + f; v = views[f]; im = upright(src, v)
     face = str(v.get("view", "")).startswith("face")
+    why = "" if md else check(slot, f, v, im, ver)   # md = قص من صورة اتقبلت قبل كده في خانتها
+    if why:
+        rejected[slot] = {"file": f, "why": why, "view": v.get("view")}; print("REJECT", slot, f, why); continue
+    rejected.pop(slot, None); done.append((slot, f))
+    if ver and f in phase_of and phase_of[f] in ("before", "after"): phase_of[f] = slot.split("_")[0]   # الطبيب أكّد المرحلة
     crop = md or ("teeth" if slot in ("before_retracted", "after_retracted") and face else "lips" if slot in ("before_smile", "after_smile") and face else "")
     if crop: im = crop_mouth(im, 1.15 if crop == "teeth" else 1.45)
     out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
@@ -279,7 +366,7 @@ for slot, f, md in pairs:
     c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True, "cropped": crop}
     if slot == "before_face" and v.get("gender") in ("male", "female"): c.m["patient"]["gender"] = v["gender"]
     it = c.m["intake"]; it["unused"] = [u for u in it.get("unused", []) if u != f]
-c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f, _ in pairs))
+c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f in done) + (" | اترفضت: " + ", ".join(f"{s}<-{x['file']} ({x['why']})" for s, x in rejected.items()) if rejected else ""))
 """
 
 
@@ -400,7 +487,10 @@ def _slots_intake(case: Path):
         r = _run(case, ["-c", _ASSIGN, str(case), *pairs], "assign.log", 900)
         if r.returncode != 0:
             raise RuntimeError("تعذّر تجهيز الصور. " + _tail(case, "assign.log", 1))
-        for s_ in m.get("upload_slots", {}):
+        rej = _engine_json(case).get("intake", {}).get("rejected", {})
+        for s_, f_ in m.get("upload_slots", {}).items():
+            if rej.get(s_, {}).get("file") == f_:
+                continue
             tag = SLOT_TAG.get(s_)
             for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):
                 (case / "ana" / f).unlink(missing_ok=True)
@@ -411,12 +501,14 @@ def _slots_intake(case: Path):
     return _continue(case)
 
 
-def _assign_job(slot: str, fname: str, then: bool = True, mode: str = ""):
-    """الطبيب حدد صورة لخانة بنفسه: نعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
+def _assign_job(slot: str, fname: str, then: bool = True, mode: str = "", verify: bool = False):
+    """الطبيب حدد صورة لخانة بنفسه: نفحصها (ولو مش هتنفع بنرفضها)، ونعدّل اتجاهها ونحطها مكانها، ونعيد تحليل الأسنان للخانة دي، وبعدين نكمّل."""
     def go(case: Path):
-        r = _run(case, ["-c", _ASSIGN, str(case), f"{slot}={fname}" + (f":{mode}" if mode else "")], "assign.log", 600)
+        r = _run(case, ["-c", _ASSIGN, str(case), f"{slot}={fname}:{mode}" + (":verify" if verify else "")], "assign.log", 600)
         if r.returncode != 0:
             raise RuntimeError("تعذّر استخدام الصورة. " + _tail(case, "assign.log", 1))
+        if _engine_json(case).get("intake", {}).get("rejected", {}).get(slot, {}).get("file") == fname:   # اترفضت: الخانة زي ما هي
+            return _continue(case) if then else None
         tag = SLOT_TAG.get(slot)
         for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):   # تحليل الصورة القديمة مايتستخدمش
             (case / "ana" / f).unlink(missing_ok=True)
@@ -523,13 +615,38 @@ def view(data_dir: Path, cid: str) -> dict | None:
         if v.get("file") and (v["file"] not in used or not v.get("cropped")):
             used[v["file"]] = k
     names = {**{k: v["name"] for k, v in SLOT_NAMES.items()}, **{s["slot"]: s["name"] for s in SHOTS}}
+    it = cj.get("intake", {})
     photos = [{"file": f.name, "url": f"/api/dental/cases/{cid}/file/input/{f.name}", "slot": used.get(f.name, ""),
-               "slot_name": names.get(used.get(f.name, ""), "")}
+               "slot_name": names.get(used.get(f.name, ""), ""), **_photo_info(cj, have, f.name)}
               for f in sorted((case / "input").glob("*")) if f.is_file() and not f.name.startswith("_") and f.suffix.lower() in IMG_EXT] if (case / "input").is_dir() else []
+    rejected = [{"slot": k, "slot_name": names.get(k, k), "file": x["file"], "url": f"/api/dental/cases/{cid}/file/input/{x['file']}",
+                 "why": REASON.get(x.get("why"), REASON["kind"])["text"], "code": x.get("why"), "view_label": VIEW_LABEL.get(x.get("view"), {}).get("label", "")}
+                for k, x in it.get("rejected", {}).items() if k in KIND_OF and k not in have]
     return {"id": cid, "title": m.get("title", ""), "created": m.get("created"), "job": m.get("job", {}),
-            "slots": slots, "slot_info": slot_info, "need": _missing(case), "photos": photos, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
+            "slots": slots, "slot_info": slot_info, "need": _missing(case), "photos": photos, "rejected": rejected, "problems": problems, "gender": cj.get("patient", {}).get("gender"), "review": review,
             "ready": ready, "videos": vids, "templates": [{**t, "available": _tpl_ok(case, t)} for t in TEMPLATES],
             "assets": _assets(case, cid)}
+
+
+def _photo_info(cj: dict, have: dict, f: str) -> dict:
+    """النوع اللي اتعرفنا عليه، والمرحلة، والخانات اللي تنفع لها (وسبب الرفض لكل خانة)، وليه مااتستخدمتش."""
+    it = cj.get("intake", {})
+    v = it.get("views", {}).get(f, {})
+    ph = it.get("phase_of", {}).get(f)
+    fit = {s["slot"]: _precheck(cj, s["slot"], f) for s in SHOTS}
+    unused, is_used = "", any(x.get("file") == f for x in have.values())
+    if not is_used:
+        if f in it.get("dropped", {}):
+            unused = it["dropped"][f].get("why", "kind")
+        elif v.get("view") == "other":
+            unused = "other"
+        elif v and not any(c == "" for c in fit.values()):
+            unused = "nofit" if v.get("view") not in sum(FIT_VIEWS.values(), ()) else min(fit.values(), key=lambda c: c != "phase")
+        elif v and not [k for k, c in fit.items() if c == "" and k not in have]:
+            unused = "taken"
+    return {"suggest": [k for k, c in fit.items() if c == "" and k not in have] if unused == "" and v and not is_used else [],"view_label": VIEW_LABEL.get(v.get("view"), {}).get("label", ""), "phase_label": PHASE_LABEL.get(ph, {}).get("label", ""),
+            "fit": {k: (REASON[c]["text"] if c else "") for k, c in fit.items()},
+            "unused_why": REASON[unused]["text"] if unused else ""}
 
 
 def _assets(case: Path, cid: str) -> list[dict]:
@@ -625,8 +742,9 @@ def _elements_redo(case: Path) -> None:
     _elements(case)
 
 
-def assign(data_dir: Path, cid: str, slot: str, photo: str = "", upload: tuple[str, bytes] | None = None) -> dict:
-    """الطبيب يحدد صورة لخانة: من صوره اللي رفعها (photo) أو صورة جديدة (upload)."""
+def assign(data_dir: Path, cid: str, slot: str, photo: str = "", upload: tuple[str, bytes] | None = None, verify: bool = False) -> dict:
+    """الطبيب يحدد صورة لخانة: من صوره اللي رفعها (photo) أو صورة جديدة (upload).
+    الصورة اللي مش هتنفع (نوع غلط، من الجنب، مش واضحة، مرحلة تانية) بتترفض. verify = الطبيب شايف إن التصنيف غلط: نفحصها من جديد للخانة دي."""
     case = case_dir(data_dir, cid)
     if not case:
         raise ValueError("غير موجود")
@@ -659,7 +777,10 @@ def assign(data_dir: Path, cid: str, slot: str, photo: str = "", upload: tuple[s
             return view(data_dir, cid)
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", photo or "") or not (case / "input" / photo).is_file():
         raise ValueError("الصورة غير موجودة")
-    _enqueue(case, "assign", _assign_job(slot, photo))
+    why = "" if verify else _precheck(_engine_json(case), slot, photo)
+    if why:
+        raise ValueError(REASON[why]["text"])
+    _enqueue(case, "assign", _assign_job(slot, photo, verify=verify))
     return view(data_dir, cid)
 
 

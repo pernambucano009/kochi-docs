@@ -42,9 +42,10 @@
 .dn-need{margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(217,68,58,.07);display:grid;gap:10px}
 .dn-need b{font-size:14px}.dn-need p{font-size:13px}
 .dn-pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px}
-.dn-pic{margin:0;display:grid;gap:4px;font-size:12px;color:var(--dn-mute);text-align:center}
+.dn-pic{margin:0;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dn-mute);text-align:center}
 .dn-pic img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--dn-bg)}
-.dn-pic.used b{color:var(--dn-ok);font-weight:600}.dn-pic button{border:0;border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;background:var(--dn-acc);color:#fff}
+.dn-pic.used b{color:var(--dn-ok);font-weight:600}.dn-pic .vw{color:inherit;font-weight:600}.dn-pic .no{color:var(--dn-bad);line-height:1.5}
+.dn-pic button{margin-top:auto}.dn-pic button.ghost{background:transparent;color:var(--dn-acc);border:1px solid var(--dn-acc)}.dn-slot .chg{justify-self:start;border:0;background:none;padding:0;font:inherit;font-size:12px;color:var(--dn-acc);cursor:pointer;text-decoration:underline}.dn-pic button{border:0;border-radius:999px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;background:var(--dn-acc);color:#fff}
 .dn-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px}
 .dn-slot{position:relative;display:grid;gap:6px;align-content:start;padding:12px;border-radius:16px;background:var(--dn-bg);border:2px dashed var(--dn-line);cursor:pointer;transition:border-color .15s}
 .dn-slot:hover,.dn-slot.on,.dn-slot:focus-within{border-color:var(--dn-acc)}.dn-slot.done{border-style:solid;border-color:var(--dn-ok)}
@@ -68,7 +69,7 @@
   const call = (p, o) => (window.api ? window.api(p, o) : fetch(p, o).then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || r.status); return d; }));
   const STAGE = { video: "قراءة الفيديو واختيار أوضح لقطة", slots: "تجهيز الصور وتحليل الأسنان", assign: "تجهيز الصورة التي حددتها وتحليلها", intake: "تصنيف الصور وتحليل الأسنان", elements: "تجهيز الصور المشتقة", render: "إنشاء الفيديو" };
   const stageName = (s) => s?.startsWith("render:") ? `${STAGE.render} (${s.slice(7)})` : (STAGE[s] || s || "");
-  let root = null, home = null, cur = null, timer = null, files = [], picked = {};
+  let root = null, home = null, cur = null, timer = null, files = [], picked = {}, pickSlot = "";
   // 🖼️ رسمة توضيحية لكل صورة مطلوبة (أفاتار أسود): الطبيب يعرف بالظبط يصوّر إيه
   const INK = "#1b1b1f";
   const teethRow = (y, h, n, fill, uneven) => { let o = ""; const w = 84 / n; for (let i = 0; i < n; i++) { const dy = uneven ? [2, -1, 3, 0, -2, 2, 1, -1][i % 8] : 0; o += `<rect x="${38 + i * w + 1}" y="${y + dy}" width="${w - 2}" height="${h - Math.abs(i - (n - 1) / 2) * (h / n / 1.6)}" rx="3" fill="${fill}"/>`; } return o; };
@@ -185,17 +186,30 @@
       : j.status === "failed" && !(v.need || []).length ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
     const slots = home?.shots || [];
     const missing = !running && v.photos?.length ? slots.filter((s) => (v.need || []).includes(s.slot)) : [];
-    const spare = [...(v.photos || [])].sort((a, b) => !!a.slot - !!b.slot);   // غير المستخدمة الأول، والمستخدمة كمان (لو اتصنفت غلط في خانة تانية)
+    // اختيار صورة لخانة: الصورة اللي تنفع بس هي اللي ليها «استخدم هذه»، واللي مش هتنفع بيظهر سبب رفضها (ولو التصنيف غلط: إعادة فحص)
+    const picker = (s) => { const cur_ = v.photos.filter((p) => !(p.slot === s.slot && !(v.slot_info?.[s.slot]?.cropped)));
+      const ok = cur_.filter((p) => !p.fit?.[s.slot]), bad = cur_.filter((p) => p.fit?.[s.slot]);
+      const fig = (p, good) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.view_label ? `<span class="vw">${esc(p.view_label)}${p.phase_label ? ` · ${esc(p.phase_label)}` : ""}</span>` : "<span>تُفحص عند اختيارها</span>"}
+        ${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : ""}
+        ${good ? `<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button>` : `<span class="no">${esc(p.fit[s.slot])}</span><button class="ghost" data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}" data-verify="1">التصنيف خطأ؟ أعد فحصها</button>`}</figure>`;
+      return `${ok.length ? `<div class="dn-pics">${ok.map((p) => fig(p, true)).join("")}</div>` : "<p>لا توجد بين صورك صورة تناسب هذه الخانة.</p>"}
+        ${bad.length ? `<details><summary style="cursor:pointer;font-size:13px">صور لا تناسب هذه الخانة (${bad.length}) ولماذا</summary><div class="dn-pics">${bad.map((p) => fig(p, false)).join("")}</div></details>` : ""}
+        <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة أو فيديو لهذه الخانة<input type="file" accept="image/*,video/*" hidden data-upslot="${esc(s.slot)}"></label></div>`; };
     // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
-    const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>
-      ${spare.length ? `<div class="dn-pics">${spare.map((p) => `<figure class="dn-pic"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<span>مستخدمة في: ${esc(p.slot_name)}</span>` : "<span>غير مستخدمة</span>"}<button data-assign="${esc(s.slot)}" data-photo="${esc(p.file)}">استخدم هذه</button></figure>`).join("")}</div>` : ""}
-      <div class="dn-row" style="margin:0"><label class="dn-btn ghost" style="cursor:pointer">ارفع صورة أو فيديو لهذه الخانة<input type="file" accept="image/*,video/*" hidden data-upslot="${esc(s.slot)}"></label></div></div>`).join("");
-    const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.slot ? `<b>${esc(p.slot_name)}</b>` : "غير مستخدمة"}</figure>`).join("")}</div></details>` : "";
+    const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b><p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>${picker(s)}</div>`).join("");
+    const ps = !running && pickSlot && !missing.some((s) => s.slot === pickSlot) ? slots.find((s) => s.slot === pickSlot) : null;
+    const changeHtml = ps ? `<div class="dn-need" style="background:var(--dn-bg)"><b>اختر صورة «${esc(ps.name)}»</b><p>${esc(ps.hint)}</p>${picker(ps)}<div class="dn-row" style="margin:0"><button class="dn-btn ghost" data-pick="">إلغاء</button></div></div>` : "";
+    // صور رفضها البرنامج لأنها هتبوّظ النتيجة
+    const rejHtml = v.rejected?.length && !running ? `<div class="dn-need"><b>لم نقبل هذه الصور</b><p>الصورة التي لا تناسب خانتها تُضعف الفيديو، فلا نستخدمها. اختر صورة أخرى أو ارفع صورة مناسبة.</p>
+      <div class="dn-pics">${v.rejected.map((r) => `<figure class="dn-pic"><img src="${esc(r.url)}" alt="" loading="lazy"><b>${esc(r.slot_name)}</b>${r.view_label ? `<span class="vw">${esc(r.view_label)}</span>` : ""}<span class="no">${esc(r.why)}</span><button class="ghost" data-pick="${esc(r.slot)}">اختر صورة أخرى</button></figure>`).join("")}</div></div>` : "";
+    const nameOf = (k) => slots.find((x) => x.slot === k)?.name || k;
+    const picsHtml = v.photos?.length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:14px">صورك (${v.photos.length}) وأين استُخدمت كل صورة</summary><div class="dn-pics">${v.photos.map((p) => `<figure class="dn-pic${p.slot ? " used" : ""}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.view_label ? `<span class="vw">${esc(p.view_label)}${p.phase_label ? ` · ${esc(p.phase_label)}` : ""}</span>` : ""}
+      ${p.slot ? `<b>${esc(p.slot_name)}</b>` : p.suggest?.length && !running ? `<span>تناسب «${esc(nameOf(p.suggest[0]))}»</span><button data-assign="${esc(p.suggest[0])}" data-photo="${esc(p.file)}">استخدمها فيها</button>` : `<span>غير مستخدمة</span>${p.unused_why ? `<span class="no">${esc(p.unused_why)}</span>` : ""}`}</figure>`).join("")}</div></details>` : "";
     const shotsHtml = Object.keys(v.slots || {}).length && Object.values(v.slots).some(Boolean)
       ? `<div class="dn-slots">${slots.map((s) => { const [k, b] = artOf(s), si = (v.slot_info || {})[s.slot], ok = v.slots[s.slot], need = (v.need || []).includes(s.slot);
           const st = ok ? (si?.cropped ? "✓ مقصوصة تلقائيًا من صورة الوجه" : "✓ تمت تعبئتها") : need ? "✗ مطلوبة ولم تُعبّأ بعد" : s.req ? "ستُقص تلقائيًا" : "اختيارية — لم تُرفع";
           return `<div class="dn-slot static ${ok ? "done" : need ? "miss" : "optional"}"><div class="art${si ? " filled" : ""}">${si ? `<img src="${esc(si.url)}" alt="" loading="lazy">` : ""}${ART[k](b)}<span class="tag${b ? "" : " after"}">${b ? "قبل" : "بعد"}</span></div>
-            <b>${esc(s.name)}</b><span class="act">${st}</span></div>`; }).join("")}</div>` : "";
+            <b>${esc(s.name)}</b><span class="act">${st}</span>${!running && v.photos?.length && !need ? `<button class="chg" data-pick="${esc(s.slot)}">${ok ? "غيّر الصورة" : "اختر صورة"}</button>` : ""}</div>`; }).join("")}</div>` : "";
     const canCrop = !running && !(v.need || []).length && slots.some((s) => s.req && !v.slots[s.slot]);
     const cropHtml = canCrop ? `<div class="dn-row"><button class="dn-btn" data-dn="redo">أكمل: قصّ الصور الناقصة تلقائيًا</button></div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
@@ -214,7 +228,7 @@
       ${Object.entries(GROUPS).map(([g, label]) => { const xs = v.assets.filter((a) => a.group === g); return xs.length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:14px">${esc(label)} (${xs.length})</summary>
         <div class="dn-pics">${xs.map((a) => `<figure class="dn-pic">${a.video ? `<video src="${esc(a.url)}" muted playsinline preload="metadata" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"></video>` : `<img src="${esc(a.url)}" alt="" loading="lazy">`}<a href="${esc(a.url)}" download="${esc(a.name)}" style="font-size:12px;color:var(--dn-acc)">تنزيل</a></figure>`).join("")}</div></details>` : ""; }).join("")}
       <div class="dn-row"><a class="dn-btn ghost" href="/api/dental/cases/${esc(v.id)}/assets.zip" download style="text-decoration:none">تنزيل ملف المريض كاملًا</a></div></div>` : "";
-    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${cropHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}${assets}
+    w.innerHTML = `<div class="dn-card"><h3>${esc(v.title)}</h3>${jobHtml}${shotsHtml}${changeHtml}${cropHtml}${rejHtml}${needHtml}${probs}${picsHtml}</div>${rev}${tpls}${assets}
       <div class="dn-row"><button class="dn-btn ghost" data-dn="delete" ${running ? "disabled" : ""}>احذف الحالة</button></div>`;
     if (running) timer = setTimeout(() => showCase(id), 5000);
     w.querySelectorAll("[data-upslot]").forEach((inp) => inp.onchange = async () => {
@@ -227,13 +241,14 @@
   }
 
   async function onClick(e) {
-    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render],[data-assign]"); if (!t) return;
+    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render],[data-assign],[data-pick]"); if (!t) return;
     const a = t.dataset.dn;
     try {
       if (a === "close") return close();
       if (a === "home") { cur = null; clearTimeout(timer); return open(); }
       if (a === "create") return create();
       if (t.dataset.case) return showCase(t.dataset.case);
+      if (t.dataset.pick !== undefined) { pickSlot = t.dataset.pick; return showCase(cur); }
       if (a === "redo") { t.disabled = true; return showCase(cur, await call(`/api/dental/cases/${cur}/redo`, { method: "POST" })); }
       if (t.dataset.ok || t.dataset.no) {
         let reason = "";
@@ -242,7 +257,7 @@
         return showCase(cur, await call(`/api/dental/cases/${cur}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: t.dataset.ok || t.dataset.no, ok: !!t.dataset.ok, reason }) }));
       }
       if (t.dataset.assign) {
-        t.disabled = true; const fd = new FormData(); fd.append("slot", t.dataset.assign); fd.append("photo", t.dataset.photo);
+        t.disabled = true; const fd = new FormData(); fd.append("slot", t.dataset.assign); fd.append("photo", t.dataset.photo); if (t.dataset.verify) fd.append("verify", "1"); pickSlot = "";
         return showCase(cur, await call(`/api/dental/cases/${cur}/assign`, { method: "POST", body: fd }));
       }
       if (t.dataset.render) { t.disabled = true; return showCase(cur, await call(`/api/dental/cases/${cur}/render`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.dataset.render }) })); }

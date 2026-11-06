@@ -57,7 +57,7 @@ def _grid(im, t=420):
 P2 = """These are all the photos of ONE dental patient's case (already rotated upright). Each image is labeled with its number and view.
 Decide for each image whether it shows the teeth BEFORE treatment (old, stained, worn, damaged, gaps, original teeth) or AFTER treatment (new uniform white veneers/crowns).
 Compare the photos with each other: the same teeth appear in several photos; before and after look clearly different.
-Then assign the best image to each slot (each image at most once; skip a slot if no image fits). For intraoral/smile slots prefer LANDSCAPE (wider than tall) framings over vertical ones; the image size is given in each label:
+Then assign the best image to each slot (each image at most once; skip a slot if no image fits). Frontal slots need FRONTAL photos and lateral slots need angled photos. Among equally good photos prefer LANDSCAPE framings for intraoral/smile slots (size is in each label), but a vertical photo is fine if it is the only frontal one:
 {slots}
 Answer ONLY JSON: {{"phase": {{"1": "before"|"after"|"during", ...}}, "assign": {{"slot_key": image_number, ...}}, "not_upright": [image numbers still not upright], "why": "short"}}"""
 
@@ -112,6 +112,40 @@ def upright(path, r):
     if r.get("mirrored"): im = ImageOps.mirror(im)
     return im
 
+# النوع اللي ينفع لكل خانة (قواعد ثابتة: اختيار الموديل اقتراح بس، والقاعدة هي اللي بتقرر)
+FIT = {"before_retracted": "retracted_front", "after_retracted": "retracted_front", "after_retracted_close": "retracted_front",
+       "after_retracted_side1": "retracted_lateral", "after_retracted_side2": "retracted_lateral",
+       "before_smile": "smile_front", "after_smile": "smile_front", "after_smile_side_r": "smile_lateral", "after_smile_side_l": "smile_lateral",
+       "before_face": "face_smile", "after_face": "face_smile", "before_face_retracted": "face_retracted", "after_face_retracted": "face_retracted",
+       "prep": "prep", "veneers": "veneers", "cast": "cast"}
+MAIN = ["before_retracted", "after_retracted", "after_smile", "before_face", "before_smile", "after_face", "before_face_retracted", "after_face_retracted"]
+MIN_Q = 4   # أقل من كده الصورة مش واضحة كفاية
+
+def fits(slot, f, views, phase_of):
+    """(تنفع؟، السبب لو لأ): النوع + المرحلة (قبل/بعد) + الوضوح."""
+    v = views.get(f, {}); want = FIT.get(slot)
+    if want and v.get("view") != want: return False, "kind"
+    ph = phase_of.get(f); sp = slot.split("_")[0]
+    if sp in ("before", "after") and ph in ("before", "after") and ph != sp: return False, "phase"
+    if (v.get("quality") or 10) < MIN_Q: return False, "blur"
+    return True, ""
+
+def reconcile(assign, pics, views, phase_of, sizes):
+    """يشيل أي اختيار مايطابقش القواعد، ويملا الخانات الأساسية الفاضية من الصور المتبقية المطابقة (الأوضح، وبعدها العرضية)."""
+    dropped = {}
+    for k, f in list(assign.items()):
+        ok, why = fits(k, f, views, phase_of)
+        if not ok: dropped[f] = {"slot": k, "why": why}; del assign[k]
+    used = set(assign.values())
+    for k in MAIN + [k for k in FIT if k not in MAIN]:
+        if k in assign: continue
+        if k not in MAIN and k not in ("prep", "veneers", "cast"): continue   # الخانات الجانبية: نسيب اختيار الموديل (يمين/شمال)
+        cands = [f for f in pics if f not in used and fits(k, f, views, phase_of)[0]]
+        if cands:
+            f = max(cands, key=lambda f: (views[f].get("quality") or 0, sizes[f][0] > sizes[f][1]))
+            assign[k] = f; used.add(f); dropped.pop(f, None)
+    return assign, dropped
+
 def intake(src_dir, case_dir):
     import concurrent.futures as cf
     from explainer import chat
@@ -132,6 +166,8 @@ def intake(src_dir, case_dir):
     for i in r2.get("not_upright", []):   # لسه مقلوبة: نسأل تاني عنها لوحدها بعد اللف
         f = pics[int(i) - 1]; tmp = f"{c.d}/input/_up_{f}.jpg"; ims[f].save(tmp); r = view_of(tmp); ims[f] = upright(tmp, r); os.remove(tmp)
     assign = {k: pics[int(v) - 1] for k, v in r2.get("assign", {}).items() if k in SLOTS and v and 0 < int(v) <= len(pics)}
+    phase_of = {f: r2.get("phase", {}).get(str(i)) for i, f in enumerate(pics, 1)}
+    assign, dropped = reconcile(assign, pics, views, phase_of, {f: ims[f].size for f in pics})
     docs = [f for f in files if views[f].get("view") == "doctor"]
     if docs: assign["doctor"] = docs[0]; ims[docs[0]] = upright(f"{c.d}/input/{docs[0]}", views[docs[0]])
     for k, f in assign.items():
@@ -142,7 +178,7 @@ def intake(src_dir, case_dir):
     g = [views[f].get("gender") for f in files if views[f].get("view", "").startswith("face") and views[f].get("gender") in ("male", "female")]
     c.m["patient"]["gender"] = max(set(g), key=g.count) if g else c.m["patient"].get("gender", "male")
     unused = [f for f in files if f not in assign.values()]
-    c.m["intake"] = {"views": views, "phase": r2.get("phase"), "why": r2.get("why"), "unused": unused}; c.save()
+    c.m["intake"] = {"views": views, "phase": r2.get("phase"), "phase_of": phase_of, "why": r2.get("why"), "unused": unused, "dropped": dropped}; c.save()
     c.log("الاستقبال خلص: " + ", ".join(f"{k}←{f}" for k, f in assign.items()) + (f" | مااتستخدمتش: {', '.join(unused)}" if unused else "")); return c
 
 if __name__ == "__main__":

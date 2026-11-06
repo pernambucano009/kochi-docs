@@ -34319,7 +34319,7 @@ def dental_redo(cid: str):
 
 
 @app.post("/api/dental/cases/{cid}/assign")
-async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), file: UploadFile | None = File(None)):
+async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), verify: str = Form(""), file: UploadFile | None = File(None)):
     """الطبيب يحدد صورة لخانة ناقصة: من صوره اللي رفعها، أو صورة جديدة."""
     dental_on()
     up = None
@@ -34329,7 +34329,7 @@ async def dental_assign(cid: str, slot: str = Form(...), photo: str = Form(""), 
             raise HTTPException(400, f"الملف {file.filename} أكبر من الحد المسموح (٢٥ ميجا للصورة، ٣٠٠ ميجا للفيديو)")
         up = (file.filename or "", data)
     try:
-        return dental.assign(DATA_DIR, cid, slot, photo, up)
+        return dental.assign(DATA_DIR, cid, slot, photo, up, verify=verify == "1")
     except ValueError as e:
         raise HTTPException(400, str(e))
     except RuntimeError as e:
