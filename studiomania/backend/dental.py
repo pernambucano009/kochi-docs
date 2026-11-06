@@ -174,7 +174,10 @@ def _run(case: Path, args: list[str], log_name: str, timeout: int, cwd: str = "p
 
 def _tail(case: Path, log_name: str, n: int = 6) -> str:
     try:
-        lines = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore").splitlines()
+        txt = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore")
+        if "ATLAS_LOW_BALANCE" in txt:   # مش مشكلة في الصور: خدمة التحليل نفسها واقفة
+            return "خدمة تحليل الصور متوقفة لأن رصيد حساب Atlas أقل من دولار واحد. اشحن الرصيد ثم اضغط «أعد المحاولة»."
+        lines = txt.splitlines()
         noise = ("mediapipe", "Exception ignored", "object is not callable", "Traceback", 'File "/usr', "TensorFlow Lite", "InitGoogle")
         lines = [l for l in lines if l.strip() and not l.startswith(("W0", "I0", "INFO:", "WARNING:")) and not any(x in l for x in noise)]
         return "\n".join(lines[-n:])[-600:]

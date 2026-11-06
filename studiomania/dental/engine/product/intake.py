@@ -195,8 +195,10 @@ def intake(src_dir, case_dir):
         if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".heic")): shutil.copy(os.path.join(src_dir, f), f"{c.d}/input/{f}"); files.append(f)
     def one(f):
         try: return f, view_of(f"{c.d}/input/{f}")
-        except BaseException as e: return f, {"view": "other", "error": str(e)[:200]}
-    with cf.ThreadPoolExecutor(6) as ex: views = dict(ex.map(one, files))
+        except BaseException as e:
+            if "ATLAS_LOW_BALANCE" in str(e): raise   # الخدمة نفسها واقفة: مش «صورة مش معروفة»
+            return f, {"view": "other", "error": str(e)[:200]}
+    with cf.ThreadPoolExecutor(3) as ex: views = dict(ex.map(one, files))
     pics = [f for f in files if views[f].get("view") not in ("other", "doctor")]
     ims = {f: upright(f"{c.d}/input/{f}", views[f]) for f in pics}
     # الدور التاني: مقارنة كل الصور ببعض (قبل/بعد + أحسن صورة لكل خانة)

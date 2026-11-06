@@ -15571,4 +15571,5 @@ window.I18N_EN = {
   "لم نقبل الصورة التي رفعتها لهذه الخانة: {0}": "We didn't accept the photo you uploaded for this slot: {0}",
   "تنتظر مراجعتك لصورة وجه المريض في قسم «راجع الصور المشتقة» بالأسفل: وافق عليها ثم اضغط «أعد المحاولة».": "Waiting for you to review the patient's face photo in «Review the derived photos» below: approve it, then press «Try again».",
   "صورة «الابتسامة بعد العلاج» ليست من الأمام، فتركيبها على الوجه يشوّهه. ارفع ابتسامة أمامية بعد العلاج، أو صورة وجه المريض بعد العلاج.": "The «Smile after treatment» photo isn't a front view, so placing it on the face distorts it. Upload a front-view smile after treatment, or a photo of the patient's face after treatment.",
+  "خدمة تحليل الصور متوقفة لأن رصيد حساب Atlas أقل من دولار واحد. اشحن الرصيد ثم اضغط «أعد المحاولة».": "The photo analysis service is stopped because the Atlas account balance is under one dollar. Top it up, then press «Try again».",
 };

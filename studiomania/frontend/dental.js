@@ -186,9 +186,10 @@
     const w = shell(v.title, true);
     const j = v.job || {}, running = j.status === "running" || j.status === "queued";
     const jobHtml = running ? `<div class="dn-job"><span class="dn-spin"></span><span>${j.status === "queued" ? "في الطابور" : "يعمل الآن"}: ${esc(stageName(j.stage))}… (قد يستغرق بضع دقائق، ويمكنك إغلاق النافذة)</span></div>`
-      : j.status === "failed" && !(v.need || []).length ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
+      : j.status === "failed" ? `<div class="dn-job bad"><span>تعذّرت خطوة «${esc(stageName(j.stage))}»: ${esc(j.error)}</span><button class="dn-btn ghost" data-dn="redo">أعد المحاولة</button></div>` : "";
     const slots = home?.shots || [];
-    const missing = !running && v.photos?.length ? slots.filter((s) => (v.need || []).includes(s.slot)) : [];
+    // خانة ناقصة واحدة بس في المرة (مش كل الصور متكررة تحت كل خانة)، ولو خطوة فشلت: الخطأ بس من غير اختيار
+    const missing = !running && j.status !== "failed" && v.photos?.length ? slots.filter((s) => (v.need || []).includes(s.slot)).slice(0, 1) : [];
     const spare = [...(v.photos || [])].sort((a, b) => !!a.slot - !!b.slot);   // غير المستخدمة الأول، والمستخدمة كمان (لو اتصنفت غلط في خانة تانية)
     // صورة ناقصة: الطبيب يختارها بنفسه من صوره (أو يرفع صورة جديدة) بدل ما الحالة تقف
     const needHtml = missing.map((s) => `<div class="dn-need"><b>لم نتعرّف على صورة «${esc(s.name)}»</b>${v.rejected?.[s.slot] ? `<p>لم نقبل الصورة التي رفعتها لهذه الخانة: ${esc(v.rejected[s.slot])}</p>` : ""}<p>${esc(s.hint)} اختر الصورة المناسبة من صورك، أو ارفع صورة جديدة.</p>

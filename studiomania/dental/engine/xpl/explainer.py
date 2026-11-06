@@ -6,13 +6,21 @@ sys.path.insert(0, ((__import__("os").environ.get("DENTAL_ROOT") or __import__("
 
 LLM = "https://api.atlascloud.ai/v1/chat/completions"
 def chat(parts, model="google/gemini-3.8-flash", mt=6000):
+    import time, random
+    err = None
     for m in (model, "google/gemini-2.5-pro"):
-        try:
-            r = httpx.post(LLM, headers={"Authorization": f"Bearer {K}"}, timeout=300,
-                           json={"model": m, "messages": [{"role": "user", "content": parts}], "temperature": .3, "max_tokens": mt, "response_format": {"type": "json_object"}})
-            t = r.json()["choices"][0]["message"]["content"].strip()
-            return json.loads(t[t.find("{"): t.rfind("}") + 1])
-        except Exception as e: err = e
+        for att in range(5):   # 429 (ضغط/طلبات كتير في نفس الوقت): نستنى ونحاول تاني بدل ما نفشل على طول
+            try:
+                r = httpx.post(LLM, headers={"Authorization": f"Bearer {K}"}, timeout=300,
+                               json={"model": m, "messages": [{"role": "user", "content": parts}], "temperature": .3, "max_tokens": mt, "response_format": {"type": "json_object"}})
+                if r.status_code == 429:
+                    msg = r.text[:300]; err = RuntimeError(msg)
+                    if "balance" in msg.lower() and att >= 3: raise SystemExit("ATLAS_LOW_BALANCE " + msg)   # الرصيد خلص: مفيش فايدة نكمّل
+                    time.sleep(2 * (att + 1) + random.random() * 2); continue
+                t = r.json()["choices"][0]["message"]["content"].strip()
+                return json.loads(t[t.find("{"): t.rfind("}") + 1])
+            except SystemExit: raise
+            except Exception as e: err = e; break
     raise SystemExit(f"chat failed: {err}")
 
 STYLE = ("Photorealistic 3D medical animation still, vertical 9:16, clean premium dental education style like a high-end clinic animation, "
