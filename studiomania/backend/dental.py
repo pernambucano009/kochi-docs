@@ -208,6 +208,31 @@ def _enqueue(case: Path, stage: str, fn) -> None:
     _Q.put((fn, case, stage))
 
 
+def resume(data_dir: Path) -> int:
+    """الخادم اتعاد تشغيله (تحديث مثلًا) والخطوة كانت شغالة أو مستنية: تكمل لوحدها من غير ما الطبيب يعمل حاجة."""
+    n = 0
+    base = root(data_dir)
+    for case in sorted(base.iterdir()) if base.is_dir() else []:
+        try:
+            job = _meta(case).get("job", {})
+            if job.get("status") not in ("running", "queued"):
+                continue
+            stage, cj = job.get("stage", ""), _engine_json(case)
+            if stage.startswith("render:") and stage[7:] in TPL_IDS:
+                fn = _render(stage[7:])
+            elif not cj.get("slots"):
+                fn = _slots_intake
+            elif _missing(case, derivable=True):
+                fn = _continue
+            else:
+                fn = _elements_redo
+            _enqueue(case, stage or "slots", fn)
+            n += 1
+        except Exception:
+            continue
+    return n
+
+
 def busy(case: Path) -> bool:
     return _meta(case).get("job", {}).get("status") in ("queued", "running")
 

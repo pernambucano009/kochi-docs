@@ -676,6 +676,16 @@ def _count_threads():
     _BASE_THREADS.update(t.ident for t in threading.enumerate())
 
 
+@app.on_event("startup")
+def _dental_resume():
+    # خطوات حالات الأسنان اللي اتقطعت بإعادة تشغيل الخادم بتكمل لوحدها
+    try:
+        if dental.enabled():
+            dental.resume(DATA_DIR)
+    except Exception:
+        pass
+
+
 @app.get("/api/_tenant/busy")
 def tenant_busy():
     """للبوابة: فيه عمل يعمل (توليد، رندر، تحليل…) ولا هذه النسخة تُغلق إذا لا يوجد حد يستخدمها؟

@@ -166,12 +166,36 @@
     b.disabled = !ok;
     root.querySelector(".dn-msg").textContent = !enough ? `ناقص: ${lack.map((s) => s.name).join("، ")}` : (ok ? "" : "أكّد موافقة المريض");
   }
+  // صور الموبايل بتبقى كبيرة جدًا (٥–١٠ ميجا): بنصغّرها لـ٣٠٠٠ بكسل قبل الرفع (أكبر من اللي القوالب بتستخدمه)، والفيديو زي ما هو
+  async function shrink(f) {
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type) || f.size < 1.5e6) return f;
+    try {
+      const bm = await createImageBitmap(f, { imageOrientation: "from-image" }), k = Math.min(1, 3000 / Math.max(bm.width, bm.height));
+      if (k >= 1 && f.size < 4e6) return f;
+      const c = document.createElement("canvas"); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
+      c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+      const bl = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.92));
+      return bl && bl.size < f.size ? new File([bl], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : f;
+    } catch (e) { return f; }
+  }
+  // رفع بنسبة مئوية ظاهرة (fetch مابيقولش اترفع قد إيه)
+  const upload = (url, fd, onp) => new Promise((ok, bad) => {
+    const x = new XMLHttpRequest(); x.open("POST", url); x.timeout = 30 * 60 * 1000;
+    x.upload.onprogress = (e) => e.lengthComputable && onp(Math.round(e.loaded * 100 / e.total));
+    x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status === 401) { location.href = "/login"; return bad(new Error("يجب تسجيل الدخول")); }
+      x.status < 300 ? ok(d) : bad(new Error(d.detail || `خطأ ${x.status}`)); };
+    x.onerror = x.ontimeout = () => bad(new Error("انقطع الاتصال أثناء الرفع، حاول مرة أخرى."));
+    x.send(fd);
+  });
   async function create() {
-    const b = root.querySelector("[data-dn=create]"); b.disabled = true; root.querySelector(".dn-msg").textContent = "جارٍ الرفع…";
-    const fd = new FormData(); Object.entries(picked).forEach(([k, f]) => fd.append(k, f, f.name)); files.forEach((f) => fd.append("files", f, f.name));
+    const b = root.querySelector("[data-dn=create]"), msg = root.querySelector(".dn-msg"); b.disabled = true; msg.textContent = "جارٍ تجهيز الصور…";
+    const fd = new FormData();
+    for (const [k, f] of Object.entries(picked)) { const g = await shrink(f); fd.append(k, g, g.name); }
+    for (const f of files) { const g = await shrink(f); fd.append("files", g, g.name); }
     fd.append("title", root.querySelector("[data-title]").value || "");
-    try { const v = await call("/api/dental/cases", { method: "POST", body: fd }); picked = {}; files = []; showCase(v.id, v); }
-    catch (e) { b.disabled = false; root.querySelector(".dn-msg").textContent = e.message; }
+    try { const v = await upload("/api/dental/cases", fd, (p) => { msg.textContent = p < 100 ? `جارٍ الرفع… ${p}%` : "تم الرفع، جارٍ الحفظ…"; }); picked = {}; files = []; showCase(v.id, v); }
+    catch (e) { b.disabled = false; msg.textContent = e.message; }
   }
 
   async function showCase(id, data) {
