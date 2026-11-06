@@ -104,6 +104,47 @@ def view_of(path, votes=3):
     else:
         with cf.ThreadPoolExecutor(votes) as ex: rs = list(ex.map(lambda _: _vote(im, q), range(votes)))
         res["rotate"], res["by"] = Counter(r["rotate"] for r in rs).most_common(1)[0][0], "vote"
+    return fix_axis(path, res)
+
+CLOSE = ("retracted_front", "retracted_lateral", "smile_front", "smile_lateral", "prep")
+
+def teeth_axis(im):
+    """اتجاه صف السنان في الصورة: (الزاوية عن الأفقي بالدرجات، قد إيه الصف ممدود). السنان = بكسلات فاتحة ومحايدة اللون.
+    في أي صورة قريبة للسنان الصف لازم يبقى أفقي؛ لو طلع رأسي يبقى الصورة لسه ملفوفة ٩٠ درجة."""
+    import cv2, numpy as np
+    a = np.array(im.convert("RGB")); h, w = a.shape[:2]; f = 400 / max(h, w); a = cv2.resize(a, (max(1, int(w * f)), max(1, int(h * f))))
+    lab = cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.float32); L, A, B_ = lab[..., 0], lab[..., 1], lab[..., 2]
+    ys, xs = np.where((L > np.percentile(L, 70)) & (np.abs(A - 128) < 8) & (np.abs(B_ - 128) < 25))
+    if len(xs) < 300: return None, 0.0
+    ev, evec = np.linalg.eigh(np.cov(np.vstack([xs, ys]))); v = evec[:, 1]
+    ang = abs(np.degrees(np.arctan2(v[1], v[0]))) % 180
+    return min(ang, 180 - ang), float(ev[1] / max(ev[0], 1e-6))
+
+def _tie(im, r1, r2, votes=3):
+    """الموديل يختار بين اتجاهين (الاتنين صف السنان فيهم أفقي، واحد منهم مقلوب)."""
+    import concurrent.futures as cf
+    from collections import Counter
+    from explainer import chat
+    a, b = im.rotate(-r1, expand=True), im.rotate(-r2, expand=True)
+    for x in (a, b): x.thumbnail((600, 600))
+    g = Image.new("RGB", (a.width + b.width + 20, max(a.height, b.height)), (255, 255, 255)); g.paste(a, (0, 0)); g.paste(b, (a.width + 20, 0))
+    def q(_):
+        for _try in range(2):   # تصويت واحد فشل (ضغط على الموديل) مايوقّعش التعديل كله
+            try: return str(_json(chat([{"type": "text", "text": TIE}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(g, 1200)}}], model="google/gemini-2.5-pro", mt=2000)).get("upright", "")).upper()
+            except BaseException: pass
+        return ""
+    with cf.ThreadPoolExecutor(votes) as ex: rs = [x for x in ex.map(q, range(votes)) if x[:1] in ("L", "R")]
+    if not rs: raise RuntimeError("تعذّر تحديد اتجاه الصورة")
+    return r1 if Counter("L" if x.startswith("L") else "R" for x in rs).most_common(1)[0][0] == "L" else r2
+
+def fix_axis(path, res):
+    """تأكيد بالقياس (مش بالموديل): صورة قريبة للسنان لازم صف السنان فيها يبقى أفقي بعد التعديل، وإلا نصلّح اللفّة."""
+    if res.get("view") not in CLOSE: return res
+    im = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
+    ang, el = teeth_axis(im.rotate(-int(res.get("rotate", 0)), expand=True))
+    res["axis"] = [None if ang is None else round(ang), round(el, 1)]
+    if ang is not None and ang > 50 and el >= 3:
+        r0 = int(res.get("rotate", 0)); res["rotate"] = _tie(im, (r0 + 90) % 360, (r0 + 270) % 360); res["by"] = "axis"
     return res
 
 def upright(path, r):

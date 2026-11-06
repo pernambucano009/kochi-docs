@@ -466,9 +466,7 @@ def _slots_intake(case: Path):
         for s_, f_ in m.get("upload_slots", {}).items():
             if rej.get(s_, {}).get("file") == f_:
                 continue
-            tag = SLOT_TAG.get(s_)
-            for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):
-                (case / "ana" / f).unlink(missing_ok=True)
+            _drop_slot_cache(case, s_)
     _set_job(case, stage="analysis")
     r = _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
     if r.returncode != 0:
@@ -485,9 +483,7 @@ def _assign_job(slot: str, fname: str, then: bool = True, mode: str = ""):
             raise RuntimeError("تعذّر استخدام الصورة. " + _tail(case, "assign.log", 1))
         if _engine_json(case).get("intake", {}).get("rejected", {}).get(slot, {}).get("file") == fname:   # اترفضت: الخانة زي ما هي
             return _continue(case) if then else None
-        tag = SLOT_TAG.get(slot)
-        for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):   # تحليل الصورة القديمة مايتستخدمش
-            (case / "ana" / f).unlink(missing_ok=True)
+        _drop_slot_cache(case, slot)   # تحليل الصورة القديمة وأقنعتها مايتستخدموش
         cj = _engine_json(case)
         if cj.get("elements"):   # العناصر اتعملت من الصور القديمة: تتعمل من جديد
             for e in cj["elements"].values():
@@ -693,7 +689,54 @@ def redo(data_dir: Path, cid: str) -> None:
         _enqueue(case, "elements", _elements_redo)
 
 
+_REAXIS = """
+import sys, os
+from case import Case
+from intake import fix_axis, upright
+c = Case(sys.argv[1]); views = c.m.get("intake", {}).get("views", {}); fixed = []
+for slot, x in list(c.m["slots"].items()):   # الصور القريبة للسنان: لو صف السنان طالع رأسي يبقى الصورة ملفوفة، نصلّحها
+    f = x.get("file")
+    if x.get("cropped") or not f or not os.path.exists(c.d + "/input/" + f): continue
+    v = dict(views.get(f) or {"view": x.get("view"), "rotate": x.get("rotate", 0), "mirrored": x.get("mirrored", False)})
+    r0 = int(v.get("rotate", 0)); v = fix_axis(c.d + "/input/" + f, v)
+    if int(v.get("rotate", 0)) == r0: continue
+    views[f] = v; im = upright(c.d + "/input/" + f, v); im.save(c.canon(slot), quality=95)
+    if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
+    x["rotate"] = v["rotate"]; fixed.append(slot)
+c.save(); print("FIXED " + " ".join(fixed))
+"""
+SLOT_ELEMENTS = {"after_smile": ["ms/smile_masks", "after_portrait_v3.png", "ap_teeth"], "after_retracted": ["gum_back_after.png", "ap_teeth"]}
+
+
+def _drop_slot_cache(case: Path, slot: str) -> None:
+    """صورة الخانة اتغيرت: تحليلها وأقنعتها المتخزنة من الصورة القديمة مايتستخدموش (المحرك بيعيد استخدام أي ملف موجود)."""
+    tag = SLOT_TAG.get(slot)
+    for f in ([f"ai_{tag}.png", f"lab_{tag}.json", f"gm_{tag}.png"] if tag else []):
+        (case / "ana" / f).unlink(missing_ok=True)
+    if slot == "after_smile":
+        for f in (case / "elements" / "ms").glob("smile_*") if (case / "elements" / "ms").is_dir() else []:
+            f.unlink(missing_ok=True)
+
+
+def _reaxis(case: Path) -> list[str]:
+    """صورة اتحطت ملفوفة قبل كده: نعدّل اتجاهها، ونمسح تحليلها والعناصر اللي اتعملت منها علشان تتعمل من جديد صح."""
+    r = _run(case, ["-c", _REAXIS, str(case)], "reaxis.log", 600)
+    out = (case / "logs" / "reaxis.log").read_text(encoding="utf-8", errors="ignore") if r.returncode == 0 else ""
+    fixed = next((l.split()[1:] for l in out.splitlines() if l.startswith("FIXED")), [])
+    if fixed:
+        cj = _engine_json(case)
+        for slot in fixed:
+            _drop_slot_cache(case, slot)
+            for e in SLOT_ELEMENTS.get(slot, []):
+                if e in cj.get("elements", {}):
+                    cj["elements"][e]["status"] = MISSING
+        (case / "case.json").write_text(json.dumps(cj, ensure_ascii=False, indent=1), encoding="utf-8")
+        _run(case, ["analysis.py", str(case)], "analysis.log", 1800)
+    return fixed
+
+
 def _elements_redo(case: Path) -> None:
+    _reaxis(case)
     cj = _engine_json(case)
     for name, e in cj.get("elements", {}).items():   # make() بيسيب المعتمد والعادي، فبنمسح حالة المرفوض علشان يتعمل تاني
         if e.get("status") in (REJECTED, QA_FAIL):
