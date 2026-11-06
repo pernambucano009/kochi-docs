@@ -9,12 +9,12 @@ RUN pip install --no-cache-dir -r backend/requirements.txt \
 # متصفح Chromium: بيرسم فيديوهات التايبوجرافي فريم فريم (frontend/typo-engine.js)
 RUN python -m playwright install --with-deps chromium
 # خط الإيموجي الملوّن (عنصر emoji في التايبوجرافي) + ffmpeg/ffprobe ومكتبات الصور لمحرك قوالب الأسنان
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji ffmpeg libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji ffmpeg libgl1 libegl1 libgles2 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 # 🦷 محرك قوالب الأسنان: نقط الوش وفصل الشخص (MediaPipe). MediaPipe بيسحب OpenCV بواجهة رسومية، فبنرجّع النسخة headless
 RUN pip install --no-cache-dir "mediapipe>=0.10.14" \
  && (pip uninstall -y opencv-contrib-python opencv-python || true) \
  && pip install --no-cache-dir --force-reinstall --no-deps opencv-contrib-python-headless \
- && python -c "import mediapipe, cv2; print(mediapipe.__version__, cv2.__version__)"
+ && python -c "import ctypes, glob, os, mediapipe, cv2; [ctypes.CDLL(f) for f in glob.glob(os.path.dirname(mediapipe.__file__) + '/tasks/c/*.so')]; print(mediapipe.__version__, cv2.__version__)"
 # تفريغ الكلام على السيرفر من غير خدمة برّه (اختياري): LOCAL_STT=1 وقت البناء + STT_LOCAL=1 في المتغيرات
 # بيزوّد حوالي 700MB (المكتبة + موديل Whisper small) وبيفرّغ دقيقة الكلام في نص دقيقة تقريبًا على CPU
 ARG LOCAL_STT=0
