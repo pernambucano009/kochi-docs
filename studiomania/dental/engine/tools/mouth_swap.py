@@ -10,35 +10,41 @@ def big(m):
     c, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE); f = np.zeros_like(m); cv2.drawContours(f, c, -1, 255, -1); return f
 def corners(m):   # طرفين فتحة البق (أبعد نقطة شمال ويمين)
     ys, xs = np.where(m > 0); l = np.argmin(xs); r = np.argmax(xs); return np.float32([xs[l], ys[l]]), np.float32([xs[r], ys[r]])
-def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None):
+def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=.3):
+    """البق كله (الشفايف + السنان) من صورة الابتسامة الحقيقية بعد العلاج على وش المريض: علاقة السنان بالشفايف حقيقية.
+    - المقاس والمكان: زوايا الشفايف على زوايا بق الوش، والبق بيتضغط رأسيًا ٨٪ (الصورة القريبة بتكبّر سُمك الشفايف) — اختيار العميل (نسخة ٣).
+    - الإضاءة: لون الشفايف وإضاءتها بيقربوا ٣٠٪ من شفايفه في صورة الوش، والسنان السطوع بس (لونها زي ما هو).
+    - الدمج: Poisson، والسنان بترجع بالبكسل الحقيقي."""
     B = np.array(Image.open(base_p).convert("RGB")); Sm = np.array(Image.open(smile_p or S + "case1/ret/smile_front_ret4.jpg").convert("RGB"))
     mo = big(cv2.imread(open_p or S + "tools/ms/smile_open.png", 0)); ml = big(cv2.imread(lips_p or S + "tools/ms/smile_lips.png", 0)); ml = np.maximum(ml, mo)
-    P = _lmk(B); fi = P[INNER]; fo = P[OUTER]
-    sl, sr = corners(ml); bl, br = P[61], P[291]   # أطراف البق الخارجية (زوايا الشفايف)
-    # تحويل تشابه (تكبير + لف + نقل) من أطراف فتحة الابتسامة لأطراف فتحة بق الوش، من غير ما نشوّه السنان
+    P = _lmk(B); fi = P[INNER]; fo = P[OUTER]; H, W = B.shape[:2]
+    sl, sr = corners(ml); bl, br = P[61], P[291]
     v1 = sr - sl; v2 = br - bl; s = np.linalg.norm(v2) / np.linalg.norm(v1); a = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
-    R = s * np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]); c1 = (sl + sr) / 2; c2 = (bl + br) / 2
-    # نظبط الرأسي على نص فتحة البق في الوش
-    ys = np.where(ml.any(1))[0]; so = np.float32([c1[0], (ys.min() + ys.max()) / 2]); yb = fo[:, 1]; bo = np.float32([c2[0], (yb.min() + yb.max()) / 2])
     # حماية: صورة ابتسامة مش من الأمام (أو فتحة غلط) بتطلّع بق مقلوب أو عملاق على الوش، فمانركّبش أصلًا
     xs_ = np.where(ml.any(0))[0]; ys_ = np.where(ml.any(1))[0]; asp = (xs_.max() - xs_.min()) / max(1, ys_.max() - ys_.min())
     fh = np.linalg.norm(P[152] - P[10])
     if asp < 1.35 or abs(a) > np.radians(20) or not (.18 < np.linalg.norm(v2) / fh < .75) or (ys_.max() - ys_.min()) * s > .45 * fh:
         raise ValueError(f"SMILE_NOT_FRONTAL asp={asp:.2f} ang={np.degrees(a):.0f} h={(ys_.max() - ys_.min()) * s / fh:.2f}")
-    t = bo - R @ so; M = np.hstack([R, t[:, None]]).astype(np.float32); H, W = B.shape[:2]
+    R = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]) @ np.diag([s, s * ysq])
+    c1 = (sl + sr) / 2; c2 = (bl + br) / 2
+    so = np.float32([c1[0], (ys_.min() + ys_.max()) / 2]); bo = np.float32([c2[0], (fo[:, 1].min() + fo[:, 1].max()) / 2])
+    M = np.hstack([R, (bo - R @ so)[:, None]]).astype(np.float32)
     Sw = cv2.warpAffine(Sm, M, (W, H), flags=cv2.INTER_AREA, borderMode=cv2.BORDER_REFLECT); mlw = cv2.warpAffine(ml, M, (W, H)); mow = cv2.warpAffine(mo, M, (W, H))
+    la = cv2.cvtColor(Sw, cv2.COLOR_RGB2LAB).astype(np.float32); lb = cv2.cvtColor(B, cv2.COLOR_RGB2LAB).astype(np.float32)
+    lips_s = (mlw > 128) & (mow < 128)
+    bl_ = np.zeros((H, W), np.uint8); cv2.fillPoly(bl_, [fo.astype(np.int32)], 255); cv2.fillPoly(bl_, [fi.astype(np.int32)], 0); lips_b = bl_ > 0
+    if lips_s.sum() > 100 and lips_b.sum() > 100:
+        dL = lb[..., 0][lips_b].mean() - la[..., 0][lips_s].mean()
+        for ch in range(3): la[..., ch][lips_s] += (lb[..., ch][lips_b].mean() - la[..., ch][lips_s].mean()) * lipcol
+        la[..., 0][mow > 128] += dL * .5
+    Sw = cv2.GaussianBlur(cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB), (0, 0), .6)   # نفس حدة صورة الوش
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
-    region = np.maximum(mlw, bo_m); k = max(9, int(.12 * np.linalg.norm(v2))); region = cv2.dilate(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    region = np.maximum((mlw > 128).astype(np.uint8) * 255, bo_m); k = max(9, int(.12 * np.linalg.norm(v2)))
+    region = cv2.dilate(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     x, y, w, h = cv2.boundingRect(region); ctr = (x + w // 2, y + h // 2)
-    comp = cv2.seamlessClone(Sw, B, region, ctr, cv2.NORMAL_CLONE)   # Poisson: الألوان والإضاءة بتتظبط على الوش من غير حواف
-    # السنان (فتحة البق) ترجع بالبكسل الحقيقي بعد ظبط لون خفيف، علشان Poisson مايغيّرش لونها
-    ring = cv2.dilate(mow, np.ones((9, 9), np.uint8)) > 0
-    la = cv2.cvtColor(Sw, cv2.COLOR_RGB2LAB).astype(np.float32); lb = cv2.cvtColor(comp, cv2.COLOR_RGB2LAB).astype(np.float32)
-    for ch, wgt in ((0, .5), (1, .7), (2, .7)): la[..., ch] += (lb[..., ch][ring].mean() - la[..., ch][ring].mean()) * wgt
-    Sc = cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)
+    comp = cv2.seamlessClone(Sw, B, region, ctr, cv2.NORMAL_CLONE)
     kk = cv2.GaussianBlur(cv2.erode(mow, np.ones((3, 3), np.uint8)), (0, 0), 1.5).astype(np.float32)[..., None] / 255
-    out = (Sc * kk + comp * (1 - kk)).astype(np.uint8)
-    sh = cv2.GaussianBlur(B, (0, 0), 2) ; sharpB = np.abs(B.astype(np.float32) - sh).mean(); so_ = cv2.GaussianBlur(out, (0, 0), 2); sharpO = np.abs(out.astype(np.float32) - so_).mean()
+    out = (Sw * kk + comp * (1 - kk)).astype(np.uint8)
     Image.fromarray(out).save(out_p)
     np.save(out_p.replace(".png", "_open.npy"), mow); np.save(out_p.replace(".png", "_M.npy"), M); return out_p   # M: تحويل صورة الابتسامة ← الوش (لحدود السنان على الوش)
 if __name__ == "__main__":
