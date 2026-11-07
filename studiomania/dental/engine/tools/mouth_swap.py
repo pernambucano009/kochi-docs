@@ -33,8 +33,7 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
         s = float(np.clip(st, s * .7, s * 1.05))
     # الرأسي: ارتفاع الشفايف المنقولة = ارتفاع شفايف الوش نفسه (من نقط الوش)، وإلا لو البق المنقول أقصر، شفة الوش الأصلية
     # بتفضل باينة فوقه (شفتين علويتين — حصلت على السيرفر لما المقاس اتصغّر من السنان)
-    lip_h_face = float(fo[:, 1].max() - fo[:, 1].min()); lip_h_sm = float(ys_.max() - ys_.min()) * s
-    ysq = float(np.clip(lip_h_face / max(1.0, lip_h_sm), .8, 1.45))
+    # الرأسي: ضغط ثابت ٨٪ (اختيار العميل). ماينفعش نمط البق المنقول على ارتفاع ابتسامة «قبل» (كانت واسعة فطلّعت سنان عملاقة)
     R = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]) @ np.diag([s, s * ysq])
     c1 = (sl + sr) / 2; c2 = (bl + br) / 2
     so = np.float32([c1[0], (ys_.min() + ys_.max()) / 2]); bo = np.float32([c2[0], (fo[:, 1].min() + fo[:, 1].max()) / 2])
@@ -57,9 +56,15 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
         for ch in (1, 2): la[..., ch][lips_s] += float(np.clip(lb[..., ch][lips_b].mean() - la[..., ch][lips_s].mean(), -6, 6)) * lipcol
     St = cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)   # السنان: البكسل الحقيقي (من غير تنعيم: تفاصيل سطح السنان لازم تفضل)
     Sw = cv2.GaussianBlur(St, (0, 0), .6)   # الشفايف والجلد بس: نفس حدة صورة الوش
+    # منطقة الدمج = بيضاوي حوالين الشفايف المنقولة بهامش جلد من الصورة القريبة نفسها + شفايف الوش الأصلية كلها (موسّعة):
+    # زي ما العميل لزق مستطيل من الصورة القريبة بإيده. لو البق المنقول أصغر من بق «قبل»، شفايف «قبل» بتتغطى بجلد الصورة القريبة بدل ما تفضل باينة (شفتين)
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
-    region = np.maximum((mlw > 128).astype(np.uint8) * 255, bo_m); k = max(7, int(.05 * np.linalg.norm(v2)))   # هامش صغير: جلد الصورة القريبة (من غير مسام الوش) مايبانش كرقعة
-    region = cv2.dilate(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    xs_l = np.where((mlw > 128).any(0))[0]; ys_l = np.where((mlw > 128).any(1))[0]
+    lw, lh = float(xs_l.max() - xs_l.min()), float(ys_l.max() - ys_l.min()); lc = (int((xs_l.min() + xs_l.max()) / 2), int((ys_l.min() + ys_l.max()) / 2))
+    region = np.zeros((H, W), np.uint8); cv2.ellipse(region, lc, (int(lw * .68), int(lh * .95)), 0, 0, 360, 255, -1)
+    kf = max(7, int(.10 * np.linalg.norm(v2)) | 1); region = np.maximum(region, cv2.dilate(bo_m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kf, kf))))
+    valid = cv2.erode(cv2.warpAffine(np.full(mo.shape, 255, np.uint8), M, (W, H)), np.ones((9, 9), np.uint8))   # جوه حدود الصورة القريبة بس
+    region = np.minimum(region, valid)
     x, y, w, h = cv2.boundingRect(region); ctr = (x + w // 2, y + h // 2)
     comp = cv2.seamlessClone(Sw, B, region, ctr, cv2.NORMAL_CLONE)
     kk = cv2.GaussianBlur(cv2.erode(mow, np.ones((3, 3), np.uint8)), (0, 0), 1.5).astype(np.float32)[..., None] / 255
