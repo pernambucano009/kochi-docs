@@ -15,8 +15,12 @@ FA, FA5, FRQ, FSER = "TY-Alexandria-800.ttf", "TY-Alexandria-500.ttf", "TY-ArefR
 L = lambda p: Image.open(p).convert("RGB")
 # ---------- أصول الحالة ----------
 BF = L(C + "before/face.webp"); BM = L(C + "before/macro.jpg")
-AF = L(C + "after/front.jpg"); AC = L(C + "after/front_close.jpg"); AS1 = L(C + "after/side1.jpg"); AS2 = L(C + "after/side2.jpg")
-SF, SR, SL = [L(C + f"ret/{n}_ret4.jpg") for n in ("smile_front", "smile_side_r", "smile_side_l")]
+# الصور الاختيارية (أقرب/جانبية): لو الطبيب مارفعهاش نستخدم الأمامية الحقيقية بدلها (الحالة ماتقعش بسبب صورة مش موجودة)
+Lo = lambda p, alt: L(p if os.path.exists(p) else alt)
+AF = L(C + "after/front.jpg"); AC = Lo(C + "after/front_close.jpg", C + "after/front.jpg")
+AS1 = Lo(C + "after/side1.jpg", C + "after/front.jpg"); AS2 = Lo(C + "after/side2.jpg", C + "after/side1.jpg" if os.path.exists(C + "after/side1.jpg") else C + "after/front.jpg")
+SF = L(C + "ret/smile_front_ret4.jpg")
+SR, SL = [Lo(C + f"ret/{n}_ret4.jpg", C + "ret/smile_front_ret4.jpg") for n in ("smile_side_r", "smile_side_l")]
 _shots = {}
 def shot(n):
     if n not in _shots:

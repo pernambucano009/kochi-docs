@@ -34,7 +34,7 @@
 .dn-rev{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
 .dn-rev figure{margin:0;background:var(--dn-bg);border-radius:14px;padding:10px;display:grid;gap:8px}
 .dn-rev img{width:100%;max-height:360px;object-fit:contain;border-radius:10px;background:#000}
-.dn-rev figcaption{font-size:13px;line-height:1.7;color:var(--dn-mute)}.dn-st{font-size:12px;font-weight:600}
+.dn-full{font-size:12px;color:var(--dn-acc);justify-self:start}.dn-rev figcaption{font-size:13px;line-height:1.7;color:var(--dn-mute)}.dn-st{font-size:12px;font-weight:600}
 .dn-st.ok{color:var(--dn-ok)}.dn-st.bad{color:var(--dn-bad)}
 .dn-tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
 .dn-tpl{background:var(--dn-bg);border-radius:14px;padding:12px;display:grid;gap:8px;align-content:start}
@@ -228,7 +228,7 @@
     const canCrop = !running && !(v.need || []).length && slots.some((s) => s.req && !v.slots[s.slot]);
     const cropHtml = canCrop ? `<div class="dn-row"><button class="dn-btn" data-dn="redo">أكمل: قصّ الصور الناقصة تلقائيًا</button></div>` : "";
     const rev = v.review.length ? `<div class="dn-card"><h3>راجع الصور المشتقة</h3><p>هذه الصور مصنوعة من صور المريض الحقيقية وتدخل في الفيديو. وافق عليها فقط إذا كانت الأسنان هي أسنان المريض نفسها.</p>
-      <div class="dn-rev">${v.review.map((r) => `<figure>${r.url ? `<img src="${esc(r.url)}" alt="${esc(r.why)}">` : ""}<figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span>${r.note ? `<br>${esc(r.note)}` : ""}</figcaption>
+      <div class="dn-rev">${v.review.map((r) => `<figure>${r.url ? `<a href="${esc(r.url.replace(/&w=\d+/, ""))}" target="_blank" rel="noopener" title="افتح الصورة بالحجم الكامل"><img src="${esc(r.url)}" alt="${esc(r.why)}" style="cursor:zoom-in"></a><a class="dn-full" href="${esc(r.url.replace(/&w=\d+/, ""))}" target="_blank" rel="noopener">افتح الصورة بالحجم الكامل</a>` : ""}<figcaption>${esc(r.why)}<br><span class="dn-st ${r.state === "approved" ? "ok" : r.state === "rejected" || r.state === "failed" ? "bad" : ""}">${esc(r.label)}</span>${r.note ? `<br>${esc(r.note)}` : ""}</figcaption>
         ${r.state === "pending" ? `<div class="dn-row" style="margin:0"><button class="dn-btn" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>موافق</button><button class="dn-btn ghost" data-no="${esc(r.name)}" ${running ? "disabled" : ""}>ارفض</button></div>`
           : r.state === "failed" && r.url ? `<div class="dn-row" style="margin:0"><button class="dn-btn ghost" data-ok="${esc(r.name)}" ${running ? "disabled" : ""}>الصورة سليمة، أوافق عليها</button></div>` : ""}</figure>`).join("")}</div>
       ${(v.review.some((r) => r.state === "rejected" || r.state === "failed") || v.problems?.length) && !running ? `<div class="dn-row"><button class="dn-btn ghost" data-dn="redo">أعد صنع المرفوض</button></div>` : ""}</div>` : "";

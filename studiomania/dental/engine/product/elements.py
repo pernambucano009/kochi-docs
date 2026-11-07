@@ -281,7 +281,8 @@ RECIPES = {
     "profile_right.png":     (["slot:before_face"], r_profile, "Is this a believable strict side profile of the SAME person (identity, hair, skin), lips closed?", []),
     "angle_closed_0.png":    (["slot:before_face"], r_angle_closed, "Is this the SAME person at a three-quarter angle with lips closed and no teeth visible?", []),
     "after_views":           (["after_portrait_v3.png", "slot:after_smile_side_l"], r_after_views, "Is this the same person at a 3/4 angle with natural mouth and teeth that match the real side smile photo?", []),
-    "before_face_hi.png":    (["slot:before_face"], r_before_hi, "Is this the same photo, sharper, with the teeth stains/colors/defects preserved exactly (NOT whitened or beautified)?", [("mouth", "slot:before_face")]),
+    "before_face_hi.png":    (["slot:before_face"], r_before_hi, "This is a sharpened version of a patient's real photo before dental treatment. Is it a natural, clean photo (no artifacts, no distortion of the face) with natural-looking teeth (not whitened or beautified)? "
+                              "Its teeth are compared with the original photo in a separate check, so do not ask for the original.", [("mouth", "slot:before_face")]),
     "teeth_only":            (["slot:before_retracted", "slot:after_retracted"], r_teeth_only, None, [("iso", None)]),
     "v/after_live.mp4":      (["after_portrait_v3.png"], r_live("after_live", "after_portrait_v3.png", "The person holds the smile, blinks naturally once, slight natural head movement and breathing."), "VIDEO", []),
     "v/after_blink.mp4":     (["after_portrait_v3.png"], r_live("after_blink", "after_portrait_v3.png", "The person starts with eyes gently closed while smiling, then slowly opens the eyes and keeps smiling, subtle head movement."), "VIDEO", []),

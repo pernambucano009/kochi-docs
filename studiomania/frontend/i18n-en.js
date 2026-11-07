@@ -15576,4 +15576,5 @@ window.I18N_EN = {
   "جارٍ الرفع… {0}%": "Uploading… {0}%",
   "تم الرفع، جارٍ الحفظ…": "Uploaded, saving…",
   "انقطع الاتصال أثناء الرفع، حاول مرة أخرى.": "The connection dropped during the upload, please try again.",
+  "افتح الصورة بالحجم الكامل": "Open the photo at full size",
 };
