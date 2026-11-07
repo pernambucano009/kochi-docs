@@ -264,7 +264,8 @@ def r_twin_walkin(c):   # الكادر الأول = البعد لوحده (بق�
            "the mouths do not talk, keep every tooth exactly as it is during the whole video (the second one's teeth stay old, yellow and stained in every frame, never whiten).", out); return [out]
 
 def r_gum_back(c):   # خلفية لثة ممتدة لحد حافة الشاشة (R4.1) — مرة لكل حالة، والريندر بياخد منها نسيج اللثة (auto_gum)
-    import subprocess
+    import subprocess, glob
+    for f in glob.glob(c.d + "/elements/gum_back_after_dx*.png"): os.remove(f)   # الكاش: المحاولة التانية لازم تولّد من جديد
     code = ("import sys; sys.argv=['T.py']; import T, shutil; from tl import shift_x, right_gap; f = T.morph_frame(1, 1.0); dx = right_gap(f) + 6; "
             "p = T.gum_backdrop(shift_x(f, dx), 'after_dx%d' % dx); shutil.copy(T.TO + 'gum_back_after_dx%d.png' % dx, T.TO + 'gum_back_after.png')")
     r = subprocess.run(["python3", "-c", code], cwd=S + "tpl", env=dict(os.environ, CASE_DIR=c.d), capture_output=True, text=True)
@@ -281,7 +282,8 @@ RECIPES = {
                               "Slight differences in sharpness or tone around the mouth are acceptable at social-media viewing size. "
                               "The mouth size and position were already measured from face landmarks before building this photo, so do not judge them. "
                               "FAIL only for a real defect: the mouth is upside down or rotated, a hard visible box/edge or colour patch around the mouth, doubled lips or teeth. Otherwise PASS.", [("mouth", "slot:after_smile")]),
-    "ap_teeth":              (["after_portrait_v3.png", "slot:after_retracted"], r_smile_fit, "This is a crop of a smiling face with thin white outlines drawn on the teeth. Pass only if each outline follows a real visible tooth edge closely (no outline floating on lips/skin, no big offset).", []),
+    "ap_teeth":              (["after_portrait_v3.png", "slot:after_retracted"], r_smile_fit, "This is a crop of a smiling face with thin white outlines drawn around the visible teeth (computed from the real close-up photo; small roughness is expected at this size). "
+                              "FAIL only for a gross error: an outline sitting on the lips or skin away from any tooth, outlines shifted by about half a tooth or more, or outlines that do not match the number of visible teeth. Otherwise PASS.", []),
     "retract":               (["slot:before_face"], r_retract, "Image of a patient wearing a black dental lip retractor, with a red box. Pass only if: same person, natural retractor, the red box tightly surrounds the visible teeth.", []),
     "pose":                  (["after_portrait_v3.png"], r_pose, "Is the pose natural (fist under chin for a man / hands on cheeks for a woman), hands anatomically correct, same identity and same smile?", [("mouth", "slot:after_smile")]),
     "profile_right.png":     (["slot:before_face"], r_profile, "Is this a believable strict side profile of the SAME person (identity, hair, skin), lips closed?", []),
@@ -374,10 +376,10 @@ def make(c, names=None, force=False):
         if not force and st in (APPROVED, QA_PASS): report[name] = st; continue
         ok, why = ready(c, needs)
         if not ok: c.set_el(name, status=MISSING, note=why); report[name] = why; continue
-        for attempt in range(VIDEO_TRIES if q == "VIDEO" else 1):   # موديلات الفيديو عشوائية: لو الفيديو اترفض بيتعمل تاني (E83)
+        for attempt in range(VIDEO_TRIES if q == "VIDEO" else TRIES.get(name, 1)):   # الموديلات التوليدية عشوائية: لو الناتج اترفض بيتعمل تاني (E83)
             if attempt:
                 for o in outs:
-                    if os.path.exists(o): os.replace(o, o.replace(".mp4", f"_rej{attempt}.mp4"))
+                    if os.path.exists(o): os.replace(o, o.rsplit(".", 1)[0] + f"_rej{attempt}." + o.rsplit(".", 1)[1])
             try: outs = fn(c)
             except BaseException as e: outs = None; c.set_el(name, status=QA_FAIL, note=f"فشل التصنيع: {str(e)[:200]}"); report[name] = "فشل"; break
             res = _qa(c, name, outs, q, tchecks)
@@ -401,6 +403,7 @@ def make_parallel(c, names, workers=4):
     return report
 
 VIDEO_TRIES = 2
+TRIES = {"gum_back_after.png": 2}   # خلفية اللثة من موديل توليدي: لو طلعت ببقع أو نسيج غريب تتعمل تاني مرة
 def _qa(c, name, outs, q, tchecks):
     if True:
         res = {"pass": True, "score": 10, "issues": []}

@@ -27,6 +27,17 @@ def fit_M(base_p, smile_p, lips_p, open_p):
     H, W = B.shape[:2]; return M, cv2.warpAffine(mo, M, (W, H))
 
 
+def smooth_poly(pts, n=64, sig=1.2):
+    """حدود السنة من قناع الموديل بتبقى مسنّنة لما تتصغّر على الوش: نعيد توزيع النقط ونمرّرها بتنعيم دائري."""
+    c = np.asarray(pts, np.float32)
+    if len(c) < 6: return c
+    cc = np.vstack([c, c[:1]]); d = np.r_[0, np.cumsum(np.linalg.norm(np.diff(cc, axis=0), axis=1))]
+    if d[-1] <= 0: return c
+    t = np.linspace(0, d[-1], n, endpoint=False); x = np.interp(t, d, cc[:, 0]); y = np.interp(t, d, cc[:, 1])
+    k = np.exp(-.5 * (np.arange(-4, 5) / sig) ** 2); k /= k.sum()
+    xs = np.convolve(np.r_[x[-4:], x, x[:4]], k, "valid"); ys = np.convolve(np.r_[y[-4:], y, y[:4]], k, "valid")
+    return np.c_[xs, ys].astype(np.float32)
+
 def smile_fit(c):
     from teethlib import analyze
     from teeth_map import map_teeth, key_pts
@@ -40,7 +51,7 @@ def smile_fit(c):
         cc = th["c"].astype(np.float32) @ M[:, :2].T + M[:, 2]
         tm = np.zeros(op.shape, np.uint8); cv2.fillPoly(tm, [cc.astype(np.int32)], 255); v = np.minimum(op, tm)
         cs = cv2.findContours(v, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
-        if cs and cv2.contourArea(max(cs, key=cv2.contourArea)) > 80: vis_ap[int(th["fdi"])] = max(cs, key=cv2.contourArea)[:, 0].tolist()
+        if cs and cv2.contourArea(max(cs, key=cv2.contourArea)) > 80: vis_ap[int(th["fdi"])] = smooth_poly(max(cs, key=cv2.contourArea)[:, 0]).tolist()
     json.dump(vis_ap, open(E + "ap_teeth_v3.json", "w"))
     _, tA = analyze(c.canon("after_retracted"), A + "ai_after.png", A + "lab_after.json")
     full = {int(t["fdi"]): t["c"] for t in tA}; vis = {int(t["fdi"]): t["c"] for t in tS}
@@ -52,10 +63,12 @@ def smile_fit(c):
     json.dump(sm_full, open(E + "smile_teeth_full.json", "w"))
     json.dump({k: (np.float32(v) @ M[:, :2].T + M[:, 2]).tolist() for k, v in sm_full.items() if int(k) < 30}, open(E + "ap_teeth_full.json", "w"))
     # صورة مراجعة: الحدود على الوش
-    im = np.array(Image.open(ap).convert("RGB"))
-    for k, v in vis_ap.items(): cv2.polylines(im, [np.int32(v)], True, (255, 255, 255) if k < 30 else (255, 80, 80), 2)
-    ys, xs = np.where(op > 0); chk = E + "ap_teeth_chk.jpg"
-    Image.fromarray(im[max(0, ys.min() - 60):ys.max() + 60, max(0, xs.min() - 80):xs.max() + 80]).save(chk)
+    im = np.array(Image.open(ap).convert("RGB")); ys, xs = np.where(op > 0)
+    y0, y1, x0, x1 = max(0, ys.min() - 60), ys.max() + 60, max(0, xs.min() - 80), xs.max() + 80
+    up = 2 if (x1 - x0) < 900 else 1   # صورة المراجعة مكبّرة ×٢ بخطوط ناعمة (الفلتر كان بيشوف الخطوط مسنّنة على بق صغير)
+    crop = cv2.resize(im[y0:y1, x0:x1], None, fx=up, fy=up, interpolation=cv2.INTER_CUBIC)
+    for k, v in vis_ap.items(): cv2.polylines(crop, [np.int32((np.float32(v) - [x0, y0]) * up)], True, (255, 255, 255) if k < 30 else (255, 80, 80), 2, cv2.LINE_AA)
+    chk = E + "ap_teeth_chk.jpg"; Image.fromarray(crop).save(chk, quality=92)
     return {"visible": sorted(vis_ap), "matched": common, "inliers": inl, "check": chk}
 
 
