@@ -271,7 +271,8 @@ def r_gum_back(c):   # خلفية لثة ممتدة لحد حافة الشاشة
     r = subprocess.run(["python3", "-c", code], cwd=S + "tpl", env=dict(os.environ, CASE_DIR=c.d), capture_output=True, text=True)
     if r.returncode != 0:   # السبب الحقيقي (آخر سطر في الخطأ) بدل نص الأمر نفسه
         ls = [l for l in r.stderr.splitlines() if l.strip() and not l.startswith(("W0000", "I0000", "INFO"))]
-        raise RuntimeError(ls[-1][:300] if ls else f"exit {r.returncode}")
+        where = [l.strip() for l in ls if l.strip().startswith("File ") and "/engine/" in l]   # آخر مكان في كودنا وقع فيه (عشان نعرف نصلّح)
+        raise RuntimeError((ls[-1][:220] if ls else f"exit {r.returncode}") + (" @ " + where[-1].split("/engine/")[-1][:120] if where else ""))
     return [c.el_path("gum_back_after.png")]
 
 RECIPES = {

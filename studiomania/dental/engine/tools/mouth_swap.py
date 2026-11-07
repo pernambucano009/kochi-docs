@@ -6,7 +6,12 @@ from derive import _lmk
 INNER = [78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95]
 OUTER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146]
 def big(m):
-    m = (m > 128).astype(np.uint8); n, lab, st, _ = cv2.connectedComponentsWithStats(m); i = 1 + np.argmax(st[1:, 4]); m = (lab == i).astype(np.uint8) * 255
+    """أكبر قطعة في القناع. لو القناع طلع رمادي/فاضي (موديل الأقنعة أحيانًا بيرجّع صورة بدل قناع) نجرب عتبة أوطى، ولو لسه فاضي خطأ واضح."""
+    for th in (128, 60):
+        mm = (m > th).astype(np.uint8); n, lab, st, _ = cv2.connectedComponentsWithStats(mm)
+        if n > 1: break
+    else: raise SystemExit("MASK_EMPTY: قناع الشفايف/فتحة البق فاضي")
+    i = 1 + np.argmax(st[1:, 4]); m = (lab == i).astype(np.uint8) * 255
     c, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE); f = np.zeros_like(m); cv2.drawContours(f, c, -1, 255, -1); return f
 def corners(m):   # طرفين فتحة البق (أبعد نقطة شمال ويمين)
     ys, xs = np.where(m > 0); l = np.argmin(xs); r = np.argmax(xs); return np.float32([xs[l], ys[l]]), np.float32([xs[r], ys[r]])
