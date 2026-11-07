@@ -7,6 +7,7 @@ def pair():
     ib, tb = analyze(C + "before/macro.jpg", AN + "ai_before.png", AN + "lab_before.json"); ia, ta = analyze(C + "after/front.jpg", AN + "ai_after.png", AN + "lab_after.json")
     B = {t["fdi"]: t for t in tb if t["fdi"] < 30}; A = {t["fdi"]: t for t in ta if t["fdi"] < 30}
     common = sorted(set(B) & set(A))
+    if len(common) < 2: raise SystemExit(f"TEETH_NO_MATCH: الأسنان العلوية المرقّمة قبل {sorted(B)} وبعد {sorted(A)}")
     src = np.float32([[A[k]["cx"], A[k]["y"] + A[k]["h"]] for k in common] + [[A[k]["cx"], A[k]["y"]] for k in common])   # الحافة القاطعة + عنق السن
     dst = np.float32([[B[k]["cx"], B[k]["y"] + B[k]["h"]] for k in common] + [[B[k]["cx"], B[k]["y"]] for k in common])
     M, inl = cv2.estimateAffinePartial2D(src, dst, method=cv2.LMEDS)

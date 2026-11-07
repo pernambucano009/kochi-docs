@@ -21,6 +21,10 @@ def run(case_dir):
         src = c.canon(slot)
         if not os.path.exists(A + f"ai_{tag}.png"): aimask.one(src, A + f"ai_{tag}.png")
         _, teeth = analyze(src, A + f"ai_{tag}.png", A + f"lab_{tag}.json")
+        if sum(1 for t in teeth if t["fdi"] < 30) < 4:   # الترقيم طلع ناقص (الموديل غلط أو القناع بايظ): قناع وترقيم من جديد مرة واحدة
+            for f in (A + f"ai_{tag}.png", A + f"lab_{tag}.json"):
+                if os.path.exists(f): os.remove(f)
+            aimask.one(src, A + f"ai_{tag}.png"); _, teeth = analyze(src, A + f"ai_{tag}.png", A + f"lab_{tag}.json")
         if tag in ("before", "after") and not os.path.exists(A + f"gm_{tag}.png"): gummask.make(src, A + f"gm_{tag}.png")
         return tag, f"{len(teeth)} سنة: " + " ".join(str(t['fdi']) for t in sorted(teeth, key=lambda t: t['fdi']))
     with cf.ThreadPoolExecutor(len(JOBS)) as ex: res = dict(ex.map(one, JOBS))

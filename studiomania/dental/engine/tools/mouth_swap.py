@@ -24,6 +24,9 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
     - الدمج: Poisson، والسنان بترجع بالبكسل الحقيقي."""
     B = np.array(Image.open(base_p).convert("RGB")); Sm = np.array(Image.open(smile_p or S + "case1/ret/smile_front_ret4.jpg").convert("RGB"))
     mo = big(cv2.imread(open_p or S + "tools/ms/smile_open.png", 0)); ml = big(cv2.imread(lips_p or S + "tools/ms/smile_lips.png", 0)); ml = np.maximum(ml, mo)
+    # قناع الشفايف من الموديل أحيانًا بيزود دقن أو جلد (شفة تحتانية «زلومة»): نحصره في نطاق معقول حوالين فتحة البق
+    oy = np.where(mo.any(1))[0]; oh = float(oy.max() - oy.min())
+    ml[: int(max(0, oy.min() - .8 * oh))] = 0; ml[int(min(ml.shape[0], oy.max() + 1.2 * oh)):] = 0
     P = _lmk(B); fi = P[INNER]; fo = P[OUTER]; H, W = B.shape[:2]
     sl, sr = corners(ml); bl, br = P[61], P[291]
     v1 = sr - sl; v2 = br - bl; s = np.linalg.norm(v2) / np.linalg.norm(v1); a = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
@@ -70,8 +73,11 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
     kf = max(7, int(.10 * np.linalg.norm(v2)) | 1); region = np.maximum(region, cv2.dilate(bo_m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kf, kf))))
     valid = cv2.erode(cv2.warpAffine(np.full(mo.shape, 255, np.uint8), M, (W, H)), np.ones((9, 9), np.uint8))   # جوه حدود الصورة القريبة بس
     region = np.minimum(region, valid)
+    # شفايف «قبل» بتتمسح من الوش الأول (inpaint) علشان لو جزء منها خرج عن منطقة الدمج (الصورة القريبة أصغر) مايفضلش شفة أصلية باينة
+    bo_d = cv2.dilate(bo_m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kf, kf)))
+    B2 = cv2.inpaint(B, bo_d, 7, cv2.INPAINT_TELEA)
     x, y, w, h = cv2.boundingRect(region); ctr = (x + w // 2, y + h // 2)
-    comp = cv2.seamlessClone(Sw, B, region, ctr, cv2.NORMAL_CLONE)
+    comp = cv2.seamlessClone(Sw, B2, region, ctr, cv2.NORMAL_CLONE)
     kk = cv2.GaussianBlur(cv2.erode(mow, np.ones((3, 3), np.uint8)), (0, 0), 1.5).astype(np.float32)[..., None] / 255
     out = (St * kk + comp * (1 - kk)).astype(np.uint8)
     Image.fromarray(out).save(out_p)
