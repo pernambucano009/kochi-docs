@@ -171,13 +171,44 @@ def fits(slot, f, views, phase_of):
     if (v.get("quality") or 10) < MIN_Q: return False, "blur"
     return True, ""
 
-def reconcile(assign, pics, views, phase_of, sizes):
+FRONTAL_Q = """These are close-up photos of the SAME patient's teeth/smile after treatment, numbered. Exactly one must be chosen for a FRONTAL slot.
+Pick the photo taken most straight from the FRONT: the dental midline (between the two upper central incisors) near the middle of the mouth, both sides of the arch equally visible and equally sized, no visible turn of the head, teeth sharp and evenly lit.
+Answer ONLY JSON: {"best": <number>, "why": "short"}"""
+FRONT_SLOTS = ("after_smile", "before_smile", "after_retracted", "before_retracted")
+
+def pick_frontal(cands, ims, votes=3):
+    """أكتر من صورة تنفع لنفس الخانة الأمامية: الموديل يشوفهم جنب بعض ويختار الأكثر أمامية (٣ أصوات). لو فشل: الأعلى جودة."""
+    import concurrent.futures as cf
+    from collections import Counter
+    from explainer import chat
+    th = []
+    for f in cands:
+        x = ims[f].copy(); x.thumbnail((700, 700)); th.append(x)
+    g = Image.new("RGB", (sum(x.width for x in th) + 20 * (len(th) - 1), max(x.height for x in th) + 50), (255, 255, 255))
+    from PIL import ImageDraw
+    d = ImageDraw.Draw(g); x0 = 0
+    for i, x in enumerate(th, 1):
+        g.paste(x, (x0, 50)); d.text((x0 + 10, 8), str(i), fill=(220, 0, 0)); x0 += x.width + 20
+    def q(_):
+        try: return int(_json(chat([{"type": "text", "text": FRONTAL_Q}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(g, 1600)}}], model="google/gemini-2.5-pro", mt=1500)).get("best", 0))
+        except BaseException: return 0
+    with cf.ThreadPoolExecutor(votes) as ex: rs = [r for r in ex.map(q, range(votes)) if 1 <= r <= len(cands)]
+    return cands[Counter(rs).most_common(1)[0][0] - 1] if rs else None
+
+def reconcile(assign, pics, views, phase_of, sizes, ims=None):
     """يشيل أي اختيار مايطابقش القواعد، ويملا الخانات الأساسية الفاضية من الصور المتبقية المطابقة (الأوضح، وبعدها العرضية)."""
     dropped = {}
     for k, f in list(assign.items()):
         ok, why = fits(k, f, views, phase_of)
         if not ok: dropped[f] = {"slot": k, "why": why}; del assign[k]
-    used = set(assign.values())
+    # الخانات الأمامية الأساسية: لو أكتر من صورة تنفع (الموديل سمّاهم كلهم أمامي)، مانمشيش ورا اختيار الموديل الأول ولا الجودة بس،
+    # ده الموديل يشوفهم جنب بعض ويختار الأكثر أمامية (حصل على السيرفر: اختار ابتسامة مايلة وسايب الأمامية)
+    used = set(assign.values()) - {assign.get(k) for k in FRONT_SLOTS}
+    for k in FRONT_SLOTS:
+        cands = [f for f in pics if f not in used and fits(k, f, views, phase_of)[0]]
+        if not cands: assign.pop(k, None); continue
+        f = cands[0] if len(cands) == 1 else ((ims and pick_frontal(cands, ims)) or max(cands, key=lambda f: (views[f].get("quality") or 0, sizes[f][0] > sizes[f][1])))
+        assign[k] = f; used.add(f); dropped.pop(f, None)
     for k in MAIN + [k for k in FIT if k not in MAIN]:
         if k in assign: continue
         if k not in MAIN and k not in ("prep", "veneers", "cast"): continue   # الخانات الجانبية: نسيب اختيار الموديل (يمين/شمال)
@@ -210,7 +241,7 @@ def intake(src_dir, case_dir):
         f = pics[int(i) - 1]; tmp = f"{c.d}/input/_up_{f}.jpg"; ims[f].save(tmp); r = view_of(tmp); ims[f] = upright(tmp, r); os.remove(tmp)
     assign = {k: pics[int(v) - 1] for k, v in r2.get("assign", {}).items() if k in SLOTS and v and 0 < int(v) <= len(pics)}
     phase_of = {f: r2.get("phase", {}).get(str(i)) for i, f in enumerate(pics, 1)}
-    assign, dropped = reconcile(assign, pics, views, phase_of, {f: ims[f].size for f in pics})
+    assign, dropped = reconcile(assign, pics, views, phase_of, {f: ims[f].size for f in pics}, ims)
     docs = [f for f in files if views[f].get("view") == "doctor"]
     if docs: assign["doctor"] = docs[0]; ims[docs[0]] = upright(f"{c.d}/input/{docs[0]}", views[docs[0]])
     for k, f in assign.items():
