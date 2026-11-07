@@ -10,7 +10,9 @@ def big(m):
     c, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE); f = np.zeros_like(m); cv2.drawContours(f, c, -1, 255, -1); return f
 def corners(m):   # طرفين فتحة البق (أبعد نقطة شمال ويمين)
     ys, xs = np.where(m > 0); l = np.argmin(xs); r = np.argmax(xs); return np.float32([xs[l], ys[l]]), np.float32([xs[r], ys[r]])
-def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=.3):
+INC_IPD = .152   # عرض السنة الأمامية ÷ المسافة بين نِنّي العينين في صورة وش (مقاس على صورة اتظبطت بإيد العميل: ٠٫١٥٥)
+
+def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=.3, inc_w=None):
     """البق كله (الشفايف + السنان) من صورة الابتسامة الحقيقية بعد العلاج على وش المريض: علاقة السنان بالشفايف حقيقية.
     - المقاس والمكان: زوايا الشفايف على زوايا بق الوش، والبق بيتضغط رأسيًا ٨٪ (الصورة القريبة بتكبّر سُمك الشفايف) — اختيار العميل (نسخة ٣).
     - الإضاءة: لون الشفايف وإضاءتها بيقربوا ٣٠٪ من شفايفه في صورة الوش، والسنان السطوع بس (لونها زي ما هو).
@@ -25,6 +27,10 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
     fh = np.linalg.norm(P[152] - P[10])
     if asp < 1.35 or abs(a) > np.radians(20) or not (.18 < np.linalg.norm(v2) / fh < .75) or (ys_.max() - ys_.min()) * s > .45 * fh:
         raise ValueError(f"SMILE_NOT_FRONTAL asp={asp:.2f} ang={np.degrees(a):.0f} h={(ys_.max() - ys_.min()) * s / fh:.2f}")
+    if inc_w and len(P) > 473:
+        # المقاس من السنان نفسها (ثابتة عند نفس الشخص) مش من زوايا البق: لو ابتسامة «قبل» أوسع، البق المنقول كان بيتمط معاها ويكبر
+        st = INC_IPD * float(np.linalg.norm(P[468] - P[473])) / float(inc_w)
+        s = float(np.clip(st, s * .7, s * 1.05))
     R = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]) @ np.diag([s, s * ysq])
     c1 = (sl + sr) / 2; c2 = (bl + br) / 2
     so = np.float32([c1[0], (ys_.min() + ys_.max()) / 2]); bo = np.float32([c2[0], (fo[:, 1].min() + fo[:, 1].max()) / 2])

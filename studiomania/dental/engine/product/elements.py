@@ -123,7 +123,13 @@ def r_after_portrait(c):
     from mouth_swap import swap
     ms = c.d + "/elements/ms/"
     if os.path.exists(ms + "smile_lips.png"): fix_smile_flip(c, {"lips": ms + "smile_lips.png", "open": ms + "smile_open.png"})   # حالات قديمة: الأقنعة اتعملت قبل الفحص ده
-    swap(c.canon("before_face"), out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png")   # البق كله بالشفايف من صورة الابتسامة الحقيقية
+    inc = None   # عرض السنتين الأماميتين في صورة الابتسامة (من تحليل السنان) — مقياس البق على الوش
+    try:
+        sys.path.insert(0, S + "ana"); from teethlib import analyze
+        _, tS = analyze(c.canon("after_smile"), c.d + "/ana/ai_smile.png", c.d + "/ana/lab_smile.json")
+        ws = [t["w"] for t in tS if t["fdi"] in (11, 21)]; inc = sum(ws) / len(ws) if ws else None
+    except Exception: inc = None
+    swap(c.canon("before_face"), out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png", inc_w=inc)   # البق كله بالشفايف من صورة الابتسامة الحقيقية
     return [out]
 
 def r_pose(c):   # الوضعية حسب النوع: راجل = قبضة تحت الدقن، ست = إيديها على خدها — وبعدين البق الحقيقي يرجع مكانه
