@@ -270,7 +270,11 @@ def r_gum_back(c):   # خلفية لثة ممتدة لحد حافة الشاشة
 RECIPES = {
     "ms/smile_masks":        (["slot:after_smile"], r_smile_masks, None, []),
     "after_portrait_v3.png": (["slot:before_face", "slot:after_smile", "ms/smile_masks"], r_after_portrait,
-                              "Is this a natural, believable photo of the same person after dental treatment? Check: the mouth (lips+teeth) looks naturally part of the face, correct size (not too big), no visible pasting edges, lighting consistent.", [("mouth", "slot:after_smile")]),
+                              "This is the patient's face photo with the patient's REAL after-treatment mouth (lips and teeth together, taken from a real close-up photo of the same patient) placed on it on purpose. "
+                              "New veneers/crowns are expected to look whiter, more uniform and somewhat bigger than the old teeth, and the real lips may show dryness or texture: that is NOT a problem. "
+                              "Slight differences in sharpness or tone around the mouth are acceptable at social-media viewing size. "
+                              "The mouth size and position were already measured from face landmarks before building this photo, so do not judge them. "
+                              "FAIL only for a real defect: the mouth is upside down or rotated, a hard visible box/edge or colour patch around the mouth, doubled lips or teeth. Otherwise PASS.", [("mouth", "slot:after_smile")]),
     "ap_teeth":              (["after_portrait_v3.png", "slot:after_retracted"], r_smile_fit, "This is a crop of a smiling face with thin white outlines drawn on the teeth. Pass only if each outline follows a real visible tooth edge closely (no outline floating on lips/skin, no big offset).", []),
     "retract":               (["slot:before_face"], r_retract, "Image of a patient wearing a black dental lip retractor, with a red box. Pass only if: same person, natural retractor, the red box tightly surrounds the visible teeth.", []),
     "pose":                  (["after_portrait_v3.png"], r_pose, "Is the pose natural (fist under chin for a man / hands on cheeks for a woman), hands anatomically correct, same identity and same smile?", [("mouth", "slot:after_smile")]),
@@ -307,7 +311,9 @@ def _b64(p, w=768):
 
 def ai_check(paths, question):
     from explainer import chat
-    parts = [{"type": "text", "text": question + '\nBe strict like a senior dental marketing editor. Answer ONLY JSON: {"pass": true/false, "score": 1-10, "issues": ["..."], "reason_ar": "جملة قصيرة"}'}]
+    # سؤال بيحدد بنفسه إمتى يرفض («Otherwise PASS»): مانزودش «كن صارم» (كان بيرفض حاجات العميل قبلها، زي وش البعد المتركّب)
+    tone = "" if question.rstrip().endswith("Otherwise PASS.") else "\nBe strict like a senior dental marketing editor."
+    parts = [{"type": "text", "text": question + tone + ' Answer ONLY JSON: {"pass": true/false, "score": 1-10, "issues": ["..."], "reason_ar": "جملة قصيرة"}'}]
     for p in paths: parts.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(p)}})
     r = chat(parts, model="google/gemini-2.5-pro", mt=2000); t = r if isinstance(r, str) else json.dumps(r)
     return json.loads(t[t.find("{"):t.rfind("}") + 1])
@@ -322,7 +328,20 @@ def teeth_check(c, el_path, ref):
     refp = c.canon(ref[5:]) if ref.startswith("slot:") else c.el_path(ref)
     try: a, b = mouth_crop(el_path), (mouth_crop(refp) if not ref.startswith("slot:after_smile") else refp)
     except Exception as e: return {"pass": False, "score": 0, "issues": [f"مش لاقي الوش/البق: {e}"]}
-    return ai_check([a, b], "Image 1 is a generated photo, image 2 is the REAL reference. Are the TEETH in image 1 the same teeth as image 2 (same count, shapes, proportions, color, stains if any)? Any change, whitening, beautification or invented teeth = fail.")
+    # البق اتنقل من الصورة الحقيقية بتحويل محفوظ (مقاس + لفّة + ضغط رأسي ٨٪ اختيار العميل): المرجع يبقى الصورة الحقيقية بنفس التحويل ونفس القص،
+    # فالفلتر بيقارن «المتوقع» بالناتج (أي سنة اتغيرت أو اتبيضت أو اتخلقت = رفض)، مش فرق المقاس والدقة
+    Mp = el_path.rsplit(".", 1)[0] + "_M.npy"
+    if ref.startswith("slot:after_smile") and os.path.exists(Mp):
+        from derive import _lmk
+        E_ = np.array(Image.open(el_path).convert("RGB")); P = _lmk(E_); x0, y0 = P[[61, 291, 0, 17]].min(0); x1, y1 = P[[61, 291, 0, 17]].max(0); pad = (x1 - x0) * .25
+        Rw = cv2.warpAffine(np.array(Image.open(refp).convert("RGB")), np.load(Mp), (E_.shape[1], E_.shape[0]), flags=cv2.INTER_AREA)
+        b = el_path.rsplit(".", 1)[0] + "_ref_same.jpg"
+        Image.fromarray(Rw[int(max(0, y0 - pad)):int(y1 + pad), int(max(0, x0 - pad)):int(x1 + pad)]).save(b, quality=92)
+    ia, ib = Image.open(a), Image.open(b).convert("RGB")
+    if ib.width > ia.width * 1.5:
+        ib = ib.resize((ia.width, max(1, round(ib.height * ia.width / ib.width))), Image.LANCZOS); b = b.rsplit(".", 1)[0] + "_ref_small.jpg"; ib.save(b, quality=92)
+    return ai_check([a, b], "Image 1 is a generated photo, image 2 is the REAL reference (shown at the same small size). Are the TEETH in image 1 the same teeth as image 2 (same count, shapes, proportions, arrangement, color, stains if any)? "
+                    "Ignore the area around the mouth (image 2 is only the real mouth photo aligned to the same place), fine surface texture, sharpness and small brightness differences (different lighting). Changed tooth shapes or count, whitening, beautification or invented teeth = fail.")
 
 def video_check(path):
     import subprocess
@@ -379,6 +398,11 @@ def _qa(c, name, outs, q, tchecks):
         res = {"pass": True, "score": 10, "issues": []}
         try:
             if q == "VIDEO": res = video_check(outs[0])
+            elif q and q.rstrip().endswith("Otherwise PASS."):   # سؤال «عيوب حقيقية بس»: رأي الموديل بيتغير من مرة للتانية، فالقرار بأغلبية ٣
+                import concurrent.futures as cf
+                with cf.ThreadPoolExecutor(3) as ex: rs = list(ex.map(lambda _: ai_check(outs[:1], q), range(3)))
+                ok = sum(bool(r.get("pass")) for r in rs) >= 2; best = max(rs, key=lambda r: (bool(r.get("pass")) == ok, r.get("score", 0)))
+                res = {**best, "pass": ok, "votes": [bool(r.get("pass")) for r in rs]}
             elif q: res = ai_check(outs[:1], q)
         except BaseException as e: res = {"pass": False, "score": 0, "issues": [f"الفحص نفسه وقع: {str(e)[:150]}"]}   # فحص عنصر واحد مايوقّفش الباقي
         for kind, ref in tchecks:

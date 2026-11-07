@@ -37,14 +37,15 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
         dL = lb[..., 0][lips_b].mean() - la[..., 0][lips_s].mean()
         for ch in range(3): la[..., ch][lips_s] += (lb[..., ch][lips_b].mean() - la[..., ch][lips_s].mean()) * lipcol
         la[..., 0][mow > 128] += dL * .5
-    Sw = cv2.GaussianBlur(cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB), (0, 0), .6)   # نفس حدة صورة الوش
+    St = cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)   # السنان: البكسل الحقيقي (من غير تنعيم: تفاصيل سطح السنان لازم تفضل)
+    Sw = cv2.GaussianBlur(St, (0, 0), .6)   # الشفايف والجلد بس: نفس حدة صورة الوش
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
-    region = np.maximum((mlw > 128).astype(np.uint8) * 255, bo_m); k = max(9, int(.12 * np.linalg.norm(v2)))
+    region = np.maximum((mlw > 128).astype(np.uint8) * 255, bo_m); k = max(7, int(.05 * np.linalg.norm(v2)))   # هامش صغير: جلد الصورة القريبة (من غير مسام الوش) مايبانش كرقعة
     region = cv2.dilate(region, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     x, y, w, h = cv2.boundingRect(region); ctr = (x + w // 2, y + h // 2)
     comp = cv2.seamlessClone(Sw, B, region, ctr, cv2.NORMAL_CLONE)
     kk = cv2.GaussianBlur(cv2.erode(mow, np.ones((3, 3), np.uint8)), (0, 0), 1.5).astype(np.float32)[..., None] / 255
-    out = (Sw * kk + comp * (1 - kk)).astype(np.uint8)
+    out = (St * kk + comp * (1 - kk)).astype(np.uint8)
     Image.fromarray(out).save(out_p)
     np.save(out_p.replace(".png", "_open.npy"), mow); np.save(out_p.replace(".png", "_M.npy"), M); return out_p   # M: تحويل صورة الابتسامة ← الوش (لحدود السنان على الوش)
 if __name__ == "__main__":
