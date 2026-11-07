@@ -175,6 +175,8 @@ def _run(case: Path, args: list[str], log_name: str, timeout: int, cwd: str = "p
 def _tail(case: Path, log_name: str, n: int = 6) -> str:
     try:
         txt = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore")
+        if "ATLAS_AUTH" in txt:   # المفتاح نفسه مرفوض (منتهي أو اتغير)
+            return "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة»."
         if "ATLAS_LOW_BALANCE" in txt:   # مش مشكلة في الصور: خدمة التحليل نفسها واقفة
             return "خدمة تحليل الصور متوقفة لأن رصيد حساب Atlas أقل من دولار واحد. اشحن الرصيد ثم اضغط «أعد المحاولة»."
         lines = txt.splitlines()
@@ -681,6 +683,10 @@ def _note(n: str) -> str:
         return f"لم تُصنع لأن خطوة «{lab}» لم تكتمل."
     if "SMILE_NOT_FRONTAL" in n:   # صورة ابتسامة البعد مش من الأمام: التركيب على الوش هيطلع مشوّه، فالمحرك رفض يعمله
         return "صورة «الابتسامة بعد العلاج» ليست من الأمام، فتركيبها على الوجه يشوّهه. ارفع ابتسامة أمامية بعد العلاج، أو صورة وجه المريض بعد العلاج."
+    if "ATLAS_AUTH" in n:
+        return "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة»."
+    if "ATLAS_LOW_BALANCE" in n:
+        return "خدمة تحليل الصور متوقفة لأن رصيد حساب Atlas أقل من دولار واحد. اشحن الرصيد ثم اضغط «أعد المحاولة»."
     if n.startswith("فشل التصنيع:"):
         return "تعذّر صنعها: " + n.split(":", 1)[1].strip()[:160]
     if n.startswith("الصورة الحقيقية ناقصة"):

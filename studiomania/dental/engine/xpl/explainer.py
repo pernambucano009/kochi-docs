@@ -13,6 +13,7 @@ def chat(parts, model="google/gemini-3.8-flash", mt=6000):
             try:
                 r = httpx.post(LLM, headers={"Authorization": f"Bearer {K}"}, timeout=300,
                                json={"model": m, "messages": [{"role": "user", "content": parts}], "temperature": .3, "max_tokens": mt, "response_format": {"type": "json_object"}})
+                if r.status_code in (401, 403): raise SystemExit("ATLAS_AUTH " + r.text[:200])   # المفتاح غلط/منتهي: مفيش فايدة نحاول تاني
                 if r.status_code == 429:
                     msg = r.text[:300]; err = RuntimeError(msg)
                     if "balance" in msg.lower() and att >= 3: raise SystemExit("ATLAS_LOW_BALANCE " + msg)   # الرصيد خلص: مفيش فايدة نكمّل

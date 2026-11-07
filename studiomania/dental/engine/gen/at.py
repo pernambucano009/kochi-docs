@@ -5,6 +5,7 @@ H = {"Authorization": f"Bearer {K}"}
 def unwrap(p): return p["data"] if isinstance(p, dict) and "data" in p and "code" in p else p
 def run(kind, body, t=1800):
     r = httpx.post(f"{B}/generate{kind}", headers=H, json=body, timeout=90)
+    if r.status_code in (401, 403): raise SystemExit("ATLAS_AUTH " + r.text[:200])
     if r.status_code >= 400: raise SystemExit(f"{r.status_code} {r.text[:600]}")
     pid = unwrap(r.json()).get("id")
     t0 = time.time()
@@ -21,4 +22,5 @@ def get(url, dest): pathlib.Path(dest).write_bytes(httpx.get(url, timeout=300, f
 def upload(path):
     with open(path, "rb") as f:
         r = httpx.post(f"{B}/uploadMedia", headers=H, files={"file": (pathlib.Path(path).name, f)}, timeout=300)
+    if r.status_code in (401, 403): raise SystemExit("ATLAS_AUTH " + r.text[:200])
     d = unwrap(r.json()); return d.get("download_url") or d.get("url")

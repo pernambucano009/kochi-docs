@@ -15577,4 +15577,5 @@ window.I18N_EN = {
   "تم الرفع، جارٍ الحفظ…": "Uploaded, saving…",
   "انقطع الاتصال أثناء الرفع، حاول مرة أخرى.": "The connection dropped during the upload, please try again.",
   "افتح الصورة بالحجم الكامل": "Open the photo at full size",
+  "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة».": "The photo analysis service rejects the Atlas key (expired or changed). Put the new key in the server's key file, then press «Try again».",
 };
