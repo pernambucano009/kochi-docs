@@ -10,6 +10,7 @@ def key_pts(c, frac=.3):
 def map_teeth(full, vis):
     """full/vis: {fdi: contour}. يرجّع التحويل (تشابه) من full لـ vis."""
     common = [k for k in full if k in vis and k < 30]
+    if len(common) < 2: raise SystemExit(f"TEETH_NO_MATCH: السنان المرقّمة في الابتسامة {sorted(k for k in vis if k < 30)} والمبعد {sorted(k for k in full if k < 30)}")
     P1 = np.vstack([key_pts(full[k]) for k in common]); P2 = np.vstack([key_pts(vis[k]) for k in common])
     M, inl = cv2.estimateAffinePartial2D(P1, P2, method=cv2.RANSAC, ransacReprojThreshold=12)
     return M, common, int(inl.sum())

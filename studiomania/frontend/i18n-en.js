@@ -15579,4 +15579,5 @@ window.I18N_EN = {
   "افتح الصورة بالحجم الكامل": "Open the photo at full size",
   "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة».": "The photo analysis service rejects the Atlas key (expired or changed). Put the new key in the server's key file, then press «Try again».",
   "خدمة Atlas مزدحمة الآن ولم تستجب بعد ثلاث محاولات. انتظر بضع دقائق ثم اضغط «أعد المحاولة».": "Atlas is busy right now and did not respond after three attempts. Wait a few minutes, then press «Try again».",
+  "لم نستطع مطابقة الأسنان المرقّمة في صورة الابتسامة بأسنان صورة المبعد. تأكّد أن الصورتين لنفس المريض بعد العلاج ومن الأمام، ثم اضغط «أعد المحاولة».": "We could not match the numbered teeth in the smile photo with the retracted photo. Make sure both are the same patient after treatment, taken from the front, then press «Try again».",
 };

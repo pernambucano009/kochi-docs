@@ -46,6 +46,10 @@ def smile_fit(c):
     else: M, op = fit_M(ap, c.canon("after_smile"), E + "ms/smile_lips.png", E + "ms/smile_open.png")
     np.save(E + "smile_to_ap.npy", M)
     _, tS = analyze(c.canon("after_smile"), A + "ai_smile.png", A + "lab_smile.json")
+    if sum(1 for t in tS if int(t["fdi"]) < 30) < 2:   # ترقيم الابتسامة طلع فاضي/غلط (مثلًا اتعمل على الصورة قبل تعديل اتجاهها): نعيده مرة
+        for f in ("ai_smile.png", "lab_smile.json"):
+            if os.path.exists(A + f): os.remove(A + f)
+        _, tS = analyze(c.canon("after_smile"), A + "ai_smile.png", A + "lab_smile.json")
     vis_ap = {}
     for th in tS:   # الظاهر بس جوه فتحة البق على الوش
         cc = th["c"].astype(np.float32) @ M[:, :2].T + M[:, 2]

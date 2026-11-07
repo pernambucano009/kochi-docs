@@ -24,7 +24,8 @@ def _run_once(kind, body, t):
         p = unwrap(httpx.get(f"{B}/prediction/{pid}", headers=H, timeout=60).json())
         st = p.get("status")
         if st in ("completed", "succeeded"):
-            o = p.get("outputs") or p.get("output"); o = [o] if isinstance(o, str) else o
+            o = p.get("outputs") or p.get("output"); o = [o] if isinstance(o, str) else (o or [])
+            if not o: raise SystemExit("failed: empty outputs; please retry")   # نجح من غير ناتج (بيحصل مع الموديلات التوليدية): يتعاد
             return o[0]
         if st in ("failed", "timeout", "canceled", "cancelled"): raise SystemExit(f"failed: {str(p)[:600]}")
         time.sleep(5)
