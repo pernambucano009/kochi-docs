@@ -5,7 +5,7 @@ from PIL import Image
 def faithful(orig, up, out, sig=2.2):
     U = np.array(Image.open(up).convert("RGB")).astype(np.float32); O = np.array(Image.open(orig).convert("RGB").resize((U.shape[1], U.shape[0]), Image.BICUBIC)).astype(np.float32)
     hi = U - cv2.GaussianBlur(U, (0, 0), sig); lo = cv2.GaussianBlur(O, (0, 0), sig)
-    Image.fromarray(np.clip(lo + hi, 0, 255).astype(np.uint8)).save(out); return out
+    Image.fromarray(np.clip(lo + hi * .7, 0, 255).astype(np.uint8)).save(out); return out   # ٧٠٪ من حدة موديل التكبير: الكاملة كانت بتعمل هالات وملمس خشن على الجلد
 def upscale_small(path, min_w=1400, passes=2):
     """صورة قريبة صغيرة (مقصوصة من صورة الوش مثلًا): تكبير أمين لحد ما عرضها يوصل min_w (كل مرة ×٢ تقريبًا)، مكانها.
     بيرجع (العرض قبل، العرض بعد)."""

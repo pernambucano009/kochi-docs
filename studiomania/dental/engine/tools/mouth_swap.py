@@ -69,7 +69,7 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
     xs_l = np.where((mlw > 128).any(0))[0]; ys_l = np.where((mlw > 128).any(1))[0]
     lw, lh = float(xs_l.max() - xs_l.min()), float(ys_l.max() - ys_l.min()); lc = (int((xs_l.min() + xs_l.max()) / 2), int((ys_l.min() + ys_l.max()) / 2))
-    region = np.zeros((H, W), np.uint8); cv2.ellipse(region, lc, (int(lw * .68), int(lh * .95)), 0, 0, 360, 255, -1)
+    region = np.zeros((H, W), np.uint8); cv2.ellipse(region, lc, (int(lw * .68), int(lh * .66)), 0, 0, 360, 255, -1)   # رأسيًا هامش صغير بس: جلد دقن الصورة القريبة كان بيبان كرقعة تحت الشفة
     kf = max(7, int(.10 * np.linalg.norm(v2)) | 1); region = np.maximum(region, cv2.dilate(bo_m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kf, kf))))
     valid = cv2.erode(cv2.warpAffine(np.full(mo.shape, 255, np.uint8), M, (W, H)), np.ones((9, 9), np.uint8))   # جوه حدود الصورة القريبة بس
     region = np.minimum(region, valid)
