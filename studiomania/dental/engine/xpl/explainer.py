@@ -18,6 +18,8 @@ def chat(parts, model="google/gemini-3.8-flash", mt=6000):
                     msg = r.text[:300]; err = RuntimeError(msg)
                     if "balance" in msg.lower() and att >= 3: raise SystemExit("ATLAS_LOW_BALANCE " + msg)   # الرصيد خلص: مفيش فايدة نكمّل
                     time.sleep(2 * (att + 1) + random.random() * 2); continue
+                if r.status_code >= 500 or "choices" not in r.text[:4000]:   # Atlas واقع/مزدحم أو رد من غير إجابة: نحاول تاني
+                    err = RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}"); time.sleep(3 * (att + 1) + random.random() * 2); continue
                 t = r.json()["choices"][0]["message"]["content"].strip()
                 return json.loads(t[t.find("{"): t.rfind("}") + 1])
             except SystemExit: raise
