@@ -12,7 +12,7 @@ def corners(m):   # طرفين فتحة البق (أبعد نقطة شمال و�
     ys, xs = np.where(m > 0); l = np.argmin(xs); r = np.argmax(xs); return np.float32([xs[l], ys[l]]), np.float32([xs[r], ys[r]])
 INC_IPD = .152   # عرض السنة الأمامية ÷ المسافة بين نِنّي العينين في صورة وش (مقاس على صورة اتظبطت بإيد العميل: ٠٫١٥٥)
 
-def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=.3, inc_w=None):
+def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=.3, inc_w=None, teeth_l=.5):
     """البق كله (الشفايف + السنان) من صورة الابتسامة الحقيقية بعد العلاج على وش المريض: علاقة السنان بالشفايف حقيقية.
     - المقاس والمكان: زوايا الشفايف على زوايا بق الوش، والبق بيتضغط رأسيًا ٨٪ (الصورة القريبة بتكبّر سُمك الشفايف) — اختيار العميل (نسخة ٣).
     - الإضاءة: لون الشفايف وإضاءتها بيقربوا ٣٠٪ من شفايفه في صورة الوش، والسنان السطوع بس (لونها زي ما هو).
@@ -39,10 +39,18 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
     la = cv2.cvtColor(Sw, cv2.COLOR_RGB2LAB).astype(np.float32); lb = cv2.cvtColor(B, cv2.COLOR_RGB2LAB).astype(np.float32)
     lips_s = (mlw > 128) & (mow < 128)
     bl_ = np.zeros((H, W), np.uint8); cv2.fillPoly(bl_, [fo.astype(np.int32)], 255); cv2.fillPoly(bl_, [fi.astype(np.int32)], 0); lips_b = bl_ > 0
-    if lips_s.sum() > 100 and lips_b.sum() > 100:
-        dL = lb[..., 0][lips_b].mean() - la[..., 0][lips_s].mean()
-        for ch in range(3): la[..., ch][lips_s] += (lb[..., ch][lips_b].mean() - la[..., ch][lips_s].mean()) * lipcol
-        la[..., 0][mow > 128] += dL * .5
+    # الإضاءة: الصورة القريبة ممكن تكون متصورة أغمق/أفتح بكتير من صورة الوش. بنقيس الفرق من الجلد اللي بين المناخير والشفة العليا
+    # (موجود في الصورتين، ومش محتاج أقنعة الموديل اللي ممكن تطلع بايظة) ونطبّقه كضرب في السطوع على البق كله (السنان والشفايف) —
+    # تصحيح إضاءة بس، نسب الألوان بين السنان والشفايف بتفضل زي ما هي.
+    H_, W_ = B.shape[:2]; sk_b = np.zeros((H_, W_), np.uint8)
+    top = P[[0, 37, 267]].astype(np.float32); nose = P[[2, 98, 327]].astype(np.float32)
+    cv2.fillPoly(sk_b, [np.vstack([nose[[1]], nose[[0]], nose[[2]], top[[2]], top[[0]], top[[1]]]).astype(np.int32)], 255)
+    sk_s = (cv2.warpAffine(np.full(mo.shape, 255, np.uint8), M, (W_, H_)) > 0) & (sk_b > 0) & ~(mlw > 128)
+    if sk_s.sum() > 150:
+        g = float(np.clip(np.median(lb[..., 0][sk_s]) / max(1.0, np.median(la[..., 0][sk_s])), .75, 1.45))
+        la[..., 0] = np.clip(la[..., 0] * g, 0, 255)
+    if lipcol and lips_s.sum() > 100 and lips_b.sum() > 100:   # لون الشفايف: الـ a/b بس، وبحد أقصى (القناع ممكن يكون مش دقيق)
+        for ch in (1, 2): la[..., ch][lips_s] += float(np.clip(lb[..., ch][lips_b].mean() - la[..., ch][lips_s].mean(), -6, 6)) * lipcol
     St = cv2.cvtColor(np.clip(la, 0, 255).astype(np.uint8), cv2.COLOR_LAB2RGB)   # السنان: البكسل الحقيقي (من غير تنعيم: تفاصيل سطح السنان لازم تفضل)
     Sw = cv2.GaussianBlur(St, (0, 0), .6)   # الشفايف والجلد بس: نفس حدة صورة الوش
     bo_m = np.zeros((H, W), np.uint8); cv2.fillPoly(bo_m, [fo.astype(np.int32)], 255)
