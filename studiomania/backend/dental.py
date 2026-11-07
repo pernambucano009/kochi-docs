@@ -363,10 +363,17 @@ for slot, f, md in pairs:
     crop = md or ("teeth" if slot in ("before_retracted", "after_retracted") and face else "lips" if slot in ("before_smile", "after_smile") and face else "")
     if crop: im = crop_mouth(im, 1.15 if crop == "teeth" else 1.45)
     out = c.canon(slot); os.makedirs(os.path.dirname(out), exist_ok=True); im.save(out, quality=95)
+    up_ = None
+    if slot.endswith(("_retracted", "_smile")) and not slot.endswith("face_retracted") and im.width < 1400:
+        # صورة قريبة صغيرة (مقصوصة من الوش أو صورة بدقة قليلة): تكبير أمين — الحدة من موديل التكبير، والألوان والبقع والشكل من الأصل
+        try:
+            sys.path.insert(0, os.path.dirname(os.getcwd()) + "/tools"); from faithful_upscale import upscale_small
+            up_ = upscale_small(out); from PIL import Image as _I; im = _I.open(out).convert("RGB")
+        except Exception as e: print("UPSCALE_FAILED", slot, str(e)[:120])
     if slot == "after_smile": im.save(c.d + "/canon/after/smile_front.jpg", quality=95)
     for k, x in list(c.m["slots"].items()):
         if k != slot and x.get("file") == f and not k.endswith(("face_retracted", "_face")): del c.m["slots"][k]
-    c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True, "cropped": crop}
+    c.m["slots"][slot] = {"file": f, "view": v.get("view"), "rotate": v.get("rotate", 0), "mirrored": v.get("mirrored", False), "manual": True, "cropped": crop, "upscaled": up_}
     if slot == "before_face" and v.get("gender") in ("male", "female"): c.m["patient"]["gender"] = v["gender"]
     it = c.m["intake"]; it["unused"] = [u for u in it.get("unused", []) if u != f]
 c.save(); c.log("الطبيب حدد: " + ", ".join(f"{s}<-{f}" for s, f in done) + (" | اترفضت: " + ", ".join(f"{s}<-{x['file']} ({x['why']})" for s, x in rejected.items()) if rejected else ""))
