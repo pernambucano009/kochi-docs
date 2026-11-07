@@ -175,6 +175,8 @@ def _run(case: Path, args: list[str], log_name: str, timeout: int, cwd: str = "p
 def _tail(case: Path, log_name: str, n: int = 6) -> str:
     try:
         txt = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore")
+        if "ATLAS_BUSY" in txt or "timeout in queue" in txt:   # طابور Atlas زحمة (حاولنا ٣ مرات)
+            return "خدمة Atlas مزدحمة الآن ولم تستجب بعد ثلاث محاولات. انتظر بضع دقائق ثم اضغط «أعد المحاولة»."
         if "ATLAS_AUTH" in txt:   # المفتاح نفسه مرفوض (منتهي أو اتغير)
             return "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة»."
         if "ATLAS_LOW_BALANCE" in txt:   # مش مشكلة في الصور: خدمة التحليل نفسها واقفة
@@ -683,6 +685,8 @@ def _note(n: str) -> str:
         return f"لم تُصنع لأن خطوة «{lab}» لم تكتمل."
     if "SMILE_NOT_FRONTAL" in n:   # صورة ابتسامة البعد مش من الأمام: التركيب على الوش هيطلع مشوّه، فالمحرك رفض يعمله
         return "صورة «الابتسامة بعد العلاج» ليست من الأمام، فتركيبها على الوجه يشوّهه. ارفع ابتسامة أمامية بعد العلاج، أو صورة وجه المريض بعد العلاج."
+    if "ATLAS_BUSY" in n or "timeout in queue" in n:
+        return "خدمة Atlas مزدحمة الآن ولم تستجب بعد ثلاث محاولات. انتظر بضع دقائق ثم اضغط «أعد المحاولة»."
     if "ATLAS_AUTH" in n:
         return "خدمة تحليل الصور ترفض مفتاح Atlas (منتهٍ أو تغيّر). ضع المفتاح الجديد في ملف المفاتيح على الخادم ثم اضغط «أعد المحاولة»."
     if "ATLAS_LOW_BALANCE" in n:

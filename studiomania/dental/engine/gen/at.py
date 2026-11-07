@@ -3,7 +3,18 @@ K = (__import__("os").environ.get("ATLASCLOUD_API_KEY") or __import__("os").envi
 B = "https://api.atlascloud.ai/api/v1/model"
 H = {"Authorization": f"Bearer {K}"}
 def unwrap(p): return p["data"] if isinstance(p, dict) and "data" in p and "code" in p else p
-def run(kind, body, t=1800):
+def run(kind, body, t=1800, tries=3):
+    """تشغيل موديل على Atlas. لو الطلب وقع في طابور Atlas نفسه («timeout in queue; please retry») بنعيده لوحدنا (لحد ٣ مرات)."""
+    err = None
+    for i in range(tries):
+        try: return _run_once(kind, body, t)
+        except SystemExit as e:
+            err = e; m = str(e).lower()
+            if not any(x in m for x in ("timeout in queue", "please retry", "queue")): raise
+            time.sleep(10 * (i + 1))
+    raise SystemExit("ATLAS_BUSY " + str(err)[:300])
+
+def _run_once(kind, body, t):
     r = httpx.post(f"{B}/generate{kind}", headers=H, json=body, timeout=90)
     if r.status_code in (401, 403): raise SystemExit("ATLAS_AUTH " + r.text[:200])
     if r.status_code >= 400: raise SystemExit(f"{r.status_code} {r.text[:600]}")
