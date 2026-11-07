@@ -32,10 +32,14 @@ Identify each index using FDI numbering from the PATIENT's perspective (patient'
 Use anatomy (central incisors are the widest front teeth, the dental midline, the labial frenum, canine shape) not just position. If an outline covers two teeth or is not a tooth, mark fdi 0.
 Return JSON: {"labels": {"<index>": <fdi>, ...}, "upper_midline_between": [<index of 11>, <index of 21>]}"""
 def label(img, comps):
-    v = img.copy()
+    # بنكبّر الصورة الأول (لـ1600) وبعدين نرسم الحدود والأرقام بمقاس مناسب لحجم السنة: في صورة صغيرة (مقصوصة من الوش)
+    # الأرقام كانت بتغطي السنان كلها والموديل مايعرفش يرقّم الفك التحتاني
+    s = 1600 / max(img.shape[:2]); v = cv2.resize(img, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
+    mw = float(np.median([t["w"] for t in comps])) * s if comps else 60; fs = max(.5, min(1.6, mw / 70)); th = max(1, int(fs * 3))
     for i, t in enumerate(comps):
-        cv2.polylines(v, [t["c"]], True, (0, 255, 255), 3); cv2.putText(v, str(i), (int(t["cx"]) - 18, int(t["cy"]) + 15), 0, 1.6, (0, 0, 255), 5)
-    s = 1600 / max(v.shape[:2]); v = cv2.resize(v, None, fx=s, fy=s); ok, b = cv2.imencode('.jpg', v, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        cv2.polylines(v, [(t["c"] * s).astype(np.int32)], True, (0, 255, 255), max(1, int(fs * 2)))
+        cv2.putText(v, str(i), (int(t["cx"] * s - 10 * fs), int(t["cy"] * s + 10 * fs)), 0, fs, (0, 0, 255), th)
+    ok, b = cv2.imencode('.jpg', v, [cv2.IMWRITE_JPEG_QUALITY, 90])
     d = chat([{"type": "text", "text": LABEL}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(b.tobytes()).decode()}}], model="google/gemini-2.5-pro", mt=8000)
     for i, t in enumerate(comps): t["fdi"] = int(d["labels"].get(str(i), 0))
     return [t for t in comps if t["fdi"]], d
