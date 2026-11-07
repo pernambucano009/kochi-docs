@@ -31,6 +31,10 @@ def swap(base_p, out_p, smile_p=None, lips_p=None, open_p=None, ysq=.92, lipcol=
         # المقاس من السنان نفسها (ثابتة عند نفس الشخص) مش من زوايا البق: لو ابتسامة «قبل» أوسع، البق المنقول كان بيتمط معاها ويكبر
         st = INC_IPD * float(np.linalg.norm(P[468] - P[473])) / float(inc_w)
         s = float(np.clip(st, s * .7, s * 1.05))
+    # الرأسي: ارتفاع الشفايف المنقولة = ارتفاع شفايف الوش نفسه (من نقط الوش)، وإلا لو البق المنقول أقصر، شفة الوش الأصلية
+    # بتفضل باينة فوقه (شفتين علويتين — حصلت على السيرفر لما المقاس اتصغّر من السنان)
+    lip_h_face = float(fo[:, 1].max() - fo[:, 1].min()); lip_h_sm = float(ys_.max() - ys_.min()) * s
+    ysq = float(np.clip(lip_h_face / max(1.0, lip_h_sm), .8, 1.25))
     R = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]]) @ np.diag([s, s * ysq])
     c1 = (sl + sr) / 2; c2 = (bl + br) / 2
     so = np.float32([c1[0], (ys_.min() + ys_.max()) / 2]); bo = np.float32([c2[0], (fo[:, 1].min() + fo[:, 1].max()) / 2])

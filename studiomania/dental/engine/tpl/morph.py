@@ -6,7 +6,8 @@ def resample(c, n=N):
     c = np.asarray(c, np.float32); cc = np.vstack([c, c[:1]]); d = np.r_[0, np.cumsum(np.linalg.norm(np.diff(cc, axis=0), axis=1))]
     t = np.linspace(0, d[-1], n, endpoint=False); x = np.interp(t, d, cc[:, 0]); y = np.interp(t, d, cc[:, 1]); out = np.c_[x, y]
     ctr = out.mean(0); ang = np.arctan2(out[:, 1] - ctr[1], out[:, 0] - ctr[0])
-    if np.cross(out[1] - out[0], out[2] - out[1]) < 0: out = out[::-1]; ang = ang[::-1]   # نفس الاتجاه
+    u, v = out[1] - out[0], out[2] - out[1]   # اتجاه الدوران (np.cross للمتجهات ثنائية البعد اتشال من numpy 2)
+    if u[0] * v[1] - u[1] * v[0] < 0: out = out[::-1]; ang = ang[::-1]   # نفس الاتجاه
     k = int(np.argmin(np.abs(ang + np.pi / 2))); return np.roll(out, -k, axis=0)       # نبدأ من أعلى نقطة (نفس المرجع للشكلين)
 def rig(c, margin=1.35):
     ctr = c.mean(0); ring = ctr + (c - ctr) * margin; return np.vstack([[ctr], c, ring])
