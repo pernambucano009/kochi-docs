@@ -186,6 +186,20 @@ def morph_setup():   # صورة البعد متطابقة على القبل + ق
                   FM={k: m.astype(np.float32) / 255 for k, m in masks.items()}, M=M)
         At = {t["fdi"]: t for t in shot("A").teeth_all}; common = [k for k in common if k in At]
         _M["planned"] = {k: cv2.transform(At[k]["c"].reshape(-1, 1, 2).astype(np.float32), M).reshape(-1, 2) for k in common}   # شكل البعد على صورة القبل
+        # سنة في طرف القوس مش باينة كويس في صورة البعد (الضاحك مغطى بالشفة/ظل/برا الفوكس): جواها في صورة البعد ظل وشفة مش سنة،
+        # فلو دخلت المورف بيطلع شريط بني جنب الناب. بنسيبها على حالها من صورة القبل (زي أي سنة مش موجودة في البعد)
+        lab_ = cv2.cvtColor(np.clip(_M["FA_"], 0, 255).astype(np.uint8), cv2.COLOR_RGB2LAB)
+        def _vis(k):
+            mm = np.zeros(lab_.shape[:2], np.uint8); cv2.fillPoly(mm, [_M["planned"][k].astype(np.int32)], 255); mm = cv2.erode(mm, np.ones((7, 7), np.uint8)) > 0
+            if mm.sum() < 50: return 0.0
+            return float(((lab_[..., 0][mm] > 120) & (lab_[..., 1][mm] < 140)).mean())
+        ups = sorted([k for k in common if k < 30], key=lambda k: _M["planned"][k][:, 0].mean()); drop = []
+        for end in (ups, ups[::-1]):
+            for k in end:
+                if _vis(k) < .9: drop.append(k)
+                else: break
+        _M["hidden"] = drop   # سنان طرفية جواها شفة/ظل في صورة البعد: بتفضل في المورف، بس البكسلات اللي مش سنة جواها بتتشال من القناع (تحت)
+        if drop: print("morph: end teeth partly hidden in after photo:", drop)
         B = shot("B"); Bt = {t["fdi"]: t for t in B.teeth_all}
         up_ = [k for k in common if k < 30]; M_up = up_
         tm = np.zeros(ib.shape[:2], np.uint8)   # السنان (قبل + بعد) محمية تماماً: التنضيف على اللثة والشفايف بس
@@ -247,7 +261,44 @@ def morph_frame(prog, z=1.0, iso=1.0):
             m = M["isoB"].copy(); cc = current_contours(prog); cur = np.zeros_like(m)
             for k, c in cc.items():
                 if k < 30: cv2.fillPoly(cur, [c.astype(np.int32)], 255)
-            m = np.maximum(m, cv2.GaussianBlur(cur, (0, 0), 1.5)); B.iso = Image.fromarray(np.ascontiguousarray(np.rot90(m, -1)))
+            m = np.maximum(m, cv2.GaussianBlur(cur, (0, 0), 1.5))
+            # حدود البعد أحيانًا بتاخد شريحة شفة/ظل عند الحافة القاطعة (بنية/غامقة مش سنة): بنحسب مرة واحدة على الصورة النهائية
+            # (prog=1) البكسلات اللي مش لون سنة في النص السفلي *والمتصلة بالبرّا* (مش فتحات جوه السنة) ونشيلها من القناع في كل الفريمات
+            # — كانت بتسيب شريط بني تحت الناب والرباعية. (مش بنحسبها على فريمات النص: المورف فيه خطوط لحام غامقة مؤقتة)
+            if "cut" not in M and not os.environ.get("ISO_NOCUT"):
+                cc1 = current_contours(1.0); cur1 = np.zeros_like(m)
+                for k, c in cc1.items():
+                    if k < 30: cv2.fillPoly(cur1, [c.astype(np.int32)], 255)
+                m1 = np.maximum(M["isoB"], cv2.GaussianBlur(cur1, (0, 0), 1.5))
+                im_ = np.asarray(morph_img(1.0, rotated=False)); lab_ = cv2.cvtColor(im_, cv2.COLOR_RGB2LAB)
+                inside = m1 > 127
+                cx_ = np.where(cur1.any(0))[0]; xs_ = np.arange(cx_.min(), cx_.max() + 1)   # النص السفلي من السنان بس (اللثة فوق وردية بطبيعتها)
+                mid_ = np.array([np.mean(np.where(cur1[:, x] > 0)[0][[0, -1]]) if cur1[:, x].any() else np.nan for x in xs_])
+                okm = ~np.isnan(mid_); mid_ = np.interp(np.arange(m.shape[1]), xs_[okm], mid_[okm])
+                low_ = np.arange(m.shape[0])[:, None] > mid_[None, :]
+                nontooth = (lab_[..., 0] < 110) | (lab_[..., 1] > 142); curd = cv2.dilate(cur1, np.ones((5, 5), np.uint8)) > 0
+                dark = np.zeros(m.shape, bool)   # جوه حدود كل سنة: التلت السفلي اللي أغمق بكتير من السنة نفسها (شفة/ظل دخل في حد البعد)
+                for k, c in cc1.items():
+                    if k >= 30: continue
+                    ck = np.zeros(m.shape, np.uint8); cv2.fillPoly(ck, [c.astype(np.int32)], 255); core = cv2.erode(ck, np.ones((9, 9), np.uint8)) > 0
+                    if core.sum() < 50: continue
+                    Lm = np.median(lab_[..., 0][core]); Am = np.median(lab_[..., 1][core]); y0_, y1_ = c[:, 1].min(), c[:, 1].max()
+                    zone = (ck > 0) & ((np.arange(m.shape[0])[:, None] > y0_ + (y1_ - y0_) * .6) if k not in M.get("hidden", []) else True)
+                    dark |= zone & ((lab_[..., 0] < Lm - 35) | (lab_[..., 1] > Am + 8))
+                dark |= lab_[..., 1] > 146
+                hid = np.zeros(m.shape, np.uint8)   # السنان الطرفية المغطاة جزئيًا: القص مسموح جوه حدودها كلها (الشفة/الظل اللي داخل فيها)
+                for k in M.get("hidden", []):
+                    if k in cc1: cv2.fillPoly(hid, [cc1[k].astype(np.int32)], 255)
+                hid = cv2.dilate(hid, np.ones((9, 9), np.uint8)) > 0; low_ |= hid; M["hid"] = hid
+                bad = inside & low_ & ((~curd & (cv2.GaussianBlur(nontooth.astype(np.float32), (0, 0), 4) > .15)) | (curd & (cv2.GaussianBlur(dark.astype(np.float32), (0, 0), 2) > .4)))
+                n_, lb_ = cv2.connectedComponents((bad | ~inside).astype(np.uint8)); ids_ = set(np.unique(lb_[~inside])) - {0}
+                cut = bad & np.isin(lb_, list(ids_)); cut = cv2.dilate(cut.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0   # يشيل معاه هالة الحافة الناعمة القديمة
+                M["cut"] = cut & ((cur1 == 0) | (cv2.erode(cur1, np.ones((5, 5), np.uint8)) == 0)); M["cut_hid"] = cut & hid & ~M["cut"]
+            if M.get("cut") is not None and (M["cut"].any() or M["cut_hid"].any()):
+                p_ = max(0.0, min(1.0, prog if isinstance(prog, (int, float)) else max(prog.values() or [0])))   # القص محسوب من صورة البعد، فبيظهر مع المورف (صورة القبل زي ما هي)
+                m = m.copy().astype(np.float32); m[(M["cut"] & (cv2.erode(cur, np.ones((5, 5), np.uint8)) == 0)) | M["cut_hid"]] *= 1 - p_
+                m = cv2.GaussianBlur(m, (0, 0), 1.5).astype(np.uint8)
+            B.iso = Image.fromarray(np.ascontiguousarray(np.rot90(m, -1)))
         return B.base(z, iso)
     finally: B.img, B.iso = B._img0, B._iso0   # يرجع القبل الحقيقي لأي حد بعده
 def planned(im, z, p=1.0, col=(255, 255, 255), width=3, dashed=True, fill=None, only_added=False):

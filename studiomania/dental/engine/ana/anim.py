@@ -19,7 +19,22 @@ def iso_mask_ai(bgr, masks, ai_path, strict=False):
     ai = cv2.resize(cv2.imread(ai_path, 0), (W, H)); b = (ai > 128).astype(np.uint8)
     b = cv2.morphologyEx(b, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)); n, lb = cv2.connectedComponents(np.maximum(b, (teeth > 0).astype(np.uint8)))
     ids = set(np.unique(lb[teeth > 0])) - {0}; keep = np.isin(lb, list(ids)).astype(np.uint8) * 255
-    ys = np.where(teeth.any(1))[0]; low = ys.max() + 8; keep[low:] = np.minimum(keep[low:], teeth[low:])   # مفيش حاجة تحت الحافة القاطعة غير السنان
+    # تحت الحافة القاطعة مفيش غير السنان — عمود عمود (مش خط واحد عند أوطى سنة): الناب والضاحك حافتهم أعلى من القواطع،
+    # فالشفة السفلية/أطراف السنان السفلية اللي تحتهم كانت بتفضل (بقع بنية ووردية تحت الناب وبين الرباعية والناب)
+    cols0 = np.where(teeth.any(0))[0]; xs0 = np.arange(cols0.min(), cols0.max() + 1)
+    bots0 = np.array([np.where(teeth[:, x] > 0)[0].max() if teeth[:, x].any() else np.nan for x in xs0], np.float32)
+    okb = ~np.isnan(bots0); bots0 = np.interp(np.arange(W), xs0[okb], bots0[okb])   # بين السنان: خط بين حافتيهم؛ برا آخر سنة: حافة آخر سنة
+    hm0 = np.mean([np.ptp(np.where(m > 0)[0]) for m in masks]); below = np.zeros_like(keep)
+    for x in range(W): below[min(H, int(bots0[x] + hm0 * .04) + 1):, x] = 255
+    keep[below > 0] = np.minimum(keep, teeth)[below > 0]
+    # اللثة مسموح بيها فوق خط اللثة بس (+ الحليمات بين السنان لحد ~٠٫٤ من طول السنة): أي حاجة وردية أوطى من كده بين السنان
+    # (شفة/لسان باين من الفراغات عند الحافة القاطعة) بتتشال — كانت بتفضل شرايط وردية بين الرباعية والناب وبين الناب والضاحك
+    tops0 = np.array([np.where(teeth[:, x] > 0)[0].min() if teeth[:, x].any() else np.nan for x in xs0], np.float32)
+    ok0 = ~np.isnan(tops0); tops0 = np.interp(xs0, xs0[ok0], tops0[ok0]); win0 = max(5, int(np.median([np.ptp(np.where(m > 0)[1]) for m in masks])) | 1)
+    env0 = np.convolve(np.pad(tops0, win0 // 2, mode="edge"), np.ones(win0) / win0, "valid")
+    gum_ok = np.zeros_like(keep)
+    for i, x in enumerate(xs0): gum_ok[:min(H, int(env0[i] + hm0 * .4)), x] = 255
+    keep = np.maximum(np.minimum(keep, gum_ok), teeth)
     if not strict:   # صورة البعد (بمبعد إسود): عزل الذكاء الاصطناعي لوحده طلع ممتاز
         keep = cv2.morphologyEx(keep, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)); aik = cv2.dilate(b * 255, np.ones((9, 9), np.uint8))
         return cv2.GaussianBlur(np.maximum(np.minimum(keep, aik), np.minimum(teeth, aik)), (0, 0), 1.6)
