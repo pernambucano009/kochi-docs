@@ -278,15 +278,18 @@
         <div class="dn-row"><button class="dn-btn ghost" data-dn="brain">افتح الحالات في العقل</button></div></div>`;
     if (r.cases.some((c) => c.busy)) pickTimer = setTimeout(() => pickT === t && root && pick(t), 4000);
   }
-  async function make(caseId) {
-    const t = pickT; clearTimeout(pickTimer);
+  let lastCase = null;
+  async function make(caseId, replace = "") {
+    const t = pickT; clearTimeout(pickTimer); lastCase = caseId;
     const w = shell(`«${t.name}»`);
     w.innerHTML = `<div class="dn-card"><p>${t.kind === "photo" ? "جارٍ صنع البوست من صور الحالة…" : "جارٍ تجهيز الحالة لقالب الفيديو…"}</p></div>`;
     try {
-      const r = await call(`/api/dental/brain/${encodeURIComponent(caseId)}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.id }) });
+      const r = await call(`/api/dental/brain/${encodeURIComponent(caseId)}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.id, replace }) });
       if (r.kind === "video") { home = home || await call("/api/dental"); return showCase(r.cid); }
       w.innerHTML = `<div class="dn-card dn-out"><img src="${esc(r.file.url)}" alt="${esc(r.file.name)}">
         <p>حُفظ البوست في فولدر الحالة في العقل.</p>
+        ${r.ask_logo ? `<div class="dn-card" data-logoask style="box-shadow:0 0 0 1.5px var(--dn-acc)"><p>شعارك لا يظهر بوضوح على هذه الخلفية. هل تسمح بتحويل لونه (أبيض على الخلفية الغامقة) في بوستات الأسنان؟ لن نغيّر شعارك دون موافقتك.</p>
+          <div class="dn-row"><button class="dn-btn" data-dn="logo-yes" data-file="${esc(r.file.id)}">نعم، حوّل لونه</button><button class="dn-btn ghost" data-dn="logo-no">لا، أبقِه كما هو</button></div></div>` : ""}
         <div class="dn-row"><a class="dn-btn" href="${esc(r.file.url)}" download style="text-decoration:none">تنزيل</a><button class="dn-btn ghost" data-dn="back-pick">قالب آخر لهذه الحالة أو حالة أخرى</button></div></div>`;
     } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p><div class="dn-row"><button class="dn-btn ghost" data-dn="back-pick">رجوع</button></div></div>`; }
   }
@@ -298,6 +301,12 @@
       if (a === "close") return close();
       if (t.dataset.pick) return make(t.dataset.pick);
       if (a === "back-pick") return pick(pickT);
+      if (a === "logo-yes" || a === "logo-no") {
+        t.disabled = true;
+        await call("/api/dental/logo-color", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ white: a === "logo-yes" }) });
+        if (a === "logo-yes") return make(lastCase, t.dataset.file);
+        root.querySelector("[data-logoask]")?.remove(); return;
+      }
       if (a === "brain") { close(); window.BL_TAB = "images"; window.BL_CASES = true; return window.NHNav?.("brainlib"); }
       if (a === "home") { cur = null; clearTimeout(timer); return pickT ? pick(pickT) : open(); }
       if (a === "create") return create();

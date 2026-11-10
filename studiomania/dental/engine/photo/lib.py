@@ -373,6 +373,9 @@ def logo_img(brand, h=None, w=None, color=None):
     return lg
 
 
+LOGO_LOW = [False]   # في البوست ده: الشعار ضعيف الظهور ومش متلوّن (محتاج موافقة العميل)
+
+
 def paste_logo(cv, brand, cx, cy, h=None, w=None, rot=0, alpha=1.0):
     lg = logo_img(brand, h, w)
     # شعار غامق فوق مكان غامق (أسود/ضل): بيتلوّن أبيض عشان يبان — زي شعارات العيادات على الأسود
@@ -381,8 +384,11 @@ def paste_logo(cv, brand, cx, cy, h=None, w=None, rot=0, alpha=1.0):
     reg = np.array(cv.convert("RGB").crop((x0, y0, min(cv.width, x0 + lg.width), min(cv.height, y0 + lg.height)))).astype(np.float32)
     blum = float(reg.mean()) if reg.size else 0
     low = float((np.abs(la[..., :3].mean(2)[on] - blum) < 60).mean()) if on.any() else 0   # جزء الشعار اللي مش باين على الخلفية
-    if low > .06:
-        lg = logo_img(brand, h, w, color=(255, 255, 255) if blum < 128 else (20, 20, 22))
+    if low > .06:   # الشعار مش هيبان كويس هنا: بنلوّنه بس لو العميل وافق (logo_recolor)، وإلا بيفضل بألوانه ونبلّغ
+        if brand.get("logo_recolor") is True:
+            lg = logo_img(brand, h, w, color=(255, 255, 255) if blum < 128 else (20, 20, 22))
+        else:
+            LOGO_LOW[0] = True
     if rot: lg = lg.rotate(rot, expand=True, resample=Image.BICUBIC)
     if alpha < 1: lg.putalpha(lg.split()[3].point(lambda v: int(v * alpha)))
     cv.paste(lg, (int(cx - lg.width / 2), int(cy - lg.height / 2)), lg); return cv

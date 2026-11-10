@@ -164,5 +164,7 @@ def make(tid, brand, out, **photos):
 
 if __name__ == "__main__":
     tid, brand_p, out = sys.argv[1:4]; kv = dict(a.split("=", 1) for a in sys.argv[4:])
-    try: print(json.dumps({"ok": True, "out": make(tid, json.load(open(brand_p)), out, **kv)}, ensure_ascii=False))
+    try:
+        o = make(tid, json.load(open(brand_p)), out, **kv)
+        print(json.dumps({"ok": True, "out": o, "logo_low_contrast": lib.LOGO_LOW[0]}, ensure_ascii=False))
     except PhotoError as e: print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)); sys.exit(2)

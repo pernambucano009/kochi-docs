@@ -34472,7 +34472,8 @@ def dental_brand(bid: str) -> dict:
         raise HTTPException(400, "أضف شعار العيادة في العقل أولًا، فكل بوست يحمل شعارك")
     name = str(b.get("name") or "").strip()
     phone = str(((b.get("wa") or {}).get("phone")) or b.get("phone") or "").strip()
-    return {"logo": str(logo), "name_en": dental_name_en(bid, name), "phone": phone[:24], "slogan": str(b.get("slogan") or "").strip()[:40]}
+    return {"logo": str(logo), "name_en": dental_name_en(bid, name), "phone": phone[:24], "slogan": str(b.get("slogan") or "").strip()[:40],
+            "logo_recolor": b.get("logo_recolor")}   # تلوين الشعار (أبيض على الغامق) بموافقة العميل بس
 
 
 LATIN_NAME = re.compile(r"[A-Za-z0-9 .&'-]{2,40}")
@@ -34526,6 +34527,20 @@ def dental_fit(tid: str):
 
 class DentalMakeIn(BaseModel):
     template: str
+    replace: str = ""   # بوست قديم يتشال (لما يتعاد بعد موافقة تلوين الشعار)
+
+
+class DentalLogoIn(BaseModel):
+    white: bool
+
+
+@app.post("/api/dental/logo-color")
+def dental_logo_color(body: DentalLogoIn):
+    """العميل وافق (أو رفض) إن الشعار يتلوّن أبيض/غامق لما مايبانش على خلفية البوست. بيتحفظ في العقل."""
+    dental_on()
+    me = active_client_id()
+    update_brain(me, lambda d: (d.update(logo_recolor=bool(body.white)), None)[1])
+    return {"ok": True, "logo_recolor": bool(body.white)}
 
 
 @app.post("/api/dental/brain/{case_id}/make")
@@ -34543,11 +34558,17 @@ def dental_brain_make(case_id: str, body: DentalMakeIn):
     files = {f["id"]: f for f in lib["files"]}
     if body.template in dentalbrain.PHOTO_IDS:
         out = TMP_DIR / f"dpost_{uuid.uuid4().hex[:8]}.jpg"
+        brand = dental_brand(me)
         try:
-            dentalbrain.render_photo(body.template, {k: lib_path(files[v], me) for k, v in r["photos"].items()}, dental_brand(me), out, {})
+            _, low = dentalbrain.render_photo(body.template, {k: lib_path(files[v], me) for k, v in r["photos"].items()}, brand, out, {})
         except RuntimeError as e:
             raise HTTPException(400, str(e))
         bid = lib_store_of(case_id, me)
+        if body.replace:   # النسخة اللي قبل موافقة تلوين الشعار تتشال
+            old_f = next((x for x in lib_load(bid)["files"] if x["id"] == body.replace and x.get("made")), None)
+            if old_f:
+                lib_update(lambda d: d.update(files=[x for x in d["files"] if x["id"] != body.replace]), bid)
+                (lib_dir(bid) / Path(old_f["file"]).name).unlink(missing_ok=True)
         name = f"post_{body.template}_{uuid.uuid4().hex[:6]}.jpg"
         shutil.move(str(out), str(lib_dir(bid) / name))
         tname = next(t["name"] for t in dentalbrain.PHOTO_TEMPLATES if t["id"] == body.template)
@@ -34555,7 +34576,8 @@ def dental_brain_make(case_id: str, body: DentalMakeIn):
              "size": (lib_dir(bid) / name).stat().st_size, "desc": f"بوست «{tname}» من صور الحالة", "tags": ["بوست", "قبل وبعد"],
              "status": "ready", "at": now(), "origin": me, "made": body.template}
         lib_update(lambda d: d["files"].append(f), bid)
-        return {"kind": "photo", "file": lib_file_dict(lib_load(bid), f, bid)}
+        return {"kind": "photo", "file": lib_file_dict(lib_load(bid), f, bid),
+                "ask_logo": bool(low and brand.get("logo_recolor") is None)}   # الشعار مش باين: نسأل العميل قبل أي تلوين
     # فيديو: الصور تتحط في خانات محرك الفيديو من التصنيف (من غير ما الطبيب يرفعها تاني)، والحالة نفسها تتعاد لو الصور ماتغيرتش
     info = case.get("case") or {}
     sig = "|".join(sorted(r["photos"].values())) + "|" + (r.get("live") or "")

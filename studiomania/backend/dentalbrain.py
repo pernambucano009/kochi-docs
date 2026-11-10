@@ -171,8 +171,9 @@ def fit_case(lib: dict, case: dict, tid: str, video_templates: list[dict]) -> di
     return {**base, "ok": r["ok"], "missing": r.get("missing"), "photos": r.get("photos") or {}, "live": r.get("live")}
 
 
-def render_photo(tid: str, photos: dict[str, Path], brand: dict, out: Path, env: dict, timeout: int = 600) -> Path:
-    """بوست صورة من قالب (المحرك: photo/templates.py) ← مسار الصورة."""
+def render_photo(tid: str, photos: dict[str, Path], brand: dict, out: Path, env: dict, timeout: int = 600) -> tuple[Path, bool]:
+    """بوست صورة من قالب (المحرك: photo/templates.py) ← (مسار الصورة، الشعار ضعيف الظهور ومحتاج إذن تلوينه؟).
+    الشعار عمره ما بيتلوّن من غير موافقة العميل (brand["logo_recolor"] = True)."""
     with tempfile.TemporaryDirectory() as td:
         bj = Path(td) / "brand.json"
         bj.write_text(json.dumps(brand, ensure_ascii=False), encoding="utf-8")
@@ -186,4 +187,4 @@ def render_photo(tid: str, photos: dict[str, Path], brand: dict, out: Path, env:
             res = {"ok": False, "error": (r.stderr or "")[-300:]}
         if not res.get("ok") or not out.exists():
             raise RuntimeError(str(res.get("error") or "تعذّر صنع الصورة").split(": ", 1)[-1])
-        return out
+        return out, bool(res.get("logo_low_contrast"))
