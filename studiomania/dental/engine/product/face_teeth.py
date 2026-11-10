@@ -45,8 +45,10 @@ def smile_fit(c):
     if os.path.exists(E + "after_portrait_v3_M.npy"): M = np.load(E + "after_portrait_v3_M.npy"); op = np.load(E + "after_portrait_v3_open.npy")
     else: M, op = fit_M(ap, c.canon("after_smile"), E + "ms/smile_lips.png", E + "ms/smile_open.png")
     np.save(E + "smile_to_ap.npy", M)
-    _, tS = analyze(c.canon("after_smile"), A + "ai_smile.png", A + "lab_smile.json")
-    if sum(1 for t in tS if int(t["fdi"]) < 30) < 2:   # ترقيم الابتسامة طلع فاضي/غلط (مثلًا اتعمل على الصورة قبل تعديل اتجاهها): نعيده مرة
+    if os.path.exists(E + "after_portrait_v3_src.txt") and open(E + "after_portrait_v3_src.txt").read().strip() == "after_retracted":
+        _, tS = analyze(c.canon("after_retracted"), A + "ai_after.png", A + "lab_after.json")   # السنان على الوش جاية من صورة البعد بالمبعد (teeth_swap)
+    else: _, tS = analyze(c.canon("after_smile"), A + "ai_smile.png", A + "lab_smile.json")
+    if not os.path.exists(E + "after_portrait_v3_src.txt") and sum(1 for t in tS if int(t["fdi"]) < 30) < 2:   # ترقيم الابتسامة طلع فاضي/غلط (مثلًا اتعمل على الصورة قبل تعديل اتجاهها): نعيده مرة
         for f in ("ai_smile.png", "lab_smile.json"):
             if os.path.exists(A + f): os.remove(A + f)
         _, tS = analyze(c.canon("after_smile"), A + "ai_smile.png", A + "lab_smile.json")

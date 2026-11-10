@@ -40,7 +40,7 @@ class Case:
     def __init__(self, d):
         self.d = os.path.abspath(d).rstrip("/")
         for sub in ("input", "canon", "ana", "elements", "elements/ms", "out", "qa"): os.makedirs(f"{self.d}/{sub}", exist_ok=True)
-        self.path = f"{self.d}/case.json"
+        self.path = f"{self.d}/case.json"; os.environ["CASE_DIR"] = self.d   # تسجيل التكلفة (gen/costlog.py) بيكتب في qa/costs.jsonl بتاع الحالة دي
         self.m = json.load(open(self.path)) if os.path.exists(self.path) else {"slots": {}, "elements": {}, "patient": {}, "settings": {}, "log": []}
 
     def save(self):

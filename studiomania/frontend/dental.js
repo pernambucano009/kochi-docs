@@ -27,6 +27,11 @@
 .dn-btn:disabled{opacity:.45;cursor:default}
 .dn-ck{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.7;margin-top:12px;color:var(--dn-mute)}
 .dn-list{display:grid;gap:8px;margin-top:10px}
+.dn-pk{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--dn-bg);border:0;color:inherit;font:inherit;text-align:start;width:100%;cursor:pointer;box-shadow:0 0 0 1px var(--dn-line)}
+.dn-pk:hover:not(:disabled){box-shadow:0 0 0 2px var(--dn-acc)}
+.dn-pk b{display:block;font-size:15px}.dn-pk small{display:block;color:var(--dn-mute);font-size:13px;line-height:1.6}
+.dn-pk:disabled{cursor:not-allowed;opacity:.62}.dn-pk:disabled small{color:var(--dn-bad)}.dn-pk .ic{font-size:20px;width:26px;text-align:center}
+.dn-out{display:grid;gap:12px;justify-items:center}.dn-out img{max-width:min(100%,460px);border-radius:16px;box-shadow:0 0 0 1px var(--dn-line)}
 .dn-case{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--dn-bg);cursor:pointer;border:0;color:inherit;font:inherit;text-align:start}
 .dn-case b{flex:1}.dn-case small{color:var(--dn-mute)}
 .dn-job{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(229,97,62,.08);font-size:14px}
@@ -113,7 +118,7 @@
     root.onclick = onClick;
     return root.querySelector(".dn-wrap");
   }
-  function close() { clearTimeout(timer); root?.remove(); root = null; cur = null; files = []; }
+  function close() { clearTimeout(timer); clearTimeout(pickTimer); pickT = null; root?.remove(); root = null; cur = null; files = []; }
 
   async function open() {
     const w = shell("فيديوهات الأسنان من حالاتك");
@@ -255,12 +260,46 @@
     });
   }
 
+  // 🧠 قالب من المشاريع ← حالات العقل: اللي تنفع تتختار، واللي ماتنفعش مقفولة ومكتوب ناقصها إيه
+  let pickT = null, pickTimer = 0;
+  async function pick(t) {
+    pickT = t; clearTimeout(pickTimer);
+    const w = shell(`اختر حالة لقالب «${t.name}»`);
+    if (!w.querySelector(".dn-card")) w.innerHTML = `<div class="dn-card"><p>جارٍ التحميل…</p></div>`;
+    let r;
+    try { r = await call(`/api/dental/fit/${encodeURIComponent(t.id)}`); } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p></div>`; return; }
+    if (pickT !== t || !root) return;
+    const item = (c) => `<button class="dn-pk" ${c.ok ? `data-pick="${esc(c.id)}"` : "disabled"}><span class="ic">${c.ok ? "🦷" : c.busy ? "⏳" : "🔒"}</span>
+      <span><b>${esc(c.name)}</b><small>${c.ok ? (t.kind === "photo" ? "جاهزة لهذا القالب" : "جاهزة لهذا القالب، وستُجهَّز عناصرها ثم تراجعها") : esc(c.missing || "")}</small></span></button>`;
+    const ok = r.cases.filter((c) => c.ok).length;
+    w.innerHTML = `<div class="dn-card"><h3>${esc(t.name)}</h3><p>${esc(t.desc || "")}</p></div>
+      <div class="dn-card"><h3>حالاتك ${r.cases.length ? `(${ok} من ${r.cases.length} تناسب هذا القالب)` : ""}</h3>
+        ${r.cases.length ? `<div class="dn-list">${r.cases.map(item).join("")}</div>` : `<p>لا توجد حالات بعد. أضف فولدرًا لكل حالة داخل «الصور ← الحالات» في العقل، وسيصنّف العقل صورها تلقائيًا.</p>`}
+        <div class="dn-row"><button class="dn-btn ghost" data-dn="brain">افتح الحالات في العقل</button></div></div>`;
+    if (r.cases.some((c) => c.busy)) pickTimer = setTimeout(() => pickT === t && root && pick(t), 4000);
+  }
+  async function make(caseId) {
+    const t = pickT; clearTimeout(pickTimer);
+    const w = shell(`«${t.name}»`);
+    w.innerHTML = `<div class="dn-card"><p>${t.kind === "photo" ? "جارٍ صنع البوست من صور الحالة…" : "جارٍ تجهيز الحالة لقالب الفيديو…"}</p></div>`;
+    try {
+      const r = await call(`/api/dental/brain/${encodeURIComponent(caseId)}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.id }) });
+      if (r.kind === "video") { home = home || await call("/api/dental"); return showCase(r.cid); }
+      w.innerHTML = `<div class="dn-card dn-out"><img src="${esc(r.file.url)}" alt="${esc(r.file.name)}">
+        <p>حُفظ البوست في فولدر الحالة في العقل.</p>
+        <div class="dn-row"><a class="dn-btn" href="${esc(r.file.url)}" download style="text-decoration:none">تنزيل</a><button class="dn-btn ghost" data-dn="back-pick">قالب آخر لهذه الحالة أو حالة أخرى</button></div></div>`;
+    } catch (e) { w.innerHTML = `<div class="dn-card"><p>${esc(e.message)}</p><div class="dn-row"><button class="dn-btn ghost" data-dn="back-pick">رجوع</button></div></div>`; }
+  }
+
   async function onClick(e) {
-    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render],[data-assign]"); if (!t) return;
+    const t = e.target.closest("[data-dn],[data-case],[data-ok],[data-no],[data-render],[data-assign],[data-pick]"); if (!t) return;
     const a = t.dataset.dn;
     try {
       if (a === "close") return close();
-      if (a === "home") { cur = null; clearTimeout(timer); return open(); }
+      if (t.dataset.pick) return make(t.dataset.pick);
+      if (a === "back-pick") return pick(pickT);
+      if (a === "brain") { close(); window.BL_TAB = "images"; window.BL_CASES = true; return window.NHNav?.("brainlib"); }
+      if (a === "home") { cur = null; clearTimeout(timer); return pickT ? pick(pickT) : open(); }
       if (a === "create") return create();
       if (t.dataset.case) return showCase(t.dataset.case);
       if (a === "redo") { t.disabled = true; return showCase(cur, await call(`/api/dental/cases/${cur}/redo`, { method: "POST" })); }
@@ -282,5 +321,5 @@
     } catch (err) { if (window.uiAlert) uiAlert(err.message); else alert(err.message); t.disabled = false; }
   }
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && root) close(); });
-  window.Dental = { open, close };
+  window.Dental = { open, close, pick };
 })();

@@ -60,7 +60,10 @@ def cmd_render(d, tpls=None):
         env = c.env(); log = f"{c.d}/out/R_{name}.log"
         with open(log, "w") as f: p = subprocess.run(["python3", "T.py", name], cwd=S + "tpl", env=env, stdout=f, stderr=subprocess.STDOUT, timeout=3600)
         vid = f"{c.d}/out/{name}.mp4"
-        if not os.path.exists(vid): out[name] = {"error": "الريندر فشل", "log": log}; continue
+        if p.returncode != 0 or not os.path.exists(vid):   # فشل (حتى لو ساب فيديو ناقص): السبب من اللوج، والفيديو الناقص بيتشال، ونكمّل القالب اللي بعده
+            why = [l.strip() for l in open(log, errors="ignore") if "PHOTO_UNUSABLE" in l][:1]
+            if os.path.exists(vid): os.remove(vid)
+            out[name] = {"error": why[0] if why else "الريندر فشل", "log": log}; continue
         q = check(vid, name, out_dir=c.d + "/qa"); out[name] = {"passed": q["passed"], "score": q["score"], "issues": len(q["issues"])}
         c.m.setdefault("videos", {})[name] = out[name]; c.save()
     print(json.dumps(out, ensure_ascii=False, indent=1)); return out
@@ -75,5 +78,7 @@ if __name__ == "__main__":
         from case import REJECTED
         c = Case(a[1]); c.set_el(a[2], status=APPROVED if a[0] == "approve" else REJECTED, note=a[3] if len(a) > 3 else ""); print(a[0], a[2])
     elif a[0] == "status": cmd_status(a[1])
+    elif a[0] == "costs":   # تكلفة الحالة: إجمالي + تفصيل حسب النوع والموديل
+        sys.path.insert(0, S + "gen"); import costlog; print(json.dumps(costlog.summary(os.path.abspath(a[1])), ensure_ascii=False, indent=1))
     elif a[0] == "render": cmd_render(a[1], a[2:] or None)
     elif a[0] == "all": cmd_new(a[1], a[2]); cmd_elements(a[2]); cmd_status(a[2])

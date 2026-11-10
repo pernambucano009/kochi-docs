@@ -30,14 +30,36 @@ def iso_mask_ai(bgr, masks, ai_path, strict=False):
     # اللثة مسموح بيها فوق خط اللثة بس (+ الحليمات بين السنان لحد ~٠٫٤ من طول السنة): أي حاجة وردية أوطى من كده بين السنان
     # (شفة/لسان باين من الفراغات عند الحافة القاطعة) بتتشال — كانت بتفضل شرايط وردية بين الرباعية والناب وبين الناب والضاحك
     tops0 = np.array([np.where(teeth[:, x] > 0)[0].min() if teeth[:, x].any() else np.nan for x in xs0], np.float32)
-    ok0 = ~np.isnan(tops0); tops0 = np.interp(xs0, xs0[ok0], tops0[ok0]); win0 = max(5, int(np.median([np.ptp(np.where(m > 0)[1]) for m in masks])) | 1)
-    env0 = np.convolve(np.pad(tops0, win0 // 2, mode="edge"), np.ones(win0) / win0, "valid")
+    ok0 = ~np.isnan(tops0); win0 = max(5, int(np.median([np.ptp(np.where(m > 0)[1]) for m in masks])) | 1)
+    xg = np.arange(max(0, cols0.min() - win0), min(W, cols0.max() + win0 + 1))   # برا آخر سنة بنص عرض سنة كمان (مش قطع رأسي عند آخر عمود = درج)
+    tops0 = np.interp(xg, xs0[ok0], tops0[ok0]); env0 = np.convolve(np.pad(tops0, win0 // 2, mode="edge"), np.ones(win0) / win0, "valid")
     gum_ok = np.zeros_like(keep)
-    for i, x in enumerate(xs0): gum_ok[:min(H, int(env0[i] + hm0 * .4)), x] = 255
+    for i, x in enumerate(xg): gum_ok[:min(H, int(env0[i] + hm0 * .4)), x] = 255
     keep = np.maximum(np.minimum(keep, gum_ok), teeth)
+    if strict and not __import__("os").environ.get("ISO_NOGUMFILL"):   # سنة طرفية من غير لثة فوقها في قناع الموديل (لثة في الضل عند آخر القوس): كان بيطلع فراغ إسود كبير فوق الضاحك.
+        # بنكمّل اللثة فوقها بارتفاع اللثة عند السنان اللي جنبها (مش أكتر من ٠٫٦ من طول السنة)
+        tt = np.array([np.where(teeth[:, x] > 0)[0].min() if teeth[:, x].any() else -1 for x in xs0])
+        gh = np.full(len(xs0), np.nan, np.float32)
+        for i, x in enumerate(xs0):
+            if tt[i] < 0: continue
+            col = keep[:tt[i], x] > 0; n = 0
+            while n < len(col) and col[len(col) - 1 - n]: n += 1
+            if n > hm0 * .15: gh[i] = n
+        okg = ~np.isnan(gh)
+        if okg.any() and (~okg & (tt >= 0)).any():
+            ghi = np.minimum(np.interp(np.arange(len(xs0)), np.where(okg)[0], gh[okg]), hm0 * .6)
+            for i, x in enumerate(xs0):
+                if not okg[i] and tt[i] >= 0: keep[max(0, int(tt[i] - ghi[i])):tt[i], x] = 255
     if not strict:   # صورة البعد (بمبعد إسود): عزل الذكاء الاصطناعي لوحده طلع ممتاز
         keep = cv2.morphologyEx(keep, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)); aik = cv2.dilate(b * 255, np.ones((9, 9), np.uint8))
-        return cv2.GaussianBlur(np.maximum(np.minimum(keep, aik), np.minimum(teeth, aik)), (0, 0), 1.6)
+        o = np.maximum(np.minimum(keep, aik), np.minimum(teeth, aik))
+        if not __import__("os").environ.get("ISO_NOSPIKE"):   # نفس تنضيف حافة اللثة بتاع القبل (باطن الشفة الغامق، نتوءات، أطراف القوس، خيوط):
+            o = gum_round_ends(gum_despike(o, teeth, win0, hm0, bgr), teeth, win0)   # srv بعد: قناع SAM طلع لجوه الشفة العليا في لفّة
+            sm_ = cv2.GaussianBlur(o.astype(np.float32), (0, 0), max(4, hm0 * .04)); o = np.maximum(np.where(sm_ > 127, 255, 0).astype(np.uint8), np.minimum(teeth, aik))   # حافة ناعمة (من غير تسنين)
+            n_, lb_ = cv2.connectedComponents((o > 0).astype(np.uint8)); ids_ = set(np.unique(lb_[teeth > 0])) - {0}   # حتت طايرة مش متصلة بالسنان ← تتشال
+            o = np.where(np.isin(lb_, list(ids_)), o, 0).astype(np.uint8)
+            o = fill_small_holes(o, hm0 * win0 * .25)
+        return cv2.GaussianBlur(o, (0, 0), 1.6)
     # 1) اللثة بارتفاع محدد فوق كل سنة (مش لحد الشفايف)، ومفيش حاجة برا عرض السنان
     hmean = np.mean([np.ptp(np.where(m > 0)[0]) for m in masks]); band = np.zeros_like(keep)
     cols = np.where(teeth.any(0))[0]; x0, x1 = cols.min(), cols.max(); xs = np.arange(x0, x1 + 1)
@@ -53,8 +75,96 @@ def iso_mask_ai(bgr, masks, ai_path, strict=False):
     # 2) حافة ناعمة: تنعيم قوي للشكل وبعدين قصّه تاني (يشيل التسنين)
     sm = cv2.GaussianBlur(out.astype(np.float32), (0, 0), 14); out2 = (sm > 127).astype(np.uint8) * 255
     out2 = np.maximum(out2, teeth)   # السنان نفسها ما تتقصش أبدًا
+    if not __import__("os").environ.get("ISO_NOSPIKE"): out2 = gum_despike(out2, teeth, win, hmean, bgr)
+    if not __import__("os").environ.get("ISO_NOROUND"): out2 = gum_round_ends(out2, teeth, win)
     n, lb = cv2.connectedComponents((out2 > 0).astype(np.uint8)); ids = set(np.unique(lb[teeth > 0])) - {0}; out2 = np.isin(lb, list(ids)).astype(np.uint8) * 255
     return cv2.GaussianBlur(out2, (0, 0), 2.0)
+def fill_small_holes(mask, max_area):
+    """خروم صغيرة محاطة باللثة/السنان من كل ناحية (عند تلاقي سنتين باللثة): في الفيديو كانت بتطلع نقط سودا في اللثة (srv بعد ث14/24).
+    بتتملي من الصورة نفسها (القناع بس اللي بيتقفل)، والفراغات الكبيرة/المفتوحة على البرّا مابتتلمسش."""
+    inv = (mask <= 127).astype(np.uint8); n, lb, st, _ = cv2.connectedComponentsWithStats(inv)
+    H, W = mask.shape; out = mask.copy()
+    for i in range(1, n):
+        x, y, w, h, a = st[i]
+        if a < max_area and x > 0 and y > 0 and x + w < W and y + h < H: out[lb == i] = 255
+    return out
+def gum_round_ends(mask, teeth, tw):
+    """طرفين القوس: شريط اللثة كان بيخلص بقطع رأسي مستقيم (في الفيديو بعد اللف = قطع أفقي مستقيم آخر القوس) أو درج مسنن.
+    آخر ٠٫٧ عرض سنة من كل طرف: سُمك اللثة فوق السنان بيقل على شكل ربع دايرة لحد الصفر عند الطرف. السنان نفسها ما بتتقصش."""
+    H, W = mask.shape; tt = teeth > 0; cols = np.where((mask > 127).any(0))[0]
+    if len(cols) < 20 or not tt.any(): return mask
+    tc = np.where(tt.any(0))[0]; R = max(10, int(tw * .7)); out = mask.copy()
+    def ttop(x):
+        x = int(np.clip(x, tc.min(), tc.max()))
+        while not tt[:, x].any(): x += 1 if x < (tc.min() + tc.max()) / 2 else -1
+        return np.argmax(tt[:, x])
+    for side in (0, 1):
+        xe = cols.min() if side == 0 else cols.max(); sgn = 1 if side == 0 else -1
+        xr = xe + sgn * R; mt = np.where(mask[:, xr] > 127)[0]
+        if not len(mt): continue
+        G = max(0, ttop(xr) - mt.min())   # سُمك اللثة عند بداية التدوير
+        for d in range(R + 1):
+            x = xe + sgn * d
+            if not (0 <= x < W): continue
+            f = np.sqrt(max(0., 1 - ((R - d) / R) ** 2)); y0 = ttop(x) - int(G * f)
+            col = out[:, x].copy(); col[:max(0, y0)] = 0
+            if tt[:, x].any(): col[tt[:, x]] = np.maximum(col[tt[:, x]], mask[:, x][tt[:, x]])
+            else: col[:] = 0 if f < .2 else col
+            out[:, x] = col
+    sm = cv2.GaussianBlur(out.astype(np.float32), (0, 0), 3); out = np.where(sm > 127, 255, 0).astype(np.uint8)
+    out = np.maximum(np.minimum(out, mask), np.where(tt, mask, 0)).astype(np.uint8)
+    # لسان/خيوط لثة رفيعة طالعة لبرا (شفة ليفية عند طرف القوس، حتة لثة متعلقة بعد القص): فتح بشكل بيضاوي بعرض ٠٫٢ سنة.
+    # السنان بتتضاف قبل الفتح علشان الحليمات اللي بين السنان (رفيعة بس محصورة بين سنتين) ماتتشالش
+    k = max(9, int(tw * .2)) | 1; ttd = cv2.dilate(tt.astype(np.uint8) * 255, np.ones((7, 7), np.uint8))
+    op = cv2.morphologyEx(np.maximum(out, ttd), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    return np.maximum(np.minimum(op, out), np.where(tt, out, 0)).astype(np.uint8)
+def _cut_dark_rim(mask, teeth, th, bgr):
+    """شريط باطن الشفة (بنفسجي/رمادي غامق) بين اللثة والشفة العليا: قناع اللثة ساعات بياخده.
+    بنشيل أي حتة فوق السنان أغمق بكتير من اللثة نفسها (L أقل من وسيط اللثة بـ 28) وأقل حمار منها، ومتصلة بالبرّا. السنان والحليمات اللي بينها مش بتتلمس."""
+    H, W = mask.shape; lab = cv2.cvtColor(cv2.GaussianBlur(bgr, (0, 0), 2), cv2.COLOR_BGR2LAB).astype(np.int16); L, A = lab[..., 0], lab[..., 1]
+    tt = teeth > 0; gum = (mask > 127) & ~cv2.dilate(tt.astype(np.uint8), np.ones((15, 15), np.uint8)).astype(bool)
+    if gum.sum() < 500: return mask
+    Lg = np.median(L[gum]); Ag = np.median(A[gum]); cols = np.where(tt.any(0))[0]
+    if not len(cols): return mask
+    xs = np.arange(cols.min(), cols.max() + 1); tops = np.array([np.argmax(tt[:, x]) if tt[:, x].any() else np.nan for x in xs], np.float32)
+    ok = ~np.isnan(tops); tops = np.interp(np.arange(W), xs[ok], tops[ok])
+    above = np.arange(H)[:, None] < (tops[None, :] - th * .15)   # بعيد عن السنان (الحليمات بين السنان مش بتتلمس)
+    edge = np.zeros(W, bool); edge[(mask[:4] > 127).any(0)] = True   # اللثة واصلة لحد طرف الصورة = مفيش شفة فوقها (صورة ماكرو): مانقصش
+    edge = np.convolve(edge.astype(np.float32), np.ones(41), "same") > 0
+    # أو أغمق من اللثة بـ 40+ حتى لو أحمر زيها (باطن الشفة تحت المبعد: test1 بعد L 87-101 vs لثة 145) — لثة الضل في full1 كانت أغمق بـ 37 بس
+    dark = (mask > 127) & above & ((L < Lg - 28) & (A < Ag - 2) | (L < Lg - 40)) & ~edge[None, :]   # غامق *وأقل حمار* من اللثة: باطن الشفة رمادي/بنفسجي. لثة في الضل بتفضل حمرا (اتقاس: لثة ظل a=164 vs لثة 163؛ شفة 145 vs لثة 150)
+    if not dark.any(): return mask
+    ext = (mask <= 127).astype(np.uint8)
+    n, lb = cv2.connectedComponents((dark | (ext > 0)).astype(np.uint8))
+    outl = set(np.unique(lb[ext > 0])) - {0}
+    rm = dark & np.isin(lb, list(outl))
+    rm = cv2.morphologyEx(rm.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0   # مش نقط صغيرة
+    out = mask.copy(); out[rm] = 0
+    n, lb = cv2.connectedComponents((out > 127).astype(np.uint8)); ids = set(np.unique(lb[tt])) - {0}   # حتت اتفصلت = تتشال
+    return np.where(np.isin(lb, list(ids)), out, 0).astype(np.uint8)
+def gum_despike(mask, teeth, tw, th, bgr=None):
+    """حافة اللثة العليا لازم تكون خط ناعم: قناع اللثة ساعات بيطلع لجوه الشفة العليا في نتوءات (شوك على حافة اللثة في الفيديو).
+    بنقيس أول صف في القناع لكل عمود، ونحسب خط مرجعي = الوسيط في شباك بعرض سنتين، وأي حتة طالعة فوقه بأكتر من ١٢٪ من طول السنة بتتقص (نتوءات test1 كانت ١٧٪؛ ٦٪ كان بيسنن حافة اللثة العادية).
+    بيقص بس، عمره ما بيضيف، وعمره ما بيقرب من السنان."""
+    H, W = mask.shape
+    if bgr is not None: mask = _cut_dark_rim(mask, teeth, th, bgr)
+    cols = np.where((mask > 0).any(0))[0]
+    if len(cols) < 10: return mask
+    top = np.array([np.argmax(mask[:, x] > 0) for x in cols], np.float32)
+    k = max(9, int(tw * 2)) | 1; pad = np.pad(top, k // 2, mode="edge")
+    base = np.array([np.median(pad[i:i + k]) for i in range(len(top))], np.float32)
+    k2 = max(5, int(tw * .6)) | 1; base = np.convolve(np.pad(base, k2 // 2, mode="edge"), np.ones(k2) / k2, "valid")
+    bad = (top < base - th * .12) & (top > 3)   # عمود واصل لطرف الصورة مش نتوء
+    if not bad.any(): return mask
+    bad = np.convolve(bad.astype(np.float32), np.ones(k2), "same") > 0   # النتوء كله لحد رجله (مش بس طرفه) → مايفضلش درج
+    out = mask.copy(); tt = teeth > 0
+    for i, x in enumerate(cols):
+        if bad[i] and top[i] < base[i]:
+            t0 = np.argmax(tt[:, x]) if tt[:, x].any() else H
+            out[:max(0, min(int(base[i]), t0 - 2)), x] = 0
+    sm = cv2.GaussianBlur(out.astype(np.float32), (0, 0), max(4, tw * .06))   # تنعيم مكان القص بس
+    out2 = np.where(sm > 127, 255, 0).astype(np.uint8); out2 = np.minimum(out2, mask)   # التنعيم مايضيفش حاجة مكانتش موجودة
+    return np.maximum(out2, np.minimum(mask, (tt * 255).astype(np.uint8)))
 def iso_mask(bgr, masks, band=.45, src=None):
     import os
     if src and os.path.basename(src) in AIMASK and os.path.exists(AIMASK[os.path.basename(src)]): return iso_mask_ai(bgr, masks, AIMASK[os.path.basename(src)], strict=os.path.basename(src) == "macro.jpg")
@@ -100,7 +210,7 @@ class Shot:
         inc = np.mean([t["y"] + t["h"] for t in s.six])
         s.ch = span; s.cw = span * FW / FH; s.cX = s.H - 1 - (inc - s.cw * .05); s.cY = (x0 + x1) / 2   # مركز القص في الصورة الملفوفة
         masks = []
-        for t in s.six:
+        for t in up:   # العزل بكل السنان العلوية الظاهرة (مش الست الأمامية بس): كانت 24/25 بتتقص ويفضل منها حتة متعلقة (test1 بعد)
             mm = np.zeros((s.H, s.W), np.uint8); cv2.fillPoly(mm, [t["c"].astype(np.int32)], 255); masks.append(mm)
         s.iso = Image.fromarray(iso_mask(im, masks, src=src)).transpose(Image.Transpose.ROTATE_270)
         tot = sum(t["w"] for t in s.six); s.pct = {id(t): 100 * t["w"] / tot for t in s.six}

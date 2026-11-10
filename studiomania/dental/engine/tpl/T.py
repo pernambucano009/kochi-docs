@@ -6,7 +6,11 @@ REG = {}
 def T(name, ref, music="piano"):
     def deco(f): REG[name] = (ref, music, f); return f
     return deco
-def A(z=1.0, iso=1.0): return shot("A").base(z, iso)
+def A(z=1.0, iso=1.0):
+    # اللثة بتتمد لحافة الشاشة على الفك المعزول نفسه *قبل* أي كتابة/خطوط/أبيض وإسود: لما كانت بتتعمل آخر الريندر كانت بتعتبر الكلام جزء من الصورة
+    # فتبدأ الملء بعده ← رقع مستطيلة رمادي/بني في اللثة وكلمة «الحافة القاطعة» متغطية (srv a30 ث19-24)، وفي الأبيض والإسود ماكانتش بتتملي خالص (ث15)
+    im = shot("A").base(z, iso)
+    return auto_gum(im) if (iso > 0 and AUTO_GUM) else im
 GUM_P = ("Isolated dental photo of an arch on black, rotated sideways. Fill ONLY the black empty area on the RIGHT side, between the pink gum and the right edge of the image, "
          "with natural continuous pink gum tissue (attached gingiva and mucosa, same color, texture, lighting and sharpness as the existing gum), so the gum reaches the right edge everywhere from top to bottom. "
          "Do not change the teeth or the existing gum at all, and keep the black background on the left of the teeth. Same framing and size.")
@@ -254,7 +258,21 @@ def a29():
 # ======================= الدفعة 2 =======================
 _EL = {}
 def EL(n):   # عنصر مولّد بخلفية سودا → شفاف
-    if n not in _EL: _EL[n] = key_black(L(G + n + ".png"))
+    if n not in _EL:
+        im = key_black(L(G + n + ".png"))
+        if n == "turbine":   # رذاذ التربينة بعد شيل الخلفية السودا كان بيفضل رمادي غامق ← شكله دخان/حرق على السنة (فلتر الفيديو: a30 ث10-11). الرذاذ مية: أبيض
+            a = np.array(im.convert("RGBA")).astype(np.float32); rgb, al = a[..., :3], a[..., 3:]
+            import cv2   # الرذاذ = كل بكسل غامق برّه جسم المعدن (مش قطع عمود ثابت: كان بيسيب رذاذ رمادي بحرف مستقيم ← "رقعة" في ث10-11)
+            mx_ = rgb.max(2); core = ((mx_ >= 95) & (al[..., 0] > 200)).astype(np.uint8); n_, lab_, st_, _ = cv2.connectedComponentsWithStats(core, 8)
+            big = [i for i in range(1, n_) if st_[i, 4] > 2000]; metal = cv2.morphologyEx(np.isin(lab_, big).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((25, 25), np.uint8))
+            ff = metal.copy(); cv2.floodFill(ff, np.zeros((ff.shape[0] + 2, ff.shape[1] + 2), np.uint8), (0, 0), 1); metal = metal | (1 - ff)
+            bo = cv2.morphologyEx((lab_ == max(big, key=lambda i: st_[i, 4])).astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (81, 81)))   # جسم القبضة من غير السنبك
+            ys_, xs_ = np.where(bo > 0); hm = np.zeros_like(metal); cv2.fillConvexPoly(hm, cv2.convexHull(np.c_[xs_, ys_].astype(np.int32)), 1)
+            metal = cv2.dilate(metal | cv2.dilate(hm, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (45, 45))), np.ones((5, 5), np.uint8)).astype(bool)   # ضل حافة الجسم يفضل معدن
+            mist = (mx_ < 95) & (al[..., 0] > 0) & ~metal
+            rgb[mist] = 245.0; a[..., 3][mist] = np.minimum(a[..., 3][mist] * .35, 95)   # أخف: كان بيغطي السنة زي ضباب ملصوق
+            im = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "RGBA")
+        _EL[n] = im
     return _EL[n]
 _CL = {}
 def CL(n):
@@ -845,25 +863,26 @@ def match_into(E, nxt, T=.7):
         e = ease(t / T); zz = 1 + (RZ - 1) * e; cx_ = ax + (bx - ax) * e; cy_ = ay + (by - ay) * e
         old_ = E.transform(E.size, Image.AFFINE, (1 / zz, 0, ax - cx_ / zz, 0, 1 / zz, ay - cy_ / zz), Image.BICUBIC)
         nw = auto_gum(nxt(t)); new_ = nw.transform(nw.size, Image.AFFINE, (RZ / zz, 0, bx - cx_ * RZ / zz, 0, RZ / zz, by - cy_ * RZ / zz), Image.BICUBIC)
-        im = Image.blend(old_, new_, e); im.info["no_auto_gum"] = True; return im
+        im = Image.blend(old_, new_, float(np.clip((e - .4) / .2, 0, 1))); im.info["no_auto_gum"] = True; return im   # الزوم ناعم طول الوقت، والمزج لحظة قصيرة في النص: مزج طويل بين عزلين مختلفين كان بيطلع لثة مزدوجة (فلتر الفيديو test1 ث14)
     return f
 @T("a30", "v39")
 def a30():
     mb = mouth_box(); mx, my = (mb[0] + mb[2]) / 2, (mb[1] + mb[3]) / 2; TU = EL("turbine")
-    def phone(im, cx, cy, sc, ang, screen_img):
-        W_, H_ = int(420 * sc), int(860 * sc); ph = Image.new("RGBA", (W_, H_)); d = ImageDraw.Draw(ph); d.rounded_rectangle((0, 0, W_ - 1, H_ - 1), int(60 * sc), fill=(20, 20, 24, 255), outline=(120, 120, 130, 255), width=4)
-        scr = cover(screen_img, 1.0, W=W_ - int(40 * sc), H=H_ - int(60 * sc)); m = Image.new("L", scr.size); ImageDraw.Draw(m).rounded_rectangle((0, 0, scr.width, scr.height), int(40 * sc), fill=255); ph.paste(scr, (int(20 * sc), int(30 * sc)), m)
+    def phone(im, cx, cy, sc, ang, screen_img, inset=1.0):   # inset→0: الشاشة بتاكل الإطار (وإحنا داخلين جوه الشاشة الإطار كان بيبان خط إسود رفيع على حافة الكادر: فلتر الفيديو ث3)
+        W_, H_ = int(420 * sc), int(860 * sc); ph = Image.new("RGBA", (W_, H_)); d = ImageDraw.Draw(ph); d.rounded_rectangle((0, 0, W_ - 1, H_ - 1), int(60 * sc), fill=(20, 20, 24, 255), outline=(120, 120, 130, 255), width=max(0, int(4 * inset)))
+        mx_, my_ = int(20 * sc * inset), int(30 * sc * inset)
+        scr = cover(screen_img, 1.0, W=W_ - 2 * mx_, H=H_ - 2 * my_); m = Image.new("L", scr.size); ImageDraw.Draw(m).rounded_rectangle((0, 0, scr.width, scr.height), int(40 * sc * inset) + int(60 * sc * (1 - inset)), fill=255); ph.paste(scr, (mx_, my_), m)
         return paste(im, ph, cx, cy, 1.0, ang)
     BM0 = Bm(1.0, 0)   # الشاشة بتعرض نفس كادر الماكرو اللي بعدها بالظبط، فالدخول جواها من غير قفزة (ملاحظة a30 3.5)
     def s2(t):   # الهاتف بالعرض وهو بيصور البق (زي الأصل، ملاحظة a30 2.7)
         im = cover(BF, 1.0); p = ease(t / 1.0); return phone(im, mx + 600 * (1 - p), my, .9, 90 - 20 * (1 - p), BM0)
     def s3(t):   # الهاتف بيلف لوضع الطول (ملاحظة a30 3.3) وبعدين ندخل جوه الشاشة على الماكرو
         r_ = ease(t / .5); z_ = ease((t - .35) / .65); im = cover(BF, 1.0)
-        im = phone(im, mx + (FW / 2 - mx) * z_, my + (FH / 2 - my) * z_, .9 + 2.15 * z_, 90 * (1 - r_), BM0)
+        im = phone(im, mx + (FW / 2 - mx) * z_, my + (FH / 2 - my) * z_, .9 + 2.15 * z_, 90 * (1 - r_), BM0, inset=1 - ease((z_ - .6) / .35))
         return blend(im, BM0, (t - .8) / .2)
-    P = Particles(None, (FW * .3, FH * .3, FW * .7, FH * .7), 1000, 400, col=(240, 240, 240), grav=200)
+    P = Particles(None, (FW * .3, FH * .3, FW * .7, FH * .7), 650, 400, col=(240, 240, 240), grav=200); P.sz = P.sz * .55; P.soft = 1.2   # رذاذ مية: نقط صغيرة ناعمة
     def s5(t):   # التربينة تمر على الأسنان مع غبار أبيض
-        im = Bm(1.2, 0); x = FW + 400 - (FW + 800) * t / 3.7; im = P.draw(im, max(0, t - .4) * .5, 1.6); return paste(im, TU, x, FH * .5, .5, 90)
+        im = Bm(1.2, 0); x = FW + 560 - (FW + 1080) * t / 3.7; im = P.draw(im, max(0, t - 1.5) * .5, 1.6); return paste(im, TU, x, FH * .5 + 190, .62, 90)   # أطول ونازلة: آخر القبضة (مقصوص في الصورة) بيبقى برّه الكادر تحت — كانت بتخلص بقطع مستقيم في نص الشاشة (فلتر الفيديو ث9-11)
     def s7(t):   # تحليل بالأبيض والأسود مع النسب
         sh = shot("A"); z = 1.12; im = bw(A(z)); im = outlines(im, sh, z, t / 1.0, width=2); im = pct_labels(im, sh, z, (t - .8) / 1.0); my_ = sh.tf(sh.mid, 0, z)[1]; w = 220
         im = spiral_on(spiral_on(im, 40, my_, w, w * 1.618, ease((t - .6) / 1.2)), 40, my_ - w * 1.618, w, w * 1.618, ease((t - .6) / 1.2), True)
@@ -1673,6 +1692,13 @@ _HI = {}
 def hi_mouth(out, M, w):
     """أداة عامة: لو الكاميرا بتكبّر الوش أكتر من دقته، البق (شفايف + سنان) بيتاخد من صورة الابتسامة الأصلية عالية الدقة،
     متحاذية بنفس التحويل اللي اتركّب بيه البق على الوش، وألوانها متظبطة على الوش."""
+    if not _HI and os.path.exists(TO + "after_portrait_v3_hi.png") and os.path.exists(TO + "after_portrait_v3_src.txt"):
+        # صورة الوش اتعملت بـ teeth_swap (شفايف الوش الحقيقية + سنان البعد): النسخة عالية الدقة بنفس الطريقة بالظبط، فمفيش لزق شفايف من صورة تانية
+        # (قبل كده كانت صورة الابتسامة القريبة بشفايفها بتتلزق بتحويل مش بتاعها ← شفة دبل مايلة في لقطة التقريب، srv 30ث)
+        hi = np.array(L(TO + "after_portrait_v3_hi.png")); k = np.array(AP).shape[1] / hi.shape[1]; la = face_pts_raw(np.array(AP))
+        ol = la[[61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146]] / k; m = np.zeros(hi.shape[:2], np.uint8); cv2.fillPoly(m, [ol.astype(np.int32)], 255)
+        wl = np.ptp(ol[:, 0]); m = cv2.GaussianBlur(cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(wl * .35) | 1, int(wl * .35) | 1))), (0, 0), wl * .08).astype(np.float32) / 255
+        _HI.update(img=hi, mask=m, Ms=np.float32([[k, 0, 0], [0, k, 0], [0, 0, 1]]))
     if not _HI:
         sys.path.insert(0, S + "tools"); from mouth_swap import big
         Sm = np.array(L(C + "ret/smile_front_ret4.jpg")).astype(np.float32); Ms = np.load(TO + "smile_to_ap.npy")
@@ -2070,7 +2096,7 @@ def a29():
         cx_ = ax + (bx - ax) * e; cy_ = ay + (by - ay) * e   # مركز السنان بيتنقل بنعومة من مكانه القديم للجديد
         old_ = auto_gum(E4).transform(E4.size, Image.AFFINE, (1 / zz, 0, ax - cx_ / zz, 0, 1 / zz, ay - cy_ / zz), Image.BICUBIC)
         nw = sA0(t); new_ = nw.transform(nw.size, Image.AFFINE, (RZ / zz, 0, bx - cx_ * RZ / zz, 0, RZ / zz, by - cy_ * RZ / zz), Image.BICUBIC)   # الجديد متطابق مع القديم في كل لحظة (مفيش صورتين فوق بعض)
-        im = Image.blend(old_, new_, e); im.info["no_auto_gum"] = True; return im
+        im = Image.blend(old_, new_, float(np.clip((e - .4) / .2, 0, 1))); im.info["no_auto_gum"] = True; return im   # الزوم ناعم طول الوقت، والمزج لحظة قصيرة في النص: مزج طويل بين عزلين مختلفين كان بيطلع لثة مزدوجة (فلتر الفيديو test1 ث14)
     return [(2.5, s1), (.9, s2), (.6, s3), (3.5, s4), (2.0, sA), (4.0, s6), (2.0, s7), (4.0, s8), (2.5, s9), (1.5, s10), (6.0, s11)]
 
 # ======================= أ٨ لعبة الابتسامة كامل (16.8ث) — ملفوفة زي الأصل =======================
@@ -2136,7 +2162,12 @@ def retract_face(prog=0.0, overlay=None):
 import os as _os
 def asset_clip(*names):   # أول فيديو موجود من القايمة (بعد التحويل للفيديو الحي المعمول من العنصر المعتمد)
     names = [_live(n) for n in names]
+    st = {}
+    if CASE_DIR and _os.path.exists(CASE_DIR + "/case.json"):
+        try: st = {k: v.get("status") for k, v in json.load(open(CASE_DIR + "/case.json")).get("elements", {}).items()}
+        except Exception: st = {}
     for n in names:
+        if st.get(f"v/{n}.mp4") not in (None, "معتمد"): continue   # فيديو متولد اترفض من الفلتر/لسه مااتعتمدش: القالب بيكمّل بالبديل (الصورة الثابتة) بدل ما يستخدمه أو يقف
         if _os.path.exists(_vpath(n)): return vclip(n)
     return None
 def upper_tint(col, reveal, alpha, from_right=False):

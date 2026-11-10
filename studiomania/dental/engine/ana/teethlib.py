@@ -72,7 +72,8 @@ LABEL = """The image shows a frontal dental photo where each detected tooth crow
 Identify each index using FDI numbering from the PATIENT's perspective (patient's right side = image LEFT): upper right 11-18, upper left 21-28, lower left 31-38, lower right 41-48.
 Use anatomy (central incisors are the widest front teeth, the dental midline, the labial frenum, canine shape) not just position. If an outline covers two teeth or is not a tooth, mark fdi 0.
 Return JSON: {"labels": {"<index>": <fdi>, ...}, "upper_midline_between": [<index of 11>, <index of 21>]}"""
-def label(img, comps):
+LABEL_MODEL = "google/gemini-3.8-flash"   # اتقارن على 5 حالات: أدق من gemini-2.5-pro (اللي سمّى سنة سفلية 24) وأرخص بكتير
+def label(img, comps, model=LABEL_MODEL, fallback=True):
     # بنكبّر الصورة الأول (لـ1600) وبعدين نرسم الحدود والأرقام بمقاس مناسب لحجم السنة: في صورة صغيرة (مقصوصة من الوش)
     # الأرقام كانت بتغطي السنان كلها والموديل مايعرفش يرقّم الفك التحتاني
     s = 1600 / max(img.shape[:2]); v = cv2.resize(img, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC)
@@ -81,11 +82,30 @@ def label(img, comps):
         cv2.polylines(v, [(t["c"] * s).astype(np.int32)], True, (0, 255, 255), max(1, int(fs * 2)))
         cv2.putText(v, str(i), (int(t["cx"] * s - 10 * fs), int(t["cy"] * s + 10 * fs)), 0, fs, (0, 0, 255), th)
     ok, b = cv2.imencode('.jpg', v, [cv2.IMWRITE_JPEG_QUALITY, 90])
-    d = chat([{"type": "text", "text": LABEL}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(b.tobytes()).decode()}}], model="google/gemini-2.5-pro", mt=8000)
+    d = chat([{"type": "text", "text": LABEL}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(b.tobytes()).decode()}}], model=model, mt=4000 if model.startswith("anthropic/") else 8000, fallback=fallback)   # Claude (تأكيد): أطلس بيحاسب على الحد الأقصى كله؛ 4000 = نفس الدقة تقريبًا (اتجرب: 5/6 مطابق 100%، و1 فرق سنة ← الحالة بتتعلّم «مراجعة») بنص التمن
     for i, t in enumerate(comps): t["fdi"] = int(d["labels"].get(str(i), 0))
     return [t for t in comps if t["fdi"]], d
+def from_ids(ids_path, det_path, shape):
+    """سنان جاهزة من موديل التقسيم (SAM): كل سنة قناعها ورقمها من خطوة الكشف — من غير تقسيم القناع وترقيمه تاني (كان بيكرر الأرقام)."""
+    ids = cv2.imread(ids_path, 0); dets = json.load(open(det_path)); H, W = shape[:2]
+    if ids.shape[:2] != (H, W): ids = cv2.resize(ids, (W, H), interpolation=cv2.INTER_NEAREST)
+    out = []
+    for i, d in enumerate(dets):
+        p = (ids == i + 1).astype(np.uint8)
+        if p.sum() < ids.size * .0005 or not d.get("fdi"): continue
+        n, lb, st, _ = cv2.connectedComponentsWithStats(p)
+        if n > 2: p = (lb == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)   # أكبر جزء بس
+        c = cv2.findContours(p, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0][:, 0]; x, y, w, h = cv2.boundingRect(c); M = cv2.moments(p)
+        out.append({"x": x, "y": y, "w": w, "h": h, "area": int(p.sum()), "cx": M["m10"] / M["m00"], "cy": M["m01"] / M["m00"], "c": c, "fdi": int(d["fdi"])})
+    return out
 def analyze(src, mask, cache):
-    img = cv2.imread(src); comps = components(mask, img.shape, img)
+    img = cv2.imread(src)
+    ids_p = mask.replace(".png", "_ids.png"); det_p = os.path.join(os.path.dirname(mask), os.path.basename(mask).replace("ai_", "det_").replace(".png", ".json"))
+    if os.path.exists(ids_p) and os.path.exists(det_p):
+        teeth = from_ids(ids_p, det_p, img.shape)
+        if not os.path.exists(cache): json.dump({str(i): t["fdi"] for i, t in enumerate(teeth)}, open(cache, "w"))
+        return img, teeth
+    comps = components(mask, img.shape, img)
     if os.path.exists(cache):
         lab = json.load(open(cache))
         for i, t in enumerate(comps): t["fdi"] = lab[str(i)]

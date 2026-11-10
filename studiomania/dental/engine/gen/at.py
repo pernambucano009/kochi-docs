@@ -26,6 +26,9 @@ def _run_once(kind, body, t):
         if st in ("completed", "succeeded"):
             o = p.get("outputs") or p.get("output"); o = [o] if isinstance(o, str) else (o or [])
             if not o: raise SystemExit("failed: empty outputs; please retry")   # نجح من غير ناتج (بيحصل مع الموديلات التوليدية): يتعاد
+            try:
+                import costlog; costlog.gen("gen", body.get("model"), body)
+            except Exception: pass
             return o[0]
         if st in ("failed", "timeout", "canceled", "cancelled"): raise SystemExit(f"failed: {str(p)[:600]}")
         time.sleep(5)

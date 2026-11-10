@@ -25,6 +25,11 @@ def jaw_gap(bgr, dark=28, tol=3):
     if len(rows) < H * .3: return None
     ys, xs = np.where(pink)
     if xs.mean() < W * .5: return None                                   # اللثة مش ناحية اليمين ← مش اتجاه الفك المعزول عندنا (الأطراف للشمال)
+    # الفراغ بيتقاس جنب اللثة بس: صفوف جسم اللثة (من غير القفلة المنحنية عند أول/آخر القوس). أطراف القوس اللي مافيهاش لثة حقيقية بتقفل على الإسود بالتصميم (زي auto_gum)
+    pr = np.where(pink[:, int(W * .5):].sum(1) > W * .03)[0]
+    if len(pr):
+        R = max(3, int(H * .07)); rows = [y for y in rows if pr.min() + R <= y <= pr.max() - R]
+        if not rows: return 0, 0.0
     xr = np.array([np.where(g[y])[0][-1] for y in rows]); gap = (W - 1) - xr
     bad = gap > tol
     return int(gap.max()), float(bad.mean())

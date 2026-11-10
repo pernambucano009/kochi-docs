@@ -96,11 +96,13 @@ def needs_all():
     return out
 
 
+OPTIONAL = {"v/after_live.mp4", "gum_back_after.png"}   # gum_back: امتداد اللثة بقى بالانعكاس من لثة المريض، والخلفية دي مجرد أساس (وليها بديل عام في assets)   # القالب ليه بديل لو مش موجود/اترفض (الصورة الثابتة بزووم): مايوقّفش الفيديو
+
 def readiness(case_dir):
     c = Case(case_dir); rep = {}
     for name, n in needs_all().items():
         miss = [f"صورة حقيقية: {SLOTS[s][1]}" for s in n["slots"] if not c.has(s)]
-        miss += [f"عنصر: {e} ({c.el(e)['status']})" for e in n["elements"] if e != "city" and not c.approved(e)]
+        miss += [f"عنصر: {e} ({c.el(e)['status']})" for e in n["elements"] if e != "city" and e not in OPTIONAL and not c.approved(e)]
         if "city" in n["elements"] and not c.m["settings"].get("city"): miss.append("إعداد: مدينة العيادة")
         miss += [f"أداة لسه متنقلتش: {p}" for p in n["pending_port"]]
         rep[name] = {"ready": not miss, "missing": miss}

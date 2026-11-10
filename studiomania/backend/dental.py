@@ -175,6 +175,9 @@ def _run(case: Path, args: list[str], log_name: str, timeout: int, cwd: str = "p
 def _tail(case: Path, log_name: str, n: int = 6) -> str:
     try:
         txt = (case / "logs" / log_name).read_text(encoding="utf-8", errors="ignore")
+        if "PHOTO_UNUSABLE" in txt:   # صورة البعد سنانها متغطية: الطبيب يرفع صورة أوضح (مش عطل)
+            msg = txt.split("PHOTO_UNUSABLE", 1)[1].strip().splitlines()[0]
+            return "لا يمكن إنشاء الفيديو من هذه الصور. " + msg
         if "ATLAS_BUSY" in txt or "timeout in queue" in txt:   # طابور Atlas زحمة (حاولنا ٣ مرات)
             return "خدمة Atlas مزدحمة الآن ولم تستجب بعد ثلاث محاولات. انتظر بضع دقائق ثم اضغط «أعد المحاولة»."
         if "ATLAS_AUTH" in txt:   # المفتاح نفسه مرفوض (منتهي أو اتغير)
@@ -554,13 +557,48 @@ def _render(tpl: str):
         if out.exists():   # النسخة القديمة بتتحفظ (أصول المريض مابتتمسحش)
             (case / "out" / "old").mkdir(exist_ok=True)
             os.replace(out, case / "out" / "old" / f"{tpl}_{int(out.stat().st_mtime)}.mp4")
+        for f in ("iso_qa.json", "claude_qa.json", "claude_video.json", "source_issues.json"):   # تقرير ريندر قديم مايتقريش على إنه بتاع الريندر ده
+            (case / "qa" / f).unlink(missing_ok=True)
         r = _run(case, ["T.py", tpl], f"render_{tpl}.log", 3600, cwd="tpl")
         if r.returncode != 0 or not out.exists():
             out.unlink(missing_ok=True)   # ملف ناقص من ريندر فاشل مايتحفظش
             raise RuntimeError("تعذّر إنشاء الفيديو. " + _tail(case, f"render_{tpl}.log", 1))
+        qa = {}
+        try:   # فحص العزل الأوتوماتيكي (المحرك بيكتبه آخر الريندر): كام عيب لقى، واتصلح كام، وفاضل كام
+            j = json.loads((case / "qa" / "iso_qa.json").read_text())
+            if j.get("frames"): qa = {"found": j.get("found", 0), "unfixed": j.get("unfixed", 0), "by_type": j.get("by_type", {})}
+        except (OSError, ValueError):
+            pass
+        cq = {}
+        try:   # مراجعة Claude (مرتين + اتفاق) لفريمات العزل: لو لقى عيب متفق عليه الفيديو بيتعلّم «محتاج مراجعة» قبل التسليم
+            j = json.loads((case / "qa" / "claude_qa.json").read_text())
+            cq = {"verdict": j.get("verdict"), "flagged": j.get("flagged", 0),
+                  "defects": [dict(d, frame=k) for k, v in j.get("frames", {}).items() for d in v.get("agreed", [])][:12]}
+        except (OSError, ValueError):
+            pass
+        num_bad = []   # ترقيم السنان: Gemini رقّم وClaude أكّد؛ لو اختلفوا على الفك العلوي في أي صورة ← الفيديو محتاج مراجعة
+        for f in (case / "ana").glob("num_*.json"):
+            try:
+                if json.loads(f.read_text()).get("agree") is False: num_bad.append(f.stem[4:])
+            except (OSError, ValueError):
+                pass
+        if num_bad: cq["numbering_disagree"] = sorted(num_bad)
+        src_bad = {}
+        try:   # صورة سنانها متغطية (الشفة مغطية حدود فك كامل): مش صالحة للفك ده ← الطبيب يرفع صورة أوضح
+            src_bad = json.loads((case / "qa" / "source_issues.json").read_text()).get("unusable") or {}
+        except (OSError, ValueError):
+            pass
+        if src_bad: cq["source_issues"] = {k: v.get("msg", "") for k, v in src_bad.items()}
+        try:   # مراجعة الفيديو النهائي نفسه (كل ثانية، مرتين + اتفاق)
+            vj = json.loads((case / "qa" / "claude_video.json").read_text())
+            cq["video"] = {"verdict": vj.get("verdict"), "defects": [{"second": d.get("second"), "what": d.get("what")} for d in vj.get("agreed", [])][:15]}
+        except (OSError, ValueError):
+            pass
+        hold = bool(qa.get("unfixed")) or cq.get("verdict") == "defect" or bool(num_bad) or bool(src_bad) or cq.get("video", {}).get("verdict") == "defect"
         with _LOCK:
             m = _meta(case)
-            m.setdefault("videos", {})[tpl] = {"at": time.time(), "size": out.stat().st_size}
+            m.setdefault("videos", {})[tpl] = {"at": time.time(), "size": out.stat().st_size, **({"iso_qa": qa} if qa else {}),
+                                               **({"claude_qa": cq} if cq else {}), **({"needs_review": True} if hold else {})}
             _save_meta(case, m)
     return go
 

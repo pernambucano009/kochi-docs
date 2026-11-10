@@ -41,6 +41,9 @@ def flash(im, p, col=(255, 255, 255)): return Image.blend(im, Image.new("RGB", i
 def txt(im, xy, s, size=56, font=FA, fill=(255, 255, 255), anchor="mm", stroke=3, alpha=1.0, rtl=True):
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay)
     d.text(xy, s, font=F(font, size), fill=fill + (int(255 * alpha),), anchor=anchor, direction="rtl" if rtl else None, stroke_width=stroke, stroke_fill=(0, 0, 0, int(170 * alpha)))
+    if alpha > .3:   # كلام خارج برا الشاشة (اتقص) = عيب: بيتسجل وفلتر الفيديو بيقراه
+        bb = d.textbbox(xy, s, font=F(font, size), anchor=anchor, direction="rtl" if rtl else None, stroke_width=stroke)
+        if bb[0] < 4 or bb[1] < 4 or bb[2] > im.width - 4 or bb[3] > im.height - 4: qa_warn("TEXT_CLIPPED", f"«{s}» خارج الشاشة {tuple(int(v) for v in bb)}")
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def chip(im, s, y=110, alpha=1.0):
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); f = F(FA, 46); w = d.textlength(s, font=f, direction="rtl") + 80
@@ -196,10 +199,41 @@ def morph_setup():   # صورة البعد متطابقة على القبل + ق
         ups = sorted([k for k in common if k < 30], key=lambda k: _M["planned"][k][:, 0].mean()); drop = []
         for end in (ups, ups[::-1]):
             for k in end:
-                if _vis(k) < .9: drop.append(k)
+                if _vis(k) < .75: drop.append(k)   # كان 0.9: سنة طرفية في ضل زاوية البق (test1 15: 0.86، لونها سنة واضح) كانت بتتساب قديمة بنية جنب الفينير
                 else: break
-        _M["hidden"] = drop   # سنان طرفية جواها شفة/ظل في صورة البعد: بتفضل في المورف، بس البكسلات اللي مش سنة جواها بتتشال من القناع (تحت)
-        if drop: print("morph: end teeth partly hidden in after photo:", drop)
+        # سنة متغطية في الصورة اللي بتتاخد منها (الشفة السفلية مغطية حد السنان السفلية في صورة البعد بالمبعد): لو دخلت المورف بتطلع مبتورة
+        # في مشهد السنان فيه باينة كاملة (srv: 31/32/41/42 طولهم في البعد 59-73% من القبل). الفينير مابيقصّرش السنة بالشكل ده،
+        # فأي سنة طولها في البعد أقل من 85% من طولها في القبل = حدودها مش باينة ← مابتتاخدش (بتفضل من القبل). ولو أغلب فك متغطي ← الصورة ماتنفعش للفك ده
+        Bt0 = {t["fdi"]: t for t in shot("B").teeth_all}; cov = []
+        for k in common:
+            if k in Bt0 and k not in drop:
+                hb = float(np.ptp(Bt0[k]["c"][:, 1])); ha = float(np.ptp(_M["planned"][k][:, 1]))
+                if hb > 0 and ha / hb < .85: cov.append(k)
+        if cov and not os.environ.get("ISO_NOCOVER"):
+            drop += [k for k in cov if k not in drop]; _M["covered"] = cov
+            iss = {}
+            for jaw, ks in (("upper", [k for k in common if k < 30]), ("lower", [k for k in common if k > 30])):
+                cj = [k for k in cov if (k < 30) == (jaw == "upper")]
+                if ks and len(cj) >= max(2, len(ks) * .4): iss[jaw] = {"covered": cj, "msg": "صورة ما بعد العلاج بالمبعد: حدود الأسنان " + ("العلوية" if jaw == "upper" else "السفلية") + " غير ظاهرة (تغطيها الشفة)، نحتاج صورة تظهر فيها الأسنان كاملة"}
+            print("morph: teeth covered in the after photo (edges not visible):", cov, "| unusable jaw:", list(iss), flush=True)
+            if iss and CASE_DIR:
+                __import__("json").dump({"covered": cov, "unusable": iss}, open(CASE_DIR + "/qa/source_issues.json", "w"), ensure_ascii=False, indent=1)
+            if iss and not os.environ.get("ALLOW_PARTIAL"):
+                # فك كامل سنانه متغطية في صورة البعد: مافيش نتيجة صح ممكن تطلع من **التحول** (لا مبتورة ولا نص قديم ونص جديد) ← المشهد اللي بيرسم التحول بيوقف الريندر
+                # والطبيب بيتطلب منه صورة السنان فيها باينة كاملة (srv: كانت بتطلع فوق أبيض وتحت أصفر).
+                # القوالب اللي بتاخد من الإعداد ده الأسنان العلوية المشتركة بس (فينيرات a12) بتكمّل عادي (البنت: صورة البعد من الجنب)
+                _M["unusable_msg"] = "PHOTO_UNUSABLE " + " | ".join(v["msg"] for v in iss.values())
+            if CASE_DIR:
+                os.makedirs(CASE_DIR + "/qa", exist_ok=True); __import__("json").dump({"covered": cov, "unusable": iss}, open(CASE_DIR + "/qa/source_issues.json", "w"), ensure_ascii=False, indent=1)
+        # سنة علوية موجودة في القبل ومالهاش مقابل في البعد خالص (الموديل مالقاهاش في صورة البعد): كانت بتبهت لشبح في نص المورف
+        # وتختفي في الآخر (srv: السنة 24). نفس القاعدة: بتفضل زي ما هي من القبل — عمرنا ما بنشيل سنة
+        Bk = [t["fdi"] for t in shot("B").teeth_all if t["fdi"] < 30]
+        drop += [k for k in Bk if k not in common and k not in drop]
+        if os.environ.get("ISO_NOHIDDEN"): drop = []   # للمعايرة بس: يرجّع السلوك القديم
+        _M["hidden"] = drop   # سنان طرفية مغطاة بالشفة/ظل في صورة البعد: شكلها «بعد» مش موجود فعلًا، فبتفضل زي ما هي من صورة القبل
+        if drop:   # (مش بتتشال: بتفضل ظاهرة في العزل بحدودها من القبل، بس ما بتدخلش المورف — جرّبنا ناخد شكلها من البعد فطلعت شريحة طايرة وفراغ إسود)
+            print("morph: end teeth hidden in after photo, kept from before:", drop); common = [k for k in common if k not in drop]; _M["common"] = common
+            _M["planned"] = {k: v for k, v in _M["planned"].items() if k in common}
         B = shot("B"); Bt = {t["fdi"]: t for t in B.teeth_all}
         up_ = [k for k in common if k < 30]; M_up = up_
         tm = np.zeros(ib.shape[:2], np.uint8)   # السنان (قبل + بعد) محمية تماماً: التنضيف على اللثة والشفايف بس
@@ -209,29 +243,39 @@ def morph_setup():   # صورة البعد متطابقة على القبل + ق
         for kk in ("FB", "FA_"): _M[kk] = dehair(_M[kk], tm)
         _M["RB"], _M["RA"] = r(_M["FB"]), r(_M["FA_"])
         own = []
-        for k in up_:   # حدود سنان القبل نفسها بس (مش المدموجة مع البعد) عشان مايدخلش أطراف السنان السفلية
+        for k in up_ + [k for k in _M["hidden"] if k < 30 and k in Bt]:   # حدود سنان القبل نفسها بس (مش المدموجة مع البعد) عشان مايدخلش أطراف السنان السفلية
             mm = np.zeros(ib.shape[:2], np.uint8); cv2.fillPoly(mm, [Bt[k]["c"].astype(np.int32)], 255); own.append(mm)
         isoB = anim.iso_mask(ib, own, src=C + "before/macro.jpg"); allm = np.zeros_like(isoB)
         for k in up_: allm = np.maximum(allm, masks[k])
         top_lower = min(t["y"] for t in B.teeth_all if t["fdi"] > 30)
         allm[top_lower + 25:] = 0 if False else allm[top_lower + 25:]
         B.iso = Image.fromarray(r(isoB)); _M["isoB"] = isoB; _M["shape"] = ib.shape[:2]
-        xs = [Bt[k]["x"] for k in up_] + [Bt[k]["x"] + Bt[k]["w"] for k in up_]; span = (max(xs) - min(xs)) * 1.12
+        At_ = {t["fdi"] for t in shot("A").teeth_all}
+        span_keys = up_ + [k for k in _M["hidden"] if k < 30 and k in Bt and k in At_]   # الكادر يلم السنان اللي في الصورتين بس:
+        # سنة مالهاش وجود في صورة البعد خالص (test1 26) مابتوسّعش الكادر ← بتفضل على الطرف أو برّاه زي أي سنة ورا (مش بنشيلها)
+        xs = [Bt[k]["x"] for k in span_keys] + [Bt[k]["x"] + Bt[k]["w"] for k in span_keys]; span = (max(xs) - min(xs)) * 1.12
         B.ch = span; B.cw = span * FW / FH; B.cY = (max(xs) + min(xs)) / 2; _M["order"] = sorted(up_, key=lambda k: Bt[k]["cx"]); _M["lower"] = [k for k in common if k > 30]
     return _M
 _SM = {}
+def _need_full():   # التحول نفسه (الفكين قبل ← بعد) محتاج صورة بعد الأسنان فيها كاملة
+    M = morph_setup()
+    if M.get("unusable_msg"): raise SystemExit(M["unusable_msg"])
 def shape_morph():
+    _need_full()
     if "sm" not in _SM:
         from morph import ShapeMorph
         M = morph_setup(); Bt = {t["fdi"]: t for t in shot("B").teeth_all}
-        _SM["sm"] = ShapeMorph(M["FB"], M["FA_"], {k: Bt[k]["c"] for k in M["common"]}, {k: M["planned"][k] for k in M["common"]})
+        _SM["sm"] = ShapeMorph(M["FB"], M["FA_"], {k: Bt[k]["c"] for k in M["common"]}, {k: M["planned"][k] for k in M["common"]},
+                               keep=[Bt[k]["c"] for k in M.get("hidden", []) if k in Bt])   # السنان الباقية من القبل
     return _SM["sm"]
 def current_contours(prog):   # حدود السنان زي ما هي ظاهرة دلوقتي (عشان الخطوط تبقى على السنان نفسها)
+    _need_full()
     sm = shape_morph(); out = {}
     for k in sm.keys:
         p = prog if isinstance(prog, (int, float)) else prog.get(k, 0); out[k] = sm.contour(k, max(0, min(1, p)))
     return out
 def morph_img(prog, rotated=True, flash_t=None):
+    _need_full()
     """المورف الحقيقي: شكل كل سنة بيتحول في مكانها (مش مزج)."""
     f = shape_morph().frame(prog); im = Image.fromarray(np.clip(f, 0, 255).astype(np.uint8))
     return rot(im) if rotated else im
@@ -245,6 +289,7 @@ def morph_img_old(prog, rotated=True, flash_t=None):
     comp = RB * (1 - al[..., None]) + RA * al[..., None]
     return Image.fromarray(np.clip(comp, 0, 255).astype(np.uint8))
 def morph_outlines(im, prog, z=1.0, p=1.0, col=(255, 255, 255), width=3):
+    _need_full()
     B = shot("B"); lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); cc = current_contours(prog); M = morph_setup()
     for i, k in enumerate(M["order"]):
         q = ease(p * 1.4 - i * .05)
@@ -252,6 +297,7 @@ def morph_outlines(im, prog, z=1.0, p=1.0, col=(255, 255, 255), width=3):
         pts = [B.tf(x, y, z) for x, y in cc[k][::1]]; pts.append(pts[0]); d.line(anim.partial(pts, q), fill=col + (255,), width=width)
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def morph_frame(prog, z=1.0, iso=1.0):
+    _need_full()
     """العزل بيتبع شكل السنان في اللحظة دي: (عزل القبل) + (شكل كل سنة دلوقتي)."""
     B = shot("B"); M = morph_setup()
     if not hasattr(B, "_img0"): B._img0, B._iso0 = B.img, B.iso   # صورة القبل الأصلية (ملاحظة a30 5.6: المورف كان بيسيب صورة القبل المشتركة متغيرة للبعد، فأي مشهد قبل بعده طلع بسنان بيضا)
@@ -261,6 +307,7 @@ def morph_frame(prog, z=1.0, iso=1.0):
             m = M["isoB"].copy(); cc = current_contours(prog); cur = np.zeros_like(m)
             for k, c in cc.items():
                 if k < 30: cv2.fillPoly(cur, [c.astype(np.int32)], 255)
+            cur = cv2.morphologyEx(cur, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))   # حدود سنتين لازقين في بعض: من غير شعرة سودا بينهم (كانت بتبان فراغ بين ١١ و٢١)
             m = np.maximum(m, cv2.GaussianBlur(cur, (0, 0), 1.5))
             # حدود البعد أحيانًا بتاخد شريحة شفة/ظل عند الحافة القاطعة (بنية/غامقة مش سنة): بنحسب مرة واحدة على الصورة النهائية
             # (prog=1) البكسلات اللي مش لون سنة في النص السفلي *والمتصلة بالبرّا* (مش فتحات جوه السنة) ونشيلها من القناع في كل الفريمات
@@ -284,23 +331,91 @@ def morph_frame(prog, z=1.0, iso=1.0):
                     if core.sum() < 50: continue
                     Lm = np.median(lab_[..., 0][core]); Am = np.median(lab_[..., 1][core]); y0_, y1_ = c[:, 1].min(), c[:, 1].max()
                     zone = (ck > 0) & ((np.arange(m.shape[0])[:, None] > y0_ + (y1_ - y0_) * .6) if k not in M.get("hidden", []) else True)
-                    dark |= zone & ((lab_[..., 0] < Lm - 35) | (lab_[..., 1] > Am + 8))
+                    near = cv2.erode(inside.astype(np.uint8), np.ones((25, 25), np.uint8)) == 0   # حزام ١٢ بكسل من الخلفية: الرمادي الشفاف عند الحافة بيتقص برضه
+                    dark |= zone & ((lab_[..., 0] < Lm - 35) | (lab_[..., 1] > Am + 8) | (near & (lab_[..., 0] < Lm - 22)))
                 dark |= lab_[..., 1] > 146
                 hid = np.zeros(m.shape, np.uint8)   # السنان الطرفية المغطاة جزئيًا: القص مسموح جوه حدودها كلها (الشفة/الظل اللي داخل فيها)
                 for k in M.get("hidden", []):
                     if k in cc1: cv2.fillPoly(hid, [cc1[k].astype(np.int32)], 255)
                 hid = cv2.dilate(hid, np.ones((9, 9), np.uint8)) > 0; low_ |= hid; M["hid"] = hid
-                bad = inside & low_ & ((~curd & (cv2.GaussianBlur(nontooth.astype(np.float32), (0, 0), 4) > .15)) | (curd & (cv2.GaussianBlur(dark.astype(np.float32), (0, 0), 2) > .4)))
+                # في الفريم النهائي: النص السفلي برا حدود سنان البعد = مش سنة (أيًا كان لونه: سنة سفلية بيج باينة من الفراغ بين ٢٢ و٢٣ كانت بتعدي من فحص اللون)
+                bad = inside & low_ & (~curd | (curd & (cv2.GaussianBlur(dark.astype(np.float32), (0, 0), 2) > .4)))
                 n_, lb_ = cv2.connectedComponents((bad | ~inside).astype(np.uint8)); ids_ = set(np.unique(lb_[~inside])) - {0}
-                cut = bad & np.isin(lb_, list(ids_)); cut = cv2.dilate(cut.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0   # يشيل معاه هالة الحافة الناعمة القديمة
+                cut = bad & np.isin(lb_, list(ids_)); cut = cv2.dilate(cut.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))) > 0   # يشيل معاه هالة الحافة الناعمة القديمة
+                Bt_ = {t["fdi"]: t for t in B.teeth_all}; prot = np.zeros(m.shape, np.uint8)   # السنان الباقية من القبل (الضاحك): ما تتقصش أبدًا
+                for k in M.get("hidden", []):
+                    if k in Bt_: cv2.fillPoly(prot, [Bt_[k]["c"].astype(np.int32)], 255)
+                import iso_qa
+                cut &= cv2.dilate(iso_qa.grow_keep(prot, im_, 15).astype(np.uint8), np.ones((9, 9), np.uint8)) == 0   # حماية السنة الباقية بلونها الحقيقي (مش بس حدودها التقريبية)
                 M["cut"] = cut & ((cur1 == 0) | (cv2.erode(cur1, np.ones((5, 5), np.uint8)) == 0)); M["cut_hid"] = cut & hid & ~M["cut"]
             if M.get("cut") is not None and (M["cut"].any() or M["cut_hid"].any()):
                 p_ = max(0.0, min(1.0, prog if isinstance(prog, (int, float)) else max(prog.values() or [0])))   # القص محسوب من صورة البعد، فبيظهر مع المورف (صورة القبل زي ما هي)
                 m = m.copy().astype(np.float32); m[(M["cut"] & (cv2.erode(cur, np.ones((5, 5), np.uint8)) == 0)) | M["cut_hid"]] *= 1 - p_
-                m = cv2.GaussianBlur(m, (0, 0), 1.5).astype(np.uint8)
+                m = cv2.GaussianBlur(m, (0, 0), 2.5).astype(np.uint8)
+            # فحص العزل الأوتوماتيكي على كل فريم (iso_qa): بيلاقي البواقي/الخروم/اللثة الناقصة/السنان الناقصة لوحده، وبيصلّح الآمن
+            import iso_qa
+            Bt_ = {t["fdi"]: t for t in B.teeth_all}
+            cons = [c for k, c in cc.items() if k < 30]; keep_ = [Bt_[k]["c"].astype(np.float32) for k in M.get("hidden", []) if k < 30 and k in Bt_]
+            kq = round(float(prog if isinstance(prog, (int, float)) else max(prog.values() or [0])), 2)
+            qc = M.setdefault("qa_cache", {}); ck_ = (kq if isinstance(prog, (int, float)) else str(sorted(prog.items())))
+            if ck_ in qc: m, dq = qc[ck_]   # نفس خطوة المورف = نفس النتيجة (الزووم مالوش دعوة بالقناع) → الفحص مرة واحدة لكل خطوة
+            else:
+                img_ = np.ascontiguousarray(np.rot90(np.asarray(B.img), 1))
+                src_ = np.ascontiguousarray(np.rot90(np.asarray(B._img0), 1))   # صورة القبل الحقيقية (مرجع للسنان الباقية واللثة)
+                m, dq = iso_qa.check_and_verify(m, img_, cons, repair=not os.environ.get("ISO_QA_NOREPAIR"), keep=keep_, src_rgb=src_,
+                                                old=[Bt_[k]["c"].astype(np.float32) for k in cc if k < 30 and k in Bt_] if (prog if isinstance(prog, (int, float)) else 1) >= .99 else ()); qc[ck_] = (m, dq)
+                if dq: M.setdefault("qa_mask", {})[kq] = (m.copy(), img_)
+            M.setdefault("qa_log", {})[kq] = dq
+            if "qa_atexit" not in M:   # تقرير الفحص بيتكتب لوحده آخر الريندر (qa/iso_qa.json + صورة لأي عيب ما اتصلحش)
+                M["qa_atexit"] = 1; import atexit; atexit.register(_iso_dump)
             B.iso = Image.fromarray(np.ascontiguousarray(np.rot90(m, -1)))
         return B.base(z, iso)
     finally: B.img, B.iso = B._img0, B._iso0   # يرجع القبل الحقيقي لأي حد بعده
+def _iso_dump():
+    try:
+        import iso_qa, json as _j
+        M = _M; log = M.get("qa_log", {}); qd = (CASE_DIR + "/qa/") if CASE_DIR else OUTD; os.makedirs(qd, exist_ok=True)
+        allq = [dict(d, p=k) for k, v in sorted(log.items()) for d in v]; left = [d for d in allq if not d["fixed"]]
+        kinds = {}
+        for d in allq: kinds.setdefault(d["type"], [0, 0])[0 if d["fixed"] else 1] += 1
+        _j.dump({"frames": len(log), "found": len(allq), "unfixed": len(left), "by_type": {k: {"fixed": a, "left": b} for k, (a, b) in kinds.items()},
+                 "left": left[:50]}, open(qd + "iso_qa.json", "w"), ensure_ascii=False, indent=1)
+        for d in left[:3]:   # صورة للعيوب اللي فضلت (للمراجعة)
+            k = d["p"]
+            if k in M.get("qa_mask", {}): m_, img_ = M["qa_mask"][k]; iso_qa.draw(img_, m_, [x for x in log[k] if not x["fixed"]], qd + f"iso_qa_left_{int(k * 100):03d}.jpg", rotate=-1)
+        print(f"ISO_QA: {len(log)} فريم، {len(allq)} عيب، اتصلح {len(allq) - len(left)}، فاضل {len(left)}")
+    except Exception as e: print("ISO_QA dump failed:", e)
+    claude_review()
+def claude_review(steps=(0, .5, 1)):
+    """مراجعة Claude (مرتين + اتفاق) لفريمات العزل في أول/نص/آخر المورف → qa/claude_qa.json + الفريمات اللي اتراجعت.
+    بتشتغل لوحدها آخر أي ريندر فيه مورف. CLAUDE_QA=0 يقفلها."""
+    if os.environ.get("CLAUDE_QA", "1") == "0" or os.environ.get("CLAUDE_MORPH_QA", "0") != "1": return None   # مقفولة افتراضيًا: مراجعة الفيديو النهائي بتغطي نفس المشاهد (كانت نضيفة دايمًا من جولة 13) — توفير ~$0.30/فيديو
+    try:
+        import claude_qa, json as _j
+        qd = (CASE_DIR + "/qa/") if CASE_DIR else OUTD; os.makedirs(qd, exist_ok=True)
+        fr = {}
+        for p in steps:
+            im = auto_gum(morph_frame(p, 1.0)).convert("RGB"); k = f"p{int(p * 100):03d}"   # نفس الكادر اللي بيتعرض في الفيديو (اللثة ممدودة لحد الحافة) مش النسخة الخام; fr[k] = im; im.save(qd + f"claude_{k}.jpg", quality=90)
+        rep = claude_qa.review_frames(fr)
+        _j.dump(rep, open(qd + "claude_qa.json", "w"), ensure_ascii=False, indent=1)
+        print(f"CLAUDE_QA: {rep['verdict']} — {rep['flagged']}/{len(fr)} فريم فيه عيب متفق عليه" + (f"، {rep['errors']} مراجعة فشلت" if rep["errors"] else ""))
+        return rep
+    except Exception as e: print("CLAUDE_QA failed:", e); return None
+def iso_report(steps=(0, .25, .5, .75, 1)):
+    """تقرير فحص العزل للحالة: بيمشي على خطوات المورف ويكتب qa/iso_qa.json + صورة مراجعة لكل خطوة فيها عيب لسه موجود.
+    بيرجّع عدد العيوب اللي ما اتصلحتش (صفر = نضيف)."""
+    import iso_qa, json as _j
+    M = morph_setup(); B = shot("B"); qd = (CASE_DIR + "/qa/") if CASE_DIR else OUTD; os.makedirs(qd, exist_ok=True)
+    rep = {}; left = 0
+    for p in steps:
+        morph_frame(p, 1.0); dq = M["qa_log"][round(float(p), 2)]; rep[str(p)] = dq
+        rest = [d for d in dq if not d["fixed"]]; left += len(rest)
+        if dq:
+            m_, img_ = M["qa_mask"][round(float(p), 2)]
+            iso_qa.draw(img_, m_, dq, qd + f"iso_qa_{int(p * 100):03d}.jpg", rotate=-1)
+    _j.dump({"unfixed": left, "steps": rep}, open(qd + "iso_qa.json", "w"), ensure_ascii=False, indent=1)
+    print(f"ISO_QA: {sum(len(v) for v in rep.values())} عيب، اتصلح {sum(len(v) for v in rep.values()) - left}، فاضل {left}")
+    return left
 def planned(im, z, p=1.0, col=(255, 255, 255), width=3, dashed=True, fill=None, only_added=False):
     """يرسم شكل السنان بعد العلاج فوق صورة القبل (من صورة البعد الحقيقية المتطابقة)."""
     M = morph_setup(); B = shot("B"); lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay)
@@ -349,7 +464,9 @@ def paste(im, el, cx, cy, scale=1.0, ang=0.0, alpha=1.0):   # عنصر شفاف 
     return base.convert("RGB")
 class Particles:   # رذاذ / تفتت: نقط من منطقة تطير
     def __init__(s, src, box, n=900, speed=600, seed=1, col=None, grav=500, spread=1.0, dirx=0.0, diry=0.0):
-        r = np.random.default_rng(seed); x0, y0, x1, y1 = box; s.p = np.c_[r.uniform(x0, x1, n), r.uniform(y0, y1, n)]
+        r = np.random.default_rng(seed); x0, y0, x1, y1 = box
+        # توزيع سحابة (جاوسي حوالين نص المنطقة) مش مستطيل منتظم: كان بيبان مستطيل نقط بحروف مستقيمة (فلتر الفيديو: a30 ث9)
+        s.p = np.c_[r.normal((x0 + x1) / 2, (x1 - x0) / 4.5, n), r.normal((y0 + y1) / 2, (y1 - y0) / 4.5, n)]
         a = r.uniform(0, 2 * np.pi, n); v = r.uniform(.2, 1, n) * speed; s.v = np.c_[np.cos(a) * v * spread + dirx * speed, np.sin(a) * v * spread + diry * speed]
         s.sz = r.uniform(3, 11, n); s.g = grav; arr = np.array(src) if src is not None else None
         s.c = [tuple(int(v) for v in arr[int(min(max(y, 0), arr.shape[0] - 1)), int(min(max(x, 0), arr.shape[1] - 1))]) if arr is not None else (col or (255, 255, 255)) for x, y in s.p]
@@ -357,7 +474,8 @@ class Particles:   # رذاذ / تفتت: نقط من منطقة تطير
         if t <= 0: return im
         lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); al = max(0, 1 - t / life)
         P = s.p + s.v * t; P[:, 1] += .5 * s.g * t * t
-        for (x, y), z, c in zip(P, s.sz, s.c): d.rectangle((x, y, x + z, y + z), fill=c + (int(255 * al),))
+        for (x, y), z, c in zip(P, s.sz, s.c): d.ellipse((x, y, x + z, y + z), fill=c + (int(255 * al),))   # نقط مدوّرة (المربعات كانت بتبان بكسلات/رقعة: فلتر الفيديو test1 ث10)
+        if getattr(s, "soft", 0): lay = lay.filter(ImageFilter.GaussianBlur(s.soft))
         return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 _FL = {}
 def face_pts(im):   # نقاط الوجه (mediapipe) على صورة بمقاس الفريم
@@ -402,7 +520,7 @@ def gum_texture(H):
     ok = np.where(b.max(2).mean(1) > 60)[0]
     if len(ok): b[:ok[0]] = b[ok[0]]; b[ok[-1] + 1:] = b[ok[-1]]
     _GT[H] = b; return b
-def auto_gum(im, dark=28, tol=3, rim=9, feather=3):
+def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بكسل عند الحافة كان بيتساب ← حزوز سودا صغيرة على حافة الكادر (فلتر الفيديو test1 ث18)
     """أداة عامة على مستوى الريندر (البلاي بوك E20/R4.1): أي كادر فيه فك معزول على إسود واللثة مش واصلة لحافة الشاشة اليمين
     ← الفراغ اللي بعد قوس اللثة بيتملي بنسيج لثة طبيعي بلون اللثة اللي جنبه. السنان واللثة الحقيقية مابيتلمسوش،
     والصفوف اللي مافيهاش فك بتفضل إسود. الكادرات اللي مش فك معزول بترجع زي ما هي."""
@@ -411,14 +529,26 @@ def auto_gum(im, dark=28, tol=3, rim=9, feather=3):
     hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV); pink = (hsv[..., 0] > 150) & (hsv[..., 1] > 40) & (hsv[..., 2] > 90)   # لون اللثة (وردي/أحمر) — الكاست البيج بيبقى hue≈11 فمابيتحسبش
     if pink.mean() < .03 or pink.sum() < .12 * g.sum(): return im       # مش لثة (مثلًا كاست بيج)
     if np.where(pink)[1].mean() < W * .5: return im                    # اللثة مش ناحية اليمين
+    thin = pink & g & ~(cv2.dilate(cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)), np.ones((3, 3), np.uint8)) > 0)
+    if thin.any():   # خيوط/شعر لثة رفيعة طالعة من حرف القوس (بقايا العزل) بتتشال — كانت بتبان «خيط لثة سايب» فوق آخر سنة (فلتر الفيديو test1 ث13-14)
+        a = a.copy(); a[thin] = 0; g = a.max(2) > dark; pink = pink & ~thin
+    body_rows = None; body = cv2.morphologyEx(pink.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (41, 41)))   # جسم اللثة الأساسي
+    n_, lab_, st_, _ = cv2.connectedComponentsWithStats(body, 8)
+    if n_ > 1:
+        big_ = [i for i in range(1, n_) if st_[i, 4] > .15 * st_[1:, 4].max()]   # كل أجزاء الجسم الكبيرة (اللثة ممكن تتقسم لجزئين عند رقبة رفيعة)
+        by0 = min(st_[i, 1] for i in big_); by1 = max(st_[i, 1] + st_[i, 3] for i in big_)
+        body_rows = (by0, by1)   # الامتداد بيشتغل جوه صفوف جسم اللثة الأساسي بس
     gs = cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)) > 0   # الخطوط الرفيعة في أي اتجاه (مسطرة، عقرب الساعة، قوس) مابتتحسبش محتوى — كانت بتقطع ملء اللثة وتسيب إسود على شكلها (a03 9.3 و15.1)
     has = gs.sum(1) > W * .05; xr = W - 1 - np.argmax(gs[:, ::-1], axis=1); gap = (W - 1) - xr
     rows = has & (gap > tol) & (gap < W * .35)
+    if body_rows is not None:   # حتة لثة صغيرة فوق/تحت آخر سنة (مش جسم اللثة) كانت بتتمد لحد الحافة ← شريط لثة سايب (فلتر الفيديو test1 ث13-14)
+        yy_ = np.arange(H); rows &= (yy_ >= body_rows[0]) & (yy_ < body_rows[1])
     hr = np.where(has)[0]
     band = len(hr) > 0 and (0 < hr[0] < H * .07 or 0 < H - 1 - hr[-1] < H * .07)
     if rows.sum() < 3 and not band: return im   # مفيش فراغ يمين ولا شريط فوق/تحت (اللثة واصلة للحافة اليمين بس الشريط اللي فوق لسه محتاج يتملي — كان بيرجع هنا بدري)
     T = gum_texture(H)
     if T is None: return im
+    if not os.environ.get("GUM_TEXTURE"): rim = max(rim, 24)   # محور الانعكاس جوه اللثة بعيد عن حرفها الغامق (كان الحرف بيبان خط رمادي رأسي في نص الامتداد: test1 ث14)
     x0 = np.clip(xr - rim, 0, W - 1).astype(np.float32); Ht, Wt = T.shape[:2]
     xs = np.arange(W, dtype=np.float32)[None, :]; mx = (xs - x0[:, None]) / np.maximum(1, W - x0[:, None]) * (Wt - 1)
     my = np.repeat((np.arange(H, dtype=np.float32) * (Ht - 1) / max(1, H - 1))[:, None], W, 1)
@@ -432,13 +562,84 @@ def auto_gum(im, dark=28, tol=3, rim=9, feather=3):
         ks = (0, 0); sm = cv2.GaussianBlur(sh * w[:, None], (1, 0), sigmaX=1, sigmaY=18); ws = cv2.GaussianBlur(w[:, None], (1, 0), sigmaX=1, sigmaY=18)
         sh = sm / np.maximum(ws, 1e-3)
     fill = fill + sh[:, None, :]
+    if not os.environ.get("GUM_TEXTURE"):
+        # الامتداد من لثة نفس المريض: انعكاس (رايح جاي) لشريط اللثة اللي قبل الحافة في نفس الصف — نفس اللون والملمس بالظبط من غير خط فاصل.
+        # (النسيج الجاهز كان بيطلع رقعة مختلفة الملمس بحرف مستقيم على يمين الفك: srv/test1 ث14-23)
+        wb = np.zeros(H, np.float32)
+        for y in np.where(rows)[0]:
+            x1_ = int(x0[y]); seg = pink[y, max(0, x1_ - 400):x1_][::-1]
+            wb[y] = np.argmin(seg) if (~seg).any() else len(seg)
+        ok_ = rows & (wb >= 12)
+        if ok_.sum() >= 3:
+            wbs = cv2.GaussianBlur(np.where(ok_, wb, 0)[:, None].astype(np.float32), (1, 0), sigmaX=1, sigmaY=25)[:, 0] / np.maximum(cv2.GaussianBlur(ok_[:, None].astype(np.float32), (1, 0), sigmaX=1, sigmaY=25)[:, 0], 1e-3)
+            mir = fill.copy()
+            for y in np.where(rows)[0]:
+                w_ = max(12, int(wbs[y] * .55)); x1_ = int(x0[y]); d = np.arange(W - x1_)
+                pp = d % (2 * w_); pp = np.where(pp < w_, pp, 2 * w_ - 1 - pp)
+                src = np.clip(x1_ - 1 - pp, 0, W - 1); mir[y, x1_:] = af[y, src]
+            # صفوف آخر القوس اللي مافيهاش لثة (حافة اللثة الحقيقية خلصت قبل آخر سنتين): بتاخد امتداد أقرب صف فيه لثة —
+            # اللثة بتكمل ورا السنان الطرفية بدل نسيج جاهز (كان بيطلع شرايط رمادي فوق آخر سنتين: test1 بعد)
+            # صفوف آخر القوس اللي مافيهاش لثة حقيقية (حافة اللثة خلصت قبل آخر سنتين): مابتتملاش — القوس بيخلص طبيعي على الإسود زي الحقيقة.
+            # (ملء من نسيج جاهز كان بيطلع شرايط رمادي، وتكرار/انعكاس صفوف كان بيطلع شرايط وخط فاصل: test1 بعد)
+            # صف جوه اللثة (فوقه وتحته لثة في حدود 40 بكسل) بس عنده خرم صغير عند الحافة: بياخد امتداد أقرب صف سليم
+            # (كان بيتساب فاضي ← شرايط سودا أفقية في اللثة الممدودة: test1 ث13)
+            oky = np.where(ok_)[0]
+            if len(oky):
+                for y in np.where(rows & ~ok_)[0]:
+                    up_ = oky[oky < y]; dn_ = oky[oky > y]
+                    if len(up_) and len(dn_) and y - up_[-1] <= 40 and dn_[0] - y <= 40:
+                        yo = up_[-1] if y - up_[-1] <= dn_[0] - y else dn_[0]; x1_ = int(x0[y]); xo = int(x0[yo])
+                        mir[y, max(x1_, xo):] = mir[yo, max(x1_, xo):]
+                        if x1_ < xo: mir[y, x1_:xo] = af[yo, x1_:xo]
+                        ok_[y] = True
+            ok_ = cv2.dilate(ok_.astype(np.uint8)[:, None], np.ones((3, 1), np.uint8))[:, 0] > 0
+            rows = rows & ok_
+            mir = cv2.GaussianBlur(mir, (0, 0), sigmaX=.6, sigmaY=2.2)   # بين الصفوف بس (من غير ما يضيع الملمس)
+            # بعد أول انعكاس: الملمس بيتنعّم تدريجيًا لحد لون لثة هادي — تكرار الانعكاس كان بيبان طيّات وخطوط رأسية (test1 ث14)
+            dd = xs - x0[:, None]; ww = np.maximum(12, wbs * .55)[:, None]; kb = np.clip((dd - ww) / (2 * ww), 0, 1)[..., None] * .85
+            mir = mir * (1 - kb) + cv2.GaussianBlur(mir, (0, 0), 14) * kb
+            fill = np.where(rows[:, None, None], mir, fill)
     m = ((xs >= x0[:, None]) & rows[:, None]).astype(np.float32)
-    m = cv2.GaussianBlur(m, (0, 0), feather)[..., None]
+    m = cv2.GaussianBlur(m, (0, 0), feather if os.environ.get("GUM_TEXTURE") else max(feather, 7))[..., None]   # دمج أعرض عند بداية الانعكاس (مايبانش خط)
     out = af * (1 - m) + fill * m
+    if not os.environ.get("GUM_TEXTURE") and body_rows is not None:
+        # فوق آخر سنة وتحت أول سنة: اللثة بتكمل لحد حافة الكادر فوق/تحت (طلب الطبيب: مفيش إسود فوق اللثة وتحتها) —
+        # انعكاس رأسي (رايح جاي) من لثة المريض نفسه في جسم اللثة، يمين السنان بس. السنان مابتتلمسش.
+        by0, by1 = body_rows; hb = max(8, by1 - by0); o_ = out.copy(); vm = np.zeros((H, W), np.float32)
+        tooth_ = cv2.morphologyEx(((a.astype(np.int16).mean(2) > 110) & ~pink).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0   # السنان بس (فاتحة) — الحرف الغامق حوالين السنة بيتملي لثة (كان بيفضل خط إسود رفيع)
+        sh_ = 14; by0i, by1i = by0 + sh_, by1 - sh_; hb = max(8, by1i - by0i)   # محور الانعكاس جوه اللثة بعيد عن حرفها الغامق (كان بيطلع خط غامق أفقي)
+        gl_body = np.median([np.where(pink[y])[0].min() for y in range(by0, by1) if pink[y].any()] or [W * .6])
+        for y in list(range(0, by0i)) + list(range(by1i, H)):
+            d_ = (by0i - y) if y < by0i else (y - by1i + 1)
+            k_ = d_ % (2 * hb); k_ = k_ if k_ < hb else 2 * hb - 1 - k_
+            ys = min(by1i - 1, by0i + k_) if y < by0i else max(by0i, by1i - 1 - k_)
+            tx = np.where(tooth_[y])[0]
+            x0r = int(tx.min() + .5 * (tx.max() - tx.min())) if len(tx) else int(gl_body * .9)   # النص ناحية اللثة من السنان (الجيوب اللي ناحية الحافة القاطعة تفضل إسود)
+            row = (~tooth_[y]); row[:x0r] = False
+            if y >= by0 and y < by1: row &= (a[y].astype(np.int16).mean(1) < 90) & ~pink[y]   # شريط حرف الجسم: نملا الإسود والحرف الغامق بس (كان بيفضل خط إسود أفقي)
+            o_[y, row] = out[ys, row]; vm[y, row] = 1
+        if vm.any():   # بعد الانعكاس الملمس بيتنعّم تدريجيًا (التماثل حوالين المحور مايبانش)
+            dist_ = np.zeros(H, np.float32); dist_[:by0i] = np.arange(by0i, 0, -1); dist_[by1i:] = np.arange(1, H - by1i + 1)
+            kb_ = np.clip(dist_ / max(1, hb), 0, 1)[:, None, None] * .75; o_ = o_ * (1 - kb_) + cv2.GaussianBlur(o_, (0, 0), 10) * kb_
+            far = np.abs(np.arange(H) - np.clip(np.arange(H), by0, by1 - 1)).astype(np.float32)[:, None, None]
+            o_ = np.where(far > hb * .5, o_ * 0 + cv2.GaussianBlur(o_, (0, 0), 6), o_) if False else o_
+            vm = cv2.GaussianBlur(vm, (0, 0), 4)[..., None]; out = out * (1 - vm) + o_ * vm
+            # الحرف الغامق الأصلي عند أول/آخر صف في جسم اللثة (بين السنة واللثة الممدودة): بيتملي من النسيج اللي حواليه
+            ink = np.zeros((H, W), np.uint8); ob = np.clip(out, 0, 255).astype(np.uint8)
+            for yb in (by0, by1):
+                for y in range(max(0, yb - 30), min(H, yb + 30)):
+                    tx = np.where(tooth_[y])[0]; x0r = int(tx.min() + .5 * (tx.max() - tx.min())) if len(tx) else 0
+                    d_ = (ob[y].astype(np.int16).mean(1) < 80); d_[:x0r] = False; d_ &= ~tooth_[y]; ink[y] = d_
+            if ink.any(): out = cv2.inpaint(ob, cv2.dilate(ink, np.ones((3, 3), np.uint8)), 5, cv2.INPAINT_TELEA).astype(np.float32)
+            # جزر إسود صغيرة مقفولة جوه اللثة (مش متوصلة بالخلفية السودا الشمال): بتتملي — كانت بتبان «نقط/خروم سودا في اللثة» (فلتر الفيديو test1 ث13)
+            ob = np.clip(out, 0, 255).astype(np.uint8); blk = (ob.max(2) < 70).astype(np.uint8); n_b, lb_b, st_b, _ = cv2.connectedComponentsWithStats(blk, 4)
+            bgc = set(np.unique(lb_b[:, 0])) | set(np.unique(lb_b[:, :int(W * .3)][blk[:, :int(W * .3)] > 0]))
+            holes = np.isin(lb_b, [i for i in range(1, n_b) if i not in bgc and st_b[i, 4] < H * W * .002 and st_b[i, 0] > W * .45])
+            if holes.any(): out = cv2.inpaint(ob, cv2.dilate(holes.astype(np.uint8), np.ones((11, 11), np.uint8)), 9, cv2.INPAINT_TELEA).astype(np.float32)
     # شريط رفيع **فوق** الفك (< 7% من الطول) بيبان زي حافة إسود بعد ما اللثة وصلت للحافة اليمين (E84)
     # ← اللثة بس (من بعد آخر سنة) بتكمل لفوق بانعكاس اللثة اللي تحت الشريط مباشرة — بعد ملء فراغ اليمين. السنان مابتتعكسش، واللي تحت الفك مابيتلمسش.
     hr = np.where(has)[0]
-    if len(hr) and 0 < hr[0] < H * .07:
+    if len(hr) and 0 < hr[0] < H * .07 and os.environ.get("GUM_TEXTURE"):   # (قديم) شد اللثة لفوق: مع نهاية القوس الطبيعية بقى بيطلع شريط رمادي (test1 ث14)
         ry = None
         for dy in range(3, 90, 3):
             yy = min(H - 1, hr[0] + dy)
@@ -475,7 +676,14 @@ def render(name, scenes, music="piano", W=FW, H=FH, xfade=0.0, still=False):
            "-c:a", "aac", "-b:a", "192k", "-c:v", "libx264", "-crf", "20", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-t", str(DUR), out]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     for i in range(int(DUR * FPS)): p.stdin.write(frame(i / FPS).convert("RGB").tobytes())
-    p.stdin.close(); p.wait(); return out
+    p.stdin.close(); p.wait()
+    if os.environ.get("CLAUDE_QA", "1") != "0" and os.path.exists(out):   # مراجعة الفيديو النهائي نفسه بـ Claude (كل ثانية، مرتين + اتفاق) → qa/claude_video.json
+        try:
+            import claude_qa; qd = (CASE_DIR + "/qa/") if CASE_DIR else OUTD; os.makedirs(qd, exist_ok=True)
+            rv = claude_qa.review_video(out, qd + "claude_video.json")
+            print(f"CLAUDE_VIDEO: {rv['verdict']} — {len(rv['agreed'])} عيب متفق عليه في {rv['seconds']} ثانية" + (f"، {rv['errors']} مراجعة فشلت" if rv["errors"] else ""), flush=True)
+        except Exception as e: print("CLAUDE_VIDEO failed:", e, flush=True)
+    return out
 def dur(p): return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", p], capture_output=True, text=True).stdout or 0)
 def compare(name, ref):
     out = OUTD + "cmp_" + name + ".mp4"; rp = S + f"up/{ref}/in/v.mp4"

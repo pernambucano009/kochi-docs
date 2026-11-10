@@ -30,6 +30,27 @@ const BrainLibPage = (() => {
   const folder = (id) => S.lib.folders.find((f) => f.id === id);
   const kidsOf = (id) => S.lib.folders.filter((f) => (f.parent || null) === (id || null)).sort((a, b) => a.name.localeCompare(b.name, "ar"));
   const T = () => TAB[S.tab];
+  // 🦷 حالات الأسنان: فولدر «الحالات» جوه الصور، وكل فولدر جواه حالة (العقل يصنّف صورها لوحده)
+  const casesRoot = () => S.lib?.folders.find((f) => f.cases_root) || null;
+  const isCase = (f) => !!f && !!casesRoot() && f.parent === casesRoot().id;
+  const caseOf = (id) => { for (let f = folder(id); f; f = folder(f.parent)) if (isCase(f)) return f; return null; };
+  const caseBusy = (c) => { const i = c.case || {}; return i.status === "classifying" || (i.stale && (i.count || 0) > 0); };
+  const caseChip = (c) => { const i = c.case || {};
+    if (i.needs_name) return `<em class="bl-cchip warn">اكتب اسم الحالة</em>`;
+    if (!(i.count || 0)) return `<em class="bl-cchip">فارغة</em>`;
+    if (caseBusy(c)) return `<em class="bl-cchip">⏳ يصنّف العقل الصور</em>`;
+    if (i.status === "error") return `<em class="bl-cchip warn">تعذّر التصنيف</em>`;
+    return `<em class="bl-cchip ok">✓ صُنّفت</em>`; };
+  const LBL = { before: "قبل", prep: "تحضير", after: "بعد", unknown: "؟", smile: "ابتسامة", retracted: "بالمبعد", macro: "مقرّبة", occlusal: "إطباقية", other: "أخرى", front: "من الأمام", right: "من اليمين", left: "من الشمال" };
+  const labelOf = (f) => { const c = caseOf(f.folder), l = c?.case?.labels?.[f.id]; return l ? [l.stage, l.kind, l.view].map((k) => LBL[k] || k).join(" · ") : ""; };
+  async function askCaseNames() {   // حالة اسمها افتراضي (مجلد جديد، IMG_…): لازم الطبيب يكتب اسمها
+    for (const c of (S.lib?.folders || []).filter((f) => isCase(f) && f.case?.needs_name)) {
+      const name = await uiPrompt(`اكتب اسم الحالة (المجلد «${c.name}»)، مثلًا: عدسات — أحمد`);
+      if (!name?.trim()) break;
+      S.lib = await api(`/api/library/folders/${c.id}`, { method: "PATCH", ...jsonBody({ name }) });
+    }
+    render();
+  }
   const tabName = (k) => TABS.find(([x]) => x === k)?.[1] || "";
 
   // 🗂 المحور: الفولدرات الثمانية بعدد اللي جواها
@@ -56,7 +77,8 @@ const BrainLibPage = (() => {
     if (f.kind === "audio") return `<div class="bl-au${S.open === f.id ? " on" : ""}" data-blfile="${f.id}" draggable="true"><button type="button" class="bl-play" data-blplay="${esc(f.url)}" aria-label="تشغيل">${pkIc(S.play === f.url ? "close" : "play", 14)}</button>
         <div><b>${esc(f.name)}</b>${f.status === "tagging" ? `<small>⏳ يتعرّف عليه العقل…</small>` : f.desc ? `<small>${esc(f.desc)}</small>` : ""}</div><small class="num" dir="ltr">${dur(f.dur)}</small></div>`;
     const media = f.kind === "image" ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : f.thumb ? `<img src="${esc(f.thumb)}" alt="" loading="lazy">` : `<span class="bl-ph">${pkIc("play", 22)}</span>`;
-    return `<figure class="bl-tile${S.open === f.id ? " on" : ""}${f.status === "tagging" ? " waiting" : ""}" data-blfile="${f.id}" draggable="true">${media}<figcaption>${esc(f.desc || f.name)}${f.dur ? ` · ${dur(f.dur)}` : ""}</figcaption></figure>`;
+    const cl = labelOf(f);
+    return `<figure class="bl-tile${S.open === f.id ? " on" : ""}${f.status === "tagging" ? " waiting" : ""}" data-blfile="${f.id}" draggable="true">${media}<figcaption>${cl ? `<b class="bl-clab">${esc(cl)}</b>` : ""}${esc(f.desc || f.name)}${f.dur ? ` · ${dur(f.dur)}` : ""}</figcaption></figure>`;
   }
   function editor(f) {
     const opts = (id, depth = 0) => kidsOf(id).map((x) => `<option value="${x.id}" ${x.id === f.folder ? "selected" : ""}>${"— ".repeat(depth + 1)}${esc(x.name)}</option>${opts(x.id, depth + 1)}`).join("");
@@ -93,9 +115,20 @@ const BrainLibPage = (() => {
           <span class="pk-wrapm">${pkIb("more", "خيارات المجلد", "data-blmenu")}${menu()}</span>
           <label class="pk-ib blk" data-tip="ارفع ملفات" aria-label="ارفع ملفات">${pkIc("upload")}<input type="file" multiple accept="${t.accept}" data-blup hidden></label></div></div>
       ${path()}
-      ${!S.hits && sub.length ? `<div class="bl-subs">${sub.map((f) => `<button type="button" class="bl-sub" data-blgo="${f.id}" data-bldrop="${f.id}">${pkIc("folder", 18)}<b>${esc(f.name)}</b><small class="num">${f.count || 0}</small></button>`).join("")}</div>` : ""}
+      ${caseBanner()}
+      ${!S.hits && sub.length ? `<div class="bl-subs">${sub.map((f) => `<button type="button" class="bl-sub" data-blgo="${f.id}" data-bldrop="${f.id}">${pkIc("folder", 18)}<b>${esc(f.name)}</b><small class="num">${f.count || 0}</small>${isCase(f) ? caseChip(f) : ""}</button>`).join("")}</div>` : ""}
       <div class="${audio ? "bl-aus" : "bl-tiles"}" data-bldrop="${S.cur}">${shown.map(card).join("") || (sub.length ? "" : `<div class="pk-empty">المجلد فارغ. ارفع ملفات أو اسحبها إلى هنا.</div>`)}</div>
       ${cur ? editor(cur) : ""}</div>`;
+  }
+  function caseBanner() {
+    const here = folder(S.cur), c = caseOf(S.cur);
+    if (here && here.cases_root) return `<p class="pk-note bl-cnote">كل مجلد هنا حالة مريض: ارفع صورها (قبل، وبعد، والتحضير إن وُجد)، وسيصنّفها العقل تلقائيًا، وتظهر في القوالب التي تناسبها.</p>`;
+    if (!c) return "";
+    const i = c.case || {};
+    if (i.needs_name) return `<div class="bl-cnote warn"><span>هذه الحالة بلا اسم. اكتب اسمها لتظهر في القوالب.</span><button type="button" class="nb-btn fs-go" data-blcname="${c.id}">اكتب اسم الحالة</button></div>`;
+    if (caseBusy(c)) return `<p class="pk-note bl-cnote">⏳ يصنّف العقل صور الحالة (قبل، تحضير، بعد، والزاوية)…</p>`;
+    if (i.status === "error") return `<p class="pk-err bl-cnote">⚠️ ${esc(i.error || "تعذّر تصنيف الصور")}</p>`;
+    return "";
   }
   async function refresh() { S.lib = await api("/api/library"); }
   async function runSearch() {
@@ -106,7 +139,7 @@ const BrainLibPage = (() => {
   }
   function poll() {
     clearTimeout(S.timer);
-    if (!S.lib?.tagging) return;
+    if (!S.lib?.tagging && !(S.lib?.folders || []).some((f) => isCase(f) && caseBusy(f))) return;
     S.timer = setTimeout(async () => { try { await refresh(); if (!S.hits) morphing(render); } catch { /* الخادم يعيد التشغيل */ } poll(); }, 3000);
   }
   async function upload(files) {
@@ -120,6 +153,7 @@ const BrainLibPage = (() => {
     S.lib = await api("/api/library/files", { method: "POST", body: fd });
     render(); poll();
     toast("✓ رُفعت، وسيكتب العقل وصف كل ملف");
+    if (casesRoot() && (S.lib.folders || []).some((f) => isCase(f) && f.case?.needs_name)) askCaseNames();
   }
   function bind(w) {
     w.addEventListener("click", async (e) => {
@@ -134,9 +168,14 @@ const BrainLibPage = (() => {
         if (S.menu && !q(".pk-menu")) { S.menu = false; render(); }
         if ((b = q("[data-blnav]"))) return b.dataset.blnav === "twin" ? showStep("16") : window.NHNav?.(b.dataset.blnav);
         if (!TAB[S.tab]) return;
+        if ((b = q("[data-blcname]"))) {
+          const c = folder(b.dataset.blcname), name = await uiPrompt("اكتب اسم الحالة، مثلًا: عدسات — أحمد", c?.name && !c.case?.needs_name ? c.name : "");
+          if (!name?.trim()) return;
+          S.lib = await api(`/api/library/folders/${b.dataset.blcname}`, { method: "PATCH", ...jsonBody({ name }) }); return render();
+        }
         if ((b = q("[data-blgo]"))) { S.cur = b.dataset.blgo || S.root; S.open = null; S.hits = null; S.q = ""; return render(); }
         if (q("[data-blnew]")) {
-          const name = (await uiPrompt("اسم المجلد الجديد:")); if (!name?.trim()) return;
+          const name = (await uiPrompt(folder(S.cur)?.cases_root ? "اسم الحالة الجديدة (مثلًا: عدسات — أحمد):" : "اسم المجلد الجديد:")); if (!name?.trim()) return;
           S.lib = await api("/api/library/folders", { method: "POST", ...jsonBody({ name, parent: S.cur }) }); return render();
         }
         if (q("[data-blren]")) {
@@ -250,9 +289,10 @@ const BrainLibPage = (() => {
     if (!w) return;
     S.el = w; S.body = w.querySelector("#blBody"); S.share = null; S.tab = null;
     bind(w);
-    const tab = window.BL_TAB;
-    window.BL_TAB = null;
+    const tab = window.BL_TAB, toCases = window.BL_CASES;
+    window.BL_TAB = null; window.BL_CASES = null;
     await showTab(tab);
+    if (toCases && casesRoot()) { S.cur = casesRoot().id; render(); }
   }
   // التسلسل فوق: «مكتبة المحتويات › الصور»، و«رجوع» من جوه فولدر بيرجّعك للمحور
   const sub = () => (S.tab ? tabName(S.tab) : "");

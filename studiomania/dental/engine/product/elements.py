@@ -129,6 +129,20 @@ def r_after_portrait(c):
         _, tS = analyze(c.canon("after_smile"), c.d + "/ana/ai_smile.png", c.d + "/ana/lab_smile.json")
         ws = [t["w"] for t in tS if t["fdi"] in (11, 21)]; inc = sum(ws) / len(ws) if ws else None
     except Exception: inc = None
+    for f in (out.rsplit(".", 1)[0] + "_src.txt",):
+        if os.path.exists(f): os.remove(f)
+    if c.has("after_retracted") and c.has("before_retracted") and os.path.exists(c.d + "/ana/det_after.json"):
+        # الطريقة الجديدة: شفايف المريض الحقيقية من الوش زي ما هي، والسنان بس بتتغير جوه فتحة البق (من صورة البعد بالمبعد، مقاسها بالمسافة بين الأنياب).
+        # الطريقة القديمة (البق كله بشفايفه من صورة ماكرو تانية) كانت بتطلع شفة دبل وحافة ولون مختلف حوالين البق (srv: الفلتر رفضها 3/3)
+        try:
+            sys.path.insert(0, S + "tools"); from teeth_swap import swap as tswap
+            r = tswap(c.d, out); c.log(f"صورة الوش بعد: السنان بس (teeth_swap) {r}")
+            hi_p = c.el_path("before_face_hi.png")   # نسخة عالية الدقة بنفس الطريقة (اللقطات اللي بتقرّب على البق) — الشفايف من التكبير الأمين لوش القبل
+            if os.path.exists(hi_p):
+                try: tswap(c.d, out.rsplit(".", 1)[0] + "_hi.png", face_p=hi_p)
+                except Exception as e: c.log(f"teeth_swap hi فشل: {str(e)[:160]}")
+            return [out]
+        except Exception as e: c.log(f"teeth_swap فشل ({str(e)[:160]}) ← الطريقة القديمة")
     swap(c.canon("before_face"), out, smile_p=c.canon("after_smile"), lips_p=ms + "smile_lips.png", open_p=ms + "smile_open.png", inc_w=inc)   # البق كله بالشفايف من صورة الابتسامة الحقيقية
     return [out]
 
@@ -165,7 +179,12 @@ def r_before_hi(c):   # تكبير أمين لوش القبل: الحدة من �
     from at import run, get, upload
     from faithful_upscale import faithful
     up = c.el_path("before_face_x2.png"); out = c.el_path("before_face_hi.png")
-    get(run("Image", {"model": "tencent/image/upscaler", "image": upload(c.canon("before_face"))}), up); faithful(c.canon("before_face"), up, out); return [out]
+    r = run("Image", {"model": "tencent/image/upscaler", "image": upload(c.canon("before_face"))}); get(r, up)
+    from PIL import Image as _I
+    im_ = _I.open(up)
+    if im_.width < 1800:   # صورة صغيرة (مثلًا 520 بكسل): التقريب ×3 على البق كان بيطلع سلالم بكسلات (test1 ث32). تكبير الموديل مرتين كان بيطلع بشرة خشنة (الفلتر رفضها: int3)
+        k_ = 1800 / im_.width; im_.resize((int(im_.width * k_), int(im_.height * k_)), _I.LANCZOS).save(up)   # ← مرة بالموديل + تكبير عادي ناعم
+    faithful(c.canon("before_face"), up, out); return [out]
 
 def r_teeth_only(c):
     from derive import teeth_only
@@ -174,6 +193,28 @@ def r_teeth_only(c):
         for which in ("upper", "lower", "both"):
             o = c.el_path(f"{pref}_teeth_{which}.png"); teeth_only(c.canon(slot), A + f"ai_{tag}.png", A + f"lab_{tag}.json", which, o); outs.append(o)
     return outs
+
+def mouth_shape_drift(video, ref_img, n=10, tol=.25):
+    """فتحة البق (ارتفاع وعرض الفتحة الداخلية ÷ المسافة بين العينين) في الصورة الأصلية vs كل كادر من الفيديو.
+    أي كادر الفتحة فيه اتغيرت أكتر من tol (البق اتقفل/اتفتح/الابتسامة اتغيرت) = رفض."""
+    import subprocess, tempfile, glob
+    from derive import _lmk
+    from mouth_swap import INNER
+    def meas(a):
+        P = _lmk(a); io = np.linalg.norm(P[33] - P[263]); q = P[INNER]
+        return np.ptp(q[:, 1]) / io, np.ptp(q[:, 0]) / io
+    try: r = meas(np.array(Image.open(ref_img).convert("RGB")))
+    except Exception as e: return {"pass": False, "issues": [f"مش لاقي البق في الصورة الأصلية: {e}"]}
+    td = tempfile.mkdtemp(); d = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video], capture_output=True, text=True).stdout or 4)
+    worst = 0.0; rows = []
+    for i, t in enumerate(np.linspace(.1, d - .15, n)):
+        f = f"{td}/m{i}.jpg"; subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{t:.2f}", "-i", video, "-frames:v", "1", f])
+        try: h, w = meas(np.array(Image.open(f).convert("RGB")))
+        except Exception: continue
+        dv = max(abs(h - r[0]) / max(r[0], 1e-3), abs(w - r[1]) / max(r[1], 1e-3)); rows.append(round(float(dv), 3)); worst = max(worst, dv)
+    ok = bool(bool(rows) and worst <= tol)
+    return {"pass": ok, "worst": round(float(worst), 3), "frames": [float(v) for v in rows],
+            "issues": [] if ok else [f"شكل البق اتغير عن الصورة الأصلية بنسبة {int(worst * 100)}% (المسموح {int(tol * 100)}%)"]}
 
 def r_live(name, src_el, prompt):
     def f(c):
@@ -278,7 +319,7 @@ def r_gum_back(c):   # خلفية لثة ممتدة لحد حافة الشاشة
 RECIPES = {
     "ms/smile_masks":        (["slot:after_smile"], r_smile_masks, None, []),
     "after_portrait_v3.png": (["slot:before_face", "slot:after_smile", "ms/smile_masks"], r_after_portrait,
-                              "This is the patient's face photo with the patient's REAL after-treatment mouth (lips and teeth together, taken from a real close-up photo of the same patient) placed on it on purpose. "
+                              "This is the patient's face photo with the patient's REAL after-treatment teeth (taken from a real close-up photo of the same patient) placed inside the mouth opening on purpose; the lips and skin are the patient's own from this same photo. "
                               "New veneers/crowns are expected to look whiter, more uniform and somewhat bigger than the old teeth, and the real lips may show dryness or texture: that is NOT a problem. "
                               "Slight differences in sharpness or tone around the mouth are acceptable at social-media viewing size. "
                               "The mouth size and position were already measured from face landmarks before building this photo, so do not judge them. "
@@ -294,7 +335,8 @@ RECIPES = {
                               "FAIL only if the sharpening added artifacts (halos, smeared or melted areas, invented details) or the teeth look whitened or beautified. Otherwise PASS."
                               "Its teeth are compared with the original photo in a separate check, so do not ask for the original.", [("mouth", "slot:before_face")]),
     "teeth_only":            (["slot:before_retracted", "slot:after_retracted"], r_teeth_only, None, [("iso", None)]),
-    "v/after_live.mp4":      (["after_portrait_v3.png"], r_live("after_live", "after_portrait_v3.png", "The person holds the smile, blinks naturally once, slight natural head movement and breathing."), "VIDEO", []),
+    "v/after_live.mp4":      (["after_portrait_v3.png"], r_live("after_live", "after_portrait_v3.png", "The person holds the exact same smile with the mouth open the same amount for the whole video, blinks naturally once, slight natural head movement and breathing."), "VIDEO",
+                              [("mouthshape", "after_portrait_v3.png"), ("mouth", "after_portrait_v3.png")]),   # كان من غير فحص: الموديل قفل البق وغيّر شكل السنان وعدّى
     "v/after_blink.mp4":     (["after_portrait_v3.png"], r_live("after_blink", "after_portrait_v3.png", "The person starts with eyes gently closed while smiling, then slowly opens the eyes and keeps smiling, subtle head movement."), "VIDEO", []),
     "v/after_fist.mp4":      (["pose"], r_live("after_fist", "POSE", "The person keeps the pose and smiles, blinks once, tiny head tilt."), "VIDEO", []),
     "v/before_live.mp4":     (["slot:before_face"], r_live("before_live", "slot:before_face", "The person holds the smile, blinks naturally once, slight natural head movement. The old teeth keep their exact yellow color, stains, gaps and shapes; never whiten or fix them."), "VIDEO", [("mouth", "slot:before_face"), ("drift", "slot:before_face")]),   # فحص السنان إجباري: الموديل بيحب يبيّض القبل
@@ -337,13 +379,16 @@ def mouth_crop(p):   # قص منطقة البق بنقط الوش (عشان نق
 
 def teeth_check(c, el_path, ref):
     """فلتر السنان: السنان في العنصر لازم تكون هي نفسها سنان الصورة الحقيقية (العدد، الشكل، اللون، البقع لو قبل)."""
-    refp = c.canon(ref[5:]) if ref.startswith("slot:") else c.el_path(ref)
-    try: a, b = mouth_crop(el_path), (mouth_crop(refp) if not ref.startswith("slot:after_smile") else refp)
+    srcf = el_path.rsplit(".", 1)[0] + "_src.txt"
+    if os.path.exists(srcf): ref = "slot:" + open(srcf).read().strip() + "|warp"   # العنصر اتعمل من صورة تانية (teeth_swap ← البعد بالمبعد): المرجع هو هي بنفس التحويل
+    refp = c.canon(ref[5:].split("|")[0]) if ref.startswith("slot:") else c.el_path(ref)
+    warp_ref = ref.startswith("slot:after_smile") or ref.endswith("|warp")
+    try: a, b = mouth_crop(el_path), (mouth_crop(refp) if not warp_ref else refp)
     except Exception as e: return {"pass": False, "score": 0, "issues": [f"مش لاقي الوش/البق: {e}"]}
     # البق اتنقل من الصورة الحقيقية بتحويل محفوظ (مقاس + لفّة + ضغط رأسي ٨٪ اختيار العميل): المرجع يبقى الصورة الحقيقية بنفس التحويل ونفس القص،
     # فالفلتر بيقارن «المتوقع» بالناتج (أي سنة اتغيرت أو اتبيضت أو اتخلقت = رفض)، مش فرق المقاس والدقة
     Mp = el_path.rsplit(".", 1)[0] + "_M.npy"
-    if ref.startswith("slot:after_smile") and os.path.exists(Mp):
+    if warp_ref and os.path.exists(Mp):
         from derive import _lmk
         E_ = np.array(Image.open(el_path).convert("RGB")); P = _lmk(E_); x0, y0 = P[[61, 291, 0, 17]].min(0); x1, y1 = P[[61, 291, 0, 17]].max(0); pad = (x1 - x0) * .25
         Rw = cv2.warpAffine(np.array(Image.open(refp).convert("RGB")), np.load(Mp), (E_.shape[1], E_.shape[0]), flags=cv2.INTER_AREA)
@@ -376,6 +421,11 @@ def make(c, names=None, force=False):
         if names and name not in names: continue
         st = c.el(name)["status"]
         if not force and st in (APPROVED, QA_PASS): report[name] = st; continue
+        prev = [os.path.join(c.d, f) for f in c.el(name).get("files", [])]
+        if not force and st == MADE and c.el(name).get("qa", {}).get("qa_error") and prev and all(os.path.exists(f) for f in prev):
+            res = _qa(c, name, prev, q, tchecks)   # اتعمل قبل كده والفحص بس اللي وقع: نفحصه تاني من غير ما نصنّعه من جديد (من غير تكلفة توليد)
+            st2 = QA_PASS if res.get("pass") else (MADE if res.get("qa_error") else QA_FAIL)
+            c.set_el(name, status=st2, qa=res, note=res.get("reason_ar", "")); report[name] = st2; continue
         ok, why = ready(c, needs)
         if not ok: c.set_el(name, status=MISSING, note=why); report[name] = why; continue
         for attempt in range(VIDEO_TRIES if q == "VIDEO" else TRIES.get(name, 1)):   # الموديلات التوليدية عشوائية: لو الناتج اترفض بيتعمل تاني (E83)
@@ -385,9 +435,10 @@ def make(c, names=None, force=False):
             try: outs = fn(c)
             except BaseException as e: outs = None; c.set_el(name, status=QA_FAIL, note=f"فشل التصنيع: {str(e)[:200]}"); report[name] = "فشل"; break
             res = _qa(c, name, outs, q, tchecks)
-            if res.get("pass"): break
+            if res.get("pass") or res.get("qa_error"): break   # الفحص نفسه وقع (خدمة واقفة/رصيد): مفيش فايدة نعيد التصنيع
         if outs is None: continue
-        st = QA_PASS if res.get("pass") else QA_FAIL
+        # الفحص ماتمّش ≠ العنصر وحش: بيفضل «اتعمل» (مش مرفوض) ويتفحص تاني في المرة الجاية — كان عنصر سليم بيترفض لما Atlas يقع
+        st = QA_PASS if res.get("pass") else (MADE if res.get("qa_error") else QA_FAIL)
         c.set_el(name, status=st, files=[os.path.relpath(o, c.d) for o in outs], qa=res, note=res.get("reason_ar", ""), tries=attempt + 1); report[name] = st
     return report
 
@@ -413,11 +464,15 @@ def _qa(c, name, outs, q, tchecks):
             if q == "VIDEO": res = video_check(outs[0])
             elif q and q.rstrip().endswith("Otherwise PASS."):   # سؤال «عيوب حقيقية بس»: رأي الموديل بيتغير من مرة للتانية، فالقرار بأغلبية ٣
                 import concurrent.futures as cf
-                with cf.ThreadPoolExecutor(3) as ex: rs = list(ex.map(lambda _: ai_check(outs[:1], q), range(3)))
+                imgs_, q_ = outs[:1], q
+                if name == "after_portrait_v3.png" and c.has("before_face"):   # الصورة الأصلية جنبها: أي علامة/خط موجود في الأصل مش عيب (test1: خط على الدقن في صورته الحقيقية اترفض بسببه)
+                    imgs_ = [outs[0], c.canon("before_face")]
+                    q_ = q + " Image 2 is the ORIGINAL photo of the same patient before treatment: anything that is also visible in image 2 (scars, lines, marks, skin texture, hair) is part of the real photo and is NOT a defect."
+                with cf.ThreadPoolExecutor(3) as ex: rs = list(ex.map(lambda _: ai_check(imgs_, q_), range(3)))
                 ok = sum(bool(r.get("pass")) for r in rs) >= 2; best = max(rs, key=lambda r: (bool(r.get("pass")) == ok, r.get("score", 0)))
                 res = {**best, "pass": ok, "votes": [bool(r.get("pass")) for r in rs]}
             elif q: res = ai_check(outs[:1], q)
-        except BaseException as e: res = {"pass": False, "score": 0, "issues": [f"الفحص نفسه وقع: {str(e)[:150]}"]}   # فحص عنصر واحد مايوقّفش الباقي
+        except BaseException as e: res = {"pass": False, "score": 0, "qa_error": True, "issues": [f"الفحص نفسه وقع: {str(e)[:150]}"]}   # فحص عنصر واحد مايوقّفش الباقي
         for kind, ref in tchecks:
             src = outs[0]
             if src.endswith(".mp4"):   # فيديو: بنفحص كادر من النص
@@ -432,6 +487,10 @@ def _qa(c, name, outs, q, tchecks):
                 from checks import teeth_image
                 ti = teeth_image(outs[0], c.canon(ref[5:]) if ref.startswith("slot:") else c.el_path(ref), faces=2 if "twin" in name else 1); res["teeth"] = ti
                 if not ti.get("pass"): res["pass"] = False; res["issues"] = res.get("issues", []) + ti.get("issues", [])
+                continue
+            if kind == "mouthshape":   # فيديو حي من صورة: البق لازم يفضل نفس الفتحة (srv: موديل الفيديو قفل البق وغيّر الابتسامة ← قفزة من بق مفتوح لمقفول)
+                ms_ = mouth_shape_drift(outs[0], c.canon(ref[5:]) if ref.startswith("slot:") else c.el_path(ref)); res["mouthshape"] = ms_
+                if not ms_.get("pass"): res["pass"] = False; res["issues"] = res.get("issues", []) + ms_.get("issues", [])
                 continue
             if kind == "drift":   # البلاي بوك Q2 (E01): فيديو "قبل" — تنوّع البقع والصفار في كل الكادرات مقارنة بالصورة الحقيقية (بالأرقام)
                 from checks import teeth_drift

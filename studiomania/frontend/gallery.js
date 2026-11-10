@@ -167,7 +167,7 @@ const Gallery = (() => {
   };
   const fits = (x) => !S.niche.key || FIT[x.id] === "*" || (FIT[x.id] || "").split(" ").includes(S.niche.key);
   // تصنيفات القوالب اللي مش جاية من السيرفر
-  const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "طب الأسنان" }, { id: "other", ar: "قوالبي" }];
+  const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "الأسنان: فيديوهات" }, { id: "dentalimg", ar: "الأسنان: صور" }, { id: "other", ar: "قوالبي" }];
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
@@ -176,7 +176,16 @@ const Gallery = (() => {
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الاصطناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
-    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
+    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");
+    // 🦷 قوالب الأسنان: كل قالب فيديو وكل قالب صور لوحده، والحالة بتتختار من العقل (dental.js ← pick)
+    const dt = await api("/api/dental/templates").catch(() => null);
+    if (dt) {
+      const mk = (t, kind) => ({ id: `d-${t.id}`, dtid: t.id, dkind: kind, name: t.name, desc: t.desc, icon: "🦷", pin: 6,
+        cover_url: `/gallery/dental/${t.id}.jpg`, cat: kind === "photo" ? "dentalimg" : "dental" });
+      const add = [...(dt.video || []).map((t) => mk(t, "video")), ...(dt.photo || []).map((t) => mk(t, "photo"))];
+      add.forEach((x) => { FIT[x.id] = "beauty"; });
+      S.items = [...S.items.filter((x) => x.id !== "dental"), ...add];
+    }   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
     // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
     S.reels = niche?.reels || [];
     const fm = niche?.field_media || [];
@@ -761,6 +770,7 @@ const Gallery = (() => {
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
     if (x.id === "editor") return openEditor();
+    if (x.dtid) return window.Dental?.pick({ id: x.dtid, name: x.name, desc: x.desc, kind: x.dkind });
     if (x.id === "dental") return window.Dental?.open();
     return Flow.start({ id: x.id, name: x.name, cat: catName(x.cat), desc: x.desc || x.description || "" });
   }

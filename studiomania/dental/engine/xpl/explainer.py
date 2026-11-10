@@ -5,14 +5,15 @@ sys.path.insert(0, '../gen'); from at import run, get, upload, K
 sys.path.insert(0, ((__import__("os").environ.get("DENTAL_ROOT") or __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))) + "/../../backend")); import clipqa
 
 LLM = "https://api.atlascloud.ai/v1/chat/completions"
-def chat(parts, model="google/gemini-3.8-flash", mt=6000):
+def chat(parts, model="google/gemini-3.8-flash", mt=6000, fallback=True, extra=None):
+    """fallback=False: الموديل ده بس (للتأكيد بموديل تاني: لو وقع مايترجعش بإجابة موديل غيره من غير ما نعرف)."""
     import time, random
     err = None
-    for m in (model, "google/gemini-2.5-pro"):
+    for m in ((model, "google/gemini-2.5-pro") if fallback else (model,)):
         for att in range(5):   # 429 (ضغط/طلبات كتير في نفس الوقت): نستنى ونحاول تاني بدل ما نفشل على طول
             try:
                 r = httpx.post(LLM, headers={"Authorization": f"Bearer {K}"}, timeout=300,
-                               json={"model": m, "messages": [{"role": "user", "content": parts}], "temperature": .3, "max_tokens": mt, "response_format": {"type": "json_object"}})
+                               json={"model": m, "messages": [{"role": "user", "content": parts}], "temperature": .3, "max_tokens": mt, "response_format": {"type": "json_object"}, **(extra or {})})
                 if r.status_code in (401, 403): raise SystemExit("ATLAS_AUTH " + r.text[:200])   # المفتاح غلط/منتهي: مفيش فايدة نحاول تاني
                 if r.status_code == 429:
                     msg = r.text[:300]; err = RuntimeError(msg)
@@ -20,7 +21,11 @@ def chat(parts, model="google/gemini-3.8-flash", mt=6000):
                     time.sleep(2 * (att + 1) + random.random() * 2); continue
                 if r.status_code >= 500 or "choices" not in r.text[:4000]:   # Atlas واقع/مزدحم أو رد من غير إجابة: نحاول تاني
                     err = RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}"); time.sleep(3 * (att + 1) + random.random() * 2); continue
-                t = r.json()["choices"][0]["message"]["content"].strip()
+                jr = r.json(); t = jr["choices"][0]["message"]["content"].strip()
+                try:   # تسجيل التكلفة (gen/costlog.py)
+                    import sys as _s, os as _o; _s.path.insert(0, _o.path.join(_o.path.dirname(_o.path.abspath(__file__)), "..", "gen")); import costlog
+                    u = jr.get("usage") or {}; costlog.tokens("llm", m, u.get("prompt_tokens"), u.get("completion_tokens"))
+                except Exception: pass
                 return json.loads(t[t.find("{"): t.rfind("}") + 1])
             except SystemExit: raise
             except Exception as e: err = e; break

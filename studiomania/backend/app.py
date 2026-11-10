@@ -29803,6 +29803,9 @@ def lib_ready(bid: str) -> dict:
             (gone if f.get("audio_id") in others else keep).append(f)
         d["files"] = keep
         roots = lib_prepare(d)
+        if not shared and dental_brain_on(bid):   # 🦷 عميل أسنان: فولدر «الحالات» جوه الصور، وكل فولدر جواه حالة
+            dentalbrain.ensure_root(d, roots["images"])
+            dentalbrain.refresh_flags(d)
         seen = set(d.get("audio_seen") or [])
         for r in rows:
             if r["id"] in seen or any(f.get("audio_id") == r["id"] for f in d["files"]):
@@ -30001,7 +30004,11 @@ def library_share_put(body: ShareIn):
 
 @app.get("/api/library")
 def library_get():
-    return lib_view(active_client_id())
+    me = active_client_id()
+    v = lib_view(me)
+    if any((x.get("case") or {}).get("stale") for x in v["folders"]):
+        dental_cases_sync(me)
+    return v
 
 
 class LibFolderIn(BaseModel):
@@ -30042,7 +30049,7 @@ def library_folder_patch(fid: str, body: LibFolderPatch):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
             raise HTTPException(404, "هذا المجلد غير موجود")
-        if f.get("sys"):
+        if f.get("sys") or (f.get("cases_root") and (body.move or (body.name is not None and body.name.strip() != f["name"]))):
             raise HTTPException(400, "هذا مجلد أساسي في المكتبة، ولا يمكن تغييره")
         if body.move and not body.parent:
             raise HTTPException(400, "يجب أن يبقى المجلد داخل أحد المجلدات الأساسية")
@@ -30065,7 +30072,7 @@ def library_folder_delete(fid: str):
         f = next((x for x in d["folders"] if x["id"] == fid), None)
         if not f:
             raise HTTPException(404, "هذا المجلد غير موجود")
-        if f.get("sys"):
+        if f.get("sys") or f.get("cases_root"):
             raise HTTPException(400, "هذا مجلد أساسي في المكتبة، ولا يمكن إزالته")
         for c in d["folders"]:
             if c.get("parent") == fid:
@@ -30187,6 +30194,7 @@ def run_library_tag(bid: str, ids: list[str]) -> None:
         except Exception as exc:  # noqa: BLE001
             upd.update(status="ready", error=str(getattr(exc, "detail", None) or exc)[:200])
         lib_update(lambda d, i=i, upd=upd: next((x.update(upd) for x in d["files"] if x["id"] == i), None), bid)
+    dental_cases_sync(bid)
 
 
 class LibFilePatch(BaseModel):
@@ -34388,6 +34396,181 @@ def dental_delete(cid: str):
     if not dental.delete(DATA_DIR, cid):
         raise HTTPException(409, "تعذّر الحذف (الحالة تعمل الآن أو غير موجودة)")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- 🦷🧠 حالات الأسنان في العقل (فولدر «الحالات» في مكتبة الصور)
+import dentalbrain  # noqa: E402
+
+DENTAL_SYNC: set[str] = set()
+DENTAL_SYNC_LOCK = threading.Lock()
+
+
+def dental_brain_on(bid: str | None) -> bool:
+    """فولدر الحالات يظهر لعميل مجاله أسنان بس (وقوالب الأسنان شغالة)."""
+    try:
+        return bool(bid) and bid != SHARED_LIB and dental.enabled() and dentalbrain.is_dental(brain_row(bid))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def dental_cases_sync(bid: str | None) -> None:
+    """كل حالة صورها اتغيرت وخلص توصيفها: تصنيف واحد للحالة كلها (في الخلفية، حالة ورا التانية)."""
+    if not dental_brain_on(bid):
+        return
+    with DENTAL_SYNC_LOCK:
+        if bid in DENTAL_SYNC:
+            return
+        DENTAL_SYNC.add(bid)
+    def go():
+        try:
+            for _ in range(20):
+                lib = lib_ready(bid)
+                todo = None
+                for c in dentalbrain.cases(lib):
+                    info = c.get("case") or {}
+                    fs = dentalbrain.case_files(lib, c)
+                    if info.get("stale") and fs and not any(f.get("status") == "tagging" for f in fs):
+                        todo = (c, fs)
+                        break
+                if not todo:
+                    return
+                c, fs = todo
+                sig = "|".join(sorted(f["id"] for f in fs))
+                lib_update(lambda d, cid=c["id"]: next((x.setdefault("case", {}).update(status="classifying") for x in d["folders"] if x["id"] == cid), None), bid)
+                imgs = [(f["id"], lib_path(f, bid)) for f in fs if f["kind"] == "image"]
+                upd = {"sig": sig, "stale": False, "at": now()}
+                try:
+                    if imgs:
+                        wallet.need(1, "تصنيف صور الحالة")
+                        labels = dentalbrain.classify(imgs, {})
+                        wallet.charge(wallet.credits(wallet.est(chars=6000, images=len(imgs))), "تصنيف صور حالة أسنان", c["id"])
+                        upd["labels"] = {x["id"]: {k: v for k, v in x.items() if k != "id"} for x in labels}
+                    else:
+                        upd["labels"] = {}
+                    upd.update(status="ready", error=None)
+                except wallet.NoCredits as exc:
+                    upd.update(status="error", error=str(exc)[:200])
+                except Exception as exc:  # noqa: BLE001
+                    upd.update(status="error", error=str(exc)[:200])
+                def fn(d, cid=c["id"], upd=upd):
+                    x = next((x for x in d["folders"] if x["id"] == cid), None)
+                    if x is not None:
+                        x.setdefault("case", {}).update(upd)
+                        x["case"].pop("stale", None)
+                lib_update(fn, bid)
+        finally:
+            with DENTAL_SYNC_LOCK:
+                DENTAL_SYNC.discard(bid)
+    threading.Thread(target=go, daemon=True).start()
+
+
+def dental_brand(bid: str) -> dict:
+    """هوية الطبيب للبوستات: الشعار (تتشال خلفيته في المحرك لو موجودة)، والاسم، والرقم، والجملة."""
+    b = brain_row(bid) or {}
+    logo = logo_path(bid)
+    if not logo:
+        raise HTTPException(400, "أضف شعار العيادة في العقل أولًا، فكل بوست يحمل شعارك")
+    name = str(b.get("name") or "").strip()
+    phone = str(((b.get("wa") or {}).get("phone")) or b.get("phone") or "").strip()
+    return {"logo": str(logo), "name_en": dental_name_en(bid, name), "phone": phone[:24], "slogan": str(b.get("slogan") or "").strip()[:40]}
+
+
+LATIN_NAME = re.compile(r"[A-Za-z0-9 .&'-]{2,40}")
+
+
+def dental_name_en(bid: str, name: str) -> str:
+    """العلامة المائية دايمًا بالإنجليزي: الاسم لو إنجليزي، وإلا كتابته بحروف إنجليزية (مرة واحدة وتتحفظ في العقل)."""
+    if LATIN_NAME.fullmatch(name or ""):
+        return name
+    b = brain_row(bid) or {}
+    if b.get("name_en_src") == name and b.get("name_en"):
+        return b["name_en"]
+    en = ""
+    if name and not atlas.mock_mode() and atlas.api_key():
+        try:
+            raw = ad_json(series_chat([{"role": "user", "content": f"اكتب اسم العيادة/الطبيب ده بحروف إنجليزية كما ينطق (تحويل حروف، مش ترجمة)، "
+                                        f"ومن غير «عيادة» لو موجودة إلا لو جزء من الاسم: «{name}». رد JSON فقط: {{\"en\": \"...\"}}"}]), "اسم بالإنجليزي")
+            en = re.sub(r"[^A-Za-z0-9 .&'-]", "", str(raw.get("en") or "")).strip()[:40]
+        except Exception:  # noqa: BLE001
+            en = ""
+    if en:
+        update_brain(bid, lambda d: (d.update(name_en=en, name_en_src=name), None)[1])
+    return en
+
+
+@app.get("/api/dental/templates")
+def dental_templates():
+    """قوالب الأسنان كلها: فيديو (محرك الفيديو) وصور (بوستات)."""
+    dental_on()
+    return {"video": dental.TEMPLATES, "photo": dentalbrain.PHOTO_TEMPLATES}
+
+
+@app.get("/api/dental/fit/{tid}")
+def dental_fit(tid: str):
+    """حالات العقل للقالب ده: اللي تنفع تتختار، واللي ماتنفعش مكتوب ناقصها إيه."""
+    dental_on()
+    me = active_client_id()
+    lib = lib_merged(me)
+    try:
+        out = [dentalbrain.fit_case(lib, c, tid, dental.TEMPLATES) for c in dentalbrain.cases(lib)]
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    if any(c.get("busy") for c in out):
+        dental_cases_sync(me)
+    for c in out:
+        c.pop("photos", None)
+        c.pop("live", None)
+    out.sort(key=lambda c: (not c["ok"], c["name"]))
+    return {"cases": out, "root": (dentalbrain.cases_root(lib) or {}).get("id")}
+
+
+class DentalMakeIn(BaseModel):
+    template: str
+
+
+@app.post("/api/dental/brain/{case_id}/make")
+def dental_brain_make(case_id: str, body: DentalMakeIn):
+    """حالة من العقل + قالب ← بوست صورة (يتحفظ في فولدر الحالة)، أو حالة في محرك الفيديو بالصور في خاناتها."""
+    dental_on()
+    me = active_client_id()
+    lib = lib_merged(me)
+    case = next((c for c in dentalbrain.cases(lib) if c["id"] == case_id), None)
+    if not case:
+        raise HTTPException(404, "الحالة غير موجودة")
+    r = dentalbrain.fit_case(lib, case, body.template, dental.TEMPLATES)
+    if not r["ok"]:
+        raise HTTPException(400, r["missing"] or "الحالة لا تناسب هذا القالب")
+    files = {f["id"]: f for f in lib["files"]}
+    if body.template in dentalbrain.PHOTO_IDS:
+        out = TMP_DIR / f"dpost_{uuid.uuid4().hex[:8]}.jpg"
+        try:
+            dentalbrain.render_photo(body.template, {k: lib_path(files[v], me) for k, v in r["photos"].items()}, dental_brand(me), out, {})
+        except RuntimeError as e:
+            raise HTTPException(400, str(e))
+        bid = lib_store_of(case_id, me)
+        name = f"post_{body.template}_{uuid.uuid4().hex[:6]}.jpg"
+        shutil.move(str(out), str(lib_dir(bid) / name))
+        tname = next(t["name"] for t in dentalbrain.PHOTO_TEMPLATES if t["id"] == body.template)
+        f = {"id": lib_.fid(), "file": name, "name": lib_.clean_name(f"{tname} — {case['name']}"), "kind": "image", "folder": case_id,
+             "size": (lib_dir(bid) / name).stat().st_size, "desc": f"بوست «{tname}» من صور الحالة", "tags": ["بوست", "قبل وبعد"],
+             "status": "ready", "at": now(), "origin": me, "made": body.template}
+        lib_update(lambda d: d["files"].append(f), bid)
+        return {"kind": "photo", "file": lib_file_dict(lib_load(bid), f, bid)}
+    # فيديو: الصور تتحط في خانات محرك الفيديو من التصنيف (من غير ما الطبيب يرفعها تاني)، والحالة نفسها تتعاد لو الصور ماتغيرتش
+    info = case.get("case") or {}
+    sig = "|".join(sorted(r["photos"].values())) + "|" + (r.get("live") or "")
+    old = info.get("dental") or {}
+    if old.get("sig") == sig and dental.case_dir(DATA_DIR, old.get("cid", "")):
+        return {"kind": "video", "cid": old["cid"], "template": body.template}
+    slots = {k: (files[v]["file"], lib_path(files[v], me).read_bytes()) for k, v in r["photos"].items()}
+    extra = [(files[r["live"]]["file"], lib_path(files[r["live"]], me).read_bytes())] if r.get("live") else []
+    try:
+        cid = dental.create(DATA_DIR, extra, case["name"], slots)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    bid = lib_store_of(case_id, me)
+    lib_update(lambda d: next((x.setdefault("case", {}).update(dental={"cid": cid, "sig": sig}) for x in d["folders"] if x["id"] == case_id), None), bid)
+    return {"kind": "video", "cid": cid, "template": body.template}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
