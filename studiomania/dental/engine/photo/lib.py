@@ -238,6 +238,34 @@ def gum_expand(a, tm):
     tm = _smooth_fill(tm) if tm.any() else tm
     ys, xs = np.where(tm)
     if not len(xs): return a * 0, tm
+    # حتت رفيعة لازقة في طرف الصف (حافة المبعد الشفاف أو لمعة): بتتشال بالفتح (opening)، والسنان نفسها بتفضل
+    th0 = float(np.percentile(ys, 95) - np.percentile(ys, 5))
+    r = max(3, int(th0 * .09)); ker = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+    op = cv2.morphologyEx(tm.astype(np.uint8), cv2.MORPH_OPEN, ker).astype(bool)
+    # اللي الفتح شاله: أركان السنان (حتت صغيرة) بترجع، والحتت الكبيرة (رقيقة وطويلة، لازقة في طرف الصف) بتتشال
+    rm = (tm & ~op).astype(np.uint8); n, lb, st, _ = cv2.connectedComponentsWithStats(rm)
+    drop = [i for i in range(1, n) if st[i, 4] > th0 * th0 * .012]
+    if drop: tm = tm & ~np.isin(lb, drop)
+    # اللي فضل من الحتة (نقطة صغيرة لوحدها أو بارزة): فتح خفيف تاني + أي حتة صغيرة لوحدها تتشال
+    tm = tm & (cv2.dilate(cv2.morphologyEx(tm.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * (r // 2) + 1,) * 2)), np.ones((3, 3), np.uint8)) > 0)
+    # أطراف الصف (آخر ١٠٪ يمين وشمال، فين المبعد بيلمس): فتح كامل من غير ما الأركان ترجع — أي نتوء بيتشال
+    ys_, xs_ = np.where(tm)
+    if len(xs_):
+        e0, e1 = np.percentile(xs_, 1), np.percentile(xs_, 99); ew = (e1 - e0) * .1
+        op2 = cv2.morphologyEx(tm.astype(np.uint8), cv2.MORPH_OPEN, ker).astype(bool)
+        ends = np.zeros_like(tm); ends[:, :int(e0 + ew)] = True; ends[:, int(e1 - ew):] = True
+        tm = np.where(ends, tm & op2, tm)
+    # من كل طرف لجوه: الأعمدة اللي القناع فيها قصير (حتة من سنة جنبية في الضل، أو حرف مبعد) بتتشال لحد أول سنة كاملة
+    hc = tm.sum(0); cols = np.where(hc > 0)[0]
+    if len(cols):
+        med = np.median(hc[cols]); lo, hi = cols[0], cols[-1]
+        while lo < hi and hc[lo] < med * .45: lo += 1
+        while hi > lo and hc[hi] < med * .45: hi -= 1
+        tm = tm.copy(); tm[:, :lo] = False; tm[:, hi + 1:] = False
+    n, lb, st, _ = cv2.connectedComponentsWithStats(tm.astype(np.uint8))
+    if n > 2:
+        big = st[1:, 4].max(); tm = np.isin(lb, [i for i in range(1, n) if st[i, 4] >= big * .03])
+    ys, xs = np.where(tm)
     x0, x1 = int(np.percentile(xs, .5)), int(np.percentile(xs, 99.5))
     th = float(np.percentile(ys, 95) - np.percentile(ys, 5))          # ارتفاع صف السنان
     top = np.full(W, np.nan)
@@ -253,7 +281,9 @@ def gum_expand(a, tm):
     hg = th * .42; upper = line - hg
     band = np.zeros((H, W), bool); yy = np.arange(H)[:, None]
     span = np.zeros(W, bool); span[x0:x1 + 1] = True
-    band = (yy >= upper[None, :]) & (yy <= top[None, :] + 2) & span[None, :] & ~tm
+    # تحت لحد السنة (اللثة بين السنان)، بس مش أوطى من ثلث ارتفاع السنة تحت خط اللثة: جنب آخر سنة (حرفها بينزل) مايتملاش لون
+    low = np.minimum(top + 2, line + th * .3)
+    band = (yy >= upper[None, :]) & (yy <= low[None, :]) & span[None, :] & ~tm
     # المحتوى: اللثة الحقيقية، والباقي يتملي من نسيجها
     lab = cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.float32)
     gum = band & (lab[..., 1] > 134) & (lab[..., 0] > 35)
