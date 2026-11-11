@@ -175,6 +175,11 @@ def check(ours, name, ai=True, out_dir=None):
     gp = video_gaps(ours)
     for sec in sorted({int(t) for t, _, _ in gp}):
         w = max((g for t, g, _ in gp if int(t) == sec)); issues.append({"t": sec, "severity": "high", "issue_ar": f"فراغ إسود بين اللثة وحافة الشاشة اليمين (لحد {w} بكسل من 360)"})
+    # Q16–Q20 (checks3, جولة المعرض 11): فراغ في كادر مخلوط، رعشة كادر واحد، اتجاه الخروج، ترتيب قبل/بعد، مكان الابتسامة
+    try:
+        from checks3 import run_all as r11
+        for i in r11(ours, ref, name=name): issues.append({k: i[k] for k in ("t", "severity", "issue_ar")})
+    except Exception as e: issues.append({"t": None, "severity": "medium", "issue_ar": f"فحوصات Q16–Q20 ماشتغلتش: {str(e)[:120]}"})
     # Q3 + Q4 (E02/E03/E04): تركيب العدسات على وش القبل — القوالب اللي فيها seat_on_face
     if name in SEAT_TEMPLATES and os.path.exists(S + "tpl/out/vb_check.json"):
         vb = json.load(open(S + "tpl/out/vb_check.json"))

@@ -33,7 +33,10 @@ def arc_line(im, sh, z, p, col=(255, 215, 120), w=3):
     d.line(anim.partial(pts, ease(p)), fill=col + (255,), width=w); return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def midline(im, sh, z, p, col=(255, 255, 255)):
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); _, my = sh.tf(sh.mid, 0, z)
-    d.line([(0, my), (im.width * ease(p), my)], fill=col + (230,), width=2); return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
+    g = np.asarray(im.convert("L")); r0 = int(max(0, min(im.height - 1, my)))
+    xs = np.where(g[max(0, r0 - 40):r0 + 40].max(0) > 40)[0]   # الخط بيبدأ قبل أطراف السنان بشوية (مش من أول الكادر فوق الأسود)
+    x0 = max(0, int(xs.min()) - 60) if len(xs) else 0
+    d.line([(x0, my), (x0 + (im.width - x0) * ease(p), my)], fill=col + (230,), width=2); return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def rotzoom(im, ang, z, cx=.5, cy=.5):   # دوران + تقريب حوالين نقطة (انتقال من الوش للابتسامة)
     W, H = FW, FH; big = cover(im, z, cx, cy); return big.rotate(-ang, resample=Image.BICUBIC, expand=False).resize((W, H))
 # ---------------------------------------------------------------- أ٥
@@ -68,7 +71,7 @@ def face_teeth_overlay(im, M, p_ol=1.0, p_mid=0.0, p_grid=0.0, p_pct=0.0, sh=Non
 
 @T("a05", "v04")
 def a05():
-    sh = shot("A"); FA1 = face_mix(1); fa = faces_aligned(); amx, amy = fa["lm"][13]; W_, H_ = AP.size; ZE = 3.6
+    sh = shot("A"); FA1 = face_mix(1); fa = faces_aligned(); amx, amy = mouth_mid(fa["lm"]); W_, H_ = AP.size; ZE = 3.6   # نص فتحة البق (Q20 مسكها عند 2.2: الابتسامة لازقة شمال)
     def s1(t):   # بورتريه بعد بحركة كاميرا يدوية خفيفة
         dx, dy = 8 * math.sin(t * 7), 6 * math.cos(t * 5); return cam(FA1, W_ / 2 + dx, H_ / 2 + dy, 1.06 + .02 * t, 0)
     def s2(t):   # تقريب ودوران متصل لحد الابتسامة (+90: أطراف السنان للشمال) — من غير أي قطع
@@ -1039,9 +1042,10 @@ def embrasures(sh):   # نسب الفراغات القاطعة بين كل سن�
     return out
 @T("a09", "v08")
 def a09():
-    fp = face_pts(cover(AP, 1.0)); sh = shot("A"); z0 = 1.08
+    # ترتيب القصة (ملاحظة a09 5.4 و9.7): التحليل كله على القبل (الوش والفك)، وبعدين يتحول للبعد — مش البعد من الأول
+    fp = face_pts(cover(BF, 1.0)); sh = shot("A"); SB = shot("B"); z0 = 1.08
     def s1(t):   # خطوط الوش: الحدقتين، المنتصف، أثلاث الوش، خط الابتسامة
-        im = cover(AP, 1.0 + .03 * t); d = ImageDraw.Draw(im, "RGBA"); P = fp
+        im = cover(BF, 1.0 + .03 * t); d = ImageDraw.Draw(im, "RGBA"); P = fp
         e1, e2 = P[468] if len(P) > 470 else P[159], P[473] if len(P) > 470 else P[386]; q = ease(t / .8)
         v = e2 - e1; d.line([tuple(e1 - v * .6), tuple(e1 - v * .6 + v * 2.2 * q)], fill=(255, 255, 255, 230), width=3)
         q2 = ease((t - .5) / .8); top, chin = P[10], P[152]; d.line([tuple(top), tuple(top + (chin - top) * q2)], fill=(255, 255, 255, 230), width=3)
@@ -1052,21 +1056,22 @@ def a09():
         if q4 > 0:
             sm = P[[61, 84, 17, 314, 291]]; d.line([tuple(p_) for p_ in sm[:max(2, int(5 * q4))]], fill=(255, 255, 255, 230), width=3)
         return im
-    fa = faces_aligned(); FA1 = face_mix(1); amx, amy = fa["lm"][13]; W_, H_ = AP.size; ZE = 4.0
+    fa = faces_aligned(); FA1 = face_mix(0); amx, amy = mouth_mid(fa["lm"]); W_, H_ = AP.size; ZE = 4.0   # ابتسامة القبل
     def s2(t):   # تقريب ودوران متصل للشفايف (كاميرا آمنة: من غير قص ولا حواف سودا، والبق بيبقى عالي الدقة تلقائي)
         p = ease(t / 1.0); return cam(FA1, W_ / 2 + (amx - W_ / 2) * p, H_ / 2 + (amy - H_ / 2) * p, 1.0 + (ZE - 1) * p, 90 * p)
     def s3(t): return cam(FA1, amx, amy, ZE + .25 * t / 2.7, 90)   # نفس اللقطة مكملة (مفيش قطع لصورة تانية)
     def s4(t):   # انتقال ناعم للفك المعزول: الاتنين بيقربوا مع بعض وهو بيدوب
-        e = ease(t / 1.0); return blend(cam(FA1, amx, amy, ZE + .25 + .6 * e, 90), A(z0 * (1.12 - .12 * e)), e)
+        e = ease(t / 1.0); return blend(cam(FA1, amx, amy, ZE + .25 + .6 * e, 90), auto_gum(morph_frame(0, z0 * (1.12 - .12 * e))), e)   # اللثة واصلة للحافة وهو بيدوب (الملء التلقائي مابيشتغلش على كادر مخلوط بالوش — ملاحظة a09 7.0)
     def zs(t): return z0 * (1 + .16 * t / 4.8)   # 7.5–12.3: الكاميرا بتزق ببطء طول رسم الخطوط والنسب (زي الأصل، مش لقطة ثابتة)
-    def s5(t): z_ = zs(t); return outlines(A(z_), sh, z_, t / 2.0, width=3, stagger=.12)
-    E = embrasures(sh)
+    def s5(t): z_ = zs(t); return morph_outlines(morph_frame(0, z_), 0, z_, t / 2.0, width=3)   # حدود سنان القبل
+    E = embrasures(SB)
     def s6(t):   # المثلثات الحمرا ونسب الفراغات القاطعة
-        z0 = zs(3.0 + t); im = outlines(A(z0), sh, z0, 1.0, width=2); d = ImageDraw.Draw(im, "RGBA")
+        z0 = zs(3.0 + t); pm = ease((t - 1.0) / .7)   # النسب على القبل، وبعدين القبل يتحول للبعد في نفس المكان (والحدود معاه)
+        im = morph_outlines(morph_frame(pm, z0), pm, z0, 1.0, width=2); d = ImageDraw.Draw(im, "RGBA")
         for k, (xm, ym, e) in enumerate(E):
-            q = ease((t - k * .15) / .3)
+            q = ease((t - k * .15) / .3) * (1 - ease((t - .9) / .3))
             if q <= 0: continue
-            x, y = sh.tf(xm, ym, z0); x = min(sh.tf(xx, yy, z0)[0] for tt in sh.six for xx, yy in tt["c"][::6]) - 40
+            x, y = SB.tf(xm, ym, z0); x = min(SB.tf(xx, yy, z0)[0] for tt in SB.six for xx, yy in tt["c"][::6]) - 40
             d.polygon([(x - 26, y - 14), (x - 26, y + 14), (x - 2, y)], fill=(230, 40, 40, int(255 * q))); d.text((x - 40, y), f"{e:.0f}%", font=F(FSER, 76), fill=(255, 255, 255, int(255 * q)), anchor="rm", stroke_width=3, stroke_fill=(0, 0, 0, int(200 * q)))
         return im
     COL = {1: (170, 110, 255), 2: (255, 170, 40), 3: (90, 220, 120)}
@@ -1094,7 +1099,9 @@ def a09():
     bt = [0, .6, 1.2, 1.8, 2.4]
     def s10(t):   # قبل وبعد بالمورف الحقيقي في نفس المكان
         k = sum(1 for b in bt if t >= b); f = (t - bt[k - 1]) / .25; p = (k % 2 == 1)
-        pr = min(1, f) if p else 1 - min(1, f); return chip(morph_frame(pr, 1.12), "بعد" if pr > .5 else "قبل")
+        pr = min(1, f) if p else 1 - min(1, f); im = morph_frame(pr, 1.12)
+        g = np.asarray(im.convert("L")); cols = np.where((g > 24).sum(0) > FH * .02)[0]; xb = cols.min() if len(cols) else FW / 2   # الكلمة على الأسود (شمال السنان) مش فوق سنة عند الحافة
+        return chip(im, "بعد" if pr > .5 else "قبل", y=FH * .12, x=max(150, xb / 2) if xb > 340 else None)
     return [(2.8, s1), (1.0, s2), (2.7, s3), (1.0, s4), (3.0, s5), (1.8, s6), (3.5, s7), (4.5, s8), (1.0, s9), (3.9, s10)]
 def rot_cover(im, z=1.0): return cover(rot(im), z)
 
@@ -1188,7 +1195,7 @@ def veneer_pieces():
         M = morph_setup(); _PC["p"] = {f: (pc, cx, cy) for f, pc, cx, cy in teeth_pieces("A") if f in M["common"]}
         m = M["M"]; _PC["s"] = float(np.hypot(m[0, 0], m[0, 1]))
     return _PC["p"], _PC["s"]
-def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt=25, wait=False, morph=True):
+def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt=25, wait=False, morph=True, src_sc=1.0, src_cy=None):
     """الفينير بيطير ويقعد على كل سنة؛ لما يقعد، السنة بتتحول بالمورف لشكل البعد. يرجّع (فريم، تقدم كل سنة).
     wait=True: العدسات اللي لسه ماطارتش بتفضل مكانها في الصف (الاختيار مايختفيش). morph=False: العدسة بتفضل قاعدة على سنة القبل (من غير مورف) — التحول للبعد بيحصل بعدين مرة واحدة بنعومة زي الأصل."""
     M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); order = order or M["order"]
@@ -1199,22 +1206,31 @@ def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt
         if wait and q <= 0: q = 1e-6
         if not morph and q >= 1: q = 1.0
         if q <= 0 or q >= 1.15 or k not in pcs: continue
-        pc, _, _ = pcs[k]; cc = M["planned"][k].mean(0); tx, ty = B.tf(cc[0], cc[1], z); sx = src[0]; sy = ty if src[1] is None else src[1]
+        pc, _, _ = pcs[k]; cc = M["planned"][k].mean(0); tx, ty = B.tf(cc[0], cc[1], z); sx = src[0]
+        scy = FH / 2 if src_cy is None else src_cy
+        sy = (scy + (ty - scy) * src_sc) if src[1] is None else src[1]   # src_sc: صف البداية أصغر (زي صف الاختيار) ← العدسة بتكبر وهي طايرة
         e = ease(min(q, 1)); x = sx + (tx - sx) * e; y = sy + (ty - sy) * e
-        im = paste(im, pc.transpose(Image.Transpose.ROTATE_270), x, y, fpx * (1.25 - .25 * e), (1 - e) * tilt, alpha=1 - max(0, (q - 1) / .15) if morph else 1.0)
+        im = paste(im, pc.transpose(Image.Transpose.ROTATE_270), x, y, fpx * (1.25 * src_sc + (1 - 1.25 * src_sc) * e), (1 - e) * tilt, alpha=1 - max(0, (q - 1) / .15) if morph else 1.0)
     return im
-def real_row(im, z, x0, dy=0.0):   # العدسات الحقيقية بتاعة المريض (من صورة البعد) مرصوصة بالطول عند x0 — نفس مكان بداية seat
-    M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); fpx = FH / B.ch * z * ms
+def real_row(im, z, x0, dy=0.0, sc=1.0, cy=None):   # العدسات الحقيقية بتاعة المريض (من صورة البعد) مرصوصة بالطول عند x0 — نفس مكان بداية seat
+    M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); fpx = FH / B.ch * z * ms; cy = FH / 2 if cy is None else cy
     for k in M["order"]:
         if k not in pcs: continue
-        cc = M["planned"][k].mean(0); _, ty = B.tf(cc[0], cc[1], z); im = paste(im, pcs[k][0].transpose(Image.Transpose.ROTATE_270), x0, ty + dy, fpx * 1.25, 0)
+        cc = M["planned"][k].mean(0); _, ty = B.tf(cc[0], cc[1], z); ty = cy + (ty - cy) * sc   # sc: الصف كله أصغر حوالين نصه
+        im = paste(im, pcs[k][0].transpose(Image.Transpose.ROTATE_270), x0, ty + dy, fpx * 1.25 * sc, 0)
     return im
 DESIGNS = ["design_square", "design_oval", "design_tri_upper"]   # تصميمات للفك العلوي بس (اتشال "arc" لأن جوانبه بتبان زي سنان سفلية) — والاختيار الأخير العدسات الحقيقية
 @T("a03", "v02")
 def a03():
     sh = shot("B"); M = morph_setup(); z = 1.0
     def bg(t): return clock_bg(t, cx=FW * .3)
-    def base(prog, t, zz=1.0): return screen(morph_frame(prog, zz), bg(t))
+    _AG = {}
+    def mf(prog, zz=1.0):   # الفك واللثة واصلين لحافة الشاشة اليمين (كان فيه إسود يمين اللثة من أول الفيديو: ملاحظة a03 0–6.6)
+        if prog not in (0, 1): return auto_gum(morph_frame(prog, zz))
+        k = (prog, zz)
+        if k not in _AG: _AG[k] = auto_gum(morph_frame(prog, zz))
+        return _AG[k]
+    def base(prog, t, zz=1.0): return screen(mf(prog, zz), bg(t))
     def upper_only(im):   # بنشيل أي حتة سنان تحت صف الأسنان العلوية (بقايا سفلية في التصميم)
         a = np.array(im); al = a[..., 3] > 40; n, lb, st, _ = cv2.connectedComponentsWithStats(al.astype(np.uint8))
         if n > 1:
@@ -1226,24 +1242,35 @@ def a03():
     XR = FW * .26
     _rr = np.array(real_row(Image.new("RGB", (FW, FH)), z, XR, 0).convert("L")) > 12; _ys, _xs = np.where(_rr)
     RH, RC, RW = _ys.max() - _ys.min(), (_ys.max() + _ys.min()) / 2, _xs.max() - _xs.min()   # مقاس ومكان صف العدسات الحقيقية — كل التصميمات بنفس الطول والمكان (ملاحظة a03 5.7)
+    # صف الاختيار جنب سنان المريض مش راكب عليها ولا مقصوص عند حافة الكادر (زي الأصل: مسافة بينهم، والصف كله جوه الكادر)
+    _b = np.array(morph_frame(0, z).convert("L")); _mid = _b[int(FH * .2):int(FH * .8)] > 70
+    _cols = np.where(_mid.sum(0) > FH * .02)[0]; XI = float(_cols.min()) if len(_cols) else FW * .45   # أطراف سنان المريض (ناحية الشمال)
+    GAP, L0 = FW * .05, FW / 2 * (1 - 1 / 1.11) + FW * .04   # المسافة، وأول نقطة باينة بعد تقريب الكادر (Z0)
+    RS = float(min(1.0, (XI - GAP - L0) / max(RW, 1)))
+    XR = XI - GAP - RW * RS / 2; RH, RW = RH * RS, RW * RS
     DS = [d.crop(Image.fromarray(((np.array(d)[..., 3] > 120) & (np.array(d.convert("L")) > 110)).astype(np.uint8) * 255).getbbox()) for d in DS]   # القص على الأسنان نفسها (مش الحواف الشفافة ولا الظل)   # القص على الأسنان نفسها (مش الحواف الشفافة)
     def design(im, t, k):   # تصميمات ابتسامة مختلفة بتدور جنب الأسنان للاختيار، والأخير العدسات الحقيقية بتاعة المريض (بتفضل)
         f = (t % 1.5) / 1.5
-        if k >= len(DS): return real_row(im, z, XR, (1 - ease(min(1, f * 3))) * 900)
+        if k >= len(DS): return real_row(im, z, XR, (1 - ease(min(1, f * 3))) * 900, RS, RC)
         d_ = DS[k].rotate(-90, expand=True)   # أطراف السنان للشمال زي سنان المريض
         y = RC + (1 - ease(min(1, f * 3))) * 900 - ease(max(0, f * 3 - 2)) * 900
         d_ = d_.resize((int(RW), int(RH)), Image.LANCZOS)   # نفس طول وعرض صف العدسات الحقيقية (التصميم بيتظبط على مقاس سنان المريض)
         return paste(im, d_, XR, y, 1.0, 0)
     def s1(t):   # 0–6: القبل على نقوش الساعة + اختيار بين تصميمات + الحدود تترسم
         im = design(base(0, t), t, int(t / 1.5)); return morph_outlines(im, 0, z, (t - 2.4) / 1.4) if 2.4 < t < 4.5 else im
-    def seated(t): return seat(t, z, step=.12, fly=.4, src=(XR, None), tilt=0, wait=True, morph=False)   # الاختيار مابيختفيش، والعدسات بتقعد على سنان القبل (ملاحظة a03 8.2)
+    def seated(t):   # نفس اللثة الممتدة تحت العدسات
+        im = seat(t, z, step=.12, fly=.4, src=(XR, None), tilt=0, wait=True, morph=False, src_sc=RS, src_cy=RC)
+        b0 = np.asarray(morph_frame(0, z)).astype(np.int16); a = np.asarray(im).astype(np.int16)
+        ven = (np.abs(a - b0).sum(2) > 18)   # اللي اتغير عن صورة القبل = العدسات بس، والباقي من الفك بلثته الممتدة
+        ven = cv2.dilate(ven.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        return Image.fromarray(np.where(ven[..., None], a, np.asarray(mf(0, z))).astype(np.uint8))   # الاختيار مابيختفيش، والعدسات بتقعد على سنان القبل (ملاحظة a03 8.2)
     def s2(t): return screen(seated(t), bg(6 + t))   # 6–7.5: نفس العدسات الحقيقية بتنزل تترص على سنان المريض
     SEATED = seated(9.0)
     def s3(t):   # 7.5–8.5: نقط حمرا — على نفس الابتسامة اللي العدسات قعدت عليها (مش قطع لصورة تانية)
         im = screen(SEATED, bg(7.5 + t)); d = ImageDraw.Draw(im); r = np.random.default_rng(1)
         for _ in range(8): x, y = r.uniform(80, FW * .45), r.uniform(200, FH - 200); d.ellipse((x - 6, y - 6, x + 6, y + 6), fill=(230, 30, 30))
         return im
-    def dial(im, t, mode="clock"):
+    def dial(im, t, mode="clock", la=1.0):   # la: شفافية أرقام المسطرة (بتختفي قبل الزووم عشان ماتتقصش عند حافة الكادر: a03 13–17)
         lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); xi = min(sh.tf(x, y, z)[0] for tt in sh.six for x, y in tt["c"][::4]); R = 1100; cx, cy = 60 + R, FH / 2
         d.arc((cx - R, cy - R, cx + R, cy + R), 140, 220, fill=(255, 255, 255, 255), width=4); d.arc((cx - R - 40, cy - R - 40, cx + R + 40, cy + R + 40), 140, 220, fill=(255, 255, 255, 255), width=2)
         for k in range(41):
@@ -1257,19 +1284,20 @@ def a03():
         else:   # مسطرة النسبة الذهبية: خطوط من المركز عند حدود كل سنة + 1.6 / 1 / 0.6
             for k, tt in enumerate(sorted(sh.six, key=lambda q: q["cx"])):
                 y0 = sh.tf(tt["x"], 0, z)[1]; a = math.atan2(y0 - cy, (xi - 30) - cx); d.line([(cx + (R - 300) * math.cos(a), cy + (R - 300) * math.sin(a)), (cx + R * math.cos(a), cy + R * math.sin(a))], fill=(255, 255, 255, 220), width=2)
-                ym = sh.tf(tt["cx"], 0, z)[1]; d.text((xi - 120, ym), ["0.6", "1", "1.6", "1.6", "1", "0.6"][k], font=F(FSER, 88), fill=(255, 255, 255, 255), anchor="mm", stroke_width=3, stroke_fill=(0, 0, 0, 200))
+                ym = sh.tf(tt["cx"], 0, z)[1]
+                if la > .02: d.text((xi - 120, ym), ["0.6", "1", "1.6", "1.6", "1", "0.6"][k], font=F(FSER, 88), fill=(255, 255, 255, int(255 * la)), anchor="mm", stroke_width=3, stroke_fill=(0, 0, 0, int(200 * la)))
         return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
     Z0 = 1.11   # ملاحظة: كان فيه شريط إسود فوق وتحت (حدود صورة المورف) في المشاهد اللي فيها اللثة
     def s4(t):   # 8.5–13.5: قرص الساعة، والابتسامة بتتحول بنعومة من القبل للبعد في نفس المكان
-        p = ease(t / 1.4); return zoomc(dial(Image.blend(SEATED, morph_frame(1, z), p), t), Z0, .5, .5)   # صورة المورف مش مغطية الكادر من فوق وتحت ← تقريب Z0 مع ظهور اللثة   # العدسات اللي قعدت ← البعد بنعومة (زي الأصل: كريمي ← أبيض)، من غير رجوع للقبل
+        p = ease(t / 1.4); return zoomc(dial(Image.blend(SEATED, mf(1, z), p), t), Z0, .5, .5)   # صورة المورف مش مغطية الكادر من فوق وتحت ← تقريب Z0 مع ظهور اللثة   # العدسات اللي قعدت ← البعد بنعومة (زي الأصل: كريمي ← أبيض)، من غير رجوع للقبل
     def s5(t):   # 13.5–18.5: يتحول لمسطرة ذهبية + الكاميرا بتقرّب على السنتين الأماميين وتفضل تزق ببطء (زي الأصل، مش لقطة ثابتة)
-        im = auto_gum(dial(morph_outlines(morph_frame(1, z), 1, z, 1.0, width=2), t, "ruler"))   # اللثة توصل للحافة قبل الزووم (بعد الزووم السنان بتملا الشمال فالريندر مابيعرفش إنه فك معزول — كان بيبان نص دايرة إسود: a03 15.1)
+        im = auto_gum(dial(morph_outlines(morph_frame(1, z), 1, z, 1.0, width=2), t, "ruler", la=1 - ease(t / .45)))   # اللثة توصل للحافة قبل الزووم (بعد الزووم السنان بتملا الشمال فالريندر مابيعرفش إنه فك معزول — كان بيبان نص دايرة إسود: a03 15.1)
         c2 = sorted(sh.six, key=lambda q: q["cx"])[2:4]; px = np.mean([sh.tf(q["cx"], q["y"] + q["h"] / 2, z) for q in c2], 0)
         zz = Z0 + (1.8 - Z0) * ease(t / .8) + .15 * t / 5.0; cx_ = FW / 2 + (px[0] - FW / 2) * ease(t / .8); cy_ = FH / 2 + (px[1] - FH / 2) * ease(t / .8)
         return cam(im, cx_, cy_, zz, 0)
-    def s6(t): return arc_line(morph_frame(1, z), shot("B"), z, t / 1.2, col=(255, 255, 255), w=2)   # 18.5–20: خط القوس
+    def s6(t): return arc_line(mf(1, z), shot("B"), z, t / 1.2, col=(255, 255, 255), w=2)   # 18.5–20: خط القوس
     def s7(t):   # 20–25.9: التوقيع بخط اليد بالطول + تحوّل تاني (قبل/بعد)
-        p = 1 - ease((t - 1.6) / .5) + ease((t - 2.9) / .5); im = morph_frame(max(0, min(1, p)), z)
+        p = 1 - ease((t - 1.6) / .5) + ease((t - 2.9) / .5); im = mf(max(0, min(1, p)), z)
         sg = Image.new("RGBA", (1500, 260)); sg = signature(Image.new("RGB", (1500, 260)), t / 1.6, y=130, W=1500).convert("RGBA")
         a_ = np.array(sg); a_[..., 3] = a_[..., :3].max(2); sg = Image.fromarray(a_)
         return paste(im, sg.rotate(90, expand=True), 150, FH / 2)
@@ -1364,6 +1392,19 @@ def seat_on_face(t, step=.09, fly=.38, settle=.3, dim=1.0, src=None):   # src: �
             j = srt.index(cx_); lo = (srt[j - 1] + cx_) / 2 if j > 0 else cx_ - 400; hi = (srt[j + 1] + cx_) / 2 if j + 1 < len(srt) else cx_ + 400
             m = np.zeros_like(mo); m[:, int(max(0, lo)):int(min(Wd, hi))] = 255; m = cv2.GaussianBlur(np.minimum(m, mo), (0, 0), 3).astype(np.float32) / 255; cols.append(m)
         _SF["cols"] = cols; _SF["A"] = np.array(veneered_before()).astype(np.float32)   # السنة بتبقى العدسة على سنانه هو جوه شفايفه هو (مش سنان صورة الابتسامة)
+        # لون العدسة وهي طايرة = لونها بعد ما تقعد على وشه (من صورة البعد بالمبعد كانت باينة رمادي مزرق على إضاءة الوش الدافية: a12 3.0)
+        A_ = _SF["A"]; P2 = []
+        for (pc, vis, cx_, cy_) in P_:
+            a = np.array(pc.convert("RGBA")).astype(np.float32); m = a[..., 3] > 128
+            x0_, y0_ = int(cx_ - pc.width / 2), int(cy_ - pc.height / 2); vm = np.array(vis.resize(pc.size)) > 128
+            ys_, xs_ = np.where(vm & m)
+            if m.sum() > 20 and len(ys_) > 20:
+                yy, xx = np.clip(ys_ + y0_, 0, A_.shape[0] - 1), np.clip(xs_ + x0_, 0, A_.shape[1] - 1)
+                tgt = A_[yy, xx].mean(0); srcm = a[m][:, :3].mean(0)
+                g = np.clip(tgt / np.maximum(srcm, 1), .7, 1.4); a[..., :3] = np.clip(a[..., :3] * g, 0, 255)
+                pc = Image.fromarray(a.astype(np.uint8), "RGBA")
+            P2.append((pc, vis, cx_, cy_))
+        _SF["p"] = P_ = P2
     P_ = _SF["p"]; n = len(P_); t_end = (n - 1) * step + fly
     im = fa["B"].convert("RGB")   # الوش والشفايف بتوع القبل زي ما هم — العدسات بس اللي بتتغير
     a_ = np.array(im).astype(np.float32); kk = np.zeros(a_.shape[:2], np.float32)
@@ -1914,7 +1955,7 @@ def a16():
     sh = shot("A"); PL = dict(lines=.0, stagger=.15, draw=.6, mid=1.4, pct=2.2, arc=3.2, gold=99, title=99, label="")
     A11G = auto_gum(A(1.1))
     def s11(t):   # السنان تتزحلق برا الكادر
-        im = black(); a = A11G; im.paste(a, (int(-FW * ease((t - .5) / 1.2)), 0)); im.info["no_auto_gum"] = True; return im   # اللثة اتملت قبل الحركة، فالفك كله بيخرج زي ما هو (ملاحظة a16 23.7)
+        im = black(); a = A11G; im.paste(a, (int(FW * ease((t - .5) / 1.2)), 0)); im.info["no_auto_gum"] = True; return im   # بيخرج يمين (ملاحظة a16 23.5)   # اللثة اتملت قبل الحركة، فالفك كله بيخرج زي ما هو (ملاحظة a16 23.7)
     return [(.5, s1), (1.6, s2), (1.6, s3), (2.3, s4), (2.0, s5), (3.5, s6), (.5, lambda t: (lambda e: Image.composite(pair(AF, morph_frame(0, ZF)), cam(A_, mx, my, 4.2, 90), Image.new("L", (FW, FH), int(255 * e))))(ease(t / .5))), (3.0, s8), (1.0, s9), (7.0, push(lambda t: anim.render(sh, t, 1.08, PL), 7.0)), (2.4, s11)]
 
 # ======================= أ١٧ نضيف ولا نبرد (27.7ث) — طولي 9:16 والصور ملفوفة =======================
@@ -1939,15 +1980,14 @@ def flip_card(a, b, p):   # قلب كارت حقيقي (منظور) من a لـ 
     Mp = cv2.getPerspectiveTransform(src, dst); return Image.fromarray(cv2.warpPerspective(np.array(side), Mp, (W, H), borderValue=(0, 0, 0)))   # qa-ok: قلب كارت (منظور مقصود لحظة القلب بس، الأصل نفسه بيقلب كارت)
 @T("a17", "v18")
 def a17():
-    z = 1.0; B = shot("B"); fa = faces_aligned(); mx, my = fa["lm"][13]
+    z = 1.0; B = shot("B"); fa = faces_aligned(); mx, my = mouth_mid(fa["lm"])   # نص فتحة البق (مش الشفة العليا) علشان الابتسامة تبقى في نص الشاشة (ملاحظة a17 27.7)
     DX = max(right_gap(morph_frame(0, z)), right_gap(morph_frame(1, z)), right_gap(morph_frame(.5, z))) + 6
     GB, GA = L(S + "assets/gum_back_before.png"), L(S + "assets/gum_back_after.png")   # لثة ممتدة لحد حافة الشاشة (الفراغ بس — السنان واللثة الأصلية زي ما هي)   # اللثة تلزق في حافة الشاشة اليمين (من غير فراغ إسود) — اختيارك
-    def s1(t): return chip(morph_frame(0, z), "قبل")
+    def s1(t): return morph_frame(0, z)   # كلمة «قبل» بتتكتب بعد زق الصورة (تحت)، عشان ماتتقصش
     def s2(t): return morph_outlines(morph_frame(0, z), 0, z, t / 1.5)   # الحدود على السنان الظاهرة نفسها
     def s3(t): return hatch_added(morph_outlines(morph_frame(0, z), 0, z, 1.0, width=2), z, t / 1.6)
     def s4(t):
-        im = hatch_added(morph_outlines(morph_frame(0, z), 0, z, 1.0, width=2), z, 1.0); im = midline(im, B, z, t / .6)
-        return txt(im, (FW / 2, FH * .9), "الأخضر = ما سيُضاف إلى السن فقط، دون برد", 40, alpha=ease((t - .4) / .5))
+        im = hatch_added(morph_outlines(morph_frame(0, z), 0, z, 1.0, width=2), z, 1.0); return midline(im, B, z, t / .6)
     def s5(t): p = ease(t / 1.2); return morph_frame(p, z)   # التحويل في نفس المكان
     def s6(t):   # قوس الابتسامة ومحاور الأسنان منقطة
         im = morph_outlines(morph_frame(1, z), 1, z, t / 1.4, width=2); im = arc_line(im, B, z, (t - 1.2) / 1.2, col=(255, 255, 255), w=2)
@@ -1959,7 +1999,9 @@ def a17():
     A0, A1 = gum_fill(shift_x(morph_frame(0, z), DX), GB), gum_fill(shift_x(morph_frame(1, z), DX), GA)
     def s7(t): return cam(A1, FW / 2, FH / 2, 1.0 + .1 * ease(t / 2.8), 0)   # الفك بعد العلاج لوحده بحركة كاميرا هادية (من غير وميض قبل/بعد)
     def s8(t): return cam(face_mix(0), mx, my, 3.4 + .1 * t / 4, 90)   # ابتسامة قبل بالشفايف (+90: أطراف السنان للشمال زي باقي الفيديو)
-    def s9(t): return cam(face_mix(ease(t / 2.0)), mx, my, 3.5, 90)   # تتحول للبعد بنعومة
+    F0c, F1c = cam(face_mix(0), mx, my, 3.5, 90), cam(face_mix(1), mx, my, 3.5, 90)
+    def s9(t):   # قبل ثابتة، وبعدين تحويل سريع (٠٫٣ث) للبعد — التحويل البطيء/المسح كان بيبان صفين سنان أو رقعة ملزوقة (a17 23)
+        p = ease((t - .9) / .3); return F0c if p <= 0 else (F1c if p >= 1 else Image.blend(F0c, F1c, p))
     def s10(t): return cam(ap_outlines(face_mix(1), t / 1.6, width=2), mx, my, 3.5 + .05 * t, 90)   # خط أبيض على الأطراف بس
     def _sx(f, mix=None):   # mix(t): 0 = قبل، 1 = بعد
         def g(t):
@@ -1967,8 +2009,24 @@ def a17():
             return gum_fill(shift_x(f(t), DX), back)
         return g
     s1, s2, s3, s4 = _sx(s1), _sx(s2), _sx(s3), _sx(s4); s5 = _sx(s5, lambda t: ease(t / 1.2)); s6 = _sx(s6, lambda t: 1.0)
+    def on_black(im):   # نص المساحة السودا اللي شمال السنان (الكلام هناك مش فوق السنان)
+        g = np.asarray(im.convert("L")); cols = np.where((g > 24).sum(0) > FH * .02)[0]; xb = int(cols.min()) if len(cols) else FW
+        return xb
+    _s1, _s4 = s1, s4
+    def s1(t): im = _s1(t); xb = on_black(im); return chip(im, "قبل", y=FH * .1, x=xb / 2 if xb > 300 else None)
+    def s4(t):
+        im = _s4(t); xb = on_black(im); a = ease((t - .4) / .5)
+        if xb > 380:   # سطرين في المساحة السودا (الخط على قد العرض)
+            fs = 42   # أكبر خط يدخل السطرين في المساحة السودا بهامش ٥٠ بكسل من كل ناحية
+            while fs > 24 and max(F(FA, fs).getlength(x, direction="rtl") for x in ("الأخضر = ما سيُضاف", "إلى السن فقط، دون برد")) > xb - 100: fs -= 2
+            im = txt(im, (xb / 2, FH * .86), "الأخضر = ما سيُضاف", fs, alpha=a); return txt(im, (xb / 2, FH * .86 + fs * 1.5), "إلى السن فقط، دون برد", fs, alpha=a)
+        return txt(im, (FW / 2, FH * .93), "الأخضر = ما سيُضاف إلى السن فقط، دون برد", 36, alpha=a)
     s5 = push(s5, 1.5)   # كان لقطة متجمدة (فلتر الفيديو)
-    s6 = push(s6, 6.5)   # كان لقطة متجمدة (فلتر الفيديو)
+    _b6 = s6(0.0); _g6 = auto_gum(_b6); _f6 = (np.abs(np.asarray(_g6).astype(int) - np.asarray(_b6)).sum(2) > 0)[..., None]; _g6 = np.asarray(_g6)
+    def s6g(t, f=s6):   # ملء اللثة مرة واحدة على الكادر الثابت قبل الزوم — الملء كل فريم مع الزوم كان بيرعش أسود بين السنان (ملاحظة a17 12.9)
+        im = Image.fromarray(np.where(_f6, _g6, np.asarray(f(t))).astype(np.uint8)); return im
+    _p6 = push(s6g, 6.5)   # كان لقطة متجمدة (فلتر الفيديو)
+    def s6(t): im = _p6(t); im.info["no_auto_gum"] = True; return im
     return [(1.0, s1), (2.0, s2), (2.0, s3), (3.0, s4), (1.5, s5), (6.5, s6), (2.8, s7), (4.0, s8), (2.4, s9), (2.5, s10)]
 
 # ======================= أ١٨ من التصميم الرقمي للمعمل (32.2ث) =======================

@@ -35,7 +35,14 @@ def cover(im, z=1.0, cx=.5, cy=.5, W=FW, H=FH):
     return im.crop((int(x), int(y), int(x + w), int(y + h))).resize((W, H), Image.BICUBIC)
 def rot(im): return im.transpose(Image.Transpose.ROTATE_270)   # فوق → يمين (زي المراجع)
 def bw(im): return ImageOps.grayscale(im).convert("RGB")
-def blend(a, b, p): return Image.blend(a, b, max(0, min(1, p)))
+def blend(a, b, p):
+    """مزج مشهدين. أي طرف فيه فك معزول بتتملا لثته **قبل** المزج: الملء التلقائي وقت الريندر بيتخطى الكادر المخلوط
+    (الشمال مش إسود)، فكان الفراغ الإسود يمين اللثة بيبان طول الذوبان (E437: a03 0–6.6 وa09 7.0)."""
+    p = max(0, min(1, p))
+    if p <= 0: return a
+    if p >= 1: return b
+    if AUTO_GUM: a, b = auto_gum(a), auto_gum(b)
+    return Image.blend(a, b.resize(a.size) if b.size != a.size else b, p)
 def black(W=FW, H=FH): return Image.new("RGB", (W, H), (0, 0, 0))
 def flash(im, p, col=(255, 255, 255)): return Image.blend(im, Image.new("RGB", im.size, col), max(0, min(1, p)))
 def txt(im, xy, s, size=56, font=FA, fill=(255, 255, 255), anchor="mm", stroke=3, alpha=1.0, rtl=True):
@@ -45,10 +52,11 @@ def txt(im, xy, s, size=56, font=FA, fill=(255, 255, 255), anchor="mm", stroke=3
         bb = d.textbbox(xy, s, font=F(font, size), anchor=anchor, direction="rtl" if rtl else None, stroke_width=stroke)
         if bb[0] < 4 or bb[1] < 4 or bb[2] > im.width - 4 or bb[3] > im.height - 4: qa_warn("TEXT_CLIPPED", f"«{s}» خارج الشاشة {tuple(int(v) for v in bb)}")
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
-def chip(im, s, y=110, alpha=1.0):
+def chip(im, s, y=110, alpha=1.0, x=None):   # x: مكان الكلمة (الافتراضي نص الكادر) — على الأسود بدل ما تقعد فوق سنة
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); f = F(FA, 46); w = d.textlength(s, font=f, direction="rtl") + 80
-    d.rounded_rectangle((im.width / 2 - w / 2, y - 42, im.width / 2 + w / 2, y + 42), 42, fill=(0, 0, 0, int(140 * alpha)))
-    d.text((im.width / 2, y), s, font=f, fill=(255, 255, 255, int(255 * alpha)), anchor="mm", direction="rtl")
+    cx = im.width / 2 if x is None else x
+    d.rounded_rectangle((cx - w / 2, y - 42, cx + w / 2, y + 42), 42, fill=(0, 0, 0, int(140 * alpha)))
+    d.text((cx, y), s, font=f, fill=(255, 255, 255, int(255 * alpha)), anchor="mm", direction="rtl")
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def tooth_icon(d, cx, cy, r, col, w):
     pts = [(-.62, -.55), (-.35, -.8), (0, -.62), (.35, -.8), (.62, -.55), (.6, .05), (.42, .78), (.2, .8), (.08, .25), (-.08, .25), (-.2, .8), (-.42, .78), (-.6, .05), (-.62, -.55)]
@@ -119,7 +127,16 @@ def flush_right(fn, t0=0.0, pad=6, extend=True, back=None, dx=None):   # أدا�
         return fit_right_img(out, *st["fit"]) if extend else out
     return g
 def push(fn, dur, k=.05, cx=.5, cy=.5):   # لقطة ثابتة ← دفع كاميرا بطيء طول المشهد (الأصل مافيهوش لقطات متجمدة)
-    return lambda t: zoomc(fn(t), 1 + k * ease(min(1, t / dur)) * .4 + k * .6 * min(1, t / dur), cx, cy)
+    """اللثة بتتملا على الكادر الثابت **قبل** الزووم، والكادر بيتعلّم no_auto_gum: الملء بعد الزووم بيتحسب على بكسلات
+    متحركة كل كادر، فالفراغات الغامقة بين السنان كانت بترمش (E438: a17 12.9)."""
+    def g(t):
+        im = fn(t); im = auto_gum(im) if (AUTO_GUM and not im.info.get("no_auto_gum")) else im
+        out = zoomc(im, 1 + k * ease(min(1, t / dur)) * .4 + k * .6 * min(1, t / dur), cx, cy); out.info["no_auto_gum"] = True; return out
+    return g
+def mouth_mid(lm):
+    """نص فتحة البق (بين الشفة العليا والسفلى من جوه) — ده المركز الصح لأي لقطة ابتسامة قريبة.
+    lm[13] لوحده (الشفة العليا) بيزق الابتسامة ناحية واحدة من الشاشة (E441: a17 27.7)."""
+    return (np.asarray(lm[13], float) + np.asarray(lm[14], float)) / 2
 def logo(v, W=FW, H=FH):   # شعار العيادة (مؤقت لحد ما الطبيب يرفع شعاره) + لمعة
     im = Image.new("RGB", (W, H), (6, 6, 7)); d = ImageDraw.Draw(im); p = ease(v / .6); col = tuple(int(c * p) for c in GOLD); cy = H / 2
     d.ellipse((W / 2 - 90, cy - 230, W / 2 + 90, cy - 50), outline=col, width=5); tooth_icon(d, W / 2, cy - 140, 60, col, 5)
@@ -681,12 +698,15 @@ def render(name, scenes, music="piano", W=FW, H=FH, xfade=0.0, still=False):
         try:
             import claude_qa; qd = (CASE_DIR + "/qa/") if CASE_DIR else OUTD; os.makedirs(qd, exist_ok=True)
             rv = claude_qa.review_video(out, qd + "claude_video.json")
+            import shutil; shutil.copy(qd + "claude_video.json", qd + f"claude_video_{os.path.basename(out).rsplit('.', 1)[0]}.json")   # نسخة لكل قالب (الأساسي بيتكتب عليه في الريندر اللي بعده)
             print(f"CLAUDE_VIDEO: {rv['verdict']} — {len(rv['agreed'])} عيب متفق عليه في {rv['seconds']} ثانية" + (f"، {rv['errors']} مراجعة فشلت" if rv["errors"] else ""), flush=True)
         except Exception as e: print("CLAUDE_VIDEO failed:", e, flush=True)
     return out
 def dur(p): return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", p], capture_output=True, text=True).stdout or 0)
 def compare(name, ref):
     out = OUTD + "cmp_" + name + ".mp4"; rp = S + f"up/{ref}/in/v.mp4"
+    if os.path.exists(out):   # النسخة القديمة (اللي ممكن يكون عليها تعليق في المعرض) بتتحفظ قبل ما تتستبدل — علشان نعاير الفحوصات عليها (E438)
+        import shutil, time as _t; os.makedirs(OUTD + "prev", exist_ok=True); shutil.copy(out, OUTD + f"prev/cmp_{name}_{_t.strftime('%m%d_%H%M', _t.localtime(os.path.getmtime(out)))}.mp4")
     if not os.path.exists(rp) or not os.path.exists(S + "sbs.sh"):   # على المنصة مفيش الفيديوهات الأصلية: الناتج هو فيديونا بس
         print(f"DURATION ours={dur(OUTD + name + '.mp4'):.1f}s ref=- OK", flush=True); return OUTD + name + ".mp4"
     subprocess.run(["bash", S + "sbs.sh", rp, OUTD + name + ".mp4", out])
