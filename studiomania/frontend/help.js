@@ -220,7 +220,7 @@ const Help = (() => {
       const c = e.target.closest("[data-hpcall]");
       if (c) {
         if (!S.paid) { box.querySelector(".hp-note").textContent = `المكالمة الصوتية مع ${nm()} للمشتركين. تقدر تكتبلها هنا في أي وقت.`; return; }
-        toggle(false); return window.Assistant?.open?.();
+        toggle(false); return typeof Assistant !== "undefined" ? Assistant.open?.() : null;
       }
       const b = e.target.closest("[data-hpq]"); if (b) ask(b.dataset.hpq);
     });

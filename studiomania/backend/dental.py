@@ -104,6 +104,9 @@ DOCTOR_REVIEW = {
 }
 
 
+# قوالب مافيهاش وش المريض خالص (سنان بس): مش محتاجة موافقة الطبيب على صور الوش المشتقة قبل الريندر
+NO_FACE = {"a03"}
+
 # العناصر الداخلية (مش بيشوفها الطبيب لو نجحت): لو فشلت لازم يعرف، لأن العناصر اللي بعدها بتستناها
 INTERNAL = {"ms/smile_masks": {"label": "تحديد الشفتين في صورة الابتسامة"}, "ap_teeth": {"label": "حدود كل سنّ على الوجه"},
             "gum_back_after.png": {"label": "خلفية اللثة"}}
@@ -156,6 +159,10 @@ def _env(case: Path) -> dict:
     e["DENTAL_ROOT"] = str(ENGINE)
     e["CASE_DIR"] = str(case)
     e["PYTHONUNBUFFERED"] = "1"
+    cl = _meta(case).get("clinic") or {}   # اسم الطبيب والعيادة والشعار في القوالب (من عقل العميل، مش من الأصل)
+    for k, v in (("DOC_NAME", cl.get("doctor")), ("CLINIC_NAME", cl.get("name")), ("CLINIC_LOGO", cl.get("logo"))):
+        if v:
+            e[k] = str(v)
     return e
 
 
@@ -629,7 +636,7 @@ def _render(tpl: str):
 
 
 # ---------------------------------------------------------------- الواجهة
-def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None) -> str:
+def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None, clinic: dict | None = None) -> str:
     """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة (أو فيديو) في خانتها. files = صور/فيديوهات بأي ترتيب (تصنيف تلقائي).
     كل اللي الطبيب رفعه بيفضل محفوظ في فولدر المريض (input/) لأي قالب بعدين."""
     slots = slots or {}
@@ -649,7 +656,8 @@ def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slot
     for i, (name, data) in enumerate(files):   # بالجملة: بتتصنف تلقائيًا وتتحط في الخانات الفاضية
         ext = ok_ext(os.path.splitext(name or "")[1].lower())
         (case / "_up" / f"{'v' if ext in VID_EXT else 'p'}{i + 1:02d}{ext}").write_bytes(data)
-    _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up})
+    _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up,
+                      **({"clinic": clinic} if clinic else {})})
     _enqueue(case, "slots", _slots_intake)
     return cid
 
@@ -908,7 +916,7 @@ def render(data_dir: Path, cid: str, tpl: str) -> None:
         raise RuntimeError("هذا القالب يحتاج فيديو حقيقيًا للمريض بعد العلاج")
     if busy(case):
         raise RuntimeError("الحالة تعمل الآن، انتظر حتى تنتهي الخطوة الحالية")
-    if not view(data_dir, cid)["ready"]:
+    if tpl not in NO_FACE and not view(data_dir, cid)["ready"]:
         raise RuntimeError("وافق على الصور المشتقة أولًا")
     _enqueue(case, "render:" + tpl, _render(tpl))
 

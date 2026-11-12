@@ -56,6 +56,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
+.as-dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(80vw,380px)}
+.as-dslot{position:relative;aspect-ratio:4/3;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
+.as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:11.5px;line-height:1.4;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
+.as-dslot.on{border-style:solid}.as-dslot.on .ph{display:none}
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
 .as-ov.dock .as-show video{height:min(46vh,440px)}.as-chs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:100%}
 .as-chs span{font-size:11.5px;padding:3px 9px;border-radius:999px;background:rgba(127,127,127,.16);opacity:.6;transition:all .3s}.as-chs span.on{background:#E5613E;color:#fff;opacity:1}.as-chs span.done{opacity:.9}
@@ -195,6 +199,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return { status: r.status, progress: r.progress, step: r.step, error: r.error, parts: (r.chapters || []).length };
     }
     if (name === "play_showcase") return play();
+    if (name === "play_demo") return playDemo();
     if (name === "show_card") return card(args.kind);
     if (name === "suggest_competitor") {
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
@@ -220,6 +225,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     if (name === "show_input") {
       if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
+      if (args.kind === "dental_case") { setTimeout(() => S && dentalBox(), 600); return { ok: true, shown: args.kind }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -506,7 +512,57 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
     myvideo: { t: "ارفع فيديو قصيرًا تتحدث فيه (من ١٥ ثانية إلى دقيقة)", accept: "video/*", video: true, url: "/api/assistant/showcase/upload", done: "رفعت فيديو أتحدث فيه" },
   };
+  // 🦷 فيديو المثال لعيادات الأسنان (حالة تجريبية، مش مريض حقيقي): بيتعرض، والمايك بيقفل وهو شغال، ولما يخلص سعاد تكمّل
+  function playDemo() {
+    if (!S || !ov) return { ok: false };
+    q(".as-box")?.remove(); acct(false);
+    const d = document.createElement("div"); d.className = "as-box as-show";
+    d.innerHTML = `<b>🎬 مثال: فيديو «تصميم الابتسامة»</b><video playsinline controls autoplay preload="auto" src="/gallery/dental/demo_a03.mp4"></video>
+      <div class="row"><button type="button" class="as-btn" data-dclose>إغلاق</button></div>`;
+    q(".as-acts").before(d);
+    const v = d.querySelector("video");
+    const mic = (on) => { const t = S?.mic?.getTracks()[0]; if (t && !S.muted) t.enabled = on; };
+    let done = false;
+    const fin = (why) => { if (done) return; done = true; mic(true);
+      note(`(SYSTEM: the example video ${why}. Now say you can make a video exactly like this from one of HIS own cases, and ask for the 4 photos of one case: a retractor photo before, a retractor photo after, a close smile after, and the patient's face before (smiling, no retractor). Call show_input kind dental_case in the same turn.)`); };
+    v.onplay = () => mic(false); v.onpause = () => mic(true);
+    v.onended = () => fin("ended");
+    v.onerror = () => { d.remove(); fin("could not be loaded (do not mention it; just continue)"); };
+    d.querySelector("[data-dclose]").onclick = () => { v.pause(); d.remove(); fin("was closed by the user"); };
+    v.play().catch(() => {});
+    return { ok: true, playing: true };
+  }
+  // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
+  const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج"], ["after_retracted", "ريتراكتور بعد العلاج"], ["after_smile", "الابتسامة بعد العلاج (قريبة)"], ["before_face", "وجه المريض قبل العلاج (يبتسم)"]];
+  function dentalBox() {
+    q(".as-box")?.remove();
+    if (!ov) return;
+    const d = document.createElement("div"); d.className = "as-box as-dcase";
+    const files = {};
+    d.innerHTML = `<b>صور حالة واحدة</b><div class="as-dgrid">${DSLOTS.map(([k, t]) => `<label class="as-dslot" data-k="${k}"><input type="file" hidden accept="image/*"><span class="ph">＋</span><small>${esc(t)}</small></label>`).join("")}</div>
+      <div class="row"><button type="button" class="as-go" data-dsend disabled>أرسل الصور</button><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
+    q(".as-acts").before(d);
+    const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
+    const send = d.querySelector("[data-dsend]");
+    d.querySelectorAll(".as-dslot").forEach((l) => {
+      const inp = l.querySelector("input");
+      inp.onchange = () => { const f = inp.files?.[0]; if (!f) return; files[l.dataset.k] = f;
+        l.style.backgroundImage = `url("${URL.createObjectURL(f)}")`; l.classList.add("on"); send.disabled = DSLOTS.some(([k]) => !files[k]); };
+    });
+    d.querySelector("[data-later]").onclick = () => { d.remove(); note("(SYSTEM: the user will send the case photos later. Tell him he can send them any time to you in the orange circle at the bottom right of the screen, by text. Then say goodbye and call finish.)"); };
+    send.onclick = async () => {
+      send.disabled = true; err(""); send.textContent = "⏳ جارٍ الرفع…";
+      const fd = new FormData(); DSLOTS.forEach(([k]) => fd.append(k, files[k]));
+      try {
+        const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
+        d.remove(); chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
+        note("(SYSTEM: the 4 case photos arrived and his video started being made. Now, in his dialect, say clearly: you started working on his video, you will close the call now, when the video is ready he will get a notification, and he should tell you what he thinks of it. This sentence is mandatory. Add that you are always there in the orange circle at the bottom right where he can text you anytime. Then say goodbye and call finish.)");
+      } catch (e) { err(e.message); send.disabled = false; send.textContent = "أرسل الصور"; }
+    };
+  }
   function box(kind) {
+    if (kind === "dental_case") return dentalBox();
     if (kind === "account") { q(".as-box")?.remove(); return acct(true); }
     const k = BOX[kind]; q(".as-box")?.remove();
     if (!k || !ov) return;

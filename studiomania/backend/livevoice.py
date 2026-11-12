@@ -129,9 +129,10 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "rival", "none"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "rival", "dental_case", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
                         "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
+                        "dental_case: (dentists only) four photo slots for ONE case: retractor before, retractor after, close smile after, face before. "
                         "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
      "you start talking about that stop). Returns real data and facts to talk about; if ok is false, skip that stop.",
@@ -161,6 +162,9 @@ TOOLS = [
     {"type": "function", "name": "get_showcase", "description": "Check whether the showcase reel is ready (and how far it got).",
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "play_showcase", "description": "Show the ready showcase reel on the user's screen and start playing it.",
+     "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "play_demo", "description": "(Dentists only) Play the example dental video (made from a sample case, not a real "
+     "patient) on the user's screen. The screen tells you when it ends.",
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "find_competitors", "description": "Search for the competitor accounts the user named (by voice or typed). "
      "The team looks them up in the background and sends the user a notification to confirm the ones found.",
@@ -205,6 +209,21 @@ def name_gender(name: str) -> str:
         return "f"
     return ""
 
+
+# 🦷 محطة أطباء الأسنان (أهم محطة، مابتتشالش): مثال جاهز ← صور حالة واحدة ← القفلة الإجبارية
+DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if the call was long):\n"
+               "      1) Tell him in one sentence you will show him an example of a video we make for dental clinics, then call play_demo. While it "
+               "plays stay silent (his microphone is off). It is a sample case, not a real patient: never say it is his.\n"
+               "      2) When the screen says it ended: say you can make him a video exactly like this one from one of HIS OWN cases, and ask for the "
+               "4 photos of ONE case: a retractor photo before treatment, a retractor photo after, a close smile after, and the patient's face before "
+               "(smiling, no retractor). Call show_input kind dental_case in that same turn, then stay silent while he uploads.\n"
+               "      3) When the screen says the photos arrived: say in his dialect, clearly, that you started working on his video, that you will "
+               "close the call now, that when the video is ready a notification will reach him, and that he should tell you what he thinks of it. "
+               "THIS SENTENCE IS MANDATORY, never skip any part of it. Add in one sentence that you are always there in the orange circle at the "
+               "bottom right of the screen, where he can text you anytime. Then say goodbye and call finish.\n"
+               "      4) If he says he has no photos now: tell him he can send them anytime to you in the orange circle at the bottom right, by "
+               "text, and you will make the video. Then say goodbye and call finish.\n"
+               "      Words: always say ريتراكتور (retractor), never مبعد or مبعّد: dentists do not use that word.")
 
 STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "photos": "uploading photos of their work/products/cases"}
 
@@ -283,6 +302,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                          "and explain each part while it plays (the screen sends you what each part shows). It is an example, not their own video: "
                          "never say it is made from their video. If they say no, move on.")
     else:
+        showcase_goal = "Skip this step."
+    if tools and have.get("dental"):   # 🦷 عيادة أسنان: بدل الفيديو الاستعراضي العام، فيديو أسنان جاهز + صور حالة منه ← فيديوه هو بعد المكالمة
+        stops = [x for x in stops if x[0] != "showcase"] + [("dental", DENTAL_STOP)]
         showcase_goal = "Skip this step."
     for k, txt in stops:
         if k == "showcase":
@@ -365,12 +387,12 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting.
 4. {tour}
-5. At the very end, in ONE short sentence (no card, no question): remind them to add as many photos and videos as they can to their content
-   library (logo, their work, cases, place), because we use them to make their content.
+5. {"(Dentist: the dental stop above IS the ending: skip this step and step 6.)" if tools and have.get("dental") else "At the very end, in ONE short sentence (no card, no question): remind them to add as many photos and videos as they can to their content"}
+   {"" if tools and have.get("dental") else "library (logo, their work, cases, place), because we use them to make their content."}
    This call is a short demo of the platform (it costs money): never ask about their preferences for features (whether they want
    autopilot, approvals before posting, budgets), never collect extra information beyond the list above. Mentioning features as part
    of the showcase (like autopilot) is fine.
-   Never ask them to upload anything during the call: we already took what we need from their page.
+   {"Never ask them to upload anything during the call, except the dental case photos of the dental stop." if tools and have.get("dental") else "Never ask them to upload anything during the call: we already took what we need from their page."}
 6. Then thank them and tell them you are preparing what you found.
 {tool_txt}
 Rules:

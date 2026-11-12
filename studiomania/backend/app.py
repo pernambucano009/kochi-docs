@@ -682,6 +682,14 @@ def _dental_resume():
     try:
         if dental.enabled():
             dental.resume(DATA_DIR)
+            # فيديو المكالمة الأولى اللي كان شغال: متابعته بترجع (الرسالة توصل لسعاد لما يخلص)
+            for f in SUAD_DIR.glob("*/chat.json"):
+                try:
+                    j = (json.loads(f.read_text(encoding="utf-8")).get("job") or {})
+                    if j.get("status") == "working" and j.get("cid"):
+                        threading.Thread(target=suad_dental_watch, args=(f.parent.name, j["cid"]), daemon=True).start()
+                except (OSError, ValueError):
+                    continue
     except Exception:
         pass
 
@@ -33181,7 +33189,8 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
         lessons = []
     sc = showcase_state(b)   # 🎬 الفيديو الاستعراضي: عندنا فيديو له؟ اتعمل قبل كده؟
     have.update(video=sc["has_video"], showcase=sc["status"], showcase_used=sc["used"], tour=list(a.get("tour") or []),
-                rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "")
+                rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "",
+                dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"))   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
@@ -34686,6 +34695,90 @@ def dental_name_en(bid: str, name: str) -> str:
     if en:
         update_brain(bid, lambda d: (d.update(name_en=en, name_en_src=name), None)[1])
     return en
+
+
+# ---------- 🦷🟠 من المكالمة الأولى: الطبيب يرفع صور حالة ← حالة جديدة ← قالب «تصميم الابتسامة» يشتغل لوحده ← الفيديو يوصله في شات سعاد
+SUAD_DENTAL_TPL = "a03"
+# تقدّم تقريبي لكل مرحلة (الشريط اللي فوق الصفحة)
+DENTAL_STAGE_P = {"slots": .08, "intake": .12, "video": .14, "analysis": .25, "assign": .3, "elements": .45}
+
+
+def dental_clinic(bid: str) -> dict:
+    """اسم الطبيب والعيادة وشعارها للقوالب: من عقل العميل (عمرها ما بتيجي من الأصل)."""
+    b = brain_row(bid) or {}
+    who = str((b.get("assistant") or {}).get("name") or "").strip()
+    logo = logo_path(bid)
+    return {k: v for k, v in {"doctor": (f"د. {who}" if who and not who.startswith("د") else who), "name": str(b.get("name") or "").strip(),
+                              "logo": str(logo) if logo else ""}.items() if v}
+
+
+def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
+    """بيتابع الحالة لحد الفيديو: الصور ← التحليل ← العناصر ← الريندر ← رسالة سعاد بالفيديو + «إيه رأيك؟»."""
+    t0, asked = time.time(), False
+    tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == tpl), "الفيديو")
+    while time.time() - t0 < 3 * 3600:
+        time.sleep(8)
+        try:
+            v = dental.view(DATA_DIR, cid)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[suad dental] {cid}: {exc}", flush=True); continue
+        if not v:
+            return
+        job = v.get("job") or {}
+        st, stage = job.get("status"), str(job.get("stage") or "")
+        if tpl in (v.get("videos") or {}):
+            url = v["videos"][tpl]["url"]
+            suad_job(bid, status="done", progress=1, url=url, seen=False)
+            suad_post(bid, f"الفيديو بتاعك جاهز 🎉 ({tname})", kind="video", url=url)
+            suad_post(bid, "إيه رأيك فيه؟ قولّي بصراحة 😊", kind="ask", ask="feedback")
+            notify("suad", "ok", "🎬 الفيديو بتاعك جاهز", f"{suad_name(brain_row(bid) or {})[0]}: افتح الشات وقولّي رأيك", "home", cid)
+            return
+        if st == "failed":
+            suad_job(bid, status="failed", progress=None)
+            suad_post(bid, "حصلت مشكلة وأنا بعمل الفيديو، والفريق بيبص عليها دلوقتي. هبلغك أول ما تتحل 🙏")
+            notify("suad", "error", "🦷 فيديو المكالمة الأولى فشل", f"{cid}: {job.get('error', '')[:160]}", "settings", cid)
+            return
+        if st == "needs":
+            miss = "، ".join(next((x["name"] for x in dental.SHOTS if x["slot"] == m), m) for m in job.get("missing") or [])
+            suad_job(bid, status="failed", progress=None)
+            suad_post(bid, f"محتاجة منك صورة كمان عشان أكمّل: {miss}. ابعتهالي هنا 🙏")
+            return
+        if stage.startswith("render:"):
+            el = time.time() - float(job.get("started") or time.time())
+            suad_job(bid, status="working", progress=min(.97, .5 + .47 * el / 900))
+            continue
+        if st == "done" and stage == "elements" and not asked:
+            try:
+                dental.render(DATA_DIR, cid, tpl); asked = True
+            except (ValueError, RuntimeError) as exc:
+                print(f"[suad dental] render {cid}: {exc}", flush=True)
+            continue
+        if st in ("running", "queued"):
+            suad_job(bid, status="working", progress=DENTAL_STAGE_P.get(stage, .1))
+
+
+@app.post("/api/assistant/dental_case")
+async def assistant_dental_case(before_retracted: UploadFile = File(...), after_retracted: UploadFile = File(...),
+                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...)):
+    """الصور اللي سعاد طلبتها في المكالمة (ريتراكتور قبل/بعد، ابتسامة بعد، وش قبل) ← الفيديو يشتغل لوحده."""
+    dental_on()
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(400, "مفيش علامة")
+    slots = {}
+    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face)):
+        data = await f.read()
+        if len(data) > dental_max(f.filename):
+            raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح")
+        slots[k] = (f.filename or "", data)
+    try:
+        cid = dental.create(DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == SUAD_DENTAL_TPL), "")
+    suad_job(bid, title=f"بنعمل فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False)
+    threading.Thread(target=suad_dental_watch, args=(bid, cid), daemon=True).start()
+    return {"ok": True, "cid": cid}
 
 
 @app.get("/api/dental/templates")

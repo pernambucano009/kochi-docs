@@ -2061,6 +2061,9 @@ Never assume the user has a "project/business/products": first learn what they d
 Build every question on the previous answers; skip what does not apply or was already said; never ask something that contradicts them.
 Address the user with the right gender. The account must be typed, never guessed or taken from speech. React to what the user says.
 Speak the user's dialect naturally. Never mention AI model or company names.
+Dentists: she plays the example dental video (play_demo), asks for 4 photos of one case (show_input dental_case), and once they arrive she MUST say
+that she started the video, she will close the call now, a notification will come when it is ready, and he should tell her his opinion. She must
+say ريتراكتور, never مبعد.
 Lines: [mm:ss] WHO: text. WHO is سعاد (assistant), العميل (user; "(كتابة)" = typed; empty = noise), أداة (tool call → result),
 النظام (platform events such as "auto-continue" = she continued on her own after a non-question).
 Output JSON only: {"score": 0-100, "summary": "1-2 Arabic sentences on how the call went",
@@ -2118,6 +2121,18 @@ def acall_review_run(cid: str) -> dict:
             "mistakes": [{k: str(m.get(k) or "")[:400] for k in ("at", "kind", "quote", "why")} for m in (res.get("mistakes") or [])[:8]],
             "lessons": [{k: str(x.get(k) or "")[:300] for k in ("text", "why")} for x in (res.get("lessons") or [])[:4] if x.get("text")],
             "at": time.time(), "usd": round(usd, 5)}
+    # 🦷 فحص ثابت (مش بالموديل): بعد ما صور الحالة وصلت، لازم القفلة فيها «إشعار» و«رأيك»
+    ev = d.get("events") or []
+    i0 = next((i for i, e in enumerate(ev) if "case photos arrived" in str(e.get("text") or "")), None)
+    if i0 is not None:
+        said = " ".join(str(e.get("text") or "") for e in ev[i0:] if e.get("who") == "agent")
+        miss = [w for w, rx in (("الإشعار", r"إشعار|اشعار|نوتيفيكيشن"), ("رأيه", r"رأي|راي|رايك|رأيك")) if not re.search(rx, said)]
+        if miss:
+            auto["mistakes"].insert(0, {"at": "", "kind": "dental closing missing", "quote": said[-200:],
+                                        "why": "بعد ما صور الحالة وصلت، القفلة ناقصها: " + " و".join(miss)})
+            auto["score"] = min(auto["score"], 60)
+    if re.search(r"مبع[ّ]?د", " ".join(str(e.get("text") or "") for e in ev if e.get("who") == "agent")):
+        auto["mistakes"].insert(0, {"at": "", "kind": "word مبعد", "quote": "مبعد", "why": "لازم تقول ريتراكتور، مش مبعد"})
     d = json.loads(f.read_text("utf-8"))
     d["auto"] = auto
     f.write_text(json.dumps(d, ensure_ascii=False), "utf-8")
