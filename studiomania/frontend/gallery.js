@@ -176,9 +176,10 @@ const Gallery = (() => {
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الاصطناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
-    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor");
+    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor" && x.id !== "dental");
     // 🦷 قوالب الأسنان: كل قالب فيديو وكل قالب صور لوحده، والحالة بتتختار من العقل (dental.js ← pick)
-    const dt = await api("/api/dental/templates").catch(() => null);
+    // 🩺 كل تخصص ليه قوالبه + القوالب العامة: قوالب الأسنان (فيديو وصور) بتظهر لعميل تخصصه أسنان بس، وفوق العامة
+    const dt = S.niche.spec === "dental" ? await api("/api/dental/templates").catch(() => null) : null;
     if (dt) {
       const mk = (t, kind) => ({ id: `d-${t.id}`, dtid: t.id, dkind: kind, name: t.name, desc: t.desc, icon: "🦷", pin: 6,
         cover_url: `/gallery/dental/${t.id}.jpg`, cat: kind === "photo" ? "dentalimg" : "dental" });
@@ -191,7 +192,8 @@ const Gallery = (() => {
         alias("avatar", .2, "الأفاتار", "النص نفسه دون أن تصوّر: نسختك (الأفاتار) تقوله بوجهك وصوتك وحركتك.")].filter(Boolean);
       lead.forEach((x) => { FIT[x.id] = "beauty"; });
       add.forEach((x) => { if (x.dkind === "video") x.pin = 1 + (dt.video || []).findIndex((t) => t.id === x.dtid) / 100; });   // ترتيب القوالب زي ما هو في القايمة
-      S.items = [...S.items.filter((x) => x.id !== "dental"), ...lead, ...add];
+      [...lead, ...add].forEach((x) => { x.spec = "dental"; });
+      S.items = [...lead, ...add, ...S.items.filter((x) => x.id !== "dental")];
     }   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
     // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
     S.reels = niche?.reels || [];
@@ -292,9 +294,11 @@ const Gallery = (() => {
   const NICHES = [["food", "المطاعم والكافيهات"], ["beauty", "التجميل والعيادات"], ["retail", "المتاجر والمنتجات"], ["realestate", "العقارات"], ["edu", "التعليم والدورات"],
     ["fitness", "الرياضة واللياقة"], ["tech", "التقنية والتطبيقات"], ["travel", "السياحة والسفر"], ["services", "الشركات والخدمات"], ["creator", "صناع المحتوى"]];
   // «موصى به لمجالك» بس للقوالب المختارة للمجال ده فعلًا (مش اللي بتنفع لأي مجال)
-  const ri = (x) => { const i = (S.reels || []).indexOf(x.id); return i < 0 ? 99 : i; };   // ترتيب قوالب المجال: أولها المقترح
-  const recFor = (x, key) => (S.reels || []).includes(x.id) || (!!key && (FIT[x.id] || "").split(" ").includes(key));
-  const GF = { q: "", type: "", niche: null };
+  // النظام الجديد: مفيش «موصى به» ولا ترتيب أولوية بالمجال — قوالب التخصص (spec) الأول، وبعدها القوالب العامة، كل مجموعة بترتيبها (pin)
+  const ri = (x) => (x.spec ? 0 : 1);
+  const recFor = () => false;
+  const SPEC_NAME = { dental: "الأسنان" };
+  const GF = { q: "", type: "", niche: "" };   // niche هنا = نوع القوالب: "" الكل، أو التخصص (dental)، أو general
   // 🎡 العجلة هي العرض الأساسي (هوية المنتج)، والشبكة بزرار «عرض الكل»
   S.view = "wheel";
   function setView(v) {
@@ -303,10 +307,10 @@ const Gallery = (() => {
     render();
   }
   function ggList() {
-    const key = GF.niche ?? S.niche.key, q = GF.q.trim().toLowerCase();
+    const key = S.niche.key, q = GF.q.trim().toLowerCase();
     const list = S.items.map((x, i) => [x, i]).filter(([x]) => (!GF.type || x.cat === GF.type)
       && (!q || [x.name, x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(q)))
-      && (!GF.niche || recFor(x, GF.niche) || FIT[x.id] === "*"));
+      && (!GF.niche || (GF.niche === "general" ? !x.spec : x.spec === GF.niche)));
     list.sort((a, b) => (ri(a[0]) - ri(b[0])) || (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
     return list;
   }
@@ -333,7 +337,7 @@ const Gallery = (() => {
       <div class="gg-tabs">${CATS2.map(([k, t, sub], i) => `<button type="button" class="gg-tab" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>
       <div class="gg-main">
         <div class="gg-bar"><input type="search" class="gg-q" placeholder="🔎 ابحث عن قالب بالاسم أو الوصف…" value="${esc(GF.q)}">
-          <select class="gg-niche" aria-label="المجال"><option value="">كل المجالات</option>${NICHES.map(([k, n]) => `<option value="${k}"${k === key ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
+          <select class="gg-niche" aria-label="نوع القوالب"><option value="">كل القوالب</option>${S.niche.spec ? `<option value="${S.niche.spec}"${GF.niche === S.niche.spec ? " selected" : ""}>قوالب ${esc(SPEC_NAME[S.niche.spec] || "تخصصك")}</option>` : ""}<option value="general"${GF.niche === "general" ? " selected" : ""}>القوالب العامة</option></select>
           <span class="gg-count muted"></span>
           <button type="button" class="btn sm gg-view" data-gview="wheel" title="ارجع إلى العجلة">🎡 رجوع إلى العجلة</button></div>
         <div class="gg-types"><button type="button" class="gg-type${GF.type ? "" : " on"}" data-gtype="">الكل</button>${types.map(([id, n]) => `<button type="button" class="gg-type${GF.type === id ? " on" : ""}" data-gtype="${esc(id)}">${esc(n)}</button>`).join("")}</div>

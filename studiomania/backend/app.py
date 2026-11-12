@@ -18344,6 +18344,8 @@ def tpl_niche():
     media = FRONTEND_DIR / "gallery" / "f" / Path(field).name if field else None
     out.update(field=field, field_name=(fieldpacks.FIELDS.get(field) or {}).get("name", ""), reels=reels,
                field_media=[r for r in reels if media and (media / f"{r}.jpg").exists()])
+    # 🩺 تخصص العميل: كل تخصص ليه قوالبه (فوق القوالب العامة). دلوقتي: الأسنان
+    out["spec"] = "dental" if dental_brain_on(active_client_id()) else ""
     return out
 
 
