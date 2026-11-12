@@ -11127,6 +11127,193 @@ def help_tickets():
         return []
 
 
+# ---------- 🟠 سعاد في الشات: الدايرة البرتقالي تحت على اليمين. هي المساعد كله (الدعم، وشرح الصفحات، والرسايل، والفيديوهات اللي بتخلص).
+# المجاني: كتابة وصور بس بعد المكالمة الأولى. المشترك: كمان يقدر يكلمها صوت. كل محادثة محفوظة لكل علامة (data/suad/<علامة>/chat.json).
+SUAD_DIR = DATA_DIR / "suad"
+SUAD_DIR.mkdir(parents=True, exist_ok=True)
+SUAD_LOCK = threading.Lock()
+
+
+def suad_dir(bid: str) -> Path:
+    d = SUAD_DIR / Path(bid or "_").name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def suad_load(bid: str) -> dict:
+    try:
+        return json.loads((suad_dir(bid) / "chat.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"msgs": [], "read": 0, "job": None}
+
+
+def suad_save(bid: str, d: dict) -> None:
+    d["msgs"] = d.get("msgs", [])[-400:]
+    (suad_dir(bid) / "chat.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+def suad_post(bid: str, text: str = "", role: str = "assistant", **kw) -> dict:
+    """رسالة في شات سعاد (من سعاد أو من النظام). kw: kind (text|image|video|cta|ask) و url و poster و action."""
+    m = {"id": uuid.uuid4().hex[:10], "role": role, "text": str(text or "")[:4000], "at": now(), **{k: v for k, v in kw.items() if v is not None}}
+    with SUAD_LOCK:
+        d = suad_load(bid); d.setdefault("msgs", []).append(m); suad_save(bid, d)
+    return m
+
+
+def suad_job(bid: str, **job) -> None:
+    """الشغل اللي شغال دلوقتي (الشريط الكبير فوق الصفحة): {title, status: working|done|failed, progress 0..1, url}. None = مفيش."""
+    with SUAD_LOCK:
+        d = suad_load(bid); d["job"] = ({**(d.get("job") or {}), **job, "at": now()} if job else None); suad_save(bid, d)
+
+
+def suad_name(b: dict | None = None) -> tuple[str, str]:
+    """(اسم المساعدة حسب لهجة العميل، النوع)."""
+    b = b if b is not None else (brain_row(active_client_id()) or {})
+    a = b.get("assistant") or {}
+    g = a.get("agent_gender") or "f"
+    return livevoice.agent_name(assist_dialect(b), g), g
+
+
+def suad_paid(request: Request) -> bool:
+    """مشترك؟ البوابة بتبعت x-user-paid. من غير بوابة (نسخة محلية/الأدمن) = مشترك."""
+    v = request.headers.get("x-user-paid")
+    return True if v is None else v == "1"
+
+
+@app.get("/api/suad")
+def suad_state(request: Request):
+    bid = active_client_id()
+    if not bid:
+        return {"name": "", "paid": suad_paid(request), "msgs": [], "unread": 0, "job": None}
+    d = suad_load(bid)
+    name, g = suad_name()
+    msgs = d.get("msgs") or []
+    unread = sum(1 for m in msgs[d.get("read", 0):] if m.get("role") != "user")
+    return {"name": name, "gender": g, "paid": suad_paid(request), "msgs": msgs[-120:], "unread": unread, "job": d.get("job"),
+            "total": len(msgs)}
+
+
+@app.post("/api/suad/job/seen")
+def suad_job_seen():
+    """شاف إن الفيديو خلص: الشريط اللي فوق يختفي."""
+    bid = active_client_id()
+    if bid:
+        with SUAD_LOCK:
+            d = suad_load(bid)
+            if d.get("job"):
+                d["job"]["seen"] = True
+            suad_save(bid, d)
+    return {"ok": True}
+
+
+@app.post("/api/suad/read")
+def suad_read():
+    bid = active_client_id()
+    if bid:
+        with SUAD_LOCK:
+            d = suad_load(bid); d["read"] = len(d.get("msgs") or []); suad_save(bid, d)
+    return {"ok": True}
+
+
+class SuadIn(BaseModel):
+    text: str
+    page: str = ""
+    lang: str = "ar"
+
+
+def suad_reply(bid: str, page: str, lang: str) -> str:
+    """رد سعاد بالكتابة: نفس معلومات الدعم وشرح الصفحات، بس بشخصيتها ولهجة العميل وبتفتكر المحادثة كلها."""
+    b = brain_row(bid) or {}
+    name, g = suad_name(b)
+    dia = assist_dialect(b)
+    label, lang_name, _ = livevoice.DIALECTS.get(dia) or livevoice.DIALECTS["ar-eg-cairo"]
+    d = suad_load(bid)
+    hist = [{"role": "user" if m.get("role") == "user" else "assistant",
+             "text": (m.get("text") or "") + (" [صورة]" if m.get("kind") == "image" else " [فيديو]" if m.get("kind") == "video" else "")}
+            for m in (d.get("msgs") or [])[-14:] if (m.get("text") or m.get("kind"))]
+    q = hist.pop()["text"] if hist and hist[-1]["role"] == "user" else ""
+    key = page if page in helpdesk.PAGES else "home"
+    msgs = helpdesk.messages(key, hist, q, " · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k)))
+    me = "امرأة (استخدمي صيغة المؤنث عن نفسك)" if g != "m" else "رجل (استخدم صيغة المذكر عن نفسك)"
+    msgs[0]["content"] = (f"اسمك {name}، المساعدة الشخصية للعميل في SimsimKit، وأنت {me}. تكلمي العميل كتابةً بلهجته ({lang_name} — {label}) "
+                          "بدفء واختصار كأنك سكرتيرته، مش بالفصحى. إذا بعت صورة أو سأل عن فيديو، ردّي على اللي بعته. "
+                          "لو المحادثة فيها رسالة منك تطلب رأيه في فيديو، ورد برأيه: اشكريه على رأيه وردي عليه بجملة، وبعدها في نفس الرد "
+                          "قولي له إنه لو حب يعمل فيديوهات زي كده بانتظام (بحالاته هو، ومعاكِ في كل خطوة) يقدر يشترك.\n\n") + msgs[0]["content"]
+    if lang == "en":
+        msgs[0]["content"] += "\n\nThe customer uses the app in English: answer in clear, simple English."
+    if atlas.mock_mode() or not atlas.api_key():
+        return helpdesk.mock_reply(key, q)
+    for model in HELP_MODELS:
+        try:
+            return atlas.chat(msgs, model, temperature=0.4, max_tokens=600, timeout=45).strip()
+        except (atlas.AtlasError, httpx.HTTPError) as exc:
+            print(f"[suad] {model}: {str(exc)[:160]}", flush=True)
+    raise HTTPException(502, "مش قادرة أرد دلوقتي، جرّب بعد شوية")
+
+
+def suad_after_feedback(bid: str) -> bool:
+    """آخر رسالة من سعاد كانت «إيه رأيك؟» في فيديو؟ (بعد ما يرد بتظهر دعوة الاشتراك)."""
+    msgs = suad_load(bid).get("msgs") or []
+    last = next((m for m in reversed(msgs[:-1]) if m.get("role") != "user"), None)
+    return bool(last and last.get("kind") == "ask" and last.get("ask") == "feedback")
+
+
+@app.post("/api/suad/msg")
+def suad_msg(body: SuadIn, request: Request):
+    bid = active_client_id()
+    text = body.text.strip()[:2000]
+    if not bid or not text:
+        raise HTTPException(400, "اكتب رسالتك")
+    day = datetime.now(timezone.utc).date().isoformat()
+    if HELP_DAY.get(day, 0) >= HELP_LIMIT:
+        raise HTTPException(429, "وصلت لحد الرسايل النهارده. جرّب بكرة")
+    if day not in HELP_DAY:
+        HELP_DAY.clear()
+    HELP_DAY[day] = HELP_DAY.get(day, 0) + 1
+    suad_post(bid, text, role="user")
+    fb = suad_after_feedback(bid)
+    reply = suad_reply(bid, body.page, body.lang)
+    out = [suad_post(bid, reply)]
+    if fb:   # رأيه في الفيديو ← دعوة الاشتراك (CTA) للمجاني
+        if not suad_paid(request):
+            out.append(suad_post(bid, "", kind="cta", action="subscribe"))
+        with SUAD_LOCK:
+            d = suad_load(bid); d.setdefault("feedback", []).append({"at": now(), "text": text}); suad_save(bid, d)
+        notify("suad", "info", "💬 رأي عميل في فيديو", text[:200], "settings", bid)
+    with SUAD_LOCK:
+        d = suad_load(bid); d["read"] = len(d.get("msgs") or []); suad_save(bid, d)
+    return {"msgs": out}
+
+
+@app.post("/api/suad/photo")
+async def suad_photo(file: UploadFile = File(...), text: str = Form("")):
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(400, "مفيش علامة")
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".heic"):
+        raise HTTPException(400, "ابعت صورة (jpg أو png)")
+    name = uuid.uuid4().hex[:12] + ext
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(413, "الصورة كبيرة قوي")
+    (suad_dir(bid) / "files").mkdir(exist_ok=True)
+    (suad_dir(bid) / "files" / name).write_bytes(data)
+    m = suad_post(bid, text.strip()[:500], role="user", kind="image", url=f"/media/suad/{Path(bid).name}/{name}")
+    r = suad_post(bid, "وصلتني الصورة 👌 قولّي تحب أعمل بيها إيه؟")
+    return {"msgs": [m, r]}
+
+
+@app.get("/media/suad/{bid}/{name}")
+def suad_media(bid: str, name: str):
+    if bid != Path(active_client_id() or "").name:
+        raise HTTPException(404, "غير موجود")
+    p = (SUAD_DIR / Path(bid).name / "files" / Path(name).name)
+    if not p.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(p)
+
+
 # ---------- 👥 أكتر من جمهور: العقل بيستخلص الجماهير لوحده من وصف البراند، وتقدر تعدّلها
 AUD_BUSY: dict[str, float] = {}
 AUD_KEYS = ("name", "who", "pain", "want")

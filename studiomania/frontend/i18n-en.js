@@ -15636,4 +15636,13 @@ window.I18N_EN = {
   "نوع القوالب": "Template type",
   "قوالب الأسنان": "Dental templates",
   "قوالب تخصصك": "Your specialty's templates",
+  "مساعدتك الشخصية": "Your personal assistant",
+  "اكتب رسالتك…": "Type your message…",
+  "ابعت صورة": "Send a photo",
+  "مكالمة صوتية": "Voice call",
+  "اشترك الآن": "Subscribe now",
+  "شوف الفيديو": "Watch the video",
+  "المساعدة": "Assistant",
+  "رسالتك": "Your message",
+  "المكالمة الصوتية للمشتركين": "Voice calls are for subscribers",
 };

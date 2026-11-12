@@ -232,6 +232,22 @@ def workspace_dir(wid: str) -> Path:
     return DATA_DIR if wid == OWNER else TENANTS / wid
 
 
+_PAID: dict[str, tuple[float, bool]] = {}
+
+
+def is_paid(wid: str, role: str = "") -> bool:
+    """مشترك (باقة مدفوعة شغالة)؟ المجاني = trial. بيتحسب مرة كل دقيقة لكل مساحة (بيتبعت للبرنامج في x-user-paid)."""
+    if role == "admin":
+        return True
+    hit = _PAID.get(wid)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    w = workspace(wid)
+    ok = bool(w) and (w["plan"] or "trial") != "trial" and (not w["ends_at"] or float(w["ends_at"]) > time.time())
+    _PAID[wid] = (time.time(), ok)
+    return ok
+
+
 def workspace(wid: str) -> sqlite3.Row | None:
     with closing(db()) as c:
         return c.execute("SELECT * FROM workspaces WHERE id=?", (wid,)).fetchone()
@@ -2930,7 +2946,8 @@ async def proxy(path: str, request: Request):
                 (b"x-forwarded-proto", (request.headers.get("x-forwarded-proto") or request.url.scheme).encode())]
     if u and not u_pub:
         headers += [(b"x-user-email", u["email"].encode()), (b"x-user-role", u["role"].encode()),
-                    (b"x-user-name", quote((u["name"] or "")[:80]).encode())]   # اسم التسجيل (المساعد الصوتي بيناديه بيه)
+                    (b"x-user-name", quote((u["name"] or "")[:80]).encode()),   # اسم التسجيل (المساعد الصوتي بيناديه بيه)
+                    (b"x-user-paid", b"1" if is_paid(u["workspace"], u["role"]) else b"0")]   # مشترك؟ (سعاد صوت للمشترك بس)
     target = f"http://127.0.0.1:{t.port}{url_path}" + (f"?{request.url.query}" if request.url.query else "")
     req = _http.build_request(request.method, target, headers=headers,
                               content=capped(request.stream()) if request.method not in ("GET", "HEAD", "OPTIONS") else None)
