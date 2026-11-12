@@ -1,5 +1,5 @@
 # StudioMania على أي سيرفر بيشغّل Docker (Railway أو Render أو Fly.io أو VPS)
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
