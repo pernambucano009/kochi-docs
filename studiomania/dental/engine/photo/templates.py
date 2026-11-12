@@ -182,6 +182,19 @@ def _upscale_for(path, scale, passes=3):
         upper.WARN.append("MACRO_UPSCALE_FAILED: " + str(e)[:100]); return path, 1.0
 
 
+def macro_pop(img, clarity=1.0, sharp=1.2, shine=1.0):
+    """E477: «السنان تلمع» في الماكرو — تحسين تصويري بس (مش توليد، والشكل واللون زي ما هم):
+    1) clarity: تباين محلي على الإضاءة بس (unsharp بنصف قطر كبير) — بيطلّع ملمس المينا والخطوط.
+    2) sharp: حدة دقيقة (unsharp صغير) على الإضاءة.
+    3) shine: منحنى للإضاءات العالية بس (أعلى ~١٥٪) — اللمعة على السنان تبان أقوى من غير ما السنة كلها تفتح."""
+    lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB).astype(np.float32); L = lab[..., 0]; Hh, Ww = L.shape
+    big = cv2.GaussianBlur(L, (0, 0), max(Ww, Hh) * .006); L = L + clarity * (L - big)
+    fine = cv2.GaussianBlur(L, (0, 0), 1.4); L = L + sharp * (L - fine)
+    t = np.percentile(L, 85); hi = np.clip((L - t) / max(1, 255 - t), 0, 1); L = L + shine * hi * hi * (255 - L) * .6
+    lab[..., 0] = np.clip(L, 0, 255)
+    return cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_LAB2RGB)
+
+
 def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبعّد بالعرض (من غير إزالة خلفية)، السنان متلفّة على ناحية، قريب قوي + لوجو + علامة مائية
     W5, H5 = 2160, 2700   # E476: دقة مضاعفة — الصورة دي هدفها التفاصيل
     A = anchors(after, "teeth"); c = (A["l"] + A["r"]) / 2; v = (A["r"] - A["l"]); u = v / np.linalg.norm(v)
@@ -193,6 +206,7 @@ def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبع
     if eff > 1.15: upper.WARN.append(f"Q27 MACRO_SOFT: الصورة لسه متكبّرة {eff:.2f}× بعد التكبير الأمين — محتاجين صورة أعلى دقة")
     A2 = dict(img=A["img"], l=c - u * half, r=c + u * half)
     (im,), _ = panels([A2], W5, H5, "v", fill, cyk=.6, orients=["cw"])
+    im = macro_pop(im)
     cv = Image.fromarray(im); d = ImageDraw.Draw(cv, "RGBA")
     lib.paste_logo(cv, brand, W5 * .2, H5 * .5, w=int(H5 * .42), rot=90, alpha=.9)   # اللوجو: بالطول على ناحية البق
     if brand.get("name_en"):   # العلامة المائية: اسم الطبيب بالإنجليزي، كبير ومتباعد وشفاف تحت — حاجة غير اللوجو
