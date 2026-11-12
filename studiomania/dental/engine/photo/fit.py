@@ -16,7 +16,7 @@ PHOTO_NEEDS = {
     "p02": [("before", "retracted", "front"), ("after", "retracted", "front")],
     "p03": [("before", "smile|retracted", "side"), ("after", "smile|retracted", "side")],
     "p04": [("before", "retracted", "*"), ("after", "retracted", "*")],
-    "p05": [("after", "retracted|macro", "front")],
+    "p05": [("after", "retracted|macro", "*")],   # أي زاوية مبعّد؛ القالب بيلفها بالعرض ويكبّر لو محتاج
     "p06": [("before", "retracted", "*"), ("prep", "retracted", "*"), ("after", "retracted", "*")],
     "p07": [("before", "retracted", "*"), ("prep", "retracted", "*"), ("after", "retracted", "*")],
     "p08": [("after", "retracted", "front")],
