@@ -11,7 +11,7 @@ import re
 
 # 🏷️ اسم «الحاجة» اللي بنعلن عنها حسب المجال: طبق من قائمة مطعمكم، منتج من متجركم…
 NOUNS = {
-    "food": ("طبق", "قائمة مطعمكم", "الطبق"), "beauty": ("خدمة", "خدمات صالونكم", "الخدمة"),
+    "food": ("طبق", "قائمة مطعمكم", "الطبق"), "beauty": ("خدمة", "خدمات صالونكم", "الخدمة"), "dental": ("علاج", "علاجات عيادتكم", "العلاج"),
     "ecom": ("منتج", "متجركم", "المنتج"), "realestate": ("عقار", "عقاراتكم", "العقار"),
     "edu": ("دورة", "دوراتكم", "الدورة"), "fitness": ("اشتراك", "ناديكم", "الاشتراك"),
     "home": ("خدمة", "خدماتكم", "الخدمة"), "shops": ("منتج", "محلكم", "المنتج"),
@@ -346,7 +346,7 @@ def auto_icons(tpl: str, params: dict) -> dict:
 
 
 # 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
-NOUNS_EN = {
+NOUNS_EN = {"dental": ("treatment", "your clinic's treatments", "the treatment"), 
     "food": ("dish", "your restaurant's menu", "the dish"), "beauty": ("service", "your salon's services", "the service"),
     "ecom": ("product", "your store", "the product"), "realestate": ("property", "your listings", "the property"),
     "edu": ("course", "your courses", "the course"), "fitness": ("membership", "your gym", "the membership"),

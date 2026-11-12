@@ -151,8 +151,8 @@ TOOLS = [
     {"type": "function", "name": "set_field", "description": "Fix the user's field in their account, once you and the user agreed which field is right "
      "(when what they say differs from the field they chose at signup).",
      "parameters": {"type": "object", "properties": {
-         "field": {"type": "string", "enum": ["food", "beauty", "ecom", "realestate", "edu", "fitness", "home", "shops", "other"],
-                   "description": "food: restaurants and cafes. beauty: clinics and beauty. ecom: online stores. realestate: real estate. edu: education and "
+         "field": {"type": "string", "enum": ["food", "dental", "beauty", "ecom", "realestate", "edu", "fitness", "home", "shops", "other"],
+                   "description": "food: restaurants and cafes. dental: dental clinics. beauty: other clinics and beauty. ecom: online stores. realestate: real estate. edu: education and "
                                   "coaching. fitness: sports and fitness. home: home services and contracting. shops: local shops and retail. other: none of these."},
          "what": {"type": "string", "description": "Their field in their own words, in Arabic (always fill it)."}}, "required": ["field", "what"]}},
     {"type": "function", "name": "save_preference", "description": "Save what the user said about a tour stop (e.g. keep these video types or try "

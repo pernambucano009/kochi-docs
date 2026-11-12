@@ -33503,7 +33503,7 @@ def tpl_names() -> dict[str, str]:
         return {}
 
 
-FIELD_HINTS = [("beauty", r"اسنان|أسنان|سنان|dent|عياد|clinic|تجميل|بشر|جلدية|derma|skin|ليزر|صالون"),
+FIELD_HINTS = [("dental", r"اسنان|أسنان|سنان|dent|تقويم|فينير|veneer|teeth"), ("beauty", r"عياد|clinic|تجميل|بشر|جلدية|derma|skin|ليزر|صالون"),
                ("fitness", r"جيم|لياق|رياض|fitness|gym|كوتش|coach|تمارين|تغذية|nutrition"),
                ("food", r"مطعم|كافي|مقهى|اكل|أكل|طبخ|حلويات|food|restaurant|cafe"),
                ("realestate", r"عقار|شقق|فلل|real ?estate|property"), ("edu", r"تعليم|دورة|دورات|كورس|course|تدريس|teach|اكاديمي|أكاديمي"),
