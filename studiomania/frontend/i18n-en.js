@@ -318,6 +318,8 @@ window.I18N_EN = {
   "مطاعم وكافيهات (مطعم، مقهى، حلويات، مطبخ سحابي)": "Restaurants and cafés (restaurant, café, desserts, cloud kitchen)",
   "عيادات أسنان (تجميل، تقويم، زراعة، فينير)": "Dental clinics (cosmetic, orthodontics, implants, veneers)",
   "عيادات أسنان": "Dental clinics",
+  "جلدية، تجميل، صالون، سبا": "Dermatology, cosmetic, salon, spa",
+  "عيادات وتجميل (جلدية، تجميل، صالون، سبا)": "Clinics and beauty (dermatology, cosmetic, salon, spa)",
   "تجميل، تقويم، زراعة، فينير": "Cosmetic, orthodontics, implants, veneers",
   "عيادات وتجميل (أسنان، جلدية، صالون، سبا)": "Clinics and beauty (dental, dermatology, salon, spa)",
   "متاجر إلكترونية (ملابس، عطور، إلكترونيات، مستحضرات)": "Online stores (clothing, perfume, electronics, cosmetics)",
