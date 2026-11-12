@@ -79,6 +79,7 @@ set -euo pipefail
 ROOT=/srv/simsimkit
 BRANCH="${BRANCH:-claude/new-program-gvemu5}"
 git -C "$ROOT/src" fetch --depth 1 origin "$BRANCH" && git -C "$ROOT/src" reset --hard FETCH_HEAD
+docker image prune -f >/dev/null 2>&1 || true   # النسخ القديمة بتملا الديسك والبناء يفشل
 docker build -t simsimkit "$ROOT/src/studiomania"
 docker rm -f simsimkit 2>/dev/null || true
 docker run -d --name simsimkit --restart unless-stopped --network host \
@@ -86,7 +87,7 @@ docker run -d --name simsimkit --restart unless-stopped --network host \
 docker rm -f caddy 2>/dev/null || true
 docker run -d --name caddy --restart unless-stopped --network host \
   -v "$ROOT/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$ROOT/caddy/data:/data" -v "$ROOT/caddy/config:/config" caddy:2
-for i in $(seq 1 60); do curl -fs http://127.0.0.1:8000/health >/dev/null && { echo "✓ البرنامج شغّال"; exit 0; }; sleep 3; done
+for i in $(seq 1 60); do curl -fs http://127.0.0.1:8000/health >/dev/null && { echo "✓ البرنامج شغّال"; git -C "$ROOT/src" rev-parse HEAD > "$ROOT/.deployed"; exit 0; }; sleep 3; done
 echo "⚠️ البرنامج مقامش، شوف: docker logs --tail 100 simsimkit"; exit 1
 EOF
 chmod 700 "$ROOT/update.sh"
@@ -112,7 +113,8 @@ ROOT=/srv/simsimkit
 BRANCH="${BRANCH:-claude/new-program-gvemu5}"
 exec 9>"$ROOT/.update.lock"; flock -n 9 || exit 0
 git -C "$ROOT/src" fetch -q --depth 1 origin "$BRANCH"
-[ "$(git -C "$ROOT/src" rev-parse HEAD)" = "$(git -C "$ROOT/src" rev-parse FETCH_HEAD)" ] && exit 0
+# بنقارن بآخر نسخة اشتغلت فعلًا (مش آخر نسخة اتسحبت)، فلو البناء فشل بيحاول تاني المرة الجاية
+[ "$(cat "$ROOT/.deployed" 2>/dev/null)" = "$(git -C "$ROOT/src" rev-parse FETCH_HEAD)" ] && exit 0
 "$ROOT/update.sh" >> "$ROOT/update.log" 2>&1
 EOF
 chmod 700 "$ROOT/autoupdate.sh"
