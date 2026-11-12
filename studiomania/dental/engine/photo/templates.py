@@ -80,7 +80,9 @@ BAND = 34
 
 def stacked(before, after, brand, kind, fill):
     ph = (H - BAND) // 2
-    (top, bot), _ = panels([anchors(before, kind), anchors(after, kind)], W, ph, "h", fill)
+    Ab, Aa = anchors(before, kind), anchors(after, kind)
+    if kind == "teeth": Ab, Aa = pair(Ab, Aa)   # p03: نفس المقاس من اللثة (الابتسامة p01 بنقط زوايا البق — مابتتغيرش بالعلاج)
+    (top, bot), _ = panels([Ab, Aa], W, ph, "h", fill)
     cv = canvas(); paste(cv, top, 0, 0); paste(cv, bot, 0, ph + BAND)
     d = ImageDraw.Draw(cv, "RGBA")
     # العلامة المائية: دايمًا اسم الطبيب بالإنجليزي، حروف صغيرة متباعدة وشفافة شوية
@@ -107,17 +109,43 @@ def snap(im, side="top", mid=.6, scale=1.0):
     return np.ascontiguousarray(np.rot90(a, {0: 0, 1: 1, 2: 2, 3: -1}[k]))
 
 
+def pair(Ab, Aa):
+    """E472: القبل والبعد بنفس المقاس بالظبط. نقط السنان (l,r) بتتغير بين القبل والبعد (السنان نفسها اتغيرت/ناقصة)،
+    فبنبدأ من نقط السنان، وبعدين نظبط المطابقة على اللثة والشفايف (من غير السنان) بـ ECC — مطابقة بالإضاءة والضل،
+    بتنفع حتى لو الصورة مافيهاش ملامح كتير (SIFT كان بيلاقي ٤ نقط بس). بنحسب نقط القبل من نقط البعد.
+    لو المطابقة ضعيفة (ارتباط < .6 أو تصحيح مقاس > ٢٠٪): كل واحدة بنقطها + تحذير."""
+    try:
+        ra, rb = Aa.get("raw", Aa["img"]), Ab.get("raw", Ab["img"])
+        Hh, Ww = ra.shape[:2]; M0 = lib.similarity(Ab["l"], Ab["r"], Aa["l"], Aa["r"])
+        wb = cv2.warpAffine(rb, M0, (Ww, Hh)); k = 700 / max(Hh, Ww)
+        g1 = cv2.GaussianBlur(cv2.cvtColor(cv2.resize(ra, None, fx=k, fy=k), cv2.COLOR_RGB2GRAY), (0, 0), 2).astype(np.float32)
+        g2 = cv2.GaussianBlur(cv2.cvtColor(cv2.resize(wb, None, fx=k, fy=k), cv2.COLOR_RGB2GRAY), (0, 0), 2).astype(np.float32)
+        tm = lib.teeth_mask(ra); tb = cv2.warpAffine(lib.teeth_mask(rb).astype(np.uint8), M0, (Ww, Hh)) > 0
+        ok = ~(cv2.dilate((tm | tb).astype(np.uint8), np.ones((31, 31), np.uint8)) > 0) & (cv2.cvtColor(ra, cv2.COLOR_RGB2GRAY) > 30)
+        mk = cv2.resize(ok.astype(np.uint8), (g1.shape[1], g1.shape[0]), interpolation=cv2.INTER_NEAREST)
+        cc, Wm = cv2.findTransformECC(g1, g2, np.eye(2, 3, dtype=np.float32), cv2.MOTION_AFFINE,
+                                      (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 300, 1e-6), mk, 5)
+        sc = math.hypot(Wm[0, 0], Wm[1, 0])
+        if cc < .6 or not (.8 < sc < 1.25): raise ValueError(f"weak ecc {cc:.2f} scale {sc:.2f}")
+        Wf = Wm.astype(np.float64).copy(); Wf[:, 2] /= k                    # بإحداثيات الصورة الكاملة: البعد ← القبل المتحوّل
+        M0i = cv2.invertAffineTransform(M0)
+        to_b = lambda p: M0i @ np.array([*(Wf @ np.array([*p, 1.0])), 1.0])
+        return dict(Ab, l=to_b(Aa["l"]), r=to_b(Aa["r"])), Aa
+    except Exception as e:
+        upper.WARN.append("PAIR_SIZE: مطابقة مقاس القبل/البعد ضعيفة — كل صورة بنقطها: " + str(e)[:60]); return Ab, Aa
+
+
 def iso(path, arch="upper", refl=.18, force=False):
     """E463: صورة مبعّد ← فك واحد (upper/lower) على أسود. لو متصورة على كونتراستور (الفك التاني مش باين) بتفضل زي ما هي إلا لو force."""
     A = anchors(path, "teeth")
     if force or upper.needs_isolation(A["img"]):
-        img, tm = upper.isolate(A["img"], arch, refl); A = dict(A, img=img, mask=tm, isolated=True)
+        img, tm = upper.isolate(A["img"], arch, refl); A = dict(A, img=img, mask=tm, isolated=True, raw=A["img"])
     return A
 
 
 def p02(before, after, brand, arch="upper", **k):   # قبل وبعد بالمبعّد: فك واحد على أسود + انعكاس خفيف تحت السنان
     ph = (H - BAND) // 2
-    As = [iso(before, arch), iso(after, arch)]
+    As = list(pair(iso(before, arch), iso(after, arch)))
     (top, bot), _ = panels(As, W, ph, "h", .80)
     sd = "top" if arch == "upper" else "bottom"
     top, bot = [snap(x, sd) if A.get("isolated") else x for x, A in zip((top, bot), As)]
@@ -131,7 +159,7 @@ def p03(before, after, brand, **k): return stacked(before, after, brand, "teeth"
 def p04(before, after, brand, **k):   # المرآة الطولية: قبل يسار (أطراف السنان يمين) وبعد يمين (أطراف السنان يسار)، شريط أسود في النص
     sw = 200; pw = (W - sw) // 2
     arch = k.get("arch", "upper")   # فك فوق قبل/بعد، أو فك تحت قبل/بعد — من صور المبعّد، معزولين على أسود ومتقابلين
-    (lft, rgt), _ = panels([iso(before, arch, refl=0, force=True), iso(after, arch, refl=0, force=True)], pw, H, "v", .74, orients=["ccw", "cw"], black=True)
+    (lft, rgt), _ = panels(list(pair(iso(before, arch, refl=0, force=True), iso(after, arch, refl=0, force=True))), pw, H, "v", .74, orients=["ccw", "cw"], black=True)
     ga, gb = ("left", "right") if arch == "upper" else ("right", "left")   # اللثة لحافة الصورة من برا
     lft, rgt = snap(lft, ga), snap(rgt, gb)
     cv = canvas(); paste(cv, lft, 0, 0); paste(cv, rgt, pw + sw, 0)
@@ -142,20 +170,20 @@ def p04(before, after, brand, **k):   # المرآة الطولية: قبل يس
 
 def _upscale_for(path, scale):
     """الماكرو محتاج تفاصيل: لو هنكبّر الصورة أكتر من ١.٢٥× بنعمل تكبير أمين (faithful_upscale) الأول. بيرجع (مسار، نسبة)."""
-    if scale <= 1.25: return path, 1.0
+    if scale <= 1.0: return path, 1.0   # E473: الماكرو هدفه التفاصيل — أي تكبير = تكبير أمين الأول
     try:
         import shutil, tempfile; sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))
         from faithful_upscale import upscale_small
         tmp = os.path.join(tempfile.mkdtemp(), "macro.jpg"); shutil.copy(path, tmp)
         w0, w1 = upscale_small(tmp, min_w=int(Image.open(path).width * min(scale, 4)), passes=2)
-        return tmp, w1 / w0
+        print(f"MACRO_UPSCALED {w0}->{w1}", file=sys.stderr); return tmp, w1 / w0
     except Exception as e:
         print("MACRO_UPSCALE_FAILED", str(e)[:120], file=sys.stderr); return path, 1.0
 
 
 def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبعّد بالعرض، السنان متلفّة (أطرافها شمال) على ناحية واحدة، قريب قوي + لوجو + علامة مائية
     A = anchors(after, "teeth"); c = (A["l"] + A["r"]) / 2; v = (A["r"] - A["l"]); u = v / np.linalg.norm(v)
-    half = np.linalg.norm(v) * .3          # الثنيتين والجانبيتين والناب تقريبًا على طول الصورة
+    half = np.linalg.norm(v) * .42         # ٤–٥ سنان على طول الصورة زي الأصل (أقرب من كده بيبقى سنتين بس)
     fill = .95; scale = H * fill / (2 * half)
     p2, f = _upscale_for(after, scale)
     if f != 1.0: A = dict(A, img=lib.load(p2)); c, half = c * f, half * f
@@ -172,6 +200,7 @@ def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبع
 
 def three(before, prep, after, brand, layout):
     As = [anchors(p, "teeth") for p in (before, prep, after)]
+    As = [pair(As[0], As[2])[0], pair(As[1], As[2])[0], As[2]]   # E472: التلاتة بنفس المقاس
     cv = canvas()
     if layout == "strips":   # 3 شرائط بالطول (أطراف السنان يمين) + اللوجو تحت
         g = 14; pw = (W - 2 * g) // 3; ph = H - 170
@@ -189,6 +218,7 @@ def three(before, prep, after, brand, layout):
 def p06(before, prep, after, brand, **k):   # المراحل الثلاث بالطول 9:16 (1080×1920): 3 صفوف فوق بعض على أسود + اللوجو كبير بالعرض تحت
     W6, H6 = 1080, 1920; g = 14; LG = 430; ph = (H6 - LG - 2 * g) // 3
     As = [anchors(p, "teeth") for p in (before, prep, after)]
+    As = [pair(As[0], As[2])[0], pair(As[1], As[2])[0], As[2]]   # E472
     ims, _ = panels(As, W6, ph, "h", .9, black=True)
     cv = canvas(W6, H6)
     for i, im in enumerate(ims): paste(cv, im, 0, i * (ph + g))
@@ -210,17 +240,31 @@ def p08(after, brand, **k):   # الأسنان على الأسود: السنان
     return cv
 
 
-def p09(before, after, brand, **k):   # قبل وبعد على الأسود، واللوجو في النص
+def p09(before, after, brand, **k):   # قبل وبعد متقابلين (زي الأصل): القبل فوق معدول، والبعد تحت مقلوب — أطراف السنان في وش بعض واللوجو في النص
     ph = H // 2 - 60
-    (top, bot), _ = panels([iso(before, refl=0, force=True), iso(after, refl=0)], W, ph, "h", .9, cyk=.5, black=True)
-    cv = canvas(); paste(cv, snap(top, "top"), 0, 0); paste(cv, snap(bot, "top"), 0, H - ph)   # E464: اللثة لحافة كل لوحة
+    (top, bot), _ = panels(list(pair(iso(before, refl=0, force=True), iso(after, refl=0, force=True))), W, ph, "h", .9, cyk=.5, black=True)
+    bot = np.ascontiguousarray(bot[::-1])   # البعد مقلوب: اللثة تحت والأطراف لفوق
+    cv = canvas(); paste(cv, snap(top, "top"), 0, 0); paste(cv, snap(bot, "bottom"), 0, H - ph)   # E464: اللثة لحافة كل لوحة
     lib.paste_logo(cv, brand, W / 2, H / 2, h=110)
     return cv
 
 
+def p10(before, after, brand, **k):   # قبل وبعد فوق بعض على الأسود (الاتنين معدولين)، واللوجو في النص
+    ph = H // 2 - 60
+    (top, bot), _ = panels(list(pair(iso(before, refl=0, force=True), iso(after, refl=0, force=True))), W, ph, "h", .9, cyk=.5, black=True)
+    cv = canvas(); paste(cv, snap(top, "top"), 0, 0); paste(cv, snap(bot, "top"), 0, H - ph)
+    lib.paste_logo(cv, brand, W / 2, H / 2, h=110)
+    return cv
+
+
+def p11(after, brand, **k): return p08(after, brand, **k)   # الأسنان على الأسود — من اليمين (نفس p08، صورة المبعّد من الجنب اليمين)
+def p12(after, brand, **k): return p08(after, brand, **k)   # الأسنان على الأسود — من الشمال
+
+
 TEMPLATES = {"p01": (p01, ["before", "after"]), "p02": (p02, ["before", "after"]), "p03": (p03, ["before", "after"]),
              "p04": (p04, ["before", "after"]), "p05": (p05, ["after"]), "p06": (p06, ["before", "prep", "after"]),
-             "p07": (p07, ["before", "prep", "after"]), "p08": (p08, ["after"]), "p09": (p09, ["before", "after"])}
+             "p07": (p07, ["before", "prep", "after"]), "p08": (p08, ["after"]), "p09": (p09, ["before", "after"]),
+             "p10": (p10, ["before", "after"]), "p11": (p11, ["after"]), "p12": (p12, ["after"])}
 
 def make(tid, brand, out, **photos):
     fn, need = TEMPLATES[tid]

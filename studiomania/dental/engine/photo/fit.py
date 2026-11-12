@@ -8,7 +8,7 @@ fit_photo(tid, photos) / fit_video(tid, photos, needs) ← {"ok", "photos": {ا�
 YAW_TOL = 10   # أقصى فرق (درجات) في زاوية الكاميرا بين صورتين «بالزاوية نفسها»
 ST = {"before": "قبل العلاج", "prep": "بعد التحضير", "after": "بعد العلاج"}
 KD = {"smile": "ابتسامة", "retracted": "بالمبعد", "macro": "مقرّبة", "*": "", "retracted|macro": "بالمبعد"}
-VW = {"front": "من الأمام", "side": "من الجانب", "*": ""}
+VW = {"front": "من الأمام", "side": "من الجانب", "right": "من اليمين", "left": "من اليسار", "*": ""}
 
 # قوالب الصور: كل دور (المرحلة، النوع، الاتجاه)
 PHOTO_NEEDS = {
@@ -21,6 +21,9 @@ PHOTO_NEEDS = {
     "p07": [("before", "retracted", "*"), ("prep", "retracted", "*"), ("after", "retracted", "*")],
     "p08": [("after", "retracted", "front")],
     "p09": [("before", "retracted", "front"), ("after", "retracted", "front")],
+    "p10": [("before", "retracted", "front"), ("after", "retracted", "front")],
+    "p11": [("after", "retracted", "right")],
+    "p12": [("after", "retracted", "left")],
 }
 
 
