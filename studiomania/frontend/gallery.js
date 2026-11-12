@@ -184,7 +184,14 @@ const Gallery = (() => {
         cover_url: `/gallery/dental/${t.id}.jpg`, cat: kind === "photo" ? "dentalimg" : "dental" });
       const add = [...(dt.video || []).map((t) => mk(t, "video")), ...(dt.photo || []).map((t) => mk(t, "photo"))];
       add.forEach((x) => { FIT[x.id] = "beauty"; });
-      S.items = [...S.items.filter((x) => x.id !== "dental"), ...add];
+      // أول قالبين في فيديوهات الأسنان: التصوير بالجوال (الطبيب يصوّر نفسه بإرشادنا) ثم الأفاتار — نفس قوالب المنصة، بيفتحوا نفس المسار
+      const alias = (id, pin, name, desc) => { const o = EXTRA.find((x) => x.id === id); return o && { ...o, id: `d-${id}`, alias: id, cat: "dental", pin, name, desc }; };
+      const lead = [alias("phone", .1, "التصوير بالجوال",
+        "صوّر نفسك وأنت تتكلم عن حالة أو معلومة: نرشدك قبل التصوير (الخلفية، ومكان الكاميرا، والإضاءة، والميكروفون)، وتعرض علينا لقطة تجريبية فنقيّمها، والنص أمامك على الشاشة وأنت تصوّر، ثم يُصنع المونتاج تلقائيًا."),
+        alias("avatar", .2, "الأفاتار", "النص نفسه دون أن تصوّر: نسختك (الأفاتار) تقوله بوجهك وصوتك وحركتك.")].filter(Boolean);
+      lead.forEach((x) => { FIT[x.id] = "beauty"; });
+      add.forEach((x) => { if (x.dkind === "video") x.pin = 1 + (dt.video || []).findIndex((t) => t.id === x.dtid) / 100; });   // ترتيب القوالب زي ما هو في القايمة
+      S.items = [...S.items.filter((x) => x.id !== "dental"), ...lead, ...add];
     }   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
     // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
     S.reels = niche?.reels || [];
@@ -765,6 +772,7 @@ const Gallery = (() => {
   // 🧭 «ابدأ بهذا القالب»: يدخل مسار القالب على طول (flow.js)
   function startTpl(x) {
     if (!x) return;
+    if (x.alias) return startTpl(EXTRA.find((e) => e.id === x.alias) || { ...x, id: x.alias });   // نسخة من قالب عام جوه تصنيف تاني (التصوير والأفاتار في الأسنان)
     if (x.id === "hairline") return startHairline();
     if (x.id === "avatar") return showStep("16");
     if (x.id === "custom") return window.NHNav?.("auto");
