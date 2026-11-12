@@ -117,17 +117,24 @@ def _upper_mask(a):
     return m, teeth, yb
 
 
-def isolate(a, arch="upper", refl=.5, depth=.6):   # انعكاس الكونتراستور (E471: كان باهت قوي فماكانش باين)
-    """بيرجع (صورة الفك على أسود + انعكاس، قناع السنان)."""
+def isolate(a, arch="upper", refl=.42, depth=1.0, gap=.07, blur=5.0):
+    """بيرجع (صورة الفك على أسود + انعكاس، قناع السنان).
+    الانعكاس زي سطح الكونتراستور في الأصل (E471/E475): بيبدأ بعد مسافة صغيرة تحت أطراف السنان (gap من طول السنة)،
+    طويل (depth = طول سنة كاملة)، ناعم (blur)، باهت ومن غير تشبع، وبيخفت لتحت تدريجيًا."""
     if arch == "lower": a = a[::-1].copy()
     m, teeth, yb = _upper_mask(a); H, W = m.shape; yy = np.arange(H)[:, None]
     soft = cv2.GaussianBlur(m.astype(np.float32), (0, 0), .8)[..., None]
     up = (a * soft).astype(np.uint8)
-    ys, _ = np.where(teeth); th = max(10, np.ptp(ys) * depth)
-    d = yy - yb[None, :]; my = np.broadcast_to(yb[None, :] - d, (H, W)).astype(np.float32)
+    ys, _ = np.where(teeth); T = max(10, np.ptp(ys)); th = T * depth; g = T * gap
+    # محور الانعكاس ناعم (مش بيتبع كل سنة) عشان الانعكاس مايبقاش متقطع
+    k = max(5, int(T * .8)) | 1; ybs = cv2.blur(yb.astype(np.float32).reshape(1, -1), (k, 1)).ravel()
+    d = yy - (ybs[None, :] + g); my = np.broadcast_to(yb[None, :] - d, (H, W)).astype(np.float32)
     mx = np.broadcast_to(np.arange(W, dtype=np.float32)[None, :], (H, W)).astype(np.float32)
-    r = cv2.remap(cv2.GaussianBlur(up, (0, 0), 1.5), mx, my, cv2.INTER_LINEAR, borderValue=0)
-    al = np.where((d > 0) & (d < th), refl * (1 - d / th) ** 2, 0)[..., None]
-    out = np.clip(up.astype(np.float32) + r * al, 0, 255).astype(np.uint8)
+    src = cv2.GaussianBlur(up, (0, 0), blur * T / 200)
+    gry = src.mean(2, keepdims=True); src = (src * .6 + gry * .4)   # أقل تشبع
+    r = cv2.remap(src.astype(np.float32), mx, my, cv2.INTER_LINEAR, borderValue=0)
+    al = np.where((d > 0) & (d < th), refl * (1 - d / th) ** 1.3, 0) * np.clip(d / (T * .05), 0, 1)
+    al = al * (~m)
+    out = np.clip(up.astype(np.float32) + r * al[..., None], 0, 255).astype(np.uint8)
     if arch == "lower": out, teeth = out[::-1].copy(), teeth[::-1].copy()
     return out, teeth
