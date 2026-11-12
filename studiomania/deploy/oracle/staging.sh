@@ -47,11 +47,12 @@ cat > "$SR/update.sh" <<EOF
 # التجريبي: أحدث كود من الفرع ← بناء ← تشغيل على $SPORT
 set -euo pipefail
 git -C "$SR/src" fetch -q --depth 1 origin "$BRANCH" && git -C "$SR/src" reset -q --hard FETCH_HEAD
+docker image prune -f >/dev/null 2>&1 || true
 docker build -q -t simsimkit-staging "$SR/src/studiomania" >/dev/null
 docker rm -f simsimkit-staging 2>/dev/null || true
 docker run -d --name simsimkit-staging --restart unless-stopped --network host \\
   --env-file "$SR/app.env" -e PORT=$SPORT -e STUDIOMANIA_DATA=/data -v "$SR/data:/data" simsimkit-staging >/dev/null
-for i in \$(seq 1 60); do curl -fs http://127.0.0.1:$SPORT/health >/dev/null && { echo "✓ التجريبي شغّال: \$(git -C "$SR/src" rev-parse --short HEAD)"; exit 0; }; sleep 3; done
+for i in \$(seq 1 60); do curl -fs http://127.0.0.1:$SPORT/health >/dev/null && { git -C "$SR/src" rev-parse HEAD > "$SR/.deployed"; echo "✓ التجريبي شغّال: \$(git -C "$SR/src" rev-parse --short HEAD)"; exit 0; }; sleep 3; done
 echo "⚠️ التجريبي مقامش: docker logs --tail 100 simsimkit-staging"; exit 1
 EOF
 cat > "$SR/autoupdate.sh" <<EOF
@@ -59,7 +60,7 @@ cat > "$SR/autoupdate.sh" <<EOF
 set -euo pipefail
 exec 9>"$SR/.update.lock"; flock -n 9 || exit 0
 git -C "$SR/src" fetch -q --depth 1 origin "$BRANCH"
-[ "\$(git -C "$SR/src" rev-parse HEAD)" = "\$(git -C "$SR/src" rev-parse FETCH_HEAD)" ] && exit 0
+[ "\$(cat "$SR/.deployed" 2>/dev/null)" = "\$(git -C "$SR/src" rev-parse FETCH_HEAD)" ] && exit 0
 "$SR/update.sh" >> "$SR/update.log" 2>&1
 EOF
 chmod 700 "$SR/update.sh" "$SR/autoupdate.sh"
