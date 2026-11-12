@@ -11135,6 +11135,33 @@ def help_tickets():
         return []
 
 
+# ---------- ⏺️ وضع تسجيل التجربة: أي حساب إيميله فيه «+rec» (مثلًا name+rec@gmail.com) بيسجّل الشاشة + المايك + صوت الجهاز وصوت سعاد
+# من أول ما يفتح، والتسجيل بيتحفظ على جهازه (عشان يبعته في الشات) وبيترفع هنا كمان (data/testrec/).
+TESTREC_DIR = DATA_DIR / "testrec"
+
+
+def testrec_on(request: Request) -> bool:
+    return "+rec@" in (request.headers.get("x-user-email") or "").lower()
+
+
+@app.get("/api/testrec")
+def testrec_state(request: Request):
+    return {"on": testrec_on(request)}
+
+
+@app.post("/api/testrec/upload")
+async def testrec_upload(request: Request, file: UploadFile = File(...)):
+    if not testrec_on(request):
+        raise HTTPException(403, "مش حساب تجربة")
+    TESTREC_DIR.mkdir(parents=True, exist_ok=True)
+    name = datetime.now().strftime("%Y%m%d-%H%M%S") + (Path(file.filename or "").suffix.lower() or ".webm")
+    with open(TESTREC_DIR / name, "wb") as f:
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
+    notify("testrec", "info", "⏺️ تسجيل تجربة جديد", name, "settings", name)
+    return {"ok": True, "name": name}
+
+
 # ---------- 🟠 سعاد في الشات: الدايرة البرتقالي تحت على اليمين. هي المساعد كله (الدعم، وشرح الصفحات، والرسايل، والفيديوهات اللي بتخلص).
 # المجاني: كتابة وصور بس بعد المكالمة الأولى. المشترك: كمان يقدر يكلمها صوت. كل محادثة محفوظة لكل علامة (data/suad/<علامة>/chat.json).
 SUAD_DIR = DATA_DIR / "suad"

@@ -684,7 +684,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const pc = new RTCPeerConnection(); S.pc = pc;
       const el = new Audio(); el.autoplay = true; S.el = el;
       pc.ontrack = (e) => {
-        el.srcObject = e.streams[0]; S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0]));
+        el.srcObject = e.streams[0]; try { window.dispatchEvent(new CustomEvent("suad-audio", { detail: e.streams[0] })); } catch { /* */ } S.outLevel = meter(S.ctx, S.ctx.createMediaStreamSource(e.streams[0]));
         // 🔊 لو المساعد فتح لوحده (من غير ضغطة)، المتصفح ممكن يمنع الصوت: زرار واحد يشغّله
         el.play().catch(() => unmute());
         if (S.ctx.state === "suspended") unmute();
