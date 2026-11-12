@@ -72,27 +72,27 @@ def _tpl_ok(case: Path, t: dict) -> bool:
 # الصور: ٤ أنواع × قبل/بعد (نفس خانات المحرك). المطلوب فعلًا ٤ مجموعات، وكل مجموعة ليها بديل بنقصّه من صورة تانية حقيقية
 # (عمرنا ما بنولّد سنان: القص بينقل بكسلات حقيقية بس)
 SHOTS = [
-    {"slot": "before_retracted", "kind": "ret", "phase": "before", "name": "الأسنان قبل العلاج بالمبعد", "hint": "صورة قريبة من الأمام والمبعد في الفم.", "req": True},
-    {"slot": "after_retracted", "kind": "ret", "phase": "after", "name": "الأسنان بعد العلاج بالمبعد", "hint": "الزاوية نفسها بعد العلاج.", "req": True},
-    {"slot": "before_smile", "kind": "smile", "phase": "before", "name": "الابتسامة قبل العلاج", "hint": "ابتسامة قريبة قبل العلاج دون مبعد (الشفتان والأسنان).", "req": False},
-    {"slot": "after_smile", "kind": "smile", "phase": "after", "name": "الابتسامة بعد العلاج", "hint": "ابتسامة قريبة بعد العلاج دون مبعد (الشفتان والأسنان).", "req": True},
-    {"slot": "before_face", "kind": "face", "phase": "before", "name": "وجه المريض قبل العلاج", "hint": "المريض يبتسم دون مبعد، من الأمام.", "req": True},
-    {"slot": "after_face", "kind": "face", "phase": "after", "name": "وجه المريض بعد العلاج", "hint": "المريض يبتسم دون مبعد، من الأمام.", "req": False},
-    {"slot": "before_face_retracted", "kind": "faceret", "phase": "before", "name": "وجه المريض قبل العلاج بالمبعد", "hint": "الوجه كاملًا والمبعد في الفم.", "req": False},
-    {"slot": "after_face_retracted", "kind": "faceret", "phase": "after", "name": "وجه المريض بعد العلاج بالمبعد", "hint": "الوجه كاملًا والمبعد في الفم.", "req": False},
+    {"slot": "before_retracted", "kind": "ret", "phase": "before", "name": "الأسنان قبل العلاج بالريتراكتور", "hint": "صورة قريبة من الأمام والريتراكتور في الفم.", "req": True},
+    {"slot": "after_retracted", "kind": "ret", "phase": "after", "name": "الأسنان بعد العلاج بالريتراكتور", "hint": "الزاوية نفسها بعد العلاج.", "req": True},
+    {"slot": "before_smile", "kind": "smile", "phase": "before", "name": "الابتسامة قبل العلاج", "hint": "ابتسامة قريبة قبل العلاج دون ريتراكتور (الشفتان والأسنان).", "req": False},
+    {"slot": "after_smile", "kind": "smile", "phase": "after", "name": "الابتسامة بعد العلاج", "hint": "ابتسامة قريبة بعد العلاج دون ريتراكتور (الشفتان والأسنان).", "req": True},
+    {"slot": "before_face", "kind": "face", "phase": "before", "name": "وجه المريض قبل العلاج", "hint": "المريض يبتسم دون ريتراكتور، من الأمام.", "req": True},
+    {"slot": "after_face", "kind": "face", "phase": "after", "name": "وجه المريض بعد العلاج", "hint": "المريض يبتسم دون ريتراكتور، من الأمام.", "req": False},
+    {"slot": "before_face_retracted", "kind": "faceret", "phase": "before", "name": "وجه المريض قبل العلاج بالريتراكتور", "hint": "الوجه كاملًا والريتراكتور في الفم.", "req": False},
+    {"slot": "after_face_retracted", "kind": "faceret", "phase": "after", "name": "وجه المريض بعد العلاج بالريتراكتور", "hint": "الوجه كاملًا والريتراكتور في الفم.", "req": False},
 ]
 # الخانة المطلوبة ← الصورة اللي نقدر نقصّها منها لو ناقصة (ونوع القص)
 DERIVE = {"before_retracted": ("before_face_retracted", "teeth"), "after_retracted": ("after_face_retracted", "teeth"),
           "after_smile": ("after_face", "lips"), "before_smile": ("before_face", "lips")}
-ALT_TEXT = {"before_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض قبل العلاج بالمبعد»"},
-            "after_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض بعد العلاج بالمبعد»"},
+ALT_TEXT = {"before_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض قبل العلاج بالريتراكتور»"},
+            "after_retracted": {"text": "أو نقصّها تلقائيًا من «وجه المريض بعد العلاج بالريتراكتور»"},
             "after_smile": {"text": "أو نقصّها تلقائيًا من «وجه المريض بعد العلاج»"},
             "before_smile": {"text": "أو نقصّها تلقائيًا من «وجه المريض قبل العلاج»"}}
 for _s in SHOTS:
     _s["alt"] = ALT_TEXT.get(_s["slot"])
 
 # كل خانات المحرك (بما فيها الإضافية اللي بيحط فيها الصور الزيادة) بأسماء للطبيب
-SLOT_NAMES = {"after_retracted_close": {"name": "الأسنان بعد العلاج بالمبعد عن قرب"},
+SLOT_NAMES = {"after_retracted_close": {"name": "الأسنان بعد العلاج بالريتراكتور عن قرب"},
               "after_retracted_side1": {"name": "الأسنان بعد العلاج من الجانب الأيمن"}, "after_retracted_side2": {"name": "الأسنان بعد العلاج من الجانب الأيسر"},
               "after_smile_side_r": {"name": "الابتسامة بعد العلاج من الجانب الأيمن"}, "after_smile_side_l": {"name": "الابتسامة بعد العلاج من الجانب الأيسر"},
               "prep": {"name": "الأسنان المحضّرة"}, "veneers": {"name": "العدسات خارج الفم"}, "cast": {"name": "التركيبات على النموذج"}, "doctor": {"name": "صورة الطبيب"}}
@@ -271,7 +271,7 @@ def busy(case: Path) -> bool:
 
 # ---------------------------------------------------------------- الخطوات
 def _intake(case: Path) -> None:
-    """تصنيف الصور (قبل/بعد، بمبعد/وش/ابتسامة) وتعديل اتجاهها، وتحليل السنان (قناع + رقم كل سنة)."""
+    """تصنيف الصور (قبل/بعد، بريتراكتور/وش/ابتسامة) وتعديل اتجاهها، وتحليل السنان (قناع + رقم كل سنة)."""
     tmp = case / "_up"
     r = _run(case, ["run.py", "new", str(tmp), str(case)], "intake.log", 1800)
     if r.returncode != 0:
@@ -303,7 +303,7 @@ def _continue(case: Path):
             cj = _engine_json(case)
             have, it = cj.get("slots", {}), cj.get("intake", {})
             used = {x.get("file") for x in have.values()}
-    for slot, (srcslot, mode) in DERIVE.items():   # الخانة ناقصة وصورتها البديلة موجودة: نقصّها منها (الأسنان من الوجه بالمبعد، الابتسامة من الوجه)
+    for slot, (srcslot, mode) in DERIVE.items():   # الخانة ناقصة وصورتها البديلة موجودة: نقصّها منها (الأسنان من الوجه بالريتراكتور، الابتسامة من الوجه)
         src = have.get(srcslot, {}).get("file")
         if slot not in have and src:
             _set_job(case, stage="assign")
@@ -355,7 +355,7 @@ with cf.ThreadPoolExecutor(max(1, len(need))) as ex:   # اتجاه كل صور�
     for f, v in zip(need, ex.map(lambda f: view_of(c.d + "/input/" + f), need)): views[f] = v
 _DET = {}
 def crop_mouth(im, k):
-    # وجه كامل بالمبعد ← صورة قريبة للأسنان: قص حوالين البق بنقط الوش (نفس نسبة صورة الماكرو 3:2)
+    # وجه كامل بالريتراكتور ← صورة قريبة للأسنان: قص حوالين البق بنقط الوش (نفس نسبة صورة الماكرو 3:2)
     import numpy as np, mediapipe as mp
     from mediapipe.tasks.python import vision, BaseOptions
     S_ = os.environ.get("DENTAL_ROOT") or os.path.dirname(os.getcwd())
@@ -749,7 +749,7 @@ def _note(n: str) -> str:
     if "SMILE_NOT_FRONTAL" in n:   # صورة ابتسامة البعد مش من الأمام: التركيب على الوش هيطلع مشوّه، فالمحرك رفض يعمله
         return "صورة «الابتسامة بعد العلاج» ليست من الأمام، فتركيبها على الوجه يشوّهه. ارفع ابتسامة أمامية بعد العلاج، أو صورة وجه المريض بعد العلاج."
     if "TEETH_NO_MATCH" in n:
-        return "لم نستطع مطابقة الأسنان المرقّمة في صورة الابتسامة بأسنان صورة المبعد. تأكّد أن الصورتين لنفس المريض بعد العلاج ومن الأمام، ثم اضغط «أعد المحاولة»."
+        return "لم نستطع مطابقة الأسنان المرقّمة في صورة الابتسامة بأسنان صورة الريتراكتور. تأكّد أن الصورتين لنفس المريض بعد العلاج ومن الأمام، ثم اضغط «أعد المحاولة»."
     if "ATLAS_BUSY" in n or "timeout in queue" in n:
         return "خدمة Atlas مزدحمة الآن ولم تستجب بعد ثلاث محاولات. انتظر بضع دقائق ثم اضغط «أعد المحاولة»."
     if "ATLAS_AUTH" in n:

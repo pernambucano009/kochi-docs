@@ -41,7 +41,7 @@ const BrainLibPage = (() => {
     if (caseBusy(c)) return `<em class="bl-cchip">⏳ يصنّف العقل الصور</em>`;
     if (i.status === "error") return `<em class="bl-cchip warn">تعذّر التصنيف</em>`;
     return `<em class="bl-cchip ok">✓ صُنّفت</em>`; };
-  const LBL = { before: "قبل", prep: "تحضير", after: "بعد", unknown: "؟", smile: "ابتسامة", retracted: "بالمبعد", macro: "مقرّبة", occlusal: "إطباقية", other: "أخرى", front: "من الأمام", right: "من اليمين", left: "من الشمال" };
+  const LBL = { before: "قبل", prep: "تحضير", after: "بعد", unknown: "؟", smile: "ابتسامة", retracted: "بالريتراكتور", macro: "مقرّبة", occlusal: "إطباقية", other: "أخرى", front: "من الأمام", right: "من اليمين", left: "من الشمال" };
   const labelOf = (f) => { const c = caseOf(f.folder), l = c?.case?.labels?.[f.id]; return l ? [l.stage, l.kind, l.view].map((k) => LBL[k] || k).join(" · ") : ""; };
   async function askCaseNames() {   // حالة اسمها افتراضي (مجلد جديد، IMG_…): لازم الطبيب يكتب اسمها
     for (const c of (S.lib?.folders || []).filter((f) => isCase(f) && f.case?.needs_name)) {

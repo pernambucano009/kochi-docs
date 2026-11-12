@@ -7,7 +7,7 @@ fit_photo(tid, photos) / fit_video(tid, photos, needs) ← {"ok", "photos": {ا�
 
 YAW_TOL = 10   # أقصى فرق (درجات) في زاوية الكاميرا بين صورتين «بالزاوية نفسها»
 ST = {"before": "قبل العلاج", "prep": "بعد التحضير", "after": "بعد العلاج"}
-KD = {"smile": "ابتسامة", "retracted": "بالمبعد", "macro": "مقرّبة", "*": "", "retracted|macro": "بالمبعد"}
+KD = {"smile": "ابتسامة", "retracted": "بالريتراكتور", "macro": "مقرّبة", "*": "", "retracted|macro": "بالريتراكتور"}
 VW = {"front": "من الأمام", "side": "من الجانب", "right": "من اليمين", "left": "من اليسار", "*": ""}
 
 # قوالب الصور: كل دور (المرحلة، النوع، الاتجاه)
@@ -16,7 +16,7 @@ PHOTO_NEEDS = {
     "p02": [("before", "retracted", "front"), ("after", "retracted", "front")],
     "p03": [("before", "smile|retracted", "side"), ("after", "smile|retracted", "side")],
     "p04": [("before", "retracted", "*"), ("after", "retracted", "*")],
-    "p05": [("after", "retracted|macro", "*")],   # أي زاوية مبعّد؛ القالب بيلفها بالعرض ويكبّر لو محتاج
+    "p05": [("after", "retracted|macro", "*")],   # أي زاوية ريتراكتور؛ القالب بيلفها بالعرض ويكبّر لو محتاج
     "p06": [("before", "retracted", "*"), ("prep", "retracted", "*"), ("after", "retracted", "*")],
     "p07": [("before", "retracted", "*"), ("prep", "retracted", "*"), ("after", "retracted", "*")],
     "p08": [("after", "retracted", "front")],
@@ -85,7 +85,7 @@ SLOTS = {
 REQUIRED = ["before_retracted", "after_retracted", "before_smile", "after_smile", "before_face"]
 DERIVE = {"before_retracted": "before_face_retracted", "after_retracted": "after_face_retracted",
           "before_smile": "before_face", "after_smile": "after_face"}
-SLOT_TEXT = {"before_retracted": "صورة بالمبعد قبل العلاج من الأمام", "after_retracted": "صورة بالمبعد بعد العلاج من الأمام",
+SLOT_TEXT = {"before_retracted": "صورة بالريتراكتور قبل العلاج من الأمام", "after_retracted": "صورة بالريتراكتور بعد العلاج من الأمام",
              "before_smile": "صورة ابتسامة قبل العلاج", "after_smile": "صورة ابتسامة بعد العلاج",
              "before_face": "صورة وجه المريض كاملًا قبل العلاج", "after_live": "فيديو للمريض بعد العلاج"}
 
