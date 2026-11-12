@@ -245,7 +245,7 @@ def morph_setup():   # صورة البعد متطابقة على القبل + ق
             iss = {}
             for jaw, ks in (("upper", [k for k in common if k < 30]), ("lower", [k for k in common if k > 30])):
                 cj = [k for k in cov if (k < 30) == (jaw == "upper")]
-                if ks and len(cj) >= max(2, len(ks) * .4): iss[jaw] = {"covered": cj, "msg": "صورة ما بعد العلاج بالمبعد: حدود الأسنان " + ("العلوية" if jaw == "upper" else "السفلية") + " غير ظاهرة (تغطيها الشفة)، نحتاج صورة تظهر فيها الأسنان كاملة"}
+                if ks and len(cj) >= max(2, len(ks) * .4): iss[jaw] = {"covered": cj, "msg": "صورة الريتراكتور بعد العلاج: حدود الأسنان " + ("العلوية" if jaw == "upper" else "السفلية") + " غير ظاهرة (تغطيها الشفة)، نحتاج صورة تظهر فيها الأسنان كاملة"}
             print("morph: teeth covered in the after photo (edges not visible):", cov, "| unusable jaw:", list(iss), flush=True)
             if iss and CASE_DIR:
                 __import__("json").dump({"covered": cov, "unusable": iss}, open(CASE_DIR + "/qa/source_issues.json", "w"), ensure_ascii=False, indent=1)

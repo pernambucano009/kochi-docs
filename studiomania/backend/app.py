@@ -11308,6 +11308,18 @@ async def suad_photo(file: UploadFile = File(...), text: str = Form("")):
     (suad_dir(bid) / "files").mkdir(exist_ok=True)
     (suad_dir(bid) / "files" / name).write_bytes(data)
     m = suad_post(bid, text.strip()[:500], role="user", kind="image", url=f"/media/suad/{Path(bid).name}/{name}")
+    fix = suad_load(bid).get("fix")
+    if fix and dental.enabled():   # سعاد كانت طالبة صورة أوضح لفيديو الحالة: تتحط مكان القديمة والفيديو يكمّل لوحده
+        try:
+            dental.assign(DATA_DIR, fix["cid"], fix["slot"], "", (file.filename or name, data))
+            with SUAD_LOCK:
+                d = suad_load(bid); d.pop("fix", None); suad_save(bid, d)
+            suad_job(bid, status="working", progress=.2, seen=False)
+            threading.Thread(target=suad_dental_watch, args=(bid, fix["cid"], fix.get("tpl") or SUAD_DENTAL_TPL), daemon=True).start()
+            r = suad_post(bid, "تمام وصلت 👌 رجعت أكمّل الفيديو، وهيجيلك إشعار أول ما يخلص.")
+            return {"msgs": [m, r]}
+        except (ValueError, RuntimeError) as exc:
+            print(f"[suad fix] {exc}", flush=True)
     r = suad_post(bid, "وصلتني الصورة 👌 قولّي تحب أعمل بيها إيه؟")
     return {"msgs": [m, r]}
 
@@ -34735,6 +34747,14 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
             return
         if st == "failed":
             suad_job(bid, status="failed", progress=None)
+            err = str(job.get("error") or "")
+            slot = suad_fix_slot(err)
+            if slot:   # مشكلة في صورة بعينها (مش عطل): سعاد تطلب صورة أوضح، وأول ما يبعتها في الشات الفيديو يكمّل لوحده
+                msg = err.split("تعذّر إنشاء الفيديو.")[-1].replace("لا يمكن إنشاء الفيديو من هذه الصور.", "").strip()
+                with SUAD_LOCK:
+                    d = suad_load(bid); d["fix"] = {"cid": cid, "slot": slot, "tpl": tpl}; suad_save(bid, d)
+                suad_post(bid, f"عشان أكمّل الفيديو محتاجة منك صورة تانية: {msg or 'الصورة مش واضحة كفاية'}. ابعتهالي هنا في الشات وأنا أكمّل على طول 🙏")
+                return
             suad_post(bid, "حصلت مشكلة وأنا بعمل الفيديو، والفريق بيبص عليها دلوقتي. هبلغك أول ما تتحل 🙏")
             notify("suad", "error", "🦷 فيديو المكالمة الأولى فشل", f"{cid}: {job.get('error', '')[:160]}", "settings", cid)
             return
@@ -34755,6 +34775,21 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
             continue
         if st in ("running", "queued"):
             suad_job(bid, status="working", progress=DENTAL_STAGE_P.get(stage, .1))
+
+
+def suad_fix_slot(err: str) -> str:
+    """رسالة فشل فيها صورة بعينها لازم تتغير ← الخانة. "" = عطل عادي."""
+    if "نحتاج صورة" not in err and "لا يمكن إنشاء الفيديو من هذه الصور" not in err:
+        return ""
+    e = err.split("تعذّر إنشاء الفيديو.")[-1]
+    ret = bool(re.search(r"ريتراكتور|مبع", e))
+    if "ابتسامة" in e:
+        return "after_smile"
+    if "وجه" in e:
+        return "before_face"
+    if "قبل العلاج" in e:
+        return "before_retracted" if ret else "before_face"
+    return "after_retracted"
 
 
 @app.post("/api/assistant/dental_case")
