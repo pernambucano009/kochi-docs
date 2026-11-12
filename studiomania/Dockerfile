@@ -1,5 +1,6 @@
 # StudioMania على أي سيرفر بيشغّل Docker (السيرفر الحالي على Oracle: deploy/oracle)
-FROM python:3.12-slim
+# مثبّت على Debian 12 (bookworm): النسخة الجديدة من الصورة (Debian 13) بتكسر تثبيت متصفح Playwright
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
