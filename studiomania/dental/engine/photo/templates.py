@@ -168,33 +168,37 @@ def p04(before, after, brand, **k):   # المرآة الطولية: قبل يس
     return cv
 
 
-def _upscale_for(path, scale):
-    """الماكرو محتاج تفاصيل: لو هنكبّر الصورة أكتر من ١.٢٥× بنعمل تكبير أمين (faithful_upscale) الأول. بيرجع (مسار، نسبة)."""
-    if scale <= 1.0: return path, 1.0   # E473: الماكرو هدفه التفاصيل — أي تكبير = تكبير أمين الأول
+def _upscale_for(path, scale, passes=3):
+    """الماكرو هدفه التفاصيل (E473/E476): أي تكبير = تكبير أمين الأول (faithful_upscale: الحدة من موديل التكبير،
+    الألوان والشكل من الأصل)، لحد ما كل بكسل في البوست يقابله بكسل حقيقي أو أكتر (scale ≤ 1). بيرجع (مسار، نسبة)."""
+    if scale <= 1.0: return path, 1.0
     try:
         import shutil, tempfile; sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))
         from faithful_upscale import upscale_small
         tmp = os.path.join(tempfile.mkdtemp(), "macro.jpg"); shutil.copy(path, tmp)
-        w0, w1 = upscale_small(tmp, min_w=int(Image.open(path).width * min(scale, 4)), passes=2)
+        w0, w1 = upscale_small(tmp, min_w=int(Image.open(path).width * min(scale * 1.05, 8)), passes=passes)
         print(f"MACRO_UPSCALED {w0}->{w1}", file=sys.stderr); return tmp, w1 / w0
     except Exception as e:
-        print("MACRO_UPSCALE_FAILED", str(e)[:120], file=sys.stderr); return path, 1.0
+        upper.WARN.append("MACRO_UPSCALE_FAILED: " + str(e)[:100]); return path, 1.0
 
 
-def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبعّد بالعرض، السنان متلفّة (أطرافها شمال) على ناحية واحدة، قريب قوي + لوجو + علامة مائية
+def p05(after, brand, **k):   # الماكرو بالتوقيع: صورة مبعّد بالعرض (من غير إزالة خلفية)، السنان متلفّة على ناحية، قريب قوي + لوجو + علامة مائية
+    W5, H5 = 2160, 2700   # E476: دقة مضاعفة — الصورة دي هدفها التفاصيل
     A = anchors(after, "teeth"); c = (A["l"] + A["r"]) / 2; v = (A["r"] - A["l"]); u = v / np.linalg.norm(v)
-    half = np.linalg.norm(v) * .42         # ٤–٥ سنان على طول الصورة زي الأصل (أقرب من كده بيبقى سنتين بس)
-    fill = .95; scale = H * fill / (2 * half)
+    half = np.linalg.norm(v) * .42         # ٤–٥ سنان على طول الصورة زي الأصل
+    fill = .95; scale = H5 * fill / (2 * half)
     p2, f = _upscale_for(after, scale)
     if f != 1.0: A = dict(A, img=lib.load(p2)); c, half = c * f, half * f
+    eff = H5 * fill / (2 * half)
+    if eff > 1.15: upper.WARN.append(f"Q27 MACRO_SOFT: الصورة لسه متكبّرة {eff:.2f}× بعد التكبير الأمين — محتاجين صورة أعلى دقة")
     A2 = dict(img=A["img"], l=c - u * half, r=c + u * half)
-    (im,), _ = panels([A2], W, H, "v", fill, cyk=.6, orients=["cw"])
+    (im,), _ = panels([A2], W5, H5, "v", fill, cyk=.6, orients=["cw"])
     cv = Image.fromarray(im); d = ImageDraw.Draw(cv, "RGBA")
-    lib.paste_logo(cv, brand, W * .2, H * .5, w=int(H * .42), rot=90, alpha=.9)   # اللوجو: بالطول على ناحية البق
+    lib.paste_logo(cv, brand, W5 * .2, H5 * .5, w=int(H5 * .42), rot=90, alpha=.9)   # اللوجو: بالطول على ناحية البق
     if brand.get("name_en"):   # العلامة المائية: اسم الطبيب بالإنجليزي، كبير ومتباعد وشفاف تحت — حاجة غير اللوجو
         n = brand["name_en"].split(); mid = (len(n) + 1) // 2
         for i, line in enumerate([" ".join(n[:mid]), " ".join(n[mid:])]):
-            if line: lib.spaced(d, line, 40, W - 40, H * .84 + i * 62, 40, (255, 255, 255, 70))
+            if line: lib.spaced(d, line, 80, W5 - 80, H5 * .84 + i * 124, 80, (255, 255, 255, 70))
     return cv
 
 
