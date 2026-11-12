@@ -218,17 +218,68 @@ class Shot:
         def ept(t):
             c = t["c"]; band = c[np.abs(c[:, 0] - t["cx"]) < t["w"] * .25]; return band[np.argmax(band[:, 1])]
         P = np.array([ept(t) for t in up]); s.arc = np.polyfit(P[:, 0], P[:, 1], 2); s.arcx = (P[:, 0].min(), P[:, 0].max())
-    def tf(s, x, y, z):   # من إحداثيات الصورة الأصلية → إحداثيات الفريم
-        X, Y = s.H - 1 - y, x; cw, ch = s.cw / z, s.ch / z
-        return ((X - (s.cX - cw / 2)) * FW / cw, (Y - (s.cY - ch / 2)) * FH / ch)
-    def base(s, z, iso=0.0):
+    def crop(s, z, iso=0.0):
+        """منطقة القص (cx, cy, cw, ch) في الصورة الملفوفة — نفسها للصورة (base) وللرسومات (tf)."""
         cw, ch = s.cw / z, s.ch / z; iw, ih = s.img.size
         cx = min(max(s.cX, cw / 2), iw - cw / 2) if cw < iw else iw / 2; cy = min(max(s.cY, ch / 2), ih - ch / 2) if ch < ih else ih / 2
         s.cX, s.cY = cx, cy   # منطقة القص جوه الصورة دايمًا (من غير شريط إسود)
+        ar = s.arch_rows() if iso > 0 else None
+        if ar:   # الفك المعزول: حد الكادر فوق وتحت = نهاية الفك الحقيقية (من غير لثة ممدودة ولا سنان مخترعة) — E457/E456
+            e0, e1 = ar; eh = e1 - e0
+            if ch > eh: ch = eh; cw = ch * s.cw / s.ch   # قرّب لحد ما الفك يملا الطول
+            cy = min(max(cy, e0 + ch / 2), e1 - ch / 2)
+            cx = min(max(cx, cw / 2), iw - cw / 2) if cw < iw else iw / 2
+        s._last_iso = iso; return cx, cy, cw, ch
+    def tf(s, x, y, z):   # من إحداثيات الصورة الأصلية → إحداثيات الفريم (نفس قص آخر base)
+        X, Y = s.H - 1 - y, x; cx, cy, cw, ch = s.crop(z, getattr(s, "_last_iso", 0.0))
+        return ((X - (cx - cw / 2)) * FW / cw, (Y - (cy - ch / 2)) * FH / ch)
+    def iso_full(s):
+        """قناع العزل + لثة المريض الحقيقية جنب كل سنة (من الصورة نفسها، بنفس عرض شريط اللثة في النص).
+        العزل كان بيقص اللثة لشريحة رفيعة جنب البريمولارز فكانت بتبان إسود (طلب الطبيب: من غير اختراع — دي لثة موجودة في الصورة)."""
+        k_ = getattr(s, "_if_src", None)
+        if k_ is not None and k_[0] is s.iso and k_[1] is s.img: return s._if   # مقارنة بالكائن نفسه مش id() — الـ id بيتعاد استخدامه لصورة جديدة فكان بياخد قناع كادر تاني (فك بيختفي كادر: a06 16.5/18.5 — E459)
+        mk = np.asarray(s.iso.convert("L")); m = mk > 127; hsv = cv2.cvtColor(np.asarray(s.img.convert("RGB")), cv2.COLOR_RGB2HSV)
+        h, sa, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+        gumc = ((h > 155) | (h < 6)) & (sa > 35) & (sa < 175) & (v > 100)
+        tooth = m & (v > 120) & (sa < 90) & ~gumc
+        H_, W_ = m.shape; xs_ = np.arange(W_)[None, :]
+        has_t = tooth.sum(1) > 6
+        lt = np.where(has_t, W_ - 1 - np.argmax(tooth[:, ::-1], axis=1), -1)
+        mr = np.where(m.any(1), W_ - 1 - np.argmax(m[:, ::-1], axis=1), -1)
+        wb = (mr - lt)[has_t & (mr - lt > 60)]
+        if len(wb) < 20: s._if = s.iso; s._if_src = (s.iso, s.img); return s._if
+        w_b = float(np.median(wb))
+        ty = np.where(has_t)[0]; rows_ok = np.zeros(H_, bool); rows_ok[ty.min():ty.max() + 1] = True
+        lts = np.interp(np.arange(H_), ty, lt[ty])   # حافة السنان ناحية اللثة (ناعمة بين الصفوف)
+        add = gumc & rows_ok[:, None] & (xs_ > lts[:, None] - 4) & (xs_ <= lts[:, None] + w_b)
+        add = cv2.morphologyEx(add.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+        n_, lab = cv2.connectedComponents(np.maximum(add, m.astype(np.uint8)))
+        keep = np.isin(lab, np.unique(lab[m])) & (lab > 0)   # متصل بالفك بس (مش شفة بعيدة)
+        full = np.maximum(mk, (cv2.GaussianBlur((keep & (add > 0)).astype(np.float32), (0, 0), 2) * 255).astype(np.uint8))
+        s._if = Image.fromarray(full); s._if_src = (s.iso, s.img); return s._if
+    def arch_rows(s):
+        """أول وآخر صف فيه سنة **ولثة حقيقية** جنبها (جوه قناع العزل) في الصورة الملفوفة. حد الكادر فوق وتحت بيقف هنا:
+        بعدها اللثة الحقيقية بتخلص (جنب آخر بريمولارز) فكان بيبان إسود — مفيش امتداد ولا اختراع، الكادر بيقف عند آخر لثة."""
+        k_ = getattr(s, "_ar_src", None)
+        if not (k_ is not None and k_[0] is s.iso and k_[1] is s.img):
+            m = np.asarray(s.iso_full().convert("L")) > 127; hsv = cv2.cvtColor(np.asarray(s.img.convert("RGB")), cv2.COLOR_RGB2HSV)
+            pink = m & (hsv[..., 0] > 150) & (hsv[..., 1] > 40) & (hsv[..., 2] > 70)
+            tooth = m & (hsv[..., 2] > 120) & (hsv[..., 1] < 90) & ~pink
+            W_ = m.shape[1]; xs_ = np.arange(W_)[None, :]
+            last_t = np.where(tooth.any(1), W_ - 1 - np.argmax(tooth[:, ::-1], axis=1), -1)[:, None]
+            pr_ = (pink & (xs_ > last_t)).sum(1); med_ = np.median(pr_[pr_ > 12]) if (pr_ > 12).sum() > 20 else 12
+            gum = pr_ > max(12, .45 * med_)   # لثة **جنب** السنان بعرض حقيقي (≥ 45% من عرض شريط اللثة) — الشريحة الرفيعة عند الأطراف مش كفاية (كانت بتسيب إسود في الركن)
+            gum = cv2.morphologyEx(gum.astype(np.uint8)[:, None], cv2.MORPH_CLOSE, np.ones((25, 1), np.uint8))[:, 0] > 0   # فجوات صغيرة بين السنان مش نهاية
+            r = np.where(gum)[0]
+            if not len(r): r = np.where(m.sum(1) > max(8, m.shape[1] * .01))[0]
+            s._ar = (int(r.min()), int(r.max())) if len(r) else None; s._ar_src = (s.iso, s.img)
+        return s._ar
+    def base(s, z, iso=0.0):
+        cx, cy, cw, ch = s.crop(z, iso)
         box = (int(cx - cw / 2), int(cy - ch / 2), int(cx + cw / 2), int(cy + ch / 2))
         im = s.img.crop(box).resize((FW, FH), Image.BICUBIC)
         if iso > 0:   # كل حاجة غير الست سنان واللثة بتسودّ (زي الأصل)
-            mk = s.iso.crop(box).resize((FW, FH), Image.BICUBIC).point(lambda v: int(255 - iso * (255 - v) * .96))
+            mk = s.iso_full().crop(box).resize((FW, FH), Image.BICUBIC).point(lambda v: int(255 - iso * (255 - v) * .96))
             im = Image.composite(im, Image.new("RGB", im.size, (4, 4, 5)), mk)
         return im
 def neon_style(): return STYLE == "neon"
@@ -304,6 +355,8 @@ def render(sh, t, z, plan, fade=1.0):
         cx, cy = sh.tf(tt["cx"], tt["y"] + tt["h"] * .45, z); txt = f"{sh.pct[id(tt)]:.1f}%" if not neon else f"{sh.pct[id(tt)]:.0f}%"
         col = NEON[tt["fdi"] % 10] if neon else (255, 255, 255)
         sz = .7 + .3 * pp; f2 = FN.font_variant(size=max(66, int(FN.size * sz * 1.4)))   # أرقام كبيرة واضحة
+        bx = d.textbbox((0, 0), txt, font=f2, anchor="mm", stroke_width=3); hw, hh_ = (bx[2] - bx[0]) / 2 + 12, (bx[3] - bx[1]) / 2 + 12
+        Wd, Hd = d.im.size; cx = min(max(cx, hw), Wd - hw); cy = min(max(cy, hh_), Hd - hh_)   # الرقم دايمًا جوه الكادر (كان بيتقص عند الحافة لأول/آخر سنة: E450 a31)
         d.text((cx, cy), txt, font=f2, fill=col + (A(pp),), anchor="mm", stroke_width=3, stroke_fill=(0, 0, 0, A(.6 * pp)))
     # 4) قوس الابتسامة
     pa = ease((t - plan["arc"]) / .8)

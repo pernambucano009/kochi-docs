@@ -4,7 +4,14 @@ B = "https://api.atlascloud.ai/api/v1/model"
 H = {"Authorization": f"Bearer {K}"}
 def unwrap(p): return p["data"] if isinstance(p, dict) and "data" in p and "code" in p else p
 def run(kind, body, t=1800, tries=3):
-    """تشغيل موديل على Atlas. لو الطلب وقع في طابور Atlas نفسه («timeout in queue; please retry») بنعيده لوحدنا (لحد ٣ مرات)."""
+    """تشغيل موديل على أرخص مزوّد متاح (gen/providers.py: أطلس أو Runware). لو Runware فشل ← أطلس لوحده.
+    على أطلس: لو الطلب وقع في طابوره («timeout in queue; please retry») بنعيده لوحدنا (لحد ٣ مرات)."""
+    try:
+        import providers
+        if providers.choose(body.get("model", "")) == "runware":
+            try: return providers.run_runware(kind, body, t)
+            except Exception as e: print("RUNWARE→ATLAS:", str(e)[:200], flush=True)
+    except ImportError: pass
     err = None
     for i in range(tries):
         try: return _run_once(kind, body, t)

@@ -5,6 +5,10 @@ Q17 flicker        بكسلات بترمش كادر واحد وترجع (رعش�
 Q18 exit_dir       الفك/الابتسامة بتخرج من الكادر عكس اتجاه الأصل (E439)
 Q19 stage_order    ترتيب القصة: «بعد» ظاهر والأصل لسه على «قبل» (أو العكس) (E440) — استشاري (low): قناع السنان البسيط بيحسب الجلد الفاتح سنان في لقطة الوش
 Q20 off_center     مكان الابتسامة في اللقطة القريبة بعيد عن مكانها في الأصل (E441)
+Q22 missing_morph  الأصل فيه تحول قبل ← بعد (أو العكس) جوه نفس اللقطة، وإحنا في نفس الوقت لقطة واحدة لونها ثابت (E454)
+Q23 static_motion  (مش متوصّل — اتجرب ومابيفرقش؛ البديل في مراجعة Claude) (E455)
+Q24 half_pop       نص الشاشة (فك في الفكين المتقابلين) بيتغير فجأة كادر/اتنين والنص التاني ثابت وبيرجع (E459)
+Q21 tool_motion    أداة (فرشة/سرنجة/قلم) بتتحرك عكس اتجاه الأصل، أو نايمة بالعرض والأصل واقفة بالطول (E452)
 
 الاستخدام:  python3 checks3.py <ours.mp4> <ref.mp4> [t0 t1]   ← كل الفحوصات على الفيديو (أو نافذة منه)
 """
@@ -88,10 +92,10 @@ def flicker(fr, d=55, back=22, frac=.0012, min_frames=3):
         if tb in cs or tc in cs: continue
         if (b < 25).mean() < .3: continue
         if (np.abs(a - c) > 25).mean() > .02: continue    # المشهد نفسه بيتحرك (عنصر طاير/بيتزحلق) — الرعشة بتبان في لقطة ثابتة تقريبًا (a03 0–5: صف التصميمات)          # بس لقطات الفك المعزول على أسود (E438). في لقطة الوش القناع البسيط بيحسب الجلد الفاتح سنان، والرسومات المتحركة = تصميم
-        tm = teeth_mask(fr[k][1])
-        if tm.mean() < .04: continue
-        roi = cv2.dilate(tm.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0   # بين السنان وحواليها بس
-        m = (np.abs(b - a) > d) & (np.abs(b - c) > d) & (np.abs(a - c) < back) & roi
+        pk = _pink(fr[k - 1][1])
+        if pk.mean() < .03: continue
+        roi = cv2.dilate(pk.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0   # جنب اللثة بس (الرمش بين السنان عند حافة اللثة). الشخصيات/الرسومات المتحركة على الأسود برا (a08)
+        m = (np.abs(b - a) > d) & (np.abs(b - c) > d) & (np.abs(a - c) < back) & roi & (np.minimum(a, c) > 90) & (b < 45)   # فاتح ← غامق ← فاتح (فراغ إسود بيظهر ويختفي)
         m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))   # بكسل لوحده = ضوضاء ضغط
         if m.mean() > frac: ts.append(tb)
     # لازم يتكرر: min_frames كادرات رمش في نفس الثانية (كادر واحد = انتقال/ضوضاء)
@@ -122,12 +126,15 @@ def exits(fr, drop=.5, win=1.6):
     return out
 
 
-def exit_dir(fo, fr_ref, tol=1.2):
-    """الخروجات اللي عندنا اتجاهها عكس خروج الأصل في نفس الوقت تقريبًا."""
+def exit_dir(fo, fr_ref, tol=1.2, dt_max=.4):
+    """الخروجات اللي عندنا اتجاهها عكس خروج الأصل في نفس الوقت تقريبًا، أو في نفس الاتجاه بس بدري/متأخر > dt_max (a16 24: خرجنا قبل الأصل بثانية).
+    بيرجع [(ثانيتنا، اتجاهنا، اتجاه الأصل، ثانية الأصل)]."""
     eo, er = exits(fo), exits(fr_ref); bad = []
     for t, d in eo:
-        near = [dr for tr, dr in er if abs(tr - t) <= tol]
-        if near and all(dr != d for dr in near): bad.append((t, d, near[0]))
+        near = sorted([(abs(tr - t), tr, dr) for tr, dr in er if abs(tr - t) <= tol])
+        if not near: continue
+        if all(dr != d for _, _, dr in near): bad.append((t, d, near[0][2], near[0][1]))
+        elif near[0][0] > dt_max: bad.append((t, d, d, near[0][1]))
     return bad
 
 
@@ -189,11 +196,28 @@ def smile_center(bgr, min_frac=.02, axis=1, with_dir=False):
     return v, tall
 
 
+def _has_face(gray_or_bgr, bgr=None):
+    """في وش كامل في الكادر؟ (العينين الاتنين جوه الكادر — لقطة البق القريبة مافيهاش عينين). نفس كاشف الوش بتاع المحرك."""
+    from checks import faces_lmk
+    f = bgr if bgr is not None else cv2.cvtColor(gray_or_bgr, cv2.COLOR_GRAY2BGR)
+    H, W = f.shape[:2]
+    try: L = faces_lmk(cv2.cvtColor(f, cv2.COLOR_BGR2RGB), n=1)
+    except Exception: return False
+    if not L: return False
+    e1, e2 = L[0][33], L[0][263]
+    return all(0 <= p[0] < W and 0 <= p[1] < H for p in (e1, e2))
+
+
 def off_center(fo, fr_ref, tol=.1, min_len=1.0, black=.35):
     """فترات مكان الابتسامة عندنا بعيد عن مكانها في الأصل في نفس الوقت بأكتر من tol من عرض الشاشة.
     (لو قالبنا طولي والأصل بالعرض بيتقارن عرضنا بطول الأصل.) (مش مقارنة بنص الشاشة: في اللقطة الملفوفة السنان نفسها بتبقى ناحية الشفة العليا، فالمرجع هو تكوين الأصل.)
     لقطات الفك المعزول على أسود متستثنية (مكانها بالتصميم: الأطراف شمال واللثة لازقة يمين)."""
-    def iso(f): return (cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) < 25).mean() > black
+    def iso(f):   # مش لقطة بق قريبة: فك معزول على أسود، أو فكين قصاد بعض بفاصل أسود، أو لقطة فيها وش كامل (القناع البسيط بيحسب الجلد/الشعر سنان)
+        g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+        if (g < 25).mean() > black: return True
+        H, W = g.shape; mid = (g[int(H * .1):int(H * .9), int(W * .2):int(W * .8)] < 30).mean(0)
+        if (mid > .85).any(): return True                       # عمود أسود بطول الكادر في النص = فاصل بين فكين (a14)
+        return _has_face(g, f)
     # قالب طولي من أصل بالعرض (الصورة ملفوفة 90°): العرض عندنا = الطول في الأصل
     rot = bool(fo) and bool(fr_ref) and (fo[0][1].shape[0] > fo[0][1].shape[1]) != (fr_ref[0][1].shape[0] > fr_ref[0][1].shape[1])
     ro = {t: smile_center(f, axis=0 if rot else 1) for t, f in fr_ref if not iso(f)}
@@ -205,6 +229,111 @@ def off_center(fo, fr_ref, tol=.1, min_len=1.0, black=.35):
         c = smile_center(f); r = ref_at(t)
         if c is not None and r is not None and abs(c - r) > tol: bad.append(t)
     return _runs(bad, gap=.35, min_len=min_len)
+
+
+# ---------------- Q21: اتجاه الأداة وحركتها ----------------
+def movers(fr, lo=.002, hi=.12, thr=28, max_obj=.1):
+    """لكل كادر في لقطة ثابتة (الكاميرا مش بتتحرك): الجسم اللي بيتحرك = فرق الكادرين.
+    بيرجع {ثانية: (x، y، زاوية المحور 0=بالعرض 90=بالطول، المساحة)} بنسب الكادر."""
+    cs = set(_cuts(fr)); out = {}
+    for (t0, a), (t1, b) in zip(fr, fr[1:]):
+        if t1 in cs: continue
+        d = cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY), cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)) > thr
+        d = cv2.morphologyEx(d.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)); fr_ = d.mean()
+        if not (lo < fr_ < hi): continue
+        n, lab, st, cen = cv2.connectedComponentsWithStats(d)
+        if n < 2: continue
+        k = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA])); ys, xs = np.where(lab == k)
+        if len(xs) < 30 or len(xs) > max_obj * d.size: continue   # جسم كبير (كاست/وش) مش أداة
+        c = np.cov(np.vstack([xs, ys])); w, v = np.linalg.eigh(c); vx, vy = v[:, 1]
+        if w[1] < 2.5 * max(w[0], 1e-6): continue   # مش جسم طويل (أداة)
+        H, W = d.shape; out[t1] = (xs.mean() / W, ys.mean() / H, abs(np.degrees(np.arctan2(vy, vx))) % 180, len(xs) / d.size)
+    return out
+
+
+def tool_motion(fo, fr_ref, win=.6, min_dx=.05, min_len=.4):
+    """بيقارن الأداة اللي بتتحرك عندنا بالأصل في نفس الثانية: اتجاه الحركة بالعرض، ووضعها (بالطول/بالعرض).
+    بيرجع [(من، لحد، السبب)]."""
+    mo, mr = movers(fo), movers(fr_ref); bad_dir, bad_ax = [], []
+    def track(m, t, sx=.25, sy=.2):
+        """سلسلة متصلة لنفس الجسم حوالين t (كل خطوة < sx بالعرض و< sy بالطول) — حواف كاست بيلف بتنط فوق وتحت فمش بتعمل سلسلة."""
+        ks = sorted(k for k in m if t - win / 2 <= k <= t + win / 2)
+        if not ks: return None
+        c = min(ks, key=lambda k: abs(k - t)); i = ks.index(c); ch = [c]
+        for j in range(i + 1, len(ks)):
+            if ks[j] - ch[-1] > .25 or abs(m[ks[j]][0] - m[ch[-1]][0]) > sx or abs(m[ks[j]][1] - m[ch[-1]][1]) > sy: break
+            ch.append(ks[j])
+        for j in range(i - 1, -1, -1):
+            if ch[0] - ks[j] > .25 or abs(m[ks[j]][0] - m[ch[0]][0]) > sx or abs(m[ks[j]][1] - m[ch[0]][1]) > sy: break
+            ch.insert(0, ks[j])
+        return [(k, m[k]) for k in ch] if len(ch) >= 4 else None
+    for t in sorted(mo):
+        a, b = track(mo, t), track(mr, t)
+        if not a or not b: continue
+        dxa = a[-1][1][0] - a[0][1][0]; dxb = b[-1][1][0] - b[0][1][0]
+        if abs(dxa) > min_dx and abs(dxb) > min_dx and np.sign(dxa) != np.sign(dxb): bad_dir.append(t)
+        axa = np.median([v[2] for _, v in a]); axb = np.median([v[2] for _, v in b])
+        va, vb = abs(axa - 90) < 30, abs(axb - 90) < 30; ha, hb = min(axa, 180 - axa) < 30, min(axb, 180 - axb) < 30
+        if (va and hb) or (ha and vb): bad_ax.append(t)
+    return [(a, b, "dir") for a, b in _runs(bad_dir, gap=.35, min_len=min_len)] + [(a, b, "axis") for a, b in _runs(bad_ax, gap=.35, min_len=min_len)]
+
+
+# ---------------- Q22: تحول قبل/بعد ناقص ----------------
+def morphs(fr, d_min=6.0, win=2.0, close=.06):
+    """تحولات لون السنان جوه لقطة واحدة (من غير قطع) في لقطة سنان قريبة بس (السنان ≥ close من الكادر — في لقطة الوش
+    التأثيرات زي الجبس/البودرة بتغير اللون من غير ما يكون تحول): b* بيتغير ≥ d_min خلال ≤ win ثانية. بيرجع [(البداية، النهاية، التغيير)]."""
+    cs = _cuts(fr); col = [(t, (teeth_color(f) or (None, None))[1] if teeth_mask(f).mean() >= close else None) for t, f in fr]; out = []; i = 0
+    while i < len(col):
+        t0, v0 = col[i]
+        if v0 is None: i += 1; continue
+        best = None
+        for t1, v1 in col[i + 1:]:
+            if t1 - t0 > win or any(t0 < c <= t1 for c in cs): break
+            if v1 is not None and abs(v1 - v0) >= d_min: best = (t0, t1, v1 - v0); break
+        if best: out.append(tuple(round(x, 2) for x in best)); i = next((k for k, (t, _) in enumerate(col) if t > best[1] + .5), len(col))
+        else: i += 1
+    return out
+
+
+def missing_morph(fo, fr_ref, tol=1.5, frac=.4):
+    """تحولات الأصل اللي مالهاش تحول عندنا (تغيير ≥ frac من حجمه) في حدود tol ثانية. بيرجع [(من، لحد، التغيير في الأصل)].
+    استشاري (low): على النسخ السليمة بيطلّع إنذارات في مشاهد فيها حاجة تانية بتغير لون السنان (عدسات بتتركب، تحضير، زووم للقطة تانية)."""
+    mr, mo = morphs(fr_ref), morphs(fo, d_min=2.5)
+    return [(a, b, d) for a, b, d in mr if not any(abs(x - a) <= tol + (b - a) and abs(dd) >= frac * abs(d) for x, _, dd in mo)]
+
+
+# ---------------- Q23: صورة ساكتة والأصل بيتحرك ----------------
+def motion_energy(fr):
+    """طاقة الحركة لكل كادر: متوسط فرق الكادر عن اللي قبله (رمادي، 0–255). القطع بيتشال."""
+    cs = set(_cuts(fr)); out = {}
+    for (t0, a), (t1, b) in zip(fr, fr[1:]):
+        if t1 in cs: continue
+        out[t1] = float(cv2.absdiff(cv2.cvtColor(a, cv2.COLOR_BGR2GRAY), cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)).mean())
+    return out
+
+
+def static_motion(fo, fr_ref, win=1.0, ratio=.3, low=.9, min_len=2.5):
+    """فترات عندنا متوسط الحركة (في نافذة win) < low وأقل من ratio من حركة الأصل في نفس الوقت، لمدة ≥ min_len."""
+    eo, er = motion_energy(fo), motion_energy(fr_ref)
+    def avg(e, t): v = [x for k, x in e.items() if abs(k - t) <= win / 2]; return np.mean(v) if v else None
+    bad = []
+    for t in sorted(eo):
+        a, b = avg(eo, t), avg(er, t)
+        if a is not None and b is not None and a < low and a < ratio * b: bad.append(t)
+    return _runs(bad, gap=.35, min_len=min_len)
+
+
+# ---------------- Q24: فك بيختفي/بيتغير كادر واحد ----------------
+def half_pop(fa, jump=15.0, calm=2.0):
+    """كادرات كاملة (fps الأصلي): نص واحد بيتغير فجأة (فرق متوسط > jump) والنص التاني ثابت (< calm)، ومش قطع مشهد. بيرجع [ثواني]."""
+    out = []; prev = None
+    for t, f in fa:
+        g = cv2.cvtColor(cv2.resize(f, (180, 320)), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        if prev is not None:
+            d = np.abs(g - prev); l, r = d[:, :90].mean(), d[:, 90:].mean()
+            if (l > jump and r < calm) or (r > jump and l < calm): out.append(round(t, 2))
+        prev = g
+    return out
 
 
 # اختلافات مقصودة عن الأصل (زي qa-ok في الكود): {قالب: {فحص: [(من، لحد، السبب)]}} — الفحص مايطلّعش إنذار جوه الفترة دي
@@ -225,10 +354,17 @@ def run_all(ours, ref, t0=0.0, t1=1e9, ref_t0=None, name=None):
     out = []
     for a, b in blend_gaps(fo): out.append({"t": a, "severity": "high", "code": "Q16", "issue_ar": f"فراغ غامق يمين اللثة وهي بتدوب مع مشهد تاني ({a}–{b}ث) — املا اللثة في طبقة الفك قبل الخلط (E437)"})
     fa = read(ours, None, t0=t0, t1=t1)
+    for t in half_pop(fa): out.append({"t": t, "severity": "high", "code": "Q24", "issue_ar": f"نص الشاشة اتغير فجأة كادر واحد عند {t}ث والنص التاني ثابت — فك بيختفي/بيقفز (E459)"})
     for a, b in flicker(fa): out.append({"t": a, "severity": "high", "code": "Q17", "issue_ar": f"رعشة: بكسلات بترمش كادر واحد وترجع ({a}–{b}ث) — غالبًا ملء/عزل بيتحسب كل كادر والكاميرا بتتحرك (E438)"})
-    for t, d, dr in exit_dir(fo, fr): out.append({"t": t, "severity": "high", "code": "Q18", "issue_ar": f"المحتوى بيخرج {'يمين' if d > 0 else 'شمال'} والأصل بيخرج {'يمين' if dr > 0 else 'شمال'} (E439)"})
+    for t, d, dr, tr in exit_dir(fo, fr):
+        if d != dr: out.append({"t": t, "severity": "high", "code": "Q18", "issue_ar": f"المحتوى بيخرج {'يمين' if d > 0 else 'شمال'} والأصل بيخرج {'يمين' if dr > 0 else 'شمال'} (E439)"})
+        else: out.append({"t": t, "severity": "medium", "code": "Q18", "issue_ar": f"الخروج من الكادر عندنا عند {t}ث والأصل عند {tr}ث — التوقيت مختلف (E445)"})
     for a, b, s in stage_order(fo, fr): out.append({"t": a, "severity": "low", "code": "Q19", "issue_ar": f"ترتيب القصة: عندنا «{'بعد' if s == 'after' else 'قبل'}» والأصل «{'قبل' if s == 'after' else 'بعد'}» ({a}–{b}ث) (E440)"})
     for a, b in off_center(fo, fr): out.append({"t": a, "severity": "medium", "code": "Q20", "issue_ar": f"مكان الابتسامة في الشاشة مختلف عن الأصل ({a}–{b}ث) — سنتر على نص فتحة البق (E441)"})
+    for a, b, d in missing_morph(fo, fr): out.append({"t": a, "severity": "low", "code": "Q22", "issue_ar": f"الأصل فيه تحول {'قبل ← بعد' if d < 0 else 'بعد ← قبل'} جوه نفس اللقطة ({a}–{b}ث) وإحنا لأ — اعمل نفس التحول بالمورف/المزج في نفس الثانية (E454)"})
+    # Q23 static_motion مش متوصّل: الأصل نفسه «ساكت» بالبكسلات وهو بيرسم رسومات رفيعة ببطء (a22 20–23ث) فمابيفرقش — الفحص ده بقى في مراجعة Claude (static stretch)
+    for a, b, k in tool_motion(fo, fr):
+        out.append({"t": a, "severity": "medium", "code": "Q21", "issue_ar": (f"الأداة بتتحرك عكس اتجاه الأصل ({a}–{b}ث) — خليها تمشي مع اللون/الأثر اللي بتسيبه زي الأصل (E452)" if k == "dir" else f"الأداة نايمة بالعرض والأصل واقفة بالطول (أو العكس) ({a}–{b}ث) — لف الصورة وخلي راسها ناحية السنان (E452)")})
     return [i for i in out if not _ok(name, i["code"], i["t"])]
 
 

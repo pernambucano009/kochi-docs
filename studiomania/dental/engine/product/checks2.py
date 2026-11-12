@@ -5,6 +5,7 @@ Q9  lint_templates   فحص كود القوالب (T.py/tl.py) قبل الرين
       L2 قلب صورة (flip/mirror) من غير سبب مكتوب (E53 نص معكوس)          — لازم "# qa-ok: السبب" على نفس السطر
       L3 perspective warp من غير سبب مكتوب (E32 تشويه في اللف)            — نفسه
       L5 أي صورة كاست بيستخدمها القالب لازم تعدّي Q11 (E203)
+      L6 صبغة على السنان (upper_tint) أو تحول قبل/بعد بتوقيت مكتوب باليد بدل strokes.Stroke / strokes.BeforeAfter (E452 E454 E458)
       L4 أنماط اتسببت في أخطاء قبل كده: pkill (E378)، setdefault(..., Clip( (E364)، رقم ffmpeg من غير صفر "=.5" (E360)
 Q10 iso_check        عنصر سنان معزولة (RGBA): جوه بق/لسان باين (E24 E140) • سنان لامسة حافة الصورة = مقطوشة (E141)
 Q11 cast_gum         كاست المعمل عليه لثة (E203)
@@ -53,6 +54,8 @@ def lint_templates(files=("tpl/T.py", "tpl/tl.py")):
             if re.search(r"\bpkill\b", code): issues.append({"rule": "L4", "err": "E378", "where": where, "issue_ar": "pkill ممنوع"})
             if re.search(r"setdefault\([^)]*Clip\(", code): issues.append({"rule": "L4", "err": "E364", "where": where, "issue_ar": "setdefault(..., Clip(...)) بيفتح ffmpeg كل مرة"})
             if re.search(r"[\"'][^\"']*\b[a-z_]+=\.\d", code) and re.search(r"ffmpeg|-vf|-af|filter", ln): issues.append({"rule": "L4", "err": "E360", "where": where, "issue_ar": "رقم في فلتر ffmpeg من غير صفر قبل العلامة"})
+            if f.endswith("T.py") and re.search(r"upper_tint\(\s*\(", code) and "Stroke" not in code and not ok:   # L6: الصبغة لازم تعدّي على Stroke (اتجاه وتوقيت من الأصل)
+                issues.append({"rule": "L6", "err": "E452", "where": where, "issue_ar": "صبغة على السنان باتجاه/توقيت مكتوب باليد — استخدم strokes.Stroke (بيقرا الاتجاه والتوقيت من الأصل)"})
             for a in re.findall(r'assets/([A-Za-z0-9_]*cast[A-Za-z0-9_]*\.png)', code):   # L5: أي كاست بيتستخدم لازم يعدّي Q11 (E203)
                 r = cast_gum(S + "assets/" + a) if os.path.exists(S + "assets/" + a) else {"pass": True}
                 if not r["pass"] and not ok: issues.append({"rule": "L5", "err": "E203", "where": where, "issue_ar": f"القالب بيستخدم {a} وعليه لثة ({r['pink_frac']:.1%})"})

@@ -1,6 +1,6 @@
 """مكتبة القوالب: أصول الحالة الحقيقية + أدوات الرسم والمورف والتحليل + محرك الإخراج + المقارنة بالأصل.
 كل قالب = قائمة مشاهد (المدة، دالة ترجع فريم)."""
-import sys, os, subprocess, numpy as np, cv2, math
+import sys, os, json, subprocess, numpy as np, cv2, math
 S = ((__import__("os").environ.get("DENTAL_ROOT") or __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))) + "/")
 sys.path.insert(0, S + "ana"); os.chdir(S + "ana")
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps, ImageEnhance
@@ -9,7 +9,13 @@ from anim import Shot, ease, FW, FH, FPS, FD
 CASE_DIR = os.environ.get("CASE_DIR")   # فولدر الحالة (product/): canon/ = الصور بأسماء ثابتة، ana/ = تحليل السنان، elements/ = العناصر المعتمدة
 C = (CASE_DIR + "/canon/") if CASE_DIR else S + "case1/"; AN = (CASE_DIR + "/ana/") if CASE_DIR else ""   # AN فاضي = ملفات التحليل في ana/ زي ما هي
 G = S + "tpl/g/"; OUTD = (CASE_DIR + "/out/") if CASE_DIR else S + "tpl/out/"; os.makedirs(OUTD, exist_ok=True)
-DOC = "د. إسلام جمعة"; CLINIC = "عيادة د. إسلام جمعة"; GOLD = (214, 178, 106)
+# بيانات العيادة: من الحالة (case.json → "clinic": {"doctor", "name", "logo"}) أو متغيرات DOC_NAME/CLINIC_NAME/CLINIC_LOGO.
+# مفيش اسم دكتور ولا شعار من الفيديوهات الأصلية في القوالب أبدًا؛ القيم دي للتجربة بس لحد ما العيادة ترفع بياناتها.
+_CJ = {}
+try: _CJ = (json.load(open(CASE_DIR + "/case.json")).get("clinic") or {}) if CASE_DIR else {}
+except Exception: _CJ = {}
+DOC = os.environ.get("DOC_NAME") or _CJ.get("doctor") or "د. إسلام جمعة"; CLINIC = os.environ.get("CLINIC_NAME") or _CJ.get("name") or "عيادة د. إسلام جمعة"
+CLINIC_LOGO = os.environ.get("CLINIC_LOGO") or ((CASE_DIR + "/" + _CJ["logo"]) if CASE_DIR and _CJ.get("logo") else ""); GOLD = (214, 178, 106)
 F = lambda n, s: ImageFont.truetype(FD + n, s)
 FA, FA5, FRQ, FSER = "TY-Alexandria-800.ttf", "TY-Alexandria-500.ttf", "TY-ArefRuqaa-700.ttf", "TY-InstrumentSerif-Italic.ttf"
 L = lambda p: Image.open(p).convert("RGB")
@@ -52,9 +58,14 @@ def txt(im, xy, s, size=56, font=FA, fill=(255, 255, 255), anchor="mm", stroke=3
         bb = d.textbbox(xy, s, font=F(font, size), anchor=anchor, direction="rtl" if rtl else None, stroke_width=stroke)
         if bb[0] < 4 or bb[1] < 4 or bb[2] > im.width - 4 or bb[3] > im.height - 4: qa_warn("TEXT_CLIPPED", f"«{s}» خارج الشاشة {tuple(int(v) for v in bb)}")
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
-def chip(im, s, y=110, alpha=1.0, x=None):   # x: مكان الكلمة (الافتراضي نص الكادر) — على الأسود بدل ما تقعد فوق سنة
+def chip(im, s, y=150, alpha=1.0, x=None):
+    """كلمة على كارت (قبل/بعد/النتيجة). x=None: لو في مساحة سودا شمال السنان (الفك المعزول) الكلمة بتقعد في نصها،
+    وإلا في نص الكادر. الكارت عمره ما يقعد فوق اللثة/السنان ولا يتقص عند الحافة (E443: a11 18–24)."""
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); f = F(FA, 46); w = d.textlength(s, font=f, direction="rtl") + 80
     cx = im.width / 2 if x is None else x
+    if x is None:
+        g = np.asarray(im.convert("L")); cols = np.where((g > 24).sum(0) > g.shape[0] * .02)[0]; xb = int(cols.min()) if len(cols) else im.width
+        if xb >= w + 40: cx = xb / 2   # المساحة السودا تكفي الكارت بهامش
     d.rounded_rectangle((cx - w / 2, y - 42, cx + w / 2, y + 42), 42, fill=(0, 0, 0, int(140 * alpha)))
     d.text((cx, y), s, font=f, fill=(255, 255, 255, int(255 * alpha)), anchor="mm", direction="rtl")
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
@@ -139,13 +150,16 @@ def mouth_mid(lm):
     return (np.asarray(lm[13], float) + np.asarray(lm[14], float)) / 2
 def logo(v, W=FW, H=FH):   # شعار العيادة (مؤقت لحد ما الطبيب يرفع شعاره) + لمعة
     im = Image.new("RGB", (W, H), (6, 6, 7)); d = ImageDraw.Draw(im); p = ease(v / .6); col = tuple(int(c * p) for c in GOLD); cy = H / 2
-    d.ellipse((W / 2 - 90, cy - 230, W / 2 + 90, cy - 50), outline=col, width=5); tooth_icon(d, W / 2, cy - 140, 60, col, 5)
+    if CLINIC_LOGO and os.path.exists(CLINIC_LOGO):   # شعار العيادة الحقيقي (بألوانه — مابنغيّرش ألوانه من غير موافقة العميل)
+        lg = Image.open(CLINIC_LOGO).convert("RGBA"); sc_ = min(300 / lg.width, 220 / lg.height); lg = lg.resize((max(1, int(lg.width * sc_)), max(1, int(lg.height * sc_))), Image.LANCZOS)
+        a_ = lg.split()[3].point(lambda x: int(x * p)); im.paste(lg, (int(W / 2 - lg.width / 2), int(cy - 140 - lg.height / 2)), a_)
+    else: d.ellipse((W / 2 - 90, cy - 230, W / 2 + 90, cy - 50), outline=col, width=5); tooth_icon(d, W / 2, cy - 140, 60, col, 5)
     d.text((W / 2, cy + 40), CLINIC, font=F(FA, 66 if W > 900 else 50), fill=col, anchor="mm", direction="rtl")
     d.text((W / 2, cy + 125), DOC, font=F(FA5, 42), fill=tuple(int(200 * p) for _ in range(3)), anchor="mm", direction="rtl")
     gx = -300 + (W + 600) * min(1, max(0, (v - .7) / 1.0)); sh = Image.new("L", (W, H))
     ImageDraw.Draw(sh).polygon([(gx, cy - 260), (gx + 90, cy - 260), (gx - 110, cy + 180), (gx - 200, cy + 180)], fill=150)
     m = Image.fromarray(np.minimum(np.array(sh), (np.array(im.convert("L")) > 40) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(6))
-    return zoomc(Image.composite(Image.new("RGB", (W, H), (255, 240, 200)), im, m), 1 + .05 * min(1, v / 3.5))   # الشعار بيقرّب ببطء
+    return zoomc(Image.composite(Image.new("RGB", (W, H), (255, 240, 200)), im, m), 1 + .05 * v / 3.5)   # الشعار بيقرّب ببطء طول المشهد (كان بيقف بعد 3.5ث ← لقطة متجمدة في كروت النهاية: a31 28.8)
 def signature(im, p, y=None, W=FW):   # توقيع الطبيب بالخط العربي (رقعة) يُكتب من اليمين
     y = y or im.height * .86; lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); f = F(FRQ, 110)
     d.text((W / 2, y), DOC, font=f, fill=(255, 255, 255, 255), anchor="mm", direction="rtl", stroke_width=2, stroke_fill=(0, 0, 0, 120))
@@ -543,6 +557,20 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
     والصفوف اللي مافيهاش فك بتفضل إسود. الكادرات اللي مش فك معزول بترجع زي ما هي."""
     a = np.asarray(im.convert("RGB")); H, W = a.shape[:2]; g = a.max(2) > dark
     if g[:, :int(W * .25)].mean() > .12: return im
+    # حتت شفة/لحمة سايبة مش متصلة بالفك (بقايا العزل عند اللجام) بتتشال قبل الملء — كانت بتوقف الملء عندها وتسيب إسود بينها وبين اللثة
+    # («تقطيع إسود في اللثة»: a06 16.4 — E460). الكلام والخطوط البيضا مابتتلمسش (مش وردي).
+    g_br = cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))   # بيقطع الكباري الرفيعة بين الحتة السايبة والفك
+    n_c, lab_c, st_c, _ = cv2.connectedComponentsWithStats(g_br, 8)
+    if n_c > 2:
+        big_c = 1 + int(np.argmax(st_c[1:, 4])); hsv0 = cv2.cvtColor(a, cv2.COLOR_RGB2HSV); pk0 = ((hsv0[..., 0] > 150) | (hsv0[..., 0] < 10)) & (hsv0[..., 1] > 40)
+        drop = np.zeros(g.shape, bool)
+        for c_ in range(1, n_c):
+            if c_ == big_c or st_c[c_, 4] > .03 * g.size: continue
+            cm = lab_c == c_
+            if pk0[cm].mean() > .5 and st_c[c_, 0] > W * .4: drop |= cm
+        if drop.any():
+            drop = cv2.dilate(drop.astype(np.uint8), np.ones((17, 17), np.uint8)) > 0; drop &= ~(cv2.dilate((lab_c == big_c).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
+            a = a.copy(); a[drop] = 0; g = a.max(2) > dark
     hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV); pink = (hsv[..., 0] > 150) & (hsv[..., 1] > 40) & (hsv[..., 2] > 90)   # لون اللثة (وردي/أحمر) — الكاست البيج بيبقى hue≈11 فمابيتحسبش
     if pink.mean() < .03 or pink.sum() < .12 * g.sum(): return im       # مش لثة (مثلًا كاست بيج)
     if np.where(pink)[1].mean() < W * .5: return im                    # اللثة مش ناحية اليمين
@@ -556,10 +584,26 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
         by0 = min(st_[i, 1] for i in big_); by1 = max(st_[i, 1] + st_[i, 3] for i in big_)
         body_rows = (by0, by1)   # الامتداد بيشتغل جوه صفوف جسم اللثة الأساسي بس
     gs = cv2.morphologyEx(g.astype(np.uint8), cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)) > 0   # الخطوط الرفيعة في أي اتجاه (مسطرة، عقرب الساعة، قوس) مابتتحسبش محتوى — كانت بتقطع ملء اللثة وتسيب إسود على شكلها (a03 9.3 و15.1)
-    has = gs.sum(1) > W * .05; xr = W - 1 - np.argmax(gs[:, ::-1], axis=1); gap = (W - 1) - xr
+    has = gs.sum(1) > W * .05; xr = W - 1 - np.argmax(gs[:, ::-1], axis=1)
+    # حافة اللثة «النضيفة»: آخر الشريط الوردي المتصل بعد آخر سنة (مش آخر حتة محتوى) — الحرف المسنن وبقايا الشفة الغامقة بعده
+    # كانت بتتعكس بلوكات غامقة بحرف مستقيم («تقطيع إسود في اللثة»: a06 16.4 — E460). اللي بعد الحافة النضيفة بيتملي لثة.
+    pk_cl = cv2.morphologyEx(pink.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((1, 7), np.uint8)) > 0
+    tt_ = cv2.morphologyEx(((a.astype(np.int16).mean(2) > 120) & ~pink).astype(np.uint8), cv2.MORPH_OPEN, np.ones((9, 9), np.uint8)) > 0
+    for y in np.where(has)[0]:
+        tx_ = np.where(tt_[y])[0]; x_s = int(tx_.max()) + 3 if len(tx_) else int(np.argmax(pk_cl[y])) if pk_cl[y].any() else -1
+        if x_s < 0 or x_s >= xr[y]: continue
+        run = pk_cl[y, x_s:xr[y] + 1]; nz = np.where(~run)[0]
+        st_ = int(np.argmax(run)) if run.any() else None
+        if st_ is None: continue
+        after = np.where(~run[st_:])[0]
+        if len(after) and st_ + after[0] > 20: xr[y] = x_s + st_ + int(after[0]) - 1
+    gap = (W - 1) - xr
     rows = has & (gap > tol) & (gap < W * .35)
+    if body_rows is not None:   # جوه جسم اللثة: صف حافته بعيدة (نتوء/حتة لثة ناقصة عند الثنايا) بيتملي برضه — كان بيفضل شريط إسود/رمادي أفقي جنب الفك (E456 a06 18.3)
+        yy0 = np.arange(H); rows |= has & (gap > tol) & (gap < W * .6) & (yy0 >= body_rows[0]) & (yy0 < body_rows[1])
     if body_rows is not None:   # حتة لثة صغيرة فوق/تحت آخر سنة (مش جسم اللثة) كانت بتتمد لحد الحافة ← شريط لثة سايب (فلتر الفيديو test1 ث13-14)
-        yy_ = np.arange(H); rows &= (yy_ >= body_rows[0]) & (yy_ < body_rows[1])
+        yy_ = np.arange(H); edge_pink_ = np.array([pink[y, max(0, int(xr[y]) - 14):int(xr[y]) + 1].sum() >= 4 for y in range(H)])
+        rows &= ((yy_ >= body_rows[0]) & (yy_ < body_rows[1])) | edge_pink_   # بره جسم اللثة: الصف بيتملي لو حافته لثة حقيقية (اللثة الرفيعة جنب آخر بريمولارز — الكادر بقى بيقف عند آخر لثة: E457)
     hr = np.where(has)[0]
     band = len(hr) > 0 and (0 < hr[0] < H * .07 or 0 < H - 1 - hr[-1] < H * .07)
     if rows.sum() < 3 and not band: return im   # مفيش فراغ يمين ولا شريط فوق/تحت (اللثة واصلة للحافة اليمين بس الشريط اللي فوق لسه محتاج يتملي — كان بيرجع هنا بدري)
@@ -567,6 +611,11 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
     if T is None: return im
     if not os.environ.get("GUM_TEXTURE"): rim = max(rim, 24)   # محور الانعكاس جوه اللثة بعيد عن حرفها الغامق (كان الحرف بيبان خط رمادي رأسي في نص الامتداد: test1 ث14)
     x0 = np.clip(xr - rim, 0, W - 1).astype(np.float32); Ht, Wt = T.shape[:2]
+    # صف آخره سنة مش لثة (آخر سنتين في القوس): الملء يبدأ بعد السنة، مايتكتبش فوقها — البداية قبل الحافة بـ rim كانت
+    # بتنسخ صف جار فوق طرف السنة ← سنان ممطوطة بشرايط أفقية تحت الفك (E446: a08/a11، مسكتها مراجعة Claude)
+    for y in np.where(rows)[0]:
+        xe = int(xr[y])
+        if pink[y, max(0, xe - 16):max(1, xe - 4)].sum() < 3: x0[y] = min(W - 1, xe + 1)
     xs = np.arange(W, dtype=np.float32)[None, :]; mx = (xs - x0[:, None]) / np.maximum(1, W - x0[:, None]) * (Wt - 1)
     my = np.repeat((np.arange(H, dtype=np.float32) * (Ht - 1) / max(1, H - 1))[:, None], W, 1)
     fill = cv2.remap(T, np.clip(mx, 0, Wt - 1).astype(np.float32), my, cv2.INTER_LINEAR)
@@ -589,11 +638,15 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
         ok_ = rows & (wb >= 12)
         if ok_.sum() >= 3:
             wbs = cv2.GaussianBlur(np.where(ok_, wb, 0)[:, None].astype(np.float32), (1, 0), sigmaX=1, sigmaY=25)[:, 0] / np.maximum(cv2.GaussianBlur(ok_[:, None].astype(np.float32), (1, 0), sigmaX=1, sigmaY=25)[:, 0], 1e-3)
-            mir = fill.copy()
+            mir = fill.copy(); pk_f = pink.astype(np.float32)
+            gavg_ = cv2.GaussianBlur(af * pk_f[..., None], (0, 0), 18) / np.maximum(cv2.GaussianBlur(pk_f, (0, 0), 18), 1e-3)[..., None]   # لون لثة المريض المحلي
             for y in np.where(rows)[0]:
                 w_ = max(12, int(wbs[y] * .55)); x1_ = int(x0[y]); d = np.arange(W - x1_)
                 pp = d % (2 * w_); pp = np.where(pp < w_, pp, 2 * w_ - 1 - pp)
-                src = np.clip(x1_ - 1 - pp, 0, W - 1); mir[y, x1_:] = af[y, src]
+                src = np.clip(x1_ - 1 - pp, 0, W - 1); ps_ = (pink[y, src] & (af[y, src].mean(1) > 115))[:, None]   # لثة فاتحة بس (حرف القناع الغامق كان بيتعكس «تقطيع إسود» في اللثة: a06 16.4)
+                mir[y, x1_:] = np.where(ps_, af[y, src], gavg_[y, src])   # بكسل مش لثة في المصدر ← متوسط لثة المريض اللي حواليه (النسيج الجاهز كان فيه علامات سودا بتتكرر «x x x»: a07 11.3)
+                seg_ = mir[y, x1_:x1_ + 2 * w_]; dev_ = gavg_[y, x1_:x1_ + 2 * w_].mean() - seg_.mean() if len(seg_) else 0
+                if dev_ > 14: mir[y, x1_:] = gavg_[y, x1_:]   # صف مصدره غامق عن اللثة اللي حواليه (لجام/ثنية): بياخد لون اللثة المحلي بدل ما يتعكس بلوكات غامقة بحرف مستقيم (E460: a06 16.4)   # بنعكس اللثة بس: بكسل سنة/ظل في المصدر بياخد نسيج اللثة (كان بيطلع شريط بني وإسود جنب الفك: E456 a06 18.3)
             # صفوف آخر القوس اللي مافيهاش لثة (حافة اللثة الحقيقية خلصت قبل آخر سنتين): بتاخد امتداد أقرب صف فيه لثة —
             # اللثة بتكمل ورا السنان الطرفية بدل نسيج جاهز (كان بيطلع شرايط رمادي فوق آخر سنتين: test1 بعد)
             # صفوف آخر القوس اللي مافيهاش لثة حقيقية (حافة اللثة خلصت قبل آخر سنتين): مابتتملاش — القوس بيخلص طبيعي على الإسود زي الحقيقة.
@@ -604,8 +657,10 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
             if len(oky):
                 for y in np.where(rows & ~ok_)[0]:
                     up_ = oky[oky < y]; dn_ = oky[oky > y]
-                    if len(up_) and len(dn_) and y - up_[-1] <= 40 and dn_[0] - y <= 40:
-                        yo = up_[-1] if y - up_[-1] <= dn_[0] - y else dn_[0]; x1_ = int(x0[y]); xo = int(x0[yo])
+                    inb_ = body_rows is not None and body_rows[0] <= y < body_rows[1] and (len(up_) or len(dn_))   # جوه جسم اللثة: أقرب صف سليم مهما بعد (لثة رفيعة عند الثنايا كانت بتسيب شريط إسود أفقي: E456 a06 18.3)
+                    if (len(up_) and len(dn_) and y - up_[-1] <= 40 and dn_[0] - y <= 40) or inb_:
+                        cand_ = ([up_[-1]] if len(up_) else []) + ([dn_[0]] if len(dn_) else [])
+                        yo = min(cand_, key=lambda v: abs(v - y)); x1_ = int(x0[y]); xo = max(int(x0[yo]), x1_)   # مانرجعش لورا جوه محتوى الصف ده
                         mir[y, max(x1_, xo):] = mir[yo, max(x1_, xo):]
                         if x1_ < xo: mir[y, x1_:xo] = af[yo, x1_:xo]
                         ok_[y] = True
@@ -623,16 +678,26 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
         # فوق آخر سنة وتحت أول سنة: اللثة بتكمل لحد حافة الكادر فوق/تحت (طلب الطبيب: مفيش إسود فوق اللثة وتحتها) —
         # انعكاس رأسي (رايح جاي) من لثة المريض نفسه في جسم اللثة، يمين السنان بس. السنان مابتتلمسش.
         by0, by1 = body_rows; hb = max(8, by1 - by0); o_ = out.copy(); vm = np.zeros((H, W), np.float32)
+
         tooth_ = cv2.morphologyEx(((a.astype(np.int16).mean(2) > 110) & ~pink).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0   # السنان بس (فاتحة) — الحرف الغامق حوالين السنة بيتملي لثة (كان بيفضل خط إسود رفيع)
         sh_ = 14; by0i, by1i = by0 + sh_, by1 - sh_; hb = max(8, by1i - by0i)   # محور الانعكاس جوه اللثة بعيد عن حرفها الغامق (كان بيطلع خط غامق أفقي)
+        toothd_ = cv2.dilate(tooth_.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0; x_ = np.arange(W)
+        empty_ = int(sum(1 for y in list(range(0, by0)) + list(range(by1, H)) if tooth_[y].sum() < 6))   # صفوف فوق/تحت جسم اللثة مفيهاش سنان خالص
+        if empty_ > .15 * H:   # E457: الفك أقصر من الشاشة بكتير والباقي لثة ممدودة فوق وتحت (شكل مش منطقي) — قرّب الفك لحد ما يوصل للحافتين
+            qa_warn("E457", f"لثة ممدودة فوق/تحت الفك {100 * empty_ / H:.0f}% من طول الشاشة — كبّر الفك يوصل لحافة الشاشة")
+        tooth_x1 = np.array([(np.where(toothd_[y])[0].max() + 1) if toothd_[y].any() else 0 for y in range(H)])   # آخر بكسل سنة في كل صف (اللثة بتبدأ بعده)
+        by0e, by1e = by0 + 14, by1 - 14
+        edge_t = int(tooth_x1[by0e:by0e + 60].max()) if by1e - by0e > 60 else 0; edge_b = int(tooth_x1[max(by0e, by1e - 60):by1e].max()) if by1e - by0e > 60 else 0   # حد مستقيم بعد آخر سنة (مش متعرّج على شكل السنان المنعكسة)
         gl_body = np.median([np.where(pink[y])[0].min() for y in range(by0, by1) if pink[y].any()] or [W * .6])
-        for y in list(range(0, by0i)) + list(range(by1i, H)):
+        for y in (list(range(0, by0i)) + list(range(by1i, H))) if VERT_EXT else []:   # اتلغى (طلب الطبيب): حد الكادر فوق وتحت = نهاية الفك، مفيش امتداد ولا اختراع — الكادر نفسه بيتقص على الفك (anim.Shot.base)
             d_ = (by0i - y) if y < by0i else (y - by1i + 1)
             k_ = d_ % (2 * hb); k_ = k_ if k_ < hb else 2 * hb - 1 - k_
             ys = min(by1i - 1, by0i + k_) if y < by0i else max(by0i, by1i - 1 - k_)
             tx = np.where(tooth_[y])[0]
             x0r = int(tx.min() + .5 * (tx.max() - tx.min())) if len(tx) else int(gl_body * .9)   # النص ناحية اللثة من السنان (الجيوب اللي ناحية الحافة القاطعة تفضل إسود)
             row = (~tooth_[y]); row[:x0r] = False
+            own_ = int(np.where(tooth_[y])[0].max()) + 3 if tooth_[y].any() else (edge_t if y < by0i else edge_b)   # الصف فيه سنة: اللثة تبدأ بعدها على طول (من غير إسود/أبيض بينهم)
+            row = (~tooth_[y]) & (x_ >= own_) & ~tooth_[ys]   # وبكسل سنة في الصف المصدر مابيتنسخش (اللثة بس اللي بتتمد)   # اللثة بس اللي بتتمد: أي بكسل سنة (أو جنب سنة / ناحية الحافة القاطعة) في الصف المصدر مابيتنسخش — كان بيعمل سنان مخترعة بعد 14 و24 (E456: a06 18.3)
             if y >= by0 and y < by1: row &= (a[y].astype(np.int16).mean(1) < 90) & ~pink[y]   # شريط حرف الجسم: نملا الإسود والحرف الغامق بس (كان بيفضل خط إسود أفقي)
             o_[y, row] = out[ys, row]; vm[y, row] = 1
         if vm.any():   # بعد الانعكاس الملمس بيتنعّم تدريجيًا (التماثل حوالين المحور مايبانش)
@@ -672,16 +737,45 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
                 # حافة ناعمة عند x0 (مش خط حاد)
                 k = min(12, W - x0); ramp = np.linspace(0, 1, k)[None, :, None]
                 out[:ry, x0:x0 + k] = af[:ry, x0:x0 + k] * (1 - ramp) + out[:ry, x0:x0 + k] * ramp
+    # فجوات سودا جوه شريط اللثة (بين آخر سنة وحافة المحتوى في نفس الصف — عند اللجام) بتتملي من اللثة اللي حواليها (E460: a06 16.4)
+    ob_ = np.clip(out, 0, 255).astype(np.uint8); hs2 = cv2.cvtColor(ob_, cv2.COLOR_RGB2HSV)
+    hs0_ = cv2.cvtColor(a, cv2.COLOR_RGB2HSV)
+    th_ = cv2.morphologyEx(((a.astype(np.int16).mean(2) > 120) & (hs0_[..., 1] < 90)).astype(np.uint8), cv2.MORPH_OPEN, np.ones((15, 15), np.uint8)) > 0   # السنان الحقيقية بس (من الصورة الأصلية، من غير الحتت البيضا الصغيرة)
+    gm_ = (hs2[..., 0] > 150) & (hs2[..., 1] > 40) & (hs2[..., 2] > 90)
+    lt_ = np.where(th_.any(1), W - 1 - np.argmax(th_[:, ::-1], axis=1), W)
+    gr_ = np.where(gm_.any(1), W - 1 - np.argmax(gm_[:, ::-1], axis=1), -1)
+    xs2 = np.arange(W)[None, :]
+    hole = (ob_.astype(np.int16).mean(2) < 70) & (xs2 > lt_[:, None] + 6) & (xs2 < gr_[:, None] - 2)
+    hole = cv2.morphologyEx(hole.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    if hole.mean() > .0005: out = cv2.inpaint(ob_, cv2.dilate(hole, np.ones((7, 7), np.uint8)), 9, cv2.INPAINT_TELEA).astype(np.float32)
+    # E456 (تحذير بس، من غير تلوين): أي لون سنة ظهر مكان كان إسود = الملء اخترع سنة
+    ob_ = np.clip(out, 0, 255).astype(np.uint8); hsv_ = cv2.cvtColor(ob_, cv2.COLOR_RGB2HSV); hh_, ss_ = hsv_[..., 0], hsv_[..., 1]
+    toothc_ = (ob_.astype(np.int16).mean(2) > 100) & ((ss_ < 30) | ((hh_ >= 8) & (hh_ <= 35) & (ss_ < 120)))
+    new_tooth = cv2.morphologyEx((toothc_ & (a.max(2) <= dark)).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
+    if new_tooth.mean() > .002: qa_warn("E456", f"ملء اللثة طلّع سنان مخترعة ({new_tooth.mean() * 100:.1f}% من الكادر)")
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
 AUTO_GUM = os.environ.get("AUTO_GUM", "1") != "0"
+VERT_EXT = os.environ.get("VERT_EXT") == "1"   # امتداد اللثة فوق/تحت الفك: مقفول (E457)
+def post(im, W=FW, H=FH):
+    """نفس المعالجة اللي الريندر بيعملها لكل كادر (المقاس + ملء اللثة التلقائي). أي معاينة لمشهد لازم تعدّي عليها،
+    وإلا المعاينة بتختلف عن الفيديو (E453: معاينة من غير ملء خلّتني أشيل ملء صح، فطلع فراغ إسود في الفيديو)."""
+    im = im.resize((W, H)) if im.size != (W, H) else im
+    return auto_gum(im) if (AUTO_GUM and not im.info.get("no_auto_gum")) else im
+def preview(scenes, ts, out, w=216):
+    """شيت معاينة بأوقات عامة في الفيديو، كادرات زي الريندر بالظبط (post)."""
+    starts = np.cumsum([0] + [d for d, _ in scenes]); ims = []
+    for t in ts:
+        i = max(0, min(len(scenes) - 1, int(np.searchsorted(starts, t, "right") - 1))); ims.append(post(scenes[i][1](t - starts[i])).resize((w, int(w * FH / FW))))
+    sh = Image.new("RGB", (w * len(ims), ims[0].height))
+    for k, im in enumerate(ims): sh.paste(im, (k * w, 0))
+    sh.save(out); return out
 def render(name, scenes, music="piano", W=FW, H=FH, xfade=0.0, still=False):
     """scenes: [(المدة, دالة(t_محلي) → صورة)]"""
     starts = np.cumsum([0] + [d for d, _ in scenes]); DUR = float(starts[-1])
     def frame(t):
         i = max(0, min(len(scenes) - 1, int(np.searchsorted(starts, t, "right") - 1))); lt = t - starts[i]; im = scenes[i][1](lt)
         if xfade and i + 1 < len(scenes) and lt > scenes[i][0] - xfade: im = blend(im, scenes[i + 1][1](0), (lt - (scenes[i][0] - xfade)) / xfade)
-        im = im.resize((W, H)) if im.size != (W, H) else im
-        return auto_gum(im) if (AUTO_GUM and not im.info.get("no_auto_gum")) else im   # مشهد بيملا اللثة بنفسه قبل الحركة (زي خروج الفك من الكادر) بيقفل الملء التلقائي   # البلاي بوك R4.1: مفيش فراغ إسود يمين الفك المعزول في أي قالب
+        return post(im, W, H)   # مشهد بيملا اللثة بنفسه قبل الحركة (زي خروج الفك من الكادر) بيقفل الملء التلقائي   # البلاي بوك R4.1: مفيش فراغ إسود يمين الفك المعزول في أي قالب
     if still:
         ts = np.linspace(.2, DUR - .1, 12); ims = [frame(t).resize((W // 5, H // 5)) for t in ts]
         sh = Image.new("RGB", (W // 5 * 6, H // 5 * 2))
