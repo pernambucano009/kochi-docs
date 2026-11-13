@@ -289,7 +289,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                      "the first seconds, text on screen) from the review. Then 1–2 account-level points (posting rhythm, bio, how each post tells "
                      "people to book or reach them). Use plain words, never marketing terms (no CTA, no «الدعوة للإجراء», no «engagement»). "
                      "This is a show, not a discussion: do NOT ask what they think or which point to start with; say it in 2–3 short turns "
-                     "and go straight to the next stop."),
+                     "and go straight to the next stop. Never skip the content: when the analysis is ready you MUST actually say at least "
+                     "two concrete findings from it (a video and one account point) before moving on."),
         ("rivals", "COMPETITOR (a show, not a discussion; never ask the user anything here):\n"
                    "      1) Call suggest_competitor. While it searches say at most 'let me look for one' and nothing else. When the card is on "
                    "the screen, say in 2–3 short sentences who it is (name, platform, followers), how many views a normal video of theirs gets "

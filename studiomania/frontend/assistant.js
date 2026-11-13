@@ -539,7 +539,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     v.onerror = () => { d.remove(); fin("could not be loaded (do not mention it; just continue)"); };
     d.querySelector("[data-dclose]").onclick = () => { v.pause(); d.remove(); fin("was closed by the user"); };
     v.play().catch(() => {});
-    return { ok: true, playing: true };
+    return { ok: true, playing: true, note: "The example video is playing now. Say NOTHING until a SYSTEM message says it ended: no photo request, no comment over it." };
   }
   // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
   const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج"], ["after_retracted", "ريتراكتور بعد العلاج"], ["after_smile", "الابتسامة بعد العلاج (قريبة)"], ["before_face", "وجه المريض قبل العلاج (يبتسم)"]];
