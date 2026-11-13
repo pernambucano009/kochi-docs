@@ -34453,7 +34453,12 @@ def assistant_field(body: AssistFieldIn):
         pass
     field_pack_apply(bid, ob)
     changed_to = fieldpacks.FIELDS[new]["name"] if new else body.what.strip()
-    return {"ok": True, "field": changed_to, "note": "Fixed in their account. Continue the conversation with the correct field."}
+    note = "Fixed in their account. Continue the conversation with the correct field."
+    # 🦷 طلع دكتور أسنان في نص المكالمة (كان مختار مجال تاني في التسجيل): محطة فيديو الأسنان بتدخل بدل الفيديو الاستعراضي العام
+    if new == "dental" and dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"):
+        note += (" He is a DENTIST, so the tour changes now: skip the generic example-video stop and the final 'add photos' reminder. "
+                 "After the remaining brain questions and the competitor stop, do this stop; it is the ending of the call:\n" + livevoice.DENTAL_STOP)
+    return {"ok": True, "field": changed_to, "note": note}
 
 
 class AssistPrefIn(BaseModel):
