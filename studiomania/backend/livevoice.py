@@ -217,12 +217,11 @@ def name_gender(name: str) -> str:
 # 🦷 محطة أطباء الأسنان (أهم محطة، مابتتشالش): مثال جاهز ← صور حالة واحدة ← القفلة الإجبارية
 DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if the call was long). First pick the path from the treatments he "
                "told you about:\n"
-               "      • Smiles, veneers (فينير), direct veneers (دايركت فينير), lenses (عدسات), crowns or prosthetics (تركيبات), Hollywood smile → "
-               "path SMILE (template a03).\n"
-               "      • Implants (زراعة، امبلانت، غرسات) → path IMPLANT (template a24){IMPLANT_NOTE}.\n"
+               "      • Smiles, veneers (فينير), direct veneers (دايركت فينير), lenses (عدسات), crowns or prosthetics (تركيبات), Hollywood smile, "
+               "or implants (زراعة، امبلانت، غرسات) → path SMILE (template a03).\n"
                "      • Anything else (orthodontics, root canals, children, …) → ask ONE question: «يعني ما تشتغل ابتسامات أو عدسات؟» (in his dialect). "
                "If he says he does → path SMILE. If not → path SAMPLE.\n"
-               "      Path SMILE / IMPLANT:\n"
+               "      Path SMILE:\n"
                "      1) Say in one sentence you will show him an example of a video we make for dental clinics, then call play_demo with that "
                "template and purpose case. While it plays stay silent (his microphone is off). It is a sample case, not a real patient: never "
                "say it is his.\n"
@@ -240,11 +239,9 @@ DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if th
                "      Path SAMPLE: say «طيب، هوريك عينة من الفيديوهات اللي بنعملها» (in his dialect), call play_demo with template a03 and purpose "
                "sample, never ask for photos, and when it ends close warmly (thank him, the orange circle at the bottom right, goodbye, finish).\n"
                "      Words: always say ريتراكتور (retractor), never مبعد or مبعّد: dentists do not use that word.")
-IMPLANT_FALLBACK = " (the implant example is not ready yet: for now use path SAMPLE for implants)"
-
-
-def dental_stop(implant_ready: bool) -> str:
-    return DENTAL_STOP.replace("{IMPLANT_NOTE}", "" if implant_ready else IMPLANT_FALLBACK)
+def dental_stop(_implant_ready: bool = False) -> str:
+    """محطة الأسنان: الزراعة بتمشي زي الابتسامات (نفس قالب a03)."""
+    return DENTAL_STOP
 
 
 STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "photos": "uploading photos of their work/products/cases"}
