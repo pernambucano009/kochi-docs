@@ -215,31 +215,32 @@ def name_gender(name: str) -> str:
 
 
 # 🦷 محطة أطباء الأسنان (أهم محطة، مابتتشالش): مثال جاهز ← صور حالة واحدة ← القفلة الإجبارية
-DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if the call was long). First pick the path from the treatments he "
+DENTAL_STOP = ("DENTAL VIDEO (the most important stop and the ending of the call; never skip it). First pick the path from the treatments he "
                "told you about:\n"
                "      • Smiles, veneers (فينير), direct veneers (دايركت فينير), lenses (عدسات), crowns or prosthetics (تركيبات), Hollywood smile, "
-               "or implants (زراعة، امبلانت، غرسات) → path SMILE (template a03).\n"
+               "or implants (زراعة، امبلانت، غرسات) → path SMILE.\n"
                "      • Anything else (orthodontics, root canals, children, …) → ask ONE question: «يعني ما تشتغل ابتسامات أو عدسات؟» (in his dialect). "
-               "If he says he does → path SMILE. If not → path SAMPLE.\n"
-               "      Path SMILE:\n"
-               "      1) Say in one sentence you will show him an example of a video we make for dental clinics, then call play_demo with that "
-               "template and purpose case. While it plays stay silent (his microphone is off). It is a sample case, not a real patient: never "
-               "say it is his.\n"
-               "      2) When the screen says it ended: say you can make him a video exactly like this one from one of HIS OWN cases, and ask ONE "
-               "question: does he have before and after photos of a case he did? Then STOP and wait for his answer (never ask for the photos in the same turn). Yes → ask for the 4 photos of ONE case: a retractor photo "
-               "before treatment, a retractor photo after, a close smile after, and the patient's face before (smiling, no retractor); call "
-               "show_input kind dental_case with the same template in that same turn, then stay silent while he uploads. No → go to the "
-               "closing without a video (step 4).\n"
-               "      3) When the screen says the photos arrived: say in his dialect, clearly, that you started working on his video, that you will "
-               "close the call now, that when the video is ready a notification will reach him, and that he should tell you what he thinks of it. "
-               "THIS SENTENCE IS MANDATORY, never skip any part of it. Add in one sentence that you are always there in the orange circle at the "
-               "bottom right of the screen, where he can text you anytime. Then say goodbye and call finish.\n"
-               "      4) No photos now (he has none, or says later): tell him he can send them anytime to you in the orange circle at the bottom "
-               "right, by text, and you will make the video. Call show_input kind none, then say goodbye warmly in one sentence and call finish. "
-               "Never say «خليني أقفلها معك» or announce that you are closing: just say the goodbye itself.\n"
-               "      Path SAMPLE: say «طيب، هوريك عينة من الفيديوهات اللي بنعملها» (in his dialect), call play_demo with template a03 and purpose "
-               "sample, never ask for photos, and when it ends close warmly (thank him, the orange circle at the bottom right, goodbye, finish).\n"
+               "If he does → path SMILE. If not → path SAMPLE.\n"
+               "      Path SMILE, in this exact order, one step per turn:\n"
+               "      1) Offer, as a nice surprise, to make him a video from his own cases, and ask ONE question, like «إيه رأيك أعملك فيديو من "
+               "حالاتك؟ لو عندك صور حالة عملتها تقدر تشاركني بيها عشان أوريك اللي نقدر نعمله» (in his dialect). Then STOP and wait.\n"
+               "      2) Yes → tell him exactly which 4 photos of ONE case you need: a retractor photo before treatment, a retractor photo after, a "
+               "close smile after, and the patient's face before (smiling, no retractor); call show_input kind dental_case in that same turn, "
+               "then stay silent while he uploads. Never repeat the request.\n"
+               "      3) When the screen says the photos arrived, say clearly in his dialect: you are preparing his video now; when it is ready a "
+               "notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him "
+               "now; when it is ready he can watch it and send you his opinion, he will find you at the bottom right of any page, with your name "
+               "on it, and you are waiting for his feedback on the video. THIS IS MANDATORY, never skip any part of it. Then goodbye and finish.\n"
+               "      4) No photos (he has none, or says later) → say «طيب، هوريك فيديو عملناه من حالة تانية، وقولي رأيك فيه» (in his dialect) and "
+               "call play_demo with template a03 and purpose sample. Stay silent while it plays. When it ends: tell him that after watching it he "
+               "can send you his opinion, he will find you at the bottom right of any page with your name, and you are waiting for his feedback; "
+               "add that he can send you his case photos there anytime and you will make his own video. Then goodbye and finish.\n"
+               "      Path SAMPLE: say «طيب، هوريك عينة من الفيديوهات اللي بنعملها، وقولي رأيك فيها» (in his dialect), call play_demo with template "
+               "a03 and purpose sample, never ask for photos, and when it ends close as in step 4 (without the photos sentence).\n"
+               "      Never show the example video before asking about his own photos (path SMILE). Never announce the closing: just say it.\n"
                "      Words: always say ريتراكتور (retractor), never مبعد or مبعّد: dentists do not use that word.")
+
+
 def dental_stop(_implant_ready: bool = False) -> str:
     """محطة الأسنان: الزراعة بتمشي زي الابتسامات (نفس قالب a03)."""
     return DENTAL_STOP
@@ -298,7 +299,7 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                      "two concrete findings from it (a video and one account point) before moving on."),
         ("rivals", "COMPETITOR (a show, not a discussion; never ask the user anything here):\n"
                    "      1) Call suggest_competitor. While it searches say at most 'let me look for one' and nothing else. When the card is on "
-                   "the screen, say in 2–3 short sentences who it is (name, platform, followers), how many views a normal video of theirs gets "
+                   "the screen, first give the context in one sentence (e.g. «لاحظت إن ليك منافسين في مجالك ومنطقتك شغالين كويس على السوشيال، زي…»), then say who it is (name, platform, followers), how many views a normal video of theirs gets "
                    "(say it plainly, e.g. «الفيديو العادي عنده يجيب حوالي …»; never say الوسيط, median or average), and what works for them "
                    "(from their best videos). Say it is in their field; say it is in their city ONLY if the result says so.\n"
                    "      2) Never ask whether it is a competitor, whether to add it, or whether to look for another one, and never call "
@@ -377,14 +378,14 @@ actually said, and only then (if it fits) move toward your next goal. Examples o
   something about another topic is not an answer to "describe your work" or "who is your ideal client"). If not, ask again.
 
 Your goals, in this order (each is a goal to reach naturally, not a line to recite):
-1. {"They talked with you before and answered some questions: welcome them back warmly by name in a few words (do NOT re-introduce yourself or restart), say how little is left, and in the SAME turn ask the next unanswered question." if returning else "Greet them warmly by name, say in ONE short sentence what this short call is (a few quick questions about their work, then you show them a sample video made for their field), and in the SAME turn ask your FIRST real question."}
-   Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! فاضلنا حاجات بسيطة…» then the next question" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name, how little is left, then the next question") if returning else "«" + t1 + "» … then one sentence about the call … then your first question"}
+1. {"They talked with you before and answered some questions: welcome them back warmly by name in a few words (do NOT re-introduce yourself or restart), say how little is left, and in the SAME turn ask the next unanswered question." if returning else "Greet them warmly by name and say you would like to ask a few quick questions about their work, then in the SAME turn ask your FIRST real question. Never say the call is short, and never mention the example video or anything we will show at the end: it is a surprise."}
+   Style reference for the greeting (adapt it, do not read it blindly): {("«أهلًا يا " + user + " تاني! فاضلنا حاجات بسيطة…» then the next question" if dialect == "ar-eg-cairo" else "a warm welcome-back in their dialect with their name, how little is left, then the next question") if returning else "«" + t1 + "» … then your first question"}
    Your first turn, and every turn while you collect answers, ends with ONE clear question they can answer. Never ask "are you ready?",
    "shall we start?" or "can we continue?": ask the real question directly. Never end a turn with only a statement
    (like "let's start step by step" or "let's make setting up your brand easy"): that is forbidden.{"" if user else " The name is unknown: greet without a name and ask for their name first."}{f" Their name is written in Latin letters: always say it, and write it, in its Arabic form (for example Islam → إسلام, Mohamed → محمد), never spelled in English." if latin else ""}
 {fill_line}
 {("   What is left, in this order (continue from the first one; everything else is done, never redo it): " + ", ".join(STEP_NAMES.get(x, x) for x in steps) + ".") if steps else ""}
-2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else f"Ask for their Instagram (or TikTok) account link so the team starts analysing it while you talk{ig_ex}."}
+2. {f"They already gave their account ({have['account']}) and it is being analysed: do NOT ask for it again." if have.get("account") else "Right after confirming their field, BEFORE the other questions, ask for their Instagram (or TikTok) account link, so the team analyses it while you talk, e.g. «إيه رأيك تبعتلي لينك الإنستجرام بتاعك عشان الشباب يحللوه عبال ما ندردش أنا وإنت شوية؟» (in their dialect)."}
 3. Get to know them and their work. The list below is ONLY the information you need (a checklist), NOT a script to read:
 {qs}
    {("What they chose when signing up: " + ctx + ". Do NOT ask what their field is: your first question CONFIRMS it, e.g. «شفت إنك "
@@ -404,6 +405,8 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting. Never ask follow-up questions about the city or area:
      whatever they answer about their market is enough.
+   - Build each question on what they already told you. If an earlier answer already tells you the answer, confirm it instead of asking
+     from zero, e.g. after «بشتغل ابتسامات»: «إنت قلت إنك بتشتغل ابتسامات، فأكيد المريض المثالي عندك اللي بيدور على ابتسامة حلوة، صح؟».
    - Never put possible answers inside your question (not «ابتسامات تجميلية ولا تركيبات أو زراعة؟»): ask openly and let them answer.
    - Say «مرضاك» (not «عملاؤك») to a doctor, and say «عقل العلامة», never «برين».
 4. {tour}

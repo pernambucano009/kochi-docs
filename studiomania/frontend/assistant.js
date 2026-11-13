@@ -29,7 +29,7 @@ const Assistant = (() => {
 .as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(127,127,127,.16);font-size:13px;line-height:1.5;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:asIn .5s cubic-bezier(.2,1.3,.3,1)}
 .as-chip b{color:#E5613E;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
-.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
+.as-ov.as-quiet .as-type{visibility:hidden;opacity:0}.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 .as-box{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 18px;border-radius:20px;background:rgba(127,127,127,.14);
   border:1px solid rgba(127,127,127,.25);max-width:min(92vw,460px);animation:asUp .5s cubic-bezier(.2,1.1,.3,1)}
 .as-box b{font-size:14.5px}.as-box .as-err{margin:0;min-height:0}.as-box .as-err:empty{display:none}.as-box .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -56,8 +56,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
-.as-dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(80vw,380px)}
-.as-dslot{position:relative;aspect-ratio:4/3;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
+.as-dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
+.as-dslot{position:relative;aspect-ratio:3/2;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
 .as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:11.5px;line-height:1.4;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
 .as-dslot.on{border-style:solid}.as-dslot.on .ph{display:none}
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
@@ -427,7 +427,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   // 🏆 كارت المنافس: أرقامه الحقيقية ورأينا فيه، وزرارين (هو منافس / مش منافس). الزرار والكلام بيعملوا نفس الحاجة
   const LEVEL = { strong: "💪 صفحة نشطة وقوية", ok: "👌 صفحة متوسطة", weak: "⚠️ صفحة ضعيفة أو غير نشطة" };
-  function rivalCard(c) {
+  // 🗣️ الكارت بيظهر لما تبدأ تتكلم عنه (مش قبل الكلام)، وبحد أقصى ٦ ثواني
+  function whenTalking(fn) { const t0 = performance.now(); const tick = () => { if (!S) return; if (S.speaking || performance.now() - t0 > 6000) fn(); else setTimeout(tick, 150); }; setTimeout(tick, 150); }
+  function rivalCard(c) { whenTalking(() => rivalCard0(c)); }
+  function rivalCard0(c) {
     if (!S || !ov || !c) return;
     if (S.show) { S.show.v.pause(); S.show = null; S.wait = null; }
     q(".as-box")?.remove(); acct(false);
@@ -532,8 +535,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     let done = false;
     const fin = (why) => { if (done) return; done = true; mic(true);
       note(purpose === "sample"
-        ? `(SYSTEM: the example video ${why}. Say in one sentence this is a sample of what we make for dental clinics. Do not ask for photos. Close warmly: thank him, say you are always there in the orange circle at the bottom right where he can text you, say goodbye and call finish.)`
-        : `(SYSTEM: the example video ${why}. Say you can make him a video exactly like this from one of HIS own cases, and ask ONLY this question: does he have before and after photos of a smile case he did? Then STOP and wait for his answer: do not ask for the photos and do not call show_input in this turn.)`); };
+        ? `(SYSTEM: the example video ${why}. Close now as the dental stop says: after watching it he can send you his opinion, he will find you at the bottom right of any page with your name, and you are waiting for his feedback (if he does smile work, add that he can send you his case photos there anytime and you will make his own video). Then goodbye and call finish. No questions.)`
+        : `(SYSTEM: the example video ${why}. Continue with the dental stop.)`); };
     v.onplay = () => mic(false); v.onpause = () => mic(true);
     v.onended = () => fin("ended");
     v.onerror = () => { d.remove(); fin("could not be loaded (do not mention it; just continue)"); };
@@ -566,7 +569,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
         d.remove(); chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
-        note("(SYSTEM: the 4 case photos arrived and his video started being made. Now, in his dialect, say clearly: you started working on his video, you will close the call now, when the video is ready he will get a notification, and he should tell you what he thinks of it. This sentence is mandatory. Add that you are always there in the orange circle at the bottom right where he can text you anytime. Then say goodbye and call finish.)");
+        note("(SYSTEM: the 4 case photos arrived and his video started being made. Now, in his dialect, say clearly: you are preparing his video now; when it is ready a notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him now; when it is ready he can watch it and send you his opinion: he will find you at the bottom right of any page, with your name on it, and you are waiting for his feedback. This is mandatory. Then goodbye and call finish.)");
       } catch (e) { err(e.message); send.disabled = false; send.textContent = "أرسل الصور"; }
     };
   }
@@ -687,6 +690,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         mic = shared ? new MediaStream([shared.getAudioTracks()[0].clone()]) : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
+      if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) TestRec.note?.(`🎙️ نورة ماسمعتش صوتك لحد دلوقتي. أعلى صوت وصل من المايك: ${((S.micPeak || 0) * 1000).toFixed(0)} (أقل من 30 = المايك مش بيوصل)`); }, 45000);
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await tokP;
@@ -725,7 +729,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
@@ -798,6 +802,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const st = q(".as-st"); if (!st) return;
     const what = S.speaking ? "تتحدث" : S.show && !S.show.wait ? "📺 يُعرض الفيديو" : S.thinking ? "لحظة…" : S.muted ? "الميكروفون مكتوم: اكتب ردك أو شغّله" : S.lastQ ? "في انتظار ردك" : "";
     st.textContent = S.agent + (what ? ` · ${what}` : "") + (S.accTimer ? " · ⏳ حسابك قيد التحليل" : "");
+    // ✍️ خانة الكتابة بتختفي وهي بتتكلم أو بتفكر (كانت بتلخبط: «اكتب هنا» وهي لسه بتجهّز)، إلا لو هي طالبة حاجة تتكتب
+    ov?.classList.toggle("as-quiet", (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")));
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
   function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); }
@@ -819,7 +825,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (r.ok) {
       changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount();
     }
-    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. ${r.dup ? r.note : "Thank them briefly and go on with the next question."})`
+    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. ${r.note ? r.note : "Thank them briefly and go on with the next question."})`
       : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);
   }
   // ✍️ الحساب بيتكتب في نفس خانة الكتابة: الخانة بتنوّر وتحتها سطر بيقول المطلوب

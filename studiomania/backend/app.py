@@ -33344,6 +33344,21 @@ def assistant_account(body: AssistAccountIn, request: Request):
     if not bid or not handle:
         return {"ok": False, "error": "no handle"}
     dup = account_seen_elsewhere(plat, handle) and not testrec_on(request)   # حساب التجربة: عادي
+    # 👤 اسم الحساب غير اسمه اللي سجّل بيه؟ نورة تسأل على طول (بعد ما يبعت الحساب)، ومعاها السبب
+    name_note = ""
+    if not dup and not atlas.mock_mode():
+        try:
+            pname = str((brainsocial.profile(plat, handle) or {}).get("name") or "").strip()
+        except Exception:  # noqa: BLE001
+            pname = ""
+        uname = signup_name(request) or (onboard_load() or {}).get("brand") or ""
+        norm = lambda x: re.sub(r"[^\w\u0600-\u06FF]+", " ", str(x).lower()).split()  # noqa: E731
+        toks = [t for t in norm(uname) if len(t) > 2]
+        hay = " ".join(norm(pname) + norm(handle))
+        if pname and toks and not any(t in hay for t in toks):
+            name_note = (f"The account's name is «{pname}» but they registered as «{uname}». In your NEXT turn, before anything else, ask once "
+                         f"kindly WITH the reason, e.g. «شفت إن الحساب باسم {pname} وإنت مسجّل باسم {uname}، متأكد إن ده حسابك ولا حساب حد تاني؟» "
+                         "(in their dialect). If it is theirs (or their clinic's), continue normally.")
     if not atlas.mock_mode() and not rivals.live():
         return {"ok": False, "error": "account analysis unavailable right now"}
     if any(x.get("kind") == "social" and x.get("handle", "").lower() == handle.lower() and x.get("status") != "failed" for x in b.get("sources") or []):
@@ -33363,7 +33378,7 @@ def assistant_account(body: AssistAccountIn, request: Request):
     update_brain(bid, fn)
     threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
     threading.Thread(target=rival_prefetch, args=(bid,), daemon=True).start()   # المنافسين يبقوا جاهزين قبل ما المكالمة توصل لمحطتهم
-    return {"ok": True, "started": True, **({"dup": True, "note": DUP_NOTE} if dup else {})}
+    return {"ok": True, "started": True, **({"dup": True, "note": DUP_NOTE} if dup else {"name": True, "note": name_note} if name_note else {})}
 
 
 class AssistRivalsIn(BaseModel):
@@ -33467,7 +33482,7 @@ def assistant_account_state():
             "posts_every_days": st.get("every_days"), "improvements": todos,
             "videos": so.get("videos") or [], "videos_overall": so.get("videos_overall") or "",
             "gender_check": gender_check(b),
-            "name_check": {"ask": True, "profile_name": b.get("social_name") or "", "user_name": (onboard_load() or {}).get("brand") or "",
+            "name_check": {"ask": False, "profile_name": b.get("social_name") or "", "user_name": (onboard_load() or {}).get("brand") or "",
                            "note": "Compare the account's profile name with the user's name and clinic/brand name. ONLY if it is clearly a "
                                    "different person or business (not their name, not their clinic, not a nickname of it), ask once kindly in "
                                    "their dialect «متأكد إن ده حسابك؟», and if they say yes continue normally. If it matches or you are unsure, "

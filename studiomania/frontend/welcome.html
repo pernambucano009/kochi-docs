@@ -868,12 +868,14 @@ Object.assign(Component.prototype, {
       if (reg.password.length < 8) return E('كلمة المرور 8 أحرف على الأقل', 'Password must be at least 8 characters');
       return this.setState({ reg, step: 2, err: '' });
     }
+    // 🧭 القيم بتتقري قبل setState: إعادة الرسم كانت بترجّع القوائم لأول اختيار (فالمجال كان بيتحفظ «مطاعم وكافيهات» دايمًا)
+    const pick = { country: g('country'), dialect: g('dialect'), field: g('field'), goal: g('goal'), coupon: g('coupon'), gender: g('gender'), agree: !!(form.elements.agree || {}).checked };
     this.setState({ busy: true, err: '' });
     try {
       if (s.mode === 'register') {
-        if (!(form.elements.agree || {}).checked) return E(LP_TEXT.ar.agreeErr, LP_TEXT.en.agreeErr);
-        if (!g('gender')) { this.setState({ busy: false }); return E('اختر ذكر أو أنثى (لكي تخاطبك المساعدة بشكل صحيح)', 'Choose male or female (so the assistant addresses you correctly)'); }
-        const d = await post('/api/auth/signup', { ...s.reg, country: g('country'), dialect: g('dialect'), field: g('field'), goal: g('goal'), coupon: g('coupon'), gender: g('gender'), adult: true });
+        if (!pick.agree) return E(LP_TEXT.ar.agreeErr, LP_TEXT.en.agreeErr);
+        if (!pick.gender) { this.setState({ busy: false }); return E('اختر ذكر أو أنثى (لكي تخاطبك المساعدة بشكل صحيح)', 'Choose male or female (so the assistant addresses you correctly)'); }
+        const d = await post('/api/auth/signup', { ...s.reg, country: pick.country, dialect: pick.dialect, field: pick.field, goal: pick.goal, coupon: pick.coupon, gender: pick.gender, adult: true });
         sessionStorage.setItem('devlink', d.dev_link || ''); sessionStorage.setItem('mailfail', d.mail_failed ? '1' : '');
         location.replace('/verify');
       } else {
