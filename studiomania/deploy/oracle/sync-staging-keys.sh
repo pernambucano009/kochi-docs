@@ -28,7 +28,8 @@ c.executemany("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", rows
 c.commit()
 print("== مفاتيح صفحة الإعدادات:", " ".join(k[4:] for k, _ in rows) or "مفيش")
 PY
-echo "OpenAI (مكالمة نورة): $(grep -q '^OPENAI_API_KEY=.\+' "$SR/app.env" && echo موجود || echo '⚠️ مش موجود في الموقع الحقيقي كمان')"
+HAS=$(python3 -c "import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute(\"SELECT count(*) FROM settings WHERE key='key:OPENAI_API_KEY' AND value<>''\").fetchone()[0])" "$SR/data/studiomania.db" 2>/dev/null || echo 0)
+echo "OpenAI (مكالمة نورة): $( { grep -q '^OPENAI_API_KEY=.\+' "$SR/app.env" || [ "$HAS" != 0 ]; } && echo موجود || echo '⚠️ مش موجود')"
 docker rm -f simsimkit-staging >/dev/null 2>&1 || true
 docker run -d --name simsimkit-staging --restart unless-stopped --network host \
   --env-file "$SR/app.env" -e PORT=8100 -e STUDIOMANIA_DATA=/data -v "$SR/data:/data" simsimkit-staging >/dev/null
