@@ -29,7 +29,8 @@ const TestRec = (() => {
         preferCurrentTab: true, selfBrowserSurface: "include", systemAudio: "include", surfaceSwitching: "exclude" });
     } catch { readyRes(); return toast("التسجيل ماشتغلش (لازم توافق على مشاركة الشاشة)"); }
     let mic = null;
-    try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { /* من غير مايك */ }
+    try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch { /* من غير مايك */ }
+    S.mic = mic;   // 🎙️ نفس المايك ده بيتدّى لمكالمة نورة (فتح المايك مرتين كان بيخلي صوت العميل مايوصلش)
     S.ctx = new AudioContext(); S.dest = S.ctx.createMediaStreamDestination();
     addAudio(scr); addAudio(mic); S.suad.forEach(addAudio);
     S.streams = [scr, mic].filter(Boolean);
@@ -107,5 +108,5 @@ const TestRec = (() => {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
   // ملاحظة على الشاشة لحساب التجربة بس (ليه حاجة ماحصلتش)، عشان تتبعت في الشات
   const note = (t) => { const d = document.createElement("div"); d.className = "tr-bar"; d.style.bottom = "120px"; d.style.maxWidth = "min(92vw,520px)"; d.textContent = "⚠️ " + t; document.body.append(d); setTimeout(() => d.remove(), 20000); };
-  return { start, stop, wait: () => ready, note };
+  return { start, stop, wait: () => ready, note, mic: () => (S.rec && S.mic?.getAudioTracks()[0]?.readyState === "live" ? S.mic : null) };
 })();

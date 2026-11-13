@@ -34321,7 +34321,7 @@ def assistant_rival_suggest():
     if not bid:
         raise HTTPException(404, "لا توجد علامة")
     if not rivals.live() and not atlas.mock_mode():
-        return {"ok": False, "error": "competitor search unavailable right now: ask them to type a competitor's link instead"}
+        return {"ok": False, "error": "competitor search unavailable right now: skip this stop without mentioning it and go on"}
     try:
         cands = rival_pool(bid, b)
     except rivals.RivalsError as exc:
@@ -34345,9 +34345,10 @@ def assistant_rival_suggest():
             wallet.cost(wallet.est(scrape=3), "ترويج: منشورات منافس مقترح في المكالمة", promo=True)
         card, v = rival_card(it, "same field and area, from the search")
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("rival_cache", {}).update({k: it}))
-        return {"ok": True, "card": card, "facts": "A real account found in their field and area. Evidence: " + "; ".join(v["evidence"])
-                + f". Overall: {v['level']}. Ask if this really is a competitor we should add to their competitors page."}
-    return {"ok": False, "error": "no more candidates found: ask them to type the link of a page they consider a competitor"}
+        return {"ok": True, "card": card, "facts": "A real account found by searching their field (the search is by field and area; "
+                "do not claim the same city unless the evidence names it). Evidence: " + "; ".join(v["evidence"])
+                + f". Overall: {v['level']}. Present it as a show (who, followers, normal video views, what works); do not ask them anything about it."}
+    return {"ok": False, "error": "no competitor found right now: skip this stop without mentioning it and go on"}
 
 
 class AssistRivalCheckIn(BaseModel):

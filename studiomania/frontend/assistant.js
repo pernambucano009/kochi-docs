@@ -301,7 +301,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       showChip(r);
       if (r.status === "done" || r.status === "failed") {
         clearInterval(S.showT); S.showT = null;
-        if (r.status === "done") sysItem("(SYSTEM: the showcase reel is ready. When you reach its stop in the tour (after the filming question), ask if they would like to see a practical example of our work on one of their own videos, and if yes call play_showcase. Do not interrupt the questions for it.)");
+        if (r.status === "done") sysItem("(SYSTEM: the showcase reel is ready. When you reach its stop in the tour, say you will show them a practical example of our work in their field and call play_showcase. Do not interrupt the questions for it.)");
         else note(`(SYSTEM: the showcase reel could not be made (${r.error || "error"}). Tell them kindly in one sentence and go on.)`);
       }
     }, 8000);
@@ -376,10 +376,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   const CARD = {
     analysis: (d) => `<b>📊 تحليل حسابك ${esc(d.account || "")}</b><div class="as-kpis"><span><b>${fmt(d.followers)}</b>متابع</span><span><b>${fmt(d.avg_views)}</b>متوسط المشاهدات</span>
       <span><b>${d.engagement_pct != null ? fmt(d.engagement_pct) + "٪" : "—"}</b>التفاعل</span><span><b>${fmt(d.posts_every_days)}</b>يوم بين كل منشور</span></div>
-      ${(d.videos || []).length ? `<p>رأينا في فيديوهاتك</p>${d.videos.map((v) => `<div class="as-rv as-vr">${v.cover ? `<img src="${esc(v.cover)}" alt="">` : ""}<div>
+      ${(d.videos || []).length ? `<p>رأينا في فيديوهاتك</p>${d.videos.slice(0, 2).map((v) => `<div class="as-rv as-vr">${v.cover ? `<img src="${esc(v.cover)}" alt="">` : ""}<div>
         <b>${esc(v.line || v.caption || "فيديو")}</b> <small>${fmt(v.views)} مشاهدة ${v.url ? `· <a href="${esc(v.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</small>
         ${(v.good || []).map((x) => `<div>✓ ${esc(x)}</div>`).join("")}${(v.improve || []).map((x) => `<div>• ${esc(x)}</div>`).join("")}</div></div>`).join("")}` : ""}
-      ${(d.improvements || []).length ? `<p>تحسينات للحساب</p><ul>${d.improvements.map((x) => `<li>${esc(x.title)}</li>`).join("")}</ul>` : ""}`,
+      ${(d.improvements || []).length ? `<p>تحسينات للحساب</p><ul>${d.improvements.slice(0, 3).map((x) => `<li>${esc(x.title)}</li>`).join("")}</ul>` : ""}`,
     types: (d) => `<b>🎬 أنواع الفيديوهات المناسبة لك</b><div class="as-steps">${(d.types || []).map((x) => `<span>${esc(x)}</span>`).join("")}</div>
       ${(d.ideas || []).length ? `<p>أفكار جاهزة:</p><ul>${d.ideas.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`,
     rivals: (d) => `<b>🏆 ما ينجح عند منافسيك</b>${(d.items || []).map((i) => `<div class="as-rv"><b>${esc(i.name || "")}</b> <small dir="ltr">@${esc(i.handle || "")}</small>
@@ -427,13 +427,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const d = document.createElement("div"); d.className = "as-box as-card"; d.dataset.card = "rival";
     d.innerHTML = `<b>🏆 ${esc(c.name)} <small dir="ltr">@${esc(c.handle)} · ${c.platform === "tiktok" ? "TikTok" : "Instagram"}</small></b>
       ${c.url ? `<a class="as-btn" href="${esc(c.url)}" target="_blank" rel="noopener">🔗 افتح صفحته وشاهدها</a>` : ""}
-      <div class="as-kpis"><span><b>${fmt(c.followers)}</b>متابع</span><span><b>${fmt(c.median_views)}</b>متوسط المشاهدات</span><span><b>${fmt(c.recent)}</b>منشور في آخر ٣٠ يومًا</span>
+      <div class="as-kpis"><span><b>${fmt(c.followers)}</b>متابع</span><span><b>${fmt(c.median_views)}</b>مشاهدات الفيديو العادي</span><span><b>${fmt(c.recent)}</b>منشور في آخر ٣٠ يومًا</span>
       ${c.days != null ? `<span><b>${fmt(c.days)}</b>يوم منذ آخر منشور</span>` : ""}</div><p>${esc(LEVEL[c.level] || "")}</p>
-      ${(c.posts || []).map((p) => `<div class="as-rv">• ${esc(p.caption || "فيديو")} — ${fmt(p.views)} مشاهدة ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</div>`).join("")}
-      <div class="row"><button type="button" class="as-go" data-ry>✓ نعم، منافس لي</button><button type="button" class="as-btn" data-rn>✕ ليس منافسًا</button></div>`;
+      ${(c.posts || []).slice(0, 2).map((p) => `<div class="as-rv">• ${esc(p.caption || "فيديو")} — ${fmt(p.views)} مشاهدة ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">شاهد</a>` : ""}</div>`).join("")}`;   // 🏆 عرض بس (من غير أسئلة ولا إضافة): المنافسين بيتضافوا بعدين من صفحتهم
     q(".as-acts").before(d);
-    d.querySelector("[data-ry]").onclick = async () => { await decide(c.platform, c.handle, true); note(`(SYSTEM: the user pressed YES: @${c.handle} is a competitor and was added to their competitors page. Say what works for them in one sentence, then ask if they want to look for one more or move on.)`); };
-    d.querySelector("[data-rn]").onclick = async () => { await decide(c.platform, c.handle, false); note(`(SYSTEM: the user pressed NO: @${c.handle} is not a competitor. Ask if they know a page they consider a competitor and can type its link (show_input kind rival), or offer to find another one.)`); };
+    d.querySelector("[data-ry]")?.addEventListener("click", async () => { await decide(c.platform, c.handle, true); note(`(SYSTEM: the user pressed YES: @${c.handle} is a competitor and was added to their competitors page. Say what works for them in one sentence, then ask if they want to look for one more or move on.)`); });
+    d.querySelector("[data-rn]")?.addEventListener("click", async () => { await decide(c.platform, c.handle, false); note(`(SYSTEM: the user pressed NO: @${c.handle} is not a competitor. Ask if they know a page they consider a competitor and can type its link (show_input kind rival), or offer to find another one.)`); });
   }
   async function decide(platform, handle, add) {
     const r = await api("/api/assistant/rival/decide", { method: "POST", ...jsonBody({ platform, handle, add }) }).catch(() => ({ ok: false }));
@@ -674,7 +673,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       // 🎙️ من غير ميكروفون (مش موجود، أو العميل رفض الإذن) المكالمة بتكمل: المساعد بيتكلم والعميل بيكتب
       let mic = null, noMic = "";
       const tokP = api("/api/assistant/token", { method: "POST", ...jsonBody({ call: S.call }) }); tokP.catch(() => {});
-      try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      try { const shared = typeof TestRec !== "undefined" ? TestRec.mic?.() : null;   // حساب التجربة: نفس مايك التسجيل (نسخة منه)
+        mic = shared ? new MediaStream([shared.getAudioTracks()[0].clone()]) : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
