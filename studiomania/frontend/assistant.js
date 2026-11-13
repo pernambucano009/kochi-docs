@@ -203,7 +203,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "show_card") return card(args.kind);
     if (name === "suggest_competitor") {
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
-      const r = await api("/api/assistant/rival/suggest", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
+      const p = api("/api/assistant/rival/suggest", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
+      // ⏳ البحث ساعات بياخد أكتر من دقيقة: المكالمة ماتسكتش. بعد ١٠ ثواني نورة تكمل المحطة اللي بعدها، والكارت يظهر لما يجهز
+      const r = await Promise.race([p, new Promise((res) => setTimeout(() => res(null), 10000))]);
+      if (!r) {
+        p.then((x) => { if (!S || !x?.ok) return; rivalCard(x.card);
+          note(`(SYSTEM: the competitor card is on the screen now. When you finish your current sentence, present it briefly as the competitor stop says (no questions), then continue where you were. Facts: ${x.facts || ""})`); });
+        return { ok: false, pending: true, error: "The competitor search is taking longer. Never wait in silence: go on right now to the next stop. You will be told when the card is ready." };
+      }
       if (r.ok) rivalCard(r.card);
       return r.ok ? { ok: true, account: r.card, facts: r.facts } : r;
     }
@@ -526,7 +533,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const fin = (why) => { if (done) return; done = true; mic(true);
       note(purpose === "sample"
         ? `(SYSTEM: the example video ${why}. Say in one sentence this is a sample of what we make for dental clinics. Do not ask for photos. Close warmly: thank him, say you are always there in the orange circle at the bottom right where he can text you, say goodbye and call finish.)`
-        : `(SYSTEM: the example video ${why}. Say you can make him a video exactly like this from one of HIS own cases, and ask ONE question: does he have before and after photos of a case he did? If yes, ask for the 4 photos of one case and call show_input kind dental_case with template ${tpl} in that turn. If no, close as step 4 of the dental stop says.)`); };
+        : `(SYSTEM: the example video ${why}. Say you can make him a video exactly like this from one of HIS own cases, and ask ONLY this question: does he have before and after photos of a smile case he did? Then STOP and wait for his answer: do not ask for the photos and do not call show_input in this turn.)`); };
     v.onplay = () => mic(false); v.onpause = () => mic(true);
     v.onended = () => fin("ended");
     v.onerror = () => { d.remove(); fin("could not be loaded (do not mention it; just continue)"); };

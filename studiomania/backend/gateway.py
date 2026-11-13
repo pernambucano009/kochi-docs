@@ -2131,6 +2131,13 @@ def acall_review_run(cid: str) -> dict:
             auto["mistakes"].insert(0, {"at": "", "kind": "dental closing missing", "quote": said[-200:],
                                         "why": "بعد ما صور الحالة وصلت، القفلة ناقصها: " + " و".join(miss)})
             auto["score"] = min(auto["score"], 60)
+    # 🗣️ جمل الحشو («خليني أرتبه»، «خلّنا نضبط هالنقطة»…): ممنوعة، وأي واحدة بتتحسب غلطة
+    agent_txt = " ".join(str(e.get("text") or "") for e in ev if e.get("who") == "agent")
+    fill = re.findall(r"(?:خليني|خلّيني|خلني|خلنا|خلّنا)\s+(?:أ|ن)?(?:رتب|ثبت|تعامل|ضبط|حدد|كمل|قفل|مشي|نمشي|جهز)[^.،؟!]{0,40}", agent_txt)
+    if fill:
+        auto["mistakes"].insert(0, {"at": "", "kind": "filler lines", "quote": " | ".join(fill[:4])[:300],
+                                    "why": f"جمل حشو بتعلن عن اللي هتعمله ({len(fill)} مرة): ممنوعة"})
+        auto["score"] = min(auto["score"], 70)
     if re.search(r"مبع[ّ]?د", " ".join(str(e.get("text") or "") for e in ev if e.get("who") == "agent")):
         auto["mistakes"].insert(0, {"at": "", "kind": "word مبعد", "quote": "مبعد", "why": "لازم تقول ريتراكتور، مش مبعد"})
     d = json.loads(f.read_text("utf-8"))
