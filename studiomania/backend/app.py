@@ -687,7 +687,7 @@ def _dental_resume():
                 try:
                     j = (json.loads(f.read_text(encoding="utf-8")).get("job") or {})
                     if j.get("status") == "working" and j.get("cid"):
-                        threading.Thread(target=suad_dental_watch, args=(f.parent.name, j["cid"]), daemon=True).start()
+                        threading.Thread(target=suad_dental_watch, args=(f.parent.name, j["cid"], j.get("tpl") or SUAD_DENTAL_TPL), daemon=True).start()
                 except (OSError, ValueError):
                     continue
     except Exception:
@@ -33230,7 +33230,8 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     sc = showcase_state(b)   # 🎬 الفيديو الاستعراضي: عندنا فيديو له؟ اتعمل قبل كده؟
     have.update(video=sc["has_video"], showcase=sc["status"], showcase_used=sc["used"], tour=list(a.get("tour") or []),
                 rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "",
-                dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"))   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
+                dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"),
+                implant_demo=(FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists())   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have)
@@ -33305,13 +33306,44 @@ class AssistAccountIn(BaseModel):
     account: str
 
 
+ACCOUNT_INDEX = providers.state_file(DATA_DIR).parent / "account_index.json"   # 🔁 حسابات السوشيال اللي اتكتبت في مكالمات العملاء: الحساب ← النسخ اللي استخدمته
+ACCOUNT_INDEX_LOCK = threading.Lock()
+
+
+def account_seen_elsewhere(plat: str, handle: str) -> bool:
+    """الحساب ده اتكتب قبل كده في نسخة عميل تاني؟ (وبيتسجّل للنسخة دي)."""
+    key, me = f"{plat}:{handle.lower()}", os.environ.get("TENANT_ID") or "owner"
+    with ACCOUNT_INDEX_LOCK:
+        try:
+            idx = json.loads(ACCOUNT_INDEX.read_text("utf-8"))
+        except (OSError, ValueError):
+            idx = {}
+        users = idx.get(key) or []
+        other = any(u != me for u in users)
+        if me not in users:
+            idx[key] = (users + [me])[-20:]
+            try:
+                ACCOUNT_INDEX.parent.mkdir(parents=True, exist_ok=True)
+                tmp = ACCOUNT_INDEX.with_suffix(".tmp"); tmp.write_text(json.dumps(idx), "utf-8"); tmp.replace(ACCOUNT_INDEX)
+            except OSError:
+                pass
+    return other
+
+
+DUP_NOTE = ("This account was already entered by another SimsimKit user. Before going on, ask ONE kind question in their dialect, like "
+            "«متأكد إن ده حسابك؟ لأنه مستخدم قبل كده عندنا». If they say yes: say it is fine, we do not open anything private, we only analyse "
+            "its public content like we do with competitors, and continue normally. If they say no: say «طيب، مستنية تبعتلي حسابك» "
+            "(in their dialect) and call show_input kind account.")
+
+
 @app.post("/api/assistant/account")
-def assistant_account(body: AssistAccountIn):
+def assistant_account(body: AssistAccountIn, request: Request):
     """تحليل الحساب من المكالمة: مجاني مرة واحدة (على المنصة)، والمرة التانية من نقاط العميل زي العادي."""
     bid, b, a = assist_info()
     plat, handle = brainsocial.parse(body.account)
     if not bid or not handle:
         return {"ok": False, "error": "no handle"}
+    dup = account_seen_elsewhere(plat, handle) and not testrec_on(request)   # حساب التجربة: عادي
     if not atlas.mock_mode() and not rivals.live():
         return {"ok": False, "error": "account analysis unavailable right now"}
     if any(x.get("kind") == "social" and x.get("handle", "").lower() == handle.lower() and x.get("status") != "failed" for x in b.get("sources") or []):
@@ -33331,7 +33363,7 @@ def assistant_account(body: AssistAccountIn):
     update_brain(bid, fn)
     threading.Thread(target=run_brain_source, args=(bid, s["id"]), daemon=True).start()
     threading.Thread(target=rival_prefetch, args=(bid,), daemon=True).start()   # المنافسين يبقوا جاهزين قبل ما المكالمة توصل لمحطتهم
-    return {"ok": True, "started": True}
+    return {"ok": True, "started": True, **({"dup": True, "note": DUP_NOTE} if dup else {})}
 
 
 class AssistRivalsIn(BaseModel):
@@ -33435,6 +33467,11 @@ def assistant_account_state():
             "posts_every_days": st.get("every_days"), "improvements": todos,
             "videos": so.get("videos") or [], "videos_overall": so.get("videos_overall") or "",
             "gender_check": gender_check(b),
+            "name_check": {"ask": True, "profile_name": b.get("social_name") or "", "user_name": (onboard_load() or {}).get("brand") or "",
+                           "note": "Compare the account's profile name with the user's name and clinic/brand name. ONLY if it is clearly a "
+                                   "different person or business (not their name, not their clinic, not a nickname of it), ask once kindly in "
+                                   "their dialect «متأكد إن ده حسابك؟», and if they say yes continue normally. If it matches or you are unsure, "
+                                   "say nothing about it."},
             "suggestions_waiting": len([p for p in b.get("pending") or [] if p.get("source") == s["id"]])}
 
 
@@ -34458,7 +34495,8 @@ def assistant_field(body: AssistFieldIn):
     # 🦷 طلع دكتور أسنان في نص المكالمة (كان مختار مجال تاني في التسجيل): محطة فيديو الأسنان بتدخل بدل الفيديو الاستعراضي العام
     if new == "dental" and dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"):
         note += (" He is a DENTIST, so the tour changes now: skip the generic example-video stop and the final 'add photos' reminder. "
-                 "After the remaining brain questions and the competitor stop, do this stop; it is the ending of the call:\n" + livevoice.DENTAL_STOP)
+                 "After the remaining brain questions and the competitor stop, do this stop; it is the ending of the call:\n"
+                 + livevoice.dental_stop((FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists()))
     return {"ok": True, "field": changed_to, "note": note}
 
 
@@ -34828,7 +34866,7 @@ def suad_fix_slot(err: str) -> str:
 
 @app.post("/api/assistant/dental_case")
 async def assistant_dental_case(before_retracted: UploadFile = File(...), after_retracted: UploadFile = File(...),
-                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...)):
+                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...), template: str = Form(SUAD_DENTAL_TPL)):
     """الصور اللي سعاد طلبتها في المكالمة (ريتراكتور قبل/بعد، ابتسامة بعد، وش قبل) ← الفيديو يشتغل لوحده."""
     dental_on()
     bid = active_client_id()
@@ -34844,9 +34882,10 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
         cid = dental.create(DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid))
     except ValueError as e:
         raise HTTPException(400, str(e))
-    tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == SUAD_DENTAL_TPL), "")
-    suad_job(bid, title=f"بنعمل فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False)
-    threading.Thread(target=suad_dental_watch, args=(bid, cid), daemon=True).start()
+    tpl = template if template in ("a03", "a24") else SUAD_DENTAL_TPL
+    tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == tpl), "")
+    suad_job(bid, title=f"بنعمل فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False, tpl=tpl)
+    threading.Thread(target=suad_dental_watch, args=(bid, cid, tpl), daemon=True).start()
     return {"ok": True, "cid": cid}
 
 

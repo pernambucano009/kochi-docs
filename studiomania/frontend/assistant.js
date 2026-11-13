@@ -199,7 +199,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return { status: r.status, progress: r.progress, step: r.step, error: r.error, parts: (r.chapters || []).length };
     }
     if (name === "play_showcase") return play();
-    if (name === "play_demo") return playDemo();
+    if (name === "play_demo") return playDemo(args.template === "a24" ? "a24" : "a03", args.purpose === "sample" ? "sample" : "case");
     if (name === "show_card") return card(args.kind);
     if (name === "suggest_competitor") {
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
@@ -225,7 +225,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     if (name === "show_input") {
       if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
-      if (args.kind === "dental_case") { setTimeout(() => S && dentalBox(), 600); return { ok: true, shown: args.kind }; }
+      if (args.kind === "dental_case") { const tp = args.template === "a24" ? "a24" : "a03"; setTimeout(() => S && dentalBox(tp), 600); return { ok: true, shown: args.kind }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -512,18 +512,21 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     myvideo: { t: "ارفع فيديو قصيرًا تتحدث فيه (من ١٥ ثانية إلى دقيقة)", accept: "video/*", video: true, url: "/api/assistant/showcase/upload", done: "رفعت فيديو أتحدث فيه" },
   };
   // 🦷 فيديو المثال لعيادات الأسنان (حالة تجريبية، مش مريض حقيقي): بيتعرض، والمايك بيقفل وهو شغال، ولما يخلص سعاد تكمّل
-  function playDemo() {
+  const DEMO_NAME = { a03: "تصميم الابتسامة", a24: "الزراعة والتركيبات" };
+  function playDemo(tpl = "a03", purpose = "case") {
     if (!S || !ov) return { ok: false };
     q(".as-box")?.remove(); acct(false);
     const d = document.createElement("div"); d.className = "as-box as-show";
-    d.innerHTML = `<b>🎬 مثال: فيديو «تصميم الابتسامة»</b><video playsinline controls autoplay preload="auto" src="/gallery/dental/demo_a03.mp4"></video>
+    d.innerHTML = `<b>🎬 مثال: فيديو «${DEMO_NAME[tpl]}»</b><video playsinline controls autoplay preload="auto" src="/gallery/dental/demo_${tpl}.mp4"></video>
       <div class="row"><button type="button" class="as-btn" data-dclose>إغلاق</button></div>`;
     q(".as-acts").before(d);
     const v = d.querySelector("video");
     const mic = (on) => { const t = S?.mic?.getTracks()[0]; if (t && !S.muted) t.enabled = on; };
     let done = false;
     const fin = (why) => { if (done) return; done = true; mic(true);
-      note(`(SYSTEM: the example video ${why}. Now say you can make a video exactly like this from one of HIS own cases, and ask for the 4 photos of one case: a retractor photo before, a retractor photo after, a close smile after, and the patient's face before (smiling, no retractor). Call show_input kind dental_case in the same turn.)`); };
+      note(purpose === "sample"
+        ? `(SYSTEM: the example video ${why}. Say in one sentence this is a sample of what we make for dental clinics. Do not ask for photos. Close warmly: thank him, say you are always there in the orange circle at the bottom right where he can text you, say goodbye and call finish.)`
+        : `(SYSTEM: the example video ${why}. Say you can make him a video exactly like this from one of HIS own cases, and ask ONE question: does he have before and after photos of a case he did? If yes, ask for the 4 photos of one case and call show_input kind dental_case with template ${tpl} in that turn. If no, close as step 4 of the dental stop says.)`); };
     v.onplay = () => mic(false); v.onpause = () => mic(true);
     v.onended = () => fin("ended");
     v.onerror = () => { d.remove(); fin("could not be loaded (do not mention it; just continue)"); };
@@ -533,7 +536,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
   const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج"], ["after_retracted", "ريتراكتور بعد العلاج"], ["after_smile", "الابتسامة بعد العلاج (قريبة)"], ["before_face", "وجه المريض قبل العلاج (يبتسم)"]];
-  function dentalBox() {
+  function dentalBox(tpl = "a03") {
     q(".as-box")?.remove();
     if (!ov) return;
     const d = document.createElement("div"); d.className = "as-box as-dcase";
@@ -551,7 +554,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     d.querySelector("[data-later]").onclick = () => { d.remove(); note("(SYSTEM: the user will send the case photos later. Tell him he can send them any time to you in the orange circle at the bottom right of the screen, by text. Then say goodbye and call finish.)"); };
     send.onclick = async () => {
       send.disabled = true; err(""); send.textContent = "⏳ جارٍ الرفع…";
-      const fd = new FormData(); DSLOTS.forEach(([k]) => fd.append(k, files[k]));
+      const fd = new FormData(); DSLOTS.forEach(([k]) => fd.append(k, files[k])); fd.append("template", tpl);
       try {
         const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
@@ -809,7 +812,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (r.ok) {
       changed(); step("account"); S.accChip = chip(`⏳ <span><b>تحليل حسابك</b><br>${esc(v)}</span>`); pollAccount();
     }
-    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. Thank them briefly and go on with the next question.)`
+    say(r.ok ? `حسابي: ${v}\n(SYSTEM: the user typed this account and its analysis already started in the background. Do not call start_account_analysis. ${r.dup ? r.note : "Thank them briefly and go on with the next question."})`
       : `حسابي: ${v}\n(SYSTEM: the account analysis could not start (${r.error || "error"}). Tell them kindly the team will check it, and go on with the next question.)`);
   }
   // ✍️ الحساب بيتكتب في نفس خانة الكتابة: الخانة بتنوّر وتحتها سطر بيقول المطلوب

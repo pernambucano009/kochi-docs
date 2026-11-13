@@ -133,7 +133,8 @@ TOOLS = [
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
                         "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
                         "dental_case: (dentists only) four photo slots for ONE case: retractor before, retractor after, close smile after, face before. "
-                        "none: close the box (they said later / they have none)."}}, "required": ["kind"]}},
+                        "none: close the box (they said later / they have none)."},
+         "template": {"type": "string", "enum": ["a03", "a24"], "description": "dental_case only: the template of the example he saw."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
      "you start talking about that stop). Returns real data and facts to talk about; if ok is false, skip that stop.",
      "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["analysis"]}},
@@ -163,9 +164,12 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "play_showcase", "description": "Show the ready showcase reel on the user's screen and start playing it.",
      "parameters": {"type": "object", "properties": {}}},
-    {"type": "function", "name": "play_demo", "description": "(Dentists only) Play the example dental video (made from a sample case, not a real "
-     "patient) on the user's screen. The screen tells you when it ends.",
-     "parameters": {"type": "object", "properties": {}}},
+    {"type": "function", "name": "play_demo", "description": "(Dentists only) Play an example dental video (made from a sample case, not a real "
+     "patient) on the user's screen. The screen tells you when it ends and what to do next.",
+     "parameters": {"type": "object", "properties": {
+         "template": {"type": "string", "enum": ["a03", "a24"], "description": "a03: smile design (veneers, smiles, crowns, lenses). a24: implants."},
+         "purpose": {"type": "string", "enum": ["case", "sample"], "description": "case: we will offer to make him the same video from his own "
+                     "case photos. sample: only a sample of what we make (no photos)."}}, "required": ["template", "purpose"]}},
     {"type": "function", "name": "find_competitors", "description": "Search for the competitor accounts the user named (by voice or typed). "
      "The team looks them up in the background and sends the user a notification to confirm the ones found.",
      "parameters": {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"},
@@ -211,19 +215,37 @@ def name_gender(name: str) -> str:
 
 
 # 🦷 محطة أطباء الأسنان (أهم محطة، مابتتشالش): مثال جاهز ← صور حالة واحدة ← القفلة الإجبارية
-DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if the call was long):\n"
-               "      1) Tell him in one sentence you will show him an example of a video we make for dental clinics, then call play_demo. While it "
-               "plays stay silent (his microphone is off). It is a sample case, not a real patient: never say it is his.\n"
-               "      2) When the screen says it ended: say you can make him a video exactly like this one from one of HIS OWN cases, and ask for the "
-               "4 photos of ONE case: a retractor photo before treatment, a retractor photo after, a close smile after, and the patient's face before "
-               "(smiling, no retractor). Call show_input kind dental_case in that same turn, then stay silent while he uploads.\n"
+DENTAL_STOP = ("DENTAL VIDEO (the most important stop, never skip it, even if the call was long). First pick the path from the treatments he "
+               "told you about:\n"
+               "      • Smiles, veneers (فينير), direct veneers (دايركت فينير), lenses (عدسات), crowns or prosthetics (تركيبات), Hollywood smile → "
+               "path SMILE (template a03).\n"
+               "      • Implants (زراعة، امبلانت، غرسات) → path IMPLANT (template a24){IMPLANT_NOTE}.\n"
+               "      • Anything else (orthodontics, root canals, children, …) → ask ONE question: «يعني ما تشتغل ابتسامات أو عدسات؟» (in his dialect). "
+               "If he says he does → path SMILE. If not → path SAMPLE.\n"
+               "      Path SMILE / IMPLANT:\n"
+               "      1) Say in one sentence you will show him an example of a video we make for dental clinics, then call play_demo with that "
+               "template and purpose case. While it plays stay silent (his microphone is off). It is a sample case, not a real patient: never "
+               "say it is his.\n"
+               "      2) When the screen says it ended: say you can make him a video exactly like this one from one of HIS OWN cases, and ask ONE "
+               "question: does he have before and after photos of a case he did? Yes → ask for the 4 photos of ONE case: a retractor photo "
+               "before treatment, a retractor photo after, a close smile after, and the patient's face before (smiling, no retractor); call "
+               "show_input kind dental_case with the same template in that same turn, then stay silent while he uploads. No → go to the "
+               "closing without a video (step 4).\n"
                "      3) When the screen says the photos arrived: say in his dialect, clearly, that you started working on his video, that you will "
                "close the call now, that when the video is ready a notification will reach him, and that he should tell you what he thinks of it. "
                "THIS SENTENCE IS MANDATORY, never skip any part of it. Add in one sentence that you are always there in the orange circle at the "
                "bottom right of the screen, where he can text you anytime. Then say goodbye and call finish.\n"
-               "      4) If he says he has no photos now: tell him he can send them anytime to you in the orange circle at the bottom right, by "
-               "text, and you will make the video. Then say goodbye and call finish.\n"
+               "      4) No photos now (he has none, or says later): tell him he can send them anytime to you in the orange circle at the bottom "
+               "right, by text, and you will make the video. Then say goodbye and call finish.\n"
+               "      Path SAMPLE: say «طيب، هوريك عينة من الفيديوهات اللي بنعملها» (in his dialect), call play_demo with template a03 and purpose "
+               "sample, never ask for photos, and when it ends close warmly (thank him, the orange circle at the bottom right, goodbye, finish).\n"
                "      Words: always say ريتراكتور (retractor), never مبعد or مبعّد: dentists do not use that word.")
+IMPLANT_FALLBACK = " (the implant example is not ready yet: for now use path SAMPLE for implants)"
+
+
+def dental_stop(implant_ready: bool) -> str:
+    return DENTAL_STOP.replace("{IMPLANT_NOTE}", "" if implant_ready else IMPLANT_FALLBACK)
+
 
 STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "photos": "uploading photos of their work/products/cases"}
 
@@ -262,7 +284,8 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     seen = set(have.get("tour") or [])
     stops = [
         ("analysis", "Their account analysis: call get_account_analysis; if ready, call show_card analysis. If it has gender_check.mismatch, "
-                     "resolve that FIRST as its note says, before anything else. Then talk about THEIR VIDEOS themselves, "
+                     "resolve that FIRST as its note says, before anything else. If it has name_check.ask, ask that ONE question first (as its note says); "
+                     "if they say it is theirs, continue normally. Then talk about THEIR VIDEOS themselves, "
                      "not only the numbers: name a specific video (what it is about, its views) and what is really good in it (be warm and "
                      "generous, e.g. the cases they show look great), then what could be better in it (lighting, color grading, quality, sound, "
                      "the first seconds, text on screen) from the review. Then 1–2 account-level points (posting rhythm, bio, how each post tells "
@@ -291,7 +314,7 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     else:
         showcase_goal = "Skip this step."
     if tools and have.get("dental"):   # 🦷 عيادة أسنان: بدل الفيديو الاستعراضي العام، فيديو أسنان جاهز + صور حالة منه ← فيديوه هو بعد المكالمة
-        stops = [x for x in stops if x[0] != "showcase"] + [("dental", DENTAL_STOP)]
+        stops = [x for x in stops if x[0] != "showcase"] + [("dental", dental_stop(bool(have.get("implant_demo"))))]
         showcase_goal = "Skip this step."
     for k, txt in stops:
         if k == "showcase":
