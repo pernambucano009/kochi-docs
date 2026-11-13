@@ -11228,6 +11228,18 @@ def suad_state(request: Request):
             "total": len(msgs)}
 
 
+@app.post("/api/suad/demo")
+def suad_demo():
+    """🦷 مفيش صور حالة: فيديو الأسنان الجاهز بيتبعت في شات سعاد (عشان يتشاف بعدين) + «إيه رأيك؟»، وبيظهر في نص الشاشة بعد المكالمة."""
+    bid = active_client_id()
+    if not bid:
+        return {"ok": False}
+    url = "/gallery/dental/demo_a03.mp4"
+    suad_post(bid, "ده فيديو عملناه من حالة تانية 🎬", kind="video", url=url)
+    suad_post(bid, "إيه رأيك فيه؟ اكتبلي هنا عشان نتكلم في الخطوة الجاية 😊", kind="ask", ask="feedback")
+    return {"ok": True, "url": url}
+
+
 @app.post("/api/suad/job/seen")
 def suad_job_seen():
     """شاف إن الفيديو خلص: الشريط اللي فوق يختفي."""

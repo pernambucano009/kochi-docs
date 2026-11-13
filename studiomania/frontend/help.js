@@ -61,6 +61,11 @@ const Help = (() => {
 .nh-ask{border:0;background:none;font:inherit;font-size:12.5px;color:var(--nh-muted, var(--muted, #6B6B67));cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 0 0}
 .nh-ask:hover{color:${OR}}
 .nh-ask svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.hp-pop{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;background:rgba(10,10,12,.72);direction:rtl;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));animation:hpIn .3s ease}
+.hp-pop>div{background:var(--card,#fff);color:var(--nh-ink, var(--text, #181718));border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center;max-width:min(94vw,520px);max-height:calc(100vh - 32px);box-sizing:border-box}
+.hp-pop b{font-size:17px;text-align:center}.hp-pop video{width:auto;max-width:100%;max-height:calc(100vh - 190px);border-radius:14px;background:#000}
+.hp-pop .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.hp-pop button{border:0;border-radius:999px;font:inherit;font-weight:600;padding:10px 18px;cursor:pointer}
+.hp-pop .go{background:${OR};color:#fff}.hp-pop .no{background:rgba(127,127,127,.15);color:inherit}
 @media (prefers-reduced-motion:reduce){.hp-fab{transition:none}.hp-fab .dot,.hp-job .dot{animation:none}.hp-tease{animation:none}}`;
   const ICON_Q = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 17h.01"/></svg>`;
   const ICON_CALL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>`;
@@ -128,9 +133,24 @@ const Help = (() => {
       if (!S.busy) S.msgs = r.msgs || [];
       // الفيديو خلص وهو فاتح الصفحة: رنة + فتح الشات
       if (prevJob === "working" && S.job?.status === "done") ring();
+      // 🎬 الفيديو خلص (دلوقتي، أو وهو برّه الصفحة ولسه ماشافوش): يظهر في نص الشاشة مرة واحدة
+      if (S.job?.status === "done" && !S.job.seen && S.job.url && S.popped !== S.job.url) { S.popped = S.job.url; popVideo(S.job.url, S.job.done_title || "الفيديو بتاعك جاهز 🎉", true); }
       draw(); tease();
       if (S.open && S.unread) api("/api/suad/read", { method: "POST" }).catch(() => {});
     } catch { /* مش مسجل دخول أو مفيش علامة */ }
+  }
+  // 🎬 فيديو في نص الشاشة: «إغلاق» (اتشاف) أو «شاهده لاحقًا» (يفضل في الشات وشريط فوق)
+  function popVideo(url, title, job = false) {
+    document.querySelector(".hp-pop")?.remove();
+    const d = document.createElement("div"); d.className = "hp-pop"; d.dataset.noI18n = ""; d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true");
+    d.innerHTML = `<div><b>${esc(title)}</b><video src="${esc(url)}" controls autoplay playsinline preload="auto"></video>
+      <div class="row"><button type="button" class="go" data-pclose>إغلاق</button><button type="button" class="no" data-plater>شاهده لاحقًا</button></div></div>`;
+    const close = (seen) => { d.querySelector("video")?.pause(); d.remove(); if (job && seen) seenJob(); };
+    d.querySelector("[data-pclose]").onclick = () => close(true);
+    d.querySelector("[data-plater]").onclick = () => close(false);
+    d.addEventListener("click", (e) => { if (e.target === d) close(false); });
+    document.body.append(d);
+    d.querySelector("video").play().catch(() => {});
   }
   function ring() {
     try { const a = new Audio("/sfx/suad_ding.wav"); a.volume = .7; a.play().catch(() => {}); } catch { /* */ }
@@ -241,5 +261,5 @@ const Help = (() => {
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
-  return { askBtn, ask, toggle, refresh };
+  return { askBtn, ask, toggle, refresh, popVideo };
 })();

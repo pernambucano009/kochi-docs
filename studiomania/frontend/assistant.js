@@ -199,7 +199,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return { status: r.status, progress: r.progress, step: r.step, error: r.error, parts: (r.chapters || []).length };
     }
     if (name === "play_showcase") return play();
-    if (name === "play_demo") return playDemo(args.template === "a24" ? "a24" : "a03", args.purpose === "sample" ? "sample" : "case");
+    if (name === "play_demo") {
+      // 🎬 مفيش صور حالة: الفيديو مايتعرضش جوه المكالمة. نورة تقفل، والفيديو يظهر في نص الشاشة بعد المكالمة (ويتبعت في شاتها)
+      if (args.purpose === "sample") { S.demoAfter = true; return { ok: true, after_call: true, note: "Do NOT wait for it: the video appears in the middle of his screen right after the call ends. Close now: tell him the video will appear in the middle of his screen right after you hang up; after he watches it he should write you his opinion, he will find you at the bottom right of any page with your name, so you talk about the next step. Then goodbye and call finish." }; }
+      return playDemo(args.template === "a24" ? "a24" : "a03", "case");
+    }
     if (name === "show_card") return card(args.kind);
     if (name === "suggest_competitor") {
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
@@ -884,6 +888,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S) return;
     const s = S; S = null;
     removeEventListener("hashchange", s.onHash);
+    if (s.demoAfter) setTimeout(async () => {   // 🎬 فيديو الأسنان الجاهز في نص الشاشة بعد ما المكالمة تقفل
+      const r = await api("/api/suad/demo", { method: "POST" }).catch(() => null);
+      if (typeof Help !== "undefined") { Help.popVideo?.(r?.url || "/gallery/dental/demo_a03.mp4", "فيديو عملناه من حالة تانية 🎬"); Help.refresh?.(); }
+    }, 900);
     clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
     // 💸 تكلفة المكالمة (ببلاش على العميل، بس علينا) ← عدّاد الصرف، وبتتكتب في سجل المكالمة في «معمل سعاد»
     if (s.greeted) {
