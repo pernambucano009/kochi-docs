@@ -107,6 +107,9 @@ body{transition:background-color 1.6s ease;-webkit-font-smoothing:antialiased}
 .lp-x{position:absolute;z-index:2;top:16px;inset-inline-end:16px;width:36px;height:36px;border-radius:18px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;background:transparent;color:inherit;opacity:.6;transition:opacity .2s,background-color .2s,transform .2s}
 .lp-pop>.lp-x{animation:none}
 .lp-x:hover,.lp-x:focus-visible{opacity:1;background:rgba(229,97,62,.12);transform:rotate(90deg)}
+/* 🌙 قوائم الاختيار في الوضع الغامق كانت بتفتح بيضا: المتصفح بياخد لونها من color-scheme */
+html[data-nh-theme="dark"]{color-scheme:dark}
+html[data-nh-theme="dark"] select option{background:#1C1C1F;color:#F2F2F2}
 </style>
 </head>
 <body>
