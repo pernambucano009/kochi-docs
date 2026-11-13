@@ -900,11 +900,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // هل المساعدة هتفتح؟ (من غير ما تفتح): عشان أول استخدام يروح لصفحة العقل الأول ويفتحها من دايرة «؟»
   let testOnce = false;
   async function gate(force) {
-    try { state = await api("/api/assistant"); } catch { return false; }
+    try { state = await api("/api/assistant"); } catch (e) { if (typeof TestRec !== "undefined") TestRec.note?.(`المكالمة مافتحتش: /api/assistant ${e?.message || e}`); return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search) || (state?.test && !testOnce);   // من دايرة «؟» أو ?assistant=1 أو حساب التجربة (مرة في كل دخول): يفتح حتى لو اتعمل قبل كده
     // 🚨 عميل جديد والمساعدة ماطلعتلوش: السبب بيروح صندوق الأخطاء (عشان نعرف من غير ما حد يبلّغ)
     const miss = (why) => { if (state?.new && !state?.done) fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); return false; };
+      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); if (state?.test && typeof TestRec !== "undefined") TestRec.note(`المكالمة مافتحتش: ${why}`); return false; };
     if (!state?.ready) return miss(`not ready: ${state?.why || "?"}`);
     if (!forced && (state.done || !state.new)) return false;
     if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }

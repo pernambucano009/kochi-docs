@@ -19,6 +19,9 @@ const TestRec = (() => {
     try { S.ctx.createMediaStreamSource(stream).connect(S.dest); } catch { /* */ }
   }
   async function start() {
+    try { await start2(); } catch (e) { toast(`التسجيل وقف: ${e?.message || e}`); } finally { readyRes(); }   // المكالمة ماتستناش للأبد لو حاجة وقعت
+  }
+  async function start2() {
     document.querySelector(".tr-ask")?.remove();
     let scr;
     try {
@@ -102,5 +105,7 @@ const TestRec = (() => {
     window.addEventListener("beforeunload", (e) => { if (S.rec) { e.preventDefault(); e.returnValue = ""; } });   // التسجيل يضيع لو الصفحة اتقفلت
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
-  return { start, stop, wait: () => ready };
+  // ملاحظة على الشاشة لحساب التجربة بس (ليه حاجة ماحصلتش)، عشان تتبعت في الشات
+  const note = (t) => { const d = document.createElement("div"); d.className = "tr-bar"; d.style.bottom = "120px"; d.style.maxWidth = "min(92vw,520px)"; d.textContent = "⚠️ " + t; document.body.append(d); setTimeout(() => d.remove(), 20000); };
+  return { start, stop, wait: () => ready, note };
 })();

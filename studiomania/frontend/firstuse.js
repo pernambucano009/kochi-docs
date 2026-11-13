@@ -191,6 +191,9 @@ body.fu-cine #nh .bm-hint,body.fu-cine .hp-fab,body.fu-cine .hp-tease{opacity:0!
   }
 
   async function check() {
+    try { await check2(); } catch (e) { if (typeof TestRec !== "undefined") TestRec.note?.(`أول استخدام وقف: ${e?.message || e}`); throw e; }
+  }
+  async function check2() {
     if (asked || (typeof APP !== "undefined" && APP === "kochi")) return;
     asked = true;
     const s = await load();
