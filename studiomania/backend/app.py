@@ -33091,7 +33091,8 @@ def assistant_state(request: Request):
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social"), None)
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
     why = "" if bid and livevoice.openai_key() else "no_brand" if not bid else "no_key"
-    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "name": a.get("name") or signup_name(request),
+    # ⏺️ حساب التجربة (+rec): المكالمة بتفتح كل مرة يدخل، حتى لو اتعملت قبل كده والعقل اتملا
+    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "test": testrec_on(request), "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
