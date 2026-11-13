@@ -8,7 +8,10 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt \
  && python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
 # متصفح Chromium: بيرسم فيديوهات التايبوجرافي فريم فريم (frontend/typo-engine.js)
-RUN python -m playwright install --with-deps chromium
+# لو تثبيت Playwright فشل (حصل مع تحديث صورة النظام)، البناء مايقفش: بننزّل Chromium من النظام والبرنامج بيستخدمه (TYPO_CHROMIUM)
+RUN python -m playwright install --with-deps chromium \
+ || (apt-get update && apt-get install -y --no-install-recommends chromium && rm -rf /var/lib/apt/lists/*)
+ENV TYPO_CHROMIUM=/usr/bin/chromium
 # خط الإيموجي الملوّن (عنصر emoji في التايبوجرافي) + ffmpeg/ffprobe ومكتبات الصور لمحرك قوالب الأسنان
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji ffmpeg libgl1 libegl1 libgles2 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 # 🦷 محرك قوالب الأسنان: نقط الوش وفصل الشخص (MediaPipe). MediaPipe بيسحب OpenCV بواجهة رسومية، فبنرجّع النسخة headless
