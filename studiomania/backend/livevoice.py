@@ -274,6 +274,11 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     # 🧠 اللي في العقل أصلًا مابيتسألش تاني: الأسئلة المجاوبة بتتشال من القايمة، وبتتبعت كمعلومة يبني عليها الكلام
     known = {k: v for k, v in (known or {}).items() if v}
     left = [(qid, q) for qid, q in quiz_questions() if qid not in known]
+    # «صِف مشروعك: ماذا تقدم، وما الذي يميزك؟» كانت بتتقال سؤالين في جملة: بقت نقطتين، كل واحدة في دور لوحدها
+    left = [x for qid, q in left for x in ((("about", "What they offer (their services / treatments). Ask this ALONE."),
+                                             ("about", "What makes them different from others. Ask this in a SEPARATE turn, after the first answer; "
+                                                       "save both answers together under [about]."))
+                                            if qid == "about" and tools else ((qid, q),))]
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
     kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in known.items())
     if kn:
@@ -399,6 +404,8 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never ask something that contradicts or ignores what they told you (e.g. after "I'm single", never ask about their kids).
    - One question per turn; follow up briefly when an answer is interesting. Never ask follow-up questions about the city or area:
      whatever they answer about their market is enough.
+   - Never put possible answers inside your question (not «ابتسامات تجميلية ولا تركيبات أو زراعة؟»): ask openly and let them answer.
+   - Say «مرضاك» (not «عملاؤك») to a doctor, and say «عقل العلامة», never «برين».
 4. {tour}
 5. {"(Dentist: the dental stop above IS the ending: skip step 6.)" if tools and have.get("dental") else "Do not ask them to add photos or videos to their library now (that comes later, after they subscribe)."}
    This call is a short demo of the platform (it costs money): never ask about their preferences for features (whether they want
