@@ -1,6 +1,7 @@
 // ⏺️ وضع تسجيل التجربة: حساب إيميله فيه «+rec» ← أول ما البرنامج يفتح بيظهر سؤال واحد «نبدأ التسجيل؟»، وبعد موافقة المتصفح
 // بيتسجل: الشاشة (التاب) + صوت التاب/الجهاز + المايك + صوت سعاد من المكالمة نفسها. «إيقاف وحفظ» ← الملف ينزل على الجهاز ويترفع للسيرفر.
 const TestRec = (() => {
+  let readyRes; const ready = new Promise((r) => { readyRes = r; });   // 🎙️ مكالمة نورة/سعاد بتستنى لحد ما التسجيل يبدأ (أو يترفض)
   const S = { rec: null, chunks: [], t0: 0, ctx: null, dest: null, streams: [], timer: 0, suad: new Set() };
   const CSS = `
 .tr-ask{border:0;padding:0;background:transparent;direction:rtl}.tr-ask::backdrop{background:rgba(0,0,0,.55)}
@@ -23,7 +24,7 @@ const TestRec = (() => {
     try {
       scr = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 24, displaySurface: "browser" }, audio: { suppressLocalAudioPlayback: false },
         preferCurrentTab: true, selfBrowserSurface: "include", systemAudio: "include", surfaceSwitching: "exclude" });
-    } catch { return toast("التسجيل ماشتغلش (لازم توافق على مشاركة الشاشة)"); }
+    } catch { readyRes(); return toast("التسجيل ماشتغلش (لازم توافق على مشاركة الشاشة)"); }
     let mic = null;
     try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); } catch { /* من غير مايك */ }
     S.ctx = new AudioContext(); S.dest = S.ctx.createMediaStreamDestination();
@@ -38,6 +39,7 @@ const TestRec = (() => {
     S.rec.start(5000); S.t0 = Date.now();
     scr.getVideoTracks()[0].addEventListener("ended", () => stop());   // وقف المشاركة من المتصفح نفسه = إيقاف وحفظ
     bar(true);
+    readyRes();   // التسجيل بدأ والأذونات اتاخدت: المكالمة تفتح دلوقتي
   }
   function stop() { if (S.rec && S.rec.state !== "inactive") S.rec.stop(); }
   async function save() {
@@ -84,7 +86,7 @@ const TestRec = (() => {
     d.innerHTML = `<div><b>⏺️ حساب تجربة</b><span>نبدأ تسجيل الشاشة والصوت (صوتك وصوت سعاد)؟ لما تخلّص دوس «إيقاف وحفظ» تحت على الشمال.</span>
       <button type="button" class="go">ابدأ التسجيل</button><button type="button" class="no">مش دلوقتي</button></div>`;
     d.querySelector(".go").onclick = start;   // ضغطة الزرار لازمة: المتصفح مابيسمحش بتسجيل الشاشة من غير ما المستخدم يدوس
-    d.querySelector(".no").onclick = () => d.remove();
+    d.querySelector(".no").onclick = () => { d.remove(); readyRes(); };
     d.addEventListener("cancel", (e) => e.preventDefault());
     document.body.append(d); d.showModal();
   }
@@ -92,13 +94,13 @@ const TestRec = (() => {
   async function mount() {
     try {
       const r = await fetch("/api/testrec", { credentials: "same-origin" });
-      if (!r.ok || !(await r.json()).on) return;
-    } catch { return; }
-    if (!navigator.mediaDevices?.getDisplayMedia) return;
+      if (!r.ok || !(await r.json()).on) return readyRes();
+    } catch { return readyRes(); }
+    if (!navigator.mediaDevices?.getDisplayMedia) return readyRes();
     const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
     ask();
     window.addEventListener("beforeunload", (e) => { if (S.rec) { e.preventDefault(); e.returnValue = ""; } });   // التسجيل يضيع لو الصفحة اتقفلت
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
-  return { start, stop };
+  return { start, stop, wait: () => ready };
 })();
