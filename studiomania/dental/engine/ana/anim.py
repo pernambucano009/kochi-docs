@@ -255,7 +255,21 @@ class Shot:
         add = cv2.morphologyEx(add.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
         n_, lab = cv2.connectedComponents(np.maximum(add, m.astype(np.uint8)))
         keep = np.isin(lab, np.unique(lab[m])) & (lab > 0)   # متصل بالفك بس (مش شفة بعيدة)
-        full = np.maximum(mk, (cv2.GaussianBlur((keep & (add > 0)).astype(np.float32), (0, 0), 2) * 255).astype(np.uint8))
+        # الإضافة لازم تبقى شريط متصل بحافة اللثة وحافته ناعمة: لون «وردي» لوحده كان بياخد حتت من الشفة ورا اللثة ويقصّها بحد مستقيم
+        # ← بقع لثة مربّعة وبينها إسود على حافة الفك (فيديو المكالمة الأولى a03: 0–25ث). طول الإضافة في كل صف = الجزء المتصل من
+        # حافة القناع، وبعدين وسيط + تنعيم رأسي، فالصف اللي فيه خرم بياخد طول جيرانه والحتة السايبة بتتشال.
+        ad = keep & (add > 0) & ~m; ext = np.zeros(H_, np.float32)
+        for y in np.where(ad.any(1) & (mr >= 0))[0]:
+            x0_ = int(mr[y]) + 1; run = ad[y, x0_:x0_ + int(w_b) + 8]
+            if not len(run): continue
+            st_ = int(np.argmax(run)) if run.any() else len(run)
+            if st_ > 3: continue   # مش لازقة في حافة اللثة
+            nz_ = np.where(~run[st_:])[0]; ext[y] = st_ + (int(nz_[0]) if len(nz_) else len(run) - st_)
+        raw_ = cv2.dilate(np.clip(ext, 0, 250).astype(np.uint8)[:, None], np.ones((15, 1), np.uint8))[:, 0]   # خرم أطول من ١٥ صف = مفيش لثة هناك فعلًا (مايتملاش من الجيران)
+        ext = np.minimum(cv2.medianBlur(np.clip(ext, 0, 250).astype(np.uint8)[:, None], 31)[:, 0], raw_).astype(np.float32)
+        ext = cv2.GaussianBlur(ext[:, None], (1, 0), sigmaX=1, sigmaY=8)[:, 0]; ext[ext < max(12, .3 * w_b)] = 0   # شريحة رفيعة (أقل من تلت عرض اللثة) بتبان خط/رقعة رمادي على الحافة مش لثة
+        band_ = (mr[:, None] >= 0) & (xs_ > mr[:, None] - 2) & (xs_ <= mr[:, None] + ext[:, None]) & (ext[:, None] > 0)
+        full = np.maximum(mk, (cv2.GaussianBlur(band_.astype(np.float32), (0, 0), 2) * 255).astype(np.uint8))
         s._if = Image.fromarray(full); s._if_src = (s.iso, s.img); return s._if
     def arch_rows(s):
         """أول وآخر صف فيه سنة **ولثة حقيقية** جنبها (جوه قناع العزل) في الصورة الملفوفة. حد الكادر فوق وتحت بيقف هنا:
