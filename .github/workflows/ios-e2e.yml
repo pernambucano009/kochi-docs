@@ -29,6 +29,7 @@ jobs:
     env:
       SIMSIMKIT_API_BASE: https://staging.simsimkit.com
       MAESTRO_CLI_NO_ANALYTICS: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "240000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
