@@ -68,8 +68,23 @@ jobs:
         run: |
           mkdir -p e2e-out
           xcrun simctl spawn "$UDID" log stream --style compact --predicate 'process == "'"$SCHEME"'"' > e2e-out/device.log 2>&1 &
-          maestro test .maestro --format junit --output e2e-out/report.xml --test-output-dir e2e-out/maestro \
-            -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
+          # كل شاشة في تشغيلة لوحدها (الـ driver بيقوم من جديد)، ولو الـ driver وقع (DeviceUnreachable) بنعيدها مرة.
+          # الكراش الحقيقي بيتسجّل "App crashed" وما بيتعادش.
+          FAIL=0; mkdir -p e2e-out/junit
+          for f in .maestro/0*.yaml; do
+            n=$(basename "$f" .yaml)
+            for attempt in 1 2; do
+              if maestro test "$f" --format junit --output "e2e-out/junit/$n.xml" --test-output-dir "e2e-out/maestro/$n" \
+                  -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD" > "e2e-out/$n.log" 2>&1; then
+                echo "✅ $n"; break
+              fi
+              if [ "$attempt" = 1 ] && grep -q -E "DeviceUnreachable|driver not ready|Connection refused" "e2e-out/$n.log"; then
+                echo "↻ $n: الـ driver وقع، بنعيد"; sleep 10; continue
+              fi
+              echo "❌ $n"; tail -n 5 "e2e-out/$n.log"; FAIL=1; break
+            done
+          done
+          exit $FAIL
       - name: Collect crashes and errors
         if: always()
         run: |
@@ -84,12 +99,14 @@ jobs:
             echo "### الشاشات"
             python3 - <<'PY'
           import xml.etree.ElementTree as ET, os
-          p='e2e-out/report.xml'
-          if os.path.exists(p):
-              for tc in ET.parse(p).getroot().iter('testcase'):
-                  f=tc.find('failure')
-                  msg = ('❌ ' + (f.get('message') or (f.text or ''))[:300].replace('\n',' ')) if f is not None else '✅'
-                  print(f"- **{tc.get('name')}**: {msg}")
+          import glob
+          files = sorted(glob.glob('e2e-out/junit/*.xml'))
+          if files:
+              for p in files:
+                  for tc in ET.parse(p).getroot().iter('testcase'):
+                      f = tc.find('failure')
+                      msg = ('❌ ' + (f.get('message') or (f.text or ''))[:300].replace('\n', ' ')) if f is not None else '✅'
+                      print(f"- **{tc.get('name')}**: {msg}")
           else:
               print('- (مفيش تقرير؛ Maestro ما اشتغلش)')
           PY
