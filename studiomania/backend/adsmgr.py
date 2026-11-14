@@ -135,7 +135,14 @@ def ad_accounts() -> list[dict]:
     prof = publisher.default_profile()   # صاحب البرنامج من غير بروفايل محدد: أول بروفايل عنده (الطلب لازم فيه profileId)
     if not prof:
         return []
-    data = _get("/ads/accounts", {"profileId": prof}, "قراءة حسابات الإعلانات")
+    # عميل جديد مالوش أي حساب نشر مربوط: مفيش حسابات إعلانات أصلًا. الخدمة كانت بترد «بيانات ناقصة» فتظهر رسالة خطأ حمرا
+    # فوق شاشة «اربط حساب الإعلانات» من غير ما العميل يعمل حاجة. الحالة دي = قائمة فاضية، مش خطأ.
+    with publisher._client(40) as c:
+        resp = c.get(f"{publisher.BASE_URL}/ads/accounts", params={"profileId": prof})
+    if resp.status_code in (400, 404, 422):
+        print(f"[adsmgr] ads accounts {resp.status_code} for a profile with nothing connected: {resp.text[:200]}", flush=True)
+        return []
+    data = _check(resp, "قراءة حسابات الإعلانات")
     items = publisher._pick(data, "accounts")
     return [x for x in (_norm_account(a) for a in items) if x]   # الطلب نفسه متفلتر ببروفايل العميل
 
