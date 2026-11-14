@@ -1,0 +1,18 @@
+appId: com.geekzone.simsimkit
+name: الدخول بالإيميل
+---
+- launchApp:
+    clearState: true
+    permissions: { all: allow }
+- extendedWaitUntil: { visible: "الدخول بالبريد الإلكتروني", timeout: 60000 }
+- takeScreenshot: 01-welcome
+- tapOn: "الدخول بالبريد الإلكتروني"
+- tapOn: { below: "البريد الإلكتروني" }
+- inputText: ${E2E_EMAIL}
+- tapOn: { below: "كلمة المرور" }
+- inputText: ${E2E_PASSWORD}
+- hideKeyboard
+- takeScreenshot: 01-login-filled
+- tapOn: "^دخول$"
+- extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
+- takeScreenshot: 01-after-login

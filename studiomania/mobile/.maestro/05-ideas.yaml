@@ -1,0 +1,20 @@
+appId: com.geekzone.simsimkit
+name: الأفكار (الكراش الأول في TestFlight)
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: "الأفكار", timeout: 30000 }
+- tapOn: { text: "الأفكار", index: 0 }
+- waitForAnimationToEnd
+- takeScreenshot: 05-ideas
+- tapOn: { text: "أو اكتبها", optional: true }
+- takeScreenshot: 05-ideas-write
+- inputText: "فكرة تجربة من اختبار الآيفون الأوتوماتيك"
+- hideKeyboard
+- tapOn: { text: "احفظها", optional: true }
+- waitForAnimationToEnd
+- takeScreenshot: 05-ideas-saved
+- tapOn: { text: "رجوع", optional: true }
+- tapOn: { text: "سجّل فكرة بصوتك", optional: true }
+- takeScreenshot: 05-ideas-record
+- tapOn: { text: "رجوع", optional: true }
+- assertVisible: "الأفكار"

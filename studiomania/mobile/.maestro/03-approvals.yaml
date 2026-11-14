@@ -1,0 +1,13 @@
+appId: com.geekzone.simsimkit
+name: الموافقات
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: "الموافقات", timeout: 30000 }
+- tapOn: { text: "الموافقات", index: 0 }
+- waitForAnimationToEnd
+- takeScreenshot: 03-approvals
+- scroll
+- takeScreenshot: 03-approvals-scrolled
+- tapOn: { text: "تخطَّ", optional: true }
+- tapOn: { text: "صوّرها الآن", optional: true }
+- takeScreenshot: 03-approvals-action

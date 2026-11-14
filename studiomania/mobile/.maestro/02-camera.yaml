@@ -1,0 +1,21 @@
+appId: com.geekzone.simsimkit
+name: الكاميرا (في الـ Simulator مفيش كاميرا حقيقية)
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
+- takeScreenshot: 02-camera
+- tapOn: { text: "الفلاش", optional: true }
+- tapOn: { text: "المؤقت", optional: true }
+- takeScreenshot: 02-camera-timer
+- tapOn: { text: "المؤقت", optional: true }
+- tapOn: { text: "تبديل الكاميرا", optional: true }
+- tapOn: { text: "حسابي", optional: true }
+- takeScreenshot: 02-account-menu
+- runFlow:
+    when: { visible: "حذف الحساب" }
+    commands:
+      - tapOn: { text: "إلغاء", optional: true }
+- back
+- tapOn: { text: "ارفع من معرض الصور", optional: true }
+- takeScreenshot: 02-gallery
+- back

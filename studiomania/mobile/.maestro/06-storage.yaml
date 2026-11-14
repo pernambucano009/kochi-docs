@@ -1,0 +1,11 @@
+appId: com.geekzone.simsimkit
+name: المساحة
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: "المساحة", timeout: 30000 }
+- tapOn: { text: "المساحة", index: 0 }
+- waitForAnimationToEnd
+- takeScreenshot: 06-storage
+- scroll
+- takeScreenshot: 06-storage-scrolled
+- assertVisible: "المساحة"

@@ -1,0 +1,19 @@
+appId: com.geekzone.simsimkit
+name: التيلي برومتر واللقطات
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
+- tapOn: { text: "التيلي برومتر", optional: true }
+- waitForAnimationToEnd
+- takeScreenshot: 07-teleprompter
+- tapOn: { text: "اسمح", optional: true }
+- tapOn: { text: "تكبير الخط", optional: true }
+- tapOn: { text: "تصغير الخط", optional: true }
+- tapOn: { text: "أسرع", optional: true }
+- tapOn: { text: "أبطأ", optional: true }
+- tapOn: { text: "اللقطات", optional: true }
+- takeScreenshot: 07-shots
+- tapOn: { text: "العودة إلى الكاميرا", optional: true }
+- tapOn: { text: "رجوع", optional: true }
+- tapOn: { text: "مشاريعي", optional: true }
+- takeScreenshot: 07-my-projects
