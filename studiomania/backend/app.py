@@ -3092,8 +3092,9 @@ def get_storage():
     }
     folders.update({"lab": LAB_DIR, "typo": TYPO_PROJ, "refs": REFS_DIR, "ads": ADS_DIR, "series": SERIES_DIR, "films": FILMS_DIR,
                     "carousels": CAROUSELS_DIR, "assets": ASSETS_DIR, "tvideos": TV_DIR})
+    cust = TENANT_ROLE == "customer"   # العميل يشوف مساحة ملفاته هو بس؛ قرص السيرفر كله للأدمن
     return {
-        "total_mb": usage.total // 2**20, "free_mb": usage.free // 2**20,
+        "total_mb": None if cust else usage.total // 2**20, "free_mb": None if cust else usage.free // 2**20,
         "folders": {k: folder_mb(v) for k, v in folders.items() if v.exists()},
         "wipe": {k: storage_count(k) for k in WIPE_SECTIONS},
     }

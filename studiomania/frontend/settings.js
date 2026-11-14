@@ -374,11 +374,13 @@ const WIPE_INFO = {
 async function loadStorage() {
   try {
     const st = await api("/api/storage");
-    const used = st.total_mb - st.free_mb;
-    const pct = Math.round((used / st.total_mb) * 100);
-    $("storageInfo").innerHTML = `${isAdmin_ ? `
+    const disk = st.total_mb != null;   // قرص السيرفر كله: للأدمن بس. العميل بيشوف مساحة ملفاته هو
+    const used = disk ? st.total_mb - st.free_mb : 0;
+    const pct = disk ? Math.round((used / st.total_mb) * 100) : 0;
+    const mine = Object.values(st.folders || {}).reduce((a, v) => a + (+v || 0), 0);
+    $("storageInfo").innerHTML = `${disk ? `
       <div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
-      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>` : ""}
+      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>` : `<p class="hint">مساحة ملفاتك: <b>${fmtMb(mine)}</b></p>`}
       <ul>${Object.entries(st.folders).filter(([, v]) => v >= 0.1).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
         const n = (st.wipe || {})[k];
         return `<li><span>${STORAGE_LABELS[k] || k}${n ? ` <small class="muted">(${n})</small>` : ""}</span><span class="row">${n ? `<button class="btn sm danger" data-wipe="${k}" data-n="${n}">${WIPE_INFO[k][0]}</button>` : ""}<b>${fmtMb(v)}</b></span></li>`;
