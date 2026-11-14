@@ -3,12 +3,13 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api } from "../../src/api";
+import { api, list as apiList } from "../../src/api";
 import { Icon } from "../../src/icons";
 import { hiddenRefs } from "../../src/report";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, T } from "../../src/ui";
 import { VideoSheet, type SheetVideo } from "../../src/VideoSheet";
+export { ScreenError as ErrorBoundary } from "../../src/errors";
 
 type Storage = { folders: Record<string, number> };
 type Export = { id: string; name: string; url: string; download_url: string; duration: number | null; created_at: string };
@@ -34,7 +35,7 @@ export default function StorageTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [a, b, hidden] = await Promise.all([api<Storage>("/api/storage").catch(() => null), api<Export[]>("/api/exports").catch(() => [] as Export[]), hiddenRefs()]);
+    const [a, b, hidden] = await Promise.all([api<Storage>("/api/storage").catch(() => null), apiList<Export>("/api/exports").catch(() => [] as Export[]), hiddenRefs()]);
     setSt(a || { folders: {} });
     setExps(b.filter((e) => !hidden.has("export:" + e.id)));
     setLoading(false);

@@ -6,6 +6,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { ReadexPro_300Light, ReadexPro_400Regular, ReadexPro_500Medium } from "@expo-google-fonts/readex-pro";
 import { Jost_400Regular, Jost_500Medium } from "@expo-google-fonts/jost";
+import { installGlobalErrorReporter } from "../src/errors";
 import { listenPush } from "../src/push";
 import { useTheme } from "../src/theme";
 
@@ -13,6 +14,7 @@ import { useTheme } from "../src/theme";
 I18nManager.allowRTL(true);
 I18nManager.forceRTL(true);
 SplashScreen.preventAutoHideAsync().catch(() => {});
+installGlobalErrorReporter();
 
 export default function RootLayout() {
   const t = useTheme();

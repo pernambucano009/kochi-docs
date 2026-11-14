@@ -38,6 +38,12 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   return data as T;
 }
 
+// 📋 قوايم: لو السيرفر رجّع حاجة مش array (صفحة HTML، أو {}، أو رسالة)، بنرجّع [] بدل ما الشاشة تقع
+export async function list<T>(path: string, init: RequestInit = {}): Promise<T[]> {
+  const r = await api<unknown>(path, init);
+  return Array.isArray(r) ? (r as T[]) : [];
+}
+
 export const json = (body: unknown): RequestInit => ({
   method: "POST",
   headers: { "Content-Type": "application/json" },

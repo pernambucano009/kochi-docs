@@ -4,13 +4,14 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl,
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { API_BASE, api, mediaHeaders, mediaUrl } from "../../src/api";
+import { API_BASE, api, list as apiList, mediaHeaders, mediaUrl } from "../../src/api";
 import { Icon } from "../../src/icons";
 import { confirmDelete, hiddenRefs, reportContent } from "../../src/report";
 import { shoot, toShoot } from "../../src/shoot";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, T } from "../../src/ui";
 import { VideoSheet, type SheetVideo } from "../../src/VideoSheet";
+export { ScreenError as ErrorBoundary } from "../../src/errors";
 
 type Flow = { id: string; template?: { kind?: string; name?: string }; stage?: string; title?: string; updated_at?: string };
 type Project = { id: string; name: string; cover_url: string | null; render_status: string; render_progress?: number | null; export_id: string | null; updated_at: string; data?: { name?: string } };
@@ -42,9 +43,9 @@ export default function Projects() {
   const load = useCallback(async () => {
     setLoading(true);
     const [flows, projects, exports, todo, hidden] = await Promise.all([
-      api<Flow[]>("/api/flows").catch(() => [] as Flow[]),
-      api<Project[]>("/api/projects").catch(() => [] as Project[]),
-      api<Export[]>("/api/exports").catch(() => [] as Export[]),
+      apiList<Flow>("/api/flows").catch(() => [] as Flow[]),
+      apiList<Project>("/api/projects").catch(() => [] as Project[]),
+      apiList<Export>("/api/exports").catch(() => [] as Export[]),
       toShoot().catch(() => []),
       hiddenRefs(),
     ]);

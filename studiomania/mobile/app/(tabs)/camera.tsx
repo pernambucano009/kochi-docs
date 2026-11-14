@@ -13,6 +13,7 @@ import { unregisterPush } from "../../src/push";
 import { shoot, toShoot, uploadShots, type Todo } from "../../src/shoot";
 import { ACCENT, F } from "../../src/theme";
 import { GlowButton, T } from "../../src/ui";
+export { ScreenError as ErrorBoundary } from "../../src/errors";
 
 type Mode = "photo" | "video" | "tp";
 const MODES: [Mode, string][] = [["photo", "صورة"], ["video", "فيديو"], ["tp", "تيلي برومتر"]];

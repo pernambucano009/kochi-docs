@@ -5,10 +5,11 @@ import { ActivityIndicator, Alert, Animated, Easing, Pressable, RefreshControl, 
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, fileField, json } from "../../src/api";
+import { api, fileField, json, list as apiList } from "../../src/api";
 import { Icon, type IconName } from "../../src/icons";
 import { ACCENT, F, useTheme } from "../../src/theme";
 import { Card, GlowButton, SoftButton, T } from "../../src/ui";
+export { ScreenError as ErrorBoundary } from "../../src/errors";
 
 type Idea = { id: string; title: string; text: string; hook: string; url: string; audio_url: string | null; status: string; error: string | null; polished: boolean; at: string };
 type Step = "idle" | "rec" | "write" | "wait" | "review";
@@ -45,7 +46,7 @@ export default function Ideas() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setIdeas(await api<Idea[]>("/api/my-ideas")); } catch { /* الشبكة: الليستة تفضل زي ما هي */ }
+    try { setIdeas(await apiList<Idea>("/api/my-ideas")); } catch { /* الشبكة: الليستة تفضل زي ما هي */ }
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -74,7 +75,7 @@ export default function Ideas() {
   useEffect(() => {
     if (step !== "wait" || !cur) return;
     const iv = setInterval(async () => {
-      const list = await api<Idea[]>("/api/my-ideas").catch(() => null);
+      const list = await apiList<Idea>("/api/my-ideas").catch(() => null);
       const x = list?.find((y) => y.id === cur);
       if (!list || !x || x.status === "transcribing") return;
       setIdeas(list);
@@ -109,7 +110,7 @@ export default function Ideas() {
       const fd = new FormData();
       if (what.file) fd.append("file", fileField(what.file, "idea.m4a", "audio/m4a"));
       if (what.text) fd.append("text", what.text);
-      const list = await api<Idea[]>("/api/my-ideas", { method: "POST", body: fd });
+      const list = await apiList<Idea>("/api/my-ideas", { method: "POST", body: fd });
       setIdeas(list);
       setCur(list[0]?.id || null);
       if (what.text) { setDraft(list[0]?.text || what.text); setStep("review"); }
@@ -135,13 +136,13 @@ export default function Ideas() {
 
   // «اتركها كما هي» / «احفظها»: لو عدّلت في النص بيتحفظ تعديلك
   const keep = () => act("save", () => (idea && draft.trim() !== idea.text
-    ? api<Idea[]>(`/api/my-ideas/${cur}`, { ...json({ text: draft.trim() }), method: "PATCH" })
-    : api<Idea[]>("/api/my-ideas")), "idle");
+    ? apiList<Idea>(`/api/my-ideas/${cur}`, { ...json({ text: draft.trim() }), method: "PATCH" })
+    : apiList<Idea>("/api/my-ideas")), "idle");
   const polish = () => act("polish", async () => {
     if (idea && draft.trim() !== idea.text) await api(`/api/my-ideas/${cur}`, { ...json({ text: draft.trim() }), method: "PATCH" });
-    return api<Idea[]>(`/api/my-ideas/${cur}/polish`, { method: "POST" });
+    return apiList<Idea>(`/api/my-ideas/${cur}/polish`, { method: "POST" });
   });
-  const revert = () => act("revert", () => api<Idea[]>(`/api/my-ideas/${cur}/revert`, { method: "POST" }));
+  const revert = () => act("revert", () => apiList<Idea>(`/api/my-ideas/${cur}/revert`, { method: "POST" }));
   const open = (x: Idea) => { setCur(x.id); setDraft(x.text); setStep(x.status === "transcribing" ? "wait" : "review"); };
 
   const glowScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] });

@@ -10,6 +10,7 @@ import { hiddenRefs, reportContent } from "../../src/report";
 import { shoot } from "../../src/shoot";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, GlowButton, SoftButton, T } from "../../src/ui";
+export { ScreenError as ErrorBoundary } from "../../src/errors";
 
 type Opt = { id: string; title: string; text: string };
 type Job = {

@@ -1,6 +1,6 @@
 // التصوير بالسكريبت: إيه اللي مستني يتصوّر (من الأوتوبايلوت أو من مشاريع «تصوير بالجوال»)، واللقطات اللي اتصوّرت، والرفع للمشروع
 import { useSyncExternalStore } from "react";
-import { api, fileField } from "./api";
+import { api, fileField, list } from "./api";
 
 export type Target = { kind: "pilot" | "flow" | "free"; id: string; title: string };
 export type Shot = { name: string; line: string; uri: string | null; secs: number; takes: number };
@@ -48,7 +48,7 @@ export async function toShoot(): Promise<Todo[]> {
   } catch {
     // الأوتوبايلوت مش متفعّل: عادي
   }
-  const flows = await api<FlowRow[]>("/api/flows").catch(() => [] as FlowRow[]);
+  const flows = await list<FlowRow>("/api/flows").catch(() => [] as FlowRow[]);
   for (const f of flows) {
     if (f.template?.kind !== "phone" || f.stage !== "shoot" || seen.has(f.id)) continue;
     const d = await api<FlowFull>(`/api/flows/${f.id}`).catch(() => null);
