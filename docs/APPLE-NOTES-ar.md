@@ -109,4 +109,31 @@
 4. بعد ما التطبيق يتعمل، اكتب هنا تحت «ردود» الـ `ascAppId` والـ Team ID (من غير أي باسوردات)، عشان أحطهم في `eas.json`.
 
 ## ردود
-(اكتب هنا)
+من جلسة الديسكتوب (2026-11-14)
+
+**على الأسئلة:**
+1. حساب Apple Developer **فردي (Individual)**، فاسم البائع اللي هيظهر في المتجر هيكون اسم إسلام الشخصي. لما الحساب يتحوّل لشركة GeekZone، التطبيق هيتنقل للشركة بـ App Transfer. سيبوا اسم GeekZone في الشروط والخصوصية زي ما هو.
+2. **ما فيش ربط بـ Apple ID ولا باسورد.** البناء والرفع هيشتغلوا بمفتاح App Store Connect API اللي على الحساب، وEAS هيعمل منه شهادة التوزيع والـ provisioning profile ومفتاح APNs لوحده. أنا اللي هضيف الـ secrets وأعدّل الـ workflow (التفاصيل تحت)، فإنتوا ما تعملوش حاجة في الجزء ده.
+3. الاسم في المتجر: **«SimsimKit»**. لو طلع محجوز، البديل «SimsimKit - سمسم كيت». الـ subtitle: «محتوى عربي بالذكاء الاصطناعي». الفئة الأساسية **Photo & Video**، والتانية **Productivity**. اللغة الأساسية: العربية.
+4. `ascAppId` والـ Team ID: هكتبهم هنا أول ما التطبيق يتعمل في App Store Connect.
+
+**على القرارات:**
+- ✅ **إخفاء الزرارين على iOS** (`approvals.tsx` و`projects.tsx`): اعملوه. «عدّل على الموقع» يتشال على iOS، والمشروع اللي مش جاهز يظهر فيه نص بس، من غير لينك. شيلوا كمان جملة «ويُلغى اشتراكك إن وُجد» من iOS.
+- ✅ **الإبلاغ والحذف لنتايج الذكاء الاصطناعي:** لازم قبل الرفع للمراجعة (مش لازم قبل TestFlight). كفاية زرار «إبلاغ» يبعت للسيرفر ويخفي النتيجة، و«احذف» للفيديو أو المشروع.
+- ✅ **صفحة الدعم** `simsimkit.com/support`: لازم قبل المراجعة.
+- ✅ **`ios.privacyManifests`:** اعملوه، وراجعوا Required Reason APIs (UserDefaults وFile timestamp وSystem boot time وDisk space).
+- ✅ **`build.json`:** ما تعملهوش لسه. أنا هقولكم إمتى، بعد ما الـ App ID والـ secrets يبقوا جاهزين.
+
+**على البناء (أنا هعمل ده بـ PR منفصل، ومحدش يلمسه):**
+- هزوّد على `mobile-build.yml` خطوة تكتب مفتاح الـ ASC من secret في ملف مؤقت، وتمرّر `EXPO_ASC_API_KEY_PATH` و`EXPO_ASC_KEY_ID` و`EXPO_ASC_ISSUER_ID` و`EXPO_APPLE_TEAM_ID` و`EXPO_APPLE_TEAM_TYPE=INDIVIDUAL` لـ `eas build`.
+- كمان هزوّد `--auto-submit` على الـ production عشان البناء يروح TestFlight على طول، وأملأ `submit.production.ios` في `eas.json`.
+- الـ secrets المطلوبة: `EXPO_TOKEN` (لسه مش موجود في الـ repo)، و`ASC_KEY_ID` و`ASC_ISSUER_ID` و`ASC_KEY_P8` و`APPLE_TEAM_ID`.
+
+⚠️ **تحذير:** الـ repo ده (`kochi-docs`) **public**، وفيه كود الموبايل والسيرفر بتاع سمسم كيت. ده قرار يرجع لإسلام، بس لو فضل public:
+- ما تتحطش أي أسرار في الكود ولا في الملفات دي.
+- الملاحظات هنا تفضل من غير أي بيانات شخصية.
+
+**أسئلة للجلسة السحابية:**
+1. حد عمل `eas credentials` لـ iOS قبل كده على مشروع geekzone-sa/simsimkit؟ (لو أيوه، هيكون فيه شهادة قديمة لازم نعرف عنها.)
+2. الشغل الحالي على `claude/new-program-gvemu5`. هل ده الفرع اللي هنبني منه iOS، ولا هيتدمج في `main` الأول؟
+
