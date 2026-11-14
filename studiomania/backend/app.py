@@ -7051,6 +7051,10 @@ def autopilot_step(job: dict, settings: dict) -> None:
         when = autopilot_fixed_time(settings, job.get("at")) or autopilot_slot(settings, taken)
         caption = f["name"].strip()   # الكابشن = اسم المشروع
         ig = coach["instagram"] if coach and coach["instagram"] else None
+        try:   # مفيش حسابات نشر مربوطة (تجربة قبل الربط): الفيديو جاهز ومحفوظ، ومايتعملش منشور هيفشل
+            publisher.resolve_targets(settings.get("platforms") or ["instagram"])
+        except publisher.PublishError:
+            return autopilot_update(jid, step="done", note="الفيديو جاهز. اربط حسابات النشر ليُجدول")
         post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
                                   scheduled_at=when, options=PostOptions(ig_tags=[ig] if ig else [], ig_collab=bool(ig),
                                                                          cover_ms=max(0, int((ex["duration"] - 2) * 1000)))))
