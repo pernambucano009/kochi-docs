@@ -2294,6 +2294,33 @@ def admin_create_customer(body: AdminCustomerIn, request: Request):
     return {"ok": True, "workspace": wid}
 
 
+# 🔁 تسليم الحساب: الأدمن يغيّر إيميل دخول العميل (حساب اتجهّز بإيميل تجريبي وبيتسلّم لصاحبه)، ومعاه باسوورد مؤقت جديد لو اتكتب.
+class AdminEmailIn(BaseModel):
+    email: str
+    password: str = ""
+
+
+@app.post("/api/platform/customers/{wid}/email")
+def admin_customer_email(wid: str, body: AdminEmailIn, request: Request):
+    admin(request)
+    if not workspace(wid) or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    email = norm_email(body.email)
+    if body.password:
+        check_pw(body.password)
+    with closing(db()) as c, c:
+        u = c.execute("SELECT id, email FROM users WHERE workspace=? AND role='customer' ORDER BY created_at LIMIT 1", (wid,)).fetchone()
+        if not u:
+            raise HTTPException(404, "لا يوجد مستخدم لهذا الحساب")
+        other = c.execute("SELECT id FROM users WHERE email=? AND id<>?", (email, u["id"])).fetchone()
+        if other:
+            raise HTTPException(400, "يوجد حساب آخر بهذا البريد الإلكتروني")
+        c.execute("UPDATE users SET email=?, verified=1 WHERE id=?", (email, u["id"]))
+        if body.password:
+            c.execute("UPDATE users SET pw=? WHERE id=?", (pw_hash(body.password), u["id"]))
+    return {"ok": True, "email": email}
+
+
 # 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن
 class CouponIn(BaseModel):
     code: str
