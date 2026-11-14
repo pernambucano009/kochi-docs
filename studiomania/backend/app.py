@@ -32664,6 +32664,13 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     if ph in ("final", "schedule"):
         if gate("video", "الفيديو جاهز: انظر إليه ووافق لكي يتجدول"):
             return
+        plats0 = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
+        try:   # مفيش حسابات نشر مربوطة (تجربة قبل الربط): الفيديو جاهز ومحفوظ، ومايتعملش منشور هيفشل ولا يتخصم رسم الجدولة
+            if not plats0:
+                raise publisher.PublishError("no accounts")
+            publisher.resolve_targets(["instagram"] if kind == "carousel" else plats0)
+        except publisher.PublishError:
+            return put(status="done", phase="done", gate=None, unposted=True, note="جاهز. اربط حسابات النشر لكي يُجدول")
         if not j.get("fee_paid"):   # الرسم مرة واحدة على البوست، قبل ما يتجدول
             wallet.need(pilot_fee(), "رسم الأوتوبايلوت")
             wallet.charge(pilot_fee(), f"الأوتوبايلوت: تجهيز وجدولة «{j['name']}»", jid)

@@ -241,7 +241,7 @@ const PilotPage = (() => {
   const ST = { run: "يعمل", wait: "بانتظارك", cam: "ينتظر تصويرك", done: "جُدول", failed: "توقف", stopped: "توقف" };
   function jobHTML(j) {
     const head = `<div class="ap-qh"><div class="tx">${esc(j.title || j.name)}<small>${esc(when(j.at))} · ${esc(j.name)}${j.note && j.status === "run" ? ` · ${esc(j.note)}` : ""}</small></div>
-      <span class="st ${j.status}">${ST[j.status] || ""}</span></div>`;
+      <span class="st ${j.status}">${j.unposted ? "جاهز دون نشر" : ST[j.status] || ""}</span></div>`;
     let body = "";
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
@@ -255,6 +255,9 @@ const PilotPage = (() => {
     } else if (j.status === "wait" && j.gate === "video") {
       body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : ""}
         <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوِله</button></div>`;
+    } else if (j.unposted) {   // مفيش حسابات مربوطة: الفيديو جاهز للمشاهدة من غير جدولة
+      body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : imgs(j)}
+        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">اربط حسابات النشر لكي يُجدول ما بعده</span></div>`;
     } else if (j.status === "cam") {
       body = `${(j.script || []).length ? `<p class="ap-say">${j.script.map(esc).join("<br>")}</p>` : ""}
         <div class="ap-acts"><button type="button" class="ok" data-phone="${esc(j.id)}">📱 صوّر من جوالك بالملقّن</button><label>⬆ ارفع الفيديو الذي صوّرته<input type="file" accept="video/*" capture="user" data-cam="${esc(j.id)}"></label><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
