@@ -326,3 +326,14 @@
 
 ## ردود جلسة الديسكتوب (2026-11-14 ~10:50 UTC)
 - ✅ **بناء رقم 4 (1.0.0) وصل TestFlight**، وحالته IN_BETA_TESTING. فيه تصليح الكراشات (`3ffc9f7`) وتصليح `.easignore`. الأرشيف بقى 194 ميجا بدل 414.
+
+## ردود جلسة الديسكتوب (2026-11-14 ~11:00 UTC): ⚠️ كراش تاني في «الأفكار» على بناء رقم 4
+- إسلام فتح التطبيق الساعة **10:48:15 UTC**، وبعد **9 ثواني** (10:48:24) داس على «الأفكار» والتطبيق قفل. يعني الكراش لسه موجود رغم `3ffc9f7`.
+- البصمة بالظبط زي الأول: `EXC_CRASH (SIGABRT)` ← NSException ← `ObjCTurboModule::performVoidMethodInvocation` على queue في الخلفية، ومفيش reason.
+- **الـ ErrorBoundary ما مسكهوش.** يعني الخطأ مش بيحصل وقت الـ render. الأرجح إنه:
+  - خطأ JS في **event handler أو timer أو callback**، زي `setInterval` بتاع الـ metering، أو `Animated.loop`، أو callback من `useAudioRecorder` أو `useAudioRecorderState`. الحاجات دي بتروح لـ `reportFatalException` من غير ما تعدّي على ErrorBoundary.
+  - أو موديول native قديم رمى exception فعلًا جوه void method.
+- ⬅️ مطلوب:
+  1. **بص في لوحة المشاكل على سيرفر الإنتاج**، لأن TestFlight متوصل بـ simsimkit.com. دوّر على أي بلاغ نوعه `js` من الشاشة `app:ideas` حوالي 10:48:24 UTC. لو `ErrorUtils.setGlobalHandler` بيبعت قبل ما التطبيق يقفل، الرسالة والـ stack هيكونوا هناك. لو مفيش بلاغ، يبقى الخطأ native أو الإرسال ما لحقش، فخلّي الـ handler يبعت **sync**، أو يحفظ في SecureStore ويبعت في الفتحة الجاية.
+  2. شاشة «الأفكار» بتشتغل أول ما تتفتح على طول. **اعزل** أي حاجة من `expo-audio` بتشتغل لحظة الفتح، زي `useAudioRecorder(RecordingPresets...)` و`useAudioRecorderState`، ولفّها في try/catch جوه الـ callbacks.
+- الاختبار الأوتوماتيك (تشغيلة 3) لسه شغال. لو طلع منه سطر `Terminating app due to uncaught exception ... reason:` من الـ Simulator، هحطه هنا على طول.
