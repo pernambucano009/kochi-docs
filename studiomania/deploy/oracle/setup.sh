@@ -119,6 +119,8 @@ git -C "$ROOT/src" fetch -q --depth 1 origin "$BRANCH"
 EOF
 chmod 700 "$ROOT/autoupdate.sh"
 echo "*/5 * * * * root $ROOT/autoupdate.sh" > /etc/cron.d/simsimkit
+# 🧹 كاش بناء Docker بيكبر مع كل تحديث (وصل ١٣٥ جيجا): كل يوم بيتقصّ ويفضل منه ١٠ جيجا بس (آخر بناء يفضل سريع)
+echo "17 3 * * * root docker builder prune -af --keep-storage 10GB >/dev/null 2>&1" > /etc/cron.d/simsimkit-clean
 
 echo "== 6) بناء وتشغيل (أول مرة بتاخد حوالي ١٠ دقايق)"
 "$ROOT/update.sh"

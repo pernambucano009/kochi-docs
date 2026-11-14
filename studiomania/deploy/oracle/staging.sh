@@ -65,6 +65,8 @@ git -C "$SR/src" fetch -q --depth 1 origin "$BRANCH"
 EOF
 chmod 700 "$SR/update.sh" "$SR/autoupdate.sh"
 echo "*/5 * * * * root $SR/autoupdate.sh" > /etc/cron.d/simsimkit-staging
+# 🧹 كاش بناء Docker بيكبر مع كل تحديث (وصل ١٣٥ جيجا): كل يوم بيتقصّ ويفضل منه ١٠ جيجا بس (آخر بناء يفضل سريع)
+echo "17 3 * * * root docker builder prune -af --keep-storage 10GB >/dev/null 2>&1" > /etc/cron.d/simsimkit-clean
 
 echo "== 4) الموقع الحقيقي يتثبّت على نسخته الحالية"
 git -C "$ROOT/src" rev-parse HEAD > "$ROOT/release"
