@@ -1,7 +1,8 @@
 # 📱 بناء تطبيق الجوال على Expo (EAS) بزرار من GitHub: Actions ← «Mobile build» ← Run workflow
 # محتاج سر واحد في الريبو: EXPO_TOKEN (من expo.dev ← Account settings ← Access tokens).
 # - preview + android: ملف APK يتثبّت على أي أندرويد للتجربة (الرابط بيظهر في expo.dev ← Builds)
-# - production: النسخة اللي بتترفع على Google Play و App Store (الآيفون محتاج حساب مطوّر Apple متربط على Expo)
+# - production: النسخة اللي بتترفع على Google Play و App Store. الآيفون بيتوقّع ويترفع على TestFlight لوحده بمفتاح ASC API
+#   (secrets: ASC_KEY_P8 و ASC_KEY_ID و ASC_ISSUER_ID و APPLE_TEAM_ID)
 name: Mobile build
 
 on:
@@ -44,4 +45,24 @@ jobs:
           echo "platform=$P" >> "$GITHUB_OUTPUT"; echo "profile=$F" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: eas build --platform ${{ steps.req.outputs.platform }} --profile ${{ steps.req.outputs.profile }} --non-interactive --no-wait
+      # 🍏 iOS: مفتاح App Store Connect API (من الـ secrets) بيتكتب في ملف مؤقت جوه المشروع (‏*.p8 متجاهَل في git فمش بيترفع).
+      # EAS بيستخدمه يعمل شهادة التوزيع والـ provisioning profile لوحده، ومع production بيرفع البناء على TestFlight (--auto-submit).
+      - name: App Store Connect API key (iOS)
+        if: steps.req.outputs.platform != 'android'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          if [ -z "$ASC_KEY_P8" ]; then echo "::error::ASC_KEY_P8 secret is missing"; exit 1; fi
+          echo "$ASC_KEY_P8" > asc-api-key.p8
+      - run: |
+          EXTRA=""
+          if [ "${{ steps.req.outputs.platform }}" = "ios" ] && [ "${{ steps.req.outputs.profile }}" = "production" ]; then EXTRA="--auto-submit"; fi
+          eas build --platform ${{ steps.req.outputs.platform }} --profile ${{ steps.req.outputs.profile }} --non-interactive --no-wait $EXTRA
+        env:
+          EXPO_ASC_API_KEY_PATH: ${{ github.workspace }}/studiomania/mobile/asc-api-key.p8
+          EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
+      - if: always()
+        run: rm -f asc-api-key.p8
