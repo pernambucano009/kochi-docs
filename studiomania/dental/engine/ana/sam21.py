@@ -2,9 +2,26 @@
 import numpy as np, cv2, onnxruntime as ort, os
 D = os.environ.get("SAM21_DIR") or (os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/models/sam21/")
 _enc = _dec = None
+FILES = ("vision_encoder.onnx", "vision_encoder.onnx_data", "prompt_encoder_mask_decoder.onnx", "prompt_encoder_mask_decoder.onnx_data")
+URL = "https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/"
+def _fetch():
+    """الموديل مش موجود (السيرفر اتبنى من غيره)؟ بيتحمّل مرة واحدة. لو المجلد مش بيتكتب فيه، بيتحط في SAM21_CACHE أو /tmp."""
+    global D
+    if all(os.path.exists(D + f) for f in FILES): return
+    import urllib.request
+    for d in (D, os.environ.get("SAM21_CACHE") or "/tmp/sam21/"):
+        try:
+            os.makedirs(d, exist_ok=True)
+            for f in FILES:
+                if not os.path.exists(d + f):
+                    urllib.request.urlretrieve(URL + f, d + f + ".part"); os.replace(d + f + ".part", d + f)
+            D = d; return
+        except OSError:
+            continue
 def _sess():
     global _enc, _dec
     if _enc is None:
+        _fetch()
         o = ort.SessionOptions(); o.intra_op_num_threads = 4
         _enc = ort.InferenceSession(D + "vision_encoder.onnx", o, providers=["CPUExecutionProvider"])
         _dec = ort.InferenceSession(D + "prompt_encoder_mask_decoder.onnx", o, providers=["CPUExecutionProvider"])

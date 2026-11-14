@@ -28,6 +28,9 @@ RUN if [ "$LOCAL_STT" = "1" ]; then pip install --no-cache-dir "faster-whisper>=
 # موديل فصل الشخص عن الخلفية (16MB) بيتحمّل وقت البناء عشان أول فيديو مايستناش
 ENV PERSON_MODELS=/opt/models
 RUN mkdir -p /opt/models && python -c "import urllib.request; urllib.request.urlretrieve('https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite', '/opt/models/selfie_multiclass_256x256.tflite'); urllib.request.urlretrieve('https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx', '/opt/models/rvm_mobilenetv3_fp32.onnx')" || true
+# 🦷 موديل تحديد الأسنان (SAM 2.1، حوالي 900MB): من غيره تحليل صور الحالة بيفشل. بيتحمّل وقت البناء، ولو مانزلش بيتحمّل أول استخدام
+ENV SAM21_DIR=/opt/models/sam21/
+RUN mkdir -p /opt/models/sam21 && python -c "import urllib.request as u; [u.urlretrieve('https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/' + f, '/opt/models/sam21/' + f) for f in ('vision_encoder.onnx', 'vision_encoder.onnx_data', 'prompt_encoder_mask_decoder.onnx', 'prompt_encoder_mask_decoder.onnx_data')]" || true
 COPY backend backend
 COPY frontend frontend
 COPY fonts fonts
