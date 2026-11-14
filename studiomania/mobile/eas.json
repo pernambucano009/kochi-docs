@@ -9,5 +9,15 @@
       "autoIncrement": true
     }
   },
-  "submit": { "production": {} }
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6834723403",
+        "appleTeamId": "L958Q47J6C",
+        "ascApiKeyPath": "./asc-api-key.p8",
+        "ascApiKeyId": "7P868LWZY3",
+        "ascApiKeyIssuerId": "a92da58b-7735-4dbf-99a3-31a21117929b"
+      }
+    }
+  }
 }
