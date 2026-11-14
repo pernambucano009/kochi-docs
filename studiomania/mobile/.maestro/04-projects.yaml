@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: المشاريع (الكراش التاني في TestFlight)
+# المشاريع (الكراش التاني في TestFlight)
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "المشاريع", timeout: 30000 }

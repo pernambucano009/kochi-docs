@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: الموافقات
+# الموافقات
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "الموافقات", timeout: 30000 }

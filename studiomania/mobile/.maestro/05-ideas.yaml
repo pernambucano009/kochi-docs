@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: الأفكار (الكراش الأول في TestFlight)
+# الأفكار (الكراش الأول في TestFlight)
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "الأفكار", timeout: 30000 }

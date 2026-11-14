@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: التيلي برومتر واللقطات
+# التيلي برومتر واللقطات
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }

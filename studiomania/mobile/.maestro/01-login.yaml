@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: الدخول بالإيميل
+# الدخول بالإيميل (حساب تجربة على staging من GitHub secrets)
 ---
 - launchApp:
     clearState: true
@@ -7,11 +7,12 @@ name: الدخول بالإيميل
 - extendedWaitUntil: { visible: "الدخول بالبريد الإلكتروني", timeout: 60000 }
 - takeScreenshot: 01-welcome
 - tapOn: "الدخول بالبريد الإلكتروني"
-- tapOn: { below: "البريد الإلكتروني" }
+- extendedWaitUntil: { visible: "كلمة المرور", timeout: 15000 }
+# الحقول من غير testID: بنضغط على مكانها (البريد فوق، وكلمة المرور تحته؛ بعيد عن زرار العين اللي على الشمال)
+- tapOn: { point: "60%,21%" }
 - inputText: ${E2E_EMAIL}
-- tapOn: { below: "كلمة المرور" }
+- tapOn: { point: "60%,30%" }
 - inputText: ${E2E_PASSWORD}
-- hideKeyboard
 - takeScreenshot: 01-login-filled
 - tapOn: "^دخول$"
 - extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }

@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: المساحة
+# المساحة
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "المساحة", timeout: 30000 }

@@ -1,5 +1,5 @@
 appId: com.geekzone.simsimkit
-name: الكاميرا (في الـ Simulator مفيش كاميرا حقيقية)
+# الكاميرا (في الـ Simulator مفيش كاميرا حقيقية)
 ---
 - launchApp: { permissions: { all: allow } }
 - extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
