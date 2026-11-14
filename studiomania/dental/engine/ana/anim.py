@@ -297,7 +297,10 @@ class Shot:
     def base(s, z, iso=0.0):
         cx, cy, cw, ch = s.crop(z, iso)
         box = (int(cx - cw / 2), int(cy - ch / 2), int(cx + cw / 2), int(cy + ch / 2))
-        im = s.img.crop(box).resize((FW, FH), Image.BICUBIC)
+        hi_ = getattr(s, "_hi", None)   # نسخة عالية الدقة لنفس الصورة المعروضة (التكبير الأمين): القص منها بنفس الكادر ← حدة أعلى، والهندسة كلها زي ما هي
+        if hi_ is not None and hi_[0] is s.img:
+            k_ = hi_[1].size[0] / s.img.size[0]; im = hi_[1].crop(tuple(int(round(v * k_)) for v in box)).resize((FW, FH), Image.LANCZOS)
+        else: im = s.img.crop(box).resize((FW, FH), Image.BICUBIC)
         if iso > 0:   # كل حاجة غير الست سنان واللثة بتسودّ (زي الأصل)
             mk = s.iso_full().crop(box).resize((FW, FH), Image.BICUBIC).point(lambda v: int(255 - iso * (255 - v) * .96))
             im = Image.composite(im, Image.new("RGB", im.size, (4, 4, 5)), mk)

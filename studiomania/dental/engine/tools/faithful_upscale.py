@@ -21,4 +21,25 @@ def upscale_small(path, min_w=1400, passes=2):
         Image.open(tmp).convert("RGB").save(path, quality=95); os.remove(tmp); os.remove(up); w = Image.open(path).width
     return w0, w
 
-if __name__ == "__main__": print(faithful(*sys.argv[1:4]))
+def hires(path, sig=6.0):
+    """نسخة عالية الدقة (×٢) من صورة الحالة للعرض في الفيديو: <الاسم>_hi.png جنب الصورة. الحدة والتفاصيل (كل اللي أدق من sig بكسل)
+    من موديل التكبير، واللون والتصبغات وشكل السنان من الصورة الأصلية. الصورة الأصلية نفسها مابتتغيرش، والتحليل بيفضل عليها."""
+    import os, sys as _s
+    out = path.rsplit(".", 1)[0] + "_hi.png"
+    if os.path.exists(out): return out
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))); _s.path.insert(0, root + "/gen")
+    from at import run, get, upload
+    up = path.rsplit(".", 1)[0] + "_upx.png"
+    get(run("Image", {"model": "tencent/image/upscaler", "image": upload(path)}), up)
+    U = np.array(Image.open(up).convert("RGB")).astype(np.float32); os.remove(up)
+    O = np.array(Image.open(path).convert("RGB").resize((U.shape[1], U.shape[0]), Image.BICUBIC)).astype(np.float32)
+    Image.fromarray(np.clip(cv2.GaussianBlur(O, (0, 0), sig) + (U - cv2.GaussianBlur(U, (0, 0), sig)), 0, 255).astype(np.uint8)).save(out)
+    return out
+
+if __name__ == "__main__":
+    if sys.argv[1] == "hires":   # python3 faithful_upscale.py hires <case_dir>: صورتين الريتراكتور (قبل/بعد)
+        import os
+        for rel in ("canon/before/macro.jpg", "canon/after/front.jpg"):
+            f = os.path.join(sys.argv[2], rel)
+            if os.path.exists(f): print("HIRES", hires(f), flush=True)
+    else: print(faithful(*sys.argv[1:4]))

@@ -613,6 +613,11 @@ def _render(tpl: str, fix: list | None = None):
             os.replace(out, case / "out" / "old" / f"{tpl}_{int(out.stat().st_mtime)}.mp4")
         for f in ("iso_qa.json", "claude_qa.json", "claude_video.json", "source_issues.json"):   # تقرير ريندر قديم مايتقريش على إنه بتاع الريندر ده
             (case / "qa" / f).unlink(missing_ok=True)
+        if not (case / "canon" / "before" / "macro_hi.png").exists():   # التكبير الأمين لصورتي الريتراكتور (مرة لكل حالة): الفيديو ياخد منه حدة أعلى
+            try:                                                           # لو فشل، الفيديو يطلع بالدقة العادية (مش عطل)
+                _run(case, ["faithful_upscale.py", "hires", str(case)], "hires.log", 600, cwd="tools")
+            except Exception as exc:
+                print(f"[dental] hires failed {case.name}: {exc}", flush=True)
         r = _run(case, ["T.py", tpl], f"render_{tpl}.log", 3600, cwd="tpl")
         if r.returncode != 0 or not out.exists():
             out.unlink(missing_ok=True)   # ملف ناقص من ريندر فاشل مايتحفظش

@@ -312,6 +312,52 @@ def morph_img(prog, rotated=True, flash_t=None):
     """المورف الحقيقي: شكل كل سنة بيتحول في مكانها (مش مزج)."""
     f = shape_morph().frame(prog); im = Image.fromarray(np.clip(f, 0, 255).astype(np.uint8))
     return rot(im) if rotated else im
+_HI = {}
+def hi_detail():
+    """التكبير الأمين في الفيديو: تفاصيل الحدة (الفرق بين النسخة عالية الدقة والصورة الأصلية مكبّرة) لصورتي القبل والبعد، متقسمة:
+    لثة وخلفية (من القبل، في كل لحظات التحول)، سنان القبل (قبل التحول بس)، سنان البعد المتطابقة على القبل (بعد التحول بس).
+    أثناء التحول نفسه السنان مابتاخدش تفاصيل (شكلها بيتغير). من غير ملفات *_hi.png بيرجّع None والفيديو يطلع بالدقة العادية."""
+    if "ok" in _HI: return _HI if _HI["ok"] else None
+    _HI["ok"] = False
+    pb, pa = C + "before/macro_hi.png", C + "after/front_hi.png"
+    if os.environ.get("NO_HIRES") or not (os.path.exists(pb) and os.path.exists(pa)): return None
+    try:
+        M = morph_setup(); B = shot("B"); H, W = M["shape"]
+        hb = np.asarray(L(pb), np.float32); k = int(round(hb.shape[1] / W))
+        if k < 2 or hb.shape[1] != W * k or hb.shape[0] != H * k: return None
+        DB = hb - np.asarray(L(C + "before/macro.jpg").resize((W * k, H * k), Image.BICUBIC), np.float32); del hb
+        la = L(C + "after/front.jpg"); ha = L(pa)
+        if ha.size != (la.width * k, la.height * k): return None
+        DA = np.asarray(ha, np.float32) - np.asarray(la.resize(ha.size, Image.BICUBIC), np.float32)
+        m2 = np.asarray(M["M"], np.float32).copy(); m2[:, 2] *= k
+        DA = cv2.warpAffine(DA, m2, (W * k, H * k), flags=cv2.INTER_LINEAR)
+        def poly(cs):
+            mk = np.zeros((H * k, W * k), np.uint8)
+            for c in cs: cv2.fillPoly(mk, [(np.asarray(c, np.float32) * k).astype(np.int32)], 255)
+            return mk
+        Bt = {t["fdi"]: t for t in B.teeth_all}; hid = [Bt[q]["c"] for q in M.get("hidden", []) if q in Bt]
+        mb = poly([t["c"] for t in B.teeth_all if t["fdi"] not in M.get("hidden", [])]); ma = poly([M["planned"][q] for q in M["common"] if q < 30]); mh = poly(hid)
+        far = cv2.dilate(np.maximum(mb, ma), np.ones((6 * k + 1, 6 * k + 1), np.uint8)) == 0   # بعيد عن أي سنة بتتحول (لثة/خلفية) + السنان الباقية من القبل
+        f32 = lambda mk: cv2.GaussianBlur(mk.astype(np.float32), (0, 0), 1.5 * k)[..., None]
+        er = lambda mk: cv2.erode(mk, np.ones((2 * k + 1, 2 * k + 1), np.uint8)) > 0
+        _HI.update(k=k, G=(DB * f32(far | (mh > 0))).astype(np.float16), TB=(DB * f32(er(mb))).astype(np.float16), TA=(DA * f32(er(ma))).astype(np.float16), cache={}, ok=True)
+        print(f"HIRES: detail layers ready (x{k})", flush=True)
+    except Exception as e: print("HIRES failed (normal resolution used):", str(e)[:200], flush=True)
+    return _HI if _HI["ok"] else None
+def hi_frame(lo, prog):
+    """lo: صورة المورف الملفوفة (الدقة العادية) ← نفس الصورة ×k بتفاصيل الحدة. بتتخزن لأول وآخر التحول (أغلب الفيديو)."""
+    hd = hi_detail()
+    if not hd: return None
+    ps = [prog] if isinstance(prog, (int, float)) else list(prog.values()) or [0]
+    st = 0 if max(ps) <= .02 else 1 if min(ps) >= .98 else None
+    if st is not None and st in hd["cache"] and hd["cache"][st][0] is lo: return hd["cache"][st][1]
+    k = hd["k"]; a = np.ascontiguousarray(np.rot90(np.asarray(lo), 1)); H, W = a.shape[:2]
+    up = cv2.resize(a, (W * k, H * k), interpolation=cv2.INTER_CUBIC).astype(np.float32) + hd["G"]
+    if st == 0: up += hd["TB"]
+    elif st == 1: up += hd["TA"]
+    out = rot(Image.fromarray(np.clip(up, 0, 255).astype(np.uint8)))
+    if st is not None: hd["cache"][st] = (lo, out)
+    return out
 def morph_img_old(prog, rotated=True, flash_t=None):
     """prog: dict سنة→تقدّم 0..1 (أو رقم واحد لكل السنان). يرجّع صورة القبل وفيها السنان المتحولة لصورة البعد الحقيقية."""
     M = morph_setup(); RB, RA, RM = (M["RB"], M["RA"], M["RM"]) if rotated else (M["FB"], M["FA_"], M["FM"])
@@ -339,6 +385,8 @@ def morph_frame(prog, z=1.0, iso=1.0):
     B = shot("B"); M = morph_setup()
     if not hasattr(B, "_img0"): B._img0, B._iso0 = B.img, B.iso   # صورة القبل الأصلية (ملاحظة a30 5.6: المورف كان بيسيب صورة القبل المشتركة متغيرة للبعد، فأي مشهد قبل بعده طلع بسنان بيضا)
     B.img = morph_img(prog)
+    hi_ = hi_frame(B.img, prog)
+    if hi_ is not None: B._hi = (B.img, hi_)
     try:
         if iso > 0:
             m = M["isoB"].copy(); cc = current_contours(prog); cur = np.zeros_like(m)
