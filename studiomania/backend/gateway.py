@@ -243,7 +243,7 @@ def is_paid(wid: str, role: str = "") -> bool:
     if hit and time.time() - hit[0] < 60:
         return hit[1]
     w = workspace(wid)
-    ok = bool(w) and (w["plan"] or "trial") != "trial" and (not w["ends_at"] or float(w["ends_at"]) > time.time())
+    ok = bool(w) and (w["plan"] or "trial") not in ("trial", "none") and (not w["ends_at"] or float(w["ends_at"]) > time.time())   # none = اشتراك خلص
     _PAID[wid] = (time.time(), ok)
     return ok
 
@@ -2342,6 +2342,37 @@ def admin_customer_email(wid: str, body: AdminEmailIn, request: Request):
         if body.name.strip():
             c.execute("UPDATE users SET name=? WHERE id=?", (body.name.strip()[:80], u["id"]))
     return {"ok": True, "email": email or u["email"]}
+
+
+# 🎁 تفعيل باقة لمدة محددة من الأدمن من غير دفع (تجربة لعميل بنجهّزله حسابه): كأنه مشترك لحد آخر المدة، وبعدها الاشتراك بيخلص لوحده.
+class AdminPlanIn(BaseModel):
+    plan: str
+    days: int = 7
+
+
+@app.post("/api/platform/customers/{wid}/plan")
+def admin_customer_plan(wid: str, body: AdminPlanIn, request: Request):
+    admin(request)
+    w = workspace(wid)
+    if not w or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    p = plan_of(body.plan)
+    if not p:
+        raise HTTPException(400, "باقة غير معروفة")
+    days = int(body.days)
+    if not 1 <= days <= 365:
+        raise HTTPException(400, "المدة من يوم إلى ٣٦٥ يومًا")
+    if w["sub_id"]:
+        raise HTTPException(400, "هذا العميل مشترك باشتراك مدفوع يعمل الآن")
+    ends = time.time() + days * 86400
+    with closing(db()) as c, c:
+        c.execute("UPDATE workspaces SET plan=?, autopilot=?, provider='admin', sub_id=NULL, ends_at=?, sub_started=?, cycle='month', refill_at=NULL WHERE id=?",
+                  (p["key"], int(bool(p.get("autopilot"))), ends, time.time(), wid))
+        c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+        c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
+        ledger_add(c, wid, p["credits"], "plan", f"باقة {p['name']} تجربة {days} يوم من فريق سمسمكيت")
+    _PAID.pop(wid, None)
+    return {"ok": True, "plan": p["key"], "ends_at": ends}
 
 
 # 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن

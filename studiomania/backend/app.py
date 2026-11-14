@@ -33122,12 +33122,17 @@ def assist_info() -> tuple[str | None, dict, dict]:
     return bid, b, b.get("assistant") or {}
 
 
+def assist_full(request: Request) -> bool:
+    """🧠 المكالمة الكاملة (كل أسئلة العقل) للمشترك بس؛ المجاني على الأسئلة الأساسية. صاحب البرنامج/الأدمن = الأساسية (بيجرب اللي العميل الجديد بيشوفه)."""
+    return TENANT_ROLE == "customer" and request.headers.get("x-user-paid") == "1"
+
+
 def signup_name(request: Request) -> str:
     """الاسم اللي العميل سجّل بيه (البوابة بتبعته)، عشان المساعد مايسألش عنه تاني."""
     return unquote(request.headers.get("x-user-name") or "").strip()[:60]
 
 
-def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
+def assist_plan(b: dict, full: bool = False) -> tuple[dict, dict, list[str]]:
     """اللي العميل قاله قبل كده (مش اللي البرنامج ملاه لوحده من بروفايل المجال)، واللي عنده (الحساب، الشعار، الصور)،
     وخطوات المكالمة اللي فاضلة بالترتيب: الحساب ← الأسئلة ← الشعار ← صور المنتجات (عشان العدّاد يبان للعميل)."""
     pre = fz._prefilled(b)
@@ -33152,7 +33157,7 @@ def assist_plan(b: dict) -> tuple[dict, dict, list[str]]:
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
     have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
     # الشعار والصور مابيتطلبوش في المكالمة (بنفكّره في الآخر يملا مكتبة المحتويات)
-    steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions() if qid not in known]
+    steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions(full) if qid not in known]
     return known, have, steps
 
 
@@ -33165,13 +33170,13 @@ def assistant_state(request: Request):
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
     why = "" if bid and livevoice.openai_key() else "no_brand" if not bid else "no_key"
     # ⏺️ حساب التجربة (+rec): المكالمة بتفتح كل مرة يدخل، حتى لو اتعملت قبل كده والعقل اتملا
-    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")) or bool(ob.get("concierge")), "new": brain_score(b) < 60, "test": testrec_on(request), "name": signup_name(request) or a.get("name"),   # اسم الحساب (بيتعدل من الإعدادات) قبل الاسم اللي اتقال في مكالمة قديمة
+    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")) or (bool(ob.get("concierge")) and not assist_full(request)),   # حساب بنجهّزه: المكالمة ماتفتحش لوحدها إلا لما نفعّله باقة (المكالمة الكاملة) "new": brain_score(b) < 60, "test": testrec_on(request), "name": signup_name(request) or a.get("name"),   # اسم الحساب (بيتعدل من الإعدادات) قبل الاسم اللي اتقال في مكالمة قديمة
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
-            "steps": assist_plan(b)[2] if bid else [],
+            "steps": assist_plan(b, assist_full(request))[2] if bid else [], "full": assist_full(request),
             # العدد الكلي ثابت (الحساب + كل أسئلة العقل): لو خرج ورجع العداد بيكمّل من مكانه («٩ من ١٤» مش «١ من ٥»)
-            "steps_total": 1 + len(livevoice.quiz_questions())}
+            "steps_total": 1 + len(livevoice.quiz_questions(assist_full(request)))}
 
 
 class AssistProfileIn(BaseModel):
@@ -33285,7 +33290,8 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ob = onboard_load() or {}
     dia = assist_dialect()
     ag = "f"   # المساعدة دايمًا بنت (صاحب المنصة اختار كده)
-    known, have, steps = assist_plan(b)
+    full = assist_full(request)
+    known, have, steps = assist_plan(b, full)
     # النوع لو اتحفظ قبل كده، وإلا الموديل يستنتجه من الاسم ومن كلام العميل نفسه
     # «راجع» بس لو فعلًا جاوب أو عدّى أسئلة في مكالمة قبل كده؛ مجرد إنه فتح المكالمة وقفلها مايخليهاش تقول «نكمّل من مكان ما وقفنا»
     returning = bool(a.get("saved") or a.get("skipped"))
@@ -33307,7 +33313,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                 implant_demo=(FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists())   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
     instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
-                                   returning=returning, have=have)
+                                   returning=returning, have=have, full=full)
     try:   # 🎚️ النموذج من «معمل سعاد»: الكامل (أجود في اللهجات) أو mini (أرخص نحو ٣ مرات)
         pick = json.loads((ASSIST_LOG_DIR.parent / "assist_log.json").read_text("utf-8")).get("model") or "full"
     except (OSError, ValueError):

@@ -95,6 +95,9 @@ VOICE_GENDER = {"marin": "f", "cedar": "m", "coral": "f", "sage": "f", "shimmer"
 SKIP_Q = {"language", "link", "type"}   # اللهجة معروفة من التسجيل، والحساب بيتطلب الأول، والنوع بيبان من الوصف
 # 💸 المكالمة استعراض (وبتتكلف فلوس): بنسأل بس اللي محتاجينه عشان نحلل ونجيب منافسين ونعمل الفيديو. الباقي العقل بيسأله بعدين
 CALL_Q = ["domain", "about", "audience", "market"]
+# 🧠 المكالمة الكاملة (للمشترك): كل أسئلة العقل اللي ينفع تتسأل بالصوت. المنافسون ليهم محطة لوحدهم، واللينك/اللهجة/النوع في SKIP_Q.
+# المجاني بيفضل على CALL_Q (تكلفة الصوت)، والباقي بيملاه كتابة من اختبار العقل.
+FULL_Q = ["domain", "about", "audience", "pain", "market", "voice", "products", "offer", "proof", "faq", "rules", "cta"]
 
 
 def agent_name(dialect: str, gender: str) -> str:
@@ -102,11 +105,12 @@ def agent_name(dialect: str, gender: str) -> str:
     return m if gender == "m" else f
 
 
-def quiz_questions() -> list[tuple[str, str]]:
-    """(رقم السؤال في كويز العقل، نصه) بالترتيب."""
+def quiz_questions(full: bool = False) -> list[tuple[str, str]]:
+    """(رقم السؤال في كويز العقل، نصه) بالترتيب. full: المكالمة الكاملة للمشترك (كل أسئلة العقل)."""
     try:
         import brainquiz  # noqa: PLC0415
-        return [(q["id"], q["ar"]) for q in brainquiz.Q if q["id"] in CALL_Q]
+        want = FULL_Q if full else CALL_Q
+        return [(q["id"], q["ar"]) for q in brainquiz.Q if q["id"] in want]
     except Exception:  # noqa: BLE001
         return [("domain", "ما مجال عملك؟"), ("about", "صِف مشروعك: ماذا تقدم، وما الذي يميزك؟"), ("audience", "من هو عميلك المثالي؟"),
                 ("market", "في أي مدينة أو دولة عملاؤك؟")]
@@ -252,7 +256,7 @@ STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading th
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
-                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "", lessons: list[str] | None = None, steps: list[str] | None = None) -> str:
+                 known: dict | None = None, returning: bool = False, have: dict | None = None, ctx: str = "", lessons: list[str] | None = None, steps: list[str] | None = None, full: bool = False) -> str:
     """have: اللي العقل فيه أصلًا ومش محتاج يتطلب تاني (account: اسم الحساب، logo / products: True لو اترفعوا)."""
     have = have or {}
     label, lang, sample = DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"]
@@ -276,13 +280,18 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
             "If the user says or shows they are of the other gender, switch at once" + (" and call set_user_gender" if tools else ""))
     # 🧠 اللي في العقل أصلًا مابيتسألش تاني: الأسئلة المجاوبة بتتشال من القايمة، وبتتبعت كمعلومة يبني عليها الكلام
     known = {k: v for k, v in (known or {}).items() if v}
-    left = [(qid, q) for qid, q in quiz_questions() if qid not in known]
+    left = [(qid, q) for qid, q in quiz_questions(full) if qid not in known]
     # «صِف مشروعك: ماذا تقدم، وما الذي يميزك؟» كانت بتتقال سؤالين في جملة: بقت نقطتين، كل واحدة في دور لوحدها
     left = [x for qid, q in left for x in ((("about", "What they offer (their services / treatments). Ask this ALONE."),
                                              ("about", "What makes them different from others. Ask this in a SEPARATE turn, after the first answer; "
                                                        "save both answers together under [about]."))
                                             if qid == "about" and tools else ((qid, q),))]
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
+    if full and len(left) > 5:   # قايمة طويلة: نفس القواعد، وتطمين إنه يقدر يعدّي أي سؤال أو يكمل وقت تاني
+        qs += ("\n   This is the FULL brand-brain interview (they are a subscriber), so the list is long. Keep every rule: ONE question per turn, "
+               "each built on what they just said, no filler lines. Tell them ONCE at the start that it takes about ten minutes, that they can say "
+               "«عدّي» to skip any question, and that if they stop, you continue next time from where they stopped. For [products], [proof], [faq] "
+               "and [rules] they may list several things: save them all in one answer. Never invent an answer for them.")
     kn = "\n".join(f"   [{k}] {v[:200]}" for k, v in known.items())
     if kn:
         qs += "\nAlready in their brand brain (never ask these again; you may refer to them naturally):\n" + kn
