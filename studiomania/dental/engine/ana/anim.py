@@ -275,6 +275,10 @@ class Shot:
     def arch_rows(s):
         """أول وآخر صف فيه سنة **ولثة حقيقية** جنبها (جوه قناع العزل) في الصورة الملفوفة. حد الكادر فوق وتحت بيقف هنا:
         بعدها اللثة الحقيقية بتخلص (جنب آخر بريمولارز) فكان بيبان إسود — مفيش امتداد ولا اختراع، الكادر بيقف عند آخر لثة."""
+        # حدود الفك بتتحسب مرة واحدة من صورة اللقطة الأصلية وبتفضل ثابتة: المورف بيبدّل s.img/s.iso مؤقتًا، فكانت الحدود (ومعاها الكادر
+        # ومقياسه) بتتحسب تاني على صورة مختلفة ← الخطوط البيضا (tf) بتترسم على كادر غير كادر الصورة فمش راكبة على السنان (فيديو الحالة a03 ث13–18)
+        if getattr(s, "_ar_fix", None) is not None: return s._ar_fix[0]
+        cur_ = (s.img, s.iso); s.img, s.iso = getattr(s, "_img0", s.img), getattr(s, "_iso0", s.iso)
         k_ = getattr(s, "_ar_src", None)
         if not (k_ is not None and k_[0] is s.iso and k_[1] is s.img):
             m = np.asarray(s.iso_full().convert("L")) > 127; hsv = cv2.cvtColor(np.asarray(s.img.convert("RGB")), cv2.COLOR_RGB2HSV)
@@ -288,6 +292,7 @@ class Shot:
             r = np.where(gum)[0]
             if not len(r): r = np.where(m.sum(1) > max(8, m.shape[1] * .01))[0]
             s._ar = (int(r.min()), int(r.max())) if len(r) else None; s._ar_src = (s.iso, s.img)
+        s.img, s.iso = cur_; s._ar_fix = (s._ar,)
         return s._ar
     def base(s, z, iso=0.0):
         cx, cy, cw, ch = s.crop(z, iso)

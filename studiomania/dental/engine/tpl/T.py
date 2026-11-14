@@ -1207,7 +1207,7 @@ def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt
     wait=True: العدسات اللي لسه ماطارتش بتفضل مكانها في الصف (الاختيار مايختفيش). morph=False: العدسة بتفضل قاعدة على سنة القبل (من غير مورف) — التحول للبعد بيحصل بعدين مرة واحدة بنعومة زي الأصل."""
     M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); order = order or M["order"]
     prog = {k: (ease((t - t0 - i * step - fly) / .15) if morph else 0.0) for i, k in enumerate(order)}
-    im = morph_frame(prog, z); fpx = FH / B.ch * z * ms
+    im = morph_frame(prog, z); fpx = FH / B.crop(z, 1.0)[3] * ms   # نفس مقياس الكادر المعزول بالظبط (القص بيقرّب لحد نهاية الفك؛ B.ch كان بيطلّع العدسات أصغر من السنان)
     for i, k in enumerate(order):
         q = (t - t0 - i * step) / fly
         if wait and q <= 0: q = 1e-6
@@ -1220,7 +1220,7 @@ def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt
         im = paste(im, pc.transpose(Image.Transpose.ROTATE_270), x, y, fpx * (1.25 * src_sc + (1 - 1.25 * src_sc) * e), (1 - e) * tilt, alpha=1 - max(0, (q - 1) / .15) if morph else 1.0)
     return im
 def real_row(im, z, x0, dy=0.0, sc=1.0, cy=None):   # العدسات الحقيقية بتاعة المريض (من صورة البعد) مرصوصة بالطول عند x0 — نفس مكان بداية seat
-    M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); fpx = FH / B.ch * z * ms; cy = FH / 2 if cy is None else cy
+    M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); fpx = FH / B.crop(z, 1.0)[3] * ms; cy = FH / 2 if cy is None else cy
     for k in M["order"]:
         if k not in pcs: continue
         cc = M["planned"][k].mean(0); _, ty = B.tf(cc[0], cc[1], z); ty = cy + (ty - cy) * sc   # sc: الصف كله أصغر حوالين نصه

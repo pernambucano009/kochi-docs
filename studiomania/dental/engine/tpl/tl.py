@@ -327,7 +327,11 @@ def morph_outlines(im, prog, z=1.0, p=1.0, col=(255, 255, 255), width=3):
     for i, k in enumerate(M["order"]):
         q = ease(p * 1.4 - i * .05)
         if q <= 0: continue
-        pts = [B.tf(x, y, z) for x, y in cc[k][::1]]; pts.append(pts[0]); d.line(anim.partial(pts, q), fill=col + (255,), width=width)
+        c_ = np.asarray(cc[k], np.float32).reshape(-1, 2)
+        if len(c_) > 30:   # حد ناعم ماشي مع السنة: حدود القناع بكسل-بكسل كانت بتطلع الخط «مشرشر» (فيديو الحالة a03 ث2–5)
+            w_ = max(5, (len(c_) // 60) | 1); pad_ = np.concatenate([c_[-w_:], c_, c_[:w_]]); ker_ = np.ones(w_, np.float32) / w_
+            c_ = np.stack([np.convolve(pad_[:, 0], ker_, "same"), np.convolve(pad_[:, 1], ker_, "same")], 1)[w_:-w_]
+        pts = [B.tf(x, y, z) for x, y in c_]; pts.append(pts[0]); d.line(anim.partial(pts, q), fill=col + (255,), width=width)
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
 def morph_frame(prog, z=1.0, iso=1.0):
     _need_full()
@@ -626,6 +630,11 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
         if st_ is None: continue
         after = np.where(~run[st_:])[0]
         if len(after) and st_ + after[0] > 20: xr[y] = x_s + st_ + int(after[0]) - 1
+    # حرف القناع الغامق: القناع أحيانًا بيزيد كام بكسل بعد اللثة الوردية (ضل/شفة غامقة). الحافة اللي الملء بيبدأ منها = آخر بكسل لثة فعلًا،
+    # وإلا الصف كان بيتحسب «آخره مش لثة» فمايتملاش ويفضل هلال إسود يمين اللثة (فيديو الحالة a03 ث0–9)
+    for y in np.where(has)[0]:
+        x1_ = int(xr[y]); x0_ = max(0, x1_ - 60); ix_ = np.where(pink[y, x0_:x1_ + 1])[0]
+        if len(ix_) and (x1_ - (x0_ + int(ix_[-1]))) > 3: xr[y] = x0_ + int(ix_[-1])
     gap = (W - 1) - xr
     rows = has & (gap > tol) & (gap < W * .35)
     if body_rows is not None:   # جوه جسم اللثة: صف حافته بعيدة (نتوء/حتة لثة ناقصة عند الثنايا) بيتملي برضه — كان بيفضل شريط إسود/رمادي أفقي جنب الفك (E456 a06 18.3)
@@ -637,7 +646,10 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
     band = len(hr) > 0 and (0 < hr[0] < H * .07 or 0 < H - 1 - hr[-1] < H * .07)
     if rows.sum() < 3 and not band: return im   # مفيش فراغ يمين ولا شريط فوق/تحت (اللثة واصلة للحافة اليمين بس الشريط اللي فوق لسه محتاج يتملي — كان بيرجع هنا بدري)
     T = gum_texture(H)
-    if T is None: return im
+    if T is None:   # مفيش خلفية لثة جاهزة للحالة (حالة بصورتين بس): النسيج الأساسي = لون لثة المريض نفسه، والملء بييجي من انعكاس لثته (كان بيرجع من غير ملء ← إسود يمين اللثة)
+        gp_ = pink & g
+        if gp_.sum() < 200: return im
+        T = np.tile(a[gp_].astype(np.float32).mean(0)[None, None, :], (H, 64, 1))
     if not os.environ.get("GUM_TEXTURE"): rim = max(rim, 24)   # محور الانعكاس جوه اللثة بعيد عن حرفها الغامق (كان الحرف بيبان خط رمادي رأسي في نص الامتداد: test1 ث14)
     x0 = np.clip(xr - rim, 0, W - 1).astype(np.float32); Ht, Wt = T.shape[:2]
     # صف آخره سنة مش لثة (آخر سنتين في القوس): الملء يبدأ بعد السنة، مايتكتبش فوقها — البداية قبل الحافة بـ rim كانت
