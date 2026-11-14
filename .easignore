@@ -1,0 +1,37 @@
+# 📦 أرشيف EAS لتطبيق الجوال: بنرفع studiomania/mobile بس، مش الـ repo كله (كان 414 ميجا).
+# الملف ده بيحل محل .gitignore وقت الرفع لـ EAS، فلازم يتجاهل كل حاجة .gitignore بتاعة الموبايل بتتجاهلها، وأهمها ملفات التوقيع.
+/*
+!/studiomania/
+/studiomania/*
+!/studiomania/mobile/
+
+# من studiomania/mobile/.gitignore
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+.env*.local
+.env
+*.tsbuildinfo
+/studiomania/mobile/ios
+/studiomania/mobile/android
+/studiomania/mobile/.claude
+
+# 🔐 ملفات التوقيع والمفاتيح (الـ workflow بيكتبها من الـ secrets) ماتترفعش أبدًا
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+google-services.json
+credentials.json
+ios-certs/
