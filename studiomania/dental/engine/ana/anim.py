@@ -236,6 +236,7 @@ class Shot:
     def iso_full(s):
         """قناع العزل + لثة المريض الحقيقية جنب كل سنة (من الصورة نفسها، بنفس عرض شريط اللثة في النص).
         العزل كان بيقص اللثة لشريحة رفيعة جنب البريمولارز فكانت بتبان إسود (طلب الطبيب: من غير اختراع — دي لثة موجودة في الصورة)."""
+        if _os2.environ.get("ISO_SAFE"): return s.iso   # التصليح التلقائي (REPAIRS): القناع زي ما هو من غير تكملة لثة بالألوان
         k_ = getattr(s, "_if_src", None)
         if k_ is not None and k_[0] is s.iso and k_[1] is s.img: return s._if   # مقارنة بالكائن نفسه مش id() — الـ id بيتعاد استخدامه لصورة جديدة فكان بياخد قناع كادر تاني (فك بيختفي كادر: a06 16.5/18.5 — E459)
         mk = np.asarray(s.iso.convert("L")); m = mk > 127; hsv = cv2.cvtColor(np.asarray(s.img.convert("RGB")), cv2.COLOR_RGB2HSV)

@@ -165,6 +165,8 @@ def _env(case: Path) -> dict:
     e["DENTAL_ROOT"] = str(ENGINE)
     e["CASE_DIR"] = str(case)
     e["PYTHONUNBUFFERED"] = "1"
+    for k in _meta(case).get("fix_env") or []:   # إعادة ريندر بمفاتيح التصليح اللي الفحص الآلي طلبها (REPAIRS)
+        e[k] = "1"
     cl = _meta(case).get("clinic") or {}   # اسم الطبيب والعيادة والشعار في القوالب (من عقل العميل، مش من الأصل)
     for k, v in (("DOC_NAME", cl.get("doctor")), ("CLINIC_NAME", cl.get("name")), ("CLINIC_LOGO", cl.get("logo"))):
         if v:
@@ -590,7 +592,20 @@ def _elements(case: Path) -> None:
             _run(case, ["run.py", "approve", str(case), name, "auto: internal element passed QA"], "approve.log", 120)
 
 
-def _render(tpl: str):
+# قواعد التصليح التلقائي: الفحص الآلي للفيديو لقى عيب ← لو وصفه بيطابق قاعدة، الفيديو بيتعاد لوحده مرة بالمفتاح بتاعها
+# (المحرك بيشتغل بالطريقة الأحوط للجزء ده)، والنسخة اللي عيوبها أقل هي اللي بتتسلّم. عيب من نوع جديد = سطر جديد هنا + مفتاحه في المحرك.
+REPAIRS = [
+    (r"gum|gingiv|pink (block|patch)|black (block|patch|gap)|stair|pixelat|jagged", "ISO_SAFE"),      # حافة اللثة/العزل: من غير تكملة لثة بالألوان
+    (r"veneer|piece|torn|notch|broken|chipp|melt|smear", "PIECE_STRICT"),                              # القطع الطايرة: قفل أي تجويف في الحد
+]
+
+
+def _repair_switches(defects: list) -> list[str]:
+    txt = " ".join(str(d.get("what") or "") for d in defects).lower()
+    return [env for rx, env in REPAIRS if re.search(rx, txt)]
+
+
+def _render(tpl: str, fix: list | None = None):
     def go(case: Path) -> None:
         out = case / "out" / f"{tpl}.mp4"
         if out.exists():   # النسخة القديمة بتتحفظ (أصول المريض مابتتمسحش)
@@ -634,11 +649,38 @@ def _render(tpl: str):
         except (OSError, ValueError):
             pass
         hold = bool(qa.get("unfixed")) or cq.get("verdict") == "defect" or bool(num_bad) or bool(src_bad) or cq.get("video", {}).get("verdict") == "defect"
-        with _LOCK:
-            m = _meta(case)
-            m.setdefault("videos", {})[tpl] = {"at": time.time(), "size": out.stat().st_size, **({"iso_qa": qa} if qa else {}),
-                                               **({"claude_qa": cq} if cq else {}), **({"needs_review": True} if hold else {})}
-            _save_meta(case, m)
+        vdef = cq.get("video", {}).get("defects") or [] if cq.get("video", {}).get("verdict") == "defect" else []
+        entry = {"at": time.time(), "size": out.stat().st_size, **({"iso_qa": qa} if qa else {}),
+                 **({"claude_qa": cq} if cq else {}), **({"needs_review": True} if hold else {}), **({"auto_fix": fix} if fix else {})}
+        sw = _repair_switches(vdef) if (vdef and not fix) else []
+        if not sw:   # لو فيه إعادة تلقائية، الفيديو مايتسلّمش غير بعدها
+            with _LOCK:
+                m = _meta(case)
+                m.setdefault("videos", {})[tpl] = entry
+                _save_meta(case, m)
+        if sw:   # التصليح التلقائي: إعادة واحدة بمفاتيح القواعد المطابقة، وبنحتفظ بالنسخة الأنضف
+            keep = case / "out" / f"{tpl}_first.mp4"
+            shutil.copy(out, keep)
+            try:
+                with _LOCK:
+                    m = _meta(case); m["fix_env"] = sw; _save_meta(case, m)
+                _render(tpl, fix=sw)(case)
+                new = _meta(case).get("videos", {}).get(tpl, {})
+                nv = new.get("claude_qa", {}).get("video", {})
+                n2 = len(nv.get("defects") or []) if nv.get("verdict") == "defect" else 0
+                if n2 >= len(vdef):   # الإعادة ماحسّنتش: نرجّع الأولى
+                    os.replace(keep, out)
+                    with _LOCK:
+                        m = _meta(case); m["videos"][tpl] = {**entry, "auto_fix_tried": sw}; _save_meta(case, m)
+            except Exception as exc:   # الإعادة وقعت: الفيديو الأول موجود وبيتسلّم زي ما هو
+                print(f"[dental] auto-fix rerender failed {case.name}: {exc}", flush=True)
+                if keep.exists(): os.replace(keep, out)
+                with _LOCK:
+                    m = _meta(case); m.setdefault("videos", {})[tpl] = {**entry, "auto_fix_tried": sw}; _save_meta(case, m)
+            finally:
+                keep.unlink(missing_ok=True)
+                with _LOCK:
+                    m = _meta(case); m.pop("fix_env", None); _save_meta(case, m)
     return go
 
 

@@ -34840,6 +34840,13 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
         st, stage = job.get("status"), str(job.get("stage") or "")
         if tpl in (v.get("videos") or {}):
             url = v["videos"][tpl]["url"]
+            if v["videos"][tpl].get("needs_review"):   # الفحص الآلي لقى عيب ماتصلحش لوحده: يتسجّل للأدمن عشان يتضافله قاعدة تصليح
+                try:
+                    dq = (v["videos"][tpl].get("claude_qa") or {}).get("video", {}).get("defects") or []
+                    issues.record("job", "/dental/video-defect", "فيديو أسنان فيه عيب بعد الفحص الآلي",
+                                  raw=f"{cid} {tpl}: " + " | ".join(f"{d.get('second')}s {d.get('what')}" for d in dq)[:900], screen="suad", ref=cid)
+                except Exception:  # noqa: BLE001
+                    pass
             suad_job(bid, status="done", progress=1, url=url, seen=False)
             suad_post(bid, f"الفيديو بتاعك جاهز 🎉 ({tname})", kind="video", url=url)
             suad_post(bid, "إيه رأيك فيه؟ قولّي بصراحة 😊", kind="ask", ask="feedback")

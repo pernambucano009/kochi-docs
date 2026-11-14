@@ -537,6 +537,7 @@ def piece_whole(pc, fdi=0, deep=.06):
     c = max(cs, key=cv2.contourArea)
     if len(c) < 20: return pc
     df = cv2.convexityDefects(c, cv2.convexHull(c, returnPoints=False)); dep = 0 if df is None else df.reshape(-1, 4)[:, 3].max() / 256
+    if os.environ.get("PIECE_STRICT"): deep = .03   # التصليح التلقائي (REPAIRS): أي تجويف صغير في الحد بيتقفل
     if dep < deep * min(w, h): return pc
     cl = al.copy(); n_ = len(c)
     for s_, e_, f_, d_ in df.reshape(-1, 4):   # كل تجويف واضح بيتقفل لحد الخط المستقيم بين طرفيه (الحد الطبيعي للسنة محدّب)
