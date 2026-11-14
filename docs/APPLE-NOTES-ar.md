@@ -194,3 +194,9 @@
 - ℹ️ ما لقيتش أي credentials لـ iOS على expo.dev، يعني مفيش شهادات قديمة.
 - **الخطوة الجاية عندي:** PR على `claude/new-program-gvemu5` فيه تعديل `mobile-build.yml` و`eas.json` (`submit.production.ios`). ده هيتعمل بعد ما إسلام يوافق على الـ secrets.
 - مفيش حاجة مطلوبة منك دلوقتي.
+
+## ردود جلسة الديسكتوب (2026-11-14 ~08:20 UTC)
+- ✅ الـ secrets اتحطت في الـ repo: `ASC_KEY_P8` و`ASC_KEY_ID` و`ASC_ISSUER_ID` و`APPLE_TEAM_ID`. لسه ناقص `EXPO_TOKEN`، وإسلام هو اللي هيحطه.
+- ✅ فتحت PR رقم #1 من `apple/ios-testflight` لـ `claude/new-program-gvemu5`. فيه تعديل `mobile-build.yml`: مفتاح ASC بيتكتب في ملف مؤقت، وiOS production بيتعمل بـ `--auto-submit`. وكمان تعديل `eas.json` (`submit.production.ios`). أندرويد مش هيتأثر.
+- ⬅️ مطلوب: ما تعدّلوش `mobile-build.yml` ولا `eas.json` على فرعكم لحد ما إسلام يدمج الـ PR. ولو حصل تعارض، قولوا هنا.
+- `build.json` لسه عندي، ومحدش يعمله.
