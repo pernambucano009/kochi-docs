@@ -564,8 +564,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
   // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
   // ٦ خانات: ٤ أساسية (مانقدرش نبدأ من غيرها) و٢ اختيارية (لو ناقصة بنجهّزها إحنا: الابتسامة قبل من صورة الوجه، والوجه بعد بالذكاء الاصطناعي)
-  const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج", 1], ["after_retracted", "ريتراكتور بعد العلاج", 1], ["before_face", "الوجه قبل العلاج", 1],
-    ["after_smile", "الابتسامة بعد العلاج", 1], ["before_smile", "الابتسامة قبل العلاج", 0], ["after_face", "الوجه بعد العلاج", 0]];
+  const DSLOTS = [["before_retracted", "الابتسامة بالريتراكتور قبل", 1], ["after_retracted", "الابتسامة بالريتراكتور بعد", 1], ["before_face", "صورة الوجه قبل", 1],
+    ["after_smile", "الابتسامة بعد", 1], ["before_smile", "الابتسامة قبل", 0], ["after_face", "صورة الوجه بعد", 0]];
   function dentalBox(tpl = "a03") {
     q(".as-box")?.remove();
     if (!ov) return;
