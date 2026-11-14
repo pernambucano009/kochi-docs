@@ -201,7 +201,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "play_showcase") return play();
     if (name === "play_demo") {
       // 🎬 مفيش صور حالة: الفيديو مايتعرضش جوه المكالمة. نورة تقفل، والفيديو يظهر في نص الشاشة بعد المكالمة (ويتبعت في شاتها)
-      if (args.purpose === "sample") { S.demoAfter = true; return { ok: true, after_call: true, note: "Do NOT wait for it: the video appears in the middle of his screen right after the call ends. Close now: tell him the video will appear in the middle of his screen right after you hang up; after he watches it he should write you his opinion, he will find you at the bottom right of any page with your name, so you talk about the next step. Then goodbye and call finish." }; }
+      if (args.purpose === "sample") { S.demoAfter = true; S.said = ""; return { ok: true, after_call: true, note: "Do NOT wait for it: the video appears in the middle of his screen right after the call ends. Close now: tell him the video will appear in the middle of his screen right after you hang up; after he watches it he should write you his opinion, he will find you at the bottom right of any page with your name, so you talk about the next step. Then goodbye and call finish." }; }
       return playDemo(args.template === "a24" ? "a24" : "a03", "case");
     }
     if (name === "show_card") return card(args.kind);
@@ -252,6 +252,17 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (sc?.status === "working") { S.finishAsked = true; return { ok: false, error: `The showcase reel is still being made (${sc.progress || 0}%). Tell them it will appear on their screen and in their ready videos in a few minutes, ask if they want to wait for it now, then call finish again if they want to leave.` }; }
     }
     if (name === "finish") {
+      // 🔒 القفلة لازم تتقال فعلًا قبل ما المكالمة تقفل (كانت بتقفل بجملة «خليني أقول لك…» بس): مكانها تحت على اليمين، ورأيه، والإشعار لو فيديوه بيتعمل
+      if (!args.later && (S.finRefused || 0) < 2) {
+        const said = (S.said || "").slice(-900) + " " + (S.aBuf || "");
+        const miss = [[/يمين/, "that he finds you at the bottom right of any page, with your name"],
+          ...(S.dentalSent || S.demoAfter ? [[/رأي|راي|فيدباك|feedback|ملاحظات/i, "that he should write you his opinion of the video so you talk about the next step"]] : []),
+          ...(S.dentalSent ? [[/إشعار|اشعار|تنبيه|نوتيف|رنة|رنّة/, "that a notification will reach him and the video will appear in the middle of his screen when it is ready"]] : []),
+          ...(S.demoAfter ? [[/نص الشاشة|وسط الشاشة|منتصف الشاشة|نص الشاشه|وسط الشاشه/, "that the video will appear in the middle of his screen right after you hang up"]] : [])]
+          .filter(([rx]) => !rx.test(said)).map(([, t]) => t);
+        if (miss.length) { S.finRefused = (S.finRefused || 0) + 1; lg("sys", `finish refused: ${miss.length} missing`);
+          return { ok: false, error: `The call is NOT closed yet: you have not said the closing. Say it now, out loud, in their dialect, in one or two sentences, with no introduction: ${miss.join("; ")}. Then say goodbye and call finish again.` }; }
+      }
       // 👋 المكالمة بتقفل بعد ما جملة الوداع تتقال كلها (مش أول ما الأداة توصل، الأداة بتوصل قبل الصوت)
       S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now();
       setTimeout(() => S?.finishing && end(S.endDone), 20000);   // احتياط لو الصوت ماوصلش
@@ -434,8 +445,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 🏆 كارت المنافس: أرقامه الحقيقية ورأينا فيه، وزرارين (هو منافس / مش منافس). الزرار والكلام بيعملوا نفس الحاجة
   const LEVEL = { strong: "💪 صفحة نشطة وقوية", ok: "👌 صفحة متوسطة", weak: "⚠️ صفحة ضعيفة أو غير نشطة" };
   // 🗣️ الكارت بيظهر لما تبدأ تتكلم عنه (مش قبل الكلام)، وبحد أقصى ٦ ثواني
-  function whenTalking(fn) { const t0 = performance.now(); const tick = () => { if (!S) return; if (S.speaking || performance.now() - t0 > 6000) fn(); else setTimeout(tick, 150); }; setTimeout(tick, 150); }
-  function rivalCard(c) { whenTalking(() => rivalCard0(c)); }
+  function whenTalking(fn, rx, max = 6000) { const t0 = performance.now(); const tick = () => { if (!S) return; if ((S.speaking && (!rx || rx.test(S.aBuf || ""))) || performance.now() - t0 > max) fn(); else setTimeout(tick, 150); }; setTimeout(tick, 150); }
+  // كارت المنافس بيستنى لحد ما تبدأ تتكلم عن المنافس نفسه (كان بيغطي كارت تحليل الحساب وهي لسه بتتكلم عنه)
+  function rivalCard(c) { whenTalking(() => rivalCard0(c), /منافس|حساب قوي|لقيت حساب|لجيت حساب/, 30000); }
   function rivalCard0(c) {
     if (!S || !ov || !c) return;
     if (S.show) { S.show.v.pause(); S.show = null; S.wait = null; }
@@ -574,7 +586,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       try {
         const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
-        d.remove(); chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
+        d.remove(); S.dentalSent = true; S.said = ""; S.wait = null; chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
         note("(SYSTEM: the 4 case photos arrived and his video started being made. Now, in his dialect, say clearly: you are preparing his video now; when it is ready a notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him now; when it is ready he can watch it and send you his opinion: he will find you at the bottom right of any page, with your name on it, and you are waiting for his feedback. This is mandatory. Then goodbye and call finish.)");
       } catch (e) { err(e.message); send.disabled = false; send.textContent = "أرسل الصور"; }
     };
@@ -696,7 +708,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         mic = shared ? new MediaStream([shared.getAudioTracks()[0].clone()]) : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
-      if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) TestRec.note?.(`🎙️ نورة ماسمعتش صوتك لحد دلوقتي. أعلى صوت وصل من المايك: ${((S.micPeak || 0) * 1000).toFixed(0)} (أقل من 30 = المايك مش بيوصل)`); }, 45000);
+      if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) { const tk = S.mic?.getTracks()[0]; TestRec.note?.(`🎙️ نورة ماسمعتش صوتك لحد دلوقتي. المايك: «${tk?.label || "?"}» · أعلى صوت وصل: ${((S.micMax || 0) * 1000).toFixed(0)} (أقل من 30 = مش بيوصل)${tk?.muted ? " · المتصفح أو النظام كاتم المايك ده" : ""}${S.muted ? " · مكتوم من زرار المكالمة" : ""}`); } }, 45000);
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await tokP;
@@ -778,7 +790,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "function_call_output", call_id: e.call_id, output: JSON.stringify(out) } }));
           follow(e.response_id);
         } else if (e.type === "response.output_audio_transcript.done" || e.type === "response.audio_transcript.done") {
-          lg("agent", e.transcript || "");
+          lg("agent", e.transcript || ""); S.said = ((S.said || "") + " " + (e.transcript || "")).slice(-4000);
           // 📥 طلبت رفع حاجة بالكلام من غير ما تفتح الخانة (نسيت الأداة): الخانة تظهر لوحدها
           const tx = e.transcript || "", ask = /ارفع|ترفع|ترفعها|ترفعلي|رفع|حمّل|حمل|ابعت|أرسل|ارسل|upload/i.test(tx);
           const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : "");
@@ -873,7 +885,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
-    S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
+    S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu); S.micMax = Math.max(S.micMax || 0, mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
     orb?.set(talk ? Math.min(1, ag * 7) : user ? Math.min(0.35, mu * 2) : 0, user);
     // بتتكلم ولا سكتت: من مستوى صوتها نفسه (السكتة الصغيرة بين الكلمات ماتتحسبش). المكتوب بيبدأ مع الصوت، ولما تسكت يتقرر تكمّل ولا تستنى
     const now = performance.now();
