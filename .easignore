@@ -1,9 +1,30 @@
 # 📦 أرشيف EAS لتطبيق الجوال: بنرفع studiomania/mobile بس، مش الـ repo كله (كان 414 ميجا).
 # الملف ده بيحل محل .gitignore وقت الرفع لـ EAS، فلازم يتجاهل كل حاجة .gitignore بتاعة الموبايل بتتجاهلها، وأهمها ملفات التوقيع.
-/*
-!/studiomania/
-/studiomania/*
-!/studiomania/mobile/
+# ⚠️ أسلوب «/* ثم !/studiomania/mobile/» بيشيل الموبايل نفسه من الأرشيف عند EAS (package.json does not exist)،
+# فبنستبعد الفولدرات التانية بالاسم بدل كده. لو اتضاف فولدر جديد كبير في الجذر أو في studiomania ضيفه هنا.
+/.claude/
+/.github/
+/CLAUDE.md
+/backup/
+/index.html
+/kochi/
+/studiomania/.dockerignore
+/studiomania/.env.example
+/studiomania/Dockerfile
+/studiomania/README.md
+/studiomania/backend/
+/studiomania/dental/
+/studiomania/deploy/
+/studiomania/design/
+/studiomania/docs/
+/studiomania/fonts/
+/studiomania/frontend/
+/studiomania/library/
+/studiomania/run.bat
+/studiomania/run.command
+/studiomania/run.sh
+/studiomania/tests/
+/studiomania/tools/
 
 # من studiomania/mobile/.gitignore
 node_modules/
