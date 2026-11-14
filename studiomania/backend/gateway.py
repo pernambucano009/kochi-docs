@@ -2251,6 +2251,49 @@ def admin_gift(wid: str, body: GiftIn, request: Request):
     return {"ok": True}
 
 
+# 🤝 حساب بنجهّزه إحنا للعميل (تجهيز يدوي): بإيميله وباسوورد مؤقت، من غير إيميل تأكيد ومن غير مكالمة المساعدة الأولى.
+# بنملى العقل ونجرّب، وبعدين نبعتله الإيميل والباسوورد المؤقت ويغيّره من الإعدادات.
+class AdminCustomerIn(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+    country: str = ""
+    dialect: str = ""
+    field: str = ""
+    goal: str = ""
+    gender: str = ""
+    points: int = 0
+
+
+@app.post("/api/platform/customers")
+def admin_create_customer(body: AdminCustomerIn, request: Request):
+    admin(request)
+    email = norm_email(body.email)
+    check_pw(body.password)
+    if user_by("email", email):
+        raise HTTPException(400, "يوجد حساب بهذا البريد الإلكتروني")
+    n = int(body.points or 0)
+    if not 0 <= n <= 1_000_000:
+        raise HTTPException(400, "اكتب عدد نقاط صحيحًا")
+    name = body.name.strip()[:80]
+    wid = new_workspace(name or email.split("@")[0])
+    save_onboard(wid, body.country.strip().upper()[:2], body.dialect.strip()[:20], body.field.strip()[:20], body.goal.strip()[:20], name, body.gender)
+    f = workspace_dir(wid) / "onboard.json"
+    if not f.exists():
+        raise HTTPException(400, "اختر الدولة أو اللهجة")
+    ob = json.loads(f.read_text(encoding="utf-8"))
+    ob["concierge"] = True   # المكالمة الأولى ماتفتحش لوحدها للحساب ده
+    f.write_text(json.dumps(ob, ensure_ascii=False), encoding="utf-8")
+    with closing(db()) as c, c:
+        c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 1, 'customer', ?, ?)",
+                  (uuid.uuid4().hex[:12], email, name, pw_hash(body.password), wid, time.time()))
+        if n:
+            c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+            c.execute("UPDATE wallet SET topup_credits = topup_credits + ?, updated_at=? WHERE workspace=?", (n, time.time(), wid))
+            ledger_add(c, wid, n, "gift", "رصيد تجهيز الحساب من فريق سمسمكيت")
+    return {"ok": True, "workspace": wid}
+
+
 # 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن
 class CouponIn(BaseModel):
     code: str

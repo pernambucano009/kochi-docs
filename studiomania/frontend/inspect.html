@@ -149,7 +149,16 @@
     <div class="card"><div class="row"><b>استهلاك العملاء</b><span class="mute">«كلّفنا» = كل ما أنفقناه عليه منذ أول يوم، ومنه أثناء التجربة المجانية وفي الترويج. «المكسب» = ما دفعه ناقص ما كلّفنا.</span>
       <select id="cuDays" style="margin-inline-start:auto"><option value="7">آخر ٧ أيام</option><option value="30" selected>آخر ٣٠ يومًا</option><option value="90">آخر ٩٠ يومًا</option><option value="3650">من البداية</option></select>
       <input type="search" id="cuQ" placeholder="ابحث بالبريد أو الاسم"></div>
-      <div class="kpis" id="cuKpis" style="margin-top:12px"></div></div>
+      <div class="kpis" id="cuKpis" style="margin-top:12px"></div>
+      <details id="ncBox" style="margin-top:12px"><summary><b>إنشاء حساب لعميل (تجهيز يدوي)</b></summary>
+        <p class="mute" style="margin:8px 0">الحساب يتعمل بإيميل العميل وباسوورد مؤقت، من غير إيميل تأكيد ومن غير مكالمة المساعدة الأولى. بعد ما نجهّزه نبعتله الإيميل والباسوورد ويغيّره من الإعدادات.</p>
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <input id="ncEmail" type="email" placeholder="إيميل العميل" dir="ltr"><input id="ncName" placeholder="اسم العلامة">
+          <input id="ncPw" placeholder="باسوورد مؤقت (٨ على الأقل)" dir="ltr">
+          <select id="ncCountry"></select><select id="ncDialect"></select><select id="ncField"></select>
+          <select id="ncGender"><option value="m">صاحب الحساب: رجل</option><option value="f">صاحبة الحساب: امرأة</option></select>
+          <input id="ncPts" type="number" min="0" placeholder="نقاط الرصيد" style="width:130px">
+          <button id="ncGo">أنشئ الحساب</button><span class="mute" id="ncMsg"></span></div></details></div>
     <div class="card"><table><thead><tr><th>العميل</th><th>سجّل</th><th>آخر دخول</th><th>الباقة</th><th>الرصيد</th><th>نقاط (الفترة)</th><th>أنفقنا (الفترة)</th><th>كلّفنا من البداية</th><th>منه أثناء التجربة</th><th>دفع</th><th>المكسب</th></tr></thead><tbody id="cuRows" class="runs"></tbody></table></div>
     <div class="card" id="cuOne" hidden></div>
     <div class="card"><div class="row"><b>🎟️ الكوبونات</b><span class="mute">العميل يكتب الكود وهو يسجّل أو من «باقتي ونقاطي»: نقاط هدية، أو خصم ٪ على الاشتراك والشحن. كل عميل يستخدم الكود مرة واحدة.</span></div>
@@ -685,6 +694,22 @@ async function openCust(w) {
     catch (e) { alert(e.message); }
   };
 }
+// 🤝 إنشاء حساب لعميل (تجهيز يدوي)
+$("ncBox").ontoggle = async () => {
+  if (!$("ncBox").open || $("ncField").options.length) return;
+  const o = await fetch("/api/auth/state").then((r) => r.json()).catch(() => ({}));
+  const fill = (id, list, first) => { $(id).innerHTML = (first ? `<option value="">${first}</option>` : "") + (list || []).map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join(""); };
+  fill("ncCountry", o.regions, "الدولة"); fill("ncDialect", o.dialects, "اللهجة (حسب الدولة)"); fill("ncField", o.fields, "المجال");
+};
+$("ncGo").onclick = async () => {
+  const body = { email: $("ncEmail").value.trim(), name: $("ncName").value.trim(), password: $("ncPw").value, country: $("ncCountry").value, dialect: $("ncDialect").value,
+    field: $("ncField").value, gender: $("ncGender").value, points: +$("ncPts").value || 0 };
+  if (!body.email || !body.password || !body.country || !body.field) { $("ncMsg").textContent = "اكتب الإيميل والباسوورد واختر الدولة والمجال"; return; }
+  $("ncGo").disabled = true; $("ncMsg").textContent = "…";
+  try { await api("/api/platform/customers", { method: "POST", body: JSON.stringify(body) }); $("ncMsg").textContent = "تم إنشاء الحساب ✓ ادخل به من صفحة الدخول."; await loadCust(); }
+  catch (e) { $("ncMsg").textContent = e.message; }
+  $("ncGo").disabled = false;
+};
 $("cuRows").onclick = (e) => { const tr = e.target.closest("tr[data-w]"); if (tr) openCust(tr.dataset.w); };
 $("cuDays").onchange = () => { loadCust(); if (CU.one) openCust(CU.one); };
 $("cuQ").oninput = () => renderCust();
