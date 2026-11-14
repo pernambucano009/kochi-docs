@@ -35,10 +35,10 @@ export default function Login() {
       </View>
       <View style={s.form}>
         <T muted size={12.5}>البريد الإلكتروني</T>
-        <TextInput style={field} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
+        <TextInput testID="login-email" style={field} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
         <T muted size={12.5}>كلمة المرور</T>
         <View>
-          <TextInput style={[field, { paddingLeft: 52 }]} value={pw} onChangeText={setPw} secureTextEntry={!show} autoComplete="password" textContentType="password" />
+          <TextInput testID="login-password" style={[field, { paddingLeft: 52 }]} value={pw} onChangeText={setPw} secureTextEntry={!show} autoComplete="password" textContentType="password" />
           <Pressable accessibilityRole="button" accessibilityLabel={show ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"} onPress={() => setShow(!show)} style={s.eye} hitSlop={8}>
             <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={t.muted} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
               {show ? <Path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
@@ -47,7 +47,7 @@ export default function Login() {
           </Pressable>
         </View>
         {err ? <T size={12.5} style={{ color: "#D44E2C" }}>{err}</T> : null}
-        <GlowButton title={busy ? "جارٍ الدخول…" : "دخول"} onPress={go} disabled={busy || !email || !pw} style={{ marginTop: 10 }} />
+        <GlowButton testID="login-submit" title={busy ? "جارٍ الدخول…" : "دخول"} onPress={go} disabled={busy || !email || !pw} style={{ marginTop: 10 }} />
       </View>
     </KeyboardAvoidingView>
   );
