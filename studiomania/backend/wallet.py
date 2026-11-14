@@ -235,3 +235,45 @@ def spend(n: int, what: str, ref: str = ""):
     except BaseException:
         refund(h, why="فشلت العملية")
         raise
+
+
+# ---------------------------------------------------------------- 💾 مساحة التخزين لكل عميل
+# الحد حسب الباقة (محسوب من قرص السيرفر: ١٩٣ جيجا، منها حوالي ١٥٠ للعملاء)، ومساحة إضافية دائمة بتتشترى بالنقاط.
+STORAGE_GB = {"trial": 1, "starter": 3, "pro": 8, "agency": 20}
+STORAGE_PACK = (5, 500)   # (جيجا، نقاط): تتشترى مرة وتفضل مع الحساب
+
+
+def _storage_table(c: sqlite3.Connection) -> None:
+    c.execute("CREATE TABLE IF NOT EXISTS storage_addon (workspace TEXT PRIMARY KEY, gb INTEGER DEFAULT 0, updated_at REAL)")
+
+
+def storage_extra_gb() -> int:
+    if free():
+        return 0
+    with closing(_db()) as c, c:
+        _storage_table(c)
+        r = c.execute("SELECT gb FROM storage_addon WHERE workspace=?", (TENANT,)).fetchone()
+    return int(r["gb"]) if r else 0
+
+
+def storage_quota_mb() -> int | None:
+    """حد المساحة بالميجا (None = من غير حد: صاحب البرنامج)."""
+    if free():
+        return None
+    with closing(_db()) as c:
+        r = c.execute("SELECT plan FROM workspaces WHERE id=?", (TENANT,)).fetchone()
+    plan = (r["plan"] if r else "") or "trial"
+    return (STORAGE_GB.get(plan, STORAGE_GB["starter"]) + storage_extra_gb()) * 1024
+
+
+def storage_buy() -> int:
+    """يشتري حزمة مساحة إضافية بالنقاط. بيرجّع إجمالي الجيجا الإضافية بعد الشراء."""
+    gb, pts = STORAGE_PACK
+    need(pts, f"مساحة إضافية {gb} جيجا")   # الرصيد مايكفيش ← NoCredits قبل ما أي حاجة تتخصم
+    charge(pts, f"مساحة إضافية {gb} جيجا")
+    with closing(_db()) as c, c:
+        _storage_table(c)
+        c.execute("INSERT INTO storage_addon (workspace, gb, updated_at) VALUES (?, ?, ?) "
+                  "ON CONFLICT(workspace) DO UPDATE SET gb = gb + excluded.gb, updated_at = excluded.updated_at", (TENANT, gb, time.time()))
+        r = c.execute("SELECT gb FROM storage_addon WHERE workspace=?", (TENANT,)).fetchone()
+    return int(r["gb"])

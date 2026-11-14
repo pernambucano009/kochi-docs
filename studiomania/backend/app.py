@@ -627,6 +627,10 @@ async def require_login(request: Request, call_next):
         if path == "/health" or hmac.compare_digest(request.headers.get("x-gateway-secret", ""), GATEWAY_SECRET):
             if (fast := gzipped_asset(request)) is not None:
                 return fast
+            # 💾 المساحة ممتلئة: مفيش رفع ملفات جديدة (اللي عنده بيفضل شغال، والحذف وشراء المساحة مسموحين)
+            if (request.method == "POST" and (request.headers.get("content-type") or "").startswith("multipart/form-data")
+                    and not path.startswith(("/api/storage", "/api/issues", "/api/assistant/log")) and await asyncio.to_thread(storage_full)):
+                return JSONResponse({"detail": STORAGE_FULL_MSG}, status_code=400)
             return await call_next(request)
         return JSONResponse({"detail": "forbidden"}, status_code=403)
     if path in PUBLIC_PATHS or auth.valid_token(request.cookies.get(SESSION_COOKIE)) or export_token_ok(request):
@@ -3083,6 +3087,48 @@ def space_message(need: int | None, free: int) -> str:
     )
 
 
+# 💾 حد مساحة العميل (حسب باقته + اللي اشتراه): بنحسب المستخدم من فولدر بياناته كله، ونخزّن الرقم ٥ دقايق (الحساب تقيل)
+_STORAGE_USED = {"at": 0.0, "mb": 0.0}
+STORAGE_FULL_MSG = "مساحة التخزين في حسابك ممتلئة. احذف ملفات قديمة من الإعدادات ← المساحة، أو اشترِ مساحة إضافية، ثم حاول مرة أخرى"
+
+
+def storage_state(fresh: bool = False) -> dict | None:
+    """{used_mb, quota_mb, pct} للعميل، أو None لو مفيش حد (صاحب البرنامج). وبينبّه مرة عند ٨٠٪."""
+    quota = wallet.storage_quota_mb()
+    if not quota:
+        return None
+    if fresh or time.time() - _STORAGE_USED["at"] > 300:
+        _STORAGE_USED.update(at=time.time(), mb=folder_mb(DATA_DIR))
+    used = _STORAGE_USED["mb"]; pct = round(100 * used / quota)
+    try:
+        warned = auth.get_setting("storage_warned") == "1"
+        if pct >= 80 and not warned:
+            auth.set_setting("storage_warned", "1")
+            notify("storage", "warn", "💾 مساحتك قاربت على الامتلاء", f"استخدمت {pct}% من مساحة حسابك. احذف الملفات المؤقتة أو القديمة من الإعدادات، أو اشترِ مساحة إضافية.", "settings")
+        elif pct < 70 and warned:
+            auth.set_setting("storage_warned", "0")
+    except Exception as exc:  # noqa: BLE001
+        print("storage warn:", exc)
+    return {"used_mb": round(used, 1), "quota_mb": quota, "pct": pct}
+
+
+def storage_full() -> bool:
+    st = storage_state()
+    return bool(st and st["used_mb"] >= st["quota_mb"])
+
+
+@app.post("/api/storage/buy")
+def storage_buy():
+    """العميل يشتري حزمة مساحة إضافية بالنقاط (بتفضل مع الحساب)."""
+    if wallet.storage_quota_mb() is None:
+        raise HTTPException(400, "هذا الحساب بلا حد مساحة")
+    try:
+        extra = wallet.storage_buy()
+    except wallet.NoCredits as e:
+        raise HTTPException(402, str(e) or "رصيد النقاط لا يكفي")
+    return {"ok": True, "extra_gb": extra, **(storage_state(fresh=True) or {})}
+
+
 @app.get("/api/storage")
 def get_storage():
     usage = shutil.disk_usage(DATA_DIR)
@@ -3097,6 +3143,8 @@ def get_storage():
         "total_mb": None if cust else usage.total // 2**20, "free_mb": None if cust else usage.free // 2**20,
         "folders": {k: folder_mb(v) for k, v in folders.items() if v.exists()},
         "wipe": {k: storage_count(k) for k in WIPE_SECTIONS},
+        "mine": (storage_state(fresh=True) if cust else None),   # العميل: المستخدم من حدّه
+        "pack": ({"gb": wallet.STORAGE_PACK[0], "points": wallet.STORAGE_PACK[1], "extra_gb": wallet.storage_extra_gb()} if cust else None),
     }
 
 
@@ -32864,7 +32912,8 @@ def pilot_tick() -> None:
     try:
         if not PILOT_FILE.exists():
             return
-        pilot_plan()
+        if not storage_full():   # 💾 المساحة ممتلئة: مفيش مهام جديدة (اللي شغالة بتكمل)
+            pilot_plan()
         d = pilot_load()
         for j in d["jobs"]:
             if j.get("status") not in ("run", "cam"):

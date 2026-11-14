@@ -380,7 +380,10 @@ async function loadStorage() {
     const mine = Object.values(st.folders || {}).reduce((a, v) => a + (+v || 0), 0);
     $("storageInfo").innerHTML = `${disk ? `
       <div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
-      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>` : `<p class="hint">مساحة ملفاتك: <b>${fmtMb(mine)}</b></p>`}
+      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>` : st.mine ? `
+      <div class="bar"><span style="width:${Math.min(100, st.mine.pct)}%;background:${st.mine.pct >= 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
+      <p class="${st.mine.pct >= 100 ? "err" : "hint"}">مستخدم ${fmtMb(st.mine.used_mb)} من ${fmtMb(st.mine.quota_mb)} في حسابك${st.mine.pct >= 100 ? " · المساحة ممتلئة: لن تُرفع ملفات جديدة حتى تحذف أو تشتري مساحة" : ""}</p>
+      ${st.pack ? `<div class="row wrap"><button type="button" class="btn sm" data-buy-storage>＋ ${st.pack.gb} جيجا إضافية (${st.pack.points} نقطة)</button>${st.pack.extra_gb ? `<span class="hint">اشتريت ${st.pack.extra_gb} جيجا إضافية</span>` : ""}</div>` : ""}` : `<p class="hint">مساحة ملفاتك: <b>${fmtMb(mine)}</b></p>`}
       <ul>${Object.entries(st.folders).filter(([, v]) => v >= 0.1).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
         const n = (st.wipe || {})[k];
         return `<li><span>${STORAGE_LABELS[k] || k}${n ? ` <small class="muted">(${n})</small>` : ""}</span><span class="row">${n ? `<button class="btn sm danger" data-wipe="${k}" data-n="${n}">${WIPE_INFO[k][0]}</button>` : ""}<b>${fmtMb(v)}</b></span></li>`;
@@ -393,6 +396,11 @@ function fmtMb(mb) {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} جيجا` : `${Math.round(mb)} ميجا`;
 }
 $("storageInfo").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-buy-storage]")) {   // شراء مساحة إضافية بالنقاط
+    if (!confirm("شراء مساحة إضافية دائمة لحسابك بالنقاط. متأكد؟")) return;
+    try { await api("/api/storage/buy", { method: "POST" }); await loadStorage(); } catch (err) { alert(err.message); }
+    return;
+  }
   const b = e.target.closest("[data-wipe]");
   if (!b) return;
   const [label, what] = WIPE_INFO[b.dataset.wipe];
