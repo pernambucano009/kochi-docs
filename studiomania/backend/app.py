@@ -7051,6 +7051,10 @@ def autopilot_step(job: dict, settings: dict) -> None:
         when = autopilot_fixed_time(settings, job.get("at")) or autopilot_slot(settings, taken)
         caption = f["name"].strip()   # الكابشن = اسم المشروع
         ig = coach["instagram"] if coach and coach["instagram"] else None
+        try:   # مفيش حسابات نشر مربوطة (تجربة قبل الربط): الفيديو جاهز ومحفوظ، ومايتعملش منشور هيفشل
+            publisher.resolve_targets(settings.get("platforms") or ["instagram"])
+        except publisher.PublishError:
+            return autopilot_update(jid, step="done", note="الفيديو جاهز. اربط حسابات النشر ليُجدول")
         post = create_post(PostIn(export_id=job["export_id"], caption=caption, platforms=settings.get("platforms") or ["instagram"],
                                   scheduled_at=when, options=PostOptions(ig_tags=[ig] if ig else [], ig_collab=bool(ig),
                                                                          cover_ms=max(0, int((ex["duration"] - 2) * 1000)))))
@@ -33104,7 +33108,7 @@ def assistant_state(request: Request):
     # بيظهر لوحده للعلامات الجديدة بس (العقل لسه فاضي)؛ والعلامات القديمة تفتحه بـ ?assistant=1
     why = "" if bid and livevoice.openai_key() else "no_brand" if not bid else "no_key"
     # ⏺️ حساب التجربة (+rec): المكالمة بتفتح كل مرة يدخل، حتى لو اتعملت قبل كده والعقل اتملا
-    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")), "new": brain_score(b) < 60, "test": testrec_on(request), "name": a.get("name") or signup_name(request),
+    return {"log": assist_log_on(), "ready": not why, "why": why, "brand": bid, "done": bool(a.get("done")) or bool(ob.get("concierge")), "new": brain_score(b) < 60, "test": testrec_on(request), "name": a.get("name") or signup_name(request),
             "gender": a.get("gender") or "", "agent_gender": a.get("agent_gender") or "f", "dialect": dia,
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,

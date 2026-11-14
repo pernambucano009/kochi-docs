@@ -12,8 +12,8 @@ function usePop(to = 1.06) {
   return { scale: s, onPressIn: () => spring(to), onPressOut: () => spring(1) };
 }
 
-export function GlowButton({ title, onPress, icon, style, textStyle, disabled }: {
-  title?: string; onPress?: () => void; icon?: ReactNode; style?: StyleProp<ViewStyle>; textStyle?: StyleProp<TextStyle>; disabled?: boolean;
+export function GlowButton({ title, onPress, icon, style, textStyle, disabled, testID }: {
+  testID?: string; title?: string; onPress?: () => void; icon?: ReactNode; style?: StyleProp<ViewStyle>; textStyle?: StyleProp<TextStyle>; disabled?: boolean;
 }) {
   const pop = usePop();
   const glow = useState(() => new Animated.Value(0))[0];
@@ -28,6 +28,7 @@ export function GlowButton({ title, onPress, icon, style, textStyle, disabled }:
   const shadowRadius = glow.interpolate({ inputRange: [0, 1], outputRange: [12, 22] });
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       disabled={disabled}
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress?.(); }}
