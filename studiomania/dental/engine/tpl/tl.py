@@ -379,6 +379,24 @@ def morph_outlines(im, prog, z=1.0, p=1.0, col=(255, 255, 255), width=3):
             c_ = np.stack([np.convolve(pad_[:, 0], ker_, "same"), np.convolve(pad_[:, 1], ker_, "same")], 1)[w_:-w_]
         pts = [B.tf(x, y, z) for x, y in c_]; pts.append(pts[0]); d.line(anim.partial(pts, q), fill=col + (255,), width=width)
     return Image.alpha_composite(im.convert("RGBA"), lay).convert("RGB")
+_GM = {}
+def gum_morph(prog, z=1.0):
+    """الفك المعزول بلثته الممدودة في أي لحظة من التحول (قبل ← بعد). مدّ اللثة بيتحسب مرة عند أول وآخر التحول بس، وفي النص بيتاخد
+    مزج بينهم: لما كان بيتحسب لكل فريم لوحده، حدود السنان المتحركة كانت بتغيّر بداية الملء في كل صف ← خطوط أفقية بتطلع وتختفي
+    على عرض اللثة وقت التحول (ملاحظة فيديو الحالة a03 ث22)."""
+    if not isinstance(prog, (int, float)): return auto_gum(morph_frame(prog, z))
+    if z not in _GM:
+        ends = []
+        for p in (0, 1):
+            raw = np.asarray(morph_frame(p, z).convert("RGB")).astype(np.float32); ext = np.asarray(auto_gum(Image.fromarray(raw.astype(np.uint8))).convert("RGB")).astype(np.float32)
+            ends.append((ext, (np.abs(ext - raw).sum(2) > 6).astype(np.float32)))
+        m = cv2.GaussianBlur(np.maximum(ends[0][1], ends[1][1]), (0, 0), 1.5)[..., None]
+        _GM[z] = (ends[0][0], ends[1][0], m)
+    e0, e1, m = _GM[z]; p = float(max(0, min(1, prog)))
+    if p <= 0: return Image.fromarray(e0.astype(np.uint8))
+    if p >= 1: return Image.fromarray(e1.astype(np.uint8))
+    fr = np.asarray(morph_frame(p, z).convert("RGB")).astype(np.float32)
+    return Image.fromarray(np.clip(fr * (1 - m) + (e0 * (1 - p) + e1 * p) * m, 0, 255).astype(np.uint8))
 def morph_frame(prog, z=1.0, iso=1.0):
     _need_full()
     """العزل بيتبع شكل السنان في اللحظة دي: (عزل القبل) + (شكل كل سنة دلوقتي)."""

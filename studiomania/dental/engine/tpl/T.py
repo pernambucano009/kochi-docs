@@ -1235,10 +1235,7 @@ def a03():
     def bg(t): return clock_bg(t, cx=FW * .3)
     _AG = {}
     def mf(prog, zz=1.0):   # الفك واللثة واصلين لحافة الشاشة اليمين (كان فيه إسود يمين اللثة من أول الفيديو: ملاحظة a03 0–6.6)
-        if prog not in (0, 1): return auto_gum(morph_frame(prog, zz))
-        k = (prog, zz)
-        if k not in _AG: _AG[k] = auto_gum(morph_frame(prog, zz))
-        return _AG[k]
+        return gum_morph(prog, zz)   # اللثة الممدودة ثابتة طول التحول (مش بتتحسب لكل فريم)
     def base(prog, t, zz=1.0): return screen(mf(prog, zz), bg(t))
     def upper_only(im):   # بنشيل أي حتة سنان تحت صف الأسنان العلوية (بقايا سفلية في التصميم)
         a = np.array(im); al = a[..., 3] > 40; n, lb, st, _ = cv2.connectedComponentsWithStats(al.astype(np.uint8))
