@@ -1,0 +1,14 @@
+# 🤖 اختبار آيفون أوتوماتيك (Maestro على iPhone Simulator): بيدخل بحساب تجربة على staging ويلف على كل شاشة.
+# كل ملف لوحده؛ لو واحد وقع (كراش أو زرار مش لاقيه) الباقي بيكمل، والتقرير بيقول أنهي شاشة.
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - 01-login
+    - 02-camera
+    - 03-approvals
+    - 04-projects
+    - 05-ideas
+    - 06-storage
+    - 07-teleprompter

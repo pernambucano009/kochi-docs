@@ -1,0 +1,18 @@
+appId: com.geekzone.simsimkit
+# الدخول بالإيميل (حساب تجربة على staging من GitHub secrets)
+---
+- launchApp:
+    clearState: true
+    permissions: { all: allow }
+- extendedWaitUntil: { visible: "الدخول بالبريد الإلكتروني", timeout: 60000 }
+- takeScreenshot: 01-welcome
+- tapOn: "الدخول بالبريد الإلكتروني"
+- extendedWaitUntil: { visible: "كلمة المرور", timeout: 15000 }
+- tapOn: { id: "login-email" }
+- inputText: ${E2E_EMAIL}
+- tapOn: { id: "login-password" }
+- inputText: ${E2E_PASSWORD}
+- takeScreenshot: 01-login-filled
+- tapOn: { id: "login-submit" }
+- extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
+- takeScreenshot: 01-after-login

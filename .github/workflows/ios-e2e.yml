@@ -1,0 +1,130 @@
+# 🤖 اختبار آيفون أوتوماتيك: بيبني التطبيق لـ iPhone Simulator (متوصل بـ staging)، ويشغّل Maestro يلف على كل الشاشات والزراير،
+# ويجمع: صور كل شاشة، وتقارير الكراش (.ips)، وسبب أي NSException من لوج الجهاز. النتيجة في Summary بتاع الـ run وفي الـ Artifacts.
+# بيشتغل لوحده لما كود الموبايل يتغيّر على الفرع، أو بزرار Run workflow، أو لما studiomania/mobile/e2e.json يتغيّر.
+name: iOS E2E (Simulator)
+
+on:
+  push:
+    paths:
+      - "studiomania/mobile/app/**"
+      - "studiomania/mobile/src/**"
+      - "studiomania/mobile/.maestro/**"
+      - "studiomania/mobile/app.json"
+      - "studiomania/mobile/package.json"
+      - "studiomania/mobile/e2e.json"
+      - ".github/workflows/ios-e2e.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: studiomania/mobile
+    env:
+      SIMSIMKIT_API_BASE: https://staging.simsimkit.com
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "240000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studiomania/mobile/package-lock.json
+      - run: npm ci
+      - name: Prebuild iOS
+        run: npx expo prebuild --platform ios --clean --no-install && cd ios && pod install
+      - name: Build for Simulator (Release، من غير توقيع)
+        run: |
+          WS=$(ls -d ios/*.xcworkspace | head -1); SCHEME=$(basename "$WS" .xcworkspace)
+          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
+          set -o pipefail
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            | tail -n 40
+      - name: Boot simulator and install
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone')))")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b
+          APP=$(ls -d build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          xcrun simctl install "$UDID" "$APP"
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run all flows
+        id: maestro
+        continue-on-error: true
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          mkdir -p e2e-out
+          xcrun simctl spawn "$UDID" log stream --style compact --predicate 'process == "'"$SCHEME"'"' > e2e-out/device.log 2>&1 &
+          # كل شاشة في تشغيلة لوحدها (الـ driver بيقوم من جديد)، ولو الـ driver وقع (DeviceUnreachable) بنعيدها مرة.
+          # الكراش الحقيقي بيتسجّل "App crashed" وما بيتعادش.
+          FAIL=0; mkdir -p e2e-out/junit
+          for f in .maestro/0*.yaml; do
+            n=$(basename "$f" .yaml)
+            for attempt in 1 2; do
+              if maestro test "$f" --format junit --output "e2e-out/junit/$n.xml" --test-output-dir "e2e-out/maestro/$n" \
+                  -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD" > "e2e-out/$n.log" 2>&1; then
+                echo "✅ $n"; break
+              fi
+              if [ "$attempt" = 1 ] && grep -q -E "DeviceUnreachable|driver not ready|Connection refused" "e2e-out/$n.log"; then
+                echo "↻ $n: الـ driver وقع، بنعيد"; sleep 10; continue
+              fi
+              echo "❌ $n"; tail -n 5 "e2e-out/$n.log"; FAIL=1; break
+            done
+          done
+          exit $FAIL
+      - name: Collect crashes and errors
+        if: always()
+        run: |
+          sleep 5
+          mkdir -p e2e-out/crashes
+          cp ~/Library/Logs/DiagnosticReports/*"$SCHEME"*.ips e2e-out/crashes/ 2>/dev/null || true
+          {
+            echo "## 🤖 iOS E2E — النتيجة"
+            echo
+            if [ "${{ steps.maestro.outcome }}" = "success" ]; then echo "✅ كل الشاشات عدّت."; else echo "❌ فيه شاشات وقعت (التفاصيل تحت)."; fi
+            echo
+            echo "### الشاشات"
+            python3 - <<'PY'
+          import xml.etree.ElementTree as ET, os
+          import glob
+          files = sorted(glob.glob('e2e-out/junit/*.xml'))
+          if files:
+              for p in files:
+                  for tc in ET.parse(p).getroot().iter('testcase'):
+                      f = tc.find('failure')
+                      msg = ('❌ ' + (f.get('message') or (f.text or ''))[:300].replace('\n', ' ')) if f is not None else '✅'
+                      print(f"- **{tc.get('name')}**: {msg}")
+          else:
+              print('- (مفيش تقرير؛ Maestro ما اشتغلش)')
+          PY
+            echo
+            echo "### كراشات (.ips): $(ls e2e-out/crashes | wc -l | tr -d ' ')"
+            for f in e2e-out/crashes/*.ips; do [ -f "$f" ] || continue; echo "- \`$(basename "$f")\`"; done
+            echo
+            echo "### أسباب الـ exceptions من لوج الجهاز"
+            echo '```'
+            grep -h -E "Terminating app due to uncaught exception|reason:|RCTFatal|Unhandled JS Exception|Invariant Violation|TypeError|ReferenceError" e2e-out/device.log | cut -c1-400 | sort | uniq -c | sort -rn | head -40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-e2e-${{ github.run_number }}
+          path: studiomania/mobile/e2e-out
+          retention-days: 14
+      - name: Fail if any flow failed
+        if: steps.maestro.outcome != 'success'
+        run: exit 1

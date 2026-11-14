@@ -1,0 +1,14 @@
+appId: com.geekzone.simsimkit
+# المشاريع (الكراش التاني في TestFlight)
+---
+- launchApp: { permissions: { all: allow } }
+- extendedWaitUntil: { visible: { id: "tab-projects" }, timeout: 30000 }
+- tapOn: { id: "tab-projects" }
+- waitForAnimationToEnd
+- takeScreenshot: 04-projects
+- scroll
+- tapOn: { text: "خيارات", optional: true }
+- takeScreenshot: 04-projects-options
+- tapOn: { text: "إلغاء", optional: true }
+- tapOn: { id: "tab-projects" }
+- assertVisible: { id: "tab-projects" }
