@@ -48,11 +48,11 @@ const Help = (() => {
 .hp-in .att{border:0;width:38px;height:38px;border-radius:50%;background:none;color:var(--nh-muted,#6B6B67);cursor:pointer;display:grid;place-items:center;flex:none}
 .hp-in .att svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round}
 .hp-in button:disabled{opacity:.5;cursor:default}
-.hp-job{position:fixed;top:0;left:0;right:0;z-index:1200;direction:rtl;display:flex;align-items:center;gap:14px;padding:12px 18px calc(12px + 4px);background:#181718;color:#fff;box-shadow:0 10px 30px -12px rgba(0,0,0,.5);font-size:15px}
+.hp-job{position:fixed;top:calc(76px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(620px,calc(100vw - 32px));box-sizing:border-box;z-index:1200;direction:rtl;display:flex;align-items:center;gap:16px;padding:18px 22px 26px;border-radius:22px;background:#181718;color:#fff;box-shadow:0 22px 50px -18px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08);font-size:17px;overflow:hidden}
 .hp-job[hidden]{display:none}
-.hp-job .dot{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb38f,#E5613E 60%,#c94a2a);flex:none;animation:hpPulse 1.4s ease-in-out infinite}
-.hp-job .tx{flex:1;display:flex;flex-direction:column;gap:2px;line-height:1.4}.hp-job .tx b{font-weight:600}.hp-job .tx small{opacity:.75;font-size:12.5px}
-.hp-job .bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.12);overflow:hidden}
+.hp-job .dot{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb38f,#E5613E 60%,#c94a2a);flex:none;animation:hpPulse 1.4s ease-in-out infinite}
+.hp-job .tx{flex:1;display:flex;flex-direction:column;gap:3px;line-height:1.45;min-width:0}.hp-job .tx b{font-weight:600}.hp-job .tx small{opacity:.75;font-size:13.5px}
+.hp-job .bar{position:absolute;left:0;right:0;bottom:0;height:9px;background:rgba(255,255,255,.12);overflow:hidden}
 .hp-job .bar i{position:absolute;top:0;bottom:0;right:0;background:${OR};transition:width .8s ease}
 .hp-job .bar i.ind{width:35%!important;animation:hpInd 1.6s ease-in-out infinite}
 @keyframes hpInd{from{right:-35%}to{right:100%}}

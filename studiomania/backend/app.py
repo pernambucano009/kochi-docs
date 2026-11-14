@@ -34898,14 +34898,19 @@ def suad_fix_slot(err: str) -> str:
 
 @app.post("/api/assistant/dental_case")
 async def assistant_dental_case(before_retracted: UploadFile = File(...), after_retracted: UploadFile = File(...),
-                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...), template: str = Form(SUAD_DENTAL_TPL)):
+                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...),
+                                before_smile: UploadFile | None = File(None), after_face: UploadFile | None = File(None),
+                                template: str = Form(SUAD_DENTAL_TPL)):
     """الصور اللي سعاد طلبتها في المكالمة (ريتراكتور قبل/بعد، ابتسامة بعد، وش قبل) ← الفيديو يشتغل لوحده."""
     dental_on()
     bid = active_client_id()
     if not bid:
         raise HTTPException(400, "مفيش علامة")
     slots = {}
-    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face)):
+    for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face),
+                 ("before_smile", before_smile), ("after_face", after_face)):   # آخر اتنين اختياريين
+        if f is None:
+            continue
         data = await f.read()
         if len(data) > dental_max(f.filename):
             raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح")

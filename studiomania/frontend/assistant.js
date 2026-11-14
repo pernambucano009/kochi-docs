@@ -56,8 +56,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
-.as-dgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
-.as-dslot{position:relative;aspect-ratio:3/4;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
+.as-dgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
+.as-dslot.opt{border-color:rgba(127,127,127,.5)}.as-dslot i{font-style:normal;font-size:9.5px;opacity:.75}.as-dslot.on i{display:none}.as-dslot{position:relative;aspect-ratio:4/3;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
 .as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:10px;line-height:1.3;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
 .as-dslot.on{border-style:solid}.as-dslot.on .ph{display:none}
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
@@ -237,7 +237,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "show_input") {
       if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
       if (args.kind === "dental_case") { const tp = args.template === "a24" ? "a24" : "a03"; S.wait = "dental_case"; S.waitResp = S.capId || "x"; setTimeout(() => S && dentalBox(tp), 600);
-        return { ok: true, shown: args.kind, note: "The 4 photo slots are on his screen. Say the request ONCE, then stay completely silent, however long it takes: never ask whether he uploaded them, never repeat or remind. A SYSTEM message tells you when they arrive." }; }
+        return { ok: true, shown: args.kind, note: "The photo slots are on his screen (4 required, 2 optional). Say the request ONCE, then stay completely silent, however long it takes: never ask whether he uploaded them, never repeat or remind. A SYSTEM message tells you when they arrive." }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -563,13 +563,15 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     return { ok: true, playing: true, note: "The example video is playing now. Say NOTHING until a SYSTEM message says it ended: no photo request, no comment over it." };
   }
   // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
-  const DSLOTS = [["before_retracted", "ريتراكتور قبل"], ["after_retracted", "ريتراكتور بعد"], ["after_smile", "ابتسامة قريبة بعد"], ["before_face", "الوجه قبل (يبتسم)"]];
+  // ٦ خانات: ٤ أساسية (مانقدرش نبدأ من غيرها) و٢ اختيارية (لو ناقصة بنجهّزها إحنا: الابتسامة قبل من صورة الوجه، والوجه بعد بالذكاء الاصطناعي)
+  const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج", 1], ["after_retracted", "ريتراكتور بعد العلاج", 1], ["before_face", "الوجه قبل العلاج", 1],
+    ["after_smile", "الابتسامة بعد العلاج", 1], ["before_smile", "الابتسامة قبل العلاج", 0], ["after_face", "الوجه بعد العلاج", 0]];
   function dentalBox(tpl = "a03") {
     q(".as-box")?.remove();
     if (!ov) return;
     const d = document.createElement("div"); d.className = "as-box as-dcase";
     const files = {};
-    d.innerHTML = `<b>صور حالة واحدة</b><div class="as-dgrid">${DSLOTS.map(([k, t]) => `<label class="as-dslot" data-k="${k}"><input type="file" hidden accept="image/*"><span class="ph">＋</span><small>${esc(t)}</small></label>`).join("")}</div>
+    d.innerHTML = `<b>صور حالة واحدة</b><div class="as-dgrid">${DSLOTS.map(([k, t, req]) => `<label class="as-dslot${req ? "" : " opt"}" data-k="${k}"><input type="file" hidden accept="image/*"><span class="ph">＋</span><small>${esc(t)}</small><i>${req ? "أساسية" : "اختيارية"}</i></label>`).join("")}</div>
       <div class="row"><button type="button" class="as-go" data-dsend disabled>أرسل الصور</button><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
     q(".as-acts").before(d);
     const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
@@ -577,17 +579,17 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     d.querySelectorAll(".as-dslot").forEach((l) => {
       const inp = l.querySelector("input");
       inp.onchange = () => { const f = inp.files?.[0]; if (!f) return; files[l.dataset.k] = f;
-        l.style.backgroundImage = `url("${URL.createObjectURL(f)}")`; l.classList.add("on"); send.disabled = DSLOTS.some(([k]) => !files[k]); };
+        l.style.backgroundImage = `url("${URL.createObjectURL(f)}")`; l.classList.add("on"); send.disabled = DSLOTS.some(([k, , req]) => req && !files[k]); };
     });
     d.querySelector("[data-later]").onclick = () => { d.remove(); note("(SYSTEM: the user will send the case photos later. Tell him he can send them any time to you in the orange circle at the bottom right of the screen, by text. Then say goodbye and call finish.)"); };
     send.onclick = async () => {
       send.disabled = true; err(""); send.textContent = "⏳ جارٍ الرفع…";
-      const fd = new FormData(); DSLOTS.forEach(([k]) => fd.append(k, files[k])); fd.append("template", tpl);
+      const fd = new FormData(); DSLOTS.forEach(([k]) => { if (files[k]) fd.append(k, files[k]); }); fd.append("template", tpl);
       try {
         const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
         d.remove(); S.dentalSent = true; S.said = ""; S.wait = null; chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
-        note("(SYSTEM: the 4 case photos arrived and his video started being made. Now, in his dialect, say clearly: you are preparing his video now; when it is ready a notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him now; when it is ready he can watch it and send you his opinion: he will find you at the bottom right of any page, with your name on it, and you are waiting for his feedback. This is mandatory. Then goodbye and call finish.)");
+        note("(SYSTEM: the case photos arrived and his video started being made. Now, in his dialect, say clearly: you are preparing his video now; when it is ready a notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him now; when it is ready he can watch it and send you his opinion: he will find you at the bottom right of any page, with your name on it, and you are waiting for his feedback. This is mandatory. Then goodbye and call finish.)");
       } catch (e) { err(e.message); send.disabled = false; send.textContent = "أرسل الصور"; }
     };
   }
