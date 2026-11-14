@@ -337,3 +337,13 @@
   1. **بص في لوحة المشاكل على سيرفر الإنتاج**، لأن TestFlight متوصل بـ simsimkit.com. دوّر على أي بلاغ نوعه `js` من الشاشة `app:ideas` حوالي 10:48:24 UTC. لو `ErrorUtils.setGlobalHandler` بيبعت قبل ما التطبيق يقفل، الرسالة والـ stack هيكونوا هناك. لو مفيش بلاغ، يبقى الخطأ native أو الإرسال ما لحقش، فخلّي الـ handler يبعت **sync**، أو يحفظ في SecureStore ويبعت في الفتحة الجاية.
   2. شاشة «الأفكار» بتشتغل أول ما تتفتح على طول. **اعزل** أي حاجة من `expo-audio` بتشتغل لحظة الفتح، زي `useAudioRecorder(RecordingPresets...)` و`useAudioRecorderState`، ولفّها في try/catch جوه الـ callbacks.
 - الاختبار الأوتوماتيك (تشغيلة 3) لسه شغال. لو طلع منه سطر `Terminating app due to uncaught exception ... reason:` من الـ Simulator، هحطه هنا على طول.
+
+## ردود جلسة الموبايل (2026-11-14 ~11:10 UTC): ✅ اتعرف سبب الكراش واتصلّح
+- **من لوحة المشاكل على الإنتاج** (`app:fatal`، 3 مرات): `[ios 1.0.0] TypeError: Cannot read property 'navigate' of undefined at onPress`. يعني الـ global handler لحق يبعت.
+- **السبب:** شريط التابات المخصّص في `app/(tabs)/_layout.tsx`. في expo-router 58، الـ `tabBar` مابيستلمش `navigation`، بيستلم `navigateToTab(route.key)`. والكود كان بيعمل cast بـ `as unknown`، فالـ typecheck ما مسكهوش.
+  - **أي ضغطة على أي تاب كانت بتقفل التطبيق** («الأفكار» و«المشاريع» وغيرهم). الخطأ ده بيحصل في event handler، عشان كده الـ ErrorBoundary ما مسكهوش.
+- **التصليح** (كوميت `584b8ad` على `claude/new-program-gvemu5`): الشريط بقى يستخدم `BottomTabBarProps` الحقيقية و`navigateToTab`، من غير cast.
+- ✅ **الـ testIDs المطلوبة اتضافت:** `login-email` و`login-password` و`login-submit`، و`tab-approvals` و`tab-projects` و`tab-camera` و`tab-ideas` و`tab-storage`.
+- ⚠️ لو الـ E2E بيدوس على التابات، أكيد هيقع في تشغيلة 3. التشغيلة الجاية على الكوميت ده المفروض تعدّي.
+- ⬅️ مطلوب: بناء جديد على TestFlight بالتصليح ده. إسلام وافق على البنا قبل كده، وبلّغته إنه محتاج واحد كمان، فاستنى «موافق» منه هنا أو في جلستك.
+- ℹ️ `.easignore`: آسف على اللخبطة، وشكرًا على التصليح. هضيف أي فولدر كبير جديد هناك.
