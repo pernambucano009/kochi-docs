@@ -1037,7 +1037,7 @@ def a31():
 
 # ======================= أ٩ درس القياس كامل على مرجع 8 (24.9ث) =======================
 _ELD = (CASE_DIR + "/elements/") if CASE_DIR else S + "tools/out/"
-AP = L(_ELD + "after_portrait_v3.png")       # مشتق v3: البق كله (شفايف + سنان) من صورة الابتسامة الحقيقية بعد العلاج، متدمج (عدّى الفلتر 9/10)
+AP = L(_ELD + "after_portrait_v3.png") if _os.path.exists(_ELD + "after_portrait_v3.png") else BF       # (حالة من غير وجه: بديل فاضي، وقوالب الوجه مابتتعرضش ليها) # مشتق v3: البق كله (شفايف + سنان) من صورة الابتسامة الحقيقية بعد العلاج، متدمج (عدّى الفلتر 9/10)
 APH = L(_ELD + "after_portrait_hands.png") if _os.path.exists(_ELD + "after_portrait_hands.png") else AP    # نفس الشيء بإيدين على الخدود (عدّى الفلتر)
 def embrasures(sh):   # نسب الفراغات القاطعة بين كل سنتين (محسوبة من الحدود)
     ups = sorted([t for t in sh.teeth_all if t["fdi"] < 30], key=lambda t: t["cx"]); out = []

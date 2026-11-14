@@ -20,7 +20,9 @@ F = lambda n, s: ImageFont.truetype(FD + n, s)
 FA, FA5, FRQ, FSER = "TY-Alexandria-800.ttf", "TY-Alexandria-500.ttf", "TY-ArefRuqaa-700.ttf", "TY-InstrumentSerif-Italic.ttf"
 L = lambda p: Image.open(p).convert("RGB")
 # ---------- أصول الحالة ----------
-BF = L(C + "before/face.webp"); BM = L(C + "before/macro.jpg")
+# 🙈 حالة من غير صورة وجه (المريض مابيتصورش): القوالب اللي مافيهاش وجه (NO_FACE) بتشتغل عادي، والباقي مابيتعرضش للحالة دي
+NO_FACE_CASE = not os.path.exists(C + "before/face.webp")
+BF = Image.new("RGB", (1080, 1350)) if NO_FACE_CASE else L(C + "before/face.webp"); BM = L(C + "before/macro.jpg")
 # الصور الاختيارية (أقرب/جانبية): لو الطبيب مارفعهاش نستخدم الأمامية الحقيقية بدلها (الحالة ماتقعش بسبب صورة مش موجودة)
 Lo = lambda p, alt: L(p if os.path.exists(p) else alt)
 AF = L(C + "after/front.jpg"); AC = Lo(C + "after/front_close.jpg", C + "after/front.jpg")
