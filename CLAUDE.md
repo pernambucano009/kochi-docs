@@ -6,7 +6,7 @@
 - الفرع الوحيد: `claude/new-program-gvemu5`. ممنوع PR، وممنوع أي فرع تاني.
 - اعمل `git pull --rebase origin claude/new-program-gvemu5` قبل كل push.
 - اشتغل في الملفات بتاعة موضوعك بس. الملفات المشتركة بين كل الجلسات هي `backend/app.py` و`backend/livevoice.py` و`frontend/assistant.js` و`backend/gateway.py`، فلو اضطريت تعدّل فيها خلّي التعديل صغير ومحدد، وماتعيدش كتابة أجزاء كبيرة.
-- كل كوميت يخلص بسطر `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` وسطر `Claude-Session:` برابط الجلسة. ومن غير أي اسم موديل في الكوميت.
+- كل كوميت يخلص بسطر `Co-Authored-By:` وسطر `Claude-Session:` زي ما الجلسة نفسها بتحددهم، ومن غير أي حاجة تانية عن الموديل في الكوميت.
 
 ## صاحب المشروع
 - الرد يكون بالعربي المصري وباختصار.
