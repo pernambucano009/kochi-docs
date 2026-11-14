@@ -106,6 +106,12 @@ DOCTOR_REVIEW = {
 
 # قوالب مافيهاش وش المريض خالص (سنان بس): مش محتاجة موافقة الطبيب على صور الوش المشتقة قبل الريندر
 NO_FACE = {"a03"}
+RET_ONLY = {"before_retracted", "after_retracted"}   # قالب من غير وش: صورتين الريتراكتور بس هما الأساس، والباقي اختياري
+
+
+def _req(only: str = "") -> set:
+    """الخانات الأساسية. حالة معمولة لقالب واحد من غير وش (only) مش محتاجة وش ولا ابتسامة."""
+    return RET_ONLY if only in NO_FACE else {s["slot"] for s in SHOTS if s["req"]}
 
 # العناصر الداخلية (مش بيشوفها الطبيب لو نجحت): لو فشلت لازم يعرف، لأن العناصر اللي بعدها بتستناها
 INTERNAL = {"ms/smile_masks": {"label": "تحديد الشفتين في صورة الابتسامة"}, "ap_teeth": {"label": "حدود كل سنّ على الوجه"},
@@ -288,8 +294,8 @@ def _intake(case: Path) -> None:
 
 def _missing(case: Path, derivable: bool = False) -> list[str]:
     """الخانات المطلوبة الناقصة. derivable=False: اللي مالهاش بديل كمان (لازم الطبيب يرفعها)."""
-    have = _engine_json(case).get("slots", {})
-    return [s["slot"] for s in SHOTS if s["req"] and s["slot"] not in have
+    have, req = _engine_json(case).get("slots", {}), _req(_meta(case).get("only", ""))
+    return [s["slot"] for s in SHOTS if s["slot"] in req and s["slot"] not in have
             and (derivable or not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in have))]
 
 
@@ -574,7 +580,8 @@ def _elements(case: Path) -> None:
     """العناصر اللي القوالب التجريبية محتاجاها. الداخلية (أقنعة، حدود السنان، خلفية اللثة) بتتعتمد لو عدّت الفلتر،
     واللي فيها وش المريض بتستنى موافقة الطبيب."""
     _set_job(case, stage="elements")
-    r = _run(case, ["run.py", "elements", str(case), *[t["id"] for t in TEMPLATES if _tpl_ok(case, t)]], "elements.log", 3600)
+    only = _meta(case).get("only", "")
+    r = _run(case, ["run.py", "elements", str(case), *([only] if only else [t["id"] for t in TEMPLATES if _tpl_ok(case, t)])], "elements.log", 3600)
     if r.returncode != 0:
         raise RuntimeError("تعذّر تجهيز العناصر. " + _tail(case, "elements.log", 1))
     cj = _engine_json(case)
@@ -636,11 +643,12 @@ def _render(tpl: str):
 
 
 # ---------------------------------------------------------------- الواجهة
-def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None, clinic: dict | None = None) -> str:
+def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slots: dict | None = None, clinic: dict | None = None, only: str = "") -> str:
     """slots = {الخانة: (اسم الملف، البيانات)}: كل صورة (أو فيديو) في خانتها. files = صور/فيديوهات بأي ترتيب (تصنيف تلقائي).
     كل اللي الطبيب رفعه بيفضل محفوظ في فولدر المريض (input/) لأي قالب بعدين."""
     slots = slots or {}
-    miss = [s["name"] for s in SHOTS if s["req"] and s["slot"] not in slots and not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in slots)]
+    only = only if only in NO_FACE else ""
+    miss = [s["name"] for s in SHOTS if s["slot"] in _req(only) and s["slot"] not in slots and not (DERIVE.get(s["slot"]) and DERIVE[s["slot"]][0] in slots)]
     if miss and not files:
         raise ValueError("ارفع صورة لكل خانة مطلوبة: " + "، ".join(miss))
     cid = uuid.uuid4().hex[:12]
@@ -657,7 +665,7 @@ def create(data_dir: Path, files: list[tuple[str, bytes]], title: str = "", slot
         ext = ok_ext(os.path.splitext(name or "")[1].lower())
         (case / "_up" / f"{'v' if ext in VID_EXT else 'p'}{i + 1:02d}{ext}").write_bytes(data)
     _save_meta(case, {"title": (title or "").strip()[:80] or "حالة جديدة", "created": time.time(), "videos": {}, "upload_slots": up,
-                      **({"clinic": clinic} if clinic else {})})
+                      **({"clinic": clinic} if clinic else {}), **({"only": only} if only else {})})
     _enqueue(case, "slots", _slots_intake)
     return cid
 

@@ -132,7 +132,7 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "rival", "dental_case", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
                         "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
-                        "dental_case: (dentists only) four photo slots for ONE case: retractor before, retractor after, close smile after, face before. "
+                        "dental_case: (dentists only) photo slots for ONE case: retractor before and retractor after are the two needed; smile and face photos are optional. "
                         "none: close the box (they said later / they have none)."},
          "template": {"type": "string", "enum": ["a03", "a24"], "description": "dental_case only: the template of the example he saw."}}, "required": ["kind"]}},
     {"type": "function", "name": "show_card", "description": "Show a card on the user's screen for the current stop of the tour (call it in the SAME turn "
@@ -224,9 +224,8 @@ DENTAL_STOP = ("DENTAL VIDEO (the most important stop and the ending of the call
                "      Path SMILE, in this exact order, one step per turn:\n"
                "      1) Offer, as a nice surprise, to make him a video from his own cases, and ask ONE question, like «إيه رأيك أعملك فيديو من "
                "حالاتك؟ لو عندك صور حالة عملتها تقدر تشاركني بيها عشان أوريك اللي نقدر نعمله» (in his dialect). Then STOP and wait.\n"
-               "      2) Yes → say it ONCE and briefly: the best is six photos of ONE case (retractor before and after, close smile before and "
-               "after, face before and after); the minimum you need is four: retractor before, retractor after, the close smile after, and the "
-               "face before (smiling, no retractor); whatever is missing of the other two you prepare yourself. Call show_input kind dental_case "
+               "      2) Yes → say it ONCE and briefly: you need two photos of ONE case, taken with the retractor: the teeth before and the teeth "
+               "after; if he also has the close smile or the face (before and after) he can add them, but they are optional. Call show_input kind dental_case "
                "in that same turn, then stay silent while he uploads. Never repeat the request.\n"
                "      3) When the screen says the photos arrived, say clearly in his dialect: you are preparing his video now, and he will see a big "
                "loading bar at the top of the page while it is being made; when it is ready he will hear a notification and the video will appear "

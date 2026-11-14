@@ -34584,6 +34584,7 @@ async def dental_new(files: list[UploadFile] = File([]), title: str = Form(""),
     """صور الحالة: كل صورة في خانتها (before_retracted…)، أو صور بأي ترتيب (files) والمحرك بيصنّفها.
     بعدها يعدّل الاتجاه ويحلل السنان ويجهز العناصر في الخلفية."""
     dental_on()
+    tpl = template if template in ("a03", "a24") else SUAD_DENTAL_TPL
     slots = {}
     for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("before_face", before_face), ("after_smile", after_smile),
                  ("before_smile", before_smile), ("after_face", after_face), ("before_face_retracted", before_face_retracted),
@@ -34898,17 +34899,17 @@ def suad_fix_slot(err: str) -> str:
 
 @app.post("/api/assistant/dental_case")
 async def assistant_dental_case(before_retracted: UploadFile = File(...), after_retracted: UploadFile = File(...),
-                                after_smile: UploadFile = File(...), before_face: UploadFile = File(...),
+                                after_smile: UploadFile | None = File(None), before_face: UploadFile | None = File(None),
                                 before_smile: UploadFile | None = File(None), after_face: UploadFile | None = File(None),
                                 template: str = Form(SUAD_DENTAL_TPL)):
-    """الصور اللي سعاد طلبتها في المكالمة (ريتراكتور قبل/بعد، ابتسامة بعد، وش قبل) ← الفيديو يشتغل لوحده."""
+    """الصور اللي سعاد طلبتها في المكالمة ← الفيديو يشتغل لوحده. الأساس صورتين الريتراكتور (قبل/بعد)، والباقي اختياري."""
     dental_on()
     bid = active_client_id()
     if not bid:
         raise HTTPException(400, "مفيش علامة")
     slots = {}
     for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face),
-                 ("before_smile", before_smile), ("after_face", after_face)):   # آخر اتنين اختياريين
+                 ("before_smile", before_smile), ("after_face", after_face)):   # غير الريتراكتور كله اختياري
         if f is None:
             continue
         data = await f.read()
@@ -34916,10 +34917,9 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
             raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح")
         slots[k] = (f.filename or "", data)
     try:
-        cid = dental.create(DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid))
+        cid = dental.create(DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid), only=tpl)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    tpl = template if template in ("a03", "a24") else SUAD_DENTAL_TPL
     tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == tpl), "")
     suad_job(bid, title=f"بنعمل فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False, tpl=tpl)
     threading.Thread(target=suad_dental_watch, args=(bid, cid, tpl), daemon=True).start()

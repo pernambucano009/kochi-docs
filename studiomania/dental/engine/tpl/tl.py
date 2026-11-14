@@ -27,8 +27,8 @@ BF = Image.new("RGB", (1080, 1350)) if NO_FACE_CASE else L(C + "before/face.webp
 Lo = lambda p, alt: L(p if os.path.exists(p) else alt)
 AF = L(C + "after/front.jpg"); AC = Lo(C + "after/front_close.jpg", C + "after/front.jpg")
 AS1 = Lo(C + "after/side1.jpg", C + "after/front.jpg"); AS2 = Lo(C + "after/side2.jpg", C + "after/side1.jpg" if os.path.exists(C + "after/side1.jpg") else C + "after/front.jpg")
-SF = L(C + "ret/smile_front_ret4.jpg")
-SR, SL = [Lo(C + f"ret/{n}_ret4.jpg", C + "ret/smile_front_ret4.jpg") for n in ("smile_side_r", "smile_side_l")]
+SF = Lo(C + "ret/smile_front_ret4.jpg", C + "after/front.jpg")   # حالة من غير صورة ابتسامة (قوالب الريتراكتور بس): بديل عشان التحميل مايقعش
+SR, SL = [Lo(C + f"ret/{n}_ret4.jpg", C + "ret/smile_front_ret4.jpg" if os.path.exists(C + "ret/smile_front_ret4.jpg") else C + "after/front.jpg") for n in ("smile_side_r", "smile_side_l")]
 _shots = {}
 def shot(n):
     if n not in _shots:
