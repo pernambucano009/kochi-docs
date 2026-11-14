@@ -760,6 +760,9 @@ def auto_gum(im, dark=28, tol=0, rim=9, feather=3):   # tol=0: فراغ 2-3 بك
             dd = xs - x0[:, None]; ww = np.maximum(12, wbs * .55)[:, None]; kb = np.clip((dd - ww) / (2 * ww), 0, 1)[..., None] * .85
             mir = mir * (1 - kb) + cv2.GaussianBlur(mir, (0, 0), 14) * kb
             fill = np.where(rows[:, None, None], mir, fill)
+    # درجات اللون بين الصفوف: كل صف بيعكس لثة صفه، فالصفوف اللي عند ملتقى سنتين (أغمق) كانت بتطلع شرايط أفقية بحرف مستقيم
+    # («رقع لثة ملزوقة»: فحص الفيديو a03 ث24–25). اللون العام بيتنعّم رأسيًا، والملمس الدقيق بيفضل.
+    f_lo = cv2.GaussianBlur(fill, (0, 0), 4); fill = cv2.GaussianBlur(f_lo, (0, 0), sigmaX=2, sigmaY=22) + (fill - f_lo) * .7
     m = ((xs >= x0[:, None]) & rows[:, None]).astype(np.float32)
     m = cv2.GaussianBlur(m, (0, 0), feather if os.environ.get("GUM_TEXTURE") else max(feather, 7))[..., None]   # دمج أعرض عند بداية الانعكاس (مايبانش خط)
     out = af * (1 - m) + fill * m

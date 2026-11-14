@@ -1202,6 +1202,8 @@ def veneer_pieces():
         M = morph_setup(); _PC["p"] = {f: (pc, cx, cy) for f, pc, cx, cy in teeth_pieces("A") if f in M["common"]}
         m = M["M"]; _PC["s"] = float(np.hypot(m[0, 0], m[0, 1]))
     return _PC["p"], _PC["s"]
+ROW_K = 1.0   # مقاس العدسة في صف العرض بالنسبة للمسافة بين مراكز السنان: 1 = العدسات متلامسة زي السنان. كانت 1.25 (مع مقياس أصغر بالغلط)،
+              # ولما المقياس اتصلح بقت راكبة على بعض ← الصف باين «سايح» (فحص الفيديو a03 ث5)
 def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt=25, wait=False, morph=True, src_sc=1.0, src_cy=None):
     """الفينير بيطير ويقعد على كل سنة؛ لما يقعد، السنة بتتحول بالمورف لشكل البعد. يرجّع (فريم، تقدم كل سنة).
     wait=True: العدسات اللي لسه ماطارتش بتفضل مكانها في الصف (الاختيار مايختفيش). morph=False: العدسة بتفضل قاعدة على سنة القبل (من غير مورف) — التحول للبعد بيحصل بعدين مرة واحدة بنعومة زي الأصل."""
@@ -1217,14 +1219,14 @@ def seat(t, z=1.0, t0=0.0, step=.22, fly=.45, order=None, src=(-300, None), tilt
         scy = FH / 2 if src_cy is None else src_cy
         sy = (scy + (ty - scy) * src_sc) if src[1] is None else src[1]   # src_sc: صف البداية أصغر (زي صف الاختيار) ← العدسة بتكبر وهي طايرة
         e = ease(min(q, 1)); x = sx + (tx - sx) * e; y = sy + (ty - sy) * e
-        im = paste(im, pc.transpose(Image.Transpose.ROTATE_270), x, y, fpx * (1.25 * src_sc + (1 - 1.25 * src_sc) * e), (1 - e) * tilt, alpha=1 - max(0, (q - 1) / .15) if morph else 1.0)
+        im = paste(im, pc.transpose(Image.Transpose.ROTATE_270), x, y, fpx * (ROW_K * src_sc + (1 - ROW_K * src_sc) * e), (1 - e) * tilt, alpha=1 - max(0, (q - 1) / .15) if morph else 1.0)
     return im
 def real_row(im, z, x0, dy=0.0, sc=1.0, cy=None):   # العدسات الحقيقية بتاعة المريض (من صورة البعد) مرصوصة بالطول عند x0 — نفس مكان بداية seat
     M = morph_setup(); B = shot("B"); pcs, ms = veneer_pieces(); fpx = FH / B.crop(z, 1.0)[3] * ms; cy = FH / 2 if cy is None else cy
     for k in M["order"]:
         if k not in pcs: continue
         cc = M["planned"][k].mean(0); _, ty = B.tf(cc[0], cc[1], z); ty = cy + (ty - cy) * sc   # sc: الصف كله أصغر حوالين نصه
-        im = paste(im, pcs[k][0].transpose(Image.Transpose.ROTATE_270), x0, ty + dy, fpx * 1.25 * sc, 0)
+        im = paste(im, pcs[k][0].transpose(Image.Transpose.ROTATE_270), x0, ty + dy, fpx * ROW_K * sc, 0)
     return im
 DESIGNS = ["design_square", "design_oval", "design_tri_upper"]   # تصميمات للفك العلوي بس (اتشال "arc" لأن جوانبه بتبان زي سنان سفلية) — والاختيار الأخير العدسات الحقيقية
 @T("a03", "v02")
