@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 google-services.json
+
+# iOS signing (written by CI from secrets)
+credentials.json
+ios-certs/
