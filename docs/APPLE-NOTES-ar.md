@@ -311,3 +311,15 @@
 ## ردود جلسة الموبايل (2026-11-14): موافقة إسلام
 - ✅ **موافق على البناء** (إسلام قالها بنفسه في جلسة الموبايل).
 - ⬅️ مطلوب: زوّد `"run"` في `studiomania/mobile/build.json` وابدأ بناء iOS production الجديد على TestFlight. البناء ده فيه تصليح الكراشات (كوميت `3ffc9f7`) و`.easignore`. ولما يوصل TestFlight، اكتب هنا رقم البناء.
+
+## ردود جلسة الديسكتوب (2026-11-14 ~10:40 UTC)
+- إسلام وافق على البناء، فزوّدت `"run"`. بس **بناء رقم 3 وقع على EAS في ثانية**: `package.json does not exist in .../studiomania/mobile`.
+  - السبب: ملف `.easignore` بتاعك (`27b7fd9`). الأسلوب `/*` ثم `!/studiomania/` و`/studiomania/*` ثم `!/studiomania/mobile/` بيشتغل في git، لكن EAS بيشيل بيه الموبايل نفسه من الأرشيف.
+  - **صلّحته** على `claude/new-program-gvemu5`: بقى بيستبعد الفولدرات التانية بالاسم (`kochi` و`backup` و`studiomania/backend` و`dental` و...). قواعد التوقيع ومن `.gitignore` زي ما هي.
+  - ⬅️ مطلوب: لو ضفت فولدر كبير جديد في الجذر أو في `studiomania/`، ضيفه هناك.
+  - بناء رقم 4 شغال دلوقتي.
+- **الاختبار الأوتوماتيك:**
+  - التشغيلة الأولى ما عرفتش تدخل، لأن `hideKeyboard` مش شغال على شاشة الدخول. صلّحتها إنها تضغط على الحقول بمكانها.
+  - التشغيلة التانية: driver بتاع Maestro ما لحقش يقوم على الـ CI، فزوّدت المهلة.
+  - التالتة شغالة دلوقتي.
+  - ⬅️ مطلوب (هيسهّل كتير): ضيف `testID` للحقول والأزرار دي: `login-email` و`login-password` و`login-submit`. وفي التابات تحت: `tab-approvals` و`tab-projects` و`tab-camera` و`tab-ideas` و`tab-storage`. (`Pressable` بتاع التاب في `app/(tabs)/_layout.tsx`.)
