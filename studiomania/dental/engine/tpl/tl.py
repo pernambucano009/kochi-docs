@@ -524,8 +524,34 @@ def teeth_pieces(sh_name="A"):   # قطع السنان العلوية الحقي
     sh = shot(sh_name); src = L(C + "after/front.jpg") if sh_name == "A" else BM; out = []
     for t in sorted([t for t in sh.teeth_all if t["fdi"] < 30], key=lambda t: t["cx"]):
         m = Image.new("L", src.size); ImageDraw.Draw(m).polygon([tuple(p) for p in t["c"]], fill=255); box = (t["x"], t["y"], t["x"] + t["w"], t["y"] + t["h"])
-        pc = src.crop(box).convert("RGBA"); pc.putalpha(m.crop(box)); out.append((t["fdi"], pc, t["cx"], t["y"] + t["h"] / 2))
+        pc = src.crop(box).convert("RGBA"); pc.putalpha(m.crop(box)); out.append((t["fdi"], piece_whole(pc, t["fdi"]), t["cx"], t["y"] + t["h"] / 2))
     return out
+def piece_whole(pc, fdi=0, deep=.06):
+    """أداة عامة (فحص + تصليح): قطعة السنة/العدسة اللي بتتعرض لوحدها لازم تبقى شكل كامل. لو حدودها فيها «قضمة» (اللثة أو سنة جارة
+    مغطية ركن منها في الصورة، أو لمعة قطعت الحد) بتبان عدسة مكسورة/مقطوعة وهي طايرة (فيديو المكالمة الأولى a03 ث5: «notch torn»).
+    الفحص: أعمق تجويف في الحد بالنسبة لعرض القطعة. التصليح: قفل التجويف، والجزء المتقفل بياخد لون وملمس السنة نفسها من جواها
+    (مش بكسلات اللثة اللي كانت مغطياه). دي القطعة الطايرة بس: صورة المريض نفسها مابتتلمسش."""
+    a = np.array(pc); al = (a[..., 3] > 127).astype(np.uint8); h, w = al.shape
+    cs, _ = cv2.findContours(al, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not cs: return pc
+    c = max(cs, key=cv2.contourArea)
+    if len(c) < 20: return pc
+    df = cv2.convexityDefects(c, cv2.convexHull(c, returnPoints=False)); dep = 0 if df is None else df.reshape(-1, 4)[:, 3].max() / 256
+    if dep < deep * min(w, h): return pc
+    cl = al.copy(); n_ = len(c)
+    for s_, e_, f_, d_ in df.reshape(-1, 4):   # كل تجويف واضح بيتقفل لحد الخط المستقيم بين طرفيه (الحد الطبيعي للسنة محدّب)
+        if not (deep * min(w, h) <= d_ / 256 <= .22 * min(w, h)): continue   # أعمق من كده = سنة جارة مغطية جزء كبير (مش قضمة): مايتخترعش
+        seg = c[s_:e_ + 1] if e_ >= s_ else np.concatenate([c[s_:], c[:e_ + 1]])
+        cv2.fillPoly(cl, [seg.reshape(-1, 2).astype(np.int32)], 1)
+    cl = (cv2.GaussianBlur(cl.astype(np.float32), (0, 0), 2) > .5).astype(np.uint8)   # حد ناعم
+    add = (cl > 0) & (al == 0)
+    if add.sum() < .004 * al.sum(): return pc
+    fix = (cv2.dilate(add.astype(np.uint8), np.ones((13, 13), np.uint8)) > 0) & (cl > 0)   # الجزء المتقفل + حرف السنة القديم اللي جنبه (كان وردي/غامق من اللثة ← خط لحام)
+    core = cv2.erode(al, np.ones((5, 5), np.uint8)) & ~fix.astype(np.uint8)   # مصدر اللون: جوه السنة بس
+    rgb = cv2.inpaint(np.ascontiguousarray(a[..., :3]), (core == 0).astype(np.uint8), 5, cv2.INPAINT_TELEA)
+    a[..., :3] = np.where(fix[..., None], rgb, a[..., :3]); a[..., 3] = np.maximum(a[..., 3], (cv2.GaussianBlur(cl.astype(np.float32), (0, 0), 1) * 255).astype(np.uint8) * (cl > 0))
+    print(f"piece_whole: tooth {fdi} outline notch {dep:.0f}px closed ({int(add.sum())} px)", flush=True)
+    return Image.fromarray(a)
 def neon_write(im, s, p, y, col=(80, 220, 255), size=110):   # كتابة بضوء نيون
     lay = Image.new("RGBA", im.size); d = ImageDraw.Draw(lay); f = F(FA, size)
     d.text((im.width / 2, y), s, font=f, fill=col + (255,), anchor="mm", direction="rtl"); tw = d.textlength(s, font=f, direction="rtl")
