@@ -649,14 +649,14 @@ async def require_login(request: Request, call_next):
 class ClientIssueIn(BaseModel):
     message: str
     screen: str = ""
-    kind: str = "ui"     # ui = رسالة خطأ ظهرت للعميل · js = كود وقع في المتصفح
+    kind: str = "ui"     # ui = رسالة خطأ ظهرت للعميل · js = كود وقع في المتصفح · report = بلاغ من التطبيق عن نتيجة ذكاء اصطناعي
     raw: str = ""
 
 
 @app.post("/api/issues/client")
 def client_issue(body: ClientIssueIn, request: Request):
     """🚨 الواجهة بتبلّغ لوحدها: رسالة خطأ ظهرت للعميل، أو كود وقع في المتصفح."""
-    issues.record("js" if body.kind == "js" else "ui", body.screen[:120] or "/", body.message[:1000], body.raw[:3000],
+    issues.record(body.kind if body.kind in ("js", "report") else "ui", body.screen[:120] or "/", body.message[:1000], body.raw[:3000],
                   user=request.headers.get("x-user-email", ""), screen=body.screen[:120])
     return {"ok": True}
 

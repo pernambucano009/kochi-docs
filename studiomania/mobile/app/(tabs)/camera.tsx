@@ -1,6 +1,6 @@
 // الرئيسية = الكاميرا (زي سناب شات): صورة / فيديو / تيلي برومتر، وفوق شريحة بالفيديوهات اللي مستنية تصويرك
 import { useCallback, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library/legacy";
@@ -141,7 +141,7 @@ export default function Camera() {
   }
   // 🗑️ حذف الحساب نهائيًا (Apple بتطلبه في أي تطبيق بيعمل حسابات): تأكيد صريح الأول
   function confirmDelete() {
-    Alert.alert("حذف الحساب نهائيًا؟", "سيُحذف حسابك وكل مشاريعك وفيديوهاتك وأفكارك من التطبيق والموقع، ويُلغى اشتراكك إن وُجد. لا يمكن التراجع عن ذلك.", [
+    Alert.alert("حذف الحساب نهائيًا؟", `سيُحذف حسابك وكل مشاريعك وفيديوهاتك وأفكارك من التطبيق والموقع${Platform.OS === "ios" ? "" : "، ويُلغى اشتراكك إن وُجد"}. لا يمكن التراجع عن ذلك.`, [
       { text: "رجوع", style: "cancel" },
       { text: "احذف حسابي", style: "destructive", onPress: async () => {
         try { await unregisterPush(); await deleteAccount(); router.replace("/welcome"); Alert.alert("حُذف حسابك", "شكرًا لأنك جرّبت SimsimKit."); }

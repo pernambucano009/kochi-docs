@@ -1,10 +1,11 @@
 // المساحة السحابية: قد إيه مستخدم (فيديوهات نهائية، لقطات خام، صور، أصوات)، وفيديوهاتك النهائية تتفرج عليها وتحفظها
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../src/api";
 import { Icon } from "../../src/icons";
+import { hiddenRefs } from "../../src/report";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, T } from "../../src/ui";
 import { VideoSheet, type SheetVideo } from "../../src/VideoSheet";
@@ -33,9 +34,9 @@ export default function StorageTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [a, b] = await Promise.all([api<Storage>("/api/storage").catch(() => null), api<Export[]>("/api/exports").catch(() => [] as Export[])]);
+    const [a, b, hidden] = await Promise.all([api<Storage>("/api/storage").catch(() => null), api<Export[]>("/api/exports").catch(() => [] as Export[]), hiddenRefs()]);
     setSt(a || { folders: {} });
-    setExps(b);
+    setExps(b.filter((e) => !hidden.has("export:" + e.id)));
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -88,19 +89,24 @@ export default function StorageTab() {
           </Pressable>
         ))}
 
-        <T weight="medium" size={15} style={{ marginTop: 8 }}>زِد مساحتك</T>
-        <View style={s.addons}>
-          {ADDONS.map((n) => (
-            <View key={n} style={[s.addon, { backgroundColor: t.card, shadowColor: t.shadow }]}>
-              <T size={18} weight="medium">+{n === 1000 ? "1 تيرا" : n}</T>
-              <T muted size={11.5}>{n === 1000 ? "" : "جيجا"}</T>
-              <T muted size={11}>قريبًا</T>
+        {/* 🍎 على الآيفون مفيش أي عرض شراء جوه التطبيق (قواعد أبل)، فباقات المساحة بتظهر على أندرويد بس */}
+        {Platform.OS !== "ios" ? (
+          <>
+            <T weight="medium" size={15} style={{ marginTop: 8 }}>زِد مساحتك</T>
+            <View style={s.addons}>
+              {ADDONS.map((n) => (
+                <View key={n} style={[s.addon, { backgroundColor: t.card, shadowColor: t.shadow }]}>
+                  <T size={18} weight="medium">+{n === 1000 ? "1 تيرا" : n}</T>
+                  <T muted size={11.5}>{n === 1000 ? "" : "جيجا"}</T>
+                  <T muted size={11}>قريبًا</T>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </>
+        ) : null}
         <T muted size={12} style={{ textAlign: "center" }}>نفس المساحة في التطبيق وعلى الموقع.</T>
       </ScrollView>
-      <VideoSheet video={video} onClose={() => setVideo(null)} />
+      <VideoSheet video={video} onClose={() => setVideo(null)} onGone={() => { const id = video?.id; setExps((x) => x.filter((e) => e.id !== id)); }} />
     </>
   );
 }

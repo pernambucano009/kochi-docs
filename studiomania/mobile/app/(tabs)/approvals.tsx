@@ -1,11 +1,12 @@
 // الموافقات: كل خطوة الأوتوبايلوت واقف مستنيك فيها (فكرة، سكريبت، مونتاج، فيديو قبل النشر، تصوير)، توافق أو تتخطّى من هنا
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_BASE, api, json, mediaHeaders, mediaUrl } from "../../src/api";
+import { hiddenRefs, reportContent } from "../../src/report";
 import { shoot } from "../../src/shoot";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, GlowButton, SoftButton, T } from "../../src/ui";
@@ -43,6 +44,7 @@ export default function Approvals() {
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(false);
   const [headers, setHeaders] = useState<Record<string, string>>({});
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +56,7 @@ export default function Approvals() {
     const iv = setInterval(load, 10000);   // الأوتوبايلوت شغال في الخلفية: نحدّث كل ١٠ ثواني والتاب مفتوح
     return () => clearInterval(iv);
   }, [load]));
-  useEffect(() => { mediaHeaders().then(setHeaders); }, []);
+  useEffect(() => { mediaHeaders().then(setHeaders); hiddenRefs().then((h) => setHidden(new Set(h))); }, []);
 
   async function act(j: Job, path: string, body?: unknown, done?: string) {
     setBusy(j.id);
@@ -73,12 +75,19 @@ export default function Approvals() {
     { text: "تخطَّ", style: "destructive", onPress: () => act(j, "stop") },
   ]);
 
+  // 🚩 بلاغ عن نتيجة الذكاء الاصطناعي: بتختفي، والموعد ده بيتخطّى عشان مايتنشرش
+  async function report(j: Job) {
+    if (!(await reportContent("pilot:" + j.id, j.gate || j.kind))) return;
+    setHidden((h) => new Set(h).add("pilot:" + j.id));
+    await api(`/api/pilot/jobs/${j.id}/stop`, { method: "POST" }).catch(() => null);
+  }
+
   const film = (j: Job) => {
     shoot.start({ kind: "pilot", id: j.id, title: j.title || "فيديو الأوتوبايلوت" }, j.script || []);
     router.push("/teleprompter");
   };
 
-  const all = jobs || [];
+  const all = (jobs || []).filter((j) => !hidden.has("pilot:" + j.id));
   const open = all.filter((j) => j.status === "wait" || j.status === "cam");
   const rest = all.filter((j) => !open.includes(j)).slice(0, 8);
   if (jid) open.sort((a, b) => (a.id === jid ? -1 : b.id === jid ? 1 : 0));
@@ -112,6 +121,7 @@ export default function Approvals() {
             <GlowButton title={isBusy ? "…" : "موافق"} disabled={isBusy || !pick} onPress={() => act(j, "ok", { pick })} style={{ flex: 1 }} />
             <SoftButton title="تخطَّ" onPress={() => skip(j)} />
           </View>
+          <SoftButton title="إبلاغ عن المحتوى" onPress={() => report(j)} style={{ alignSelf: "flex-start" }} />
         </>
       );
     }
@@ -128,9 +138,13 @@ export default function Approvals() {
           ) : null}
           <View style={s.acts}>
             <GlowButton title={isBusy ? "…" : okLabel} disabled={isBusy} onPress={() => act(j, "ok", { pick: "" }, j.gate === "video" ? "جُدول الفيديو وسيُنشر في موعده." : undefined)} style={{ flex: 1 }} />
-            {!carousel ? <SoftButton title="عدّل على الموقع" onPress={() => Linking.openURL(API_BASE + "/")} /> : null}
+            {/* 🍎 مفيش لينكات للموقع على الآيفون */}
+            {!carousel && Platform.OS !== "ios" ? <SoftButton title="عدّل على الموقع" onPress={() => Linking.openURL(API_BASE + "/")} /> : null}
           </View>
-          <SoftButton title="تخطَّ" onPress={() => skip(j)} style={{ alignSelf: "flex-start" }} />
+          <View style={s.acts}>
+            <SoftButton title="تخطَّ" onPress={() => skip(j)} />
+            <SoftButton title="إبلاغ عن المحتوى" onPress={() => report(j)} />
+          </View>
         </>
       );
     }

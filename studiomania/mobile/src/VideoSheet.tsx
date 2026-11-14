@@ -1,13 +1,14 @@
-// مشغّل فيديو بيطلع من تحت (للفيديوهات النهائية والمشاريع)، ومعاه «احفظ في معرض الصور»
+// مشغّل فيديو بيطلع من تحت (للفيديوهات النهائية والمشاريع)، ومعاه «احفظ في معرض الصور» و«إبلاغ» و«احذف»
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { File, Paths } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { mediaHeaders, mediaUrl } from "./api";
+import { api, mediaHeaders, mediaUrl } from "./api";
 import { Icon } from "./icons";
 import { ACCENT } from "./theme";
+import { confirmDelete, reportContent } from "./report";
 import { GlowButton, T } from "./ui";
 
 export type SheetVideo = { id: string; name: string; url: string; download_url?: string };
@@ -18,7 +19,8 @@ function Player({ uri, headers }: { uri: string; headers: Record<string, string>
   return <VideoView player={player} style={s.video} contentFit="contain" nativeControls />;
 }
 
-export function VideoSheet({ video, onClose }: { video: SheetVideo | null; onClose: () => void }) {
+// onGone: الفيديو اتحذف أو اتبلّغ عنه، فالشاشة اللي فتحته تشيله من القائمة
+export function VideoSheet({ video, onClose, onGone }: { video: SheetVideo | null; onClose: () => void; onGone?: () => void }) {
   const ins = useSafeAreaInsets();
   const [headers, setHeaders] = useState<Record<string, string> | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,12 +42,21 @@ export function VideoSheet({ video, onClose }: { video: SheetVideo | null; onClo
     setSaving(false);
   }
 
+  async function report() {
+    if (video && (await reportContent("export:" + video.id, "video"))) { onGone?.(); onClose(); }
+  }
+  async function remove() {
+    if (video && (await confirmDelete(video.name || "الفيديو", () => api(`/api/exports/${video.id}`, { method: "DELETE" })))) { onGone?.(); onClose(); }
+  }
+
   return (
     <Modal visible={!!video} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <View style={[s.root, { paddingTop: ins.top + 8, paddingBottom: ins.bottom + 16 }]}>
         <View style={s.top}>
           <Pressable accessibilityRole="button" accessibilityLabel="إغلاق" onPress={onClose} style={s.round}><Icon name="close" /></Pressable>
           <T size={14} weight="medium" style={{ color: "#F1F1F3", flex: 1 }}>{video?.name || ""}</T>
+          <Pressable accessibilityRole="button" onPress={report} style={s.pill}><T size={12.5} style={{ color: "#F1F1F3" }}>إبلاغ</T></Pressable>
+          <Pressable accessibilityRole="button" onPress={remove} style={s.pill}><T size={12.5} style={{ color: "#FF8A7A" }}>احذف</T></Pressable>
         </View>
         <View style={{ flex: 1 }}>
           {video && headers ? <Player uri={mediaUrl(video.url)} headers={headers} /> : <ActivityIndicator color={ACCENT} style={{ marginTop: 80 }} />}
@@ -60,5 +71,6 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0C0C0E", gap: 12 },
   top: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16 },
   round: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" },
+  pill: { height: 34, borderRadius: 17, paddingHorizontal: 12, backgroundColor: "rgba(255,255,255,.08)", alignItems: "center", justifyContent: "center" },
   video: { flex: 1, backgroundColor: "#000" },
 });

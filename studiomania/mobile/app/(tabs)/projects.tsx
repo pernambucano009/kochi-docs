@@ -1,11 +1,12 @@
 // المشاريع: كل اللي شغّال عليه (مشاريع القوالب ومشاريع المونتاج) بالكفر بتاعه، واللي خلص تتفرج عليه وتحفظه
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_BASE, api, mediaHeaders, mediaUrl } from "../../src/api";
 import { Icon } from "../../src/icons";
+import { confirmDelete, hiddenRefs, reportContent } from "../../src/report";
 import { shoot, toShoot } from "../../src/shoot";
 import { ACCENT, useTheme } from "../../src/theme";
 import { Card, T } from "../../src/ui";
@@ -14,7 +15,7 @@ import { VideoSheet, type SheetVideo } from "../../src/VideoSheet";
 type Flow = { id: string; template?: { kind?: string; name?: string }; stage?: string; title?: string; updated_at?: string };
 type Project = { id: string; name: string; cover_url: string | null; render_status: string; render_progress?: number | null; export_id: string | null; updated_at: string; data?: { name?: string } };
 type Export = { id: string; name: string; url: string; download_url: string; project_id: string | null; created_at: string };
-type Row = { key: string; title: string; sub: string; at: string; cover: string | null; state: "done" | "busy" | "todo" | "shoot"; video?: SheetVideo; flowId?: string };
+type Row = { key: string; title: string; sub: string; at: string; cover: string | null; state: "done" | "busy" | "todo" | "shoot"; video?: SheetVideo; flowId?: string; projectId?: string };
 
 const STAGE: Record<string, string> = { idea: "الفكرة", scenario: "النص", shoot: "الفيديو", review: "الملاحظات", montage: "المونتاج", generate: "التوليد",
   format: "الشكل", cast: "الشخصيات", assets: "العناصر", output: "الناتج" };
@@ -40,11 +41,12 @@ export default function Projects() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [flows, projects, exports, todo] = await Promise.all([
+    const [flows, projects, exports, todo, hidden] = await Promise.all([
       api<Flow[]>("/api/flows").catch(() => [] as Flow[]),
       api<Project[]>("/api/projects").catch(() => [] as Project[]),
       api<Export[]>("/api/exports").catch(() => [] as Export[]),
       toShoot().catch(() => []),
+      hiddenRefs(),
     ]);
     const shootIds = new Set(todo.filter((x) => x.kind === "flow").map((x) => x.id));
     const exp = new Map(exports.map((e) => [e.id, e]));
@@ -53,7 +55,7 @@ export default function Projects() {
       const e = p.export_id ? exp.get(p.export_id) : undefined;
       const busy = p.render_status === "rendering";
       out.push({
-        key: "p" + p.id, title: p.name || "مشروع", at: p.updated_at, cover: p.cover_url,
+        key: "p" + p.id, projectId: p.id, title: p.name || "مشروع", at: p.updated_at, cover: p.cover_url,
         sub: busy ? `جارٍ التصدير${p.render_progress ? ` ${Math.round(p.render_progress)}٪` : "…"}` : e ? "الفيديو جاهز" : p.render_status === "failed" ? "توقف التصدير" : "في المونتاج",
         state: e && !busy ? "done" : busy ? "busy" : "todo", video: e ? { id: e.id, name: e.name, url: e.url, download_url: e.download_url } : undefined,
       });
@@ -66,7 +68,7 @@ export default function Projects() {
       });
     }
     out.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
-    setRows(out);
+    setRows(out.filter((r) => !hidden.has(r.key) && !(r.video && hidden.has("export:" + r.video.id))));
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -77,7 +79,22 @@ export default function Projects() {
       const todo = (await toShoot()).find((x) => x.kind === "flow" && x.id === r.flowId);
       if (todo) { shoot.start({ kind: "flow", id: todo.id, title: todo.title }, todo.lines); return router.push("/teleprompter"); }
     }
+    // 🍎 على الآيفون مفيش لينكات للموقع (ممكن توصل لصفحة الأسعار، وأبل بتمنع ده)
+    if (Platform.OS === "ios") return Alert.alert(r.title, "يُكمل هذا المشروع على موقع SimsimKit من الكمبيوتر، وسيظهر هنا عندما يجهز.");
     Linking.openURL(API_BASE + "/");
+  }
+
+  // ⋯ على كل مشروع: إبلاغ عن النتيجة أو حذف المشروع
+  const drop = (r: Row) => setRows((x) => (x || []).filter((y) => y.key !== r.key));
+  function more(r: Row) {
+    Alert.alert(r.title, undefined, [
+      { text: "إبلاغ عن المحتوى", onPress: async () => { if (await reportContent(r.key, "project")) drop(r); } },
+      { text: "احذف", style: "destructive", onPress: async () => {
+        const path = r.flowId ? `/api/flows/${r.flowId}` : `/api/projects/${r.projectId}`;
+        if (await confirmDelete(r.title, () => api(path, { method: "DELETE" }))) drop(r);
+      } },
+      { text: "رجوع", style: "cancel" },
+    ]);
   }
 
   const list = (rows || []).filter((r) => filter === "all" || (filter === "done" ? r.state === "done" : r.state !== "done"));
@@ -104,12 +121,15 @@ export default function Projects() {
 
         <View style={s.grid}>
           {list.map((r) => (
-            <Pressable key={r.key} onPress={() => open(r)} style={({ pressed }) => [s.cell, pressed && { transform: [{ scale: 1.03 }] }]}>
+            <Pressable key={r.key} onPress={() => open(r)} onLongPress={() => more(r)} style={({ pressed }) => [s.cell, pressed && { transform: [{ scale: 1.03 }] }]}>
               <View style={[s.cover, { backgroundColor: t.field }]}>
                 {r.cover ? <Image source={{ uri: mediaUrl(r.cover), headers }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} /> : (
                   <View style={s.noCover}><Icon name={r.state === "shoot" ? "lines" : "folder"} size={28} color={t.muted} /></View>
                 )}
                 {r.state === "done" ? <View style={s.play}><Icon name="play" size={18} /></View> : null}
+                <Pressable accessibilityRole="button" accessibilityLabel="خيارات" hitSlop={8} onPress={() => more(r)} style={s.more}>
+                  <T size={15} style={{ color: "#FFFFFF", lineHeight: 18 }}>⋯</T>
+                </Pressable>
                 <View style={[s.badge, { backgroundColor: r.state === "done" ? t.okBg : r.state === "shoot" ? ACCENT : "rgba(12,12,14,.55)" }]}>
                   <T size={10.5} style={{ color: r.state === "done" ? t.okInk : "#FFFFFF" }}>{r.state === "done" ? "جاهز" : r.state === "busy" ? "جارٍ التصدير" : r.state === "shoot" ? "صوّر" : "قيد العمل"}</T>
                 </View>
@@ -120,7 +140,7 @@ export default function Projects() {
           ))}
         </View>
       </ScrollView>
-      <VideoSheet video={video} onClose={() => setVideo(null)} />
+      <VideoSheet video={video} onClose={() => setVideo(null)} onGone={load} />
     </>
   );
 }
@@ -134,5 +154,6 @@ const s = StyleSheet.create({
   cover: { width: "100%", aspectRatio: 4 / 5, borderRadius: 20, overflow: "hidden" },
   noCover: { flex: 1, alignItems: "center", justifyContent: "center" },
   play: { position: "absolute", top: "50%", left: "50%", marginTop: -20, marginLeft: -20, width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,.45)", alignItems: "center", justifyContent: "center" },
+  more: { position: "absolute", top: 8, end: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(12,12,14,.55)", alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", top: 8, start: 8, borderRadius: 99, paddingVertical: 3, paddingHorizontal: 9 },
 });
