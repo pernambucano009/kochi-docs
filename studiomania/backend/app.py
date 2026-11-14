@@ -34855,7 +34855,12 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
                 suad_post(bid, f"عشان أكمّل الفيديو محتاجة منك صورة تانية: {msg or 'الصورة مش واضحة كفاية'}. ابعتهالي هنا في الشات وأنا أكمّل على طول 🙏")
                 return
             suad_post(bid, "حصلت مشكلة وأنا بعمل الفيديو، والفريق بيبص عليها دلوقتي. هبلغك أول ما تتحل 🙏")
-            notify("suad", "error", "🦷 فيديو المكالمة الأولى فشل", f"{cid}: {job.get('error', '')[:160]}", "settings", cid)
+            # 🚨 العطل الفني بيروح صندوق الأخطاء (للأدمن)، والعميل بيشوف رسالة بسيطة من غير كلام تقني
+            try:
+                issues.record("job", "/dental/first-call-video", "فيديو المكالمة الأولى فشل", raw=f"{cid}: {str(job.get('error') or '')[:600]}", screen="suad", ref=cid)
+            except Exception:  # noqa: BLE001
+                pass
+            notify("suad", "error", "🎬 الفيديو اتأخر شوية", f"{suad_name(brain_row(bid) or {})[0]}: حصلت مشكلة عندنا وبنحلّها، وهبلغك أول ما الفيديو يجهز", "home", cid)
             return
         if st == "needs":
             miss = "، ".join(next((x["name"] for x in dental.SHOTS if x["slot"] == m), m) for m in job.get("missing") or [])

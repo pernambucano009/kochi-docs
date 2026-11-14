@@ -338,8 +338,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
             ) if tools and tour_lines else "Skip this step."
     tool_txt = ("""
 Tools (use them silently, never read them out loud):
-- After each answer, call save_answer with the question id in [brackets] and the answer, in the same turn as your short reaction and
-  the next question. If one answer covers several questions, save each one.
+- After each answer, call save_answer with the question id in [brackets] and the answer FIRST and SILENTLY: say nothing at all in the
+  turn where you call it (no «حلو», no «خليني…»). When its result comes back, speak ONCE: a few real words about what they said, then
+  the next question, in the same breath. If one answer covers several questions, save each one.
 - If they ask to skip a question, move to the next one, or answer it later, call skip_question with its id (never save_answer for it).
 - Only in the turn where you actually ask for the account, the logo, product photos or the intro video (and you say that word),
   call show_input with that kind,

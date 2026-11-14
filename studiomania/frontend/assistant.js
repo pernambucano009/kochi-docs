@@ -56,9 +56,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
-.as-dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
-.as-dslot{position:relative;aspect-ratio:3/2;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
-.as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:11.5px;line-height:1.4;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
+.as-dgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
+.as-dslot{position:relative;aspect-ratio:3/4;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
+.as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:10px;line-height:1.3;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
 .as-dslot.on{border-style:solid}.as-dslot.on .ph{display:none}
 .as-show{gap:8px;padding:10px 12px}.as-show video{display:block;height:min(54vh,520px);max-width:100%;aspect-ratio:9/16;border-radius:14px;background:#000;object-fit:cover}
 .as-ov.dock .as-show video{height:min(46vh,440px)}.as-chs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:100%}
@@ -163,7 +163,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "save_answer") {
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) { S.saved++; S.wait = null; changed(); step(String(args.qid || "").replace(/[^a-z_]/g, "")); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
-      return r;
+      return r.ok ? { ...r, note: "Saved. Now speak once: a few real words about what they just said, then the next question itself, in the same breath. No transition sentence (nothing like «خليني…» or «خلّنا…»)." } : r;
     }
     if (name === "start_account_analysis") {
       // 🛑 الحساب لازم العميل يكتبه بنفسه (في المربع أو خانة الكتابة): الكلام بالصوت مابيتكتبش صح، والموديل ساعات بيخمّن حساب من اسم العلامة
@@ -236,7 +236,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     }
     if (name === "show_input") {
       if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
-      if (args.kind === "dental_case") { const tp = args.template === "a24" ? "a24" : "a03"; setTimeout(() => S && dentalBox(tp), 600); return { ok: true, shown: args.kind }; }
+      if (args.kind === "dental_case") { const tp = args.template === "a24" ? "a24" : "a03"; S.wait = "dental_case"; S.waitResp = S.capId || "x"; setTimeout(() => S && dentalBox(tp), 600);
+        return { ok: true, shown: args.kind, note: "The 4 photo slots are on his screen. Say the request ONCE, then stay completely silent, however long it takes: never ask whether he uploaded them, never repeat or remind. A SYSTEM message tells you when they arrive." }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -269,6 +270,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!S || !S.dc || S.dc.readyState !== "open" || S.finishing || S.busy || S.speaking || S.lastQ !== true) return;
     if (S.show) return;   // الفيديو الاستعراضي شغال (بيتفرج أو هي بتشرح جزء)
     if (document.querySelector(".ui-dlg")) return;   // بيملا نافذة (المعطيات الحقيقية لأول فيديو)
+    if (q(".as-dcase")) return;   // 🦷 بيرفع صور الحالة: تسكت خالص لحد ما يخلّص (كانت بتسأل «رفعت الصور؟» كل شوية)
     const quiet = now - Math.max(S.lastAct || S.t0, S.lastTalk || 0), lim = q(".as-box:not(.as-card)") || S.acct ? 90000 : 45000;
     if (quiet < lim) return;
     S.lastAct = now;
@@ -549,7 +551,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     return { ok: true, playing: true, note: "The example video is playing now. Say NOTHING until a SYSTEM message says it ended: no photo request, no comment over it." };
   }
   // 🦷 صور الحالة (٤ خانات): أول ما تترفع الفيديو بيشتغل لوحده على السيرفر، وسعاد تقفل بالجملة المهمة
-  const DSLOTS = [["before_retracted", "ريتراكتور قبل العلاج"], ["after_retracted", "ريتراكتور بعد العلاج"], ["after_smile", "الابتسامة بعد العلاج (قريبة)"], ["before_face", "وجه المريض قبل العلاج (يبتسم)"]];
+  const DSLOTS = [["before_retracted", "ريتراكتور قبل"], ["after_retracted", "ريتراكتور بعد"], ["after_smile", "ابتسامة قريبة بعد"], ["before_face", "الوجه قبل (يبتسم)"]];
   function dentalBox(tpl = "a03") {
     q(".as-box")?.remove();
     if (!ov) return;
