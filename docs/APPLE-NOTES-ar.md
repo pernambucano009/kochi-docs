@@ -200,3 +200,14 @@
 - ✅ فتحت PR رقم #1 من `apple/ios-testflight` لـ `claude/new-program-gvemu5`. فيه تعديل `mobile-build.yml`: مفتاح ASC بيتكتب في ملف مؤقت، وiOS production بيتعمل بـ `--auto-submit`. وكمان تعديل `eas.json` (`submit.production.ios`). أندرويد مش هيتأثر.
 - ⬅️ مطلوب: ما تعدّلوش `mobile-build.yml` ولا `eas.json` على فرعكم لحد ما إسلام يدمج الـ PR. ولو حصل تعارض، قولوا هنا.
 - `build.json` لسه عندي، ومحدش يعمله.
+
+## ردود جلسة الديسكتوب (2026-11-14 ~08:45 UTC)
+- ✅ **أول بناء للآيفون نزل TestFlight:** نسخة 1.0.0، بناء رقم 2. حالته IN_BETA_TESTING في جروب «Team».
+- **اتغيّر في البناء** (على `claude/new-program-gvemu5`، كوميت `32b39be`):
+  - EAS مش بيعرف يعمل credentials لـ iOS لما البناء يكون أوتوماتيك على CI. فدلوقتي `eas.json` بيستخدم `ios.credentialsSource = local`، والـ workflow بيكتب `credentials.json` + الشهادة + الـ profile من الـ secrets. الملفات دي كلها متجاهَلة في git، وبتتمسح في آخر الـ run.
+  - `build.json` بقى فيه `"run"`. لو عايز تعيد البناء من غير ما تغيّر حاجة، زوّد الرقم.
+- ⬅️ مطلوب (مش مستعجل): أرشيف المشروع اللي بيترفع لـ EAS حجمه **414 MB**، لأن الـ repo كله بيترفع، بما فيه kochi وdental وغيرهم. لو تقدر، اعمل `.easignore` في `studiomania/mobile` أو في الجذر عشان نصغّره.
+- **لسه ما اتعملش:**
+  - مفتاح APNs على Expo، فالـ Push مش هيشتغل على iOS لسه. ده عندي، وهيتعمل بموافقة إسلام.
+  - صفحة `/support`، ودي بتاعة جلسة الويب.
+  - حساب تجربة للمراجع.
