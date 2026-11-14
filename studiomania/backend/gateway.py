@@ -2263,6 +2263,7 @@ class AdminCustomerIn(BaseModel):
     goal: str = ""
     gender: str = ""
     points: int = 0
+    owner: str = ""           # اسم صاحب الحساب (غير اسم العلامة)
 
 
 @app.post("/api/platform/customers")
@@ -2286,7 +2287,7 @@ def admin_create_customer(body: AdminCustomerIn, request: Request):
     f.write_text(json.dumps(ob, ensure_ascii=False), encoding="utf-8")
     with closing(db()) as c, c:
         c.execute("INSERT INTO users (id, email, name, pw, verified, role, workspace, created_at) VALUES (?, ?, ?, ?, 1, 'customer', ?, ?)",
-                  (uuid.uuid4().hex[:12], email, name, pw_hash(body.password), wid, time.time()))
+                  (uuid.uuid4().hex[:12], email, body.owner.strip()[:80] or name, pw_hash(body.password), wid, time.time()))
         if n:
             c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
             c.execute("UPDATE wallet SET topup_credits = topup_credits + ?, updated_at=? WHERE workspace=?", (n, time.time(), wid))
@@ -2296,8 +2297,9 @@ def admin_create_customer(body: AdminCustomerIn, request: Request):
 
 # 🔁 تسليم الحساب: الأدمن يغيّر إيميل دخول العميل (حساب اتجهّز بإيميل تجريبي وبيتسلّم لصاحبه)، ومعاه باسوورد مؤقت جديد لو اتكتب.
 class AdminEmailIn(BaseModel):
-    email: str
+    email: str = ""           # فاضي = الإيميل زي ما هو (تغيير الاسم بس مثلًا)
     password: str = ""
+    name: str = ""            # اسم صاحب الحساب (اللي المساعدة بتناديه بيه)
 
 
 @app.post("/api/platform/customers/{wid}/email")
@@ -2305,20 +2307,23 @@ def admin_customer_email(wid: str, body: AdminEmailIn, request: Request):
     admin(request)
     if not workspace(wid) or wid == OWNER:
         raise HTTPException(404, "هذا العميل غير موجود")
-    email = norm_email(body.email)
+    email = norm_email(body.email) if body.email.strip() else ""
     if body.password:
         check_pw(body.password)
     with closing(db()) as c, c:
         u = c.execute("SELECT id, email FROM users WHERE workspace=? AND role='customer' ORDER BY created_at LIMIT 1", (wid,)).fetchone()
         if not u:
             raise HTTPException(404, "لا يوجد مستخدم لهذا الحساب")
-        other = c.execute("SELECT id FROM users WHERE email=? AND id<>?", (email, u["id"])).fetchone()
-        if other:
-            raise HTTPException(400, "يوجد حساب آخر بهذا البريد الإلكتروني")
-        c.execute("UPDATE users SET email=?, verified=1 WHERE id=?", (email, u["id"]))
+        if email:
+            other = c.execute("SELECT id FROM users WHERE email=? AND id<>?", (email, u["id"])).fetchone()
+            if other:
+                raise HTTPException(400, "يوجد حساب آخر بهذا البريد الإلكتروني")
+            c.execute("UPDATE users SET email=?, verified=1 WHERE id=?", (email, u["id"]))
         if body.password:
             c.execute("UPDATE users SET pw=? WHERE id=?", (pw_hash(body.password), u["id"]))
-    return {"ok": True, "email": email}
+        if body.name.strip():
+            c.execute("UPDATE users SET name=? WHERE id=?", (body.name.strip()[:80], u["id"]))
+    return {"ok": True, "email": email or u["email"]}
 
 
 # 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن

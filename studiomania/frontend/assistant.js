@@ -53,6 +53,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-send{position:absolute;right:5px;width:34px;height:34px;border-radius:50%;border:0;background:#E5613E;color:#fff;font-size:14px;cursor:pointer;display:grid;place-items:center}
 .as-send:hover{filter:brightness(1.08)}
 .as-btn[data-mute].on{background:#E5613E;color:#fff;border-color:#E5613E}
+.as-miclv{display:inline-block;width:46px;height:8px;border-radius:8px;background:rgba(127,127,127,.25);overflow:hidden;align-self:center}.as-miclv i{display:block;height:100%;width:0;background:#3fbf6f;transition:width .08s}
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
@@ -123,6 +124,41 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   const q = (s) => ov?.querySelector(s);
 
   // ---------- المكالمة
+  // 🎙️ حارس الميكروفون (بيصلّح لوحده): مؤشر صوت ظاهر، ولو الميكروفون مش بيطلّع صوت خالص بيجرب من غير معالجة الصوت وبعدين باقي الميكروفونات،
+  // ولو الصوت واصل والمساعدة مابتلقطش كلام بيغيّر طريقة التقاط الكلام. كل خطوة بتتسجل في سجل المكالمة.
+  function micWatch() {
+    const st = { t0: performance.now(), tried: 0, loud: 0, vad: false, told: false, busy: false, list: null };
+    const bar = q("[data-miclv]"); if (bar) bar.hidden = false;
+    const swap = async (constraints, why) => {
+      st.busy = true;
+      try {
+        const ms = await navigator.mediaDevices.getUserMedia({ audio: constraints }); const tr = ms.getAudioTracks()[0];
+        if (!S) { tr.stop(); return; }
+        await S.sender.replaceTrack(tr); S.mic?.getTracks().forEach((x) => x.stop()); S.mic = ms; tr.enabled = !S.muted;
+        S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(ms)); S.micMax = 0; lg("sys", `mic switch (${why}): ${tr.label || "?"}`);
+      } catch (e) { lg("sys", `mic switch failed (${why}): ${e?.name || e}`); }
+      st.busy = false; st.t0 = performance.now();
+    };
+    const iv = setInterval(async () => {
+      if (!S || !S.sender) return clearInterval(iv);
+      if (S.ctx?.state === "suspended") { S.ctx.resume().catch(() => {}); st.t0 = performance.now(); return; }   // المؤشر مابيقراش والسياق واقف
+      if (st.busy || S.muted || S.show?.v) return;
+      const mu = S.micLevel ? S.micLevel() : 0, el = (performance.now() - st.t0) / 1000;
+      if (mu > 0.04 && !S.speaking) st.loud++;
+      // (أ) صوته واصل بوضوح والمساعدة مالقطتش أي كلام: طريقة التقاط الكلام تتغير للأبسط
+      if (!st.vad && st.loud >= 6 && !S.heard) {
+        st.vad = true; lg("sys", "mic loud but no speech detected → server_vad");
+        try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: { type: "server_vad", threshold: 0.45, silence_duration_ms: 650, create_response: true, interrupt_response: true } } } } })); } catch { /* */ }
+      }
+      // (ب) الميكروفون مابيطلّعش صوت خالص (صمت رقمي) بعد ٤ ثواني: نجرب غيره
+      if (el < 4 || (S.micMax || 0) > 0.0004) return;
+      if (st.tried === 0) { st.tried = 1; return swap({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }, "raw"); }
+      if (!st.list) { try { const cur = S.mic?.getTracks()[0]?.getSettings?.().deviceId; st.list = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" && d.deviceId !== cur); } catch { st.list = []; } }
+      const next = st.list.shift();
+      if (next) return swap({ deviceId: { exact: next.deviceId } }, "device");
+      if (!st.told) { st.told = true; lg("sys", "mic: all devices silent"); chip(`🎙️ <span><b>الميكروفون لا يلتقط صوتًا</b><br>تأكد أنه غير مكتوم من الجهاز، أو اكتب ردك في الخانة</span>`); }
+    }, 500);
+  }
   function meter(ctx, node) { const a = ctx.createAnalyser(); a.fftSize = 512; node.connect(a); const buf = new Float32Array(a.fftSize); return () => { a.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }; }
   function chip(html) { const d = document.createElement("div"); d.className = "as-chip"; d.innerHTML = html; q(".as-side")?.prepend(d); return d; }
   function caption(t) { const c = q(".as-cap"); if (c) c.textContent = t.slice(-170); }
@@ -671,7 +707,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
       <form class="as-type" data-tform><div class="as-tw"><input data-type enterkeyhint="send" autocomplete="off" placeholder="أو اكتب هنا واضغط Enter"><button type="submit" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-sent" data-sent></p><p class="as-hint" data-hint hidden></p></form>
-      <div class="as-acts"><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
+      <div class="as-acts"><span class="as-miclv" data-miclv hidden title="مستوى صوتك"><i></i></span><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
       ${state?.log && window.IS_CUSTOMER ? `<p class="as-lognote" data-lognote>📝 تُحفظ هذه المحادثة نصًا فقط (دون صوت) لمدة 30 يومًا لتحسين المساعدة، دون اسمك أو بيانات تواصلك. <button type="button" data-nolog>لا تحفظها</button></p>` : ""}`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
       call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [],
@@ -723,7 +759,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         el.play().catch(() => unmute());
         if (S.ctx.state === "suspended") unmute();
       };
-      if (mic) pc.addTrack(mic.getTracks()[0], mic); else pc.addTransceiver("audio", { direction: "recvonly" });
+      if (mic) { S.sender = pc.addTrack(mic.getTracks()[0], mic); micWatch(); } else pc.addTransceiver("audio", { direction: "recvonly" });
       const dc = pc.createDataChannel("oai-events"); S.dc = dc;
       // 👋 أول ما الجلسة تجهز المساعد يبدأ يتكلم على طول (لو اتبعت قبلها ممكن يضيع، فيستنى العميل يتكلم الأول)
       const greet = () => {
@@ -749,7 +785,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
-        else if (e.type === "input_audio_buffer.speech_started") { if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.heard = (S.heard || 0) + 1; if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
@@ -887,6 +923,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
+    { const lv = q("[data-miclv] i"); if (lv) lv.style.width = S.muted ? "0" : Math.min(100, mu * 600) + "%"; }
     S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu); S.micMax = Math.max(S.micMax || 0, mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
     orb?.set(talk ? Math.min(1, ag * 7) : user ? Math.min(0.35, mu * 2) : 0, user);
     // بتتكلم ولا سكتت: من مستوى صوتها نفسه (السكتة الصغيرة بين الكلمات ماتتحسبش). المكتوب بيبدأ مع الصوت، ولما تسكت يتقرر تكمّل ولا تستنى

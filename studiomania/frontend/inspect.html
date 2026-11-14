@@ -153,7 +153,7 @@
       <details id="ncBox" style="margin-top:12px"><summary><b>إنشاء حساب لعميل (تجهيز يدوي)</b></summary>
         <p class="mute" style="margin:8px 0">الحساب يتعمل بإيميل العميل وباسوورد مؤقت، من غير إيميل تأكيد ومن غير مكالمة المساعدة الأولى. بعد ما نجهّزه نبعتله الإيميل والباسوورد ويغيّره من الإعدادات.</p>
         <div class="row" style="flex-wrap:wrap;gap:8px">
-          <input id="ncEmail" type="email" placeholder="إيميل العميل" dir="ltr"><input id="ncName" placeholder="اسم العلامة">
+          <input id="ncEmail" type="email" placeholder="إيميل العميل" dir="ltr"><input id="ncOwner" placeholder="اسم صاحب الحساب"><input id="ncName" placeholder="اسم العلامة">
           <input id="ncPw" placeholder="باسوورد مؤقت (٨ على الأقل)" dir="ltr">
           <select id="ncCountry"></select><select id="ncDialect"></select><select id="ncField"></select>
           <select id="ncGender"><option value="m">صاحب الحساب: رجل</option><option value="f">صاحبة الحساب: امرأة</option></select>
@@ -680,8 +680,8 @@ async function openCust(w) {
   box.innerHTML = `<div class="row"><b>${esc(r?.name || r?.brand || "")}</b><span class="mute ltr">${esc(r?.email || "")}</span>
       <span style="margin-inline-start:auto" class="row"><input id="gfPts" type="number" min="1" placeholder="عدد النقاط" style="width:110px"><input id="gfNote" placeholder="سبب الهدية (يظهر للعميل)">
       <button class="btn pri" id="gfGo">🎁 أهدِ نقاطًا</button></span></div>
-    <div class="row" style="margin-top:8px"><span class="mute">تسليم الحساب:</span><input id="emNew" type="email" dir="ltr" placeholder="إيميل الدخول الجديد"><input id="emPw" dir="ltr" placeholder="باسوورد مؤقت جديد (اختياري)">
-      <button class="btn" id="emGo">غيّر إيميل الدخول</button><span class="mute" id="emMsg"></span></div>
+    <div class="row" style="margin-top:8px"><span class="mute">تسليم الحساب:</span><input id="emNew" type="email" dir="ltr" placeholder="إيميل الدخول الجديد"><input id="emPw" dir="ltr" placeholder="باسوورد مؤقت جديد (اختياري)"><input id="emName" placeholder="اسم صاحب الحساب (اختياري)">
+      <button class="btn" id="emGo">احفظ</button><span class="mute" id="emMsg"></span></div>
     <h4>أنفقنا عليه في (منذ أول يوم)</h4>
     <table><thead><tr><th>القسم</th><th>الدولار</th><th>منه أثناء التجربة</th><th>منه ترويج</th></tr></thead><tbody>${(d.spend_cat || []).map((x) => `<tr><td>${esc(x.cat)}</td><td>${money(x.usd)}</td><td>${money(x.trial)}</td><td>${money(x.promo)}</td></tr>`).join("") || `<tr><td colspan="4" class="mute">لم يُسجَّل إنفاق بعد</td></tr>`}</tbody></table>
     <h4>صرف نقاطه في (الفترة المختارة)</h4>
@@ -690,9 +690,10 @@ async function openCust(w) {
     <table><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>النقاط</th></tr></thead><tbody>${(d.moves || []).map((m) => `<tr><td class="mute">${when(m.at)}</td><td>${KIND[m.kind] || esc(m.kind)}</td><td>${esc(m.note || "")}</td><td class="${m.delta > 0 ? "ok" : ""}" dir="ltr">${m.delta > 0 ? "+" : ""}${num(m.delta)}</td></tr>`).join("")}</tbody></table>
     ${(d.payments || []).length ? `<h4>المدفوعات</h4><table><tbody>${d.payments.map((p) => `<tr><td class="mute">${when(p.at)}</td><td>${esc(p.kind)}</td><td>${esc(p.note || "")}</td><td>${money(p.amount)}</td></tr>`).join("")}</tbody></table>` : ""}`;
   $("emGo").onclick = async () => {
-    const email = $("emNew").value.trim(); if (!email) return;
-    if (!confirm(`إيميل دخول هذا العميل سيصبح ${email}. متأكد؟`)) return;
-    try { await api(`/api/platform/customers/${w}/email`, { method: "POST", body: JSON.stringify({ email, password: $("emPw").value }) }); await loadCust(); openCust(w); }
+    const email = $("emNew").value.trim(), name = $("emName").value.trim(), password = $("emPw").value;
+    if (!email && !name && !password) return;
+    if (email && !confirm(`إيميل دخول هذا العميل سيصبح ${email}. متأكد؟`)) return;
+    try { await api(`/api/platform/customers/${w}/email`, { method: "POST", body: JSON.stringify({ email, password, name }) }); await loadCust(); openCust(w); }
     catch (e) { $("emMsg").textContent = e.message; }
   };
   $("gfGo").onclick = async () => {
@@ -710,7 +711,7 @@ $("ncBox").ontoggle = async () => {
   fill("ncCountry", o.regions, "الدولة"); fill("ncDialect", o.dialects, "اللهجة (حسب الدولة)"); fill("ncField", o.fields, "المجال");
 };
 $("ncGo").onclick = async () => {
-  const body = { email: $("ncEmail").value.trim(), name: $("ncName").value.trim(), password: $("ncPw").value, country: $("ncCountry").value, dialect: $("ncDialect").value,
+  const body = { email: $("ncEmail").value.trim(), owner: $("ncOwner").value.trim(), name: $("ncName").value.trim(), password: $("ncPw").value, country: $("ncCountry").value, dialect: $("ncDialect").value,
     field: $("ncField").value, gender: $("ncGender").value, points: +$("ncPts").value || 0 };
   if (!body.email || !body.password || !body.country || !body.field) { $("ncMsg").textContent = "اكتب الإيميل والباسوورد واختر الدولة والمجال"; return; }
   $("ncGo").disabled = true; $("ncMsg").textContent = "…";
