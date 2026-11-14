@@ -23,7 +23,8 @@ async function loadSettings() {
     $(`${name}Key`).placeholder = k.set ? `•••••••••••• (${k.hint})` : "الصق المفتاح هنا";
     $(`${name}Key`).value = "";
   }
-  api("/api/system").then((x) => {
+  const me_ = await (window.MEP || Promise.resolve(null)).catch(() => null), isAdmin_ = !me_ || me_.role === "admin";   // معلومات السيرفر (القرص والمعالج والذاكرة) للأدمن بس
+  if (isAdmin_) api("/api/system").then((x) => {
     $("sysInfo").textContent = `🖥️ الخادم: ${x.cpus ?? "?"} معالج · الذاكرة ${x.memory_limit_mb ? `${x.memory_limit_mb} ميجا (مستخدم ${x.memory_used_mb ?? "?"})` : "دون حد معروف"}`;
   }).catch(() => {});
   loadStorage();
@@ -375,9 +376,9 @@ async function loadStorage() {
     const st = await api("/api/storage");
     const used = st.total_mb - st.free_mb;
     const pct = Math.round((used / st.total_mb) * 100);
-    $("storageInfo").innerHTML = `
+    $("storageInfo").innerHTML = `${isAdmin_ ? `
       <div class="bar"><span style="width:${pct}%;background:${pct > 90 ? "var(--danger)" : "var(--accent)"}"></span></div>
-      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>
+      <p class="${pct > 90 ? "err" : "hint"}">مستخدم ${fmtMb(used)} من ${fmtMb(st.total_mb)} · فارغ ${fmtMb(st.free_mb)}</p>` : ""}
       <ul>${Object.entries(st.folders).filter(([, v]) => v >= 0.1).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
         const n = (st.wipe || {})[k];
         return `<li><span>${STORAGE_LABELS[k] || k}${n ? ` <small class="muted">(${n})</small>` : ""}</span><span class="row">${n ? `<button class="btn sm danger" data-wipe="${k}" data-n="${n}">${WIPE_INFO[k][0]}</button>` : ""}<b>${fmtMb(v)}</b></span></li>`;
@@ -499,3 +500,11 @@ $("expBox")?.addEventListener("change", (e) => {
 // المصاريف لصاحب المنصة بس: العميل مايطلبهاش أصلًا (كانت بترجع ٤٠٣ عند كل عميل وتتسجل خطأ)
 const expHide = () => { const b = $("expBox"); if (b) b.closest(".set-card").hidden = true; };
 (window.MEP || Promise.resolve(null)).then((me) => (me && me.role !== "admin" ? expHide() : api("/api/expenses").then(expRender))).catch(expHide);
+
+// ---------- اسم صاحب الحساب ----------
+(window.MEP || Promise.resolve(null)).then((me) => { if (me && $("meName")) $("meName").value = me.name || ""; }).catch(() => {});
+$("meNameSave")?.addEventListener("click", async () => {
+  const name = $("meName").value.trim(); if (!name) return;
+  try { await api("/api/auth/name", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }); $("meNameMsg").textContent = "✓ حُفظ"; }
+  catch (e) { $("meNameMsg").textContent = e.message; }
+});

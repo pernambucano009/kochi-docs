@@ -1308,6 +1308,7 @@ html { overflow-x: clip; }
 .fx { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
 /* البروز: واضح (بيكبر ويطلع لفوق) وبيكسب أي قاعدة تانية في الصفحة */
 :root .fx.fx-on:not(:disabled), :root .fx:focus-visible { translate: 0 -3px !important; scale: 1.06 !important; z-index: 2; }
+:root .fx.fx-wide.fx-on:not(:disabled), :root .fx.fx-wide:focus-visible { translate: 0 -2px !important; scale: 1 !important; }
 .fx:not(:disabled):active { translate: 0 0; scale: .98; transition-duration: .12s; }
 .fx-snake { position: absolute; pointer-events: none; overflow: visible; opacity: 0; transition: opacity .4s ease; z-index: 3; }
 .fx-snake rect { fill: none; stroke: currentColor; stroke-linecap: round; }

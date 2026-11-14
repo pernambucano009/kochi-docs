@@ -41,6 +41,7 @@
     if (!el || el.matches(SKIP) || el.closest(SKIP) || el.disabled) return;
     if (el.offsetWidth < 26 || el.offsetHeight < 22) return;   // أيقونات صغيرة جدًا
     el.classList.add("fx");
+    el.classList.toggle("fx-wide", el.offsetWidth > 320);   // صف/كارت عريض: مايتكبرش (٦٪ من عرضه بتطلّعه بره إطاره وتطلّع شريط تمرير)، بيترفع بس
     snake(el);
     if (on !== el && e.pointerType !== "touch") {
       off();

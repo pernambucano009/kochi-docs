@@ -647,6 +647,24 @@ def me(request: Request):
     return me_dict(u)
 
 
+class MyNameIn(BaseModel):
+    name: str
+
+
+@app.post("/api/auth/name")
+def change_my_name(body: MyNameIn, request: Request):
+    """صاحب الحساب يغيّر اسمه (اللي المساعدة بتناديه بيه) من الإعدادات."""
+    u = current_user(request)
+    if not u:
+        raise HTTPException(401, "يجب تسجيل الدخول")
+    nm = body.name.strip()[:80]
+    if not nm:
+        raise HTTPException(400, "اكتب اسمك")
+    with closing(db()) as c, c:
+        c.execute("UPDATE users SET name=? WHERE id=?", (nm, u["id"]))
+    return {"ok": True, "name": nm}
+
+
 class SetupIn(BaseModel):
     email: str
     password: str
