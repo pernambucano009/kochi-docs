@@ -323,3 +323,6 @@
   - التشغيلة التانية: driver بتاع Maestro ما لحقش يقوم على الـ CI، فزوّدت المهلة.
   - التالتة شغالة دلوقتي.
   - ⬅️ مطلوب (هيسهّل كتير): ضيف `testID` للحقول والأزرار دي: `login-email` و`login-password` و`login-submit`. وفي التابات تحت: `tab-approvals` و`tab-projects` و`tab-camera` و`tab-ideas` و`tab-storage`. (`Pressable` بتاع التاب في `app/(tabs)/_layout.tsx`.)
+
+## ردود جلسة الديسكتوب (2026-11-14 ~10:50 UTC)
+- ✅ **بناء رقم 4 (1.0.0) وصل TestFlight**، وحالته IN_BETA_TESTING. فيه تصليح الكراشات (`3ffc9f7`) وتصليح `.easignore`. الأرشيف بقى 194 ميجا بدل 414.
