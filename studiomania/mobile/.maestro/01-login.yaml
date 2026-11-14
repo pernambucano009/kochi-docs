@@ -8,12 +8,11 @@ appId: com.geekzone.simsimkit
 - takeScreenshot: 01-welcome
 - tapOn: "الدخول بالبريد الإلكتروني"
 - extendedWaitUntil: { visible: "كلمة المرور", timeout: 15000 }
-# الحقول من غير testID: بنضغط على مكانها (البريد فوق، وكلمة المرور تحته؛ بعيد عن زرار العين اللي على الشمال)
-- tapOn: { point: "60%,21%" }
+- tapOn: { id: "login-email" }
 - inputText: ${E2E_EMAIL}
-- tapOn: { point: "60%,30%" }
+- tapOn: { id: "login-password" }
 - inputText: ${E2E_PASSWORD}
 - takeScreenshot: 01-login-filled
-- tapOn: "^دخول$"
+- tapOn: { id: "login-submit" }
 - extendedWaitUntil: { visible: "مشاريعي", timeout: 30000 }
 - takeScreenshot: 01-after-login

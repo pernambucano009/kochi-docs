@@ -2,8 +2,8 @@ appId: com.geekzone.simsimkit
 # الأفكار (الكراش الأول في TestFlight)
 ---
 - launchApp: { permissions: { all: allow } }
-- extendedWaitUntil: { visible: "الأفكار", timeout: 30000 }
-- tapOn: { text: "الأفكار", index: 0 }
+- extendedWaitUntil: { visible: { id: "tab-ideas" }, timeout: 30000 }
+- tapOn: { id: "tab-ideas" }
 - waitForAnimationToEnd
 - takeScreenshot: 05-ideas
 - tapOn: { text: "أو اكتبها", optional: true }
@@ -17,4 +17,4 @@ appId: com.geekzone.simsimkit
 - tapOn: { text: "سجّل فكرة بصوتك", optional: true }
 - takeScreenshot: 05-ideas-record
 - tapOn: { text: "رجوع", optional: true }
-- assertVisible: "الأفكار"
+- assertVisible: { id: "tab-ideas" }
