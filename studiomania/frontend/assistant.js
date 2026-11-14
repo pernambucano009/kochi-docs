@@ -720,6 +720,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
     if (dock) {
       let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false, true); } }, 400);
+      // ضغطة «رجوع» أو التسلسل أو اللوجو: المكالمة تقفل مع الضغطة نفسها (قبل ما الصفحة تبدأ تتحرك)
+      S.leave = (e) => { if (S && e.target.closest?.("#nhGoBack, #nhCrumbs [data-crumb], #nhBar .nh-logo")) { lg("sys", "left brain page (click)"); end(false, true); } };
+      document.addEventListener("click", S.leave, true);
       // الصفحة اتغيّرت (زرار «رجوع» أو الرئيسية): المكالمة تقفل في نفس اللحظة قبل ما الصفحة الجديدة ترسم نفسها
       S.onHash = () => { if (S && !/^#brand/.test(location.hash)) { lg("sys", "left brain page"); end(false, true); } };
       addEventListener("hashchange", S.onHash);
@@ -940,12 +943,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished, instant = false) {
     if (!S) return;
     const s = S; S = null;
+    if (instant) close(true);   // خرج من صفحة العقل: الكرة تختفي في نفس اللحظة (كانت بتستنى حساب التكلفة فتفضل متعلّقة فوق الرئيسية وهي بتتحرك)
     removeEventListener("hashchange", s.onHash);
     if (s.demoAfter) setTimeout(async () => {   // 🎬 فيديو الأسنان الجاهز في نص الشاشة بعد ما المكالمة تقفل
       const r = await api("/api/suad/demo", { method: "POST" }).catch(() => null);
       if (typeof Help !== "undefined") { Help.popVideo?.(r?.url || "/gallery/dental/demo_a03.mp4", "فيديو عملناه من حالة تانية 🎬"); Help.refresh?.(); }
     }, 900);
-    clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT);
+    clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT); if (s.leave) document.removeEventListener("click", s.leave, true);
     // 💸 تكلفة المكالمة (ببلاش على العميل، بس علينا) ← عدّاد الصرف، وبتتكتب في سجل المكالمة في «معمل سعاد»
     if (s.greeted) {
       const u = await api("/api/assistant/usage", { method: "POST", ...jsonBody({ call_s: (performance.now() - s.t0) / 1000, agent_s: (s.agentMs || 0) / 1000, model: s.model || "", usage: s.usage }) }).catch(() => null);

@@ -701,8 +701,13 @@ body.stage-settled #nh { visibility: hidden; }
 #nhBar .nh-crumbs .nh-cb { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 10px; background: var(--nh-fill); }
 #nhBar .nh-crumbs .nh-cb-empty { min-width: 72px; }
 /* في الرئيسية «رجوع» والتسلسل مخفيين بالكامل بس مكانهم محجوز، فالشريط مابيتنطش لما تدخل قسم */
-#nhBar .nh-goback.off { pointer-events: none; visibility: hidden; }
-#nhBar:not(.deep) .nh-crumbs { visibility: hidden; }
+/* طلب صاحب المنصة: في الرئيسية إطار «رجوع» ومربعات التسلسل بيفضلوا ظاهرين فاضيين، ولما تدخل قسم بيتملوا (الكلام بس اللي بيظهر ويختفي بنعومة) */
+#nhBar .nh-goback.off { pointer-events: none; }
+#nhBar .nh-goback > * { transition: opacity .3s ease; }
+#nhBar .nh-goback.off > * { opacity: 0; }
+#nhBar .nh-crumbs .nh-cb, #nhBar .nh-crumbs i { animation: nhCbIn .3s ease both; }
+@keyframes nhCbIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #nhBar .nh-goback > *, #nhBar .nh-crumbs .nh-cb, #nhBar .nh-crumbs i { transition: none; animation: none; } }
 /* الرصيد والكومنتات والمواعيد بيبانوا في الرئيسية كمان */
 #nhBar .nh-tools .nh-xtra { box-shadow: 0 4px 18px rgba(24, 23, 24, .08); }
 /* اللي اتكرر في راس الصفحات بقى في الشريط: بيتخبّى (ومكانه بيفضل عشان الشريط يقعد فوقه) */
