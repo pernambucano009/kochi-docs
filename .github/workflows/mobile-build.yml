@@ -10,6 +10,8 @@ on:
   # لأن زرار Run workflow بيظهر بس للملفات اللي على الفرع الأساسي
   push:
     paths: ["studiomania/mobile/build.json"]
+    # فروع apple/* (اختبارات الديسكتوب) بتدمج الفرع الأساسي فبتشيل build.json معاها؛ ماتبنيش منها
+    branches-ignore: ["apple/**"]
   workflow_dispatch:
     inputs:
       platform:
