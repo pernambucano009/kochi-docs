@@ -219,3 +219,30 @@
   - وكمان بيتجاهل `credentials.json` و`ios-certs/` و`*.p8` و`*.p12` و`*.mobileprovision`، فملفات التوقيع ماتترفعش في الأرشيف. (مع `credentialsSource = local` الـ CLI بيقراهم من الجهاز وبيبعتهم لوحدهم، فمش محتاجينهم في الأرشيف.)
   - ما لمستش `mobile-build.yml` ولا `eas.json` ولا `build.json`.
 - ⬅️ مطلوب: في البناء الجاي، بص على حجم الأرشيف في لوج EAS. لو البناء فشل وقال إن فيه ملف ناقص، قولي هنا.
+
+## ردود جلسة الديسكتوب (2026-11-14 ~09:10 UTC): ⚠️ كراشين في TestFlight
+إسلام جرّب بناء رقم 2 (1.0.0) على آيفون (iPhone18,2، iOS 27.0.1)، والتطبيق قفل مرتين:
+1. 08:43 UTC، لما داس على تاب **«الأفكار»** (بعد حوالي 72 ثانية من فتح التطبيق).
+2. 08:56 UTC، لما داس على تاب **«المشاريع»**.
+
+**الكراشين ليهم نفس البصمة بالظبط:**
+- `EXC_CRASH (SIGABRT)`، والسبب: `NSException` مش متعالج، وماجاش معاه Exception Reason في التقرير.
+- Last Exception Backtrace:
+  ```
+  CoreFoundation  __exceptionPreprocess
+  libobjc         objc_exception_throw
+  React           facebook::react::ObjCTurboModule::performVoidMethodInvocation(...)  ← block
+  libdispatch     _dispatch_call_block_and_release ... (background serial queue، مش الـ main thread)
+  ```
+- معنى ده: فيه native module قديم (legacy / ObjC TurboModule)، اتنادت فيه method بترجع `void` وشغالة على الـ methodQueue بتاعه، والـ method دي رمت NSException. الموديولات بتاعة Expo (JSI) مش بتطلع في الستاك بالشكل ده، فالأغلب إن الموديول ده من موديولات React Native الأساسية.
+- الحاجة المشتركة بين الشاشتين: الاتنين بيعملوا `useFocusEffect(load)` ← `api()` ← `fetch` (يعني `RCTNetworking`، وده شغال على queue في الخلفية). وكمان `mediaHeaders()` في المشاريع.
+
+**المشتبه فيهم (رتبتهم حسب الأرجح):**
+1. هيدر قيمته مش string، زي `undefined` أو `null` أو رقم، أو URL باظ، في `fetch` أو في `headers` اللي بتتبعت للـ `Image`/`Video`. على iOS، الحاجات دي بترمي NSException جوه `RCTNetworking`/`NSMutableURLRequest`.
+2. `Alert.alert` بأزرار فيها عنصر `undefined`. ده في المشاريع، سطر 90، في قايمة «⋯» الجديدة.
+3. Animated بـ `useNativeDriver` في «الأفكار» (`Animated.loop`).
+
+⬅️ مطلوب:
+- اعرف السبب وصلّحه. الأحسن تجرّب على iOS Simulator، وأسهل طريقة من expo.dev ← Simulator sessions، أو بـ `npx expo run:ios` لو عندك ماك.
+- لما تخلّص، زوّد `"run"` في `studiomania/mobile/build.json` عشان بناء جديد يطلع على TestFlight لوحده. البدء ده متفق عليه مع إسلام عشان يصلّح الكراش.
+- التقارير الكاملة (`.ips`) موجودة عندي، ولو احتجت أجزاء منها اكتب هنا.
