@@ -165,12 +165,12 @@ def sources():
             yield from scan_js(f"frontend/{f.name}", "web")
     for f in sorted(fe.glob("*.html")):
         yield from scan_html(f"frontend/{f.name}", "web")
-        if f.name in ("welcome.html", "welcome-m.html", "auth.html", "inspect.html", "index.html"):
-            src = (fe / f.name).read_text(encoding="utf-8")
-            for sc in re.findall(r"<script>(.*?)</script>", src, flags=re.S):
-                for lit in js_literals(sc):
-                    for k in segments(lit) if AR.search(lit) else ():
-                        yield k, f"frontend/{f.name}:{line_of(src, k)}", "web"
+        src = (fe / f.name).read_text(encoding="utf-8")   # السكريبت اللي جوه الصفحة نفسها (كل الصفحات، مش خمسة بس)
+        for sc in re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", src, flags=re.S):
+            for lit in js_literals(sc):
+                for k in segments(lit) if AR.search(lit) else ():
+                    if not CODE.search(re.sub(r"\{\d\}", "", k)):
+                        yield k, f"frontend/{f.name}:{line_of(src, k)}", "content" if f.name in CONTENT_HTML else "web"
     for d in ("mobile/app", "mobile/src"):
         for f in sorted((ROOT / d).rglob("*.ts*")):
             if "node_modules" not in f.parts:
@@ -185,6 +185,7 @@ def sources():
 NO_EN = ("mobile", "content")
 OWN_EN = ("frontend/welcome.html", "frontend/welcome-m.html", "frontend/inspect.html", "frontend/voicelive.html", "frontend/privacy.html", "frontend/terms.html", "frontend/refund.html")
 # كلام بيترسم جوه الفيديو نفسه (التايبوجرافي): محتوى بلهجة العميل، مش واجهة
+CONTENT_HTML = ("typo-render.html",)   # الصفحة اللي بترسم الفيديو على السيرفر
 CONTENT_FILES = ("frontend/typo-studio.js", "frontend/typo-moments.js", "frontend/typo-engine.js")
 CODE = re.compile(r";\s*return\b|=>|\bfunction\b|P\.k_|\bconst\s|\}\s*\)|[{};]\s*$")
 
