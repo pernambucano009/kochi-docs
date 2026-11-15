@@ -883,13 +883,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
-      if (!r.ok) throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل");
+      if (!r.ok) { const why = (await r.text().catch(() => "")).slice(0, 300); lg("err", `start: realtime ${r.status} ${why}`); flush(true); throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل"); }
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       S.agent = tok.agent || ""; S.model = tok.model || ""; if (!S.greeted) S.thinking = true; status();   // «لحظة…» لحد ما تبدأ تتكلم
       if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
       loop();
     } catch (e) {
       if (!ov) return;   // اتقفلت وهي لسه بتتصل
+      if (!/realtime \d/.test(String(e?.message))) { try { lg("err", `start failed: ${e?.name || ""} ${e?.message || e}`.slice(0, 300)); flush(true); } catch { /* */ } }   // السبب الحقيقي في سجل المكالمة
       q("[data-err]").textContent = /[\u0600-\u06ff]/.test(e.message || "") ? e.message : "تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل";
       q(".as-st").textContent = "";
     }
