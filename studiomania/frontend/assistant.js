@@ -817,6 +817,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
+        // 🔇 صوتها بيتشغل عند العميل: المايك مقفول من أول كلمة لآخر كلمة (حتى في السكتة بين الجمل)، ولو بتقفل المكالمة تقفل بعد آخر كلمة بالظبط
+        else if (e.type === "output_audio_buffer.started") S.outPlay = true;
+        else if (e.type === "output_audio_buffer.stopped" || e.type === "output_audio_buffer.cleared") {
+          S.outPlay = false; S.agentAt = performance.now();
+          if (S.finishing && S.finishReady && !S.busy) setTimeout(() => S?.finishing && !S.outPlay && !S.busy && end(S.endDone), 700);
+        }
         else if (e.type === "response.created") { if (S.nextSilent) { S.nextSilent = false; R(e.response?.id).silent = true; } S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true; S.busy = false;
@@ -834,9 +840,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           { const tail = (S.said || "").slice(-450);
             if (!S.finishing && r.msg && /يمين/.test(tail) && /(السلامة|سلامة|أمان الله|امان الله|باي|نشوفك|يعطيك العافية)/.test(tail)) {
               S.finishing = true; S.endDone = true; S.finishAt = performance.now(); lg("sys", "closing said: ending"); stopTurns();
-              setTimeout(() => S?.finishing && end(S.endDone), 20000); } }
+              const safe = () => { if (!S?.finishing) return; if (S.outPlay || S.speaking) return setTimeout(safe, 1500); end(S.endDone); };
+              setTimeout(safe, 20000); } }
           if (S.finishing) {
-            if (r.msg) { S.finishReady = true; setTimeout(() => S?.finishing && !S.busy && !S.speaking && performance.now() - (S.lastTalk || 0) > 800 && end(S.endDone), 1500); }
+            if (r.msg) { S.finishReady = true; setTimeout(() => S?.finishing && !S.busy && !S.speaking && !S.outPlay && performance.now() - (S.lastTalk || 0) > 800 && end(S.endDone), 1500); }
             else if (!S.byeAsked && !r.pending) { S.byeAsked = true; S.dc.send(JSON.stringify({ type: "response.create", response: { instructions: "Say a warm, short goodbye in the same dialect (one or two sentences): thank them, and tell them they can continue any time from your circle on the brain page. Do not call any tool." } })); }
           }
           // ردها كان كلام مش سؤال: لو العميل فضل ساكت ثانية بعد ما تخلّص، تكمّل هي (التقدير على طول الكلام لو حدث نهاية الصوت ماوصلش)
@@ -968,7 +975,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // سؤال؟ علامة الاستفهام، أو كلمة سؤال (بأي لهجة) لو النص اتكتب من غير «؟»
   // كلمات السؤال في كل اللهجات (الخليجي والنجدي والشامي والمغاربي كمان): «فاضي نسولف؟» من غير علامة استفهام سؤال برضه
   const QW = /(^|\s)(هل|ايه|إيه|ليه|لماذا|ازاي|إزاي|كيف|كيفك|كيفاش|شلون|شلونك|وشلونك|شنو|وش|ايش|إيش|شو|مين|من هو|فين|وين|أين|امتى|إمتى|متى|كام|كم|ماذا|ما هو|ما هي|عندك|عندكم|تحب|تحبي|تقدر|ممكن|فاضي|فاضية|جاهز|جاهزة|مستعد|مستعدة|تبي|تبين|تبغى|تبغي|ودك|شرايك|رأيك|رايك|بدك|واش|علاش|نسولف|ندردش|حالك)(\s|$|[،,])/;
-  const isQ = (t) => /[؟?]\s*$/.test(t) || (QW.test(t) && !/[.!]\s*$/.test(t.trim()) ) || /(ولا لا|ولا لأ|صح؟|مش كده|ولا لاء|ولا؟|ولا لا\b)\s*[.!]?$/.test(t);
+  const isQ = (t) => /[؟?]\s*$/.test(t) || (QW.test(t.trim().split(/\s+/).slice(0, 3).join(" ")) && !/[.!،]\s*$/.test(t.trim())) || /(ولا لا|ولا لأ|صح؟|مش كده|ولا لاء|ولا؟|ولا لا\b)\s*[.!]?$/.test(t);
   function nudge(ms) {
     if (!S) return;
     clearTimeout(S.nudgeT);
@@ -997,7 +1004,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // 🔁 صدى صوتها: لما الصوت بيخرج من السماعة والمايك بيلقطه، كانت بتسمع نفسها كأنه العميل اتكلم (اتكتب «والله يا وليد…» على إنه كلامه)
     // فكلامها يتقطع في النص وتعيد الجملة. الحل: المايك بيقفل وهي بتتكلم، ويرجع بعد ما تسكت بثلث ثانية
     { const tk = S.mic?.getTracks()[0], vid = S.show?.v && !S.show.v.paused;
-      if (tk && !S.muted && !vid) { const t = performance.now(); if (talk) S.agentAt = t; const open = t - (S.agentAt || 0) > 350;
+      if (tk && !S.muted && !vid) { const t = performance.now(); if (talk || S.outPlay) S.agentAt = t; const open = !S.outPlay && t - (S.agentAt || 0) > 600;
         if (tk.enabled !== open) tk.enabled = open; S.half = !open; } }
     { const lv = q("[data-miclv] i"); if (lv) lv.style.width = S.muted ? "0" : Math.min(100, mu * 600) + "%"; }
     S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu); S.micMax = Math.max(S.micMax || 0, mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)

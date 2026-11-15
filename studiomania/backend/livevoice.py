@@ -558,7 +558,7 @@ def stt_lang(dialect: str) -> str:
 def stt_hint(dialect: str, name: str = "", brand: str = "") -> str:
     label = (DIALECTS.get(dialect) or DIALECTS["ar-eg-cairo"])[1]
     return (f"Arabic, {label} dialect, a phone-style conversation about their business and social media"
-            + (f". Names: {name}" if name else "") + (f", {brand}" if brand else "") + ". Instagram, TikTok, SimsimKit.")
+            + (f". Brand: {brand}" if brand else "") + ". Instagram, TikTok, SimsimKit.")   # اسم العميل نفسه مش هنا: الكلام المش واضح كان بيتكتب «وليد»
 
 
 def openai_secret(model: str, voice: str, instr: str, eagerness: str = "auto", tools: list | None = None, lang: str = "", hint: str = "") -> dict:
