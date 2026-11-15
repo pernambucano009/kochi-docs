@@ -31,7 +31,7 @@ if (!appId) appId = (await gql(`mutation($i:AppleAppIdentifierInput!,$a:ID!){ ap
   { i: { bundleIdentifier: BUNDLE, appleTeamId: team.id }, a: accountId })).appleAppIdentifier.createAppleAppIdentifier;
 console.log("appleAppIdentifier", appId.id);
 
-const creds = (await gql(`query($f:String!,$aid:ID!){ app { byFullName(fullName:$f){ iosAppCredentials(filter:{ appleAppIdentifierId:$aid }){ id pushKey{ id keyIdentifier } } } } }`,
+const creds = (await gql(`query($f:String!,$aid:String!){ app { byFullName(fullName:$f){ iosAppCredentials(filter:{ appleAppIdentifierId:$aid }){ id pushKey{ id keyIdentifier } } } } }`,
   { f: FULL, aid: appId.id })).app.byFullName.iosAppCredentials;
 if (creds[0]?.pushKey?.keyIdentifier === KEY_ID) { console.log("✅ push key already linked:", KEY_ID); process.exit(0); }
 
