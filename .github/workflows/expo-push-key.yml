@@ -1,0 +1,18 @@
+# مرة واحدة: مفتاح APNs ← Expo (إشعارات iOS لسمسم كيت). بيشتغل لما الفرع apple/expo-push-key يتعمله push.
+name: Expo push key (one-off)
+on:
+  push:
+    branches: ["apple/expo-push-key"]
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node .github/scripts/expo-push-key.mjs
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APNS_KEY_P8: ${{ secrets.APNS_KEY_P8 }}
+          APNS_KEY_ID: "43349H8582"
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
