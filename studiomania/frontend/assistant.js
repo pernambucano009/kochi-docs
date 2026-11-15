@@ -883,7 +883,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
-      if (!r.ok) { const why = (await r.text().catch(() => "")).slice(0, 300); lg("err", `start: realtime ${r.status} ${why}`); flush(true); throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل"); }
+      if (!r.ok) { const why = (await r.text().catch(() => "")).slice(0, 300); lg("err", `start: realtime ${r.status} ${why}`); flush(true);
+        // 🚨 صندوق الأخطاء عند الأدمن (زي الرصيد اللي خلص عند المزوّد): نعرف على طول من غير ما العميل يبلّغ
+        fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "ui", screen: "assistant", message: "مكالمة المساعدة لم تبدأ (رفض من خدمة الصوت)", raw: `${r.status} ${why}` }) }).catch(() => {}); throw new Error("تعذّر بدء المحادثة الآن، جرّب مرة أخرى بعد قليل"); }
       await pc.setRemoteDescription({ type: "answer", sdp: await r.text() });
       S.agent = tok.agent || ""; S.model = tok.model || ""; if (!S.greeted) S.thinking = true; status();   // «لحظة…» لحد ما تبدأ تتكلم
       if (noMic) { ov?.classList.add("talked"); q("[data-err]").textContent = noMic; setTimeout(() => q("[data-type]")?.focus(), 300); }
