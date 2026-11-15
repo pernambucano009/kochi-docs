@@ -145,7 +145,7 @@ def scan_json(path: str, body, user: str = "") -> None:
                 k = f"{norm_path(path)}:{ref}"
                 t0 = _WORKING.setdefault(k, now)
                 if now - t0 > STUCK_MIN * 60:
-                    record("stuck", path, f"شغّال منذ أكثر من {int(STUCK_MIN)} دقيقة: {x.get('step') or x.get('stage') or st}", json.dumps(x, ensure_ascii=False)[:1500],
+                    record("stuck", path, f"يعمل منذ أكثر من {int(STUCK_MIN)} دقيقة: {x.get('step') or x.get('stage') or st}", json.dumps(x, ensure_ascii=False)[:1500],
                            user=user, ref=ref)
             elif ref:
                 _WORKING.pop(f"{norm_path(path)}:{ref}", None)

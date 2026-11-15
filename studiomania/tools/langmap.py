@@ -159,7 +159,7 @@ UI_CONSTS = {
     "growth.py": {"KINDS": None}, "rivals.py": {"PLATFORMS": None}, "brainsrc.py": {"FIELDS": None, "SECTIONS": None},
     "flow.py": {"FORMATS": None, "KNOW": None}, "dub.py": {"AR": None, "FOREIGN": None, "ELEVEN": None, "LIPSYNC": None},
     "app.py": {k: None for k in ("MONTH_KINDS", "ASSET_KINDS", "SRC_KINDS", "CAPTION_LANGS", "PUSH_TEXT", "ALGO_WARN", "STORAGE_FULL_MSG", "STYLE_CATS", "AVATAR_MODELS")},
-    "typo.py": {"BUILTIN_STYLES": {"name"}, "STUDIO_KINDS": None, "COLLECTIONS": {"name", "note"}},
+    "typo.py": {"BUILTIN_STYLES": {"name"}, "COLLECTIONS": {"name", "note"}},   # STUDIO_KINDS برومبت (ومعرض العناصر لصاحب المنصة)
     "lab.py": {"SCHEMA_ROLES": None, "CONNECTOR_FAMILIES": None, "TEXT_MODES": None, "VEDIT_MODELS": {"label"}},
     "tplguide.py": {"GUIDE": None}, "adtpl.py": {"UGC_PLACES": None, "LOOKS": {0}, "CINEMA_LOOKS": {0}, "CINEMA_BEATS": None},
     "twin.py": {"TIPS": None}, "livevoice.py": {"AGENT_NAMES": None}, "adsmgr.py": {"GOALS": None},
@@ -210,7 +210,9 @@ def _is_ui(n, par, rel) -> bool:
                 if isinstance(p, ast.Call) and _fname(p.func) == "_i" and c in p.args:   # أفكار المجال _i(العنوان، الفكرة، الهوك)
                     return "title" in spec and p.args.index(c) == 0
             return False
-    # جوه دالة: مفتاح واجهة، أو كلمة لنداء رسالة/خطأ/إشعار/خصم نقاط
+    # جوه دالة: مفتاح واجهة، أو كلمة لنداء رسالة/خطأ/إشعار/خصم نقاط (على مستوى الملف من غير دالة: X.update({...}) وغيره = برومبت)
+    if not any(isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef)) for p, _ in path):
+        return False
     for p, c in path:
         if isinstance(p, ast.Dict) and any(v is c and isinstance(k, ast.Constant) and k.value in UI_KEYS for k, v in zip(p.keys, p.values)):
             return True

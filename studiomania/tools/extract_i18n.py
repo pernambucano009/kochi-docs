@@ -2,6 +2,8 @@
 عشان نترجمها. الجمل اللي فيها قيم متغيّرة بتطلع بعلامات {0} و {1}.
 
 python tools/extract_i18n.py > /tmp/keys.json
+python tools/extract_i18n.py --missing      ← الجمل اللي العميل بيشوفها ومن غير إنجليزي (نفس خريطة اللغة)
+python tools/extract_i18n.py --missing-all  ← كل الجمل العربي من غير إنجليزي (برومبتات كمان)
 """
 import io
 import json
@@ -145,6 +147,22 @@ def main():
             for k in segments(lit):
                 keys.setdefault(k, f.name)
     if "--missing" in sys.argv:
+        # الجمل اللي العميل بيشوفها ومن غير إنجليزي: نفس حكم خريطة اللغة (tools/langmap.py) عشان العددين يبقوا واحد.
+        # + أي جملة في ملفات الواجهة الخريطة مش شايفاها خالص (يعني نمط جديد لازم يتضاف للخريطة)
+        sys.path.insert(0, str(ROOT / "tools"))
+        import langmap
+        m = langmap.build()
+        seen = {r["ar"] for r in m["items"]}
+        out = {r["ar"]: r["where"][0] for r in m["items"] if "no_en" in r["problems"]}
+        dic = langmap.en_dict()
+        for k, v in keys.items():
+            if v.endswith(".py") or ("frontend/" + v) in langmap.CONTENT_FILES or k in dic or len(k) < 2 or re.search(r"[\\[\]$]", k):
+                continue
+            if langmap.norm(k) not in seen and not langmap.CODE.search(re.sub(r"\{\d\}", "", k)):
+                out[k] = v + " (مش في الخريطة)"
+        json.dump(out, sys.stdout, ensure_ascii=False, indent=0)
+        return
+    if "--missing-all" in sys.argv:
         # الجمل اللي لسه مش في القاموس الإنجليزي
         dic = (ROOT / "frontend" / "i18n-en.js").read_text(encoding="utf-8")
         body = re.sub(r",\s*}$", "}", dic.split("window.I18N_EN = ", 1)[1].strip().rstrip(";").strip())   # فاصلة بعد آخر جملة كانت بتبوّظ الأداة
