@@ -33175,6 +33175,8 @@ def assistant_state(request: Request):
             "dialect_label": livevoice.DIALECTS[dia][0], "agents": livevoice.AGENT_NAMES[dia],
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
             "steps": assist_plan(b, assist_full(request))[2] if bid else [], "full": assist_full(request),
+            # 🛟 الأسئلة خلصت: الدايرة بتفتح مساعدة («محتاج مني حاجة؟») للمشترك، وللمجاني الشات بدل المكالمة
+            "help": bool(bid) and bool(a.get("saved") or a.get("skipped")) and not assist_plan(b, assist_full(request))[2],
             # العدد الكلي ثابت (الحساب + كل أسئلة العقل): لو خرج ورجع العداد بيكمّل من مكانه («٩ من ١٤» مش «١ من ٥»)
             "steps_total": 1 + len(livevoice.quiz_questions(assist_full(request)))}
 
@@ -33311,7 +33313,10 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                 rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "",
                 dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"),
                 implant_demo=(FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists())   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
-    instr = livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
+    helper = returning and not steps   # 🛟 كل الأسئلة اتجاوبت: مفيش أسئلة تاني، مساعدة بس
+    instr = livevoice.help_instructions(dia, who, ag, ug, site=helpdesk.GENERAL + "\n" + "\n".join(f"- {p['name']}: {p['what']}" for p in helpdesk.PAGES.values()),
+                                        brand=" · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k))) if helper else \
+        livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
                                    steps=[x if x in livevoice.STEP_NAMES else f"question [{x}]" for x in steps] if returning else None,
                                    returning=returning, have=have, full=full)
     try:   # 🎚️ النموذج من «معمل سعاد»: الكامل (أجود في اللهجات) أو mini (أرخص نحو ٣ مرات)
@@ -33321,7 +33326,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ms = livevoice.models()["openai"]["models"]
     model = os.environ.get("LIVE_MODEL") or next((m for m in ms if livevoice.tier(m) == pick), ms[0])
     try:
-        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", livevoice.TOOLS, lang=livevoice.stt_lang(dia),
+        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", [t for t in livevoice.TOOLS if t["name"] in livevoice.HELP_TOOLS] if helper else livevoice.TOOLS, lang=livevoice.stt_lang(dia),
                                       hint=livevoice.stt_hint(dia, who, first_brand_name(b) if b else ""))
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
@@ -33333,7 +33338,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                                       meta={"agent": livevoice.agent_name(dia, ag)}), request)
         except Exception:  # noqa: BLE001
             pass
-    return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag), "model": model}
+    return {"value": tok["value"], "agent": livevoice.agent_name(dia, ag), "model": model, "help": helper}
 
 
 class AssistAnswerIn(BaseModel):

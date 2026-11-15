@@ -724,7 +724,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (dock) {
       let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false, false); } }, 400);
       // ضغطة «رجوع» أو التسلسل أو اللوجو: المكالمة تقفل مع الضغطة نفسها (قبل ما الصفحة تبدأ تتحرك)
-      S.leave = (e) => { if (S && e.target.closest?.("#nhGoBack, #nhCrumbs [data-crumb], #nhBar .nh-logo")) { lg("sys", "left brain page (click)"); end(false, false); } };
+      // خرج من العقل وهو في المكالمة: الضغطة بتستنى لحد ما الكرة تنزل مكانها، وبعدين الصفحة تتغير (ومن غير رجوع للعقل تاني)
+      S.leave = (e) => {
+        const t = S && e.target.closest?.("#nhGoBack, #nhCrumbs [data-crumb], #nhBar .nh-logo"); if (!t) return;
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        lg("sys", "left brain page (click)");
+        if (S.hist && history.state?.assistant) { S.hist = false; const { assistant: _a, ...rest } = history.state; history.replaceState(rest, "", location.href); }   // ماترجعش للعقل بعد ما يوصل الرئيسية
+        end(false, false); setTimeout(() => t.isConnected && t.click(), dock ? 1000 : 750);
+      };
       document.addEventListener("click", S.leave, true);
       // الصفحة اتغيّرت (زرار «رجوع» أو الرئيسية): المكالمة تقفل في نفس اللحظة قبل ما الصفحة الجديدة ترسم نفسها
       S.onHash = () => { if (S && !/^#brand/.test(location.hash)) { lg("sys", "left brain page"); end(false, true); } };
@@ -1060,5 +1067,5 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     return true;
   }
 
-  return { maybe, can: () => (ov || S ? Promise.resolve(false) : gate(false)), open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
+  return { info: () => api("/api/assistant").catch(() => null), maybe, can: () => (ov || S ? Promise.resolve(false) : gate(false)), open: async (el) => { try { localStorage.removeItem(SKIP_KEY); } catch { /* */ } state = null; return maybe(true, el); } };
 })();
