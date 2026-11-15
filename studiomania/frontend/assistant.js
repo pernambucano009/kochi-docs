@@ -255,8 +255,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (args.purpose === "sample") { S.demoAfter = true; S.said = ""; return { ok: true, after_call: true, note: "Do NOT wait for it: the video appears in the middle of his screen right after the call ends. Close now: tell him the video will appear in the middle of his screen right after you hang up; after he watches it he should write you his opinion, he will find you at the bottom right of any page with your name, so you talk about the next step. Then goodbye and call finish." }; }
       return playDemo(args.template === "a24" ? "a24" : "a03", "case");
     }
-    if (name === "show_card") return card(args.kind);
+    if (name === "show_card") { if (args.kind === "analysis") { S.anaShown = true; S.anaChars = 0; } return card(args.kind); }
     if (name === "suggest_competitor") {
+      // 📋 الترتيب ثابت: تحليل الصفحة الأول (تتكلم عنه فعلًا)، وبعده المنافس آخر حاجة
+      if (S.anaShown && (S.anaChars || 0) < 150) { lg("sys", "competitor refused: analysis not presented yet");
+        return { ok: false, error: "Not yet: present the page analysis card that is on the screen first (3–4 short sentences: their best posts and why they worked, posting rate, and one or two improvements). Only after that call suggest_competitor. The competitor is the LAST stop." }; }
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
       const p = api("/api/assistant/rival/suggest", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
       // ⏳ البحث ساعات بياخد أكتر من دقيقة: المكالمة ماتسكتش. بعد ١٠ ثواني نورة تكمل المحطة اللي بعدها، والكارت يظهر لما يجهز
@@ -808,7 +811,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         let e; try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") {
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
-          R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
+          R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; if (S.anaShown) S.anaChars = (S.anaChars || 0) + (e.delta || "").length; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") { if (!R(e.response_id).silent) R(e.response_id).msg = true; }
         else if (e.type === "input_audio_buffer.committed" && S.tc === "manual") { S.thinking = true; status(); create("silent"); }   // خلّص كلامه: أداة الحفظ الأول من غير صوت
         else if (e.type === "input_audio_buffer.speech_started") { S.heard = (S.heard || 0) + 1; if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
