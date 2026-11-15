@@ -1313,7 +1313,7 @@ html { overflow-x: clip; }
 .fx { transition: translate .32s cubic-bezier(.2, .8, .2, 1), scale .32s cubic-bezier(.2, .8, .2, 1); }
 /* البروز: واضح (بيكبر ويطلع لفوق) وبيكسب أي قاعدة تانية في الصفحة */
 :root .fx.fx-on:not(:disabled), :root .fx:focus-visible { translate: 0 -3px !important; scale: 1.06 !important; z-index: 2; }
-:root .fx.fx-wide.fx-on:not(:disabled), :root .fx.fx-wide:focus-visible { translate: 0 -2px !important; scale: 1 !important; }
+:root .fx.fx-wide.fx-on:not(:disabled), :root .fx.fx-wide:focus-visible { translate: none !important; scale: 1 !important; }   /* صف عريض جوه قايمة: مايترفعش خالص (الرفعة كانت بتقص حده اللي فوق) */
 .fx:not(:disabled):active { translate: 0 0; scale: .98; transition-duration: .12s; }
 .fx-snake { position: absolute; pointer-events: none; overflow: visible; opacity: 0; transition: opacity .4s ease; z-index: 3; }
 .fx-snake rect { fill: none; stroke: currentColor; stroke-linecap: round; }
@@ -3135,3 +3135,8 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #twMain .tw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
 #twMain .tw-step { margin-bottom: 12px; }
 #nh .bm-world .bm-branch.bm-seed > b { font-size: calc(12px * max(1, .82 / var(--bm-s, 1))); }
+
+/* 👤 الحساب جوه نافذة العلامات */
+.client-acct { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line, rgba(24,23,24,.1)); font-size: 13px; }
+#nhBar .nh-logo { cursor: pointer; }
+.client-list { padding-block: 4px; }

@@ -212,15 +212,14 @@ const NH = (() => {
   bar.id = "nhBar";
   bar.className = "nh-top nh-bar";
   bar.innerHTML = `<div class="nh-bar-r">
-      <div class="nh-logo" aria-hidden="true"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</div>
-      <button class="nh-goback" id="nhGoBack" aria-label="رجوع" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
+      <div class="nh-logo" role="button" tabindex="0" title="الرئيسية" aria-label="الرئيسية"><img class="nh-lm lm-l" src="/logo-mark-light.png" alt=""><img class="nh-lm lm-d" src="/logo-mark-dark.png" alt="">SIMSIMKIT</div>
       <nav class="nh-crumbs" id="nhCrumbs" aria-label="موقعك" hidden></nav>
+      <button class="nh-goback" id="nhGoBack" aria-label="رجوع" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>رجوع</span></button>
     </div>
     <div class="nh-tools" id="nhTools">
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
       <button class="nh-chip latin nh-langb" id="nhLang" aria-label="English">EN</button>
-      <button class="nh-chip" id="nhClient" title="العلامة التي تعمل عليها" aria-label="العلامة التي تعمل عليها"><i id="nhClientAv" aria-hidden="true"></i><span id="nhClientName" data-no-i18n></span></button>
-      <button class="nh-chip nh-acct" id="nhAcct" title="حسابك" aria-label="حسابك"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></button>
+      <button class="nh-chip" id="nhClient" title="علاماتك وحسابك" aria-label="علاماتك وحسابك"><i id="nhClientAv" aria-hidden="true"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-switch" id="nhTheme" aria-label="تبديل الوضع الفاتح والغامق"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
@@ -395,23 +394,25 @@ const NH = (() => {
     root.classList.add("nh-wipe");
     document.startViewTransition(flip).finished.finally(() => root.classList.remove("nh-wipe"));
   });
-  document.getElementById("nhClient").onclick = () => document.getElementById("clientBtn").click();
+  // 👤 زرار واحد: العلامات اللي بتشتغل عليها، وتحتها حسابك وتسجيل الخروج
+  document.getElementById("nhClient").onclick = () => {
+    document.getElementById("clientBtn").click();
+    const who = document.getElementById("clientWho");
+    if (who && !who.textContent) fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((m) => { if (m?.email) who.textContent = m.email; }).catch(() => {});
+  };
   document.getElementById("nhLang").textContent = I18N.lang === "en" ? "ع" : "EN";
   document.getElementById("nhLang").setAttribute("aria-label", I18N.lang === "en" ? "العربية" : "English");
   document.getElementById("nhLang").onclick = () => document.getElementById("langToggle").click();
   // 🔒 العميل: لا زر الإنجليزي ولا شريحة رصيد Atlas (بتتشال من الصفحة نفسها، مش بس بتستخبى بالـ CSS)
   if (root.dataset.role && root.dataset.role !== "admin") {
-    document.getElementById("nhLang")?.remove();
     ["stageMoney", "moneyBtn"].forEach((id) => document.getElementById(id)?.style.setProperty("display", "none", "important"));
   }
-  // 👤 الحساب: بيوري الإيميل، ومنه تسجيل الخروج
-  document.getElementById("nhAcct").onclick = async () => {
-    let who = "";
-    try { const r = await fetch("/api/me"); if (r.ok) { const m = await r.json(); who = m.email || ""; } } catch { /* بدون بوابة الحسابات */ }
-    if (!(await uiConfirm(who ? `مسجّل الدخول بـ ${who}\nهل تسجّل الخروج؟` : "هل تسجّل الخروج؟", { ok: "تسجيل الخروج" }))) return;
+  // 👤 تسجيل الخروج: من نافذة العلامات (زرار الحساب اتدمج فيها)
+  document.getElementById("clientLogout")?.addEventListener("click", async () => {
+    if (!(await uiConfirm("هل تسجّل الخروج من الحساب؟", { ok: "تسجيل الخروج" }))) return;
     try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* */ }
     location.href = "/login";
-  };
+  });
 
   // ---------- الزوم: المربع بيكبر بنعومة لحد ما يبقى الشاشة، واسمه وأيقونته بيتنقلوا لركن الصفحة زي ما هم ----------
   // الاسم بيتحرك بالـ transform بس (من غير تكبير ولا تغيير في الخط)، فعنوان الصفحة لازم يبقى بنفس مقاس اسم المربع
@@ -791,9 +792,9 @@ const NH = (() => {
     back.classList.toggle("off", !deep);
     back.tabIndex = deep ? 0 : -1;
     nav.hidden = false;
-    nav.innerHTML = list.map((c, k) => k === list.length - 1 && deep ? `<b class="nh-cb" aria-current="page">${esc(c.label)}</b>`
-      : `<button type="button" class="nh-cb" data-crumb="${k}" ${deep ? "" : 'aria-current="page"'}>${esc(c.label)}</button><i aria-hidden="true">›</i>`).join("")
-      + (deep ? "" : `<span class="nh-cb nh-cb-empty" aria-hidden="true"></span>`);
+    nav.innerHTML = deep ? list.map((c, k) => !k ? "" : k === list.length - 1 ? `<b class="nh-cb" aria-current="page">${esc(c.label)}</b>`
+      : `<button type="button" class="nh-cb" data-crumb="${k}">${esc(c.label)}</button><i aria-hidden="true">‹</i>`).join("")
+      : `<span class="nh-cb nh-cb-empty" aria-hidden="true"></span>`;   // الشعار هو «الرئيسية»: التسلسل بيبدأ من الصفحة اللي انت فيها
     nav._list = list;
     syncHash();
   }
@@ -873,6 +874,7 @@ const NH = (() => {
   document.getElementById("nhGoBack").onclick = goBack;
   document.getElementById("nhCrumbs").addEventListener("click", (e) => { const b = e.target.closest("[data-crumb]"); if (b) goCrumb(+b.dataset.crumb); });
   bar.querySelector(".nh-logo").addEventListener("click", () => { if (bar.classList.contains("deep")) goCrumb(0); });
+  bar.querySelector(".nh-logo").addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && bar.classList.contains("deep")) { e.preventDefault(); goCrumb(0); } });
   function act(id) {
     const t = T[id];
     if (t.fn) return t.fn;
