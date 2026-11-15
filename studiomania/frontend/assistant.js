@@ -566,7 +566,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     lg("user", text, { typed: 1 }); sent("✓ وصلت رسالتك");
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
-    create(quizLeft() ? "silent" : "auto");
+    create(SILENT_TURNS && quizLeft() ? "silent" : "auto");
   }
   // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
   const BOX = {
@@ -887,9 +887,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function vadCfg(create_) { return S.vadType === "server_vad"
     ? { type: "server_vad", threshold: 0.45, silence_duration_ms: 650, create_response: create_, interrupt_response: true }
     : { type: "semantic_vad", eagerness: "auto", create_response: create_, interrupt_response: true }; }
+  const SILENT_TURNS = false;   // صاحب المنصة: الحشو من طبيعة الموديل ومش مشكلة، فالردود بترجع زي الأول (الطريقة الصامتة متوقفة)
   function quizMode() {
-    if (!S?.dc || S.dc.readyState !== "open") return;
-    const want = quizLeft() && !S.noSilent ? "manual" : "auto";
+    if (!SILENT_TURNS || !S?.dc || S.dc.readyState !== "open") return;   // متوقفة: إعدادات الجلسة زي ما السيرفر بعتها بالظبط
+    const want = SILENT_TURNS && quizLeft() && !S.noSilent ? "manual" : "auto";
     if (S.tc === want) return;
     S.tc = want; lg("sys", `turns ${want}`);
     try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: vadCfg(want === "auto") } } } })); } catch { /* */ }
