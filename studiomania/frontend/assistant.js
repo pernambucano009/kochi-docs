@@ -315,12 +315,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           ...(S.dentalSent ? [[/إشعار|اشعار|تنبيه|نوتيف|رنة|رنّة/, "that a notification will reach him and the video will appear in the middle of his screen when it is ready"]] : []),
           ...(S.demoAfter ? [[/نص الشاشة|وسط الشاشة|منتصف الشاشة|نص الشاشه|وسط الشاشه/, "that the video will appear in the middle of his screen right after you hang up"]] : [])]
           .filter(([rx]) => !rx.test(said)).map(([, t]) => t);
-        if (miss.length) { S.finRefused = (S.finRefused || 0) + 1; lg("sys", `finish refused: ${miss.length} missing`);
+        if (miss.length) { S.finRefused = (S.finRefused || 0) + 1; S.closeNow = true; lg("sys", `finish refused: ${miss.length} missing`);
           return { ok: false, error: `The call is NOT closed yet: you have not said the closing. Say it now, out loud, in their dialect, in one or two sentences, with no introduction: ${miss.join("; ")}. Then say goodbye and call finish again.` }; }
       }
       // 👋 المكالمة بتقفل بعد ما جملة الوداع تتقال كلها (مش أول ما الأداة توصل، الأداة بتوصل قبل الصوت)
       S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now(); stopTurns();
-      setTimeout(() => S?.finishing && end(S.endDone), 20000);   // احتياط لو الصوت ماوصلش
+      { const safe = () => { if (!S?.finishing) return; if (S.outPlay || S.speaking) return setTimeout(safe, 1500); end(S.endDone); }; setTimeout(safe, 20000); }   // احتياط لو الصوت ماوصلش (من غير ما يقطعها وهي بتتكلم)
       return { ok: true };
     }
     return { ok: false, error: "unknown tool" };
@@ -800,6 +800,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         const r = S?.resp[id];
         if (!r || !r.done || r.pending || !r.calls || (r.msg && !r.force) || S.finishing) return;
         delete S.resp[id];
+        // 👋 القفلة اترفضت (قالت «بختم المكالمة…» بدل القفلة نفسها، ٣ مرات): الرد الجاي القفلة بس، بتعليمات للرد ده لوحده
+        if (S.closeNow) { S.closeNow = false; lg("sys", "closing forced");
+          S.dc.send(JSON.stringify({ type: "response.create", response: { tool_choice: "none", instructions: `You are ${S.agent || "the assistant"}, ending a friendly call with ${state?.name || "the user"}. `
+            + `Speak ${state?.dialect_label || "their"} Arabic dialect only. Say ONLY this, warmly, in one or two short sentences, starting directly with it (no introduction like «بختم» or «كلمة ختام»): `
+            + `that they always find you in the orange circle at the bottom right of any page, with your name, and can message you anytime; then thank them and say goodbye (مع السلامة). Nothing else.` } }));
+          return; }
         create("auto");   // ردها لسه شغال: يستنى (كان بيرفض: active response in progress)
       };
       dc.onmessage = async (m) => {
