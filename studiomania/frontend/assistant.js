@@ -803,8 +803,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         // 👋 القفلة اترفضت (قالت «بختم المكالمة…» بدل القفلة نفسها، ٣ مرات): الرد الجاي القفلة بس، بتعليمات للرد ده لوحده
         if (S.closeNow) { S.closeNow = false; lg("sys", "closing forced");
           S.dc.send(JSON.stringify({ type: "response.create", response: { tool_choice: "none", instructions: `You are ${S.agent || "the assistant"}, ending a friendly call with ${state?.name || "the user"}. `
-            + `Speak ${state?.dialect_label || "their"} Arabic dialect only. Say ONLY this, warmly, in one or two short sentences, starting directly with it (no introduction like «بختم» or «كلمة ختام»): `
-            + `that they always find you in the orange circle at the bottom right of any page, with your name, and can message you anytime; then thank them and say goodbye (مع السلامة). Nothing else.` } }));
+            + `Speak ${state?.dialect_label || "their"} Arabic dialect only. Say ONLY this, warmly, in one or two short sentences, starting directly with it (no introduction such as "I will now close the call"): `
+            + `that they always find you in the orange circle at the bottom right of any page, with your name, and can message you anytime; then thank them and say goodbye. Nothing else.` } }));
           return; }
         create("auto");   // ردها لسه شغال: يستنى (كان بيرفض: active response in progress)
       };
