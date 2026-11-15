@@ -148,7 +148,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       // (أ) صوته واصل بوضوح والمساعدة مالقطتش أي كلام: طريقة التقاط الكلام تتغير للأبسط
       if (!st.vad && st.loud >= 6 && !S.heard) {
         st.vad = true; lg("sys", "mic loud but no speech detected → server_vad");
-        try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: { type: "server_vad", threshold: 0.45, silence_duration_ms: 650, create_response: true, interrupt_response: true } } } } })); } catch { /* */ }
+        S.vadType = "server_vad";
+        try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: vadCfg(S.tc !== "manual") } } } })); } catch { /* */ }
       }
       // (ب) الميكروفون مابيطلّعش صوت خالص (صمت رقمي) بعد ٤ ثواني: نجرب غيره
       if (el < 4 || (S.micMax || 0) > 0.0004) return;
@@ -565,7 +566,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     lg("user", text, { typed: 1 }); sent("✓ وصلت رسالتك");
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
-    create(quizLeft() ? "required" : "auto");
+    create(quizLeft() ? "silent" : "auto");
   }
   // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
   const BOX = {
@@ -788,23 +789,25 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         if (e.type === "response.output_audio_transcript.delta" || e.type === "response.audio_transcript.delta") {
           if (e.response_id !== S.capId) { S.capId = e.response_id; capReset(); }   // كل رد بيبدأ الكلام المكتوب من الأول، ماتتركبش على بعض
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; S.noAudio = !S.outLevel;
-        } else if (e.type === "response.output_item.added" && e.item?.type === "message") R(e.response_id).msg = true;
+        } else if (e.type === "response.output_item.added" && e.item?.type === "message") { if (!R(e.response_id).silent) R(e.response_id).msg = true; }
+        else if (e.type === "input_audio_buffer.committed" && S.tc === "manual") { S.thinking = true; status(); create("silent"); }   // خلّص كلامه: أداة الحفظ الأول من غير صوت
         else if (e.type === "input_audio_buffer.speech_started") { S.heard = (S.heard || 0) + 1; if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
 
         else if (e.type === "session.created" || e.type === "session.updated") greet();
-        else if (e.type === "response.created") { S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
+        else if (e.type === "response.created") { if (S.nextSilent) { S.nextSilent = false; R(e.response?.id).silent = true; } S.busy = true; S.greeted = true; clearTimeout(S.nudgeT); S.thinking = true; S.ask = null; S.lastQ = null; status(); }
         else if (e.type === "response.done") {
           const id = e.response?.id, r = R(id); r.done = true; S.busy = false;
           // 💵 الاستهلاك الحقيقي من المزوّد (توكنات الصوت والنص، والمتخزّن منها) ← تكلفة المكالمة بالظبط
           const u = e.response?.usage, it = u?.input_token_details || {}, ot = u?.output_token_details || {}, ct = it.cached_tokens_details || {};
           if (u) { const a = S.usage; a.text_in += it.text_tokens || 0; a.audio_in += it.audio_tokens || 0; a.text_cached += ct.text_tokens || 0; a.audio_cached += ct.audio_tokens || 0; a.text_out += ot.text_tokens || 0; a.audio_out += ot.audio_tokens || 0; }
           if (S.wait && S.waitResp && id && id !== S.waitResp && r.msg && !q(".as-box")?.isConnected && !S.acct) { S.wait = null; S.waitResp = null; }
-          if (S.queued) { const qm = S.queued; S.queued = false; S.dc.send(JSON.stringify(qm === true ? { type: "response.create" } : qm)); }
+          if (S.queued) { const qm = S.queued; S.queued = false; send(qm === true ? { type: "response.create" } : qm); }
           if (id === S.capId || !S.capId) S.capDone = true;
-          if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
+          if (!r.silent && (e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
+          if (r.silent && !r.calls) { lg("sys", "silent reply had no tool"); create("auto"); }   // ماستخدمش أداة: يتكلم عادي (ماتسكتش)
           follow(id);
           if (S.finishing) {
             if (r.msg) { S.finishReady = true; setTimeout(() => S?.finishing && !S.busy && !S.speaking && performance.now() - (S.lastTalk || 0) > 800 && end(S.endDone), 1500); }
@@ -841,7 +844,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           const askType = /اكتب|تكتب|اكتبه|اكتبي|عطني|اعطني|أعطني|عطيني|ابعت|ابعث|أرسل|ارسل|حط|حطه|شاركني|الصندوق|المربع|الخانة/.test(tx);
           if (askType && KW.account.test(tx) && !S.acct && !q(".as-box") && !(state?.account) && !S.accChip) { S.wait = "account"; S.waitResp = e.response_id || "x"; lg("sys", "account box opened from speech"); acct(true); }
         }
-        else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error"); }
+        else if (e.type === "error") { console.warn("assistant:", e.error); lg("err", e.error?.message || "error");
+          // الطلب الصامت اترفض (المزوّد مش قابل الإعداد): نرجع للطريقة العادية فورًا بدل ما المكالمة تسكت
+          if (S.nextSilent || /modalit|tool_choice/i.test(e.error?.message || e.error?.param || "")) { S.nextSilent = false; S.noSilent = true; S.tc = null;
+            try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: vadCfg(true) } } } })); } catch { /* */ }
+            S.tc = "auto"; if (!S.busy) create("auto"); } }
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
       const r = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", body: offer.sdp, headers: { Authorization: `Bearer ${tok.value}`, "Content-Type": "application/sdp" } });
@@ -874,19 +881,28 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // الحل في الكود: طول ما فيه أسئلة فاضلة، أي رد بعد كلام العميل لازم يبدأ بأداة (save_answer أو not_an_answer) من غير كلام،
   // والكلام ييجي في الرد اللي بعده (رد فعل + السؤال الجاي). بعد الأسئلة بيرجع عادي.
   const quizLeft = () => !!S && S.steps.some((x) => x !== "account" && !S.done.has(x));
+  // (التجربة الأولى بـ tool_choice=required ماكفتش: الموديل كان بيتكلم قبل الأداة في نفس الرد برضه — مكالمة الفتنس ٢)
+  // دلوقتي: طول الأسئلة، الرد الأول بعد كلام العميل «كتابة بس» (من غير صوت) ولازم يكون أداة، فأي جملة قبل الأداة ماتتسمعش
+  // ولا تتكتب على الشاشة. والكلام (رد فعل + السؤال الجاي) في الرد اللي بعده.
+  function vadCfg(create_) { return S.vadType === "server_vad"
+    ? { type: "server_vad", threshold: 0.45, silence_duration_ms: 650, create_response: create_, interrupt_response: true }
+    : { type: "semantic_vad", eagerness: "auto", create_response: create_, interrupt_response: true }; }
   function quizMode() {
     if (!S?.dc || S.dc.readyState !== "open") return;
-    const want = quizLeft() ? "required" : "auto";
+    const want = quizLeft() && !S.noSilent ? "manual" : "auto";
     if (S.tc === want) return;
-    S.tc = want; lg("sys", `tool_choice ${want}`);
-    try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", tool_choice: want } })); } catch { /* */ }
+    S.tc = want; lg("sys", `turns ${want}`);
+    try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: vadCfg(want === "auto") } } } })); } catch { /* */ }
   }
-  // رد من عندنا (مش بعد كلام العميل): كلام عادي مسموح فيه (auto). لو فيه رد شغال يستنى ويتبعت بعده بنفس النوع
+  // رد من عندنا: "auto" كلام عادي. "silent" = أداة بس من غير صوت (أول رد بعد كلام العميل وقت الأسئلة)
   function create(tc = "auto", extra = {}) {
     if (!S?.dc) return;
-    const msg = { type: "response.create", response: { tool_choice: tc, ...extra } };
-    if (S.busy) S.queued = msg; else S.dc.send(JSON.stringify(msg));
+    const silent = tc === "silent";
+    const msg = { type: "response.create", response: silent ? { tool_choice: "required", output_modalities: ["text"], ...extra } : { tool_choice: tc, ...extra } };
+    msg._silent = silent;
+    if (S.busy) S.queued = msg; else send(msg);
   }
+  function send(msg) { if (msg._silent) S.nextSilent = true; const m = { ...msg }; delete m._silent; S.dc.send(JSON.stringify(m)); }
   // العداد على الأسئلة بس (الحساب + أسئلة العقل)، والكلي ثابت: اللي اتجاوب في مكالمة قبل كده محسوب
   function prog() {
     const left = S?.steps.length || 0, n = Math.max(left, state?.steps_total || left), p = q(".as-prog"); if (!p) return;

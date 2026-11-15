@@ -34334,8 +34334,12 @@ def tour_card(bid: str, b: dict, kind: str) -> dict:
         st = assistant_account_state()
         if not st.get("ready"):
             return {"ok": False, "error": "analysis not ready", "status": st.get("status")}
-        return {"ok": True, "kind": kind, "data": st, "facts": "videos = our review of each of their own videos (good / improve, measured issues). "
-                "Talk about specific videos first, then the account numbers and improvements. Only use what is here."}
+        has_v = bool([v for v in (st.get("videos") or []) if v])
+        return {"ok": True, "kind": kind, "data": st, "facts": ("videos = our review of each of their own videos (good / improve, measured issues). "
+                "Talk about specific videos first, then the account numbers and improvements. Only use what is here.") if has_v else
+                ("There is no per-video review for this account. Do NOT mention videos one by one and NEVER say a video review is missing or "
+                 "that you have no specific video. Talk about their best posts listed here (what they are about and why they did well), then the "
+                 "account numbers and improvements. Only use what is here.")}
     if kind == "types":
         # من بروفايل المجال، ولو مجاله مش من المجالات الجاهزة: الأنواع اللي بتنجح في أغلب المجالات
         angles = [x.strip() for x in re.split(r"[،,]", str(fp.get("angles") or "")) if x.strip()] or \
