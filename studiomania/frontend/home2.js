@@ -167,8 +167,8 @@ const NH = (() => {
   // بعد أول فيديو (أو لو العميل بدأ مشاريع بنفسه) الزرار بيبقى «ابدأ مشروعًا جديدًا»، وأثناء تجهيزه بيفتح خطواته
   const fu = () => (typeof FirstUse !== "undefined" ? FirstUse.state() : null);
   const firstRun = () => fu()?.job?.status === "run";
-  const firstNeeded = () => !KOCHI && D.loaded && typeof FirstUse !== "undefined" && !fu()?.first_done
-    && (firstRun() || (!D.work.length && !(D.drafts || []).length));
+  // 🚫 «اصنع أول فيديو» اتلغى: الزرار دايمًا «ابدأ مشروعًا جديدًا» على القوالب العادية (فيديو التخصص بيوصل من المساعدة في أول مكالمة)
+  const firstNeeded = () => false;
   const cta = () => firstNeeded()
     ? `<div class="nh-tile nh-cta nh-gen" data-first tabindex="0" role="button" aria-label="${firstRun() ? "أول فيديو قيد التجهيز" : "اصنع أول فيديو"}">
       <div class="nh-head"><div class="nh-name"><span class="latin en-k">First video</span><b>${firstRun() ? "⏳ أول فيديو قيد التجهيز" : "🎬 اصنع أول فيديو"}</b></div>${gi("create")}</div>
@@ -328,7 +328,7 @@ const NH = (() => {
     // 🎬 عميل جديد لم يبدأ أي مشروع: زر «اصنع أول فيديو» تحت العنوان (سؤالان ثم قالب موشن رخيص من مجاله)
     const first = "";   // الزرار البرتقالي الوحيد تحت (cta)
     return pct < 30 || !name || name === "عميلي"
-      ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو</div>${first}`
+      ? `${icon}<h1 class="nh-ttl">ابدأ من هنا</h1><div class="ar">عرّف عقل العلامة بنشاطك، ثم ابدأ فيديوهاتك</div>${first}`
       : `${icon}<h1 class="nh-ttl">${esc(name)}</h1><div class="ar">استوديو المحتوى والفيديو</div>${first}`;
   }
   // وقت الزوم وشوية بعد الرجوع: المجسّم بيفضل زي ما هو مهما الماوس واقف فين، وآخر حاجة الماوس وقف عليها بتتطبق بعدها

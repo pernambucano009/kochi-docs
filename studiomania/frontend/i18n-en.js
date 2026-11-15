@@ -9325,6 +9325,7 @@ window.I18N_EN = {
   "العلامة التي تعمل عليها: {0}": "The brand you're working on: {0}",
   "ابدأ من هنا": "Start here",
   "عرّف عقل العلامة بنشاطك، ثم اصنع أول فيديو": "Tell the brand brain about your business, then make your first video",
+  "عرّف عقل العلامة بنشاطك، ثم ابدأ فيديوهاتك": "Tell the brand brain about your business, then start making videos",
   "مسجّل الدخول بـ {0}": "Signed in as {0}",
   "تسجيل الخروج؟": "Sign out?",
   "هل تسجّل الخروج؟": "Sign out?",
