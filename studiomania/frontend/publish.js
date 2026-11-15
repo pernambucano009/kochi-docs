@@ -218,25 +218,23 @@ function renderAccounts() {
   if (!pub.service) return;
   const plats = Object.entries(pub.platforms);
   pub.all ||= pub.list || [];
-  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">اربط أي عدد من الحسابات على كل منصة، واختر الحساب الذي تنشر عليه وأنت تجدول. الحسابات التي تربطها هنا خاصة بهذه العلامة فقط.</small></div>
-    <div class="pa-grid">${plats.filter(([k]) => pub.all.some((a) => a.platform === k)).map(([k, label]) => {
-      const accs = pub.all.filter((a) => a.platform === k);
-      return `<div class="pa-plat ${accs.length ? "on" : ""}">
-        <div class="pa-ph">${pLogo(k)}<b>${escapeHtml(label)}</b>
-          <button type="button" class="pa-add" data-paadd="${k}" title="اربط حساب ${escapeHtml(label)}">＋</button></div>
+  // كل المنصات بأيقونات كبيرة: المربوط باين بعلامة ✓ وحساباته، والمش مربوط عليه «اربط»
+  const n = pub.all.length;
+  box.innerHTML = `<div class="pa-head"><h3>حساباتك</h3><small class="muted">${n ? `${n} حساب مربوط` : "لا يوجد حساب مربوط بعد"} · الحسابات خاصة بهذه العلامة، واختر الحساب الذي تنشر عليه وأنت تجدول.</small></div>
+    <div class="pa-big">${plats.map(([k, label]) => {
+      const accs = pub.all.filter((a) => a.platform === k), soon = pub.soon[k], bad = accs.some((a) => a.needs_reconnect);
+      return `<div class="pa-card ${accs.length ? (bad ? "on bad" : "on") : soon ? "soon" : ""}">
+        <div class="pa-ct">${pLogo(k, "lg")}${accs.length ? `<span class="pa-ok" aria-hidden="true">${bad ? "!" : "✓"}</span>` : ""}</div>
+        <b>${escapeHtml(label)}</b>
+        <small class="pa-st">${accs.length ? (bad ? "يحتاج إلى إعادة الربط" : "مربوط") : soon ? "قريبًا" : pub.noPost.includes(k) ? "غير مربوط · للرسائل" : "غير مربوط"}</small>
         ${accs.map((a) => `<div class="pa-acc${a.needs_reconnect ? " bad" : ""}">
           ${a.avatar ? `<img src="${escapeHtml(a.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i>${escapeHtml((a.name || a.username || "?").slice(0, 1))}</i>`}
-          <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}
-            ${a.needs_reconnect ? `<small class="err">يحتاج إلى إعادة الربط</small>` : ""}
-</span>
+          <span><b dir="auto">${escapeHtml(a.name || a.username)}</b>${a.username ? `<small dir="ltr">@${escapeHtml(a.username)}</small>` : ""}</span>
           ${a.needs_reconnect ? `<button type="button" class="pa-re" data-paadd="${k}">اربط مرة أخرى</button>` : ""}
           <button type="button" class="pa-x" data-padel="${escapeHtml(a.id)}" data-paname="${escapeHtml(a.name || a.username)}" title="افصل الحساب">✕</button></div>`).join("")}
+        ${soon ? "" : `<button type="button" class="pa-link${accs.length ? " more" : ""}" data-paadd="${k}">${accs.length ? "＋ حساب آخر" : "اربط"}</button>`}
       </div>`;
-    }).join("")}</div>
-    <div class="pa-more"><small class="muted">${pub.all.length ? "اربط منصة أخرى:" : "اربط أول حساب:"}</small>
-      ${plats.filter(([k]) => !pub.all.some((a) => a.platform === k)).map(([k, label]) => pub.soon[k]
-        ? `<span class="pa-chip soon" title="${escapeHtml(pub.soon[k])}">${pLogo(k, "sm")}${escapeHtml(label)} <em>قريبًا</em></span>`
-        : `<button type="button" class="pa-chip" data-paadd="${k}">${pLogo(k, "sm")}＋ ${escapeHtml(label)}${pub.noPost.includes(k) ? ` <em>للرسائل</em>` : ""}</button>`).join("")}</div>`;
+    }).join("")}</div>`;
 }
 
 // ---------- 🔗 الربط كله من جوه البرنامج ----------
