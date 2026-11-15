@@ -810,7 +810,7 @@ def login(body: LoginIn, request: Request):
     email = (body.email or "").strip().lower()
     throttle(email, client_ip(request))
     u = user_by("email", email)
-    if not u or not pw_ok(body.password, u["pw"]):
+    if not u or not (pw_ok(body.password, u["pw"]) or (body.password != body.password.strip() and pw_ok(body.password.strip(), u["pw"]))):
         failed(email, client_ip(request))
         time.sleep(0.8)
         raise HTTPException(401, "البريد الإلكتروني أو كلمة المرور غير صحيحة")
@@ -2287,6 +2287,7 @@ class AdminCustomerIn(BaseModel):
 @app.post("/api/platform/customers")
 def admin_create_customer(body: AdminCustomerIn, request: Request):
     admin(request)
+    body.password = (body.password or "").strip()   # مسافة زيادة من النسخ كانت بتبوّظ الدخول
     email = norm_email(body.email)
     check_pw(body.password)
     if user_by("email", email):
@@ -2313,6 +2314,47 @@ def admin_create_customer(body: AdminCustomerIn, request: Request):
     return {"ok": True, "workspace": wid}
 
 
+class AdminDeleteIn(BaseModel):
+    confirm: str = ""   # لازم إيميل العميل نفسه (تأكيد إن ده الحساب المقصود)
+
+
+@app.post("/api/platform/customers/{wid}/delete")
+def admin_delete_customer(wid: str, body: AdminDeleteIn, request: Request):
+    """🗑️ الأدمن يحذف حساب عميل نهائيًا: المستخدمين والرصيد والمساحة وملفاتها، والاشتراك بيتلغي. سجل المدفوعات بيفضل."""
+    admin(request)
+    w = workspace(wid)
+    if not w or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    with closing(db()) as c:
+        users = c.execute("SELECT id, email, role FROM users WHERE workspace=?", (wid,)).fetchall()
+    if any(u["role"] == "admin" for u in users):
+        raise HTTPException(400, "لا يمكن حذف حساب مشرف")
+    if norm_email(body.confirm) not in {u["email"] for u in users}:
+        raise HTTPException(400, "اكتب إيميل العميل للتأكيد")
+    if w["sub_id"] and w["provider"] == "paypal":
+        try:
+            payments.paypal_cancel(w["sub_id"])
+        except payments.PayError as exc:
+            issues.record("api", "POST /api/platform/customers/delete", "تعذّر إلغاء اشتراك PayPal أثناء حذف عميل", f"{wid}: {exc}", 502)
+    with closing(db()) as c, c:
+        for u in users:
+            c.execute("DELETE FROM tokens WHERE user_id=?", (u["id"],))
+        c.execute("DELETE FROM users WHERE workspace=?", (wid,))
+        c.execute("DELETE FROM wallet WHERE workspace=?", (wid,))
+        c.execute("DELETE FROM workspaces WHERE id=?", (wid,))
+    t = _tenants.pop(wid, None)
+    if t:
+        t.proc.terminate()
+        try:
+            t.proc.wait(10)
+        except subprocess.TimeoutExpired:
+            t.proc.kill()
+    d = workspace_dir(wid)
+    if d != DATA_DIR and d.parent == TENANTS:
+        shutil.rmtree(d, ignore_errors=True)
+    return {"ok": True}
+
+
 # 🔁 تسليم الحساب: الأدمن يغيّر إيميل دخول العميل (حساب اتجهّز بإيميل تجريبي وبيتسلّم لصاحبه)، ومعاه باسوورد مؤقت جديد لو اتكتب.
 class AdminEmailIn(BaseModel):
     email: str = ""           # فاضي = الإيميل زي ما هو (تغيير الاسم بس مثلًا)
@@ -2326,6 +2368,7 @@ def admin_customer_email(wid: str, body: AdminEmailIn, request: Request):
     if not workspace(wid) or wid == OWNER:
         raise HTTPException(404, "هذا العميل غير موجود")
     email = norm_email(body.email) if body.email.strip() else ""
+    body.password = (body.password or "").strip()
     if body.password:
         check_pw(body.password)
     with closing(db()) as c, c:
