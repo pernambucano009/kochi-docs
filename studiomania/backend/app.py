@@ -33178,7 +33178,7 @@ def assistant_state(request: Request):
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
             "steps": assist_plan(b, assist_full(request))[2] if bid else [], "full": assist_full(request),
             # 🛟 الأسئلة خلصت: الدايرة بتفتح مساعدة («محتاج مني حاجة؟») للمشترك، وللمجاني الشات بدل المكالمة
-            "help": bool(bid) and bool(a.get("saved") or a.get("skipped")) and not assist_plan(b, assist_full(request))[2] and bool(a.get("finished")),
+            "help": bool(bid) and bool(a.get("saved") or a.get("skipped")) and not assist_plan(b, assist_full(request))[2],   # الأسئلة خلصت: مفيش مكالمة أسئلة تاني (المشترك مكالمة مساعدة، المجاني الشات)
             # العدد الكلي ثابت (الحساب + كل أسئلة العقل): لو خرج ورجع العداد بيكمّل من مكانه («٩ من ١٤» مش «١ من ٥»)
             "steps_total": 1 + len(livevoice.quiz_questions(assist_full(request)))}
 
@@ -33315,7 +33315,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                 rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "",
                 dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"),
                 implant_demo=(FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists())   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
-    helper = returning and not steps and bool(a.get("finished"))   # 🛟 المكالمة الأولى خلصت للآخر: مساعدة بس (اتقطعت بعد الأسئلة ← تكمّل العرض)
+    helper = returning and not steps   # 🛟 كل الأسئلة اتجاوبت: مساعدة بس (لو اتقطعت قبل ما الأسئلة تخلص، بتكمّل الأسئلة)
     instr = livevoice.help_instructions(dia, who, ag, ug, site=helpdesk.GENERAL + "\n" + "\n".join(f"- {p['name']}: {p['what']}" for p in helpdesk.PAGES.values()),
                                         brand=" · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k))) if helper else \
         livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,

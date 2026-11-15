@@ -30,6 +30,8 @@ const Help = (() => {
 .hp-h .who{flex:1;display:flex;flex-direction:column;line-height:1.3}.hp-h .who b{font-size:15px;font-weight:600}.hp-h .who small{font-size:11.5px;color:var(--nh-muted, var(--muted, #6B6B67))}
 .hp-call{border:0;width:36px;height:36px;border-radius:50%;background:rgba(229,97,62,.12);color:${OR};cursor:pointer;display:grid;place-items:center}
 .hp-call[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+.hp-call{position:relative}.hp-call[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);inset-inline-end:0;white-space:nowrap;background:#181718;color:#fff;font-size:12px;padding:6px 10px;border-radius:10px;pointer-events:none;z-index:5;opacity:1}
+.hp-call[aria-disabled="true"]:hover{opacity:.8}
 .hp-call svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
 .hp-x{border:0;background:none;font-size:16px;color:var(--nh-muted, var(--muted, #6B6B67));cursor:pointer;padding:4px}
 .hp-note{font-size:11.5px;color:var(--nh-muted,#6B6B67);padding:6px 16px 0;min-height:0}.hp-note:empty{display:none}
@@ -99,7 +101,7 @@ const Help = (() => {
     box.querySelector(".who b").textContent = nm();
     const call = box.querySelector(".hp-call");
     call.setAttribute("aria-disabled", S.paid ? "false" : "true");
-    call.title = S.paid ? `كلّم ${nm()}` : "المكالمة الصوتية للمشتركين";
+    call.title = ""; call.dataset.tip = S.paid ? `كلّم ${nm()}` : `المكالمة الصوتية مع ${nm()} للمشتركين فقط`;   // فقاعة واضحة لما الماوس يقف عليها (الـ title كان بيتأخر ومحدش بيشوفه)
     const k = pageKey();
     const first = [{ role: "assistant", text: `أهلًا، أنا ${nm()} 👋 مساعدتك هنا في كل شيء. اكتب لي، أو أرسل صورة، أو اسألني عن أي صفحة.` }];
     box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : first).map(msgHTML).join("") + (S.busy ? `<div class="hp-m ai">…</div>` : "");
