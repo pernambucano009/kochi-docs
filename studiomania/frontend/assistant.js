@@ -725,7 +725,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     mount(`<div class="as-in"><div class="as-orb"><canvas></canvas></div></div><div class="as-st">⏳ جارٍ الاتصال…</div>
       <div class="as-prog" hidden><span data-pt></span><i><b data-pb></b></i></div><div class="as-cap"></div>
       <form class="as-type" data-tform><div class="as-tw"><input data-type enterkeyhint="send" autocomplete="off" placeholder="أو اكتب هنا واضغط Enter"><button type="submit" class="as-send" data-tsend aria-label="أرسل">➤</button></div><p class="as-sent" data-sent></p><p class="as-hint" data-hint hidden></p></form>
-      <div class="as-acts"><span class="as-miclv" data-miclv hidden title="مستوى صوتك"><i></i></span><button type="button" class="as-btn" data-mute hidden>🔇 اكتم الميكروفون</button><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
+      <div class="as-acts"><span class="as-miclv" data-miclv hidden title="مستوى صوتك"><i></i></span><button type="button" class="as-btn end" data-end>⏹ أنهِ المحادثة</button></div><p class="as-err" data-err></p><div class="as-side"></div>
       ${state?.log && window.IS_CUSTOMER ? `<p class="as-lognote" data-lognote>📝 تُحفظ هذه المحادثة نصًا فقط (دون صوت) لمدة 30 يومًا لتحسين المساعدة، دون اسمك أو بيانات تواصلك. <button type="button" data-nolog>لا تحفظها</button></p>` : ""}`);
     S = { saved: 0, aBuf: "", capI: 0, capAt: 0, capDone: false, box: null, typed: "", t0: performance.now(), agentMs: 0, steps: [...(state?.steps || [])], done: new Set(), speaking: false,
       call: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, log: [],
@@ -759,12 +759,6 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const nl = q("[data-nolog]");
     if (nl) nl.onclick = () => { S.nolog = true; S.log.length = 0; q("[data-lognote]").textContent = "✓ لن تُحفظ هذه المحادثة"; };
     // 🔇 كتم الميكروفون: لو العميل هيبعد أو فيه كلام في الأوضة، عشان أصوات الأوضة ماتتاخدش على إنها إجابات
-    q("[data-mute]").onclick = () => {
-      const t = S?.mic?.getTracks()[0]; if (!t) return;
-      t.enabled = !t.enabled; S.muted = !t.enabled; lg("sys", S.muted ? "mic muted" : "mic on");
-      q("[data-mute]").textContent = S.muted ? "🎙️ شغّل الميكروفون" : "🔇 اكتم الميكروفون";
-      q("[data-mute]").classList.toggle("on", S.muted); status();
-    };
     try {
       q(".as-st").textContent = "🎙️ اسمح للمتصفح باستخدام الميكروفون إن ظهر لك طلب بذلك";
       // 🎙️ من غير ميكروفون (مش موجود، أو العميل رفض الإذن) المكالمة بتكمل: المساعد بيتكلم والعميل بيكتب
@@ -775,7 +769,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
       if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) { const tk = S.mic?.getTracks()[0]; TestRec.note?.(`🎙️ نورة ماسمعتش صوتك لحد دلوقتي. المايك: «${tk?.label || "?"}» · أعلى صوت وصل: ${((S.micMax || 0) * 1000).toFixed(0)} (أقل من 30 = مش بيوصل)${tk?.muted ? " · المتصفح أو النظام كاتم المايك ده" : ""}${S.muted ? " · مكتوم من زرار المكالمة" : ""}`); } }, 45000);
-      S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); if (mic) q("[data-mute]").hidden = false; S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
+      S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await tokP;
       if (!S || (dock && !onBrain())) { if (S) end(false); return; }   // خرج من العقل وهي بتتصل
