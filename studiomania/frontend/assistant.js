@@ -1079,7 +1079,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const miss = (why) => { if (state?.new && !state?.done) fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); if (state?.test && typeof TestRec !== "undefined") TestRec.note(`تعذّر فتح المكالمة: ${why}`); return false; };
     if (!state?.ready) return miss(`not ready: ${state?.why || "?"}`);
-    if (!forced && (state.done || !state.new)) return false;
+    if (!forced && state.done) return false;
+    if (!forced && !state.new) return miss("brain already full (no call needed)");
     if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }
     return true;
   }
