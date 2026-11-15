@@ -33178,7 +33178,7 @@ def assistant_state(request: Request):
             "saved": a.get("saved") or [], "account": {"status": social.get("status"), "name": social.get("name")} if social else None,
             "steps": assist_plan(b, assist_full(request))[2] if bid else [], "full": assist_full(request),
             # 🛟 الأسئلة خلصت: الدايرة بتفتح مساعدة («محتاج مني حاجة؟») للمشترك، وللمجاني الشات بدل المكالمة
-            "help": bool(bid) and bool(a.get("saved") or a.get("skipped")) and not assist_plan(b, assist_full(request))[2],
+            "help": bool(bid) and bool(a.get("saved") or a.get("skipped")) and not assist_plan(b, assist_full(request))[2] and bool(a.get("finished")),
             # العدد الكلي ثابت (الحساب + كل أسئلة العقل): لو خرج ورجع العداد بيكمّل من مكانه («٩ من ١٤» مش «١ من ٥»)
             "steps_total": 1 + len(livevoice.quiz_questions(assist_full(request)))}
 
@@ -33315,7 +33315,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                 rivals=bool((b.get("competitors") or {}).get("items")), first_video=(b.get("first_job") or {}).get("status") or "",
                 dental=dental_brain_on(bid) and not (suad_load(bid).get("job") or {}).get("cid"),
                 implant_demo=(FRONTEND_DIR / "gallery" / "dental" / "demo_a24.mp4").exists())   # 🦷 مرة واحدة: لو بعت حالة قبل كده مش هيطلبها تاني
-    helper = returning and not steps   # 🛟 كل الأسئلة اتجاوبت: مفيش أسئلة تاني، مساعدة بس
+    helper = returning and not steps and bool(a.get("finished"))   # 🛟 المكالمة الأولى خلصت للآخر: مساعدة بس (اتقطعت بعد الأسئلة ← تكمّل العرض)
     instr = livevoice.help_instructions(dia, who, ag, ug, site=helpdesk.GENERAL + "\n" + "\n".join(f"- {p['name']}: {p['what']}" for p in helpdesk.PAGES.values()),
                                         brand=" · ".join(str(b.get(k) or "") for k in ("name", "domain", "about") if b.get(k))) if helper else \
         livevoice.instructions(dia, "", who, ag, ug, tools=True, known=known, ctx=ctx, lessons=lessons,
@@ -33690,11 +33690,16 @@ def assistant_act(body: AssistActIn, request: Request):
     return {"ok": False, "error": "unknown action"}
 
 
+class AssistDoneIn(BaseModel):
+    finished: bool = False   # المكالمة وصلت للقفلة (مش اتقطعت: النت فصل أو قفلها)
+
+
 @app.post("/api/assistant/done")
-def assistant_done(request: Request):
+def assistant_done(request: Request, body: AssistDoneIn | None = None):
     bid, _b, _a = assist_info()
     if bid:
-        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(done=True, done_at=now()))
+        fin = bool(body and body.finished)
+        update_brain(bid, lambda d: d.setdefault("assistant", {}).update(done=True, done_at=now(), **({"finished": True} if fin else {})))
     return assistant_state(request)
 
 

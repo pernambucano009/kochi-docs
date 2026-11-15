@@ -1046,7 +1046,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (s.hist && history.state?.assistant) history.back();   // اتقفل من الزرار: نشيل خطوة التاريخ اللي ضفناها
     try { s.dc?.close(); s.pc?.close(); s.mic?.getTracks().forEach((t) => t.stop()); s.ctx?.close(); if (s.el) s.el.srcObject = null; } catch { /* اتقفل خلاص */ }
     // المحادثة بتتحسب «خلصت» لو المساعد قفلها، أو العميل جاوب على كام سؤال؛ غير كده بتظهر تاني المرة الجاية
-    if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
+    if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({ finished: !!finished }) }).catch(() => {});   // finished = وصلت للقفلة فعلًا (مش اتقطعت في النص)
     // التأجيل لنفس العلامة بس: حساب جديد على نفس المتصفح (أو علامة تانية) المساعدة بتطلعله عادي
     else try { localStorage.setItem(SKIP_KEY, JSON.stringify({ b: state?.brand || "", t: Date.now() })); } catch { /* التخزين مقفول */ }
     await closeP;
