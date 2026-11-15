@@ -662,6 +662,8 @@ def client_issue(body: ClientIssueIn, request: Request):
     """🚨 الواجهة بتبلّغ لوحدها: رسالة خطأ ظهرت للعميل، أو كود وقع في المتصفح."""
     issues.record(body.kind if body.kind in ("js", "report") else "ui", body.screen[:120] or "/", body.message[:1000], body.raw[:3000],
                   user=request.headers.get("x-user-email", ""), screen=body.screen[:120])
+    if body.screen == "assistant":   # 💳 مكالمة اترفضت لأن رصيد خدمة الصوت خلص ← تظهر «منتهي» في قسم الحسابات وتنبيه للأدمن
+        providers.note_error("openai", body.raw[:300])
     return {"ok": True}
 
 
@@ -33332,6 +33334,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
                                       hint=livevoice.stt_hint(dia, who, first_brand_name(b) if b else ""))
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
+        providers.note_error("openai", str(exc))
         raise HTTPException(503, "المساعد غير متاح الآن. جرّب مرة أخرى بعد قليل") from exc
     update_brain(bid, lambda d: d.setdefault("assistant", {}).update(started=now(), calls=int((d.get("assistant") or {}).get("calls") or 0) + 1))
     if body and body.call and assist_log_on():
