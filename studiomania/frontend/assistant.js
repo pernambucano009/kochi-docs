@@ -201,6 +201,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (r.ok) { S.saved++; S.wait = null; changed(); step(String(args.qid || "").replace(/[^a-z_]/g, "")); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
       return r.ok ? { ...r, note: "Saved. Now speak once: a few real words about what they just said, then the next question itself, in the same breath. No transition sentence (nothing like «خليني…» or «خلّنا…»)." } : r;
     }
+    if (name === "not_an_answer") return { ok: true, note: "Not saved. Now reply in one short turn: repeat or rephrase the same question, or answer what they asked. No filler." };
     if (name === "start_account_analysis") {
       // 🛑 الحساب لازم العميل يكتبه بنفسه (في المربع أو خانة الكتابة): الكلام بالصوت مابيتكتبش صح، والموديل ساعات بيخمّن حساب من اسم العلامة
       const norm = (x) => String(x || "").toLowerCase().replace(/https?:\/\/|www\.|instagram\.com\/|tiktok\.com\/|[@\s/]/g, "");
@@ -337,14 +338,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       : S.idleN === 1
       ? "(SYSTEM: the user has been silent for a while. Check in warmly in ONE short sentence in the dialect, using their name, and say it is fine to continue another time if they are busy (like: are you still with me? and if you are busy, no problem, we can continue another time). Then wait.)"
       : "(SYSTEM: the user is still silent. Say a warm short goodbye in the dialect (like: you seem busy now, I will go now, and talk to me whenever you are free), then call finish with later=true.)");
-    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
+    create("auto");
   }
   // 🛰️ رسالة من المنصة لسعاد (مش كلام العميل): مابتتحسبش كتابة منه، وهي بترد عليها لما تخلّص كلامها
   function note(text) {
     if (!S?.dc || S.dc.readyState !== "open") return;
     lg("sys", text);
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
-    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
+    create("auto");
   }
   // 🎬 الفيديو الاستعراضي: بيتعمل في الخلفية (دقايق)، والكارت على الجنب بيقول وصل لفين، ولما يجهز سعاد تعرف وتعرضه
   function showChip(r) {
@@ -564,7 +565,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     lg("user", text, { typed: 1 }); sent("✓ وصلت رسالتك");
     S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text }] } }));
     // لو هي لسه بتتكلم: الرد يستنى لحد ما تخلّص (طلب رد وهي بترد كان بيترفض، والكلام المكتوب يضيع)
-    if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));
+    create(quizLeft() ? "required" : "auto");
   }
   // 📥 المكان اللي العميل يكتب أو يرفع فيه اللي المساعد طلبه (الحساب، الشعار، صور المنتجات، الإنترو)
   const BOX = {
@@ -770,7 +771,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         S.greeted = true;
         for (const t of S.pend || []) dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: t }] } }));
         if (S.pend?.length) { lg("sys", `queued sent: ${S.pend.length}`); sent("✓ وصلت رسالتك"); } S.pend = [];
-        dc.send(JSON.stringify({ type: "response.create" }));
+        quizMode(); dc.send(JSON.stringify({ type: "response.create", response: { tool_choice: "auto" } }));
       };
       dc.onopen = () => setTimeout(greet, 900);   // احتياط لو حدث «الجلسة جاهزة» اتأخر (كان ٢٫٥ ثانية زيادة قبل أول كلمة)
       // ⏸️ كل رد = سؤال واحد ويستنى العميل: بعد نتيجة الأداة المساعد مابيتكلمش تاني إلا لو الرد كان أداة بس من غير كلام
@@ -780,7 +781,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         const r = S?.resp[id];
         if (!r || !r.done || r.pending || !r.calls || (r.msg && !r.force) || S.finishing) return;
         delete S.resp[id];
-        if (S.busy) S.queued = true; else S.dc.send(JSON.stringify({ type: "response.create" }));   // ردها لسه شغال: يستنى (كان بيرفض: active response in progress)
+        create("auto");   // ردها لسه شغال: يستنى (كان بيرفض: active response in progress)
       };
       dc.onmessage = async (m) => {
         let e; try { e = JSON.parse(m.data); } catch { return; }
@@ -801,7 +802,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           const u = e.response?.usage, it = u?.input_token_details || {}, ot = u?.output_token_details || {}, ct = it.cached_tokens_details || {};
           if (u) { const a = S.usage; a.text_in += it.text_tokens || 0; a.audio_in += it.audio_tokens || 0; a.text_cached += ct.text_tokens || 0; a.audio_cached += ct.audio_tokens || 0; a.text_out += ot.text_tokens || 0; a.audio_out += ot.audio_tokens || 0; }
           if (S.wait && S.waitResp && id && id !== S.waitResp && r.msg && !q(".as-box")?.isConnected && !S.acct) { S.wait = null; S.waitResp = null; }
-          if (S.queued) { S.queued = false; S.dc.send(JSON.stringify({ type: "response.create" })); }
+          if (S.queued) { const qm = S.queued; S.queued = false; S.dc.send(JSON.stringify(qm === true ? { type: "response.create" } : qm)); }
           if (id === S.capId || !S.capId) S.capDone = true;
           if ((e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           follow(id);
@@ -865,7 +866,24 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ov?.classList.toggle("as-quiet", (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")));
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
-  function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); }
+  function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); quizMode(); }
+  // 🔇 جمل الحشو («بسجلها وبعدين نكمل…») كانت بتتقال *قبل* حفظ الإجابة في نفس الرد، والتعليمات ماقدرتش تمنعها (٤ مكالمات).
+  // الحل في الكود: طول ما فيه أسئلة فاضلة، أي رد بعد كلام العميل لازم يبدأ بأداة (save_answer أو not_an_answer) من غير كلام،
+  // والكلام ييجي في الرد اللي بعده (رد فعل + السؤال الجاي). بعد الأسئلة بيرجع عادي.
+  const quizLeft = () => !!S && S.steps.some((x) => x !== "account" && !S.done.has(x));
+  function quizMode() {
+    if (!S?.dc || S.dc.readyState !== "open") return;
+    const want = quizLeft() ? "required" : "auto";
+    if (S.tc === want) return;
+    S.tc = want; lg("sys", `tool_choice ${want}`);
+    try { S.dc.send(JSON.stringify({ type: "session.update", session: { type: "realtime", tool_choice: want } })); } catch { /* */ }
+  }
+  // رد من عندنا (مش بعد كلام العميل): كلام عادي مسموح فيه (auto). لو فيه رد شغال يستنى ويتبعت بعده بنفس النوع
+  function create(tc = "auto", extra = {}) {
+    if (!S?.dc) return;
+    const msg = { type: "response.create", response: { tool_choice: tc, ...extra } };
+    if (S.busy) S.queued = msg; else S.dc.send(JSON.stringify(msg));
+  }
   // العداد على الأسئلة بس (الحساب + أسئلة العقل)، والكلي ثابت: اللي اتجاوب في مكالمة قبل كده محسوب
   function prog() {
     const left = S?.steps.length || 0, n = Math.max(left, state?.steps_total || left), p = q(".as-prog"); if (!p) return;
@@ -910,7 +928,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       // تكمّل بسؤال مباشر، مش بجملة انتقالية تانية («خليني أرتب…» وبعدين تسكت تاني)
       S.dc.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "system", content: [{ type: "input_text",
         text: "You ended your last turn without asking anything, so the user is waiting for you. Now ask your next question directly, in one short sentence, with no transition or filler before it." }] } }));
-      S.dc.send(JSON.stringify({ type: "response.create" })); } }, ms);
+      S.dc.send(JSON.stringify({ type: "response.create", response: { tool_choice: "auto" } })); } }, ms);
   }
   function unmute() {
     if (!S || q("[data-unmute]")) return;

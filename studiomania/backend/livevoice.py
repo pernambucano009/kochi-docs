@@ -118,11 +118,17 @@ def quiz_questions(full: bool = False) -> list[tuple[str, str]]:
 
 # 🧰 أدوات المساعد الحقيقي (بعد التسجيل): كل إجابة بتتحفظ في العقل وقت ما بتتقال، وتحليل الحساب بيبدأ في الخلفية
 TOOLS = [
-    {"type": "function", "name": "save_answer", "description": "Save the user's answer to one onboarding question into their brand profile.",
+    {"type": "function", "name": "save_answer", "description": "Save the user's answer to one onboarding question into their brand profile. "
+     "Call it silently, before you say anything. Confirming the field chosen at signup is [domain], never [about].",
      "parameters": {"type": "object", "properties": {
          "qid": {"type": "string", "description": "The question id from the list in the instructions."},
-         "answer": {"type": "string", "description": "The answer, written clearly in Arabic, keeping the user's own facts and words. No invented details."}},
+         "answer": {"type": "string", "description": "Exactly what the user said, written clearly in Arabic. Keep every name and number exactly as "
+                    "heard; never add a number, name, title or detail they did not say, and never turn a vague reply into a claim."}},
          "required": ["qid", "answer"]}},
+    {"type": "function", "name": "not_an_answer", "description": "The user's last turn is NOT an answer to your question: a short reaction "
+     "(«تمام», «طيب»), a question to you, a request to repeat, noise, or something unclear or cut off. Call it silently instead of save_answer, "
+     "then reply: repeat or rephrase the same question, or answer what they asked. Never save an unclear reply as an answer.",
+     "parameters": {"type": "object", "properties": {"why": {"type": "string", "enum": ["reaction", "question", "repeat", "unclear"]}}, "required": ["why"]}},
     {"type": "function", "name": "skip_question", "description": "The user asked to skip this question (or move to the next one, or answer it "
      "later). Call it with the question id, then go on to the next question.",
      "parameters": {"type": "object", "properties": {"qid": {"type": "string"}}, "required": ["qid"]}},
@@ -341,7 +347,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
             tour_lines.append(f"   {chr(97 + len(tour_lines))}. {txt}")
     tour = ("A SHORT tour, one stop at a time, in this order. Keep the whole call short: never add topics that are not in this list, never "
             "talk about templates, video downloading or features they did not ask about. At each stop: 1–3 short sentences in their terms, "
-            "no questions (it is a show; the only thing you ask for is the dental case photos), then go on. Never read a card out loud; talk about it."
+            "no questions (it is a show; the only thing you ask for is the dental case photos), then go on. Never read a card out loud; talk about it. "
+            "After the last question NEVER ask anything again (not about competitors, not «anything else?»), and never say what you do not have "
+            "(like «no specific video came up»): if a tool has no videos or details, just talk about what it does have."
             + " Do not suggest video ideas or scripts unless they ask you."
             + "\n" + "\n".join(tour_lines)
             ) if tools and tour_lines else "Skip this step."
