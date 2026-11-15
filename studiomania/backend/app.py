@@ -33326,7 +33326,7 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ms = livevoice.models()["openai"]["models"]
     model = os.environ.get("LIVE_MODEL") or next((m for m in ms if livevoice.tier(m) == pick), ms[0])
     try:
-        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", [t for t in livevoice.TOOLS if t["name"] in livevoice.HELP_TOOLS] if helper else livevoice.TOOLS, lang=livevoice.stt_lang(dia),
+        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", [t for t in livevoice.TOOLS if t["name"] in livevoice.HELP_TOOLS] + livevoice.HELP_TOOL_DEFS if helper else livevoice.TOOLS, lang=livevoice.stt_lang(dia),
                                       hint=livevoice.stt_hint(dia, who, first_brand_name(b) if b else ""))
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
@@ -33593,6 +33593,96 @@ def assistant_usage(body: AssistUsageIn):
         usd = (call_m - agent_m) * pin * 2 + agent_m * pout
     wallet.cost(usd, f"ترويج: مكالمة المساعدة الصوتية ({max(1, round(call_m))} دقيقة)", promo=True)
     return {"ok": True, "usd": round(usd, 3)}
+
+
+# 🛟 نورة في وضع المساعدة: تعرف حالة حساب العميل (النقاط، الحسابات المربوطة، المكتبة، الأوتوبايلوت، حالات الأسنان)
+# وتنفّذ شوية حاجات بعد موافقته الصريحة. كل اللي هنا بيعيد استخدام نفس دوال الصفحات (مفيش منطق جديد للبيانات).
+def assist_facts_data(topic: str) -> dict:
+    me = active_client_id()
+    out: dict = {}
+    if topic in ("points", "all"):
+        bal = wallet.balance()
+        out["points"] = {"balance": bal, "unlimited": bal is None}
+    if topic in ("accounts", "all"):
+        try:
+            st = publisher_status()
+            accs = st.get("account_list") or []
+            out["accounts"] = {"connected": [{"id": a["id"], "platform": a["platform"], "platform_name": st["platforms"].get(a["platform"], a["platform"]),
+                                              "name": a.get("name") or "", "username": a.get("username") or "", "needs_reconnect": bool(a.get("needs_reconnect"))} for a in accs],
+                               "available": [{"platform": k, "name": v} for k, v in st["platforms"].items() if k not in (st.get("soon") or {})],
+                               "soon": list((st.get("soon") or {}).keys())}
+        except HTTPException as exc:
+            out["accounts"] = {"error": str(exc.detail)}
+    if topic in ("library", "all") and me:
+        v = lib_view(me)
+        kinds: dict = {}
+        for f in v["files"]:
+            kinds[f.get("kind") or "other"] = kinds.get(f.get("kind") or "other", 0) + 1
+        out["library"] = {"total": v["total"], "by_kind": kinds,
+                          "folders": [{"name": x["path"], "files": x["count"]} for x in v["folders"] if x["count"]][:25]}
+    if topic in ("autopilot", "all"):
+        p = pilot_state()
+        jobs = p["jobs"]
+        out["autopilot"] = {"on": bool(p["settings"].get("on")), "per_day": p["settings"].get("per_day"), "mode": p["settings"].get("mode"),
+                            "waiting_for_you": p["waiting"], "next_times": p["upcoming"][:3],
+                            "recent": [{"title": j.get("title") or "", "status": j.get("status") or j.get("step") or "", "note": j.get("note") or ""} for j in jobs[:5]]}
+    if topic in ("dental", "all") and me and dental_brain_on(me):
+        lib = lib_merged(me)
+        vids, photos = dental.TEMPLATES, dentalbrain.PHOTO_TEMPLATES
+        cases = []
+        for c in dentalbrain.cases(lib):
+            fits = [(t, dentalbrain.fit_case(lib, c, t["id"], vids)) for t in vids + photos]
+            cases.append({"id": c["id"], "name": c["name"],
+                          "videos": [t["name"] for t, r in fits if r["ok"] and t in vids], "posts": [t["name"] for t, r in fits if r["ok"] and t in photos],
+                          "missing": next((r.get("missing") for _, r in fits if not r["ok"] and r.get("missing")), "")})
+        out["dental"] = {"cases": cases, "total_cases": len(cases), "total_possible": sum(len(c["videos"]) + len(c["posts"]) for c in cases),
+                         "templates": {"video": [{"id": t["id"], "name": t["name"]} for t in vids], "post": [{"id": t["id"], "name": t["name"]} for t in photos]}}
+    return out
+
+
+@app.get("/api/assistant/facts")
+def assistant_facts(topic: str = "all"):
+    if topic not in ("points", "accounts", "library", "autopilot", "dental", "all"):
+        raise HTTPException(400, "topic")
+    return assist_facts_data(topic)
+
+
+class AssistActIn(BaseModel):
+    action: str
+    confirmed: bool = False
+    account_id: str = ""
+    on: bool | None = None
+    case_id: str = ""
+    template: str = ""
+
+
+@app.post("/api/assistant/act")
+def assistant_act(body: AssistActIn, request: Request):
+    """🔒 أي حاجة بتغيّر حاجة لازم العميل يكون وافق بصوته (confirmed). نفس دوال الصفحات بالظبط."""
+    if not body.confirmed:
+        return {"ok": False, "error": "Ask the user to confirm clearly first, then call again with confirmed=true."}
+    if not assist_full(request) and TENANT_ROLE == "customer":
+        return {"ok": False, "error": "Actions are for subscribers only."}
+    try:
+        if body.action == "disconnect_account":
+            accs = (publisher_status().get("account_list") or [])
+            a = next((x for x in accs if x["id"] == body.account_id), None)
+            if not a:
+                return {"ok": False, "error": "No such connected account. Call account_facts accounts to get the right id."}
+            publisher_disconnect(body.account_id)
+            return {"ok": True, "done": f"disconnected {a.get('platform')} {a.get('name') or a.get('username') or ''}".strip()}
+        if body.action == "autopilot" and body.on is not None:
+            pilot_put(PilotIn(on=body.on), request)
+            return {"ok": True, "done": "autopilot " + ("on" if body.on else "off")}
+        if body.action == "dental_make":
+            r = dental_brain_make(body.case_id, DentalMakeIn(template=body.template))
+            if r.get("kind") == "video":
+                dental_render(r["cid"], DentalRenderIn(template=body.template))
+                return {"ok": True, "done": "video is being made now; it appears in the case folder in the library and a notification arrives when ready"}
+            return {"ok": True, "done": "post made and saved in the case folder in the library"}
+    except HTTPException as exc:
+        return {"ok": False, "error": str(exc.detail)}
+    return {"ok": False, "error": "unknown action"}
 
 
 @app.post("/api/assistant/done")

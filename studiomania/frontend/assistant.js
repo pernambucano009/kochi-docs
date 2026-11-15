@@ -6,6 +6,7 @@ const Assistant = (() => {
   const css = `
 .as-ov{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:inherit;
   -webkit-backdrop-filter:blur(0);backdrop-filter:blur(0);transition:backdrop-filter .9s,-webkit-backdrop-filter .9s;font-family:inherit}
+@keyframes asHint{0%,100%{box-shadow:0 0 0 0 rgba(229,97,62,.55)}50%{box-shadow:0 0 0 10px rgba(229,97,62,0)}}.as-hint{animation:asHint 1.2s ease-in-out 5}
 .as-ov.on{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .as-ov>:not(.as-in){opacity:0;transition:opacity .45s}
 .as-ov.on>:not(.as-in){opacity:1;transition:opacity .7s .55s}
@@ -202,6 +203,17 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) { S.saved++; S.wait = null; changed(); step(String(args.qid || "").replace(/[^a-z_]/g, "")); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
       return r.ok ? { ...r, note: "Saved. Now speak once: a few real words about what they just said, then the next question itself, in the same breath. No transition sentence (nothing like «خليني…» or «خلّنا…»)." } : r;
+    }
+    // 🛟 وضع المساعدة: حالة حسابه الحقيقية، وتنفيذ بعد موافقته، وصفحة تتفتح بعد ما المكالمة تقفل
+    if (name === "account_facts") return api(`/api/assistant/facts?topic=${encodeURIComponent(args.topic || "all")}`).catch((e) => ({ error: e.message }));
+    if (name === "do_action") {
+      const r = await api("/api/assistant/act", { method: "POST", ...jsonBody(args) }).catch((e) => ({ ok: false, error: e.message }));
+      if (r.ok) { changed(); chip(`✓ <span><b>تم</b><br>${esc({ disconnect_account: "فُصل الحساب", autopilot: args.on ? "شُغّل الأوتوبايلوت" : "أُوقف الأوتوبايلوت", dental_make: "بدأ التنفيذ" }[args.action] || "")}</span>`); }
+      return r;
+    }
+    if (name === "open_page") {
+      S.navAfter = { page: String(args.page || ""), platform: String(args.platform || "") };
+      return { ok: true, note: "The page opens when the call ends. Tell them in one sentence what to press there, say they find you in the orange circle at the bottom right, then call finish." };
     }
     if (name === "not_an_answer") return { ok: true, note: "Not saved. Now reply in one short turn: repeat or rephrase the same question, or answer what they asked. No filler." };
     if (name === "start_account_analysis") {
@@ -1024,10 +1036,24 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // التأجيل لنفس العلامة بس: حساب جديد على نفس المتصفح (أو علامة تانية) المساعدة بتطلعله عادي
     else try { localStorage.setItem(SKIP_KEY, JSON.stringify({ b: state?.brand || "", t: Date.now() })); } catch { /* التخزين مقفول */ }
     await closeP;
+    if (s.navAfter) openAfter(s.navAfter);
     if (typeof NH !== "undefined") NH?.refresh?.();
     S_done?.();
   }
   let S_done = null;
+  // 🛟 الصفحة اللي نورة قالت هتفتحها (بعد ما المكالمة تقفل). «حساباتك»: المنصة اللي هيربطها بتتعلّم عشان يدوس عليها
+  function openAfter({ page, platform }) {
+    const key = { accounts: "pubacc", create: "create", library: "brainlib", autopilot: "pilot", plans: "plans", publish: "publish", brand: "brand" }[page];
+    if (!key || typeof window.NHGo !== "function") return;
+    if (key === "pubacc") {
+      window.NHGo("publish");
+      setTimeout(() => {
+        if (typeof showStep === "function") showStep("7"); if (typeof pubTab === "function") pubTab("acc");
+        const b = platform && document.querySelector(`#pubAccounts [data-paadd="${CSS.escape(platform.toLowerCase())}"]`);
+        if (b) { b.scrollIntoView({ block: "center", behavior: "smooth" }); b.classList.add("as-hint"); setTimeout(() => b.classList.remove("as-hint"), 6000); }
+      }, 1300);
+    } else window.NHGo(key);
+  }
   addEventListener("popstate", () => { if (S) { S.hist = false; end(false, dock); } });
 
   // بترجع false لو المساعد مافتحش (مش جاهز أو مش وقته)، وtrue بعد ما المكالمة تخلص

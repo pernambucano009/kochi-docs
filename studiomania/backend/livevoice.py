@@ -494,6 +494,25 @@ def _fail(r: httpx.Response, who: str) -> None:
 
 
 HELP_TOOLS = ("save_preference", "set_user_gender", "finish")
+# 🛟 أدوات وضع المساعدة: تعرف حالة حسابه، وتنفّذ بعد موافقته، وتفتحله الصفحة
+HELP_TOOL_DEFS = [
+    {"type": "function", "name": "account_facts", "description": "Get the user's real account status before answering any question about it. "
+     "topic: points (balance), accounts (connected social accounts and which platforms can be connected), library (files in the content library), "
+     "autopilot (on/off, schedule, recent videos), dental (patient cases, which video/post templates each case can make, totals), or all.",
+     "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["points", "accounts", "library", "autopilot", "dental", "all"]}}, "required": ["topic"]}},
+    {"type": "function", "name": "do_action", "description": "Do something for the user. ONLY after you said exactly what you will do (and its cost if any) and the user clearly said yes "
+     "in their last turn; then set confirmed=true. Actions: disconnect_account (account_id from account_facts), autopilot (on=true/false), "
+     "dental_make (case_id + template id from account_facts dental: makes that video or post from the case).",
+     "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["disconnect_account", "autopilot", "dental_make"]},
+                                                     "confirmed": {"type": "boolean"}, "account_id": {"type": "string"}, "on": {"type": "boolean"},
+                                                     "case_id": {"type": "string"}, "template": {"type": "string"}}, "required": ["action", "confirmed"]}},
+    {"type": "function", "name": "open_page", "description": "Open a page of the platform for the user after this call ends (the call closes when the page opens). "
+     "Use it when they must do something themselves: connecting a NEW social account (the platform asks them to log in, so they press «اربط» on it), "
+     "making a video from a template, the library, autopilot settings, plans and points. Say in one sentence what they will do there, then call this, then finish.",
+     "parameters": {"type": "object", "properties": {"page": {"type": "string", "enum": ["accounts", "create", "library", "autopilot", "plans", "publish", "brand"]},
+                                                     "platform": {"type": "string", "description": "For accounts: the platform to connect (instagram, tiktok, youtube, facebook, x, linkedin…)"}},
+                    "required": ["page"]}},
+]
 
 
 def help_instructions(dialect: str, user: str = "", agent_gender: str = "f", user_gender: str = "m", site: str = "", brand: str = "") -> str:
@@ -515,6 +534,13 @@ say something is left. You only help.
    You can also help with content and marketing ideas for their brand. If you do not know, or it sounds like a bug, say so honestly
    and tell them to send it to support from the chat in the orange circle.
 3. Do not ask follow-up questions of your own. Only if their request is unclear, ask ONE short clarifying question.
+   Questions about THEIR account (how many points, which accounts are connected, how many cases / videos / templates they have, what is in
+   the library, is autopilot on): call account_facts first and answer from it with real numbers. Never guess numbers.
+   Things you can do yourself with do_action: disconnect a connected account, turn autopilot on or off, and (dentists) make a video or
+   post from one of their cases. Before any of them, say in one sentence exactly what you will do and ask «أعملها؟»; only after a clear yes
+   call do_action with confirmed=true, then say it is done. Never do two actions from one yes.
+   Things they must do themselves (connecting a NEW account needs their login on the platform; any other video): call open_page and tell
+   them which button to press there, then close the call.
 4. When they say they have nothing else (or say goodbye), close in one sentence: you are always there in the orange circle at the
    bottom right of the screen. Then call finish. Say goodbye once only.
 No filler lines like «خليني…» or «خلّينا…».
