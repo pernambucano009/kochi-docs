@@ -143,6 +143,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (!S || !S.sender) return clearInterval(iv);
       if (S.ctx?.state === "suspended") { S.ctx.resume().catch(() => {}); st.t0 = performance.now(); return; }   // المؤشر مابيقراش والسياق واقف
       if (st.busy || S.muted || S.show?.v) return;
+      if (S.half) { st.t0 = performance.now(); return; }   // المايك مقفول وهي بتتكلم: مش سكوت من الجهاز
       const mu = S.micLevel ? S.micLevel() : 0, el = (performance.now() - st.t0) / 1000;
       if (mu > 0.04 && !S.speaking) st.loud++;
       // (أ) صوته واصل بوضوح والمساعدة مالقطتش أي كلام: طريقة التقاط الكلام تتغير للأبسط
@@ -156,7 +157,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       if (st.tried === 0) { st.tried = 1; return swap({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }, "raw"); }
       if (!st.list) { try { const cur = S.mic?.getTracks()[0]?.getSettings?.().deviceId; st.list = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications" && d.deviceId !== cur); } catch { st.list = []; } }
       const next = st.list.shift();
-      if (next) return swap({ deviceId: { exact: next.deviceId } }, "device");
+      if (next) return swap({ deviceId: { exact: next.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, "device");
       if (!st.told) { st.told = true; lg("sys", "mic: all devices silent"); chip(`🎙️ <span><b>الميكروفون لا يلتقط صوتًا</b><br>تأكد أنه غير مكتوم من الجهاز، أو اكتب ردك في الخانة</span>`); }
     }, 500);
   }
@@ -302,7 +303,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           return { ok: false, error: `The call is NOT closed yet: you have not said the closing. Say it now, out loud, in their dialect, in one or two sentences, with no introduction: ${miss.join("; ")}. Then say goodbye and call finish again.` }; }
       }
       // 👋 المكالمة بتقفل بعد ما جملة الوداع تتقال كلها (مش أول ما الأداة توصل، الأداة بتوصل قبل الصوت)
-      S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now();
+      S.finishing = true; S.endDone = !args.later; S.finishAt = performance.now(); stopTurns();
       setTimeout(() => S?.finishing && end(S.endDone), 20000);   // احتياط لو الصوت ماوصلش
       return { ok: true };
     }
@@ -809,6 +810,12 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           if (!r.silent && (e.response?.output || []).some((x) => x.type === "message")) r.msg = true;
           if (r.silent && !r.calls) { lg("sys", "silent reply had no tool"); create("auto"); }   // ماستخدمش أداة: يتكلم عادي (ماتسكتش)
           follow(id);
+          // 👋 القفلة اتقالت (مكانها تحت على اليمين + وداع): المكالمة تقفل بعد الصوت على طول، من غير ما تستنى أداة finish
+          // (كانت بتودّع ٤–٥ مرات: «بختم لك…»، القفلة، «بأختم المكالمة الآن»، وكل «مع السلامة» من العميل بتعمل وداع جديد)
+          { const tail = (S.said || "").slice(-450);
+            if (!S.finishing && r.msg && /يمين/.test(tail) && /(السلامة|سلامة|أمان الله|امان الله|باي|نشوفك|يعطيك العافية)/.test(tail)) {
+              S.finishing = true; S.endDone = true; S.finishAt = performance.now(); lg("sys", "closing said: ending"); stopTurns();
+              setTimeout(() => S?.finishing && end(S.endDone), 20000); } }
           if (S.finishing) {
             if (r.msg) { S.finishReady = true; setTimeout(() => S?.finishing && !S.busy && !S.speaking && performance.now() - (S.lastTalk || 0) > 800 && end(S.endDone), 1500); }
             else if (!S.byeAsked && !r.pending) { S.byeAsked = true; S.dc.send(JSON.stringify({ type: "response.create", response: { instructions: "Say a warm, short goodbye in the same dialect (one or two sentences): thank them, and tell them they can continue any time from your circle on the brain page. Do not call any tool." } })); }
@@ -873,7 +880,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // خانة الكتابة: بتختفي على طول لما تبدأ تتكلم، بس مابترجعش غير بعد ما تسكت ثانية كاملة (كانت بتنور وتطفي مع كل سكتة صغيرة بين الجمل)
     { const busyNow = (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")), t = performance.now();
       if (busyNow) S.quietAt = t;
-      ov?.classList.toggle("as-quiet", busyNow || (S.quietAt && t - S.quietAt < 1000)); }
+      // بتظهر بس لما فيه رد مطلوب من العميل: سؤال، أو مربع، أو هي سكتت بعد جملة ومش هتكمّل لوحدها
+      const waitingUser = S.lastQ !== false || (S.nudged || 0) >= 2 || !!S.acct || !!(S.wait && q(".as-box"));
+      ov?.classList.toggle("as-quiet", busyNow || (S.quietAt && t - S.quietAt < 1000) || !waitingUser || !!S.finishing); }
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
   function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); quizMode(); }
@@ -888,6 +897,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ? { type: "server_vad", threshold: 0.45, silence_duration_ms: 650, create_response: create_, interrupt_response: true }
     : { type: "semantic_vad", eagerness: "auto", create_response: create_, interrupt_response: true }; }
   const SILENT_TURNS = false;   // صاحب المنصة: الحشو من طبيعة الموديل ومش مشكلة، فالردود بترجع زي الأول (الطريقة الصامتة متوقفة)
+  // بعد القفلة: كلام العميل («مع السلامة») مابيعملش رد جديد
+  function stopTurns() { try { S?.dc?.send(JSON.stringify({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: vadCfg(false) } } } })); } catch { /* */ } }
   function quizMode() {
     if (!SILENT_TURNS || !S?.dc || S.dc.readyState !== "open") return;   // متوقفة: إعدادات الجلسة زي ما السيرفر بعتها بالظبط
     const want = SILENT_TURNS && quizLeft() && !S.noSilent ? "manual" : "auto";
@@ -964,6 +975,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ov?.classList.toggle("has-box", !!ov.querySelector(".as-box"));
     const mu = S.micLevel ? S.micLevel() : 0, ag = S.outLevel ? S.outLevel() : 0;
     const talk = ag > 0.012, user = !talk && mu > 0.03;
+    // 🔁 صدى صوتها: لما الصوت بيخرج من السماعة والمايك بيلقطه، كانت بتسمع نفسها كأنه العميل اتكلم (اتكتب «والله يا وليد…» على إنه كلامه)
+    // فكلامها يتقطع في النص وتعيد الجملة. الحل: المايك بيقفل وهي بتتكلم، ويرجع بعد ما تسكت بثلث ثانية
+    { const tk = S.mic?.getTracks()[0], vid = S.show?.v && !S.show.v.paused;
+      if (tk && !S.muted && !vid) { const t = performance.now(); if (talk) S.agentAt = t; const open = t - (S.agentAt || 0) > 350;
+        if (tk.enabled !== open) tk.enabled = open; S.half = !open; } }
     { const lv = q("[data-miclv] i"); if (lv) lv.style.width = S.muted ? "0" : Math.min(100, mu * 600) + "%"; }
     S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu); S.micMax = Math.max(S.micMax || 0, mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
     orb?.set(talk ? Math.min(1, ag * 7) : user ? Math.min(0.35, mu * 2) : 0, user);
