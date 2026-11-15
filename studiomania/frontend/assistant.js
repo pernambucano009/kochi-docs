@@ -1011,7 +1011,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     // 🔁 صدى صوتها: لما الصوت بيخرج من السماعة والمايك بيلقطه، كانت بتسمع نفسها كأنه العميل اتكلم (اتكتب «والله يا وليد…» على إنه كلامه)
     // فكلامها يتقطع في النص وتعيد الجملة. الحل: المايك بيقفل وهي بتتكلم، ويرجع بعد ما تسكت بثلث ثانية
     { const tk = S.mic?.getTracks()[0], vid = S.show?.v && !S.show.v.paused;
-      if (tk && !S.muted && !vid) { const t = performance.now(); if (talk || S.outPlay) S.agentAt = t; const open = !S.outPlay && t - (S.agentAt || 0) > 600;
+      if (tk && !S.muted && !vid) { const t = performance.now(); if (talk) S.agentAt = t;
+        // المايك بيتفتح أول ما تخلص: بعد نهاية صوتها بـ ٠٫٣ ثانية. ولو المزوّد لسه بيقول «شغّال» وهي ساكتة أكتر من ثانية ← خلصت (كان بيفضل مقفول ويضيّع أول الإجابة)
+        const playing = S.outPlay && t - (S.agentAt || 0) < 1100, open = !playing && t - (S.agentAt || 0) > 300;
         if (tk.enabled !== open) tk.enabled = open; S.half = !open; } }
     { const lv = q("[data-miclv] i"); if (lv) lv.style.width = S.muted ? "0" : Math.min(100, mu * 600) + "%"; }
     S.micPeak = Math.max(S.micPeak || 0, talk ? 0 : mu); S.micMax = Math.max(S.micMax || 0, mu);   // 🎙️ للسجل: الميكروفون التقط صوت العميل ولا لأ (وقت ما هي ساكتة)
