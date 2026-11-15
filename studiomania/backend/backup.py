@@ -62,7 +62,7 @@ def access_token(refresh: str, client_id: str, secret: str) -> str:
     d = r.json() if r.content else {}
     if r.status_code >= 400 or not d.get("access_token"):
         err = d.get("error") or r.status_code
-        raise BackupError("ربط جوجل درايف اتلغى أو انتهى، اربطه تاني من الإعدادات" if err == "invalid_grant" else f"جوجل رفض: {err}")
+        raise BackupError("أُلغي ربط جوجل درايف أو انتهى، اربطه مرة أخرى من الإعدادات" if err == "invalid_grant" else f"جوجل رفض: {err}")
     return d["access_token"]
 
 

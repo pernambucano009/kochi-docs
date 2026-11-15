@@ -144,6 +144,107 @@ def scan_py(rel: str):
                     yield seg.strip(), f"{rel}:{tok.start[0]}", kind
 
 
+# ---------------------------------------------------------------- رسايل السيرفر من الـ AST (الثوابت والنداءات اللي السطر لوحده مابيبينهاش)
+import ast  # noqa: E402
+
+UI_KEYS = {"note", "step", "error", "label", "title", "hint", "desc", "name", "msg", "why", "text", "detail", "what", "progress",
+           "level", "tips", "reply", "ar", "ph_ar", "title_ar", "sample_step", "status_text", "verdict_text", "where", "how", "summary",
+           "message", "reason", "toast", "idea", "hook", "about_ph", "sub", "done_title", "cta", "placeholder", "ph", "body", "uses", "steps"}
+UI_CALLS = re.compile(r"^(HTTPException|\w*Error|notify|step|gate|log_render|lab_step|tpl_mark|record|charge|reserve|refund|_issue|toast)$")
+# الثوابت اللي بترجع للواجهة (من تتبّع الـ endpoints والـ frontend). None = كله، {"key"} = مفاتيح بعينها، {0} = خانة في الـ tuple
+# ثوابت تانية في نفس الملفات برومبتات بس. brainquiz وtplbrief ليهم إنجليزي جوه الملف نفسه (ar/en و brief_en)
+UI_CONSTS = {
+    "fieldpacks.py": {"REGIONS": {1}, "DIALECT_OPTS": {1}, "GOALS": {1}, "DIALECT_PHRASE": None, "FIELDS": {"name", "hint", "about_ph", "title"}},
+    "algo.py": {"GAMES": None, "AXES": None, "PLAN_KINDS": None, "VERDICTS": None, "CHECKS": None, "PLAN_FIELDS": None},
+    "growth.py": {"KINDS": None}, "rivals.py": {"PLATFORMS": None}, "brainsrc.py": {"FIELDS": None, "SECTIONS": None},
+    "flow.py": {"FORMATS": None, "KNOW": None}, "dub.py": {"AR": None, "FOREIGN": None, "ELEVEN": None, "LIPSYNC": None},
+    "app.py": {k: None for k in ("MONTH_KINDS", "ASSET_KINDS", "SRC_KINDS", "CAPTION_LANGS", "PUSH_TEXT", "ALGO_WARN", "STORAGE_FULL_MSG", "STYLE_CATS", "AVATAR_MODELS")},
+    "typo.py": {"BUILTIN_STYLES": {"name"}, "STUDIO_KINDS": None, "COLLECTIONS": {"name", "note"}},
+    "lab.py": {"SCHEMA_ROLES": None, "CONNECTOR_FAMILIES": None, "TEXT_MODES": None, "VEDIT_MODELS": {"label"}},
+    "tplguide.py": {"GUIDE": None}, "adtpl.py": {"UGC_PLACES": None, "LOOKS": {0}, "CINEMA_LOOKS": {0}, "CINEMA_BEATS": None},
+    "twin.py": {"TIPS": None}, "livevoice.py": {"AGENT_NAMES": None}, "adsmgr.py": {"GOALS": None},
+}
+# ملفات مش بتوصل للعميل خالص (برومبتات أو أداة اختبار لصاحب المنصة)، أو ليها إنجليزي جوه الملف
+SKIP_PY = {"backend/ads.py", "backend/help.py", "backend/journey.py", "backend/brainquiz.py"}
+
+
+def _fname(f) -> str:
+    return f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else ""
+
+
+def _text(node) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value if isinstance(v, ast.Constant) else "${x}" for v in node.values)
+    return None
+
+
+def _is_ui(n, par, rel) -> bool:
+    cur, child, path = n, n, []   # path: (الأب، الابن) من تحت لفوق
+    while cur in par:
+        cur, child = par[cur], cur
+        path.append((cur, child))
+        if isinstance(cur, ast.Dict):
+            keys = {k.value for k in cur.keys if isinstance(k, ast.Constant)}
+            if "role" in keys or "content" in keys:
+                return False
+        elif isinstance(cur, ast.Call) and re.search(r"messages|prompt|system", _fname(cur.func), re.I):
+            return False
+        elif isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if cur.name.startswith("mock") or re.search(r"messages|prompt", cur.name):
+                return False
+            break
+        elif isinstance(cur, (ast.Assign, ast.AnnAssign)) and isinstance(par.get(cur), ast.Module):
+            tg = cur.targets[0] if isinstance(cur, ast.Assign) else cur.target
+            spec = UI_CONSTS.get(rel.split("/")[-1], {}).get(getattr(tg, "id", ""), False)
+            if spec is False:
+                return False
+            if spec is None:
+                return True
+            for p, c in path:
+                if isinstance(p, ast.Dict) and any(v is c and isinstance(k, ast.Constant) and k.value in spec for k, v in zip(p.keys, p.values)):
+                    return True
+                if isinstance(p, ast.Tuple) and c in p.elts and p.elts.index(c) in spec:
+                    return True
+                if isinstance(p, ast.Call) and _fname(p.func) == "_i" and c in p.args:   # أفكار المجال _i(العنوان، الفكرة، الهوك)
+                    return "title" in spec and p.args.index(c) == 0
+            return False
+    # جوه دالة: مفتاح واجهة، أو كلمة لنداء رسالة/خطأ/إشعار/خصم نقاط
+    for p, c in path:
+        if isinstance(p, ast.Dict) and any(v is c and isinstance(k, ast.Constant) and k.value in UI_KEYS for k, v in zip(p.keys, p.values)):
+            return True
+        if isinstance(p, ast.keyword) and p.arg in UI_KEYS:
+            return True
+        if isinstance(p, ast.Call) and UI_CALLS.match(_fname(p.func)) and c in p.args:
+            return True
+        if isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            break
+    return False
+
+
+def scan_py_ast(rel: str):
+    """جمل عربي بتوصل للعميل: ثابت بيرجع للواجهة، أو جوه دالة: قيمة مفتاح واجهة أو كلمة في نداء رسالة/خطأ/إشعار/خصم نقاط."""
+    if rel in SKIP_PY:
+        return
+    try:
+        tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+    except SyntaxError:
+        return
+    par = {}
+    for n in ast.walk(tree):
+        for c in ast.iter_child_nodes(n):
+            par[c] = n
+    for n in ast.walk(tree):
+        t = _text(n)
+        if t is None or not AR.search(t) or isinstance(par.get(n), (ast.JoinedStr, ast.Expr)) or len(t) > 400:
+            continue
+        if _is_ui(n, par, rel):
+            for p in pieces(t):
+                for seg in p.split("\n"):
+                    if AR.search(seg):
+                        yield seg.strip(), f"{rel}:{n.lineno}", "server"
+
 TPL_FIELD = re.compile(r'\b(label|hint|tip|name|about|story|group)\s*:\s*"([^"]*[ء-ي][^"]*)"')
 
 
@@ -177,6 +278,7 @@ def sources():
                 yield from scan_js(str(f.relative_to(ROOT)), "mobile")
     for f in sorted((ROOT / "backend").glob("*.py")):
         yield from scan_py(f"backend/{f.name}")
+        yield from scan_py_ast(f"backend/{f.name}")
     for f in sorted((ROOT / "library" / "motion" / "r").glob("*/reel.html")):
         yield from scan_template(str(f.relative_to(ROOT)))
 

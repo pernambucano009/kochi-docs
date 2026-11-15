@@ -48,7 +48,7 @@ def _err(resp: httpx.Response, what: str) -> FasihError:
         providers.note_error("fasih", f"quota/credit {resp.status_code} {code}")
         if os.environ.get("TENANT_ROLE") == "customer":
             return FasihError(providers.friendly("fasih"))
-    return FasihError(f"{what}: {hints.get(resp.status_code, 'فصيح فيه مشكلة دلوقتي')} ({resp.status_code}) {code[:200]}".strip())
+    return FasihError(f"{what}: {hints.get(resp.status_code, 'توجد مشكلة في خدمة الصوت الآن')} ({resp.status_code}) {code[:200]}".strip())
 
 
 def catalog(max_age: float = 86400) -> list[dict]:
@@ -136,7 +136,7 @@ def speak(text: str, voice: str, dialect: str, dest: Path) -> Path:
         try:
             return _speak_once(text, voice, dialect, dest)
         except _JobFailed as exc2:
-            raise FasihError(f"{exc2} — اتعادت مرتين وفشلت. جرّب صوت تاني أو غيّر صياغة الجملة") from exc
+            raise FasihError(f"{exc2} — أُعيدت مرتين وفشلت. جرّب صوتًا آخر أو غيّر صياغة الجملة") from exc
 
 
 class _JobFailed(FasihError):
@@ -146,10 +146,10 @@ class _JobFailed(FasihError):
 def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
     key = api_key()
     if not key:
-        raise FasihError("مفتاح فصيح مش متسجل: ضيف FASIH_API_KEY في ملف المفاتيح على السيرفر")
+        raise FasihError("مفتاح خدمة الصوت غير مسجل: أضف FASIH_API_KEY في ملف المفاتيح على السيرفر")
     text = (text or "").strip()
     if not text:
-        raise FasihError("مفيش كلام يتقال")
+        raise FasihError("لا يوجد كلام لقوله")
     head = {"x-api-key": key, "Content-Type": "application/json"}
     body = {"text": text[:5000], "voice": hd_voice(voice), "dialect": dialect}
     req_key = uuid.uuid4().hex   # نفس المفتاح لو بنعيد نفس الطلب، علشان مايتحسبش مرتين
@@ -160,7 +160,7 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
                 r = c.post(f"{HD}/generate-tts-v2", headers={**head, "Idempotency-Key": req_key}, json=body)
             except httpx.HTTPError:
                 if attempt == 2:
-                    raise FasihError("مش قادرين نوصل لفصيح دلوقتي")
+                    raise FasihError("تعذّر الوصول إلى خدمة الصوت الآن")
                 time.sleep(2 * (attempt + 1))
                 continue
             if r.status_code in (500, 502, 503, 504) and attempt < 2:
@@ -171,7 +171,7 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
             job = r.json().get("jobId")
             break
         if not job:
-            raise FasihError("فصيح مرجعش رقم مهمة")
+            raise FasihError("خدمة الصوت لم ترجع رقم مهمة")
         t0, misses = time.time(), 0
         while time.time() - t0 < 600:
             time.sleep(3)
@@ -182,7 +182,7 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
             if r is None or r.status_code in (500, 502, 503, 504):
                 misses += 1
                 if misses > 5:
-                    raise FasihError("فصيح مش بيرد على متابعة الصوت")
+                    raise FasihError("خدمة الصوت لا ترد على متابعة الصوت")
                 continue
             if r.status_code != 200:
                 raise _err(r, "متابعة الأصوات العربية")
@@ -191,10 +191,10 @@ def _speak_once(text: str, voice: str, dialect: str, dest: Path) -> Path:
             if st == "completed" and j.get("audio_url"):
                 a = c.get(j["audio_url"], timeout=120)   # رابط مؤقت: بيتنزّل على طول ويتحفظ عندنا
                 if a.status_code != 200 or len(a.content) < 200:
-                    raise FasihError("ملف الصوت من فصيح مانزلش")
+                    raise FasihError("لم يُنزَّل ملف الصوت من خدمة الصوت")
                 dest.write_bytes(a.content)
                 return dest
             if st in ("failed", "error", "cancelled", "canceled"):
                 why = j.get("error") or j.get("error_message") or j.get("message") or j.get("reason") or "الصوت فشل"
-                raise _JobFailed(f"فصيح: {why} (رقم المهمة {job}) · الجملة: «{text[:60]}»")
-        raise FasihError(f"فصيح اتأخر أكتر من 10 دقايق (رقم المهمة {job})")
+                raise _JobFailed(f"خدمة الصوت: {why} (رقم المهمة {job}) · الجملة: «{text[:60]}»")
+        raise FasihError(f"تأخرت خدمة الصوت أكثر من 10 دقائق (رقم المهمة {job})")

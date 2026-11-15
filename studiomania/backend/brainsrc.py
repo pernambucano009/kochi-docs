@@ -117,7 +117,7 @@ def safe_url(url: str) -> str:
         url = "https://" + url
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
-        raise ValueError("هذا الرابط غير مظبوط")
+        raise ValueError("هذا الرابط غير صحيح")
     try:
         for info in socket.getaddrinfo(u.hostname, None):
             ip = ipaddress.ip_address(info[4][0])

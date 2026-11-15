@@ -16213,7 +16213,7 @@ def run_lab_components(lid: str) -> None:
     keep = [c for c in old if (c.get("review") or {}).get("ok") is not None or c.get("asset")]
     rejected = [{"name": c["name"], "t0": c["t0"], "t1": c["t1"], "note": (c.get("review") or {}).get("note")}
                 for c in keep if (c.get("review") or {}).get("ok") is False] + (d.get("comp_lessons") or [])
-    lab_step(lid, "components", progress="يبحث عن الحتت الذي تنفع تُعاد")
+    lab_step(lid, "components", progress="يبحث عن الأجزاء التي تصلح لإعادة الاستخدام")
     raw = lab.mock_components(d) if atlas.mock_mode() else ad_json(series_chat(lab.components_messages(d, rejected)), "المكونات")
     ids = {e["id"] for s in d.get("shots") or [] for e in (s.get("analysis") or {}).get("elements") or []}
     bounds = sorted({x for s in d.get("shots") or [] if not s.get("ignored") for x in (s["start"], s["end"])})
@@ -22530,7 +22530,7 @@ def run_dub_render(did: str, dialect: str, lipsync: str | None, background: str,
         vcodec = ["-c:v", "copy"]
         if caps:
             # 🌍 الكابشن: كلام الدبلجة نفسه، أو مترجم للغة اللي اخترتها، في نفس وقت كل جملة
-            step("🔤 بيكتب الكابشن" + ("" if caps == "same" else f" ({CAPTION_LANGS[caps]})"))
+            step("🔤 يكتب الكابشن" + ("" if caps == "same" else f" ({CAPTION_LANGS[caps]})"))
             said = [(texts[i], sp) for i, sp in zip(range(len(lines)), spots) if files[i] and texts[i].strip()]
             cap_texts = [x[0] for x in said]
             if caps != "same" and cap_texts:
@@ -25667,7 +25667,7 @@ def vlab_say(j: dict, text: str, dialect: str, dest: Path) -> Path:
     elif p == "eleven":
         voicelab.eleven_say(text, j["voice"], raw)
     else:
-        raise voicelab.LabError("مزوّد مش معروف")
+        raise voicelab.LabError("مزوّد غير معروف")
     subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(raw), "-c:a", "libmp3lame", "-b:a", "128k", str(dest)],
                    check=True, capture_output=True, timeout=120)
     raw.unlink(missing_ok=True)
@@ -30809,7 +30809,7 @@ def auto_gen_images(bid: str, s: dict, ratio: str, run_id: str, report: list[str
         return []
     m = auto_img_model(o)
     if not m:
-        raise RuntimeError("لا يوجد نموذج صور متاح على Atlas الآن")
+        raise RuntimeError("لا يوجد نموذج صور متاح الآن")
     tmp = GENERATED_DIR / f"autoimg_{run_id}_{s['id']}"
     tmp.mkdir(parents=True, exist_ok=True)
     try:
@@ -31413,7 +31413,7 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
     ms = auto_gen_models()
     cand = next((m for m in ms if m["model"] == o.get("model")), None) or (ms[0] if ms else None)
     if not cand:
-        raise RuntimeError("لا يوجد نموذج توليد فيديو متاح على Atlas الآن")
+        raise RuntimeError("لا يوجد نموذج توليد فيديو متاح الآن")
     mode = cand.get("mode") or ("video" if cand.get("kind") == "edit" else "refs")
     if not prompt and mode != "lipsync":
         raise RuntimeError("خطوة «ولّد» بدون وصف")
@@ -35016,7 +35016,7 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
             suad_job(bid, status="done", progress=1, url=url, seen=False)
             suad_post(bid, f"الفيديو بتاعك جاهز 🎉 ({tname})", kind="video", url=url)
             suad_post(bid, "إيه رأيك فيه؟ قولّي بصراحة 😊", kind="ask", ask="feedback")
-            notify("suad", "ok", "🎬 الفيديو بتاعك جاهز", f"{suad_name(brain_row(bid) or {})[0]}: افتح الشات وقولّي رأيك", "home", cid)
+            notify("suad", "ok", "🎬 الفيديو جاهز", f"{suad_name(brain_row(bid) or {})[0]}: افتح الشات وقولّي رأيك", "home", cid)
             return
         if st == "failed":
             suad_job(bid, status="failed", progress=None)
@@ -35034,7 +35034,7 @@ def suad_dental_watch(bid: str, cid: str, tpl: str = SUAD_DENTAL_TPL) -> None:
                 issues.record("job", "/dental/first-call-video", "فيديو المكالمة الأولى فشل", raw=f"{cid}: {str(job.get('error') or '')[:600]}", screen="suad", ref=cid)
             except Exception:  # noqa: BLE001
                 pass
-            notify("suad", "error", "🎬 الفيديو اتأخر شوية", f"{suad_name(brain_row(bid) or {})[0]}: حصلت مشكلة عندنا وبنحلّها، وهبلغك أول ما الفيديو يجهز", "home", cid)
+            notify("suad", "error", "🎬 تأخر الفيديو قليلًا", f"{suad_name(brain_row(bid) or {})[0]}: حدثت مشكلة لدينا ونعمل على حلها، وسأبلغك فور جاهزية الفيديو", "home", cid)
             return
         if st == "needs":
             miss = "، ".join(next((x["name"] for x in dental.SHOTS if x["slot"] == m), m) for m in job.get("missing") or [])
@@ -35094,7 +35094,7 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
     except ValueError as e:
         raise HTTPException(400, str(e))
     tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == tpl), "")
-    suad_job(bid, title=f"بنعمل فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False, tpl=tpl)
+    suad_job(bid, title=f"نصنع فيديو حالتك ({tname})…", status="working", progress=.05, cid=cid, seen=False, tpl=tpl)
     threading.Thread(target=suad_dental_watch, args=(bid, cid, tpl), daemon=True).start()
     return {"ok": True, "cid": cid}
 

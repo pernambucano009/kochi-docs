@@ -62,7 +62,7 @@ def body_prompt(hero: dict) -> str:
 # ---------------------------------------------------------------- 📱 UGC (skill «ugc»): ١٥ ثانية، ٤ نبضات، الكاميرا الأمامية والخلفية
 UGC_PLACES = {
     "bathroom": "حمام، الصبح (سكين كير وتجهيز)", "car": "عربية راكنة، كرسي السواق (نص على السريع)",
-    "kitchen": "مطبخ، ضوء النهار (روتين ونصيحة صادقة)", "bedroom": "أوضة نوم، بالليل (دافي وصادق)",
+    "kitchen": "مطبخ، ضوء النهار (روتين ونصيحة صادقة)", "bedroom": "غرفة نوم، ليلًا (دافئ وصادق)",
     "desk": "مكتب في البيت (عمل وإنتاجية)", "street": "شارع أو كافيه خارج (حركة وطاقة)",
 }
 UGC_BEATS = [("0-3s", "Opener"), ("3-7s", "Use"), ("7-11s", "Result"), ("11-15s", "Verdict")]
@@ -114,7 +114,7 @@ CINEMA_LOOKS = {   # الشكل ← (اسم عربي، سطر الكاميرا �
     "narrative": ("حياة حقيقية: شوارع ويوت وعربيات", "wide-latitude cinema capture, vintage 2x anamorphic character at a wide aperture - oval bokeh, "
                   "soft frame-edge falloff - light diffusion bloom softening highlights, handheld with natural operator breath, color-negative daylight "
                   "film rendition with fine 35mm grain, teal-amber grade, shallow depth of field, 24fps 180-degree shutter"),
-    "studio": ("استوديو وموضة: نضيف ومتصمّم", "wide-latitude cinema capture, clean spherical lens character at a wide aperture - natural round bokeh, "
+    "studio": ("استوديو وموضة: نظيف ومصمَّم", "wide-latitude cinema capture, clean spherical lens character at a wide aperture - natural round bokeh, "
                "even sharpness - mild diffusion bloom, locked tripod with an optional slow push-in, saturated editorial grade, fine grain, "
                "warm-retained blacks, 24fps 180-degree shutter"),
     "action": ("أكشن وطاقة: حركة وتراب وسرعة", "wide-latitude cinema capture, vintage 2x anamorphic character at a wide aperture - oval bokeh, soft edge "

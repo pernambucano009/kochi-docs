@@ -218,7 +218,7 @@ def create(recipe: str, account: dict, name: str, o: dict) -> dict:
     made = _req("POST", "/workflows", "عمل البوت", body=body)
     wid = ((made or {}).get("workflow") or {}).get("id")
     if not wid:
-        raise publisher.PublishError(f"Zernio مارجعش رقم البوت: {str(made)[:200]}")
+        raise publisher.PublishError(f"لم يرجع رقم البوت: {str(made)[:200]}")
     _req("POST", f"/workflows/{wid}/activate", "تشغيل البوت")
     return {"id": wid, "key": key}
 
