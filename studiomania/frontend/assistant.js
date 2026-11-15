@@ -259,8 +259,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "show_card") { if (args.kind === "analysis") { S.anaShown = true; S.anaChars = 0; } return card(args.kind); }
     if (name === "suggest_competitor") {
       // 📋 الترتيب ثابت: تحليل الصفحة الأول (تتكلم عنه فعلًا)، وبعده المنافس آخر حاجة
-      if (S.anaShown && (S.anaChars || 0) < 150) { lg("sys", "competitor refused: analysis not presented yet");
-        return { ok: false, error: "Not yet: present the page analysis card that is on the screen first (3–4 short sentences: their best posts and why they worked, posting rate, and one or two improvements). Only after that call suggest_competitor. The competitor is the LAST stop." }; }
+      if (S.anaShown && (S.anaChars || 0) < 380) { lg("sys", "competitor refused: analysis not presented yet");
+        return { ok: false, error: "Not yet: you have not really presented their page analysis. Present it now from the card on the screen, warmly and concretely, in 4–5 short sentences with real numbers: their followers and usual views, their best post (what it is about, its views, and why it worked), what is good in their content, then one or two clear improvements (posting rhythm, bio, first seconds). Only after that call suggest_competitor. The competitor is the LAST stop." }; }
       chip(`🔎 <span><b>نبحث عن منافس في مجالك ومنطقتك…</b></span>`);
       const p = api("/api/assistant/rival/suggest", { method: "POST", ...jsonBody({}) }).catch((e) => ({ ok: false, error: e.message }));
       // ⏳ البحث ساعات بياخد أكتر من دقيقة: المكالمة ماتسكتش. بعد ١٠ ثواني نورة تكمل المحطة اللي بعدها، والكارت يظهر لما يجهز
