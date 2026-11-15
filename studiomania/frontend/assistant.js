@@ -199,6 +199,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   }
 
   async function tool(name, args) {
+    if (S && name !== "not_an_answer") S.nudged = 0;
     if (name === "save_answer") {
       const r = await api("/api/assistant/answer", { method: "POST", ...jsonBody({ qid: args.qid, answer: args.answer || "" }) }).catch((e) => ({ ok: false, error: e.message }));
       if (r.ok) { S.saved++; S.wait = null; changed(); step(String(args.qid || "").replace(/[^a-z_]/g, "")); chip(`✓ <span><b>${esc(QNAME[args.qid] || args.qid)}</b><br>${esc(String(args.answer || "").slice(0, 90))}</span>`); }
@@ -850,7 +851,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
             // بتستنى بهدوء بس لو طلبت حاجة وخانتها ظاهرة فعلًا قدام العميل (الأداة لوحدها من غير ما تطلبها بالكلام مش انتظار)
             // سؤال في آخر جملتين من ردها: تستنى العميل. جملة عادية في الآخر («خلينا نبدأ خطوة بخطوة») = تكمّل هي بالسؤال
             const tail = sentences(S.aBuf).slice(-2);
-            S.lastQ = isQ(last) || tail.some((x) => /[؟?]/.test(x) || isQ(x)) || (!!S.wait && !!(q(".as-box") || S.acct));
+            S.lastQ = /[؟?]/.test(S.aBuf || "") || isQ(last) || tail.some((x) => isQ(x)) || (!!S.wait && !!(q(".as-box") || S.acct));
             nudge(Math.max(1800, S.aBuf.length * 75 + 1200)); status();
           }
           if (!r.msg) { S.thinking = false; status(); }
@@ -904,7 +905,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     { const busyNow = (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")), t = performance.now();
       if (busyNow) S.quietAt = t;
       // بتظهر بس لما فيه رد مطلوب من العميل: سؤال، أو مربع، أو هي سكتت بعد جملة ومش هتكمّل لوحدها
-      const waitingUser = S.lastQ !== false || (S.nudged || 0) >= 2 || !!S.acct || !!(S.wait && q(".as-box"));
+      const waitingUser = S.lastQ === true || !!S.acct || !!(S.wait && q(".as-box"));   // سؤال فعلًا أو خانة طالبة حاجة؛ غير كده مخفية (حتى أول المكالمة)
       ov?.classList.toggle("as-quiet", busyNow || (S.quietAt && t - S.quietAt < 1000) || !waitingUser || !!S.finishing); }
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور

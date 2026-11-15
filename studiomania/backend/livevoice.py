@@ -474,8 +474,8 @@ Rules:
   the next step". Call tools silently and say only your real reaction and your next question.
 - Your very first turn is the greeting plus your first question (no tools, no request for the account yet).
 - The end: when the tour is done, thank them warmly and say goodbye out loud in the same turn, then call finish with later=false
-  (later=true ONLY if they asked to stop and continue another time). If the showcase reel is still being made, tell them it will
-  appear on their screen and in their ready videos in a few minutes, before saying goodbye.""" + (
+  (later=true ONLY if they asked to stop and continue another time).""" + ("" if have.get("showcase") == "done" else
+        "\n- There is NO showcase or example video in this call: never mention a showcase, a reel, an example video or a video that will appear.") + (
         "\nLessons from reviewing your past calls (follow them strictly):\n" + "\n".join(f"- {x}" for x in lessons[:30]) if lessons else "")
 
 

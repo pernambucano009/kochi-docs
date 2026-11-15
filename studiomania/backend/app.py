@@ -33326,7 +33326,9 @@ def assistant_token(request: Request, body: AssistTokenIn | None = None):
     ms = livevoice.models()["openai"]["models"]
     model = os.environ.get("LIVE_MODEL") or next((m for m in ms if livevoice.tier(m) == pick), ms[0])
     try:
-        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", [t for t in livevoice.TOOLS if t["name"] in livevoice.HELP_TOOLS] + livevoice.HELP_TOOL_DEFS if helper else livevoice.TOOLS, lang=livevoice.stt_lang(dia),
+        tok = livevoice.openai_secret(model, ASSIST_VOICE[ag], instr, "auto", [t for t in livevoice.TOOLS if t["name"] in livevoice.HELP_TOOLS] + livevoice.HELP_TOOL_DEFS if helper else
+                                      # 🎬 السيناريو معروف: مفيش فيديو استعراضي جاهز ← مفيش محطة ولا أدوات ليه (ماتوعدش بيه)
+                                      [t for t in livevoice.TOOLS if have.get("showcase") == "done" or t["name"] not in ("get_showcase", "play_showcase")], lang=livevoice.stt_lang(dia),
                                       hint=livevoice.stt_hint(dia, who, first_brand_name(b) if b else ""))
     except livevoice.LiveError as exc:
         issues.record("api", "assistant/token", "المساعد الصوتي لم يبدأ", str(exc), 400)
