@@ -217,7 +217,7 @@ const BrandPage = (() => {
     S.ex = ex;
     const list = branches(b), nodes = [{ id: "c", kind: "center", x: 0, y: 0 }];
     // «ضيف للعقل بكويز» البرتقاني فوق المخ. (نقطة «أضف للعقل» اتشالت: الإضافة بقت جوه كل فرع)
-    nodes.push({ id: "quiz", kind: "quiz", x: 0, y: -206, from: "c" });
+    nodes.push({ id: "quiz", kind: "quiz", x: 0, y: -206, from: "c", hidden: true });   // 🟠 نورة بقت في الدايرة البرتقالي تحت يمين (نفس مكانها في كل الصفحات) ومربوطة بالعقل بحبل (help.js)
     list.forEach((br, i) => {
       // نص الفروع يمين ونصها شمال، وفوق المخ وتحته فاضيين دايمًا للكويز و«+» (حتى لو عدد الفروع فردي)
       const nr = Math.ceil(list.length / 2), nl = list.length - nr;
@@ -1206,7 +1206,7 @@ const BrandPage = (() => {
       if (td) return save(() => bAPI(`/todos/${td.dataset.tdone}`, { method: "PATCH", ...jsonBody({ done: !!td.dataset.v }) }));
       const tdl = t.closest("[data-tdel]");
       if (tdl) { if ((await uiConfirm("أتزيل هذه النقطة؟"))) { openCard(null); save(() => bAPI(`/todos/${tdl.dataset.tdel}`, { method: "DELETE" })); } return; }
-      if (t.closest("[data-socialgo]")) { openCard(null); if (typeof Assistant !== "undefined") Assistant.open(S.el.querySelector('[data-n="quiz"]')); return; }   // حساب التواصل بيتاخد في المكالمة
+      if (t.closest("[data-socialgo]")) { openCard(null); if (typeof Assistant !== "undefined") Assistant.open(document.querySelector(".hp-fab")); return; }   // حساب التواصل بيتاخد في المكالمة
       const itg = t.closest("[data-itgt]");
       if (itg) { if (S.imgTarget) S.imgTarget.t = itg.dataset.itgt; S.el.querySelectorAll(".bm-card [data-itgt]").forEach((x) => x.classList.toggle("on", x === itg)); return; }
       const bk = t.closest("[data-back]");

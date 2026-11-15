@@ -99,7 +99,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function grow(open, root = ov) {
     const o = root?.querySelector(".as-orb"), disc = root?.querySelector(".as-disc"), cv = root?.querySelector("canvas");
     if (!o) return null;
-    const dot = from?.querySelector?.(":scope > i") || from;   // الدايرة نفسها، مش الزرار كله (اللي تحته الاسم)
+    const dot = from?.querySelector?.(":scope > i, :scope > .dot") || from;   // الدايرة نفسها، مش الزرار كله (اللي تحته الاسم)
     const t = o.getBoundingClientRect(), f = dot?.isConnected && dot.getBoundingClientRect(), vis = f && f.width && f.bottom > 0 && f.top < innerHeight;
     const fx = vis ? f.left + f.width / 2 : innerWidth / 2, fy = vis ? f.top + f.height / 2 : innerHeight / 2, fs = (vis ? f.width : 48) / (t.width * 0.84);
     const small = `translate(${fx - (t.left + t.width / 2)}px,${fy - (t.top + t.height / 2)}px) scale(${fs})`;
@@ -722,9 +722,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     ["input", "pointerdown", "change"].forEach((ev) => ov.addEventListener(ev, () => { if (S) { S.lastAct = performance.now(); S.idleN = 0; } }, true));   // بيكتب أو بيختار حاجة: مش ساكت
     // خرج من صفحة العقل والمكالمة شغالة (للرئيسية مثلًا): المكالمة بتقفل (نص ثانية سماح عشان إعادة رسم الخريطة)
     if (dock) {
-      let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false, true); } }, 400);
+      let away = 0; S.pageT = setInterval(() => { away = onBrain() ? 0 : away + 1; if (away >= 2 && S) { lg("sys", "left brain page"); end(false, false); } }, 400);
       // ضغطة «رجوع» أو التسلسل أو اللوجو: المكالمة تقفل مع الضغطة نفسها (قبل ما الصفحة تبدأ تتحرك)
-      S.leave = (e) => { if (S && e.target.closest?.("#nhGoBack, #nhCrumbs [data-crumb], #nhBar .nh-logo")) { lg("sys", "left brain page (click)"); end(false, true); } };
+      S.leave = (e) => { if (S && e.target.closest?.("#nhGoBack, #nhCrumbs [data-crumb], #nhBar .nh-logo")) { lg("sys", "left brain page (click)"); end(false, false); } };
       document.addEventListener("click", S.leave, true);
       // الصفحة اتغيّرت (زرار «رجوع» أو الرئيسية): المكالمة تقفل في نفس اللحظة قبل ما الصفحة الجديدة ترسم نفسها
       S.onHash = () => { if (S && !/^#brand/.test(location.hash)) { lg("sys", "left brain page"); end(false, true); } };
@@ -997,7 +997,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   async function end(finished, instant = false) {
     if (!S) return;
     const s = S; S = null;
-    if (instant) close(true);   // خرج من صفحة العقل: الكرة تختفي في نفس اللحظة (كانت بتستنى حساب التكلفة فتفضل متعلّقة فوق الرئيسية وهي بتتحرك)
+    const closeP = close(instant);   // الكرة بترجع لمكانها تحت يمين على طول (مش بعد حساب التكلفة)   // خرج من صفحة العقل: الكرة تختفي في نفس اللحظة (كانت بتستنى حساب التكلفة فتفضل متعلّقة فوق الرئيسية وهي بتتحرك)
     removeEventListener("hashchange", s.onHash);
     if (s.demoAfter) setTimeout(async () => {   // 🎬 فيديو الأسنان الجاهز في نص الشاشة بعد ما المكالمة تقفل
       const r = await api("/api/suad/demo", { method: "POST" }).catch(() => null);
@@ -1016,7 +1016,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (finished || s.saved >= 3) await api("/api/assistant/done", { method: "POST", ...jsonBody({}) }).catch(() => {});
     // التأجيل لنفس العلامة بس: حساب جديد على نفس المتصفح (أو علامة تانية) المساعدة بتطلعله عادي
     else try { localStorage.setItem(SKIP_KEY, JSON.stringify({ b: state?.brand || "", t: Date.now() })); } catch { /* التخزين مقفول */ }
-    await close(instant);
+    await closeP;
     if (typeof NH !== "undefined") NH?.refresh?.();
     S_done?.();
   }
@@ -1048,13 +1048,14 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // 🧠 صفحة العقل لسه مفتوحة؟ المكالمة بتاعتها: لو العميل خرج منها قبل ما تفتح أو وهي شغالة، المكالمة ماتكملش في صفحة تانية
   const onBrain = () => { const m = document.querySelector("#nh .bm"); return !!m && m.isConnected && m.offsetParent !== null; };
   async function run(force, el) {
-    const fromBrain = !!(el || document.querySelector('[data-n="quiz"]'))?.closest?.(".bm");
+    const fromBrain = onBrain() || !!el?.closest?.(".bm");
     if (!(await gate(force))) return false;
     testOnce = true;   // حساب التجربة: مرة واحدة في كل دخول
     if (fromBrain && !onBrain()) return false;   // ضغط على سعاد وخرج من العقل قبل ما تفتح
     calm = !!el?.classList?.contains("fu-call") || document.body.classList.contains("fu-cine");
-    from = el || document.querySelector('[data-n="quiz"]');
-    dock = !!from?.closest?.(".bm");   // مفتوح من خريطة العقل
+    // الكرة بتطلع من دايرة نورة تحت يمين (نفس مكانها في كل الصفحات) وبترجعلها لما المكالمة تخلص
+    from = el && !el.classList?.contains("hp-fab") && !el.closest?.(".hp-fab") ? el : (document.querySelector(".hp-fab") || el);
+    dock = onBrain() || !!from?.closest?.(".bm");   // في صفحة العقل: المكالمة على الجنب والعقل باين
     await new Promise((res) => { S_done = res; call(); });
     return true;
   }

@@ -16,6 +16,8 @@ const Help = (() => {
 @keyframes hpPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 .hp-tease{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom,0px));right:calc(22px + env(safe-area-inset-right,0px));z-index:80;display:flex;align-items:center;gap:4px;max-width:min(320px,calc(100vw - 40px));background:var(--card,#fff);color:var(--nh-ink, var(--text, #181718));border-radius:18px 18px 6px 18px;box-shadow:0 14px 34px -14px rgba(24,23,24,.45);padding:4px 4px 4px 6px;direction:rtl;animation:hpIn .35s ease}
 .hp-tease[hidden]{display:none}
+.hp-rope{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:79;overflow:visible;opacity:0;transition:opacity .45s ease}
+.hp-rope.on{opacity:1}.hp-rope path{fill:none;stroke:${OR};stroke-opacity:.45;stroke-width:1.6;stroke-dasharray:2 6;stroke-linecap:round}
 .hp-tease button{border:0;background:none;font:inherit;color:inherit;cursor:pointer}
 .hp-tease [data-hpt]{font-size:13px;padding:8px 10px;text-align:start;line-height:1.5}
 .hp-tease [data-hpt]:hover{color:${OR}}
@@ -193,12 +195,35 @@ const Help = (() => {
     if (on) setTimeout(() => document.querySelector(".hp-in textarea")?.focus(), 30);
   }
   function seenJob() { if (S.job) { S.job.seen = true; api("/api/suad/job/seen", { method: "POST" }).catch(() => {}); drawJob(); } }
+  // 🧠 صفحة العقل: الدايرة تحت يمين هي نفسها مدخل المكالمة («املأ العقل مع نورة»)، ومربوطة بالعقل بحبل
+  const onBrain = () => { const m = document.querySelector("#nh .bm"); return !!m && m.isConnected && m.offsetParent !== null; };
   function tease() {
     const t = document.querySelector(".hp-tease");
     if (!t) return;
-    const k = pageKey(), show = !S.open && k !== "home" && k !== "create" && S.closed !== k && !!S.names[k];
-    t.hidden = !show;
-    if (show) t.querySelector("[data-hpt]").textContent = `اشرح لي «${pageName(k)}»`;
+    const k = pageKey(), brain = onBrain() && typeof Assistant !== "undefined";
+    const call = document.body.classList.contains("as-docked") || !!document.querySelector(".as-ov");
+    const show = !S.open && !(brain && call) && (brain || (k !== "home" && k !== "create" && S.closed !== k && !!S.names[k]));
+    t.hidden = !show; t.dataset.brain = brain ? "1" : "";
+    if (show) t.querySelector("[data-hpt]").textContent = brain ? `املأ العقل مع ${nm()}` : `اشرح لي «${pageName(k)}»`;
+    t.querySelector("[data-hptx]").hidden = brain;
+  }
+  // الحبل: خط ناعم من العقل للدايرة (بيتحرك مع العقل لو اتزق أو اتقرّب)، وبيختفي وقت المكالمة
+  function rope() {
+    let svg = document.querySelector(".hp-rope");
+    if (!svg) { svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("class", "hp-rope"); svg.setAttribute("aria-hidden", "true");
+      svg.innerHTML = '<path/>'; document.body.appendChild(svg); }
+    const fab = document.querySelector(".hp-fab"), c = document.querySelector("#nh .bm .bm-center");
+    const on = onBrain() && !!fab && !!c && !S.open && !document.body.classList.contains("as-docked") && fab.style.visibility !== "hidden";
+    svg.classList.toggle("on", on);
+    if (on) {
+      const a = c.getBoundingClientRect(), d = (fab.querySelector(".dot") || fab).getBoundingClientRect();
+      const x1 = a.left + a.width / 2, y1 = a.top + a.height / 2, x2 = d.left + d.width / 2, y2 = d.top + d.height / 2;
+      const r1 = a.width / 2 + 6, r2 = d.width / 2 + 6, L = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+      const p0 = [x1 + ux * r1, y1 + uy * r1], p3 = [x2 - ux * r2, y2 - uy * r2], sag = Math.min(120, L * .18);
+      const c1 = [p0[0] + (p3[0] - p0[0]) * .35, p0[1] + (p3[1] - p0[1]) * .35 + sag], c2 = [p0[0] + (p3[0] - p0[0]) * .75, p0[1] + (p3[1] - p0[1]) * .75 + sag * .6];
+      svg.firstChild.setAttribute("d", `M${p0[0].toFixed(1)} ${p0[1].toFixed(1)}C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p3[0].toFixed(1)} ${p3[1].toFixed(1)}`);
+    }
+    requestAnimationFrame(rope);
   }
   const askBtn = (key, name) => `<button type="button" class="nh-ask" data-hpask="${esc(key)}">${ICON_Q}اشرح لي «${esc(name)}»</button>`;
   function mount() {
@@ -223,6 +248,7 @@ const Help = (() => {
     t.innerHTML = `<button type="button" data-hpt></button><button type="button" data-hptx aria-label="إخفاء">✕</button>`;
     t.addEventListener("click", (e) => {
       if (e.target.closest("[data-hptx]")) { S.closed = pageKey(); return tease(); }
+      if (t.dataset.brain && typeof Assistant !== "undefined") { t.hidden = true; return Assistant.open(fab); }   // «املأ العقل مع نورة»
       toggle(true); ask(`اشرح لي «${pageName(pageKey())}»`);
     });
     const job = document.createElement("div");
@@ -231,8 +257,9 @@ const Help = (() => {
     job.addEventListener("click", (e) => { if (e.target.closest("[data-hpjob]")) { seenJob(); toggle(true); } });
     document.body.append(fab, box, t, job);
     let last = "";
-    setInterval(() => { const k = pageKey(); if (k !== last) { last = k; if (S.closed && S.closed !== k) S.closed = null; tease(); draw(); } }, 700);
-    fab.addEventListener("click", () => toggle());
+    setInterval(() => { const k = pageKey() + (onBrain() ? "|b" : "") + (document.body.classList.contains("as-docked") || document.querySelector(".as-ov") ? "|c" : ""); if (k !== last) { last = k; if (S.closed && S.closed !== pageKey()) S.closed = null; tease(); draw(); } }, 700);
+    fab.addEventListener("click", () => { if (!S.open && onBrain() && typeof Assistant !== "undefined") { document.querySelector(".hp-tease").hidden = true; return Assistant.open(fab); } toggle(); });   // في العقل: الدايرة بتفتح المكالمة
+    requestAnimationFrame(rope);
     box.addEventListener("click", (e) => {
       if (e.target.closest("[data-hpx]")) return toggle(false);
       if (e.target.closest("[data-hpsub]")) { toggle(false); return window.NHNav?.("plans"); }
