@@ -3215,7 +3215,7 @@ html:not([data-role="customer"]) .cust-only { display: none !important; }   /* �
 html[dir="rtl"] :is(.en-k, .set-k, .pub-k, .mt-k) { display: none !important; }
 
 /* 🌐 زرار اللغة لصاحب المنصة فقط لحد ما الترجمة الإنجليزية تكتمل (يظهر بعد ما نعرف نوع الحساب، فمش بيظهر ويختفي) */
-:root:not([data-role="admin"]) #nhLang, :root:not([data-role="admin"]) #langToggle, :root:not([data-role="admin"]) .admin-lang, :root:not([data-role="admin"]) .admin-lang-t { display: none !important; }
+/* زرار اللغة واختيار اللغة في الإعدادات ظاهرين للكل (كانوا للأدمن بس) */
 :root[data-role="admin"] .cust-lang-t { display: none; }
 /* 🎧 مختبر الأصوات: الزرار البرتقالي بحجمه (مش ممدود على عرض النافذة)، ولما تقف عليه مابيطلّعش شريط تمرير فالنافذة ماتتهزش */
 .vl-box{overflow-x:hidden}
