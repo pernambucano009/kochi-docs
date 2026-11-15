@@ -29,7 +29,7 @@ const Assistant = (() => {
 .as-chip{display:flex;gap:8px;align-items:center;padding:9px 13px;border-radius:14px;background:rgba(127,127,127,.16);font-size:13px;line-height:1.5;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);animation:asIn .5s cubic-bezier(.2,1.3,.3,1)}
 .as-chip b{color:#E5613E;font-weight:600}@keyframes asIn{from{opacity:0;transform:translateX(30px) scale(.9)}}
-.as-ov.as-quiet .as-type{visibility:hidden;opacity:0}.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
+.as-type{transition:opacity .35s ease,visibility .35s}.as-ov.as-quiet .as-type{visibility:hidden;opacity:0}.as-type{display:flex;gap:8px}.as-type input{width:min(60vw,360px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 .as-box{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 18px;border-radius:20px;background:rgba(127,127,127,.14);
   border:1px solid rgba(127,127,127,.25);max-width:min(92vw,460px);animation:asUp .5s cubic-bezier(.2,1.1,.3,1)}
 .as-box b{font-size:14.5px}.as-box .as-err{margin:0;min-height:0}.as-box .as-err:empty{display:none}.as-box .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -863,7 +863,10 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const what = S.speaking ? "تتحدث" : S.show && !S.show.wait ? "📺 يُعرض الفيديو" : S.thinking ? "لحظة…" : S.muted ? "الميكروفون مكتوم: اكتب ردك أو شغّله" : S.lastQ ? "في انتظار ردك" : "";
     st.textContent = S.agent + (what ? ` · ${what}` : "") + (S.accTimer ? " · ⏳ حسابك قيد التحليل" : "");
     // ✍️ خانة الكتابة بتختفي وهي بتتكلم أو بتفكر (كانت بتلخبط: «اكتب هنا» وهي لسه بتجهّز)، إلا لو هي طالبة حاجة تتكتب
-    ov?.classList.toggle("as-quiet", (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")));
+    // خانة الكتابة: بتختفي على طول لما تبدأ تتكلم، بس مابترجعش غير بعد ما تسكت ثانية كاملة (كانت بتنور وتطفي مع كل سكتة صغيرة بين الجمل)
+    { const busyNow = (S.speaking || S.thinking || !!S.show) && !S.acct && !(S.wait && q(".as-box")), t = performance.now();
+      if (busyNow) S.quietAt = t;
+      ov?.classList.toggle("as-quiet", busyNow || (S.quietAt && t - S.quietAt < 1000)); }
   }
   // 📊 فاضل قد إيه: الحساب ← أسئلة العقل ← الشعار ← الصور
   function step(id) { if (!S || !S.steps.includes(id)) return; S.done.add(id); prog(); quizMode(); }
