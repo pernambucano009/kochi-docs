@@ -11205,7 +11205,7 @@ def testrec_state(request: Request):
 @app.post("/api/testrec/upload")
 async def testrec_upload(request: Request, file: UploadFile = File(...)):
     if not testrec_on(request):
-        raise HTTPException(403, "مش حساب تجربة")
+        raise HTTPException(403, "ليس حساب تجربة")
     TESTREC_DIR.mkdir(parents=True, exist_ok=True)
     name = datetime.now().strftime("%Y%m%d-%H%M%S") + (Path(file.filename or "").suffix.lower() or ".webm")
     with open(TESTREC_DIR / name, "wb") as f:
@@ -11348,7 +11348,7 @@ def suad_reply(bid: str, page: str, lang: str) -> str:
             return atlas.chat(msgs, model, temperature=0.4, max_tokens=600, timeout=45).strip()
         except (atlas.AtlasError, httpx.HTTPError) as exc:
             print(f"[suad] {model}: {str(exc)[:160]}", flush=True)
-    raise HTTPException(502, "مش قادرة أرد دلوقتي، جرّب بعد شوية")
+    raise HTTPException(502, "تعذّر الرد الآن، حاول بعد قليل")
 
 
 def suad_after_feedback(bid: str) -> bool:
@@ -11366,7 +11366,7 @@ def suad_msg(body: SuadIn, request: Request):
         raise HTTPException(400, "اكتب رسالتك")
     day = datetime.now(timezone.utc).date().isoformat()
     if HELP_DAY.get(day, 0) >= HELP_LIMIT:
-        raise HTTPException(429, "وصلت لحد الرسايل النهارده. جرّب بكرة")
+        raise HTTPException(429, "بلغت حد الرسائل اليوم. حاول غدًا")
     if day not in HELP_DAY:
         HELP_DAY.clear()
     HELP_DAY[day] = HELP_DAY.get(day, 0) + 1
@@ -11389,14 +11389,14 @@ def suad_msg(body: SuadIn, request: Request):
 async def suad_photo(file: UploadFile = File(...), text: str = Form("")):
     bid = active_client_id()
     if not bid:
-        raise HTTPException(400, "مفيش علامة")
+        raise HTTPException(400, "لا توجد علامة")
     ext = Path(file.filename or "").suffix.lower()
     if ext not in (".jpg", ".jpeg", ".png", ".webp", ".heic"):
-        raise HTTPException(400, "ابعت صورة (jpg أو png)")
+        raise HTTPException(400, "أرسل صورة (jpg أو png)")
     name = uuid.uuid4().hex[:12] + ext
     data = await file.read()
     if len(data) > 25 * 1024 * 1024:
-        raise HTTPException(413, "الصورة كبيرة قوي")
+        raise HTTPException(413, "الصورة كبيرة جدًا")
     (suad_dir(bid) / "files").mkdir(exist_ok=True)
     (suad_dir(bid) / "files" / name).write_bytes(data)
     m = suad_post(bid, text.strip()[:500], role="user", kind="image", url=f"/media/suad/{Path(bid).name}/{name}")
@@ -35079,7 +35079,7 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
     dental_on()
     bid = active_client_id()
     if not bid:
-        raise HTTPException(400, "مفيش علامة")
+        raise HTTPException(400, "لا توجد علامة")
     slots = {}
     for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face),
                  ("before_smile", before_smile), ("after_face", after_face)):   # غير الريتراكتور كله اختياري

@@ -78,7 +78,7 @@ const Help = (() => {
   function msgHTML(m) {
     const me = m.role === "user";
     if (m.kind === "cta") {
-      return `<div class="hp-cta" data-no-i18n><span>${esc(m.text || "لو عجبك، اشترك وأنا هعملك فيديوهات زي دي بحالاتك إنت بانتظام، وهكون معاك في كل خطوة (وكمان تقدر تكلمني صوت في أي وقت).")}</span>
+      return `<div class="hp-cta" data-no-i18n><span>${esc(m.text || (window.I18N?.t || String)("إن أعجبك، اشترك وسأصنع لك فيديوهات مثله من حالاتك بانتظام، وسأكون معك في كل خطوة (ويمكنك أيضًا مكالمتي صوتيًا في أي وقت)."))}</span>
         <button type="button" data-hpsub>اشترك الآن</button></div>`;
     }
     const media = m.kind === "image" && m.url ? `<img src="${esc(m.url)}" alt="" loading="lazy">`
@@ -101,7 +101,7 @@ const Help = (() => {
     call.setAttribute("aria-disabled", S.paid ? "false" : "true");
     call.title = S.paid ? `كلّم ${nm()}` : "المكالمة الصوتية للمشتركين";
     const k = pageKey();
-    const first = [{ role: "assistant", text: `أهلًا، أنا ${nm()} 👋 مساعدتك هنا في كل حاجة. اكتبلي، أو ابعتلي صورة، أو اسألني عن أي صفحة.` }];
+    const first = [{ role: "assistant", text: `أهلًا، أنا ${nm()} 👋 مساعدتك هنا في كل شيء. اكتب لي، أو أرسل صورة، أو اسألني عن أي صفحة.` }];
     box.querySelector(".hp-log").innerHTML = (S.msgs.length ? S.msgs : first).map(msgHTML).join("") + (S.busy ? `<div class="hp-m ai">…</div>` : "");
     box.querySelector(".hp-sug").innerHTML = [`اشرح لي «${pageName(k)}»`, ...(S.msgs.some((m) => m.role === "user") ? ["أرسلها للدعم"] : [])]
       .map((t) => `<button type="button" data-hpq="${esc(t)}">${esc(t)}</button>`).join("");
@@ -119,8 +119,8 @@ const Help = (() => {
     if (!on) return;
     const done = j.status === "done";
     el.classList.toggle("done", done);
-    el.querySelector(".tx b").textContent = done ? (j.done_title || "الفيديو بتاعك جاهز 🎉") : (j.title || "بنعمل الفيديو بتاعك…");
-    el.querySelector(".tx small").textContent = done ? `هتلاقيه عند ${nm()} تحت على اليمين` : (j.sub || "خليك هنا لو تحب، ولو خرجت هيجيلك إشعار أول ما يخلص");
+    el.querySelector(".tx b").textContent = done ? (j.done_title || "الفيديو جاهز 🎉") : (j.title || "نصنع الفيديو…");
+    el.querySelector(".tx small").textContent = done ? `ستجده عند ${nm()} أسفل اليمين` : (j.sub || "ابقَ هنا إن أردت، وإن خرجت فسيصلك إشعار فور انتهائه");
     el.querySelector("[data-hpjob]").hidden = !done;
     const i = el.querySelector(".bar i");
     const p = typeof j.progress === "number" ? Math.max(.03, Math.min(1, j.progress)) : null;
@@ -136,7 +136,7 @@ const Help = (() => {
       // الفيديو خلص وهو فاتح الصفحة: رنة + فتح الشات
       if (prevJob === "working" && S.job?.status === "done") ring();
       // 🎬 الفيديو خلص (دلوقتي، أو وهو برّه الصفحة ولسه ماشافوش): يظهر في نص الشاشة مرة واحدة
-      if (S.job?.status === "done" && !S.job.seen && S.job.url && S.popped !== S.job.url) { S.popped = S.job.url; popVideo(S.job.url, S.job.done_title || "الفيديو بتاعك جاهز 🎉", true); }
+      if (S.job?.status === "done" && !S.job.seen && S.job.url && S.popped !== S.job.url) { S.popped = S.job.url; popVideo(S.job.url, S.job.done_title || "الفيديو جاهز 🎉", true); }
       draw(); tease();
       if (S.open && S.unread) api("/api/suad/read", { method: "POST" }).catch(() => {});
     } catch { /* مش مسجل دخول أو مفيش علامة */ }
@@ -156,7 +156,7 @@ const Help = (() => {
   }
   function ring() {
     try { const a = new Audio("/sfx/suad_ding.wav"); a.volume = .7; a.play().catch(() => {}); } catch { /* */ }
-    try { if ("Notification" in window && Notification.permission === "granted") new Notification(`${nm()}`, { body: "الفيديو بتاعك جاهز 🎉" }); } catch { /* */ }
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification(`${nm()}`, { body: "الفيديو جاهز 🎉" }); } catch { /* */ }
   }
   async function ask(q) {
     q = String(q || "").trim();
@@ -243,7 +243,7 @@ const Help = (() => {
         <button type="button" class="hp-x" data-hpx aria-label="إغلاق">✕</button></div>
       <div class="hp-note"></div>
       <div class="hp-log" aria-live="polite"></div><div class="hp-sug"></div>
-      <form class="hp-in"><button type="button" class="att" data-hpatt aria-label="ابعت صورة">${ICON_ATT}</button>
+      <form class="hp-in"><button type="button" class="att" data-hpatt aria-label="أرسل صورة">${ICON_ATT}</button>
         <input type="file" accept="image/*" hidden data-hpfile>
         <textarea rows="1" placeholder="اكتب رسالتك…" aria-label="رسالتك"></textarea>
         <button type="submit" class="send" data-hpsend aria-label="أرسل"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button></form>`;
@@ -271,7 +271,7 @@ const Help = (() => {
       if (e.target.closest("[data-hpatt]")) return box.querySelector("[data-hpfile]").click();
       const c = e.target.closest("[data-hpcall]");
       if (c) {
-        if (!S.paid) { box.querySelector(".hp-note").textContent = `المكالمة الصوتية مع ${nm()} للمشتركين. تقدر تكتبلها هنا في أي وقت.`; return; }
+        if (!S.paid) { box.querySelector(".hp-note").textContent = `المكالمة الصوتية مع ${nm()} للمشتركين. يمكنك مراسلتها هنا في أي وقت.`; return; }
         toggle(false); return typeof Assistant !== "undefined" ? Assistant.open?.() : null;
       }
       const b = e.target.closest("[data-hpq]"); if (b) ask(b.dataset.hpq);

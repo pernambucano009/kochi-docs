@@ -19,7 +19,7 @@ const TestRec = (() => {
     try { S.ctx.createMediaStreamSource(stream).connect(S.dest); } catch { /* */ }
   }
   async function start() {
-    try { await start2(); } catch (e) { toast(`التسجيل وقف: ${e?.message || e}`); } finally { readyRes(); }   // المكالمة ماتستناش للأبد لو حاجة وقعت
+    try { await start2(); } catch (e) { toast(`توقّف التسجيل: ${e?.message || e}`); } finally { readyRes(); }   // المكالمة ماتستناش للأبد لو حاجة وقعت
   }
   async function start2() {
     document.querySelector(".tr-ask")?.remove();
@@ -27,7 +27,7 @@ const TestRec = (() => {
     try {
       scr = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 24, displaySurface: "browser" }, audio: { suppressLocalAudioPlayback: false },
         preferCurrentTab: true, selfBrowserSurface: "include", systemAudio: "include", surfaceSwitching: "exclude" });
-    } catch { readyRes(); return toast("التسجيل ماشتغلش (لازم توافق على مشاركة الشاشة)"); }
+    } catch { readyRes(); return toast("لم يبدأ التسجيل (يجب الموافقة على مشاركة الشاشة)"); }
     let mic = null;
     try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch { /* من غير مايك */ }
     S.mic = mic;   // 🎙️ نفس المايك ده بيتدّى لمكالمة نورة (فتح المايك مرتين كان بيخلي صوت العميل مايوصلش)
@@ -55,13 +55,13 @@ const TestRec = (() => {
     const d = new Date(); const name = `test-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}.${ext}`;
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
     const b = document.querySelector(".tr-bar");
-    if (b) { b.querySelector("span").textContent = "⏳ بيترفع…"; b.querySelector("button").hidden = true; b.querySelector("i").hidden = true; }
+    if (b) { b.querySelector("span").textContent = "⏳ جارٍ الرفع…"; b.querySelector("button").hidden = true; b.querySelector("i").hidden = true; }
     try {
       const fd = new FormData(); fd.append("file", blob, name);
       const r = await fetch("/api/testrec/upload", { method: "POST", body: fd, credentials: "same-origin" });
       if (!r.ok) throw new Error();
-      toast(`✓ اتحفظ «${name}» على جهازك واترفع. ابعته في الشات.`);
-    } catch { toast(`✓ اتحفظ «${name}» على جهازك (الرفع ماكملش). ابعته في الشات.`); }
+      toast(`✓ حُفظ «${name}» على جهازك ورُفع. أرسله في الدردشة.`);
+    } catch { toast(`✓ حُفظ «${name}» على جهازك (لم يكتمل الرفع). أرسله في الدردشة.`); }
     S.rec = null; bar(false);
     setTimeout(ask, 1500);   // تجربة جديدة؟
   }
@@ -76,7 +76,7 @@ const TestRec = (() => {
     b.hidden = !on;
     if (!on) return;
     b.querySelector("i").hidden = false; b.querySelector("button").hidden = false;
-    const tick = () => { b.querySelector("span").textContent = `بيسجّل ${fmt((Date.now() - S.t0) / 1000)}`; };
+    const tick = () => { b.querySelector("span").textContent = `يسجّل ${fmt((Date.now() - S.t0) / 1000)}`; };
     tick(); clearInterval(S.timer); S.timer = setInterval(tick, 1000);
   }
   function toast(t) {
@@ -87,8 +87,8 @@ const TestRec = (() => {
     if (S.rec || document.querySelector(".tr-ask")) return;
     // <dialog> مفتوح بـ showModal بيبقى فوق أي نافذة تانية (زي نافذة الترحيب)
     const d = document.createElement("dialog"); d.className = "tr-ask"; d.dataset.noI18n = "";
-    d.innerHTML = `<div><b>⏺️ حساب تجربة</b><span>نبدأ تسجيل الشاشة والصوت (صوتك وصوت سعاد)؟ لما تخلّص دوس «إيقاف وحفظ» تحت على الشمال.</span>
-      <button type="button" class="go">ابدأ التسجيل</button><button type="button" class="no">مش دلوقتي</button></div>`;
+    d.innerHTML = `<div><b>⏺️ حساب تجربة</b><span>هل نبدأ تسجيل الشاشة والصوت (صوتك وصوت سعاد)؟ عند الانتهاء اضغط «إيقاف وحفظ» أسفل اليسار.</span>
+      <button type="button" class="go">ابدأ التسجيل</button><button type="button" class="no">ليس الآن</button></div>`;
     d.querySelector(".go").onclick = start;   // ضغطة الزرار لازمة: المتصفح مابيسمحش بتسجيل الشاشة من غير ما المستخدم يدوس
     d.querySelector(".no").onclick = () => { d.remove(); readyRes(); };
     d.addEventListener("cancel", (e) => e.preventDefault());

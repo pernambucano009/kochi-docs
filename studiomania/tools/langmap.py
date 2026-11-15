@@ -6,6 +6,7 @@
 
     python3 tools/langmap.py            ← ملخص
     python3 tools/langmap.py --json     ← الخريطة كاملة
+    python3 tools/langmap.py --strict   ← يفشل (exit 1) لو فيه جملة للعميل من غير إنجليزي أو بعامية: شغّله قبل أي push فيه كلام جديد
     python3 tools/langmap.py --csv      ← جدول (عربي، إنجليزي، إسباني، برتغالي، المكان) لإضافة لغات جديدة
 """
 from __future__ import annotations
@@ -64,7 +65,7 @@ def norm(s: str) -> str:
         r = "{%d}" % k[0]
         k[0] += 1
         return r
-    s = re.sub(r"\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", rep, s)
+    s = re.sub(r"\$\{(?!\d\})[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", rep, s)   # «~${0}» (دولار + خانة) يفضل زي ما هو
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -100,7 +101,7 @@ def scan_js(rel: str, kind: str):
         if not AR.search(lit) or (re.search(r"[|][^ |]", lit) and lit.count(" ") < 2):   # أنماط بحث
             continue
         for k in segments(lit):
-            if CODE.search(k):   # المحلّل اتلخبط وجاب حتة كود مش جملة
+            if CODE.search(re.sub(r"\{\d\}", "", k)):   # المحلّل اتلخبط وجاب حتة كود مش جملة (من غير خانات {0})
                 continue
             yield k, f"{rel}:{line_of(src, k)}", kind
 
@@ -240,7 +241,7 @@ if __name__ == "__main__":
         sys.stdout.write(to_csv(m["items"]))
     else:
         print(json.dumps(m["stat"], ensure_ascii=False))
-        if "--check" in sys.argv and (m["stat"]["no_en"] or m["stat"]["dialect"]):   # للـ CI: أي مشكلة = أحمر
+        if ("--check" in sys.argv or "--strict" in sys.argv) and (m["stat"]["no_en"] or m["stat"]["dialect"]):   # للـ CI: أي مشكلة = أحمر
             for r in [x for x in m["items"] if x["problems"]]:
                 print(" ".join(r["problems"]), "|", r["where"][0], "|", r["ar"][:120])
             sys.exit(1)

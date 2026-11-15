@@ -642,7 +642,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       try {
         const r = await fetch("/api/assistant/dental_case", { method: "POST", body: fd, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
-        d.remove(); S.dentalSent = true; S.said = ""; S.wait = null; chip(`✓ <span><b>وصلت صور الحالة</b><br>الفيديو بدأ يتعمل</span>`); if (typeof Help !== "undefined") Help.refresh?.();
+        d.remove(); S.dentalSent = true; S.said = ""; S.wait = null; chip(`✓ <span><b>وصلت صور الحالة</b><br>بدأ صنع الفيديو</span>`); if (typeof Help !== "undefined") Help.refresh?.();
         note("(SYSTEM: the case photos arrived and his video started being made. Now, in his dialect, say clearly: you are preparing his video now; when it is ready a notification will reach him, and he will see a big loading bar at the top of the page while it is being made; you will leave him now; when it is ready he can watch it and send you his opinion: he will find you at the bottom right of any page, with your name on it, and you are waiting for his feedback. This is mandatory. Then goodbye and call finish.)");
       } catch (e) { err(e.message); send.disabled = false; send.textContent = "أرسل الصور"; }
     };
@@ -768,7 +768,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         mic = shared ? new MediaStream([shared.getAudioTracks()[0].clone()]) : await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
-      if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) { const tk = S.mic?.getTracks()[0]; TestRec.note?.(`🎙️ نورة ماسمعتش صوتك لحد دلوقتي. المايك: «${tk?.label || "?"}» · أعلى صوت وصل: ${((S.micMax || 0) * 1000).toFixed(0)} (أقل من 30 = مش بيوصل)${tk?.muted ? " · المتصفح أو النظام كاتم المايك ده" : ""}${S.muted ? " · مكتوم من زرار المكالمة" : ""}`); } }, 45000);
+      if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) { const tk = S.mic?.getTracks()[0]; TestRec.note?.(`🎙️ لم تسمع نورة صوتك حتى الآن. الميكروفون: «${tk?.label || "?"}» · أعلى مستوى صوت: ${((S.micMax || 0) * 1000).toFixed(0)} (أقل من 30 = لا يصل)${tk?.muted ? " · المتصفح أو النظام يكتم هذا الميكروفون" : ""}${S.muted ? " · مكتوم من زر المكالمة" : ""}`); } }, 45000);
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await tokP;
@@ -808,7 +808,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           R(e.response_id).msg = true; if (!S.aBuf) S.textAt = performance.now(); S.aBuf += e.delta; if (S.anaShown) S.anaChars = (S.anaChars || 0) + (e.delta || "").length; S.noAudio = !S.outLevel;
         } else if (e.type === "response.output_item.added" && e.item?.type === "message") { if (!R(e.response_id).silent) R(e.response_id).msg = true; }
         else if (e.type === "input_audio_buffer.committed" && S.tc === "manual") { S.thinking = true; status(); create("silent"); }   // خلّص كلامه: أداة الحفظ الأول من غير صوت
-        else if (e.type === "input_audio_buffer.speech_started") { S.heard = (S.heard || 0) + 1; if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة سامعة صوتك (المايك شغال)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
+        else if (e.type === "input_audio_buffer.speech_started") { S.heard = (S.heard || 0) + 1; if (!S.heardMic && typeof TestRec !== "undefined" && TestRec.mic?.()) { S.heardMic = true; TestRec.note?.("🎙️ نورة تسمع صوتك (الميكروفون يعمل)"); } S.lastAct = performance.now(); S.idleN = 0; lg("sys", "speech_started"); S.nudged = 0; S.capId = null; capReset(); clearTimeout(S.nudgeT); S.lastQ = null; status(); }
         else if (e.type === "input_audio_buffer.speech_stopped") { S.thinking = true; status(); }
         else if (e.type === "conversation.item.input_audio_transcription.failed") lg("sys", `transcription failed: ${e.error?.message || e.error?.code || ""}`.slice(0, 200));
         else if (e.type === "conversation.item.input_audio_transcription.completed") { if (!(e.transcript || "").trim()) lg("sys", "transcript empty"); else { S.heard = true; lg("user", e.transcript, { voice: 1 }); } if ((q(".as-box") || S.acct || S.wait) && LATER.test(e.transcript || "")) later(); }
@@ -1024,7 +1024,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     removeEventListener("hashchange", s.onHash);
     if (s.demoAfter) setTimeout(async () => {   // 🎬 فيديو الأسنان الجاهز في نص الشاشة بعد ما المكالمة تقفل
       const r = await api("/api/suad/demo", { method: "POST" }).catch(() => null);
-      if (typeof Help !== "undefined") { Help.popVideo?.(r?.url || "/gallery/dental/demo_a03.mp4", "فيديو عملناه من حالة تانية 🎬"); Help.refresh?.(); }
+      if (typeof Help !== "undefined") { Help.popVideo?.(r?.url || "/gallery/dental/demo_a03.mp4", "فيديو صنعناه من حالة أخرى 🎬"); Help.refresh?.(); }
     }, 900);
     clearInterval(s.accTimer); clearInterval(s.showT); clearInterval(s.fvT); clearInterval(s.show?.t); clearInterval(s.capT); clearTimeout(s.nudgeT); clearInterval(s.logT); clearInterval(s.pageT); if (s.leave) document.removeEventListener("click", s.leave, true);
     // 💸 تكلفة المكالمة (ببلاش على العميل، بس علينا) ← عدّاد الصرف، وبتتكتب في سجل المكالمة في «معمل سعاد»
@@ -1072,11 +1072,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   // هل المساعدة هتفتح؟ (من غير ما تفتح): عشان أول استخدام يروح لصفحة العقل الأول ويفتحها من دايرة «؟»
   let testOnce = false;
   async function gate(force) {
-    try { state = await api("/api/assistant"); } catch (e) { if (typeof TestRec !== "undefined") TestRec.note?.(`المكالمة مافتحتش: /api/assistant ${e?.message || e}`); return false; }
+    try { state = await api("/api/assistant"); } catch (e) { if (typeof TestRec !== "undefined") TestRec.note?.(`تعذّر فتح المكالمة: /api/assistant ${e?.message || e}`); return false; }
     const forced = force === true || /[?&]assistant=1\b/.test(location.search) || (state?.test && !testOnce);   // من دايرة «؟» أو ?assistant=1 أو حساب التجربة (مرة في كل دخول): يفتح حتى لو اتعمل قبل كده
     // 🚨 عميل جديد والمساعدة ماطلعتلوش: السبب بيروح صندوق الأخطاء (عشان نعرف من غير ما حد يبلّغ)
     const miss = (why) => { if (state?.new && !state?.done) fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); if (state?.test && typeof TestRec !== "undefined") TestRec.note(`المكالمة مافتحتش: ${why}`); return false; };
+      body: JSON.stringify({ kind: "ui", screen: "assistant", message: "المساعدة الصوتية لم تظهر لعميل جديد", raw: why }) }).catch(() => {}); if (state?.test && typeof TestRec !== "undefined") TestRec.note(`تعذّر فتح المكالمة: ${why}`); return false; };
     if (!state?.ready) return miss(`not ready: ${state?.why || "?"}`);
     if (!forced && (state.done || !state.new)) return false;
     if (!forced) try { const k = JSON.parse(localStorage.getItem(SKIP_KEY) || "null"); if (k?.b && k.b === state.brand && Date.now() - k.t < 864e5) return miss("skipped today (closed early before)"); } catch { /* التخزين مقفول أو قيمة قديمة */ }

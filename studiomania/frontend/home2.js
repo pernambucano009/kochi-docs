@@ -539,7 +539,7 @@ const NH = (() => {
     // 📤 النشر بنفس شكل «مكتبة المحتويات» في البروتوتايب: أيقونات هادية في النص، باسم كل قسم وسطر صغير تحته (مش مربعات كبيرة)
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      const sub = { pubacc: "اربط حساباتك وشوف المربوط", pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
+      const sub = { pubacc: "اربط حساباتك واعرض المربوط منها", pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
         audience: "من سيشتري، وكيف تصل إليه", leads: "أشخاص مهتمون بموضوعك", wacamp: "رسائل لمشتركينك" };
       const ic = PUB_IC;
       return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubacc", "pubpost", "inbox", "adsmgr", "audience", "leads", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
