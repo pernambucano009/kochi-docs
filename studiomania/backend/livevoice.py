@@ -129,9 +129,9 @@ TOOLS = [
      "(«تمام», «طيب»), a question to you, a request to repeat, noise, or something unclear or cut off. Call it silently instead of save_answer, "
      "then reply: repeat or rephrase the same question, or answer what they asked. Never save an unclear reply as an answer.",
      "parameters": {"type": "object", "properties": {"why": {"type": "string", "enum": ["reaction", "question", "repeat", "unclear"]}}, "required": ["why"]}},
-    {"type": "function", "name": "skip_question", "description": "The user asked to skip this question (or move to the next one, or answer it "
-     "later). Call it with the question id, then go on to the next question.",
-     "parameters": {"type": "object", "properties": {"qid": {"type": "string"}}, "required": ["qid"]}},
+    {"type": "function", "name": "skip_question", "description": "The user clearly asked to skip this question (or answer it later). The first call only "
+     "checks: you must then ask him to confirm (you may have misheard); call it again with confirmed=true only after he clearly confirms.",
+     "parameters": {"type": "object", "properties": {"qid": {"type": "string"}, "confirmed": {"type": "boolean"}}, "required": ["qid"]}},
     {"type": "function", "name": "start_account_analysis", "description": "Start analysing the user's Instagram or TikTok account in the background.",
      "parameters": {"type": "object", "properties": {"account": {"type": "string", "description": "The @handle or profile link exactly as the user gave it."}},
                     "required": ["account"]}},
@@ -234,9 +234,9 @@ DENTAL_STOP = ("DENTAL VIDEO (the most important stop and the ending of the call
                "      Path SMILE, in this exact order, one step per turn:\n"
                "      1) Offer, as a nice surprise, to make him a video from his own cases, and ask ONE question, like «إيه رأيك أعملك فيديو من "
                "حالاتك؟ لو عندك صور حالة عملتها تقدر تشاركني بيها عشان أوريك اللي نقدر نعمله» (in his dialect). Then STOP and wait.\n"
-               "      2) Yes → say it ONCE and briefly: you need two photos of ONE case, taken with the retractor: the teeth before and the teeth "
-               "after; if he also has the close smile or the face (before and after) he can add them, but they are optional. Call show_input kind dental_case "
-               "in that same turn, then stay silent while he uploads. Never repeat the request.\n"
+               "      2) Yes → call show_input kind dental_case and say ONE short sentence only, like «تمام، ارفع صور الحالة في المربع اللي قدامك، "
+               "ومكتوب فيه الأساسي والاختياري» (in his dialect). Do NOT list the photos and do NOT say «بالريتراكتور» in your question or here: "
+               "the box on the screen explains which photos are needed. Then stay silent while he uploads. Never repeat the request.\n"
                "      3) When the screen says the photos arrived, say clearly in his dialect: you are preparing his video now, and he will see a big "
                "loading bar at the top of the page while it is being made; when it is ready he will hear a notification and the video will appear "
                "in the middle of his screen; you will leave him now; after he watches it he should write you his opinion, he will find you at the "

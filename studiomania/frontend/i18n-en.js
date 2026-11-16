@@ -1,6 +1,8 @@
 // StudioMania — الترجمة الإنجليزي: كل جملة عربي في الواجهة وقصادها الإنجليزي.
 // {0} و {1}... مكان القيم اللي بتتغيّر (أرقام وأسماء). الجمل الجديدة: python tools/extract_i18n.py --missing
 window.I18N_EN = {
+  "الصورتان بالريتراكتور (قبل وبعد) أساسيتان، والباقي اختياري ويحسّن الفيديو.": "The two retractor photos (before and after) are required; the rest are optional and make the video better.",
+  "احذف الصورة": "Remove photo",
   "المكالمة الصوتية مع {0} للمشتركين فقط": "Voice calls with {0} are for subscribers only",
   "مكالمة المساعدة لم تبدأ (رفض من خدمة الصوت)": "The assistant call did not start (rejected by the voice service)",
   "د. {0}": "Dr. {0}",

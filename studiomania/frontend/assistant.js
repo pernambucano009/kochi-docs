@@ -58,7 +58,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
 .as-lognote{font-size:11.5px;opacity:.72;text-align:center;max-width:420px;margin:4px auto 0;line-height:1.6}.as-lognote button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .as-ov.dock .as-orb{width:min(210px,26vh)}.as-ov.dock{scrollbar-width:none}.as-ov.dock::-webkit-scrollbar{display:none}.as-ov.dock .as-type input{width:min(80vw,300px)}
 @media (max-width:720px){.as-ov.dock{top:auto;width:100vw;height:auto;max-height:60vh;padding:12px 14px 18px;gap:10px}.as-ov.dock .as-orb{width:min(130px,22vh)}}
-.as-dgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;max-width:380px;box-sizing:border-box}.as-dcase{max-width:100%;box-sizing:border-box;overflow:hidden}
+.as-dgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;box-sizing:border-box}.as-dcase{box-sizing:border-box;overflow:hidden}
+.as-ov .as-box.as-dcase{position:fixed!important;left:50%;top:50%;transform:translate(-50%,-50%);width:min(880px,94vw)!important;max-width:none!important;max-height:92vh;z-index:1002;pointer-events:auto;
+  background:var(--card,#fff);color:inherit;box-shadow:0 30px 80px rgba(24,23,24,.25);padding:22px 26px;gap:14px}
+.as-dcase>b{font-size:18px}.as-dcase .as-dhint{font-size:13px;opacity:.7;margin:-6px 0 0}
+.as-dcase .as-dslot{aspect-ratio:auto;height:min(22vh,190px)}.as-dcase .as-dslot small{font-size:12.5px}.as-dcase .as-dslot i{font-size:11.5px}
+.as-dslot .x{position:absolute;top:6px;inset-inline-start:6px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:26px;cursor:pointer;display:none;z-index:2}
+.as-dslot.on .x{display:block}
 .as-dslot.opt{border-color:rgba(127,127,127,.5)}.as-dslot i{font-style:normal;font-size:9.5px;opacity:.75}.as-dslot.on i{display:none}.as-dslot{position:relative;aspect-ratio:4/3;min-width:0;box-sizing:border-box;border:1.5px dashed rgba(229,97,62,.7);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:center/cover no-repeat rgba(127,127,127,.08);padding:6px;text-align:center}
 .as-dslot .ph{font-size:22px;color:#E5613E}.as-dslot small{font-size:10px;line-height:1.3;background:rgba(0,0,0,.45);color:#fff;border-radius:8px;padding:2px 6px}
 .as-dslot.on{border-style:solid}.as-dslot.on .ph{display:none}
@@ -216,6 +222,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       S.navAfter = { page: String(args.page || ""), platform: String(args.platform || "") };
       return { ok: true, note: "The page opens when the call ends. Tell them in one sentence what to press there, say they find you in the orange circle at the bottom right, then call finish." };
     }
+    if (name === "skip_question" && !args.confirmed) { lg("sys", `skip asked to confirm: ${args.qid || ""}`);
+      return { ok: false, error: "Not skipped. You may have misheard. Ask him in one short sentence, in his dialect, whether he really wants to skip this question or has something to add (for example: are you sure you want to skip it, or do you have something to add?). Only if he clearly says skip, call skip_question again with confirmed=true. If he answers, save the answer instead." }; }
     if (name === "not_an_answer") return { ok: true, note: "Not saved. Now reply in one short turn: repeat or rephrase the same question, or answer what they asked. No filler." };
     if (name === "start_account_analysis") {
       // 🛑 الحساب لازم العميل يكتبه بنفسه (في المربع أو خانة الكتابة): الكلام بالصوت مابيتكتبش صح، والموديل ساعات بيخمّن حساب من اسم العلامة
@@ -292,7 +300,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (name === "show_input") {
       if (args.kind === "none") { step({ logo: "logo", products: "photos", account: "account" }[S.wait] || ""); later(); return { ok: true, closed: true }; }
       if (args.kind === "dental_case") { const tp = args.template === "a24" ? "a24" : "a03"; S.wait = "dental_case"; S.waitResp = S.capId || "x"; setTimeout(() => S && dentalBox(tp), 600);
-        return { ok: true, shown: args.kind, note: "The photo slots are on his screen (4 required, 2 optional). Say the request ONCE, then stay completely silent, however long it takes: never ask whether he uploaded them, never repeat or remind. A SYSTEM message tells you when they arrive." }; }
+        return { ok: true, shown: args.kind, note: "The photo slots are on his screen; the box itself says which photos are required and which are optional. Say the request ONCE, then stay completely silent, however long it takes: never ask whether he uploaded them, never repeat or remind. A SYSTEM message tells you when they arrive." }; }
       if (BOX[args.kind]) {
         S.box = args.kind; S.ask = S.capId || true; S.wait = args.kind; S.waitResp = S.capId || "x";
         // لو الأداة وصلت بعد ما خلّصت كلامها (أو قالتها بكلمة مش في القايمة): الخانة تظهر على طول، مش تستنى كلمة
@@ -626,7 +634,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     if (!ov) return;
     const d = document.createElement("div"); d.className = "as-box as-dcase";
     const files = {};
-    d.innerHTML = `<b>صور حالة واحدة</b><div class="as-dgrid">${DSLOTS.map(([k, t, req]) => `<label class="as-dslot${req ? "" : " opt"}" data-k="${k}"><input type="file" hidden accept="image/*"><span class="ph">＋</span><small>${esc(t)}</small><i>${req ? "أساسية" : "اختيارية"}</i></label>`).join("")}</div>
+    d.innerHTML = `<b>صور حالة واحدة</b><p class="as-dhint">الصورتان بالريتراكتور (قبل وبعد) أساسيتان، والباقي اختياري ويحسّن الفيديو.</p><div class="as-dgrid">${DSLOTS.map(([k, t, req]) => `<label class="as-dslot${req ? "" : " opt"}" data-k="${k}"><input type="file" hidden accept="image/*"><button type="button" class="x" data-dx aria-label="احذف الصورة">✕</button><span class="ph">＋</span><small>${esc(t)}</small><i>${req ? "أساسية" : "اختيارية"}</i></label>`).join("")}</div>
       <div class="row"><button type="button" class="as-go" data-dsend disabled>أرسل الصور</button><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
     q(".as-acts").before(d);
     const err = (m) => { d.querySelector("[data-berr]").textContent = m || ""; };
@@ -635,6 +643,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       const inp = l.querySelector("input");
       inp.onchange = () => { const f = inp.files?.[0]; if (!f) return; files[l.dataset.k] = f;
         l.style.backgroundImage = `url("${URL.createObjectURL(f)}")`; l.classList.add("on"); send.disabled = DSLOTS.some(([k, , req]) => req && !files[k]); };
+      // ✕ صورة اتحطت غلط: تتشال والخانة ترجع فاضية (من غير ما تفتح اختيار ملف)
+      l.querySelector("[data-dx]").onclick = (e) => { e.preventDefault(); e.stopPropagation(); delete files[l.dataset.k]; inp.value = "";
+        l.style.backgroundImage = ""; l.classList.remove("on"); send.disabled = DSLOTS.some(([k, , req]) => req && !files[k]); };
     });
     d.querySelector("[data-later]").onclick = () => { d.remove(); note("(SYSTEM: the user will send the case photos later. Tell him he can send them any time to you in the orange circle at the bottom right of the screen, by text. Then say goodbye and call finish.)"); };
     send.onclick = async () => {
