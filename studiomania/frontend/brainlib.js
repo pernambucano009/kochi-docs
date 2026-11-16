@@ -128,7 +128,23 @@ const BrainLibPage = (() => {
     if (i.needs_name) return `<div class="bl-cnote warn"><span>هذه الحالة بلا اسم. اكتب اسمها لتظهر في القوالب.</span><button type="button" class="nb-btn fs-go" data-blcname="${c.id}">اكتب اسم الحالة</button></div>`;
     if (caseBusy(c)) return `<p class="pk-note bl-cnote">⏳ يصنّف العقل صور الحالة (قبل، تحضير، بعد، والزاوية)…</p>`;
     if (i.status === "error") return `<p class="pk-err bl-cnote">⚠️ ${esc(i.error || "تعذّر تصنيف الصور")}</p>`;
-    return "";
+    return fitsHTML(c);
+  }
+  // 🦷 القوالب اللي تنفع للحالة دي (وزرار يعمل منها على طول)، واللي ماتنفعش مكتوب ناقصها إيه
+  function fitsHTML(c) {
+    const key = `${c.id}:${c.case?.sig || ""}`, f = S.fits?.[key];
+    if (!f) {
+      S.fits = S.fits || {};
+      if (!S.fitsLoading?.[key]) { S.fitsLoading = { ...(S.fitsLoading || {}), [key]: 1 };
+        api(`/api/dental/case/${encodeURIComponent(c.id)}/fits`).then((r) => { S.fits[key] = r.templates; }).catch(() => { S.fits[key] = []; }).finally(() => render()); }
+      return `<p class="pk-note bl-cnote">جارٍ معرفة القوالب التي تناسب هذه الحالة…</p>`;
+    }
+    if (!f.length) return "";
+    const ok = f.filter((t) => t.ok), no = f.filter((t) => !t.ok);
+    const row = (t) => `<div class="bl-fit${t.ok ? "" : " no"}"><span>${t.kind === "photo" ? "🖼️" : "🎬"} <b>${esc(t.name)}</b>${t.ok ? "" : `<small>${esc(t.missing)}</small>`}</span>
+      ${t.ok ? `<button type="button" class="nb-btn fs-go" data-blmk="${esc(t.id)}" data-blcase="${esc(c.id)}">${t.kind === "photo" ? "اصنع البوست" : "اصنع الفيديو"}</button>` : ""}</div>`;
+    return `<div class="bl-fits"><b>القوالب التي تناسب هذه الحالة (${ok.length} من ${f.length})</b>${ok.map(row).join("")}
+      ${no.length ? `<details><summary>قوالب تحتاج صورًا أخرى (${no.length})</summary>${no.map(row).join("")}</details>` : ""}</div>`;
   }
   async function refresh() { S.lib = await api("/api/library"); }
   async function runSearch() {
@@ -161,6 +177,8 @@ const BrainLibPage = (() => {
       try {
         let b;
         if ((b = q("[data-bltab]"))) return showTab(b.dataset.bltab);
+        if ((b = q("[data-blmk]"))) { const key = Object.keys(S.fits || {}).find((k) => k.startsWith(b.dataset.blcase + ":")), t = (S.fits[key] || []).find((x) => x.id === b.dataset.blmk);
+          return t && window.Dental?.makeFor({ id: t.id, name: t.name, desc: t.desc, kind: t.kind }, b.dataset.blcase); }
         if ((b = q("[data-blplay]"))) { e.stopPropagation(); return playAudio(b.dataset.blplay); }
         if (q("[data-blsearchon]")) { S.searchOn = true; render(); return w.querySelector("[data-blq]")?.focus(); }
         if (q("[data-blmenu]")) { S.menu = !S.menu; return render(); }

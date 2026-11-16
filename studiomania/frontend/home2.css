@@ -2836,6 +2836,13 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .bl-cchip.ok { background: rgba(46, 139, 87, .12); color: #2E8B57; }
 #nh .bl-cchip.warn { background: rgba(229, 97, 62, .14); color: #E5613E; }
 #nh .bl-cnote { margin: 4px 0 12px; }
+#nh .bl-fits { margin: 4px 0 14px; padding: 12px 14px; border-radius: 14px; background: var(--card-bg, rgba(127,127,127,.08)); display: flex; flex-direction: column; gap: 8px; }
+#nh .bl-fit { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#nh .bl-fit span { display: flex; flex-direction: column; gap: 2px; }
+#nh .bl-fit small { font-size: 12px; opacity: .7; }
+#nh .bl-fit.no { opacity: .75; }
+#nh .bl-fits details summary { cursor: pointer; font-size: 13px; opacity: .8; margin: 4px 0; }
+#nh .bl-fits details .bl-fit { margin-top: 6px; }
 #nh div.bl-cnote.warn { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 14px; background: rgba(229, 97, 62, .1); }
 #nh .bl-clab { display: block; font-size: 11.5px; color: var(--nh-acc, #E5613E); font-weight: 600; }
 #nh .bl-sub small { color: var(--nh-muted); font-size: 11.5px; }

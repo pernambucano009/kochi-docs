@@ -16633,4 +16633,9 @@ window.I18N_EN = {
   "طباعة يابانية": "Japanese print",
   "الملف لم يُرفع كاملًا. احذفه وارفعه مرة أخرى": "The file was not fully uploaded. Delete it and upload it again",
   "تعذّرت قراءة الصورة (قد تكون تالفة أو بصيغة غير مدعومة). احذفها وارفعها مرة أخرى بصيغة JPG أو PNG": "Couldn't read the image (it may be damaged or in an unsupported format). Delete it and upload it again as JPG or PNG",
+  "هذه الحالة غير موجودة": "This case doesn't exist",
+  "جارٍ معرفة القوالب التي تناسب هذه الحالة…": "Finding the templates that fit this case…",
+  "القوالب التي تناسب هذه الحالة ({0} من {1})": "Templates that fit this case ({0} of {1})",
+  "اصنع البوست": "Make the post",
+  "قوالب تحتاج صورًا أخرى ({0})": "Templates that need other photos ({0})",
 };

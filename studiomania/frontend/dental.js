@@ -330,5 +330,7 @@
     } catch (err) { if (window.uiAlert) uiAlert(err.message); else alert(err.message); t.disabled = false; }
   }
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && root) close(); });
-  window.Dental = { open, close, pick };
+  // 🧠 من فولدر الحالة في العقل: قالب معيّن للحالة دي على طول
+  function makeFor(t, caseId) { pickT = t; return make(caseId); }
+  window.Dental = { open, close, pick, makeFor };
 })();

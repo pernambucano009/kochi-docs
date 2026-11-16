@@ -35357,6 +35357,24 @@ def dental_templates():
     return {"video": dental.TEMPLATES, "photo": dentalbrain.PHOTO_TEMPLATES}
 
 
+@app.get("/api/dental/case/{case_id}/fits")
+def dental_case_fits(case_id: str):
+    """🦷 الحالة دي تنفع لأنهي قوالب (فيديو وبوستات)، واللي ماتنفعش ناقصها إيه."""
+    dental_on()
+    lib = lib_merged(active_client_id())
+    c = next((x for x in dentalbrain.cases(lib) if x["id"] == case_id), None)
+    if not c:
+        raise HTTPException(404, "هذه الحالة غير موجودة")
+    out = []
+    for kind, ts in (("video", dental.TEMPLATES), ("photo", dentalbrain.PHOTO_TEMPLATES)):
+        for t in ts:
+            r = dentalbrain.fit_case(lib, c, t["id"], dental.TEMPLATES)
+            out.append({"id": t["id"], "name": t["name"], "desc": t.get("desc") or "", "kind": kind, "ok": bool(r["ok"]),
+                        "busy": bool(r.get("busy")), "missing": r.get("missing") or ""})
+    out.sort(key=lambda x: (not x["ok"], x["kind"] != "video"))
+    return {"case": c["id"], "sig": (c.get("case") or {}).get("sig") or "", "templates": out}
+
+
 @app.get("/api/dental/fit/{tid}")
 def dental_fit(tid: str):
     """حالات العقل للقالب ده: اللي تنفع تتختار، واللي ماتنفعش مكتوب ناقصها إيه."""
