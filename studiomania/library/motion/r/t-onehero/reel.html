@@ -10,6 +10,7 @@ const PR = M.params({
   s3: { label: "خطوة ٣ (النابض والصندوق)", kind: "text", def: "بنغلّفه", group: G2, max: 10 },
   s4: { label: "خطوة ٤ (السير)", kind: "text", def: "يوصلك", group: G2, max: 10 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "صندوق", group: G3, max: 16, hint: "يُكتب على الصندوق وفي النهاية." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G2, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   accent: { label: "لون الكرة بعد التخصيص", kind: "color", role: "accent", def: "#ff4d6d", group: GS, hint: "لون العلامة: تأخذه الكرة حين تعبر البوابة." },
   bg: { label: "لون الخلفية", kind: "color", def: "#fff4e0", group: GS, hint: "فاتح وهادئ لتظهر الكرة والمحطات." },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
@@ -29,7 +30,7 @@ const PAINT = 3.4, BOUNCE = 5.6;
 
 M.reel({
   W, H, DUR, bg: PR.bg,
-  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d") }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fText)]); const c = M.canvas(W, H); return { x: c.getContext("2d"), ELS: await M.els(PR.els, 4) }; },   // 🧩 عناصر مكتبة المجال: عنصر جنب كل محطة
   seek(t, C, M) {
     const { x } = C, { seg, clamp, cubicIO, springO, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, INK = "#2b2238", BL = "#f4a259";
     const [bxw, byw] = pos(Math.min(t, 7.2));
@@ -37,7 +38,8 @@ M.reel({
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.bg; x.fillRect(0, 0, W, H);
     x.save(); x.translate(0, -camY);
     x.fillStyle = "rgba(43,34,56,.08)"; for (let i = 0; i < 300; i++) { const yy = hash(i) * 4000; if (yy < camY - 50 || yy > camY + H + 50) continue; x.beginPath(); x.arc(hash(i + 300) * W, yy, 6, 0, Math.PI * 2); x.fill(); }
-    const label = (n, s2, ly, on) => { const k = springO(clamp(on), 12, .55); if (k <= 0) return; x.save(); x.translate(540, ly); x.scale(k, k); x.font = `${M.fit(s2, "LZ", 700, 110, 50)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; const tw = x.measureText(s2).width;
+    const label = (n, s2, ly, on) => { const k = springO(clamp(on), 12, .55); if (k <= 0) return;
+      const ei = "١٢٣٤".indexOf(n), im = C.ELS[ei]; if (im) { const sz = 210, w2 = Math.min(sz, sz * im.width / im.height), h2 = w2 * im.height / im.width; x.save(); x.translate(130, ly + 10); x.scale(k, k); x.rotate(Math.sin(t * 2 + ei) * .05); x.drawImage(im, -w2 / 2, -h2 / 2, w2, h2); x.restore(); } x.save(); x.translate(540, ly); x.scale(k, k); x.font = `${M.fit(s2, "LZ", 700, 110, 50)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; const tw = x.measureText(s2).width;
       x.fillStyle = INK; x.fillText(s2, -40, 36); x.beginPath(); x.arc(tw / 2 + 30, 0, 46, 0, Math.PI * 2); x.fill(); x.fillStyle = "#fff"; x.font = "700 48px PB"; x.fillText(n, tw / 2 + 30, 16); x.restore(); };
     x.fillStyle = INK; x.font = `${M.fit(PR.title, "LZ", 700, 160, 60)}px LZ`; x.textAlign = "center"; x.direction = "rtl"; x.globalAlpha = io(seg(t, .1, .6)); x.fillText(PR.title, 450, 330); x.globalAlpha = 1;
     // ١) قمع

@@ -6,6 +6,7 @@ const G1 = "١ · النافذة والضوء", G2 = "٢ · النص", GS = "ا�
 const PR = M.params({
   ribbon: { label: "النص على الشريط", kind: "text", role: "brand", def: "إضاءة نور", group: G2, max: 16, hint: "يظهر على شريط داخل الزجاج حين يكتمل الضوء: اسم العلامة أو كلمتان." },
   tag: { label: "المحفور في الأسفل", kind: "text", def: "النور بيغيّر كل حاجة", group: G2, max: 28, hint: "جملة محفورة في الحجر تحت النافذة." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   sky: { label: "لون السماء", kind: "color", def: "#2a5db0", group: G1, hint: "لون معظم قطع الزجاج: الأزرق أو الأخضر الغامق يبدو أجمل." },
   sun: { label: "لون الشمس", kind: "color", role: "accent", def: "#f2b134", group: G1, hint: "لون الشمس في المنتصف والضوء الساقط على الأرض." },
   fRibbon: { label: "خط الشريط", kind: "font", def: "ruqaa", group: GS },
@@ -26,10 +27,16 @@ M.reel({
     await Promise.all([M.font("AM", PR.fTag), M.font("RQ", PR.fRibbon)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const R = M.rng(4);
+    // 🧩 عناصر مكتبة المجال: الشمس والشجرة بيتشالوا من صورة الزجاج، والعناصر بتبقى ألواح زجاج لوحدها (ألوان قليلة + رصاص على الحدود)
+    const ims = await M.els(PR.els, 3), noArt = ims.length > 0;
+    const GL = ims.map((im) => { const S = 420, c2 = document.createElement("canvas"); c2.width = c2.height = S; const g = c2.getContext("2d");
+      M.fx.posterize(im, ["#1f4e9c", "#2f8a52", "#d9a32b", "#b8322a", "#e9dcc0", "#6a3d8a", "#3b2a20"], S, S).forEach((l) => g.drawImage(l, 0, 0));
+      const lead = M.fx.edges(im, "#141210", S, S, 30, 3); g.drawImage(lead, 0, 0); return c2; });
     // الصورة اللي في الزجاج: سما، شمس، تلال، شجرة، شريط تحت
     const sky = hex(PR.sky), sun = hex(PR.sun);
     const pic = (px, py) => {
       const cx = WX0 + AR;
+      if (noArt) { const hill = 930 - Math.sin(px * .008) * 70, hill2 = 1040 - Math.sin(px * .011 + 2) * 50; if (py > hill2) return [70, 120, 50]; if (py > hill) return [120, 170, 70]; return py < 420 ? sky.map((v) => v * .75) : sky; }
       if (Math.hypot(px - cx, py - 560) < 130) return sun;                                         // الشمس
       if (Math.hypot(px - cx, py - 560) < 200) return [245, 205, 110];
       if (px > 280 && px < 330 && py > 820 && py < 1180) return [110, 70, 40];                      // جذع الشجرة
@@ -55,7 +62,7 @@ M.reel({
     w.fillStyle = "#38332c"; w.beginPath(); w.moveTo(WX0 - 60, WY1 + 50); w.lineTo(WX0 - 60, WY0 + AR); w.arc(WX0 + AR, WY0 + AR, AR + 60, Math.PI, 0); w.lineTo(WX1 + 60, WY1 + 50); w.closePath(); w.fill();
     const vg = w.createRadialGradient(540, 900, 300, 540, 900, 1200); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.6)"); w.fillStyle = vg; w.fillRect(0, 0, W, H);
     const floorC = document.createElement("canvas"); floorC.width = W / 4; floorC.height = H / 4;
-    return { x, P, wall, floorC, dust: Array.from({ length: 140 }, () => [R(), R(), R()]) };
+    return { x, P, wall, floorC, GL, dust: Array.from({ length: 140 }, () => [R(), R(), R()]) };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, expo } = M;
@@ -78,6 +85,12 @@ M.reel({
     x.strokeStyle = "#141210"; x.lineWidth = 9; x.lineJoin = "round"; C.P.forEach((p) => { x.beginPath(); p.pts.forEach((q) => x.lineTo(q[0], q[1])); x.closePath(); x.stroke(); });
     x.strokeStyle = "rgba(120,120,120,.25)"; x.lineWidth = 2; C.P.forEach((p) => { x.beginPath(); p.pts.forEach((q) => x.lineTo(q[0] + 1, q[1] - 1)); x.closePath(); x.stroke(); });
     x.fillStyle = "#1c1916"; [520, 800, 1080].forEach((y) => x.fillRect(WX0 - 10, y, WX1 - WX0 + 20, 12));
+    // ألواح العناصر: بتنوّر لما الشعاع يعدّي عليها زي باقي الزجاج، وإطار رصاص تخين
+    [[WX0 + AR, 640, 380], [WX0 + 150, 1000, 230], [WX1 - 150, 1000, 230]].slice(0, C.GL.length).forEach(([cx, cy, sz], i) => {
+      const L = Math.min(1.1, lit(cx, cy)), k = .22 + .9 * L; x.save(); x.filter = `brightness(${k.toFixed(2)}) saturate(${(.6 + .6 * L).toFixed(2)})`;
+      x.beginPath(); x.ellipse(cx, cy, sz * .56, sz * .6, 0, 0, Math.PI * 2); x.fillStyle = "#e9dcc0"; x.fill(); x.drawImage(C.GL[i], cx - sz / 2, cy - sz / 2, sz, sz); x.restore();
+      x.strokeStyle = "#141210"; x.lineWidth = 12; x.beginPath(); x.ellipse(cx, cy, sz * .56, sz * .6, 0, 0, Math.PI * 2); x.stroke();
+    });
     // الشريط: قطعة زجاج كريمي لوحدها بإطار رصاص والكلام عليها بالجريزاي البني
     { const L = lit(540, 1235), v = Math.round(150 + 95 * L); x.fillStyle = `rgb(${v},${v - 8},${v - 30})`; x.beginPath(); x.moveTo(WX0 + 30, 1180); x.quadraticCurveTo(540, 1150, WX1 - 30, 1180); x.lineTo(WX1 - 30, 1290); x.quadraticCurveTo(540, 1260, WX0 + 30, 1290); x.closePath(); x.fill(); x.lineWidth = 12; x.strokeStyle = "#141210"; x.stroke();
       const rk = smooth(seg(t, 6.8, 7.8)); if (rk > 0) { x.save(); x.globalAlpha = rk; x.fillStyle = "rgba(70,40,20,.92)"; x.font = `700 ${M.fit(PR.ribbon, "RQ", 520, 88, 40, "700")}px RQ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(PR.ribbon, 540, 1228); x.restore(); } }

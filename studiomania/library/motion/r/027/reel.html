@@ -8,6 +8,7 @@ const PR = M.params({
   subtitle: { label: "تحت العنوان", kind: "text", def: "في ٦ محطات غيّرت كل حاجة.", group: G1, max: 50 },
   events: { label: "المحطات (كل سطر: السنة | الحدث | سبب أهميته)", kind: "lines", def: ["١٩٨٥ | فتحنا أول فرن في شارع صغير | كان فرن واحد وعيلة واحدة وحلم كبير.", "١٩٩٦ | أول فرع تاني في الحي اللي جنبنا | الناس بقت تيجي من بعيد علشان الرغيف.", "٢٠٠٤ | ابتدينا نعمل حلويات الأعياد | السفرة بقت تستنانا في كل موسم.", "٢٠١٣ | فتحنا ورشة تدريب للخبازين | الصنعة بقت تتعلم بدل ما تضيع.", "٢٠٢٠ | التوصيل لحد البيت | الرغيف السخن بقى يوصل في ٢٠ دقيقة.", "٢٠٢٥ | ١٢ فرع ونفس الوصفة | كبرنا… والطعم زي ما هو."], group: G2, max: 120, hint: "كل سطر: السنة | ما حدث | سبب أهميته. حتى ١٤ محطة، ويطول الفيديو بعددها." },
   ending: { label: "الجملة الأخيرة", kind: "text", def: "والحكاية لسه بتتكتب.", group: G3, max: 40 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: GC, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   ink: { label: "لون النص", kind: "color", role: "ink", def: "#111214", group: GC },
   accent: { label: "اللون المميز", kind: "color", role: "accent", def: "#2f5cff", group: GC, hint: "لون السنة والرسومات المميزة." },
   bg: { label: "الخلفية", kind: "color", role: "bg", def: "#f4f2ed", group: GC },
@@ -26,7 +27,12 @@ M.meta({
 M.reel({
   W: 1920, H: 1080, DUR, bg: PAPER,
   fonts: { I4: ["inter400.ttf", "400"], I6: ["inter600.ttf", "600"], I8: ["inter800.ttf", "800"] },
-  init(M) { const c = M.canvas(1920, 1080); return { x: c.getContext("2d") }; },
+  async init(M) {
+    const c = M.canvas(1920, 1080);
+    // 🧩 عناصر مكتبة المجال: رسمة كل محطة بتبقى عنصر (حدوده بلون النص + ظل خفيف باللون المميز) بدل الرسومات الثابتة
+    const EL = (await M.els(PR.els, 8)).map((im) => { const S = 380, c2 = document.createElement("canvas"); c2.width = c2.height = S; const g = c2.getContext("2d"); g.globalAlpha = .22; g.drawImage(M.fx.silhouette(im, ACC, S, S), 0, 0); g.globalAlpha = 1; g.drawImage(M.fx.edges(im, INK, S, S, 30, 3), 0, 0); return c2; });
+    return { x: c.getContext("2d"), EL };
+  },
   seek(t, P, M) {
     const { x } = P, { seg, lerp, expo, expoIO, spring, clamp } = M;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, 1920, 1080);
@@ -69,7 +75,8 @@ M.reel({
       wrap(x, why, sx, 890 + (1 - wIn) * 24, 820, 44, sx + 16);
       x.globalAlpha = 1;
       // illustration, top right of the moment
-      drawArt(x, M, art, RTL ? sx - 1000 : sx + 1000, 300, t - t0);
+      if (P.EL && P.EL.length) { const im = P.EL[i % P.EL.length], g = M.expo(M.seg(t - t0, 1.1, 2)), ax = RTL ? sx - 1000 : sx + 1000; if (g > 0) { x.save(); x.globalAlpha = g; x.translate(ax, 300); x.scale(.9 + .1 * g, .9 + .1 * g); x.drawImage(im, -190, -190); x.restore(); } }
+      else drawArt(x, M, art, RTL ? sx - 1000 : sx + 1000, 300, t - t0);
     });
     // ---- end: pull back to see the whole line
     const end = HOOK + MOM.length * PER;

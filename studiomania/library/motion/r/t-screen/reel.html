@@ -8,6 +8,7 @@ const PR = M.params({
   num: { label: "الرقم", kind: "text", def: "٠٧", group: G2, max: 3, hint: "رقم صغير بلون التمييز: رقم الرحلة أو الإصدار." },
   stats: { label: "سطر البيانات", kind: "text", def: "٣ أيام · ٢ ليالي · من ٤٥٠٠ جنيه", group: G2, max: 36, hint: "المعلومات المهمة مفصولة بـ « · »." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "رحلات الواحة", group: G2, max: 16, hint: "يُلصق على ورقة في النهاية." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G2, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   i1: { label: "حبر السماء الفاتح", kind: "color", def: "#f6d7a7", group: GI },
   i2: { label: "حبر السماء الغامق", kind: "color", def: "#eba26a", group: GI },
   i3: { label: "حبر الكثبان", kind: "color", def: "#c9724a", group: GI },
@@ -24,7 +25,8 @@ M.meta({
 });
 const W = 1080, H = 1920, DUR = 12, PX = 70, PY = 150, PW = 940, PH = 1410;
 const PAPER = "#f1e8d6";
-const u = (v) => v * PW / 1000;   // وحدات البوستر (١٠٠٠×١٥٠٠)
+const u = (v) => v * PW / 1000;
+let NOPALM = false;   // لما فيه عناصر من مكتبة المجال: النخل بيتشال وهي بتتطبع مكانه   // وحدات البوستر (١٠٠٠×١٥٠٠)
 const palm = (q, x0, y0, s) => { q.rect(x0 - 3 * s, y0 - 70 * s, 6 * s, 70 * s); for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * .45; q.moveTo(x0, y0 - 70 * s); q.quadraticCurveTo(x0 + Math.cos(a) * 30 * s, y0 - 70 * s + Math.sin(a) * 30 * s - 6 * s, x0 + Math.cos(a) * 48 * s, y0 - 70 * s + Math.sin(a) * 48 * s + 14 * s); q.lineTo(x0 + Math.cos(a) * 40 * s, y0 - 70 * s + Math.sin(a) * 40 * s + 18 * s); q.closePath(); } };
 // الطبقات بالترتيب: كل طبقة = لون + مسار + إزاحة صغيرة
 const LAYERS = [
@@ -32,7 +34,7 @@ const LAYERS = [
   ["i2", [-1.5, 2], (q) => { [[140, 60], [300, 40], [420, 30]].forEach(([y, h]) => q.rect(0, u(y), u(1000), u(h))); }],
   ["acc", [1.8, 1.5], (q) => q.arc(u(640), u(470), u(150), 0, Math.PI * 2)],
   ["i3", [-2, -1.2], (q) => { q.moveTo(0, u(760)); for (let xx = 0; xx <= 1000; xx += 20) q.lineTo(u(xx), u(720 - Math.sin(xx * .006 + .6) * 90 - Math.sin(xx * .019) * 20)); q.lineTo(u(1000), u(1220)); q.lineTo(0, u(1220)); q.closePath(); }],
-  ["i4", [1.4, 2], (q) => { q.moveTo(0, u(930)); q.lineTo(u(1000), u(910)); q.lineTo(u(1000), u(1000)); q.lineTo(0, u(1010)); q.closePath(); [[120, 930, 1.6], [190, 935, 1.2], [790, 915, 1.8], [870, 918, 1.3], [700, 920, 1]].forEach(([a, b, s]) => palm(q, u(a), u(b), s)); }],
+  ["i4", [1.4, 2], (q) => { q.moveTo(0, u(930)); q.lineTo(u(1000), u(910)); q.lineTo(u(1000), u(1000)); q.lineTo(0, u(1010)); q.closePath(); (NOPALM ? [] : [[120, 930, 1.6], [190, 935, 1.2], [790, 915, 1.8], [870, 918, 1.3], [700, 920, 1]]).forEach(([a, b, s]) => palm(q, u(a), u(b), s)); }],
   ["i5", [-1.6, -1.8], (q) => { q.moveTo(0, u(1080)); for (let xx = 0; xx <= 1000; xx += 20) q.lineTo(u(xx), u(1060 + Math.sin(xx * .008) * 40)); q.lineTo(u(1000), u(1500)); q.lineTo(0, u(1500)); q.closePath(); }],
 ];
 const PULL = (i) => [.4 + i * 1.05, 1.25 + i * 1.05];   // وقت سحب كل لون
@@ -48,7 +50,10 @@ M.reel({
     const mottle = mk(PW, PH), m = mottle.getContext("2d");
     for (let i = 0; i < 80; i++) { const cx = R() * PW, cy = R() * PH, r = 40 + R() * 160, g = m.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(255,255,255,${R() * .12})`); g.addColorStop(1, "rgba(255,255,255,0)"); m.fillStyle = g; m.fillRect(cx - r, cy - r, r * 2, r * 2); }
     for (let i = 0; i < 1500; i++) { m.fillStyle = `rgba(241,232,214,${.5 + R() * .5})`; m.fillRect(R() * PW, R() * PH, 1.4, 1.4); }
-    return { x, paper, mottle, lay: mk(PW, PH) };
+    // 🧩 كل عنصر بيتقسم بالكود لأحبار البوستر نفسه (الكثبان، الأخضر، الغامق، الشمس) وبيتطبع لون لون
+    const ims = await M.els(PR.els, 3); NOPALM = ims.length > 0;
+    const EL = ims.map((im) => M.fx.posterize(im, [PR.i5, PR.i4, PR.i3, PR.acc, PR.i2], 480, 480));
+    return { x, paper, mottle, lay: mk(PW, PH), EL };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, cubic, expo } = M;
@@ -72,6 +77,15 @@ M.reel({
       x.drawImage(C.lay, PX + off[0], PY + off[1]); x.restore();
     };
     LAYERS.forEach(([key, off, draw], i) => { const { k, wet } = pullTo(i); ink(PR[key], off, draw, k, wet); });
+    // العناصر: بعد الخلفية، كل عنصر بيتطبع بأحباره ورا بعض (كل حبر بمسحة من فوق لتحت وإزاحة صغيرة)، والبوستر بيتملي
+    const n = C.EL.length, slots = [[500], [300, 700], [210, 500, 790]][n - 1] || [];
+    C.EL.forEach((layers, e) => {
+      const cx = PX + u(slots[e]), base = PY + u(1010), sz = u(n === 1 ? 440 : n === 2 ? 360 : 300);
+      layers.forEach((lay, li) => {
+        const t0 = 6.4 + e * .7 + li * .14, k = seg(t, t0, t0 + .35); if (k <= 0) return; const off = [[1.6, -1], [-1.4, 1.8], [2, 1.2], [-1.8, -1.4], [1, 2]][li];
+        x.save(); x.beginPath(); x.rect(cx - sz / 2 - 6, base - sz - 6, sz + 12, (sz + 12) * k); x.clip(); x.drawImage(lay, cx - sz / 2 + off[0], base - sz + off[1], sz, sz); x.restore();
+      });
+    });
     // آخر سحبة: كلام بلون الورق على الغامق (الاسم، الرقم، سطر البيانات)
     const tk = seg(t, 6.9, 7.8), twet = 1 - seg(t, 7.8, 9);
     ink(PAPER, [1, 1], (q) => {}, 0, 0);

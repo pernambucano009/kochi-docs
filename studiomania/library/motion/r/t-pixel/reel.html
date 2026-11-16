@@ -7,6 +7,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", def: "مغامرة التسوّق", group: G1, max: 16, hint: "اسم «اللعبة» يظهر في البداية بنجوم تحته." },
   who: { label: "اسم المتحدث", kind: "text", def: "البيّاع", group: G1, max: 10, hint: "اسم الشخصية في صندوق الحوار: البائع، الطاهي، المدرب…" },
   line1: { label: "كلام البائع", kind: "text", def: "أهلاً يا بطل! عندنا عرض النهارده", group: G1, max: 40, hint: "يُكتب حرفًا حرفًا مثل الألعاب القديمة. جملة ترحيب + العرض." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G2, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   got: { label: "كلمة «حصلت على:»", kind: "text", def: "حصلت على:", group: G2, max: 12 },
   item: { label: "الجائزة", kind: "text", role: "product", def: "هدية مجانية مع أول طلب", group: G2, max: 28, hint: "ما سيحصل عليه العميل: هدية، خصم، شحن مجاني." },
   opt1: { label: "الخيار الأول", kind: "text", def: "اطلب دلوقتي", group: G2, max: 14, hint: "تشير إليه اليد ويُختار: هذا هو الدعوة لاتخاذ إجراء." },
@@ -34,7 +35,17 @@ M.reel({
     const out = M.canvas(W, H); const o = out.getContext("2d"); o.imageSmoothingEnabled = false;
     const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
     const art = mk(NW, NH), tl = mk(NW * TS, NH * TS);
-    return { o, art, a: art.getContext("2d"), tl, t: tl.getContext("2d", { willReadFrequently: true }) };
+    // 🧩 عناصر مكتبة المجال: كل عنصر بيتحول «سبرايت» صغير (٢٢ بكسل) بألوان اللعبة وحد أسود، وبيطلع جوايز ورا بعض من الصندوق
+    const pal = Object.values(C).filter((v) => /^#[0-9a-f]{6}$/i.test(v)).map(M.rgbOf);
+    const sprite = (im, S) => {
+      const c = mk(S, S), g = c.getContext("2d"); g.imageSmoothingEnabled = true; const sc = Math.min((S - 2) / im.width, (S - 2) / im.height); g.drawImage(im, (S - im.width * sc) / 2, (S - im.height * sc) / 2, im.width * sc, im.height * sc);
+      const d = g.getImageData(0, 0, S, S), p = d.data, on = new Uint8Array(S * S);
+      for (let i = 0; i < S * S; i++) { if (p[i * 4 + 3] < 110) { p[i * 4 + 3] = 0; continue; } on[i] = 1; let b = pal[0], bd = 1e9; for (const q of pal) { const dd = (q[0] - p[i * 4]) ** 2 + (q[1] - p[i * 4 + 1]) ** 2 + (q[2] - p[i * 4 + 2]) ** 2; if (dd < bd) { bd = dd; b = q; } } p[i * 4] = b[0]; p[i * 4 + 1] = b[1]; p[i * 4 + 2] = b[2]; p[i * 4 + 3] = 255; }
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const i = y * S + x; if (on[i]) continue; if ((x > 0 && on[i - 1]) || (x < S - 1 && on[i + 1]) || (y > 0 && on[i - S]) || (y < S - 1 && on[i + S])) { p[i * 4] = 24; p[i * 4 + 1] = 20; p[i * 4 + 2] = 37; p[i * 4 + 3] = 255; } }
+      g.putImageData(d, 0, 0); return c;
+    };
+    const SP = (await M.els(PR.els, 4)).map((im) => ({ big: sprite(im, 22), sign: sprite(im, 12) }));
+    return { o, art, a: art.getContext("2d"), tl, t: tl.getContext("2d", { willReadFrequently: true }), SP };
   },
   seek(t, X, M) {
     const { a } = X, { seg, clamp } = M;
@@ -66,7 +77,7 @@ M.reel({
     for (let i = 0; i < 9; i++) px(98 + i * 9, 150, 9, 18, i % 2 ? C.W : C.red); px(96, 166, 82, 3, C.red2);
     px(130, 200, 18, 30, C.br); px(132, 202, 14, 28, C.br2); px(143, 214, 2, 2, C.ye);
     px(110, 180, 14, 12, C.bl); px(111, 181, 12, 10, C.sky2); px(156, 180, 14, 12, C.bl); px(157, 181, 12, 10, C.sky2);
-    px(122, 134, 34, 14, C.K); px(123, 135, 32, 12, C.ye); px(134, 137, 10, 8, C.or); px(136, 136, 6, 2, C.K);
+    px(122, 134, 34, 14, C.K); px(123, 135, 32, 12, C.ye); if (X.SP.length) a.drawImage(X.SP[0].sign, 133, 135); else { px(134, 137, 10, 8, C.or); px(136, 136, 6, 2, C.K); }
     // البطل: بيمشي بـ٨ فريمات في الثانية، والكوفية الحمرا علامته
     const hx = Math.round(-10 + 98 * seg(t, .6, 3.2)), walking = t > .6 && t < 3.2, fr = walking ? f8 % 4 : 0;
     const arms = t > T_GET && t < T_MENU;
@@ -89,7 +100,8 @@ M.reel({
     if (t > T_GET && t < T_MENU + .3) {
       const gy = 196 - Math.min(8, Math.floor((t - T_GET) * 30)), gx = hx + 1;
       for (let r = 0; r < 8; r++) { const ang = r / 8 * Math.PI * 2 + t * 2; for (let d = 8; d < 22; d += 2) { const xx = Math.round(gx + 6 + Math.cos(ang) * d), yy = Math.round(gy + 5 + Math.sin(ang) * d); if (BAYER[yy & 3][xx & 3] < 10 - d * .4) px(xx, yy, 1, 1, C.ye2); } }
-      px(gx, gy, 12, 10, C.K); px(gx + 1, gy + 1, 10, 8, C.pk); px(gx + 5, gy + 1, 2, 8, C.ye); px(gx + 1, gy + 4, 10, 2, C.ye); px(gx + 3, gy - 2, 3, 3, C.ye); px(gx + 7, gy - 2, 3, 3, C.ye);
+      if (X.SP.length) { const n = X.SP.length, k = Math.min(n - 1, Math.floor((t - T_GET) / ((T_MENU - T_GET) / n))), lt2 = t - T_GET - k * (T_MENU - T_GET) / n, yy = Math.round(196 - Math.min(10, lt2 * 30)); a.drawImage(X.SP[k].big, gx - 5, yy - 12); } else {
+      px(gx, gy, 12, 10, C.K); px(gx + 1, gy + 1, 10, 8, C.pk); px(gx + 5, gy + 1, 2, 8, C.ye); px(gx + 1, gy + 4, 10, 2, C.ye); px(gx + 3, gy - 2, 3, 3, C.ye); px(gx + 7, gy - 2, 3, 3, C.ye); }
     }
     // شريط اللعبة فوق: قلوب + عملات (بتزيد مع الجائزة)
     for (let i = 0; i < 3; i++) { const hx2 = 6 + i * 11; px(hx2 + 1, 6, 3, 2, C.red); px(hx2 + 5, 6, 3, 2, C.red); px(hx2, 7, 9, 3, C.red); px(hx2 + 1, 10, 7, 2, C.red); px(hx2 + 3, 12, 3, 1, C.red); px(hx2 + 1, 7, 2, 1, C.pk); }
