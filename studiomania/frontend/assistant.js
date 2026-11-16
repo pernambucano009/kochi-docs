@@ -274,9 +274,9 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       // ⏳ البحث ساعات بياخد أكتر من دقيقة: المكالمة ماتسكتش. بعد ١٠ ثواني نورة تكمل المحطة اللي بعدها، والكارت يظهر لما يجهز
       const r = await Promise.race([p, new Promise((res) => setTimeout(() => res(null), 10000))]);
       if (!r) {
-        p.then((x) => { if (!S || !x?.ok) return; rivalCard(x.card);
-          note(`(SYSTEM: the competitor card is on the screen now. When you finish your current sentence, present it briefly as the competitor stop says (no questions), then continue where you were. Facts: ${x.facts || ""})`); });
-        return { ok: false, pending: true, error: "The competitor search is taking longer. Never wait in silence: go on right now to the next stop. You will be told when the card is ready." };
+        p.then((x) => { if (!S || !x?.ok) return; const go = () => { if (!S) return; if (q(".as-dcase")) return setTimeout(go, 1200); rivalCard(x.card);
+          note(`(SYSTEM: the competitor card is on the screen now. When you finish your current sentence, present it briefly as the competitor stop says (no questions), then continue where you were. Facts: ${x.facts || ""})`); }; go(); });
+        return { ok: false, pending: true, error: "The competitor search is taking longer. Never wait in silence and never jump without a bridge: say ONE short sentence in the customer's dialect that the team is still looking for the competitor so meanwhile you will do the next step (e.g. 'the team is still finding competitors, so meanwhile…'), then go on right away to the next stop. You will be told when the card is ready." };
       }
       if (r.ok) rivalCard(r.card);
       return r.ok ? { ok: true, account: r.card, facts: r.facts } : r;
@@ -513,6 +513,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function rivalCard(c) { whenTalking(() => rivalCard0(c), /منافس|حساب قوي|لقيت حساب|لجيت حساب/, 30000); }
   function rivalCard0(c) {
     if (!S || !ov || !c) return;
+    if (q(".as-dcase")) return void setTimeout(() => rivalCard0(c), 1200);   // 🦷 مايقفلش مربع صور الحالة وهو بيرفع: يستنى لحد ما يخلّص
     if (S.show) { S.show.v.pause(); S.show = null; S.wait = null; }
     q(".as-box")?.remove(); acct(false);
     const d = document.createElement("div"); d.className = "as-box as-card"; d.dataset.card = "rival";
@@ -781,6 +782,13 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       catch (me) { noMic = me.name === "NotAllowedError" ? "لم يُسمح باستخدام الميكروفون، فاكتب ردودك في الخانة. للكلام بالصوت: اسمح بالميكروفون من شريط العنوان ثم افتح المساعد مرة أخرى"
         : "لم نجد ميكروفونًا في هذا الجهاز، فاكتب ردودك في الخانة"; }
       if (mic && typeof TestRec !== "undefined" && TestRec.mic?.()) setTimeout(() => { if (S && !S.heardMic) { const tk = S.mic?.getTracks()[0]; TestRec.note?.(`🎙️ لم تسمع نورة صوتك حتى الآن. الميكروفون: «${tk?.label || "?"}» · أعلى مستوى صوت: ${((S.micMax || 0) * 1000).toFixed(0)} (أقل من 30 = لا يصل)${tk?.muted ? " · المتصفح أو النظام يكتم هذا الميكروفون" : ""}${S.muted ? " · مكتوم من زر المكالمة" : ""}`); } }, 45000);
+      // 🎙️ لو المايك الافتراضي كابل وهمي (VB-Audio وغيره) بنختار مايك حقيقي من الأول (كان أول رد بيضيع لحد ما الحارس يبدّل)
+      const VIRT = /CABLE|VB-Audio|Virtual|VoiceMeeter|Stereo Mix/i;
+      if (mic && VIRT.test(mic.getAudioTracks()[0]?.label || "") && !(typeof TestRec !== "undefined" && TestRec.mic?.())) {
+        try { const real = (await navigator.mediaDevices.enumerateDevices()).find((d) => d.kind === "audioinput" && d.deviceId && !["default", "communications"].includes(d.deviceId) && !VIRT.test(d.label));
+          if (real) { const m2 = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: real.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            lg("sys", `mic virtual skipped: ${mic.getAudioTracks()[0].label}`); mic.getTracks().forEach((x) => x.stop()); mic = m2; } } catch (e) { lg("sys", `mic real pick failed: ${e?.name || e}`); }
+      }
       S.mic = mic; lg("sys", mic ? `mic ok: ${mic.getTracks()[0]?.label || "default"}` : `mic: none (${noMic})`); S.ctx = new AudioContext(); if (mic) S.micLevel = meter(S.ctx, S.ctx.createMediaStreamSource(mic));
       q(".as-st").textContent = "⏳ جارٍ الاتصال…";
       const tok = await tokP;
