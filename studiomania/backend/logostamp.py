@@ -81,3 +81,25 @@ def stamp(clip: Path, logo: Path, ffmpeg: str, secs: float = 2.0) -> bool:
         return False
     finally:
         tmp_last.unlink(missing_ok=True)
+
+
+# 🧼 تجهيز اللوجو وقت الرفع: تكبير لو صغير/ضعيف، وشيل الخلفية (لو سادة بالكود ببلاش، ولو مش سادة بموديل)
+MIN_SIDE = 1000
+UPSCALER = "tencent/image/upscaler"            # بيكبّر ×2
+BG_REMOVER = "midjourney/v8.2/remove-background"
+
+
+def needs_upscale(path: Path) -> bool:
+    from PIL import Image
+    with Image.open(path) as im:
+        return max(im.size) < MIN_SIDE
+
+
+def plain_background(path: Path) -> bool:
+    """أطراف الصورة لون واحد تقريبًا؟ (يبقى الكود يشيلها من غير موديل)"""
+    import numpy as np
+    from PIL import Image
+    with Image.open(path) as im:
+        a = np.asarray(im.convert("RGB")).astype(np.float32)
+    b = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+    return float(np.sqrt(((b - np.median(b, axis=0)) ** 2).sum(-1)).mean()) < 12.0

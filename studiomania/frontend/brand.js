@@ -774,7 +774,7 @@ const BrandPage = (() => {
         const xs = b?.[l.f] || [];
         return head + `<div class="bm-imgs">${xs.map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><button data-adel title="احذف">✕</button></figure>`).join("")}
           <label class="bm-up">+<small>ارفع</small><input type="file" accept="image/*" multiple data-up="${l.f}" hidden></label></div>
-          <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من العلامة. يصفها البرنامج ويستخدمها كما هي بدلًا من الاختراع."} يمكنك سحب الصور وإفلاتها هنا.</p>` + (l.f === "logos" && xs.length ? lstHTML(b) : "");
+          <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة). يزيل البرنامج خلفيته ويحسّن جودته تلقائيًا بعد الرفع." : "صور حقيقية من العلامة. يصفها البرنامج ويستخدمها كما هي بدلًا من الاختراع."} يمكنك سحب الصور وإفلاتها هنا.</p>` + (l.f === "logos" && xs.length ? lstHTML(b) : "");
       }
       case "video": {
         const url = b?.[`${l.f}_url`];

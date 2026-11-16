@@ -7575,7 +7575,7 @@ def upload_logo(file: UploadFile = File(...)):
         raise HTTPException(400, "اختر عميلًا أولًا")
     name = save_upload(file, IMAGE_EXTENSIONS, brain_dir(cid), "logo")
     update_brain(cid, lambda d: d.update(logos=[{"file": name, "name": "الشعار", "description": ""}] + (d.get("logos") or [])))
-    logo_styles_kick(cid)
+    logo_upload_kick(cid, [name])
     return get_logo()
 
 
@@ -12639,7 +12639,7 @@ def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[Uploa
         raise HTTPException(400, "لا توجد صور في هذه الملفات (PNG / JPG / WEBP)")
     update_brain(bid, lambda d: d.setdefault(kind, []).extend(added) or d.update(status="working", error=None))
     if kind == "logos":
-        logo_styles_kick(bid)
+        logo_upload_kick(bid, [a["file"] for a in added])
     threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
     return brain_to_dict(brain_row(bid))
 
@@ -24987,6 +24987,61 @@ def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
     except Exception as exc:  # noqa: BLE001 — القالب بياخد اللوجو الأصلي
         print(f"[logost] {bid}/{style}: {exc}", flush=True)
         return None
+
+
+def logo_prepare(bid: str, name: str) -> str:
+    """🧼 لوجو اترفع: لو صغير يتكبّر (×2 لحد ما يعدّي ١٠٠٠ بكسل)، وخلفيته تتشال (سادة: بالكود، مش سادة: بموديل).
+    النسخة النضيفة بتاخد مكانه في العقل (والأصل بيتحفظ جنبها). يرجع اسم الملف الجديد (أو القديم لو مفيش تغيير)."""
+    folder = brain_dir(bid)
+    src = folder / name
+    if not src.exists():
+        return name
+    work = src
+    try:
+        from PIL import Image as _PImg
+        with _PImg.open(src) as im:
+            transparent = firstvid.has_alpha(im)
+        if not atlas.mock_mode() and atlas.api_key():
+            for _ in range(2):
+                if not logostamp.needs_upscale(work):
+                    break
+                url = atlas.run_model("Image", {"model": logostamp.UPSCALER, "image": atlas.reference_url(work)}, "تحسين جودة الشعار", max_seconds=300)
+                up = folder / f"logo-up-{uuid.uuid4().hex[:6]}.png"
+                atlas.download(url, up)
+                if work != src:
+                    work.unlink(missing_ok=True)
+                work = up
+            if not transparent and not logostamp.plain_background(work):
+                url = atlas.run_model("Image", {"model": logostamp.BG_REMOVER, "image": atlas.reference_url(work)}, "إزالة خلفية الشعار", max_seconds=300)
+                nb = folder / f"logo-nobg-{uuid.uuid4().hex[:6]}.png"
+                atlas.download(url, nb)
+                if work != src:
+                    work.unlink(missing_ok=True)
+                work = nb
+        out = f"logo-{uuid.uuid4().hex[:8]}.png"
+        firstvid.cutout(work, folder / out)   # الخلفية السادة + قص الفراغ (واللي شفاف بيتقص بس)
+        if work != src:
+            work.unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001 — اللوجو يفضل زي ما اترفع
+        print(f"[logo-prep] {bid}/{name}: {exc}", flush=True)
+        if work != src:
+            work.unlink(missing_ok=True)
+        return name
+    def fn(d):
+        for a in d.get("logos") or []:
+            if a.get("file") == name:
+                a.update(file=out, original=name)
+    update_brain(bid, fn)
+    return out
+
+
+def logo_upload_kick(bid: str, names: list[str]) -> None:
+    """بعد رفع اللوجو: تنضيفه، وبعدها نسخ الستايلات (في الخلفية)."""
+    def go():
+        for n in names:
+            logo_prepare(bid, n)
+        logo_styles_kick(bid)
+    threading.Thread(target=go, daemon=True).start()
 
 
 def logo_styles_kick(bid: str) -> None:

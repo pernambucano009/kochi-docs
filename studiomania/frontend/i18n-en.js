@@ -16638,4 +16638,5 @@ window.I18N_EN = {
   "القوالب التي تناسب هذه الحالة ({0} من {1})": "Templates that fit this case ({0} of {1})",
   "اصنع البوست": "Make the post",
   "قوالب تحتاج صورًا أخرى ({0})": "Templates that need other photos ({0})",
+  "الشعار بنسخه (فاتح، غامق، أيقونة). يزيل البرنامج خلفيته ويحسّن جودته تلقائيًا بعد الرفع.": "Your logo in its versions (light, dark, icon). After upload, its background is removed and its quality improved automatically.",
 };
