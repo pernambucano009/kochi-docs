@@ -24967,6 +24967,8 @@ def flow_els_inline(params: dict) -> dict:
 import logostamp  # noqa: E402
 
 LOGOST_JOBS: dict[str, str] = {}
+LOGOST_STEP: dict[str, str] = {}   # الخطوة الحالية (تظهر للعميل)
+LOGOST_ERR: dict[str, str] = {}    # آخر خطأ (يظهر للعميل بدل شرطات صامتة)
 
 
 def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
@@ -24986,6 +24988,7 @@ def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
         return out
     except Exception as exc:  # noqa: BLE001 — القالب بياخد اللوجو الأصلي
         print(f"[logost] {bid}/{style}: {exc}", flush=True)
+        LOGOST_ERR[bid] = str(getattr(exc, "detail", None) or exc)[:200]
         return None
 
 
@@ -25024,6 +25027,7 @@ def logo_prepare(bid: str, name: str) -> str:
             work.unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001 — اللوجو يفضل زي ما اترفع
         print(f"[logo-prep] {bid}/{name}: {exc}", flush=True)
+        LOGOST_ERR[bid] = str(getattr(exc, "detail", None) or exc)[:200]
         if work != src:
             work.unlink(missing_ok=True)
         return name
@@ -25037,9 +25041,14 @@ def logo_prepare(bid: str, name: str) -> str:
 
 def logo_upload_kick(bid: str, names: list[str]) -> None:
     """بعد رفع اللوجو: تنضيفه، وبعدها نسخ الستايلات (في الخلفية)."""
+    LOGOST_JOBS[bid] = "working"
+    LOGOST_STEP[bid] = "clean"
     def go():
-        for n in names:
-            logo_prepare(bid, n)
+        try:
+            for n in names:
+                logo_prepare(bid, n)
+        finally:
+            LOGOST_JOBS.pop(bid, None)
         logo_styles_kick(bid)
     threading.Thread(target=go, daemon=True).start()
 
@@ -25049,12 +25058,15 @@ def logo_styles_kick(bid: str) -> None:
     if LOGOST_JOBS.get(bid) == "working" or not logo_path(bid):
         return
     LOGOST_JOBS[bid] = "working"
+    LOGOST_ERR.pop(bid, None)
     def go():
         try:
             for st in logostamp.STYLES:
+                LOGOST_STEP[bid] = f"draw:{st}"
                 logo_styled(bid, st)
         finally:
             LOGOST_JOBS.pop(bid, None)
+            LOGOST_STEP.pop(bid, None)
     threading.Thread(target=go, daemon=True).start()
 
 
@@ -25077,7 +25089,9 @@ def logo_styles_get(bid: str):
         f = logostamp.file_for(brain_dir(bid), src, st) if src else None
         items.append({"style": st, "label": logostamp.LABELS[st], "on": st not in off,
                       "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
-    return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items}
+    step = LOGOST_STEP.get(bid, "")
+    return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""),
+            "step": "clean" if step == "clean" else step.split(":", 1)[1] if step.startswith("draw:") else ""}
 
 
 class LogoStyleIn(BaseModel):
