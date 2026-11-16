@@ -527,5 +527,349 @@
   "secs": 9.0,
   "cost": "0.009227",
   "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "kettlebell",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "barbell",
+  "secs": 5.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "jump_rope",
+  "secs": 8.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "yoga_mat",
+  "secs": 5.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "treadmill",
+  "secs": 9.6,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "bench",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "resistance_band",
+  "secs": 6.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "foam_roller",
+  "secs": 6.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "pullup_bar",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "boxing_gloves",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "medicine_ball",
+  "secs": 8.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "stationary_bike",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "smartwatch",
+  "secs": 8.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "protein",
+  "secs": 5.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "shaker",
+  "secs": 8.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "banana",
+  "secs": 8.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "apple",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "oats_bowl",
+  "secs": 8.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "salad_bowl",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "eggs",
+  "secs": 5.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "dates",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "scale",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "tape_measure",
+  "secs": 9.0,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "towel",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "plank",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "running",
+  "secs": 8.8,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "pushup",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "lunge",
+  "secs": 8.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "deadlift",
+  "secs": 5.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "stretch",
+  "secs": 8.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "jumping_jack",
+  "secs": 5.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "biceps_curl",
+  "secs": 5.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "rest",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "heart",
+  "secs": 5.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "flame",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "arrow_up",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "trophy",
+  "secs": 5.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "medal",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "calendar",
+  "secs": 5.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "lightning",
+  "secs": 9.5,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "star",
+  "secs": 9.1,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "check",
+  "secs": 4.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "target",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
  }
 ]
