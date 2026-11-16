@@ -7575,6 +7575,7 @@ def upload_logo(file: UploadFile = File(...)):
         raise HTTPException(400, "اختر عميلًا أولًا")
     name = save_upload(file, IMAGE_EXTENSIONS, brain_dir(cid), "logo")
     update_brain(cid, lambda d: d.update(logos=[{"file": name, "name": "الشعار", "description": ""}] + (d.get("logos") or [])))
+    logo_styles_kick(cid)
     return get_logo()
 
 
@@ -12637,6 +12638,8 @@ def upload_brain_assets(bid: str, kind: str = Form("screens"), files: list[Uploa
     if not added:
         raise HTTPException(400, "لا توجد صور في هذه الملفات (PNG / JPG / WEBP)")
     update_brain(bid, lambda d: d.setdefault(kind, []).extend(added) or d.update(status="working", error=None))
+    if kind == "logos":
+        logo_styles_kick(bid)
     threading.Thread(target=run_brain_analyze, args=(bid,), daemon=True).start()
     return brain_to_dict(brain_row(bid))
 
@@ -16640,7 +16643,7 @@ def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progre
     return dur
 
 
-def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None) -> None:
+def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None, stamp: Path | None = None) -> None:
     """يفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، ويأخذ الصوت الذي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
     aid = uuid.uuid4().hex[:12]
     folder = clip_dir(aid)
@@ -16649,6 +16652,9 @@ def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: st
         (folder / "variants").mkdir(parents=True, exist_ok=True)
         dur = motion_to_mp4(mid, params, folder, folder / "clip.mp4", lambda k: job.update(progress=k), timing, vo)
         (folder / "track.wav").unlink(missing_ok=True)
+        if stamp and stamp.exists():   # 🏷️ قفلة بلوجو العميل بستايل القالب
+            job.update(progress=0.99)
+            logostamp.stamp(folder / "clip.mp4", stamp, ffmpeg_exe())
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
                         "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
         info = media_info(folder / "clip.mp4")
@@ -24955,6 +24961,91 @@ def flow_els_inline(params: dict) -> dict:
     return {**params, "els": out}
 
 
+# 🏷️ ختم اللوجو في آخر فيديو القالب: نسخة من لوجو العميل بستايل القالب (تترسم مرة لكل ستايل، والعميل يقدر يقفل أي نسخة)
+import logostamp  # noqa: E402
+
+LOGOST_JOBS: dict[str, str] = {}
+
+
+def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
+    """نسخة اللوجو بالستايل ده (لو مش موجودة وmake: تترسم دلوقتي). None = مافيش لوجو، أو الرسم فشل."""
+    src = logo_path(bid)
+    if not src or style not in logostamp.STYLES:
+        return None
+    out = logostamp.file_for(brain_dir(bid), src, style)
+    if out.exists() or not make or atlas.mock_mode() or not atlas.api_key():
+        return out if out.exists() else None
+    try:
+        url = atlas.generate_image("sunburst", logostamp.prompt(style), "1024x1024", "medium", images=[atlas.reference_url(src)])
+        raw = out.with_name(f"logost-src-{uuid.uuid4().hex[:6]}.png")
+        atlas.download(url, raw)
+        firstvid.cutout(raw, out)
+        raw.unlink(missing_ok=True)
+        return out
+    except Exception as exc:  # noqa: BLE001 — القالب بياخد اللوجو الأصلي
+        print(f"[logost] {bid}/{style}: {exc}", flush=True)
+        return None
+
+
+def logo_styles_kick(bid: str) -> None:
+    """بعد رفع اللوجو: كل النسخ بتترسم في الخلفية (مرة واحدة)."""
+    if LOGOST_JOBS.get(bid) == "working" or not logo_path(bid):
+        return
+    LOGOST_JOBS[bid] = "working"
+    def go():
+        try:
+            for st in logostamp.STYLES:
+                logo_styled(bid, st)
+        finally:
+            LOGOST_JOBS.pop(bid, None)
+    threading.Thread(target=go, daemon=True).start()
+
+
+def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
+    """اللوجو اللي يتختم بيه فيديو القالب ده: نسخته بستايل القالب (لو مش مقفولة)، وإلا الأصلي. None لو الشعار مقفول أو مش موجود."""
+    if not bid or not logo_path(bid) or (brain_row(bid) or {}).get("logo_on") == "0":
+        return None
+    style = logostamp.style_of(mid, EL_DIR / "fitness" / "index.json")
+    if style and style not in ((brain_row(bid) or {}).get("logo_styles_off") or []):
+        return logo_styled(bid, style) or logo_path(bid)
+    return logo_path(bid)
+
+
+@app.get("/api/ad-brains/{bid}/logo-styles")
+def logo_styles_get(bid: str):
+    src = logo_path(bid)
+    off = (brain_row(bid) or {}).get("logo_styles_off") or []
+    items = []
+    for st in logostamp.STYLES:
+        f = logostamp.file_for(brain_dir(bid), src, st) if src else None
+        items.append({"style": st, "label": logostamp.LABELS[st], "on": st not in off,
+                      "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
+    return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items}
+
+
+class LogoStyleIn(BaseModel):
+    style: str
+    on: bool | None = None
+    redo: bool = False
+
+
+@app.post("/api/ad-brains/{bid}/logo-styles")
+def logo_styles_set(bid: str, body: LogoStyleIn):
+    """قفل/فتح نسخة، أو إعادة رسمها، أو (style=all) ارسم الناقص."""
+    if brain_row(bid) is None:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    if body.style == "all":
+        logo_styles_kick(bid)
+    elif body.style in logostamp.STYLES:
+        if body.on is not None:
+            update_brain(bid, lambda d: d.update(logo_styles_off=sorted({*(d.get("logo_styles_off") or [])} - {body.style}
+                                                                        if body.on else {*(d.get("logo_styles_off") or []), body.style})))
+        if body.redo and (src := logo_path(bid)):
+            logostamp.file_for(brain_dir(bid), src, body.style).unlink(missing_ok=True)
+            logo_styles_kick(bid)
+    return logo_styles_get(bid)
+
+
 def flow_motion_params(d: dict) -> dict:
     """خانات القالب: الصور والألوان والاسم من عقل العلامة، والنص من النص المختار، ومعطيات العميل الحقيقية آخر حاجة (مقفولة)."""
     mid = d["template"]["id"]
@@ -26378,7 +26469,8 @@ def flow_export(fid: str, body: FlowExportIn):
         p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
         p = flow_els_inline(p)                    # 🧩 عناصر المجال تتضمّن في الرسم
         run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
-                          timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None)
+                          timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None,
+                          stamp=logo_stamp_for(d.get("client_id") or active_client_id(), mid))
     threading.Thread(target=go, daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
 

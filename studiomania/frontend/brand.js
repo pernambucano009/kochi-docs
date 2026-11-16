@@ -633,6 +633,24 @@ const BrandPage = (() => {
   const arRows = (fid) => (S.ar?.parts.find((p) => p.id === fid)?.rules || []).map((r) => ({ t: r.t, on: r.on }));
 
   // ✅ مهام العقل (مش أسئلة): رفع اللوجو، صور الأفاتار، الفيديو، صوتك… كل واحدة بتتعلّم لوحدها لما تتعمل
+  // 🏷️ الشعار بستايلات القوالب: يُختم به آخر كل فيديو قالب (والنسخة المقفولة يحل محلها الشعار الأصلي)
+  async function loadLst(b) {
+    S.lstLoading = b.id;
+    try { S.lst = await bAPI("/logo-styles"); } catch { S.lst = null; }
+    S.lstFor = b.id; S.lstLoading = null;
+    if (S.open && cur()?.id === b.id) refreshCard();
+    if (S.lst?.working) setTimeout(() => { if (cur()?.id === b.id && S.lstFor === b.id) { S.lstFor = null; loadLst(b); } }, 6000);
+  }
+  function lstHTML(b) {
+    const x = S.lstFor === b?.id ? S.lst : null;
+    if (!x) { if (b && S.lstLoading !== b.id) loadLst(b); return ""; }
+    const miss = x.items.some((i) => !i.url);
+    return `<div class="bm-sub"><small>شعارك بأساليب القوالب</small>
+      <p class="bm-note">يُختم آخر كل فيديو قالب بنسخة من شعارك بأسلوب القالب نفسه. إن لم تعجبك نسخة فأوقفها، فيُستخدم شعارك الأصلي مكانها.</p>
+      <div class="bm-lst">${x.items.map((i) => `<figure class="${i.on ? "" : "off"}">${i.url ? `<img src="${esc(i.url)}" alt="" loading="lazy">` : `<span>${x.working ? "⏳" : "—"}</span>`}
+        <figcaption>${esc(i.label)}</figcaption><div><button class="bm-pill${i.on ? " on" : ""}" data-lst="${i.style}" data-v="${i.on ? "" : "1"}">${i.on ? "تعمل" : "متوقفة"}</button>${i.url ? `<button class="bm-pill" data-lstredo="${i.style}" title="ارسمها من جديد">↻</button>` : ""}</div></figure>`).join("")}</div>
+      ${miss && !x.working ? `<button class="bm-pill" data-lstall>🎨 ارسم النسخ الناقصة</button>` : x.working ? `<p class="bm-note">⏳ تُرسم النسخ الآن…</p>` : ""}</div>`;
+  }
   async function loadTasks(b) {
     S.tqLoading = b.id;
     try { S.tq = await bAPI("/tasks"); S.tqFor = b.id; } catch { S.tq = null; S.tqFor = b.id; }
@@ -756,7 +774,7 @@ const BrandPage = (() => {
         const xs = b?.[l.f] || [];
         return head + `<div class="bm-imgs">${xs.map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><button data-adel title="احذف">✕</button></figure>`).join("")}
           <label class="bm-up">+<small>ارفع</small><input type="file" accept="image/*" multiple data-up="${l.f}" hidden></label></div>
-          <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من العلامة. يصفها البرنامج ويستخدمها كما هي بدلًا من الاختراع."} يمكنك سحب الصور وإفلاتها هنا.</p>`;
+          <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة)." : "صور حقيقية من العلامة. يصفها البرنامج ويستخدمها كما هي بدلًا من الاختراع."} يمكنك سحب الصور وإفلاتها هنا.</p>` + (l.f === "logos" && xs.length ? lstHTML(b) : "");
       }
       case "video": {
         const url = b?.[`${l.f}_url`];
@@ -1282,6 +1300,14 @@ const BrandPage = (() => {
       const hdel = t.closest("[data-hdel]");
       if (hdel) return patch({ palette: String(cur()?.palette || "").replace(new RegExp(`${hdel.dataset.hdel}[^,\\n]*[,\\n]?\\s*`, "i"), "").trim() });
       if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
+      const lst = t.closest("[data-lst]"), lsr = t.closest("[data-lstredo]");
+      if (lst || lsr || t.closest("[data-lstall]")) {
+        const b = cur(); if (!b) return;
+        try { S.lst = await bAPI("/logo-styles", { method: "POST", ...jsonBody(lst ? { style: lst.dataset.lst, on: !!lst.dataset.v } : { style: lsr ? lsr.dataset.lstredo : "all", redo: !!lsr }) }); S.lstFor = b.id; }
+        catch (err) { toast(err.message, true); }
+        refreshCard(); if (S.lst?.working) { S.lstFor = null; setTimeout(() => loadLst(b), 4000); }
+        return;
+      }
       const fig = t.closest("[data-file]");
       if (fig && t.closest("[data-adel]")) { if ((await uiConfirm("تحذف هذه الصورة؟"))) save(() => bAPI(`/assets/${encodeURIComponent(fig.dataset.file)}`, { method: "DELETE" })); return; }
       // دوسة في الفاضي بتقفل الكارت

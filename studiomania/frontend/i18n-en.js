@@ -16623,4 +16623,12 @@ window.I18N_EN = {
   "اختر الفكرة التي تعجبك": "Pick the idea you like",
   "📱 بانتظار تصويرك": "📱 Waiting for your shoot",
   "· {0}٪": "· {0}%",
+  "شعارك بأساليب القوالب": "Your logo in template styles",
+  "يُختم آخر كل فيديو قالب بنسخة من شعارك بأسلوب القالب نفسه. إن لم تعجبك نسخة فأوقفها، فيُستخدم شعارك الأصلي مكانها.": "Every template video ends with a version of your logo drawn in that template's style. If you don't like a version, turn it off and your original logo is used instead.",
+  "ارسمها من جديد": "Redraw it",
+  "🎨 ارسم النسخ الناقصة": "🎨 Draw the missing versions",
+  "⏳ تُرسم النسخ الآن…": "⏳ Drawing the versions now…",
+  "خط واحد": "One line",
+  "رسم بالقلم": "Pencil sketch",
+  "طباعة يابانية": "Japanese print",
 };
