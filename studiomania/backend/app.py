@@ -16590,7 +16590,7 @@ def motion_params(params: dict) -> dict:
             else:
                 v = ""
         elif isinstance(v, list):
-            v = [str(z)[:400] for z in v[:40]]
+            v = [str(z) if isinstance(z, str) and z.startswith("data:image/") and len(z) < 3_000_000 else str(z)[:400] for z in v[:40]]   # 🧩 صور العناصر المضمّنة ماتتقصّش
         elif isinstance(v, (int, float)):
             v = str(v)
         elif not isinstance(v, str):
@@ -24885,6 +24885,75 @@ def flow_set_facts(fid: str, tpl: str, facts: dict) -> None:
     flow_update(fid, lambda d: d.update(facts=facts, locked=params, facts_say=say))
 
 
+# 🧩 مكتبة عناصر المجال (frontend/gallery/el/<field>/): القوالب المرسومة (خانة els) بتاخد عناصر من مجال العميل حسب السكريبت
+# بدل رسمتها الثابتة (الكوباية، الدراجة…). الستايل لكل قالب من الفهرس، والاختيار بموديل نصي رخيص، وإلا بالكلمات.
+EL_DIR = FRONTEND_DIR / "gallery" / "el"
+
+
+def field_el_index(field: str) -> dict | None:
+    try:
+        return json.loads((EL_DIR / re.sub(r"[^a-z0-9_-]", "", field) / "index.json").read_text("utf-8")) if field else None
+    except (OSError, ValueError):
+        return None
+
+
+def field_elements(mid: str, text: str, n: int = 5) -> list[str]:
+    """عناصر المجال المناسبة للسكريبت ده، بستايل القالب ده: روابط /gallery/el/… (فاضية لو المجال مالوش مكتبة)."""
+    field = str((onboard_load() or {}).get("field") or "")
+    idx = field_el_index(field)
+    if not idx or not idx.get("items"):
+        return []
+    style = (idx.get("tpl") or {}).get(mid) or "base"
+    folder = EL_DIR / idx["field"] / style
+    have = [k for k in idx["items"] if (folder / f"{k}.webp").exists()]
+    if not have:
+        return []
+    picks: list[str] = []
+    if not atlas.mock_mode() and atlas.api_key():
+        menu = "\n".join(f"- {k}: {idx['items'][k]}" for k in have)
+        msgs = [{"role": "system", "content": "You pick illustration elements for a short social video. Answer JSON only: {\"picks\": [\"name\", ...]}."},
+                {"role": "user", "content": f"Video script (Arabic):\n{text[:2500]}\n\nAvailable elements (name: what it shows):\n{menu}\n\n"
+                                            f"Pick {n} different elements that best illustrate this script, in the order they should appear. Use only names from the list."}]
+        for model in HELP_MODELS[2:] + HELP_MODELS[:1]:   # الأرخص الأول
+            try:
+                raw = atlas.chat(msgs, model, temperature=0.2, max_tokens=200, timeout=30)
+                got = json.loads(re.search(r"\{.*\}", raw, re.S).group(0)).get("picks") or []
+                picks = [x for x in dict.fromkeys(str(x).strip() for x in got) if x in have][:n]
+                if picks:
+                    break
+            except Exception:  # noqa: BLE001 — الموديل الجاي، وإلا الكلمات
+                continue
+    if len(picks) < n:   # 🔤 احتياطي: كلمات من السكريبت، وبعدها عناصر عامة من المكتبة
+        t = text.lower()
+        words = {"dumbbell": "دمبل|دامبل|أوزان|اوزان|حديد", "ems_suit": "ems|بدلة|كهرب", "water_bottle": "مويه|موية|ماء|ماي|شرب", "protein": "بروتين",
+                 "running": "جري|ركض|كارديو", "squat": "سكوات|قرفص", "scale": "وزن|ميزان|كيلو", "stopwatch": "وقت|دقيقة|دقايق|ثانية", "flame": "حرق|دهون|سعرات",
+                 "heart": "قلب|نبض", "trophy": "نتيجة|نتايج|إنجاز|انجاز|هدف", "rest": "نوم|راحة|تعافي", "stretch": "إطالة|اطالة|مرونة", "salad_bowl": "أكل|اكل|غذاء|دايت|رجيم"}
+        for k, pat in words.items():
+            if k in have and k not in picks and re.search(pat, t):
+                picks.append(k)
+        for k in have:
+            if len(picks) >= n:
+                break
+            if k not in picks:
+                picks.append(k)
+    return [f"/gallery/el/{idx['field']}/{style}/{k}.webp" for k in picks[:n]]
+
+
+def flow_els_inline(params: dict) -> dict:
+    """روابط عناصر المكتبة ← صور مضمّنة (الرسم بيشتغل من ملف محلي، فالرابط النسبي مش هيتفتح)."""
+    els = params.get("els")
+    if not isinstance(els, list) or not any(isinstance(x, str) and x.startswith("/gallery/el/") for x in els):
+        return params
+    out = []
+    for x in els:
+        f = FRONTEND_DIR / str(x).lstrip("/") if isinstance(x, str) and x.startswith("/gallery/el/") else None
+        if f and f.resolve().is_relative_to(EL_DIR.resolve()) and f.exists():
+            out.append("data:image/webp;base64," + base64.b64encode(f.read_bytes()).decode())
+        elif isinstance(x, str) and not x.startswith("/gallery/el/"):
+            out.append(x)
+    return {**params, "els": out}
+
+
 def flow_motion_params(d: dict) -> dict:
     """خانات القالب: الصور والألوان والاسم من عقل العلامة، والنص من النص المختار، ومعطيات العميل الحقيقية آخر حاجة (مقفولة)."""
     mid = d["template"]["id"]
@@ -24894,6 +24963,16 @@ def flow_motion_params(d: dict) -> dict:
         out.update(fz.clean_params(schema, row.get("fields") or {}))
     out.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema})
     out.update({k: v for k, v in tplbrief.auto_icons(mid, out).items() if k in schema and k not in (d.get("locked") or {})})   # رسمة كل خطوة من كلامها
+    if "els" in schema and "els" not in (d.get("locked") or {}) and not [x for x in out.get("els") or [] if x]:   # 🧩 عناصر من مجال العميل حسب السكريبت
+        sc = d.get("scenario") or {}
+        txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
+                                                       for r in sc.get("scenes") or []])
+        try:
+            els = field_elements(mid, txt)
+        except Exception:  # noqa: BLE001 — من غير عناصر القالب بيرجع لرسمته
+            els = []
+        if els:
+            out["els"] = els
     return out
 
 
@@ -26296,6 +26375,7 @@ def flow_export(fid: str, body: FlowExportIn):
     def go():
         p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
         p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
+        p = flow_els_inline(p)                    # 🧩 عناصر المجال تتضمّن في الرسم
         run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
                           timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None)
     threading.Thread(target=go, daemon=True).start()
@@ -26412,10 +26492,17 @@ def flow_generate(fid: str, body: FlowGoIn):
                 raw = flow_llm(fz.params_messages(schema, {**sc, "brief": brief}, (brain or {}).get("name") or "", flow_assets_list(d)), "خانات القالب")
                 # الكلام من السيناريو، والصور والألوان والاسم من عقل العلامة (الموديل مايعرفش يجيب صورة)
                 params = {**fill, **{k: v for k, v in fz.clean_params(schema, raw).items() if schema[k].get("kind") != "image" and not (schema[k].get("kind") == "color" and k in fill)}}
+            if "els" in schema and not [x for x in params.get("els") or [] if x]:   # 🧩 عناصر من مجال العميل حسب السكريبت
+                try:
+                    els = field_elements(mid, " ".join(str(v) for v in [sc.get("title"), brief, *params.values()] if isinstance(v, str)))
+                except Exception:  # noqa: BLE001
+                    els = []
+                if els:
+                    params["els"] = els
             before = motion_assets().get(mid, [])
             MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
             flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
-            run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, params, f"🧭 {title}")
+            run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, flow_els_inline(params), f"🧭 {title}")
         flow_job(fid, "generate", run_motion)
     elif tpl["kind"] == "typo":
         script = " ".join(str(b.get("say") or b.get("text") or "") for b in sc.get("beats") or []).strip() or sc.get("summary", "")
