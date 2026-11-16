@@ -160,7 +160,11 @@ const PilotPage = (() => {
     const d = new Date(iso), t = new Date(), day = d.toDateString() === t.toDateString() ? "اليوم" : d.toDateString() === new Date(+t + 864e5).toDateString() ? "غدًا" : d.toLocaleDateString("ar-EG", { weekday: "long" });
     return `${day} ${fmtH(d.getHours() + d.getMinutes() / 60)}`;
   };
-  const codeTpls = () => (typeof Gallery !== "undefined" && Gallery.list ? Gallery.list() : []).filter((x) => String(x.id).startsWith("t-"));
+  // 🎯 غلاف ومعاينة كل قالب من مجال العميل (frontend/gallery/f/<المجال>/) لو موجودين، حتى لو المعرض لسه ماتفتحش
+  let FM = null;
+  const fieldTpl = (x) => (FM && FM.field && (FM.field_media || []).includes(x.id)
+    ? { ...x, cover_url: `/gallery/f/${FM.field}/${x.id}.jpg`, sample_url: `/gallery/f/${FM.field}/${x.id}.mp4` } : x);
+  const codeTpls = () => (typeof Gallery !== "undefined" && Gallery.list ? Gallery.list() : []).filter((x) => String(x.id).startsWith("t-")).map(fieldTpl);
 
   const html = () => `<div class="ap" id="apRoot"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   async function mount(root) {
@@ -310,6 +314,7 @@ const PilotPage = (() => {
     box.hidden = !S.pop;
     if (!S.pop) return (box.innerHTML = "");
     if (S.pop === "tpl") {
+      if (!FM) { FM = {}; api("/api/tpl-niche").then((d) => { FM = d || {}; if (S.pop === "tpl") drawPop(); }).catch(() => {}); }
       const on = new Set(tplIds());
       box.innerHTML = `<div class="ap-ph"><b>قوالب الفيديو</b><small>علّم على القوالب التي تريدها (واحد على الأقل)، والأوتوبايلوت يتناوب بينها</small><button type="button" data-popx>تم</button></div>
         <div class="ap-grid">${codeTpls().map((x) => `<button type="button" class="ap-card ${on.has(x.id) ? "on" : ""}" data-tplc="${esc(x.id)}">
