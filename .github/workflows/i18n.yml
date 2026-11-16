@@ -1,9 +1,15 @@
 # 🔎 فحص اللغة: كل شاشة بالإنجليزي وكل زرار، وأي جملة من غير ترجمة أو فيها عامية بتخلّي العلامة حمرا
 name: i18n
 on:
-  push:
-    paths: ["studiomania/frontend/**", "studiomania/backend/**", "studiomania/mobile/app/**", "studiomania/mobile/src/**", "studiomania/library/**", "studiomania/tests/i18n/**", "studiomania/tools/langmap.py", ".github/workflows/i18n.yml"]
+  # 💸 كان بيشتغل مع كل push (٣ أجزاء × ~٢٥ دقيقة) وصرف أغلب رصيد GitHub Actions. بقرار صاحب المشروع:
+  # فحص شامل مرة في الشهر (يوم ١) على كل الصفحات، أو بزرار Run workflow. وقبل كل push الفحص السريع المحلي:
+  # python3 studiomania/tools/langmap.py --strict (بيمسك أي جملة جديدة من غير إنجليزي أو بعامية)
+  schedule:
+    - cron: "0 2 1 * *"
   workflow_dispatch:
+concurrency:
+  group: i18n-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   audit:
     # ubuntu-latest بقى 26.04، وأداة المتصفح (Playwright) لسه مابتشتغلش عليه: بنثبّت نسخة مدعومة
