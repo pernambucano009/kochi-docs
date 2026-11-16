@@ -51,6 +51,7 @@ audio { width: 100%; height: 40px }
 .recbar audio { flex: 1 1 200px }
 .recbar .t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--rec) }
 .tip { font-size: 12px; color: var(--mute) }
+.row.hit { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) }
 .todo { color: var(--mute); font-size: 13px; margin: 0 }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 </style>
@@ -153,7 +154,7 @@ function render() {
   $("#count").textContent = `${done} من ${S.items.length} جاهزة · ${has.size} عليها ملاحظات`;
   $("#meter").style.width = (100 * done / (S.items.length || 1)) + "%";
   const list = S.items.filter((x) => filter === "all" || (filter === "notes" ? has.has(x.id) : x.done));
-  $("#list").innerHTML = list.map((x) => `<section class="row">
+  $("#list").innerHTML = list.map((x) => `<section class="row" id="${x.id}">
     <div class="head"><h2>${esc(x.name)}</h2><code>${x.id}</code><span class="badge">${x.done ? "جاهز" : "لسه"}</span></div>
     ${x.done ? `<p class="idea"><b>الفكرة:</b> ${esc(x.idea)}</p>
     <div class="pair">
@@ -179,7 +180,14 @@ document.querySelector(".filters").addEventListener("click", (e) => {
   const f = e.target.closest("button")?.dataset.f; if (!f) return;
   filter = f; try { localStorage.setItem("rv-filter", f); } catch (e) {} render();
 });
-api(`/api/review/items?field=${FIELD}`).then((d) => { S = d; render(); }).catch((e) => { $("#list").innerHTML = `<p class="todo">ما اتحمّلش: ${esc(e.message)}</p>`; });
+api(`/api/review/items?field=${FIELD}`).then((d) => {
+  S = d;
+  const want = location.hash.slice(1);   // جاي من لينك قالب معيّن: نعرضه حتى لو مش في الفلتر ونروح له
+  if (want && !d.items.some((x) => x.id === want && x.done)) filter = "all";
+  render();
+  const el = want && document.getElementById(want);
+  if (el) { el.scrollIntoView({ block: "start" }); el.classList.add("hit"); }
+}).catch((e) => { $("#list").innerHTML = `<p class="todo">ما اتحمّلش: ${esc(e.message)}</p>`; });
 // ردود Claude بتوصل وانت فاتح الصفحة
 setInterval(() => api(`/api/review/items?field=${FIELD}`).then((d) => {
   const before = S.notes.length; S.notes = d.notes;
