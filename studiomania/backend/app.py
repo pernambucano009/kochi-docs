@@ -30663,7 +30663,19 @@ def run_library_tag(bid: str, ids: list[str]) -> None:
                 else:
                     img = folder / (upd.get("thumb") or f["file"])
                     small = TMP_DIR / f"libtag_{f['id']}.jpg"
-                    typo_frame(img, 0, small, 640) if f["kind"] == "image" and img.suffix.lower() != ".gif" else shutil.copy(img, small)
+                    if not img.exists() or img.stat().st_size == 0:
+                        raise HTTPException(400, "الملف لم يُرفع كاملًا. احذفه وارفعه مرة أخرى")
+                    try:
+                        typo_frame(img, 0, small, 640) if f["kind"] == "image" and img.suffix.lower() != ".gif" else shutil.copy(img, small)
+                    except Exception:  # noqa: BLE001 — نجرب بـ Pillow تحت
+                        pass
+                    if not small.exists():   # FFmpeg ماقدرش يقرا الصورة (بيخرج من غير ملف): نجرب Pillow، وإلا رسالة واضحة
+                        try:
+                            from PIL import Image as _Im
+                            with _Im.open(img) as im:
+                                im.convert("RGB").resize((640, max(1, round(im.height * 640 / max(1, im.width))))).save(small, "JPEG", quality=85)
+                        except Exception:  # noqa: BLE001
+                            raise HTTPException(400, "تعذّرت قراءة الصورة (قد تكون تالفة أو بصيغة غير مدعومة). احذفها وارفعها مرة أخرى بصيغة JPG أو PNG") from None
                     extra = f"ده فريم من نص فيديو مدته {f.get('dur') or 0} ثانية." if f["kind"] == "video" else ""
                     try:
                         raw = ad_json(lab_media_chat(az.with_media(lib_.tag_messages(f["kind"], f["name"], where, extra), data_url(small, "image/jpeg"), "image.jpg")), "توصيف ملف")

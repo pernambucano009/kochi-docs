@@ -16631,4 +16631,6 @@ window.I18N_EN = {
   "خط واحد": "One line",
   "رسم بالقلم": "Pencil sketch",
   "طباعة يابانية": "Japanese print",
+  "الملف لم يُرفع كاملًا. احذفه وارفعه مرة أخرى": "The file was not fully uploaded. Delete it and upload it again",
+  "تعذّرت قراءة الصورة (قد تكون تالفة أو بصيغة غير مدعومة). احذفها وارفعها مرة أخرى بصيغة JPG أو PNG": "Couldn't read the image (it may be damaged or in an unsupported format). Delete it and upload it again as JPG or PNG",
 };
