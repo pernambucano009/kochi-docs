@@ -156,7 +156,8 @@ const BrainLibPage = (() => {
   function poll() {
     clearTimeout(S.timer);
     if (!S.lib?.tagging && !(S.lib?.folders || []).some((f) => isCase(f) && caseBusy(f))) return;
-    S.timer = setTimeout(async () => { try { await refresh(); if (!S.hits) morphing(render); } catch { /* الخادم يعيد التشغيل */ } poll(); }, 3000);
+    // 🖼️ بيعيد الرسم بس لو حاجة اتغيّرت (إعادة الرسم كل ٣ ثواني كانت بتمسح الصور قبل ما تتحمّل فتفضل المربعات فاضية)
+    S.timer = setTimeout(async () => { try { const was = JSON.stringify(S.lib); await refresh(); if (!S.hits && JSON.stringify(S.lib) !== was) morphing(render); } catch { /* الخادم يعيد التشغيل */ } poll(); }, 3000);
   }
   async function upload(files) {
     const list = [...files];

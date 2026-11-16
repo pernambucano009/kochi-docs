@@ -30745,7 +30745,7 @@ def _lib_retag_jpg():
         for lj in (ADS_DIR / "brains").glob("*/library/library.json"):
             bid = lj.parent.parent.name
             try:
-                ids = [f["id"] for f in json.loads(lj.read_text("utf-8")).get("files") or [] if re.search(r"libtag_|gemini.*HTTP 400", str(f.get("error") or ""))]
+                ids = [f["id"] for f in json.loads(lj.read_text("utf-8")).get("files") or [] if f.get("status") == "tagging" or re.search(r"libtag_|gemini.*HTTP 400", str(f.get("error") or ""))]   # والمعلّقة على «بيتوصف» من قبل إعادة التشغيل
             except (OSError, ValueError):
                 continue
             if ids:
