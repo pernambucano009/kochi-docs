@@ -143,5 +143,349 @@
   "secs": 9.6,
   "cost": "0.009227",
   "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "kettlebell",
+  "secs": 6.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "barbell",
+  "secs": 9.5,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "jump_rope",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "yoga_mat",
+  "secs": 10.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "treadmill",
+  "secs": 9.0,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "bench",
+  "secs": 10.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "resistance_band",
+  "secs": 9.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "foam_roller",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "pullup_bar",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "boxing_gloves",
+  "secs": 5.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "medicine_ball",
+  "secs": 9.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "stationary_bike",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "smartwatch",
+  "secs": 9.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "protein",
+  "secs": 8.8,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "shaker",
+  "secs": 5.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "banana",
+  "secs": 5.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "oats_bowl",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "salad_bowl",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "dates",
+  "secs": 9.0,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "scale",
+  "secs": 9.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "tape_measure",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "towel",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "plank",
+  "secs": 5.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "running",
+  "secs": 5.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "pushup",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "lunge",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "deadlift",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "stretch",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "biceps_curl",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "rest",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "heart",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "flame",
+  "secs": 5.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "arrow_up",
+  "secs": 8.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "trophy",
+  "secs": 5.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "medal",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "calendar",
+  "secs": 8.8,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "lightning",
+  "secs": 5.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "star",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "check",
+  "secs": 8.2,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "target",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "apple",
+  "secs": 5.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "eggs",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "jumping_jack",
+  "secs": 5.8,
+  "cost": "0.009227",
+  "base": 0.008
  }
 ]
