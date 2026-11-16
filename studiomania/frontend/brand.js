@@ -245,7 +245,7 @@ const BrandPage = (() => {
     { const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y), X = Math.max(320, ...xs.map(Math.abs)), Y = Math.min(-260, ...ys);
       if (branchOn(b, { k: "pulse", leaves: [] })) nodes.push({ id: "trends", kind: "trends", x: -X * .9, y: Y - 70, from: "c" });
       // 🧭 خطة المحتوى: نقطة لوحدها فوق يمين، عدّادها بيزيد مع كل معلومة العقل بيعرفها والخطة بتتبني لوحدها
-      if (lateOn(b)) nodes.push({ id: "plan", kind: "plan", x: X * .9, y: Y - 70, from: "c" }); }
+      if (false && lateOn(b)) nodes.push({ id: "plan", kind: "plan", x: X * .9, y: Y - 70, from: "c" }); }   // 🗂️ خطة المحتوى مخفية (معلّقة لحد ما نقرر)
     // كل نقطة ليها مكانها الأصلي (x, y) ومكانها الحالي (px, py) وسرعتها؛ لو الخريطة اتعادت بتكمّل من مكانها
     const old = Object.fromEntries((S.nodes || []).map((n) => [n.id, n])), again = !!S.nodes?.length && !reduce.matches;
     S.nodes = nodes.map((n, i) => {

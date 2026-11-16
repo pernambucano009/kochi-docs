@@ -158,8 +158,7 @@ const PilotPage = (() => {
       <section class="ap-sec"><div class="ap-day" data-day></div>
         <div class="ap-leg"><span><em></em>اخترناه في أفضل وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط لإضافة موعد · اسحب النقطة لتغييره · اضغط عليها لإزالته</span></div></section></div>
       <section class="ap-sec"><span class="ap-lbl">القوالب</span>
-        <div class="ap-seg" data-srcs><button type="button" data-src="rotate">بالتناوب من القوالب</button><button type="button" data-src="plan">من خطة الشهر</button></div>
-        <div class="ap-plan" data-plan></div>
+        <div class="ap-seg" data-srcs hidden></div><div class="ap-plan" data-plan hidden></div>
         <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
         <small data-tplsub>يختار منها بالتناوب حتى لا يتكرر المحتوى</small></section>
       <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل شيء تلقائيًا</button><button type="button" data-mode="approve">أوافق على هذه الخطوات</button></div>
@@ -171,7 +170,11 @@ const PilotPage = (() => {
   function draw() { drawHead(); drawDay(); drawSrc(); drawTpls(); drawMode(); drawQ(); }
   // 🗓️ المصدر: بالدور من القوالب، أو خطة الشهر (كل بوست في ميعاده بفكرته وقالبه، من صفحة «خطة المحتوى»)
   const fromPlan = () => S.d.settings.source === "plan";
+  // 🗂️ خطة الشهر اتشالت من الموقع (الكود فاضل لحد ما نقرر): لو كان شغال عليها يرجع للقوالب لوحده مرة واحدة
   function drawSrc() {
+    if (fromPlan() && !S.srcFix) { S.srcFix = true; api("/api/plan/month/apply", { method: "POST", ...jsonBody({ on: false }) }).then((r) => { S.d = r.pilot; draw(); }).catch(() => {}); }
+    return;
+    // eslint-disable-next-line no-unreachable
     const plan = fromPlan(), m = S.mo?.month, left = (m?.items || []).filter((x) => !x.job).length;
     q("[data-srcs]").querySelectorAll("[data-src]").forEach((b) => b.classList.toggle("on", b.dataset.src === (plan ? "plan" : "rotate")));
     q("[data-plan]").innerHTML = plan
