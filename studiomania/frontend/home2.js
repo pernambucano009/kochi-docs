@@ -69,7 +69,9 @@ const NH = (() => {
       : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
     pubacc: { en: "Your accounts", ar: "حساباتك", icon: "send", go: "7", tab: "acc", desc: "ربط حسابات السوشيال ميديا وفصلها." },
-    pubpost: { en: "Post & Schedule", ar: "انشر وجدول", icon: "send", go: "7", tab: "new", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة وما نُشر." },
+    pubcal: { en: "Schedule", ar: "المواعيد", icon: "send", go: "7", tab: "cal", desc: "المنشورات المجدولة وموعد كل منها." },
+    pubdone: { en: "Published", ar: "ما نُشر", icon: "send", go: "7", tab: "done", desc: "كل ما نُشر على حساباتك." },
+    pubpost: { en: "New post", ar: "منشور جديد", icon: "send", go: "7", tab: "new", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة وما نُشر." },
     inbox: { en: "Comments & DMs", ar: "التعليقات والرسائل", icon: "mic", go: "15", desc: "رد على التعليقات والرسائل من مكان واحد، وبوتات ترد تلقائيًا." },
     audience: { en: "Targeting Recipe", ar: "وصفة الاستهداف", icon: "users", page: "audience", desc: "من هو الجمهور الذي سيشتري، والاستهداف الجاهز لميتا وجوجل وتيك توك." },
     // جوه «اعمل جديد»: كل نوع بيفتح القسم اللي بيعمله النهارده
@@ -114,7 +116,7 @@ const NH = (() => {
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", twin: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
     inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox", leads: "audience" };
   // 📤 أيقونات أقسام النشر (خط بسيط): نفس الأيقونة في مربعات صفحة النشر وفي عنوان صفحة كل قسم لما تدخله
-  const PUB_IC = { pubacc: "M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1 M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1", pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
+  const PUB_IC = { pubcal: "M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4", pubdone: "M5 12l4 4L19 6", pubacc: "M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1 M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1", pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
     audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
     // الهدف ونقطة في النص: ناس بعينهم مهتمين
     leads: "M12 3a9 9 0 1 0 9 9 M12 7a5 5 0 1 0 5 5 M12 11a1 1 0 1 0 1 1 M15 9l5-5 M17 4h3v3",
@@ -539,10 +541,11 @@ const NH = (() => {
     // 📤 النشر بنفس شكل «مكتبة المحتويات» في البروتوتايب: أيقونات هادية في النص، باسم كل قسم وسطر صغير تحته (مش مربعات كبيرة)
     publish: () => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
-      const sub = { pubacc: "اربط حساباتك واعرض المربوط منها", pubpost: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "جدول أول منشور", inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
+      const sub = { pubacc: "اربط حساباتك واعرض المربوط منها", pubpost: "فيديو جاهز ← المنصات ← الموعد", pubcal: up ? `${up} منشور مجدول${bad ? ` · ${bad} فشل` : ""}` : "لا مواعيد بعد",
+        pubdone: `${D.posts.filter((p) => p.status === "published").length} منشور`, inbox: "التعليقات والرسائل والبوتات", adsmgr: "روّج وتابع الأرقام",
         audience: "من سيشتري، وكيف تصل إليه", leads: "أشخاص مهتمون بموضوعك", wacamp: "رسائل لمشتركينك" };
       const ic = PUB_IC;
-      return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubacc", "pubpost", "inbox", "adsmgr", "audience", "leads", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
+      return `<div class="bl-hub nh-pubhub"><div class="bl-folds">${["pubacc", "pubpost", "pubcal", "pubdone", "inbox", "adsmgr", "audience", "leads", "wacamp"].map((id) => `<button type="button" class="bl-fd" data-id="${id}">
         <span class="bl-fi"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${ic[id]}"/></svg></span><b>${esc(T[id].ar)}</b><small>${esc(sub[id])}</small></button>`).join("")}</div></div>`;
     },
     progress: () => KOCHI ? panel(12, 6, `${head("progress")}<div class="nh-lines" style="align-content:start">${D.work.map(lineHTML).join("") || `<div class="nh-empty">لا توجد مشاريع بعد.</div>`}</div>`) : projectsBoard(),
@@ -762,7 +765,7 @@ const NH = (() => {
     renderBar();
   };
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
-  const PAGE_PARENT = { pubacc: "publish", pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
+  const PAGE_PARENT = { pubacc: "publish", pubcal: "publish", pubdone: "publish", pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
     coaches: "brand", twin: "brand", brainlib: "brand", auto: "create", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {

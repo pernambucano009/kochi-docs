@@ -1,6 +1,10 @@
 // StudioMania — الترجمة الإنجليزي: كل جملة عربي في الواجهة وقصادها الإنجليزي.
 // {0} و {1}... مكان القيم اللي بتتغيّر (أرقام وأسماء). الجمل الجديدة: python tools/extract_i18n.py --missing
 window.I18N_EN = {
+  "فيديو جاهز ← المنصات ← الموعد": "Ready video → platforms → time",
+  "لا مواعيد بعد": "Nothing scheduled yet",
+  "المنشورات المجدولة وموعد كل منها.": "Scheduled posts and when each goes out.",
+  "كل ما نُشر على حساباتك.": "Everything published on your accounts.",
   "الصورتان بالريتراكتور (قبل وبعد) أساسيتان، والباقي اختياري ويحسّن الفيديو.": "The two retractor photos (before and after) are required; the rest are optional and make the video better.",
   "احذف الصورة": "Remove photo",
   "المكالمة الصوتية مع {0} للمشتركين فقط": "Voice calls with {0} are for subscribers only",

@@ -3158,3 +3158,6 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 .pub-accounts .pa-card .pa-acc { width: 100%; text-align: start; }
 .pub-accounts .pa-link { margin-top: 4px; padding: 7px 18px; border-radius: 99px; border: 0; background: var(--nh-accent, #E5613E); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
 .pub-accounts .pa-link.more { background: none; color: var(--muted, #8A8984); padding: 4px 10px; }
+
+/* 📤 تابات النشر بقت أزرار في صفحة النشر نفسها: الشريط اللي فوق مخفي */
+.pub-tabs[hidden] { display: none !important; }
