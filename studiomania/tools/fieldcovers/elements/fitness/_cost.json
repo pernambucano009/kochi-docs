@@ -1,0 +1,107 @@
+[
+ {
+  "model": "gpt25",
+  "name": "ems_suit",
+  "secs": 21.2,
+  "cost": "0.010912",
+  "base": 0.003
+ },
+ {
+  "model": "gpt25",
+  "name": "water_bottle",
+  "secs": 20.8,
+  "cost": "0.010912",
+  "base": 0.003
+ },
+ {
+  "model": "nano2lite",
+  "name": "dumbbell",
+  "secs": 40.8,
+  "cost": null,
+  "base": 0.014
+ },
+ {
+  "model": "nano2lite",
+  "name": "ems_suit",
+  "secs": 4.3,
+  "cost": null,
+  "base": 0.014
+ },
+ {
+  "model": "nano2lite",
+  "name": "water_bottle",
+  "secs": 38.4,
+  "cost": null,
+  "base": 0.014
+ },
+ {
+  "model": "nano2lite",
+  "name": "squat",
+  "secs": 11.4,
+  "cost": null,
+  "base": 0.014
+ },
+ {
+  "model": "nano2lite",
+  "name": "stopwatch",
+  "secs": 7.6,
+  "cost": null,
+  "base": 0.014
+ },
+ {
+  "model": "krea2t",
+  "name": "dumbbell",
+  "secs": 5.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "name": "ems_suit",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "name": "water_bottle",
+  "secs": 8.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "name": "squat",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "name": "stopwatch",
+  "secs": 8.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "gpt25",
+  "name": "dumbbell",
+  "secs": 16.9,
+  "cost": "0.010908",
+  "base": 0.003
+ },
+ {
+  "model": "gpt25",
+  "name": "squat",
+  "secs": 23.0,
+  "cost": "0.01104",
+  "base": 0.003
+ },
+ {
+  "model": "gpt25",
+  "name": "stopwatch",
+  "secs": 32.7,
+  "cost": "0.010888",
+  "base": 0.003
+ }
+]
