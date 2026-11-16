@@ -10,6 +10,7 @@ const PR = M.params({
   s3: { label: "الخطوة ٣", kind: "text", def: "صب واستمتع", group: G2, max: 14 },
   end: { label: "الجملة الأخيرة", kind: "text", def: "بس كده!", group: G3, max: 12 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "بيتي للأجهزة", group: G3, max: 16 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: GS, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   product: { label: "لون المنتج", kind: "color", role: "accent", def: "#2bb3a8", group: G1, hint: "لون المنتج المرسوم بجانب المذيعة." },
   fHead: { label: "خط العناوين", kind: "font", def: "lalezar", group: GS },
   fText: { label: "خط العلامة", kind: "font", def: "changa", group: GS },
@@ -28,7 +29,8 @@ M.reel({
   async init(M) {
     await Promise.all([M.font("LZ", PR.fHead), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
-    return { x };
+    const ELS = await M.els(PR.els, 5);   // 🧩 عناصر مكتبة المجال (بستايل الكرتون): عنصر لكل خطوة مكان الخلاط
+    return { x, ELS };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, expo, springO, clamp } = M;
@@ -61,22 +63,29 @@ M.reel({
       shape(() => { x.beginPath(); x.roundRect(-400, -110, 800, 220, 40); }, "#fffaf0", 7, 5);
       x.font = `${M.fit(PR[key], "LZ", 560, 110, 50)}px LZ`; x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillStyle = "#e9573f"; x.fillText(`${"١٢٣"[si - 1]}. ${PR[key]}`, REG[0] * .6, 10 + REG[1] * .6); x.fillStyle = INK; x.globalAlpha = .9; x.restore(); x.globalAlpha = 1;
     }
-    // المنتج: خلاط (لونه ثابت طول الفيلم)
-    const bx = 720, by = 1450, pc = PR.product;
-    const shakeX = si === 2 && lt > .9 && lt < 2.2 ? Math.sin(t * 60) * 5 : 0;
-    x.save(); x.translate(shakeX, 0);
-    shape(poly([[bx - 130, by], [bx + 130, by], [bx + 110, by - 170], [bx - 110, by - 170]]), pc, 11, 5, ["rgba(0,0,0,.18)", () => x.fillRect(bx + 40, by - 200, 120, 220)]);
-    shape(ell(bx, by - 85, 26, 26), si === 2 && lt > .7 && lt < 1.1 ? "#ffd84a" : "#f3e8d2", 12, 4);
-    shape(poly([[bx - 110, by - 175], [bx + 110, by - 175], [bx + 140, by - 560], [bx - 140, by - 560]]), "rgba(220,240,240,.55)", 13, 5);
-    // اللي جوه الخلاط حسب الخطوة
-    const fill2 = si >= 3 ? 1 : si === 2 ? smooth(seg(lt, 1.0, 2.0)) : 0;
-    if (si === 1 || si === 2 && fill2 < 1) { [[-50, "#e9573f"], [20, "#f0c45a"], [60, "#7cbf5a"], [-10, "#e9573f"]].forEach(([ox, col], i) => { const fy = si === 1 ? Math.min(by - 230 - i * 40, by - 900 + 700 * smooth(seg(lt, .5 + i * .3, 1.0 + i * .3))) : by - 230 - i * 40; if (si === 1 && lt < .5 + i * .3) return; shape(ell(bx + ox, fy, 34, 30, i), col, 20 + i, 3.5); }); }
-    if (fill2 > 0) { const top = by - 180 - 300 * (si === 3 ? 1 - smooth(seg(lt, .4, 1.6)) * .7 : fill2); shape(poly([[bx - 106, by - 180], [bx + 106, by - 180], [bx + 106 + (by - 180 - top) * .08, top], [bx - 106 - (by - 180 - top) * .08, top]]), "#f28aa0", 25, 3); }
-    if (si === 2 && lt > 1 && lt < 2.2) for (let k = 0; k < 4; k++) { x.strokeStyle = INK; x.lineWidth = 4; x.beginPath(); x.arc(bx, by - 380, 50 + k * 26, t * 9 + k, t * 9 + k + 1.4); x.stroke(); }
-    shape(poly([[bx - 150, by - 560], [bx + 150, by - 560], [bx + 130, by - 610], [bx - 130, by - 610]]), pc, 14, 5);
-    x.restore();
-    // الكوباية في الخطوة ٣
-    if (si >= 3) { const gx = 960, gy = 1450, gk = smooth(seg(lt, .4, 1.8)); shape(poly([[gx - 55, gy], [gx + 55, gy], [gx + 70, gy - 240], [gx - 70, gy - 240]]), "rgba(230,245,245,.6)", 30, 4); if (gk > 0) shape(poly([[gx - 53, gy - 4], [gx + 53, gy - 4], [gx + 53 + 14 * gk, gy - 230 * gk], [gx - 53 - 14 * gk, gy - 230 * gk]]), "#f28aa0", 31, 3); shape(ell(gx + 30, gy - 260, 18, 18), "#e9573f", 32, 3); }
+    const bx = 720, by = 1450;
+    if (C.ELS.length) {   // العنصر بتاع الخطوة دي: بينط بسوستة أول الخطوة، وبيتهز على «اتنين»، بلون مزاح عن نفسه زي الطباعة
+      const im = C.ELS[Math.min(si, C.ELS.length - 1) % C.ELS.length], k = springO(Math.max(0, lt - .05), 11, .45), mh = 600, mw = Math.min(440, mh * im.width / im.height), hh = mw * im.height / im.width;
+      x.save(); x.translate(720, 1450); x.scale(k, k); x.rotate(Math.sin(tw * 1.7) * .02);
+      x.globalAlpha = .35; x.drawImage(im, -mw / 2 + REG[0] * 2, -hh + REG[1] * 2, mw, hh); x.globalAlpha = 1; x.drawImage(im, -mw / 2, -hh, mw, hh); x.restore();
+    } else {
+      // المنتج: خلاط (لونه ثابت طول الفيلم)
+      const pc = PR.product;
+      const shakeX = si === 2 && lt > .9 && lt < 2.2 ? Math.sin(t * 60) * 5 : 0;
+      x.save(); x.translate(shakeX, 0);
+      shape(poly([[bx - 130, by], [bx + 130, by], [bx + 110, by - 170], [bx - 110, by - 170]]), pc, 11, 5, ["rgba(0,0,0,.18)", () => x.fillRect(bx + 40, by - 200, 120, 220)]);
+      shape(ell(bx, by - 85, 26, 26), si === 2 && lt > .7 && lt < 1.1 ? "#ffd84a" : "#f3e8d2", 12, 4);
+      shape(poly([[bx - 110, by - 175], [bx + 110, by - 175], [bx + 140, by - 560], [bx - 140, by - 560]]), "rgba(220,240,240,.55)", 13, 5);
+      // اللي جوه الخلاط حسب الخطوة
+      const fill2 = si >= 3 ? 1 : si === 2 ? smooth(seg(lt, 1.0, 2.0)) : 0;
+      if (si === 1 || si === 2 && fill2 < 1) { [[-50, "#e9573f"], [20, "#f0c45a"], [60, "#7cbf5a"], [-10, "#e9573f"]].forEach(([ox, col], i) => { const fy = si === 1 ? Math.min(by - 230 - i * 40, by - 900 + 700 * smooth(seg(lt, .5 + i * .3, 1.0 + i * .3))) : by - 230 - i * 40; if (si === 1 && lt < .5 + i * .3) return; shape(ell(bx + ox, fy, 34, 30, i), col, 20 + i, 3.5); }); }
+      if (fill2 > 0) { const top = by - 180 - 300 * (si === 3 ? 1 - smooth(seg(lt, .4, 1.6)) * .7 : fill2); shape(poly([[bx - 106, by - 180], [bx + 106, by - 180], [bx + 106 + (by - 180 - top) * .08, top], [bx - 106 - (by - 180 - top) * .08, top]]), "#f28aa0", 25, 3); }
+      if (si === 2 && lt > 1 && lt < 2.2) for (let k = 0; k < 4; k++) { x.strokeStyle = INK; x.lineWidth = 4; x.beginPath(); x.arc(bx, by - 380, 50 + k * 26, t * 9 + k, t * 9 + k + 1.4); x.stroke(); }
+      shape(poly([[bx - 150, by - 560], [bx + 150, by - 560], [bx + 130, by - 610], [bx - 130, by - 610]]), pc, 14, 5);
+      x.restore();
+      // الكوباية في الخطوة ٣
+      if (si >= 3) { const gx = 960, gy = 1450, gk = smooth(seg(lt, .4, 1.8)); shape(poly([[gx - 55, gy], [gx + 55, gy], [gx + 70, gy - 240], [gx - 70, gy - 240]]), "rgba(230,245,245,.6)", 30, 4); if (gk > 0) shape(poly([[gx - 53, gy - 4], [gx + 53, gy - 4], [gx + 53 + 14 * gk, gy - 230 * gk], [gx - 53 - 14 * gk, gy - 230 * gk]]), "#f28aa0", 31, 3); shape(ell(gx + 30, gy - 260, 18, 18), "#e9573f", 32, 3); }
+    }
     // المذيعة: جسم ثابت (الإيدين والعيون بس بيتحركوا)
     const px = 300, py = 1450;
     shape(poly([[px - 150, py], [px + 150, py], [px + 70, py - 470], [px - 70, py - 470]]), "#e9573f", 40, 5, ["rgba(0,0,0,.15)", () => x.fillRect(px + 30, py - 500, 200, 520)]);

@@ -8,6 +8,7 @@ const PR = M.params({
   line: { label: "السطر (مثل بيت الشعر)", kind: "text", def: "الهدوء… بداية كل حاجة حلوة", group: G2, max: 30, hint: "جملة هادئة تكمل الكلمة، مثل بيت شعر." },
   seal: { label: "حرف الختم", kind: "text", def: "ج", group: G2, max: 2, hint: "حرف واحد (أول حرف من العلامة) يُحفر في الختم الأحمر." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "شاي الجبل", group: G2, max: 16 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: GS, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   red: { label: "لون الختم", kind: "color", role: "accent", def: "#b02e22", group: GS, hint: "الختم فقط: أحمر صيني. واللوحة نفسها حبر أسود بدرجاته." },
   fTitle: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS, hint: "خط يد/فرشاة للكلمة الكبيرة والختم." },
   fText: { label: "خط السطر", kind: "font", def: "amiri", group: GS },
@@ -66,7 +67,8 @@ M.reel({
     S.man = mkStroke([[500, 1388], [496, 1350], [492, 1322]], 14, "press", 42, .1);
     S.rod = mkStroke([[496, 1340], [580, 1250], [660, 1200]], 3, "tip", 43, .1);
     S.streaks = Array.from({ length: 10 }, (_, i) => { const r = ((k) => () => M.hash(i * 5.1 + (k++) * 2.3))(1), y = 1300 + r() * 380, x0 = 80 + r() * 700; return mkStroke([[x0, y], [x0 + 90 + r() * 160, y + r() * 4]], 3, "tip", 700 + i, .85); });
-    return { x, paper, S };
+    const ELS = await M.els(PR.els, 4);   // 🧩 عناصر مكتبة المجال (بستايل الحبر): بالدور على المية مكان القارب
+    return { x, paper, S, ELS };
   },
   seek(t, C, M) {
     const { x, S } = C, { seg, cubic, smooth, sine } = M;
@@ -93,13 +95,21 @@ M.reel({
     S.moss.forEach(([a, b, r], i) => { const k = seg(t, 5.6 + i * .02, 5.7 + i * .02); if (k > 0) { x.fillStyle = `rgba(${INK},${TONE.jiao * k})`; x.beginPath(); x.ellipse(a, b, r, r * .7, i, 0, Math.PI * 2); x.fill(); } });
     // المية: فاضية + خطوط ناشفة باهتة + دواير بتتفتح حوالين القارب
     S.streaks.forEach((s, i) => drawStroke(x, s, cubic(seg(t, 5.8 + i * .05, 6.3 + i * .05)), TONE.qing * 1.5, false));
-    const bob = Math.sin(tq * 1.6) * 3;
-    x.save(); x.translate(Math.sin(t * .3) * 10, bob);
-    drawStroke(x, S.boat, cubic(seg(t, 6.0, 6.5)), TONE.nong); drawStroke(x, S.man, cubic(seg(t, 6.4, 6.7)), TONE.jiao);
-    if (t > 6.6) { x.fillStyle = `rgba(${INK},${TONE.jiao})`; x.beginPath(); x.ellipse(492, 1312, 11, 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = `rgba(${INK},${TONE.zhong})`; x.beginPath(); x.moveTo(470, 1306); x.lineTo(492, 1290); x.lineTo(514, 1306); x.fill(); }
-    drawStroke(x, S.rod, cubic(seg(t, 6.7, 7.0)), TONE.nong);
-    x.restore();
-    for (let k = 0; k < 3; k++) { const u = ((t - 6.6) / 3 + k / 3) % 1; if (t < 6.6) break; x.strokeStyle = `rgba(${INK},${.3 * (1 - u)})`; x.lineWidth = 2; x.beginPath(); x.ellipse(495, 1404, 60 + u * 220, 8 + u * 30, 0, 0, Math.PI * 2); x.stroke(); }
+    if (C.ELS.length) {   // كل عنصر بيتفرّش من الشمال لليمين على المية، ودواير تحته، وبعدين بيبهت في الورق
+      M.turns(t, C.ELS.length, 5.9, 11.6, 1.05, .9, .7).forEach((e) => {
+        const im = C.ELS[e.k], mh = 430, mw = Math.min(520, mh * im.width / im.height), hh = mw * im.height / im.width, cx = 495, base = 1420 + Math.sin(tq * 1.6) * 3, rv = cubic(e.in), fd = 1 - smooth(e.out);
+        x.save(); x.globalAlpha = fd; x.globalCompositeOperation = "multiply"; x.beginPath(); x.rect(cx - mw / 2 - 20, base - hh - 20, (mw + 40) * rv, hh + 40); x.clip(); x.drawImage(im, cx - mw / 2, base - hh, mw, hh); x.restore();
+        for (let k = 0; k < 3; k++) { const u = ((t - e.s0) / 3 + k / 3) % 1; x.strokeStyle = `rgba(${INK},${.25 * (1 - u) * fd})`; x.lineWidth = 2; x.beginPath(); x.ellipse(cx, base + 8, 60 + u * 220, 8 + u * 30, 0, 0, Math.PI * 2); x.stroke(); }
+      });
+    } else {
+      const bob = Math.sin(tq * 1.6) * 3;
+      x.save(); x.translate(Math.sin(t * .3) * 10, bob);
+      drawStroke(x, S.boat, cubic(seg(t, 6.0, 6.5)), TONE.nong); drawStroke(x, S.man, cubic(seg(t, 6.4, 6.7)), TONE.jiao);
+      if (t > 6.6) { x.fillStyle = `rgba(${INK},${TONE.jiao})`; x.beginPath(); x.ellipse(492, 1312, 11, 9, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = `rgba(${INK},${TONE.zhong})`; x.beginPath(); x.moveTo(470, 1306); x.lineTo(492, 1290); x.lineTo(514, 1306); x.fill(); }
+      drawStroke(x, S.rod, cubic(seg(t, 6.7, 7.0)), TONE.nong);
+      x.restore();
+      for (let k = 0; k < 3; k++) { const u = ((t - 6.6) / 3 + k / 3) % 1; if (t < 6.6) break; x.strokeStyle = `rgba(${INK},${.3 * (1 - u)})`; x.lineWidth = 2; x.beginPath(); x.ellipse(495, 1404, 60 + u * 220, 8 + u * 30, 0, 0, Math.PI * 2); x.stroke(); }
+    }
     // طيور: ٣ ضربات صغيرة بتتحرك على «اتنين»
     if (t > 6.0) for (let k = 0; k < 4; k++) { const bx = 180 + (tq - 6) * 70 + k * 70, by = 620 + k * 26 + Math.sin(tq * 3 + k) * 10, f = Math.sin(tq * 9 + k) * 10; x.strokeStyle = `rgba(${INK},${TONE.nong})`; x.lineWidth = 3.5; x.lineCap = "round"; x.beginPath(); x.moveTo(bx - 16, by - f); x.quadraticCurveTo(bx - 6, by - 6, bx, by); x.quadraticCurveTo(bx + 6, by - 6, bx + 16, by - f); x.stroke(); }
     // ضباب بيعدّي (لون الورق)
