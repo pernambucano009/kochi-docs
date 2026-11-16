@@ -34,8 +34,9 @@ def score(im):
 
 
 def render(b, field: str, tpl: str, params: dict, arts: dict):
-    def el(v):   # «ستايل:اسم» = عنصر من مكتبة المجال (elements/<field>/krea2t/<style>/<name>.png)
-        f = HERE / "elements" / field / "krea2t" / v.split(":")[0] / f"{v.split(':', 1)[1]}.png" if isinstance(v, str) and ":" in v else None
+    def el(v):   # «ستايل:اسم» = عنصر من مكتبة المجال (elements/<field>/krea2t/<style>/<name>.png)، و«base:اسم» = العنصر العادي
+        st, _, nm = v.partition(":") if isinstance(v, str) else ("", "", "")
+        f = (HERE / "elements" / field / "krea2t" / ("" if st == "base" else st) / f"{nm}.png") if nm else None   # base: = العناصر العادية (الستايل بيتعمل بالكود)
         return "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode() if f and f.exists() else v
     pr = {k: (arts[v] if k.startswith(("img", "p", "th", "cover", "bg")) and isinstance(v, str) and v in arts else
               [el(i) for i in v] if isinstance(v, list) and any(isinstance(i, str) and ":" in i and not i.startswith("data:") and "|" not in i for i in v) else v)

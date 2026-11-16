@@ -10,6 +10,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "صباحك أسرع", group: G2, max: 16 },
   sub: { label: "تحت العنوان", kind: "text", def: "اطلب قهوتك في دقيقة", group: G2, max: 28 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "كافيه بت", group: G2, max: 16 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر بخلفية شفافة، رابط في كل سطر (حتى ٥). تتحول إلى حروف وتُطبع بالتناوب مكان الفنجان، وإن تُركت فارغة يظهر الفنجان." },
   color: { label: "لون الشاشة", kind: "color", role: "accent", def: "#ff9a10", group: GS, hint: "كهرماني أو أخضر فسفوري مثل الشاشات القديمة." },
   fHead: { label: "خط العنوان", kind: "font", def: "plex", group: GS },
   fText: { label: "خط الأوامر", kind: "font", def: "plex4", group: GS },
@@ -21,6 +22,8 @@ M.meta({
 });
 const W = 1080, H = 1920, DUR = 12, SL = 60, SR = 1020, ST = 110, SB = 1790, COLS = 44, ROWS = 26, CW = 21.6, RH = 34, GX = 540 - COLS * CW / 2, GY = 560;
 const RAMP = " .:-=+*#%@";
+// 🧩 عناصر مكتبة المجال (اختياري): كل صورة بتتحول لشبكة سطوع (الحتة الأنور حرفها أتقل) وبتتطبع بالدور مكان الفنجان
+const ELS = (PR.els || []).filter(Boolean).slice(0, 5);
 const hex = (h) => { h = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)); };
 
 M.reel({
@@ -39,7 +42,20 @@ M.reel({
       const hx = (ua - .3) / .11, hy = (v - .5) / .13, hd = Math.hypot(hx, hy); if (hd > .62 && hd < 1 && ua > .22) b = Math.max(b, .55 + .3 * (1 - hy));  // الودن
       const sx = ua / .5, sy = (v - .8) / .035; if (sx * sx + sy * sy < 1 && v > .78) b = Math.max(b, .45 + .4 * (1 - Math.abs(sx)));                      // الطبق
       row.push(b); } B.push(row); }
-    return { x, s: s.getContext("2d"), B };
+    // كل عنصر ← شبكة COLS×ROWS: الشكل نفسه (الشفافية) أساس، والإضاءة بتفرق بين الحروف (مطوّلة على مدى كل صورة لوحدها)
+    const imgs = (await Promise.all(ELS.map((u) => M.img(u)))).filter(Boolean);
+    const EB = imgs.map((im) => {
+      const g = document.createElement("canvas"); g.width = COLS; g.height = ROWS; const q = g.getContext("2d");
+      const box = .86, ar = im.width / im.height, cellAR = CW / RH;   // الخانة أطول من عرضها
+      let w = COLS * box, h = w / ar * cellAR; if (h > ROWS * box) { h = ROWS * box; w = h * ar / cellAR; }
+      q.drawImage(im, (COLS - w) / 2, (ROWS - h) / 2 + ROWS * .04, w, h);
+      const d = q.getImageData(0, 0, COLS, ROWS).data, L = [];
+      let lo = 1, hi = 0;
+      for (let i = 0; i < COLS * ROWS; i++) { const a = d[i * 4 + 3] / 255, l = (.3 * d[i * 4] + .59 * d[i * 4 + 1] + .11 * d[i * 4 + 2]) / 255; L.push([a, l]); if (a > .5) { lo = Math.min(lo, l); hi = Math.max(hi, l); } }
+      const rows = []; for (let r = 0; r < ROWS; r++) { const row = []; for (let k = 0; k < COLS; k++) { const [a, l] = L[r * COLS + k]; row.push(a < .15 ? 0 : a * (.32 + .68 * (l - lo) / Math.max(.05, hi - lo))); } rows.push(row); }
+      return rows;
+    });
+    return { x, s: s.getContext("2d"), B, EB };
   },
   seek(t, C, M) {
     const { x, s, B } = C, { seg, smooth, expo, clamp, hash } = M, [cr, cg, cb] = hex(PR.color), col = (a) => `rgba(${cr},${cg},${cb},${a})`;
@@ -55,11 +71,17 @@ M.reel({
       if (t > 1.7) { const k = clamp(seg(t, 1.7, 2.7)), n = Math.round(k * 20); s.fillStyle = col(1); s.font = "500 38px PM"; s.textAlign = "right"; s.direction = "ltr"; s.fillText("[" + "#".repeat(n) + ".".repeat(20 - n) + "]", SR - 70, 320); }
       if (t > 2.8) { const a2 = typed(L2, 2.8, 18); line(a2, 400, 46, "PX", 1, t < 3.4); }
       // الفنجان بيتطبع سطر سطر
-      const pr = seg(t, 3.3, 5.6) * ROWS; s.font = "500 36px PM"; s.textAlign = "left"; s.direction = "ltr";
-      for (let r = 0; r < ROWS; r++) { if (r >= pr) break; for (let k = 0; k < COLS; k++) {
-        let b = B[r][k]; const v = (r + .5) / ROWS, ua = ((k + .5) / COLS - .5) * 1.07;
+      // مع العناصر: كل عنصر بيتطبع سطر سطر، يفضل شوية، وبعدين بيتمسح من فوق لتحت والعنصر اللي بعده بيتطبع
+      let G = B, pr = seg(t, 3.3, 5.6) * ROWS, er = 0;
+      if (C.EB.length) {
+        const n = C.EB.length, D = (11.6 - 3.3) / n, k0 = Math.min(n - 1, Math.max(0, Math.floor((t - 3.3) / D))), s0 = 3.3 + k0 * D;
+        G = C.EB[k0]; pr = seg(t, s0, s0 + Math.min(1.6, D * .45)) * ROWS; er = k0 < n - 1 ? seg(t, s0 + D - .45, s0 + D) * ROWS : 0;
+      }
+      s.font = "500 36px PM"; s.textAlign = "left"; s.direction = "ltr";
+      for (let r = 0; r < ROWS; r++) { if (r >= pr) break; if (r < er) continue; for (let k = 0; k < COLS; k++) {
+        let b = G[r][k]; const v = (r + .5) / ROWS, ua = ((k + .5) / COLS - .5) * 1.07;
         // بخار: حروف خفيفة بتتموج فوق الفنجان
-        if (t > 5.0 && v < .27 && v > .02) { const sv = (v - .02) / .25; for (const o of [-.08, .06]) { const cx = o + Math.sin(sv * 7 - t * 2.2 + o * 30) * .05; const d = Math.abs(ua - cx); if (d < .05) b = Math.max(b, (1 - d / .05) * .55 * sv * smooth(seg(t, 5.0, 6.0)) * (.7 + .3 * Math.sin(t * 5 + r))); } }
+        if (!C.EB.length && t > 5.0 && v < .27 && v > .02) { const sv = (v - .02) / .25; for (const o of [-.08, .06]) { const cx = o + Math.sin(sv * 7 - t * 2.2 + o * 30) * .05; const d = Math.abs(ua - cx); if (d < .05) b = Math.max(b, (1 - d / .05) * .55 * sv * smooth(seg(t, 5.0, 6.0)) * (.7 + .3 * Math.sin(t * 5 + r))); } }
         if (b < .06) continue; const ch = RAMP[Math.min(RAMP.length - 1, Math.round(b * (RAMP.length - 1)))]; if (ch === " ") continue;
         const fresh = r > pr - 1.5 ? 1.4 : 1; s.fillStyle = col(Math.min(1, (.45 + .55 * b) * fresh)); s.fillText(ch, GX + k * CW, GY + r * RH);
       } }
