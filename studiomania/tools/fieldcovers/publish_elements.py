@@ -4,6 +4,7 @@
 الستايل لكل قالب من أمثلة الأغلفة (fitness.py: أول «ستايل:اسم» في els)، و«base» = العناصر العادية."""
 import json
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from PIL import Image
@@ -28,25 +29,29 @@ def tpl_styles() -> dict:
     return out
 
 
+def convert(job) -> int:
+    f, out = job
+    im = Image.open(f).convert("RGBA")
+    box = im.getbbox()   # الهوامش الفاضية بتتشال (العنصر بحجمه الحقيقي)
+    if box:
+        im = im.crop(box)
+    im.thumbnail((512, 512))
+    im.save(out, "WEBP", quality=82, method=4)
+    return 1
+
+
 def main() -> None:
     tpl = tpl_styles()
     styles = sorted(set(tpl.values()) | {"base"})
-    n = 0
+    jobs = []
     for st in styles:
         src = SRC if st == "base" else SRC / st
         dst = OUT / st
         dst.mkdir(parents=True, exist_ok=True)
-        for name in elements.ITEMS:
-            f = src / f"{name}.png"
-            if not f.exists():
-                continue
-            im = Image.open(f).convert("RGBA")
-            box = im.getbbox()   # الهوامش الفاضية بتتشال (العنصر بحجمه الحقيقي)
-            if box:
-                im = im.crop(box)
-            im.thumbnail((512, 512))
-            im.save(dst / f"{name}.webp", "WEBP", quality=82, method=6)
-            n += 1
+        jobs += [(src / f"{name}.png", dst / f"{name}.webp") for name in elements.ITEMS
+                 if (src / f"{name}.png").exists() and not (dst / f"{name}.webp").exists()]
+    with ProcessPoolExecutor() as ex:   # بالتوازي (كانت بطيئة جدًا واحدة واحدة)
+        n = sum(ex.map(convert, jobs))
     items = {k: v.replace(elements.PERSON, "a faceless athletic figure ") for k, v in elements.ITEMS.items()
              if (SRC / f"{k}.png").exists()}
     (OUT / "index.json").write_text(json.dumps({"field": FIELD, "items": items, "styles": styles, "tpl": tpl}, ensure_ascii=False, indent=1), "utf-8")
