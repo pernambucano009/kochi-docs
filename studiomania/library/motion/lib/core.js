@@ -161,7 +161,7 @@
       return c;
     },
   };
-  M.rgbOf = (h) => { const n = parseInt(String(h).replace("#", "").replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  M.rgbOf = (h) => { const m = String(h).match(/rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/); if (m) return [+m[1], +m[2], +m[3]]; const n = parseInt(String(h).replace("#", "").slice(0, 6).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   M.isAr = (s) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(String(s || ""));
   // أكبر مقاس يخلّي الكلام في العرض ده (بين min و max)
   M.fit = (text, fam, maxW, max, min = 12, weight = "") => { let s = max; while (s > min && M.measure(text, `${weight} ${s}px ${fam}`.trim()) > maxW) s -= 2; return s; };

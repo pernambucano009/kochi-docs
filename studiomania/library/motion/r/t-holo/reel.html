@@ -15,6 +15,7 @@ const PR = M.params({
   product: { label: "اسم المنتج", kind: "text", role: "product", def: "سبيكر نبض", group: G3, max: 14, hint: "يظهر كبيرًا في بطاقة تحت المجسم." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "نبض أوديو", group: G3, max: 20 },
   hue: { label: "لون الهولوجرام", kind: "color", def: "#5ef2c8", group: GS, hint: "لون الضوء: السماوي أو الأخضر النعناعي يعطي إحساس الهولوجرام." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: GS, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   accent: { label: "لون التمييز", kind: "color", role: "accent", def: "#ff8a3d", group: GS, hint: "الأرقام عند تثبيتها: لون دافئ معاكس للون الهولوجرام ليظهر." },
   fTitle: { label: "خط الاسم", kind: "font", def: "plex", group: GS },
   fText: { label: "خط النص", kind: "font", def: "plex4", group: GS },
@@ -24,7 +25,7 @@ M.meta({
   scenes: [{ name: G1, t0: 0, t1: 3.3, about: "المسح يبني المجسم والنسبة تعدّ" }, { name: G2, t0: 3.3, t1: 8.5, about: "التفكيك و٣ أرقام" }, { name: G3, t0: 8.5, t1: 12, about: "بطاقة الاسم والعلامة" }],
   tips: ["مناسب للإلكترونيات والأجهزة والتقنية.", "الأرقام هي البطل: ٣ أرقام مختلفة (مدة، قوة، سرعة) أفضل من ٣ عن الشيء نفسه.", "يمكن ترك الكلام التقني في الأعلى بالإنجليزية حتى لو كان الفيديو عربيًا."],
 });
-const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 1050;
+const W = 1080, H = 1920, DUR = 12, CX = 540, CY = 1050, HS0 = 620;
 const hex = (h) => { const n = parseInt(String(h).slice(1), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 
@@ -45,7 +46,14 @@ M.reel({
     const title = M.el("div", "", `position:absolute;left:90px;right:90px;top:0;padding:26px 30px 34px;background:rgba(3,10,10,.85);border:1px solid ${PR.hue}66;text-align:center;direction:rtl;`, `<div style="font:700 92px PB;color:#effffa;">${PR.product}</div><div style="font:400 36px PX;color:${PR.hue};margin-top:6px;">${PR.brand}</div>`);
     const status = M.el("div", "", `position:absolute;right:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;text-align:right;unicode-bidi:plaintext;`);
     const sub = M.el("div", "", `position:absolute;left:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;unicode-bidi:plaintext;`, PR.hudTop);
-    return { x, segs, plates, title, status };
+    // 🧩 عناصر مكتبة المجال: كل عنصر هولوجرام (حدود منوّرة + خطوط مسح أفقية جوه الشكل) بلون الشاشة، بالدور مكان السبيكر
+    const ims = await M.els(PR.els, 4), HS = 600;
+    const EL = ims.map((im) => {
+      const c = document.createElement("canvas"); c.width = c.height = HS; const g = c.getContext("2d"), sil = M.fx.silhouette(im, PR.hue, HS, HS);
+      g.globalAlpha = .1; g.drawImage(sil, 0, 0); g.globalAlpha = .55; for (let y = 0; y < HS; y += 6) g.drawImage(sil, 0, y, HS, 2, 0, y, HS, 2);
+      g.globalAlpha = 1; g.drawImage(M.fx.edges(im, PR.hue, HS, HS, 28, 2), 0, 0); return c;
+    });
+    return { x, segs, plates, title, status, EL };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, expo, cubic, clamp, X, op } = M;
@@ -67,7 +75,13 @@ M.reel({
     const ex = smooth(seg(t, 4.2, 5.2)) * (1 - smooth(seg(t, 8.6, 9.6))), capUp = 170 * ex, coreSide = 0;
     const proj = ([px, py, pz], part) => { if (part === "cap") py += capUp; const ca = Math.cos(yaw), sa = Math.sin(yaw); let x1 = px * ca - pz * sa, z1 = px * sa + pz * ca; const cp = Math.cos(pitch), sp = Math.sin(pitch); const y1 = py * cp - z1 * sp, z2 = py * sp + z1 * cp; const f = 1400 / (1400 + z2); return [CX + x1 * f, CY - y1 * f, z2]; };
     x.globalCompositeOperation = "lighter"; x.lineCap = "round";
-    C.segs.forEach(([a, b, part]) => {
+    if (C.EL.length) M.turns(t, C.EL.length, .6, 11.6, 1.0, 1.6, .5).forEach((e) => {   // مسح بيبني العنصر من تحت لفوق، ولفّة خفيفة (عرض بيتغير)، وخروج بوميض
+      const im = C.EL[e.k], sw = HS0 * (.82 + .18 * Math.abs(Math.cos((t - e.s0) * .9))), top = padY - 40 - HS0, rv = cubic(e.in), fl = 1 - smooth(e.out);
+      x.save(); x.globalAlpha = fl * (.88 + .12 * Math.sin(t * 31)); x.beginPath(); x.rect(0, top + HS0 * (1 - rv), W, HS0 * rv + 10); x.clip();
+      x.drawImage(im, CX - sw / 2, top, sw, HS0); x.restore();
+      if (rv < 1) { const sy = top + HS0 * (1 - rv); x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 3; x.beginPath(); x.ellipse(CX, sy, 230, 40, 0, 0, Math.PI * 2); x.stroke(); }
+    });
+    if (!C.EL.length) C.segs.forEach(([a, b, part]) => {
       const ya = a[1] + (part === "cap" ? capUp : 0); if (ya > scan + 4 && t < 3.3) return;
       const p1 = proj(a, part), p2 = proj(b, part), depth = clamp(1 - ((p1[2] + p2[2]) / 2 + 160) / 420, .25, 1);
       const hot = part === "core" && ex > .3;
@@ -75,7 +89,7 @@ M.reel({
       x.lineWidth = hot ? 2.4 : 1.5; x.beginPath(); x.moveTo(p1[0], p1[1]); x.lineTo(p2[0], p2[1]); x.stroke();
     });
     // خط المسح الساخن
-    if (t > .6 && t < 3.3) { const [, sy] = proj([0, scan, 0]); x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 3; x.beginPath(); x.ellipse(CX, sy, 190, 52, 0, 0, Math.PI * 2); x.stroke(); x.fillStyle = `rgba(${hr},${hg},${hb},.12)`; x.fill(); }
+    if (!C.EL.length && t > .6 && t < 3.3) { const [, sy] = proj([0, scan, 0]); x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 3; x.beginPath(); x.ellipse(CX, sy, 190, 52, 0, 0, Math.PI * 2); x.stroke(); x.fillStyle = `rgba(${hr},${hg},${hb},.12)`; x.fill(); }
     x.globalCompositeOperation = "source-over";
     // HUD: أركان + مساطر بتتحرك أسرع + حالة
     const brk = (bx, by, sx, sy) => { x.strokeStyle = `rgba(${hr},${hg},${hb},.8)`; x.lineWidth = 3; x.beginPath(); x.moveTo(bx, by + 50 * sy); x.lineTo(bx, by); x.lineTo(bx + 50 * sx, by); x.stroke(); };

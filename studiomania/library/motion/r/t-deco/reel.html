@@ -8,6 +8,7 @@ const PR = M.params({
   sub: { label: "تحت العنوان", kind: "text", def: "مجموعة الشتا الجديدة", group: G2, max: 28 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "دار الذهب", group: G3, max: 16 },
   since: { label: "سطر صغير", kind: "text", def: "منذ ١٩٢٥", group: G3, max: 18, hint: "تحت العلامة بين شرطتين: سنة التأسيس أو جملة قصيرة." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   accent: { label: "لون الجوهرة", kind: "color", role: "accent", def: "#8e1b3a", group: G1, hint: "لون الجوهرة في المنتصف: نبيذي أو زمردي أو ياقوتي." },
   fHead: { label: "خط العنوان والعلامة", kind: "font", def: "amiri", group: GS },
   fText: { label: "خط النص الصغير", kind: "font", def: "plex", group: GS },
@@ -25,7 +26,9 @@ M.reel({
   async init(M) {
     await Promise.all([M.font("AM", PR.fHead), M.font("PB", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
-    return { x };
+    // 🧩 عناصر مكتبة المجال: كل عنصر خطوط دهب (حدوده) فوق ظل دهبي خفيف، بالدور مكان الجوهرة
+    const ims = await M.els(PR.els, 5), EL = ims.map((im) => ({ ln: M.fx.edges(im, "#f3dc98", 520, 520, 30, 2), sh: M.fx.silhouette(im, "rgba(201,162,74,.22)", 520, 520) }));
+    return { x, EL };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, cubic, expo, clamp } = M;
@@ -50,7 +53,13 @@ M.reel({
     const fk = seg(t, 2.8, 3.6); for (let i = 0; i < 9; i++) { const a = Math.PI + Math.PI * (i + .5) / 9; gline(() => { x.moveTo(CX, 600); x.lineTo(CX + Math.cos(a) * 140 * fk, 600 + Math.sin(a) * 140 * fk); }, 2, fk); }
     // ٣) الجوهرة: شكل بأوجه، لون واحد مشبع بإيرباش + حافة دهب من الناحية المنوّرة
     const jk = expo(seg(t, 3.0, 4.4)), jy = 1080 - 40 * Math.sin(t * .9) * jk + (1 - jk) * 200;
-    if (jk > 0) {
+    if (C.EL.length) {
+      M.turns(t, C.EL.length, 3.0, 11.6, 1.0, .9, .6).forEach((e) => {
+        const k = expo(e.in) * (1 - smooth(e.out)), y = 1080 - 40 * Math.sin(t * .9) + (1 - expo(e.in)) * 160 - smooth(e.out) * 120, s2 = .92 + .08 * k;
+        x.save(); x.globalAlpha = k; x.translate(CX, y); x.scale(s2, s2); x.drawImage(C.EL[e.k].sh, -260, -260); x.shadowColor = "rgba(247,227,161,.55)"; x.shadowBlur = 14; x.drawImage(C.EL[e.k].ln, -260, -260); x.restore();
+      });
+    }
+    if (jk > 0 && !C.EL.length) {
       x.save(); x.globalAlpha = jk; x.translate(CX, jy); const s = .9 + .1 * jk; x.scale(s, s);
       const facets = [[[0, -230], [-170, -90], [0, -60]], [[0, -230], [170, -90], [0, -60]], [[-170, -90], [0, 230], [0, -60]], [[170, -90], [0, 230], [0, -60]]];
       facets.forEach((f, i) => { x.beginPath(); f.forEach(([a, b]) => x.lineTo(a, b)); x.closePath(); const g = x.createLinearGradient(-170, -230, 170, 230); const lt = [1, .6, .8, .35][i]; g.addColorStop(0, `rgba(255,255,255,${.35 * lt})`); g.addColorStop(.4, PR.accent); g.addColorStop(1, "#200810"); x.fillStyle = g; x.fill(); });

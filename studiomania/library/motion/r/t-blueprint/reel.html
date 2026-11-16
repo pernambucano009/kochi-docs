@@ -4,6 +4,7 @@
 // (خط النص ← الحدود ← التفاصيل ← التظليل ← المقاسات ← الأرقام والملاحظات ← جدول البيانات) وختم أحمر واحد في الآخر. 12 ثانية.
 const G1 = "١ · الرسمة والمقاسات", G2 = "٢ · الملاحظات", G3 = "٣ · جدول البيانات والختم", GS = "الشكل العام";
 const PR = M.params({
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   h: { label: "الطول", kind: "text", def: "٢٨ سم", group: G1, max: 8, hint: "رقم ووحدة (٢٨ سم). يُكتب بجانب سهم الطول." },
   w: { label: "العرض", kind: "text", def: "٨ سم", group: G1, max: 8, hint: "يُكتب تحت سهم العرض." },
   n1: { label: "ملاحظة ١ (أعلى)", kind: "text", def: "غطا محكم ضد التسريب", group: G2, max: 22, hint: "ميزة في الجزء العلوي (الغطاء/الرأس). جملة قصيرة تشير إلى هذا الجزء." },
@@ -54,13 +55,17 @@ M.reel({
     const L = [];
     const add = (pts, t0, t1, w = 5, dash = null) => L.push({ p: pathLen(pts), t0, t1, w, dash });
     const cx = 620;
-    add([[cx, 330], [cx, 1440]], .8, 1.4, 1.6, [34, 8, 6, 8]);
-    const out = [[cx - 85, 330], [cx + 85, 330], [cx + 85, 440], [cx + 70, 440], [cx + 70, 520], ...arc(cx + 70 + 0, 600, 80, -Math.PI / 2, 0).map(([a, b]) => [a + 0, b]), [cx + 150, 1330], ...arc(cx + 110, 1330, 40, 0, Math.PI / 2), [cx - 110, 1370], ...arc(cx - 110, 1330, 40, Math.PI / 2, Math.PI), [cx - 150, 600], ...arc(cx - 70, 600, 80, Math.PI, Math.PI * 1.5), [cx - 70, 440], [cx - 85, 440], [cx - 85, 330]];
-    add(out, 1.3, 2.7, 5);
-    for (let k = -3; k <= 3; k++) add([[cx + k * 22, 342], [cx + k * 22, 428]], 2.6 + (k + 3) * .04, 2.75 + (k + 3) * .04, 2.2);
-    add([[cx - 150, 720], [cx + 150, 720]], 2.9, 3.1, 3); add([[cx - 150, 1240], [cx + 150, 1240]], 3.0, 3.2, 3);
-    add([[cx - 132, 620], [cx - 132, 1330]], 3.1, 3.4, 2, [14, 10]); add([[cx + 132, 620], [cx + 132, 1330]], 3.15, 3.45, 2, [14, 10]);
-    for (let i = 0; i < 12; i++) { const x0 = cx - 150 + i * 26; add([[x0, 1370], [x0 + 40, 1330]], 3.5 + i * .03, 3.6 + i * .03, 1.6); }
+    // 🧩 عناصر مكتبة المجال: كل عنصر بيتحول خطوط حدود بيضا (بالكود) ويترسم بالدور مكان الزمزمية
+    const ims = await M.els(PR.els, 3), EL = ims.map((im) => M.fx.edges(im, LINE, 520, 1000, 34, 2));
+    if (!EL.length) {
+      add([[cx, 330], [cx, 1440]], .8, 1.4, 1.6, [34, 8, 6, 8]);
+      const out = [[cx - 85, 330], [cx + 85, 330], [cx + 85, 440], [cx + 70, 440], [cx + 70, 520], ...arc(cx + 70 + 0, 600, 80, -Math.PI / 2, 0).map(([a, b]) => [a + 0, b]), [cx + 150, 1330], ...arc(cx + 110, 1330, 40, 0, Math.PI / 2), [cx - 110, 1370], ...arc(cx - 110, 1330, 40, Math.PI / 2, Math.PI), [cx - 150, 600], ...arc(cx - 70, 600, 80, Math.PI, Math.PI * 1.5), [cx - 70, 440], [cx - 85, 440], [cx - 85, 330]];
+      add(out, 1.3, 2.7, 5);
+      for (let k = -3; k <= 3; k++) add([[cx + k * 22, 342], [cx + k * 22, 428]], 2.6 + (k + 3) * .04, 2.75 + (k + 3) * .04, 2.2);
+      add([[cx - 150, 720], [cx + 150, 720]], 2.9, 3.1, 3); add([[cx - 150, 1240], [cx + 150, 1240]], 3.0, 3.2, 3);
+      add([[cx - 132, 620], [cx - 132, 1330]], 3.1, 3.4, 2, [14, 10]); add([[cx + 132, 620], [cx + 132, 1330]], 3.15, 3.45, 2, [14, 10]);
+      for (let i = 0; i < 12; i++) { const x0 = cx - 150 + i * 26; add([[x0, 1370], [x0 + 40, 1330]], 3.5 + i * .03, 3.6 + i * .03, 1.6); }
+    }
     // المقاسات: خطوط امتداد + خط بسهمين
     add([[cx + 95, 330], [cx + 290, 330]], 4.0, 4.15, 1.6); add([[cx + 160, 1370], [cx + 290, 1370]], 4.05, 4.2, 1.6);
     add([[cx + 260, 345], [cx + 260, 1355]], 4.2, 4.6, 2); add([[cx + 248, 372], [cx + 260, 345], [cx + 272, 372]], 4.55, 4.62, 2); add([[cx + 248, 1328], [cx + 260, 1355], [cx + 272, 1328]], 4.58, 4.66, 2);
@@ -85,7 +90,7 @@ M.reel({
     txt(PR.title, 1000, 170, 92, 8.7, 9.4, "RQ", "right", LINE, 900); txt(PR.sub, 1000, 250, 32, 9.3, 9.7, "PX");
     const fw = (o) => o.font === "RQ" ? FW + " " : o.font === "PB" ? "700 " : "";
     T.forEach((o) => { o.fw = fw(o); x.font = `${o.fw}${o.size}px ${o.font}`; o.w = x.measureText(o.s).width; if (o.maxw && o.w > o.maxw) { o.size *= o.maxw / o.w; o.w = o.maxw; } });
-    return { x, sh, L, T, tb };
+    return { x, sh, L, T, tb, EL };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, clamp, springO } = M;
@@ -99,9 +104,16 @@ M.reel({
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#0d1116"; x.fillRect(0, 0, W, H);
     x.translate(W / 2, H / 2 + bump); x.scale(z * slap, z * slap); x.translate(-cx, -cy);
     x.shadowColor = "rgba(0,0,0,.6)"; x.shadowBlur = 50; x.shadowOffsetY = 20; x.drawImage(C.sh, 0, 0); x.shadowColor = "transparent";
+    // العناصر: كل واحد بيترسم من فوق لتحت (القلم ماشي)، يفضل، وبعدين يتمسح لتحت والتاني يترسم
+    let elNib = null;
+    if (C.EL.length) M.turns(t, C.EL.length, 1.2, 7.1, 1.0, 1.3, .45).forEach((e) => {
+      const im = C.EL[e.k], top = 440, hgt = 1000, rv = smooth(e.in), gone = smooth(e.out);
+      x.save(); x.beginPath(); x.rect(620 - 280, top + hgt * gone - 10, 560, hgt * (rv - gone) + 20); x.clip(); x.drawImage(im, 620 - 260, top, 520, hgt); x.restore();
+      if (rv < 1) elNib = [620 + Math.sin(t * 9) * 160, top + hgt * rv];
+    });
     // الخطوط: سُمك الخط على الشاشة = السُمك × الزوم^0.65 (عشان ما يتخنش في القرب)
     const wk = Math.pow(z, .65) / z;
-    let nib = null;
+    let nib = elNib;
     x.lineCap = "round"; x.lineJoin = "round"; x.strokeStyle = LINE;
     C.L.forEach((o) => {
       const p = seg(t, o.t0, o.t1); if (p <= 0) return;
