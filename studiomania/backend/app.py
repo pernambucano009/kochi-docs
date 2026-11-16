@@ -30683,7 +30683,10 @@ def run_library_tag(bid: str, ids: list[str]) -> None:
                         upd["thumb"] = f"th_{f['id']}.jpg"
                     extra = f"ده فريم من نص فيديو مدته {f.get('dur') or 0} ثانية." if f["kind"] == "video" else ""
                     try:
-                        raw = ad_json(lab_media_chat(az.with_media(lib_.tag_messages(f["kind"], f["name"], where, extra), data_url(small, "image/jpeg"), "image.jpg")), "توصيف ملف")
+                        msgs = lib_.tag_messages(f["kind"], f["name"], where, extra)   # 🖼️ الصورة كـ image_url (كملف «file» بقت بترجع HTTP 400)
+                        msgs = msgs[:-1] + [{**msgs[-1], "content": [{"type": "text", "text": msgs[-1]["content"]},
+                                                                     {"type": "image_url", "image_url": {"url": data_url(small, "image/jpeg")}}]}]
+                        raw = ad_json(lab_media_chat(msgs), "توصيف ملف")
                     finally:
                         small.unlink(missing_ok=True)
                     usd = wallet.est(chars=3000, images=1)
@@ -30737,12 +30740,12 @@ def library_file_patch(fid: str, body: LibFilePatch):
 
 @app.on_event("startup")
 def _lib_retag_jpg():
-    """صور JPG اللي توصيفها فشل بسبب FFmpeg (libtag_… مش موجود): تتوصف تاني لوحدها مرة واحدة."""
+    """صور اللي توصيفها فشل (FFmpeg مع JPG، أو الصورة اترفضت كملف HTTP 400): تتوصف تاني لوحدها مرة واحدة."""
     def go():
         for lj in (ADS_DIR / "brains").glob("*/library/library.json"):
             bid = lj.parent.parent.name
             try:
-                ids = [f["id"] for f in json.loads(lj.read_text("utf-8")).get("files") or [] if "libtag_" in str(f.get("error") or "")]
+                ids = [f["id"] for f in json.loads(lj.read_text("utf-8")).get("files") or [] if re.search(r"libtag_|gemini.*HTTP 400", str(f.get("error") or ""))]
             except (OSError, ValueError):
                 continue
             if ids:

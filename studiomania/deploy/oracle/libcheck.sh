@@ -24,6 +24,8 @@ for lj in sorted(root.glob("ads/brains/*/library/library.json")):
         stat[kind.split(",")[0]] += 1
         print(f"  {f['file']:<22} {(p.stat().st_size if p.exists() else 0):>9} {kind[:20]:<20} st={f.get('status')} th={f.get('thumb') or '-'} | {str(f.get('error') or '')[:110]}")
     print("  summary:", dict(stat))
+    e = next((str(f.get("error")) for f in files if f.get("error")), "")
+    if e: print("  first full error:", e[:700])
 tmp = root / "tmp"
 print("tmp dir:", "ok" if tmp.is_dir() else "MISSING", "| free:", subprocess.run(["df", "-h", str(root)], capture_output=True, text=True).stdout.splitlines()[-1])
 PY
