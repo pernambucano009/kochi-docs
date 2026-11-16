@@ -2909,6 +2909,11 @@ def issues_feed_state(request: Request):
     return {"has_key": bool(kv_get("issues_feed_hash")), "made_at": f("issues_feed_at"), "seen_at": f("issues_feed_seen")}
 
 
+# 🎬 معرض مراجعة أغلفة المجالات بملاحظات مكتوبة وصوتية (review.py): /admin/review
+import review  # noqa: E402
+review.setup(app, DATA_DIR, admin, feed_ok, page)
+
+
 @app.get("/admin/inspect")
 def admin_inspect_page(request: Request):
     u = current_user(request)

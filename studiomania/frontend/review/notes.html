@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>مراجعة الأغلفة</title>
+<!-- 🎬 معرض مراجعة أغلفة المجالات (لصاحب المنصة بس): الغلاف العام جنب نسخة المجال، والفكرة، وملاحظات مكتوبة أو بصوت بيتسجّل جوه الصفحة. السيرفر: backend/review.py -->
+<style>
+:root { --bg: #f3f4f1; --panel: #fff; --fg: #1b1f1c; --mute: #5f6862; --line: #dde1dc; --accent: #e8590c; --ink: #fff; --chip: #eceee9; --claude: #fff1e6; --rec: #d92d20; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121513; --panel: #1b1f1c; --fg: #eef1ed; --mute: #9aa39d; --line: #2c322e; --accent: #ff7a33; --ink: #1b1f1c; --chip: #252a26; --claude: #3a2617; --rec: #ff5a4a; color-scheme: dark } }
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 60px max(16px, env(safe-area-inset-left)) }
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 18px }
+h1 { font-size: 26px; margin: 0; line-height: 1.25 }
+header p { margin: 6px 0 0; color: var(--mute) }
+.bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px }
+.meter { flex: 1 1 200px; height: 9px; background: var(--chip); border-radius: 99px; overflow: hidden }
+.meter i { display: block; height: 100%; background: var(--accent) }
+.count { font-weight: 700; font-variant-numeric: tabular-nums }
+.filters { display: flex; gap: 6px; flex-wrap: wrap }
+.filters button { font: 600 13px inherit; font-family: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 5px 12px; border-radius: 99px; cursor: pointer }
+.filters button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+.row { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 12px }
+.head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap }
+.head h2 { font-size: 18px; margin: 0 }
+.head code { font-size: 12px; color: var(--mute); direction: ltr }
+.badge { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 99px; background: var(--chip); color: var(--mute) }
+.idea { margin: 0; font-size: 14px } .idea b { color: var(--accent) }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.pair figure { margin: 0; display: grid; gap: 4px; min-width: 0 }
+.pair figcaption { font-size: 12px; font-weight: 700; color: var(--mute) }
+.pair .fit figcaption { color: var(--accent) }
+video { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 10px; background: var(--chip); display: block }
+.notes { border-top: 1px dashed var(--line); padding-top: 10px; display: grid; gap: 8px }
+.msg { background: var(--chip); border-radius: 10px; padding: 8px 12px; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; display: grid; gap: 4px }
+.msg.claude { background: var(--claude) }
+.msg small { color: var(--mute); font-size: 11px; display: flex; gap: 8px; align-items: center }
+.msg small button { margin-inline-start: auto; background: none; border: 0; color: var(--mute); cursor: pointer; font-size: 12px; font-family: inherit }
+audio { width: 100%; height: 40px }
+.say { display: flex; gap: 8px; align-items: stretch }
+.say textarea { flex: 1; min-width: 0; font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 10px; padding: 8px 10px; resize: vertical; min-height: 44px }
+.btn { font: inherit; font-weight: 700; font-size: 14px; border: 0; border-radius: 10px; padding: 0 14px; cursor: pointer; min-height: 44px; background: var(--accent); color: var(--ink) }
+.btn.ghost { background: var(--chip); color: var(--fg) }
+.btn:disabled { opacity: .5; cursor: default }
+.mic { font-size: 20px; min-width: 52px; padding: 0 }
+.mic.on { background: var(--rec); color: #fff; animation: pulse 1s infinite }
+@keyframes pulse { 50% { opacity: .6 } }
+@media (prefers-reduced-motion: reduce) { .mic.on { animation: none } }
+.recbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--chip); border-radius: 10px; padding: 8px }
+.recbar audio { flex: 1 1 200px }
+.recbar .t { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--rec) }
+.tip { font-size: 12px; color: var(--mute) }
+.todo { color: var(--mute); font-size: 13px; margin: 0 }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>أغلفة القوالب لمجال <span id="fname">اللياقة</span></h1>
+    <p>كل قالب: الغلاف العام على اليمين، ونسخة المجال على اليسار. اكتب ملاحظتك، أو اضغط 🎙️ وسجّل بصوتك هنا في الصفحة، واضغط مرة ثانية للإيقاف ثم «إرسال».</p>
+    <div class="bar">
+      <span class="count" id="count"></span>
+      <div class="meter"><i id="meter"></i></div>
+      <div class="filters" role="group">
+        <button type="button" data-f="done" aria-pressed="true">الجاهزة</button>
+        <button type="button" data-f="notes" aria-pressed="false">عليها ملاحظات</button>
+        <button type="button" data-f="all" aria-pressed="false">كل القوالب</button>
+      </div>
+    </div>
+  </header>
+  <main id="list" class="wrap"></main>
+</div>
+<script>
+const FIELD = (new URLSearchParams(location.search).get("field") || "fitness").replace(/[^a-z]/g, "");
+const NAMES = { fitness: "اللياقة", food: "الأكل", beauty: "التجميل", ecom: "المتاجر", realestate: "العقارات", edu: "التعليم", home: "الخدمات المنزلية", shops: "المحلات" };
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same-origin", ...o }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status); return r.json(); };
+let S = { items: [], notes: [] }, filter = "done";
+try { filter = localStorage.getItem("rv-filter") || "done"; } catch (e) {}
+$("#fname").textContent = NAMES[FIELD] || FIELD;
+
+// 🎙️ التسجيل جوه الصفحة: MediaRecorder (webm على أندرويد وكروم، mp4 على الآيفون)
+const REC = { mr: null, chunks: [], tpl: null, t0: 0, timer: 0, blob: null, mime: "", secs: 0, stream: null };
+const pickMime = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+async function recStart(tpl) {
+  if (REC.mr) recStop();
+  try { REC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { tip(tpl, "الميكروفون مقفول. اسمح للموقع بالميكروفون من إعدادات المتصفح وجرّب تاني."); return; }
+  REC.mime = pickMime(); REC.chunks = []; REC.tpl = tpl; REC.blob = null; REC.t0 = Date.now();
+  REC.mr = new MediaRecorder(REC.stream, REC.mime ? { mimeType: REC.mime } : undefined);
+  REC.mr.ondataavailable = (e) => e.data.size && REC.chunks.push(e.data);
+  REC.mr.onstop = () => {
+    REC.stream.getTracks().forEach((t) => t.stop());
+    REC.secs = (Date.now() - REC.t0) / 1000;
+    REC.blob = new Blob(REC.chunks, { type: REC.mr.mimeType || REC.mime || "audio/webm" });
+    REC.mr = null; clearInterval(REC.timer); drawRec(tpl);
+  };
+  REC.mr.start(500);
+  REC.timer = setInterval(() => drawRec(tpl), 500);
+  drawRec(tpl);
+}
+function recStop() { if (REC.mr && REC.mr.state !== "inactive") REC.mr.stop(); }
+function recDiscard(tpl) { recStop(); REC.blob = null; REC.tpl = null; drawRec(tpl); }
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function drawRec(tpl) {
+  const n = $(`.notes[data-id="${tpl}"]`); if (!n) return;
+  const mic = $(".mic", n), bar = $(".recbar", n), live = REC.tpl === tpl && REC.mr;
+  mic.classList.toggle("on", !!live); mic.setAttribute("aria-label", live ? "إيقاف التسجيل" : "سجّل بصوتك");
+  if (live) { bar.hidden = false; bar.innerHTML = `<span class="t">● ${fmt((Date.now() - REC.t0) / 1000)}</span><span class="tip">بيسجّل… اضغط 🎙️ للإيقاف</span>`; return; }
+  if (REC.tpl === tpl && REC.blob) {
+    bar.hidden = false;
+    bar.innerHTML = `<audio controls src="${URL.createObjectURL(REC.blob)}"></audio><button type="button" class="btn ghost" data-x>مسح</button>`;
+    $("[data-x]", bar).onclick = () => recDiscard(tpl);
+    return;
+  }
+  bar.hidden = true; bar.innerHTML = "";
+}
+function tip(tpl, t) { const e = $(`.notes[data-id="${tpl}"] .tip.msgtip`); if (e) { e.textContent = t || ""; e.hidden = !t; } }
+const b64 = (blob) => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = no; r.readAsDataURL(blob); });
+
+async function send(tpl) {
+  const n = $(`.notes[data-id="${tpl}"]`), ta = $("textarea", n), btn = $(".send", n);
+  if (REC.tpl === tpl && REC.mr) { recStop(); await new Promise((r) => setTimeout(r, 300)); }
+  const blob = REC.tpl === tpl ? REC.blob : null, text = ta.value.trim();
+  if (!blob && !text) return;
+  btn.disabled = true; tip(tpl, blob ? "بيترفع…" : "");
+  try {
+    const body = { field: FIELD, tpl, text };
+    if (blob) Object.assign(body, { audio_b64: await b64(blob), mime: blob.type, secs: REC.secs });
+    const note = await api("/api/review/note", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    S.notes.push(note); ta.value = ""; if (blob) { REC.blob = null; REC.tpl = null; }
+    drawThread(tpl); drawRec(tpl); tip(tpl, "");
+  } catch (e) { tip(tpl, "ما انحفظت: " + e.message); }
+  btn.disabled = false;
+}
+async function del(tpl, id) {
+  try { await api(`/api/review/note/${id}/delete?field=${FIELD}`, { method: "POST" }); S.notes = S.notes.filter((x) => x.id !== id); drawThread(tpl); } catch (e) { tip(tpl, e.message); }
+}
+function drawThread(tpl) {
+  const box = $(`.notes[data-id="${tpl}"] .thread`); if (!box) return;
+  box.innerHTML = S.notes.filter((x) => x.tpl === tpl).map((x) => `<div class="msg ${x.by === "claude" ? "claude" : ""}">
+    <small><b>${x.by === "claude" ? "Claude" : "أنت"}</b> ${new Date(x.at * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" })}${x.audio ? ` · 🎙️ ${fmt(x.audio.secs || 0)}` : ""}${x.by !== "claude" ? `<button type="button" data-del="${x.id}">حذف</button>` : ""}</small>
+    ${x.text ? `<span>${esc(x.text)}</span>` : ""}${x.audio ? `<audio controls preload="none" src="/api/review/audio/${esc(x.audio.file)}?field=${FIELD}"></audio>` : ""}</div>`).join("");
+  box.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del(tpl, b.dataset.del));
+}
+function render() {
+  document.querySelectorAll(".filters button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.f === filter)));
+  const has = new Set(S.notes.map((x) => x.tpl));
+  const done = S.items.filter((x) => x.done).length;
+  $("#count").textContent = `${done} من ${S.items.length} جاهزة · ${has.size} عليها ملاحظات`;
+  $("#meter").style.width = (100 * done / (S.items.length || 1)) + "%";
+  const list = S.items.filter((x) => filter === "all" || (filter === "notes" ? has.has(x.id) : x.done));
+  $("#list").innerHTML = list.map((x) => `<section class="row">
+    <div class="head"><h2>${esc(x.name)}</h2><code>${x.id}</code><span class="badge">${x.done ? "جاهز" : "لسه"}</span></div>
+    ${x.done ? `<p class="idea"><b>الفكرة:</b> ${esc(x.idea)}</p>
+    <div class="pair">
+      <figure><figcaption>الغلاف العام</figcaption><video src="/gallery/${x.id}.mp4" poster="/gallery/${x.id}.jpg" controls muted loop playsinline preload="none"></video></figure>
+      <figure class="fit"><figcaption>نسخة ${esc(NAMES[FIELD] || FIELD)}</figcaption><video src="/gallery/f/${FIELD}/${x.id}.mp4" poster="/gallery/f/${FIELD}/${x.id}.jpg" controls muted loop playsinline preload="none"></video></figure>
+    </div>` : `<p class="todo">${esc(x.desc)}</p>`}
+    <div class="notes" data-id="${x.id}"><div class="thread"></div>
+      <div class="recbar" hidden></div>
+      <div class="say"><textarea rows="1" placeholder="ملاحظتك على هذا القالب…"></textarea>
+        <button type="button" class="btn ghost mic" aria-label="سجّل بصوتك">🎙️</button>
+        <button type="button" class="btn send">إرسال</button></div>
+      <div class="tip msgtip" hidden></div></div>
+  </section>`).join("") || `<p class="todo">مافيش قوالب هنا.</p>`;
+  list.forEach((x) => {
+    const n = $(`.notes[data-id="${x.id}"]`);
+    $(".mic", n).onclick = () => (REC.tpl === x.id && REC.mr ? recStop() : recStart(x.id));
+    $(".send", n).onclick = () => send(x.id);
+    drawThread(x.id); drawRec(x.id);
+  });
+  if (!window.MediaRecorder || !navigator.mediaDevices) document.querySelectorAll(".mic").forEach((b) => b.hidden = true);
+}
+document.querySelector(".filters").addEventListener("click", (e) => {
+  const f = e.target.closest("button")?.dataset.f; if (!f) return;
+  filter = f; try { localStorage.setItem("rv-filter", f); } catch (e) {} render();
+});
+api(`/api/review/items?field=${FIELD}`).then((d) => { S = d; render(); }).catch((e) => { $("#list").innerHTML = `<p class="todo">ما اتحمّلش: ${esc(e.message)}</p>`; });
+// ردود Claude بتوصل وانت فاتح الصفحة
+setInterval(() => api(`/api/review/items?field=${FIELD}`).then((d) => {
+  const before = S.notes.length; S.notes = d.notes;
+  if (d.notes.length !== before) new Set(d.notes.map((x) => x.tpl)).forEach(drawThread);
+}).catch(() => {}), 30000);
+</script>
+</body>
+</html>
