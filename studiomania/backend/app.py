@@ -20614,7 +20614,9 @@ def run_typo_plan(pid: str) -> None:
 
 
 def typo_frame(src: Path, t: float, out: Path, width: int = 768) -> Path:
-    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.2f}", "-i", str(src), "-frames:v", "1",
+    # 🖼️ صورة ثابتة: من غير -ss (FFmpeg مع -ss على JPG بيخرج من غير ما يكتب أي ملف ومن غير خطأ)
+    seek = [] if src.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".gif") else ["-ss", f"{max(0.0, t):.2f}"]
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *seek, "-i", str(src), "-frames:v", "1",
                     "-vf", f"scale={width}:-2", str(out)], check=True, capture_output=True, timeout=60)
     return out
 
@@ -30676,6 +30678,9 @@ def run_library_tag(bid: str, ids: list[str]) -> None:
                                 im.convert("RGB").resize((640, max(1, round(im.height * 640 / max(1, im.width))))).save(small, "JPEG", quality=85)
                         except Exception:  # noqa: BLE001
                             raise HTTPException(400, "تعذّرت قراءة الصورة (قد تكون تالفة أو بصيغة غير مدعومة). احذفها وارفعها مرة أخرى بصيغة JPG أو PNG") from None
+                    if f["kind"] == "image" and img.suffix.lower() != ".gif" and small.exists():   # 🖼️ صورة صغيرة للمكتبة (الأصل ممكن يبقى ٥ ميجا)
+                        shutil.copy(small, folder / f"th_{f['id']}.jpg")
+                        upd["thumb"] = f"th_{f['id']}.jpg"
                     extra = f"ده فريم من نص فيديو مدته {f.get('dur') or 0} ثانية." if f["kind"] == "video" else ""
                     try:
                         raw = ad_json(lab_media_chat(az.with_media(lib_.tag_messages(f["kind"], f["name"], where, extra), data_url(small, "image/jpeg"), "image.jpg")), "توصيف ملف")
@@ -30728,6 +30733,22 @@ def library_file_patch(fid: str, body: LibFilePatch):
                 conn.execute("UPDATE audio SET name = ?, kind = COALESCE(?, kind) WHERE id = ?", (f["name"], r if r in ("voice", "music") else None, f["audio_id"]))
     lib_update(fn, bid)
     return lib_view(me)
+
+
+@app.on_event("startup")
+def _lib_retag_jpg():
+    """صور JPG اللي توصيفها فشل بسبب FFmpeg (libtag_… مش موجود): تتوصف تاني لوحدها مرة واحدة."""
+    def go():
+        for lj in (ADS_DIR / "brains").glob("*/library/library.json"):
+            bid = lj.parent.parent.name
+            try:
+                ids = [f["id"] for f in json.loads(lj.read_text("utf-8")).get("files") or [] if "libtag_" in str(f.get("error") or "")]
+            except (OSError, ValueError):
+                continue
+            if ids:
+                lib_update(lambda d, ids=set(ids): [x.update(status="tagging", error=None) for x in d["files"] if x["id"] in ids], bid)
+                run_library_tag(bid, ids)
+    threading.Thread(target=go, daemon=True).start()
 
 
 @app.post("/api/library/files/{fid}/retag")
