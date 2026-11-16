@@ -55,7 +55,17 @@ M.reel({
     const tm = mk(), q = tm.getContext("2d", { willReadFrequently: true }); q.fillStyle = "#fff"; q.font = `${M.fit(PR.title, "LZ", 900, 230, 80)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(PR.title, 540, 330);
     const td = q.getImageData(0, 0, W, H).data, T = [];
     for (let i = 0; i < 11000; i++) { const px = 60 + R() * 960, py = 150 + R() * 360; if (td[((py | 0) * W + (px | 0)) * 4 + 3] < 128) continue; T.push({ px, py, a: -.2 + (R() - .5) * .5, len: 12 + R() * 10, wid: 8 + R() * 5, col: [250 - R() * 20, 240 - R() * 25, 220 - R() * 30], t: 7.6 + (1 - px / W) * 1.2 + R() * .3 }); }
-    return { x, S, T, ELS };
+    // 🧩 كل عنصر بيترسم بنفس ضربات السكينة (الألوان من صورة العنصر نفسها): كبيرة الأول، وبعدين صغيرة على الحواف
+    const ES = ELS.map((im, e) => {
+      const SZ = 620, cv = M.fx.fit(im, SZ, SZ), d = cv.getContext("2d").getImageData(0, 0, SZ, SZ).data, Rr = M.rng(50 + e), out = [];
+      const at2 = (px, py) => { px = Math.max(0, Math.min(SZ - 1, px | 0)); py = Math.max(0, Math.min(SZ - 1, py | 0)); const k = (py * SZ + px) * 4; return [d[k], d[k + 1], d[k + 2], d[k + 3]]; };
+      const put = (rad, n, edge) => { for (let i = 0; i < n; i++) { const px = Rr() * SZ, py = Rr() * SZ, c = at2(px, py); if (c[3] < 150) continue;
+        if (edge && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, b]) => at2(px + a * rad * 1.4, py + b * rad * 1.4)[3] > 150)) continue;
+        const a = (Rr() - .5) * .9 + (py / SZ - .5) * .4, v = 1 + (Rr() - .5) * .14; out.push({ px, py, a, len: rad * (1.6 + Rr() * 1.2), wid: rad * (.9 + Rr() * .4), col: [c[0] * v, c[1] * v, c[2] * v], c2: null, o: (rad > 10 ? 0 : .5) + Rr() * .5 }); } };
+      put(15, 2600, false); put(7, 3200, true);
+      out.sort((a, b) => a.o - b.o); return { SZ, st: out };
+    });
+    return { x, S, T, ELS, ES };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, expo } = M;
@@ -79,10 +89,12 @@ M.reel({
     const rk = seg(t, 6.0, 7.0); if (rk > 0) for (let i = 0; i < 18; i++) { const y = 1590 + i * 12, w2 = (200 - i * 8) * rk * (.6 + M.hash(i) * .6); x.fillStyle = `rgba(30,18,10,${.22 - i * .01})`; x.fillRect(800 - w2 / 2 + (M.hash(i * 3) - .5) * 40, y, w2, 9); }
     // بخار من الكوباية: ضربات فاتحة صغيرة بتطلع
     // العناصر: كل عنصر بيتحط على الترابيزة بمسحة سكينة مايلة، يفضل، وبعدين يتمسح والتاني مكانه
-    if (C.ELS.length) M.turns(t, C.ELS.length, 2.2, 11.6, 1.0, .7, .5).forEach((e) => {
-      const im = C.ELS[e.k], h = 640, w = Math.min(760, h * im.width / im.height), hh = w * im.height / im.width, cx = 540 + (e.k % 2 ? 60 : -60), by = 1560;
-      const k = smooth(e.in), o = smooth(e.out); x.save(); x.beginPath(); const sw = (w + hh) * k; x.moveTo(cx - w / 2 - 40 + (w + hh) * o, by + 40); x.lineTo(cx - w / 2 - 40 + sw, by + 40); x.lineTo(cx - w / 2 - 40 + sw + hh, by - hh - 40); x.lineTo(cx - w / 2 - 40 + (w + hh) * o + hh, by - hh - 40); x.closePath(); x.clip();
-      x.shadowColor = "rgba(30,15,5,.45)"; x.shadowBlur = 20; x.shadowOffsetY = 12; x.drawImage(im, cx - w / 2, by - hh, w, hh); x.restore();
+    // العناصر: كل عنصر بيترسم ضربة ضربة على الترابيزة، يفضل، وبعدين بيبهت والتاني يترسم
+    if (C.ES.length) M.turns(t, C.ES.length, 2.4, 11.6, 1.0, 1.3, .5).forEach((e) => {
+      const E = C.ES[e.k], sc = 600 / E.SZ, cx = 540 + (e.k % 2 ? 50 : -50), by = 1580, lim = e.in * E.st.length;
+      x.save(); x.globalAlpha = 1 - smooth(e.out); x.translate(cx - E.SZ * sc / 2, by - E.SZ * sc); x.scale(sc, sc);
+      for (let i = 0; i < lim; i++) knife(E.st[i], Math.min(1, (lim - i) / 60));
+      x.restore();
     });
     const sa = C.ELS.length ? 0 : seg(t, 6.4, 7.4); if (sa > 0) for (let j = 0; j < 3; j++) for (let i = 0; i < 16; i++) { const u = ((t * .18 + i / 16) % 1), sx = 330 + j * 50 + Math.sin(u * 6 + j * 2 + t * .8) * (18 + u * 30), sy = 1200 - u * 330; x.globalAlpha = sa * Math.sin(u * Math.PI) * .7; knife({ px: sx, py: sy, a: -1.57 + Math.cos(u * 6 + j * 2 + t * .8) * .7, len: 34, wid: 13, col: [250, 242, 230] }, 1); } x.globalAlpha = 1;
     x.setTransform(1, 0, 0, 1, 0, 0);
