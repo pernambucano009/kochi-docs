@@ -6,6 +6,7 @@ const G1 = "١ · الرسمة", G2 = "٢ · العنوان والعلامة", G
 const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "ارسم يومك بألوانك", group: G2, max: 20, hint: "يُكتب بالشمع فوق الرسمة: جملة مبهجة وقصيرة." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مكتبة ألوان", group: G2, max: 16 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   line: { label: "لون الخط", kind: "color", def: "#2d2a6e", group: G1, hint: "لون خطوط الرسم والنص: اجعله غامقًا ليظهر على الورق." },
   balloon: { label: "لون البالون", kind: "color", role: "accent", def: "#e5423b", group: G1, hint: "البالون الذي يطير في الرسمة: لون علامتك." },
   fTitle: { label: "خط العنوان", kind: "font", def: "lalezar", group: GS },
@@ -32,7 +33,8 @@ M.reel({
     const tooth = mk(), q = tooth.getContext("2d");
     for (let i = 0; i < 60000; i++) { q.fillStyle = `rgba(0,0,0,${.5 + R() * .5})`; const s = 1 + R() * 2.2; q.fillRect(R() * W, R() * H, s, s * (.6 + R() * .8)); }
     for (let y = 0; y < H; y += 5) { q.fillStyle = "rgba(0,0,0,.12)"; q.fillRect(0, y, W, 1); }
-    return { x, paper, tooth, wax: mk(), wash: mk() };
+    const ELS = await M.els(PR.els, 3);   // 🧩 عناصر مكتبة المجال (بستايل الشمع): بتتلوّن واحد ورا التاني مكان البيت والشجرة والطفل، وبتفضل في الرسمة
+    return { x, paper, tooth, wax: mk(), wash: mk(), ELS };
   },
   seek(t, C, M) {
     const { x } = C, { seg, smooth, cubic } = M;
@@ -63,35 +65,45 @@ M.reel({
     fill(P([[0, 1420], [W, 1415], [W, 1600], [0, 1600]]), BOX.green, seg(t, .4, 1.2), 1, 15);
     line(ground, BOX.dgreen, seg(t, .1, .7), 12, 2);
     for (let i = 0; i < 22; i++) line([[60 + i * 45, 1430], [70 + i * 45, 1395], [80 + i * 45, 1430]], BOX.dgreen, seg(t, .7 + i * .02, .9 + i * .02), 7, 3 + i);
-    // البيت: حيطة + سقف + باب + شباك (منظور طفل: السقف أكبر من البيت)
-    const house = [[220, 1420], [220, 1080], [600, 1080], [600, 1420]], roof = [[180, 1090], [410, 880], [640, 1090]];
-    fill(P(house), BOX.orange, seg(t, 1.6, 2.4), 4); fill(P(roof), BOX.balloon || "#c33", 0, 5);
-    fill(P(roof), "#c9473b", seg(t, 1.8, 2.5), 5);
-    line([...house, house[0]], ln, seg(t, 1.0, 1.7), 12, 6); line([...roof, roof[0]], ln, seg(t, 1.2, 1.8), 12, 7);
-    const door = [[350, 1420], [350, 1270], [460, 1270], [460, 1420]]; fill(P(door), BOX.brown, seg(t, 2.4, 2.8), 8); line(door, ln, seg(t, 2.2, 2.6), 10, 9);
-    const win = [[270, 1130], [340, 1130], [340, 1200], [270, 1200], [270, 1130]]; fill(P(win), BOX.yellow, seg(t, 2.6, 2.9), 10); line(win, ln, seg(t, 2.4, 2.8), 9, 11); line([[305, 1130], [305, 1200]], ln, seg(t, 2.8, 2.9), 7, 12); line([[270, 1165], [340, 1165]], ln, seg(t, 2.85, 2.95), 7, 13);
+    if (C.ELS.length) {   // كل عنصر بيتلوّن بخطوط شمع من الشمال لليمين (حافة مسننة) ويتهز على «اتنين»، وبيفضل
+      [[300, 1425, 380, 1.0, 2.6], [850, 1425, 290, 4.6, 5.9], [580, 1435, 440, 6.2, 7.6]].slice(0, C.ELS.length).forEach(([cx, base, mh, t0, t1], i) => {
+        const im = C.ELS[i], k = seg(t, t0, t1); if (k <= 0) return; const mw = Math.min(mh * 1.15, mh * im.width / im.height), hh = mw * im.height / im.width, j = (M.hash(boil + i) - .5) * 3;
+        w.save(); w.beginPath(); const ex = cx - mw / 2 - 20 + (mw + 40) * k; w.moveTo(cx - mw / 2 - 20, base - hh - 20); for (let yy = 0; yy <= 20; yy++) w.lineTo(ex + Math.sin(yy * 1.7 + i) * 18, base - hh - 20 + (hh + 40) * yy / 20); w.lineTo(cx - mw / 2 - 20, base + 20); w.closePath(); w.clip();
+        w.drawImage(im, cx - mw / 2 + j, base - hh + j, mw, hh); w.restore();
+      });
+    } else {
+      // البيت: حيطة + سقف + باب + شباك (منظور طفل: السقف أكبر من البيت)
+      const house = [[220, 1420], [220, 1080], [600, 1080], [600, 1420]], roof = [[180, 1090], [410, 880], [640, 1090]];
+      fill(P(house), BOX.orange, seg(t, 1.6, 2.4), 4); fill(P(roof), BOX.balloon || "#c33", 0, 5);
+      fill(P(roof), "#c9473b", seg(t, 1.8, 2.5), 5);
+      line([...house, house[0]], ln, seg(t, 1.0, 1.7), 12, 6); line([...roof, roof[0]], ln, seg(t, 1.2, 1.8), 12, 7);
+      const door = [[350, 1420], [350, 1270], [460, 1270], [460, 1420]]; fill(P(door), BOX.brown, seg(t, 2.4, 2.8), 8); line(door, ln, seg(t, 2.2, 2.6), 10, 9);
+      const win = [[270, 1130], [340, 1130], [340, 1200], [270, 1200], [270, 1130]]; fill(P(win), BOX.yellow, seg(t, 2.6, 2.9), 10); line(win, ln, seg(t, 2.4, 2.8), 9, 11); line([[305, 1130], [305, 1200]], ln, seg(t, 2.8, 2.9), 7, 12); line([[270, 1165], [340, 1165]], ln, seg(t, 2.85, 2.95), 7, 13);
+    }
     // الشمس بوش
     const sc = [830, 560]; fill(P(circle(sc[0], sc[1], 120)), BOX.yellow, seg(t, 3.4, 4.0), 14);
     line(circle(sc[0], sc[1], 120), BOX.orange, seg(t, 3.0, 3.5), 12, 15);
     for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; line([[sc[0] + Math.cos(a) * 150, sc[1] + Math.sin(a) * 150], [sc[0] + Math.cos(a) * 205, sc[1] + Math.sin(a) * 205]], BOX.orange, seg(t, 3.6 + i * .05, 3.75 + i * .05), 11, 16 + i); }
     line(circle(sc[0] - 40, sc[1] - 20, 9, 10), ln, seg(t, 4.1, 4.2), 9, 27); line(circle(sc[0] + 40, sc[1] - 20, 9, 10), ln, seg(t, 4.2, 4.3), 9, 28);
     line(Array.from({ length: 10 }, (_, i) => [sc[0] - 45 + i * 10, sc[1] + 30 + Math.sin(i / 9 * Math.PI) * 26]), ln, seg(t, 4.3, 4.5), 9, 29);
-    // الشجرة
-    const trunk = [[770, 1420], [770, 1180], [830, 1180], [830, 1420]]; fill(P(trunk), BOX.brown, seg(t, 4.8, 5.1), 30); line([...trunk, trunk[0]], ln, seg(t, 4.6, 4.9), 11, 31);
-    const crown = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [800 + Math.cos(a) * (150 + Math.sin(a * 5) * 18), 1080 + Math.sin(a) * (130 + Math.sin(a * 5) * 16)]; });
-    fill(P(crown), BOX.green, seg(t, 5.1, 5.7), 32); line(crown, BOX.dgreen, seg(t, 4.9, 5.4), 12, 33);
-    [[760, 1040], [850, 1010], [820, 1120], [730, 1110], [880, 1100]].forEach(([a, b], i) => { fill(P(circle(a, b, 18, 12)), "#e5423b", seg(t, 5.7 + i * .08, 5.8 + i * .08), 34 + i, 8); });
-    // الطفل بالبالونة (البالونة طالعة شوية لفوق)
-    const kx = 560, ky = 1300, bob = Math.sin(Math.floor(t * 8) / 8 * 2) * 8;
-    fill(P(circle(kx, ky - 140, 46, 24)), BOX.skin, seg(t, 6.4, 6.6), 40); line(circle(kx, ky - 140, 46, 24), ln, seg(t, 6.2, 6.5), 10, 41);
-    fill(P([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10]]), BOX.blue, seg(t, 6.6, 6.9), 42); line([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10], [kx - 40, ky - 92]], ln, seg(t, 6.5, 6.8), 10, 43);
-    line([[kx - 20, ky + 10], [kx - 26, ky + 110]], ln, seg(t, 6.8, 6.9), 12, 44); line([[kx + 20, ky + 10], [kx + 26, ky + 110]], ln, seg(t, 6.85, 6.95), 12, 45);
-    line([[kx - 45, ky - 70], [kx - 90, ky - 10]], ln, seg(t, 6.9, 7.0), 11, 46); line([[kx + 45, ky - 70], [kx + 100, ky - 160]], ln, seg(t, 6.95, 7.05), 11, 47);
-    w.fillStyle = ln; [[-15, -148], [15, -148]].forEach(([a, b]) => { w.beginPath(); w.arc(kx + a, ky + b, 6, 0, Math.PI * 2); w.fill(); });
-    fill(P(circle(kx - 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 48, 7); fill(P(circle(kx + 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 49, 7);
-    line([[kx + 100, ky - 160], [kx + 130, ky - 300 + bob], [kx + 140, ky - 420 + bob]], ln, seg(t, 7.1, 7.3), 5, 50);
-    const bl = Array.from({ length: 31 }, (_, i) => { const a = i / 30 * Math.PI * 2; return [kx + 140 + Math.cos(a) * 70, ky - 500 + bob + Math.sin(a) * 85]; });
-    fill(P(bl), PR.balloon, seg(t, 7.4, 7.8), 51); line(bl, ln, seg(t, 7.2, 7.5), 10, 52);
+    if (!C.ELS.length) {
+      // الشجرة
+      const trunk = [[770, 1420], [770, 1180], [830, 1180], [830, 1420]]; fill(P(trunk), BOX.brown, seg(t, 4.8, 5.1), 30); line([...trunk, trunk[0]], ln, seg(t, 4.6, 4.9), 11, 31);
+      const crown = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [800 + Math.cos(a) * (150 + Math.sin(a * 5) * 18), 1080 + Math.sin(a) * (130 + Math.sin(a * 5) * 16)]; });
+      fill(P(crown), BOX.green, seg(t, 5.1, 5.7), 32); line(crown, BOX.dgreen, seg(t, 4.9, 5.4), 12, 33);
+      [[760, 1040], [850, 1010], [820, 1120], [730, 1110], [880, 1100]].forEach(([a, b], i) => { fill(P(circle(a, b, 18, 12)), "#e5423b", seg(t, 5.7 + i * .08, 5.8 + i * .08), 34 + i, 8); });
+      // الطفل بالبالونة (البالونة طالعة شوية لفوق)
+      const kx = 560, ky = 1300, bob = Math.sin(Math.floor(t * 8) / 8 * 2) * 8;
+      fill(P(circle(kx, ky - 140, 46, 24)), BOX.skin, seg(t, 6.4, 6.6), 40); line(circle(kx, ky - 140, 46, 24), ln, seg(t, 6.2, 6.5), 10, 41);
+      fill(P([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10]]), BOX.blue, seg(t, 6.6, 6.9), 42); line([[kx - 40, ky - 92], [kx + 40, ky - 92], [kx + 50, ky + 10], [kx - 50, ky + 10], [kx - 40, ky - 92]], ln, seg(t, 6.5, 6.8), 10, 43);
+      line([[kx - 20, ky + 10], [kx - 26, ky + 110]], ln, seg(t, 6.8, 6.9), 12, 44); line([[kx + 20, ky + 10], [kx + 26, ky + 110]], ln, seg(t, 6.85, 6.95), 12, 45);
+      line([[kx - 45, ky - 70], [kx - 90, ky - 10]], ln, seg(t, 6.9, 7.0), 11, 46); line([[kx + 45, ky - 70], [kx + 100, ky - 160]], ln, seg(t, 6.95, 7.05), 11, 47);
+      w.fillStyle = ln; [[-15, -148], [15, -148]].forEach(([a, b]) => { w.beginPath(); w.arc(kx + a, ky + b, 6, 0, Math.PI * 2); w.fill(); });
+      fill(P(circle(kx - 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 48, 7); fill(P(circle(kx + 26, ky - 126, 10, 10)), BOX.pink, seg(t, 7.0, 7.1), 49, 7);
+      line([[kx + 100, ky - 160], [kx + 130, ky - 300 + bob], [kx + 140, ky - 420 + bob]], ln, seg(t, 7.1, 7.3), 5, 50);
+      const bl = Array.from({ length: 31 }, (_, i) => { const a = i / 30 * Math.PI * 2; return [kx + 140 + Math.cos(a) * 70, ky - 500 + bob + Math.sin(a) * 85]; });
+      fill(P(bl), PR.balloon, seg(t, 7.4, 7.8), 51); line(bl, ln, seg(t, 7.2, 7.5), 10, 52);
+    }
     // سحاب
     [[260, 470], [560, 340]].forEach(([a, b], i) => { const cl = Array.from({ length: 41 }, (_, k) => { const ang = k / 40 * Math.PI * 2; return [a + Math.cos(ang) * (110 + Math.abs(Math.sin(ang * 3)) * 30), b + Math.sin(ang) * (50 + Math.abs(Math.sin(ang * 3)) * 18)]; }); line(cl, BOX.blue, seg(t, 7.8 + i * .2, 8.2 + i * .2), 9, 60 + i); });
     // العنوان بالشمع (حروف بخط تخين متلوّنة بالخطوط)

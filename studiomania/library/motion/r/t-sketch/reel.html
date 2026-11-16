@@ -9,6 +9,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "الطريق لحد عندنا", group: G2, max: 20 },
   sub: { label: "تحت العنوان", kind: "text", def: "مستنيينك في نفس الركن", group: G2, max: 26 },
   brand: { label: "اسم المحل على اللافتة", kind: "text", role: "brand", def: "كافيه الركن", group: G2, max: 14, hint: "يتوقف البالون عند هذا المحل." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   accent: { label: "لون البالون (العنصر الوحيد الملوّن)", kind: "color", role: "accent", def: "#e0352b", group: G1 },
   fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
   fText: { label: "خط النص", kind: "font", def: "amiri", group: GS },
@@ -56,10 +57,11 @@ M.reel({
     for (let s = 0; s < 9; s++) ln(sx + 20 + s * 75, BASE - sh + 260, sx + s * 75, BASE - sh + 330, 1.6); ln(sx, BASE - sh + 260, sx + sw, BASE - sh + 260, 2); ln(sx - 20, BASE - sh + 330, sx + sw + 20, BASE - sh + 330, 2);
     L.forEach((l) => (l.reveal = Math.min(l.x1, l.x2)));
     WASH.forEach((w2) => { w2.dx = (R() - .5) * 26; w2.dy = (R() - .5) * 20; w2.seed = R() * 100; });
-    return { x, L, WASH, sx, sw, sh };
+    const ELS = await M.els(PR.els, 4);   // 🧩 عناصر مكتبة المجال (بستايل الاسكتش): واقفة على الرصيف على طول الشارع، وبتترسم لما الكاميرا توصلها
+    return { x, L, WASH, sx, sw, sh, ELS };
   },
   seek(t, C, M) {
-    const { x, L, WASH, sx, sw, sh } = C, { seg, clamp, cubicIO, smooth, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, INK = "#5a3d24";
+    const { x, L, WASH, sx, sw, sh, ELS } = C, { seg, clamp, cubicIO, smooth, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.accent, INK = "#5a3d24";
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#f3ecdc"; x.fillRect(0, 0, W, H);
     for (let i = 0; i < 1400; i++) { x.fillStyle = "rgba(140,110,70,.05)"; x.fillRect(hash(i) * W, hash(i + 1400) * H, 2, 2); }
     const cam = 2200 * io(seg(t, .3, 9.0)), z = 1.12 - .2 * io(seg(t, 9.0, 11.0)), ox = -cam;
@@ -76,6 +78,10 @@ M.reel({
     x.strokeStyle = INK; x.lineCap = "round";
     L.forEach((l) => { if (l.reveal > cam + 1500 || Math.max(l.x1, l.x2) < cam - 200) return; const k = vis(l.reveal); if (k <= 0) return;
       x.lineWidth = l.w; x.beginPath(); const n = 6; for (let i = 0; i <= n * k; i++) { const u = i / n, px = l.x1 + (l.x2 - l.x1) * u, py = l.y1 + (l.y2 - l.y1) * u + Math.sin(u * 7 + l.wob) * 1.6; i ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke(); });
+    ELS.forEach((im, k) => {
+      const wx = 560 + k * 520, ar = im.width / im.height, mh = ar < .75 ? 420 : 250, mw = Math.min(380, mh * ar), hh = mw * im.height / im.width, kk = clamp((front - 120 - wx) / 420); if (kk <= 0 || wx > cam + 1500 || wx < cam - 600) return;
+      x.save(); x.globalCompositeOperation = "multiply"; x.beginPath(); x.rect(wx - mw / 2 - 10, BASE - hh - 10, (mw + 20) * kk, hh + 20); x.clip(); x.drawImage(im, wx - mw / 2, BASE - hh + 6, mw, hh); x.restore();
+    });
     // يافطة المحل بخط الإيد
     const sk = clamp((front - 250 - sx) / 400); if (sk > 0) { x.globalAlpha = sk; x.fillStyle = INK; x.font = `700 ${M.fit(PR.brand, "RQ", sw - 160, 96, 40, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, sx + sw / 2, BASE - sh + 190); x.globalAlpha = 1; }
     // البالونة: الحاجة الوحيدة الملونة
