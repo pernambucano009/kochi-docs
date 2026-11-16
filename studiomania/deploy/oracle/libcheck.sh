@@ -27,3 +27,32 @@ for lj in sorted(root.glob("ads/brains/*/library/library.json")):
 tmp = root / "tmp"
 print("tmp dir:", "ok" if tmp.is_dir() else "MISSING", "| free:", subprocess.run(["df", "-h", str(root)], capture_output=True, text=True).stdout.splitlines()[-1])
 PY
+echo "== HTTP test (inside the app, like the browser)"
+docker exec -i simsimkit python3 - "$T" <<'PY'
+import os, sys, json, urllib.request, pathlib
+t = sys.argv[1]
+for pid in os.listdir("/proc"):
+    if not pid.isdigit(): continue
+    try:
+        env = dict(x.split("=", 1) for x in open(f"/proc/{pid}/environ", "rb").read().decode(errors="ignore").split("\0") if "=" in x)
+        cmd = open(f"/proc/{pid}/cmdline", "rb").read().decode(errors="ignore").split("\0")
+    except OSError:
+        continue
+    if t not in env.get("STUDIOMANIA_DATA", "") or "--port" not in cmd: continue
+    port, sec = cmd[cmd.index("--port") + 1], env.get("GATEWAY_SECRET", "")
+    data = pathlib.Path(env["STUDIOMANIA_DATA"])
+    print("tenant app port", port)
+    for lj in data.glob("ads/brains/*/library/library.json"):
+        bid = lj.parent.parent.name
+        for f in [x for x in json.loads(lj.read_text()).get("files", []) if x.get("kind") == "image"][-4:]:
+            for n in {f["file"], f.get("thumb") or f["file"]}:
+                u = f"/media/ads/brains/{bid}/library/{n}"
+                try:
+                    r = urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}{u}", headers={"x-gateway-secret": sec}), timeout=20)
+                    print(" ", r.status, r.headers.get("content-type"), r.headers.get("content-length"), u)
+                except Exception as e:
+                    print("  FAIL", e, u)
+    break
+else:
+    print("tenant app not running now (open the site with that account then run again)")
+PY
