@@ -103,5 +103,45 @@
   "secs": 32.7,
   "cost": "0.010888",
   "base": 0.003
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "dumbbell",
+  "secs": 12.8,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "ems_suit",
+  "secs": 12.8,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "water_bottle",
+  "secs": 15.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "squat",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "stopwatch",
+  "secs": 9.6,
+  "cost": "0.009227",
+  "base": 0.008
  }
 ]

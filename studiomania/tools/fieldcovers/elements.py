@@ -2,6 +2,7 @@
 عشان القوالب المرسومة تاخد منها حسب السكريبت وتطبّق ستايلها عليها بالكود.
     python3 tools/fieldcovers/elements.py trial               ← نفس ٥ عناصر على كل موديل رخيص (للمقارنة والسعر)
     python3 tools/fieldcovers/elements.py gen <model> [name…] ← يولّد المكتبة (أو عناصر بعينها) بالموديل اللي اتختار
+    python3 tools/fieldcovers/elements.py style riso krea2t [name…] ← نفس العناصر بستايل قالب (بدون أسماء: ٥ للتجربة الأول)
 الناتج: tools/fieldcovers/elements/<field>/<model>/<name>.png (من غير خلفية) و_cost.json (السعر الفعلي لكل صورة).
 المفتاح من المتغيرات بس (والبروكسي بيحطه)، مابيتحفظش في أي ملف."""
 import json
@@ -34,6 +35,17 @@ STYLE = ("A single isolated object, centered, fully visible with generous margin
          "three-quarter view from slightly above, one soft contact shadow under it, no other objects, no text, no logo, no brand, no watermark. Subject: ")
 PERSON = ("a stylized faceless mannequin-like athletic figure with smooth matte light-grey skin and no facial features, "
           "wearing modest long black sports clothes (long sleeves, long pants), side view, ")
+
+# 🖌️ نسخة العناصر بستايل قالب معيّن (برومبت ثابت لكل قالب، نفس الموديل الرخيص): لما الستايل مايتعملش بالكود من صورة عادية.
+# الناتج: elements/<field>/<model>/<style>/<name>.png
+STYLES = {
+    "riso": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Risograph print illustration made of exactly three transparent overlapping inks: medium blue (#0078BF), fluorescent pink (#FF48B0) "
+             "and bright yellow (#FFE800), where the inks overlap they mix into purple, green and orange. Flat simple shapes, visible coarse halftone dots, "
+             "grainy ink texture, slight misregistration between the color layers, no black outlines, no gradients, no shadow, "
+             "three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+}
+PERSON_STYLED = ("a simple faceless athletic figure with no facial features, wearing modest long sports clothes (long sleeves, long pants), side view, ")
 
 # العناصر: الاسم ← الوصف (people بتاخد وصف الشخص قبلها)
 ITEMS = {
@@ -93,9 +105,10 @@ ITEMS = {
 TRIAL = ["dumbbell", "ems_suit", "water_bottle", "squat", "stopwatch"]
 
 
-def one(key: str, name: str) -> dict:
+def one(key: str, name: str, style: str = "") -> dict:
     m = MODELS[key]
-    body = {"model": m["model"], **m["body"](STYLE + ITEMS[name])}
+    desc = ITEMS[name].replace(PERSON, PERSON_STYLED) if style else ITEMS[name]
+    body = {"model": m["model"], **m["body"]((STYLES[style] if style else STYLE) + desc)}
     t0 = time.time()
     with httpx.Client(timeout=90) as c:
         r = c.post(f"{atlas.BASE_URL}/api/v1/model/generateImage", headers=atlas._headers(), json=body)  # noqa: SLF001
@@ -103,7 +116,7 @@ def one(key: str, name: str) -> dict:
     pid = (data or {}).get("id") or (data or {}).get("prediction_id")
     pred = atlas.wait_prediction(pid, max_seconds=600, interval=3, what="رسم العنصر")
     url = next(o for o in (pred.get("outputs") or []) if isinstance(o, str) and o.startswith("http"))
-    d = OUT / key
+    d = OUT / key / style if style else OUT / key
     d.mkdir(parents=True, exist_ok=True)
     raw = d / f"{name}.raw.png"
     raw.write_bytes(httpx.get(url, timeout=120, follow_redirects=True).content)
@@ -114,17 +127,17 @@ def one(key: str, name: str) -> dict:
         time.sleep(3)
         p2 = atlas.get_prediction(pid)
         cost = next((p2.get(k) for k in ("cost", "price", "credits", "amount", "fee") if p2.get(k) not in (None, "", 0)), None)
-    return {"model": key, "name": name, "secs": round(time.time() - t0, 1), "cost": cost, "base": m["base"]}
+    return {"model": key, "style": style, "name": name, "secs": round(time.time() - t0, 1), "cost": cost, "base": m["base"]}
 
 
-def run(jobs: list[tuple[str, str]]) -> None:
+def run(jobs: list[tuple], style: str = "") -> None:
     log = OUT / "_cost.json"
     rows = json.loads(log.read_text()) if log.exists() else []
     with ThreadPoolExecutor(6) as ex:
-        for f, (k, n) in [(ex.submit(one, k, n), (k, n)) for k, n in jobs]:
+        for f, (k, n) in [(ex.submit(one, k, n, style), (k, n)) for k, n in jobs]:
             try:
                 row = f.result()
-                rows = [x for x in rows if (x["model"], x["name"]) != (k, n)] + [row]
+                rows = [x for x in rows if (x["model"], x.get("style", ""), x["name"]) != (k, style, n)] + [row]
                 print("✓", k, n, row["secs"], "s", flush=True)
             except Exception as e:  # noqa: BLE001
                 print("✗", k, n, str(e)[:300], flush=True)
@@ -140,5 +153,7 @@ if __name__ == "__main__":
         run([(k, n) for k in MODELS for n in TRIAL])
     elif cmd == "trial-only":   # موديل واحد على عناصر التجربة: trial-only <model> [name…]
         run([(sys.argv[2], n) for n in (sys.argv[3:] or TRIAL)])
+    elif cmd == "style":   # style <style> <model> [name…] ← بدون أسماء = عناصر التجربة الخمسة بس
+        run([(sys.argv[3], n) for n in (sys.argv[4:] or TRIAL)], style=sys.argv[2])
     elif cmd == "gen":
         run([(sys.argv[2], n) for n in (sys.argv[3:] or ITEMS)])
