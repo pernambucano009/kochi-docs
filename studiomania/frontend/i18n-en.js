@@ -924,6 +924,8 @@ window.I18N_EN = {
   "النجوم بتكوّن الرقم والسطور": "Stars form the number and lines",
   "النجوم تكوّن الرقم والسطور": "Stars form the number and lines",
   "النجوم تكتب اسم العلامة": "Stars write the brand name",
+  "عناصر من مكتبة المجال": "Elements from the field library",
+  "صور عناصر بأسلوب الريزو، رابط في كل سطر (حتى ٨). تظهر بالتناوب على التل مكان الدراجة، وإن تُركت فارغة تظهر الدراجة.": "Riso-style element images, one link per line (up to 8). They take turns on the hill instead of the bike; leave empty to show the bike.",
   "النجوم بتكتب اسم العلامة": "Stars write the brand name",
   "إعلان نشرة بريدية بأسلوب المجلات: ظرف يُفتح ويخرج منه العدد، وسؤال جذاب، و٣ بطاقات فيها أهم ما في العدد، وخانة بريد تُكتب وحدها وزر اشتراك وعدّاد المشتركين.": "A magazine-style newsletter ad: an envelope opens and the issue comes out, a catchy question, 3 cards with the issue's highlights, an email field that types itself, a subscribe button and a subscriber counter.",
   "الظرف بيتفتح والسؤال": "Envelope opens and the question",

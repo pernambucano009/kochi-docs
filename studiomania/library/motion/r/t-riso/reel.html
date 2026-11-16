@@ -8,6 +8,7 @@ const PR = M.params({
   sub: { label: "السطر الذي تحته", kind: "text", def: "تخفيضات على كل التشكيلة", group: G2, max: 26, hint: "العرض أو الخبر." },
   strip: { label: "الشريط السفلي", kind: "text", def: "من ١ لـ ١٥ يوليو · اطلب أونلاين", group: G3, max: 34, hint: "الموعد ومكان الطلب، بنقطة في المنتصف بينهما." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "دراجة", group: G3, max: 16 },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر بأسلوب الريزو، رابط في كل سطر (حتى ٨). تظهر بالتناوب على التل مكان الدراجة، وإن تُركت فارغة تظهر الدراجة." },
   ink1: { label: "حبر ١ (الأساسي)", kind: "color", role: "accent", def: "#0078BF", group: G1, hint: "أحبار الريزو الحقيقية: أزرق، وردي فسفوري، أصفر. حين تتراكب تكوّن ألوانًا ثالثة." },
   ink2: { label: "حبر ٢", kind: "color", def: "#FF48B0", group: G1 },
   ink3: { label: "حبر ٣", kind: "color", def: "#FFE800", group: G1 },
@@ -24,6 +25,8 @@ const INKS = [PR.ink1, PR.ink2, PR.ink3];
 const ANG = [15, 75, 45];          // زاوية شبكة النقط لكل لوح
 const ARRIVE = [[1.0, 1.8], [1.9, 2.7], [0.1, 0.9]];   // إمتى كل لوح بيتطبع (أزرق، بمبي، أصفر)
 const REG = [[2, -1, .0015], [-2, 2, -.001], [1, 2, .0008]];   // إزاحة ثابتة لكل لوح
+// 🧩 عناصر مكتبة المجال (اختياري): لو موجودة، الدراجة بتتشال والعناصر بتطلع بالدور على التل (بتدخل من جنب، بتتنطط على الإيقاع، وتخرج)
+const ELS = (PR.els || []).filter(Boolean).slice(0, 8);
 
 M.reel({
   W, H, DUR, bg: "#F4EEE2",
@@ -53,7 +56,8 @@ M.reel({
       for (let i = 0; i < 40; i++) { const cx = r() * W, cy = r() * H, rr = 40 + r() * 160, gr = q.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, "rgba(0,0,0,.14)"); gr.addColorStop(1, "rgba(0,0,0,0)"); q.fillStyle = gr; q.fillRect(cx - rr, cy - rr, rr * 2, rr * 2); }
       return g;
     });
-    return { x, plates, pats, paper, grains };
+    const els = (await Promise.all(ELS.map((u) => M.img(u)))).filter(Boolean);
+    return { x, plates, pats, paper, grains, els };
   },
   seek(t, C, M) {
     const { x, plates, pats } = C, { seg, cubic, clamp, springO, expo } = M;
@@ -92,7 +96,24 @@ M.reel({
       const sc = Math.sin(tq * 6) * 10; g.beginPath(); g.moveTo(0, -282); g.quadraticCurveTo(-60, -280 + sc, -110, -262 - sc); g.stroke();
       g.restore();
     };
-    if (bx > -200 && bx < W + 200) {
+    // العناصر: كل عنصر ليه دور (بيدخل، يفضل، يخرج) والدور اللي بعده بيبدأ قبل ما يخلص، فيبقى فيه دايمًا حركة
+    const shown = [];
+    if (C.els.length) {
+      const n = C.els.length, t0 = 2.4, t1 = 11.4, D = (t1 - t0) / n, life = Math.min(D * 1.7, 4.2);
+      C.els.forEach((im, k) => {
+        const s0 = t0 + k * D, u = (t - s0) / life;
+        if (u <= 0 || u >= 1) return;
+        const side = k % 2 ? 1 : -1, homeX = n === 1 ? 540 : 540 + side * 245;
+        const inK = springO(Math.min(1, u * life / .55) * .9, 13, .62), outK = cubic(clamp((u - .78) / .22, 0, 1));
+        const px = homeX + side * (1 - inK) * 760 + side * outK * 900, gy0 = hill(1600, 26, .005, .5, px + cam);
+        const beat = Math.abs(Math.sin((t - s0) * Math.PI / B)), hop = 24 * Math.pow(beat, 6) * (1 - outK);
+        const hgt = 540, w = hgt * im.width / im.height, sc = Math.min(1, 500 / w);
+        shown.push({ im, cx: px, base: gy0 + 10 - hop, w: w * sc, h: hgt * sc, rot: (1 - inK) * side * .25 + outK * side * .35 + Math.sin((t - s0) * 2.1) * .025 });
+      });
+      // هالة ورق تحت كل عنصر (الحبر بيتشال مكانه) زي الدراجة
+      shown.forEach((e) => P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.translate(e.cx, e.base); g.rotate(e.rot); g.shadowColor = "#000"; g.shadowBlur = 14; g.drawImage(e.im, -e.w / 2, -e.h, e.w, e.h); g.restore(); }));
+    }
+    if (!C.els.length && bx > -200 && bx < W + 200) {
       P.forEach((g) => { g.save(); g.globalCompositeOperation = "destination-out"; g.strokeStyle = g.fillStyle = "#000"; bike(g, 32); g.restore(); });
       bl.strokeStyle = bl.fillStyle = INKS[0]; bike(bl, 14);
     }
@@ -121,6 +142,7 @@ M.reel({
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "source-over"; x.drawImage(C.paper, 0, 0);
     const kickT = [3.0, 4.0, 6.0, 7.0].reduce((a, k) => (t >= k ? k : a), -9), kk = Math.exp(-8 * (t - kickT)) * Math.cos(26 * (t - kickT));
     const order = [2, 1, 0];
+    const plateIn = seg(t, ARRIVE[0][0], ARRIVE[0][1]);
     order.forEach((i) => {
       const [a0, a1] = ARRIVE[i], k = seg(t, a0, a1); if (k <= 0) return;
       const [ox, oy, rot] = REG[i], drift = i === 1 ? 10 * kk : i === 0 ? -8 * kk : 0;
@@ -130,6 +152,11 @@ M.reel({
       x.drawImage(plates[i], 0, 0);
       x.restore();
       if (k > 0 && k < 1) { const edge = H * cubic(k); x.save(); x.globalCompositeOperation = "multiply"; x.globalAlpha = .25; x.fillStyle = INKS[i]; x.fillRect(0, edge - 26, W, 26); x.restore(); }
+    });
+    // العناصر نفسها: مطبوعة على الورق (multiply) بإزاحة صغيرة للوح التاني زي الريزو
+    if (plateIn > 0) shown.forEach((e) => {
+      x.save(); x.globalCompositeOperation = "multiply"; x.translate(e.cx, e.base); x.rotate(e.rot);
+      x.drawImage(e.im, -e.w / 2, -e.h, e.w, e.h); x.globalAlpha = .18; x.drawImage(e.im, -e.w / 2 + 6, -e.h + 4, e.w, e.h); x.restore();
     });
   },
   sound(A) {
