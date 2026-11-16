@@ -44,6 +44,11 @@ STYLES = {
              "and bright yellow (#FFE800), where the inks overlap they mix into purple, green and orange. Flat simple shapes, visible coarse halftone dots, "
              "grainy ink texture, slight misregistration between the color layers, no black outlines, no gradients, no shadow, "
              "three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "watercolor": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+                   "Loose hand-painted watercolor illustration in a sketchbook style: soft transparent washes that pool darker at the edges, "
+                   "visible paper texture, a few loose thin brown ink pencil lines, some white paper left unpainted, muted natural colors "
+                   "(teal blue, olive green, ochre, warm brick red), no hard black outlines, no shadow, no background wash, "
+                   "three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
 }
 PERSON_STYLED = ("a simple faceless athletic figure with no facial features, wearing modest long sports clothes (long sleeves, long pants), side view, ")
 

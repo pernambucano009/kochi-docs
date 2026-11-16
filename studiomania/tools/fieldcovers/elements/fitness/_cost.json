@@ -487,5 +487,45 @@
   "secs": 5.8,
   "cost": "0.009227",
   "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "dumbbell",
+  "secs": 8.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "ems_suit",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "water_bottle",
+  "secs": 6.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "squat",
+  "secs": 14.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "watercolor",
+  "name": "stopwatch",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
  }
 ]
