@@ -18643,8 +18643,9 @@ def tpl_niche():
     field = c.get("field") or ""
     reels = fieldpacks.field_reels(field) if field in fieldpacks.FIELDS else []
     media = FRONTEND_DIR / "gallery" / "f" / Path(field).name if field else None
+    have = sorted(x.stem for x in media.glob("*.jpg")) if media and media.is_dir() else []   # كل قالب ليه نسخة من المجال، مش الموصى بيها بس
     out.update(field=field, field_name=(fieldpacks.FIELDS.get(field) or {}).get("name", ""), reels=reels,
-               field_media=[r for r in reels if media and (media / f"{r}.jpg").exists()])
+               field_media=[r for r in reels if r in have] + [r for r in have if r not in reels])
     # 🩺 تخصص العميل: كل تخصص ليه قوالبه (فوق القوالب العامة). دلوقتي: الأسنان
     out["spec"] = "dental" if dental_brain_on(active_client_id()) else ""
     return out

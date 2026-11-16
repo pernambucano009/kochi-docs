@@ -85,3 +85,7 @@ S = {
                         "name1": "قهوة عربية", "price1": "٣٥ ريال", "name2": "عصير طبيعي", "price2": "١٢ ريال", "cart": "أضف للسلة", "added": "تمت الإضافة ✓", "brand": "تموينات الحي", "tag": "اطلب من الواتساب"},
     },
 }
+
+# 🏋️ اللياقة: مثال على كل قالب (fitness.py)
+from fitness import F as _FIT  # noqa: E402
+S["fitness"].update(_FIT)

@@ -34,7 +34,7 @@ def score(im):
 
 
 def render(b, field: str, tpl: str, params: dict, arts: dict):
-    pr = {k: (arts[v] if k.startswith(("img", "p")) and isinstance(v, str) and v in ART else v) for k, v in params.items()}
+    pr = {k: (arts[v] if k.startswith(("img", "p", "th", "cover", "bg")) and isinstance(v, str) and v in arts else v) for k, v in params.items()}
     pg = b.new_page(viewport={"width": 1080, "height": 1920})
     try:
         pg.add_init_script("window.PARAMS = " + json.dumps(pr, ensure_ascii=False) + ";")
@@ -79,10 +79,9 @@ def main():
         ap = b.new_page()
         arts = {k: art_png(k, ap) for k in ART}
         # 📸 لو فيه صورة حقيقية الشكل (photos.py بـ Atlas) تبقى هي، والرسمة احتياطي
-        for k in ART:
-            ph = HERE / "photos" / f"{k}.png"
-            if ph.exists():
-                arts[k] = "data:image/png;base64," + base64.b64encode(ph.read_bytes()).decode()
+        for ph in sorted((HERE / "photos").glob("*.png")):   # ومنها صور مالهاش رسمة (دمبل، بروتين…)
+            if not ph.stem.endswith(".raw"):
+                arts[ph.stem] = "data:image/png;base64," + base64.b64encode(ph.read_bytes()).decode()
         ap.close()
         for field, tpls in S.items():
             for tpl, params in tpls.items():
@@ -94,7 +93,8 @@ def main():
                 except Exception as e:  # noqa: BLE001
                     print("✗", field, tpl, e, flush=True)
         b.close()
-    idx = {f: sorted(x.stem for x in (OUT / f).glob("*.jpg")) for f in S if (OUT / f).exists()}
+    old = json.loads((OUT / "index.json").read_text(encoding="utf-8")) if (OUT / "index.json").exists() else {}
+    idx = {**old, **{f: sorted(x.stem for x in (OUT / f).glob("*.jpg")) for f in S if (OUT / f).exists()}}   # مجالات من برّه S (الأسنان) تفضل
     (OUT / "index.json").write_text(json.dumps(idx, ensure_ascii=False), encoding="utf-8")
 
 

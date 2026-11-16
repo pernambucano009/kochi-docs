@@ -33,11 +33,18 @@ P = {
     "serum": ("A pink glass skincare serum bottle with a dropper cap, blank label, elegant", "4:5"),
     "cream": ("A white and lavender skincare cream jar, lid slightly open showing the cream, blank label", "4:5"),
     "tooth": ("A clean glossy white 3D tooth model with small sparkles, dental clinic concept", "4:5"),
+    # 🏋️ لياقة
+    "protein": ("A large black tub of whey protein powder with a blank orange label and a scoop of powder in front", "4:5"),
+    "dumbbell": ("A pair of black hexagonal rubber dumbbells with chrome handles, three-quarter view", "1:1"),
+    "shaker": ("A sports protein shaker bottle, translucent with a black lid, half full of chocolate shake, blank", "4:5"),
+    "ems": ("A modern EMS electrical muscle stimulation training suit vest, black with orange electrode pads, on an invisible mannequin torso", "4:5"),
+    "kettlebell": ("A matte orange cast iron kettlebell with a black handle, three-quarter view", "1:1"),
+    "mat": ("A rolled teal yoga and fitness mat standing upright next to a folded white towel", "4:5"),
 }
 
 
 # المنتجات البيضا: على خلفية غامقة، علشان شيل الخلفية مايشيلش المنتج نفسه
-DARK = {"ac", "tooth", "sneaker", "cream"}
+DARK = {"ac", "tooth", "sneaker", "cream", "mat"}
 
 
 def one(name: str) -> str:
