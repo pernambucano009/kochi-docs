@@ -886,7 +886,8 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
           lg("agent", e.transcript || ""); S.said = ((S.said || "") + " " + (e.transcript || "")).slice(-4000);
           // 📥 طلبت رفع حاجة بالكلام من غير ما تفتح الخانة (نسيت الأداة): الخانة تظهر لوحدها
           const tx = e.transcript || "", ask = /ارفع|ترفع|ترفعها|ترفعلي|رفع|حمّل|حمل|ابعت|أرسل|ارسل|upload/i.test(tx);
-          const kind = ask && (KW.logo.test(tx) ? "logo" : /صور|منتج|أعمال|حالات|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : "");
+          // 🦷 دكتور أسنان (حالة/حالات/ريتراكتور): مربع صور الحالة نفسه، مش مربع صور المنتجات
+          const kind = ask && (KW.logo.test(tx) ? "logo" : /حالة|حالات|حالتك|ريتراكتور|ريتركتور|قبل وبعد/.test(tx) ? "dental_case" : /صور|منتج|أعمال|شغل/.test(tx) ? "products" : KW.intro.test(tx) ? "intro" : "");
           if (kind && !q(".as-box") && S.wait !== kind) { S.wait = kind; S.waitResp = e.response_id || "x"; lg("sys", `box opened from speech: ${kind}`); setTimeout(() => S && box(kind), 300); }
           // ✍️ طلبت الحساب بالكلام («عطني حسابك واكتبه في الصندوق») من غير ما تفتح الخانة: الخانة تنوّر لوحدها (أي لهجة)
           const askType = /اكتب|تكتب|اكتبه|اكتبي|عطني|اعطني|أعطني|عطيني|ابعت|ابعث|أرسل|ارسل|حط|حطه|شاركني|الصندوق|المربع|الخانة/.test(tx);
