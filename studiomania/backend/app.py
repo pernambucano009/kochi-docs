@@ -35091,6 +35091,7 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
     bid = active_client_id()
     if not bid:
         raise HTTPException(400, "لا توجد علامة")
+    tpl = template if any(t["id"] == template for t in dental.TEMPLATES) else SUAD_DENTAL_TPL   # (كان متغيّر مش متعرّف ← الرفع كله بيفشل)
     slots = {}
     for k, f in (("before_retracted", before_retracted), ("after_retracted", after_retracted), ("after_smile", after_smile), ("before_face", before_face),
                  ("before_smile", before_smile), ("after_face", after_face)):   # غير الريتراكتور كله اختياري
@@ -35101,7 +35102,8 @@ async def assistant_dental_case(before_retracted: UploadFile = File(...), after_
             raise HTTPException(400, f"الملف {f.filename} أكبر من الحد المسموح")
         slots[k] = (f.filename or "", data)
     try:
-        cid = dental.create(DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid), only=tpl)
+        import asyncio  # noqa: PLC0415
+        cid = await asyncio.to_thread(dental.create, DATA_DIR, [], "حالة من المكالمة الأولى", slots, clinic=dental_clinic(bid), only=tpl)   # تقيل: مايوقفش باقي البرنامج
     except ValueError as e:
         raise HTTPException(400, str(e))
     tname = next((t["name"] for t in dental.TEMPLATES if t["id"] == tpl), "")
