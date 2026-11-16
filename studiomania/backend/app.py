@@ -32519,6 +32519,31 @@ def push_unregister(body: PushIn):
     return {"ok": True}
 
 
+def pilot_occasion(at: str | None = None, before: int = 3, after: int = 1) -> str:
+    """🗓️ مناسبة في بلد العلامة (من «المواسم» في العقل) يوم المنشور أو قبله بأيام قليلة: الأوتوبايلوت يعمل الفكرة عنها.
+    المناسبة نفسها أولوية؛ لو مفيش مناسبة قريبة ← فاضي (الأفكار من العقل والمنافسين كالعادة)."""
+    bid = active_client_id()
+    b = (brain_row(bid) or {}) if bid else {}
+    try:
+        day = datetime.fromisoformat(str(at)).date() if at else datetime.now(timezone.utc).date()
+    except ValueError:
+        day = datetime.now(timezone.utc).date()
+    best = None
+    for it in fz.fit_seasons(((b.get("seasons") or {}).get("items") or []), b.get("market", "")):
+        try:
+            dd = (datetime.fromisoformat(str(it.get("date"))[:10]).date() - day).days
+        except ValueError:
+            continue
+        if -after <= dd <= before and (best is None or abs(dd) < abs(best[0])):
+            best = (dd, it)
+    if not best:
+        return ""
+    dd, it = best
+    when = "اليوم" if dd == 0 else "غدًا" if dd == 1 else "أمس" if dd == -1 else f"بعد {dd} أيام"
+    return (f"{it.get('name')} ({it.get('date')}، {when})" + (f": {it.get('angle')}" if it.get("angle") else "")
+            + ". مهم: الفكرة يجب أن تكون عن هذه المناسبة ومرتبطة بعمل العلامة")[:200]
+
+
 def pilot_kind(tpl: str) -> str:
     return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar", "carousel") else "motion"
 
@@ -32691,7 +32716,8 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if kind == "avatar" and not pilot_twin(s):
             raise HTTPException(400, "لا يوجد أفاتار جاهز في «الأفاتار». سجّل فيديو القراءة أو صورة أمامية أولًا")
         pre = j.get("preset") or {}
-        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea"))))
+        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea")),
+                               season=pilot_occasion(j.get("at"))))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
         flow_update(f["id"], lambda x: x.update(pilot=jid))
         if pre.get("title") or pre.get("idea"):   # 🗓️ الفكرة من خطة الشهر: على السكريبت على طول
             flow_pick_idea(f["id"], FlowPickIn(item={"title": pre.get("title"), "idea": pre.get("idea"), "hook": pre.get("hook")}))
