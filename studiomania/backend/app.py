@@ -5,6 +5,7 @@
 الخطوة 4: مكتبة المدربين (الصورة والأوترو).
 """
 
+import asyncio
 import base64
 import mimetypes
 import gzip
@@ -34889,7 +34890,8 @@ async def dental_new(files: list[UploadFile] = File([]), title: str = Form(""),
                      before_retracted: UploadFile | None = File(None), after_retracted: UploadFile | None = File(None),
                      before_face: UploadFile | None = File(None), after_smile: UploadFile | None = File(None),
                      before_smile: UploadFile | None = File(None), after_face: UploadFile | None = File(None),
-                     before_face_retracted: UploadFile | None = File(None), after_face_retracted: UploadFile | None = File(None)):
+                     before_face_retracted: UploadFile | None = File(None), after_face_retracted: UploadFile | None = File(None),
+                     template: str = Form("")):   # (كان متغيّر مش متعرّف ← رفع الحالة من صفحة الأسنان كان بيفشل)
     """صور الحالة: كل صورة في خانتها (before_retracted…)، أو صور بأي ترتيب (files) والمحرك بيصنّفها.
     بعدها يعدّل الاتجاه ويحلل السنان ويجهز العناصر في الخلفية."""
     dental_on()
