@@ -67,6 +67,37 @@ const PilotPage = (() => {
 #nh .ap-steps button { height: 30px; padding: 0 12px; border-radius: 999px; background: var(--ap-field); font-size: 12px; color: var(--ap-sub); }
 #nh .ap-steps button.on { background: var(--ap-soft); color: var(--ap-acc-ink, #A93A17); }
 #nh .ap-steps i { font-style: normal; color: var(--ap-track); align-self: center; }
+#nh .ap-flow { gap: 14px; }
+#nh .ap-types { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+#nh .ap-ty { height: 38px; padding: 0 16px; border-radius: 999px; background: var(--ap-card); box-shadow: var(--ap-chip); font-size: 13px; }
+#nh .ap-ty.on { box-shadow: inset 0 0 0 1.5px var(--nh-accent), var(--ap-sh); color: var(--nh-accent); }
+#nh .ap-ty em { font-style: normal; font-size: 10.5px; color: var(--nh-muted); margin-inline-start: 4px; }
+#nh .ap-ty.soon { opacity: .55; }
+#nh .ap-ty.new { background: none; box-shadow: inset 0 0 0 1.5px var(--ap-line); color: var(--ap-sub); }
+#nh .ap-hint { margin: 0; font-size: 12.5px; color: var(--ap-sub); display: flex; align-items: center; gap: 6px; }
+#nh .ap-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2F7BF6; }
+#nh .ap-rows { display: grid; gap: 10px; width: min(980px, 100%); }
+#nh .ap-flowrow { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 18px; background: var(--ap-card); box-shadow: var(--ap-sh); }
+#nh .ap-rn { flex: none; width: 110px; font-size: 13px; font-weight: 600; }
+#nh .ap-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#nh .ap-chain .ar { font-style: normal; color: var(--nh-muted); font-size: 13px; }
+#nh .ap-stp { position: relative; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ap-field); font-size: 12.5px; color: var(--nh-ink); display: inline-flex; align-items: center; gap: 4px; }
+#nh .ap-stp.fixed { color: var(--ap-sub); cursor: default; }
+#nh .ap-stp.dot::after { content: ""; position: absolute; top: -3px; inset-inline-end: -3px; width: 12px; height: 12px; border-radius: 50%; background: #2F7BF6; box-shadow: 0 0 0 2px var(--ap-card); }
+#nh .ap-stp.pick { background: var(--ap-soft); color: var(--ap-acc-ink, #A93A17); }
+#nh .ap-stp small { font-size: 11px; opacity: .8; }
+#nh .ap-pop { width: min(980px, 100%); padding: 14px; border-radius: 20px; background: var(--ap-card); box-shadow: 0 30px 80px -30px rgba(24, 23, 24, .45); }
+#nh .ap-ph { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+#nh .ap-ph small { flex: 1; font-size: 12px; color: var(--ap-sub); }
+#nh .ap-ph button { height: 30px; padding: 0 16px; border-radius: 999px; background: var(--nh-accent); color: #fff; font-size: 12px; }
+#nh .ap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; max-height: 46vh; overflow: auto; padding: 4px; }
+#nh .ap-card { position: relative; display: grid; gap: 6px; padding: 6px; border-radius: 14px; background: var(--ap-field); text-align: center; font-size: 12px; }
+#nh .ap-card video, #nh .ap-card img, #nh .ap-card > i { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: #000; }
+#nh .ap-card > i { background: var(--ap-line); }
+#nh .ap-card .ck { position: absolute; top: 10px; inset-inline-start: 10px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 0, 0, .45); color: transparent; display: grid; place-items: center; font-size: 12px; }
+#nh .ap-card.on { box-shadow: inset 0 0 0 2px var(--nh-accent); }
+#nh .ap-card.on .ck { background: var(--nh-accent); color: #fff; }
+@media (max-width: 820px) { #nh .ap-flowrow { flex-direction: column; align-items: stretch; } #nh .ap-rn { width: auto; } }
 #nh .ap-dock { position: fixed; bottom: 24px; inset-inline-end: 28px; z-index: 6; display: grid; justify-items: end; gap: 10px; }
 #nh .ap-cap { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; border-radius: 22px; background: var(--ap-card); box-shadow: var(--ap-chip); font-size: 13px; transition: translate .32s var(--ap-pop); }
 #nh .ap-cap:hover { translate: 0 -3px; }
@@ -138,6 +169,7 @@ const PilotPage = (() => {
     if (!S.root) return;
     try { S.d = await api("/api/pilot"); } catch (err) { S.root.innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; return; }
     S.mo = await api("/api/plan/month").catch(() => null);
+    S.lib = await api("/api/carousel/library").catch(() => []);
     S.root.innerHTML = shell();
     bind();
     draw();
@@ -157,17 +189,17 @@ const PilotPage = (() => {
         <small>منشور في اليوم <span data-fee></span></small></section>
       <section class="ap-sec"><div class="ap-day" data-day></div>
         <div class="ap-leg"><span><em></em>اخترناه في أفضل وقت</span><span><i></i>وقت الجمهور الأنشط</span><span>اضغط على الخط لإضافة موعد · اسحب النقطة لتغييره · اضغط عليها لإزالته</span></div></section></div>
-      <section class="ap-sec"><span class="ap-lbl">القوالب</span>
-        <div class="ap-seg" data-srcs hidden></div><div class="ap-plan" data-plan hidden></div>
-        <div class="ap-tpls" data-tpls></div><div class="ap-more" data-more></div>
-        <small data-tplsub>يختار منها بالتناوب حتى لا يتكرر المحتوى</small></section>
-      <section class="ap-sec ap-modes"><div class="ap-seg" data-modes><button type="button" data-mode="auto">يعمل كل شيء تلقائيًا</button><button type="button" data-mode="approve">أوافق على هذه الخطوات</button></div>
-        <div class="ap-steps" data-steps></div></section>
+      <div class="ap-seg" data-srcs hidden></div><div class="ap-plan" data-plan hidden></div>
+      <section class="ap-sec ap-flow"><span class="ap-lbl">أنواع المنشورات</span>
+        <div class="ap-types" data-types></div>
+        <p class="ap-hint">ضع علامة <span class="ap-dot"></span> على الخطوات التي تحتاج موافقتك</p>
+        <div class="ap-rows" data-rows></div>
+        <div class="ap-pop" data-pop hidden></div></section>
     </main>
     <div class="ap-dock" data-dock><div class="ap-q" data-q></div>
       <button type="button" class="ap-cap" data-cap><span>قائمة الانتظار</span><span class="n" data-qn hidden></span><small data-qsub></small></button></div>`;
   const q = (s) => S.root.querySelector(s);
-  function draw() { drawHead(); drawDay(); drawSrc(); drawTpls(); drawMode(); drawQ(); }
+  function draw() { drawHead(); drawDay(); drawSrc(); drawFlow(); drawQ(); }
   // 🗓️ المصدر: بالدور من القوالب، أو خطة الشهر (كل بوست في ميعاده بفكرته وقالبه، من صفحة «خطة المحتوى»)
   const fromPlan = () => S.d.settings.source === "plan";
   // 🗂️ خطة الشهر اتشالت من الموقع (الكود فاضل لحد ما نقرر): لو كان شغال عليها يرجع للقوالب لوحده مرة واحدة
@@ -201,7 +233,7 @@ const PilotPage = (() => {
   function drawHead() {
     const s = S.d.settings, nx = S.d.upcoming?.[0];
     q("[data-on]").classList.toggle("on", !!s.on);
-    q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length && s.source !== "plan" ? "يعمل · اختر قالبًا واحدًا على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
+    q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length ? "يعمل · اختر نوعًا واحدًا على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
   }
   function drawDay() {
     const pct = (h) => (h / 24) * 100, s = S.d.settings;
@@ -238,6 +270,58 @@ const PilotPage = (() => {
     q("[data-steps]").innerHTML = s.mode === "approve"
       ? STEP_N.map(([k, n], i) => `${i ? "<i>←</i>" : ""}<button type="button" data-step="${k}" class="${s.steps.includes(k) ? "on" : ""}">${s.steps.includes(k) ? "✓ " : ""}${n}</button>`).join("")
       : `<small style="font-size:12.5px;color:var(--nh-muted)">يختار الفكرة ويكتب النص ويصنع الفيديو وينشر دون الرجوع إليك${cam ? " · قالب الجوال سينتظر أن تصوّر" : ""}</small>`;
+  }
+  // 🛫 أنواع المنشورات بالترتيب، ولكل نوع خطواته. الخطوة اللي ليها مفتاح (idea…) تقبل الدايرة الزرقا (توقف لحد موافقتك)
+  const TYPES = [
+    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["@tpl", "القالب"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "photo", n: "صور", soon: true },
+    { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["", "النشر"]] },
+  ];
+  const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
+  const typeOn = (t) => (t.id === "tpl" ? tplIds().length > 0 : S.d.settings.templates.includes(t.id));
+  const carStyles = () => (S.lib || []).filter((a) => a.kind === "style" || a.kind === "template");
+  function stepsBy() {   // الإعداد القديم (نفس الخطوات لكل الأنواع) بيتحول لكل نوع لوحده
+    const s = S.d.settings;
+    if (s.steps_by && typeof s.steps_by === "object") return s.steps_by;
+    const base = s.mode === "approve" ? s.steps || [] : [];
+    return Object.fromEntries(["phone", "avatar", "motion", "carousel"].map((k) => [k, [...base]]));
+  }
+  function drawFlow() {
+    const s = S.d.settings, sb = stepsBy(), twin = S.d.twins.find((t) => t.ready);
+    q("[data-types]").innerHTML = TYPES.map((t) => `<button type="button" class="ap-ty ${typeOn(t) ? "on" : ""} ${t.soon ? "soon" : ""}" data-type="${t.id}">${esc(t.n)}${t.soon ? " <em>قريبًا</em>" : t.id === "avatar" && !twin ? " <em>يحتاج إلى أفاتار</em>" : ""}</button>`).join("")
+      + S.d.custom.map((c) => `<button type="button" class="ap-ty ${s.templates.includes(c.id) ? "on" : ""}" data-type="${esc(c.id)}">${esc(c.name)} <em>مخصص</em></button>`).join("")
+      + `<button type="button" class="ap-ty new" data-newauto>+ قالب مخصص</button>`;
+    const rows = TYPES.filter((t) => !t.soon && typeOn(t)).map((t) => {
+      const on = new Set(sb[t.kind] || []);
+      const chips = t.steps.map(([k, n]) => {
+        if (k === "@tpl") return `<button type="button" class="ap-stp pick" data-open="tpl">${esc(n)} <b class="num">${tplIds().length}</b> ▾</button>`;
+        if (k === "@style") return `<button type="button" class="ap-stp pick" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : "<small>تلقائي</small>"} ▾</button>`;
+        return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
+      }).join('<i class="ar" aria-hidden="true">←</i>');
+      return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b><div class="ap-chain">${chips}</div></div>`;
+    });
+    q("[data-rows]").innerHTML = rows.join("") || `<small class="ap-none">اختر نوعًا واحدًا على الأقل</small>`;
+    drawPop();
+  }
+  function drawPop() {
+    const box = q("[data-pop]"), s = S.d.settings;
+    box.hidden = !S.pop;
+    if (!S.pop) return (box.innerHTML = "");
+    if (S.pop === "tpl") {
+      const on = new Set(tplIds());
+      box.innerHTML = `<div class="ap-ph"><b>قوالب الفيديو</b><small>علّم على القوالب التي تريدها (واحد على الأقل)، والأوتوبايلوت يتناوب بينها</small><button type="button" data-popx>تم</button></div>
+        <div class="ap-grid">${codeTpls().map((x) => `<button type="button" class="ap-card ${on.has(x.id) ? "on" : ""}" data-tplc="${esc(x.id)}">
+          <video src="${esc(x.sample_url || "")}" poster="${esc(x.cover_url || "")}" muted loop playsinline preload="none"></video><span class="ck">✓</span><b>${esc(x.name)}</b></button>`).join("") || `<span class="ap-none">لا توجد قوالب</span>`}</div>`;
+      box.querySelectorAll("video").forEach((v) => { const c = v.closest(".ap-card"); c.onmouseenter = () => v.play().catch(() => {}); c.onmouseleave = () => v.pause(); });
+    } else {
+      const on = new Set(s.car_styles || []), lib = carStyles();
+      box.innerHTML = `<div class="ap-ph"><b>ستايلات الكاروسيل</b><small>${lib.length ? "علّم على ستايل واحد أو أكثر، والأوتوبايلوت يتناوب بينها" : "لا توجد ستايلات بعد: أضفها من صفحة الكاروسيل، وحتى ذلك يصمّم بستايل علامتك"}</small><button type="button" data-popx>تم</button></div>
+        <div class="ap-grid">${lib.map((a) => `<button type="button" class="ap-card ${on.has(a.id) ? "on" : ""}" data-styc="${esc(a.id)}">
+          ${a.images?.[0] ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<span class="ck">✓</span><b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
+        ${lib.length ? "" : `<div class="ap-acts" style="justify-content:center"><button type="button" data-carpage>افتح صفحة الكاروسيل</button></div>`}`;
+    }
   }
   // صور الكاروسيل صف واحد بيتسحب بالعرض
   const imgs = (j) => (j.images || []).length ? `<div class="ap-imgs">${j.images.map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div>` : "";
@@ -355,6 +439,35 @@ const PilotPage = (() => {
         return save({ templates: [...set], names: x ? { [x.id]: x.name } : {} });
       }
       if ("newauto" in d) return window.NHNav?.("auto");
+      if (d.type) {
+        const t = TYPES.find((x) => x.id === d.type);
+        if (t?.soon) return toast("منشورات الصور قريبًا");
+        if (d.type === "avatar" && !S.d.twins.some((x) => x.ready)) return toast("أنشئ أفاتار أولًا من «الأفاتار» (فيديو قراءة أو صورة أمامية)");
+        if (d.type === "tpl") { if (tplIds().length) return save({ templates: s.templates.filter((x) => !x.startsWith("t-")) }); S.pop = "tpl"; return drawPop(); }
+        const set = new Set(s.templates); set.has(d.type) ? set.delete(d.type) : set.add(d.type);
+        if (d.type === "carousel" && set.has("carousel") && carStyles().length && !(s.car_styles || []).length) S.pop = "style";
+        return save({ templates: [...set] });
+      }
+      if (d.open) { S.pop = S.pop === d.open ? null : d.open; return drawPop(); }
+      if ("popx" in d) { S.pop = null; return drawPop(); }
+      if ("carpage" in d) return showStep("8");
+      if (d.tplc) {
+        const set = new Set(s.templates), x = codeTpls().find((t) => t.id === d.tplc);
+        set.has(d.tplc) ? set.delete(d.tplc) : set.add(d.tplc);
+        return save({ templates: [...set], names: x ? { [x.id]: x.name } : {} });
+      }
+      if (d.styc) {
+        const set = new Set(s.car_styles || []);
+        if (set.has(d.styc) && set.size === 1) return toast("اختر ستايلًا واحدًا على الأقل");
+        set.has(d.styc) ? set.delete(d.styc) : set.add(d.styc);
+        return save({ car_styles: [...set] });
+      }
+      if (d.dot) {   // 🔵 دايرة زرقا على الخطوة: تتوقف لحد ما توافق (ضغطة تانية تشيلها)
+        const [kind, step] = d.dot.split(":"), sb = JSON.parse(JSON.stringify(stepsBy())), st = new Set(sb[kind] || []);
+        st.has(step) ? st.delete(step) : st.add(step);
+        sb[kind] = [...st];
+        return save({ steps_by: sb });
+      }
       if (d.mode) return save({ mode: d.mode });
       if (d.src) return setSrc(d.src);
       if ("openplan" in d) return openPlan();

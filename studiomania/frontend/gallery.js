@@ -280,7 +280,7 @@ const Gallery = (() => {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريبًا</small></span>`;
     return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
-      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}</div></article>`;
+      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${apMark(x)}</div></article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
   function labLines(name) {
@@ -320,7 +320,7 @@ const Gallery = (() => {
     return `<article class="gg-card" data-gi="${i}">
       <button type="button" class="gg-art" data-gpv="${i}" aria-label="شاهد عرض «${esc(x.name)}»">${art}${x.sample_url ? `<span class="gg-play" aria-hidden="true">▶</span>` : ""}</button>
       <div class="gg-meta"><b>${esc(x.name)}</b><small>${esc(catName(x.cat))}</small>${recFor(x, key) ? `<span class="gg-rec">موصى به لمجال ${esc((NICHES.find((n) => n[0] === key) || [, S.niche.name])[1])}</span>` : ""}</div>
-      <button type="button" class="nh-gal-go gg-go" data-gstart="${i}">${x.id === "editor" ? "🎞️ افتح المحرر" : "ابدأ بهذا القالب"}</button></article>`;
+      <button type="button" class="nh-gal-go gg-go" data-gstart="${i}">${x.id === "editor" ? "🎞️ افتح المحرر" : "ابدأ بهذا القالب"}</button>${apMark(x)}</article>`;
   }
   function ggFill() {
     const box = S.root.querySelector(".gg-grid");
@@ -812,6 +812,7 @@ const Gallery = (() => {
       <div class="nh-gal-pvt"><span class="latin en-k">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
+        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost${AP.on.has(x.id) ? " apon" : ""}" data-gap="${esc(x.id)}">${AP.on.has(x.id) ? "✓ في قائمة الأوتوبايلوت (اضغط للإزالة)" : "اختر هذا القالب لقائمة الأوتوبايلوت"}</button>` : ""}
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ أنشئ نسختك من هذا القالب</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتُحفظ في «قوالبك المخصصة».</small>` : ""}
         <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
@@ -833,6 +834,37 @@ const Gallery = (() => {
       if (gn) return Gen.open(gn.dataset.gen);
     });
   }
+  // 🛫 قائمة الأوتوبايلوت: علامة على كل قالب (من برّه أو من المعاينة) بتضيفه للقوالب اللي الأوتوبايلوت بيتناوب بينها
+  const AP = { on: new Set(), all: [], names: {} };
+  function apMark(x) {
+    if (!String(x.id).startsWith("t-")) return "";
+    const on = AP.on.has(x.id);
+    return `<button type="button" class="gg-ap${on ? " on" : ""}" data-gap="${esc(x.id)}" title="${on ? "في قائمة الأوتوبايلوت" : "اختر لقائمة الأوتوبايلوت"}" aria-label="${on ? "في قائمة الأوتوبايلوت" : "اختر لقائمة الأوتوبايلوت"}">✓</button>`;
+  }
+  async function apLoad() {
+    try { const d = await api("/api/pilot"); AP.all = d.settings.templates || []; AP.on = new Set(AP.all.filter((t) => t.startsWith("t-"))); } catch { /* من غير أوتوبايلوت */ }
+  }
+  async function apToggle(id) {
+    const x = EXTRA.find((t) => t.id === id), set = new Set(AP.all);
+    set.has(id) ? set.delete(id) : set.add(id);
+    try {
+      const d = await api("/api/pilot", { method: "PUT", ...jsonBody({ templates: [...set], names: x ? { [id]: x.name } : {} }) });
+      AP.all = d.settings.templates || []; AP.on = new Set(AP.all.filter((t) => t.startsWith("t-")));
+      document.querySelectorAll(`[data-gap="${CSS.escape(id)}"]`).forEach((b) => {
+        const on = AP.on.has(id); b.classList.toggle("on", on); b.classList.toggle("apon", on);
+        if (b.classList.contains("nh-gal-go")) b.textContent = on ? "✓ في قائمة الأوتوبايلوت (اضغط للإزالة)" : "اختر هذا القالب لقائمة الأوتوبايلوت";
+      });
+      toast(AP.on.has(id) ? "✓ أُضيف لقائمة الأوتوبايلوت" : "أُزيل من قائمة الأوتوبايلوت");
+    } catch (err) { toast(err.message, true); }
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-gap]"); if (!b) return; e.preventDefault(); e.stopPropagation(); apToggle(b.dataset.gap); }, true);
+  if (!document.getElementById("galApCss")) document.head.appendChild(Object.assign(document.createElement("style"), { id: "galApCss", textContent: `
+.gg-card, .nh-wc-art { position: relative; }
+.gg-ap { position: absolute; top: 10px; inset-inline-start: 10px; z-index: 3; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.35); color: transparent; font-size: 14px; cursor: pointer; display: grid; place-items: center; }
+.gg-ap:hover { background: rgba(0,0,0,.55); color: rgba(255,255,255,.7); }
+.gg-ap.on { background: #E5613E; border-color: #E5613E; color: #fff; }
+.nh-gal-go.apon { color: #E5613E; }
+.nh-gal-aphint { text-align: center; font-size: 13px; color: var(--nh-muted, #6B6B67); margin: 0 0 10px; }` }));
   // Esc بيقفل المعاينة الأول (قبل ما يرجع من الصفحة)
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && closePv()) e.preventDefault(); }, true);
 
@@ -840,6 +872,8 @@ const Gallery = (() => {
     S.root = root;
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر يُعاد استخدامه لكل الصفحات: الأحداث مرة واحدة فقط
     dubOut(); Gen.close?.(); SceneStudio.close?.();
+    await apLoad();
+    if (!root.querySelector(".nh-gal-aphint")) root.querySelector(".nh-gal")?.prepend(Object.assign(document.createElement("p"), { className: "nh-gal-aphint", textContent: "شاهد القالب وعلّم على القوالب التي تريد استخدامها في الأوتوبايلوت لعلامتك" }));
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount, list: () => EXTRA, fieldMedia, openEditor, start: (id) => { const x = EXTRA.find((t) => t.id === id); if (!x) return false; startTpl(x); return true; } };

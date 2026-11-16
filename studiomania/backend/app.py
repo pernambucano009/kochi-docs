@@ -32296,7 +32296,8 @@ PILOT_STEPS = ("idea", "script", "montage", "video")
 PILOT_BEST = {1: ["19:00"], 2: ["13:00", "20:00"], 3: ["12:00", "17:00", "21:00"], 4: ["09:00", "13:00", "18:00", "21:30"],
               5: ["09:00", "12:00", "15:00", "18:00", "21:30"], 6: ["08:00", "11:00", "13:30", "16:30", "19:00", "22:00"]}
 PILOT_DEFAULTS = {"on": False, "per_day": 2, "times": [{"t": t, "mine": False} for t in PILOT_BEST[2]], "tz": 180, "templates": [],
-                  "mode": "approve", "steps": list(PILOT_STEPS), "platforms": [], "twin": "", "names": {}}
+                  "mode": "approve", "steps": list(PILOT_STEPS), "platforms": [], "twin": "", "names": {},
+                  "steps_by": None, "car_styles": [], "car_i": 0}   # steps_by: {النوع: [الخطوات اللي محتاجة موافقته]} · car_styles: ستايلات الكاروسيل بالتناوب
 PILOT_ACTIVE = ("run", "wait", "cam")
 
 
@@ -32656,7 +32657,9 @@ def pilot_plan_month(d: dict) -> None:
 
 def pilot_gate(j: dict, s: dict, step: str) -> bool:
     """هذه الخطوة تحتاج موافقة العميل وما زال ماوافقش؟"""
-    return s.get("mode") == "approve" and step in (s.get("steps") or []) and step not in (j.get("passed") or [])
+    sb = s.get("steps_by")
+    steps = (sb.get(j.get("kind") or pilot_kind(j.get("tpl") or "")) or []) if isinstance(sb, dict) else (s.get("steps") or [])
+    return s.get("mode") == "approve" and step in steps and step not in (j.get("passed") or [])
 
 
 def pilot_export_file(src: Path, name: str) -> str:
@@ -32805,7 +32808,15 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + 1), "كاروسيل")
         car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
         cid = car["id"]
-        patch_carousel(cid, CarouselPatch(settings={"slides": n}))
+        sty = [x for x in s.get("car_styles") or [] if x]
+        if sty:   # 🎨 ستايلات العميل: كل كاروسيل بالدور (لو واحد بس: هو كل مرة)
+            pick = sty[int(s.get("car_i") or 0) % len(sty)]
+            pilot_update(lambda d: d["settings"].update(car_i=int(d["settings"].get("car_i") or 0) + 1))
+            lib = {a["id"]: a for a in carousel_library()}
+            key = "template_id" if (lib.get(pick) or {}).get("kind") == "template" else "style_id"
+            patch_carousel(cid, CarouselPatch(settings={"slides": n, key: pick}))
+        else:
+            patch_carousel(cid, CarouselPatch(settings={"slides": n}))
         brief = flow_brief({**d, "_id": fid})
         put(phase="car_plan", carousel_id=cid, note="جارٍ كتابة الشرائح")
 
@@ -33016,6 +33027,8 @@ class PilotIn(BaseModel):
     platforms: list[str] | None = None
     twin: str | None = None
     names: dict | None = None   # أسماء قوالب الكود (للعرض)
+    steps_by: dict | None = None   # 🔵 الموافقات لكل نوع: {"phone": ["idea", ...], "motion": [...], "carousel": [...], "avatar": [...]}
+    car_styles: list[str] | None = None   # 🎨 ستايلات الكاروسيل (واحد على الأقل لو فيه): بيتناوب بينها
 
 
 def pilot_port(request: Request) -> int:
@@ -33053,6 +33066,11 @@ def pilot_put(body: PilotIn, request: Request):
             s["mode"] = body.mode
         if body.steps is not None:
             s["steps"] = [x for x in PILOT_STEPS if x in body.steps]
+        if body.steps_by is not None:
+            s["steps_by"] = {k: [x for x in PILOT_STEPS if x in (v or [])] for k, v in body.steps_by.items() if k in ("phone", "avatar", "motion", "carousel", "custom")}
+            s["mode"] = "approve" if any(s["steps_by"].values()) else "auto"   # مفيش ولا دايرة زرقا = كله تلقائي
+        if body.car_styles is not None:
+            s["car_styles"] = [str(x)[:40] for x in dict.fromkeys(body.car_styles)][:20]
         if body.platforms is not None:
             s["platforms"] = [p for p in dict.fromkeys(body.platforms) if publisher.valid_target(p)][:20]
         if body.twin is not None:
