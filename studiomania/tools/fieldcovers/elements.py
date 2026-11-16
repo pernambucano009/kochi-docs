@@ -44,6 +44,20 @@ STYLES = {
              "and bright yellow (#FFE800), where the inks overlap they mix into purple, green and orange. Flat simple shapes, visible coarse halftone dots, "
              "grainy ink texture, slight misregistration between the color layers, no black outlines, no gradients, no shadow, "
              "three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "impasto": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Thick impasto oil painting made with a palette knife: heavy sculpted paint strokes with bright edges and dark ridges, rich warm colors, visible thick paint texture, painterly. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "toon": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "1950s vintage cartoon advertisement illustration: bold rounded shapes, slightly offset flat print colors (teal, coral, mustard, cream) with misregistered black outlines, retro atomic-age style, cheerful. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "ink": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Traditional Chinese ink wash painting (sumi-e): black ink brush strokes of varied thickness on rice paper, soft grey washes, minimal, elegant, mostly monochrome black and grey. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "ukiyo": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Japanese ukiyo-e woodblock print: flat areas of color (indigo, muted red, ochre, sage), bold black carved outlines, parallel line patterns, slight wood grain texture. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "crayon": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Child's wax crayon drawing: rough waxy back-and-forth coloring strokes that go outside the lines, wobbly outlines, bright primary colors, coarse paper texture, naive and playful. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "oneline": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Minimal continuous one-line drawing: a single unbroken thin black line drawing the object, no fill, no shading, elegant and simple. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
+    "sketch": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
+             "Urban sketch: thin wobbly brown ink pen lines with light loose watercolor tints that do not exactly match the lines, mostly brown and grey with one soft color accent. No background, no shadow beyond the style, three-quarter view from slightly above, no text, no logo, no watermark. Subject: "),
     "watercolor": ("A single isolated object, centered, fully visible with generous margin, on plain white paper. "
                    "Loose hand-painted watercolor illustration in a sketchbook style: soft transparent washes that pool darker at the edges, "
                    "visible paper texture, a few loose thin brown ink pencil lines, some white paper left unpainted, muted natural colors "
@@ -79,7 +93,7 @@ ITEMS = {
     "oats_bowl": "a white bowl of oatmeal topped with blueberries and banana slices",
     "salad_bowl": "a white bowl of green salad with grilled chicken slices",
     "eggs": "three whole eggs standing side by side, simple oval shapes",
-    "dates": "a small ceramic plate of dates",
+    "dates": "a small ceramic plate piled with brown dried dates fruit",
     "scale": "a white digital bathroom scale",
     "tape_measure": "a yellow measuring tape loosely coiled",
     "towel": "a folded white gym towel",

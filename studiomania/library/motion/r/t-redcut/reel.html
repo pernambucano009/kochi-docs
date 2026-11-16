@@ -8,6 +8,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "كل سنة وإنتم طيبين", group: G2, max: 22, hint: "التهنئة أو العرض." },
   sub: { label: "تحت العنوان", kind: "text", def: "هدايا العيد وصلت", group: G2, max: 24 },
   brand: { label: "اسم العلامة (يُقص داخل الدائرة)", kind: "text", role: "brand", def: "هدية", group: G2, max: 8, hint: "كلمة قصيرة لتُقص داخل دائرة صغيرة." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   red: { label: "لون الورق", kind: "color", role: "accent", def: "#d4202a", group: G1, hint: "لون الورق المقصوص كله." },
   ground: { label: "لون الورقة السفلية", kind: "color", def: "#f6efe2", group: G1, hint: "يجب أن تكون فاتحة ليظهر القص." },
   fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
@@ -25,7 +26,17 @@ M.reel({
   async init(M) {
     await Promise.all([M.font("LZ", PR.fText), M.font("RQ", PR.fHead)]);
     const c = M.canvas(W, H), x = c.getContext("2d"), L = document.createElement("canvas"); L.width = W; L.height = H;
-    return { x, q: L.getContext("2d") };
+    // 🧩 عناصر مكتبة المجال (حتى ٣): كل عنصر ورقة حمرا مقصوصة على شكله، وجواها خروم صغيرة (نقط وأهلّة) زي باقي القص
+    const ims = await M.els(PR.els, 3);
+    const cuts = ims.map((im, k) => {
+      const S = 520, c = M.fx.silhouette(im, PR.red, S, S), g = c.getContext("2d"), d = g.getImageData(0, 0, S, S).data, R = M.rng(40 + k);
+      g.globalCompositeOperation = "destination-out"; g.beginPath();
+      for (let i = 0; i < 70; i++) { const x0 = 40 + R() * (S - 80), y0 = 40 + R() * (S - 80), r = 6 + R() * 9;
+        if (![[0, 0], [r + 12, 0], [-r - 12, 0], [0, r + 12], [0, -r - 12]].every(([a, b]) => d[(Math.round(y0 + b) * S + Math.round(x0 + a)) * 4 + 3] > 200)) continue;
+        g.moveTo(x0 + r, y0); if (i % 3) g.arc(x0, y0, r, 0, 7); else { g.arc(x0, y0, r, 0, Math.PI); g.arc(x0, y0 - r * .35, r * .75, Math.PI, 0, true); } }
+      g.fill(); return c;
+    });
+    return { x, q: L.getContext("2d"), cuts };
   },
   seek(t, C, M) {
     const { x, q } = C, { seg, clamp, cubicIO, springO, hash, smooth } = M, io = (k) => cubicIO(clamp(k)), RED = PR.red;
@@ -59,27 +70,34 @@ M.reel({
       for (const [cx, cy] of [[150, 530], [930, 530], [930, 1490], [150, 1490]]) { q.beginPath(); q.arc(cx, cy, 70, 0, TAU); q.fill(); cut(() => { cres(cx, cy, 40, hash(cx) * 6); q.moveTo(cx + 10, cy); q.arc(cx, cy, 10, 0, TAU); }); }
       // الأرض
       q.beginPath(); q.moveTo(150, 1490); for (let k = 0; k <= 20; k++) q.lineTo(150 + k * 39, 1380 + Math.sin(k * .9) * 14); q.lineTo(930, 1490); q.fill(); cut(() => { for (let k = 0; k < 12; k++) cres(200 + k * 62, 1440, 16, Math.PI); });
-      // البيت بقبة وباب مقوّس
-      q.beginPath(); q.rect(560, 1060, 300, 340); q.moveTo(540, 1070); q.lineTo(710, 930); q.lineTo(880, 1070); q.fill();
-      cut(() => { q.moveTo(660, 1400); q.lineTo(660, 1290); q.arc(710, 1290, 50, Math.PI, 0); q.lineTo(760, 1400); q.closePath(); for (const wx of [610, 810]) { q.moveTo(wx - 30, 1160); q.rect(wx - 30, 1130, 60, 70); } cres(710, 1010, 32, -Math.PI / 2); });
-      cut(() => { for (let k = 0; k < 9; k++) { q.moveTo(575 + k * 32, 1225); q.lineTo(590 + k * 32, 1250); q.lineTo(560 + k * 32, 1250); q.closePath(); } });
-      // شجرة بورق هلالي
-      q.fillRect(305, 1050, 40, 360); q.beginPath(); q.arc(325, 930, 190, 0, TAU); q.fill();
-      cut(() => { for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, r = 60 + (k % 3) * 45; cres(325 + Math.cos(a) * r, 930 + Math.sin(a) * r, 26, a + Math.sin(t * 2 + k) * .2); } q.moveTo(345, 930); q.arc(325, 930, 20, 0, TAU); });
+      if (C.cuts.length) {   // العناصر المقصوصة بالدور جوه البرواز: بتتلزق بنطة، وتفضل تتهز، وتتشال
+        M.turns(t, C.cuts.length, 4.0, 8.0, 1.0, .5, .35).forEach((e) => {
+          const im = C.cuts[e.k], sc = back(e.in) * (1 - io(e.out)), w = 560 * sc;
+          if (w <= 1) return; q.save(); q.translate(540, 1395); q.rotate(Math.sin((t - e.s0) * 2.4) * .03); q.drawImage(im, -w / 2, -w, w, w); q.restore();
+        });
+      } else {
+        // البيت بقبة وباب مقوّس
+        q.beginPath(); q.rect(560, 1060, 300, 340); q.moveTo(540, 1070); q.lineTo(710, 930); q.lineTo(880, 1070); q.fill();
+        cut(() => { q.moveTo(660, 1400); q.lineTo(660, 1290); q.arc(710, 1290, 50, Math.PI, 0); q.lineTo(760, 1400); q.closePath(); for (const wx of [610, 810]) { q.moveTo(wx - 30, 1160); q.rect(wx - 30, 1130, 60, 70); } cres(710, 1010, 32, -Math.PI / 2); });
+        cut(() => { for (let k = 0; k < 9; k++) { q.moveTo(575 + k * 32, 1225); q.lineTo(590 + k * 32, 1250); q.lineTo(560 + k * 32, 1250); q.closePath(); } });
+        // شجرة بورق هلالي
+        q.fillRect(305, 1050, 40, 360); q.beginPath(); q.arc(325, 930, 190, 0, TAU); q.fill();
+        cut(() => { for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, r = 60 + (k % 3) * 45; cres(325 + Math.cos(a) * r, 930 + Math.sin(a) * r, 26, a + Math.sin(t * 2 + k) * .2); } q.moveTo(345, 930); q.arc(325, 930, 20, 0, TAU); });
+        // شخصية بمفاصل ماشية وشايلة هدية
+        const wk = io(seg(t, 4.2, 7.8)), px = 230 + 300 * wk, ph = (t - 4.2) * 9, py = 1380 - Math.abs(Math.sin(ph)) * 6;
+        q.save(); q.translate(px, py); q.fillStyle = RED;
+        for (const s of [1, -1]) { q.save(); q.translate(0, -120); q.rotate(Math.sin(ph) * .4 * s); q.fillRect(-9, 0, 18, 120); q.restore(); }
+        q.beginPath(); q.moveTo(-40, -120); q.lineTo(40, -120); q.lineTo(26, -260); q.lineTo(-26, -260); q.fill();
+        q.beginPath(); q.arc(4, -300, 38, 0, TAU); q.fill(); q.beginPath(); q.moveTo(36, -305); q.lineTo(52, -292); q.lineTo(34, -288); q.fill();
+        q.save(); q.translate(16, -240); q.rotate(-.9); q.fillRect(-8, 0, 16, 80); q.restore(); q.fillRect(50, -232, 70, 60); q.fillRect(44, -246, 82, 18);
+        cut(() => { q.moveTo(20, -306); q.arc(16, -306, 6, 0, TAU); cres(0, -190, 14, Math.PI / 2); q.rect(80, -232, 10, 60); cres(85, -260, 12, Math.PI); q.moveTo(-10, -150); q.arc(-14, -150, 6, 0, TAU); });
+        q.restore();
+      }
       // عصافير بجناح بيرفرف (مفصل)
       for (let b = 0; b < 2; b++) { const bx = 300 + ((t - 3.4) * 90 + b * 330) % 650, by = 650 + b * 90 + Math.sin(t * 3 + b) * 20, fl = Math.sin(t * 12 + b * 2) * .7;
         q.save(); q.translate(bx, by); q.fillStyle = RED; q.beginPath(); q.ellipse(0, 0, 50, 24, 0, 0, TAU); q.moveTo(-50, 0); q.lineTo(-90, -22); q.lineTo(-84, 14); q.closePath(); q.moveTo(48, -8); q.lineTo(70, -2); q.lineTo(48, 6); q.fill();
         q.save(); q.rotate(-.3 + fl); q.beginPath(); q.moveTo(-10, -6); q.quadraticCurveTo(-20, -70, 26, -64); q.quadraticCurveTo(14, -24, 12, -6); q.fill(); q.restore();
         cut(() => { q.moveTo(36, -6); q.arc(32, -6, 5, 0, TAU); cres(-10, 4, 12, 0); }); q.restore(); }
-      // شخصية بمفاصل ماشية وشايلة هدية
-      const wk = io(seg(t, 4.2, 7.8)), px = 230 + 300 * wk, ph = (t - 4.2) * 9, py = 1380 - Math.abs(Math.sin(ph)) * 6;
-      q.save(); q.translate(px, py); q.fillStyle = RED;
-      for (const s of [1, -1]) { q.save(); q.translate(0, -120); q.rotate(Math.sin(ph) * .4 * s); q.fillRect(-9, 0, 18, 120); q.restore(); }
-      q.beginPath(); q.moveTo(-40, -120); q.lineTo(40, -120); q.lineTo(26, -260); q.lineTo(-26, -260); q.fill();
-      q.beginPath(); q.arc(4, -300, 38, 0, TAU); q.fill(); q.beginPath(); q.moveTo(36, -305); q.lineTo(52, -292); q.lineTo(34, -288); q.fill();
-      q.save(); q.translate(16, -240); q.rotate(-.9); q.fillRect(-8, 0, 16, 80); q.restore(); q.fillRect(50, -232, 70, 60); q.fillRect(44, -246, 82, 18);
-      cut(() => { q.moveTo(20, -306); q.arc(16, -306, 6, 0, TAU); cres(0, -190, 14, Math.PI / 2); q.rect(80, -232, 10, 60); cres(85, -260, 12, Math.PI); q.moveTo(-10, -150); q.arc(-14, -150, 6, 0, TAU); });
-      q.restore();
       q.restore();
     }
     // ٣) الاسم مقصوص جوه دايرة وردية + العنوان

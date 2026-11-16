@@ -9,6 +9,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "فرن العيلة", group: G3, max: 12, hint: "يُحفر في اللوحة الثالثة." },
   sub: { label: "تحت العنوان", kind: "text", def: "نفس النار من ١٩٦٠", group: G3, max: 24 },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "مخبز الأمانة", group: G3, max: 16, hint: "يُطبع أول حرف منه ختمًا صغيرًا في الركن." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   fire: { label: "لون النار", kind: "color", role: "accent", def: "#e8562a", group: GS, hint: "اللون الوحيد غير الأبيض والأسود." },
   fHead: { label: "خط العنوان", kind: "font", def: "ruqaa", group: GS },
   fText: { label: "خط الجمل", kind: "font", def: "amiri", group: GS },
@@ -55,13 +56,22 @@ M.reel({
       if (Y > 1060) l = .35;   // ترابيزة خشب فاتحة
       return l; };
     const P1 = carve(oven, ovenF, .03), P2 = carve(loaf, () => false, -.02);
-    return { x, P1, P2 };
+    // 🧩 عناصر مكتبة المجال (حتى ٣): كل عنصر بيتحفر لوح لوحده من نوره هو (والأجزاء البرتقاني/الحمرا بتطلع بلون النار)
+    const ims = await M.els(PR.els, 3);
+    const PE = ims.map((im, k) => {
+      const ew = 860, eh = 980, cv = M.fx.fit(im, ew, eh), d = cv.getContext("2d").getImageData(0, 0, ew, eh).data, ox0 = (BW - ew) / 2, oy0 = 170;
+      const at = (X, Y) => { const ix = Math.round(X - ox0), iy = Math.round(Y - oy0); return ix < 0 || iy < 0 || ix >= ew || iy >= eh ? -1 : (iy * ew + ix) * 4; };
+      const L = (X, Y) => { const i = at(X, Y); if (i < 0 || d[i + 3] < 60) return Y > 1180 ? .3 : .06 + .1 * Math.exp(-Math.hypot(X - BW / 2, Y - 660) / 420); return .18 + .82 * (.3 * d[i] + .59 * d[i + 1] + .11 * d[i + 2]) / 255; };
+      const F = (X, Y) => { const i = at(X, Y); if (i < 0 || d[i + 3] < 60) return false; const r = d[i], g = d[i + 1], b = d[i + 2]; return r > 150 && r > g * 1.35 && r > b * 1.8; };
+      return carve(L, F, k % 2 ? -.02 : .03);
+    });
+    return { x, P1, P2, PE };
   },
   seek(t, C, M) {
-    const { x, P1, P2 } = C, { seg, clamp, hash, smooth, expo } = M;
+    const { x, P1, P2, PE } = C, { seg, clamp, hash, smooth, expo } = M;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PAPER; x.fillRect(0, 0, W, H);
     for (let i = 0; i < 70; i++) { x.fillStyle = "rgba(120,100,70,.05)"; x.fillRect(0, i * 28, W, 1); }   // ورق مخطط (laid)
-    const plate = (img, t0, t1, cap) => {
+    const plate = (img, t0, t1, cap, num) => {
       if (t < t0 || t > t1) return; const k = seg(t, t0, t1), z = 1 + .04 * smooth(k);
       x.save(); x.translate(MX, MY); x.fillStyle = BLK; x.fillRect(0, 0, BW, BH);
       // السكينة بتكشف بمسحة مايلة
@@ -76,10 +86,15 @@ M.reel({
       // إطار الطبعة + الجملة تحتها بحروف حبر
       x.strokeStyle = BLK; x.lineWidth = 3; x.strokeRect(MX - 14, MY - 14, BW + 28, BH + 28);
       const ca = smooth(seg(t, t0 + 1.8, t0 + 2.4)); x.globalAlpha = ca; x.fillStyle = BLK; x.font = `700 ${M.fit(cap, "AM", 900, 88, 40, "700")}px AM`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(cap, 540, MY + BH + 150); x.globalAlpha = 1;
-      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText(img === P1 ? "١ / ٣" : "٢ / ٣", MX, MY - 40);
+      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText(num || (img === P1 ? "١ / ٣" : "٢ / ٣"), MX, MY - 40);
     };
-    plate(P1, 0, 4.1, PR.line1);
-    plate(P2, 4.1, 8.1, PR.line2);
+    if (PE.length) {   // ألواح العناصر بالدور في نفس الوقت (٨ ثواني)
+      const n = PE.length, D = 8.1 / n, ar = "٠١٢٣٤٥٦٧٨٩";
+      PE.forEach((img, k) => plate(img, k * D, (k + 1) * D, k % 2 ? PR.line2 : PR.line1, `${ar[k + 1]} / ${ar[n + 1]}`));
+    } else {
+      plate(P1, 0, 4.1, PR.line1);
+      plate(P2, 4.1, 8.1, PR.line2);
+    }
     // لوحة ٣: العنوان محفور + أشعة
     if (t >= 8.1) {
       const k = seg(t, 8.1, 9.6); x.save(); x.translate(MX, MY); x.fillStyle = BLK; x.fillRect(0, 0, BW, BH);
@@ -96,7 +111,7 @@ M.reel({
       x.restore(); x.strokeStyle = BLK; x.lineWidth = 3; x.strokeRect(MX - 14, MY - 14, BW + 28, BH + 28);
       const ba = smooth(seg(t, 10.4, 11.0)); x.globalAlpha = ba; x.fillStyle = BLK; x.font = `700 ${M.fit(PR.brand, "RQ", 800, 96, 40, "700")}px RQ`; x.textAlign = "center"; x.direction = "rtl"; x.fillText(PR.brand, 540, MY + BH + 160);
       x.fillStyle = PR.fire; x.fillRect(540 - 60, MY + BH + 196, 120, 8); x.globalAlpha = 1;
-      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText("٣ / ٣", MX, MY - 40);
+      x.font = "700 30px AM"; x.fillStyle = "rgba(21,18,15,.6)"; x.textAlign = "left"; x.fillText(PE.length ? `${"٠١٢٣٤٥٦٧٨٩"[PE.length + 1]} / ${"٠١٢٣٤٥٦٧٨٩"[PE.length + 1]}` : "٣ / ٣", MX, MY - 40);
     }
     // ختم الفنان الأحمر الصغير في الركن
     x.fillStyle = PR.fire; x.globalAlpha = .85; x.fillRect(W - MX - 60, MY + BH + 40, 50, 50); x.globalAlpha = 1; x.fillStyle = PAPER; x.font = "700 30px RQ"; x.textAlign = "center"; x.fillText([...PR.brand][0] || "", W - MX - 35, MY + BH + 76);

@@ -101,6 +101,67 @@
     return f.weight;
   };
   M.img = (src) => new Promise((res) => { if (!src) return res(null); const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+
+  // ---------- 🧩 عناصر مكتبة المجال (خانة els في القالب): تحميل، وتوقيت الدور، وستايلات بالكود
+  // M.els(PR.els, max) ← صور العناصر المتحملة (الفاضي بيتشال)
+  M.els = async (list, max = 8) => (await Promise.all((list || []).filter(Boolean).slice(0, max).map((u) => M.img(u)))).filter(Boolean);
+  // M.turns(t, n, t0, t1, hold) ← العناصر اللي ظاهرة دلوقتي: [{k, s0, s1, u (٠←١ عمره), in (دخول ٠←١), out (خروج ٠←١)}]
+  //   كل عنصر ليه دور D، وبيفضل hold×D (أكبر من ١ = تداخل)، والأخير بيفضل لحد t1
+  M.turns = (t, n, t0, t1, hold = 1.25, inS = .6, outS = .5) => {
+    const D = (t1 - t0) / Math.max(1, n), out = [];
+    for (let k = 0; k < n; k++) {
+      const s0 = t0 + k * D, s1 = k === n - 1 ? t1 + 9 : s0 + D * hold;
+      if (t < s0 || t > s1) continue;
+      out.push({ k, s0, s1, u: M.clamp((t - s0) / (s1 - s0)), in: M.clamp((t - s0) / inS), out: k === n - 1 ? 0 : M.clamp((t - (s1 - outS)) / outS) });
+    }
+    return out;
+  };
+  // كانفس بمقاس معيّن والصورة جواه مظبوطة (contain)
+  const fitCv = (im, w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); const sc = Math.min(w / im.width, h / im.height); g.drawImage(im, (w - im.width * sc) / 2, (h - im.height * sc) / 2, im.width * sc, im.height * sc); return c; };
+  M.fx = {
+    fit: fitCv,
+    // ظل بلون واحد (خيال الظل، القص، الهالات)
+    silhouette(im, color, w = 600, h = 600) { const c = fitCv(im, w, h), g = c.getContext("2d"); g.globalCompositeOperation = "source-in"; g.fillStyle = color; g.fillRect(0, 0, w, h); return c; },
+    // خطوط الحدود بلون واحد (مخطط هندسي، آرت ديكو، رسومات بالخط)
+    edges(im, color, w = 600, h = 600, thr = 38, thick = 1) {
+      const c = fitCv(im, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) L[i] = p[i * 4 + 3] < 40 ? 255 : (.3 * p[i * 4] + .59 * p[i * 4 + 1] + .11 * p[i * 4 + 2]) * .6 + 60;
+      const o = g.createImageData(w, h), q = o.data, [r, gg, b] = M.rgbOf(color);
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x, gx = L[i + 1] - L[i - 1] + (L[i + 1 - w] - L[i - 1 - w] + L[i + 1 + w] - L[i - 1 + w]) / 2, gy = L[i + w] - L[i - w] + (L[i + w + 1] - L[i - w + 1] + L[i + w - 1] - L[i - w - 1]) / 2;
+        const m = Math.hypot(gx, gy); if (m < thr) continue;
+        for (let a = 0; a < thick; a++) for (let bb = 0; bb < thick; bb++) { const j = ((y + a) * w + x + bb) * 4; q[j] = r; q[j + 1] = gg; q[j + 2] = b; q[j + 3] = Math.min(255, m * 2.2); }
+      }
+      g.clearRect(0, 0, w, h); g.putImageData(o, 0, 0); return c;
+    },
+    // نقط طباعة (halftone) بلون واحد: الحتة الأغمق نقطتها أكبر
+    halftone(im, color, w = 600, h = 600, step = 9) {
+      const src = fitCv(im, w, h), d = src.getContext("2d").getImageData(0, 0, w, h).data, c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.fillStyle = color;
+      for (let y = step / 2; y < h; y += step) for (let x = step / 2; x < w; x += step) { const i = (Math.floor(y) * w + Math.floor(x)) * 4; if (d[i + 3] < 60) continue; const l = (.3 * d[i] + .59 * d[i + 1] + .11 * d[i + 2]) / 255, rr = step * .62 * Math.sqrt(Math.max(.08, 1 - l)); g.beginPath(); g.arc(x, y, rr, 0, Math.PI * 2); g.fill(); }
+      return c;
+    },
+    // بكسل: الصورة بتتصغّر وترجع كبيرة من غير تنعيم، بألوان محدودة (palette = مصفوفة ألوان hex اختيارية)
+    pixelate(im, px, w = 600, h = 600, palette) {
+      const s = document.createElement("canvas"); s.width = Math.ceil(w / px); s.height = Math.ceil(h / px); const sg = s.getContext("2d"); sg.drawImage(fitCv(im, w, h), 0, 0, s.width, s.height);
+      const d = sg.getImageData(0, 0, s.width, s.height), p = d.data, pal = (palette || []).map(M.rgbOf);
+      for (let i = 0; i < p.length; i += 4) { p[i + 3] = p[i + 3] > 110 ? 255 : 0; if (pal.length && p[i + 3]) { let best = pal[0], bd = 1e9; for (const c of pal) { const dd = (c[0] - p[i]) ** 2 + (c[1] - p[i + 1]) ** 2 + (c[2] - p[i + 2]) ** 2; if (dd < bd) { bd = dd; best = c; } } p[i] = best[0]; p[i + 1] = best[1]; p[i + 2] = best[2]; } }
+      sg.putImageData(d, 0, 0); const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.imageSmoothingEnabled = false; g.drawImage(s, 0, 0, w, h); return c;
+    },
+    // ألوان قليلة (بوستر/طباعة حريرية): كل بكسل بياخد أقرب لون من palette، والنتيجة طبقات بعدد الألوان (ترتيب palette)
+    posterize(im, palette, w = 600, h = 600) {
+      const src = fitCv(im, w, h), d = src.getContext("2d").getImageData(0, 0, w, h).data, pal = palette.map(M.rgbOf), layers = pal.map(() => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; });
+      const datas = layers.map((c) => c.getContext("2d").createImageData(w, h));
+      for (let i = 0; i < w * h; i++) { if (d[i * 4 + 3] < 90) continue; const l = (.3 * d[i * 4] + .59 * d[i * 4 + 1] + .11 * d[i * 4 + 2]); let bi = 0, bd = 1e9; pal.forEach((c, k) => { const dd = (c[0] - d[i * 4]) ** 2 + (c[1] - d[i * 4 + 1]) ** 2 + (c[2] - d[i * 4 + 2]) ** 2 + ((.3 * c[0] + .59 * c[1] + .11 * c[2]) - l) ** 2 * 2; if (dd < bd) { bd = dd; bi = k; } }); const q = datas[bi].data; q[i * 4] = pal[bi][0]; q[i * 4 + 1] = pal[bi][1]; q[i * 4 + 2] = pal[bi][2]; q[i * 4 + 3] = 255; }
+      layers.forEach((c, k) => c.getContext("2d").putImageData(datas[k], 0, 0)); return layers;
+    },
+    // حفر خشب: خطوط أفقية متموجة بيتغير سمكها مع النور (الحتة المنورة خطها أتخن)، بلون واحد
+    engrave(im, color, w = 600, h = 600, gap = 7) {
+      const src = fitCv(im, w, h), d = src.getContext("2d").getImageData(0, 0, w, h).data, c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.fillStyle = color;
+      for (let y = 0; y < h; y += gap) for (let x = 0; x < w; x += 2) { const yy = Math.min(h - 1, Math.round(y + Math.sin(x * .05) * 2)), i = (yy * w + x) * 4; if (d[i + 3] < 70) continue; const l = (.3 * d[i] + .59 * d[i + 1] + .11 * d[i + 2]) / 255, th = gap * (.18 + .75 * l); g.fillRect(x, yy - th / 2, 2, th); }
+      return c;
+    },
+  };
+  M.rgbOf = (h) => { const n = parseInt(String(h).replace("#", "").replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   M.isAr = (s) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(String(s || ""));
   // أكبر مقاس يخلّي الكلام في العرض ده (بين min و max)
   M.fit = (text, fam, maxW, max, min = 12, weight = "") => { let s = max; while (s > min && M.measure(text, `${weight} ${s}px ${fam}`.trim()) > maxW) s -= 2; return s; };
