@@ -104,7 +104,18 @@
 
   // ---------- 🧩 عناصر مكتبة المجال (خانة els في القالب): تحميل، وتوقيت الدور، وستايلات بالكود
   // M.els(PR.els, max) ← صور العناصر المتحملة (الفاضي بيتشال)
-  M.els = async (list, max = 8) => (await Promise.all((list || []).filter(Boolean).slice(0, max).map((u) => M.img(u)))).filter(Boolean);
+  //   الفراغ الشفاف حوالين العنصر بيتقص، فكل العناصر بتبان بحجمها الحقيقي
+  M.trim = (im) => {
+    const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const g = c.getContext("2d"); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data, W0 = c.width, H0 = c.height, rows = new Uint32Array(H0), cols = new Uint32Array(W0);
+    for (let y = 0; y < H0; y += 2) for (let x = 0; x < W0; x += 2) if (d[(y * W0 + x) * 4 + 3] > 100) { rows[y]++; cols[x]++; }
+    // صفوف وعواميد فيها العنصر فعلًا (مش نقط متفرقة على الأطراف)
+    const rmin = Math.max(2, W0 * .006), cmin = Math.max(2, H0 * .006); let x0 = 0, x1 = W0 - 1, y0 = 0, y1 = H0 - 1;
+    while (y0 < H0 && rows[y0] < rmin) y0++; while (y1 > y0 && rows[y1] < rmin) y1--; while (x0 < W0 && cols[x0] < cmin) x0++; while (x1 > x0 && cols[x1] < cmin) x1--;
+    if (y0 >= H0 || x0 >= W0) return im; const p = 6; x0 = Math.max(0, x0 - p); y0 = Math.max(0, y0 - p); x1 = Math.min(c.width - 1, x1 + p); y1 = Math.min(c.height - 1, y1 + p);
+    const o = document.createElement("canvas"); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1; o.getContext("2d").drawImage(c, -x0, -y0); return o;
+  };
+  M.els = async (list, max = 8) => (await Promise.all((list || []).filter(Boolean).slice(0, max).map((u) => M.img(u)))).filter(Boolean).map(M.trim);
   // M.turns(t, n, t0, t1, hold) ← العناصر اللي ظاهرة دلوقتي: [{k, s0, s1, u (٠←١ عمره), in (دخول ٠←١), out (خروج ٠←١)}]
   //   كل عنصر ليه دور D، وبيفضل hold×D (أكبر من ١ = تداخل)، والأخير بيفضل لحد t1
   M.turns = (t, n, t0, t1, hold = 1.25, inS = .6, outS = .5) => {
