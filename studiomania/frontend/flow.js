@@ -23,7 +23,7 @@ const Flow = (() => {
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
   const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع المنشور"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
   // قالب كود: السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير
-  const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "لوحة التحكم"], ["generate", "التصدير"]];
+  const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "المشاهد"], ["generate", "الفيديو والمونتاج"]];
   // قالب تايبوجرافي: كلام بس بيتحرك (مفيش نوع بوست ولا أبطال ولا ملفات)
   const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "النص"], ["generate", "التوليد"]];
   const isCode = (d) => d?.template?.kind === "motion";
@@ -444,8 +444,8 @@ const Flow = (() => {
       <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب لترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
       ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn big" data-panel>🎛️ افتح لوحة القالب</button>
-        <button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 صدّر الفيديو<small class="flw-cost">بدون نقاط</small></button></div>
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 اصنع الفيديو<small class="flw-cost">بدون نقاط</small></button></div>
+      <p class="flw-sub">بعد صنعه يفتح في المونتاج: تشاهده وتعدّل فيه (العناصر، والموسيقى، والتعليق الصوتي أو صوتك أنت)، ثم تصدّره.</p>
       <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
   }
 
@@ -566,7 +566,7 @@ const Flow = (() => {
       ${!isWork && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind ? `<div class="flw-done">
         ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "أُنشئ الكاروسيل بالشرائح والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
-          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل الفيديو</a>` : ""}
+          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<button type="button" class="flw-btn pri big" data-tomont>✂️ افتح في المونتاج وعدّل</button><a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل كما هو</a>` : ""}
         <div class="flw-final"><b>هل أعجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
         ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ما الذي لم يعجبك؟ (سيتذكره العقل)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
         <button type="button" class="flw-link" data-go="scenario">↩︎ جرّب سيناريو آخر</button></div>` : ""}`;
@@ -810,6 +810,10 @@ const Flow = (() => {
     if ((b = q("[data-fxdel]"))) { try { S.mstate = await api(`/api/flows/${S.d.id}/effects/remove`, { method: "POST", ...J({ index: +b.dataset.fxdel }) }); render(); toast("✓ حُذف الإفكت، وسيختفي في التصدير القادم"); } catch (err) { toast(err.message, true); } return; }
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
+    if (q("[data-tomont]")) {   // ✂️ فيديو القالب ← المونتاج (يعدّل فيه ويصدّر من هناك)
+      try { const r = await api(`/api/flows/${S.d.id}/to-montage`, { method: "POST" }); close(); storageSet(projectKey("free"), r.project_id); return showStep("6f"); }
+      catch (err) { return toast(err.message, true); }
+    }
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {
       const pid = S.d.montage?.project_id;

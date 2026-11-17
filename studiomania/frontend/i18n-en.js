@@ -16700,4 +16700,10 @@ window.I18N_EN = {
   "استبدلها بفكرة مختلفة تمامًا تناسب نفس القالب": "Replace it with a completely different idea that fits the same template",
   "اكتب نصًا مختلفًا تمامًا لنفس الفكرة": "Write a completely different script for the same idea",
   "تم التسجيل. يستمع إليه الآن ليضبط كل مشهد على جملته…": "Recorded. Now listening to it to fit each scene to its sentence\u2026",
+  "الفيديو والمونتاج": "Video & editing",
+  "🎬 اصنع الفيديو": "🎬 Make the video",
+  "بعد صنعه يفتح في المونتاج: تشاهده وتعدّل فيه (العناصر، والموسيقى، والتعليق الصوتي أو صوتك أنت)، ثم تصدّره.": "Once made, it opens in the editor: watch it and edit it (elements, music, the voice-over or your own voice), then export it.",
+  "✂️ افتح في المونتاج وعدّل": "✂️ Open in the editor and edit",
+  "⬇️ نزّل كما هو": "⬇️ Download as is",
+  "الفيديو لم يُرسم بعد": "The video hasn't been drawn yet",
 };

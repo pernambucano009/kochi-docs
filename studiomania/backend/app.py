@@ -30138,7 +30138,10 @@ def phone_broll_own(b: dict, used: set, bid: str | None) -> Path | None:
             p = lib_path(f, bid)
             if p.is_file():
                 used.add(f["id"])
-                return p
+                out = GENERATED_DIR / f"own_{uuid.uuid4().hex[:10]}.mp4"   # المونتاج بيقرا من مكتبة الفيديوهات المولّدة: نسخة ٤ ثواني منها
+                r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(p), "-t", "4", "-an",
+                                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", str(out)], capture_output=True, timeout=180)
+                return out if r.returncode == 0 and out.exists() else None
     return None
 
 
@@ -30389,6 +30392,29 @@ class PhoneMontageIn(BaseModel):
     comics: str = "auto"   # auto = لو الفيديو كوميدي · on · off
     broll: str = "auto"    # auto = البرنامج بيختار ويعمل لقطات B-roll · off
     effects: str = "auto"  # auto = العقل بيحط إفكتات على أقوى اللحظات · off
+
+
+@app.post("/api/flows/{fid}/to-montage")
+def flow_to_montage(fid: str):
+    """✂️ فيديو القالب بعد ما اترسم ← مشروع مونتاج (يعدّل فيه: يبدّل عناصر، موسيقى، تعليق صوتي، صوته هو)، وبعدها يصدّر من هناك."""
+    d = flow_load(fid)
+    pid = (d.get("montage") or {}).get("project_id")
+    if pid:
+        with closing(db()) as conn:
+            if conn.execute("SELECT 1 FROM projects WHERE id = ?", (pid,)).fetchone():
+                return {"project_id": pid}
+    o = flow_to_dict(fid, d).get("output") or {}
+    src = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
+    if o.get("status") != "done" or not src.is_file():
+        raise HTTPException(400, "الفيديو لم يُرسم بعد")
+    title = (d.get("idea") or {}).get("title") or d["template"].get("name") or "فيديو"
+    name = f"motion_{fid}_{uuid.uuid4().hex[:6]}.mp4"
+    shutil.copy(src, GENERATED_DIR / name)
+    gid = phone_gen(GENERATED_DIR / name, f"🎨 {title}")
+    pid = create_project(ProjectIn(name=f"🧭 {title}"[:100], clips=[ClipEdit(gen_id=gid)], outro=False, brand_intro=False, char_intro=False,
+                                   brand_outro=False, logo={"enabled": False}))["id"]   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
+    flow_update(fid, lambda x: x.update(montage={"project_id": pid, "at": now()}))
+    return {"project_id": pid}
 
 
 @app.post("/api/flows/{fid}/auto-montage")
