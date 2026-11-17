@@ -2214,6 +2214,7 @@ label.dim { opacity: .4; }
 /* 📈 ترند محفوظ في خطوة الفكرة */
 .flw-trend { margin: 0 0 12px; padding: 12px 14px; border-radius: 16px; background: rgba(224, 52, 43, .07); border: 1px solid rgba(224, 52, 43, .25); display: grid; gap: 8px; }
 .flw-trend.on { background: rgba(224, 52, 43, .1); }
+.flw-trend.flw-ok { background: rgba(31, 157, 85, .07); border-color: rgba(31, 157, 85, .3); }
 .flw-trend b { font-size: 14px; }
 #nh .bm-tr .bm-acts { flex-wrap: wrap; gap: 6px; }
 #nh .bm-tr .bm-acts > button { padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
