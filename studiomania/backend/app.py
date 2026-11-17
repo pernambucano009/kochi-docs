@@ -25475,7 +25475,7 @@ def logo_styles_get(bid: str):
         f = logostamp.file_for(brain_dir(bid), src, st) if src else None
         label = logostamp.ALL_LABELS.get(st) or names.get(st[2:]) or st[2:]
         items.append({"style": st, "label": label, "on": st not in off, "extra": st not in logostamp.STYLES,
-                      "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
+                      "url": f"/media/ads/brains/{bid}/{f.name}?v={int(f.stat().st_mtime)}" if f and f.exists() else None})
     step = LOGOST_STEP.get(bid, "")
     try:   # 🗺️ كل قالب مرسوم ← ستايله (صفحة القوالب بتعلّم عليه: الشعار اتعمل ولا لأ)
         tmap = {k: v for k, v in (json.loads((EL_DIR / "fitness" / "index.json").read_text("utf-8")).get("tpl") or {}).items() if v in logostamp.STYLES}
