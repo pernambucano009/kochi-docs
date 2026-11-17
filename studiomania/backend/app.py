@@ -24945,7 +24945,7 @@ def field_el_index(field: str) -> dict | None:
 
 def field_elements(mid: str, text: str, n: int = 5) -> list[str]:
     """عناصر المجال المناسبة للسكريبت ده، بستايل القالب ده: روابط /gallery/el/… (فاضية لو المجال مالوش مكتبة)."""
-    field = str((onboard_load() or {}).get("field") or "")
+    field = str((onboard_load() or {}).get("field") or (brain_row(active_client_id()) or {}).get("field") or "")
     idx = field_el_index(field)
     if not idx or not idx.get("items"):
         return []
@@ -25183,6 +25183,32 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
                     LOGOST_STEP.pop(bid, None)
             threading.Thread(target=one, daemon=True).start()
     return logo_styles_get(bid)
+
+
+def flow_fill_els(d: dict, params: dict) -> dict:
+    """🧩 عناصر المجال لو لسه مش متحطة (مشروع قديم، أو اللوحة اتفتحت قبل الميزة): نفس اختيار flow_motion_params."""
+    mid = d["template"]["id"]
+    schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
+    if "els" not in schema or "els" in (d.get("locked") or {}) or [x for x in params.get("els") or [] if x]:
+        return params
+    sc = d.get("scenario") or {}
+    txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
+                                                   for r in sc.get("scenes") or []])
+    try:
+        els = field_elements(mid, txt)
+    except Exception:  # noqa: BLE001
+        els = []
+    return {**params, "els": els} if els else params
+
+
+@app.get("/api/flows/{fid}/panel")
+def flow_panel_params(fid: str):
+    """🎛️ خانات لوحة القالب زي ما هتطلع في الفيديو (بعناصر المجال)، وبتتحفظ في المشروع."""
+    d = flow_load(fid)
+    p = flow_fill_els(d, dict(d.get("params") or {}))
+    if p != (d.get("params") or {}):
+        flow_update(fid, lambda x: x.update(params=p))
+    return {"params": p}
 
 
 def flow_motion_params(d: dict) -> dict:
@@ -26700,7 +26726,7 @@ def flow_export(fid: str, body: FlowExportIn):
     schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
     params = {**(d.get("params") or {}), **{k: v for k, v in (body.params or {}).items() if k in schema}}
     params.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema and k not in (body.params or {})})   # 🧾 معطيات العميل
-    params = brand_guard(schema, params, flow_brain(d))
+    params = flow_fill_els(d, brand_guard(schema, params, flow_brain(d)))
     vt = d.get("vo_track") or {}
     vo_path = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None
     title = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or d["template"]["name"]

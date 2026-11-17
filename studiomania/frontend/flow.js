@@ -860,8 +860,9 @@ const Flow = (() => {
     if ((b = q("[data-rewrite]"))) { S.dialOpen = false; if (await call("/stage", { stage: "scenario" })) return call("/scenarios", { lang: b.dataset.rewrite, more: false }); return; }
     if (q("[data-panel]")) {
       const d = S.d;
+      const p = await api(`/api/flows/${d.id}/panel`).then((x) => x.params).catch(() => d.params || {});   // 🧩 بعناصر المجال زي الفيديو
       return MotionPage.openTemplate(d.template.id, d.template.name, {
-        vals: d.params || {}, timing: d.vo_track?.timing || null, vo: d.vo_url || null,
+        vals: p || {}, timing: d.vo_track?.timing || null, vo: d.vo_url || null,
         onExport: (vals) => api(`/api/flows/${d.id}/export`, { method: "POST", ...J({ params: vals }) }).then((x) => { S.d = x; render(); poll(); }),
       });
     }
