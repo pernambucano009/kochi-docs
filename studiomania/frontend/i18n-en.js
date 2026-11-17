@@ -16708,4 +16708,5 @@ window.I18N_EN = {
   "الفيديو لم يُرسم بعد": "The video hasn't been drawn yet",
   "المونتاج والتصدير": "Editing & export",
   "📤 انشره كما هو": "📤 Publish it as is",
+  "الفيديو جاهز: عدّله أو انشره": "Video ready: edit or publish it",
 };

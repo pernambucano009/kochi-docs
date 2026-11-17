@@ -562,7 +562,7 @@ const NH = (() => {
     const drafts = D.drafts || [];
     const n = (k) => D.work.filter((p) => pjState(p)[0] === k).length + (k === "run" ? drafts.length : 0);
     const dcards = drafts.map((x, i) => {
-      const when = x.updated_at ? new Date(x.updated_at).toLocaleDateString(UI_LOCALE(), { day: "numeric", month: "short" }) : "";
+      const when = x.updated_at ? new Date(x.updated_at).toLocaleString(UI_LOCALE(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";   // بالساعة: نفس القالب أكتر من مرة
       return `<article class="nh-line nh-pj-card" data-draft="${x.kind}:${esc(x.id)}" data-st="run" data-q="${esc(String(x.name).toLowerCase())}" tabindex="0" role="button">
         <div class="nh-pj-art" style="${x.thumb ? `background:center/cover no-repeat url('${esc(x.thumb)}'), ${PJ_ART[i % PJ_ART.length]}` : ""}">${x.thumb ? "" : glImg(DRAFT_IC[x.kind] || "progress")}</div>
         <div class="nh-pj-name"><span class="nh-pj-av s-tpl">ق</span><b>${esc(x.name)}</b></div>
@@ -945,8 +945,10 @@ const NH = (() => {
     // 🧭 شغل لسه ما خلصش في القوالب (مسار القالب متوقف عند الفكرة/السيناريو…، أو فيديو قالب لسه بيتعمل): بيظهر في «شغّال عليه»
     const FLOW_ST = { idea: "الفكرة", format: "نوع المنشور", scenario: "السيناريو", cast: "الأبطال", assets: "الملفات", generate: "التوليد", voice: "الصوت", panel: "لوحة التحكم", shoot: "التصوير", review: "المراجعة", montage: "المونتاج", output: "التصدير", story: "القصة", scenes: "المشاهد" };
     D.drafts = [
-      ...flows.filter((f) => f.stage !== "done").map((f) => ({ kind: "flow", id: f.id, name: f.title || f.template?.name || "فكرة جديدة",
-        sec: `قالب «${f.template?.name || ""}»`, step: `متوقف عند ${FLOW_ST[f.stage] || "خطوة لم تكتمل"}`, updated_at: f.updated_at,
+      // الفيديو اللي خلص ولسه ما اتنشرش بيفضل هنا (المونتاج أو النشر)، والمسودة الفاضية (لسه مافيهاش فكرة) آخر القايمة
+      ...flows.filter((f) => f.stage !== "done" || (f.out === "done" && !f.published)).map((f) => ({ kind: "flow", id: f.id, name: f.title || "فكرة جديدة",
+        empty: !f.title, sec: `قالب «${f.template?.name || ""}»`,
+        step: f.stage === "done" ? "الفيديو جاهز: عدّله أو انشره" : `متوقف عند ${FLOW_ST[f.stage] || "خطوة لم تكتمل"}`, updated_at: f.updated_at,
         // كفر الفكرة اللي لسه شغّالة: غلاف القالب نفسه من المعرض
         thumb: (typeof Gallery !== "undefined" && Gallery.list().find((x) => x.id === f.template?.id)?.cover_url) || (f.template?.id ? `/gallery/${encodeURIComponent(f.template.id)}.jpg` : "") })),
       ...tvs.filter((v) => v.section === "templates" && v.status !== "done").map((v) => ({ kind: "tv", id: v.id, name: v.name || v.template_name || "فيديو قالب",
@@ -958,7 +960,7 @@ const NH = (() => {
         step: x.busy ? "يعمل الآن" : "لا توجد لغة جاهزة بعد", updated_at: x.updated_at })),
       ...scenes.filter((x) => x.busy || !x.takes).map((x) => ({ kind: "scene", id: x.id, name: x.name || "مشهد", sec: "استوديو المشهد",
         step: x.busy ? "يُولّد الآن" : "لم يُولّد بعد", updated_at: x.updated_at })),
-    ].sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+    ].sort((a, b) => (a.empty ? 1 : 0) - (b.empty ? 1 : 0) || String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     D.work = KOCHI ? folders : projects.filter((p) => SEC[p.section]);
     D.loaded = true;
     Object.assign(D, { cats, folders, publisher, posts, coaches, voices: voices.length || D.voices || 0, music: music.length || D.music || 0, money: window.money?.last || D.money,

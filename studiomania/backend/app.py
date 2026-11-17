@@ -24836,7 +24836,8 @@ def flow_list():
             continue
         if owned(d.get("client_id")) and (d.get("template") or {}).get("kind") not in ("avatar", "carousel"):   # الأفاتار والكاروسيل بيتعملوا من الأوتوبايلوت بس
             out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
-                        "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
+                        "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at"),
+                        "published": bool(d.get("export_id")), "out": ((d.get("output") or {}).get("status") or "")})
     out = sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)
     seen, keep = set(), []   # 🧹 مشاريع فاضية لنفس القالب (اتفتح ومااتختارتش فكرة): الأحدث بس بيظهر
     for x in out:
