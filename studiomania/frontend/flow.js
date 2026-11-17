@@ -144,7 +144,7 @@ const Flow = (() => {
   function picked(stage, acts = true) {   // acts=false: بعد صفحة النص (الصوت ولوحة التحكم والملفات) من غير «ناقش» و«غيّر»
     const it = S.d[stage];
     if (!it) return "";
-    acts = acts && !S.d.busy;   // ✏️ «تعديل» بيظهر بعد ما الخطوة دي تخلص تحميل، مش وهي بتحمّل
+    acts = false;   // 🧹 مفيش أزرار على الاختيار اللي فات: كل فكرة وكل نص تحته «عدّل» أصلًا، والرجوع من شريط الخطوات فوق
     const open = acts && S.chat === stage;
     return `<div class="flw-picked"><div><small class="latin en-k">${stage === "idea" ? "Idea" : "Scenario"}</small>
         <b>${esc(it.title || "")}</b><p>${esc(stage === "idea" ? it.idea || it.hook || "" : it.summary || "")}</p></div>
