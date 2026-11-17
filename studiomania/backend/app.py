@@ -24907,6 +24907,7 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     dl = dub.DIALECTS[lang]
     lang_label = dl.get("language") or dl["label"].split(" ", 1)[-1]
+    schema = {k: v for k, v in schema.items() if k != "els"}   # 🧩 العناصر صور من مكتبة المجال، مش كلام يكتبه العقل
     if d.get("locked"):   # 🧾 خانات معطيات العميل مقفولة: العقل مايكتبهاش، وبيتقاله يقول نفس الأرقام في الكلام
         schema = {k: v for k, v in schema.items() if k not in d["locked"]}
         idea_txt += tplbrief.prompt_text(d.get("facts_say") or {})
@@ -25185,11 +25186,16 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
     return logo_styles_get(bid)
 
 
+def els_ok(v) -> list:
+    """🧩 خانة العناصر لازم تكون صور (رابط أو صورة مضمّنة). كلام زي «رمز اللياقة» (كان العقل بيكتبه في الخانة) بيتشال."""
+    return [x for x in (v if isinstance(v, list) else []) if isinstance(x, str) and x.startswith(("/gallery/", "/media/", "data:image/", "http"))]
+
+
 def flow_fill_els(d: dict, params: dict) -> dict:
     """🧩 عناصر المجال لو لسه مش متحطة (مشروع قديم، أو اللوحة اتفتحت قبل الميزة): نفس اختيار flow_motion_params."""
     mid = d["template"]["id"]
     schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
-    if "els" not in schema or "els" in (d.get("locked") or {}) or [x for x in params.get("els") or [] if x]:
+    if "els" not in schema or "els" in (d.get("locked") or {}) or els_ok(params.get("els")):
         return params
     sc = d.get("scenario") or {}
     txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
@@ -25220,7 +25226,9 @@ def flow_motion_params(d: dict) -> dict:
         out.update(fz.clean_params(schema, row.get("fields") or {}))
     out.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema})
     out.update({k: v for k, v in tplbrief.auto_icons(mid, out).items() if k in schema and k not in (d.get("locked") or {})})   # رسمة كل خطوة من كلامها
-    if "els" in schema and "els" not in (d.get("locked") or {}) and not [x for x in out.get("els") or [] if x]:   # 🧩 عناصر من مجال العميل حسب السكريبت
+    if "els" in out and not els_ok(out.get("els")):
+        out.pop("els")   # كلام مش صور: يتشال، والمكتبة تحط مكانه
+    if "els" in schema and "els" not in (d.get("locked") or {}) and not els_ok(out.get("els")):   # 🧩 عناصر من مجال العميل حسب السكريبت
         sc = d.get("scenario") or {}
         txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
                                                        for r in sc.get("scenes") or []])
