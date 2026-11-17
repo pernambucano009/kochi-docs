@@ -140,14 +140,14 @@ const Flow = (() => {
         <button type="button" class="flw-btn" data-send="${stage}" ${S.d.busy ? "disabled" : ""}>أرسل</button></div></div>`;
   }
   // الاختيار اللي فات (بيظهر فوق الخطوة الجاية): تقدر تتناقش فيه أو ترجع تغيّره
-  function picked(stage) {
+  function picked(stage, acts = true) {   // acts=false: بعد صفحة النص (الصوت ولوحة التحكم والملفات) من غير «ناقش» و«غيّر»
     const it = S.d[stage];
     if (!it) return "";
-    const open = S.chat === stage;
+    const open = acts && S.chat === stage;
     return `<div class="flw-picked"><div><small class="latin en-k">${stage === "idea" ? "Idea" : "Scenario"}</small>
         <b>${esc(it.title || "")}</b><p>${esc(stage === "idea" ? it.idea || it.hook || "" : it.summary || "")}</p></div>
-      <div class="flw-pact"><button type="button" class="flw-link" data-chat="${stage}">💬 ${open ? "أغلق النقاش" : "ناقش مع العقل"}</button>
-        <button type="button" class="flw-link" data-go="${stage}">↩︎ غيّر</button></div>
+      ${acts ? `<div class="flw-pact"><button type="button" class="flw-link" data-chat="${stage}">💬 ${open ? "أغلق النقاش" : "ناقش مع العقل"}</button>
+        <button type="button" class="flw-link" data-go="${stage}">↩︎ غيّر</button></div>` : ""}
       ${open ? chatBox(stage) : ""}</div>`;
   }
 
@@ -425,7 +425,7 @@ const Flow = (() => {
   function stPanel(d) {
     const ml = d.mlive || { scenes: [] }, vt = d.vo_track, t = vt?.timing;
     const rows = ml.scenes.map((s, i) => { const L = s.t1 - s.t0, n = t ? t[i] : L; return `<li><b>${esc(s.name)}</b><span class="num">${L.toFixed(1)}</span>${t ? ` ← <span class="num ${n > L * (ml.max_stretch || 1.5) ? "warn" : ""}">${n.toFixed(1)}</span>` : ""} ث</li>`; }).join("");
-    return `${picked("scenario")}<h2>لوحة التحكم</h2>
+    return `${picked("scenario", false)}<h2>لوحة التحكم</h2>
       <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب لترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
       ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
@@ -455,14 +455,14 @@ const Flow = (() => {
 
   // ---------------------------------------------------------------- 🎙️ الصوت: مين بيتكلم، وبأي لهجة، وبأي صوت
   function stVoice(d) {
-    if (d.busy === "vo") return `${picked("scenario")}${working("يسجّل التعليق الصوتي كله مرة واحدة، ثم يستمع إليه ليعرف بداية كل جملة ونهايتها ويضبط المشاهد عليها…")}`;
+    if (d.busy === "vo") return `${picked("scenario", false)}${working("يسجّل التعليق الصوتي كله مرة واحدة، ثم يستمع إليه ليعرف بداية كل جملة ونهايتها ويضبط المشاهد عليها…")}`;
     const o = S.vopts;
-    if (!o) { loadVoice(); return `${picked("scenario")}${working("جارٍ جلب الأصوات…")}`; }
+    if (!o) { loadVoice(); return `${picked("scenario", false)}${working("جارٍ جلب الأصوات…")}`; }
     S.vo ??= { ...o.pick };
     const v = S.vo, on = v.speaker !== "none";
     const voices = o.voices[v.lang] || [];
     if (!voices.some((x) => x.id === v.voice)) v.voice = voices[0]?.id || "";
-    return `${picked("scenario")}<h2>من الذي يتكلم؟</h2><p class="flw-sub">اختر صاحب الصوت، ثم اللهجة والصوت الذي سيُقال به النص.</p>
+    return `${picked("scenario", false)}<h2>من الذي يتكلم؟</h2><p class="flw-sub">اختر صاحب الصوت، ثم اللهجة والصوت الذي سيُقال به النص.</p>
       <div class="flw-spk">${o.speakers.map((s) => `<button type="button" class="flw-person sm${s.id === v.speaker ? " on" : ""}" data-vspk="${esc(s.id)}">
         ${s.image_url ? `<img src="${esc(s.image_url)}" alt="" loading="lazy">` : `<i>${s.id === "none" ? "🔇" : "🎙️"}</i>`}<b>${esc(s.name)}</b><small>${esc(s.about || "")}</small></button>`).join("")}</div>
       ${on ? `${dialLine(v.lang, "vlang")}
@@ -506,7 +506,7 @@ const Flow = (() => {
       <button type="button" class="flw-x" data-adel="${esc(a.file)}" title="احذف">✕</button></div>`;
   }
   function stAssets(d) {
-    return `${picked("scenario")}<h2>ارفع ملفاتك</h2><p class="flw-sub">صور منتج، شعار، لقطات… لكل ملف اسم، ويمكنك الإشارة إليه <b class="latin">@اسمه</b> في الوصف ليستخدمه العقل في المكان الصحيح.</p>
+    return `${picked("scenario", false)}<h2>ارفع ملفاتك</h2><p class="flw-sub">صور منتج، شعار، لقطات… لكل ملف اسم، ويمكنك الإشارة إليه <b class="latin">@اسمه</b> في الوصف ليستخدمه العقل في المكان الصحيح.</p>
       <label class="flw-drop"><input type="file" id="flwFiles" accept="image/*,video/*" multiple hidden><i>⬆️</i><b>اضغط أو اسحب الملفات هنا</b><small class="muted">صور أو فيديوهات، حتى ١٠ في المرة الواحدة</small></label>
       ${(d.assets || []).length ? `<div class="flw-assets">${d.assets.map(assetTile).join("")}</div>` : ""}
       ${tplPanel(d)}
