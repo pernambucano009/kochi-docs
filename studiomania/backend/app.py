@@ -16624,6 +16624,7 @@ def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progre
             page.set_viewport_size({"width": W, "height": H})
             (folder / "track.wav").write_bytes(base64.b64decode(page.evaluate("() => soundtrack()")))
             if vo:   # الفويس أوفر فوق المزيكا: المزيكا بتوطى، والصوت بطول الفيديو بالظبط
+                shutil.copyfile(folder / "track.wav", folder / "music.wav")   # 🎙️ المزيكا لوحدها: المونتاج بيفصل التعليق الصوتي في مكانه
                 subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / "track.wav"), "-i", str(vo), "-filter_complex",
                                 "[0]volume=0.32[m];[1]aformat=channel_layouts=stereo,volume=1.15[v];[m][v]amix=inputs=2:duration=first:normalize=0[o]",
                                 "-map", "[o]", "-ar", "48000", str(folder / "mix.wav")], check=True, capture_output=True, timeout=180)
@@ -30776,12 +30777,34 @@ def flow_to_montage(fid: str):
         raise HTTPException(400, "الفيديو لم يُرسم بعد")
     title = (d.get("idea") or {}).get("title") or d["template"].get("name") or "فيديو"
     name = f"motion_{fid}_{uuid.uuid4().hex[:6]}.mp4"
-    shutil.copy(src, GENERATED_DIR / name)
+    # 🎙️ التعليق الصوتي في مكانه: الفيديو بالمزيكا بس، والصوت في مسار «تعليق» (لو الفيديو اتعمل بعد الميزة دي)
+    music, vt = src.parent / "music.wav", d.get("vo_track") or {}
+    vof = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None
+    voice = None
+    if music.is_file() and vof and vof.is_file():
+        try:
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-i", str(music), "-filter_complex", "[1:a]volume=0.32,apad[a]",
+                            "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", str(GENERATED_DIR / name)],
+                           check=True, capture_output=True, timeout=300)
+            vid = uuid.uuid4().hex[:12]
+            vfile = f"voice_{vid}{vof.suffix}"
+            shutil.copyfile(vof, AUDIO_DIR / vfile)
+            with closing(db()) as conn, conn:
+                conn.execute("INSERT INTO audio (id, kind, name, filename, duration, created_at) VALUES (?, 'voice', ?, ?, ?, ?)",
+                             (vid, f"🎙️ {title}"[:80], vfile, probe_duration(AUDIO_DIR / vfile), now()))
+            voice = {"id": vid, "volume": 1.0, "delay": 0.0, "offset": 0.0, "length": None, "fade_out": False, "parts": []}
+        except Exception as exc:  # noqa: BLE001 — الفيديو بالصوت زي ما هو
+            print(f"[to-montage] {fid} split voice: {exc}", flush=True)
+            voice = None
+    if not voice:
+        shutil.copy(src, GENERATED_DIR / name)
     gid = phone_gen(GENERATED_DIR / name, f"🎨 {title}")
     # نفس اللي المونتاج الحر بيفتحه (section free + الكادر الطولي + العميل)، وإلا الصفحة بتفتح فاضية
     data = {**ProjectIn(name=f"🧭 {title}"[:100], section="free", clips=[ClipEdit(gen_id=gid, no_sil=True)], outro=False, brand_intro=False, char_intro=False,
                         brand_outro=False, logo={"enabled": False}, canvas={"ratio": "9:16", "bg": "#000000"}).model_dump(),
             "client_id": active_client_id()}   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
+    if voice:
+        data["voice"] = voice
     pid = uuid.uuid4().hex[:12]
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
