@@ -196,6 +196,9 @@ const Gallery = (() => {
       S.items = [...lead, ...add, ...S.items.filter((x) => x.id !== "dental")];
     }   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
     // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
+    // 🎯 القوالب المتخصصة لمجالات تانية مابتظهرش أصلًا (دكتور الأسنان مالوش كوباية قهوة بتتنطط)
+    const unfit = new Set(niche?.unfit || []);
+    if (unfit.size) S.items = S.items.filter((x) => !unfit.has(x.alias || x.id));
     S.reels = niche?.reels || [];
     const fm = niche?.field_media || [];
     for (const x of EXTRA) {

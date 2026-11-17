@@ -1,0 +1,64 @@
+"""🎯 كل قالب يصلح لأنهي مجالات (من جرد جلسة القوالب). القالب المتخصص بيفضل في تخصصه: مابيظهرش في المعرض ولا بيدخل
+الأوتوبايلوت لعميل مجاله مش من مجالاته. والقالب اللي محتاج نوع محتوى (صوت، تطبيق، يوتيوب، شخص، رمضان، مناسبة) مابيتختارش
+تلقائيًا غير لو العميل اختاره بنفسه.
+
+المجالات = مفاتيح fieldpacks.FIELDS. «*» = كل المجالات. els = القالب بياخد عناصر المجال (فيصلح لأي مجال ليه مكتبة عناصر).
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+ALL = "*"
+EL_DIR = Path(__file__).resolve().parent.parent / "frontend" / "gallery" / "el"
+
+_ALL = ("t-chart t-chat t-count t-keynote t-logo t-loop t-particles t-review t-show t-signature t-swiss t-title3d t-versus t-wrapped t-beat "
+        "t-newsletter t-flipcards t-brandreveal t-microgame t-price t-map t-spy t-tilt 017 019 026 038 042 052 061 080 119 121 123 149 226 b-intro b-outro")
+_ALL_ELS = "t-board t-flow t-milestone t-riso t-glass t-sketch t-redcut t-shadow 027"
+_FIELDS_ELS = {
+    "t-watercolor": "food", "t-impasto": "food", "t-oneline": "food", "t-woodcut": "food shops", "t-ascii": "food ecom",
+    "t-dossier": "food ecom shops", "t-ink": "beauty food", "t-ukiyo": "food", "t-screen": "food ecom", "t-deco": "ecom beauty",
+    "t-holo": "ecom shops", "t-blueprint": "ecom home realestate", "t-crayon": "edu", "t-toon": "ecom shops home", "t-pixel": "shops ecom food",
+}
+_SPECIAL = {
+    "t-shopfloat": "ecom shops food beauty", "t-brandline": "ecom shops food", "t-captions": "ecom shops beauty food", "t-onehero": "ecom shops food",
+    "t-iso": "ecom shops food", "t-silent": "food ecom shops", "t-hose": "food", "009": "food", "t-anime": "food", "t-brick": "shops ecom food",
+    "t-pictogram": "fitness", "t-math": "edu realestate", "055": "edu fitness realestate beauty dental home",
+}
+_NEED = {"t-audiogram": "audio", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
+         "t-lantern": "ramadan", "065": "event", "072": "event"}
+
+FIT: dict[str, dict] = {}
+for _t in _ALL.split():
+    FIT[_t] = {"fields": ALL, "els": False}
+for _t in _ALL_ELS.split():
+    FIT[_t] = {"fields": ALL, "els": True}
+for _t, _f in _FIELDS_ELS.items():
+    FIT[_t] = {"fields": _f.split(), "els": True}
+for _t, _f in _SPECIAL.items():
+    FIT[_t] = {"fields": _f.split(), "els": False, "special": True}
+for _t, _n in _NEED.items():
+    FIT[_t] = {"fields": ALL, "els": False, "need": _n}
+
+
+def has_els(field: str) -> bool:
+    return bool(field) and (EL_DIR / field / "index.json").is_file()
+
+
+def fits(tpl: str, field: str) -> bool:
+    """القالب يصلح لعميل المجال ده؟ (مجال مش معروف، أو قالب مش في الخريطة: يصلح)"""
+    f = FIT.get(tpl)
+    if not f or not field:
+        return True
+    if f["fields"] == ALL or field in f["fields"]:
+        return True
+    return bool(f.get("els")) and not f.get("special") and has_els(field)
+
+
+def auto_ok(tpl: str, field: str, chosen: bool = False) -> bool:
+    """الأوتوبايلوت يختاره لوحده؟ لازم يصلح للمجال، والمحتاج نوع محتوى بعينه بس لو العميل اختاره."""
+    f = FIT.get(tpl) or {}
+    return fits(tpl, field) and (not f.get("need") or chosen)
+
+
+def unfit(field: str) -> list[str]:
+    return [t for t in FIT if not fits(t, field)]

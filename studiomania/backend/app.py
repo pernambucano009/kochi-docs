@@ -11571,6 +11571,7 @@ def first_client_id() -> str | None:
 
 
 import fieldpacks  # noqa: E402
+import tplfit  # noqa: E402  (كل قالب يصلح لأنهي مجالات)
 
 
 def assist_dialect(b: dict | None = None) -> str:
@@ -18657,7 +18658,8 @@ def tpl_niche():
     media = FRONTEND_DIR / "gallery" / "f" / Path(field).name if field else None
     have = sorted(x.stem for x in media.glob("*.jpg")) if media and media.is_dir() else []   # كل قالب ليه نسخة من المجال، مش الموصى بيها بس
     out.update(field=field, field_name=(fieldpacks.FIELDS.get(field) or {}).get("name", ""), reels=reels,
-               field_media=[r for r in reels if r in have] + [r for r in have if r not in reels])
+               field_media=[r for r in reels if r in have] + [r for r in have if r not in reels and tplfit.fits(r, field)],
+               unfit=tplfit.unfit(field or field_guess(c)))   # 🎯 قوالب متخصصة لمجالات تانية: مابتظهرش للعميل ده
     # 🩺 تخصص العميل: كل تخصص ليه قوالبه (فوق القوالب العامة). دلوقتي: الأسنان
     out["spec"] = "dental" if dental_brain_on(active_client_id()) else ""
     return out
@@ -33691,6 +33693,7 @@ def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
     bid = active_client_id()
     field = field_guess(brain_row(bid) or {}) if bid else ""
     cands = list(dict.fromkeys([*fieldpacks.field_reels(field), *[t for t in pool if t.startswith("t-")]]))
+    cands = [t for t in cands if tplfit.auto_ok(t, field, chosen=t in pool)]   # 🎯 المتخصص يفضل في تخصصه
     if "t-review" in cands and not review_facts(bid):
         cands.remove("t-review")
     if not cands:
