@@ -25300,6 +25300,7 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
 class FlowChatIn(BaseModel):
     stage: str
     message: str
+    item: str = ""   # ✏️ «عدّل» على كارت فكرة/نص بعينه (قبل ما يتختار): التعديل بيتعمل على الكارت ده في القايمة
 
 
 @app.post("/api/flows/{fid}/chat")
@@ -25308,14 +25309,15 @@ def flow_chat(fid: str, body: FlowChatIn):
     d = flow_load(fid)
     flow_idle(d)
     stage = "idea" if body.stage == "idea" else "scenario"
-    cur = d.get(stage)
+    lkey = "ideas" if stage == "idea" else "scenarios"
+    cur = next((x for x in d.get(lkey) or [] if x.get("id") == body.item), None) if body.item else d.get(stage)
     if not cur:
         raise HTTPException(400, "اختر أولًا")
     msg = body.message.strip()[:1500]
     if not msg:
         raise HTTPException(400, "اكتب طلبك")
     key = "idea_chat" if stage == "idea" else "scen_chat"
-    chat = [*(d.get(key) or []), {"role": "user", "content": msg}]
+    chat = [*((d.get("item_chat") or {}).get(body.item) or [] if body.item else d.get(key) or []), {"role": "user", "content": msg}]
     brain = flow_brain(d)
     if atlas.mock_mode():
         raw = {"reply": "حسنًا، عدّلتها", "item": {**cur, "title": (cur.get("title") or "") + " ✓"}}
@@ -25326,7 +25328,14 @@ def flow_chat(fid: str, body: FlowChatIn):
     reply = str(raw.get("reply") or "حسنًا")[:800]
 
     def fn(x):
-        x[key] = [*chat, {"role": "assistant", "content": reply}][-30:]
+        log = [*chat, {"role": "assistant", "content": reply}][-30:]
+        if body.item:
+            x.setdefault("item_chat", {})[body.item] = log
+            if item:
+                x[lkey] = [{**item, "id": body.item, "edited": True} if y.get("id") == body.item else y for y in x.get(lkey) or []]
+                flow_pref(x, stage, f"طلب تعديل: {msg}", 1, "")
+            return
+        x[key] = log
         if item:
             x[stage] = {**item, "id": cur.get("id") or uuid.uuid4().hex[:8], "edited": True}
             # التعديل بيتسجل كمعلومة عن ذوق العميل

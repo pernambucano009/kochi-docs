@@ -16691,4 +16691,12 @@ window.I18N_EN = {
   "اكتب ما تريد تغييره في النص، أو": "Write what you want to change in the script, or",
   "↩︎ اختر فكرة أخرى": "↩︎ Pick another idea",
   "↩︎ اختر نصًا آخر": "↩︎ Pick another script",
+  "⏳ العقل يعدّلها…": "⏳ The brain is editing it…",
+  "قل للعقل ماذا تريد: أجرأ، أقصر، ركّز على السعر…": "Tell the brain what you want: bolder, shorter, focus on the price…",
+  "قل للعقل ماذا تريد: خطاف أقوى، نص أقل…": "Tell the brain what you want: a stronger hook, less text…",
+  "🔄 بدّلها بفكرة مختلفة": "🔄 Swap it for a different idea",
+  "🔄 بدّله بنص مختلف": "🔄 Swap it for a different script",
+  "✍️ عدّلها بنفسك": "✍️ Edit it yourself",
+  "استبدلها بفكرة مختلفة تمامًا تناسب نفس القالب": "Replace it with a completely different idea that fits the same template",
+  "اكتب نصًا مختلفًا تمامًا لنفس الفكرة": "Write a completely different script for the same idea",
 };

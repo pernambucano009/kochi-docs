@@ -45,6 +45,7 @@ const Flow = (() => {
     S.el.addEventListener("input", onInput);
     S.el.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-chatin]")) { e.preventDefault(); send(e.target.dataset.chatin); }
+      if (e.key === "Enter" && !e.shiftKey && e.target.matches("[data-ichatin]")) { e.preventDefault(); const b = e.target.closest(".flw-chat")?.querySelector("[data-isend]"); if (b) isend(b.dataset.isend, b.dataset.id); }
     });
     document.body.appendChild(S.el);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.el && !S.el.hidden) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
@@ -179,14 +180,27 @@ const Flow = (() => {
     return call("/tset", cur);
   }
 
+  // ✏️ «عدّل»: نقاش مع العقل على الكارت ده (اكتب اللي عايزه يتغيّر، أو اطلب واحدة مختلفة)، أو عدّلها بإيدك
+  function editPanel(stage, id) {
+    const log = (S.d.item_chat || {})[id] || [], busy = !!S.d.busy;
+    const idea = stage === "idea";
+    return `<div class="flw-chat">
+      ${log.length ? `<div class="flw-log">${log.slice(-8).map((m) => `<p class="${m.role}">${esc(m.content)}</p>`).join("")}</div>` : ""}
+      ${busy && S.d.busy === "chat" ? `<p class="flw-sub">⏳ العقل يعدّلها…</p>` : ""}
+      <div class="flw-chatrow"><input data-ichatin="${esc(id)}" placeholder="${idea ? "قل للعقل ماذا تريد: أجرأ، أقصر، ركّز على السعر…" : "قل للعقل ماذا تريد: خطاف أقوى، نص أقل…"}" ${busy ? "disabled" : ""}>
+        <button type="button" class="flw-btn" data-isend="${stage}" data-id="${esc(id)}" ${busy ? "disabled" : ""}>أرسل</button></div>
+      <div class="flw-acts"><button type="button" class="flw-link" data-iredo="${stage}" data-id="${esc(id)}" ${busy ? "disabled" : ""}>${idea ? "🔄 بدّلها بفكرة مختلفة" : "🔄 بدّله بنص مختلف"}</button>
+        <button type="button" class="flw-link" data-iform>✍️ عدّلها بنفسك</button><button type="button" class="flw-link" data-iclose>✕ إغلاق</button></div></div>`;
+  }
+
   // ---------------------------------------------------------------- 1) الفكرة
   function ideaCard(it) {
-    if (S.edit === it.id) return ideaForm(it);
+    if (S.edit === it.id && S.editForm) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
       ${it.aud ? `<small class="flw-aud">👥 ${esc(it.aud)}</small>` : ""}<p class="flw-idea">${esc(it.idea)}</p>${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}
       ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (خطافات أخرى، وكيف تناسب القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختر هذه الفكرة</button>
-        <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div></article>`;
+        <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div>${S.edit === it.id ? editPanel("idea", it.id) : ""}</article>`;
   }
   // 🔖 احفظها لوقت لاحق: بتروح مكتبة «محفوظاتك» ومابتتقترحش تاني لحد ما تستخدمها
   function laterBtn(kind, id) {
@@ -344,11 +358,11 @@ const Flow = (() => {
       ${a.fixes.length ? `<ul>${a.fixes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</details>`;
   }
   function scenCard(sc, fmt) {
-    if (S.edit === sc.id) return scenForm(sc, fmt);
+    if (S.edit === sc.id && S.editForm) return scenForm(sc, fmt);
     return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
       ${scenAlgo(sc.algo)}${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scenBody(sc, fmt)}${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختر هذا السيناريو</button>
-        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div></article>`;
+        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div>${S.edit === sc.id ? editPanel("scenario", sc.id) : ""}</article>`;
   }
   function stScenario(d) {
     const loading = d.busy === "scenarios";
@@ -399,14 +413,14 @@ const Flow = (() => {
     };
   }
   function scriptCard(sc, ml) {
-    if (S.edit === sc.id) return scriptForm(sc, ml);
+    if (S.edit === sc.id && S.editForm) return scriptForm(sc, ml);
     const total = (sc.scenes || []).reduce((a, r, i) => a + Math.max(sec(r.say, ml.cps), ml.scenes[i] ? (ml.scenes[i].t1 - ml.scenes[i].t0) / ml.max_stretch : 0), 0);
     return `<article class="flw-card${S.seen.has(sc.id) ? "" : " in"}" data-cid="${esc(sc.id)}"><div class="flw-ch"><b>${esc(sc.title)}</b>${rateBtns("scenario", sc.id)}</div>
       ${sc.summary ? `<p>${esc(sc.summary)}</p>` : ""}${scriptBody(sc, ml)}
       <small class="muted">⏱ الفيديو سيصبح نحو <span class="num">${Math.round(total)}</span> ثانية بالفويس أوفر (القالب الأصلي <span class="num">${Math.round(ml.DUR)}</span>)</small>
       ${sc.caption ? `<small class="muted">✍️ ${esc(sc.caption)}</small>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-scen="${sc.id}">اختر هذا النص</button>
-        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div></article>`;
+        <button type="button" class="flw-link" data-edit="${sc.id}">✏️ عدّل</button>${laterBtn("scenario", sc.id)}</div>${S.edit === sc.id ? editPanel("scenario", sc.id) : ""}</article>`;
   }
   function stScript(d) {
     const ml = d.mlive, loading = d.busy === "scenarios";
@@ -759,7 +773,14 @@ const Flow = (() => {
     S.d.busy = "chat";
     await call("/chat", { stage, message: msg });
   }
-  function reset() { S.edit = null; S.own = false; S.hint = false; }
+  function reset() { S.edit = null; S.editForm = false; S.own = false; S.hint = false; }
+  async function isend(stage, id, preset) {
+    const inp = S.el.querySelector(`[data-ichatin="${CSS.escape(id)}"]`), msg = preset || inp?.value.trim();
+    if (!msg) return;
+    if (inp) inp.disabled = true;
+    S.d.busy = "chat"; render();
+    await call("/chat", { stage, message: msg, item: id });
+  }
   async function onClick(e) {
     const t = e.target;
     const q = (sel) => t.closest(sel);
@@ -825,7 +846,11 @@ const Flow = (() => {
       box.insertAdjacentHTML("beforeend", rowHTML({}, S.d.format, box.children.length));
       return box.lastElementChild.querySelector("input, textarea")?.focus();
     }
-    if ((b = q("[data-edit]"))) { S.edit = b.dataset.edit; S.own = false; return render(); }
+    if ((b = q("[data-edit]"))) { S.edit = S.edit === b.dataset.edit && !S.editForm ? null : b.dataset.edit; S.editForm = false; S.own = false; return render(); }
+    if (q("[data-iform]")) { S.editForm = true; return render(); }
+    if (q("[data-iclose]")) { reset(); return render(); }
+    if ((b = q("[data-isend]"))) return isend(b.dataset.isend, b.dataset.id);
+    if ((b = q("[data-iredo]"))) return isend(b.dataset.iredo, b.dataset.id, b.dataset.iredo === "idea" ? "استبدلها بفكرة مختلفة تمامًا تناسب نفس القالب" : "اكتب نصًا مختلفًا تمامًا لنفس الفكرة");
     if (q("[data-cancel]")) { reset(); return render(); }
     if (q("[data-own]")) { S.own = true; S.edit = null; render(); return S.el.querySelector(".flw-form input")?.focus(); }
     if (q("[data-hint]")) { S.hint = true; render(); return S.el.querySelector("#flwHint")?.focus(); }
