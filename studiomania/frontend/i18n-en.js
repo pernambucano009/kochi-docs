@@ -16676,4 +16676,10 @@ window.I18N_EN = {
   "🎙️ ارفع عينة صوتك": "🎙️ Upload your voice sample",
   "صوت الراوي": "Narrator voice",
   "الأساسي": "Main",
+  "قراءة رأي عميل": "Reading a customer review",
+  "ارفع صور آراء عملائك (تقييمات جوجل أو رسائل واتساب)": "Upload screenshots of your customers' reviews (Google reviews or WhatsApp messages)",
+  "رفعت آراء العملاء": "I uploaded the customer reviews",
+  "عميل": "Customer",
+  "ارفع هنا صور آراء عملائك (تقييمات جوجل، أو رسائل واتساب والرسائل الخاصة). يقرأ العقل كل رأي كما كتبه صاحبه، ويستخدمه قالب «آراء العملاء» بدلًا من الأمثلة.": "Upload screenshots of your customers' reviews here (Google reviews, or WhatsApp and direct messages). The brain reads each review exactly as its writer wrote it, and the «Customer reviews» template uses them instead of examples.",
+  "آراء العملاء": "Customer reviews",
 };

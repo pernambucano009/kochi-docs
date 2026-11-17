@@ -599,6 +599,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     account: { t: "رابط حسابك على إنستغرام أو تيك توك", ph: "instagram.com/… أو @اسم_الحساب" },
     rival: { t: "رابط صفحة تراها منافسًا لك", ph: "instagram.com/… أو tiktok.com/@…", pre: "صفحة منافس: " },
     logo: { t: "ارفع شعارك", accept: "image/png,image/jpeg,image/webp", kind: "logos", done: "رفعت الشعار" },
+    reviews: { t: "ارفع صور آراء عملائك (تقييمات جوجل أو رسائل واتساب)", accept: "image/png,image/jpeg,image/webp", multi: true, url: "/api/library/reviews", done: "رفعت آراء العملاء" },
     products: { t: "ارفع صور منتجاتك أو أعمالك", accept: "image/png,image/jpeg,image/webp", multi: true, kind: "products", done: "رفعت صور المنتجات" },
     intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
     myvideo: { t: "ارفع فيديو قصيرًا تتحدث فيه (من ١٥ ثانية إلى دقيقة)", accept: "video/*", video: true, url: "/api/assistant/showcase/upload", done: "رفعت فيديو أتحدث فيه" },
@@ -684,11 +685,11 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       files = [...files].slice(0, k.multi ? 30 : 1); if (!files.length) return;
       err(""); drop.querySelector("span").textContent = "⏳ جارٍ الرفع…";
       const f = new FormData();
-      if (k.url) f.append("file", files[0]); else if (k.video) { f.append("kind", "intro"); f.append("file", files[0]); } else { f.append("kind", k.kind); files.forEach((x) => f.append("files", x)); }
+      if (k.url && k.multi) files.forEach((x) => f.append("files", x)); else if (k.url) f.append("file", files[0]); else if (k.video) { f.append("kind", "intro"); f.append("file", files[0]); } else { f.append("kind", k.kind); files.forEach((x) => f.append("files", x)); }
       try {
         const r = await fetch(k.url || `/api/ad-brains/${encodeURIComponent(state.brand)}/${k.video ? "brand-video" : "assets"}`, { method: "POST", body: f, credentials: "same-origin" });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "تعذّر الرفع، جرّب مرة أخرى");
-        d.remove(); if (!k.url) changed(); step(k.kind === "logos" ? "logo" : k.kind === "products" ? "photos" : k.url ? "myvideo" : "intro"); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
+        d.remove(); if (!k.url) changed(); step(k.kind === "logos" ? "logo" : k.kind === "products" ? "photos" : k.multi && k.url ? "reviews" : k.url ? "myvideo" : "intro"); chip(`✓ <span><b>${esc(k.t)}</b></span>`); say(`(${k.done} الآن)`);
       } catch (e) { err(e.message); drop.querySelector("span").textContent = "جرّب مرة أخرى"; }
     };
     fin.onchange = () => up(fin.files);

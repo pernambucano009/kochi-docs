@@ -139,8 +139,8 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "products", "intro", "rival", "dental_case", "none"],
-         "description": "account: Instagram/TikTok link or @handle. logo: their logo image. products: photos of their products or work. "
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "reviews", "products", "intro", "rival", "dental_case", "none"],
+         "description": "account: Instagram/TikTok link or @handle. logo: their logo image. reviews: screenshots of real customer reviews (Google reviews, WhatsApp or DM messages). products: photos of their products or work. "
                         "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
                         "dental_case: (dentists only) photo slots for ONE case: retractor before and retractor after are the two needed; smile and face photos are optional. "
                         "none: close the box (they said later / they have none)."},
@@ -258,7 +258,7 @@ def dental_stop(_implant_ready: bool = False) -> str:
     return DENTAL_STOP
 
 
-STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "photos": "uploading photos of their work/products/cases"}
+STEP_NAMES = {"account": "their Instagram/TikTok account", "logo": "uploading their logo", "reviews": "uploading screenshots of their customer reviews", "photos": "uploading photos of their work/products/cases"}
 
 
 def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_gender: str = "f", user_gender: str = "m", tools: bool = False,
@@ -293,6 +293,13 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                                                        "save both answers together under [about]."))
                                             if qid == "about" and tools else ((qid, q),))]
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
+    # ⭐ المشترك: بعد الأسئلة، الشعار وآراء العملاء (لو ناقصين) علشان فيديوهاته تتعمل بيهم من الأول
+    need = [k for k in ("logo", "reviews") if not have.get(k)] if full and tools and not have.get("dental") else []
+    plus_ask = ("4b. They are a subscriber: right after the questions of step 3 (before the tour), ask for " + " then ".join(
+        {"logo": "their logo (call show_input kind=logo in the same turn)", "reviews": "screenshots of real reviews from their customers, "
+         "like Google reviews or WhatsApp messages (call show_input kind=reviews in the same turn)"}[k] for k in need)
+        + ". ONE thing per turn; say in a few words why (their videos will carry their logo, and the reviews templates use their real reviews). "
+        "After they upload, or say later / they have none, continue. These are the only uploads you ask for.\n") if need else ""
     if full and len(left) > 5:   # قايمة طويلة: نفس القواعد، وتطمين إنه يقدر يعدّي أي سؤال أو يكمل وقت تاني
         qs += ("\n   This is the FULL brand-brain interview (they are a subscriber), so the list is long. Keep every rule: ONE question per turn, "
                "each built on what they just said, no filler lines. Tell them ONCE at the start that it takes about ten minutes, that they can say "
@@ -430,11 +437,11 @@ Your goals, in this order (each is a goal to reach naturally, not a line to reci
    - Never put possible answers inside your question (not «ابتسامات تجميلية ولا تركيبات أو زراعة؟»): ask openly and let them answer.
    - Say «مرضاك» (not «عملاؤك») to a doctor, and say «عقل العلامة», never «برين».
 4. {tour}
-5. {"(Dentist: the dental stop above IS the ending: skip step 6.)" if tools and have.get("dental") else "Do not ask them to add photos or videos to their library now (that comes later, after they subscribe)."}
+{plus_ask}5. {"(Dentist: the dental stop above IS the ending: skip step 6.)" if tools and have.get("dental") else "Do not ask them to add photos or videos to their library now (that comes later, after they subscribe)."}
    This call is a short demo of the platform (it costs money): never ask about their preferences for features (whether they want
    autopilot, approvals before posting, budgets), never collect extra information beyond the list above. Mentioning features as part
    of the showcase (like autopilot) is fine.
-   {"Never ask them to upload anything during the call, except the dental case photos of the dental stop." if tools and have.get("dental") else "Never ask them to upload anything during the call: we already took what we need from their page."}
+   {"Never ask them to upload anything during the call, except the dental case photos of the dental stop." if tools and have.get("dental") else "Never ask them to upload anything during the call, except the logo and reviews of the subscriber step above." if plus_ask else "Never ask them to upload anything during the call: we already took what we need from their page."}
 6. {"(Dentist: skip this step.)" if tools and have.get("dental") else "Close the call warmly in ONE or two sentences: thank them, and say you are always there in the orange circle at the bottom right of the screen, where they can text you anytime. Then call finish."}
    Never say you are «preparing the results» or that you will «close the call in an organised way»: those are instructions, not words to say.
    From the moment the questions in step 3 are done, you never ask the user anything again (except the dental case photos): the rest of

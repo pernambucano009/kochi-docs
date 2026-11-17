@@ -24808,6 +24808,8 @@ def flow_new(body: FlowNewIn):
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
     with FLOW_LOCK:
         flow_save(fid, d)
+    if tpl.get("id") == "t-review" and (rf := review_facts(d["client_id"])):   # ⭐ آراء حقيقية من فولدر «آراء العملاء» (مش أمثلة)
+        flow_set_facts(fid, "t-review", rf)
     if not body.skip_ideas:
         flow_job(fid, "ideas", lambda: flow_gen_ideas(fid))
     return flow_to_dict(fid, flow_load(fid))
@@ -30427,6 +30429,49 @@ def lib_root_for(f: dict) -> str:
     return "music" if re.search(r"موسيق|مزيك|music|song|track|بيت", f.get("name") or "", re.I) else "voice"
 
 
+REVIEWS_NAME = "آراء العملاء"
+
+
+def reviews_root(d: dict, images_root: str | None = None) -> str | None:
+    """فولدر «آراء العملاء» (بيتعمل مرة واحدة جوه الصور، ومتعلّم reviews_root)."""
+    r = next((f for f in d["folders"] if f.get("reviews_root")), None)
+    if not r and images_root:
+        r = next((f for f in d["folders"] if f.get("parent") == images_root and f["name"].strip() == REVIEWS_NAME), None)
+        if not r:
+            r = {"id": lib_.fid(), "name": REVIEWS_NAME, "parent": images_root}
+            d["folders"].append(r)
+        r["reviews_root"] = True
+    return r["id"] if r else None
+
+
+def in_reviews(d: dict, folder: str | None) -> bool:
+    return any(f.get("reviews_root") for f in lib_.path_of(d, folder))
+
+
+def brand_reviews(bid: str | None) -> list[dict]:
+    """الآراء اللي البرنامج قراها من سكرينات فولدر «آراء العملاء»: [{quote, name, rating, source}] (الأوضح والأقصر الأول)."""
+    if not bid:
+        return []
+    d = lib_load(bid)
+    out = [f["review"] for f in d.get("files") or [] if isinstance(f.get("review"), dict) and f["review"].get("quote") and in_reviews(d, f.get("folder"))]
+    return sorted(out, key=lambda r: (not r.get("name"), abs(len(r["quote"]) - 55)))
+
+
+def review_facts(bid: str | None) -> dict:
+    """⭐ خانات قالب آراء العملاء من آرائهم الحقيقية (فاضي لو مفيش آراء)."""
+    rs = brand_reviews(bid)
+    if not rs:
+        return {}
+    short = lambda n: (lambda p: (p[0] + (f" {p[1][0]}." if len(p) > 1 else ""))[:14])((n or "عميل").split())  # noqa: E731
+    f = {"q1": rs[0]["quote"][:70], "n1": short(rs[0].get("name")), "verified": "1"}
+    if len(rs) > 1:
+        f.update(q2=rs[1]["quote"][:70], n2=short(rs[1].get("name")))
+    stars = [float(r["rating"]) for r in rs if isinstance(r.get("rating"), (int, float)) and 1 <= float(r["rating"]) <= 5]
+    if len(stars) >= 3:
+        f["rating"] = round(sum(stars) / len(stars), 1)
+    return f
+
+
 def lib_prepare(d: dict) -> dict:
     """المجلدات الأساسية موجودة دائمًا، وأي ملف أو مجلد برّاها يُنقل داخل المناسب له. يعود {النوع: id المجلد}."""
     roots = {}
@@ -30490,6 +30535,8 @@ def lib_ready(bid: str) -> dict:
             (gone if f.get("audio_id") in others else keep).append(f)
         d["files"] = keep
         roots = lib_prepare(d)
+        if not shared:   # ⭐ فولدر «آراء العملاء» جوه الصور: سكرينات تقييمات جوجل والرسايل (قوالب آراء العملاء بتاخد منه)
+            reviews_root(d, roots["images"])
         if not shared and dental_brain_on(bid):   # 🦷 عميل أسنان: فولدر «الحالات» جوه الصور، وكل فولدر جواه حالة
             dentalbrain.ensure_root(d, roots["images"])
             dentalbrain.refresh_flags(d)
@@ -30840,6 +30887,39 @@ def library_upload(folder: str = Form(""), paths: str = Form(""), files: list[Up
     return lib_view(me)
 
 
+def review_read(img: Path) -> dict | None:
+    """⭐ سكرين تقييم/رسالة ← {quote, name, rating, source} (الكلام زي ما العميل كتبه بالظبط)."""
+    small = TMP_DIR / f"rv_{uuid.uuid4().hex[:6]}.jpg"
+    try:
+        typo_frame(img, 0, small, 900)
+        msgs = [{"role": "user", "content": [
+            {"type": "text", "text": "This is a screenshot of a customer review or a customer message about a business. Extract it exactly as written "
+             "(same language and dialect, no translation, no fixing). Answer JSON only: {\"quote\": \"the review text, max 160 chars, cut at a sentence end\", "
+             "\"name\": \"reviewer name or empty\", \"rating\": stars 1-5 or null, \"source\": \"google|whatsapp|instagram|facebook|other\"}. "
+             "If it is not a customer review or message, answer {\"quote\": \"\"}."},
+            {"type": "image_url", "image_url": {"url": data_url(small, "image/jpeg")}}]}]
+        r = ad_json(lab_media_chat(msgs), "قراءة رأي العميل")
+        wallet.charge(wallet.credits(wallet.est(chars=1500, images=1)), "قراءة رأي عميل", img.stem[:40])
+        q = str(r.get("quote") or "").strip()
+        return {"quote": q[:160], "name": str(r.get("name") or "").strip()[:40], "rating": r.get("rating"), "source": str(r.get("source") or "")[:12]} if q else None
+    except Exception as exc:  # noqa: BLE001 — الصورة تفضل في الفولدر من غير قراءة
+        print(f"[review] {img.name}: {exc}", flush=True)
+        return None
+    finally:
+        small.unlink(missing_ok=True)
+
+
+@app.post("/api/library/reviews")
+def library_reviews_upload(files: list[UploadFile] = File(...)):
+    """⭐ رفع سكرينات آراء العملاء (من المكالمة أو من أي مكان) ← فولدر «آراء العملاء» في المكتبة."""
+    me = active_client_id()
+    if not me:
+        raise HTTPException(400, "اختر عميلًا أولًا")
+    lib = lib_ready(me)
+    rid = reviews_root(lib)
+    return library_upload(folder=rid or "", paths="", files=files)
+
+
 def run_library_tag(bid: str, ids: list[str]) -> None:
     """🧠 العقل يشاهد كل ملف ويكتب وصف وتاجات (يُخصم على قدر الذي أُنشئ)."""
     folder = lib_dir(bid)
@@ -30894,6 +30974,8 @@ def run_library_tag(bid: str, ids: list[str]) -> None:
                 desc, tags = lib_.clean_tags(raw)
                 wallet.charge(wallet.credits(usd), "توصيف ملف في المكتبة", f["id"])
             upd.update(desc=desc, tags=tags, status="ready", error=None)
+            if f["kind"] == "image" and in_reviews(lib, f.get("folder")) and not atlas.mock_mode() and atlas.api_key():
+                upd["review"] = review_read(folder / f["file"])
         except wallet.NoCredits as exc:
             upd.update(status="ready", error=str(exc)[:200])
         except Exception as exc:  # noqa: BLE001
@@ -33619,7 +33701,8 @@ def assist_plan(b: dict, full: bool = False) -> tuple[dict, dict, list[str]]:
         if qid not in known and qid not in livevoice.SKIP_Q:
             known[qid] = "(skipped by the user: do not ask it again)"
     social = next((x for x in reversed(b.get("sources") or []) if x.get("kind") == "social" and x.get("status") != "failed"), None)
-    have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products"))}
+    have = {"account": (social or {}).get("name") or "", "logo": bool(b.get("logos")), "products": bool(b.get("products")),
+            "reviews": bool(brand_reviews(b.get("id"))) or any(in_reviews(lib, f.get("folder")) for lib in [lib_load(b["id"])] for f in lib.get("files") or []) if b.get("id") else False}
     # الشعار والصور مابيتطلبوش في المكالمة (بنفكّره في الآخر يملا مكتبة المحتويات)
     steps = ([] if have["account"] else ["account"]) + [qid for qid, _ in livevoice.quiz_questions(full) if qid not in known]
     return known, have, steps

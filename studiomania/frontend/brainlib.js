@@ -122,6 +122,7 @@ const BrainLibPage = (() => {
   }
   function caseBanner() {
     const here = folder(S.cur), c = caseOf(S.cur);
+    if (here && here.reviews_root) return `<p class="pk-note bl-cnote">ارفع هنا صور آراء عملائك (تقييمات جوجل، أو رسائل واتساب والرسائل الخاصة). يقرأ العقل كل رأي كما كتبه صاحبه، ويستخدمه قالب «آراء العملاء» بدلًا من الأمثلة.</p>`;
     if (here && here.cases_root) return `<p class="pk-note bl-cnote">كل مجلد هنا حالة مريض: ارفع صورها (قبل، وبعد، والتحضير إن وُجد)، وسيصنّفها العقل تلقائيًا، وتظهر في القوالب التي تناسبها.</p>`;
     if (!c) return "";
     const i = c.case || {};
