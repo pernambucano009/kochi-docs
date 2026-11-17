@@ -24945,15 +24945,15 @@ def field_el_index(field: str) -> dict | None:
         return None
 
 
-def field_elements(mid: str, text: str, n: int = 5) -> list[str]:
-    """عناصر المجال المناسبة للسكريبت ده، بستايل القالب ده: روابط /gallery/el/… (فاضية لو المجال مالوش مكتبة)."""
+def field_elements_old(mid: str, text: str, n: int = 5, skip: tuple = ()) -> list[str]:
+    """(احتياطي) عناصر المجال الثابتة: الموديل بيختار من المكتبة، وإلا كلمات من السكريبت."""
     field = field_guess(brain_row(active_client_id()) or {})   # 🧩 اللي اختاره، وإلا من كلامه عن نفسه (حساب اتعمل من الأدمن مالوش اختيار مجال)
     idx = field_el_index(field)
     if not idx or not idx.get("items"):
         return []
     style = (idx.get("tpl") or {}).get(mid) or "base"
     folder = EL_DIR / idx["field"] / style
-    have = [k for k in idx["items"] if (folder / f"{k}.webp").exists()]
+    have = [k for k in idx["items"] if (folder / f"{k}.webp").exists() and k not in skip]
     if not have:
         return []
     picks: list[str] = []
@@ -24987,17 +24987,158 @@ def field_elements(mid: str, text: str, n: int = 5) -> list[str]:
     return [f"/gallery/el/{idx['field']}/{style}/{k}.webp" for k in picks[:n]]
 
 
+# 🌱 مكتبة العناصر اللي بتكبر (elgrow.py): كل جملة في السكريبت بتاخد رسمة للي اتقال فيها بالظبط، والناقص بيترسم بستايل
+#   القالب ويتحفظ في مكتبة المنصة المشتركة (كل الحسابات في نفس المجال بتستفيد). والحساب بيفتكر اللي استخدمه عشان مايتكررش.
+import elgrow  # noqa: E402
+
+EL_SHARED = providers.state_file(DATA_DIR).parent   # جنب قاعدة المنصة: واحدة لكل الحسابات
+EL_PLANS = DATA_DIR / "el_plans.json"
+EL_RECENT = DATA_DIR / "el_recent.json"
+EL_MAKING: set[str] = set()
+EL_MAKING_LOCK = threading.Lock()
+
+
+def el_cap(mid: str) -> int:
+    """كام عنصر القالب بيعرضه (من كود القالب نفسه)."""
+    try:
+        src = (MOTION_DIR / "r" / Path(mid).name / "reel.html").read_text("utf-8")
+    except OSError:
+        return 5
+    m = re.search(r"M\.els\(PR\.els,\s*(\d+)\)|PR\.els \|\| \[\]\)\.filter\(Boolean\)\.slice\(0,\s*(\d+)\)", src)
+    return int(m.group(1) or m.group(2)) if m else 5
+
+
+def el_url(field: str, style: str, key: str) -> str | None:
+    if (EL_DIR / field / style / f"{key}.webp").exists():
+        return f"/gallery/el/{field}/{style}/{key}.webp"
+    if elgrow.file_for(EL_SHARED, field, style, key).exists():
+        return f"/api/el/{field}/{style}/{key}.webp"
+    return None
+
+
+def el_make(field: str, style: str, key: str, desc: str) -> bool:
+    """رسمة جديدة بستايل القالب (المرجع: عنصرين من نفس الستايل)، وتتضاف لمكتبة المنصة."""
+    dst = elgrow.file_for(EL_SHARED, field, style, key)
+    if dst.exists():
+        return True
+    if atlas.mock_mode() or not atlas.api_key():
+        return False
+    tag = f"{field}/{style}/{key}"
+    with EL_MAKING_LOCK:
+        if tag in EL_MAKING:
+            return False
+        EL_MAKING.add(tag)
+    try:
+        with elgrow.locked(dst.with_suffix(".lock")):   # حساب تاني بيرسمها في نفس اللحظة: نستنى ونستخدم رسمته
+            if dst.exists():
+                return True
+            ref_dir = EL_DIR / field / style
+            refs = [f for f in sorted(ref_dir.glob("*.webp"))[:40:13]][:3]
+            if not refs:
+                return False
+            tmp = TMP_DIR / f"el-{uuid.uuid4().hex[:8]}"
+            tmp.mkdir(parents=True, exist_ok=True)
+            try:
+                ref_urls = []
+                for r in refs:   # المرجع PNG (بعض الموديلات مابتقبلش webp)
+                    rp = tmp / f"{r.stem}.png"
+                    from PIL import Image as _PImg
+                    with _PImg.open(r) as im:
+                        bg = _PImg.new("RGBA", im.size, (255, 255, 255, 255))
+                        bg.alpha_composite(im.convert("RGBA"))
+                        bg.convert("RGB").save(rp)
+                    ref_urls.append(atlas.reference_url(rp))
+                url = atlas.generate_image("sunburst", elgrow.gen_prompt(desc), "1024x1024", "medium", images=ref_urls)
+                raw = tmp / "raw.png"
+                atlas.download(url, raw)
+                firstvid.cutout(raw, tmp / "cut.png")
+                elgrow.save_webp(tmp / "cut.png", dst)
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+        elgrow.add_shared(EL_SHARED, field, key, desc)
+        print(f"[el] new {tag}", flush=True)
+        return True
+    except Exception as exc:  # noqa: BLE001 — الجملة دي تاخد عنصر من المكتبة بدالها
+        print(f"[el] {tag}: {exc}", flush=True)
+        return False
+    finally:
+        with EL_MAKING_LOCK:
+            EL_MAKING.discard(tag)
+
+
+def field_elements(mid: str, text: str, n: int | None = None, make: bool = True) -> list[str]:
+    """عناصر الفيديو ده من كلام السكريبت نفسه، بستايل القالب: روابط /gallery/el/… أو /api/el/… (فاضية لو المجال مالوش مكتبة).
+    make=False (اللوحة/اختيار النص): الموجود بس، والناقص بيترسم في الخلفية عشان يبقى جاهز وقت التصدير."""
+    field = field_guess(brain_row(active_client_id()) or {})
+    idx = field_el_index(field)
+    if not idx or not idx.get("items"):
+        return []
+    fld = idx["field"]
+    style = (idx.get("tpl") or {}).get(mid) or "base"
+    n = n or el_cap(mid)
+    lines = elgrow.lines_of(text)
+    if not lines or atlas.mock_mode() or not atlas.api_key():
+        return field_elements_old(mid, text, n)
+    shared = elgrow.shared_items(EL_SHARED, fld)
+    menu = {k: v for k, v in idx["items"].items() if (EL_DIR / fld / style / f"{k}.webp").exists()}
+    menu.update({k: v.get("desc", "") for k, v in shared.items() if elgrow.file_for(EL_SHARED, fld, style, k).exists()})
+    known = {k: v.get("desc", "") for k, v in shared.items()}
+    pk = elgrow.plan_key(mid, style, lines)
+    got = elgrow.plan_get(EL_PLANS, pk)
+    beats = got.get("beats") if isinstance(got, dict) else None
+    if not beats:
+        msgs = elgrow.plan_messages(lines, menu, elgrow.recent_get(EL_RECENT)[-25:], n)
+        for model in HELP_MODELS:   # الأذكى الأول: الاختيار ده هو اللي بيفرّق فيديو عن التاني
+            try:
+                beats = elgrow.parse_plan(atlas.chat(msgs, model, temperature=0.5, max_tokens=900, timeout=45), menu, known, n, len(lines))
+                if beats:
+                    break
+            except Exception:  # noqa: BLE001 — الموديل الجاي
+                continue
+        if not beats:
+            return field_elements_old(mid, text, n)
+        elgrow.plan_put(EL_PLANS, pk, beats)
+    todo = [b for b in beats if not el_url(fld, style, b["key"])]
+    if todo and make:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            list(ex.map(lambda b: el_make(fld, style, b["key"], b["desc"]), todo))
+    elif todo:
+        threading.Thread(target=lambda: [el_make(fld, style, b["key"], b["desc"]) for b in todo], daemon=True).start()
+    urls = [u for u in (el_url(fld, style, b["key"]) for b in beats) if u]
+    if len(urls) < min(3, n):   # رسمة فشلت: نكمّل من المكتبة الثابتة
+        used = {b["key"] for b in beats}
+        urls += [u for u in field_elements_old(mid, text, n, tuple(used)) if u not in urls][: min(3, n) - len(urls)]
+    if make:
+        elgrow.recent_add(EL_RECENT, [b["key"] for b in beats])
+    return urls[:n]
+
+
+@app.get("/api/el/{field}/{style}/{name}")
+def el_shared_file(field: str, style: str, name: str):
+    """🌱 عنصر من مكتبة المنصة المشتركة."""
+    f = elgrow.file_for(EL_SHARED, field, style, Path(name).stem)
+    if not f.exists():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="image/webp", headers={"Cache-Control": "public, max-age=604800, immutable"})
+
+
 def flow_els_inline(params: dict) -> dict:
     """روابط عناصر المكتبة ← صور مضمّنة (الرسم بيشتغل من ملف محلي، فالرابط النسبي مش هيتفتح)."""
     els = params.get("els")
-    if not isinstance(els, list) or not any(isinstance(x, str) and x.startswith("/gallery/el/") for x in els):
+    if not isinstance(els, list) or not any(isinstance(x, str) and x.startswith(("/gallery/el/", "/api/el/")) for x in els):
         return params
     out = []
     for x in els:
-        f = FRONTEND_DIR / str(x).lstrip("/") if isinstance(x, str) and x.startswith("/gallery/el/") else None
-        if f and f.resolve().is_relative_to(EL_DIR.resolve()) and f.exists():
+        f = None
+        if isinstance(x, str) and x.startswith("/gallery/el/"):
+            f = FRONTEND_DIR / x.lstrip("/")
+            f = f if f.resolve().is_relative_to(EL_DIR.resolve()) else None
+        elif isinstance(x, str) and x.startswith("/api/el/"):
+            parts = x.split("/")   # ['', 'api', 'el', field, style, name]
+            f = elgrow.file_for(EL_SHARED, parts[3], parts[4], Path(parts[5]).stem) if len(parts) == 6 else None
+        if f and f.exists():
             out.append("data:image/webp;base64," + base64.b64encode(f.read_bytes()).decode())
-        elif isinstance(x, str) and not x.startswith("/gallery/el/"):
+        elif isinstance(x, str) and not x.startswith(("/gallery/el/", "/api/el/")):
             out.append(x)
     return {**params, "els": out}
 
@@ -25192,17 +25333,32 @@ def els_ok(v) -> list:
     return [x for x in (v if isinstance(v, list) else []) if isinstance(x, str) and x.startswith(("/gallery/", "/media/", "data:image/", "http"))]
 
 
-def flow_fill_els(d: dict, params: dict) -> dict:
-    """🧩 عناصر المجال لو لسه مش متحطة (مشروع قديم، أو اللوحة اتفتحت قبل الميزة): نفس اختيار flow_motion_params."""
+def flow_els_text(d: dict) -> str:
+    """كلام السكريبت سطر لكل مشهد (المنطوق، وإلا كلام الشاشة): منه بتتختار عناصر الفيديو."""
+    sc = d.get("scenario") or {}
+    rows = [str(sc.get("title") or "")]
+    for r in sc.get("scenes") or []:
+        say = str(r.get("say") or "").strip()
+        rows.append(say or " ".join(str(v) for v in (r.get("fields") or {}).values() if isinstance(v, str)))
+    return "\n".join(x for x in rows if x.strip())
+
+
+def els_auto(v) -> bool:
+    """العناصر دي البرنامج اللي حاطها (من المكتبة)، مش العميل."""
+    return bool(v) and all(isinstance(x, str) and x.startswith(("/gallery/el/", "/api/el/")) for x in v)
+
+
+def flow_fill_els(d: dict, params: dict, make: bool = False) -> dict:
+    """🧩 عناصر الفيديو من كلام السكريبت. make=True (وقت الرسم): الرسومات الناقصة بتترسم دلوقتي وتدخل في الفيديو."""
     mid = d["template"]["id"]
     schema = fz.motion_schema(MOTION_DIR / "r" / mid / "reel.html")
-    if "els" not in schema or "els" in (d.get("locked") or {}) or els_ok(params.get("els")):
+    if "els" not in schema or "els" in (d.get("locked") or {}):
         return params
-    sc = d.get("scenario") or {}
-    txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
-                                                   for r in sc.get("scenes") or []])
+    cur = params.get("els")
+    if els_ok(cur) and not (make and els_auto(cur)):
+        return params
     try:
-        els = field_elements(mid, txt)
+        els = field_elements(mid, flow_els_text(d), make=make)
     except Exception:  # noqa: BLE001
         els = []
     return {**params, "els": els} if els else params
@@ -25230,11 +25386,8 @@ def flow_motion_params(d: dict) -> dict:
     if "els" in out and not els_ok(out.get("els")):
         out.pop("els")   # كلام مش صور: يتشال، والمكتبة تحط مكانه
     if "els" in schema and "els" not in (d.get("locked") or {}) and not els_ok(out.get("els")):   # 🧩 عناصر من مجال العميل حسب السكريبت
-        sc = d.get("scenario") or {}
-        txt = " ".join([str(sc.get("title") or "")] + [" ".join(str(v) for v in [r.get("say"), *(r.get("fields") or {}).values()] if isinstance(v, str))
-                                                       for r in sc.get("scenes") or []])
         try:
-            els = field_elements(mid, txt)
+            els = field_elements(mid, flow_els_text(d), make=False)   # الناقص بيترسم في الخلفية لحد التصدير
         except Exception:  # noqa: BLE001 — من غير عناصر القالب بيرجع لرسمته
             els = []
         if els:
@@ -26745,6 +26898,7 @@ def flow_export(fid: str, body: FlowExportIn):
     def go():
         p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
         p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
+        p = flow_fill_els(d, p, make=True)        # 🌱 رسومات الجمل اللي لسه ناقصة بتترسم وتدخل
         p = flow_els_inline(p)                    # 🧩 عناصر المجال تتضمّن في الرسم
         run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
                           timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None,
@@ -26865,7 +27019,7 @@ def flow_generate(fid: str, body: FlowGoIn):
                 params = {**fill, **{k: v for k, v in fz.clean_params(schema, raw).items() if schema[k].get("kind") != "image" and not (schema[k].get("kind") == "color" and k in fill)}}
             if "els" in schema and not [x for x in params.get("els") or [] if x]:   # 🧩 عناصر من مجال العميل حسب السكريبت
                 try:
-                    els = field_elements(mid, " ".join(str(v) for v in [sc.get("title"), brief, *params.values()] if isinstance(v, str)))
+                    els = field_elements(mid, flow_els_text(d) or " ".join(str(v) for v in [sc.get("title"), brief, *params.values()] if isinstance(v, str)))
                 except Exception:  # noqa: BLE001
                     els = []
                 if els:
