@@ -132,9 +132,10 @@ const Flow = (() => {
   const working = (t) => `<div class="flw-work"><span class="flw-spin"></span><p>${t} <small class="muted" data-secs></small></p></div>`;
   const failed = (what) => (S.d.error && !S.d.busy ? `<div class="flw-empty bad">⚠️ ${esc(S.d.error)}
     <div class="flw-acts"><button type="button" class="flw-btn pri" data-retry="${what}">↻ جرّب مرة أخرى</button></div></div>` : "");
-  function chatBox(stage) {
+  function chatBox(stage) {   // ✏️ تعديل: اكتب للعقل اللي عايز تغيّره فيها، أو ارجع واختار واحدة تانية
     const log = S.d[stage === "idea" ? "idea_chat" : "scen_chat"] || [];
     return `<div class="flw-chat">
+      <p class="flw-sub">${stage === "idea" ? "اكتب ما تريد تغييره في الفكرة، أو" : "اكتب ما تريد تغييره في النص، أو"} <button type="button" class="flw-link" data-go="${stage}">${stage === "idea" ? "↩︎ اختر فكرة أخرى" : "↩︎ اختر نصًا آخر"}</button></p>
       ${log.length ? `<div class="flw-log">${log.slice(-8).map((m) => `<p class="${m.role}">${esc(m.content)}</p>`).join("")}</div>` : ""}
       <div class="flw-chatrow"><input data-chatin="${stage}" placeholder="${stage === "idea" ? "مثلًا: اجعلها أجرأ، أو ركّز على السعر…" : "مثلًا: خطاف أقوى، أو نص أقل…"}" ${S.d.busy ? "disabled" : ""}>
         <button type="button" class="flw-btn" data-send="${stage}" ${S.d.busy ? "disabled" : ""}>أرسل</button></div></div>`;
@@ -143,11 +144,11 @@ const Flow = (() => {
   function picked(stage, acts = true) {   // acts=false: بعد صفحة النص (الصوت ولوحة التحكم والملفات) من غير «ناقش» و«غيّر»
     const it = S.d[stage];
     if (!it) return "";
+    acts = acts && !S.d.busy;   // ✏️ «تعديل» بيظهر بعد ما الخطوة دي تخلص تحميل، مش وهي بتحمّل
     const open = acts && S.chat === stage;
     return `<div class="flw-picked"><div><small class="latin en-k">${stage === "idea" ? "Idea" : "Scenario"}</small>
         <b>${esc(it.title || "")}</b><p>${esc(stage === "idea" ? it.idea || it.hook || "" : it.summary || "")}</p></div>
-      ${acts ? `<div class="flw-pact"><button type="button" class="flw-link" data-chat="${stage}">💬 ${open ? "أغلق النقاش" : "ناقش مع العقل"}</button>
-        <button type="button" class="flw-link" data-go="${stage}">↩︎ غيّر</button></div>` : ""}
+      ${acts ? `<div class="flw-pact"><button type="button" class="flw-link" data-chat="${stage}">${open ? "✕ إغلاق" : "✏️ تعديل"}</button></div>` : ""}
       ${open ? chatBox(stage) : ""}</div>`;
   }
 

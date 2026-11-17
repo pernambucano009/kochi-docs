@@ -16686,4 +16686,9 @@ window.I18N_EN = {
   "يختاره البرنامج": "Picked by the program",
   "تعذّر تنفيذ الطلب: البيانات المرسلة غير مكتملة. حدّث الصفحة وجرّب مرة أخرى": "The request couldn't be done: the data sent is incomplete. Refresh the page and try again",
   "تعذّر تنفيذ الطلب، جرّب مرة أخرى": "The request couldn't be done, try again",
+  "✏️ تعديل": "✏️ Edit",
+  "اكتب ما تريد تغييره في الفكرة، أو": "Write what you want to change in the idea, or",
+  "اكتب ما تريد تغييره في النص، أو": "Write what you want to change in the script, or",
+  "↩︎ اختر فكرة أخرى": "↩︎ Pick another idea",
+  "↩︎ اختر نصًا آخر": "↩︎ Pick another script",
 };
