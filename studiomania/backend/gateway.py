@@ -1828,7 +1828,7 @@ def fixed_bills(refill: bool = False) -> float:
 def admin_costs(request: Request, month: str = ""):
     """💸 عدّاد صرف الشهر: صرفنا كام، على مين (مشتركين، تجربة مجانية، ترويج، حسابنا إحنا)، وفي أنهي أقسام.
     واقتصاد كل باقة: متوسط اللي بنصرفه على المشترك فيها في الشهر قصاد سعرها، وأقصى خصم يفضل معاه مكسب."""
-    admin(request)
+    admin_or_feed(request)
     import datetime as dt  # noqa: PLC0415
     now = dt.datetime.now()
     try:
@@ -1894,7 +1894,7 @@ CU_AR = {"idea": "لم نتواصل بعد", "asked": "تواصلنا وننتظ
 def admin_finance_xlsx(request: Request, months: int = 12):
     """📊 تصدير النموذج المالي (Excel): ملخص كل شهر (الإيراد والإنفاق على مين والفواتير والصافي والإنفاق الفعلي من الأرصدة)،
     وباقات كل منصة وسيناريوهاتها (والباقة المخصصة)، واستهلاك المنصات شهر بشهر، وأقسام الإنفاق، والعملاء، واقتصاد الباقات، والفواتير الثابتة."""
-    admin(request)
+    admin_or_feed(request)
     import datetime as dt  # noqa: PLC0415
 
     import providers  # noqa: PLC0415
@@ -2870,6 +2870,23 @@ def issues_resolve(iid: str, body: IssueResolveIn, request: Request):
 
 # 🤖 متابعة Claude: نفس صندوق الأخطاء لكن بمفتاح بدل الدخول، عشان جلسة Claude تسحب الأخطاء الجديدة وتصلّحها وتقفلها.
 # المفتاح بيتعمل من /admin/inspect ويظهر مرة واحدة، والمتخزّن بصمته بس (sha256)، وتوليد مفتاح جديد بيلغي القديم.
+def admin_or_feed(request: Request) -> None:
+    """💰 قراءة الحسابات: الأدمن، أو جلسة Claude بمفتاح المتابعة (نفس مفتاح صندوق الأخطاء، قراءة بس)."""
+    try:
+        feed_ok(request)
+    except HTTPException:
+        admin(request)
+
+
+@app.get("/api/platform/finance/providers")
+def finance_providers(request: Request):
+    """💳 رصيد كل منصة وباقتها وصرف الشهر ورابط الشحن (لجلسة الحسابات)."""
+    admin_or_feed(request)
+    import providers  # noqa: PLC0415
+    pd = providers.load(PLATFORM / "providers.json")
+    return {"providers": [{**r, "active_pack": providers.active_pack(pd, r["key"])} for r in providers.summary(pd)], "catalog": {k: {x: v[x] for x in ("name", "what", "unit", "url")} for k, v in providers.PROVIDERS.items()}}
+
+
 def feed_ok(request: Request) -> None:
     want, got = kv_get("issues_feed_hash") or "", (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
     if not want or not got or not hmac.compare_digest(want, hashlib.sha256(got.encode()).hexdigest()):
