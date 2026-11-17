@@ -2878,6 +2878,22 @@ def admin_or_feed(request: Request) -> None:
         admin(request)
 
 
+@app.get("/api/platform/issues/fin/costs")
+def finance_feed_costs(request: Request, month: str = ""):
+    """💰 نفس صرف الشهر، تحت مسار صندوق الأخطاء (مفتاح المتابعة بيتحط لوحده على المسار ده في بيئة جلسات Claude)."""
+    return admin_costs(request, month)
+
+
+@app.get("/api/platform/issues/fin/providers")
+def finance_feed_providers(request: Request):
+    return finance_providers(request)
+
+
+@app.get("/api/platform/issues/fin/finance.xlsx")
+def finance_feed_xlsx(request: Request, months: int = 12):
+    return admin_finance_xlsx(request, months)
+
+
 @app.get("/api/platform/finance/providers")
 def finance_providers(request: Request):
     """💳 رصيد كل منصة وباقتها وصرف الشهر ورابط الشحن (لجلسة الحسابات)."""
