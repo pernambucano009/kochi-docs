@@ -25217,12 +25217,20 @@ def flow_make_vo(fid: str) -> None:
         raise HTTPException(400, "لا يحتوي النص على أي جملة تعليق صوتي")
     folder = FLOWS_DIR / Path(fid).name
     raw = folder / f"vo-raw-{uuid.uuid4().hex[:6]}.wav"
+    t0 = time.time()   # ⏱️ وقت كل خطوة بيتسجل (التسجيل والتفريغ) علشان نعرف البطء منين
+    flow_update(fid, lambda x: x.update(vo_step="tts"))
     vo_say("\n".join(x for x in says if x), vo.get("voice") or "", vo.get("lang") or d.get("lang") or "ar-eg-cairo", raw)
+    t_tts = round(time.time() - t0, 1)
     vdur = probe_duration(raw)
-    try:
-        heard = atlas.transcribe(raw, vdur)
-    except Exception:  # noqa: BLE001 — من غير تفريغ الكلام بيتوزّع على طول الصوت بعدد الحروف
+    flow_update(fid, lambda x: x.update(vo_step="stt"))
+    t1 = time.time()
+    try:   # التفريغ بس علشان توقيت الجمل: لو اتأخر أكتر من دقيقتين بنوزّع بعدد الحروف بدل ما نستنى
+        heard = atlas.transcribe(raw, vdur, max_seconds=120)
+    except Exception as exc:  # noqa: BLE001 — من غير تفريغ الكلام بيتوزّع على طول الصوت بعدد الحروف
+        print(f"[vo] {fid} stt skipped: {str(exc)[:160]}", flush=True)
         heard = []
+    t_stt = round(time.time() - t1, 1)
+    print(f"[vo] {fid} voice={vo.get('voice')} tts={t_tts}s stt={t_stt}s chars={sum(len(x) for x in says)}", flush=True)
     words, owner = [], []
     for i, t in enumerate(says):
         for w in hekaya.split_words(t):
@@ -25249,7 +25257,8 @@ def flow_make_vo(fid: str) -> None:
         old = (x.get("vo_track") or {}).get("file")
         if old and old != out.name:
             (folder / old).unlink(missing_ok=True)
-        x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard),
+        x.pop("vo_step", None)
+        x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard), "secs": {"tts": t_tts, "stt": t_stt, "voice": vo.get("voice")},
                            "heard_text": " ".join(str(w.get("w") or "") for w in heard)[:4000], "said_text": " ".join(says)[:4000]}, stage="panel")
     flow_update(fid, fin)
 

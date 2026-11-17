@@ -367,7 +367,7 @@ def _find_text(obj) -> str:
     return ""
 
 
-def transcribe(audio_path: Path, duration: float) -> list[dict]:
+def transcribe(audio_path: Path, duration: float, max_seconds: int = 600) -> list[dict]:
     """يحوّل التعليق الصوتي لكلام، ويعود كل كلمة بوقت بدايتها ونهايتها."""
     import json
 
@@ -380,7 +380,7 @@ def transcribe(audio_path: Path, duration: float) -> list[dict]:
         return [{"w": w, "s": round(i * step, 3), "e": round((i + 1) * step, 3)} for i, w in enumerate(texts)]
 
     url = upload_media(audio_path)
-    pred = wait_prediction(submit_audio({"model": STT_MODEL, "audio": url}))
+    pred = wait_prediction(submit_audio({"model": STT_MODEL, "audio": url}), max_seconds=max_seconds)
     payload: object = pred
     outputs = pred.get("outputs") or []
     first = outputs[0] if outputs else None

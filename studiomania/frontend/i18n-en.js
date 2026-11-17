@@ -16699,4 +16699,5 @@ window.I18N_EN = {
   "✍️ عدّلها بنفسك": "✍️ Edit it yourself",
   "استبدلها بفكرة مختلفة تمامًا تناسب نفس القالب": "Replace it with a completely different idea that fits the same template",
   "اكتب نصًا مختلفًا تمامًا لنفس الفكرة": "Write a completely different script for the same idea",
+  "تم التسجيل. يستمع إليه الآن ليضبط كل مشهد على جملته…": "Recorded. Now listening to it to fit each scene to its sentence\u2026",
 };
