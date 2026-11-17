@@ -2623,7 +2623,7 @@ $("mixPunch").addEventListener("change", () => setMix({ punch: $("mixPunch").che
 
 // ---------- مقاس الكادر ولون الخلفية وإعدادات التصدير ----------
 const RATIOS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "3:4": [1080, 1440], "1:1": [1080, 1080], "16:9": [1920, 1080] };
-const RATIO_LABEL = { "9:16": "9:16 ريلز وتيك توك", "4:5": "4:5 منشور إنستغرام", "3:4": "3:4", "1:1": "1:1 مربع", "16:9": "16:9 يوتيوب" };
+const RATIO_LABEL = { "9:16": "ريلز وتيك توك", "4:5": "منشور إنستغرام", "3:4": "عمودي", "1:1": "مربع", "16:9": "يوتيوب" };
 const BG_SWATCHES = ["#000000", "#ffffff", "#111827", "#1d3557", "#e63946", "#f4a261", "#2a9d8f", "#7b2cbf"];
 const EXPORT_RES = { 720: "720p", 1080: "1080p (Full HD)", 1440: "2K", 2160: "4K" };
 const EXPORT_Q = { small: "حجم صغير", normal: "عادي", high: "جودة عالية" };
@@ -2658,7 +2658,11 @@ function sizeEstimate() {
 function renderCanvasPane() {
   if (!mt.project) return;
   const r = canvasRatio(), bg = mt.project.data.canvas?.bg || "#000000", ex = exportCfg();
-  $("cvRatio").innerHTML = Object.keys(RATIOS).map((k) => `<button class="chip ${k === r ? "on" : ""}" data-ratio="${k}">${RATIO_LABEL[k]}</button>`).join("");
+  // 🖼️ كروت المقاس: شكل الكادر بنسبته الحقيقية، والرقم، والاستخدام
+  $("cvRatio").innerHTML = Object.keys(RATIOS).map((k) => {
+    const [a, b] = k.split(":").map(Number), sc = 34 / Math.max(a, b);
+    return `<button type="button" class="cv-ratio ${k === r ? "on" : ""}" data-ratio="${k}"><i style="width:${Math.round(a * sc)}px;height:${Math.round(b * sc)}px"></i><b dir="ltr">${k}</b><small>${RATIO_LABEL[k]}</small></button>`;
+  }).join("");
   $("cvBg").innerHTML = BG_SWATCHES.map((c) => `<button class="sw ${c === bg ? "on" : ""}" data-bg="${c}" style="background:${c}" title="${c}"></button>`).join("") +
     `<label class="sw pick" title="لون آخر"><input type="color" id="cvBgPick" value="${bg}"></label>`;
   $("exRes").innerHTML = Object.entries(EXPORT_RES).map(([k, l]) => `<option value="${k}" ${Number(k) === ex.res ? "selected" : ""}>${l}</option>`).join("");

@@ -3407,3 +3407,16 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .ty-v2 .ty-main textarea { width: 100%; box-sizing: border-box; border-radius: 14px; }
 .ty-v2 .ty-main .hint { font-size: 13px; }
 @media (max-width: 900px) { .ty-v2 .ty-tools { flex-basis: 100%; overflow-x: auto; } }
+
+/* 🖼️ مقاس الكادر: كروت بشكل النسبة */
+.cv-ratios { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.cv-ratio { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding: 12px 6px 10px; min-height: 96px;
+  border: 1.5px solid var(--line, #E6E1DA); border-radius: 16px; background: var(--card, #fff); color: var(--ink, #1D1B19); cursor: pointer; font: inherit;
+  transition: border-color .15s, box-shadow .15s, transform .15s; }
+.cv-ratio:hover { transform: translateY(-1px); border-color: var(--accent, #E2572B); }
+.cv-ratio i { display: block; border: 2px solid currentColor; border-radius: 5px; opacity: .55; }
+.cv-ratio b { font-size: 13px; font-weight: 700; line-height: 1; }
+.cv-ratio small { font-size: 11px; color: var(--muted, #8A847C); line-height: 1.2; text-align: center; }
+.cv-ratio.on { border-color: var(--accent, #E2572B); box-shadow: 0 0 0 3px rgba(226, 87, 43, .14); }
+.cv-ratio.on i { opacity: 1; background: rgba(226, 87, 43, .12); border-color: var(--accent, #E2572B); }
+:root[data-nh-theme="dark"] .cv-ratio { background: #242324; border-color: #3A3839; color: #EEE; }
