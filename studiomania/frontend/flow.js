@@ -477,7 +477,12 @@ const Flow = (() => {
   async function loadVoice() {
     if (S.vLoading) return;
     S.vLoading = true;
-    try { S.vopts = await api(`/api/flows/${S.d.id}/voice-options`); } catch (err) { toast(err.message, true); S.vopts = null; S.vLoading = false; return; }
+    try { S.vopts = await api(`/api/flows/${S.d.id}/voice-options`); S.vTry = 0; }
+    catch (err) {   // 🔁 فشل (غالبًا البرنامج بيتحدّث): يحاول تاني لوحده بدل ما يفضل «جارٍ جلب الأصوات» للأبد
+      S.vopts = null; S.vLoading = false; S.vTry = (S.vTry || 0) + 1;
+      if (S.vTry <= 5) return void setTimeout(() => { if (S.d && !S.vopts) loadVoice(); }, 3000 * S.vTry);
+      return toast(err.message, true);
+    }
     S.vLoading = false;
     render();
   }
