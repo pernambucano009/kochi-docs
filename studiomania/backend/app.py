@@ -24945,7 +24945,7 @@ def field_el_index(field: str) -> dict | None:
 
 def field_elements(mid: str, text: str, n: int = 5) -> list[str]:
     """عناصر المجال المناسبة للسكريبت ده، بستايل القالب ده: روابط /gallery/el/… (فاضية لو المجال مالوش مكتبة)."""
-    field = str((onboard_load() or {}).get("field") or (brain_row(active_client_id()) or {}).get("field") or "")
+    field = field_guess(brain_row(active_client_id()) or {})   # 🧩 اللي اختاره، وإلا من كلامه عن نفسه (حساب اتعمل من الأدمن مالوش اختيار مجال)
     idx = field_el_index(field)
     if not idx or not idx.get("items"):
         return []
@@ -33215,7 +33215,7 @@ def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
     """🎨 قالب الفيديو الجاي: من قوالب مجال العميل (والقوالب اللي كان اختارها)، اللي ماتستخدمش الأسبوع ده والأقدم استخدامًا،
     وقالب آراء العملاء بس لو عنده آراء حقيقية. None لو اتعمل ٥ فيديوهات قوالب الأسبوع ده."""
     bid = active_client_id()
-    field = str(((brain_row(bid) or {}) if bid else {}).get("field") or (onboard_load() or {}).get("field") or "")
+    field = field_guess(brain_row(bid) or {}) if bid else ""
     cands = list(dict.fromkeys([*fieldpacks.field_reels(field), *[t for t in pool if t.startswith("t-")]]))
     if "t-review" in cands and not review_facts(bid):
         cands.remove("t-review")
