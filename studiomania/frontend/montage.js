@@ -3038,6 +3038,8 @@ function renderRender() {
   $("renderError").textContent = p.render_error || "";
   const done = p.render_status === "done" && p.export_id;
   $("renderResult").hidden = !done;
+  syncExportTop();
+  renderFlowBar();
   if (done) {
     // اسم المشروع جوه الرابط، عشان الفيديو يتحفظ باسمه من أي مكان
     const file = exportFileName(p.data.name);
@@ -3165,8 +3167,54 @@ $("refreshFromVideo").onclick = async () => {
 
 viewHooks["6"] = initMontage;
 
-// «صدّر الفيديو» فوق (من البروتوتايب): بيفتح تاب التصدير
-$("mtExportTop")?.addEventListener("click", () => document.querySelector('#inspTabs [data-tab="export"]')?.click());
+// «صدّر الفيديو» فوق: أول دوسة بتفتح إعدادات التصدير، والتانية (والإعدادات مفتوحة) بتصدّر. زرار التصدير اللي جوه اللوحة بيستخبى
+const exportTabOn = () => document.querySelector('#inspTabs [data-tab="export"]')?.classList.contains("active");
+function syncExportTop() {
+  const top = $("mtExportTop"), p = mt.project;
+  if (!top) return;
+  const shown = !!top.offsetParent, rendering = p?.render_status === "rendering";
+  $("renderBtn").hidden = shown;
+  top.disabled = rendering;
+  top.textContent = rendering ? `⏳ ${p.render_progress || "جارٍ التصدير..."}` : exportTabOn() ? "🎬 صدّر الآن" : "صدّر الفيديو";
+}
+$("mtExportTop")?.addEventListener("click", () => {
+  if (!exportTabOn()) { document.querySelector('#inspTabs [data-tab="export"]')?.click(); return syncExportTop(); }
+  $("renderBtn").click();
+});
+$("inspTabs").addEventListener("click", () => setTimeout(syncExportTop, 0));
+
+// 🧭 المونتاج جوه المسار: شريط الخطوات فوق، و«التالي: النشر» بعد التصدير
+const FLOW_STEPS = ["الفكرة", "النص", "الصوت", "المشاهد", "الفيديو", "المونتاج والتصدير", "النشر"];
+function inFlow() { const c = flowCtx(); return c?.fid && mt.project && c.pid === mt.project.id ? c : null; }
+function renderFlowBar() {
+  const bar = $("mtFlowBar"), c = inFlow();
+  bar.hidden = !c;
+  $("resultNext").hidden = !c;
+  if (!c) return;
+  const done = mt.project.render_status === "done" && mt.project.export_id;
+  bar.innerHTML = `<button type="button" class="btn sm" data-fb="back">↩︎ المسار</button>
+    <ol class="mt-fsteps">${FLOW_STEPS.map((t, i) => `<li class="${i < 5 ? "ok" : i === 5 ? "cur" : ""}"><button type="button" data-fb="${i < 5 ? "back" : i === 6 ? "next" : ""}" ${i === 5 ? "disabled" : ""}><i>${i < 5 ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>
+    <button type="button" class="btn primary sm" data-fb="next">${done ? "التالي: النشر ←" : "صدّر ثم انشر ←"}</button>`;
+}
+function flowNext() {
+  const p = mt.project, c = inFlow();
+  if (!c) return;
+  if (!(p.render_status === "done" && p.export_id)) {
+    if (!exportTabOn()) document.querySelector('#inspTabs [data-tab="export"]')?.click();
+    syncExportTop();
+    return toast("صدّر الفيديو أولًا من «صدّر الفيديو» في الأعلى، ثم انتقل إلى النشر");
+  }
+  try { localStorage.setItem("studiomania.pubPick", p.export_id); } catch { /* غير مهم */ }
+  flowCtxSet({ ...c, pub: true });
+  showStep("7"); if (typeof pubTab === "function") pubTab("new");
+}
+$("mtFlowBar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fb]");
+  if (!b || !b.dataset.fb) return;
+  if (b.dataset.fb === "back") { const c = inFlow(); if (c) Flow.open(c.fid); return; }
+  flowNext();
+});
+$("resultNext").onclick = flowNext;
 $("mtPreviewTop")?.addEventListener("click", () => $("tpFull")?.click());
 
 

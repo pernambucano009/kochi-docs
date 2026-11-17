@@ -325,6 +325,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
         <!-- الخطوة 6: المونتاج -->
         <main class="view" data-view="16" hidden></main>
         <main class="view" data-view="6" hidden>
+          <div class="mt-flowbar" id="mtFlowBar" hidden></div>
           <div class="panel project-bar">
             <button class="btn sm" id="montageBack" data-goto="10" hidden>↩ رجوع</button>
             <select id="projectSelect"></select>
@@ -701,6 +702,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                 <div class="row"><a class="btn sm" id="resultDownload" download>⬇ تحميل</a>
                 <button class="btn sm" id="resultDub" title="الفيديو نفسه بلهجة أو لغة أخرى">🌍 دبلجة</button>
                 <span class="muted">حُفظ في مجلد الفيديوهات الجاهزة</span></div>
+                <button class="btn primary wide gap-top" id="resultNext" type="button" hidden>التالي: النشر ←</button>
               </div>
               <div class="row wrap gap-top">
                 <button class="btn sm" id="exAudio" title="التعليق والموسيقى والمؤثرات وصوت الفيديوهات في ملف MP3"><span class="emo">🎧</span> صدّر الصوت فقط (MP3)</button>

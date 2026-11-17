@@ -852,6 +852,7 @@ const NH = (() => {
   // رجوع خطوة واحدة: القسم اللي قبله، أو تقفل القسم، أو الصفحة اللي قبلها، أو الرئيسية
   function goBack() {
     if (busy) return;
+    if (window.flowBack?.()) return;   // 🧭 صفحة فاتحة من جوه المسار (المونتاج/النشر): الرجوع للمسار
     if (stageOpen()) {
       if (stageTrail.length > 1) return showStep(stageTrail[stageTrail.length - 2]);
       return closeStage();

@@ -3420,3 +3420,15 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .cv-ratio.on { border-color: var(--accent, #E2572B); box-shadow: 0 0 0 3px rgba(226, 87, 43, .14); }
 .cv-ratio.on i { opacity: 1; background: rgba(226, 87, 43, .12); border-color: var(--accent, #E2572B); }
 :root[data-nh-theme="dark"] .cv-ratio { background: #242324; border-color: #3A3839; color: #EEE; }
+
+/* 🧭 المونتاج جوه المسار: شريط الخطوات فوق المحرر */
+.mt-flowbar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin: 0 0 12px; border-radius: 18px; background: var(--card, #fff); border: 1px solid var(--line, #E6E1DA); }
+.mt-fsteps { display: flex; flex: 1; justify-content: center; gap: 4px; margin: 0; padding: 0; list-style: none; overflow-x: auto; }
+.mt-fsteps button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: 999px; background: none; color: var(--muted, #8A847C); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.mt-fsteps button:disabled { cursor: default; }
+.mt-fsteps i { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-style: normal; font-size: 11px; background: var(--soft, #F1EEEA); }
+.mt-fsteps .ok button { color: var(--ink, #1D1B19); }
+.mt-fsteps .ok i { background: var(--ink, #1D1B19); color: var(--card, #fff); }
+.mt-fsteps .cur button { background: var(--soft, #F1EEEA); color: var(--ink, #1D1B19); font-weight: 700; }
+.mt-fsteps .cur i { background: var(--accent, #E2572B); color: #fff; }
+:root[data-nh-theme="dark"] .mt-flowbar { background: #242324; border-color: #3A3839; }

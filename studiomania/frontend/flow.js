@@ -1,3 +1,17 @@
+// 🧭 سياق المسار: لما خطوة من المسار بتتفتح في صفحة تانية (المونتاج أو النشر)، الصفحة دي بتعرف إنها جوه المسار
+function flowCtx() {   // بيقدم بعد ٦ ساعات (عشان صفحة النشر بعدين ماترجعش لمسار قديم)
+  try { const c = JSON.parse(localStorage.getItem("studiomania.flowCtx") || "null"); return c && Date.now() - (c.at || 0) < 6 * 3600e3 ? c : null; } catch { return null; }
+}
+function flowCtxSet(v) { try { localStorage.setItem("studiomania.flowCtx", JSON.stringify({ ...v, at: Date.now() })); } catch { /* غير مهم */ } }
+// «رجوع» من صفحة جوه المسار: يرجع للمسار نفسه (مش للقوالب)
+window.flowBack = () => {
+  const c = flowCtx(), step = typeof shell !== "undefined" ? shell.step : "";
+  if (!c?.fid) return false;
+  const inMont = step === "6f" && (typeof mt === "undefined" || !mt.project || mt.project.id === c.pid);
+  if (!inMont && !(step === "7" && c.pub)) return false;
+  Flow.open(c.fid);
+  return true;
+};
 // 🧭 مسار القالب: العميل داس على قالب ← المخ بيمشي معاه خطوة بخطوة
 // قالب كود: الفكرة ← السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير.
 // قالب تايبوجرافي: الفكرة ← السكريبت ← التوليد.
@@ -782,10 +796,12 @@ const Flow = (() => {
     try {
       if (where === "montage") {
         const r = await api(`/api/flows/${S.d.id}/to-montage`, { method: "POST" });
+        flowCtxSet({ fid: S.d.id, pid: r.project_id });   // 🧭 المونتاج خطوة من المسار: شريط المسار فوقه، و«رجوع» بيرجع هنا
         close(); storageSet(projectKey("free"), r.project_id); return showStep("6f");
       }
       const r = await api(`/api/flows/${S.d.id}/to-publish`, { method: "POST" });
       try { localStorage.setItem("studiomania.pubPick", r.export_id); } catch { /* غير مهم */ }
+      flowCtxSet({ ...(flowCtx() || {}), fid: S.d.id, pub: true });
       close(); showStep("7"); if (typeof pubTab === "function") pubTab("new"); return;   // نفس «منشور جديد»
     } catch (err) { toast(err.message, true); }
   }
@@ -839,7 +855,7 @@ const Flow = (() => {
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-tomont]")) return codeOut("montage");
     if (q("[data-topub]")) return codeOut("publish");
-    if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
+    if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; flowCtxSet({ fid: S.d.id, pid }); close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {
       const pid = S.d.montage?.project_id;
       try { await api(`/api/projects/${pid}/render`, { method: "POST" }); toast("⏳ جارٍ تصدير الفيديو…"); } catch (err) { return toast(err.message, true); }
