@@ -3175,3 +3175,11 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 
 /* 📤 تابات النشر بقت أزرار في صفحة النشر نفسها: الشريط اللي فوق مخفي */
 .pub-tabs[hidden] { display: none !important; }
+#nh .bm-nrs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+#nh .bm-nr { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--page-bg, #F7F7F5); }
+#nh .bm-nr.on { box-shadow: 0 0 0 1.5px var(--nh-accent); }
+#nh .bm-nr > span { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#nh .bm-nr small { font-size: 12px; opacity: .7; }
+#nh .bm-nradd { display: flex; flex-direction: column; gap: 8px; }
+#nh .bm-nradd select { max-width: 100%; }
+#nh .bm-nrv { display: inline-flex; gap: 2px; }

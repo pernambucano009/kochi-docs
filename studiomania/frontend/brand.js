@@ -68,6 +68,7 @@ const BrandPage = (() => {
         { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
+        { f: "narrators", t: "صوت الراوي", type: "narr" },
         { f: "cta", t: "الدعوة لاتخاذ إجراء", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "التعليق النصي الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
@@ -131,6 +132,7 @@ const BrandPage = (() => {
       case "multi": return l.fields.some(([k]) => String(b[k] || "").trim());
       case "video": return !!b[`${l.f}_url`];
       case "auds": return (b.audiences || []).length > 0;
+      case "narr": return (b.narrators || []).length > 0;
       case "rule": case "note": case "algo": return true;
       case "page": return false;   // رابط لصفحة، غير خانة تُملأ
       case "todo": return !!l.todo.done;
@@ -166,6 +168,7 @@ const BrandPage = (() => {
     if (l.type === "video") return b?.[`${l.f}_url`] ? (b[`${l.f}_on`] ? "يعمل" : "موجود ومطفأ") : "";
     if (l.type === "todo") return l.todo.done ? "أُنشئت ✓" : l.todo.why;
     if (l.type === "auds") return (b?.audiences || []).map((a) => a.name).join("، ");
+    if (l.type === "narr") return (b?.narrators || []).length ? `${(b.narrators || []).length} ${b.narrator_mode === "rotate" ? "بالتناوب" : "· صوت أساسي"}` : "";
     return "";
   };
 
@@ -633,6 +636,32 @@ const BrandPage = (() => {
   const arRows = (fid) => (S.ar?.parts.find((p) => p.id === fid)?.rules || []).map((r) => ({ t: r.t, on: r.on }));
 
   // ✅ مهام العقل (مش أسئلة): رفع اللوجو، صور الأفاتار، الفيديو، صوتك… كل واحدة بتتعلّم لوحدها لما تتعمل
+  // 🎙️ صوت الراوي: الأصوات اللي البرنامج بيتكلم بيها في فيديوهات العلامة (أساسي أو بالتناوب)، وصوت العميل المستنسخ
+  async function loadNarr(b) {
+    S.nrLoading = b.id;
+    try { S.nr = await bAPI("/narrators"); } catch { S.nr = null; }
+    S.nrFor = b.id; S.nrLoading = null;
+    if (S.open && cur()?.id === b.id) refreshCard();
+  }
+  function narrHTML(b) {
+    const x = S.nrFor === b?.id ? S.nr : null;
+    if (!x) { if (b && S.nrLoading !== b.id) loadNarr(b); return `<p class="bm-note">جارٍ التحميل…</p>`; }
+    const dl = x.dialects.find((d) => d.id === (S.nrLang || "")) || x.dialects[0];
+    const row = (n, i) => `<div class="bm-nr${n.default && x.mode !== "rotate" ? " on" : ""}">
+      ${n.sample ? `<button type="button" class="bm-pill" data-nrplay="${esc(n.sample)}" title="استمع">▶</button>` : ""}
+      <span><b>${esc(n.kind === "clone" ? `🎙️ ${n.label}` : n.label)}</b><small>${esc(n.kind === "clone" ? "صوتك المستنسخ" : n.dialect)}</small></span>
+      ${x.mode !== "rotate" ? `<button type="button" class="bm-pill${n.default ? " on" : ""}" data-nrdef="${i}">${n.default ? "الأساسي" : "اجعله الأساسي"}</button>` : ""}
+      <button class="bm-x2" data-nrdel="${i}" title="أزل هذا الصوت">✕</button></div>`;
+    return `<p class="bm-note">الصوت الذي يتكلم في فيديوهات العلامة. اختر صوتًا أساسيًا، أو أكثر من صوت يتناوب عليها البرنامج.</p>
+      <div class="bm-nrs">${x.items.map(row).join("") || `<p class="bm-note">لم تختر صوتًا بعد، فيُستخدم أول صوت في لهجة الفيديو.</p>`}</div>
+      ${x.items.length > 1 ? `<div class="bm-pills"><button class="bm-pill${x.mode !== "rotate" ? " on" : ""}" data-nrmode="default">صوت أساسي</button><button class="bm-pill${x.mode === "rotate" ? " on" : ""}" data-nrmode="rotate">بالتناوب</button></div>` : ""}
+      <div class="bm-sub"><small>أضف صوتًا جاهزًا</small>
+        <div class="bm-nradd"><select data-nrlang>${x.dialects.map((d) => `<option value="${d.id}" ${d.id === dl.id ? "selected" : ""}>${esc(d.label)}</option>`).join("")}</select>
+        <div class="bm-pills">${dl.voices.map((v) => `<span class="bm-nrv">${v.sample ? `<button type="button" class="bm-pill" data-nrplay="${esc(v.sample)}" title="استمع">▶</button>` : ""}<button type="button" class="bm-pill" data-nradd="${esc(v.id)}" data-lang="${dl.id}">＋ ${esc(v.label)}</button></span>`).join("")}</div></div></div>
+      ${x.clone ? `<div class="bm-sub"><small>صوتك أنت</small><p class="bm-note">ارفع تسجيلًا لصوتك (من ٣٠ ثانية إلى دقيقتين، بصوت واضح ومن غير موسيقى)، فيتكلم البرنامج بصوتك في الفيديوهات.</p>
+        <label class="bm-pill">🎙️ ارفع عينة صوتك<input type="file" accept="audio/*,video/*" data-nrclone hidden></label></div>` : ""}`;
+  }
+  const nrSave = async (b, items, mode) => { try { S.nr = await bAPI("/narrators", { method: "PUT", ...jsonBody({ items, mode: mode || S.nr.mode }) }); S.nrFor = b.id; refreshCard(); } catch (err) { toast(err.message, true); } };
   // 🏷️ الشعار بستايلات القوالب: يُختم به آخر كل فيديو قالب (والنسخة المقفولة يحل محلها الشعار الأصلي)
   async function loadLst(b) {
     S.lstLoading = b.id;
@@ -752,6 +781,7 @@ const BrandPage = (() => {
     switch (l.type) {
       case "text": return head + editable(l.f, l.f === "@name" ? b?.name : b?.[l.f], l.ph, l.ltr) + (l.hint ? `<p class="bm-note">${esc(l.hint)}</p>` : "") + suggBox(b, l);
       case "rule": return head + editable(`rule:${l.i}`, l.t, "القاعدة") + `<button class="bm-link bad" data-rdel="${l.i}">أزل هذه القاعدة</button>`;
+      case "narr": return head + narrHTML(b);
       case "auds": {   // 👥 أكثر من جمهور: العقل يستخلصهم من الوصف، وكل فكرة وإعلان يتوجّه لواحد منهم
         const A = b?.audiences || [];
         return head + `<p class="bm-note">${b?.audiences_busy ? "⏳ يستخلص العقل الجماهير من وصف العلامة…" : "يستخلصها العقل تلقائيًا من «عن العلامة» و«الجمهور»، وتتوجّه كل فكرة وإعلان إلى واحد منها."}</p>
@@ -1301,6 +1331,17 @@ const BrandPage = (() => {
       const hdel = t.closest("[data-hdel]");
       if (hdel) return patch({ palette: String(cur()?.palette || "").replace(new RegExp(`${hdel.dataset.hdel}[^,\\n]*[,\\n]?\\s*`, "i"), "").trim() });
       if (t.closest("[data-analyze]")) return save(() => bAPI("/analyze", { method: "POST" }));
+      const nrp = t.closest("[data-nrplay]");
+      if (nrp) { S.nrAudio?.pause(); S.nrAudio = new Audio(nrp.dataset.nrplay); S.nrAudio.play().catch(() => {}); return; }
+      const nrd = t.closest("[data-nrdef]"), nrx = t.closest("[data-nrdel]"), nra = t.closest("[data-nradd]"), nrm = t.closest("[data-nrmode]");
+      if ((nrd || nrx || nra || nrm) && S.nr) {
+        const b = cur(); if (!b) return;
+        let items = S.nr.items.map((n) => ({ id: n.id, kind: n.kind, lang: n.lang, voice: n.voice, label: n.label, default: n.default }));
+        if (nrd) items = items.map((n, i) => ({ ...n, default: i === +nrd.dataset.nrdef }));
+        if (nrx) items.splice(+nrx.dataset.nrdel, 1);
+        if (nra) { if (items.some((n) => n.voice === nra.dataset.nradd)) return toast("هذا الصوت مضاف بالفعل"); items.push({ kind: "stock", lang: nra.dataset.lang, voice: nra.dataset.nradd, default: !items.length }); }
+        return nrSave(b, items, nrm?.dataset.nrmode);
+      }
       const lst = t.closest("[data-lst]"), lsr = t.closest("[data-lstredo]");
       if (lst || lsr || t.closest("[data-lstall]")) {
         const b = cur(); if (!b) return;
@@ -1361,6 +1402,14 @@ const BrandPage = (() => {
     w.addEventListener("change", (e) => {
       const el = e.target;
       if (el.dataset.up) { const f = el.files; upload(el.dataset.up, f); el.value = ""; return; }
+      if (el.matches("[data-nrlang]")) { S.nrLang = el.value; return refreshCard(); }
+      if (el.matches("[data-nrclone]")) {
+        const f = el.files[0], b = cur(); el.value = ""; if (!f || !b) return;
+        const form = new FormData(); form.append("file", f);
+        toast("⏳ يُرفع صوتك…");
+        api(`/api/ad-brains/${b.id}/narrators/clone`, { method: "POST", body: form }).then((r) => { S.nr = r; S.nrFor = b.id; refreshCard(); toast("✓ أُضيف صوتك"); }).catch((err) => toast(err.message, true));
+        return;
+      }
       if (el.matches("[data-src]")) { const form = new FormData(); [...el.files].forEach((f) => form.append("files", f)); el.value = ""; return addSource(form); }
       if (el.dataset.hadd != null && el.matches("[data-hadd]")) {
         const b = cur(), p = String(b?.palette || "").trim();

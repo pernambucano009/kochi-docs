@@ -814,8 +814,7 @@ const Gallery = (() => {
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
         ${lgLine(x)}
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost${AP.on.has(x.id) ? " apon" : ""}" data-gap="${esc(x.id)}">${AP.on.has(x.id) ? "✓ في قائمة الأوتوبايلوت (اضغط للإزالة)" : "اختر هذا القالب لقائمة الأوتوبايلوت"}</button>` : ""}
-        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ أنشئ نسختك من هذا القالب</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتُحفظ في «قوالبك المخصصة».</small>` : ""}
-        <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
+                <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;
     pv.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });

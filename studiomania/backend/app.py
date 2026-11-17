@@ -11984,7 +11984,7 @@ def run_first(bid: str, jid: str, tpl: str, name: str, t0: float, facts: dict | 
         step("voice")
         d = flow_load(fid)
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-        voice = FlowVoiceIn(speaker="narrator", lang=lang, voice=dub.DIALECTS[lang]["voices"][0])
+        voice = FlowVoiceIn(speaker="narrator", lang=lang, voice=brand_narrator(lang))
         flow_voice(fid, voice)
         first_wait(fid, lambda x: bool((x.get("vo_track") or {}).get("file")), "تسجيل الصوت", lambda: flow_voice(fid, voice))
         done.append("voice")
@@ -22683,7 +22683,7 @@ def tpl_sample_cost(d: dict) -> float:
 
 def voice_usd(voice: str, text: str) -> float:
     """تكلفة التعليق الصوتي الحقيقية: فصيح بالدقيقة، وElevenLabs بالألف حرف."""
-    v = dub.VOICES.get(voice) or {}
+    v = dub.VOICES.get(voice) or ({"per_1k": 0.30} if str(voice).startswith("clone:") else {})
     n = len(text or "")
     per_1k = v.get("per_1k", 0.1)
     return n / 1000 * per_1k + (n / dub.CHARS_PER_SEC) / 60 * v.get("per_min", 0)
@@ -22700,6 +22700,21 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     cost = wallet.credits(voice_usd(voice, text))
     wallet.need(cost, "التعليق الصوتي")
     raw = out.with_suffix(".src")
+    if str(voice).startswith("clone:"):   # 🎙️ صوت العميل المستنسخ: نسخة فورية من العينة، بتتمسح بعد الجملة
+        _, cbid, nid = (voice.split(":") + ["", ""])[:3]
+        n = next((x for x in (brain_row(cbid) or {}).get("narrators") or [] if x.get("id") == nid), None)
+        sample = brain_dir(cbid) / str((n or {}).get("file") or "")
+        if not n or not sample.is_file():
+            raise HTTPException(400, "عينة الصوت المستنسخ غير موجودة. أضفها من «صوت الراوي» في عقل العلامة")
+        vid = voicelab.eleven_clone(sample, f"brand-{cbid}")
+        try:
+            voicelab.eleven_say(text, vid, raw)
+        finally:
+            voicelab.eleven_delete(vid)
+        subprocess.run(ff + ["-i", str(raw), "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=60)
+        raw.unlink(missing_ok=True)
+        wallet.charge(cost, "تعليق صوتي بصوتك", out.stem[:60])
+        return out
     v = dub.VOICES[voice]
     if v["provider"] in ("fasih", "eleven_direct"):
         ar_speak(v, text, raw)
@@ -25755,6 +25770,88 @@ def flow_lang_guess(d: dict) -> str:
 
 
 @app.get("/api/flows/{fid}/voice-options")
+# 🎙️ صوت الراوي في عقل العلامة: صوت أساسي، أو أكتر من صوت بالتناوب، أو صوت العميل نفسه (مستنسخ من عينة)
+def brand_narrator(lang: str, bid: str | None = None, advance: bool = False) -> str:
+    """الصوت اللي يتكلم في فيديو العلامة باللهجة دي: من «صوت الراوي» (أساسي أو بالتناوب)، وإلا أول صوت في اللهجة."""
+    bid = bid or active_client_id()
+    b = brain_row(bid) if bid else None
+    ok = [n for n in (b or {}).get("narrators") or []
+          if (n.get("kind") == "clone" and n.get("file")) or (n.get("voice") in (dub.DIALECTS.get(lang) or {}).get("voices", []))]
+    fallback = (dub.DIALECTS.get(lang) or dub.DIALECTS["ar-eg-cairo"])["voices"][0]
+    if not ok:
+        return fallback
+    if (b or {}).get("narrator_mode") == "rotate" and len(ok) > 1:
+        i = int((b or {}).get("narrator_i") or 0)
+        if advance:
+            update_brain(bid, lambda d: d.update(narrator_i=i + 1))
+        n = ok[i % len(ok)]
+    else:
+        n = next((x for x in ok if x.get("default")), ok[0])
+    return f"clone:{bid}:{n['id']}" if n.get("kind") == "clone" else n["voice"]
+
+
+def narrators_view(bid: str) -> dict:
+    b = brain_row(bid) or {}
+    items = []
+    for n in b.get("narrators") or []:
+        v = dub.VOICES.get(n.get("voice") or "") or {}
+        items.append({**n, "label": n.get("label") or v.get("label") or "صوت",
+                      "dialect": (dub.DIALECTS.get(n.get("lang") or "") or {}).get("label", ""),
+                      "sample": f"/media/ads/brains/{bid}/{n['file']}" if n.get("kind") == "clone" and n.get("file")
+                      else v.get("sample") or (f"/media/vsamples/{n.get('voice')}.mp3" if (VSAMPLE_DIR / f"{n.get('voice')}.mp3").exists() else "")})
+    dialects = [{"id": k, "label": d["label"], "voices": [{"id": x, "label": dub.VOICES[x]["label"], "gender": dub.VOICES[x].get("gender") or "",
+                 "sample": dub.VOICES[x].get("sample") or (f"/media/vsamples/{x}.mp3" if (VSAMPLE_DIR / f"{x}.mp3").exists() else "")} for x in d["voices"]]}
+                for k, d in dub.DIALECTS.items()]
+    return {"items": items, "mode": b.get("narrator_mode") or "default", "dialects": dialects, "clone": bool(voicelab.eleven_key() or atlas.mock_mode())}
+
+
+@app.get("/api/ad-brains/{bid}/narrators")
+def narrators_get(bid: str):
+    if brain_row(bid) is None:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    return narrators_view(bid)
+
+
+class NarratorsIn(BaseModel):
+    items: list[dict] = []
+    mode: str = "default"
+
+
+@app.put("/api/ad-brains/{bid}/narrators")
+def narrators_put(bid: str, body: NarratorsIn):
+    """إضافة/شيل/اختيار الأساسي. الأصوات الجاهزة لازم تكون موجودة في اللهجة، والمستنسخة لازم عينتها موجودة."""
+    old = {n.get("id"): n for n in (brain_row(bid) or {}).get("narrators") or []}
+    keep = []
+    for x in body.items[:8]:
+        nid = str(x.get("id") or uuid.uuid4().hex[:8])[:12]
+        if x.get("kind") == "clone":
+            if nid in old and old[nid].get("file"):
+                keep.append({**old[nid], "label": str(x.get("label") or old[nid].get("label") or "")[:40], "default": bool(x.get("default"))})
+        elif x.get("lang") in dub.DIALECTS and x.get("voice") in dub.DIALECTS[x["lang"]]["voices"]:
+            keep.append({"id": nid, "kind": "stock", "lang": x["lang"], "voice": x["voice"], "default": bool(x.get("default"))})
+    for n in old.values():   # المستنسخ اللي اتشال: عينته تتمسح
+        if n.get("kind") == "clone" and n.get("id") not in {k["id"] for k in keep}:
+            (brain_dir(bid) / str(n.get("file") or "_")).unlink(missing_ok=True)
+    if sum(1 for k in keep if k.get("default")) != 1 and keep:
+        for i, k in enumerate(keep):
+            k["default"] = i == 0
+    update_brain(bid, lambda d: d.update(narrators=keep, narrator_mode="rotate" if body.mode == "rotate" else "default"))
+    return narrators_view(bid)
+
+
+@app.post("/api/ad-brains/{bid}/narrators/clone")
+def narrators_clone(bid: str, label: str = Form(""), file: UploadFile = File(...)):
+    """🎙️ عينة صوت العميل (٣٠ ثانية إلى دقيقتين، بصوت واضح من غير موسيقى): البرنامج بيتكلم بصوته في الفيديوهات."""
+    if brain_row(bid) is None:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    if not (voicelab.eleven_key() or atlas.mock_mode()):
+        raise HTTPException(400, "استنساخ الصوت غير متاح الآن")
+    name = save_audio_upload(file, brain_dir(bid), "narr")
+    n = {"id": uuid.uuid4().hex[:8], "kind": "clone", "file": name, "label": (label.strip() or "صوتي")[:40], "default": False}
+    update_brain(bid, lambda d: d.update(narrators=[*(d.get("narrators") or []), n][:8]))
+    return narrators_view(bid)
+
+
 def flow_voice_options(fid: str):
     d = flow_load(fid)
     fasih_sync()
@@ -25770,7 +25867,10 @@ def flow_voice_options(fid: str):
                   for x in v["voices"]] for k, v in dub.DIALECTS.items()}
     vo = d.get("vo") or {}
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else vo.get("lang") if vo.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-    voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] else dub.DIALECTS[lang]["voices"][0]
+    mine = brand_narrator(lang, d.get("client_id"))
+    voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] or str(vo.get("voice") or "").startswith("clone:") else mine
+    if mine.startswith("clone:"):   # 🎙️ صوت العميل المستنسخ يظهر أول اختيار في اللهجة
+        voices[lang] = [{"id": mine, "label": "صوتك (مستنسخ)", "gender": "", "pts": wallet.credits(voice_usd(mine, say)), "sample": ""}, *voices[lang]]
     return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()), "balance": wallet.balance(),
             "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
 
@@ -25823,7 +25923,8 @@ def flow_voice(fid: str, body: FlowVoiceIn):
         raise HTTPException(400, "اختر من يتكلم")
     if body.lang not in dub.DIALECTS:
         raise HTTPException(400, "هذه اللهجة غير موجودة")
-    voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] else dub.DIALECTS[body.lang]["voices"][0]
+    voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] or body.voice.startswith(f"clone:{d.get('client_id') or active_client_id()}:") \
+        else brand_narrator(body.lang, d.get("client_id"))
     vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
     if d["template"].get("kind") == "motion":
         flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, vo_track=None, stage="voice" if vo["on"] else "panel"))
@@ -33175,7 +33276,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     # 🎨 قالب كود: فويس أوفر ← رسم الفيديو
     if ph == "voice":
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-        flow_voice(fid, FlowVoiceIn(speaker="narrator", lang=lang, voice=dub.DIALECTS[lang]["voices"][0]))
+        flow_voice(fid, FlowVoiceIn(speaker="narrator", lang=lang, voice=brand_narrator(lang, d.get("client_id"), advance=True)))   # 🎙️ صوت الراوي من عقل العلامة
         return put(phase="vo", note="جارٍ تسجيل التعليق الصوتي")
     if ph == "vo":
         if not (d.get("vo_track") or {}).get("file"):

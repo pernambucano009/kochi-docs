@@ -279,7 +279,7 @@ const PilotPage = (() => {
   const TYPES = [
     { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
     { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
-    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["@tpl", "القالب"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["", "النشر"]] },
     { id: "photo", n: "صور", soon: true },
     { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["", "النشر"]] },
   ];
