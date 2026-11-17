@@ -6628,6 +6628,7 @@ window.I18N_EN = {
   "تحليل الحسابات": "Account analysis",
   "تُحسب من نقاطك": "Counted from your points",
   "نقاطك": "Your points",
+  "🪙 استُهلك لصناعة هذا الفيديو {0} نقطة (رسم العناصر والإخراج).": "🪙 This video used {0} credits (element drawing and rendering).",
   "الخدمة": "Service",
   "{0}الأصوات العربية": "{0}Arabic voices",
   "{0}الأصوات الخليجية": "{0}Gulf voices",

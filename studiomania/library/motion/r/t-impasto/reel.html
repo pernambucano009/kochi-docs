@@ -25,7 +25,7 @@ M.reel({
     await Promise.all([M.font("LZ", PR.fTitle), M.font("CH", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     const mk = () => { const k = document.createElement("canvas"); k.width = W; k.height = H; return k; };
-    const ELS = await M.els(PR.els, 5);   // 🧩 عناصر مكتبة المجال (بستايل الزيت): لو موجودة، الشمسية والكوباية والطبق بيتشالوا والعناصر بتتحط على الترابيزة بالدور
+    const ELS = await M.els(PR.els, Infinity);   // 🧩 عناصر مكتبة المجال (بستايل الزيت): لو موجودة، الشمسية والكوباية والطبق بيتشالوا والعناصر بتتحط على الترابيزة بالدور
     // ١) الرسمة المرجعية بقيم واضحة + خريطة المجموعات (كل لون = مجموعة، الضربة ماتعدّيش برّاها)
     const ref = mk(), r = ref.getContext("2d", { willReadFrequently: true }), grp = mk(), g = grp.getContext("2d", { willReadFrequently: true });
     const both = (fn, col, id) => { r.fillStyle = col; fn(r); g.fillStyle = `rgb(${id},0,0)`; fn(g); };

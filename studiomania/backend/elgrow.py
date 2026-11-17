@@ -12,7 +12,6 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-MAX_NEW = 4          # أقصى رسومات جديدة لكل فيديو (اتفاق صاحب المشروع)
 RECENT_KEEP = 40     # ذاكرة الحساب: آخر العناصر اللي اتستخدمت (عشان مايتكررش)
 PLANS_KEEP = 300
 
@@ -108,7 +107,7 @@ def recent_add(f: Path, keys: list[str]) -> None:
 def plan_messages(lines: list[str], menu: dict[str, str], avoid: list[str], n: int) -> list[dict]:
     script = "\n".join(f"{i}. {s}" for i, s in enumerate(lines))
     lib = "\n".join(f"- {k}: {v}" for k, v in menu.items())
-    lo = min(3, n)
+    lo = min(3, n, len(lines))
     return [
         {"role": "system", "content": "You are the art director of a short vertical social video. For the spoken script you choose the "
                                       "illustrations that appear on screen, one at a time, so each one shows exactly what is being said at that moment. "
@@ -117,12 +116,12 @@ def plan_messages(lines: list[str], menu: dict[str, str], avoid: list[str], n: i
             f"Script lines (Arabic, numbered, in speaking order):\n{script}\n\n"
             f"Existing illustration library (key: what it shows):\n{lib or '(empty)'}\n\n"
             f"Recently used in this account's other videos (avoid unless nothing else fits): {', '.join(avoid) or 'none'}\n\n"
-            f"Choose between {lo} and {n} illustrations, in the order the lines are spoken, spread across the script.\n"
+            f"Choose about one illustration per line (between {lo} and {n}), in the order the lines are spoken. Skip only lines with nothing concrete to show.\n"
             "Rules:\n"
             "- Each illustration shows the concrete thing a specific line actually talks about: the exact object, food, body part, "
             "movement, tool, situation or number mentioned in those words. Not a generic symbol of the whole field.\n"
             "- Use a library key ONLY if its description shows that same specific thing. Otherwise create a new one.\n"
-            f"- At most {MAX_NEW} new ones. Prefer specific new ones over vague library matches.\n"
+            "- Prefer a specific new one over a vague library match.\n"
             "- A new one: key = short english snake_case name; desc = one english sentence describing a single isolated subject "
             "(object, food, body part, simple figure doing the action), with its colors/details, no text, no letters, no numbers, no logos, no real people.\n"
             "- No two picks may show the same thing.\n"
@@ -132,10 +131,10 @@ def plan_messages(lines: list[str], menu: dict[str, str], avoid: list[str], n: i
 
 
 def parse_plan(raw: str, menu: dict[str, str], known: dict[str, str], n: int, nlines: int) -> list[dict]:
-    """رد الموديل ← [{key, desc, line, new}] (الجديد محدود بـ MAX_NEW، ومفيش تكرار)."""
+    """رد الموديل ← [{key, desc, line, new}] (من غير تكرار)."""
     m = re.search(r"\{.*\}", raw or "", re.S)
     beats = (json.loads(m.group(0)).get("beats") if m else None) or []
-    out, seen, new = [], set(), 0
+    out, seen = [], set()
     for b in beats:
         if not isinstance(b, dict):
             continue
@@ -154,9 +153,8 @@ def parse_plan(raw: str, menu: dict[str, str], known: dict[str, str], n: int, nl
             else:
                 desc = known.get(key) or str(nw.get("desc") or "").strip()[:300]
                 is_new = True
-                if not desc or new >= MAX_NEW:
+                if not desc:
                     continue
-                new += 1
         else:
             continue
         if key in seen:
@@ -166,6 +164,32 @@ def parse_plan(raw: str, menu: dict[str, str], known: dict[str, str], n: int, nl
         if len(out) >= n:
             break
     return sorted(out, key=lambda x: x["line"])
+
+
+def line_starts(lines: list[str], words: list, norm) -> list[float | None]:
+    """ثانية بداية كل جملة في الفيديو النهائي: كلماتها بتتدوّر بالترتيب في كلمات التعليق الصوتي ([كلمة, ثانية])."""
+    seq = [norm(str(w[0])) for w in words]
+    out, pos = [], 0
+    for ln in lines:
+        ws = [norm(w) for w in re.findall(r"\w+", ln)]
+        ws = [w for w in ws if w]
+        hit = None
+        for L in (3, 2, 1):
+            if len(ws) < L:
+                continue
+            key = ws[:L]
+            for i in range(pos, len(seq) - L + 1):
+                if seq[i:i + L] == key:
+                    hit = i
+                    break
+            if hit is not None:
+                break
+        if hit is None:
+            out.append(None)
+        else:
+            out.append(float(words[hit][1]))
+            pos = hit + 1
+    return out
 
 
 def gen_prompt(desc: str) -> str:

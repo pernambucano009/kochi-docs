@@ -27,7 +27,7 @@ M.reel({
     await Promise.all([M.font("AM", PR.fTitle), M.font("TJ", PR.fText)]);
     const c = M.canvas(W, H), x = c.getContext("2d");
     // 🧩 عناصر مكتبة المجال (بستايل الخط الواحد): الكوباية بتتشال من المسار، والعناصر بتترسم بالدور على الطبق (بلون الحبر وأغمق)
-    const ELS = (await M.els(PR.els, 4)).map((im) => { const c2 = document.createElement("canvas"); c2.width = im.width; c2.height = im.height; const g = c2.getContext("2d"), sil = M.fx.silhouette(im, PR.ink, im.width, im.height); for (let k = 0; k < 3; k++) g.drawImage(sil, 0, 0); return c2; });
+    const ELS = (await M.els(PR.els, Infinity)).map((im) => { const c2 = document.createElement("canvas"); c2.width = im.width; c2.height = im.height; const g = c2.getContext("2d"), sil = M.fx.silhouette(im, PR.ink, im.width, im.height); for (let k = 0; k < 3; k++) g.drawImage(sil, 0, 0); return c2; });
     // المسار: نقط متتابعة، كل نقطة معاها لونها (٠ = حبر، ١ = لون القلب) ووزن السرعة (القلب أبطأ)
     const P = []; let cx = -30, cy = 1430, tag = 0, slow = 1;
     const push = (px, py) => P.push([px, py, tag, slow]);

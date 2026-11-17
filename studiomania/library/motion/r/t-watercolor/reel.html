@@ -24,7 +24,7 @@ M.meta({
 });
 const W = 1080, H = 1920, DUR = 12;
 // 🧩 عناصر مكتبة المجال (اختياري): لو موجودة، الكوباية والنعناع بيتشالوا والعناصر بتترسم بالدور في نص الصفحة (مسحة فرشاة) وتسيح في الورق
-const ELS = (PR.els || []).filter(Boolean).slice(0, 6);
+const ELS = (PR.els || []).filter(Boolean);   // عنصر لكل جملة (ومع توقيت الكلام بيظهر مع كلمته)
 const rgb = (h) => { const n = parseInt(String(h).slice(1).replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const dark = (c, k) => c.map((v) => Math.round(v * k));
@@ -117,7 +117,7 @@ M.reel({
     S.steam = [0, 1, 2].map((k) => k);
     S.lead1 = [[300, 860], [262, 1000], [250, 1215]];
     S.lead2 = [[760, 1500], [700, 1420], [620, 1300]];
-    const els = (await Promise.all(ELS.map((u) => M.img(u)))).filter(Boolean);
+    const els = await M.els(ELS, Infinity);
     return { x, paper, S, cup, leaf, acc, tea, ochre, els };
   },
   seek(t, C, M) {
@@ -134,7 +134,7 @@ M.reel({
       // كل عنصر: بيترسم بمسحة من فوق لتحت بحافة متموجة، ولمعة لون خفيفة وراه، ويفضل يتنفس، وبعدين يسيح في الورق والعنصر اللي بعده بيترسم
       const n = C.els.length, t0 = .5, t1 = 11.6, D = (t1 - t0) / n;
       C.els.forEach((im, k) => {
-        const s0 = t0 + k * D, s1 = s0 + D + (k === n - 1 ? 1 : .5);
+        const [s0, w1] = M.elsWin(k, n, t0, t1, 1, .7), s1 = k === n - 1 ? Math.max(w1, t1 + 1) : w1 + (M._elsAt ? .2 : .5);
         if (t < s0 || t > s1) return;
         const rev = cubic(seg(t, s0, s0 + 1.1)), fade = k === n - 1 ? 0 : smooth(seg(t, s1 - .7, s1));
         const bh = 620, bw = bh * im.width / im.height, sc = Math.min(1, 640 / bw), w = bw * sc, h = bh * sc;

@@ -47,7 +47,7 @@ M.reel({
     const status = M.el("div", "", `position:absolute;right:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;text-align:right;unicode-bidi:plaintext;`);
     const sub = M.el("div", "", `position:absolute;left:70px;top:80px;font:500 26px PM;color:${PR.hue};direction:ltr;unicode-bidi:plaintext;`, PR.hudTop);
     // 🧩 عناصر مكتبة المجال: كل عنصر هولوجرام (حدود منوّرة + خطوط مسح أفقية جوه الشكل) بلون الشاشة، بالدور مكان السبيكر
-    const ims = await M.els(PR.els, 4), HS = 600;
+    const ims = await M.els(PR.els, Infinity), HS = 600;
     const EL = ims.map((im) => {
       const c = document.createElement("canvas"); c.width = c.height = HS; const g = c.getContext("2d"), sil = M.fx.silhouette(im, PR.hue, HS, HS);
       g.globalAlpha = .1; g.drawImage(sil, 0, 0); g.globalAlpha = .55; for (let y = 0; y < HS; y += 6) g.drawImage(sil, 0, y, HS, 2, 0, y, HS, 2);

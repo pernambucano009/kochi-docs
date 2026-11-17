@@ -115,13 +115,30 @@
     if (y0 >= H0 || x0 >= W0) return im; const p = 6; x0 = Math.max(0, x0 - p); y0 = Math.max(0, y0 - p); x1 = Math.min(c.width - 1, x1 + p); y1 = Math.min(c.height - 1, y1 + p);
     const o = document.createElement("canvas"); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1; o.getContext("2d").drawImage(c, -x0, -y0); return o;
   };
-  M.els = async (list, max = 8) => (await Promise.all((list || []).filter(Boolean).slice(0, max).map((u) => M.img(u)))).filter(Boolean).map(M.trim);
+  // ⏱️ window.ELS_AT = ثانية بداية الجملة بتاعة كل عنصر في الفيديو النهائي (من توقيت التعليق الصوتي). لو موجودة كل عنصر
+  //   بيظهر مع كلمته بالظبط (M.turns / M.elsWin)، والقوالب اللي بتعرض عنصر ورا التاني (max = Infinity) بتاخد كل العناصر.
+  M._elsAt = null;
+  M.els = async (list, max = 8) => {
+    const at = Array.isArray(window.ELS_AT) ? window.ELS_AT : null;
+    const src = (list || []).map((u, i) => [u, at ? +at[i] : NaN]).filter((p) => p[0]).slice(0, Number.isFinite(max) ? max : 40);
+    const got = (await Promise.all(src.map(async ([u, s]) => [await M.img(u), s]))).filter((p) => p[0]);
+    const tt = M._at || ((x) => x);
+    M._elsAt = at && got.length && got.every((p) => Number.isFinite(p[1])) ? got.map((p) => tt(p[1])) : null;
+    return got.map((p) => M.trim(p[0]));
+  };
+  // نافذة العنصر k من n (بوقت القالب): مع كلمته لو التوقيت معروف، وإلا بالتساوي بين t0 وt1. الأخير بيفضل لآخر الفيديو.
+  M.elsWin = (k, n, t0, t1, hold = 1.25, outS = .5) => {
+    const A = M._elsAt && M._elsAt.length === n ? M._elsAt : null;
+    if (!A) { const D = (t1 - t0) / Math.max(1, n), s0 = t0 + k * D; return [s0, k === n - 1 ? t1 + 9 : s0 + D * hold]; }
+    const st = (i) => Math.max(t0, A[i]);
+    return [st(k), k === n - 1 ? t1 + 9 : Math.max(st(k) + .3, st(k + 1) + outS * .6)];
+  };
   // M.turns(t, n, t0, t1, hold) ← العناصر اللي ظاهرة دلوقتي: [{k, s0, s1, u (٠←١ عمره), in (دخول ٠←١), out (خروج ٠←١)}]
   //   كل عنصر ليه دور D، وبيفضل hold×D (أكبر من ١ = تداخل)، والأخير بيفضل لحد t1
   M.turns = (t, n, t0, t1, hold = 1.25, inS = .6, outS = .5) => {
-    const D = (t1 - t0) / Math.max(1, n), out = [];
+    const out = [];
     for (let k = 0; k < n; k++) {
-      const s0 = t0 + k * D, s1 = k === n - 1 ? t1 + 9 : s0 + D * hold;
+      const [s0, s1] = M.elsWin(k, n, t0, t1, hold, outS);
       if (t < s0 || t > s1) continue;
       out.push({ k, s0, s1, u: M.clamp((t - s0) / (s1 - s0)), in: M.clamp((t - s0) / inS), out: k === n - 1 ? 0 : M.clamp((t - (s1 - outS)) / outS) });
     }
@@ -325,6 +342,7 @@
   M.reel = (o) => {
     const W = o.W || 1920, H = o.H || 1080;
     const TM = timeMap(o.DUR), DUR = TM ? TM.dur : o.DUR, at = TM ? TM.real : (t) => t;
+    M._at = at;   // وقت الفيديو النهائي ← وقت القالب (لتوقيت العناصر)
     if (TM && window.TEMPLATE_META) window.TEMPLATE_META = { ...window.TEMPLATE_META, scenes: window.TEMPLATE_META.scenes.map((x) => ({ ...x, t0: TM.fwd(+x.t0), t1: TM.fwd(+x.t1 - 1e-4) })) };
     window.W = W; window.H = H; window.DUR = DUR; window.SUB = o.SUB || 2;
     document.documentElement.style.cssText = `margin:0;width:${W}px;height:${H}px;overflow:hidden;background:${o.bg || "#000"}`;

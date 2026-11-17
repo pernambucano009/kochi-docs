@@ -26,7 +26,7 @@ const ANG = [15, 75, 45];          // زاوية شبكة النقط لكل لو
 const ARRIVE = [[1.0, 1.8], [1.9, 2.7], [0.1, 0.9]];   // إمتى كل لوح بيتطبع (أزرق، بمبي، أصفر)
 const REG = [[2, -1, .0015], [-2, 2, -.001], [1, 2, .0008]];   // إزاحة ثابتة لكل لوح
 // 🧩 عناصر مكتبة المجال (اختياري): لو موجودة، الدراجة بتتشال والعناصر بتطلع بالدور على التل (بتدخل من جنب، بتتنطط على الإيقاع، وتخرج)
-const ELS = (PR.els || []).filter(Boolean).slice(0, 8);
+const ELS = (PR.els || []).filter(Boolean);   // عنصر لكل جملة (ومع توقيت الكلام بيظهر مع كلمته)
 
 M.reel({
   W, H, DUR, bg: "#F4EEE2",
@@ -56,7 +56,7 @@ M.reel({
       for (let i = 0; i < 40; i++) { const cx = r() * W, cy = r() * H, rr = 40 + r() * 160, gr = q.createRadialGradient(cx, cy, 0, cx, cy, rr); gr.addColorStop(0, "rgba(0,0,0,.14)"); gr.addColorStop(1, "rgba(0,0,0,0)"); q.fillStyle = gr; q.fillRect(cx - rr, cy - rr, rr * 2, rr * 2); }
       return g;
     });
-    const els = (await Promise.all(ELS.map((u) => M.img(u)))).filter(Boolean);
+    const els = await M.els(ELS, Infinity);
     return { x, plates, pats, paper, grains, els };
   },
   seek(t, C, M) {
@@ -101,10 +101,10 @@ M.reel({
     if (C.els.length) {
       const n = C.els.length, t0 = 2.4, t1 = 11.4, D = (t1 - t0) / n, life = Math.min(D * 1.7, 4.2);
       C.els.forEach((im, k) => {
-        const s0 = t0 + k * D, u = (t - s0) / life;
+        const [s0, w1] = M.elsWin(k, n, t0, t1, 1.7, .5), lf = M._elsAt ? Math.max(1.2, Math.min(w1, t1 + 1) - s0) : life, u = (t - s0) / lf;
         if (u <= 0 || u >= 1) return;
         const side = k % 2 ? 1 : -1, homeX = n === 1 ? 540 : 540 + side * 245;
-        const inK = springO(Math.min(1, u * life / .55) * .9, 13, .62), outK = cubic(clamp((u - .78) / .22, 0, 1));
+        const inK = springO(Math.min(1, u * lf / .55) * .9, 13, .62), outK = cubic(clamp((u - .78) / .22, 0, 1));
         const px = homeX + side * (1 - inK) * 760 + side * outK * 900, gy0 = hill(1600, 26, .005, .5, px + cam);
         const beat = Math.abs(Math.sin((t - s0) * Math.PI / B)), hop = 24 * Math.pow(beat, 6) * (1 - outK);
         const hgt = 540, w = hgt * im.width / im.height, sc = Math.min(1, 500 / w);

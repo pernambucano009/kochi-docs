@@ -67,7 +67,7 @@ M.reel({
     S.man = mkStroke([[500, 1388], [496, 1350], [492, 1322]], 14, "press", 42, .1);
     S.rod = mkStroke([[496, 1340], [580, 1250], [660, 1200]], 3, "tip", 43, .1);
     S.streaks = Array.from({ length: 10 }, (_, i) => { const r = ((k) => () => M.hash(i * 5.1 + (k++) * 2.3))(1), y = 1300 + r() * 380, x0 = 80 + r() * 700; return mkStroke([[x0, y], [x0 + 90 + r() * 160, y + r() * 4]], 3, "tip", 700 + i, .85); });
-    const ELS = await M.els(PR.els, 4);   // 🧩 عناصر مكتبة المجال (بستايل الحبر): بالدور على المية مكان القارب
+    const ELS = await M.els(PR.els, Infinity);   // 🧩 عناصر مكتبة المجال (بستايل الحبر): بالدور على المية مكان القارب
     return { x, paper, S, ELS };
   },
   seek(t, C, M) {

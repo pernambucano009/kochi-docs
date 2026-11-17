@@ -16605,7 +16605,8 @@ def motion_params(params: dict) -> dict:
     return out
 
 
-def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progress=lambda k: None, timing: list | None = None, vo: Path | None = None) -> float:
+def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progress=lambda k: None, timing: list | None = None, vo: Path | None = None,
+                  els_at: list | None = None) -> float:
     """يفتح قالب الموشن في المتصفح، يرسم كل فريم من الوقت (seek) ويأخذ الصوت المكتوب بالكود، ويعمل منهم فيديو. يعود الطول."""
     from playwright.sync_api import sync_playwright
 
@@ -16614,7 +16615,8 @@ def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progre
         try:
             page = browser.new_page(viewport={"width": 1920, "height": 1080})
             page.add_init_script("window.PARAMS = " + json.dumps(motion_params(params or {}), ensure_ascii=False) + ";"
-                                 + (f"window.TIMING = {json.dumps([float(x) for x in timing])};" if timing else ""))
+                                 + (f"window.TIMING = {json.dumps([float(x) for x in timing])};" if timing else "")
+                                 + (f"window.ELS_AT = {json.dumps([float(x) for x in els_at])};" if els_at else ""))   # ⏱️ كل عنصر مع كلمته
             page.goto((MOTION_DIR / "r" / Path(mid).name / "reel.html").as_uri())
             page.evaluate("() => window.ready")
             W, H, dur = page.evaluate("() => [window.W, window.H, window.DUR]")
@@ -16643,14 +16645,15 @@ def motion_to_mp4(mid: str, params: dict | None, folder: Path, out: Path, progre
     return dur
 
 
-def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None, stamp: Path | None = None) -> None:
+def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: str = "", timing: list | None = None, vo: Path | None = None, stamp: Path | None = None,
+                      els_at: list | None = None) -> None:
     """يفتح الأنيميشن في المتصفح، يرسم كل فريم من الوقت (seek)، ويأخذ الصوت الذي مكتوب بالكود، ويعمل منهم فيديو + أصل."""
     aid = uuid.uuid4().hex[:12]
     folder = clip_dir(aid)
     job = MOTION_JOBS[mid]
     try:
         (folder / "variants").mkdir(parents=True, exist_ok=True)
-        dur = motion_to_mp4(mid, params, folder, folder / "clip.mp4", lambda k: job.update(progress=k), timing, vo)
+        dur = motion_to_mp4(mid, params, folder, folder / "clip.mp4", lambda k: job.update(progress=k), timing, vo, els_at)
         (folder / "track.wav").unlink(missing_ok=True)
         if stamp and stamp.exists():   # 🏷️ قفلة بلوجو العميل بستايل القالب
             job.update(progress=0.99)
@@ -24999,11 +25002,13 @@ EL_MAKING_LOCK = threading.Lock()
 
 
 def el_cap(mid: str) -> int:
-    """كام عنصر القالب بيعرضه (من كود القالب نفسه)."""
+    """كام عنصر القالب بيعرضه (من كود القالب نفسه). ٠ = مفتوح (عنصر لكل جملة)."""
     try:
         src = (MOTION_DIR / "r" / Path(mid).name / "reel.html").read_text("utf-8")
     except OSError:
         return 5
+    if re.search(r"M\.els\((PR\.els|ELS), Infinity\)", src):
+        return 0   # عنصر ورا التاني: عنصر لكل جملة من غير حد
     m = re.search(r"M\.els\(PR\.els,\s*(\d+)\)|PR\.els \|\| \[\]\)\.filter\(Boolean\)\.slice\(0,\s*(\d+)\)", src)
     return int(m.group(1) or m.group(2)) if m else 5
 
@@ -25048,9 +25053,18 @@ def el_make(field: str, style: str, key: str, desc: str) -> bool:
                         bg.alpha_composite(im.convert("RGBA"))
                         bg.convert("RGB").save(rp)
                     ref_urls.append(atlas.reference_url(rp))
-                url = atlas.generate_image("sunburst", elgrow.gen_prompt(desc), "1024x1024", "medium", images=ref_urls)
-                raw = tmp / "raw.png"
-                atlas.download(url, raw)
+                why = ""
+                for _try in range(2):   # 🔎 الرسمة بتتراجع قبل ما تدخل المكتبة: لو مش نفس الستايل أو مش هي، بتترسم تاني مرة واحدة
+                    url = atlas.generate_image("sunburst", elgrow.gen_prompt(desc) + (f" Avoid this problem from the last try: {why}" if why else ""),
+                                               "1024x1024", "medium", images=ref_urls)
+                    raw = tmp / "raw.png"
+                    atlas.download(url, raw)
+                    ok, why = el_review(raw, ref_urls, desc)
+                    if ok:
+                        break
+                else:
+                    print(f"[el] rejected {tag}: {why}", flush=True)
+                    return False
                 firstvid.cutout(raw, tmp / "cut.png")
                 elgrow.save_webp(tmp / "cut.png", dst)
             finally:
@@ -25066,17 +25080,35 @@ def el_make(field: str, style: str, key: str, desc: str) -> bool:
             EL_MAKING.discard(tag)
 
 
+def el_review(img: Path, ref_urls: list[str], desc: str) -> tuple[bool, str]:
+    """مراجعة الرسمة الجديدة بالمقارنة بعناصر الستايل: نفس الأسلوب، وهي الحاجة المطلوبة، ومن غير كتابة. لو المراجعة نفسها وقعت: مقبولة."""
+    try:
+        parts = [{"type": "text", "text": (
+            "The first images are reference elements of one illustration set. The LAST image is a new element meant to show: "
+            f"{desc}\nCheck the last image strictly: (1) same art style, medium, line and color treatment as the references "
+            "(not a different style, not a photo unless the references are photos); (2) it clearly shows that subject, one isolated subject, fully visible; "
+            "(3) no text, letters, numbers or logos; (4) plain light background. "
+            'Answer JSON only: {"ok": true|false, "problem": "short english description of what is wrong, empty if ok"}')}]
+        parts += [{"type": "image_url", "image_url": {"url": u}} for u in ref_urls] + [{"type": "image_url", "image_url": {"url": atlas.reference_url(img)}}]
+        raw = ad_media_chat([{"role": "user", "content": parts}], max_tokens=300, models=["google/gemini-2.5-flash", "google/gemini-2.5-pro"])
+        v = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+        return bool(v.get("ok")), str(v.get("problem") or "")[:200]
+    except Exception as exc:  # noqa: BLE001
+        print(f"[el] review skipped: {str(exc)[:120]}", flush=True)
+        return True, ""
+
+
 def field_elements(mid: str, text: str, n: int | None = None, make: bool = True) -> list[str]:
     """عناصر الفيديو ده من كلام السكريبت نفسه، بستايل القالب: روابط /gallery/el/… أو /api/el/… (فاضية لو المجال مالوش مكتبة).
-    make=False (اللوحة/اختيار النص): الموجود بس، والناقص بيترسم في الخلفية عشان يبقى جاهز وقت التصدير."""
+    make=False (اللوحة/اختيار النص): الموجود بس. make=True (صناعة الفيديو): الناقص بيترسم ويدخل."""
     field = field_guess(brain_row(active_client_id()) or {})
     idx = field_el_index(field)
     if not idx or not idx.get("items"):
         return []
     fld = idx["field"]
     style = (idx.get("tpl") or {}).get(mid) or "base"
-    n = n or el_cap(mid)
     lines = elgrow.lines_of(text)
+    n = n or el_cap(mid) or max(3, min(24, len(lines)))
     if not lines or atlas.mock_mode() or not atlas.api_key():
         return field_elements_old(mid, text, n)
     shared = elgrow.shared_items(EL_SHARED, fld)
@@ -25099,11 +25131,9 @@ def field_elements(mid: str, text: str, n: int | None = None, make: bool = True)
             return field_elements_old(mid, text, n)
         elgrow.plan_put(EL_PLANS, pk, beats)
     todo = [b for b in beats if not el_url(fld, style, b["key"])]
-    if todo and make:
+    if todo and make:   # الرسم وقت صناعة الفيديو بس (نقاطه بتتحسب على العملية دي وبتظهر للعميل بعدها)
         with ThreadPoolExecutor(max_workers=4) as ex:
             list(ex.map(lambda b: el_make(fld, style, b["key"], b["desc"]), todo))
-    elif todo:
-        threading.Thread(target=lambda: [el_make(fld, style, b["key"], b["desc"]) for b in todo], daemon=True).start()
     urls = [u for u in (el_url(fld, style, b["key"]) for b in beats) if u]
     if len(urls) < min(3, n):   # رسمة فشلت: نكمّل من المكتبة الثابتة
         used = {b["key"] for b in beats}
@@ -25364,6 +25394,36 @@ def flow_fill_els(d: dict, params: dict, make: bool = False) -> dict:
     return {**params, "els": els} if els else params
 
 
+def flow_els_at(d: dict, mid: str, els: list) -> list | None:
+    """⏱️ ثانية ظهور كل عنصر = بداية الجملة اللي بيمثّلها في التعليق الصوتي (لو فيه توقيت كلمات)."""
+    words = (d.get("vo_track") or {}).get("words") or []
+    if not words or not isinstance(els, list) or not els:
+        return None
+    field = field_guess(brain_row(active_client_id()) or {})
+    idx = field_el_index(field) or {}
+    style = (idx.get("tpl") or {}).get(mid) or "base"
+    lines = elgrow.lines_of(flow_els_text(d))
+    got = elgrow.plan_get(EL_PLANS, elgrow.plan_key(mid, style, lines)) or {}
+    line_of = {b["key"]: b["line"] for b in got.get("beats") or [] if isinstance(b, dict)}
+    starts = elgrow.line_starts(lines, words, hekaya.norm_word)
+    at = []
+    for u in els:
+        ln = line_of.get(Path(str(u).split("?")[0]).stem) if isinstance(u, str) else None
+        at.append(starts[ln] if ln is not None and ln < len(starts) else None)
+    known = [i for i, v in enumerate(at) if v is not None]
+    if not known:
+        return None
+    total = float((d.get("vo_track") or {}).get("total") or 0) or (max(at[i] for i in known) + 3)
+    for i, v in enumerate(at):   # عنصر مالوش جملة (احتياطي): في النص بين اللي قبله واللي بعده
+        if v is None:
+            prv = max((at[j] for j in known if j < i), default=0.0)
+            nxt = min((at[j] for j in known if j > i), default=total)
+            at[i] = round((prv + nxt) / 2, 3)
+    for i in range(1, len(at)):   # الترتيب لازم يفضل ماشي لقدّام
+        at[i] = max(at[i], at[i - 1] + 0.3)
+    return [round(float(v), 3) for v in at]
+
+
 @app.get("/api/flows/{fid}/panel")
 def flow_panel_params(fid: str):
     """🎛️ خانات لوحة القالب زي ما هتطلع في الفيديو (بعناصر المجال)، وبتتحفظ في المشروع."""
@@ -25387,7 +25447,7 @@ def flow_motion_params(d: dict) -> dict:
         out.pop("els")   # كلام مش صور: يتشال، والمكتبة تحط مكانه
     if "els" in schema and "els" not in (d.get("locked") or {}) and not els_ok(out.get("els")):   # 🧩 عناصر من مجال العميل حسب السكريبت
         try:
-            els = field_elements(mid, flow_els_text(d), make=False)   # الناقص بيترسم في الخلفية لحد التصدير
+            els = field_elements(mid, flow_els_text(d), make=False)   # الناقص بيترسم وقت صناعة الفيديو
         except Exception:  # noqa: BLE001 — من غير عناصر القالب بيرجع لرسمته
             els = []
         if els:
@@ -25433,6 +25493,12 @@ def flow_make_vo(fid: str) -> None:
         end = first[voiced[n + 1]] - 0.05 if n + 1 < len(voiced) else vdur
         spans[i] = (first[i], max(first[i] + 0.3, end))
     plan = fz.vo_plan(live["scenes"], float(live["DUR"]), spans, vdur)
+    def final_t(t: float) -> float:   # ثانية في الصوت الخام ← ثانية في الفيديو النهائي
+        for pc in plan["pieces"]:
+            if float(pc["from"]) - 0.01 <= t < float(pc["to"]):
+                return float(pc["at"]) + t - float(pc["from"])
+        return t
+    vwords = [[w, round(final_t(float(t)), 3)] for w, t in zip(words, times)]
     # الصوت النهائي: كل جملة في مكان مشهدها، والباقي سكوت، بطول الفيديو الجديد بالظبط
     out = folder / f"vo-{uuid.uuid4().hex[:6]}.wav"
     parts = "".join(f"[0]atrim={p['from']}:{p['to']},asetpts=PTS-STARTPTS,adelay={int(p['at'] * 1000)}|{int(p['at'] * 1000)}[p{i}];" for i, p in enumerate(plan["pieces"]))
@@ -25447,7 +25513,7 @@ def flow_make_vo(fid: str) -> None:
             (folder / old).unlink(missing_ok=True)
         x.pop("vo_step", None)
         x.update(vo_track={"file": out.name, "timing": plan["timing"], "total": plan["total"], "heard": len(heard), "secs": {"tts": t_tts, "stt": t_stt, "voice": vo.get("voice")},
-                           "heard_text": " ".join(str(w.get("w") or "") for w in heard)[:4000], "said_text": " ".join(says)[:4000]}, stage="panel")
+                           "heard_text": " ".join(str(w.get("w") or "") for w in heard)[:4000], "said_text": " ".join(says)[:4000], "words": vwords[:3000]}, stage="panel")
     flow_update(fid, fin)
 
 
@@ -26895,14 +26961,24 @@ def flow_export(fid: str, body: FlowExportIn):
     before = motion_assets().get(mid, [])
     MOTION_JOBS[mid] = {"status": "working", "progress": 0.0, "error": ""}
     flow_update(fid, lambda x: x.update(params=params, stage="generate", output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
+    t_go = time.time()
     def go():
         p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
         p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
         p = flow_fill_els(d, p, make=True)        # 🌱 رسومات الجمل اللي لسه ناقصة بتترسم وتدخل
+        try:
+            els_at = flow_els_at(d, mid, p.get("els")) if vo_path and vo_path.exists() else None
+        except Exception:  # noqa: BLE001 — من غير توقيت: بالتساوي
+            els_at = None
         p = flow_els_inline(p)                    # 🧩 عناصر المجال تتضمّن في الرسم
         run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, p, f"🧭 {title}",
                           timing=vt.get("timing"), vo=vo_path if vo_path and vo_path.exists() else None,
-                          stamp=logo_stamp_for(d.get("client_id") or active_client_id(), mid))
+                          stamp=logo_stamp_for(d.get("client_id") or active_client_id(), mid), els_at=els_at)
+        try:   # 🪙 النقاط اللي العملية دي سحبتها (رسم العناصر وغيره): تظهر للعميل بعد ما الفيديو يخلص
+            pts = wallet.spent_between(t_go)
+            flow_update(fid, lambda x: (x.get("output") or {}).update(points=pts))
+        except Exception:  # noqa: BLE001
+            pass
     threading.Thread(target=go, daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
 

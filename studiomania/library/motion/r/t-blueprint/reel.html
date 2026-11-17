@@ -56,7 +56,7 @@ M.reel({
     const add = (pts, t0, t1, w = 5, dash = null) => L.push({ p: pathLen(pts), t0, t1, w, dash });
     const cx = 620;
     // 🧩 عناصر مكتبة المجال: كل عنصر بيتحول خطوط حدود بيضا (بالكود) ويترسم بالدور مكان الزمزمية
-    const ims = await M.els(PR.els, 3), EL = ims.map((im) => M.fx.edges(im, LINE, 520, 1000, 34, 2));
+    const ims = await M.els(PR.els, Infinity), EL = ims.map((im) => M.fx.edges(im, LINE, 520, 1000, 34, 2));
     if (!EL.length) {
       add([[cx, 330], [cx, 1440]], .8, 1.4, 1.6, [34, 8, 6, 8]);
       const out = [[cx - 85, 330], [cx + 85, 330], [cx + 85, 440], [cx + 70, 440], [cx + 70, 520], ...arc(cx + 70 + 0, 600, 80, -Math.PI / 2, 0).map(([a, b]) => [a + 0, b]), [cx + 150, 1330], ...arc(cx + 110, 1330, 40, 0, Math.PI / 2), [cx - 110, 1370], ...arc(cx - 110, 1330, 40, Math.PI / 2, Math.PI), [cx - 150, 600], ...arc(cx - 70, 600, 80, Math.PI, Math.PI * 1.5), [cx - 70, 440], [cx - 85, 440], [cx - 85, 330]];

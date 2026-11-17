@@ -27,7 +27,7 @@ M.reel({
     await Promise.all([M.font("AM", PR.fHead), M.font("PB", PR.fText)]);
     const c = M.canvas(W, H); const x = c.getContext("2d");
     // 🧩 عناصر مكتبة المجال: كل عنصر خطوط دهب (حدوده) فوق ظل دهبي خفيف، بالدور مكان الجوهرة
-    const ims = await M.els(PR.els, 5), EL = ims.map((im) => ({ ln: M.fx.edges(im, "#f3dc98", 520, 520, 30, 2), sh: M.fx.silhouette(im, "rgba(201,162,74,.22)", 520, 520) }));
+    const ims = await M.els(PR.els, Infinity), EL = ims.map((im) => ({ ln: M.fx.edges(im, "#f3dc98", 520, 520, 30, 2), sh: M.fx.silhouette(im, "rgba(201,162,74,.22)", 520, 520) }));
     return { x, EL };
   },
   seek(t, C, M) {

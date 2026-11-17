@@ -42,7 +42,7 @@ M.reel({
     const fuji = (q) => { q.beginPath(); q.moveTo(60, 1160); q.lineTo(430, 700); q.quadraticCurveTo(470, 662, 520, 668); q.quadraticCurveTo(570, 660, 610, 700); q.lineTo(1020, 1160); q.closePath(); };
     const snow = (q) => { q.beginPath(); q.moveTo(430, 700); q.quadraticCurveTo(470, 662, 520, 668); q.quadraticCurveTo(570, 660, 610, 700); q.lineTo(650, 745); q.lineTo(610, 760); q.lineTo(585, 735); q.lineTo(555, 770); q.lineTo(520, 740); q.lineTo(490, 772); q.lineTo(460, 738); q.lineTo(420, 760); q.lineTo(395, 745); q.closePath(); };
     const hills = (q) => { q.beginPath(); q.moveTo(0, 1180); for (let xx = 0; xx <= W; xx += 20) q.lineTo(xx, 1100 - Math.sin(xx * .006 + 1) * 50 - Math.sin(xx * .017) * 14); q.lineTo(W, 1180); q.closePath(); };
-    const ELS = await M.els(PR.els, 4);   // 🧩 عناصر مكتبة المجال (بستايل الطباعة اليابانية): بالدور على الموج مكان القارب
+    const ELS = await M.els(PR.els, Infinity);   // 🧩 عناصر مكتبة المجال (بستايل الطباعة اليابانية): بالدور على الموج مكان القارب
     return { x, paper, grain, fuji, snow, hills, lay: mk(), ELS };
   },
   seek(t, C, M) {
