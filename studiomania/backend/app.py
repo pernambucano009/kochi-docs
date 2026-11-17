@@ -30026,6 +30026,9 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
                     return b, f, "avatar"
         except Exception:  # noqa: BLE001  # الموديل وقع ← ستوك بداله
             pass
+        own = phone_broll_own(b, used, d.get("client_id"))   # 📚 فيديوهات العميل نفسه من مكتبته الأول، وبعدها الستوك العام
+        if own:
+            return b, own, "own"
         try:
             f = phone_broll_stock(b, vertical, used)
         except Exception:  # noqa: BLE001
@@ -30042,13 +30045,37 @@ def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], word
         if ln < 1.5:
             continue
         info = media_info(f)
-        gid = phone_gen(f, ("🪄 " if kind == "avatar" else "🎞️ ") + (b["query"] if kind == "stock" else "B-roll بالأفاتار"))
+        gid = phone_gen(f, ("🪄 " if kind == "avatar" else "📚 " if kind == "own" else "🎞️ ") + (b["query"] if kind == "stock" else b.get("query_ar") or "" if kind == "own" else "B-roll بالأفاتار"))
         cover = max(1.0, (info.width / max(1, info.height)) / ((9 / 16) if vertical else (16 / 9)))
         overlays.append({"id": uuid.uuid4().hex[:8], "src": gid, "t0": round(t0 + 0.2, 2), "dur": round(min(3.0, ln - 0.3, info.duration or 3), 2),
                          "start": 0, "x": 0.5, "y": 0.5, "w": round(cover, 3), "volume": 0, "broll": kind,
                          "anim_in": {"type": "fade", "dur": 0.2}, "anim_out": {"type": "fade", "dur": 0.2}})
-        rep["broll_ai" if kind == "avatar" else "broll_stock"] += 1
+        rep["broll_ai" if kind == "avatar" else "broll_own" if kind == "own" else "broll_stock"] = rep.get("broll_ai" if kind == "avatar" else "broll_own" if kind == "own" else "broll_stock", 0) + 1
     return overlays, rep
+
+
+_OWN_LOCK = threading.Lock()
+
+
+def phone_broll_own(b: dict, used: set, bid: str | None) -> Path | None:
+    """📚 لقطة من فيديوهات العميل في مكتبته (وصفها فيه كلمتين على الأقل من كلمات اللقطة)، غير آراء العملاء والحالات."""
+    words = [w for w in lib_.norm(b.get("query_ar") or "").split() if len(w) > 1]
+    if not words or not bid:
+        return None
+    lib = lib_merged(bid, ready=False)
+    skip = {f["id"] for f in lib["folders"] if f.get("reviews_root") or f.get("cases_root")}
+    skip |= {x for r in list(skip) for x in lib_.descendants(lib, r)}
+    need = min(2, len(words))
+    with _OWN_LOCK:
+        for f in lib_.search(lib, " ".join(words), "video"):
+            hay = lib_.norm(" ".join([f.get("name", ""), f.get("desc", ""), " ".join(f.get("tags") or [])]))
+            if f["id"] in used or f.get("folder") in skip or sum(w in hay for w in words) < need:
+                continue
+            p = lib_path(f, bid)
+            if p.is_file():
+                used.add(f["id"])
+                return p
+    return None
 
 
 def phone_effects(d: dict, shots: list[tuple[float, float]], words: list[dict], starts: list[tuple[float, float]],

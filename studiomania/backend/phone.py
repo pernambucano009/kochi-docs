@@ -154,8 +154,9 @@ def broll_plan_prompt(texts: list[str], has_twin: bool, brief: str) -> str:
             + kinds
             + f"Rules: at most {MAX_BROLL} B-rolls" + (f", at most {MAX_AVATAR} avatar" if has_twin else "") + "; never shot 1 (the hook keeps the face); never two shots in a row; "
               "only where a visual really adds something concrete to the words. For each: shot number, kind, query (2-5 English Pexels keywords for stock), "
+              "query_ar (the same 2-4 keywords in simple Arabic, to search the brand's own video library first), "
               "and prompt (one English sentence describing the action and framing for avatar, vertical 9:16, natural phone-camera look).\n"
-              'Return JSON only: {"broll": [{"shot": 2, "kind": "stock", "query": "...", "prompt": "..."}]}')
+              'Return JSON only: {"broll": [{"shot": 2, "kind": "stock", "query": "...", "query_ar": "...", "prompt": "..."}]}')
 
 
 def mock_broll_plan(n: int, has_twin: bool) -> dict:
@@ -177,6 +178,7 @@ def clean_broll_plan(raw: dict, n: int, has_twin: bool) -> list[dict]:
             continue
         kind = "avatar" if b.get("kind") == "avatar" and has_twin and av < MAX_AVATAR else "stock"
         av += kind == "avatar"
-        out.append({"shot": k, "kind": kind, "query": str(b.get("query") or "")[:80] or "lifestyle", "prompt": str(b.get("prompt") or "")[:400]})
+        out.append({"shot": k, "kind": kind, "query": str(b.get("query") or "")[:80] or "lifestyle", "query_ar": str(b.get("query_ar") or "")[:80],
+                    "prompt": str(b.get("prompt") or "")[:400]})
         last = k
     return out
