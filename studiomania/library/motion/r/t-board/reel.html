@@ -13,6 +13,8 @@ const PR = M.params({
   icon2: { label: "رسمة الخطوة ٢", kind: "select", def: "bulb", options: [["person", "👤 شخص"], ["bulb", "💡 لمبة"], ["chart", "📈 رسم بياني"], ["check", "✅ علامة صح"], ["star", "⭐ نجمة"]], group: G2 },
   step3: { label: "الخطوة ٣", kind: "text", def: "قيس وطوّر", group: G2, max: 16 },
   icon3: { label: "رسمة الخطوة ٣", kind: "select", def: "chart", options: [["person", "👤 شخص"], ["bulb", "💡 لمبة"], ["chart", "📈 رسم بياني"], ["check", "✅ علامة صح"], ["star", "⭐ نجمة"]], group: G2, hint: "اختر رسمة تشرح الخطوة دون كلام." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G2, max: 3,
+    hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   result: { label: "النتيجة", kind: "text", def: "مبيعات أكتر", group: G3, max: 16, hint: "ما سيحصل عليه العميل في النهاية، وتُرسم حوله دائرة وعلامة صح." },
   brand: { label: "اسم العلامة", kind: "text", role: "brand", def: "ستوديو نمو", group: G3, max: 20, hint: "يُكتب تحت النتيجة، وتبتعد الكاميرا لتُظهر السبورة كلها." },
   board: { label: "نوع السبورة", kind: "look", def: "white", group: GS, hint: "اختر السبورة ثم اضبط ألوانها في الأسفل إن أردت.", options: [
@@ -46,6 +48,7 @@ function wob(pts, seed, amp = 3) {
 }
 const circ = (cx, cy, rx, ry, a0, turns, n = 80) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + Math.PI * 2 * turns * i / n; return [cx + Math.cos(a) * rx * (1 + .03 * i / n), cy + Math.sin(a) * ry]; });
 const rect = (x0, y0, w, h, s) => [[[x0 - 6, y0 + 2], [x0 + w + 10, y0 - 3]], [[x0 + w + 2, y0 - 8], [x0 + w - 3, y0 + h + 8]], [[x0 + w + 6, y0 + h + 2], [x0 - 8, y0 + h - 2]], [[x0 + 3, y0 + h + 6], [x0 - 2, y0 - 9]]].map((p, i) => wob(p, s + i));
+let STT = [3, 5, 7];   // بداية كل خطوة (بتتظبط على جملها لو فيه عناصر وتوقيت)
 const ease = (u) => u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * .8;   // بطيء-سريع-بطيء زي الإيد
 
 M.reel({
@@ -77,10 +80,23 @@ M.reel({
     add({ k: "text", txt: PR.title2, x: 800, y: 590, size: 120, t0: 1.7, t1: 2.5, col: acc, maxw: 800 });
     add({ k: "line", p: wob([[1180, 640], [420, 652]], 9, 4), t0: 2.5, t1: 2.85, col: acc, w: 9 });
     const steps = [[PR.step1, 1050, PR.icon1], [PR.step2, 1600, PR.icon2], [PR.step3, 2150, PR.icon3]];
+    // عناصر المجال: كل عنصر بيترسم بالقلم (حدود + تظليل خفيف) مكان رسمة خطوته، ومع جملته لو التوقيت معروف
+    const EL = await M.els(PR.els, 3);
+    if (EL.length === 3 && M._elsAt) { const A = M._elsAt.map((a) => a - .55); for (let i = 0; i < 3; i++) STT[i] = Math.max(i ? STT[i - 1] + 1.9 : 2.9, A[i]); for (let i = 2; i >= 0; i--) STT[i] = Math.min(STT[i], i < 2 ? STT[i + 1] - 1.9 : 7); }
+    const elDraw = (im) => {
+      const ar = im.width / im.height, w = ar > 1 ? 230 : 270 * ar, h = ar > 1 ? 230 / ar : 270, ew = Math.round(Math.min(w, 230)), eh = Math.round(Math.min(h, 270));
+      const c = document.createElement("canvas"); c.width = ew + 20; c.height = eh + 20; const g = c.getContext("2d");
+      const hat = M.fx.silhouette(im, acc, ew, eh), hg = hat.getContext("2d"); hg.globalCompositeOperation = "destination-in"; hg.fillStyle = "#000";
+      for (let q = -eh; q < ew; q += 13) { hg.save(); hg.translate(q, 0); hg.rotate(.5); hg.fillRect(0, -40, 5, eh * 2 + 80); hg.restore(); }
+      g.globalAlpha = .55; g.drawImage(hat, 14, 14);
+      g.globalAlpha = 1; g.drawImage(M.fx.edges(im, ink2, ew, eh, 46, 3), 10, 10); return c;
+    };
     steps.forEach(([txt, y, icon], i) => {
-      const T = 3.0 + i * 2;
+      const T = STT[i];
+      if (EL[i]) icon = "el";
       rect(380, y - 190, 840, 380, 20 + i * 5).forEach((s, k) => add({ k: "line", p: s, t0: T + k * .14, t1: T + k * .14 + .16, col: ink, w: 8 }));
       const ix = 1095, iy = y;
+      if (icon === "el") { const im = elDraw(EL[i]); add({ k: "img", im, x: ix - 20 - im.width / 2, y: iy - im.height / 2, t0: T + .55, t1: T + 1.05 }); }
       if (icon === "person") { add({ k: "line", p: wob(circ(ix, iy - 60, 52, 52, -1.2, 1.08), 31), t0: T + .55, t1: T + .8, col: ink2, w: 8 }); add({ k: "line", p: wob(circ(ix, iy + 110, 100, 90, Math.PI, .5, 30), 32), t0: T + .8, t1: T + 1.0, col: ink2, w: 8 }); }
       if (icon === "bulb") { add({ k: "line", p: wob(circ(ix, iy - 40, 70, 78, 2.2, 1.0), 41), t0: T + .55, t1: T + .8, col: acc, w: 8 }); add({ k: "line", p: wob([[ix - 32, iy + 50], [ix + 32, iy + 50]], 42), t0: T + .8, t1: T + .86, col: ink, w: 8 }); add({ k: "line", p: wob([[ix - 26, iy + 76], [ix + 26, iy + 76]], 43), t0: T + .86, t1: T + .92, col: ink, w: 8 }); [[-1, -1], [0, -1.3], [1, -1]].forEach(([dx, dy], q) => add({ k: "line", p: wob([[ix + dx * 100, iy - 40 + dy * 90], [ix + dx * 135, iy - 40 + dy * 125]], 44 + q), t0: T + .92 + q * .05, t1: T + .97 + q * .05, col: acc, w: 7 })); }
       if (icon === "chart") { add({ k: "line", p: wob([[ix - 110, iy - 120], [ix - 110, iy + 110], [ix + 120, iy + 110]], 51), t0: T + .55, t1: T + .75, col: ink, w: 8 }); add({ k: "line", p: wob([[ix - 90, iy + 70], [ix - 30, iy + 10], [ix + 10, iy + 40], [ix + 95, iy - 90]], 52), t0: T + .75, t1: T + .95, col: acc, w: 9 }); add({ k: "line", p: wob([[ix + 50, iy - 92], [ix + 98, iy - 94], [ix + 92, iy - 46]], 53), t0: T + .95, t1: T + 1.02, col: acc, w: 9 }); }
@@ -94,7 +110,7 @@ M.reel({
     add({ k: "line", p: wob(circ(800, 2650, 380, 150, 3.6, 1.1), 90, 5), t0: 9.6, t1: 10.1, col: acc, w: 10 });
     add({ k: "line", p: wob([[1150, 2520], [1195, 2575], [1290, 2440]], 91, 3), t0: 10.1, t1: 10.35, col: acc, w: 12 });
     add({ k: "text", txt: PR.brand, x: 800, y: 2930, size: 84, t0: 10.6, t1: 11.3, col: ink2 });
-    I.forEach((o) => { if (o.k === "line") o.L = o.p[o.p.length - 1][2]; if (o.k === "text") { x.font = `${FW} ${o.size}px RQ`; o.size = Math.min(o.size, o.size * (o.maxw || 1300) / Math.max(1, x.measureText(o.txt).width)); x.font = `${FW} ${o.size}px RQ`; o.w = x.measureText(o.txt).width; } });
+    I.forEach((o) => { if (o.k === "line") o.L = o.p[o.p.length - 1][2]; if (o.k === "img") o.L = 1; if (o.k === "text") { x.font = `${FW} ${o.size}px RQ`; o.size = Math.min(o.size, o.size * (o.maxw || 1300) / Math.max(1, x.measureText(o.txt).width)); x.font = `${FW} ${o.size}px RQ`; o.w = x.measureText(o.txt).width; } });
     // ورقة الحبر: الحاجات اللي خلصت بتترسم مرة واحدة على طبقة ثابتة
     const inkL = document.createElement("canvas"); inkL.width = BW; inkL.height = BH;
     return { x, board, I, inkL, done: -1, FW, layer, grainPat: layer.getContext("2d").createPattern(grain, "repeat") };
@@ -102,7 +118,7 @@ M.reel({
   seek(t, C, M) {
     const { x, I } = C, { seg, smooth, clamp } = M;
     // الكاميرا: مفاتيح (وقت، نص الكادر، زوم)، التنقل بالـ 1/زوم عشان يحس إنه «دولي»
-    const K = [[0, 800, 520, 1.1], [2.7, 800, 520, 1.1], [3.2, 800, 1050, 1.05], [4.8, 800, 1050, 1.05], [5.2, 800, 1600, 1.05], [6.8, 800, 1600, 1.05], [7.2, 800, 2150, 1.05], [8.6, 800, 2150, 1.05], [9.0, 800, 2700, 1.05], [10.4, 800, 2700, 1.05], [11.3, 800, 1600, .62], [12, 800, 1600, .62]];
+    const K = [[0, 800, 520, 1.1], [STT[0] - .3, 800, 520, 1.1], [STT[0] + .2, 800, 1050, 1.05], [STT[1] - .2, 800, 1050, 1.05], [STT[1] + .2, 800, 1600, 1.05], [STT[2] - .2, 800, 1600, 1.05], [STT[2] + .2, 800, 2150, 1.05], [8.6, 800, 2150, 1.05], [9.0, 800, 2700, 1.05], [10.4, 800, 2700, 1.05], [11.3, 800, 1600, .62], [12, 800, 1600, .62]];
     let k = 0; while (k < K.length - 2 && t > K[k + 1][0]) k++;
     const [ta, xa, ya, za] = K[k], [tb, xb, yb, zb] = K[k + 1], u = smooth(seg(t, ta, tb));
     const iz = 1 / za + (1 / zb - 1 / za) * u, z = 1 / iz, cx = xa + (xb - xa) * u, hh = H / (2 * z), cy = hh * 2 < BH ? clamp(ya + (yb - ya) * u, hh, BH - hh) : BH / 2;
@@ -126,6 +142,10 @@ M.reel({
         x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = o.w; x.strokeStyle = o.col; x.globalAlpha = .94; x.stroke();
         x.beginPath(); x.arc(pts[0][0], pts[0][1], o.w * .62, 0, Math.PI * 2); x.fillStyle = o.col; x.globalAlpha = .5; x.fill(); x.globalAlpha = 1;   // نقطة الحبر اللي اتجمعت أول ما القلم نزل
         if (p < 1) { pen = last; penCol = o.col; }
+      } else if (o.k === "img") {
+        // بيترسم من فوق لتحت والقلم ماشي رايح جاي على الحافة
+        const yy = o.y + o.im.height * p; x.save(); x.beginPath(); x.rect(o.x - 10, o.y - 10, o.im.width + 20, yy - o.y + 10); x.clip(); x.globalAlpha = .94; x.drawImage(o.im, o.x, o.y); x.restore();
+        if (p < 1) { pen = [o.x + o.im.width * (.5 + .45 * Math.sin(t * 26)), yy]; penCol = PR.ink2; }
       } else {
         x.save(); x.font = `${C.FW} ${o.size}px RQ`; x.direction = "rtl"; x.textAlign = "center";
         const x1 = o.x + o.w / 2 + 10, edge = x1 - (o.w + 30) * p;   // العربي بيتكتب من اليمين للشمال
@@ -168,9 +188,9 @@ M.reel({
   sound(A) {
     const N = A.midi;
     // صرير الماركر على السبورة أثناء الكتابة (رشقات قصيرة)
-    const writes = [[.4, 2.85], [3.0, 4.85], [5.0, 6.85], [7.0, 8.85], [8.9, 10.35], [10.6, 11.3]];
+    const writes = [[.4, 2.85], [STT[0], STT[0] + 1.85], [STT[1], STT[1] + 1.85], [STT[2], 8.85], [8.9, 10.35], [10.6, 11.3]];
     writes.forEach(([a, b]) => { for (let s = a; s < b; s += .11 + (Math.sin(s * 13) + 1) * .04) A.nz(s, .07 + (Math.sin(s * 7) + 1) * .03, "bandpass", (CHALK ? 1500 : 2600) + Math.sin(s * 5) * (CHALK ? 500 : 900), CHALK ? .07 : .05, 3); });
-    [2.9, 4.95, 6.95, 8.9, 10.5].forEach((s) => A.whoosh(s, .5, .12));
+    [STT[0] - .1, STT[1] - .05, STT[2] - .05, 8.9, 10.5].forEach((s) => A.whoosh(s, .5, .12));
     // موسيقى خفيفة: نقرات كيبورد وجيتار
     const chords = [[60, 64, 67], [57, 60, 64], [62, 65, 69], [55, 59, 62]];
     for (let i = 0; i < 24; i++) { const t = i * .5, ch = chords[Math.floor(i / 6) % 4]; A.pluck(t, N(ch[i % 3] + 12), .05, .45); if (i % 2 === 0) A.tone(t, N(ch[0] - 12), .45, "triangle", .07); }
