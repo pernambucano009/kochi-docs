@@ -24671,8 +24671,21 @@ def mem_update(cid: str, fn) -> dict:
         return m
 
 
-def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
+def brain_ideas_pick(d: dict, n: int = 2) -> list[dict]:
+    """💡 أفكار من عقل العلامة نفسه (فولدر الأفكار: باقة المجال واللي العميل ضافه) لسه ما اتستخدمتش، بترتيب عشوائي."""
+    import random   # noqa: PLC0415
+    pool = [x for x in saved_of(d) if x.get("kind") == "idea" and x.get("mine") and not x.get("used_at") and (x.get("status") or "ready") == "ready"
+            and str((x.get("item") or {}).get("title") or "").strip()]
+    random.shuffle(pool)
+    return [{"id": uuid.uuid4().hex[:8], "title": str(x["item"].get("title") or "")[:600], "hook": str(x["item"].get("hook") or "")[:600],
+             "idea": str(x["item"].get("idea") or "")[:600], "fit": "", "why": "", "aud": "", "brain": True} for x in pool[:n]]
+
+
+def flow_gen_ideas(fid: str, hint: str = "", more: bool = False, brain_first: bool = False) -> None:
+    """brain_first (الأوتوبايلوت): فكرتين من أفكار العقل وواحدة جديدة، والأولى (اللي بتتختار) من العقل في ٣ من كل ٤ مرات."""
     d = flow_load(fid)
+    mine = brain_ideas_pick(d) if brain_first and not hint and not more else []
+    target = 3 - len(mine)
     brain = flow_brain(d)
     avoid = [i.get("title", "") for i in d.get("ideas") or []]
     k = len(avoid)
@@ -24680,13 +24693,13 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
     mem = mem_load(mem_cid(d))   # 🧠 اللي اتستخدم أو اتحفظ قبل كده مايتقترحش تاني
     old_titles, old_refs = ideamem.avoid_titles(mem, "idea"), ideamem.refs(mem, "idea")
     items, dropped, repeats = [], [], []
-    for attempt in range(2):
+    for attempt in range(2 if target else 0):
         if atlas.mock_mode():
             raw = fz.mock_ideas(3, k + attempt * 3, d["template"].get("name", ""))
         else:
             rej = ("\nهذه الأفكار اترفضت، أنشئ غيرها مختلفة عنها: " + " · ".join(f"«{x['title']}» ({x['why_out']})" for x in dropped)) if dropped else ""
             raw = flow_llm(fz.ideas_messages(flow_brand(brain, d["template"]["name"]), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d),
-                                             3 + (1 if gate else 0) - len(items) if attempt else 3 + (1 if gate else 0),
+                                             target + (1 if gate else 0) - len(items) if attempt else target + (1 if gate else 0),
                                              (avoid if more else []) + old_titles + [x["title"] for x in items + dropped + repeats], hint, d.get("season") or "",
                                              (algo.idea_gate_rule(brain) + rej) if gate else ""), "الأفكار")
         got, rep = ideamem.fresh("idea", flow_parse_ideas(raw), old_refs + [ideamem.entry("idea", x) for x in items + ((d.get("ideas") or []) if more else [])])
@@ -24698,9 +24711,12 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False) -> None:
                     dropped.append({"title": it.get("title", ""), "why_out": why})
                     continue
             items.append(it)
-        if len(items) >= 3:
+        if len(items) >= target:
             break
-    items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:3] if gate else items
+    items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:target] if gate else items[:target]
+    if mine:
+        import random   # noqa: PLC0415
+        items = [*mine, *items] if random.random() < 0.75 or not items else [*items, *mine]
     if not items:
         raise HTTPException(400, "كل الأفكار الناتجة تشبه ما استخدمته أو حفظته من قبل. جرّب «وجّه العقل» بموضوع مختلف" if repeats else "لم يُرجع العقل أفكارًا، جرّب مرة أخرى")
     flow_update(fid, lambda x: x.update(ideas=(x.get("ideas") or []) + items if more else items, ideas_dropped=dropped[:6], ideas_repeats=len(repeats)))
@@ -33642,9 +33658,12 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if kind == "avatar" and not pilot_twin(s):
             raise HTTPException(400, "لا يوجد أفاتار جاهز في «الأفاتار». سجّل فيديو القراءة أو صورة أمامية أولًا")
         pre = j.get("preset") or {}
-        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=bool(pre.get("title") or pre.get("idea")),
-                               season=pilot_occasion(j.get("at"))))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
+        occ = pilot_occasion(j.get("at"))
+        f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=True, season=occ))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
         flow_update(f["id"], lambda x: x.update(pilot=jid))
+        if not (pre.get("title") or pre.get("idea")):   # 💡 أغلب الأفكار من عقل العلامة، وفكرة جديدة أحيانًا (المناسبة لو فيه بتتقدّم)
+            fid0 = f["id"]
+            flow_job(fid0, "ideas", lambda: flow_gen_ideas(fid0, brain_first=not occ))
         if pre.get("title") or pre.get("idea"):   # 🗓️ الفكرة من خطة الشهر: على السكريبت على طول
             flow_pick_idea(f["id"], FlowPickIn(item={"title": pre.get("title"), "idea": pre.get("idea"), "hook": pre.get("hook")}))
             return put(phase="script", fid=f["id"], note="جارٍ كتابة النص")
