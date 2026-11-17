@@ -56,7 +56,7 @@ const Flow = (() => {
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكارًا…</p></div></div>`;
     try {
-      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
+      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true, reuse: true }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
       try { localStorage.setItem("studiomania.flow", S.d.id); } catch { /* غير مهم */ }
       if (typeof NH !== "undefined") NH?.refresh?.();
       render(); poll();

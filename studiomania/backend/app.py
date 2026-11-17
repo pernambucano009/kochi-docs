@@ -24793,6 +24793,7 @@ class FlowNewIn(BaseModel):
     desc: str = ""
     season: str = ""
     skip_ideas: bool = False   # الفكرة جاهزة (من خطة الشهر): من غير ما المخ يقترح أفكار
+    reuse: bool = False        # من الواجهة: لو فيه مشروع لنفس القالب لسه ماتختارتش فكرته، يفتحه بدل مشروع جديد (كانت المشاريع بتتكرر في «قيد العمل»)
 
 
 @app.post("/api/flows")
@@ -24802,6 +24803,16 @@ def flow_new(body: FlowNewIn):
         raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
     tpl = flow_template(body.template, body.name.strip()[:120], body.cat.strip()[:40], body.desc.strip()[:400])
     tpl = flow_tpl({"template": tpl})
+    if body.reuse:
+        me = active_client_id()
+        for f in sorted(FLOWS_DIR.glob("*/flow.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+            try:
+                old = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if old.get("client_id") == me and (old.get("template") or {}).get("id") == tpl.get("id") and not old.get("idea") \
+                    and not old.get("pilot") and old.get("stage") == "idea" and not old.get("busy"):
+                return flow_to_dict(f.parent.name, old)
     fid = uuid.uuid4().hex[:10]
     d = {"client_id": active_client_id(), "template": tpl, "stage": "idea", "season": body.season.strip()[:200],
          "ideas": [], "idea": None, "idea_chat": [], "format": None, "episodes": "auto", "scenarios": [], "scenario": None, "scen_chat": [],
@@ -24826,7 +24837,16 @@ def flow_list():
         if owned(d.get("client_id")) and (d.get("template") or {}).get("kind") not in ("avatar", "carousel"):   # الأفاتار والكاروسيل بيتعملوا من الأوتوبايلوت بس
             out.append({"id": f.parent.name, "template": d.get("template"), "stage": d.get("stage"), "title": (d.get("idea") or {}).get("title") or "",
                         "format": d.get("format"), "updated_at": d.get("updated_at") or d.get("created_at")})
-    return sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)[:40]
+    out = sorted(out, key=lambda x: x["updated_at"] or "", reverse=True)
+    seen, keep = set(), []   # 🧹 مشاريع فاضية لنفس القالب (اتفتح ومااتختارتش فكرة): الأحدث بس بيظهر
+    for x in out:
+        k = (x["template"] or {}).get("id")
+        if x["stage"] == "idea" and not x["title"]:
+            if k in seen:
+                continue
+            seen.add(k)
+        keep.append(x)
+    return keep[:40]
 
 
 @app.get("/api/flows/{fid}")
