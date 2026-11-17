@@ -66,7 +66,17 @@ async function api(path, opts = {}) {
   const data = await res.json().catch(() => ({}));
   if (window.ME && window.ME.credits && (opts.method || "GET") !== "GET") meSoon();   // عملية ممكن تكون صرفت نقاط: الرقم يتحدّث
   if (res.status === 402) noCredits(data.detail);
-  if (!res.ok) throw new Error(data.detail || `خطأ ${res.status}`);
+  if (!res.ok) {
+    // تفاصيل الخطأ ممكن تكون قايمة (بيانات ناقصة/غلط) أو كائن: بتتحول لجملة مفهومة بدل «[object Object]»، وبتتسجل في صندوق الأخطاء
+    let d = data.detail;
+    if (d && typeof d !== "string") {
+      const raw = JSON.stringify(d).slice(0, 600);
+      d = Array.isArray(d) ? "تعذّر تنفيذ الطلب: البيانات المرسلة غير مكتملة. حدّث الصفحة وجرّب مرة أخرى" : (d.message || d.error || "تعذّر تنفيذ الطلب، جرّب مرة أخرى");
+      fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "ui", screen: location.hash || location.pathname, message: `${opts.method || "GET"} ${path.split("?")[0]} → ${res.status}`, raw }) }).catch(() => {});
+    }
+    throw new Error(d || `خطأ ${res.status}`);
+  }
   return data;
 }
 

@@ -16684,4 +16684,6 @@ window.I18N_EN = {
   "آراء العملاء": "Customer reviews",
   "يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع": "The program picks the right template from your field's templates, without repeats, and up to 5 template videos a week",
   "يختاره البرنامج": "Picked by the program",
+  "تعذّر تنفيذ الطلب: البيانات المرسلة غير مكتملة. حدّث الصفحة وجرّب مرة أخرى": "The request couldn't be done: the data sent is incomplete. Refresh the page and try again",
+  "تعذّر تنفيذ الطلب، جرّب مرة أخرى": "The request couldn't be done, try again",
 };
