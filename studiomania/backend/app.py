@@ -30419,10 +30419,31 @@ def flow_to_montage(fid: str):
     name = f"motion_{fid}_{uuid.uuid4().hex[:6]}.mp4"
     shutil.copy(src, GENERATED_DIR / name)
     gid = phone_gen(GENERATED_DIR / name, f"🎨 {title}")
-    pid = create_project(ProjectIn(name=f"🧭 {title}"[:100], clips=[ClipEdit(gen_id=gid)], outro=False, brand_intro=False, char_intro=False,
-                                   brand_outro=False, logo={"enabled": False}))["id"]   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
+    # نفس اللي المونتاج الحر بيفتحه (section free + الكادر الطولي + العميل)، وإلا الصفحة بتفتح فاضية
+    data = {**ProjectIn(name=f"🧭 {title}"[:100], section="free", clips=[ClipEdit(gen_id=gid)], outro=False, brand_intro=False, char_intro=False,
+                        brand_outro=False, logo={"enabled": False}, canvas={"ratio": "9:16", "bg": "#000000"}).model_dump(),
+            "client_id": active_client_id()}   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
+    pid = uuid.uuid4().hex[:12]
+    with closing(db()) as conn, conn:
+        conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",
+                     (pid, data["name"], json.dumps(data), now(), now()))
     flow_update(fid, lambda x: x.update(montage={"project_id": pid, "at": now()}))
     return {"project_id": pid}
+
+
+@app.post("/api/flows/{fid}/to-publish")
+def flow_to_publish(fid: str):
+    """📤 فيديو القالب ← «الفيديوهات الجاهزة» (اللي النشر بيختار منها)، مرة واحدة لكل فيديو."""
+    d = flow_load(fid)
+    o = flow_to_dict(fid, d).get("output") or {}
+    src = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
+    if o.get("status") != "done" or not src.is_file():
+        raise HTTPException(400, "الفيديو لم يُرسم بعد")
+    if d.get("export_id") and (EXPORTS_DIR / f"pilot_{d['export_id']}.mp4").exists() and d.get("export_src") == o.get("asset"):
+        return {"export_id": d["export_id"]}
+    ex = pilot_export_file(src, f"🧭 {(d.get('idea') or {}).get('title') or d['template'].get('name') or 'فيديو'}")
+    flow_update(fid, lambda x: x.update(export_id=ex, export_src=o.get("asset")))
+    return {"export_id": ex}
 
 
 @app.post("/api/flows/{fid}/auto-montage")

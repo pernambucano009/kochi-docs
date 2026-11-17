@@ -16706,4 +16706,6 @@ window.I18N_EN = {
   "✂️ افتح في المونتاج وعدّل": "✂️ Open in the editor and edit",
   "⬇️ نزّل كما هو": "⬇️ Download as is",
   "الفيديو لم يُرسم بعد": "The video hasn't been drawn yet",
+  "المونتاج والتصدير": "Editing & export",
+  "📤 انشره كما هو": "📤 Publish it as is",
 };

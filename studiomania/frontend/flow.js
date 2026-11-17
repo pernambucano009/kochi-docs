@@ -23,7 +23,7 @@ const Flow = (() => {
   const S = { seen: new Set(), html: {}, busyFrom: null, tickT: null, el: null, d: null, timer: null, edit: null, own: false, hint: false, chat: null, cast: null, seasons: null, why: false };
   const STEPS_AI = [["idea", "الفكرة"], ["format", "نوع المنشور"], ["scenario", "السيناريو"], ["cast", "الأبطال"], ["voice", "الصوت"], ["assets", "ملفاتك"], ["generate", "التوليد"]];
   // قالب كود: السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير
-  const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "المشاهد"], ["generate", "الفيديو والمونتاج"]];
+  const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "المشاهد"], ["generate", "الفيديو"], ["montage", "المونتاج والتصدير"], ["publish", "النشر"]];
   // قالب تايبوجرافي: كلام بس بيتحرك (مفيش نوع بوست ولا أبطال ولا ملفات)
   const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "النص"], ["generate", "التوليد"]];
   const isCode = (d) => d?.template?.kind === "motion";
@@ -121,7 +121,7 @@ const Flow = (() => {
   function stepper(d) {
     const cur = idx(d.stage, d);
     const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d),
-      shoot: isPhone(d), review: !!d.footage?.main, montage: !!(d.review || d.montage) };
+      shoot: isPhone(d), review: !!d.footage?.main, montage: isCode(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: isCode(d) && d.output?.status === "done" };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -566,7 +566,7 @@ const Flow = (() => {
       ${!isWork && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind ? `<div class="flw-done">
         ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "أُنشئ الكاروسيل بالشرائح والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
-          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<button type="button" class="flw-btn pri big" data-tomont>✂️ افتح في المونتاج وعدّل</button><a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل كما هو</a>` : ""}
+          <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<button type="button" class="flw-btn pri big" data-tomont>✂️ افتح في المونتاج وعدّل</button><button type="button" class="flw-btn" data-topub>📤 انشره كما هو</button><a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل</a>` : ""}
         <div class="flw-final"><b>هل أعجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
         ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ما الذي لم يعجبك؟ (سيتذكره العقل)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
         <button type="button" class="flw-link" data-go="scenario">↩︎ جرّب سيناريو آخر</button></div>` : ""}`;
@@ -773,6 +773,18 @@ const Flow = (() => {
     S.d.busy = "chat";
     await call("/chat", { stage, message: msg });
   }
+  // ✂️📤 فيديو القالب بعد ما اترسم: للمونتاج (يعدّل ويصدّر)، أو للنشر على طول
+  async function codeOut(where) {
+    try {
+      if (where === "montage") {
+        const r = await api(`/api/flows/${S.d.id}/to-montage`, { method: "POST" });
+        close(); storageSet(projectKey("free"), r.project_id); return showStep("6f");
+      }
+      const r = await api(`/api/flows/${S.d.id}/to-publish`, { method: "POST" });
+      try { localStorage.setItem("studiomania.pubPick", r.export_id); } catch { /* غير مهم */ }
+      close(); showStep("7"); if (typeof pubTab === "function") pubTab("new"); return;   // نفس «منشور جديد»
+    } catch (err) { toast(err.message, true); }
+  }
   function reset() { S.edit = null; S.editForm = false; S.own = false; S.hint = false; }
   async function isend(stage, id, preset) {
     const inp = S.el.querySelector(`[data-ichatin="${CSS.escape(id)}"]`), msg = preset || inp?.value.trim();
@@ -810,10 +822,8 @@ const Flow = (() => {
     if ((b = q("[data-fxdel]"))) { try { S.mstate = await api(`/api/flows/${S.d.id}/effects/remove`, { method: "POST", ...J({ index: +b.dataset.fxdel }) }); render(); toast("✓ حُذف الإفكت، وسيختفي في التصدير القادم"); } catch (err) { toast(err.message, true); } return; }
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
-    if (q("[data-tomont]")) {   // ✂️ فيديو القالب ← المونتاج (يعدّل فيه ويصدّر من هناك)
-      try { const r = await api(`/api/flows/${S.d.id}/to-montage`, { method: "POST" }); close(); storageSet(projectKey("free"), r.project_id); return showStep("6f"); }
-      catch (err) { return toast(err.message, true); }
-    }
+    if (q("[data-tomont]")) return codeOut("montage");
+    if (q("[data-topub]")) return codeOut("publish");
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {
       const pid = S.d.montage?.project_id;
@@ -840,6 +850,7 @@ const Flow = (() => {
       if (ok) campoll();
       return;
     }
+    if ((b = q("[data-go]")) && isCode(S.d) && (b.dataset.go === "montage" || b.dataset.go === "publish")) return codeOut(b.dataset.go);
     if ((b = q("[data-go]"))) { reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
     if ((b = q("[data-rate]"))) {
       return call("/rate", { stage: b.dataset.rate, item: b.dataset.rid, value: +b.dataset.v });

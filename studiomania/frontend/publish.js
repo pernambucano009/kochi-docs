@@ -62,6 +62,10 @@ async function initPublish() {
 // ---------- الفولدر ----------
 async function pubLoadExports() {
   pub.exports = await api("/api/exports");
+  try {   // 📤 جاي من «انشره» في صفحة القالب: الفيديو متختار على طول
+    const pick = localStorage.getItem("studiomania.pubPick");
+    if (pick) { localStorage.removeItem("studiomania.pubPick"); if (pub.exports.some((e) => e.id === pick)) pub.videoId = pick; }
+  } catch { /* غير مهم */ }
   if (!pub.exports.some((e) => e.id === pub.videoId)) pub.videoId = null;
   renderReady();
   renderPostVideo();
