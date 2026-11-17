@@ -25304,18 +25304,43 @@ LOGOST_STEP: dict[str, str] = {}   # الخطوة الحالية (تظهر لل�
 LOGOST_ERR: dict[str, str] = {}    # آخر خطأ (يظهر للعميل بدل شرطات صامتة)
 
 
+def logo_like_ref(style: str) -> Path | None:
+    """صورة من القالب (غلافه) للنسخ اللي على شكل القالب نفسه (x-<قالب>)."""
+    if not style.startswith("x-"):
+        return None
+    mid = Path(style[2:]).name
+    for f in (FRONTEND_DIR / "gallery" / f"{mid}.jpg", MOTION_DIR / "r" / mid / "poster.jpg"):
+        if f.is_file():
+            return f
+    return None
+
+
+def logo_style_ok(style: str) -> bool:
+    return style in logostamp.ALL or bool(logo_like_ref(style))
+
+
 def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
     """نسخة اللوجو بالستايل ده (لو مش موجودة وmake: تترسم دلوقتي). None = مافيش لوجو، أو الرسم فشل."""
     src = logo_path(bid)
-    if not src or style not in logostamp.ALL:
+    if not src or not logo_style_ok(style):
         return None
     out = logostamp.file_for(brain_dir(bid), src, style)
     if out.exists() or not make or atlas.mock_mode() or not atlas.api_key():
         return out if out.exists() else None
     try:
-        url = atlas.generate_image("sunburst", logostamp.prompt(style), "1024x1024", "medium", images=[atlas.reference_url(src)])
+        ref = logo_like_ref(style)
+        url = atlas.generate_image("sunburst", logostamp.prompt_like() if ref else logostamp.prompt(style), "1024x1024", "medium",
+                                   images=[atlas.reference_url(src)] + ([atlas.reference_url(ref)] if ref else []))
         raw = out.with_name(f"logost-src-{uuid.uuid4().hex[:6]}.png")
         atlas.download(url, raw)
+        if not logostamp.plain_background(raw):   # 🧼 الرسم طلع بخلفية (ورق/ملمس): تتشال بالموديل، مش بس بالكود
+            nb = out.with_name(f"logost-nobg-{uuid.uuid4().hex[:6]}.png")
+            try:
+                atlas.download(atlas.run_model("Image", {"model": logostamp.BG_REMOVER, "image": atlas.reference_url(raw)}, "إزالة خلفية الشعار", max_seconds=300), nb)
+                raw.unlink(missing_ok=True)
+                raw = nb
+            except Exception as exc:  # noqa: BLE001 — الكود يشيل اللي يقدر عليه
+                print(f"[logost] bg {bid}/{style}: {exc}", flush=True)
         firstvid.cutout(raw, out)
         raw.unlink(missing_ok=True)
         return out
@@ -25412,8 +25437,8 @@ def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
     if not bid or not logo_path(bid) or (brain_row(bid) or {}).get("logo_on") == "0":
         return None
     style = logostamp.style_of(mid, EL_DIR / "fitness" / "index.json")
-    if style and style not in ((brain_row(bid) or {}).get("logo_styles_off") or []):
-        return logo_styled(bid, style) or logo_path(bid)
+    if style and style not in ((brain_row(bid) or {}).get("logo_styles_off") or []):   # الـ٨ بيترسموا لو ناقصين، والباقي لو العميل طلبه بس
+        return logo_styled(bid, style, make=style in logostamp.STYLES) or logo_path(bid)
     return logo_path(bid)
 
 
@@ -25423,11 +25448,33 @@ def logo_styles_get(bid: str):
     ent = next((a for a in (brain_row(bid) or {}).get("logos") or [] if src and a.get("file") == src.name), None)
     if ent and not ent.get("original") and not ent.get("prepped") and bid not in LOGOST_JOBS:   # 🧼 لوجو اترفع قبل التنضيف التلقائي: يتنضّف دلوقتي مرة واحدة
         logo_upload_kick(bid, [src.name])
+    elif src and bid not in LOGOST_JOBS:   # 🧼 نسخ اترسمت قبل ما خلفيتها تتشال بالموديل: تتمسح وتترسم تاني (مرة واحدة لكل نسخة)
+        fixed = set((brain_row(bid) or {}).get("logost_fixed") or [])
+        bad = []
+        for st in logostamp.ALL:
+            f = logostamp.file_for(brain_dir(bid), src, st)
+            if f.exists() and f.name not in fixed:
+                try:
+                    from PIL import Image as _PImg
+                    with _PImg.open(f) as im:
+                        if not firstvid.has_alpha(im):
+                            bad.append(f)
+                except OSError:
+                    pass
+        if bad:
+            for f in bad:
+                f.unlink(missing_ok=True)
+            update_brain(bid, lambda d: d.update(logost_fixed=sorted(fixed | {f.name for f in bad})))
+            logo_styles_kick(bid)
     off = (brain_row(bid) or {}).get("logo_styles_off") or []
     items = []
-    for st in logostamp.ALL:   # الـ٨ دايمًا، والخاصة بقالب (EXTRA) بتظهر في صفحة القوالب، وفي صفحة العلامة لو اترسمت
+    names = tpl_names()
+    likes = [f"x-{m.name}" for m in sorted((MOTION_DIR / "r").iterdir()) if m.is_dir() and logostamp.style_of(m.name, EL_DIR / "fitness" / "index.json") == f"x-{m.name}"
+             and logo_like_ref(f"x-{m.name}")]
+    for st in [*logostamp.ALL, *likes]:   # الـ٨ دايمًا، والباقي (خاص بقالب) بيظهر في صفحة القوالب، وفي صفحة العلامة لو اترسم
         f = logostamp.file_for(brain_dir(bid), src, st) if src else None
-        items.append({"style": st, "label": logostamp.ALL_LABELS[st], "on": st not in off, "extra": st in logostamp.EXTRA,
+        label = logostamp.ALL_LABELS.get(st) or names.get(st[2:]) or st[2:]
+        items.append({"style": st, "label": label, "on": st not in off, "extra": st not in logostamp.STYLES,
                       "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
     step = LOGOST_STEP.get(bid, "")
     try:   # 🗺️ كل قالب مرسوم ← ستايله (صفحة القوالب بتعلّم عليه: الشعار اتعمل ولا لأ)
@@ -25435,6 +25482,7 @@ def logo_styles_get(bid: str):
     except (OSError, ValueError):
         tmap = {}
     tmap.update({f"t-{k}": k for k in logostamp.EXTRA if f"t-{k}" not in tmap and (MOTION_DIR / "r" / f"t-{k}" / "reel.html").exists()})
+    tmap.update({st[2:]: st for st in likes if st[2:] not in tmap})
     return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""), "tpl": tmap,
             "step": "clean" if step == "clean" else step.split(":", 1)[1] if step.startswith("draw:") else ""}
 
@@ -25468,7 +25516,7 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
         raise HTTPException(404, "هذا العميل غير موجود")
     if body.style == "all":
         logo_styles_kick(bid)
-    elif body.style in logostamp.ALL:
+    elif logo_style_ok(body.style):
         if body.on is not None:
             update_brain(bid, lambda d: d.update(logo_styles_off=sorted({*(d.get("logo_styles_off") or [])} - {body.style}
                                                                         if body.on else {*(d.get("logo_styles_off") or []), body.style})))
@@ -25476,7 +25524,7 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
             logostamp.file_for(brain_dir(bid), src, body.style).unlink(missing_ok=True)
             if body.style in logostamp.STYLES:
                 logo_styles_kick(bid)
-        if (body.make or (body.redo and body.style in logostamp.EXTRA)) and logo_path(bid) and LOGOST_JOBS.get(bid) != "working":
+        if (body.make or (body.redo and body.style not in logostamp.STYLES)) and logo_path(bid) and LOGOST_JOBS.get(bid) != "working":
             LOGOST_JOBS[bid] = "working"
             LOGOST_ERR.pop(bid, None)
             LOGOST_STEP[bid] = f"draw:{body.style}"

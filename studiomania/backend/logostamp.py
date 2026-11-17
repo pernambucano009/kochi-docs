@@ -46,6 +46,14 @@ ALL = {**STYLES, **EXTRA}
 ALL_LABELS = {**LABELS, **EXTRA_LABELS}
 
 
+def prompt_like() -> str:
+    """باقي القوالب (مالهاش ستايل مكتوب): المرجع صورة من القالب نفسه (الصورة التانية)."""
+    return ("Redraw the exact logo from the FIRST image in the visual style of the SECOND image (a frame from an animated video): "
+            "the same art medium, line quality, texture, color palette and rendering. Keep exactly the same shapes, layout, proportions, letters and text "
+            "of the logo (same spelling, same language, nothing added or removed). Do not copy anything else from the second image. "
+            "Centered on a plain flat pure white background, nothing else in the image, no extra text, no frame, no shadow.")
+
+
 def prompt(style: str) -> str:
     return ("Redraw this exact logo in a new art style. Keep exactly the same shapes, layout, proportions, letters and text "
             "(same spelling, same language, nothing added or removed). Only the rendering changes to: "
@@ -61,7 +69,9 @@ def style_of(mid: str, index: Path) -> str | None:
     if s in STYLES:
         return s
     x = mid[2:] if mid.startswith("t-") else ""
-    return x if x in EXTRA else None
+    if x in EXTRA:
+        return x
+    return f"x-{mid}" if re.fullmatch(r"[a-z0-9-]+", mid) and not mid.startswith("b-") else None   # باقي القوالب: على شكل القالب نفسه
 
 
 def file_for(folder: Path, src: Path, style: str) -> Path:
