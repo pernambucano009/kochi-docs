@@ -24677,8 +24677,102 @@ def brain_ideas_pick(d: dict, n: int = 2) -> list[dict]:
     pool = [x for x in saved_of(d) if x.get("kind") == "idea" and x.get("mine") and not x.get("used_at") and (x.get("status") or "ready") == "ready"
             and str((x.get("item") or {}).get("title") or "").strip()]
     random.shuffle(pool)
+    if len(pool) - n < IDEAS_MIN:   # 🔄 قربت تخلص: العقل يملا الفولدر من المنافسين والترند
+        cid = SHARED_LIB if "ideas" in share_keys() else mem_cid(d)
+        brain_ideas_refill(cid, d.get("client_id") or active_client_id())
     return [{"id": uuid.uuid4().hex[:8], "title": str(x["item"].get("title") or "")[:600], "hook": str(x["item"].get("hook") or "")[:600],
              "idea": str(x["item"].get("idea") or "")[:600], "fit": "", "why": "", "aud": "", "brain": True} for x in pool[:n]]
+
+
+# 🔄 فولدر أفكار العقل بيتملي لوحده: لما الأفكار اللي لسه ما اتستخدمتش تقل عن ٥، العقل بياخد البوستات الناجحة عند المنافسين
+#   (مشاهداتها أعلى بكتير من المعتاد للحساب نفسه أو من عدد متابعينه) والترندات اللي في السوق، ويطلع منها أفكار للعلامة.
+IDEAS_MIN = 5
+IDEAS_REFILL = 8
+IDEAS_REFILL_EVERY = 6 * 3600
+IDEAS_REFILLING: set[str] = set()
+
+
+def rival_winners(c: dict, n: int = 14) -> list[dict]:
+    """البوستات الناجحة: ضعف وسيط مشاهدات الحساب نفسه على الأقل، أو مشاهداتها أكتر من عدد متابعينه."""
+    out = []
+    for it in rivals.approved(c):
+        fol = int(it.get("followers") or 0)
+        for p in it.get("posts") or []:
+            v, mult = int(p.get("views") or 0), float(p.get("multiple") or 0)
+            if not str(p.get("caption") or "").strip() or not (mult >= 2 or (fol and v >= fol)):
+                continue
+            out.append({"handle": it.get("handle"), "platform": it.get("platform"), "caption": str(p["caption"])[:260], "views": v,
+                        "multiple": mult, "per_follower": round(v / fol, 2) if fol else None, "url": p.get("url")})
+    return sorted(out, key=lambda x: -(x["multiple"] or 0))[:n]
+
+
+def brain_ideas_refill(cid: str, bid: str, force: bool = False) -> None:
+    """يملي فولدر أفكار العقل لو الأفكار المتاحة أقل من ٥ (في الخلفية، ومرة كل ٦ ساعات بالكتير)."""
+    if cid in IDEAS_REFILLING or atlas.mock_mode():
+        return
+    mem = mem_load(cid)
+    left = [x for x in mem.get("saved") or [] if x.get("kind") == "idea" and x.get("mine") and not x.get("used_at")]
+    if not force and (len(left) >= IDEAS_MIN or time.time() - float(mem.get("refill_at") or 0) < IDEAS_REFILL_EVERY):
+        return
+    IDEAS_REFILLING.add(cid)
+
+    def go():
+        try:
+            b = brain_row(bid) or {}
+            wins = rival_winners(b.get("competitors") or {})
+            trs = [t for t in (b.get("trends") or {}).get("items") or [] if t.get("title")][:8]
+            if not wins and not trs:
+                if b.get("competitors") or b.get("market"):
+                    start_trends(bid)   # مفيش ترندات لسه: تتجاب، والمرة الجاية تتستخدم
+                return
+            lang = cz.full_brand(b).get("language") or "عربي"
+            old = [str((x.get("item") or {}).get("title") or "") for x in mem.get("saved") or [] if x.get("kind") == "idea"]
+            old += [str(u.get("title") or "") for u in mem.get("used") or [] if u.get("kind") == "idea"]
+            wl = "\n".join(f"[W{i}] @{w['handle']} ({w['platform']}) · {w['views']} views · ×{w['multiple']} vs its usual"
+                            + (f" · {w['per_follower']}× followers" if w.get("per_follower") else "") + f" · {w['caption']}" for i, w in enumerate(wins))
+            tl = "\n".join(f"[T{i}] {t['title']}: {t.get('what') or ''} | angle: {t.get('angle') or ''}" for i, t in enumerate(trs))
+            msgs = [{"role": "system", "content": "You are the content strategist of a brand. You turn what is working for competitors and in the market into original video ideas for this brand. Return JSON only."},
+                    {"role": "user", "content": f"""Brand:
+{rivals.brand_info(b)}
+Write in: {lang} (the brand's audience dialect), natural social-media wording.
+
+Competitor posts that clearly outperformed (views far above that account's usual, or above its follower count):
+{wl or "(none)"}
+
+Trends in this market now:
+{tl or "(none)"}
+
+Create {IDEAS_REFILL} short-video ideas for THIS brand. Each one takes the reason a winning post or trend worked (topic, question, format, emotion) and applies it to the brand's own offer and audience. Never copy a post. Mix sources. Skip anything similar to: {old[-60:]}
+Return JSON: {{"ideas": [{{"title": "...", "hook": "first spoken line", "idea": "2 sentences: what the video shows and says", "src": ["W0", "T1"]}}]}}"""}]
+            raw = rivals_llm(msgs, "أفكار من المنافسين والترند")
+            items = []
+            for it in (raw.get("ideas") or [])[:IDEAS_REFILL]:
+                if not isinstance(it, dict) or not str(it.get("title") or "").strip():
+                    continue
+                src = []
+                for k in it.get("src") or []:
+                    m = re.fullmatch(r"([WT])(\d+)", str(k).strip().upper())
+                    if m and m[1] == "W" and int(m[2]) < len(wins):
+                        src.append({"kind": "rival", "handle": wins[int(m[2])]["handle"], "url": wins[int(m[2])].get("url") or "", "views": wins[int(m[2])]["views"]})
+                    elif m and m[1] == "T" and int(m[2]) < len(trs):
+                        src.append({"kind": "trend", "title": trs[int(m[2])]["title"]})
+                items.append({"id": uuid.uuid4().hex[:10], "kind": "idea", "mine": True, "at": now(), "status": "ready", "origin": "auto:rivals",
+                              "item": {"title": str(it["title"])[:120], "idea": str(it.get("idea") or "")[:600], "hook": str(it.get("hook") or "")[:300],
+                                       "url": "", "audio": "", "sources": src[:3]}})
+            def add(m):
+                saved = m.get("saved") or []
+                have = [str((x.get("item") or {}).get("title") or "") for x in saved]
+                fresh = [x for x in items if not any(trends.similar(x["item"]["title"], h) for h in have)]
+                m["saved"] = ([*saved, *fresh])[-ideamem.SAVED_MAX:]
+                m["refill_at"] = time.time()
+            mem_update(cid, add)
+            print(f"[ideas-refill] {cid}: +{len(items)} ({len(wins)} winners, {len(trs)} trends)", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ideas-refill] {cid}: {exc}", flush=True)
+            mem_update(cid, lambda m: m.update(refill_at=time.time()))
+        finally:
+            IDEAS_REFILLING.discard(cid)
+    threading.Thread(target=go, daemon=True).start()
 
 
 def flow_gen_ideas(fid: str, hint: str = "", more: bool = False, brain_first: bool = False) -> None:
