@@ -25307,7 +25307,7 @@ LOGOST_ERR: dict[str, str] = {}    # آخر خطأ (يظهر للعميل بدل
 def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
     """نسخة اللوجو بالستايل ده (لو مش موجودة وmake: تترسم دلوقتي). None = مافيش لوجو، أو الرسم فشل."""
     src = logo_path(bid)
-    if not src or style not in logostamp.STYLES:
+    if not src or style not in logostamp.ALL:
         return None
     out = logostamp.file_for(brain_dir(bid), src, style)
     if out.exists() or not make or atlas.mock_mode() or not atlas.api_key():
@@ -25354,6 +25354,9 @@ def logo_prepare(bid: str, name: str) -> str:
                 if work != src:
                     work.unlink(missing_ok=True)
                 work = nb
+        if work == src and transparent:   # شفاف وجودته كويسة: زي ما هو (من غير نسخة جديدة، فالنسخ المرسومة بتفضل صالحة)
+            update_brain(bid, lambda d: [a.update(prepped=True) for a in d.get("logos") or [] if a.get("file") == name])
+            return name
         out = f"logo-{uuid.uuid4().hex[:8]}.png"
         firstvid.cutout(work, folder / out)   # الخلفية السادة + قص الفراغ (واللي شفاف بيتقص بس)
         if work != src:
@@ -25363,6 +25366,7 @@ def logo_prepare(bid: str, name: str) -> str:
         LOGOST_ERR[bid] = str(getattr(exc, "detail", None) or exc)[:200]
         if work != src:
             work.unlink(missing_ok=True)
+        update_brain(bid, lambda d: [a.update(prepped=True) for a in d.get("logos") or [] if a.get("file") == name])   # مايتعادش لوحده كل مرة
         return name
     def fn(d):
         for a in d.get("logos") or []:
@@ -25416,17 +25420,21 @@ def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
 @app.get("/api/ad-brains/{bid}/logo-styles")
 def logo_styles_get(bid: str):
     src = logo_path(bid)
+    ent = next((a for a in (brain_row(bid) or {}).get("logos") or [] if src and a.get("file") == src.name), None)
+    if ent and not ent.get("original") and not ent.get("prepped") and bid not in LOGOST_JOBS:   # 🧼 لوجو اترفع قبل التنضيف التلقائي: يتنضّف دلوقتي مرة واحدة
+        logo_upload_kick(bid, [src.name])
     off = (brain_row(bid) or {}).get("logo_styles_off") or []
     items = []
-    for st in logostamp.STYLES:
+    for st in logostamp.ALL:   # الـ٨ دايمًا، والخاصة بقالب (EXTRA) بتظهر في صفحة القوالب، وفي صفحة العلامة لو اترسمت
         f = logostamp.file_for(brain_dir(bid), src, st) if src else None
-        items.append({"style": st, "label": logostamp.LABELS[st], "on": st not in off,
+        items.append({"style": st, "label": logostamp.ALL_LABELS[st], "on": st not in off, "extra": st in logostamp.EXTRA,
                       "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
     step = LOGOST_STEP.get(bid, "")
     try:   # 🗺️ كل قالب مرسوم ← ستايله (صفحة القوالب بتعلّم عليه: الشعار اتعمل ولا لأ)
         tmap = {k: v for k, v in (json.loads((EL_DIR / "fitness" / "index.json").read_text("utf-8")).get("tpl") or {}).items() if v in logostamp.STYLES}
     except (OSError, ValueError):
         tmap = {}
+    tmap.update({f"t-{k}": k for k in logostamp.EXTRA if f"t-{k}" not in tmap and (MOTION_DIR / "r" / f"t-{k}" / "reel.html").exists()})
     return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""), "tpl": tmap,
             "step": "clean" if step == "clean" else step.split(":", 1)[1] if step.startswith("draw:") else ""}
 
@@ -25460,14 +25468,15 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
         raise HTTPException(404, "هذا العميل غير موجود")
     if body.style == "all":
         logo_styles_kick(bid)
-    elif body.style in logostamp.STYLES:
+    elif body.style in logostamp.ALL:
         if body.on is not None:
             update_brain(bid, lambda d: d.update(logo_styles_off=sorted({*(d.get("logo_styles_off") or [])} - {body.style}
                                                                         if body.on else {*(d.get("logo_styles_off") or []), body.style})))
         if body.redo and (src := logo_path(bid)):
             logostamp.file_for(brain_dir(bid), src, body.style).unlink(missing_ok=True)
-            logo_styles_kick(bid)
-        elif body.make and logo_path(bid) and LOGOST_JOBS.get(bid) != "working":
+            if body.style in logostamp.STYLES:
+                logo_styles_kick(bid)
+        if (body.make or (body.redo and body.style in logostamp.EXTRA)) and logo_path(bid) and LOGOST_JOBS.get(bid) != "working":
             LOGOST_JOBS[bid] = "working"
             LOGOST_ERR.pop(bid, None)
             LOGOST_STEP[bid] = f"draw:{body.style}"

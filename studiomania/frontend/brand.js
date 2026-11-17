@@ -673,12 +673,13 @@ const BrandPage = (() => {
   function lstHTML(b) {
     const x = S.lstFor === b?.id ? S.lst : null;
     if (!x) { if (b && S.lstLoading !== b.id) loadLst(b); return ""; }
-    const miss = x.items.some((i) => !i.url);
+    const items = x.items.filter((i) => !i.extra || i.url);   // نسخ القوالب الخاصة بتظهر هنا بعد ما تترسم بس (بتتطلب من صفحة القوالب)
+    const miss = items.some((i) => !i.url && !i.extra);
     return `<div class="bm-sub"><small>شعارك بأساليب القوالب</small>
       <p class="bm-note">يُختم آخر كل فيديو قالب بنسخة من شعارك بأسلوب القالب نفسه. إن لم تعجبك نسخة فأوقفها، فيُستخدم شعارك الأصلي مكانها.</p>
-      <div class="bm-lst">${x.items.map((i) => `<figure class="${i.on ? "" : "off"}">${i.url ? `<img src="${esc(i.url)}" alt="" loading="lazy">` : `<span>${x.working && x.step === i.style ? "🎨" : x.working ? "⏳" : "—"}</span>`}
+      <div class="bm-lst">${items.map((i) => `<figure class="${i.on ? "" : "off"}">${i.url ? `<img src="${esc(i.url)}" alt="" loading="lazy">` : `<span>${x.working && x.step === i.style ? "🎨" : x.working ? "⏳" : "—"}</span>`}
         <figcaption>${esc(i.label)}</figcaption><div><button class="bm-pill${i.on ? " on" : ""}" data-lst="${i.style}" data-v="${i.on ? "" : "1"}">${i.on ? "تعمل" : "متوقفة"}</button>${i.url ? `<button class="bm-pill" data-lstredo="${i.style}" title="ارسمها من جديد">↻</button>` : ""}</div></figure>`).join("")}</div>
-      ${miss && !x.working ? `<button class="bm-pill" data-lstall>🎨 ارسم النسخ الناقصة</button>` : x.working ? `<p class="bm-note">${x.step === "clean" ? "⏳ تُزال خلفية الشعار وتُحسَّن جودته…" : `⏳ تُرسم النسخ الآن (${x.items.filter((i) => i.url).length} من ${x.items.length})…`}</p>` : ""}
+      ${miss && !x.working ? `<button class="bm-pill" data-lstall>🎨 ارسم النسخ الناقصة</button>` : x.working ? `<p class="bm-note">${x.step === "clean" ? "⏳ تُزال خلفية الشعار وتُحسَّن جودته…" : `⏳ تُرسم النسخ الآن (${items.filter((i) => i.url).length} من ${items.length})…`}</p>` : ""}
       ${x.error && !x.working ? `<p class="pk-err">⚠️ تعذّر رسم بعض النسخ: ${esc(x.error)}</p>` : ""}</div>`;
   }
   async function loadTasks(b) {

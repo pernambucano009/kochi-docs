@@ -22,10 +22,34 @@ LABELS = {"crayon": "ألوان شمع", "ink": "حبر صيني", "oneline": "�
           "toon": "كرتون قديم", "ukiyo": "طباعة يابانية", "watercolor": "ألوان مائية"}
 
 
+# 🎨 قوالب مالهاش رسم في مكتبة العناصر: ليها ستايل لوجو خاص بيها، بيترسم بس لما العميل يطلبه من صفحة القوالب
+#   (النسخ الـ٨ اللي فوق بس هي اللي بتترسم لوحدها أول ما اللوجو يترفع).
+EXTRA = {
+    "pixel": "8-bit retro video game pixel art: chunky square pixels, limited bright palette, no anti-aliasing",
+    "blueprint": "technical blueprint drawing: thin white construction lines and dimension marks on a deep blue grid paper",
+    "glass": "stained glass window: bold dark lead lines separating glowing translucent colored glass pieces",
+    "screen": "silkscreen poster print: two or three flat opaque ink layers, slight registration offset, ink texture",
+    "deco": "1920s Art Deco: gold geometric line work, symmetry and sunburst rays on glossy black",
+    "holo": "holographic projection: glowing cyan light lines and scanlines, translucent wireframe on a dark background",
+    "impasto": "thick impasto oil painting: heavy palette-knife strokes with raised paint edges and rich color",
+    "shadow": "shadow puppet theatre: translucent colored leather cut-out with punched holes, backlit, dark outline",
+    "ascii": "amber monochrome ASCII art on an old computer screen: built from text characters only",
+    "dossier": "vintage case-file print: rubber-stamp ink, halftone dots and flat spot colors on cream archive paper",
+    "woodcut": "woodcut relief print: bold black carved strokes with gouge marks and one flat accent color",
+    "redcut": "red paper cut-out art: the shape is cut from one sheet of red paper, holes where light passes",
+    "onehero": "clean modern 3D render: soft studio light, smooth rounded materials, gentle shadows",
+}
+EXTRA_LABELS = {"pixel": "بكسل", "blueprint": "مخطط هندسي", "glass": "زجاج معشّق", "screen": "طباعة حريرية", "deco": "آرت ديكو",
+                "holo": "هولوجرام", "impasto": "زيت سميك", "shadow": "خيال الظل", "ascii": "حروف الشاشة", "dossier": "ملف أرشيف",
+                "woodcut": "حفر خشب", "redcut": "قص ورق", "onehero": "مجسّم"}
+ALL = {**STYLES, **EXTRA}
+ALL_LABELS = {**LABELS, **EXTRA_LABELS}
+
+
 def prompt(style: str) -> str:
     return ("Redraw this exact logo in a new art style. Keep exactly the same shapes, layout, proportions, letters and text "
             "(same spelling, same language, nothing added or removed). Only the rendering changes to: "
-            f"{STYLES[style]}. Centered on a plain flat pure white background, nothing else in the image, no extra text, no frame, no shadow.")
+            f"{ALL[style]}. Centered on a plain flat pure white background, nothing else in the image, no extra text, no frame, no shadow.")
 
 
 def style_of(mid: str, index: Path) -> str | None:
@@ -34,7 +58,10 @@ def style_of(mid: str, index: Path) -> str | None:
         s = (json.loads(index.read_text("utf-8")).get("tpl") or {}).get(mid)
     except (OSError, ValueError):
         return None
-    return s if s in STYLES else None
+    if s in STYLES:
+        return s
+    x = mid[2:] if mid.startswith("t-") else ""
+    return x if x in EXTRA else None
 
 
 def file_for(folder: Path, src: Path, style: str) -> Path:
