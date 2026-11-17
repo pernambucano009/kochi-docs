@@ -25809,7 +25809,6 @@ def flow_lang_guess(d: dict) -> str:
     return dialect.code(flow_brain(d) or {}, brand_settings().get("language") or "")
 
 
-@app.get("/api/flows/{fid}/voice-options")
 # 🎙️ صوت الراوي في عقل العلامة: صوت أساسي، أو أكتر من صوت بالتناوب، أو صوت العميل نفسه (مستنسخ من عينة)
 def brand_narrator(lang: str, bid: str | None = None, advance: bool = False) -> str:
     """الصوت اللي يتكلم في فيديو العلامة باللهجة دي: من «صوت الراوي» (أساسي أو بالتناوب)، وإلا أول صوت في اللهجة."""
@@ -25892,6 +25891,7 @@ def narrators_clone(bid: str, label: str = Form(""), file: UploadFile = File(...
     return narrators_view(bid)
 
 
+@app.get("/api/flows/{fid}/voice-options")
 def flow_voice_options(fid: str):
     d = flow_load(fid)
     fasih_sync()
