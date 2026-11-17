@@ -2507,6 +2507,7 @@ def montage_filmstrip(kind: str, id: str):
 
 class ClipEdit(BaseModel):
     gen_id: str
+    no_sil: bool = False   # 🎬 فيديو قالب (موشن): السكتات فيه مقصودة (رسم ومزيكا)، فمابيتقترحش قصها
     start: float = 0
     end: float | None = None
     zoom: float = 1.0
@@ -7258,10 +7259,10 @@ def project_silence_marks(conn: sqlite3.Connection, data: dict, min_len: float =
     marks = []
     cache: dict[str, list] = {}
     for i, c in enumerate(clips):
-        if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf"):
+        if c.get("disabled") or float(c.get("volume", 1) or 0) <= 0 or c.get("kf") or c.get("no_sil"):
             continue
         path = clip_source(conn, c["gen_id"])
-        if not path or not media_info(path).has_audio:
+        if not path or path.name.startswith("motion_") or not media_info(path).has_audio:   # 🎬 فيديو قالب (اتفتح في المونتاج قبل علامة no_sil)
             continue
         info = media_info(path)
         if str(path) not in cache:
@@ -30778,7 +30779,7 @@ def flow_to_montage(fid: str):
     shutil.copy(src, GENERATED_DIR / name)
     gid = phone_gen(GENERATED_DIR / name, f"🎨 {title}")
     # نفس اللي المونتاج الحر بيفتحه (section free + الكادر الطولي + العميل)، وإلا الصفحة بتفتح فاضية
-    data = {**ProjectIn(name=f"🧭 {title}"[:100], section="free", clips=[ClipEdit(gen_id=gid)], outro=False, brand_intro=False, char_intro=False,
+    data = {**ProjectIn(name=f"🧭 {title}"[:100], section="free", clips=[ClipEdit(gen_id=gid, no_sil=True)], outro=False, brand_intro=False, char_intro=False,
                         brand_outro=False, logo={"enabled": False}, canvas={"ratio": "9:16", "bg": "#000000"}).model_dump(),
             "client_id": active_client_id()}   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
     pid = uuid.uuid4().hex[:12]
