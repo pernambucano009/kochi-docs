@@ -24470,9 +24470,20 @@ def flow_to_dict(fid: str, d: dict) -> dict:
             out["output"] = {**o, "status": "failed", "error": job.get("error")}
         elif not job:
             aid = next((a for a in motion_assets().get(o.get("mid"), []) if a not in (o.get("before") or [])), None)
+            if not aid and (d.get("export_resumes") or 0) < 2:   # 🔁 الرسم اتقطع (السيرفر اتحدّث في النص): يكمّل لوحده، والعناصر اللي اترسمت محفوظة
+                flow_update(fid, lambda x: x.update(export_resumes=(x.get("export_resumes") or 0) + 1))
+                MOTION_JOBS[o.get("mid")] = {"status": "working", "progress": 0.0, "error": ""}
+                def again(m=o.get("mid")):
+                    MOTION_JOBS.pop(m, None)
+                    try:
+                        flow_export(fid, FlowExportIn())
+                    except Exception as exc:  # noqa: BLE001
+                        MOTION_JOBS[m] = {"status": "error", "progress": 0.0, "error": str(getattr(exc, "detail", None) or exc)[:300]}
+                threading.Thread(target=again, daemon=True).start()
+                return {**out, "output": {**o, "status": "working"}}
             out["output"] = {**o, "status": "done" if aid else "failed", "asset": aid, "error": None if aid else "توقف الرسم"}
             if aid:
-                flow_update(fid, lambda x: x.update(output=out["output"], stage="done"))
+                flow_update(fid, lambda x: x.update(output=out["output"], stage="done", export_resumes=0))
                 out["stage"] = "done"
         else:
             out["output"] = {**o, "progress": job.get("progress", 0)}
@@ -26963,6 +26974,12 @@ def flow_export(fid: str, body: FlowExportIn):
     flow_update(fid, lambda x: x.update(params=params, stage="generate", output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
     t_go = time.time()
     def go():
+        try:
+            go_()
+        except Exception as exc:  # noqa: BLE001 — مايفضلش «شغال» على طول
+            print(f"[flow-export] {fid}: {exc}", flush=True)
+            MOTION_JOBS[mid] = {"status": "error", "progress": 0.0, "error": str(getattr(exc, "detail", None) or exc)[:300]}
+    def go_():
         p = flow_draw_missing(fid, mid, params)   # 🎨 صورة منتج ناقصة: بتترسم بستايل القالب قبل الرسم
         p = flow_qa(fid, mid, p)                  # 🔎 الكلام المنطوق ↔ الخانات ↔ الصورة، والمخالف يتظبط قبل الرسم
         p = flow_fill_els(d, p, make=True)        # 🌱 رسومات الجمل اللي لسه ناقصة بتترسم وتدخل
