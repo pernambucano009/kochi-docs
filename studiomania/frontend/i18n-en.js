@@ -16682,4 +16682,6 @@ window.I18N_EN = {
   "عميل": "Customer",
   "ارفع هنا صور آراء عملائك (تقييمات جوجل، أو رسائل واتساب والرسائل الخاصة). يقرأ العقل كل رأي كما كتبه صاحبه، ويستخدمه قالب «آراء العملاء» بدلًا من الأمثلة.": "Upload screenshots of your customers' reviews here (Google reviews, or WhatsApp and direct messages). The brain reads each review exactly as its writer wrote it, and the «Customer reviews» template uses them instead of examples.",
   "آراء العملاء": "Customer reviews",
+  "يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع": "The program picks the right template from your field's templates, without repeats, and up to 5 template videos a week",
+  "يختاره البرنامج": "Picked by the program",
 };

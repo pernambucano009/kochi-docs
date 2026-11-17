@@ -284,7 +284,7 @@ const PilotPage = (() => {
     { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["", "النشر"]] },
   ];
   const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
-  const typeOn = (t) => (t.id === "tpl" ? tplIds().length > 0 : S.d.settings.templates.includes(t.id));
+  const typeOn = (t) => (t.id === "tpl" ? S.d.settings.templates.includes("tpl:auto") || tplIds().length > 0 : S.d.settings.templates.includes(t.id));
   const carStyles = () => (S.lib || []).filter((a) => a.kind === "style" || a.kind === "template");
   function stepsBy() {   // الإعداد القديم (نفس الخطوات لكل الأنواع) بيتحول لكل نوع لوحده
     const s = S.d.settings;
@@ -300,7 +300,7 @@ const PilotPage = (() => {
     const rows = TYPES.filter((t) => !t.soon && typeOn(t)).map((t) => {
       const on = new Set(sb[t.kind] || []);
       const chips = t.steps.map(([k, n]) => {
-        if (k === "@tpl") return `<button type="button" class="ap-stp pick" data-open="tpl">${esc(n)} <b class="num">${tplIds().length}</b> ▾</button>`;
+        if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
         if (k === "@style") return `<button type="button" class="ap-stp pick" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : "<small>تلقائي</small>"} ▾</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
       }).join('<i class="ar" aria-hidden="true">←</i>');
@@ -448,7 +448,10 @@ const PilotPage = (() => {
         const t = TYPES.find((x) => x.id === d.type);
         if (t?.soon) return toast("منشورات الصور قريبًا");
         if (d.type === "avatar" && !S.d.twins.some((x) => x.ready)) return toast("أنشئ أفاتار أولًا من «الأفاتار» (فيديو قراءة أو صورة أمامية)");
-        if (d.type === "tpl") { if (tplIds().length) return save({ templates: s.templates.filter((x) => !x.startsWith("t-")) }); S.pop = "tpl"; return drawPop(); }
+        if (d.type === "tpl") {   // 🎨 القوالب: البرنامج بيختار (مفيش قايمة يختار منها العميل)
+          const on = s.templates.includes("tpl:auto") || tplIds().length;
+          return save({ templates: on ? s.templates.filter((x) => x !== "tpl:auto" && !x.startsWith("t-")) : [...s.templates, "tpl:auto"] });
+        }
         const set = new Set(s.templates); set.has(d.type) ? set.delete(d.type) : set.add(d.type);
         if (d.type === "carousel" && set.has("carousel") && carStyles().length && !(s.car_styles || []).length) S.pop = "style";
         return save({ templates: [...set] });

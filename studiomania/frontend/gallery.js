@@ -813,8 +813,7 @@ const Gallery = (() => {
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
         ${lgLine(x)}
-        ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost${AP.on.has(x.id) ? " apon" : ""}" data-gap="${esc(x.id)}">${AP.on.has(x.id) ? "✓ في قائمة الأوتوبايلوت (اضغط للإزالة)" : "اختر هذا القالب لقائمة الأوتوبايلوت"}</button>` : ""}
-                <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
+                        <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
     S.pvItem = x;
     pv.hidden = false;
     pv.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 });
@@ -867,6 +866,8 @@ const Gallery = (() => {
   // 🛫 قائمة الأوتوبايلوت: علامة على كل قالب (من برّه أو من المعاينة) بتضيفه للقوالب اللي الأوتوبايلوت بيتناوب بينها
   const AP = { on: new Set(), all: [], names: {} };
   function apMark(x) {
+    return "";   // 🎨 الأوتوبايلوت بقى بيختار القوالب لوحده (مفيش علامة اختيار على القوالب)
+    // eslint-disable-next-line no-unreachable
     if (!String(x.id).startsWith("t-")) return "";
     const on = AP.on.has(x.id);
     return `<button type="button" class="gg-ap${on ? " on" : ""}" data-gap="${esc(x.id)}" title="${on ? "في قائمة الأوتوبايلوت" : "اختر لقائمة الأوتوبايلوت"}" aria-label="${on ? "في قائمة الأوتوبايلوت" : "اختر لقائمة الأوتوبايلوت"}">✓</button>`;
@@ -908,7 +909,7 @@ const Gallery = (() => {
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر يُعاد استخدامه لكل الصفحات: الأحداث مرة واحدة فقط
     dubOut(); Gen.close?.(); SceneStudio.close?.();
     await Promise.all([apLoad(), lgLoad()]);
-    if (!root.querySelector(".nh-gal-aphint")) root.querySelector(".nh-gal")?.prepend(Object.assign(document.createElement("p"), { className: "nh-gal-aphint", textContent: "شاهد القالب وعلّم على القوالب التي تريد استخدامها في الأوتوبايلوت لعلامتك" }));
+    root.querySelector(".nh-gal-aphint")?.remove();   // 🎨 الأوتوبايلوت بيختار القوالب لوحده
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }
   return { mount, list: () => EXTRA, fieldMedia, openEditor, start: (id) => { const x = EXTRA.find((t) => t.id === id); if (!x) return false; startTpl(x); return true; } };

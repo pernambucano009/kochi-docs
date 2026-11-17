@@ -33061,7 +33061,7 @@ def pilot_tpl_name(tpl: str, names: dict) -> str:
             return auto_load(tpl[5:], active_client_id()).get("name") or "قالب مخصص"
         except HTTPException:
             return "قالب مخصص (حُذف)"
-    return names.get(tpl) or tpl   # أسماء قوالب الكود زي ما هي في معرض القوالب (الواجهة بتبعتها)
+    return names.get(tpl) or tpl_names().get(tpl) or tpl   # أسماء قوالب الكود زي ما هي في معرض القوالب (الواجهة بتبعتها)
 
 
 def pilot_twin(s: dict) -> str | None:
@@ -33091,6 +33091,31 @@ def pilot_slots(s: dict, start: datetime, hours: float = 24) -> list[datetime]:
     return sorted(set(out))
 
 
+PILOT_TPL_WEEK = 5   # فيديوهات القوالب حشو: مش أكتر من ٥ في الأسبوع، والأساس محتوى العميل نفسه (الموبايل/الأفاتار)
+
+
+def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
+    """🎨 قالب الفيديو الجاي: من قوالب مجال العميل (والقوالب اللي كان اختارها)، اللي ماتستخدمش الأسبوع ده والأقدم استخدامًا،
+    وقالب آراء العملاء بس لو عنده آراء حقيقية. None لو اتعمل ٥ فيديوهات قوالب الأسبوع ده."""
+    bid = active_client_id()
+    field = str(((brain_row(bid) or {}) if bid else {}).get("field") or (onboard_load() or {}).get("field") or "")
+    cands = list(dict.fromkeys([*fieldpacks.field_reels(field), *[t for t in pool if t.startswith("t-")]]))
+    if "t-review" in cands and not review_facts(bid):
+        cands.remove("t-review")
+    if not cands:
+        return None
+    week = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    tjobs = [j for j in d["jobs"] if str(j.get("tpl") or "").startswith("t-")]
+    recent = [j["tpl"] for j in tjobs if str(j.get("at") or "") >= week]
+    if len(recent) >= PILOT_TPL_WEEK:
+        return None
+    last = {}
+    for j in tjobs:
+        last.setdefault(j["tpl"], str(j.get("at") or ""))
+    fresh = [t for t in cands if t not in recent] or cands
+    return min(fresh, key=lambda t: (last.get(t, ""), random.random()))
+
+
 def pilot_plan() -> None:
     """مهمة جديدة لكل موعد قادم في الـ ٢٤ ساعة ليس له مهمة، والقالب يتلف على القوالب المختارة بالدور."""
     def fn(d):
@@ -33107,6 +33132,10 @@ def pilot_plan() -> None:
                 continue
             tpl = pool[d["rot"] % len(pool)]
             d["rot"] += 1
+            if tpl == "tpl:auto" or tpl.startswith("t-"):   # 🎨 القالب يختاره البرنامج (حد ٥ في الأسبوع ومن غير تكرار)
+                tpl = pilot_auto_tpl(d, pool)
+                if not tpl:
+                    continue
             d["jobs"].insert(0, {"id": uuid.uuid4().hex[:8], "at": key, "tpl": tpl, "kind": pilot_kind(tpl), "name": pilot_tpl_name(tpl, s.get("names") or {}),
                                  "status": "run", "phase": "start", "gate": None, "passed": [], "note": "في الطابور", "error": None,
                                  "fid": None, "project_id": None, "export_id": None, "post_id": None, "tries": 0, "created_at": now()})
@@ -33561,7 +33590,7 @@ def pilot_put(body: PilotIn, request: Request):
         if body.tz is not None:
             s["tz"] = max(-720, min(840, int(body.tz)))
         if body.templates is not None:
-            s["templates"] = [t for t in dict.fromkeys(body.templates) if t in ("phone", "avatar", "carousel") or t.startswith("auto:") or re.fullmatch(r"t-[\w-]+", t)][:30]
+            s["templates"] = [t for t in dict.fromkeys(body.templates) if t in ("phone", "avatar", "carousel", "tpl:auto") or t.startswith("auto:") or re.fullmatch(r"t-[\w-]+", t)][:30]
         if body.mode in ("auto", "approve"):
             s["mode"] = body.mode
         if body.steps is not None:
