@@ -3090,9 +3090,10 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { #nh.nh-wait .nh-cta { animation: none; opacity: .6; } }
 #nh .nh-ttl, #nh .nh-ttl ~ .ar, #nh .nh-cta .nh-name { transition: opacity .25s; }
 
-/* ➡️ أي تسلسل خطوات (الفكرة ← النص ← الصوت…، مسار الصفحة، خطوات الأوتوبايلوت والكاروسيل والإعلانات) بيمشي من الشمال لليمين
-   في العربي والإنجليزي زي بعض، والكلام جوه كل خطوة بيفضل باتجاه لغته */
-.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps { direction: ltr; }
+/* ➡️ أي تسلسل خطوات (الفكرة ← النص ← الصوت…، مسار الصفحة، خطوات الأوتوبايلوت والكاروسيل والإعلانات) بيمشي مع اتجاه اللغة
+   (صاحب المشروع طلب كده): من اليمين للشمال في العربي، ومن الشمال لليمين في الإنجليزي، والكلام جوه كل خطوة باتجاه لغته */
+:is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps) { direction: rtl; }
+html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps) { direction: ltr; }
 :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps, .nh-crumbs, .bl-crumbs, .db-steps) > * { unicode-bidi: plaintext; }
 :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .fs-steps, .nh-steps5, .ad-stages, .sc2-steps) :is(button, span, b, small) { unicode-bidi: plaintext; }
 
