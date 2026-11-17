@@ -2004,8 +2004,13 @@ document.addEventListener("fullscreenchange", () => {
   const full = !!document.fullscreenElement;
   $("previewFrame").closest(".ed-player").classList.toggle("full", full);
   // الكادر بيكبر على قد الشاشة (المعاينة بنفس الحسبة، بس بتتكبّر بـ CSS)
-  const fr = $("previewFrame");
-  fr.style.transform = full ? `scale(${Math.min((innerHeight - 90) / PV_H, (innerWidth - 40) / PV_W).toFixed(3)})` : "";
+  // الغلاف بياخد مقاس الكادر بعد التكبير بالظبط (التكبير بـ transform مابيغيّرش المساحة)، فالكادر كله بيبان في النص والتحكم تحته
+  const fr = $("previewFrame"), wrap = $("pvWrap");
+  const k = full ? Math.min((innerHeight - 110) / PV_H, (innerWidth - 40) / PV_W) : 1;
+  fr.style.transformOrigin = full ? "0 0" : "";
+  fr.style.transform = full ? `scale(${k.toFixed(3)})` : "";
+  wrap.style.width = full ? `${Math.round(PV_W * k)}px` : "";
+  wrap.style.height = full ? `${Math.round(PV_H * k)}px` : "";
   drawClipBox();
 });
 

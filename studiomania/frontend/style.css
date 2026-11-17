@@ -1929,7 +1929,11 @@ a.btn.disabled { opacity: .45; pointer-events: none; }
 .ctx-menu hr { border: 0; border-top: 1px solid #2f3440; margin: 4px 0; }
 #tpLoop.on { color: var(--accent); }
 .ed-player.full { background: #000; justify-content: center; }
-.ed-player.full .frame { transform-origin: center; }
+.ed-player.full .frame { transform-origin: 0 0; }
+:root:root .ed-player.full { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0; }
+:root:root .ed-player.full .ty-wrap { flex: none; min-height: 0; margin: 0; padding: 0; background: none; border-radius: 0; overflow: visible; display: block; }
+.ed-player.full .mt-gbar { display: none; }
+.ed-player.full .transport { flex: none; width: min(560px, 92vw); color: #fff; }
 .h-snd, .t-snd { height: 30px; }
 .t-snd { position: relative; }
 .tl-audio.snd { background: #4a2140; top: 2px; bottom: auto; }
