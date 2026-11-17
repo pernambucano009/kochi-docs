@@ -707,6 +707,7 @@ const Flow = (() => {
   function render() {
     const d = S.d;
     if (!d || !S.el) return;
+    S.el.classList.toggle("flw-lock", !!S.inflight || busy());
     const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
     const body = { idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
       shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
@@ -794,7 +795,18 @@ const Flow = (() => {
     S.d.busy = "chat"; render();
     await call("/chat", { stage, message: msg, item: id });
   }
+  // 🔒 زرار واحد في المرة: من أول ما يدوس لحد ما الطلب يرجع (ولو العقل شغال) باقي الأزرار بتقف، عشان مايبدأش عمليتين فوق بعض.
+  //   الأزرار اللي مابتغيرش حاجة (إغلاق، إلغاء، تشغيل صوت، عرض المزيد…) شغالة على طول.
+  const FREE = "[data-close],[data-why],[data-seek],[data-lib],[data-cancel],[data-vplay],[data-hint],[data-more],[data-savedopen],[data-iclose],[data-dialopen],a[download],summary";
   async function onClick(e) {
+    const btn = e.target.closest("button,[data-go],[role=button]");
+    if (!btn || e.target.closest(FREE)) return onAct(e);
+    if (S.inflight || busy()) { e.preventDefault(); e.stopPropagation(); return; }
+    S.inflight = true;
+    S.el?.classList.add("flw-lock");
+    try { await onAct(e); } finally { S.inflight = false; S.el?.classList.remove("flw-lock"); }
+  }
+  async function onAct(e) {
     const t = e.target;
     const q = (sel) => t.closest(sel);
     if (q("[data-close]")) return close();
