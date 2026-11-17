@@ -1253,23 +1253,23 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
           </div>
         </main>
 
-        <main class="view" data-view="12" hidden>
-          <div class="car-layout">
-            <aside class="panel ad-side">
-              <div class="panel-head"><h2><span class="emo">🔤</span> التايبوجرافي</h2></div>
-              <button type="button" class="btn primary ad-up" id="tyNew">＋ فيديو تايبوجرافي جديد</button>
-              <p class="hint">يتحول النص إلى موشن جرافيك: كلمات تُكتب وتتبعثر وتتجمع، وحروف تُستبدل بأيقونات. من نص تكتبه، أو صوت، أو فيديو مصوّر (يُركَّب النص فوقه).</p>
-              <ul class="ad-list" id="tyList"></ul>
-              <a class="btn lab-libbtn" href="/typo-gallery.html" target="_blank" rel="noopener"><span class="emo">🎨</span> معرض العناصر (شاهد كل الحركات)</a>
-              <button type="button" class="btn lab-libbtn" id="tyStkBtn"><span class="emo">🧩</span> مكتبة الملصقات <span class="muted" id="tyStkCount"></span></button>
-              <p class="hint">الأيقونات والصور الشفافة التي يتحول إليها النص. تأتي من «🔤 التايبوجرافي» في معمل التفكيك، أو ترفعها، أو تُرسم بالوصف.</p>
-              <button type="button" class="btn lab-libbtn" id="tySfxBtn"><span class="emo">🔊</span> الأصوات الرسمية <span class="muted" id="tySfxCount"></span></button>
-              <p class="hint">نقرة مع كل كلمة أو عنصر يظهر أو يختفي، وصوت لوحة المفاتيح على كتابة الرسائل فقط.</p>
-            </aside>
-            <section class="car-main" id="tyMain" hidden></section>
-            <section class="car-main" id="tyStk" hidden></section>
-            <section class="car-main" id="tySfx" hidden></section>
-            <div class="panel muted" id="tyEmpty">أنشئ فيديو جديدًا من «＋ فيديو تايبوجرافي جديد».</div>
+        <main class="view db-v2 ty-v2" data-view="12" hidden>
+          <!-- التايبوجرافي بالتصميم الجديد: المشاريع شريط فوق، والأدوات أزرار صغيرة، والمشروع تحته من غير كروت -->
+          <div class="db-bar">
+            <button type="button" class="btn primary ad-up" id="tyNew">＋ فيديو تايبوجرافي جديد</button>
+            <ul class="ad-list db-strip" id="tyList"></ul>
+            <div class="ty-tools">
+              <a class="btn" href="/typo-gallery.html" target="_blank" rel="noopener" title="شاهد كل الحركات"><span class="emo">🎨</span> معرض العناصر</a>
+              <button type="button" class="btn" id="tyStkBtn" title="الأيقونات والصور الشفافة التي يتحول إليها النص"><span class="emo">🧩</span> الملصقات <span class="muted" id="tyStkCount"></span></button>
+              <button type="button" class="btn" id="tySfxBtn" title="نقرة مع كل كلمة أو عنصر يظهر أو يختفي، وصوت لوحة المفاتيح على كتابة الرسائل فقط"><span class="emo">🔊</span> الأصوات <span class="muted" id="tySfxCount"></span></button>
+            </div>
+          </div>
+          <section class="ty-main" id="tyMain" hidden></section>
+          <section class="ty-main" id="tyStk" hidden></section>
+          <section class="ty-main" id="tySfx" hidden></section>
+          <div class="db-empty" id="tyEmpty">
+            <p>أنشئ فيديو جديدًا من «＋ فيديو تايبوجرافي جديد».</p>
+            <p class="hint">يتحول النص إلى موشن جرافيك: كلمات تُكتب وتتبعثر وتتجمع، وحروف تُستبدل بأيقونات. من نص تكتبه، أو صوت، أو فيديو مصوَّر (يُركَّب النص فوقه).</p>
           </div>
         </main>
 

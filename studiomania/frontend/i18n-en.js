@@ -16642,4 +16642,10 @@ window.I18N_EN = {
   "⏳ تُزال خلفية الشعار وتُحسَّن جودته…": "⏳ Removing the logo background and improving its quality…",
   "⏳ تُرسم النسخ الآن ({0} من {1})…": "⏳ Drawing the versions now ({0} of {1})…",
   "⚠️ تعذّر رسم بعض النسخ: {0}": "⚠️ Some versions couldn't be drawn: {0}",
+  "معرض العناصر": "Elements gallery",
+  "شاهد كل الحركات": "See all the moves",
+  "الملصقات": "Stickers",
+  "الأيقونات والصور الشفافة التي يتحول إليها النص": "The icons and transparent images the text turns into",
+  "نقرة مع كل كلمة أو عنصر يظهر أو يختفي، وصوت لوحة المفاتيح على كتابة الرسائل فقط": "A click with every word or element that appears or disappears, and a keyboard sound only when typing messages",
+  "يتحول النص إلى موشن جرافيك: كلمات تُكتب وتتبعثر وتتجمع، وحروف تُستبدل بأيقونات. من نص تكتبه، أو صوت، أو فيديو مصوَّر (يُركَّب النص فوقه).": "Text turns into motion graphics: words get typed, scattered and gathered, and letters swap into icons. From text you write, a voice, or a filmed video (the text goes on top of it).",
 };
