@@ -13,6 +13,7 @@ function fmt(t) {
 }
 
 function toast(msg, isError = false) {
+  if (!msg) return;   // 🤫 أخطاء داخلية صامتة (بتتسجل في صندوق الأخطاء بس، مابتظهرش للعميل)
   const el = $("toast");
   el.textContent = msg;
   el.className = "toast" + (isError ? " error" : "");
@@ -71,11 +72,11 @@ async function api(path, opts = {}) {
     let d = data.detail;
     if (d && typeof d !== "string") {
       const raw = JSON.stringify(d).slice(0, 600);
-      d = Array.isArray(d) ? "تعذّر تنفيذ الطلب: البيانات المرسلة غير مكتملة. حدّث الصفحة وجرّب مرة أخرى" : (d.message || d.error || "تعذّر تنفيذ الطلب، جرّب مرة أخرى");
+      d = Array.isArray(d) ? "" : (d.message || d.error || "");   // 🤫 خطأ تقني (مش رسالة للعميل): بيتسجل بس، ومن غير رسالة على الشاشة
       fetch("/api/issues/client", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "ui", screen: location.hash || location.pathname, message: `${opts.method || "GET"} ${path.split("?")[0]} → ${res.status}`, raw }) }).catch(() => {});
     }
-    throw new Error(d || `خطأ ${res.status}`);
+    throw new Error(d ?? `خطأ ${res.status}`);
   }
   return data;
 }
