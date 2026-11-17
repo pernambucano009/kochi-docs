@@ -25090,7 +25090,11 @@ def logo_styles_get(bid: str):
         items.append({"style": st, "label": logostamp.LABELS[st], "on": st not in off,
                       "url": f"/media/ads/brains/{bid}/{f.name}" if f and f.exists() else None})
     step = LOGOST_STEP.get(bid, "")
-    return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""),
+    try:   # 🗺️ كل قالب مرسوم ← ستايله (صفحة القوالب بتعلّم عليه: الشعار اتعمل ولا لأ)
+        tmap = {k: v for k, v in (json.loads((EL_DIR / "fitness" / "index.json").read_text("utf-8")).get("tpl") or {}).items() if v in logostamp.STYLES}
+    except (OSError, ValueError):
+        tmap = {}
+    return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""), "tpl": tmap,
             "step": "clean" if step == "clean" else step.split(":", 1)[1] if step.startswith("draw:") else ""}
 
 
@@ -25098,6 +25102,22 @@ class LogoStyleIn(BaseModel):
     style: str
     on: bool | None = None
     redo: bool = False
+    make: bool = False   # ارسم الستايل ده بس دلوقتي (من صفحة القوالب)
+
+
+@app.get("/api/logo-styles")
+def logo_styles_mine():
+    """نفس /api/ad-brains/{bid}/logo-styles للعلامة المختارة (صفحة القوالب)."""
+    bid = active_client_id()
+    return logo_styles_get(bid) if bid else {"logo": False, "working": False, "items": [], "error": "", "tpl": {}, "step": ""}
+
+
+@app.post("/api/logo-styles")
+def logo_styles_mine_set(body: LogoStyleIn):
+    bid = active_client_id()
+    if not bid:
+        raise HTTPException(400, "اختر عميلًا أولًا")
+    return logo_styles_set(bid, body)
 
 
 @app.post("/api/ad-brains/{bid}/logo-styles")
@@ -25114,6 +25134,17 @@ def logo_styles_set(bid: str, body: LogoStyleIn):
         if body.redo and (src := logo_path(bid)):
             logostamp.file_for(brain_dir(bid), src, body.style).unlink(missing_ok=True)
             logo_styles_kick(bid)
+        elif body.make and logo_path(bid) and LOGOST_JOBS.get(bid) != "working":
+            LOGOST_JOBS[bid] = "working"
+            LOGOST_ERR.pop(bid, None)
+            LOGOST_STEP[bid] = f"draw:{body.style}"
+            def one(st=body.style):
+                try:
+                    logo_styled(bid, st)
+                finally:
+                    LOGOST_JOBS.pop(bid, None)
+                    LOGOST_STEP.pop(bid, None)
+            threading.Thread(target=one, daemon=True).start()
     return logo_styles_get(bid)
 
 

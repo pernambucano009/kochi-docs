@@ -280,7 +280,7 @@ const Gallery = (() => {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريبًا</small></span>`;
     return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
-      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${apMark(x)}</div></article>`;
+      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${apMark(x)}${lgMark(x)}</div></article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
   function labLines(name) {
@@ -320,7 +320,7 @@ const Gallery = (() => {
     return `<article class="gg-card" data-gi="${i}">
       <button type="button" class="gg-art" data-gpv="${i}" aria-label="شاهد عرض «${esc(x.name)}»">${art}${x.sample_url ? `<span class="gg-play" aria-hidden="true">▶</span>` : ""}</button>
       <div class="gg-meta"><b>${esc(x.name)}</b><small>${esc(catName(x.cat))}</small>${recFor(x, key) ? `<span class="gg-rec">موصى به لمجال ${esc((NICHES.find((n) => n[0] === key) || [, S.niche.name])[1])}</span>` : ""}</div>
-      <button type="button" class="nh-gal-go gg-go" data-gstart="${i}">${x.id === "editor" ? "🎞️ افتح المحرر" : "ابدأ بهذا القالب"}</button>${apMark(x)}</article>`;
+      <button type="button" class="nh-gal-go gg-go" data-gstart="${i}">${x.id === "editor" ? "🎞️ افتح المحرر" : "ابدأ بهذا القالب"}</button>${apMark(x)}${lgMark(x)}</article>`;
   }
   function ggFill() {
     const box = S.root.querySelector(".gg-grid");
@@ -812,6 +812,7 @@ const Gallery = (() => {
       <div class="nh-gal-pvt"><span class="latin en-k">${esc(CAT_EN[x.cat] || x.cat)}</span><b>${esc(x.name)}</b>
         <p>${esc(x.desc || x.description || "")}</p><small class="muted">${esc(catName(x.cat))}</small>
         <button type="button" class="nh-gal-go" data-gstart>${x.id === "editor" ? "🎞️ افتح المحرر" : "✨ ابدأ بهذا القالب"}</button>
+        ${lgLine(x)}
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost${AP.on.has(x.id) ? " apon" : ""}" data-gap="${esc(x.id)}">${AP.on.has(x.id) ? "✓ في قائمة الأوتوبايلوت (اضغط للإزالة)" : "اختر هذا القالب لقائمة الأوتوبايلوت"}</button>` : ""}
         ${String(x.id).startsWith("t-") ? `<button type="button" class="nh-gal-go ghost" data-gedit>✏️ أنشئ نسختك من هذا القالب</button><small class="nh-gal-hint">نسخة تعدّل فيها النص والألوان والخطوط والمشاهد بنفسك، وتُحفظ في «قوالبك المخصصة».</small>` : ""}
         <small class="nh-gal-hint">${x.id === "editor" ? "يفتح مشروع مونتاج جديدًا فارغًا، وتجده لاحقًا في «قيد العمل»." : "سيقترح عليك العقل أفكارًا وسيناريوهات تناسب علامتك، وأنت تختار."}</small></div></div>`;
@@ -834,6 +835,36 @@ const Gallery = (() => {
       if (gn) return Gen.open(gn.dataset.gen);
     });
   }
+  // 🏷️ شعارك بأسلوب القالب: علامة على كل قالب مرسوم (اتعمل ولا لأ)، وفي المعاينة زرار يعمله
+  const LG = { d: null };
+  async function lgLoad() { try { LG.d = await api("/api/logo-styles"); } catch { LG.d = null; } }
+  const lgOf = (x) => { const st = LG.d?.logo && LG.d.tpl?.[x.id]; return st ? LG.d.items.find((i) => i.style === st) : null; };
+  function lgMark(x) {
+    const it = lgOf(x);
+    if (!it) return "";
+    return it.url ? `<span class="gg-lg ok" title="شعارك بأسلوب هذا القالب جاهز"><img src="${esc(it.url)}" alt=""></span>`
+      : `<span class="gg-lg miss" title="لم يُصنع شعارك بأسلوب هذا القالب بعد">🏷️</span>`;
+  }
+  function lgLine(x) {
+    if (!LG.d?.logo) return "";
+    const it = lgOf(x), busy = LG.d.working && LG.d.step === it?.style;
+    if (!it) return `<small class="nh-gal-hint">🏷️ يُختم آخر الفيديو بشعارك الأصلي.</small>`;
+    if (it.url) return `<div class="gg-lgrow"><img src="${esc(it.url)}" alt=""><small>🏷️ شعارك بأسلوب هذا القالب جاهز، ويُختم به آخر الفيديو.</small></div>`;
+    return `<button type="button" class="nh-gal-go ghost" data-glogo="${esc(it.style)}" ${LG.d.working ? "disabled" : ""}>${busy ? "⏳ يُرسم شعارك بأسلوب هذا القالب…" : "🎨 اصنع شعاري بأسلوب هذا القالب"}</button>`;
+  }
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-glogo]"); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    try { LG.d = await api("/api/logo-styles", { method: "POST", ...jsonBody({ style: b.dataset.glogo, make: true }) }); } catch (err) { return toast(err.message, true); }
+    b.disabled = true; b.textContent = "⏳ يُرسم شعارك بأسلوب هذا القالب…";
+    const wait = async () => {
+      await lgLoad();
+      if (LG.d?.working) return setTimeout(wait, 4000);
+      if (S.pvItem && !S.pv?.hidden) preview(S.pvItem);
+      if (LG.d?.error) toast(LG.d.error, true);
+    };
+    setTimeout(wait, 4000);
+  }, true);
   // 🛫 قائمة الأوتوبايلوت: علامة على كل قالب (من برّه أو من المعاينة) بتضيفه للقوالب اللي الأوتوبايلوت بيتناوب بينها
   const AP = { on: new Set(), all: [], names: {} };
   function apMark(x) {
@@ -863,6 +894,11 @@ const Gallery = (() => {
 .gg-ap { position: absolute; top: 10px; inset-inline-start: 10px; z-index: 3; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.35); color: transparent; font-size: 14px; cursor: pointer; display: grid; place-items: center; }
 .gg-ap:hover { background: rgba(0,0,0,.55); color: rgba(255,255,255,.7); }
 .gg-ap.on { background: #E5613E; border-color: #E5613E; color: #fff; }
+.gg-lg { position: absolute; top: 10px; inset-inline-end: 10px; z-index: 3; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.92); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.18); font-size: 15px; }
+.gg-lg img { width: 28px; height: 28px; object-fit: contain; }
+.gg-lg.miss { opacity: .55; filter: grayscale(1); }
+.gg-lgrow { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.gg-lgrow img { width: 48px; height: 48px; object-fit: contain; border-radius: 10px; background: #fff; padding: 4px; }
 .nh-gal-go.apon { color: #E5613E; }
 .nh-gal-aphint { text-align: center; font-size: 13px; color: var(--nh-muted, #6B6B67); margin: 0 0 10px; }` }));
   // Esc بيقفل المعاينة الأول (قبل ما يرجع من الصفحة)
@@ -872,7 +908,7 @@ const Gallery = (() => {
     S.root = root;
     if (!root._gal) { root._gal = true; bind(root); }   // نفس العنصر يُعاد استخدامه لكل الصفحات: الأحداث مرة واحدة فقط
     dubOut(); Gen.close?.(); SceneStudio.close?.();
-    await apLoad();
+    await Promise.all([apLoad(), lgLoad()]);
     if (!root.querySelector(".nh-gal-aphint")) root.querySelector(".nh-gal")?.prepend(Object.assign(document.createElement("p"), { className: "nh-gal-aphint", textContent: "شاهد القالب وعلّم على القوالب التي تريد استخدامها في الأوتوبايلوت لعلامتك" }));
     try { await load(); render(); } catch (err) { root.querySelector(".nh-gal-grid").innerHTML = `<div class="nh-empty">${esc(err.message)}</div>`; }
   }

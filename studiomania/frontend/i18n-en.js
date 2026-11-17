@@ -16648,4 +16648,10 @@ window.I18N_EN = {
   "الأيقونات والصور الشفافة التي يتحول إليها النص": "The icons and transparent images the text turns into",
   "نقرة مع كل كلمة أو عنصر يظهر أو يختفي، وصوت لوحة المفاتيح على كتابة الرسائل فقط": "A click with every word or element that appears or disappears, and a keyboard sound only when typing messages",
   "يتحول النص إلى موشن جرافيك: كلمات تُكتب وتتبعثر وتتجمع، وحروف تُستبدل بأيقونات. من نص تكتبه، أو صوت، أو فيديو مصوَّر (يُركَّب النص فوقه).": "Text turns into motion graphics: words get typed, scattered and gathered, and letters swap into icons. From text you write, a voice, or a filmed video (the text goes on top of it).",
+  "شعارك بأسلوب هذا القالب جاهز": "Your logo in this template's style is ready",
+  "🏷️ شعارك بأسلوب هذا القالب جاهز، ويُختم به آخر الفيديو.": "🏷️ Your logo in this template's style is ready, and it stamps the end of the video.",
+  "لم يُصنع شعارك بأسلوب هذا القالب بعد": "Your logo hasn't been made in this template's style yet",
+  "🏷️ يُختم آخر الفيديو بشعارك الأصلي.": "🏷️ The video ends with your original logo.",
+  "⏳ يُرسم شعارك بأسلوب هذا القالب…": "⏳ Drawing your logo in this template's style…",
+  "🎨 اصنع شعاري بأسلوب هذا القالب": "🎨 Make my logo in this template's style",
 };
