@@ -30815,8 +30815,14 @@ def flow_to_montage(fid: str):
 
 @app.post("/api/flows/{fid}/to-publish")
 def flow_to_publish(fid: str):
-    """📤 فيديو القالب ← «الفيديوهات الجاهزة» (اللي النشر بيختار منها)، مرة واحدة لكل فيديو."""
+    """📤 فيديو القالب ← «الفيديوهات الجاهزة» (اللي النشر بيختار منها)، مرة واحدة لكل فيديو. لو اتعدّل في المونتاج واتصدّر: نسخة المونتاج."""
     d = flow_load(fid)
+    mpid = (d.get("montage") or {}).get("project_id")
+    if mpid:
+        with closing(db()) as conn:
+            r = conn.execute("SELECT render_status, export_id FROM projects WHERE id = ?", (mpid,)).fetchone()
+        if r and r["render_status"] == "done" and r["export_id"]:
+            return {"export_id": r["export_id"]}
     o = flow_to_dict(fid, d).get("output") or {}
     src = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
     if o.get("status") != "done" or not src.is_file():
