@@ -444,7 +444,7 @@ const Flow = (() => {
       <p class="flw-sub">${vt ? "المشاهد ضُبطت على التعليق الصوتي: كل مشهد يأخذ طول جملته." : "بدون تعليق صوتي: المشاهد بطولها الأصلي."} افتح لوحة القالب لترى الفيديو بالصوت وتضبط النص والألوان والخطوط والصور، ثم صدّر.</p>
       ${d.vo_url ? `<audio class="flw-vo" src="${esc(d.vo_url)}" controls preload="metadata"></audio>` : ""}
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 اصنع الفيديو<small class="flw-cost">بدون نقاط</small></button></div>
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 اصنع الفيديو</button></div>
       <p class="flw-sub">بعد صنعه يفتح في المونتاج: تشاهده وتعدّل فيه (العناصر، والموسيقى، والتعليق الصوتي أو صوتك أنت)، ثم تصدّره.</p>
       <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
   }
