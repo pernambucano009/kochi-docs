@@ -16857,4 +16857,6 @@ window.I18N_EN = {
   "شبكة سويسرية": "Swiss grid",
   "ملصق سينما": "Movie poster",
   "فاتورة": "Receipt",
+  "اختر ستايل الكاروسيل": "Pick a carousel style",
+  "يُرسم بألوان علامتك وشعارها. اختر ستايلًا، واكتب الموضوع، واضغط جديد.": "Drawn in your brand colors and logo. Pick a style, write the topic, and press New.",
 };

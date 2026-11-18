@@ -3439,3 +3439,13 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 :root:root .stage .project-bar .mt-export { background: var(--ink, #1D1B19); color: var(--card, #fff); box-shadow: 0 10px 24px rgba(0, 0, 0, .18); border-color: transparent; }
 :root[data-nh-theme="dark"] .mt-fnext, :root[data-nh-theme="dark"] .stage .project-bar .mt-export { background: #F2EFEA; color: #1D1B19; }
 #carTemplates .car-asset { width: 124px; } #carTemplates .car-asset span { font-size: 12.5px; }
+/* 🎨 شاشة بداية الكاروسيل: الستايلات الجاهزة */
+.car-start { display: grid; gap: 10px; align-content: start; }
+.car-start h2 { margin: 0; }
+.car-stygrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.car-sty { display: grid; gap: 6px; padding: 8px; border-radius: 16px; border: 2px solid transparent; background: var(--surface); cursor: pointer; font: inherit; color: var(--text); text-align: start; }
+.car-sty span { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.car-sty img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; display: block; }
+.car-sty b { font-weight: 500; font-size: 13.5px; padding-inline: 2px; }
+.car-sty:hover { border-color: var(--line); }
+.car-sty.on { border-color: var(--accent); }

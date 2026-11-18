@@ -15,6 +15,7 @@ async function initCarousel() {
   $("carModelName").textContent = car.cfg.text_model;
   $("carCount").innerHTML = [3, 4, 5, 6, 7, 8, 9, 10].map((n) => `<option value="${n}">${n}</option>`).join("");
   await loadCarList();
+  renderStyGrid();
   const last = car.cur?.id || storageGet(CAR_KEY) || car.list[0]?.id;
   if (last && car.list.some((c) => c.id === last)) await openCarousel(last);
   else renderCarousel();
@@ -33,6 +34,19 @@ async function loadCarList() {
     .join("");
 }
 
+// 🎨 شاشة البداية: كل الستايلات الجاهزة، بالشرائح الثلاثة لكل ستايل
+function renderStyGrid() {
+  const el = $("carStyGrid"); if (!el) return;
+  el.innerHTML = car.lib.filter((a) => a.builtin).map((a) => `<button type="button" class="car-sty${car.pickSty === a.id ? " on" : ""}" data-sty="${a.id}">
+    <span>${a.images.map((im) => `<img src="${im.url}" alt="" loading="lazy">`).join("")}</span><b>${escapeHtml(a.name)}</b></button>`).join("");
+}
+$("carStyGrid")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-sty]"); if (!b) return;
+  car.pickSty = car.pickSty === b.dataset.sty ? null : b.dataset.sty;
+  renderStyGrid();
+  $("carNewName").focus();
+});
+
 $("carList").addEventListener("click", (e) => {
   const li = e.target.closest("li[data-id]");
   if (li) openCarousel(li.dataset.id);
@@ -43,7 +57,12 @@ $("carNewForm").addEventListener("submit", async (e) => {
   const topic = $("carNewName").value.trim();
   if (!topic) return $("carNewName").focus();
   try {
-    const c = await api("/api/carousels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: topic }) });
+    let c = await api("/api/carousels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: topic }) });
+    if (car.pickSty) {   // 🎨 الستايل اللي اختاره من شاشة البداية
+      car.cur = c;
+      try { await patchCarousel({ settings: { template_id: car.pickSty } }); c = car.cur; } catch { /* يختاره بعدين */ }
+      car.pickSty = null;
+    }
     $("carNewName").value = "";
     car.cur = c;
     car.sec = "idea";
