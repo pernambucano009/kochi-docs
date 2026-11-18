@@ -16812,4 +16812,8 @@ window.I18N_EN = {
   "🧠 جارٍ توزيع الكلام على الحركات": "🧠 Assigning words to moves",
   "توقف التوزيع": "Planning stopped",
   "خطوط رفيعة": "Hairline",
+  "تفاصيل العرض": "Offer details",
+  "الآراء": "Reviews",
+  "آراء عملائك وتقييمهم": "Your customer reviews and rating",
+  "متابعة": "Continue",
 };

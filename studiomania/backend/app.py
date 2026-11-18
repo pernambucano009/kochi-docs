@@ -25335,6 +25335,12 @@ def flow_new(body: FlowNewIn):
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
     with FLOW_LOCK:
         flow_save(fid, d)
+    if tpl.get("id") in FACT_TPLS and not body.skip_ideas:   # 🧾 عرض السعر وآراء العملاء: أول خطوة التفاصيل نفسها، مش أفكار عامة
+        b0 = brain_row(d["client_id"]) or {}
+        br = tplbrief.brief(tpl["id"], field_guess(b0), first_brand_name(b0)) or {}
+        pre = review_facts(d["client_id"]) if tpl["id"] == "t-review" else {}
+        flow_update(fid, lambda x: x.update(stage="facts", brief={**br, **FACT_TPLS[tpl["id"]]}, facts_prefill=pre))
+        return flow_to_dict(fid, flow_load(fid))
     if tpl.get("id") == "t-review" and (rf := review_facts(d["client_id"])):   # ⭐ آراء حقيقية من فولدر «آراء العملاء» (مش أمثلة)
         flow_set_facts(fid, "t-review", rf)
     if not body.skip_ideas:
@@ -25441,6 +25447,28 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
         raise HTTPException(400, "كل النصوص الناتجة تشبه ما استخدمته من قبل. جرّب «وجّه العقل» بفكرة مختلفة" if rep else "لم يُرجع العقل نصًا، جرّب مرة أخرى")
     flow_update(fid, lambda x: x.update(scen_repeats=len(rep)))
     flow_update(fid, lambda x: x.update(lang=lang, script_lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
+
+
+FACT_TPLS = {"t-price": {"step": "العرض", "title": "تفاصيل العرض"}, "t-review": {"step": "الآراء", "title": "آراء عملائك وتقييمهم"}}
+
+
+class FlowFactsIn(BaseModel):
+    facts: dict = {}
+
+
+@app.post("/api/flows/{fid}/facts")
+def flow_facts(fid: str, body: FlowFactsIn):
+    """🧾 تفاصيل العرض (أو الآراء) ← خانات مقفولة، والأفكار والنص بيتبنوا حواليها."""
+    d = flow_load(fid)
+    flow_idle(d)
+    tpl = d["template"]["id"]
+    facts, errs = tplbrief.validate(tpl, body.facts or {})
+    if errs:
+        raise HTTPException(400, " · ".join(errs))
+    flow_set_facts(fid, tpl, facts)
+    flow_update(fid, lambda x: x.update(stage="idea", ideas=[], error=None))
+    flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, tplbrief.prompt_text(tplbrief.apply(tpl, facts)[1])))
+    return flow_to_dict(fid, flow_load(fid))
 
 
 def flow_set_facts(fid: str, tpl: str, facts: dict) -> None:

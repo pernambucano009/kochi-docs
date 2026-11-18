@@ -44,7 +44,9 @@ const Flow = (() => {
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
   const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
   const isPhone = (d) => d?.template?.kind === "phone";
-  const steps = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
+  // 🧾 قوالب المعطيات (عرض السعر، آراء العملاء): أول خطوة تفاصيل العرض أو الآراء نفسها، والأفكار والنص مبنيين عليها
+  const steps0 = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
+  const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d)] : steps0(d));
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
@@ -301,6 +303,21 @@ const Flow = (() => {
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
   const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
   const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
+  function stFacts(d) {
+    const b = d.brief || {}, v = d.facts || d.facts_prefill || {};
+    const fld = (q) => {
+      const id = `flwF_${q.key}`, val = v[q.key] ?? q.value ?? "";
+      const lab = `<span>${esc(q.label)}${q.req ? "" : ` <small class="muted">(اختياري)</small>`}</span>`;
+      if (q.kind === "image") return "";
+      if (q.kind === "choice") return `<label class="flw-fact">${lab}<select id="${id}" data-fact="${esc(q.key)}">${(q.opts || []).map(([k, t]) => `<option value="${esc(k)}" ${String(val) === String(k) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+      if (q.kind === "textarea" || q.kind === "lines") return `<label class="flw-fact">${lab}<textarea id="${id}" data-fact="${esc(q.key)}" rows="${q.kind === "lines" ? 4 : 2}" placeholder="${esc(q.ph || "")}">${esc(Array.isArray(val) ? val.join("\n") : val)}</textarea></label>`;
+      return `<label class="flw-fact">${lab}<input id="${id}" data-fact="${esc(q.key)}" ${q.kind === "num" ? 'inputmode="decimal" dir="ltr"' : ""} value="${esc(val)}" placeholder="${esc(q.ph || "")}"></label>`;
+    };
+    return `<h2>${esc(b.title || "التفاصيل")}</h2><p class="flw-sub">${esc(b.idea || "")}</p>
+      <div class="flw-facts">${(b.ask || []).map(fld).join("")}</div>
+      <div class="flw-acts"><button type="button" class="flw-btn pri big" data-factsgo ${busy() ? "disabled" : ""}>متابعة</button></div>${failed("facts")}`;
+  }
+
   function stIdea(d) {
     const loading = d.busy === "ideas";
     return `<h2>اختر فكرة للمنشور</h2><p class="flw-sub">${(d.ideas || []).length ? "العقل اقترح أفكارًا على قدر العلامة والقالب. اختر واحدة، أو عدّلها، أو اطلب غيرها، أو اكتب فكرتك." : "اطلب من العقل أفكارًا على قدر العلامة والقالب، أو اكتب فكرتك أنت."}</p>${costNote(d)}
@@ -803,7 +820,7 @@ const Flow = (() => {
     if (!d || !S.el) return;
     S.el.classList.toggle("flw-lock", !!S.inflight || busy());
     const st = S.view === "publish" ? "publish" : d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { publish: stPublish, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
+    const body = { publish: stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
       shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
@@ -906,6 +923,11 @@ const Flow = (() => {
     const t = e.target;
     const q = (sel) => t.closest(sel);
     if (q("[data-close]")) return close();
+    if (q("[data-factsgo]")) {
+      const facts = {};
+      S.el.querySelectorAll("[data-fact]").forEach((el) => { facts[el.dataset.fact] = el.value; });
+      return call("/facts", { facts });
+    }
     if (q("[data-why]")) return window.uiKnow?.(S.d?.knowledge);
     let b;
     if (q("[data-skipshoot]")) { reset(); return call("/skip-shoot", {}); }

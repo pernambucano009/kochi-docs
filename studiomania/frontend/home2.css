@@ -3201,3 +3201,7 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-acc.on, .flw-chip.on { border-color: var(--ink, #1D1B19); background: var(--ink, #1D1B19); color: var(--card, #fff); }
 .flw-acc.add { border-style: dashed; color: var(--muted, #8A847C); }
 .flw-btn.orange { background: var(--accent, #E2572B) !important; color: #fff !important; }
+/* 🧾 تفاصيل العرض / الآراء (قوالب المعطيات) */
+.flw-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 14px 0 8px; max-width: 760px; }
+.flw-fact { display: grid; gap: 6px; font-size: 13.5px; min-width: 0; }
+.flw-fact :is(input, textarea, select) { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(127, 127, 127, .25); background: var(--card); color: var(--ink); font: inherit; }
