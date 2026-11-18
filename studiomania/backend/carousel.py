@@ -58,18 +58,6 @@ OLD_DEFAULT_STYLES = {
     "2D flat vector illustration, clean geometric shapes, solid fills, no gradients or only very soft ones, "
     "no 3D, no photorealism, consistent character design across slides, generous white space, "
     "modern social-media carousel layout",
-    "split": ("نصفين", "split layout: the slide is divided into two halves, one a solid brand-color block with the headline, the other a realistic photo of objects from the brand's world (no faces)"),
-    "arabesque": ("زخرفة عربية", "elegant Arabic geometric pattern border and corner ornaments in the brand accent, calm solid background, centered refined Arabic calligraphy-style headline"),
-    "chalk": ("سبورة", "chalkboard texture tinted with the brand's dark color, hand-written white chalk Arabic text, simple chalk doodles and arrows"),
-    "newspaper": ("جريدة", "vintage newspaper page: off-white newsprint, bold condensed Arabic headline, column rules, a black and white halftone photo of objects (no faces)"),
-    "sticky": ("ورق ملاحظات", "colored sticky notes pinned on a cork board, Arabic text handwritten on the notes, push pins, tape"),
-    "neon": ("نيون", "dark night background with glowing neon tube Arabic text in the brand accent color, soft glow reflections"),
-    "pastel": ("باستيل ناعم", "soft pastel palette derived from the brand colors, rounded blobs and organic shapes, friendly rounded Arabic headline, airy and calm"),
-    "grid": ("شبكة سويسرية", "Swiss grid poster: strict grid, one huge number, small aligned Arabic text blocks, one bold brand-color circle breaking the grid"),
-    "chat": ("محادثة", "the slide looks like a chat conversation on a phone: message bubbles in Arabic between a customer and the brand, the brand bubbles in the brand color, no English UI text"),
-    "poster": ("ملصق سينما", "dramatic movie poster: cinematic lighting on an object from the brand's world (no faces), big title at the bottom, small credits line"),
-    "watercolor": ("ألوان مائية", "soft watercolor illustration washes in the brand colors on textured paper, hand-lettered-style Arabic headline"),
-    "receipt": ("فاتورة", "the content printed like a long paper receipt or ticket on a solid background: monospaced-style Arabic text, dotted lines, totals, a barcode"),
 }
 EYES_RULE = "!!!!! TWO TINY SOLID BLACK FILLED CIRCLES AS EYES — NO EXCEPTIONS !!!!!"
 
@@ -495,6 +483,18 @@ STYLES = {
     "steps": ("خطوات ومعلومة", "infographic: numbered badge, simple flat icons, a clean card layout with a big number and short text, like an explainer"),
     "collage": ("قص ولصق", "paper collage: torn paper pieces, tape strips, cut-out photos of the brand's products or tools (no people), stickers, text on torn paper labels"),
     "clay": ("مجسمات ثلاثية", "soft 3D clay-like icons of the brand's own products or tools floating on a pastel background tinted with the brand accent, rounded friendly Arabic headline"),
+    "split": ("نصفين", "split layout: the slide is divided into two halves, one a solid brand-color block with the headline, the other a realistic photo of objects from the brand's world (no faces)"),
+    "arabesque": ("زخرفة عربية", "elegant Arabic geometric pattern border and corner ornaments in the brand accent, calm solid background, centered refined Arabic calligraphy-style headline"),
+    "chalk": ("سبورة", "chalkboard texture tinted with the brand's dark color, hand-written white chalk Arabic text, simple chalk doodles and arrows"),
+    "newspaper": ("جريدة", "vintage newspaper page: off-white newsprint, bold condensed Arabic headline, column rules, a black and white halftone photo of objects (no faces)"),
+    "sticky": ("ورق ملاحظات", "colored sticky notes pinned on a cork board, Arabic text handwritten on the notes, push pins, tape"),
+    "neon": ("نيون", "dark night background with glowing neon tube Arabic text in the brand accent color, soft glow reflections"),
+    "pastel": ("باستيل ناعم", "soft pastel palette derived from the brand colors, rounded blobs and organic shapes, friendly rounded Arabic headline, airy and calm"),
+    "grid": ("شبكة سويسرية", "Swiss grid poster: strict grid, one huge number, small aligned Arabic text blocks, one bold brand-color circle breaking the grid"),
+    "chat": ("محادثة", "the slide looks like a chat conversation on a phone: message bubbles in Arabic between a customer and the brand, the brand bubbles in the brand color, no English UI text"),
+    "poster": ("ملصق سينما", "dramatic movie poster: cinematic lighting on an object from the brand's world (no faces), big title at the bottom, small credits line"),
+    "watercolor": ("ألوان مائية", "soft watercolor illustration washes in the brand colors on textured paper, hand-lettered-style Arabic headline"),
+    "receipt": ("فاتورة", "the content printed like a long paper receipt or ticket on a solid background: monospaced-style Arabic text, dotted lines, totals, a barcode"),
 }
 STYLE_RULE = ("The references show an EXAMPLE brand («نادي الحركة», green and lime): never copy its name, its text, its photos or its colors. "
               "Copy only the design system (layout, typography treatment, decoration, mood) and apply it to this brand's colors and content.")
