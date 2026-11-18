@@ -22,7 +22,7 @@ _FIELDS_ELS = {
 _SPECIAL = {
     "t-shopfloat": "ecom shops food beauty", "t-brandline": "ecom shops food", "t-captions": "ecom shops beauty food", "t-onehero": "ecom shops food",
     "t-iso": "ecom shops food", "t-silent": "food ecom shops", "t-hose": "food", "009": "food", "t-anime": "food", "t-brick": "shops ecom food",
-    "t-pictogram": "fitness", "t-math": "edu realestate", "055": "edu fitness realestate beauty dental home",
+    "t-pictogram": "fitness", "t-math": "edu realestate fitness", "055": "edu fitness realestate beauty dental home",
 }
 _NEED = {"t-audiogram": "audio", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
          "t-lantern": "ramadan", "065": "event", "072": "event"}
