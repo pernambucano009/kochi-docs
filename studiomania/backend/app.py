@@ -6938,8 +6938,18 @@ def scheduler_loop() -> None:
 OFFERS_EVERY = 7 * 86400
 
 
+SPECIAL_ASKS = [   # 🗓️ كل أسبوع سؤال واحد بالدور، والإشعار بيفتح القالب المتخصص على خطوة تفاصيله
+    ("t-price", "🏷️ هل لديك عرض قادم؟", "أخبرنا بالعرض وسعره قبل وبعد، ونجهّز له فيديو عرض السعر في يومه."),
+    ("t-review", "⭐ هل وصلتك آراء جديدة من عملائك؟", "أضف رأيين وتقييمكم، ونصنع منها فيديو آراء العملاء."),
+    ("t-tilt", "📍 هل تفتتحون فرعًا جديدًا؟", "أخبرنا بالموعد والمكان، ونجهّز إعلان الافتتاح."),
+    ("t-versus", "⚖️ هل تريد مقارنة منتجك بالبديل المعتاد؟", "اكتب طرفي المقارنة ونقاطها، ونصنع فيديو مقارنة صادقًا."),
+    ("t-show", "🎁 ما رأيك بمسابقة لمتابعيك؟", "اكتب السؤال والجائزة، ونصنع فيديو المسابقة."),
+    ("t-map", "🛵 هل توصلون لمناطق جديدة؟", "اكتب الفرع والأحياء ووقت التوصيل، ونصنع فيديو الخريطة."),
+]
+
+
 def offers_remind() -> None:
-    """🏷️ كل أسبوع: «عندك عرض قريب؟» عشان نجهز له فيديو عرض السعر في يومه (للعملاء بس، ومرة في الأسبوع)."""
+    """🗓️ كل أسبوع سؤال (عرض، آراء جديدة، افتتاح، مقارنة، مسابقة، توصيل) عشان القوالب المتخصصة تتعمل في وقتها (للعملاء بس)."""
     if TENANT_ROLE != "customer":
         return
     bid = active_client_id()
@@ -6949,9 +6959,10 @@ def offers_remind() -> None:
     if not b.get("offer_ask_at"):   # أول مرة: بعد أسبوع من التسجيل، مش أول يوم
         update_brain(bid, lambda d: d.update(offer_ask_at=time.time()))
         return
-    update_brain(bid, lambda d: d.update(offer_ask_at=time.time()))
-    notify("brain", "info", "🏷️ هل لديك عرض قادم؟", "أخبرنا بالعرض وموعده من قالب «كشف السعر»، ونجهّز له فيديو عرض السعر في يومه.", "create", "offers")
-
+    i = int(b.get("special_i") or 0)
+    tid, title, body = SPECIAL_ASKS[i % len(SPECIAL_ASKS)]
+    update_brain(bid, lambda d: d.update(offer_ask_at=time.time(), special_i=i + 1))
+    notify("brain", "info", title, body, f"tpl:{tid}", tid)
 
 with closing(db()) as _conn, _conn:
     if "remote_id" not in {c[1] for c in _conn.execute("PRAGMA table_info(posts)")}:
@@ -25024,9 +25035,11 @@ def flow_profile(tpl: dict) -> str:
         out.append("أي: الفكرة يجب تتحكي بالكامل داخل هذه الخانات ونفس تسلسل القالب. لا يوجد مشاهد أو شخصيات أو أماكن جديدة غير ما القالب يرسمها، "
                    "النص فقط (والألوان) هو ما يتغير. اجعل النص بنفس طول الأمثلة تقريبًا.")
         if tid in MOTION_TWO_VOICES:
-            a, b = MOTION_TWO_VOICES[tid]
-            out.append(f"هذا القالب حوار بين شخصين: {a} (A) و{b} (B). الفكرة نفسها لازم تكون حوارًا بينهما (سؤال وجواب، أو موقف يحكيه واحد "
-                       "ويرد عليه التاني)، مش فكرة عامة تتقال بصوت واحد. والنص: كل جملة يقولها واحد منهما، والسطر يبدأ بـ «A:» أو «B:».")
+            names = MOTION_TWO_VOICES[tid]
+            out.append(f"هذا القالب حوار بين {' و'.join(f'{n} ({c})' for n, c in zip(names, 'ABC'))} (أو شخص واحد لو العميل اختار كده). "
+                       "الفكرة نفسها لازم تكون حوارًا أو مكالمة أو بودكاست بينهم حسب المطلوب (سؤال وجواب، أو موقف يحكيه واحد ويرد عليه التاني)، "
+                       "مش فكرة عامة تتقال بصوت واحد. والنص: كل جملة يقولها واحد منهم، والسطر يبدأ بحرف المتكلم «A:» أو «B:» أو «C:»، "
+                       "وعلى قد عدد المتحدثين المطلوب بالظبط.")
     elif kind == "carousel":
         out.append("هذا القالب كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد هوك يشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
                    "وآخر سلايد دعوة. الفكرة يجب تُقسّم لنقط أو خطوات أو مقارنة أو قائمة، غير حكاية فيديو.")
@@ -25419,7 +25432,7 @@ def flow_new(body: FlowNewIn):
     """العميل داس على قالب: مشروع جديد والعقل يبدأ يقترح أفكار مباشرة."""
     if not (atlas.api_key() or atlas.mock_mode()):
         raise HTTPException(400, "خدمة التوليد غير مهيأة بعد")
-    tpl = flow_template(body.template, body.name.strip()[:120], body.cat.strip()[:40], body.desc.strip()[:400])
+    tpl = flow_template(body.template, (body.name.strip() or tpl_names().get(body.template, ""))[:120], body.cat.strip()[:40], body.desc.strip()[:400])
     tpl = flow_tpl({"template": tpl})
     if body.reuse:
         me = active_client_id()
@@ -25553,7 +25566,8 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
 
 FACT_TPLS = {"t-price": {"step": "العرض", "title": "تفاصيل العرض"}, "t-review": {"step": "الآراء", "title": "آراء عملائك وتقييمهم"},
              "t-count": {"step": "العرض", "title": "العرض الذي ينتظره الناس"}, "t-tilt": {"step": "الافتتاح", "title": "تفاصيل الافتتاح"},
-             "t-versus": {"step": "المقارنة", "title": "طرفا المقارنة ونقاطها"}, "t-show": {"step": "المسابقة", "title": "سؤال المسابقة وجائزتها"}, "t-map": {"step": "التوصيل", "title": "فرعك ومناطق التوصيل"}}
+             "t-versus": {"step": "المقارنة", "title": "طرفا المقارنة ونقاطها"}, "t-show": {"step": "المسابقة", "title": "سؤال المسابقة وجائزتها"},
+             "t-audiogram": {"step": "الحوار", "title": "شكل الحوار ومن يتكلم"}, "t-map": {"step": "التوصيل", "title": "فرعك ومناطق التوصيل"}}
 
 
 class FlowFactsIn(BaseModel):
@@ -26188,22 +26202,25 @@ def flow_motion_params(d: dict) -> dict:
     return out
 
 
-MOTION_TWO_VOICES = {"t-audiogram": ("المذيع", "الضيف"), "t-chat": ("العميل", "العلامة")}
+MOTION_TWO_VOICES = {"t-audiogram": ("المذيع", "الضيف", "الضيف الثاني"), "t-chat": ("العميل", "العلامة")}
 
 
-def vo_dialogue(rows: list[dict], says: list[str], voice_a: str, lang: str, out: Path, voice_b: str = "") -> None:
-    """صوتين: كل جملة (سطر، أو جملة منتهية بعلامة) بصوت متكلمها. «A:»/«B:» في السكريبت بتحدد المتكلم، وإلا بالتناوب."""
+def vo_dialogue(rows: list[dict], says: list[str], voice_a: str, lang: str, out: Path, voice_b: str = "", voice_c: str = "", people: int = 2) -> None:
+    """حوار: كل جملة (سطر، أو جملة منتهية بعلامة) بصوت متكلمها. «A:»/«B:»/«C:» في السكريبت بتحدد المتكلم، وإلا بالدور."""
     voice_b = voice_b or tytpl_voice_b(lang, voice_a)
-    parts, who = [], "B"
+    voice_c = voice_c or next((v for v in dub.DIALECTS.get(lang, {}).get("voices") or [] if v not in (voice_a, voice_b)), voice_b)
+    order = "ABC"[:max(2, min(3, people))]
+    vmap = {"A": voice_a, "B": voice_b, "C": voice_c}
+    parts, who = [], order[-1]
     for i, txt in enumerate(says):
         raw_lines = str(((rows[i] if i < len(rows) else {}) or {}).get("say") or "").splitlines()
-        marks = [re.match(r"^\s*([AB])\s*[:：]", ln) for ln in raw_lines if ln.strip()]
+        marks = [re.match(r"^\s*([ABC])\s*[:：]", ln) for ln in raw_lines if ln.strip()]
         sents = [x for x in re.split(r"\n+|(?<=[.!?؟])\s+", txt) if x.strip()]
         for k, sent in enumerate(sents):
             m = marks[k] if k < len(marks) else None
-            who = m.group(1).upper() if m else ("B" if who == "A" else "A")
+            who = m.group(1).upper() if m else order[(order.index(who) + 1) % len(order)] if who in order else "A"
             f = out.with_name(f".dlg{len(parts)}.wav")
-            vo_say(sent.strip(), voice_a if who == "A" else voice_b, lang, f)
+            vo_say(sent.strip(), vmap.get(who, voice_a), lang, f)
             parts.append(f)
     if not parts:
         raise HTTPException(400, "لا يحتوي النص على أي جملة تعليق صوتي")
@@ -26228,9 +26245,9 @@ def flow_make_vo(fid: str) -> None:
     flow_update(fid, lambda x: x.update(vo_step="tts"))
     lang_v = vo.get("lang") or d.get("lang") or "ar-eg-cairo"
     if d["template"]["id"] in MOTION_TWO_VOICES:   # 🎙️🎙️ حوار: كل جملة بصوت متكلمها (A ثم B)، أو شخص واحد يقرأ الكل
-        says = [re.sub(r"(?m)^\s*[AB]\s*[:：]\s*", "", x) for x in says]
-        if (vo.get("people") or 2) == 2:
-            vo_dialogue(rows, says, vo.get("voice") or "", lang_v, raw, vo.get("voice_b") or "")
+        says = [re.sub(r"(?m)^\s*[ABC]\s*[:：]\s*", "", x) for x in says]
+        if (vo.get("people") or 2) >= 2:
+            vo_dialogue(rows, says, vo.get("voice") or "", lang_v, raw, vo.get("voice_b") or "", vo.get("voice_c") or "", int(vo.get("people") or 2))
         else:
             vo_say("\n".join(x for x in says if x), vo.get("voice") or "", lang_v, raw)
     else:
@@ -26935,8 +26952,9 @@ def flow_voice_options(fid: str):
     two = MOTION_TWO_VOICES.get(d["template"]["id"])   # 🎙️🎙️ قالب حوار: شخص واحد يقرأ، أو شخصين بصوتين
     return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()), "balance": wallet.balance(),
             "two": list(two) if two else None,
-            "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice, "people": vo.get("people") or (2 if two else 1),
-                     "voice_b": vo.get("voice_b") or (tytpl_voice_b(lang, voice) if two else "")}}
+            "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice,
+                     "people": vo.get("people") or (int((d.get("facts_say") or {}).get("speakers") or 2) if two else 1),
+                     "voice_b": vo.get("voice_b") or (tytpl_voice_b(lang, voice) if two else ""), "voice_c": vo.get("voice_c") or ""}}
 
 
 class FlowVoiceIn(BaseModel):
@@ -26944,6 +26962,7 @@ class FlowVoiceIn(BaseModel):
     lang: str = "ar-eg-cairo"
     voice: str = ""
     voice_b: str = ""   # الصوت التاني في قوالب الحوار
+    voice_c: str = ""   # التالت (البودكاست بتلاتة)
     people: int = 1
 
 
@@ -26994,7 +27013,8 @@ def flow_voice(fid: str, body: FlowVoiceIn):
     vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
     if d["template"]["id"] in MOTION_TWO_VOICES:
         vb = body.voice_b if body.voice_b in dub.DIALECTS[body.lang]["voices"] else tytpl_voice_b(body.lang, voice)
-        vo.update(people=2 if body.people == 2 else 1, voice_b=vb)
+        vc = body.voice_c if body.voice_c in dub.DIALECTS[body.lang]["voices"] else ""
+        vo.update(people=max(1, min(len(MOTION_TWO_VOICES[d["template"]["id"]]), body.people)), voice_b=vb, voice_c=vc)
     if d["template"].get("kind") == "motion":
         flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, vo_track=None, stage="voice" if vo["on"] else "panel"))
         if vo["on"]:
@@ -27732,7 +27752,7 @@ def flow_export(fid: str, body: FlowExportIn):
     params.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema and k not in (body.params or {})})   # 🧾 معطيات العميل
     params = flow_fill_els(d, brand_guard(schema, params, flow_brain(d)))
     if mid in MOTION_TWO_VOICES:   # علامة المتكلم (A:/B:) للصوت بس، مش للشاشة
-        strip = lambda v: re.sub(r"^\s*[AB]\s*[:：]\s*", "", v) if isinstance(v, str) else v  # noqa: E731
+        strip = lambda v: re.sub(r"^\s*[ABC]\s*[:：]\s*", "", v) if isinstance(v, str) else v  # noqa: E731
         params = {k: ([strip(x) for x in v] if isinstance(v, list) else strip(v)) for k, v in params.items()}
     vt = d.get("vo_track") or {}
     vo_path = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None

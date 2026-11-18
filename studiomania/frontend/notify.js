@@ -113,6 +113,7 @@ async function ntfRead(ids) {
 }
 
 function ntfGo(x) {
+  if (/^tpl:/.test(x.link || "") && typeof Flow !== "undefined") return Flow.start({ id: x.link.slice(4) });   // 🗓️ قالب متخصص: على خطوة تفاصيله
   if (x.link) {   // صفحة من صفحات الرئيسية («ابدأ مشروع جديد» مثلًا) أو شاشة
     if (x.link !== "home" && window.NHGo && !document.querySelector(`.view[data-view="${x.link}"]`)) window.NHGo(x.link); else showStep(x.link);
   }

@@ -120,6 +120,14 @@ BRIEFS: dict[str, dict] = {
             _q("gift", "هدية أو عرض الافتتاح", ph="مثال: قهوة مجانية لأول ١٠٠ زائر", req=False, max=40),
         ],
     },
+    "t-audiogram": {
+        "idea": "سنصنع لك حوارًا صوتيًا قصيرًا بشكل بودكاست: موجة صوت تتحرك مع الكلام، والجمل تظهر كلمة كلمة، ويقوله شخص أو أكثر.",
+        "ask": [
+            _q("kind", "شكل الحوار", "choice", opts=[["podcast", "بودكاست"], ["call", "مكالمة"], ["talk", "متحدث واحد"]], value="podcast"),
+            _q("people", "عدد المتحدثين", "choice", opts=[["2", "شخصان"], ["3", "ثلاثة أشخاص"], ["1", "شخص واحد"]], value="2"),
+            _q("topic", "عن ماذا يتحدثون؟", ph="مثال: أكثر سؤال يسأله عملاؤنا عن الاشتراك", req=False, max=80),
+        ],
+    },
     "t-count": {
         "idea": "سنصنع لك عدًّا تنازليًا يشد الانتباه، وعند الصفر يظهر عرضكم.",
         "ask": [
@@ -279,6 +287,9 @@ def apply(tpl: str, facts: dict, currency: str = "") -> tuple[dict, dict]:
     elif tpl == "t-tilt":
         p.update(title=f.get("title"), sub=f.get("when"))
         say.update(news=f.get("title"), when=f.get("when"), gift=f.get("gift"))
+    elif tpl == "t-audiogram":
+        n = 1 if f.get("kind") == "talk" else max(1, min(3, int(_num(f.get("people")) or 2)))
+        say.update(format={"podcast": "بودكاست", "call": "مكالمة"}.get(f.get("kind"), "متحدث واحد"), speakers=n, topic=f.get("topic"))
     elif tpl == "t-count":
         p["offer"] = f.get("offer")
         say.update(offer=f.get("offer"), until=f.get("until"))
@@ -362,6 +373,10 @@ def auto_icons(tpl: str, params: dict) -> dict:
 
 # 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
 NOUNS_EN = {
+    "سنصنع لك حوارًا صوتيًا قصيرًا بشكل بودكاست: موجة صوت تتحرك مع الكلام، والجمل تظهر كلمة كلمة، ويقوله شخص أو أكثر.": "We will make you a short podcast-style audio piece: a sound wave moving with the voice, the lines appearing word by word, said by one person or more.",
+    "شكل الحوار": "Format", "بودكاست": "Podcast", "مكالمة": "Call", "متحدث واحد": "One speaker", "عدد المتحدثين": "Speakers",
+    "شخصان": "Two people", "ثلاثة أشخاص": "Three people", "شخص واحد": "One person", "عن ماذا يتحدثون؟": "What do they talk about?",
+    "مثال: أكثر سؤال يسأله عملاؤنا عن الاشتراك": "e.g. The question our customers ask most about the membership",
     "سؤال المسابقة": "The quiz question", "مثال: ما أسرع طريقة للطلب؟": "e.g. What is the fastest way to order?",
     "إجابتان خاطئتان لكن منطقيتان": "Two wrong but believable answers", "إجابة في كل سطر، مثال: تتصل": "One answer per line, e.g. Call us",
     "تقارنه بماذا؟": "Compared with what?", "مثال: الباقة العادية، أو الطريقة المعتادة": "e.g. the regular plan, or the usual way",
