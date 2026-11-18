@@ -6943,7 +6943,7 @@ SPECIAL_ASKS = [   # 🗓️ كل أسبوع سؤال واحد بالدور، و
     ("t-review", "⭐ هل وصلتك آراء أو رسائل من عملائك تحب نشرها؟", "إذا وافق أصحابها، أضفها مع تقييمكم ونصنع منها فيديو آراء العملاء."),
     ("t-tilt", "📍 هل تفتتحون فرعًا جديدًا؟", "أخبرنا بالموعد والمكان، ونجهّز إعلان الافتتاح."),
     ("t-show", "🎁 ما رأيك بمسابقة لمتابعيك؟", "اكتب السؤال والجائزة، ونصنع فيديو المسابقة."),
-    ("t-map", "🗺️ هل وصل منتجك أو خدمتك إلى أماكن جديدة؟", "أخبرنا بالأماكن الجديدة، ونصنع فيديو على الخريطة."),
+    ("t-map", "🛵 هل توصلون لمناطق جديدة؟", "اكتب الفرع والأحياء ووقت التوصيل، ونصنع فيديو الخريطة."),   # للي عندهم توصيل بس
 ]
 
 
@@ -6959,7 +6959,9 @@ def offers_remind() -> None:
         update_brain(bid, lambda d: d.update(offer_ask_at=time.time()))
         return
     i = int(b.get("special_i") or 0)
-    tid, title, body = SPECIAL_ASKS[i % len(SPECIAL_ASKS)]
+    field = field_guess(b)
+    asks = [a for a in SPECIAL_ASKS if tplfit.fits(a[0], field)]   # سؤال القالب بيتسأل بس لو القالب يصلح لمجاله
+    tid, title, body = asks[i % len(asks)]
     update_brain(bid, lambda d: d.update(offer_ask_at=time.time(), special_i=i + 1))
     notify("brain", "info", title, body, f"tpl:{tid}", tid)
 

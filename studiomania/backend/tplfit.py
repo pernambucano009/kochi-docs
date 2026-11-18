@@ -24,7 +24,7 @@ _SPECIAL = {
     "t-iso": "ecom shops food", "t-silent": "food ecom shops", "t-hose": "food", "009": "food", "t-anime": "food", "t-brick": "shops ecom food",
     "t-pictogram": "fitness", "t-math": "edu realestate fitness", "055": "edu fitness realestate beauty dental home",
 }
-_NEED = {"t-price": "offer", "t-count": "offer", "t-map": "delivery", "t-tilt": "event", "t-versus": "compare", "t-show": "quiz", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
+_NEED = {"t-price": "offer", "t-count": "offer", "t-tilt": "event", "t-versus": "compare", "t-show": "quiz", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
          "t-lantern": "ramadan", "065": "event", "072": "event"}
 
 FIT: dict[str, dict] = {}
@@ -38,6 +38,8 @@ for _t, _f in _SPECIAL.items():
     FIT[_t] = {"fields": _f.split(), "els": False, "special": True}
 for _t, _n in _NEED.items():
     FIT[_t] = {"fields": ALL, "els": False, "need": _n}
+# 🛵 الخريطة: للي عندهم منتجات وتوصيل بس (مطاعم، متاجر إلكترونية، محلات)، ومابتتختارش لوحدها
+FIT["t-map"] = {"fields": ["food", "ecom", "shops"], "els": False, "special": True, "need": "delivery"}
 
 
 def has_els(field: str) -> bool:
