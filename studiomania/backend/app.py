@@ -24812,6 +24812,7 @@ def flow_gen_ideas(fid: str, hint: str = "", more: bool = False, brain_first: bo
         if len(items) >= target:
             break
     items = sorted(items, key=lambda x: -((x.get("heat") or {}).get("avg") or 0))[:target] if gate else items[:target]
+    items = dub.fix_dialect(items, d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d))   # 🇸🇦 النجدي من غير كشكشة
     if mine:
         import random   # noqa: PLC0415
         items = [*mine, *items] if random.random() < 0.75 or not items else [*items, *mine]
@@ -24870,7 +24871,8 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
                                              d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2,
                                              (avoid if more else []) + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint),
                        "السيناريوهات")
-    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)]
+    slang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in dub.fix_dialect((raw.get("scenarios") or [])[:4], slang) if isinstance(s, dict)]
     items, rep = flow_fresh_scen(d, items, more)
     if rep and not items and not atlas.mock_mode():   # كلهم شبه حاجات اتستخدمت: مرة كمان بعناوينهم في «تجنّب»
         raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
@@ -25045,7 +25047,7 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
                                                  dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "النص")
-    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in fz.clean_scripts(raw, schema, live["scenes"])]
+    items = [{**s, "id": uuid.uuid4().hex[:8]} for s in dub.fix_dialect(fz.clean_scripts(raw, schema, live["scenes"]), lang)]   # 🇸🇦 كاف المخاطَبة ماتبقاش شين
     # نفس النص بلهجة تانية مش تكرار: لما اللهجة تتغير، فلتر «اتستخدم قبل كده» مابيشتغلش
     items, rep = (items, []) if relang else flow_fresh_scen(d, items, more)
     if not items:
