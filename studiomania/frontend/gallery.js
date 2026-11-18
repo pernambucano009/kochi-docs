@@ -167,16 +167,21 @@ const Gallery = (() => {
   };
   const fits = (x) => !S.niche.key || FIT[x.id] === "*" || (FIT[x.id] || "").split(" ").includes(S.niche.key);
   // تصنيفات القوالب اللي مش جاية من السيرفر
-  const MORE_CATS = [{ id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "الأسنان: فيديوهات" }, { id: "dentalimg", ar: "الأسنان: صور" }, { id: "other", ar: "قوالبي" }];
+  const MORE_CATS = [{ id: "carousel", ar: "كاروسيل" }, { id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "الأسنان: فيديوهات" }, { id: "dentalimg", ar: "الأسنان: صور" }, { id: "other", ar: "قوالبي" }];
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
-    const [cats, niche, tyt] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null), api("/api/tytpl").catch(() => [])]);
+    const [cats, niche, tyt, clib] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null), api("/api/tytpl").catch(() => []),
+      api("/api/carousel/library").catch(() => [])]);
+    // 🖼️ الكاروسيل: تصنيف لوحده في العجلة الصغيرة، والعجلة الكبيرة بتلف على ستايلاته
+    S.carItems = (clib || []).filter((a) => a.builtin).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
+      slides: a.images.map((im) => im.url), desc: "كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
+    S.carItems.forEach((x) => { FIT[x.id] = "*"; });
     S.niche = niche?.key ? niche : { key: "", name: "" };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الاصطناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
-    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor" && x.id !== "dental");
+    S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor" && x.id !== "dental" && x.id !== "carousel");   // الكاروسيل ليه تصنيفه
     // 🔤 قوالب التايبوجرافي الجاهزة: بتظهر لما معاينتها تترسم، والسيرفر بيرجع اللي يصلح لمجال العميل بس
     (tyt || []).forEach((t) => { FIT[t.id] = "*"; if (!S.items.some((x) => x.id === t.id)) S.items.push({ ...t, cat: "motion", icon: "🔤" }); });
     // 🦷 قوالب الأسنان: كل قالب فيديو وكل قالب صور لوحده، والحالة بتتختار من العقل (dental.js ← pick)
@@ -201,6 +206,7 @@ const Gallery = (() => {
     // 🎯 القوالب المتخصصة لمجالات تانية مابتظهرش أصلًا (دكتور الأسنان مالوش كوباية قهوة بتتنطط)
     const unfit = new Set(niche?.unfit || []);
     if (unfit.size) S.items = S.items.filter((x) => !unfit.has(x.alias || x.id));
+    S.vidItems = S.items; S.mode = "vid";
     S.reels = niche?.reels || [];
     const fm = niche?.field_media || [];
     for (const x of EXTRA) {
@@ -225,10 +231,10 @@ const Gallery = (() => {
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // عجلة الفأرة فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
   // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
-  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "محرر الفيديو", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الاصطناعي"], ["scene", "استوديو المشهد", "مسودة 3D → فيديو حقيقي"],
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["carousel", "كاروسيل", "ستايلات الصور"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "محرر الفيديو", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الاصطناعي"], ["scene", "استوديو المشهد", "مسودة 3D → فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الاصطناعي"], ["voice", "توليد صوت", "بالذكاء الاصطناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
-  const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 2 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
+  const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 3 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
   // صفحة الدبلجة نفسها (اللي كانت برّه في الرئيسية) بتتنقل جوه الصفحة دي، وبترجع مكانها لما تمشي
   const DUB = { home: null };
   function dubIn(panel) {
@@ -247,6 +253,14 @@ const Gallery = (() => {
     const el = S.view === "grid" ? S.root.querySelector(".gg") : W.el;
     if (!el || k === C.cur) return;
     C.cur = k;
+    // 🖼️ القوالب ↔ الكاروسيل: العجلة الكبيرة نفسها، بس بتلف على ستايلات الكاروسيل
+    const want = CATS2[k][0] === "carousel" ? "car" : k === 0 ? "vid" : S.mode;
+    if (want !== S.mode && S.vidItems) {
+      S.mode = want; S.items = want === "car" ? S.carItems || [] : S.vidItems;
+      window.GAL_CAT = CATS2[k][0];   // العجلة بتتبني من الأول وواقفة على نفس التصنيف
+      return render();
+    }
+    if (CATS2[k][0] === "carousel") return;
     const panel = el.querySelector(".nh-wh-panel, .gg-panel");
     el.classList.toggle("panel-on", k > 0);
 
@@ -356,7 +370,7 @@ const Gallery = (() => {
       el.addEventListener("click", (e) => {
         const t = e.target;
         const tab = t.closest("[data-cat2]");
-        if (tab) { const k = +tab.dataset.cat2; el.classList.toggle("panel-on", k > 0); el.querySelector(".gg-main").hidden = k > 0; setCat(k); return; }
+        if (tab) { const k = +tab.dataset.cat2, pn = k > 0 && CATS2[k][0] !== "carousel"; el.classList.toggle("panel-on", pn); el.querySelector(".gg-main").hidden = pn; setCat(k); return; }
         const ty = t.closest("[data-gtype]");
         if (ty) { GF.type = ty.dataset.gtype; el.querySelectorAll("[data-gtype]").forEach((b) => b.classList.toggle("on", b === ty)); return ggFill(); }
         if (t.closest("[data-gview]")) return setView("wheel");
@@ -377,7 +391,7 @@ const Gallery = (() => {
     window.GAL_CAT = null;
     C.cur = -1;
     el.querySelectorAll("[data-cat2]").forEach((b) => b.classList.toggle("on", +b.dataset.cat2 === Math.max(0, want)));
-    if (want > 0) { el.classList.add("panel-on"); el.querySelector(".gg-main").hidden = true; setCat(want); } else C.cur = 0;
+    if (want > 0 && CATS2[want][0] !== "carousel") { el.classList.add("panel-on"); el.querySelector(".gg-main").hidden = true; setCat(want); } else C.cur = Math.max(0, want);
     ggFill();
     ggWatch(el);
   }
@@ -777,6 +791,7 @@ const Gallery = (() => {
     if (x.id === "avatar") return showStep("16");
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
+    if (x.car) { storageSet("studiomania.carSty", x.id); return showStep("8"); }   // 🖼️ ستايل كاروسيل: صفحة الكاروسيل والستايل مختار
     if (x.id === "editor") return openEditor();
     if (x.dtid) return window.Dental?.pick({ id: x.dtid, name: x.name, desc: x.desc, kind: x.dkind });
     if (x.id === "dental") return window.Dental?.open();

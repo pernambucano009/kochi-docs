@@ -16859,4 +16859,6 @@ window.I18N_EN = {
   "فاتورة": "Receipt",
   "اختر ستايل الكاروسيل": "Pick a carousel style",
   "يُرسم بألوان علامتك وشعارها. اختر ستايلًا، واكتب الموضوع، واضغط جديد.": "Drawn in your brand colors and logo. Pick a style, write the topic, and press New.",
+  "كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها.": "A carousel in this style, in your brand colors, logo and font. Write the topic and the program writes and draws the slides.",
+  "ستايلات الصور": "Image styles",
 };

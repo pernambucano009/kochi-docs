@@ -15,6 +15,12 @@ async function initCarousel() {
   $("carModelName").textContent = car.cfg.text_model;
   $("carCount").innerHTML = [3, 4, 5, 6, 7, 8, 9, 10].map((n) => `<option value="${n}">${n}</option>`).join("");
   await loadCarList();
+  const sty = storageGet("studiomania.carSty");   // 🖼️ جاي من عجلة الكاروسيل بستايل: كاروسيل جديد بيه (يكتب الموضوع بس)
+  if (sty) {
+    storageSet("studiomania.carSty", "");
+    car.pickSty = sty; car.cur = null; renderStyGrid(); renderCarousel();
+    return setTimeout(() => $("carNewName")?.focus(), 200);
+  }
   renderStyGrid();
   const last = car.cur?.id || storageGet(CAR_KEY) || car.list[0]?.id;
   if (last && car.list.some((c) => c.id === last)) await openCarousel(last);
