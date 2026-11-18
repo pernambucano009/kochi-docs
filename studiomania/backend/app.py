@@ -25269,38 +25269,10 @@ def el_make(field: str, style: str, key: str, desc: str) -> bool:
         with elgrow.locked(dst.with_suffix(".lock")):   # حساب تاني بيرسمها في نفس اللحظة: نستنى ونستخدم رسمته
             if dst.exists():
                 return True
-            ref_dir = EL_DIR / field / style
-            refs = [f for f in sorted(ref_dir.glob("*.webp"))[:40:13]][:3]
-            if not refs:
+            ok, why = el_draw(field, style, desc, dst)
+            if not ok:
+                print(f"[el] rejected {tag}: {why}", flush=True)
                 return False
-            tmp = TMP_DIR / f"el-{uuid.uuid4().hex[:8]}"
-            tmp.mkdir(parents=True, exist_ok=True)
-            try:
-                ref_urls = []
-                for r in refs:   # المرجع PNG (بعض الموديلات مابتقبلش webp)
-                    rp = tmp / f"{r.stem}.png"
-                    from PIL import Image as _PImg
-                    with _PImg.open(r) as im:
-                        bg = _PImg.new("RGBA", im.size, (255, 255, 255, 255))
-                        bg.alpha_composite(im.convert("RGBA"))
-                        bg.convert("RGB").save(rp)
-                    ref_urls.append(atlas.reference_url(rp))
-                why = ""
-                for _try in range(2):   # 🔎 الرسمة بتتراجع قبل ما تدخل المكتبة: لو مش نفس الستايل أو مش هي، بتترسم تاني مرة واحدة
-                    url = atlas.generate_image("sunburst", elgrow.gen_prompt(desc) + (f" Avoid this problem from the last try: {why}" if why else ""),
-                                               "1024x1024", "medium", images=ref_urls)
-                    raw = tmp / "raw.png"
-                    atlas.download(url, raw)
-                    ok, why = el_review(raw, ref_urls, desc)
-                    if ok:
-                        break
-                else:
-                    print(f"[el] rejected {tag}: {why}", flush=True)
-                    return False
-                firstvid.cutout(raw, tmp / "cut.png")
-                elgrow.save_webp(tmp / "cut.png", dst)
-            finally:
-                shutil.rmtree(tmp, ignore_errors=True)
         elgrow.add_shared(EL_SHARED, field, key, desc)
         print(f"[el] new {tag}", flush=True)
         return True
@@ -25310,6 +25282,41 @@ def el_make(field: str, style: str, key: str, desc: str) -> bool:
     finally:
         with EL_MAKING_LOCK:
             EL_MAKING.discard(tag)
+
+
+def el_draw(field: str, style: str, desc: str, dst: Path) -> tuple[bool, str]:
+    """رسمة بستايل القالب (المرجع: عناصر من نفس الستايل) ← webp شفاف. بتتراجع، ولو اترفضت بتترسم تاني مرة. يرجع (اتقبلت؟, السبب)."""
+    refs = [f for f in sorted((EL_DIR / field / style).glob("*.webp"))[:40:13]][:3]
+    if not refs:
+        return False, "no reference elements"
+    tmp = TMP_DIR / f"el-{uuid.uuid4().hex[:8]}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        ref_urls = []
+        for r in refs:   # المرجع PNG (بعض الموديلات مابتقبلش webp)
+            rp = tmp / f"{r.stem}.png"
+            from PIL import Image as _PImg
+            with _PImg.open(r) as im:
+                bg = _PImg.new("RGBA", im.size, (255, 255, 255, 255))
+                bg.alpha_composite(im.convert("RGBA"))
+                bg.convert("RGB").save(rp)
+            ref_urls.append(atlas.reference_url(rp))
+        why = ""
+        for _try in range(2):   # 🔎 الرسمة بتتراجع قبل ما تدخل المكتبة: لو مش نفس الستايل أو مش هي، بتترسم تاني مرة واحدة
+            url = atlas.generate_image("sunburst", elgrow.gen_prompt(desc) + (f" Avoid this problem from the last try: {why}" if why else ""),
+                                       "1024x1024", "medium", images=ref_urls)
+            raw = tmp / "raw.png"
+            atlas.download(url, raw)
+            ok, why = el_review(raw, ref_urls, desc)
+            if ok:
+                break
+        else:
+            return False, why
+        firstvid.cutout(raw, tmp / "cut.png")
+        elgrow.save_webp(tmp / "cut.png", dst)
+        return True, ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def el_review(img: Path, ref_urls: list[str], desc: str) -> tuple[bool, str]:
@@ -36587,6 +36594,281 @@ def dental_brain_make(case_id: str, body: DentalMakeIn):
     bid = lib_store_of(case_id, me)
     lib_update(lambda d: next((x.setdefault("case", {}).update(dental={"cid": cid, "sig": sig}) for x in d["folders"] if x["id"] == case_id), None), bid)
     return {"kind": "video", "cid": cid, "template": body.template}
+
+
+# ---------------------------------------------------------------- 🧪 فحص الجودة الأسبوعي (للأدمن): الأدوات الحقيقية بعينات ثابتة، وكلود وجيميناي بيقيّموا، وصاحب المشروع بيحكم
+import qa  # noqa: E402
+
+QA_LOCK = threading.Lock()
+QA_RUNNING: dict = {}
+
+
+def qa_review(parts: list[dict], model: str) -> dict:
+    """تقييم بموديل (كلود للنص والصور، جيميناي للصوت). لو التقييم نفسه وقع: «مراجعة يدوية»."""
+    try:
+        raw = ad_media_chat([{"role": "user", "content": parts}], max_tokens=800, models=[model, "google/gemini-2.5-pro"])
+        return {**qa.judge_json(raw), "by": model}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": None, "notes": f"التقييم الآلي لم يعمل: {str(exc)[:160]}", "by": model}
+
+
+def qa_img(path: Path) -> dict:
+    mime = "image/png" if path.suffix == ".png" else "image/webp" if path.suffix == ".webp" else "image/jpeg"
+    return {"type": "image_url", "image_url": {"url": data_url(path, mime)}}
+
+
+def qa_tts(out: Path, cfg: dict) -> list[dict]:
+    items = []
+    for code, text in qa.SAY.items():
+        dl = dub.DIALECTS.get(code)
+        if not dl or not dl.get("voices"):
+            continue
+        it = {"id": f"tts-{code}", "kind": "tts", "label": dl["label"], "said": text, "voice": dl["voices"][0]}
+        try:
+            wav = out / f"tts-{code}.wav"
+            vo_say(text, dl["voices"][0], code, wav)
+            mp3 = wav.with_suffix(".mp3")
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-b:a", "96k", str(mp3)],
+                           check=True, capture_output=True, timeout=60)
+            wav.unlink(missing_ok=True)
+            it["files"] = [mp3.name]
+            heard = " ".join(str(w.get("w") or "") for w in atlas.transcribe(mp3, min(probe_duration(mp3), 30)))
+            it["heard"], it["match"] = heard, qa.words_match(text, heard)
+            it["verdict"] = qa_review([{"type": "text", "text": qa.AUDIO_JUDGE.format(dialect=dl["label"], text=text)},
+                                       {"type": "image_url", "image_url": {"url": data_url(mp3, "audio/mpeg")}}], cfg["audio_model"])
+        except Exception as exc:  # noqa: BLE001
+            it["error"] = str(exc)[:300]
+        items.append(it)
+    return items
+
+
+def qa_ideas(out: Path, cfg: dict) -> list[dict]:
+    items = []
+    for fk in fieldpacks.FIELD_ORDER:
+        f, code = fieldpacks.FIELDS.get(fk) or {}, qa.IDEA_DIALECT.get(fk, "ar-msa")
+        lab = dub.DIALECTS.get(code, {}).get("label", code)
+        it = {"id": f"ideas-{fk}", "kind": "ideas", "label": f"{f.get('name', fk)} · {lab}"}
+        try:
+            raw = llm([{"role": "system", "content": "You are the content strategist of a small business. Return JSON only."},
+                       {"role": "user", "content": (f"Business field: {f.get('name')} ({f.get('hint')}). Audience: {f.get('audience')}. Voice: {f.get('voice')}.\n"
+                                                    f"Rules: {f.get('rules')}\nWrite in: {lab} {fieldpacks.dialect_phrase(code)}, natural spoken social-media wording.\n"
+                                                    'Create 3 short-video ideas. JSON: {"ideas": [{"title": "...", "hook": "first spoken line", "idea": "2 sentences"}]}')}],
+                      json_mode=True)
+            ideas = [x for x in (json.loads(re.search(r"\{.*\}", raw, re.S).group(0)).get("ideas") or []) if isinstance(x, dict)][:3]
+            it["ideas"] = [{k: str(x.get(k) or "")[:400] for k in ("title", "hook", "idea")} for x in ideas]
+            txt = "\n".join(f"- {x['title']} | hook: {x['hook']} | {x['idea']}" for x in it["ideas"])
+            it["verdict"] = qa_review([{"type": "text", "text": qa.IDEAS_JUDGE.format(field=f.get("name"), dialect=lab, ideas=txt)}], cfg["review_model"])
+        except Exception as exc:  # noqa: BLE001
+            it["error"] = str(exc)[:300]
+        items.append(it)
+    return items
+
+
+def qa_element(out: Path, cfg: dict) -> list[dict]:
+    items = []
+    for fk, descs in qa.ELEMENTS.items():
+        styles = sorted(p.name for p in (EL_DIR / fk).iterdir() if p.is_dir()) if (EL_DIR / fk).is_dir() else []
+        if not styles:
+            continue
+        style, desc = qa.week_pick(styles), qa.week_pick(descs, 3)
+        it = {"id": f"el-{fk}-{style}", "kind": "element", "label": f"{fk} · {style}", "desc": desc}
+        try:
+            dst = out / f"el-{fk}-{style}.webp"
+            ok, why = el_draw(fk, style, desc, dst)
+            refs = [f for f in sorted((EL_DIR / fk / style).glob("*.webp"))[:40:13]][:2]
+            for r in refs:
+                shutil.copy(r, out / f"ref-{fk}-{style}-{r.name}")
+            it["files"] = ([dst.name] if dst.is_file() else []) + [f"ref-{fk}-{style}-{r.name}" for r in refs]
+            if not ok:
+                it["error"] = f"الرسمة اترفضت مرتين: {why}"
+            else:
+                it["verdict"] = qa_review([{"type": "text", "text": qa.IMAGE_JUDGE.format(
+                    what=f"The first image is a new illustration meant to show: {desc}. The others are references of the same illustration set. "
+                         "Is it the same style, the right subject, isolated on transparency, with no text?")}, qa_img(dst)] + [qa_img(r) for r in refs], cfg["review_model"])
+        except Exception as exc:  # noqa: BLE001
+            it["error"] = str(exc)[:300]
+        items.append(it)
+    return items
+
+
+def qa_nobg(out: Path, cfg: dict) -> list[dict]:
+    it = {"id": "nobg", "kind": "nobg", "label": "إزالة الخلفية"}
+    try:
+        src = out / "nobg-src.png"
+        from PIL import Image as _PImg
+        with _PImg.open(FRONTEND_DIR / "icon-512.png") as im:   # أيقونة على خلفية سادة
+            bg = _PImg.new("RGBA", im.size, (236, 232, 222, 255))
+            bg.alpha_composite(im.convert("RGBA"))
+            bg.convert("RGB").save(src)
+        dst = out / "nobg.png"
+        atlas.download(atlas.run_model("Image", {"model": logostamp.BG_REMOVER, "image": atlas.reference_url(src)}, "إزالة الخلفية", max_seconds=300), dst)
+        with _PImg.open(dst) as im:
+            a = im.convert("RGBA").getchannel("A")
+            clear = sum(a.histogram()[:16]) / max(1, a.width * a.height)
+        it["files"], it["clear"] = [src.name, dst.name], round(clear, 2)
+        it["verdict"] = {"ok": clear > 0.15, "notes": "" if clear > 0.15 else "الخلفية لم تُشل (الصورة كلها غير شفافة)", "by": "check"}
+    except Exception as exc:  # noqa: BLE001
+        it["error"] = str(exc)[:300]
+    return [it]
+
+
+def qa_stock(out: Path, cfg: dict) -> list[dict]:
+    subject = qa.week_pick(qa.STOCK)
+    it = {"id": "stock", "kind": "stock", "label": "لقطة متولّدة", "desc": subject}
+    try:
+        start, dest = out / "stock-start.png", out / "stock.mp4"
+        prompt = stockgen.prompt(subject)
+        atlas.download(atlas.generate_image("nano2", prompt + " The first frame of a video.", GEN_RATIOS["9:16"], "medium"), start)
+        body = {"model": TRIAL_MODELS["seedance-mini"]["model"], "prompt": prompt, "image": atlas.reference_url(start), "duration": 4,
+                "resolution": "480p", "ratio": "9:16", "generate_audio": False, "watermark": False}
+        atlas.download(atlas.run_model("Video", body, "لقطة الفحص", max_seconds=1200, interval=6), dest)
+        ai_natural(dest)
+        ok, why = ai_slop(dest)
+        frame = out / "stock-frame.jpg"
+        typo_frame(dest, 2.0, frame, 512)
+        it["files"] = [dest.name, frame.name]
+        it["slop"] = {"ok": ok, "why": why}
+        it["verdict"] = qa_review([{"type": "text", "text": qa.IMAGE_JUDGE.format(
+            what=f"A frame of a generated stock clip of: {subject}. It must look like natural documentary footage (not glossy AI), "
+                 "simple subject, no faces close-up, no text, no mixed-gender scene, modest clothing.")}, qa_img(frame)], cfg["review_model"])
+    except Exception as exc:  # noqa: BLE001
+        it["error"] = str(exc)[:300]
+    return [it]
+
+
+def qa_publish(out: Path, cfg: dict) -> list[dict]:
+    it = {"id": "publish", "kind": "publish", "label": "خدمة النشر"}
+    try:
+        svc = publisher.service_name()
+        n = len(publisher.account_list(refresh=True)) if svc == "zernio" else 0
+        it["verdict"] = {"ok": svc == "zernio", "notes": f"{svc} · {n}", "by": "check"}
+    except Exception as exc:  # noqa: BLE001
+        it["error"] = str(exc)[:300]
+    return [it]
+
+
+QA_PARTS = {"tts": qa_tts, "ideas": qa_ideas, "element": qa_element, "nobg": qa_nobg, "stock": qa_stock, "publish": qa_publish}
+
+
+def qa_run(parts: list[str] | None = None, why: str = "manual") -> str | None:
+    """تشغيلة فحص في الخلفية. يرجع رقمها (أو None لو فيه واحدة شغالة)."""
+    with QA_LOCK:
+        if QA_RUNNING.get("id"):
+            return None
+        rid = time.strftime("%Y%m%d-%H%M") + "-" + uuid.uuid4().hex[:4]
+        QA_RUNNING.update(id=rid, at=time.time())
+    cfg = qa.settings(PLATFORM_DIR)
+    run = {"id": rid, "at": time.time(), "why": why, "status": "working", "items": [], "step": ""}
+    qa.run_put(PLATFORM_DIR, run)
+
+    def go():
+        out = qa.run_dir(PLATFORM_DIR, rid)
+        try:
+            for k in parts or list(QA_PARTS):
+                run["step"] = k
+                qa.run_put(PLATFORM_DIR, run)
+                try:
+                    run["items"] += QA_PARTS[k](out, cfg)
+                except Exception as exc:  # noqa: BLE001
+                    run["items"].append({"id": k, "kind": k, "label": k, "error": str(exc)[:300]})
+            bad = [i for i in run["items"] if i.get("error") or (i.get("verdict") or {}).get("ok") is False]
+            for i in bad:
+                issues.record("qa", f"/qa/{rid}/{i['id']}", f"فحص الجودة: {i['label']}: " + (i.get("error") or (i.get("verdict") or {}).get("notes") or ""), ref=rid)
+            run.update(status="done", step="", done_at=time.time(), bad=len(bad))
+        except Exception as exc:  # noqa: BLE001
+            run.update(status="error", error=str(exc)[:300])
+        finally:
+            qa.run_put(PLATFORM_DIR, run)
+            qa.prune(PLATFORM_DIR)
+            QA_RUNNING.clear()
+    threading.Thread(target=go, daemon=True, name=f"qa-{rid}").start()
+    return rid
+
+
+@app.on_event("startup")
+def _qa_weekly():
+    """كل ساعة: لو الفحص متفعّل وعدّت مدته من آخر تشغيلة، يشتغل لوحده (في نسخة الأدمن بس)."""
+    if TENANT_ROLE == "customer" or atlas.mock_mode():
+        return
+
+    def loop():
+        time.sleep(600)
+        while True:
+            try:
+                cfg = qa.settings(PLATFORM_DIR)
+                if cfg["on"] and time.time() - qa.last_at(PLATFORM_DIR) > cfg["every_days"] * 86400:
+                    qa_run(why="weekly")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[qa] {exc}", flush=True)
+            time.sleep(3600)
+    threading.Thread(target=loop, daemon=True, name="qa-weekly").start()
+
+
+class QaSetIn(BaseModel):
+    on: bool | None = None
+    every_days: int | None = None
+    review_model: str | None = None
+    audio_model: str | None = None
+    director_model: str | None = None
+    director_review_model: str | None = None
+    director_on: bool | None = None
+
+
+class QaRunIn(BaseModel):
+    parts: list[str] = []
+
+
+class QaMarkIn(BaseModel):
+    ok: bool
+    note: str = ""
+
+
+@app.get("/api/admin/qa")
+def qa_list():
+    sc_lab_admin()
+    return {"settings": qa.settings(PLATFORM_DIR), "models": qa.MODELS, "parts": list(QA_PARTS), "running": QA_RUNNING.get("id"),
+            "runs": qa.runs(PLATFORM_DIR)}
+
+
+@app.put("/api/admin/qa/settings")
+def qa_settings_put(body: QaSetIn):
+    sc_lab_admin()
+    return qa.settings_set(PLATFORM_DIR, body.model_dump(exclude_none=True))
+
+
+@app.post("/api/admin/qa/run")
+def qa_run_now(body: QaRunIn):
+    sc_lab_admin()
+    parts = [p for p in body.parts if p in QA_PARTS] or None
+    rid = qa_run(parts, "manual")
+    if not rid:
+        raise HTTPException(409, "يوجد فحص يعمل الآن")
+    return {"id": rid}
+
+
+@app.post("/api/admin/qa/{rid}/{iid}/mark")
+def qa_mark(rid: str, iid: str, body: QaMarkIn):
+    """حكم صاحب المشروع على العينة. «فيه مشكلة» بتروح صندوق المشاكل بملاحظته."""
+    sc_lab_admin()
+    run = qa.run_get(PLATFORM_DIR, rid)
+    it = next((i for i in (run or {}).get("items") or [] if i.get("id") == iid), None)
+    if not it:
+        raise HTTPException(404, "العينة غير موجودة")
+    it["owner"] = {"ok": body.ok, "note": body.note.strip()[:800], "at": time.time()}
+    qa.run_put(PLATFORM_DIR, run)
+    if not body.ok:
+        issues.record("qa", f"/qa/{rid}/{iid}", f"فحص الجودة (حكم صاحب المشروع): {it.get('label')}: {body.note.strip()[:500]}", ref=rid)
+    return it
+
+
+@app.get("/api/admin/qa/{rid}/file/{name}")
+def qa_file(rid: str, name: str):
+    sc_lab_admin()
+    f = qa.run_dir(PLATFORM_DIR, rid) / Path(name).name
+    if not f.is_file():
+        raise HTTPException(404, "الملف غير موجود")
+    return FileResponse(f)
+
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")

@@ -77,6 +77,7 @@
     <button data-t="calls">🎙️ معمل سعاد</button>
     <button data-t="sclab">🎬 معمل الاستعراض</button>
     <button data-t="elite">🏆 صفوة المجال</button>
+    <button data-t="qa">🧪 فحص الجودة <b id="qaN"></b></button>
     <button data-t="runs">الفحص الشامل</button>
     <button data-t="steps">الخطوات</button>
     <button data-t="outs">النتائج للمراجعة</button>
@@ -90,7 +91,7 @@
 <main>
   <section data-p="issues">
     <div class="card"><div class="row"><span class="mute">كل خطأ ظهر لأي عميل، وكل عمل فشل أو توقف في المنتصف، يصل إلى هنا تلقائيًا. الخطأ نفسه يُجمع في سطر واحد مع عدد مراته وأصحابه.</span>
-      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من الخادم</option><option value="job">عمل فشل</option><option value="stuck">عمل توقف في المنتصف</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option></select>
+      <label class="chip"><input type="checkbox" id="issAll"> أظهر المحلولة أيضًا</label><select id="issKind"><option value="">كل الأنواع</option><option value="api">رد خطأ من الخادم</option><option value="job">عمل فشل</option><option value="stuck">عمل توقف في المنتصف</option><option value="ui">رسالة خطأ ظهرت للعميل</option><option value="js">خطأ في كود الصفحة</option><option value="i18n">مشاكل اللغة (ترجمة ناقصة أو عامية)</option><option value="qa">فحص الجودة الأسبوعي</option></select>
       <button class="btn" id="issReload">↻ حدّث</button></div></div>
     <div class="card"><div class="row"><b>🤖 متابعة Claude</b><span class="mute" id="feedSt"></span>
       <button class="btn" id="feedNew" style="margin-inline-start:auto">أنشئ مفتاح متابعة</button></div>
@@ -105,6 +106,16 @@
         <button class="btn" id="slGo">▶ اصنع الفيديو الاستعراضي</button><button class="btn" id="slReload">↻ حدّث</button><span class="mute" id="slMsg"></span></div></div>
     <div class="card"><div class="row"><b>🏆 الفيديوهات المعتمدة لكل مجال</b><span class="mute">هذا ما يُعرض على العميل في المكالمة حسب مجاله. اعتمد تجربة من الأسفل لمجالها.</span></div><div id="slLib" style="margin-top:8px"></div></div>
     <div id="slRows"></div>
+  </section>
+  <section data-p="qa" hidden>
+    <div class="card"><div class="row"><b>🧪 فحص الجودة الأسبوعي</b>
+      <span class="mute">كل أسبوع يجرّب البرنامج أدواته الحقيقية بعينات ثابتة: صوت كل لهجة، وأفكار كل مجال، ورسم عنصر، وإزالة خلفية، ولقطة متولّدة، وخدمة النشر. Claude يقيّم النص والصور، وGemini يسمع الصوت، وأنت تحكم. ما فيه مشكلة يصل لصندوق الأخطاء.</span></div>
+      <div class="row" style="margin-top:10px"><label class="chip"><input type="checkbox" id="qaOn"> يعمل تلقائيًا كل</label><input id="qaEvery" type="number" min="1" max="60" style="width:64px"> <span class="mute">يوم</span>
+        <span class="mute">مقيّم النص والصور</span><select id="qaRev"></select><span class="mute">مقيّم الصوت</span><select id="qaAud"></select></div>
+      <div class="row" style="margin-top:8px"><b>🎬 مخرج الأوتوبايلوت</b><label class="chip"><input type="checkbox" id="qaDirOn"> يعمل</label>
+        <span class="mute">يقرر الوصفة</span><select id="qaDir"></select><span class="mute">يراجع الفيديو النهائي</span><select id="qaDirRev"></select></div>
+      <div class="row" style="margin-top:10px"><span id="qaParts"></span><button class="btn pri" id="qaGo">▶ شغّل الفحص الآن</button><button class="btn" id="qaReload">↻ حدّث</button><span class="mute" id="qaSt"></span></div></div>
+    <div id="qaRuns"></div>
   </section>
   <section data-p="elite" hidden>
     <div class="card"><div class="row"><b>🏆 صفوة المجال</b><span class="mute">أفضل الفيديوهات فنيًا في المجال. يقيّم عقل سمسمكيت كل فيديو من 10 حسب الإضاءة والتكوين واللقطات القريبة والألوان، ثم يأتي الانتشار. اختر الفيديوهات التي تستحق أن نفككها ونصنع منها قوالب.</span></div>
@@ -224,7 +235,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const api = async (u, o = {}) => { const r = await fetch(u, { credentials: "same-origin", ...o, headers: { "content-type": "application/json", ...(o.headers || {}) } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j; };
 const S = { cur: null, run: null, map: null, iss: [] };
-const KIND = { api: "رد خطأ من الخادم", job: "عمل فشل", stuck: "عمل توقف في المنتصف", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
+const KIND = { qa: "فحص الجودة", api: "رد خطأ من الخادم", job: "عمل فشل", stuck: "عمل توقف في المنتصف", ui: "رسالة خطأ ظهرت للعميل", js: "خطأ في كود الصفحة" };
 const when = (t) => t ? new Date(t * 1000).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }) : "";
 async function feedState() {
   const r = await api("/api/platform/issues/feed-state").catch(() => null); if (!r) return;
@@ -354,7 +365,77 @@ function tab(t) {
   if (t === "calls") loadCalls();
   if (t === "sclab") loadLab();
   if (t === "elite") loadElite();
+  if (t === "qa") loadQa();
 }
+// 🧪 فحص الجودة الأسبوعي
+const QA = { open: null };
+const QA_PART = { tts: "🔊 الأصوات", ideas: "💡 الأفكار", element: "🎨 العناصر", nobg: "✂️ إزالة الخلفية", stock: "🎞️ اللقطة المتولّدة", publish: "📤 النشر" };
+async function loadQa() {
+  const d = QA.d = await api("/api/admin/qa").catch((e) => ({ err: e.message, runs: [], models: [], parts: [], settings: {} }));
+  const st = d.settings || {}, opt = (v) => d.models.map((m) => `<option ${m === v ? "selected" : ""}>${esc(m)}</option>`).join("");
+  $("qaOn").checked = !!st.on; $("qaEvery").value = st.every_days || 7; $("qaDirOn").checked = !!st.director_on;
+  $("qaRev").innerHTML = opt(st.review_model); $("qaAud").innerHTML = opt(st.audio_model); $("qaDir").innerHTML = opt(st.director_model); $("qaDirRev").innerHTML = opt(st.director_review_model);
+  if (!$("qaParts").childElementCount) $("qaParts").innerHTML = d.parts.map((k) => `<label class="chip"><input type="checkbox" data-qp="${k}" checked> ${QA_PART[k] || k}</label>`).join("");
+  $("qaGo").disabled = !!d.running; $("qaSt").textContent = d.err || (d.running ? "⏳ فحص يعمل الآن…" : "");
+  const last = d.runs[0]; $("qaN").textContent = last && last.bad ? `(${last.bad})` : "";
+  if (!QA.open && last) QA.open = last.id;
+  renderQa();
+  clearTimeout(loadQa.t); if (d.running) loadQa.t = setTimeout(loadQa, 15000);
+}
+function qaVerdict(v) {
+  if (!v) return "";
+  const c = v.ok === true ? "ok" : v.ok === false ? "bad" : "mid";
+  return `<div class="ac-auto"><div class="row"><span class="ac-sc ${c}">${v.ok === true ? "✓ سليم" : v.ok === false ? "✗ فيه مشكلة" : "؟ راجعه بعينك"}${v.score ? ` · ${esc(v.score)}/10` : ""}</span><span class="mute ltr">${esc(v.by || "")}</span></div>${v.notes ? `<div>${esc(v.notes)}</div>` : ""}</div>`;
+}
+function qaItem(r, it) {
+  const f = (n) => `/api/admin/qa/${r.id}/file/${encodeURIComponent(n)}`, files = it.files || [];
+  const media = files.map((n) => /\.mp3$/.test(n) ? `<audio controls preload="none" src="${f(n)}" style="width:100%"></audio>`
+    : /\.mp4$/.test(n) ? `<video controls muted playsinline preload="none" src="${f(n)}" style="width:180px;border-radius:8px"></video>`
+    : `<img src="${f(n)}" style="width:${/^ref-/.test(n) ? 72 : 160}px;border-radius:8px;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0/16px 16px">`).join(" ");
+  const ow = it.owner;
+  return `<div class="card" data-qi="${esc(it.id)}"><div class="row"><b>${QA_PART[it.kind] || ""} ${esc(it.label)}</b>
+      ${it.match != null ? `<span class="ac-sc ${it.match >= .85 ? "ok" : it.match >= .65 ? "mid" : "bad"}">سُمع ${Math.round(it.match * 100)}٪ من الكلمات</span>` : ""}
+      ${it.slop ? `<span class="ac-sc ${it.slop.ok ? "ok" : "bad"}">فلتر الـ slop: ${it.slop.ok ? "عدّت" : esc(it.slop.why)}</span>` : ""}
+      <span style="margin-inline-start:auto">${ow ? `<span class="ac-sc ${ow.ok ? "ok" : "bad"}">حكمك: ${ow.ok ? "تمام" : "فيه مشكلة"}</span>` : ""}
+      <button class="btn" data-qok>👍 تمام</button><button class="btn" data-qbad>👎 فيه مشكلة</button></span></div>
+    ${it.said ? `<p style="margin:8px 0 2px"><b>المكتوب:</b> ${esc(it.said)}</p><p class="mute" style="margin:0">المسموع: ${esc(it.heard || "")}</p>` : ""}
+    ${it.desc ? `<p class="mute ltr" style="margin:6px 0">${esc(it.desc)}</p>` : ""}
+    ${(it.ideas || []).map((x) => `<p style="margin:6px 0"><b>${esc(x.title)}</b> · <i>${esc(x.hook)}</i><br><span class="mute">${esc(x.idea)}</span></p>`).join("")}
+    ${media ? `<div class="row" style="margin-top:8px;align-items:flex-start">${media}</div>` : ""}
+    ${it.error ? `<div class="ac-auto bad">✗ ${esc(it.error)}</div>` : ""}${qaVerdict(it.verdict)}
+    ${ow && ow.note ? `<p class="mute">ملاحظتك: ${esc(ow.note)}</p>` : ""}</div>`;
+}
+function renderQa() {
+  const d = QA.d; if (!d) return;
+  $("qaRuns").innerHTML = d.runs.length ? d.runs.map((r) => {
+    const bad = (r.items || []).filter((i) => i.error || (i.verdict || {}).ok === false).length;
+    const head = `<div class="row"><b>${when(r.at)}</b><span class="chip">${r.why === "weekly" ? "تلقائي" : "يدوي"}</span>
+      <span class="mute">${r.status === "working" ? `⏳ يعمل الآن: ${QA_PART[r.step] || esc(r.step)}` : `${(r.items || []).length} عينة`}</span>
+      ${bad ? `<span class="ac-sc bad">${bad} فيها مشكلة</span>` : r.status === "done" ? `<span class="ac-sc ok">كله سليم</span>` : ""}
+      <button class="btn" data-qr="${esc(r.id)}" style="margin-inline-start:auto">${QA.open === r.id ? "إخفاء" : "افتح"}</button></div>`;
+    return `<div class="card" data-qrun="${esc(r.id)}">${head}${QA.open === r.id ? `<div style="margin-top:10px">${(r.items || []).map((it) => qaItem(r, it)).join("")}</div>` : ""}</div>`;
+  }).join("") : `<div class="card mute">لم يعمل أي فحص بعد. شغّله من الزر بالأعلى.</div>`;
+}
+const qaSave = () => api("/api/admin/qa/settings", { method: "PUT", body: JSON.stringify({ on: $("qaOn").checked, every_days: +$("qaEvery").value || 7,
+  review_model: $("qaRev").value, audio_model: $("qaAud").value, director_on: $("qaDirOn").checked, director_model: $("qaDir").value,
+  director_review_model: $("qaDirRev").value }) }).then(() => { $("qaSt").textContent = "✓ حُفظ"; }).catch((e) => alert(e.message));
+["qaOn", "qaEvery", "qaRev", "qaAud", "qaDirOn", "qaDir", "qaDirRev"].forEach((k) => { $(k).onchange = qaSave; });
+$("qaReload").onclick = loadQa;
+$("qaGo").onclick = async () => {
+  const parts = [...document.querySelectorAll("[data-qp]:checked")].map((x) => x.dataset.qp);
+  await api("/api/admin/qa/run", { method: "POST", body: JSON.stringify({ parts }) }).then((r) => { QA.open = r.id; }).catch((e) => alert(e.message));
+  loadQa();
+};
+$("qaRuns").onclick = async (e) => {
+  const rb = e.target.closest("[data-qr]"); if (rb) { QA.open = QA.open === rb.dataset.qr ? null : rb.dataset.qr; renderQa(); return; }
+  const ok = !!e.target.closest("[data-qok]"); if (!ok && !e.target.closest("[data-qbad]")) return;
+  const run = e.target.closest("[data-qrun]").dataset.qrun, iid = e.target.closest("[data-qi]").dataset.qi;
+  const note = ok ? "" : prompt("ما المشكلة؟ (تصل لصندوق الأخطاء)");
+  if (note === null) return;
+  await api(`/api/admin/qa/${run}/${encodeURIComponent(iid)}/mark`, { method: "POST", body: JSON.stringify({ ok, note: note || "" }) }).catch((er) => alert(er.message));
+  loadQa();
+};
+if (location.hash === "#qa") setTimeout(() => tab("qa"), 0);
 // 🏆 صفوة المجال
 const EL = { d: null, niche: "dental" };
 const nfmt = (n) => (n = +n || 0) >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n);

@@ -16762,4 +16762,11 @@ window.I18N_EN = {
   "المونتاج والتصدير": "Editing & export",
   "📤 انشره كما هو": "📤 Publish it as is",
   "الفيديو جاهز: عدّله أو انشره": "Video ready: edit or publish it",
+  "إزالة الخلفية": "Background removal",
+  "لقطة متولّدة": "Generated clip",
+  "خدمة النشر": "Publishing service",
+  "فحص الجودة: {0}:": "Quality check: {0}:",
+  "يوجد فحص يعمل الآن": "A check is already running",
+  "العينة غير موجودة": "Sample not found",
+  "فحص الجودة (حكم صاحب المشروع): {0}: {1}": "Quality check (owner verdict): {0}: {1}",
 };
