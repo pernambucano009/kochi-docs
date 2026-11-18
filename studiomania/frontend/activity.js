@@ -12,6 +12,8 @@
 .act-it.busy i em{width:35%;animation:actBusy 1.2s ease-in-out infinite}
 .act-it.ok{border-color:rgba(30,158,106,.5)}.act-it.ok i em{background:#1E9E6A;width:100%}
 .act-it.bad{border-color:rgba(217,71,43,.6)}.act-it.bad i em{background:#d9472b;width:100%}
+.act-it.job{padding:7px 12px;font-size:12px;gap:4px;border-radius:12px}.act-it.job i{height:3px}
+.act-it.idle{padding:7px 12px;opacity:.85}.act-it.idle i{display:none}
 .act-it.out{opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s}
 @keyframes actIn{from{opacity:0;transform:translateY(12px)}}@keyframes actBusy{0%{margin-inline-start:-35%}100%{margin-inline-start:100%}}
 @media (prefers-reduced-motion:reduce){.act-it,.act-it.busy i em{animation:none}}`;
@@ -35,6 +37,8 @@
         el.querySelector("b").textContent = p == null ? "" : `${Math.round(p)}٪`;
         if (p != null) el.querySelector("em").style.width = `${Math.max(2, Math.min(100, p))}%`;
       },
+      el,
+      idle(on) { el.classList.toggle("idle", on); },
       done(ok, l) {
         el.classList.remove("busy"); el.classList.add(ok ? "ok" : "bad");
         el.querySelector("em").style.width = "100%";
@@ -47,6 +51,32 @@
     return it;
   }
   window.Activity = { add };
+
+  // ⏳ شغل الخلفية بتاع العميل (من السيرفر): الشعار بيترسم، فيديو بيتنشر، فيديو مجدول، تصدير، صناعة فيديو…
+  //   سطر رفيع لكل شغلانة، بيختفي لما تخلص. المجدول بيظهر بموعده من غير حركة.
+  const jobs = new Map();
+  const when = (iso) => { try { return new Date(iso).toLocaleString(typeof UI_LOCALE === "function" ? UI_LOCALE() : undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }); } catch { return ""; } };
+  async function pollJobs() {
+    if (document.hidden || !document.cookie.length && location.pathname.startsWith("/login")) return;
+    let r;
+    try { r = await ofetch("/api/activity/jobs", { credentials: "same-origin" }); } catch { return; }
+    if (!r.ok) return;
+    let list = [];
+    try { list = (await r.json()).jobs || []; } catch { return; }
+    const seen = new Set();
+    for (const j of list) {
+      seen.add(j.id);
+      const label = j.at ? `${j.label} · ${when(j.at)}` : j.label;
+      let it = jobs.get(j.id);
+      if (!it) { it = add(label, j.pct ?? null); it.el.classList.add("job"); jobs.set(j.id, it); }
+      else it.set(label, j.pct ?? null);
+      it.idle?.(!!j.idle);
+    }
+    for (const [id, it] of jobs) if (!seen.has(id)) { jobs.delete(id); it.done(true, null); }
+  }
+  setTimeout(pollJobs, 2500);
+  setInterval(pollJobs, 7000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) pollJobs(); });
 
   // الكلام جمل كاملة لكل نوع (عشان الترجمة الإنجليزي تطلع جملة سليمة): «يتم الآن رفع الفيديو «x.mp4»» أو «يتم الآن رفع ٣ صور»
   const short = (s) => (s.length > 28 ? s.slice(0, 25) + "…" : s);

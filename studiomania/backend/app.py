@@ -651,6 +651,56 @@ async def require_login(request: Request, call_next):
     return RedirectResponse("/login")
 
 
+# ⏳ اللي شغّال في الخلفية للعميل دلوقتي (شريط النشاط في الواجهة بيعرضه سطر رفيع لكل شغلانة): الشعار، النشر، المجدول،
+#   التصدير، رسم الفيديو، التعليق الصوتي، الأفكار والنصوص. الواجهة بتسأل كل شوية، والاستعلام خفيف.
+FLOW_BUSY_LABEL = {"ideas": "💡 العقل يكتب أفكارًا لـ«{0}»", "scenarios": "✍️ العقل يكتب النص لـ«{0}»", "vo": "🎙️ يُسجَّل التعليق الصوتي لـ«{0}»",
+                   "generate": "🎬 يُصنع الفيديو «{0}»", "montage": "✂️ يُجهَّز المونتاج لـ«{0}»", "review": "🔎 يُراجَع الفيديو «{0}»",
+                   "chat": "💬 العقل يعدّل «{0}»", "upload": "⬆️ يُرفع الفيديو لـ«{0}»"}
+
+
+@app.get("/api/activity/jobs")
+def activity_jobs():
+    bid = active_client_id()
+    out = []
+    if bid and LOGOST_JOBS.get(bid) == "working":
+        st = LOGOST_STEP.get(bid, "")
+        lab = logostamp.ALL_LABELS.get(st[5:], "") if st.startswith("draw:") else ""
+        out.append({"id": f"logo:{bid}", "label": "🧼 تُزال خلفية شعارك وتُحسَّن جودته" if st == "clean" else
+                    (f"🎨 يُرسم شعارك بأسلوب «{lab}»" if lab else "🎨 يُرسم شعارك بأساليب القوالب"), "pct": None})
+    now_ = datetime.now(timezone.utc)
+    with closing(db()) as conn:
+        for r in conn.execute(POSTS_QUERY + " WHERE p.status IN ('sending', 'publishing', 'scheduled') AND mine(p.client_id) ORDER BY p.scheduled_at LIMIT 20").fetchall():
+            name = r["export_name"] or r["carousel_name"] or "منشور"
+            if r["status"] in ("sending", "publishing"):
+                out.append({"id": f"post:{r['id']}", "label": f"📤 يُنشر الآن «{name}»", "pct": None})
+                continue
+            try:
+                when = datetime.fromisoformat(str(r["scheduled_at"]).replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if timedelta(0) <= when - now_ <= timedelta(hours=24):
+                out.append({"id": f"post:{r['id']}", "label": f"🗓️ مجدول «{name}»", "at": when.isoformat(), "pct": None, "idle": True})
+        for r in conn.execute("SELECT id, name FROM projects WHERE render_status = 'rendering' AND mine(client_id) LIMIT 10").fetchall():
+            out.append({"id": f"render:{r['id']}", "label": f"🎞️ يُصدَّر الفيديو «{r['name']}»", "pct": None, "note": RENDER_ACTIVE.get(r["id"]) or ""})
+    for f in FLOWS_DIR.glob("*/flow.json"):
+        try:
+            if time.time() - f.stat().st_mtime > 3 * 3600:
+                continue
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if d.get("client_id") != bid:
+            continue
+        t = str((d.get("idea") or {}).get("title") or (d.get("template") or {}).get("name") or "فيديو")[:40]
+        o = d.get("output") or {}
+        if o.get("status") == "working" and o.get("kind") == "motion":
+            job = MOTION_JOBS.get(o.get("mid")) or {}
+            out.append({"id": f"flow:{f.parent.name}", "label": f"🎬 يُصنع الفيديو «{t}»", "pct": round(float(job.get("progress") or 0) * 100) or None})
+        elif d.get("busy") in FLOW_BUSY_LABEL:
+            out.append({"id": f"flow:{f.parent.name}", "label": FLOW_BUSY_LABEL[d["busy"]].format(t), "pct": None})
+    return {"jobs": out[:12]}
+
+
 class ClientIssueIn(BaseModel):
     message: str
     screen: str = ""
