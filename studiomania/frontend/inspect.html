@@ -114,7 +114,7 @@
         <span class="mute">مقيّم النص والصور</span><select id="qaRev"></select><span class="mute">مقيّم الصوت</span><select id="qaAud"></select></div>
       <div class="row" style="margin-top:8px"><b>🎬 مخرج الأوتوبايلوت</b><label class="chip"><input type="checkbox" id="qaDirOn"> يعمل</label>
         <span class="mute">يقرر الوصفة</span><select id="qaDir"></select><span class="mute">يراجع الفيديو النهائي</span><select id="qaDirRev"></select></div>
-      <div class="row" style="margin-top:10px"><span id="qaParts"></span><button class="btn pri" id="qaGo">▶ شغّل الفحص الآن</button><button class="btn" id="qaReload">↻ حدّث</button><span class="mute" id="qaSt"></span></div></div>
+      <div class="row" style="margin-top:10px"><span id="qaParts"></span><button class="btn pri" id="qaGo">▶ شغّل الفحص الآن</button><button class="btn" id="qaReload">↻ حدّث</button><button class="btn" id="qaTyPrev">🔤 أعد رسم معاينات قوالب التايبوجرافي</button><span class="mute" id="qaSt"></span></div></div>
     <div id="qaRuns"></div>
   </section>
   <section data-p="elite" hidden>
@@ -421,6 +421,7 @@ const qaSave = () => api("/api/admin/qa/settings", { method: "PUT", body: JSON.s
   director_review_model: $("qaDirRev").value }) }).then(() => { $("qaSt").textContent = "✓ حُفظ"; }).catch((e) => alert(e.message));
 ["qaOn", "qaEvery", "qaRev", "qaAud", "qaDirOn", "qaDir", "qaDirRev"].forEach((k) => { $(k).onchange = qaSave; });
 $("qaReload").onclick = loadQa;
+$("qaTyPrev").onclick = () => api("/api/admin/tytpl/previews", { method: "POST" }).then((r) => { $("qaSt").textContent = `⏳ ${r.n} معاينة تُرسم في الخلفية (دقائق)`; }).catch((e) => alert(e.message));
 $("qaGo").onclick = async () => {
   const parts = [...document.querySelectorAll("[data-qp]:checked")].map((x) => x.dataset.qp);
   await api("/api/admin/qa/run", { method: "POST", body: JSON.stringify({ parts }) }).then((r) => { QA.open = r.id; }).catch((e) => alert(e.message));

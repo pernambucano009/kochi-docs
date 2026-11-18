@@ -171,12 +171,14 @@ const Gallery = (() => {
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
-    const [cats, niche] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null)]);
+    const [cats, niche, tyt] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null), api("/api/tytpl").catch(() => [])]);
     S.niche = niche?.key ? niche : { key: "", name: "" };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الاصطناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
     S.items = EXTRA.filter((x) => x.id !== "custom" && x.id !== "editor" && x.id !== "dental");
+    // 🔤 قوالب التايبوجرافي الجاهزة: بتظهر لما معاينتها تترسم، والسيرفر بيرجع اللي يصلح لمجال العميل بس
+    (tyt || []).forEach((t) => { FIT[t.id] = "*"; if (!S.items.some((x) => x.id === t.id)) S.items.push({ ...t, cat: "motion", icon: "🔤" }); });
     // 🦷 قوالب الأسنان: كل قالب فيديو وكل قالب صور لوحده، والحالة بتتختار من العقل (dental.js ← pick)
     // 🩺 كل تخصص ليه قوالبه + القوالب العامة: قوالب الأسنان (فيديو وصور) بتظهر لعميل تخصصه أسنان بس، وفوق العامة
     const dt = S.niche.spec === "dental" ? await api("/api/dental/templates").catch(() => null) : null;

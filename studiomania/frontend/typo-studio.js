@@ -5653,7 +5653,7 @@
     const it = this.items(b);
     if (!it.length) return "";
     const ar = isAr(it), ff = famOf(ar ? "ع" : "a");
-    const nm = NAMES[ar ? "ar" : "en"][bi % 4];
+    const nm = this.doc.brand || NAMES[ar ? "ar" : "en"][bi % 4];   // 🏷️ البوست باسم العلامة نفسها، مش اسم وهمي
     const cw = Math.min(w * 0.88, mn * 0.95), fz = cw * (h > w ? 0.078 : 0.058);
     const cx = (w - cw) / 2, cy = h * 0.24;
     const p = eOut(seg(t, b.t0, b.t0 + 0.35));

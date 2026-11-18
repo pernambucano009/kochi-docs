@@ -69,6 +69,7 @@ import series as sz  # noqa: E402
 import ads as az  # noqa: E402
 import brainsrc  # noqa: E402
 import typo  # noqa: E402  (التايبوجرافي)
+import typotpl  # noqa: E402  (🔤 قوالب التايبوجرافي الجاهزة)
 import concepts  # noqa: E402  (قاموس المعاني: كلمة ← أيقونة)
 import stt_local  # noqa: E402  (تفريغ على السيرفر من غير خدمة برّه)
 import sfx  # noqa: E402  (الأصوات الرسمية: كليكات وكيبورد)
@@ -21043,6 +21044,7 @@ def typo_doc(pid: str, d: dict) -> dict:
                       "moments": {**(st.get("moments") or {}), **(d.get("fonts") or {})}},
             # 🗣️ لهجة العميل (من التسجيل): الكلام الثابت جوه المشاهد بيمشي عليها لو السكريبت نفسه مابيبيّنش لهجته
             "dialect": d.get("dialect") or (onboard_load() or {}).get("dialect") or "",
+            "brand": re.sub(r"^عميلي$", "", str((brain_row(d.get("client_id")) or {}).get("name") or "").strip())[:40] if d.get("client_id") else "",
             "transparent": kind != "theme", "blocks": blocks}
 
 
@@ -21996,6 +21998,209 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
     except Exception as exc:  # noqa: BLE001
         tmp_v.unlink(missing_ok=True)
         typo_fail(pid, exc)
+
+
+# ---------------------------------------------------------------- 🔤 قوالب التايبوجرافي الجاهزة (typotpl.py): مشروع تايبوجرافي بيتبني ويترسم لوحده
+TYTPL_DIR = providers.state_file(DATA_DIR).parent / "tytpl"   # معاينات المعرض: مشتركة لكل الحسابات
+TYTPL_STOCK_USD = 0.13   # صورة البداية + ١٠ ثواني Seedance Mini 480p
+
+
+def tytpl_voice_b(lang: str, voice_a: str) -> str:
+    """الصوت التاني في الحوار: صوت تاني في نفس اللهجة (نوعه عكس الأول لو ينفع)."""
+    vs = [v for v in dub.DIALECTS.get(lang, {}).get("voices") or [] if v != voice_a]
+    ga = (dub.VOICES.get(voice_a) or {}).get("gender")
+    return next((v for v in vs if (dub.VOICES.get(v) or {}).get("gender") not in (None, ga)), vs[0] if vs else voice_a)
+
+
+def tytpl_stock(tid: str, script: str, field: str, folder: Path) -> Path | None:
+    """لقطة الخلفية: موضوع على قد السكريبت من نفس عيلة لقطة القالب ← صورة ← حركة ← الشكل الطبيعي ← فلتر الـ slop."""
+    if atlas.mock_mode() or not atlas.api_key():
+        return None
+    img0, mot0 = typotpl.STOCK.get(tid) or ("", "")
+    tries = []
+    try:
+        v = flow_llm(typotpl.stock_messages(tid, script, (fieldpacks.FIELDS.get(field) or {}).get("name") or field or "fitness"), "لقطة القالب")
+        if str(v.get("image") or "").strip():
+            tries.append((str(v["image"])[:600], str(v.get("motion") or mot0)[:300]))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[tytpl] stock prompt: {str(exc)[:120]}", flush=True)
+    tries.append((img0, mot0))
+    wallet.need(wallet.credits(TYTPL_STOCK_USD), "لقطة القالب")
+    for img, mot in tries[:2]:
+        start, out = folder / "stock-start.png", folder / "stock.mp4"
+        try:
+            atlas.download(atlas.run_model("Image", {"model": "krea-2-turbo/text-to-image", "prompt": stockgen.prompt(img), "image_size": "768x1344"},
+                                           "لقطة القالب", max_seconds=300, interval=2), start)
+            body = {"model": TRIAL_MODELS["seedance-mini"]["model"], "image": atlas.reference_url(start), "prompt": mot, "duration": typotpl.SECS,
+                    "resolution": "480p", "ratio": "9:16", "generate_audio": False, "watermark": False}
+            atlas.download(atlas.run_model("Video", body, "لقطة القالب", max_seconds=1800, interval=5), out)
+            wallet.charge(wallet.credits(TYTPL_STOCK_USD), "لقطة القالب", tid)
+            ai_natural(out)
+            ok, why = ai_slop(out)
+            if ok:
+                return out
+            print(f"[tytpl] slop {tid}: {why}", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[tytpl] stock {tid}: {str(exc)[:160]}", flush=True)
+        finally:
+            start.unlink(missing_ok=True)
+    (folder / "stock.mp4").unlink(missing_ok=True)
+    return None
+
+
+def tytpl_new(tid: str, name: str, script: str, lang: str, voice: str, client: str | None, field: str) -> str:
+    """مشروع تايبوجرافي جديد بالقالب، والبناء والرسم في الخلفية. يرجع رقمه."""
+    pid = typo_new(TypoNewIn(name=name[:100], text=""))["id"]
+    typo_update(pid, lambda x: x.update(style=typotpl.STYLE, script=typotpl.clean_script(script), status="planning", step="🎙️ جارٍ تسجيل الصوت",
+                                        preset=tid, dialect=lang, client_id=client or x.get("client_id")))
+    threading.Thread(target=tytpl_build, args=(pid, tid, script, lang, voice, field), daemon=True, name=f"tytpl-{pid}").start()
+    return pid
+
+
+def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: str, render: bool = True) -> None:
+    sp = typotpl.SPECS[tid]
+    folder = TYPO_PROJ / pid
+    try:
+        # 🎙️ الصوت: صوت واحد، أو صوتين للحوار (كل سطر بصوت المتكلم بتاعه، وبينهم وقفة قصيرة)
+        lines = typotpl.dialogue(script) if tid in typotpl.TWO_VOICES else [("A", typotpl.clean_script(script))]
+        lines = [(w, t) for w, t in lines if t.strip()]
+        if not lines:
+            raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
+        vb = tytpl_voice_b(lang, voice) if tid in typotpl.TWO_VOICES else voice
+        parts = []
+        for i, (who, text) in enumerate(lines):
+            f = folder / f".vo{i}.wav"
+            vo_say(text, voice if who == "A" else vb, lang, f)
+            parts.append(f)
+        wav = folder / "voice.wav"
+        if len(parts) == 1:
+            parts[0].replace(wav)
+        else:
+            fl = "".join(f"[{i}:a]apad=pad_dur=0.25[a{i}];" for i in range(len(parts))) + "".join(f"[a{i}]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[o]"
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *sum((["-i", str(f)] for f in parts), []), "-filter_complex", fl,
+                            "-map", "[o]", "-ac", "1", "-ar", "48000", str(wav)], check=True, capture_output=True, timeout=120)
+            for f in parts:
+                f.unlink(missing_ok=True)
+        vdur = probe_duration(wav)
+        typo_set(pid, step="👂 جارٍ ضبط توقيت الكلمات")
+        try:
+            heard = atlas.transcribe(wav, vdur, max_seconds=120)
+        except Exception as exc:  # noqa: BLE001 — من غير تفريغ: الكلام على طول الصوت بالتناسب
+            print(f"[tytpl] stt {pid}: {str(exc)[:120]}", flush=True)
+            heard = []
+        words = typotpl.align(" ".join(t for _, t in lines).split(), heard)
+        dur = round(max(vdur, words[-1]["e"]) + 0.9, 2)
+        bg = {"kind": "theme", "color": "#0E0E10"}
+        if sp["type"] == "stock":
+            typo_set(pid, step="🎞️ جارٍ توليد لقطة الخلفية")
+            clip = tytpl_stock(tid, typotpl.clean_script(script), field, folder)
+            if clip:
+                bg = {"kind": "video", "file": clip.name, "dim": typotpl.DIM}
+        typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
+        blocks = typo.studio_plan(words, dur, None, sp["collection"], sp["seed"])
+        for i, b in enumerate(blocks):   # الحركات الثابتة للقالب، وفوق اللقطة: كلها بتسيب اللقطة باينة (بالدور على حركات القالب)
+            if i < len(sp["kinds"]) or bg["kind"] == "video":
+                b["kind"] = sp["kinds"][i % len(sp["kinds"])]
+        typo_update(pid, lambda x: x.update(source={"kind": "audio", "file": wav.name}, words=words, duration=dur, bg=bg, blocks=blocks,
+                                            collection=sp["collection"], status="planned", step=None, error=None))
+        if render:
+            typo_set(pid, status="rendering", step="🎬 يُجهّز")
+            run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[tytpl] {pid}: {exc}", flush=True)
+        typo_fail(pid, exc)
+
+
+def tytpl_start(fid: str) -> str:
+    """من المسار (أو الأوتوبايلوت): السكريبت المختار ← مشروع القالب."""
+    d = flow_load(fid)
+    tid = d["template"].get("preset") or d["template"]["id"]
+    sc = d.get("scenario") or {}
+    script = "\n".join(str(b.get("say") or b.get("text") or "").strip() for b in sc.get("beats") or sc.get("scenes") or []).strip() \
+        or str(sc.get("text") or sc.get("summary") or "")
+    if not script:
+        raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
+    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    bid = d.get("client_id") or active_client_id()
+    voice = brand_narrator(lang, bid, advance=True)
+    field = field_guess(brain_row(bid) or {}) if bid else ""
+    title = (d.get("idea") or {}).get("title") or d["template"]["name"]
+    return tytpl_new(tid, f"🧭 {title}", script, lang, voice, bid, field)
+
+
+# 🖼️ معاينات المعرض: كل قالب بنصه النجدي المثال، بتترسم مرة واحدة في نسخة الأدمن وتتشارك مع كل الحسابات
+TYTPL_PREV_RUNNING: set[str] = set()
+
+
+def tytpl_preview(tid: str) -> None:
+    if tid in TYTPL_PREV_RUNNING:
+        return
+    TYTPL_PREV_RUNNING.add(tid)
+    try:
+        lang = "ar-sa-najdi"
+        voice = dub.DIALECTS[lang]["voices"][0]
+        pid = typo_new(TypoNewIn(name=f"معاينة {typotpl.SPECS[tid]['name']}", text=""))["id"]
+        typo_update(pid, lambda x: x.update(style=typotpl.STYLE, preset=tid, dialect=lang, status="planning", step="🎙️"))
+        tytpl_build(pid, tid, typotpl.SAMPLE[tid], lang, voice, "fitness")
+        t = typo_load(pid)
+        if t.get("final"):
+            TYTPL_DIR.mkdir(parents=True, exist_ok=True)
+            src = TYPO_PROJ / pid / t["final"]
+            shutil.copy(src, TYTPL_DIR / f"{tid}.mp4")
+            typo_frame(src, min(2.5, (t.get("duration") or 4) * 0.4), TYTPL_DIR / f"{tid}.jpg", 720)
+        shutil.rmtree(TYPO_PROJ / pid, ignore_errors=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[tytpl] preview {tid}: {exc}", flush=True)
+    finally:
+        TYTPL_PREV_RUNNING.discard(tid)
+
+
+@app.on_event("startup")
+def _tytpl_previews():
+    """المعاينات الناقصة بتترسم لوحدها (نسخة الأدمن بس، واحدة واحدة)."""
+    if TENANT_ROLE == "customer" or atlas.mock_mode() or not atlas.api_key():
+        return
+    def go():
+        time.sleep(300)
+        for tid in typotpl.SPECS:
+            if not (TYTPL_DIR / f"{tid}.mp4").is_file():
+                tytpl_preview(tid)
+    threading.Thread(target=go, daemon=True, name="tytpl-previews").start()
+
+
+@app.get("/api/tytpl")
+def tytpl_list():
+    """القوالب الجاهزة اللي معاينتها اترسمت، واللي تصلح لمجال العميل."""
+    bid = active_client_id()
+    field = field_guess(brain_row(bid) or {}) if bid else ""
+    out = []
+    for tid, sp in typotpl.SPECS.items():
+        f = TYTPL_DIR / f"{tid}.mp4"
+        if f.is_file() and typotpl.fits(tid, field):
+            v = int(f.stat().st_mtime)
+            out.append({"id": tid, "name": sp["name"], "desc": sp["desc"], "sample_url": f"/api/tytpl/{tid}.mp4?v={v}", "cover_url": f"/api/tytpl/{tid}.jpg?v={v}"})
+    return out
+
+
+@app.get("/api/tytpl/{name}")
+def tytpl_file(name: str):
+    tid, _, ext = name.rpartition(".")
+    f = TYTPL_DIR / f"{tid}.{ext}"
+    if tid not in typotpl.SPECS or ext not in ("mp4", "jpg") or not f.is_file():
+        raise HTTPException(404, "الملف غير موجود")
+    return FileResponse(f, media_type="video/mp4" if ext == "mp4" else "image/jpeg")
+
+
+@app.post("/api/admin/tytpl/previews")
+def tytpl_previews_redo():
+    """الأدمن: يعيد رسم كل المعاينات (بعد تعديل في القوالب)."""
+    sc_lab_admin()
+    def go():
+        for tid in typotpl.SPECS:
+            tytpl_preview(tid)
+    threading.Thread(target=go, daemon=True).start()
+    return {"ok": True, "n": len(typotpl.SPECS)}
+
 
 
 @app.post("/api/typo/{pid}/to-editor")
@@ -24605,6 +24810,9 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
     """نوع القالب: موشن بالكود (t-*) / تايبوجرافي / قالب متولّد (مشاهد، إعلان، صور) / قالب من المعمل."""
     if tid.startswith("t-") and (MOTION_DIR / "r" / Path(tid).name / "reel.html").exists():
         return {"id": tid, "name": name, "cat": cat, "desc": desc, "kind": "motion"}
+    if tid in typotpl.SPECS:   # 🔤 قالب تايبوجرافي جاهز: الصوت واللقطة والحركات بتتعمل لوحدها
+        sp = typotpl.SPECS[tid]
+        return {"id": tid, "name": name or sp["name"], "cat": cat, "desc": desc or sp["desc"], "kind": "typo", "preset": tid}
     if tid == "typo":
         return {"id": tid, "name": name or "تايبوجرافي", "cat": cat, "desc": desc, "kind": "typo"}
     if tid == "phone":
@@ -24655,6 +24863,8 @@ def flow_profile(tpl: dict) -> str:
     elif kind == "typo":
         out.append("هذا القالب نص فقط يتحرك على الإيقاع (بدون صور ولا شخصيات ولا مشاهد): الكلمات نفسها هي البطل. "
                    "الفكرة يجب تصبح جملة/رسالة قوية تُقال بصوت: سؤال وإجابته، قائمة سريعة، اعتراف، مقارنة بالكلام، أو جملة تُبنى كلمة كلمة.")
+        if tid in typotpl.SPECS:
+            out.append(typotpl.script_hint(tid))
     else:
         try:
             t = tpl_load(tid)
@@ -27407,6 +27617,9 @@ def flow_generate(fid: str, body: FlowGoIn):
             flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
             run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, flow_els_inline(params), f"🧭 {title}")
         flow_job(fid, "generate", run_motion)
+    elif tpl["kind"] == "typo" and tpl.get("preset") in typotpl.SPECS:
+        pid = tytpl_start(fid)
+        flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": pid, "status": "done"}, stage="done"))
     elif tpl["kind"] == "typo":
         script = " ".join(str(b.get("say") or b.get("text") or "") for b in sc.get("beats") or []).strip() or sc.get("summary", "")
         r = typo_new(TypoNewIn(name=f"🧭 {title}"[:100], text=script))
@@ -33837,7 +34050,7 @@ def pilot_occasion(at: str | None = None, before: int = 3, after: int = 1) -> st
 
 
 def pilot_kind(tpl: str) -> str:
-    return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar", "carousel") else "motion"
+    return "custom" if tpl.startswith("auto:") else tpl if tpl in ("phone", "avatar", "carousel") else "typo" if tpl in typotpl.SPECS else "motion"
 
 
 def pilot_tpl_name(tpl: str, names: dict) -> str:
@@ -33891,6 +34104,7 @@ def pilot_tpl_cands(pool: list[str]) -> list[str]:
     field = field_guess(brain_row(bid) or {}) if bid else ""
     cands = list(dict.fromkeys([*fieldpacks.field_reels(field), *[t for t in pool if t.startswith("t-")]]))
     cands = [t for t in cands if tplfit.auto_ok(t, field, chosen=t in pool)]   # 🎯 المتخصص يفضل في تخصصه
+    cands += [t for t in typotpl.SPECS if typotpl.fits(t, field) and t not in cands]   # 🔤 قوالب التايبوجرافي الجاهزة (تنويع)
     if "t-review" in cands and not review_facts(bid):
         cands.remove("t-review")
     return cands
@@ -33903,7 +34117,7 @@ def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
     if not cands:
         return None
     week = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    tjobs = [j for j in d["jobs"] if str(j.get("tpl") or "").startswith("t-")]
+    tjobs = [j for j in d["jobs"] if str(j.get("tpl") or "").startswith("t-") or j.get("tpl") in typotpl.SPECS]
     recent = [j["tpl"] for j in tjobs if str(j.get("at") or "") >= week]
     if len(recent) >= PILOT_TPL_WEEK:
         return None
@@ -33930,7 +34144,7 @@ def pilot_plan() -> None:
                 continue
             tpl = pool[d["rot"] % len(pool)]
             d["rot"] += 1
-            auto = tpl == "tpl:auto" or tpl.startswith("t-")
+            auto = tpl == "tpl:auto" or tpl.startswith("t-") or tpl in typotpl.SPECS
             if auto:   # 🎨 القالب يختاره البرنامج (حد ٥ في الأسبوع ومن غير تكرار)
                 tpl = pilot_auto_tpl(d, pool)
                 if not tpl:
@@ -34049,8 +34263,9 @@ def director_pick(s: dict, j: dict, occ: str) -> dict | None:
         if len(cands) < 2:
             return None
         man = {m["id"]: m for m in json.loads((MOTION_DIR / "manifest.json").read_text("utf-8")) if isinstance(m, dict)}
+        man.update({k: {"name": v["name"], "use": "Typography template: " + v["desc"]} for k, v in typotpl.SPECS.items()})
         d = pilot_load()
-        recent = [x["tpl"] for x in d["jobs"] if x.get("id") != j["id"] and str(x.get("tpl") or "").startswith("t-")][:10]
+        recent = [x["tpl"] for x in d["jobs"] if x.get("id") != j["id"] and (str(x.get("tpl") or "").startswith("t-") or x.get("tpl") in typotpl.SPECS)][:10]
         b = brain_row(active_client_id()) or {}
         mem = mem_load(mem_cid({"client_id": active_client_id()}))
         ideas = [str((x.get("item") or {}).get("title") or "") for x in mem.get("saved") or []
@@ -34243,8 +34458,21 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             return
         pick = j.get("pick") if any(x["id"] == j.get("pick") for x in d["scenarios"]) else d["scenarios"][0]["id"]
         flow_pick_scenario(fid, FlowPickIn(id=pick))
-        nxt = {"motion": "voice", "phone": "shoot", "avatar": "say", "carousel": "car"}[kind]
+        nxt = {"motion": "voice", "phone": "shoot", "avatar": "say", "carousel": "car", "typo": "typo"}[kind]
         return put(phase=nxt, pick=None, note="يُكمل")
+
+    # 🔤 قالب تايبوجرافي جاهز: الصوت ← اللقطة ← الحركات ← الرسم
+    if ph == "typo":
+        pid = tytpl_start(fid)
+        return put(phase="typodraw", typo=pid, note="جارٍ رسم الفيديو")
+    if ph == "typodraw":
+        t = typo_load(j["typo"])
+        if t.get("status") == "failed":
+            raise HTTPException(400, t.get("error") or "توقف الرسم")
+        if t.get("status") != "done" or not t.get("final"):
+            return put(note=re.sub(r"^\W+", "", str(t.get("step") or "جارٍ رسم الفيديو")))
+        ex = pilot_export_file(TYPO_PROJ / j["typo"] / t["final"], f"🛫 {(d.get('idea') or {}).get('title') or j['name']}")
+        return put(phase="final", export_id=ex, note="الفيديو جاهز")
 
     # 🖼️ الكاروسيل: نص السلايدات ← الشكل العام (مراجعة «المونتاج») ← السلايدات
     if ph == "car":
@@ -35227,7 +35455,8 @@ def showcase_dub_lang(words: str) -> tuple[str, str, str]:
 def tpl_names() -> dict[str, str]:
     """أسامي القوالب زي ما ظاهرة في المعرض (من gallery.js)."""
     try:
-        return dict(re.findall(r'\["(t-[a-z0-9]+)", "([^"]+)"', (FRONTEND_DIR / "gallery.js").read_text("utf-8")))
+        return {**dict(re.findall(r'\["(t-[a-z0-9]+)", "([^"]+)"', (FRONTEND_DIR / "gallery.js").read_text("utf-8"))),
+                **{k: v["name"] for k, v in typotpl.SPECS.items()}}
     except OSError:
         return {}
 
