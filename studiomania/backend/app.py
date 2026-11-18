@@ -30918,6 +30918,7 @@ def flow_to_montage(fid: str):
             "client_id": active_client_id()}   # 🏷️ اللوجو مختوم في آخر فيديو القالب أصلًا
     if voice:
         data["voice"] = voice
+    data["captions"] = {"enabled": False}   # 🙅 الفيديو بيدخل المونتاج زي ما هو: الكابشن بيتفعل لما العميل يختار
     pid = uuid.uuid4().hex[:12]
     with closing(db()) as conn, conn:
         conn.execute("INSERT INTO projects (id, name, data, render_status, created_at, updated_at) VALUES (?, ?, ?, 'idle', ?, ?)",

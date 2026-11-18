@@ -3255,13 +3255,8 @@ async function algoPrep(force = false, minSec = 0) {
   if (mt.project?.id !== p.id) return;
   const old = new Map(silAll().map((m) => [m.id, m]));
   d.algo = { ...(d.algo || {}), sig, caps: r.caps, marks: r.marks.map((m) => ({ ...m, del: old.get(m.id)?.del ?? true, done: old.get(m.id)?.done || false })) };
-  if (r.hook && !texts().some((x) => x.t0 < 3)) {
-    texts().push({ text: r.hook, t0: 0, dur: 3, font: "SM Changa", size: 88, color: "#FFFFFF", x: 0.5, y: 0.22, angle: 0, scale: 1, opacity: 1, spacing: 0,
-      stroke: { w: 6, color: "#000000" }, shadow: true, bg: { on: false, color: "#000000" }, bold: true, italic: false,
-      anim_in: { type: "pop", dur: 0.35 }, anim_out: { type: "fade", dur: 0.25 }, lane: freeTextLane(0, 3), algo: true });
-    toast("⚡ وُضع خطاف مكتوب على الشاشة في أول ٣ ثوانٍ (يمكنك تعديله من تبويب النص)");
-  }
-  if (r.caps === "done" && d.voice && d.captions?.enabled === undefined) d.captions = { ...(d.captions || {}), enabled: true };
+  // 🙅 مفيش حاجة بتتطبق لوحدها: الفيديو بيدخل المونتاج زي ما هو. السكتات بتبان بالأحمر للمراجعة بس، والكابشن والهوك بيتفعلوا لما العميل يختار.
+  d.algo.hook = r.hook || "";
   renderAll();
   renderSilReview();
   scheduleSave();

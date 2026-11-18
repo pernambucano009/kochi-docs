@@ -28,6 +28,12 @@ for mt, f, d in sorted(rows, key=lambda r: r[0], reverse=True)[:5]:
     print(f"   params.els={len(els)} {[str(x)[:60] for x in els[:3]]}")
     print(f"   output.status={o.get('status')} output.els={len(op.get('els') or [])} {[str(x)[:60] for x in (op.get('els') or [])[:2]]}")
     print(f"   vo={ (d.get('vo') or {}).get('voice') } secs={(d.get('vo_track') or {}).get('secs')}")
+    # 🇸🇦 الكشكشة: كلمات آخرها شين/تسين في النص المكتوب (said) وفي اللي اتسمع من الصوت (heard). لو في heard بس = المشكلة من الصوت
+    import re
+    vt = d.get("vo_track") or {}
+    keep = {"وش", "ليش", "مش", "شي", "عيش", "إيش", "ايش", "معليش"}
+    sh = lambda t: sorted({w for w in re.findall(r"[\u0621-\u064A]+(?:ش|تس)\b", t or "") if w not in keep})[:12]
+    print(f"   lang={d.get('lang')}  said_sh={sh(vt.get('said_text'))}  heard_sh={sh(vt.get('heard_text'))}")
 PY
 echo "== app version: $(cut -c1-7 /srv/simsimkit/release 2>/dev/null)"
 docker logs --since 6h simsimkit 2>&1 | grep -E "\[vo\]|field|els|\[logost\]|\[stamp\]" | tail -8
