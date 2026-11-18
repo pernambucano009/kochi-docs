@@ -25968,6 +25968,20 @@ def logo_styles_kick(bid: str) -> None:
     threading.Thread(target=go, daemon=True).start()
 
 
+def logo_bg_fix(bid: str, files: list[Path]) -> None:
+    """🧼 نسخ شعار اترسمت وخلفيتها (أبيض/ورق) لسه موجودة: الموديل يشيلها من النسخة نفسها (من غير ما تترسم تاني)."""
+    for f in files:
+        if atlas.mock_mode() or not atlas.api_key():
+            return
+        try:
+            nb = f.with_name(f"logost-nobg-{uuid.uuid4().hex[:6]}.png")
+            atlas.download(atlas.run_model("Image", {"model": logostamp.BG_REMOVER, "image": atlas.reference_url(f)}, "إزالة خلفية الشعار", max_seconds=300), nb)
+            firstvid.cutout(nb, f)
+            nb.unlink(missing_ok=True)
+            print(f"[logost] bg fixed {f.name}", flush=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[logost] bg fix {f.name}: {exc}", flush=True)
+
 def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
     """اللوجو اللي يتختم بيه فيديو القالب ده: نسخته بستايل القالب (لو مش مقفولة)، وإلا الأصلي. None لو الشعار مقفول أو مش موجود."""
     if not bid or not logo_path(bid) or (brain_row(bid) or {}).get("logo_on") == "0":
@@ -25985,24 +25999,22 @@ def logo_styles_get(bid: str):
     if ent and not ent.get("original") and not ent.get("prepped") and bid not in LOGOST_JOBS:   # 🧼 لوجو اترفع قبل التنضيف التلقائي: يتنضّف دلوقتي مرة واحدة
         logo_upload_kick(bid, [src.name])
     elif src and bid not in LOGOST_JOBS:   # 🧼 نسخ اترسمت قبل ما خلفيتها تتشال بالموديل: تتمسح وتترسم تاني (مرة واحدة لكل نسخة)
-        fixed = set((brain_row(bid) or {}).get("logost_fixed2") or [])   # 2: كمان النسخ اللي ليها شفافية بس الورق/الملمس لسه حواليها
+        fixed = set((brain_row(bid) or {}).get("logost_fixed2") or [])   # 2: كمان النسخ اللي ليها شفافية بس الورق/الأبيض لسه حواليها
         bad = []
-        for st in logostamp.ALL:
-            f = logostamp.file_for(brain_dir(bid), src, st)
-            if f.exists() and f.name not in fixed:
-                try:
-                    from PIL import Image as _PImg
-                    with _PImg.open(f) as im:
-                        alpha = firstvid.has_alpha(im)
-                    if not alpha or logostamp.edges_opaque(f):
-                        bad.append(f)
-                except OSError:
-                    pass
+        for f in brain_dir(bid).glob(f"logost-*-{src.stem}.png"):   # كل النسخ: الـ٨ والخاصة بقالب (x-…)
+            if f.name in fixed:
+                continue
+            try:
+                from PIL import Image as _PImg
+                with _PImg.open(f) as im:
+                    alpha = firstvid.has_alpha(im)
+                if not alpha or logostamp.edges_opaque(f):
+                    bad.append(f)
+            except OSError:
+                pass
         if bad:
-            for f in bad:
-                f.unlink(missing_ok=True)
             update_brain(bid, lambda d: d.update(logost_fixed2=sorted(fixed | {f.name for f in bad})))
-            logo_styles_kick(bid)
+            threading.Thread(target=logo_bg_fix, args=(bid, bad), daemon=True).start()
     off = (brain_row(bid) or {}).get("logo_styles_off") or []
     items = []
     names = tpl_names()
