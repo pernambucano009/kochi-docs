@@ -16899,4 +16899,8 @@ window.I18N_EN = {
   "اكتب السؤال والجائزة، ونصنع فيديو المسابقة.": "Write the question and the prize, and we make the contest video.",
   "🛵 هل توصلون لمناطق جديدة؟": "🛵 Delivering to new areas?",
   "اكتب الفرع والأحياء ووقت التوصيل، ونصنع فيديو الخريطة.": "Write the branch, the areas and the delivery time, and we make the map video.",
+  "⭐ هل وصلتك آراء أو رسائل من عملائك تحب نشرها؟": "⭐ Got reviews or messages from customers you would like to post?",
+  "إذا وافق أصحابها، أضفها مع تقييمكم ونصنع منها فيديو آراء العملاء.": "If their owners agree, add them with your rating and we make a reviews video.",
+  "🗺️ هل وصل منتجك أو خدمتك إلى أماكن جديدة؟": "🗺️ Has your product or service reached new places?",
+  "أخبرنا بالأماكن الجديدة، ونصنع فيديو على الخريطة.": "Tell us the new places, and we make a map video.",
 };
