@@ -6928,7 +6928,29 @@ def scheduler_loop() -> None:
             pilot_tick()
         except Exception:  # noqa: BLE001
             pass
+        try:
+            offers_remind()
+        except Exception:  # noqa: BLE001
+            pass
         time.sleep(20)
+
+
+OFFERS_EVERY = 7 * 86400
+
+
+def offers_remind() -> None:
+    """🏷️ كل أسبوع: «عندك عرض قريب؟» عشان نجهز له فيديو عرض السعر في يومه (للعملاء بس، ومرة في الأسبوع)."""
+    if TENANT_ROLE != "customer":
+        return
+    bid = active_client_id()
+    b = brain_row(bid) if bid else None
+    if not b or time.time() - float(b.get("offer_ask_at") or 0) < OFFERS_EVERY:
+        return
+    if not b.get("offer_ask_at"):   # أول مرة: بعد أسبوع من التسجيل، مش أول يوم
+        update_brain(bid, lambda d: d.update(offer_ask_at=time.time()))
+        return
+    update_brain(bid, lambda d: d.update(offer_ask_at=time.time()))
+    notify("brain", "info", "🏷️ هل لديك عرض قادم؟", "أخبرنا بالعرض وموعده من قالب «كشف السعر»، ونجهّز له فيديو عرض السعر في يومه.", "create", "offers")
 
 
 with closing(db()) as _conn, _conn:
@@ -11820,6 +11842,20 @@ def first_brand_name(b: dict) -> str:
     return "" if n in ("", "علامتي", "علامتك", "عميلي", "عميل جديد", "علامة جديدة") else n[:40]
 
 
+def brand_colors_text(ans: str) -> str:
+    """«أخضر غامق وليموني» ← «#1F4D3A (الأساسي)، #C8F169 (الثانوي)». لو فيه أكواد مكتوبة بتتاخد زي ما هي."""
+    hexes = re.findall(r"#[0-9a-fA-F]{6}\b", ans)
+    if not hexes and not atlas.mock_mode():
+        try:
+            raw = llm([{"role": "user", "content": f"Brand colors described by the owner (Arabic): «{ans[:300]}». "
+                        'Give the matching hex codes in the same order. JSON only: {"hex": ["#RRGGBB", ...]}'}], json_mode=True, temperature=0.2)
+            hexes = [h for h in json.loads(re.search(r"\{.*\}", raw, re.S).group(0)).get("hex") or [] if re.fullmatch(r"#[0-9a-fA-F]{6}", str(h))]
+        except Exception:  # noqa: BLE001
+            hexes = []
+    names = ("الأساسي", "الثانوي", "المساعد", "إضافي", "إضافي")
+    return "، ".join(f"{c} ({names[i]})" for i, c in enumerate(hexes[:5])) or ans[:300]
+
+
 def first_colors_apply(bid: str, path: Path) -> list[str]:
     """ألوان اللوجو ← فرع «الشكل» في العقل (لو العميل ماكتبش ألوانه بنفسه)."""
     cols = firstvid.palette(path)
@@ -13189,6 +13225,10 @@ def brain_quiz_answer(bid: str, body: QuizIn):
                     d[to["pick"]] = ans
                     if to["pick"] == "type":
                         d["type_set"] = True
+            elif "colors" in to:   # 🎨 ألوان العلامة بكلامه ← أكواد، و«من الشعار»/«لا» ← من الشعار (بعد الحفظ)
+                if not re.search(r"^\s*(لا|لأ|no|مش|مو|ما عندي|من الشعار|من اللوجو)", ans, re.I):
+                    d["palette"] = brand_colors_text(ans)
+                    d.setdefault("edited", []).append("palette") if "palette" not in d.get("edited", []) else None
             elif "dm" in to:   # 💬 «علّق بكلمة»: لا ← مقفول، وإلا الكلمة (بين علامتين لو موجودة، وإلا آخر كلمة) ← في كل منشور
                 if re.match(r"^\s*(لا|لأ|no|مش|مو|ما ابي|ما أبي|لا شكرا)\b", ans, re.I):
                     d.update(dm_mode="off")
@@ -13216,6 +13256,8 @@ def brain_quiz_answer(bid: str, body: QuizIn):
             d["pending"] = [p for p in d.get("pending") or [] if not brainquiz.answers(q, p)]
     old = brain_row(bid) or {}
     update_brain(bid, fn)
+    if q["id"] == "colors" and ans and re.search(r"^\s*(لا|لأ|no|مش|مو|ما عندي|من الشعار|من اللوجو)", ans, re.I) and logo_path(bid):
+        first_colors_apply(bid, logo_path(bid))
     # 📱 رابط حساب إنستغرام أو تيك توك في سؤال الرابط: التحليل بيبدأ لوحده (مرة واحدة)، والإجابات ونقاط التحسين تتملا لما يخلص
     if q["id"] == "link" and brainquiz.social_link(ans) and not any(x.get("kind") == "social" and x.get("status") != "failed" for x in old.get("sources") or []):
         try:

@@ -50,6 +50,10 @@ Q = [
     {"id": "cta", "to": {"field": "cta"},
      "ar": "ماذا تريد من المشاهد أن يفعل بعد أن يرى الفيديو؟", "en": "What should viewers do after watching?",
      "ph_ar": "مثلًا: اطلب الآن، احجز موعدك، حمّل التطبيق", "ph_en": "e.g. order now, book a visit, download the app"},
+    # 🎨 ألوان العلامة: عليها الكاروسيل والقوالب. «لا» = نطلّعها من الشعار
+    {"id": "colors", "to": {"colors": True},
+     "ar": "ما الألوان الأساسية لعلامتك؟ وإن لم تكن لديك ألوان محددة نستخرجها من شعارك.", "en": "What are your brand's main colors? If you have none, we take them from your logo.",
+     "ph_ar": "مثلًا: أخضر غامق وليموني، أو اكتب «من الشعار»", "ph_en": "e.g. dark green and lime, or «from the logo»"},
     # 💬 «علّق بكلمة»: اللي يعلّق بالكلمة دي يوصله رد تلقائي في الرسائل. الإجابة = الكلمة نفسها، أو «لا»
     {"id": "dm", "to": {"dm": True},
      "ar": "هل تريد أن يصل ردّ تلقائي في الرسائل لمن يعلّق بكلمة معيّنة؟ وما هي الكلمة؟", "en": "Should people who comment a certain word get an automatic DM reply? Which word?",
@@ -89,6 +93,8 @@ def current(q: dict, brain: dict) -> str:
         return str((n or {}).get("body") or "")
     if "dm" in to:
         return "لا" if brain.get("dm_mode") == "off" else str(brain.get("dm_word") or "")
+    if "colors" in to:
+        return str(brain.get("palette") or "") if "palette" in (brain.get("edited") or []) else ""
     return ""
 
 

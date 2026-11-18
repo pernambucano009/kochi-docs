@@ -97,7 +97,7 @@ SKIP_Q = {"language", "link", "type"}   # اللهجة معروفة من الت�
 CALL_Q = ["domain", "about", "audience", "market", "cta", "dm"]   # 📣 الأساسيات: الدعوة في آخر الفيديو، و«علّق بكلمة»
 # 🧠 المكالمة الكاملة (للمشترك): كل أسئلة العقل اللي ينفع تتسأل بالصوت. المنافسون ليهم محطة لوحدهم، واللينك/اللهجة/النوع في SKIP_Q.
 # المجاني بيفضل على CALL_Q (تكلفة الصوت)، والباقي بيملاه كتابة من اختبار العقل.
-FULL_Q = ["domain", "about", "audience", "pain", "market", "voice", "products", "offer", "proof", "faq", "rules", "cta", "dm"]
+FULL_Q = ["domain", "about", "audience", "pain", "market", "voice", "colors", "products", "offer", "proof", "faq", "rules", "cta", "dm"]
 
 
 def agent_name(dialect: str, gender: str) -> str:

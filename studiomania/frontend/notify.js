@@ -113,7 +113,9 @@ async function ntfRead(ids) {
 }
 
 function ntfGo(x) {
-  if (x.link) showStep(x.link);
+  if (x.link) {   // صفحة من صفحات الرئيسية («ابدأ مشروع جديد» مثلًا) أو شاشة
+    if (x.link !== "home" && window.NHGo && !document.querySelector(`.view[data-view="${x.link}"]`)) window.NHGo(x.link); else showStep(x.link);
+  }
 }
 
 async function ntfClick(e) {

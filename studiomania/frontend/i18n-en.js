@@ -16822,4 +16822,6 @@ window.I18N_EN = {
   "الصوت المختار بالأعلى هو صوت {0}. اختر صوت {1}:": "The voice chosen above is {0}. Pick the voice for {1}:",
   "المذيع": "Host",
   "الضيف": "Guest",
+  "🏷️ هل لديك عرض قادم؟": "🏷️ Got an offer coming up?",
+  "أخبرنا بالعرض وموعده من قالب «كشف السعر»، ونجهّز له فيديو عرض السعر في يومه.": "Tell us the offer and its date from the «Price reveal» template, and we will prepare its video for that day.",
 };
