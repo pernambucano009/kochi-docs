@@ -71,7 +71,9 @@ BRIEFS: dict[str, dict] = {
     "t-show": {
         "idea": "سنصنع لك مسابقة قصيرة: سؤال إجابته الصحيحة {the} أو ميزته، والفائز يحصل على جائزة حقيقية منكم.",
         "ask": [
+            _q("q", "سؤال المسابقة", ph="مثال: ما أسرع طريقة للطلب؟", max=28),
             _q("answer", "الإجابة الصحيحة: ما الذي يميزكم؟", ph="مثال: توصيل خلال 30 دقيقة", max=12),
+            _q("wrong", "إجابتان خاطئتان لكن منطقيتان", "lines", ph="إجابة في كل سطر، مثال: تتصل", count=2, max=12, req=False),
             _q("prize", "الجائزة الحقيقية للمتفاعلين", ph="مثال: توصيل مجاني لأول طلب", max=26),
         ],
     },
@@ -255,8 +257,9 @@ def apply(tpl: str, facts: dict, currency: str = "") -> tuple[dict, dict]:
             p["count"] = str(int(f["count"]))
         say.update(rating=f.get("rating"), count=f.get("count"))
     elif tpl == "t-show":
-        p.update(a3=f.get("answer"), prize=f.get("prize"))
-        say.update(answer=f.get("answer"), prize=f.get("prize"))
+        w = (f.get("wrong") or []) + ["", ""]
+        p.update(q=f.get("q"), a1=w[0] or None, a2=w[1] or None, a3=f.get("answer"), prize=f.get("prize"))
+        say.update(question=f.get("q"), answer=f.get("answer"), prize=f.get("prize"))
     elif tpl == "t-flow":
         p["steps"] = [s if "|" in s else f"{s}|" for s in f.get("steps") or []]
         p["result"] = f.get("result")
@@ -359,6 +362,8 @@ def auto_icons(tpl: str, params: dict) -> dict:
 
 # 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
 NOUNS_EN = {
+    "سؤال المسابقة": "The quiz question", "مثال: ما أسرع طريقة للطلب؟": "e.g. What is the fastest way to order?",
+    "إجابتان خاطئتان لكن منطقيتان": "Two wrong but believable answers", "إجابة في كل سطر، مثال: تتصل": "One answer per line, e.g. Call us",
     "تقارنه بماذا؟": "Compared with what?", "مثال: الباقة العادية، أو الطريقة المعتادة": "e.g. the regular plan, or the usual way",
     "سنصنع لك إعلان افتتاح: المدينة من أعلى كأنها مجسّم صغير، والناس يتجمعون عند فرعكم الجديد، ومعه الموعد.": "We will make you an opening ad: the city from above like a small model, people gathering at your new branch, with the date.",
     "الخبر": "The news", "مثال: افتتاح فرعنا الجديد في العليا": "e.g. Opening our new branch in Olaya", "الموعد والمكان": "Date and place",

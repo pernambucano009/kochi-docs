@@ -16876,4 +16876,10 @@ window.I18N_EN = {
   "طرفا المقارنة ونقاطها": "The two sides and the points",
   "تقارنه بماذا؟": "Compared with what?",
   "مثال: الباقة العادية، أو الطريقة المعتادة": "e.g. the regular plan, or the usual way",
+  "المسابقة": "Quiz",
+  "سؤال المسابقة وجائزتها": "The quiz question and prize",
+  "سؤال المسابقة": "The quiz question",
+  "مثال: ما أسرع طريقة للطلب؟": "e.g. What is the fastest way to order?",
+  "إجابتان خاطئتان لكن منطقيتان": "Two wrong but believable answers",
+  "إجابة في كل سطر، مثال: تتصل": "One answer per line, e.g. Call us",
 };

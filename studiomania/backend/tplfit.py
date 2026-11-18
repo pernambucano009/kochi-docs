@@ -11,7 +11,7 @@ from pathlib import Path
 ALL = "*"
 EL_DIR = Path(__file__).resolve().parent.parent / "frontend" / "gallery" / "el"
 
-_ALL = ("t-chart t-chat t-keynote t-logo t-loop t-particles t-review t-show t-signature t-swiss t-title3d t-wrapped t-beat "
+_ALL = ("t-chart t-chat t-keynote t-logo t-loop t-particles t-review t-signature t-swiss t-title3d t-wrapped t-beat "
         "t-newsletter t-flipcards t-brandreveal t-microgame t-spy t-audiogram 017 019 026 038 042 052 061 080 119 121 123 149 226 b-intro b-outro")
 _ALL_ELS = "t-board t-flow t-milestone t-riso t-glass t-sketch t-redcut t-shadow 027"
 _FIELDS_ELS = {
@@ -24,7 +24,7 @@ _SPECIAL = {
     "t-iso": "ecom shops food", "t-silent": "food ecom shops", "t-hose": "food", "009": "food", "t-anime": "food", "t-brick": "shops ecom food",
     "t-pictogram": "fitness", "t-math": "edu realestate fitness", "055": "edu fitness realestate beauty dental home",
 }
-_NEED = {"t-price": "offer", "t-count": "offer", "t-map": "delivery", "t-tilt": "event", "t-versus": "compare", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
+_NEED = {"t-price": "offer", "t-count": "offer", "t-map": "delivery", "t-tilt": "event", "t-versus": "compare", "t-show": "quiz", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
          "t-lantern": "ramadan", "065": "event", "072": "event"}
 
 FIT: dict[str, dict] = {}
