@@ -1,4 +1,4 @@
-"""💳 الدفع: PayPal (حساب PayPal أو بالكارت من صفحة PayPal). النص مع PayPal فقط، والنقاط والباقات في gateway.py.
+"""💳 الدفع: Tap (مدى وفيزا وApple Pay بالريال) وPayPal. النقاط والباقات في gateway.py.
 
 المتغيرات (على الخادم):
 - PAYPAL_CLIENT_ID و PAYPAL_SECRET و PAYPAL_WEBHOOK_ID و PAYPAL_MODE (sandbox للتجربة، live للحقيقي)
@@ -163,3 +163,70 @@ def paypal_verify(headers, event: dict) -> bool:
     except PayError:
         return False
     return j.get("verification_status") == "SUCCESS"
+
+
+# ---------------------------------------------------------------- Tap Payments (مدى وفيزا وماستركارد وApple Pay، بالريال)
+# TAP_SECRET_KEY: المفتاح السري من tapOS (Accounts ← Operators ← API Keys). sk_test_… للتجربة، sk_live_… للحقيقي.
+# الدفعة الأولى بتحفظ الكارت (بموافقة العميل في صفحة تاب)، والتجديد بيتخصم من الكارت المحفوظ (gateway.py كل يوم).
+TAP = "https://api.tap.company/v2"
+SAR_PER_USD = 3.76   # نفس سعر الصرف اللي في صفحة الباقات
+
+
+def tap_key() -> str:
+    return _clean(os.environ.get("TAP_SECRET_KEY"))
+
+
+def tap_on() -> bool:
+    return bool(tap_key())
+
+
+def sar(usd: float) -> float:
+    return round(float(usd) * SAR_PER_USD, 2)
+
+
+def _tap(method: str, path: str, body: dict | None = None) -> dict:
+    if not tap_on():
+        raise PayError("الدفع بالبطاقة غير متفعّل بعد")
+    try:
+        with httpx.Client(timeout=40) as c:
+            r = c.request(method, f"{TAP}{path}", json=body, headers={"Authorization": f"Bearer {tap_key()}", "accept": "application/json"})
+    except httpx.HTTPError as exc:
+        raise PayError(f"تعذّر الوصول إلى بوابة الدفع: {exc}") from exc
+    j = r.json() if r.content else {}
+    if r.status_code >= 400:
+        errs = "; ".join(str(e.get("description") or e) for e in (j.get("errors") or [])) or r.text[:300]
+        log.warning("tap %s %s: %s", method, path, errs)
+        raise PayError(f"بوابة الدفع رفضت الطلب: {errs}")
+    return j
+
+
+def tap_charge(usd: float, desc: str, meta: dict, email: str, name: str, redirect: str, post: str, save_card: bool = False) -> tuple[str, str]:
+    """دفعة جديدة ← (رقمها، رابط صفحة الدفع). المبلغ بيتحوّل ريال."""
+    first, _, last = (name or "عميل").partition(" ")
+    body = {"amount": sar(usd), "currency": "SAR", "threeDSecure": True, "save_card": save_card, "description": desc[:200],
+            "metadata": {k: str(v) for k, v in meta.items()}, "receipt": {"email": True, "sms": False},
+            "customer": {"first_name": first or "عميل", "last_name": last or "-", "email": email},
+            "source": {"id": "src_all"}, "post": {"url": post}, "redirect": {"url": redirect}}
+    j = _tap("POST", "/charges", body)
+    url = (j.get("transaction") or {}).get("url")
+    if not url:
+        raise PayError("بوابة الدفع لم ترجع رابط الدفع")
+    return j["id"], url
+
+
+def tap_get(charge_id: str) -> dict:
+    """حالة الدفعة: {status, amount (ريال), usd, meta, customer, card, agreement}."""
+    j = _tap("GET", f"/charges/{charge_id}")
+    return {"id": j.get("id"), "status": j.get("status"), "amount": float(j.get("amount") or 0), "currency": j.get("currency"),
+            "meta": j.get("metadata") or {}, "customer": (j.get("customer") or {}).get("id"), "card": (j.get("card") or {}).get("id"),
+            "agreement": (j.get("payment_agreement") or {}).get("id")}
+
+
+def tap_renew(usd: float, desc: str, meta: dict, customer: str, card: str, agreement: str, post: str) -> dict:
+    """تجديد من الكارت المحفوظ (من غير العميل): توكن من الكارت ← دفعة. يرجع حالة الدفعة."""
+    tok = _tap("POST", "/tokens", {"saved_card": {"card_id": card, "customer_id": customer}})
+    body = {"amount": sar(usd), "currency": "SAR", "description": desc[:200], "metadata": {k: str(v) for k, v in meta.items()},
+            "customer_initiated": False, "payment_agreement": {"id": agreement} if agreement else None,
+            "customer": {"id": customer}, "source": {"id": tok["id"]}, "post": {"url": post}, "redirect": {"url": post}}
+    j = _tap("POST", "/charges", {k: v for k, v in body.items() if v is not None})
+    return {"id": j.get("id"), "status": j.get("status"), "amount": float(j.get("amount") or 0)}

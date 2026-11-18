@@ -1321,7 +1321,7 @@ def billing_state(request: Request):
             "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
             "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
-            "paypal": payments.paypal_on(),
+            "paypal": payments.paypal_on(), "tap": payments.tap_on(),
             "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist,
             "discount": {"pct": w["discount_pct"] or 0, "code": w["discount_code"] or "", "once": bool(w["discount_once"])} if w and w["discount_pct"] else None}
 
@@ -1370,6 +1370,9 @@ def checkout(body: CheckoutIn, request: Request):
             if body.provider == "paypal":
                 url = payments.paypal_order(off(t["price"]), f"{wid}|topup|{t['key']}", name,
                                             ret=f"{back}/api/billing/paypal/order", cancel=f"{back}/billing")
+            elif body.provider == "tap":
+                _, url = payments.tap_charge(off(t["price"]), name, {"wid": wid, "kind": "topup", "key": t["key"], "usd": t["price"]},
+                                             real_email(u), u["name"] if "name" in u.keys() else "", f"{back}/api/billing/tap/back", f"{back}/api/billing/tap/webhook")
             else:
                 raise HTTPException(400, "طريقة دفع غير معروفة")
             return {"url": url}
@@ -1391,6 +1394,13 @@ def checkout(body: CheckoutIn, request: Request):
                                        px(tot["total"]), "YEAR" if yr else "MONTH", first=px(first) if first else None)
             url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", real_email(u),
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
+        elif body.provider == "tap":   # 💳 أول دفعة بتحفظ الكارت، والتجديد بيتخصم منه لوحده (tap_renewals)
+            usd = px(first if first else tot["total"])
+            _, url = payments.tap_charge(usd, f"SimsimKit {p['name_en']}{' yearly' if yr else ''}",
+                                         {"wid": wid, "kind": "plan", "plan": p["key"], "extra": extra, "ap": int(ap_paid), "cycle": "year" if yr else "month",
+                                          "usd": usd, "renew_usd": px(tot["total"])},
+                                         real_email(u), u["name"] if "name" in u.keys() else "", f"{back}/api/billing/tap/back", f"{back}/api/billing/tap/webhook",
+                                         save_card=True)
         else:
             raise HTTPException(400, "طريقة دفع غير معروفة")
         return {"url": url}
@@ -1454,6 +1464,10 @@ def cancel_sub(request: Request):
             nxt = payments.paypal_sub(w["sub_id"]).get("next")
             payments.paypal_cancel(w["sub_id"])
             end_subscription(u["workspace"], _iso(nxt))
+        elif w["provider"] == "tap":   # التجديد بيقف، والباقة شغالة لآخر الفترة المدفوعة
+            nxt = float(kv_get(f"tap_next:{u['workspace']}") or 0) or None
+            kv_set(f"tap_next:{u['workspace']}", "")
+            end_subscription(u["workspace"], nxt)
         else:
             raise HTTPException(400, "لا يوجد اشتراك PayPal فعّال")
     except payments.PayError as e:
@@ -1519,6 +1533,106 @@ async def paypal_hook(request: Request):
     elif typ in ("BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.SUSPENDED", "BILLING.SUBSCRIPTION.EXPIRED"):
         end_subscription(r["id"], _iso((res.get("billing_info") or {}).get("next_billing_time")) if typ == "BILLING.SUBSCRIPTION.CANCELLED" else None)
     return {"ok": True}
+
+# ---------------------------------------------------------------- 💳 Tap: الرجوع من صفحة الدفع، والإشعار من تاب، والتجديد من الكارت المحفوظ
+TAP_YEAR = 365 * 86400
+
+
+def tap_apply(ch: dict) -> str:
+    """دفعة اتأكدت من تاب نفسها (مش من الرابط) ← النقاط أو الباقة. يرجع topup / plan / ''. مرة واحدة لكل دفعة (paid_once)."""
+    m = ch.get("meta") or {}
+    if ch.get("status") != "CAPTURED" or ch.get("currency") != "SAR" or not m.get("wid"):
+        return ""
+    usd = float(m.get("usd") or 0)
+    if ch["amount"] + 0.05 < payments.sar(usd):
+        return ""
+    wid = m["wid"]
+    if m.get("kind") == "topup":
+        cfg = billing.config(DATA_DIR)
+        t = next((x for x in cfg["topups"] if x["key"] == m.get("key")), None)
+        return "topup" if t and add_topup(wid, m["key"], "tap", f"tap-{ch['id']}", max(usd, t["price"])) else ""
+    if m.get("kind") == "plan":
+        yr = m.get("cycle") == "year"
+        apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), m.get("ap") == "1", "tap",
+                           f"{ch.get('customer') or ''}|{ch.get('card') or ''}|{ch.get('agreement') or ''}", ch.get("customer"), f"tap-{ch['id']}",
+                           usd, "year" if yr else "month")
+        if not kv_get(f"tap_due:{ch['id']}"):
+            kv_set(f"tap_due:{ch['id']}", "1")
+            kv_set(f"tap_next:{wid}", str(time.time() + (TAP_YEAR if yr else MONTH)))
+            kv_set(f"tap_amt:{wid}", str(m.get("renew_usd") or usd))
+        return "plan"
+    return ""
+
+
+@app.get("/api/billing/tap/back")
+def tap_back(request: Request, tap_id: str = ""):
+    u = customer_user(request)
+    try:
+        ch = payments.tap_get(tap_id)
+    except payments.PayError:
+        return RedirectResponse("/billing?err=paypal")
+    if (ch.get("meta") or {}).get("wid") != u["workspace"]:
+        return RedirectResponse("/billing?err=paypal")
+    done = tap_apply(ch)
+    return RedirectResponse(f"/billing?ok={done}" if done else "/billing?err=paypal")
+
+
+@app.post("/api/billing/tap/webhook")
+async def tap_hook(request: Request):
+    """تاب بتبعت الدفعة هنا كمان (لو العميل قفل الصفحة قبل الرجوع). بنتأكد من تاب نفسها بالرقم، مش من الرسالة."""
+    try:
+        ev = json.loads(await request.body() or b"{}")
+    except ValueError:
+        return {"ok": True}
+    cid = str(ev.get("id") or "")
+    if cid.startswith("chg_"):
+        try:
+            tap_apply(await asyncio.to_thread(payments.tap_get, cid))
+        except payments.PayError:
+            pass
+    return {"ok": True}
+
+
+def tap_renewals() -> None:
+    """كل ساعة: الاشتراكات اللي ميعاد تجديدها جه بتتخصم من الكارت المحفوظ. لو الخصم فشل ٣ أيام: الاشتراك بيخلص."""
+    while True:
+        time.sleep(3600)
+        if not payments.tap_on():
+            continue
+        with closing(db()) as c:
+            rows = c.execute("SELECT id, plan, sub_id, cycle FROM workspaces WHERE provider='tap' AND sub_id IS NOT NULL AND ends_at IS NULL").fetchall()
+        for r in rows:
+            nxt = float(kv_get(f"tap_next:{r['id']}") or 0)
+            if not nxt or nxt > time.time():
+                continue
+            customer, card, agreement = (r["sub_id"].split("|") + ["", "", ""])[:3]
+            usd = float(kv_get(f"tap_amt:{r['id']}") or 0)
+            p = plan_of(r["plan"])
+            if not (customer and card and usd and p):
+                continue
+            try:
+                ch = payments.tap_renew(usd, f"SimsimKit {p['name_en']} renewal", {"wid": r["id"], "kind": "renew"}, customer, card, agreement,
+                                        f"{(os.environ.get('PUBLIC_URL') or 'https://simsimkit.com').rstrip('/')}/api/billing/tap/webhook")
+                ok = ch.get("status") == "CAPTURED"
+            except payments.PayError as exc:
+                ok, ch = False, {"id": ""}
+                print(f"[tap] renew {r['id']}: {exc}", flush=True)
+            if ok:
+                kv_set(f"tap_fail:{r['id']}", "0")
+                kv_set(f"tap_next:{r['id']}", str(nxt + (TAP_YEAR if r["cycle"] == "year" else MONTH)))
+                renew(r["id"], f"tap-{ch['id']}", usd)
+            else:
+                n = int(kv_get(f"tap_fail:{r['id']}") or 0) + 1
+                kv_set(f"tap_fail:{r['id']}", str(n))
+                kv_set(f"tap_next:{r['id']}", str(time.time() + 86400))   # محاولة تانية بكرة
+                if n >= 3:
+                    kv_set(f"tap_next:{r['id']}", "")
+                    end_subscription(r["id"])
+                    issues.record("job", "tap/renew", "تجديد اشتراك بتاب فشل ٣ مرات، والاشتراك انتهى", r["id"], 402)
+
+
+threading.Thread(target=tap_renewals, daemon=True).start()
+
 
 # ---------------------------------------------------------------- لوحة الأدمن (أول جزء: العملاء)
 

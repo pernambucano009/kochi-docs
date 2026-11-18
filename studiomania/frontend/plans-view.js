@@ -161,7 +161,7 @@ const PlansView = (() => {
     const moP = (p) => S.cyc === "year" ? Math.round(p.price * ym / 12) : p.price;
     const fmtD = (t) => t ? new Date(t * 1000).toLocaleDateString(typeof UI_LOCALE === "function" ? UI_LOCALE() : "ar-EG", { day: "numeric", month: "long" }) : "";
     const renew = d.ends_at ? `تنتهي ${fmtD(d.ends_at)}` : d.renews_at ? `تتجدد ${fmtD(d.renews_at)}` : "";
-    const providers = [d.paypal && ["paypal", "PayPal"]].filter(Boolean);
+    const providers = [d.tap && ["tap", "مدى · بطاقة · Apple Pay"], d.paypal && ["paypal", "PayPal"]].filter(Boolean);
     const sameCycle = () => (d.cycle || "month") === S.cyc;
 
     function state(p, i) {

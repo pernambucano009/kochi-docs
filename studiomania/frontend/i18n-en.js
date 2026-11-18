@@ -16903,4 +16903,10 @@ window.I18N_EN = {
   "إذا وافق أصحابها، أضفها مع تقييمكم ونصنع منها فيديو آراء العملاء.": "If their owners agree, add them with your rating and we make a reviews video.",
   "🗺️ هل وصل منتجك أو خدمتك إلى أماكن جديدة؟": "🗺️ Has your product or service reached new places?",
   "أخبرنا بالأماكن الجديدة، ونصنع فيديو على الخريطة.": "Tell us the new places, and we make a map video.",
+  "تجديد اشتراك بتاب فشل ٣ مرات، والاشتراك انتهى": "A Tap subscription renewal failed 3 times and the subscription ended",
+  "الدفع بالبطاقة غير متفعّل بعد": "Card payment is not active yet",
+  "تعذّر الوصول إلى بوابة الدفع: {0}": "Could not reach the payment gateway: {0}",
+  "بوابة الدفع رفضت الطلب: {0}": "The payment gateway refused the request: {0}",
+  "بوابة الدفع لم ترجع رابط الدفع": "The payment gateway returned no payment link",
+  "مدى · بطاقة · Apple Pay": "mada · Card · Apple Pay",
 };
