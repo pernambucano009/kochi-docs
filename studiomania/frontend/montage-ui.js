@@ -37,7 +37,7 @@
   // ---------- الأدوات: أيقونة بس، والاسم في الفقاعة ----------
   const clean = (s) => s.replace(/[\u{1F000}-\u{1FFFF}☀-➿️]/gu, "").replace(/\s+/g, " ").trim();
   tabs.querySelectorAll("button[data-tab]").forEach((b) => { b.dataset.tip = clean(b.textContent); b.setAttribute("aria-label", b.dataset.tip); });
-  tabs.querySelector('[data-tab="typo"]')?.setAttribute("hidden", "");   // بقت داخل التعليق النصي
+  tabs.querySelector('[data-tab="typo"]')?.setAttribute("hidden", "");   // بقت داخل الكابشن
 
   // ---------- كارت الأداة: بيظهر لما تختار أداة، وبيستخبى لما تدوس عليها تاني أو تقفله ----------
   const close = document.createElement("button");
@@ -86,7 +86,7 @@
   const capPane = insp.querySelector('.pane[data-pane="caps"]');
   const seg = document.createElement("div");
   seg.className = "mtu-seg";
-  seg.innerHTML = `<button type="button" data-capmode="plain">تعليق نصي عادي</button><button type="button" data-capmode="typo">تايبوجرافي 3D</button>`;
+  seg.innerHTML = `<button type="button" data-capmode="plain">كابشن عادي</button><button type="button" data-capmode="typo">تايبوجرافي 3D</button>`;
   const typoBox = document.createElement("div");
   typoBox.className = "mtu-typo";
   typoBox.hidden = true;
@@ -177,7 +177,7 @@
     afterH = hd; after = row;
   }
   const GROUPS = { video: ["h-video", "h-over"], audio: ["h-voice", "h-music", "h-snd"], caps: ["h-caps", "h-typo", "h-click"] };
-  const NAMES = { "h-over": "طبقات", "h-video": "فيديو", "h-voice": "تعليق", "h-music": "موسيقى", "h-snd": "أصوات", "h-text": "نصوص", "h-caps": "تعليق نصي", "h-typo": "تايبوجرافي", "h-click": "كليكات", "h-fx": "عناصر" };
+  const NAMES = { "h-over": "طبقات", "h-video": "فيديو", "h-voice": "تعليق", "h-music": "موسيقى", "h-snd": "أصوات", "h-text": "نصوص", "h-caps": "كابشن", "h-typo": "تايبوجرافي", "h-click": "كليكات", "h-fx": "عناصر" };
   const KEY = "studiomania.mtGroups";
   let openG = {};
   try { openG = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { openG = {}; }

@@ -26,7 +26,7 @@ async function openAd(id) {
 }
 
 const AD_LABELS = {
-  summary: "الملخص", idea: "الفكرة", hook: "الخطاف (أول 3 ثواني)", structure: "البناء", audience: "الجمهور",
+  summary: "الملخص", idea: "الفكرة", hook: "الهوك (أول 3 ثواني)", structure: "البناء", audience: "الجمهور",
   tone: "النبرة", cta: "الدعوة للفعل", cinematography: "التصوير", direction: "الإخراج", editing: "المونتاج", colors: "الألوان",
 };
 const SCENE_LABELS = {
@@ -34,9 +34,9 @@ const SCENE_LABELS = {
   sfx: "المؤثرات", music: "الموسيقى", transition: "الانتقال", purpose: "وظيفة المشهد",
 };
 const ADAPT_LABELS = {
-  concept: "الفكرة", why_it_fits: "له مناسب للعلامة", kochi_angle: "العلامة يظهر كيف", hook: "الخطاف", format: "المقاس", angle: "🎯 الزاوية", tone: "🎭 الإحساس", palette: "🎨 ألوان هذا الإعلان",
+  concept: "الفكرة", why_it_fits: "له مناسب للعلامة", kochi_angle: "العلامة يظهر كيف", hook: "الهوك", format: "المقاس", angle: "🎯 الزاوية", tone: "🎭 الإحساس", palette: "🎨 ألوان هذا الإعلان",
   voiceover_script: "التعليق الصوتي كامل", music_direction: "الموسيقى", sound_design: "المؤثرات وتصميم الصوت", cast: "الممثلين",
-  locations: "أماكن التصوير", production_notes: "ملاحظات التنفيذ", cta: "الدعوة للفعل", caption: "تعليق نصي المنشور",
+  locations: "أماكن التصوير", production_notes: "ملاحظات التنفيذ", cta: "الدعوة للفعل", caption: "كابشن المنشور",
 };
 const ADAPT_SCENE_LABELS = {
   visual: "ما سيحدث", shot: "اللقطة", camera: "الكاميرا", on_screen_text: "نص على الشاشة", voice: "النص",
@@ -182,7 +182,7 @@ const adaptNoMotion = (a) => !!a.adaptation?.scenes?.length && !a.adaptation.sce
   && (a.analysis?.scenes || []).some((s) => s.motion_graphics);
 
 // 🎲 الاتجاهات: كروت تختار منها، والاختيار بيتحفظ في الإعدادات ويتكتب بيه الاقتراح
-const DIR_LABELS = { angle: "🎯 الزاوية", hook: "🪝 الخطاف", tone: "🎭 الإحساس", setting: "📍 المكان", hero: "🧍 البطل", palette: "🎨 الألوان", feature: "📱 الميزة" };
+const DIR_LABELS = { angle: "🎯 الزاوية", hook: "🪝 الهوك", tone: "🎭 الإحساس", setting: "📍 المكان", hero: "🧍 البطل", palette: "🎨 الألوان", feature: "📱 الميزة" };
 function renderDirections(a) {
   const st = a.settings || {}, working = a.directions_status === "working";
   $("adDirsGo").disabled = working || !a.analysis;

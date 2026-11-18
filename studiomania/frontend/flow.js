@@ -152,7 +152,7 @@ const Flow = (() => {
     return `<div class="flw-chat">
       <p class="flw-sub">${stage === "idea" ? "اكتب ما تريد تغييره في الفكرة، أو" : "اكتب ما تريد تغييره في النص، أو"} <button type="button" class="flw-link" data-go="${stage}">${stage === "idea" ? "↩︎ اختر فكرة أخرى" : "↩︎ اختر نصًا آخر"}</button></p>
       ${log.length ? `<div class="flw-log">${log.slice(-8).map((m) => `<p class="${m.role}">${esc(m.content)}</p>`).join("")}</div>` : ""}
-      <div class="flw-chatrow"><input data-chatin="${stage}" placeholder="${stage === "idea" ? "مثلًا: اجعلها أجرأ، أو ركّز على السعر…" : "مثلًا: خطاف أقوى، أو نص أقل…"}" ${S.d.busy ? "disabled" : ""}>
+      <div class="flw-chatrow"><input data-chatin="${stage}" placeholder="${stage === "idea" ? "مثلًا: اجعلها أجرأ، أو ركّز على السعر…" : "مثلًا: هوك أقوى، أو نص أقل…"}" ${S.d.busy ? "disabled" : ""}>
         <button type="button" class="flw-btn" data-send="${stage}" ${S.d.busy ? "disabled" : ""}>أرسل</button></div></div>`;
   }
   // الاختيار اللي فات (بيظهر فوق الخطوة الجاية): تقدر تتناقش فيه أو ترجع تغيّره
@@ -201,7 +201,7 @@ const Flow = (() => {
     return `<div class="flw-chat">
       ${log.length ? `<div class="flw-log">${log.slice(-8).map((m) => `<p class="${m.role}">${esc(m.content)}</p>`).join("")}</div>` : ""}
       ${busy && S.d.busy === "chat" ? `<p class="flw-sub">⏳ العقل يعدّلها…</p>` : ""}
-      <div class="flw-chatrow"><input data-ichatin="${esc(id)}" placeholder="${idea ? "قل للعقل ماذا تريد: أجرأ، أقصر، ركّز على السعر…" : "قل للعقل ماذا تريد: خطاف أقوى، نص أقل…"}" ${busy ? "disabled" : ""}>
+      <div class="flw-chatrow"><input data-ichatin="${esc(id)}" placeholder="${idea ? "قل للعقل ماذا تريد: أجرأ، أقصر، ركّز على السعر…" : "قل للعقل ماذا تريد: هوك أقوى، نص أقل…"}" ${busy ? "disabled" : ""}>
         <button type="button" class="flw-btn" data-isend="${stage}" data-id="${esc(id)}" ${busy ? "disabled" : ""}>أرسل</button></div>
       <div class="flw-acts"><button type="button" class="flw-link" data-iredo="${stage}" data-id="${esc(id)}" ${busy ? "disabled" : ""}>${idea ? "🔄 بدّلها بفكرة مختلفة" : "🔄 بدّله بنص مختلف"}</button>
         <button type="button" class="flw-link" data-iform>✍️ عدّلها بنفسك</button><button type="button" class="flw-link" data-iclose>✕ إغلاق</button></div></div>`;
@@ -212,7 +212,7 @@ const Flow = (() => {
     if (S.edit === it.id && S.editForm) return ideaForm(it);
     return `<article class="flw-card${S.seen.has(it.id) ? "" : " in"}" data-cid="${esc(it.id)}"><div class="flw-ch"><b>${esc(it.title)}</b>${rateBtns("idea", it.id)}</div>${algoTags(it)}
       ${it.aud ? `<small class="flw-aud">👥 ${esc(it.aud)}</small>` : ""}<p class="flw-idea">${esc(it.idea)}</p>${it.hook ? `<p class="flw-hook">«${esc(it.hook)}»</p>` : ""}
-      ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (خطافات أخرى، وكيف تناسب القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
+      ${(it.hooks || []).length || it.pack || it.fit || it.why ? `<details class="flw-more"><summary>التفاصيل (هوكات أخرى، وكيف تناسب القالب)</summary>${hooksRow(it)}${it.pack && (it.pack.for == null || it.pack.for === it.hook) ? packRow(it.pack) : ""}${it.fit ? `<small class="flw-fit">🎨 على القالب: ${esc(it.fit)}</small>` : ""}${it.why ? `<small class="muted">💡 ${esc(it.why)}</small>` : ""}</details>` : ""}
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-pick-idea="${it.id}">اختر هذه الفكرة</button>
         <button type="button" class="flw-link" data-edit="${it.id}">✏️ عدّل</button>${laterBtn("idea", it.id)}</div>${S.edit === it.id ? editPanel("idea", it.id) : ""}</article>`;
   }
@@ -239,13 +239,13 @@ const Flow = (() => {
   function hooksRow(it) {
     if (!(it.hooks || []).length) return "";
     return `<div class="flw-hooks">${it.hooks.map((h) => `<button type="button" class="flw-hk${h.text === it.hook ? " on" : ""}" data-hook="${esc(it.id)}" data-text="${esc(h.text)}"
-        title="${esc(h.why || "")}"><b class="num">${h.score}</b><span>${esc(h.formula || "خطاف")}</span>${h.principle ? `<small class="flw-psy" title="المبدأ النفسي">🧠 ${esc(h.principle)}</small>` : ""}${h.text === it.hook ? "" : `<i>«${esc(h.text)}»</i>`}</button>`).join("")}</div>`;
+        title="${esc(h.why || "")}"><b class="num">${h.score}</b><span>${esc(h.formula || "هوك")}</span>${h.principle ? `<small class="flw-psy" title="المبدأ النفسي">🧠 ${esc(h.principle)}</small>` : ""}${h.text === it.hook ? "" : `<i>«${esc(h.text)}»</i>`}</button>`).join("")}</div>`;
   }
   // ⚡ وضع الخوارزمية: الفكرة معلّمة بدايرة الجمهور ومجموعة المواضيع ودرجة HEAT
   function algoTags(it) {
     const h = it.heat;
     if (!h && !it.ring && !it.bucket) return "";
-    const names = { h: "فضول الخطاف", e: "لا يوجد ركود", a: "نتيجة في النهاية", t: "relatable", r: "تتكرر" };
+    const names = { h: "فضول الهوك", e: "لا يوجد ركود", a: "نتيجة في النهاية", t: "relatable", r: "تتكرر" };
     const tip = h ? Object.entries(names).map(([k, t]) => `${t}: ${h[k] ?? "—"}`).join(" · ") : "";
     return `<div class="flw-algo">${h?.avg != null ? `<span class="heat ${h.avg >= 8 ? "hi" : ""}" title="${esc(tip)}">🔥 HEAT ${h.avg}</span>` : ""}
       ${it.ring ? `<span title="دائرة الجمهور (١ الأضيق)">🎯 دائرة ${it.ring}</span>` : ""}${it.bucket ? `<span>🗂 ${esc(it.bucket)}</span>` : ""}</div>`;
@@ -254,13 +254,13 @@ const Flow = (() => {
   function packRow(p) {
     if (!p) return "";
     const row = (ic, t, v) => (v ? `<div><span>${ic} ${t}</span><b>${esc(v)}</b></div>` : "");
-    return `<div class="flw-pack" title="الخطاف الثلاثي: يجب أن تقول الثلاثة المعنى نفسه">${row("📝", "على الشاشة", p.screen)}${row("👁", "ما يُرى", p.visual)}${row("🎙", "ما يُقال", p.spoken)}
-      ${row("🔒", `بعد الخطاف${p.lockin_method ? ` (${esc(p.lockin_method)})` : ""}`, p.lockin)}</div>`;
+    return `<div class="flw-pack" title="الهوك الثلاثي: يجب أن تقول الثلاثة المعنى نفسه">${row("📝", "على الشاشة", p.screen)}${row("👁", "ما يُرى", p.visual)}${row("🎙", "ما يُقال", p.spoken)}
+      ${row("🔒", `بعد الهوك${p.lockin_method ? ` (${esc(p.lockin_method)})` : ""}`, p.lockin)}</div>`;
   }
   function ideaForm(it = {}) {
     return `<form class="flw-card flw-form" data-ideaform="${esc(it.id || "")}">
       <label>العنوان <input name="title" value="${esc(it.title || "")}" placeholder="عنوان قصير للفكرة"></label>
-      <label>الخطاف (أول جملة تشدّ الانتباه) <input name="hook" value="${esc(it.hook || "")}"></label>
+      <label>الهوك (أول جملة تشدّ الانتباه) <input name="hook" value="${esc(it.hook || "")}"></label>
       <label>الفكرة <textarea name="idea" rows="3" placeholder="اكتب الفكرة في سطرين">${esc(it.idea || "")}</textarea></label>
       <div class="flw-acts"><button class="flw-btn pri">اختر هذه</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
   }
@@ -362,7 +362,7 @@ const Flow = (() => {
       <label>الملخص <textarea name="summary" rows="2">${esc(sc.summary || "")}</textarea></label>
       <div class="flw-rows">${rows.map((r, i) => rowHTML(r, fmt, i)).join("")}</div>
       <button type="button" class="flw-link" data-rowadd>+ أضف ${ROWS[fmt][1]}</button>
-      <label>التعليق النصي <input name="caption" value="${esc(sc.caption || "")}"></label>
+      <label>الكابشن <input name="caption" value="${esc(sc.caption || "")}"></label>
       <div class="flw-acts"><button class="flw-btn pri">اختر هذا</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
   }
   // ⚡ السيناريو اتفحص بالـ ١٥ بند واتصلّح قبل ما يظهر: درجته واللي اتغيّر
@@ -415,7 +415,7 @@ const Flow = (() => {
         ${Object.entries(r.fields || {}).map(([k, v]) => `<label>📝 ${esc(ml.fields[k]?.label || k)}${ml.fields[k]?.kind === "lines"
           ? `<textarea data-fk="${esc(k)}" data-lines rows="3" dir="auto">${esc((Array.isArray(v) ? v : String(v || "").split("\n")).join("\n"))}</textarea>`
           : `<input data-fk="${esc(k)}" value="${esc(fieldVal(v))}" dir="auto">`}</label>`).join("")}</fieldset>`).join("")}
-      <label>التعليق النصي <input name="caption" value="${esc(sc.caption || "")}"></label>
+      <label>الكابشن <input name="caption" value="${esc(sc.caption || "")}"></label>
       <div class="flw-acts"><button class="flw-btn pri">اختر هذا</button><button type="button" class="flw-link" data-cancel>إلغاء</button></div></form>`;
   }
   function scriptFrom(form, ml) {
@@ -569,7 +569,7 @@ const Flow = (() => {
       ${[...open, ...fixed].map((i) => `<small class="${i.fixed ? "muted" : ""}">${i.fixed ? "✓ " : "• "}${esc(i.detail)}</small>`).join("<br>")}</div>`;
   }
   // ---------------------------------------------------------------- 📤 النشر جوه المسار (الفيديو ده بس)
-  // الفيديو، والحسابات المربوطة (واللي مش مربوط يتربط من هنا)، وتعليق نصي جاهز بالدعوة والوسوم، و«علّق بكلمة» حسب العقل، والموعد.
+  // الفيديو، والحسابات المربوطة (واللي مش مربوط يتربط من هنا)، وكابشن جاهز بالدعوة والهاشتاجات، و«علّق بكلمة» حسب العقل، والموعد.
   async function openPub(fresh = false) {
     S.view = "publish";
     if (fresh) S.pub = { ...(S.pub || {}), recap: true }; else S.pub = null;
@@ -616,7 +616,7 @@ const Flow = (() => {
   }
   function stPublish(d) {
     const p = S.pub;
-    if (!p) return `<h2>النشر</h2>${working("يجهّز الفيديو والتعليق النصي…")}`;
+    if (!p) return `<h2>النشر</h2>${working("يجهّز الفيديو والكابشن…")}`;
     if (p.error) return `<h2>النشر</h2><div class="flw-empty"><p>تعذّر تجهيز النشر الآن.</p><div class="flw-acts"><button type="button" class="flw-btn pri" data-topub>🔁 أعد المحاولة</button></div></div>`;
     const fmtW = (iso) => new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" });
     if (p.posted) return `<h2>${p.posted.now ? "🚀 يُنشر الآن" : "✅ جُدول المنشور"}</h2>
@@ -634,7 +634,7 @@ const Flow = (() => {
           <section><b>الحسابات</b>
             <div class="flw-accs">${posting.map((a) => { const k = `${a.platform}@${a.id}`; return `<button type="button" class="flw-acc${S.pubAcc?.[k] ? " on" : ""}" data-pacc="${esc(k)}">${S.pubAcc?.[k] ? "✓ " : ""}${esc(p.platforms?.[a.platform] || a.platform)}${a.username ? ` <small dir="ltr">@${esc(a.username)}</small>` : ""}</button>`; }).join("") || `<small class="muted">لا توجد حسابات مربوطة بعد.</small>`}</div>
             ${unlinked.length ? `<div class="flw-accs">${unlinked.map((k) => `<button type="button" class="flw-acc add" data-plink="${k}">＋ اربط ${esc(p.platforms[k])}</button>`).join("")}</div>` : ""}</section>
-          <section><b>التعليق النصي</b>
+          <section><b>الكابشن</b>
             <textarea id="pubCap" rows="6" dir="auto">${esc(p.caption || "")}</textarea>
             <button type="button" class="flw-link" data-pcapnew>✍️ اكتب تعليقًا آخر</button></section>
           ${df.dm_mode === "ask" && df.dm_word ? `<section><button type="button" class="flw-acc${S.pubDm ? " on" : ""}" data-pdm>${S.pubDm ? "✓ " : ""}من يعلّق بكلمة «${esc(df.dm_word)}» تصله رسالة على الخاص</button></section>`

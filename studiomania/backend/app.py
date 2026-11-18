@@ -3015,11 +3015,11 @@ def project_captions(conn: sqlite3.Connection, data: dict, total: float, export_
         return None
     voice = data.get("voice")
     if not voice:
-        raise HTTPException(400, "التعليق النصي يُنشأ من التعليق الصوتي. اختر تعليق صوتي أو أغلق التعليق النصي")
+        raise HTTPException(400, "الكابشن يُنشأ من التعليق الصوتي. اختر تعليق صوتي أو أغلق الكابشن")
     row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice["id"],)).fetchone()
     tr = json.loads(row["transcript"]) if row and row["transcript"] else {}
     if tr.get("status") != "done" or not tr.get("words"):
-        raise HTTPException(400, "لم يُكتب نص التعليق الصوتي بعد. اضغط «اكتب النص» أولًا أو أطفئ التعليق النصي")
+        raise HTTPException(400, "لم يُكتب نص التعليق الصوتي بعد. اضغط «اكتب النص» أولًا أو أطفئ الكابشن")
     # الكلام اللي اتمسح من الكابشن في المشروع ده (بمعاد بدايته جوه ملف الصوت)
     removed = {int(k) for k in cfg.get("removed") or []}
     source = [w for w in tr["words"] if round(w["s"] * 100) not in removed]
@@ -4337,7 +4337,7 @@ DM_CTA = re.compile(r"(علّ?ق|علِّق|اكتب|كومنت|تعليق|comme
 
 
 def dm_detect(caption: str) -> str:
-    """التعليق النصي فيه دعوة «علّق بكلمة»؟ يعود الكلمة. أي منشور فيه هذه الدعوة الرد التلقائي يشتغل تلقائيًا بدون ما حد يفعّله."""
+    """الكابشن فيه دعوة «علّق بكلمة»؟ يعود الكلمة. أي منشور فيه هذه الدعوة الرد التلقائي يشتغل تلقائيًا بدون ما حد يفعّله."""
     for line in (caption or "").splitlines():
         if not DM_CTA.search(line):
             continue
@@ -5009,10 +5009,10 @@ class AlgoReviewIn(BaseModel):
 
 @app.post("/api/algo/review")
 def algo_review(body: AlgoReviewIn):
-    """يقيّم النص أو التعليق النصي بقواعد الخوارزميات قبل النشر: درجة لكل بند وتعديلات وخطافات وتعليق نصي أحسن."""
+    """يقيّم النص أو الكابشن بقواعد الخوارزميات قبل النشر: درجة لكل بند وتعديلات وهوكات وكابشن أحسن."""
     text = body.text.strip()
     if len(text) < 8:
-        raise HTTPException(400, "اكتب النص أو التعليق النصي أولًا")
+        raise HTTPException(400, "اكتب النص أو الكابشن أولًا")
     if atlas.mock_mode():
         return algo.mock_review(text)
     kind = body.kind if body.kind in algo.KINDS else "script"
@@ -5049,7 +5049,7 @@ def project_is_ai(conn: sqlite3.Connection, data: dict) -> bool:
 
 @app.post("/api/algo/post-pack")
 def algo_post_pack(body: PostPackIn):
-    """⚡ وضع الخوارزمية في النشر: التعليق النصي (خطاف آخر + دعوة الخطة + هاشتاجات المجال) والغلاف وقت ظهور الخطاف وعلامة AI."""
+    """⚡ وضع الخوارزمية في النشر: الكابشن (هوك آخر + دعوة الخطة + هاشتاجات المجال) والغلاف وقت ظهور الهوك وعلامة AI."""
     brain = brain_row(active_client_id() or "")
     if not algo.mode_on(brain):
         return {"on": False}
@@ -5073,9 +5073,9 @@ def algo_post_pack(body: PostPackIn):
         raw = algo.mock_post_caption(hook or ex["name"])
     else:
         try:
-            raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), platform), json_mode=True, temperature=0.6), "التعليق النصي")
+            raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), platform), json_mode=True, temperature=0.6), "الكابشن")
         except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError) as exc:
-            raise HTTPException(502, f"لم يُكتب التعليق النصي: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
+            raise HTTPException(502, f"لم يُكتب الكابشن: {str(getattr(exc, 'detail', None) or exc)[:200]}") from exc
     return {"on": True, "caption": algo.assemble_caption(raw, brain, ai), "ai": ai, "cover_ms": min(cover_ms, int(float(ex["duration"] or 0) * 1000)),
             "cover_hook": bool(hooks), "cta": algo.funnel_cta(brain)}
 
@@ -5264,7 +5264,7 @@ def month_messages(b: dict, fmts: list[dict], start, days: int, per_day: int, ti
 وكل منشور فكرته محددة جدًا (غير عامة) وهوكه جملة قصيرة تشد. الكاروسيل للمعلومات والقوائم والخطوات، والجوال للآراء والقصص والإجابات.
 استعد JSON هذا بالشكل فقط:
 {{"posts": [{{"date": "YYYY-MM-DD", "time": "HH:MM", "format": "id من الأشكال", "bucket": "مجموعة المواضيع", "title": "عنوان قصير",
-  "idea": "الفكرة في جملة واحدة قصيرة (غير نص)", "hook": "الخطاف", "cta": "الدعوة", "why": "له هذا المنشور في هذا اليوم (جملة)",
+  "idea": "الفكرة في جملة واحدة قصيرة (غير نص)", "hook": "الهوك", "cta": "الدعوة", "why": "له هذا المنشور في هذا اليوم (جملة)",
   "aud": "اسم الجمهور المقصود بالضبط من «الجماهير المستهدفة» إذا موجودة، وإلا فارغ"}}]}}"""}]
 
 
@@ -5284,7 +5284,7 @@ def month_clean(raw: dict, fmts: list[dict], dates: set[str], times: list[str]) 
 
 def month_mock(fmts: list[dict], start, days: int, per_day: int, times: list[str]) -> list[dict]:
     raw = {"posts": [{"date": (start + timedelta(days=i)).isoformat(), "time": times[k % len(times)], "format": fmts[(i * per_day + k) % len(fmts)]["id"],
-                      "bucket": "مجموعة تجريبية", "title": f"فكرة اليوم {i + 1} رقم {k + 1}", "idea": "فكرة تجريبية للجدول", "hook": "خطاف تجريبي",
+                      "bucket": "مجموعة تجريبية", "title": f"فكرة اليوم {i + 1} رقم {k + 1}", "idea": "فكرة تجريبية للجدول", "hook": "هوك تجريبي",
                       "cta": "علّق بكلمة", "why": "تجربة"} for i in range(days) for k in range(per_day)]}
     return month_clean(raw, fmts, {(start + timedelta(days=i)).isoformat() for i in range(days)}, times)
 
@@ -5449,7 +5449,7 @@ class BatchFetchIn(BaseModel):
 
 @app.post("/api/batch/fetch")
 def batch_fetch(body: BatchFetchIn):
-    """يجلب آخر منشورات حساب العلامة (ScrapeCreators) وكلامها المنطوق لكي التحليل يرى الخطاف."""
+    """يجلب آخر منشورات حساب العلامة (ScrapeCreators) وكلامها المنطوق لكي التحليل يرى الهوك."""
     bid = rivals_client()
     handle, platform = rivals.clean_handle(body.handle), body.platform if body.platform in rivals.PLATFORMS else "tiktok"
     if not handle:
@@ -5612,7 +5612,7 @@ RIVALS_BUSY: set[str] = set()
 
 
 def brain_rivals(text: str, brain: dict | None) -> str:
-    """ملف العلامة + ما ينجح عند المنافسين (للأفكار والنصوص والخطافات)."""
+    """ملف العلامة + ما ينجح عند المنافسين (للأفكار والنصوص والهوكات)."""
     rv = "\n\n".join(x for x in (algo.strategy_text(brain), algo.batch_text(brain), rivals.insight_text(brain)) if x)   # خطة المحتوى المعتمدة + المنافسين
     return text + (f"\n\n{rv}" if rv else "")
 
@@ -7106,8 +7106,8 @@ def autopilot_step(job: dict, settings: dict) -> None:
             if tr.get("status") != "done" and tr_tries < 2:
                 if tr.get("status") != "working":
                     start_transcribe(f["voice_id"])
-                    return autopilot_update(jid, tr_tries=tr_tries + 1, note="جارٍ كتابة نص التعليق النصي")
-                return autopilot_update(jid, note="جارٍ كتابة نص التعليق النصي")
+                    return autopilot_update(jid, tr_tries=tr_tries + 1, note="جارٍ كتابة نص الكابشن")
+                return autopilot_update(jid, note="جارٍ كتابة نص الكابشن")
             captions_on = tr.get("status") == "done" and bool(tr.get("words"))
             music = next((r for r in conn.execute("SELECT id, name FROM audio WHERE kind = 'music' AND vis(client_id, kind) ORDER BY created_at DESC")
                           if DEFAULT_MUSIC_NAME in (r["name"] or "").lower()), None)
@@ -7127,7 +7127,7 @@ def autopilot_step(job: dict, settings: dict) -> None:
                     data["client_id"] = job["client_id"]
                 c2.execute("UPDATE projects SET data = ?, updated_at = ? WHERE id = ?", (json.dumps(data), now(), pid))
             return autopilot_update(jid, step="rendering", project_id=pid,
-                                    note="جارٍ التصدير" if captions_on else "جارٍ التصدير (دون تعليق نصي: لم يُكتب نصه)")
+                                    note="جارٍ التصدير" if captions_on else "جارٍ التصدير (دون كابشن: لم يُكتب نصه)")
 
         if step == "rendering":
             row = get_project(conn, job["project_id"])
@@ -7357,7 +7357,7 @@ def cut_silences(conn: sqlite3.Connection, data: dict, min_len: float) -> tuple[
 
 @app.post("/api/projects/{project_id}/algo-prep")
 def project_algo_prep(project_id: str, min_sec: float = 0.0):
-    """السكتات في الفيديوهات التي بصوت (بالأحمر للمراجعة)، وخطاف الشاشة، وحالة التعليق النصي.
+    """السكتات في الفيديوهات التي بصوت (بالأحمر للمراجعة)، وهوك الشاشة، وحالة الكابشن.
     min_sec: أقل طول للسكتة (مستوى الإزالة: خفيف/متوسط/قوي)، والافتراضي algo.SILENCE_MIN."""
     min_len = min(2.0, max(0.25, min_sec)) if min_sec else algo.SILENCE_MIN
     with closing(db()) as conn:
@@ -7382,7 +7382,7 @@ def project_algo_prep(project_id: str, min_sec: float = 0.0):
                 hook = "غلطة تعملها\nكل يوم"
             else:
                 try:
-                    hook = str(az.parse_json(llm(algo.hook_text_messages(context), json_mode=True, temperature=0.5), "خطاف الشاشة").get("text") or "").strip()[:80] or None
+                    hook = str(az.parse_json(llm(algo.hook_text_messages(context), json_mode=True, temperature=0.5), "هوك الشاشة").get("text") or "").strip()[:80] or None
                 except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError):
                     hook = None
     return {"marks": marks, "hook": hook, "caps": status if data.get("voice") else "no_voice"}
@@ -7527,7 +7527,7 @@ def translate_words(words: list[dict], lang: str) -> list[dict]:
                  + " so it reads naturally on screen: same meaning and tone, short, no notes, keep names and brands as they are. "
                    'Return exactly the same number of lines in the same order as JSON: {"lines": ["..."]}'},
                 {"role": "user", "content": json.dumps({"lines": texts}, ensure_ascii=False)}]
-        raw = flow_llm(msgs, "ترجمة التعليق النصي")
+        raw = flow_llm(msgs, "ترجمة الكابشن")
         lines = [str(x or "").strip() for x in (raw.get("lines") or [])]
         if len(lines) != len(texts):
             raise HTTPException(400, "أعادت الترجمة عددًا مختلفًا من الجمل، جرّب مرة أخرى")
@@ -7541,7 +7541,7 @@ def translate_words(words: list[dict], lang: str) -> list[dict]:
 
 
 def caption_words(audio_id: str, lang: str) -> list[dict]:
-    """نص التعليق النصي باللغة المطلوبة (متخزن مع النص الأصلي، ويُعاد إذا النص عُدّل)."""
+    """نص الكابشن باللغة المطلوبة (متخزن مع النص الأصلي، ويُعاد إذا النص عُدّل)."""
     with closing(db()) as conn:
         row = conn.execute("SELECT transcript FROM audio WHERE id = ?", (audio_id,)).fetchone()
     if row is None:
@@ -18080,7 +18080,7 @@ class FilmRewriteIn(BaseModel):
 
 @app.post("/api/films/{fid}/script/rewrite")
 def film_script_rewrite(fid: str, body: FilmRewriteIn):
-    """✍️ تعديل النص بالكلام (أقصر، خطاف أقوى...). يغيّر التعليق الصوتي والنص الذي على الشاشة فقط."""
+    """✍️ تعديل النص بالكلام (أقصر، هوك أقوى...). يغيّر التعليق الصوتي والنص الذي على الشاشة فقط."""
     d = film_load(fid)
     if d.get("status") == "planning" or not (d.get("plan") or {}).get("scenes"):
         raise HTTPException(400, "انتظر حتى ينتهي السيناريو")
@@ -19544,7 +19544,7 @@ def run_tv_once(vid: str) -> None:
 
 @app.post("/api/tvideos/{vid}/to-editor")
 def tvideo_to_editor(vid: str):
-    """🎞️ الأجزاء بالترتيب في مونتاج الإعلانات (على طولها في التيمبليت)، والنص يُكتب بنفسك في التعليق النصي/النص."""
+    """🎞️ الأجزاء بالترتيب في مونتاج الإعلانات (على طولها في التيمبليت)، والنص يُكتب بنفسك في الكابشن/النص."""
     d = tv_load(vid)
     folder = tv_dir(vid)
     beats, segs = d["schema"]["beats"], d.get("segs") or {}
@@ -21085,7 +21085,7 @@ def montage_typo(project_id: str, body: MontageTypoIn):
 
 
 def montage_source(tid: str, segments, voice, music, keep: bool = False) -> None:
-    """فيديو المونتاج (اللقطات بعد القص بدون تعليق نصي وشعار) يصبح الفيديو الخاص بـ مشروع التايبوجرافي/المشهد.
+    """فيديو المونتاج (اللقطات بعد القص بدون كابشن وشعار) يصبح الفيديو الخاص بـ مشروع التايبوجرافي/المشهد.
     keep: النص والعناصر يظلون (تجهيز المشهد فقط)؛ من غيره يتمسحون لكي سيتوزعون من جديد."""
     folder = TYPO_PROJ / tid
     work = TMP_DIR / f"mtypo-{tid}"
@@ -21782,7 +21782,7 @@ def cv2_box(pts: np.ndarray) -> np.ndarray:
 
 
 def scene_export(tid: str, cmd: list[str], work_dir: Path, progress=None) -> bool:
-    """التصدير: الأشياء التي أُزيلت والخلفية الجديدة يتركّبون على فيديو المونتاج (قبل الشعار والتعليق النصي).
+    """التصدير: الأشياء التي أُزيلت والخلفية الجديدة يتركّبون على فيديو المونتاج (قبل الشعار والكابشن).
     يبدّل دخل أمر التجميع النهائي بالفيديو الجديد. False إذا لا شيء تُنشأ أو الفيديو تغيّر بعد التجهيز."""
     try:
         d = typo_load(tid)
@@ -22848,8 +22848,8 @@ def tv_script_messages(d: dict, brain_txt: str) -> list[dict]:
             f"اكتب نص تعليق صوتي جديد عن: {d.get('brief') or 'المنتج'}.")
     sys = (f"أنت كاتب نصوص فيديوهات قصيرة محترف. القالب «{sch.get('title')}»: {sch.get('summary')}\n"
            f"نبرة الصوت: {d.get('voice_tone') or 'natural'}.\nاللغة: {lang_txt}. {guide}\n"
-           "كل نبضة لها جملة واحدة قصيرة تُقال في وقتها تقريبًا (نحو 13 حرف في الثانية)، وتخدم وظيفة النبضة (خطاف، مشكلة، ميزة، دليل، دعوة). "
-           "الخطاف يجب يشد من أول ثانية. إذا النبضة لا تحتاج نص (فلاش أو انتقال) اتركها فارغة.\n"
+           "كل نبضة لها جملة واحدة قصيرة تُقال في وقتها تقريبًا (نحو 13 حرف في الثانية)، وتخدم وظيفة النبضة (هوك، مشكلة، ميزة، دليل، دعوة). "
+           "الهوك يجب يشد من أول ثانية. إذا النبضة لا تحتاج نص (فلاش أو انتقال) اتركها فارغة.\n"
            "ممنوع أسامي أشخاص حقيقيين أو شعارات حقيقية غير بتوع العميل، وأي رقم مش متأكد منه اكتبه بشكل عام.\n"
            'استعد JSON فقط: {"title": "اسم قصير للفيديو", "lines": ["جملة النبضة 1", ...]} بنفس عدد النبضات بالضبط.')
     user = f"ملف العميل:\n{brain_txt or '(لا يوجد)'}\n\n{task}\n\nالنبضات:\n{json.dumps(beats, ensure_ascii=False)}"
@@ -24646,11 +24646,11 @@ def flow_profile(tpl: dict) -> str:
         out.append("أي: الفكرة يجب تتحكي بالكامل داخل هذه الخانات ونفس تسلسل القالب. لا يوجد مشاهد أو شخصيات أو أماكن جديدة غير ما القالب يرسمها، "
                    "النص فقط (والألوان) هو ما يتغير. اجعل النص بنفس طول الأمثلة تقريبًا.")
     elif kind == "carousel":
-        out.append("هذا القالب كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد خطاف يشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
+        out.append("هذا القالب كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد هوك يشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
                    "وآخر سلايد دعوة. الفكرة يجب تُقسّم لنقط أو خطوات أو مقارنة أو قائمة، غير حكاية فيديو.")
     elif kind in ("phone", "avatar"):
         out.append("هذا القالب فيديو يصوّره صاحب العلامة نفسه بالجوال وهو يتكلم للكاميرا (Talking head)، ومعه لقطات قصيرة يصورها (B-roll). "
-                   "النص = الجمل الذي سيقولها بصوته بالترتيب، بلغة طبيعية سهلة تُقال، والخطاف أول جملة، وكل beat فيه say (ما سيُقال) "
+                   "النص = الجمل الذي سيقولها بصوته بالترتيب، بلغة طبيعية سهلة تُقال، والهوك أول جملة، وكل beat فيه say (ما سيُقال) "
                    "و visual (سيظهر ماذا: وشه، أو لقطة B-roll يصورها). لا يوجد شخصيات متولّدة ولا مشاهد خيالية.")
     elif kind == "typo":
         out.append("هذا القالب نص فقط يتحرك على الإيقاع (بدون صور ولا شخصيات ولا مشاهد): الكلمات نفسها هي البطل. "
@@ -24960,11 +24960,11 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
         idea_txt += ("\nنص العميل الجاهز: النص المنطوق يسير عليه كما هو (يمكنك تقسّمه على المشاهد فقط)، "
                      "والآيات والأحاديث والمراجع الذي فيه تُقال نصها بالضبط ومتتشالش ومتتغيرش:\n" + str(idea["script"])[:6000])
     if (pk := idea.get("pack")) and pk.get("for", idea.get("hook")) == idea.get("hook"):   # الهوك التلاتي (لو العميل مابدّلش الهوك): أول مشهد لازم يبقى عليه
-        idea_txt += ("\nالخطاف التلاتي (أول مشهد يجب يطبقه بالضبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · ما يُرى: " + pk.get("visual", "")
+        idea_txt += ("\nالهوك التلاتي (أول مشهد يجب يطبقه بالضبط): المكتوب على الشاشة «" + pk.get("screen", "") + "» · ما يُرى: " + pk.get("visual", "")
                      + " · ما يُقال: «" + pk.get("spoken", "") + "» · جمل القفل بعده: «" + pk.get("lockin", "") + "»")
     if not idea.get("script"):   # 🗣️ الفكرة والهوك ممكن يكونوا اتكتبوا بلهجة تانية: الهوك بيتولد من جديد بلهجة النص، مش بيتنسخ
-        idea_txt += ("\nمهم: الفكرة والخطاف أعلاه ربما كُتبا بلهجة أخرى. لا تنسخ الخطاف كما هو: أعد كتابته بنفس المعنى والقوة "
-                     "بلهجة النص المطلوبة، وكذلك أي جملة تُقال من الخطاف التلاتي.")
+        idea_txt += ("\nمهم: الفكرة والهوك أعلاه ربما كُتبا بلهجة أخرى. لا تنسخ الهوك كما هو: أعد كتابته بنفس المعنى والقوة "
+                     "بلهجة النص المطلوبة، وكذلك أي جملة تُقال من الهوك التلاتي.")
     avoid = [s.get("title", "") for s in d.get("scenarios") or []]
     if d["template"].get("kind") == "motion":
         return flow_gen_scripts(fid, d, brain, idea_txt, avoid if more else [], hint, more, relang)
@@ -24989,7 +24989,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
     flow_update(fid, lambda x: x.update(scen_repeats=len(rep)))
     if algo.mode_on(brain):   # ⚡ وضع الخوارزمية: كل سيناريو بيتفحص بالـ ١٥ بند والضعيف بيتصلّح قبل ما العميل يشوفه
         if atlas.mock_mode():
-            fixed = {"scenarios": [{"score": 84, "checks": [{"key": "payoff", "score": 9}], "fixes": ["النتيجة اتنقلت لآخر مشهد", "أُضيفت جملة قفل بعد الخطاف"],
+            fixed = {"scenarios": [{"score": 84, "checks": [{"key": "payoff", "score": 9}], "fixes": ["النتيجة اتنقلت لآخر مشهد", "أُضيفت جملة قفل بعد الهوك"],
                                     "scenario": {k: v for k, v in s.items() if k != "id"}} for s in items]}
         else:
             try:
@@ -25007,7 +25007,7 @@ class FlowHookIn(BaseModel):
 
 @app.post("/api/flows/{fid}/hook")
 def flow_set_hook(fid: str, body: FlowHookIn):
-    """العميل اختر خطاف آخر من الخطافات المقترحة للفكرة."""
+    """العميل اختر هوك آخر من الهوكات المقترحة للفكرة."""
     hook = body.hook.strip()[:300]
 
     def upd(x):
@@ -26171,7 +26171,7 @@ def my_ideas_audio(iid: str):
 
 @app.post("/api/my-ideas/{iid}/polish")
 def my_ideas_polish(iid: str):
-    """✨ نقّح: الذكاء الاصطناعي يرتّب النص في فكرة واضحة (عنوان + الفكرة + خطاف)، والأصل يُحفظ لكي «استعد كما كتبتها»."""
+    """✨ نقّح: الذكاء الاصطناعي يرتّب النص في فكرة واضحة (عنوان + الفكرة + هوك)، والأصل يُحفظ لكي «استعد كما كتبتها»."""
     cid = my_ideas_cid()
     s = next((x for x in mem_load(cid).get("saved") or [] if x["id"] == iid), None)
     if not s:
@@ -31007,7 +31007,7 @@ def flow_cta_hint(brain: dict | None) -> str:
 
 @app.post("/api/flows/{fid}/publish-pack")
 def flow_publish_pack(fid: str, fresh: bool = False):
-    """📤 خطوة النشر جوه المسار: الفيديو ده بس، وتعليق نصي جاهز (بالدعوة والوسوم)، و«علّق بكلمة» حسب العقل، والحسابات المربوطة."""
+    """📤 خطوة النشر جوه المسار: الفيديو ده بس، وكابشن جاهز (بالدعوة والهاشتاجات)، و«علّق بكلمة» حسب العقل، والحسابات المربوطة."""
     d = flow_load(fid)
     ex_id = flow_to_publish(fid)["export_id"]
     with closing(db()) as conn:
@@ -31027,7 +31027,7 @@ def flow_publish_pack(fid: str, fresh: bool = False):
             raw = algo.mock_post_caption(context)
         else:
             try:
-                raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), ""), json_mode=True, temperature=0.6), "التعليق النصي")
+                raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), ""), json_mode=True, temperature=0.6), "الكابشن")
             except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError):
                 raw = {"first": sc.get("title") or "", "body": "", "cta": "", "tags": []}
         raw = raw if isinstance(raw, dict) else {}
@@ -33108,7 +33108,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
         if outro:
             clips.append({**vclip(outro, None), **({"trans": {"type": trans, "dur": 0.3}} if trans else {})})
         cache_f.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-        mo = opt("montage")   # 🎬 «مونتاج»: الاختيارات فوق «تعليق نصي» والتوطية لو موجودة
+        mo = opt("montage")   # 🎬 «مونتاج»: الاختيارات فوق «كابشن» والتوطية لو موجودة
         cap_style = (mo or {}).get("cap_style") or "off"
         caps = voice_id and ((cap_style != "off") if mo else (opt("caption") or {}).get("on"))
         duck = ((mo or {}).get("duck_pct", 75) / 100 if mo else 0.75) if voice_id and (mo or (music or {}).get("duck")) else 0
@@ -33131,7 +33131,7 @@ def run_automation(rid: str, run_id: str, bid: str, port: int = 8000) -> None:
                     report.append(f"✂️ اتشال {n_sil} سكتة ({sec_sil} ثانية، مستوى {lvl[0]})")
         pj = create_project(ProjectIn(**data))
         if caps:   # الكابشن محتاج الكلام مكتوب بتوقيته
-            setr(step="✍️ جارٍ كتابة نص التعليق النصي", project_id=pj["id"])
+            setr(step="✍️ جارٍ كتابة نص الكابشن", project_id=pj["id"])
             with closing(db()) as conn:
                 tr = transcript_of(conn.execute("SELECT transcript FROM audio WHERE id = ?", (voice_id,)).fetchone())
             if tr.get("status") != "done":

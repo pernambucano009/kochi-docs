@@ -288,7 +288,7 @@ def scenario_text(sc: dict, fmt: str) -> str:
         out += [f"{b.get('t', '')}: {b.get('what', '')}" + (f" | «{b['say']}»" if b.get("say") else "") + (f" | على الشاشة: {b['text']}" if b.get("text") else "")
                 for b in sc.get("beats") or []]
     if sc.get("caption"):
-        out.append(f"التعليق النصي: {sc['caption']}")
+        out.append(f"الكابشن: {sc['caption']}")
     return "\n".join(x for x in out if x)
 
 
@@ -308,12 +308,12 @@ def mock_scenarios(fmt: str, n: int, episodes) -> dict:
     out = []
     for i in range(n):
         if fmt == "carousel":
-            out.append({"title": f"كاروسيل {i + 1}", "summary": "تجربة", "slides": [{"n": j + 1, "heading": f"سلايد {j + 1}", "text": "نص", "visual": "صورة"} for j in range(5)], "caption": "تعليق نصي"})
+            out.append({"title": f"كاروسيل {i + 1}", "summary": "تجربة", "slides": [{"n": j + 1, "heading": f"سلايد {j + 1}", "text": "نص", "visual": "صورة"} for j in range(5)], "caption": "كابشن"})
         elif fmt == "series":
             ne = int(episodes) if str(episodes).isdigit() else 3
-            out.append({"title": f"مسلسل {i + 1}", "summary": "تجربة", "episodes": [{"n": j + 1, "title": f"الحلقة {j + 1}", "beats": ["بداية", "نهاية"], "voice": ["جملة", "جملة"]} for j in range(ne)], "caption": "تعليق نصي"})
+            out.append({"title": f"مسلسل {i + 1}", "summary": "تجربة", "episodes": [{"n": j + 1, "title": f"الحلقة {j + 1}", "beats": ["بداية", "نهاية"], "voice": ["جملة", "جملة"]} for j in range(ne)], "caption": "كابشن"})
         else:
-            out.append({"title": f"ريل {i + 1}", "summary": "تجربة", "beats": [{"t": "٠-٣ث", "what": "لقطة تشد", "say": "انتظر!", "text": "انتظر"}, {"t": "٣-١٠ث", "what": "الحل", "say": "جرّب هذا", "text": ""}], "caption": "تعليق نصي"})
+            out.append({"title": f"ريل {i + 1}", "summary": "تجربة", "beats": [{"t": "٠-٣ث", "what": "لقطة تشد", "say": "انتظر!", "text": "انتظر"}, {"t": "٣-١٠ث", "what": "الحل", "say": "جرّب هذا", "text": ""}], "caption": "كابشن"})
     return {"scenarios": out}
 
 
@@ -427,7 +427,7 @@ def clean_scripts(raw: dict, schema: dict, scenes: list[dict]) -> list[dict]:
 
 def mock_scripts(schema: dict, scenes: list[dict], n: int) -> dict:
     fields = scene_fields(schema, scenes)
-    return {"scripts": [{"title": f"نص تجريبي {j + 1}", "summary": "نص للتجربة بدون العقل", "caption": "تعليق نصي تجريبي",
+    return {"scripts": [{"title": f"نص تجريبي {j + 1}", "summary": "نص للتجربة بدون العقل", "caption": "كابشن تجريبي",
                          "scenes": [{"scene": sc["name"], "say": f"هذه جملة المشهد {i + 1} للتجربة.", "fields": {k: schema[k].get("def") for k in fields[sc["name"]]}}
                                     for i, sc in enumerate(scenes)]} for j in range(n)]}
 

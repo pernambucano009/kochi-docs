@@ -100,7 +100,7 @@ def tasks(b: dict, ctx: dict) -> list[dict]:
         ("typography", "اختر خطوط العلامة", "خط العناوين وخط النص", bool(str(b.get("typography") or "").strip()), {"leaf": "look:typography:"}),
         ("intro", "ارفع إنترو العلامة", "فيديو قصير في أول كل فيديو", bool(b.get("intro_file")), {"leaf": "delivery:intro:"}),
         ("outro", "ارفع أوترو العلامة", "فيديو قصير في آخر كل فيديو", bool(b.get("outro_file")), {"leaf": "delivery:outro:"}),
-        ("caption", "اكتب التعليق النصي الافتراضي", "الشكل الذي التعليق النصي ينزل به مع كل منشور", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
+        ("caption", "اكتب الكابشن الافتراضي", "الشكل الذي الكابشن ينزل به مع كل منشور", bool(str(b.get("caption") or "").strip()), {"leaf": "delivery:caption:"}),
         # الحساب اتدّى للعقل (من أسئلة البداية أو سؤال الرابط) ← التحليل شغّال لوحده، فالمهمة متتعدّش ومتطلبهوش تاني
         ("social", "حلّل حساب السوشيال الخاص بك", "العقل يتعلم من بوستاتك ومشاهداتك",
          bool(b.get("todos") or b.get("niche") or b.get("social") or any(x.get("kind") == "social" and x.get("status") != "failed" for x in b.get("sources") or [])),

@@ -70,7 +70,7 @@ def norm(s: str) -> str:
 
 
 def pieces(s: str):
-    """الجملة ممكن تبقى HTML: كل نص عربي بين الوسوم لوحده."""
+    """الجملة ممكن تبقى HTML: كل نص عربي بين الهاشتاجات لوحده."""
     if "<" in s and ">" in s:
         for part in re.split(r"<[^>]*>", s):
             part = part.strip()

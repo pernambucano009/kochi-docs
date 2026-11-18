@@ -332,7 +332,7 @@ function labAssetForm(d, s) {
     <div class="row wrap">
       <input type="text" data-af="name" placeholder="اسم الأصل" value="${le((s.analysis?.summary || "").slice(0, 80))}" data-no-i18n>
       <select data-af="category">${labOpts(ASSET_CATS, guess)}</select>
-      <input type="text" data-af="tags" placeholder="وسوم: فأرة، سحب، مجلد" data-no-i18n>
+      <input type="text" data-af="tags" placeholder="هاشتاجات: فأرة، سحب، مجلد" data-no-i18n>
     </div>
     <div class="row wrap"><label>من <input type="number" step="0.05" min="0" max="${T}" value="${s.start.toFixed(2)}" data-af="t0"></label>
       <label>لـ <input type="number" step="0.05" min="0" max="${T}" value="${s.end.toFixed(2)}" data-af="t1"></label>

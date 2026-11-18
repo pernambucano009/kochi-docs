@@ -87,7 +87,7 @@ const BrainLibPage = (() => {
       <div class="bl-em">${f.kind === "image" ? `<img src="${esc(f.url)}" alt="">` : f.kind === "video" ? `<video src="${esc(f.url)}" controls playsinline preload="metadata"></video>` : `<audio src="${esc(f.url)}" controls preload="metadata"></audio>`}</div>
       <label class="pk-f">الاسم<input data-blf="name" value="${esc(f.name)}"></label>
       <label class="pk-f">الوصف (كتبه العقل، ويمكنك تعديله)<textarea rows="2" data-blf="desc">${esc(f.desc || "")}</textarea></label>
-      <label class="pk-f">الوسوم (بينها فاصلة)<input data-blf="tags" value="${esc((f.tags || []).join("، "))}"></label>
+      <label class="pk-f">الهاشتاجات (بينها فاصلة)<input data-blf="tags" value="${esc((f.tags || []).join("، "))}"></label>
       <label class="pk-f">المجلد<select data-blf="folder">${roots.map((k) => { const r = S.lib.roots[k]; return `<option value="${r}" ${r === f.folder ? "selected" : ""}>${esc(TAB[k].t)}</option>${opts(r)}`; }).join("")}</select></label>
       <p class="pk-note">للإشارة إليه في القالب المخصص: <code dir="auto">@${esc([f.path, f.name].filter(Boolean).join("/"))}</code></p>
       ${f.error ? `<p class="pk-err">⚠️ ${esc(f.error)}</p>` : ""}

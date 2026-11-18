@@ -45,10 +45,10 @@ const AutoPage = (() => {
       voice: [srcLeaf, { f: "fit", t: "الفيديو بطول التعليق", val: o.fit ? "نعم" : "لا" }, { f: "order", t: "أي تسجيل", val: M.orders[o.order] }],
       music: [srcLeaf, { f: "volume", t: "مستوى الموسيقى", val: `${AR_N(o.volume)}٪` }, { f: "duck", t: "تنخفض وقت الكلام", val: o.duck ? "نعم" : "لا" }, { f: "order", t: "أي موسيقى", val: M.orders[o.order] }],
       cut: [{ f: "max", t: "أقصى طول للقطة", val: `${AR_N(o.max)} ث` }, { f: "trans", t: "الانتقال", val: M.trans[o.trans] }],
-      caption: [{ f: "on", t: "التعليق النصي", val: o.on ? "يعمل" : "مغلق" }],
+      caption: [{ f: "on", t: "الكابشن", val: o.on ? "يعمل" : "مغلق" }],
       montage: [{ f: "silence", t: "إزالة السكتات", val: M.silence?.[o.silence] || "" }, { f: "logo", t: "مكان الشعار", val: M.logo_pos?.[o.logo]?.[0] || "" },
         ...(o.logo === "off" ? [] : [{ f: "logo_size", t: "حجم الشعار", val: `${AR_N(o.logo_size)}٪` }]),
-        { f: "duck_pct", t: "خفض الموسيقى وقت الراوي", val: o.duck_pct ? `${AR_N(o.duck_pct)}٪` : "لا" }, { f: "cap_style", t: "شكل التعليق النصي", val: M.cap_styles?.[o.cap_style] || "" },
+        { f: "duck_pct", t: "خفض الموسيقى وقت الراوي", val: o.duck_pct ? `${AR_N(o.duck_pct)}٪` : "لا" }, { f: "cap_style", t: "شكل الكابشن", val: M.cap_styles?.[o.cap_style] || "" },
         { f: "b_intro", t: "مقدمة العلامة", val: o.b_intro ? "نعم" : "لا" }, { f: "b_outro", t: "خاتمة العلامة", val: o.b_outro ? "نعم" : "لا" },
         { f: "denoise", t: "تنقية صوت الكلام", val: o.denoise ? "نعم" : "لا" }],
       export: [{ f: "ratio", t: "المقاس", val: o.ratio }],
@@ -61,7 +61,7 @@ const AutoPage = (() => {
         ...(o.out === "clips" ? [] : [{ f: "sec", t: "مدة الصورة", val: `${AR_N(o.sec)} ث` }]), { f: "order", t: "أي فيديو", val: M.orders[o.order] }],
       merge: [{ f: "items", t: "ما الذي يُجمع وبأي ترتيب", val: (o.items || []).length ? `${AR_N(o.items.length)} مخرج بترتيبك` : "آخر شيء في كل مسار" }],
       publish: [{ f: "when", t: "متى", val: M.when[o.when] }, { f: "platforms", t: "إلى أين", val: (o.platforms || []).length ? `${AR_N(o.platforms.length)} حساب` : "", miss: o.when === "now" && !(o.platforms || []).length },
-        { f: "caption", t: "التعليق النصي", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
+        { f: "caption", t: "الكابشن", val: (o.caption || "").slice(0, 40) || "اسم القالب" }],
     }[s.verb] || [];
     if ((M.rules_verbs || []).includes(s.verb)) L.push({ f: "rules", t: "قواعدي", val: (o.rules || "").slice(0, 40) });
     return [...L.map((l) => ({ ...l, type: "opt" })), ...(M.fixed.includes(s.verb) || s.verb === "merge" ? [] : [{ f: "move", t: "رتّبها أو أزلها", type: "action" }])];
@@ -280,7 +280,7 @@ const AutoPage = (() => {
       <div class="bm-zoom"><button data-zoom="1" aria-label="تكبير">+</button><button data-zoom="0" aria-label="الخريطة كلها">⤢</button><button data-zoom="-1" aria-label="تصغير">−</button></div>
       <div class="bm-card" hidden role="dialog"></div>
       <div class="am-desc${S.descOpen ? " open" : ""}"><button class="am-desc-t" data-desc-open>✨ صِف القالب بكلامك (كتابة أو صوت)</button>
-        <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» إلى مقاطع أقصر من ١٥ ثانية، وولّد كل مقطع بأسلوب كرتوني، واجمعها، وأضف موسيقى وتعليقًا نصيًا، وانتظر موافقتي قبل النشر"></div>
+        <div class="am-desc-b"><div class="bm-write" contenteditable="plaintext-only" data-k="desc" data-ph="مثلًا: قطّع الفيديو الذي في مجلد «لايفات» إلى مقاطع أقصر من ١٥ ثانية، وولّد كل مقطع بأسلوب كرتوني، واجمعها، وأضف موسيقى وكابشن، وانتظر موافقتي قبل النشر"></div>
           <div class="bm-acts"><button class="bm-pill am-recb" data-rec data-nofx>🎙️ سجّل صوتك</button><button class="bm-pill" data-recphone data-nofx>📱 سجّل من جوالك</button><span class="am-recst"></span>
             <button class="bm-go" data-desc-go>✨ افهم ما قلته</button><button class="bm-pill" data-undo hidden>↩ استعد كما كان</button></div>
           <div class="am-clip" hidden></div>
@@ -508,7 +508,7 @@ const AutoPage = (() => {
     if (l.f === "ratio") return head + pills("ratio", M.ratios.map((x) => [x, x]), o.ratio);
     if (l.f === "when") return head + pills("when", Object.entries(M.when), o.when) + `<p class="bm-note">«ينتظر موافقتي»: يُصدَّر الفيديو وينتظرك في صفحة النشر. «يُنشر مباشرة»: يُنشر على الحسابات التي ستختارها.</p>`;
     if (l.f === "platforms") return head + platCard(o);
-    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "التعليق النصي الذي سيُنشر مع الفيديو (إن كان فارغًا: اسم القالب)") + `<p class="bm-note">يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
+    if (l.f === "caption") return head + editable("pubcap", o.caption || "", "الكابشن الذي سيُنشر مع الفيديو (إن كان فارغًا: اسم القالب)") + `<p class="bm-note">يُحفظ تلقائيًا عند توقفك عن الكتابة.</p>`;
     if (l.f === "prompt" && (s.verb === "gen" || s.verb === "genvid")) {
       const mode = genMode(o), PH = { video: "مثلًا: المشهد نفسه بأسلوب الأنمي، بألوان دافئة", refs: "مثلًا: @سارة تمشي في @المكتب وتشير إلى الشاشة", image: "مثلًا: الكاميرا تقترب ببطء والأشخاص يتحركون",
         startend: "مثلًا: الكاميرا تدور من البداية إلى النهاية", text: "صِف الفيديو كله: المكان، الأشخاص، الحركة، الإضاءة",
@@ -590,7 +590,7 @@ const AutoPage = (() => {
     else if (f === "logo") body = `<div class="mp-grid">${["tl", "tc", "tr", "ml", "off", "mr", "bl", "bc", "br"].map((k) => `<button class="mp-cell${o.logo === k ? " on" : ""}" data-set="logo" data-v="${k}" aria-label="${esc(M.logo_pos?.[k]?.[0] || k)}" title="${esc(M.logo_pos?.[k]?.[0] || k)}">${k === "off" ? "✕" : ""}</button>`).join("")}</div><p class="bm-note">الشعار من «عقل العلامة». الخانة الوسطى = بدون شعار.</p>`;
     else if (f === "logo_size") body = pills("logo_size", [[10, "صغير"], [14, "وسط"], [18, "عادي"], [24, "كبير"]], o.logo_size);
     else if (f === "duck_pct") body = pills("duck_pct", [[0, "لا"], [50, "نص"], [75, "واضح"], [90, "شبه صامتة"]], o.duck_pct) + `<p class="bm-note">تنخفض الموسيقى تلقائيًا وقت كلام الراوي، وتعود بعده.</p>`;
-    else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">يُكتب التعليق النصي من التعليق الصوتي بتوقيته.</p>`;
+    else if (f === "cap_style") body = pills("cap_style", Object.entries(M.cap_styles || {}), o.cap_style) + `<p class="bm-note">يُكتب الكابشن من التعليق الصوتي بتوقيته.</p>`;
     else body = pills(f, yes, o[f]) + (f === "b_intro" || f === "b_outro" ? `<p class="bm-note">من «عقل العلامة ← التسليم».</p>` : "");
     return body + (["logo", "logo_size", "cap_style"].includes(f) ? montPrev(o) : "");
   }

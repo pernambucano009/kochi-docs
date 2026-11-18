@@ -381,7 +381,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                   <button data-tab="audio"><span class="emo">🔊</span> الصوت</button>
                   <button data-tab="text"><span class="emo">🔠</span> نص</button>
                   <button data-tab="over"><span class="emo">🖼️</span> طبقة</button>
-                  <button data-tab="caps"><span class="emo">✍️</span> التعليق النصي</button>
+                  <button data-tab="caps"><span class="emo">✍️</span> الكابشن</button>
                   <button data-tab="typo"><span class="emo">🔤</span> تايبوجرافي</button>
                   <button data-tab="scene"><span class="emo">🪄</span> المشهد</button>
                   <button data-tab="logo"><span class="emo">🏷️</span> الشعار</button>
@@ -621,8 +621,8 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
               <p class="hint">التنظيف وخفض الموسيقى وتوحيد مستوى الصوت والووش والتقريب تظهر في الفيديو المُصدَّر.</p>
 
               <h3 class="pane-h"><span class="emo">✨</span> ترتيب كوتشي التلقائي</h3>
-              <button class="btn wide" id="kochiLayoutBtn" title="الخطاف في البداية، وباقي الجمل موزعة على الفيديو، وآخر جملة مع الأوترو"><span class="emo">✨</span> رتّب التعليق والموسيقى</button>
-              <p class="hint">يقطّع التعليق إلى جمل ويوزّعها: الخطاف في أول الفيديو، وآخر جملة مع الأوترو (ويُكتم صوت الأوترو). تبدأ الموسيقى بعد أول جملة بإطارين، وتنخفض إلى 20% أثناء الكلام.</p>
+              <button class="btn wide" id="kochiLayoutBtn" title="الهوك في البداية، وباقي الجمل موزعة على الفيديو، وآخر جملة مع الأوترو"><span class="emo">✨</span> رتّب التعليق والموسيقى</button>
+              <p class="hint">يقطّع التعليق إلى جمل ويوزّعها: الهوك في أول الفيديو، وآخر جملة مع الأوترو (ويُكتم صوت الأوترو). تبدأ الموسيقى بعد أول جملة بإطارين، وتنخفض إلى 20% أثناء الكلام.</p>
 
               <h3 class="pane-h" id="secMusic"><span class="emo">🎵</span> الموسيقى</h3>
               <div class="sel-up"><label class="field"><select id="mMusic"></select></label>
@@ -636,15 +636,15 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                 </div>
 
                 <div class="pane" data-pane="caps" hidden>
-                  <label class="switch"><input type="checkbox" id="capOn"> التعليق النصي مفعّل</label>
+                  <label class="switch"><input type="checkbox" id="capOn"> الكابشن مفعّل</label>
                   <div id="capOpts">
                 <div class="cap-status" id="capStatus"></div>
                 <div class="row wrap">
                   <button class="btn sm" id="capTranscribe"><span class="emo">🎧</span> اكتب النص من التعليق الصوتي</button>
                   <button class="btn sm" id="capEdit" hidden><span class="emo">✎</span> عدّل النص</button>
-                  <button class="btn sm" id="capRestore" hidden>↺ استعد التعليق النصي المحذوف</button>
+                  <button class="btn sm" id="capRestore" hidden>↺ استعد الكابشن المحذوف</button>
                 </div>
-                <label class="field">🌍 لغة التعليق النصي <select id="capLang"><option value="">نفس لغة النص</option></select>
+                <label class="field">🌍 لغة الكابشن <select id="capLang"><option value="">نفس لغة النص</option></select>
                   <small class="muted" id="capLangHint"></small></label>
                 <div class="field">القالب <div class="templates" id="capTemplates"></div></div>
                 <label class="field">الخط <select id="capFont"></select></label>
@@ -745,7 +745,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                   <div class="h-music">🎵 موسيقى</div>
                   <div class="h-snd" id="hSnd">🔉 أصوات</div>
                   <div class="h-text" id="hText">🔠 نصوص</div>
-                  <div class="h-caps">✍️ تعليق نصي</div>
+                  <div class="h-caps">✍️ كابشن</div>
                   <div class="h-typo">🔤 تايبوجرافي</div>
                   <div class="h-fx">✨ عناصر <button class="ic" id="fxAddQuick" title="أضف عنصرًا عند المؤشر">＋</button></div>
                   <div class="h-click">🔊 نقرة</div>
@@ -805,9 +805,9 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
               <div class="panel-head"><h2 id="postFormTitle">جدولة منشور</h2></div>
               <form id="postForm">
                 <div class="post-video" id="postVideo"><span class="muted">اختر فيديو من المجلد (اضغط «جدول»)</span></div>
-                <label class="field">التعليق النصي
-                  <textarea id="postCaption" rows="4" placeholder="النص الذي سيُنشر مع الفيديو، والوسوم"></textarea></label>
-                <div class="loc-row"><button type="button" class="btn sm" id="algoCaption" title="⚡ وضع الخوارزمية: خطاف آخر + دعوة خطة المحتوى + وسوم المجال، والغلاف من إطار الخطاف، وعلامة AI إن كان الفيديو مولّدًا"><span class="emo">⚡</span> تعليق نصي للخوارزمية</button> <button type="button" class="btn sm" id="brandCaption" title="التعليق النصي الافتراضي من عقل العلامة (مع الـ CTA والرابط)"><span class="emo">✨</span> تعليق نصي للعلامة</button> <button type="button" class="btn sm" data-humanize="#postCaption" title="يزيل العبارات المعلّبة والحروف المخفية التي تكشف أن النص مولّد، دون تغيير المعنى"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button> <button type="button" class="btn sm" id="addRiyadh" title="المنصات لا تأخذ موقع المنشور من هنا، فنكتبه في التعليق النصي"><span class="emo">📍</span> أضف «الرياض» إلى التعليق النصي</button>
+                <label class="field">الكابشن
+                  <textarea id="postCaption" rows="4" placeholder="النص الذي سيُنشر مع الفيديو، والهاشتاجات"></textarea></label>
+                <div class="loc-row"><button type="button" class="btn sm" id="algoCaption" title="⚡ وضع الخوارزمية: هوك آخر + دعوة خطة المحتوى + هاشتاجات المجال، والغلاف من إطار الهوك، وعلامة AI إن كان الفيديو مولّدًا"><span class="emo">⚡</span> كابشن للخوارزمية</button> <button type="button" class="btn sm" id="brandCaption" title="الكابشن الافتراضي من عقل العلامة (مع الـ CTA والرابط)"><span class="emo">✨</span> كابشن للعلامة</button> <button type="button" class="btn sm" data-humanize="#postCaption" title="يزيل العبارات المعلّبة والحروف المخفية التي تكشف أن النص مولّد، دون تغيير المعنى"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button> <button type="button" class="btn sm" id="addRiyadh" title="المنصات لا تأخذ موقع المنشور من هنا، فنكتبه في الكابشن"><span class="emo">📍</span> أضف «الرياض» إلى الكابشن</button>
                   <button type="button" class="btn sm opt-chip" id="igOptsChip" hidden>وسم الكوتش + تعاون</button>
                   <button type="button" class="btn sm opt-chip" id="coverChip" hidden>الغلاف</button></div>
 
@@ -815,7 +815,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                 <div class="pub-check" id="pubCheck"></div>
                 <div class="post-extra dm-opts" id="dmOpts">
                   <label class="check"><input type="checkbox" id="dmOn"> 💬 <b>علّق بكلمة</b>: من يكتب الكلمة في التعليق تصله رسالة في الخاص تلقائيًا</label>
-                  <p class="hint" id="dmAuto" hidden>✅ فُعّل تلقائيًا لأن التعليق النصي فيه دعوة «علّق بكلمة». الرسالة جاهزة، ويمكنك تعديلها.</p>
+                  <p class="hint" id="dmAuto" hidden>✅ فُعّل تلقائيًا لأن الكابشن فيه دعوة «علّق بكلمة». الرسالة جاهزة، ويمكنك تعديلها.</p>
                   <div id="dmBox" hidden>
                     <label class="field">الكلمة (أو عدة كلمات بفاصلة) <input type="text" id="dmWords" placeholder="مثلًا: أريد"></label>
                     <label class="field">الرسالة التي ستصله في الخاص <textarea id="dmMessage" rows="3" placeholder="رابط، عرض، هدية، أو رابط الواتساب"></textarea></label>
@@ -828,7 +828,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                       <div class="loc-row"><button type="button" class="btn sm" id="dmFlowSave">💾 احفظ السيناريو للعلامة</button><span class="muted" id="dmFlowStat"></span></div>
                       <p class="hint">لا نتحقق من المتابعة فعلًا، بل نصدّق إجابته. يُحفظ هذا السيناريو للعلامة ويعمل على كل المنشورات.</p>
                     </details>
-                    <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> أضف الدعوة إلى التعليق النصي</button></div>
+                    <div class="loc-row"><button type="button" class="btn sm" id="dmCta"><span class="emo">✍️</span> أضف الدعوة إلى الكابشن</button></div>
                     <p class="hint" id="dmHint">يعمل على إنستجرام وفيسبوك فور نشر المنشور. تيك توك لا يسمح بالرد التلقائي في منطقتنا، فتصبح الدعوة في تيك توك «أرسل الكلمة على واتساب».</p>
                   </div>
                 </div>
@@ -952,7 +952,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                 </form>
                 <div class="row wrap car-quick" id="carQuick">
                   <button class="btn sm" data-q="اقترح عليّ 5 أفكار كاروسيل عن هذا الموضوع"><span class="emo">💡</span> اقترح 5 أفكار</button>
-                  <button class="btn sm" data-q="اختر أقوى فكرة وقولي له، واقترح خطاف أقوى لأول سلايد"><span class="emo">🎯</span> أقوى فكرة</button>
+                  <button class="btn sm" data-q="اختر أقوى فكرة وقولي له، واقترح هوك أقوى لأول سلايد"><span class="emo">🎯</span> أقوى فكرة</button>
                 </div>
                 <div class="car-setup">
                   <p class="hint car-mix-hint">اختر ما يعجبك من كل شيء واجمعها معًا (قالب + أسلوب + شخصيات + شخصية). كلها اختيارية، وضغطة أخرى على أي شيء تلغيه. دون اختيار يرسم البرنامج بأسلوب العميل.</p>
@@ -996,9 +996,9 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                   <button class="btn sm" id="carPolish" title="يراجع النموذج الإملاء ويجعل النص سعوديًا طبيعيًا"><span class="emo">✨</span> نقّح اللهجة والإملاء</button></span></div>
                 <p class="hint">راجع كل كلمة هنا قبل الرسم: هذا النص هو ما سيُكتب على الصور حرفيًا. يمكنك التعديل بنفسك.</p>
                 <div class="car-slides-edit" id="carPlan"></div>
-                <label class="field">التعليق النصي <textarea id="carCaption" rows="3"></textarea></label>
+                <label class="field">الكابشن <textarea id="carCaption" rows="3"></textarea></label>
                 <button type="button" class="btn sm" data-humanize="#carCaption"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button>
-                <label class="field">الوسوم <input type="text" id="carTags" dir="auto"></label>
+                <label class="field">الهاشتاجات <input type="text" id="carTags" dir="auto"></label>
                 <div class="row"><button class="btn primary" id="carToOverview"><span class="emo">🖼️</span> ارسم الشكل العام</button></div>
               </section>
 
@@ -1039,7 +1039,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                   <label class="check"><input type="checkbox" id="carPubIg" checked> إنستجرام</label>
                   <label class="check"><input type="checkbox" id="carPubTt" checked> تيك توك</label>
                 </div>
-                <label class="field">التعليق النصي <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
+                <label class="field">الكابشن <textarea id="carPubCaption" rows="4" data-no-i18n></textarea></label>
                 <button type="button" class="btn sm" data-humanize="#carPubCaption"><span class="emo">🧹</span> أزل أسلوب الذكاء الاصطناعي</button>
                 <div class="car-pub-tags">
                   <label class="field">وسم على إنستجرام (حساب الشخصية وأي شخص آخر، افصل بمسافة) <input type="text" id="carPubTags" dir="ltr" placeholder="@coach_name"></label>
@@ -1170,7 +1170,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                 <div class="ser-missing" id="serMissing" hidden></div>
                 <div class="row wrap"><button class="btn primary" id="serToEditor"><span class="emo">🎬</span> افتح في محرر الفيديو</button>
                   <button class="btn" id="serRenderGo"><span class="emo">👀</span> معاينة سريعة</button></div>
-                <p class="hint">يفتح المحرر مشروعًا فيه كل لقطة بالفيديو الموافق عليه مقصوصة على مدتها، والتعليق الصوتي تحتها. يمكنك إضافة موسيقى وتعليق نصي وشعار والتصدير من هناك.</p>
+                <p class="hint">يفتح المحرر مشروعًا فيه كل لقطة بالفيديو الموافق عليه مقصوصة على مدتها، والتعليق الصوتي تحتها. يمكنك إضافة موسيقى وكابشن وشعار والتصدير من هناك.</p>
                 <div class="ser-rendered" id="serRendered"></div>
               </section>
             </section>
@@ -1603,8 +1603,8 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                     <p class="hint">يمكنك إزالة المقدمة أو الخاتمة من أي مشروع من المونتاج.</p>
                     <label class="field">الدعوة الافتراضية <input type="text" data-bf="cta" placeholder="مثلًا: حمّل التطبيق الآن"></label>
                     <label class="field">الرابط <input type="text" data-bf="link" dir="ltr" placeholder="https://..."></label>
-                    <label class="field">التعليق النصي الافتراضي <textarea rows="4" data-bf="caption" placeholder="{caption}&#10;&#10;{cta} 👇&#10;{link}&#10;#هاشتاج"></textarea></label>
-                    <p class="hint">{caption} = التعليق النصي للفيديو نفسه · {cta} = الدعوة · {link} = الرابط. يوضع هذا التعليق النصي تلقائيًا وقت النشر.</p>
+                    <label class="field">الكابشن الافتراضي <textarea rows="4" data-bf="caption" placeholder="{caption}&#10;&#10;{cta} 👇&#10;{link}&#10;#هاشتاج"></textarea></label>
+                    <p class="hint">{caption} = الكابشن للفيديو نفسه · {cta} = الدعوة · {link} = الرابط. يوضع هذا الكابشن تلقائيًا وقت النشر.</p>
                   </div>
                 </div>
               </div>
@@ -1742,7 +1742,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
   <div id="moneyBody"></div>
 </dialog>
 <dialog class="tr-dlg" id="trDialog">
-  <div class="panel-head"><h2><span class="emo">✎</span> تعديل نص التعليق النصي</h2><button class="btn sm" id="trClose">✕</button></div>
+  <div class="panel-head"><h2><span class="emo">✎</span> تعديل نص الكابشن</h2><button class="btn sm" id="trClose">✕</button></div>
   <p class="hint">عدّل أي جملة كما تحب. إن غيّرت عدد الكلمات، يوزّعها البرنامج على الوقت نفسه. ويمكنك تشغيل الجملة لتسمعها.</p>
   <audio id="trAudio" preload="none"></audio>
   <div class="tr-list" id="trList"></div>
@@ -1799,7 +1799,7 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
     </div>
     <div>
       <div class="field">الشعار <div class="brand-logo" id="brandLogo"></div><span class="hint">أول شعار في ملف العميل (وهو نفسه شعار المونتاج).</span></div>
-      <div class="field">أنواع الدعوة لاتخاذ إجراء
+      <div class="field">أنواع الـ CTA
         <div class="cta-list" id="ctaList"></div>
         <div class="row"><button type="button" class="btn sm" id="ctaAdd">＋ دعوة جديدة</button><button type="button" class="btn sm" id="ctaReset">↺ استعد الأصلي</button></div>
         <span class="hint">في النص: {keyword} = الكلمة التي يكتبونها، {reward} = سيأخذون ماذا، {coach} = اسم الشخصية.</span></div>

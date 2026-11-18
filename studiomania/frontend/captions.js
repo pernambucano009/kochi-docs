@@ -16,7 +16,7 @@ async function loadBrandOptions() {
     $("capTemplates").innerHTML = Object.entries(brand.options.templates)
       .map(([k, t]) => `<button type="button" data-t="${k}" style="font-family:'${t.font}';color:${t.color};${
         t.box ? `background:${t.box_color};` : `-webkit-text-stroke:1px #000;paint-order:stroke fill;`}">
-        تعليق نصي <span style="color:${t.highlight_on ? t.highlight : t.color}">&nbsp;هنا</span><small>${t.label}</small></button>`)
+        كابشن <span style="color:${t.highlight_on ? t.highlight : t.color}">&nbsp;هنا</span><small>${t.label}</small></button>`)
       .join("");
   }
   brand.logoUrl = (await api("/api/logo")).url;
@@ -53,7 +53,7 @@ function renderBrandPanels() {
   $("capHlOn").checked = !!c.highlight_on; $("capBox").checked = !!c.box; $("capPop").checked = !!c.pop;
   renderTranscriptStatus();
   $("capRestore").hidden = !c.removed?.length;
-  $("capRestore").textContent = `↺ استعد التعليق النصي المحذوف (${c.removed?.length || 0} كلمة)`;
+  $("capRestore").textContent = `↺ استعد الكابشن المحذوف (${c.removed?.length || 0} كلمة)`;
 
   $("logoOn").checked = !!l.enabled;
   $("logoThumb").hidden = $("logoRemove").hidden = !brand.logoUrl;
@@ -101,7 +101,7 @@ async function capLangLoad(lang) {
   brand.trxBusy = brand.trxBusy || {};
   if (key in brand.trx || brand.trxBusy[key]) return;   // (إذا فشلت لا تُعاد تلقائيًا؛ تغيير اللغة يعيدها)
   brand.trxBusy[key] = true;
-  $("capLangHint").textContent = "⏳ جارٍ ترجمة التعليق النصي…";
+  $("capLangHint").textContent = "⏳ جارٍ ترجمة الكابشن…";
   try {
     brand.trx[key] = (await api(`/api/audio/${voice.id}/transcript/${lang}`)).words;
     $("capLangHint").textContent = "✓ تُرجم";
@@ -190,7 +190,7 @@ $("pvLogo").addEventListener("load", updatePreviewOverlays);
 function liveCaption(c) {
   const blocks = captionBlocks();
   if (!blocks.length) {
-    if (!mt.project?.data.clips?.length) return { words: [], hl: -1 };   // مشروع فارغ: لا يوجد تعليق نصي مثال
+    if (!mt.project?.data.clips?.length) return { words: [], hl: -1 };   // مشروع فارغ: لا يوجد كابشن مثال
     const words = sampleWords(c.words);
     return { words, hl: c.highlight_on && words.length > 1 ? 1 : -1 };
   }
@@ -210,7 +210,7 @@ function liveCaption(c) {
 function sampleWords(n) {
   const voice = mt.project?.data.voice;
   const tr = voice && brand.tr[voice.id];
-  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "هذا مثال للتعليق النصي على فيديوك".split(" ");
+  const src = tr?.status === "done" && tr.words.length ? tr.words.map((w) => w.w) : "هذا مثال للكابشن على فيديوك".split(" ");
   return src.slice(0, Math.max(1, n));
 }
 
@@ -229,7 +229,7 @@ function renderTranscriptStatus() {
   clearTimeout(brand.trTimer);
   if (!voice) {
     st.className = "cap-status err";
-    st.textContent = "⚠️ اختر تعليقًا صوتيًا أولًا (في الأسفل)، فالتعليق النصي يُكتب منه.";
+    st.textContent = "⚠️ اختر تعليقًا صوتيًا أولًا (في الأسفل)، فالكابشن يُكتب منه.";
     return;
   }
   if (!tr) {

@@ -288,7 +288,7 @@ BUILTIN = {
         "voice_tone": "friendly, direct, a little playful",
         "sample": "مصمم جرافيك يعرّف بنفسه ويعرض أعماله (مجلات، هويات، تغليف) ويقول «راسلني لتصميمك»",
         "schema": {
-            "title": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "summary": "خطاف بحبة ثلاثية الأبعاد، وشخص مقصوص يلقي التحية، ومجلد يُفتح على أعماله، وكل نوع عمل بنموذج عرض، وجدار تحت الإضاءة، ودعوة للمراسلة.",
+            "title": "ترويج مستقل: «من يحتاج إلى هذه الحبة؟»", "summary": "هوك بحبة ثلاثية الأبعاد، وشخص مقصوص يلقي التحية، ومجلد يُفتح على أعماله، وكل نوع عمل بنموذج عرض، وجدار تحت الإضاءة، ودعوة للمراسلة.",
             "beat_sec": 0.0,
             "style": "Clean 3D motion-graphics promo on a light grey grid wall with diagonal window-light shadows: glossy 3D capsule pill, a real person photo cut-out, "
                      "a 3D blue folder opening with work samples, realistic mockups (magazine spreads, business cards, snack packaging with flying pieces), "
@@ -897,7 +897,7 @@ ADS = {
     },
     "sk-song": {
         "name": "إعلان بأغنية (فيديو موسيقي)", "icon": "🎵", "kind": "song", "hero": "plate", "needs_product": False,
-        "uses": "أغنية حقيقية تحكي نتيجة العميل، وفيديو أنيميشن على إيقاعها والبطل يغني في الخطاف واللازمة",
+        "uses": "أغنية حقيقية تحكي نتيجة العميل، وفيديو أنيميشن على إيقاعها والبطل يغني في الهوك واللازمة",
         "voice_tone": "sung",
         "sample": "أغنية خفيفة عن شاي يوقظك دون أن يرهقك",
     },

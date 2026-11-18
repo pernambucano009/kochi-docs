@@ -114,7 +114,7 @@ const WaCampPage = (() => {
   }
   function rowsPeople() {
     if (!S.cs) { loadPeople(); return `<div class="pk-empty">جارٍ التحميل…</div>`; }
-    return `<div class="pk-row2 wa-find"><input type="search" class="pk-q" data-waf="q" value="${esc(val("q"))}" placeholder="ابحث باسم أو رقم" aria-label="بحث">${tagSel("qtag", "كل الوسوم")}${pkIb("search", "ابحث", "data-wasearch", "sm")}</div>
+    return `<div class="pk-row2 wa-find"><input type="search" class="pk-q" data-waf="q" value="${esc(val("q"))}" placeholder="ابحث باسم أو رقم" aria-label="بحث">${tagSel("qtag", "كل الهاشتاجات")}${pkIb("search", "ابحث", "data-wasearch", "sm")}</div>
       ${S.cs.contacts.length ? S.cs.contacts.map((c) => `<div class="wa-r" data-cid="${esc(c.id)}"><b>${esc(c.name)}</b><span dir="ltr" class="num">${esc(c.phone)}</span>
         <span class="am-st ${c.subscribed ? "ok" : "bad"}">${c.subscribed ? "مشترك" : "ألغى"}</span><span class="pk-pills">${c.tags.map((t) => `<span class="pk-pill">${esc(t)}</span>`).join("")}</span>
         <button class="pk-chip" data-wasub="${c.subscribed ? 0 : 1}">${c.subscribed ? "ألغِ اشتراكه" : "أعده"}</button><span>${pkIb("trash", "احذف", "data-wacdel", "sm")}</span></div>`).join("")

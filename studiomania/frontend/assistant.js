@@ -86,7 +86,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   const changed = () => window.dispatchEvent(new CustomEvent("brain:changed"));
   const docked = (on) => (document.body.classList.toggle("as-docked", on), window.dispatchEvent(new CustomEvent("assistant:dock", { detail: { on, w: on && innerWidth > 720 ? 380 : 0 } })));
   const QNAME = { domain: "مجال العمل", about: "وصف المشروع", audience: "العميل المثالي", pain: "مشكلة العميل", market: "السوق", voice: "نبرة العلامة",
-    products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الدعوة لاتخاذ إجراء", rivals: "المنافسون" };
+    products: "المنتجات والأسعار", offer: "العرض الحالي", proof: "النتائج", faq: "أسئلة العملاء", rules: "الممنوعات", cta: "الـ CTA", rivals: "المنافسون" };
   const SKIP_KEY = "simsim:assistSkip";
 
   function mount(html) {

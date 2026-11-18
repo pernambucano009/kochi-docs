@@ -165,7 +165,7 @@ function fmScript(f) {
     <div class="row wrap fm-sapply" ${staleN ? "" : "hidden"}>
       <button type="button" class="btn primary" data-fmapply ${busy ? "disabled" : ""}>✨ طبّق التعديلات على الفريمات (<span data-fmstalen>${staleN}</span> مشهد)</button>
       <small class="muted">يقرر النموذج لكل مشهد: يبدّل النص الذي على الشاشة فقط، أو يرسم المشهد من جديد إن تغيّر معناه.</small></div>
-    <div class="row wrap fm-rewrite"><input type="text" data-fmrw placeholder="اطلب تعديلًا على النص كله (مثلًا: اجعل الخطاف أقوى، والجمل أقصر)" data-no-i18n>
+    <div class="row wrap fm-rewrite"><input type="text" data-fmrw placeholder="اطلب تعديلًا على النص كله (مثلًا: اجعل الهوك أقوى، والجمل أقصر)" data-no-i18n>
       <button type="button" class="btn sm" data-fmrewrite ${busy ? "disabled" : ""}>✍️ عدّل</button></div>
     <div class="fm-voice">
       <b>🎙️ التعليق الصوتي</b>

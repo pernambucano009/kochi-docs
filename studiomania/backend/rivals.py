@@ -2,7 +2,7 @@
 
 البرنامج بيدوّر بكلمات المجال بلهجة السوق، يجمّع الحسابات اللي بتطلع، يختار الأقرب للبراند،
 ثم يجلب آخر منشورات كل حساب ويحسب كل منشور عدّى متوسط صاحبه بكام مرة.
-ما ينجح لديهم (الخطافات والفكرة والهيكل) يدخل في كتابة الأفكار والنصوص.
+ما ينجح لديهم (الهوكات والفكرة والهيكل) يدخل في كتابة الأفكار والنصوص.
 الداتا من ScrapeCreators (SCRAPECREATORS_API_KEY)، ومن غيره يشتغل بداتا تجريبية.
 """
 from __future__ import annotations
@@ -308,7 +308,7 @@ A high multiple means the IDEA worked, not the account. Find what repeats in the
 {chr(10).join(blocks)}
 
 Write everything in simple Egyptian Arabic. Return JSON:
-{{"hooks": ["نوع خطاف يكسب لديهم + مثال قصير منهم", "..."],
+{{"hooks": ["نوع هوك يكسب لديهم + مثال قصير منهم", "..."],
   "concepts": ["فكرة/زاوية محتوى تجلب مشاهدات عالية لديهم", "..."],
   "formats": ["شكل/هيكل الفيديو (مثلًا: قبل وبعد، قائمة ٣ أشياء، رد على تعليق)", "..."],
   "angles": ["زاوية يمكن العلامة ياخدها ومحدش منهم عاملها كويس", "..."],
@@ -330,7 +330,7 @@ def insight_text(brain: dict | None) -> str:
     items = approved(c)
     if not items and not c.get("trending"):
         return ""
-    lines = ["منافسين العلامة في نفس المجال والسوق (أعلى مشاهدات). تعلّم من الفكرة والخطاف والهيكل الذي نجح لديهم، وماتنسخش كلامهم:"]
+    lines = ["منافسين العلامة في نفس المجال والسوق (أعلى مشاهدات). تعلّم من الفكرة والهوك والهيكل الذي نجح لديهم، وماتنسخش كلامهم:"]
     for i in items[:TOP]:
         lines.append(f"- @{i['handle']} ({PLATFORMS.get(i['platform'], i['platform'])}، متوسطه {fmt(i.get('median_views'))}):")
         for p in i["posts"][:3]:
@@ -343,7 +343,7 @@ def insight_text(brain: dict | None) -> str:
     for k, t in (("hooks", "هوكات بتكسب عندهم"), ("concepts", "أفكار بتجيب مشاهدات"), ("formats", "أشكال ناجحة"), ("angles", "زوايا فاضية ينفع ناخدها"), ("avoid", "بيجيب مشاهدات قليلة")):
         if d.get(k):
             lines.append(f"{t}: " + " · ".join(d[k][:5]))
-    lines.append("عندما تختار الخطاف والفكرة: اجعلها على نفس نمط المنشورات التي عدّت متوسطها بكتير، فقط بزاوية العلامة وصوته.")
+    lines.append("عندما تختار الهوك والفكرة: اجعلها على نفس نمط المنشورات التي عدّت متوسطها بكتير، فقط بزاوية العلامة وصوته.")
     return "\n".join(lines)[:2500]
 
 
@@ -396,7 +396,7 @@ Build a TARGETING RECIPE so the brand's ads reach people likely to buy or follow
 Interest names must be real options that exist in Meta / TikTok ads (English names as they appear in Ads Manager). Google keywords in the language people actually search with.
 Write explanations in simple Egyptian Arabic. Return JSON:
 {{"summary": "جملتين: من الذين سيشتري وكيف نوصله",
-  "personas": [{{"name": "اسم قصير للشريحة", "who": "من هم بالضبط", "age": [25, 40], "gender": "all|female|male", "pains": ["..."], "desires": ["..."], "hook": "خطاف إعلان لهم بلهجتهم"}}],
+  "personas": [{{"name": "اسم قصير للشريحة", "who": "من هم بالضبط", "age": [25, 40], "gender": "all|female|male", "pains": ["..."], "desires": ["..."], "hook": "هوك إعلان لهم بلهجتهم"}}],
   "meta": {{"age": [22, 45], "gender": "all|female|male", "locations": ["الدولة/المدن"], "interests": ["English interest names"], "behaviors": ["..."], "exclusions": ["..."], "placements": "اقتراح الأماكن (ريلز، ستوريز…) وليه"}},
   "google": {{"keywords": ["كلمات بحث بنية شراء"], "negative": ["كلمات نستبعدها"], "competitor_terms": ["أسماء أو مواقع منافسين يستهدف الذي يدورون عليهم (Custom segment)"], "youtube_topics": ["..."]}},
   "tiktok": {{"tt_interests": ["..."], "tt_hashtags": ["..."]}},

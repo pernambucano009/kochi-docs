@@ -56,7 +56,7 @@ function ibRenderList() {
     ? `<li data-id="${escapeHtml(x.id)}" class="${ib.sel === x.id ? "on" : ""}">
         ${x.picture ? `<img class="ib-thumb" src="${escapeHtml(x.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<i class="ib-thumb">${IB_ICON[x.platform] || "•"}</i>`}
         <span class="ib-li"><span class="ib-top"><span class="ib-plat">${escapeHtml(IB_NAME[x.platform] || x.platform || "")}${x.account ? ` · @${escapeHtml(x.account)}` : ""}</span><small>${x.created_at ? ntfAgo(x.created_at) : ""}</small></span>
-          <span class="ib-snip">${escapeHtml(x.content || "(بدون تعليق نصي)")}</span>
+          <span class="ib-snip">${escapeHtml(x.content || "(بدون كابشن)")}</span>
           <span class="ib-count">${ibCount(x.comments)}</span></span></li>`
     : `<li data-id="${escapeHtml(x.id)}" class="${ib.sel === x.id ? "on" : ""}${x.unread ? " unread" : ""}">
         ${ibAv(x.picture, x.name)}
@@ -111,12 +111,12 @@ function ibRenderPost() {
   const list = ib.onlyWaiting ? ib.comments.filter(ibWaiting) : ib.comments;
   const waiting = ib.comments.filter(ibWaiting).length;
   $("ibThread").innerHTML = `<div class="ib-post">
-      <h3 class="ib-cap" dir="auto">${escapeHtml(p.content || "(بدون تعليق نصي)")}</h3>
+      <h3 class="ib-cap" dir="auto">${escapeHtml(p.content || "(بدون كابشن)")}</h3>
       ${p.url ? `<a class="ib-open" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">افتح المنشور ↗</a>` : ""}
       <label class="ib-filter"><input type="checkbox" id="ibOnlyWaiting" ${ib.onlyWaiting ? "checked" : ""}> ما ينتظر ردًا فقط${waiting ? ` (${waiting})` : ""}</label></div>
     ${waiting ? `<div class="ib-triage">
       <b>🧠 رتّب التعليقات وجهّز ردودًا</b>
-      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الدعوة لاتخاذ إجراء، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
+      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الـ CTA، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
         <input type="text" id="ibDm" placeholder="(اختياري) ماذا تقول الرسالة الخاصة؟ مثلًا: رابط الدليل" value="${escapeHtml(ib.tdm)}">
         <button type="button" class="btn sm primary" id="ibTriage">رتّب ${waiting} ${waiting === 1 ? "تعليق" : "تعليقات"}</button></div>
       ${ib.triage ? `<small class="muted">${ibTriageSummary()} · راجع كل رد واضغط «إرسال»، أو عدّله أولًا.</small>` : ""}</div>` : ""}

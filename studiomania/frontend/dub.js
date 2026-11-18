@@ -49,7 +49,7 @@ const dbOpts = (k, t, dis) => {
   // 🎵 بعد ما يسمع الكلام بيعرف فيه موسيقى ولا لا: مفيش موسيقى = مفيش فصل ولا تكلفته
   const hb = dbx.cur?.has_bg, autoL = hb === false ? "تلقائي (لا توجد موسيقى، فلا حاجة للفصل)" : hb ? "تلقائي (توجد موسيقى: تُفصل وتبقى)" : DB_BG.auto;
   return `<label>🎵 الخلفية <select data-dbbg="${k}" ${dis}>${Object.entries(DB_BG).filter(([b]) => b !== "separate" || info.separate).map(([b, l]) => `<option value="${b}" ${(t.bg || "auto") === b ? "selected" : ""}>${b === "auto" ? autoL : l}</option>`).join("")}</select></label>
-    <label>🔤 التعليق النصي <select data-dbcap="${k}" ${dis}><option value="">بدون تعليق نصي</option><option value="same" ${t.caps === "same" ? "selected" : ""}>بنفس لغة الدبلجة</option>${Object.entries(info.caption_langs || {}).map(([c, l]) => `<option value="${c}" ${t.caps === c ? "selected" : ""}>مترجم: ${dbe(l)}</option>`).join("")}</select></label>
+    <label>🔤 الكابشن <select data-dbcap="${k}" ${dis}><option value="">بدون كابشن</option><option value="same" ${t.caps === "same" ? "selected" : ""}>بنفس لغة الدبلجة</option>${Object.entries(info.caption_langs || {}).map(([c, l]) => `<option value="${c}" ${t.caps === c ? "selected" : ""}>مترجم: ${dbe(l)}</option>`).join("")}</select></label>
     <label>👄 مزامنة الشفاه <select data-dblip="${k}" ${dis}><option value="">بدون (الصوت فقط)</option>${Object.entries(info.lipsync).map(([m, l]) => `<option value="${m}" ${t.lipsync === m ? "selected" : ""}>${dbe(l)}${lc[m] != null ? ` · ≈ $${lc[m]}` : ""}</option>`).join("")}</select></label>`;
 };
 

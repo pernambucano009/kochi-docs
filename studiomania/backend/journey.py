@@ -323,8 +323,8 @@ class Journey:
                 row = next((x for x in rows if isinstance(x, dict) and x.get("id") == iid), None)
                 return (row or {}).get("item") or (res if isinstance(res, dict) else {})
             pi, si = item(p), item(s)
-            out("تنقيح الفكرة", pi.get("title") or "الفكرة", f"{pi.get('idea') or ''}\n\nالخطاف: {pi.get('hook') or ''}")
-            out("السكريبت", si.get("title") or "السكريبت", f"الخطاف: {si.get('hook') or ''}\n\n{si.get('script') or ''}\n\nالمصادر: "
+            out("تنقيح الفكرة", pi.get("title") or "الفكرة", f"{pi.get('idea') or ''}\n\nالهوك: {pi.get('hook') or ''}")
+            out("السكريبت", si.get("title") or "السكريبت", f"الهوك: {si.get('hook') or ''}\n\n{si.get('script') or ''}\n\nالمصادر: "
                 + json.dumps(si.get("sources") or [], ensure_ascii=False))
         step("فكرة ← تنقيح ← سكريبت", idea)
 

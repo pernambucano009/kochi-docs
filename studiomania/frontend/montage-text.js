@@ -27,7 +27,7 @@ function loadTextFonts() {
   if (textFontsLoaded) return;
   textFontsLoaded = true;
   for (const [fam, , file, w] of TEXT_FONTS) {
-    if (fam.startsWith("SM ")) continue;  // متسجلين مع التعليق النصي
+    if (fam.startsWith("SM ")) continue;  // متسجلين مع الكابشن
     const face = new FontFace(fam, `url(/fonts/${file})`, w ? { weight: String(w) } : {});
     face.load().then((ff) => { document.fonts.add(ff); drawTextLayer(); }).catch(() => {});
   }

@@ -36,7 +36,7 @@ const RivalsPage = (() => {
     if (!d || !Object.keys(d).length) return "";
     const col = (k, t) => (d[k] || []).length ? `<div><span class="pk-lbl">${t}</span><ul>${d[k].slice(0, 5).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
     return `<div class="rv-dg2"><b class="pk-h3">ما ينجح لديهم</b>${d.summary ? `<p class="pk-note">${esc(d.summary)}</p>` : ""}
-      <div class="rv-cols">${col("hooks", "خطافات تكسب")}${col("concepts", "أفكار تجلب المشاهدات")}${col("formats", "أشكال ناجحة")}${col("angles", "زوايا فارغة لك")}${col("avoid", "يجلب مشاهدات قليلة")}</div></div>`;
+      <div class="rv-cols">${col("hooks", "هوكات تكسب")}${col("concepts", "أفكار تجلب المشاهدات")}${col("formats", "أشكال ناجحة")}${col("angles", "زوايا فارغة لك")}${col("avoid", "يجلب مشاهدات قليلة")}</div></div>`;
   }
   function rivalsView() {
     const d = S.d, busy = d.status === "working", pend = d.items.filter((r) => r.state !== "approved"), oks = d.items.filter((r) => r.state === "approved"), b = d.brain || {};
@@ -98,7 +98,7 @@ const RivalsPage = (() => {
         m.behaviors.length && `السلوك: ${m.behaviors.join(", ")}`, m.exclusions.length && `استبعد: ${m.exclusions.join("، ")}`, m.placements && `أماكن الظهور: ${m.placements}`].filter(Boolean).join("\n")),
       sec("جوجل: كلمات البحث", lines(g.keywords)), sec("جوجل: كلمات سلبية", lines(g.negative)), sec("جوجل: من يبحث عن المنافسين", lines(g.competitor_terms)), sec("يوتيوب", lines(g.youtube_topics)),
       sec("تيك توك", [t.tt_interests.join(", "), t.tt_hashtags.map((h) => "#" + h).join(" ")].filter(Boolean).join("\n")),
-      sec("الوسوم", a.hashtags.map((h) => "#" + h).join(" ")), ...a.angles.map((x) => sec(`${x.angle} (${x.persona})`, `${x.text}\n${x.cta}`)),
+      sec("الهاشتاجات", a.hashtags.map((h) => "#" + h).join(" ")), ...a.angles.map((x) => sec(`${x.angle} (${x.persona})`, `${x.text}\n${x.cta}`)),
       sec("أسئلة الجمهور", lines(a.questions)), sec("الاعتراضات", lines(a.objections)), sec("الميزانية", a.budget)].filter(Boolean).join("\n");
   }
   // الجماهير: اللي استخلصها العقل من وصف العلامة أولًا، وإلا الشرائح اللي طلعت من كلام جمهور المنافسين
@@ -129,7 +129,7 @@ const RivalsPage = (() => {
         <div><span class="pk-lbl">${cur.hook ? "جملة تشدّه" : "ما يريده"}</span><p class="${cur.hook ? "au-hook" : ""}">${cur.hook ? `«${esc(cur.hook)}»` : esc(cur.want || "—")}</p></div></div>` : "")
       + `<div class="au-plats">${plat("ميتا (فيسبوك وإنستجرام)", "meta", kv("العمر والجنس", `<span class="num">${age}</span>`) + kv("الأماكن", tags(m.locations)) + kv("الاهتمامات", tags(m.interests)))}
         ${plat("جوجل ويوتيوب", "google", kv("كلمات البحث", tags(g.keywords)) + kv("كلمات مستبعدة", tags(g.negative)))}
-        ${plat("تيك توك", "tiktok", kv("الاهتمامات", tags(t.tt_interests)) + kv("الوسوم", tags(t.tt_hashtags, "#")))}</div>
+        ${plat("تيك توك", "tiktok", kv("الاهتمامات", tags(t.tt_interests)) + kv("الهاشتاجات", tags(t.tt_hashtags, "#")))}</div>
       ${angles.length ? `<div class="au-ang"><span class="pk-lbl">زوايا إعلانية لهذا الجمهور</span>${angles.slice(0, 3).map((x) => `<div class="pk-li"><b>${esc(x.angle)}</b><small>${esc(x.text)}${x.cta ? ` · ${esc(x.cta)}` : ""}</small><span class="pk-acts">${pkIb("copy", "انسخ", `data-aucp="angle.${a.angles.indexOf(x)}"`, "sm")}</span></div>`).join("")}</div>` : ""}
       <button class="pk-more" data-aumore>${S.more ? "أخفِ التفاصيل" : "المزيد: السلوك والاستبعاد وأسئلة الجمهور واعتراضاته"}</button>
       ${S.more ? `<div class="au-plats">${plat("تفاصيل ميتا", "meta2", kv("السلوك", tags(m.behaviors)) + kv("استبعد", tags(m.exclusions)) + (m.placements ? kv("أماكن الظهور", `<p class="pk-note">${esc(m.placements)}</p>`) : ""))}
@@ -181,7 +181,7 @@ const RivalsPage = (() => {
         <div class="pk-acts">${pkIb("spark", "الاستراتيجية التي تُبنى عليها الخطة", 'data-rvdw="strategy"')}${stepper}${pkIb("refresh", `${m ? "أعد بناء الخطة" : "ابنِ خطة الشهر"}${ct("month")}`, `data-momake ${busy || !d.ready ? "disabled" : ""}`)}
           ${m ? applied ? `<button class="pk-chip" data-mopilot>افتح الأوتوبايلوت</button><button class="pk-chip" data-moapply="0">أوقف التطبيق</button>` : `<button class="nb-btn fs-go" data-moapply="1">اعتمد الخطة للأوتوبايلوت</button>` : ""}</div></div>`;
     if (!items.length) return top + `<div class="pk-hero"><span class="pk-big">${pkIc("target", 40)}</span><h2>${d.ready ? "ابنِ خطة الشهر" : "العقل يحتاج أن يفهمك أكثر"}</h2>
-        <p>${d.ready ? "كل يوم بعدد منشوراته، وكل منشور بشكله وقالبه وفكرته وخطافه. راجعها ثم اعتمدها لتنتقل إلى الأوتوبايلوت." : `تُبنى الخطة عندما يفهمك العقل بنسبة ${d.need}٪ مع الشروط الأساسية. اضغط على العدّاد لترى ما ينقص.`}</p>
+        <p>${d.ready ? "كل يوم بعدد منشوراته، وكل منشور بشكله وقالبه وفكرته وهوكه. راجعها ثم اعتمدها لتنتقل إلى الأوتوبايلوت." : `تُبنى الخطة عندما يفهمك العقل بنسبة ${d.need}٪ مع الشروط الأساسية. اضغط على العدّاد لترى ما ينقص.`}</p>
         ${d.ready ? `<button class="nb-btn fs-go" data-momake ${busy ? "disabled" : ""}>ابنِ خطة الشهر${ct("month")}</button>` : ""}</div>`;
     // التقويم: من أول يوم في الشهر لحد آخر يوم فيه بوست
     const y = first.getFullYear(), mo = first.getMonth(), lead = new Date(y, mo, 1).getDay(), last = new Date(y, mo + 1, 0).getDate();
@@ -198,7 +198,7 @@ const RivalsPage = (() => {
       const done = !!x.job;
       if (M.edit === x.id) return `<div class="pl-post on" data-moid="${esc(x.id)}">
           <label class="pk-f">العنوان<input data-mof="title" value="${esc(x.title)}"></label><label class="pk-f">الفكرة<textarea data-mof="idea" rows="2">${esc(x.idea)}</textarea></label>
-          <label class="pk-f">الخطاف<input data-mof="hook" value="${esc(x.hook)}"></label><label class="pk-f">الدعوة<input data-mof="cta" value="${esc(x.cta)}"></label>
+          <label class="pk-f">الهوك<input data-mof="hook" value="${esc(x.hook)}"></label><label class="pk-f">الدعوة<input data-mof="cta" value="${esc(x.cta)}"></label>
           <div class="pk-row2"><label class="pk-f">الوقت<input type="time" data-mof="time" value="${esc(x.time)}"></label><label class="pk-f">القالب<select data-mof="tpl">${moFmts(x).map((f) => `<option value="${esc(f.id)}" ${f.id === x.tpl ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label></div>
           <div class="pk-acts"><button class="nb-btn fs-go" data-mosave>احفظ</button><button class="pk-chip" data-mox>إلغاء</button>${pkIb("trash", "احذف المنشور من الخطة", "data-model", "sm")}</div></div>`;
       return `<div class="pl-post${done ? " done" : ""}" data-moid="${esc(x.id)}" ${done ? "" : `data-moedit data-tip="اضغط للتعديل"`}>

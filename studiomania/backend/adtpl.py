@@ -339,11 +339,11 @@ def beats_messages(d: dict, lang_txt: str, guide: str, brain_txt: str) -> list[d
                'استعد JSON فقط: {"title": "...", "angle": "الشكل والنبرة في سطر", "shots": [{"line": "...", "emotion": "...", "visual": "...", "camera": "...", "with": ["hero"]}]}')
     else:
         sys = ("أنت كاتب أغاني إعلانات: أغنية حقيقية (غير جينجل) تحكي نتيجة العميل، أعلى فيديو أنيميشن والبطل يغني في لقطة أو اثنان.\n"
-               f"- الكلمات بلغة: {lang_txt}. {guide} الخطاف في أول ٥ ثواني، والكلمات عن النتيجة التي العميل يوصلها غير اسم العلامة. "
+               f"- الكلمات بلغة: {lang_txt}. {guide} الهوك في أول ٥ ثواني، والكلمات عن النتيجة التي العميل يوصلها غير اسم العلامة. "
                "سطور قصيرة تتغني (٤-٨ مقاطع). ٣٠ ثانية = كوبليه، كورس، كوبليه، كورس. استخدم [Verse] و[Chorus] في الكلمات.\n"
                "- style (English, under 25 words): genre, vocal, tempo/BPM, mood, production. Genre from the audience. No artist names.\n"
                "- shots: لقطة لكل سطر أو سطرين بالترتيب: lyric = السطور الذي تتغنى في هذه اللقطة بالضبط، sing = true للقطات التي البطل يغني فيها "
-               "أمام الكاميرا (الخطاف والكورس الأخير غالبًا)، والباقي صورة توضح النص.\n" + common +
+               "أمام الكاميرا (الهوك والكورس الأخير غالبًا)، والباقي صورة توضح النص.\n" + common +
                'استعد JSON فقط: {"title": "...", "angle": "الفكرة في سطر", "style": "...", "lyrics": "...", '
                '"shots": [{"lyric": "...", "sing": false, "visual": "...", "camera": "...", "with": ["hero"]}]}')
     return [{"role": "system", "content": sys + "\n\n" + algo.for_use("ads")}, {"role": "user", "content":

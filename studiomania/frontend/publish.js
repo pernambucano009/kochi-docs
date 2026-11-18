@@ -423,7 +423,7 @@ async function algoPack(force) {
   const id = pub.videoId, note = $("pubAlgo");
   if (!id) return force && toast("اختر فيديو من المجلد أولًا", true);
   if (!force && $("postCaption").value.trim()) return;
-  if (force) { note.hidden = false; note.textContent = "⏳ جارٍ كتابة التعليق النصي…"; }
+  if (force) { note.hidden = false; note.textContent = "⏳ جارٍ كتابة الكابشن…"; }
   try {
     const pl = checkedPlatforms().map(platOf)[0] || "";
     const r = await api("/api/algo/post-pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ export_id: id, platform: pl }) });
@@ -434,7 +434,7 @@ async function algoPack(force) {
     setCover(r.cover_ms);
     pub.notAi = !r.ai;
     note.hidden = false;
-    note.textContent = `⚡ جُهّز بالخوارزمية: تعليق نصي (خطاف آخر${r.cta ? " + دعوة الخطة" : ""} + وسوم المجال) · الغلاف ${r.cover_hook ? "على إطار الخطاف" : "قبل النهاية بثانيتين"}${r.ai ? " · 🤖 علامة الذكاء الاصطناعي" : ""}. عدّل كما تشاء.`;
+    note.textContent = `⚡ جُهّز بالخوارزمية: كابشن (هوك آخر${r.cta ? " + دعوة الخطة" : ""} + هاشتاجات المجال) · الغلاف ${r.cover_hook ? "على إطار الهوك" : "قبل النهاية بثانيتين"}${r.ai ? " · 🤖 علامة الذكاء الاصطناعي" : ""}. عدّل كما تشاء.`;
     renderPostExtras();
   } catch (err) {
     note.hidden = !force;
@@ -490,7 +490,7 @@ function brandCaption(text) {
 }
 $("brandCaption").onclick = () => {
   const out = brandCaption($("postCaption").value);
-  if (out === null) return toast("لا يوجد تعليق نصي افتراضي في عقل العلامة (تبويب «التسليم»)", true);
+  if (out === null) return toast("لا يوجد كابشن افتراضي في عقل العلامة (تبويب «التسليم»)", true);
   $("postCaption").value = out;
   $("postCaption").focus();
 };
@@ -883,7 +883,7 @@ function dmCheck(cap, pl) {
   const spoken = pub.spoken?.id === pub.videoId ? pub.spoken.word : "", inCap = dmDetect(cap), word = inCap || spoken;
   if (!word) return pub.videoId && pub.spoken?.id !== pub.videoId
     ? [{ ok: null, t: "هل يقول الفيديو في آخره «علّق بكلمة…»؟", tip: "نستمع لآخر ٢٠ ثانية لنتأكد أن الرد التلقائي مفعّل", act: "spoken" }] : [];
-  const where = inCap ? "في التعليق النصي" : "في آخر الفيديو";
+  const where = inCap ? "في الكابشن" : "في آخر الفيديو";
   if (!pl.some((v) => ["instagram", "facebook"].includes(platOf(v)))) return [{ ok: null, t: `قلت ${where} «علّق بكلمة ${word}»: الرد التلقائي يعمل على إنستجرام وفيسبوك فقط، وفي تيك توك اجعل الدعوة «أرسل الكلمة على واتساب»`, tip: "تيك توك لا يسمح بالرد التلقائي على التعليقات في منطقتنا" }];
   return [{ ok: $("dmOn").checked, t: $("dmOn").checked ? `«علّق بكلمة ${word}» يعمل: من يعلّق تصله رسالة في الخاص` : `قلت ${where} «علّق بكلمة ${word}» والرد التلقائي غير مفعّل`, tip: "دونه لن يصل شيء لمن يعلّق، وهذا يُضيّع العميل", act: "dm", word }];
 }
@@ -893,14 +893,14 @@ function pubChecks() {
   const fw = first.replace(/#[\p{L}\p{N}_]+/gu, "").trim().split(/\s+/).filter(Boolean).length;
   const pl = checkedPlatforms(), visual = pl.some((v) => ["instagram", "tiktok"].includes(platOf(v)));
   return [
-    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر خطاف آخر (مختصر، يُكمل الفضول، وليس «أهلًا بكم»)", tip: "آخر ما يقرؤه قبل أن يمرّر: اترك سؤالًا مفتوحًا أو أكمل وعد الفيديو" },
+    { ok: !!cap && fw > 0 && fw <= 14 && !PC_GREET.test(first), t: "أول سطر هوك آخر (مختصر، يُكمل الفضول، وليس «أهلًا بكم»)", tip: "آخر ما يقرؤه قبل أن يمرّر: اترك سؤالًا مفتوحًا أو أكمل وعد الفيديو" },
     { ok: PC_CTA.test(cap), t: "توجد دعوة واضحة (علّق بكلمة، احفظ، الرابط…)", tip: "دعوة واحدة مطابقة لموضوع الفيديو" },
-    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ وسوم من المجال (الآن ${tags.length})`, tip: "تأثير الوسوم ضعيف؛ ٣–٥ محددة تكفي" },
+    { ok: tags.length >= 3 && tags.length <= 5, t: `٣–٥ هاشتاجات من المجال (الآن ${tags.length})`, tip: "تأثير الهاشتاجات ضعيف؛ ٣–٥ محددة تكفي" },
     { ok: !tags.some((x) => PC_BAD_TAGS.test(x)), t: "بدون #fyp #viral #explore", tip: "توصل الفيديو إلى أشخاص غير مهتمين فيقل وقت المشاهدة" },
-    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "اخترت الغلاف بنفسك (إطار مثير)", tip: "فرصة خطاف إضافية في الملف الشخصي", act: "cover" }] : []),
+    ...(visual && pub.videoId ? [{ ok: $("coverOn").checked, t: "اخترت الغلاف بنفسك (إطار مثير)", tip: "فرصة هوك إضافية في الملف الشخصي", act: "cover" }] : []),
     ...dmCheck(cap, pl),
     { ok: PC_AI.test(cap) || !!pub.notAi, t: "إذا كان الفيديو مصنوعًا بالذكاء الاصطناعي فهو معلَّم", tip: "لا عقوبة، وقد تحذفه المنصة إذا لم تحدد", act: "ai" },
-    { ok: null, t: "الترجمة في وسط الشاشة وليست مخفية تحت التعليق النصي والأزرار", tip: "تأكد من الفيديو نفسه" },
+    { ok: null, t: "الترجمة في وسط الشاشة وليست مخفية تحت الكابشن والأزرار", tip: "تأكد من الفيديو نفسه" },
     { ok: null, t: "بعد النشر: رد على أول ٣٠ تعليقًا", tip: "النقاش في التعليقات يطوّل وقت المشاهدة" },
   ];
 }
@@ -913,7 +913,7 @@ function renderPubCheck() {
   if (!box) return;
   const list = pubChecks(), scored = list.filter((c) => c.ok !== null), n = scored.filter((c) => c.ok).length;
   box.innerHTML = `<div class="pc-head"><b>✅ قبل أن تنشر</b><span class="num ${n === scored.length ? "ok" : ""}">${n}/${scored.length}</span>
-      <button type="button" class="btn sm" id="pcReview" title="يقيّم النموذج التعليق النصي بقواعد الخوارزميات ويقترح أفضل منه">📡 افحص التعليق النصي${pcCost("review")}</button></div>
+      <button type="button" class="btn sm" id="pcReview" title="يقيّم النموذج الكابشن بقواعد الخوارزميات ويقترح أفضل منه">📡 افحص الكابشن${pcCost("review")}</button></div>
     <ul>${list.map((c) => `<li class="${c.ok === null ? "info" : c.ok ? "ok" : "no"}" title="${escapeHtml(c.tip)}"><i>${c.ok === null ? "•" : c.ok ? "✓" : "✕"}</i><span>${escapeHtml(c.t)}</span>
       ${c.act === "cover" && !c.ok ? `<button type="button" class="btn xs" data-pc="cover">اختر الغلاف</button>` : ""}
       ${c.act === "dm" && !c.ok ? `<button type="button" class="btn xs" data-pc="dm" data-word="${escapeHtml(c.word)}">💬 فعّله</button>` : ""}
@@ -938,7 +938,7 @@ $("pubCheck").addEventListener("click", async (e) => {
   if (use) { $("postCaption").value = use.dataset.pcuse; return renderPubCheck(); }
   if (!e.target.closest("#pcReview")) return;
   const cap = $("postCaption").value.trim();
-  if (cap.length < 8) return toast("اكتب التعليق النصي أولًا", true);
+  if (cap.length < 8) return toast("اكتب الكابشن أولًا", true);
   const out = $("pcOut");
   out.innerHTML = `<p class="muted">⏳ جارٍ الفحص…</p>`;
   try {

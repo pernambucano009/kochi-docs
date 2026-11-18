@@ -91,7 +91,7 @@ ADAPT_FORMAT = """{
   "locations": "أماكن التصوير",
   "production_notes": "ملاحظات التنفيذ: تصوير حقيقي ولا AI، المعدات، الوقت، الميزانية التقريبية",
   "cta": "الدعوة للفعل",
-  "caption": "تعليق نصي المنشور"
+  "caption": "كابشن المنشور"
 }"""
 
 
@@ -161,7 +161,7 @@ def brand_controls(settings: dict, others: list[dict] | None = None) -> str:
         lines.append(BRAND_LEVELS[s["brand_level"]])
     txt = "التطبيق على العلامة (اختيارات المستخدم، لها الأولوية):\n" + "\n".join(f"- {x}" for x in lines) + "\n"
     if s.get("variety") != "off" and others:
-        txt += ("إعلانات عملناها من قبل هذا للعلامة. الإعلان الجديد يجب يصبح مختلف عنهم بوضوح في الزاوية والخطاف "
+        txt += ("إعلانات عملناها من قبل هذا للعلامة. الإعلان الجديد يجب يصبح مختلف عنهم بوضوح في الزاوية والهوك "
                 "والتون والألوان والمكان والأشخاص (إلا الذي المستخدم اختره أعلى):\n"
                 + "\n".join("- " + " | ".join(f"{k}: {o[k]}" for k in ("title", "angle", "hook", "tone", "palette", "locations") if o.get(k))
                              for o in others[:8]) + "\n")
@@ -375,7 +375,7 @@ def mock_adaptation(duration: int = 30) -> dict:
                                         "image_prompt": "A brand app card UI.", "animation": "يقفز من أسفل"}]}
                        for i in range(3)],
             "voiceover_script": "تعليق صوتي تجريبي", "music_direction": "beat", "sound_design": "whoosh",
-            "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل التطبيق", "caption": "تعليق نصي"}
+            "cast": "مدرب", "locations": "جيم", "production_notes": "تجربة", "cta": "حمّل التطبيق", "caption": "كابشن"}
 
 
 # ================================================================ التنفيذ: راس الإعلان ← ستوري بورد ← مكونات ← لقطات

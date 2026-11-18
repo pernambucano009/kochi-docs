@@ -37,8 +37,8 @@ const BrandPage = (() => {
   };
   const svg = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  const ALGO_G = { strategy: "الاستراتيجية والتوزيع", ideas: "الأفكار", hook: "الخطاف", script: "النص والسرد", edit: "المونتاج والشكل",
-    publish: "النشر والتعليق النصي", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الاصطناعي" };
+  const ALGO_G = { strategy: "الاستراتيجية والتوزيع", ideas: "الأفكار", hook: "الهوك", script: "النص والسرد", edit: "المونتاج والشكل",
+    publish: "النشر والكابشن", analysis: "التحليل", ads: "الإعلانات", aivideo: "فيديو الذكاء الاصطناعي" };
   // الخريطة: كل فرع وكل نقطة فيه. النوع بيحدد الكارت اللي بيفتح
   function branches(b) {
     return [
@@ -69,12 +69,12 @@ const BrandPage = (() => {
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
         { f: "narrators", t: "صوت الراوي", type: "narr" },
-        { f: "cta", t: "الدعوة لاتخاذ إجراء", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
+        { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
         { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
         { f: "dm_mode", t: "«علّق بكلمة» فتصله رسالة على الخاص", type: "pick", opts: [["always", "في كل منشور"], ["ask", "أختار عند النشر"], ["off", "لا"]] },
         { f: "dm_word", t: "كلمة التعليق", type: "text", ph: "مثلًا: برنامج" },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
-        { f: "caption", t: "التعليق النصي الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
+        { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
       // 🧑‍🎤 الشخصيات والأفاتار: دراع لوحده من المخ، فيه بندين: الشخصيات لوحدها والأفاتار لوحده
       { k: "chars", t: "الشخصيات والأفاتار", en: "Characters", leaves: [
@@ -119,7 +119,7 @@ const BrandPage = (() => {
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
     typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
   const FIELD_T = { niche: "النيتش", about: "عن العلامة", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
-    palette: "الألوان", cta: "الدعوة لاتخاذ إجراء", link: "الرابط", caption: "التعليق النصي الافتراضي" };
+    palette: "الألوان", cta: "الـ CTA", link: "الرابط", caption: "الكابشن الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
   const pendLabel = (p) => (p.kind === "field" ? `اقتراح: ${FIELD_T[p.field] || p.field}` : p.kind === "rule" ? "قاعدة مقترحة" : p.kind === "question" ? "سؤال" : p.kind === "image" ? `صورة: ${p.title}` : p.title);
   const srcName = (id) => (id === "feedback" ? "تقييماتك" : cur()?.sources?.find((s) => s.id === id)?.name || "");
@@ -627,7 +627,7 @@ const BrandPage = (() => {
     if (!ar) { if (b && S.arLoading !== b.id) loadAlgo(b); return head + `<p class="bm-note">جارٍ جلب القواعد…</p>`; }
     const parts = ar.parts.filter((p) => p.group === l.i);
     return head + `<p class="bm-warn">⚠️ ${esc(ar.warn)}</p>
-      <p class="bm-note">هذه هي القواعد الأساسية التي تلتزم بها كل أدوات البرنامج عند كتابة الأفكار والخطافات والنصوص والتعليق النصي. علامة ✓ تعني أن القاعدة مفعّلة.</p>
+      <p class="bm-note">هذه هي القواعد الأساسية التي تلتزم بها كل أدوات البرنامج عند كتابة الأفكار والهوكات والنصوص والكابشن. علامة ✓ تعني أن القاعدة مفعّلة.</p>
       ${parts.map((p) => `<div class="bm-ar"><div class="bm-arh"><b>${esc(p.title)}</b>${p.changed ? `<button class="bm-pill" data-arreset="${p.id}" title="يعيد القواعد الأصلية">↺ استعد الأصل</button>` : ""}</div>
         <ul>${p.rules.map((r, i) => `<li class="${r.on ? "" : "off"}${r.custom ? " custom" : ""}"><input type="checkbox" data-aron="${p.id}:${i}" ${r.on ? "checked" : ""} title="مفعّل / مطفأ">
           ${editable(`ar:${p.id}:${i}`, r.t, "القاعدة")}<button class="bm-x2" data-ardel="${p.id}:${i}" title="احذف القاعدة">✕</button></li>`).join("")}</ul>
@@ -855,7 +855,7 @@ const BrandPage = (() => {
       // معلومة في «المعرفة»: حاجة المخ عرفها عن البراند وبيرجع لها وهو بيكتب (مش مهمة مطلوب منك تعملها)
       case "algo": return algoHTML(b, l);
       case "note": return head.replace(esc(l.t), "معلومة")
-        + `<p class="bm-note">هذه معلومة عرفها العقل عن العلامة${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الاختبار" : ""}، ويرجع إليها عند كتابة النصوص والأفكار والتعليق النصي. إن كان فيها خطأ فعدّلها هنا، وأي تعديل يُحفظ تلقائيًا.</p>`
+        + `<p class="bm-note">هذه معلومة عرفها العقل عن العلامة${srcName(l.note.source) ? ` من «${esc(srcName(l.note.source))}»` : l.note.source === "quiz" ? " من إجابتك في الاختبار" : ""}، ويرجع إليها عند كتابة النصوص والأفكار والكابشن. إن كان فيها خطأ فعدّلها هنا، وأي تعديل يُحفظ تلقائيًا.</p>`
         + `<div class="bm-sub"><small>العنوان</small>${editable(`note:t:${l.i}`, l.note.title, "العنوان")}</div>`
         + `<div class="bm-sub"><small>الملخص (سطر واحد يظهر عند الوقوف على النقطة)</small>${editable(`note:s:${l.i}`, l.note.summary || "", "سطر واحد")}</div>`
         + `<div class="bm-sub"><small>التفاصيل (النص الذي يقرؤه العقل)</small>${editable(`note:b:${l.i}`, l.note.body, "التفاصيل")}</div>`
@@ -871,7 +871,7 @@ const BrandPage = (() => {
   const MK_OPTS = {
     intro: { style: [["assemble", "تجميع الشعار"], ["shine", "لمعة فاخرة"], ["letters", "كتابة الاسم"], ["wipe", "ستارة لونية"], ["pulse", "نبضة على الإيقاع"], ["glitch", "تشويش رقمي"], ["flip", "قلبة ثلاثية الأبعاد"]],
       textk: [["name", "الاسم"], ["tag", "الاسم والشعار"], ["none", "بدون نص"]] },
-    outro: { style: [["cta", "دعوة لاتخاذ إجراء"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
+    outro: { style: [["cta", "CTA"], ["handles", "الحسابات"], ["follow", "تابعنا"], ["tagline", "الشعار والختام"]] },
   };
   const MK_BG = [["dark", "غامق"], ["light", "فاتح"], ["brand", "لون العلامة"]], MK_RATIO = [["9:16", "٩:١٦"], ["1:1", "١:١"], ["16:9", "١٦:٩"]];
   const MK_TXT = { intro: [["tag", "الشعار"]], outro: [["cta", "الدعوة"], ["handle", "الحساب"], ["link", "الموقع أو الرقم"], ["tag", "الشعار"]] };

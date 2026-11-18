@@ -356,7 +356,7 @@ const ViralPage = (() => {
   // من البروتوتايب: صفوف بخط تحت بس من غير براويز، والنتيجة ترتيب بالمضاعف وأفكار بنفس الهيكل
   const row = (r, i) => `<div class="vr2-row" data-i="${i}">
       <input type="text" data-k="account" placeholder="الحساب" aria-label="الحساب" value="${libEsc(r.account)}">
-      <input type="text" data-k="hook" placeholder="أول جملة (الخطاف)" aria-label="الخطاف" value="${libEsc(r.hook)}">
+      <input type="text" data-k="hook" placeholder="أول جملة (الهوك)" aria-label="الهوك" value="${libEsc(r.hook)}">
       <input type="text" data-k="views" placeholder="مشاهداته" aria-label="مشاهداته" inputmode="numeric" value="${libEsc(r.views)}">
       <input type="text" data-k="avg" placeholder="متوسط الحساب" aria-label="متوسط الحساب" inputmode="numeric" value="${libEsc(r.avg)}">
       <input type="text" data-k="url" placeholder="الرابط (اختياري)" aria-label="الرابط" dir="ltr" value="${libEsc(r.url)}">
