@@ -24853,6 +24853,10 @@ def flow_profile(tpl: dict) -> str:
             out.append("الخانات التي تتغير في القالب (والباقي شكل وحركة ثابتين مبيتغيروش):\n" + "\n".join(rows))
         out.append("أي: الفكرة يجب تتحكي بالكامل داخل هذه الخانات ونفس تسلسل القالب. لا يوجد مشاهد أو شخصيات أو أماكن جديدة غير ما القالب يرسمها، "
                    "النص فقط (والألوان) هو ما يتغير. اجعل النص بنفس طول الأمثلة تقريبًا.")
+        if tid in MOTION_TWO_VOICES:
+            a, b = MOTION_TWO_VOICES[tid]
+            out.append(f"هذا القالب حوار بصوتين: {a} (A) و{b} (B). كل جملة يقولها واحد منهما بالتناوب، فاكتب الجمل كأنها حوار قصير بينهما، "
+                       "وابدأ كل سطر بـ «A:» أو «B:».")
     elif kind == "carousel":
         out.append("هذا القالب كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد هوك يشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
                    "وآخر سلايد دعوة. الفكرة يجب تُقسّم لنقط أو خطوات أو مقارنة أو قائمة، غير حكاية فيديو.")
@@ -25961,6 +25965,32 @@ def flow_motion_params(d: dict) -> dict:
     return out
 
 
+MOTION_TWO_VOICES = {"t-audiogram": ("المذيع", "الضيف")}
+
+
+def vo_dialogue(rows: list[dict], says: list[str], voice_a: str, lang: str, out: Path) -> None:
+    """صوتين: كل جملة (سطر، أو جملة منتهية بعلامة) بصوت متكلمها. «A:»/«B:» في السكريبت بتحدد المتكلم، وإلا بالتناوب."""
+    voice_b = tytpl_voice_b(lang, voice_a)
+    parts, who = [], "B"
+    for i, txt in enumerate(says):
+        raw_lines = str(((rows[i] if i < len(rows) else {}) or {}).get("say") or "").splitlines()
+        marks = [re.match(r"^\s*([AB])\s*[:：]", ln) for ln in raw_lines if ln.strip()]
+        sents = [x for x in re.split(r"\n+|(?<=[.!?؟])\s+", txt) if x.strip()]
+        for k, sent in enumerate(sents):
+            m = marks[k] if k < len(marks) else None
+            who = m.group(1).upper() if m else ("B" if who == "A" else "A")
+            f = out.with_name(f".dlg{len(parts)}.wav")
+            vo_say(sent.strip(), voice_a if who == "A" else voice_b, lang, f)
+            parts.append(f)
+    if not parts:
+        raise HTTPException(400, "لا يحتوي النص على أي جملة تعليق صوتي")
+    fl = "".join(f"[{i}:a]apad=pad_dur=0.15[a{i}];" for i in range(len(parts))) + "".join(f"[a{i}]" for i in range(len(parts))) + f"concat=n={len(parts)}:v=0:a=1[o]"
+    subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *sum((["-i", str(f)] for f in parts), []), "-filter_complex", fl,
+                    "-map", "[o]", "-ac", "1", "-ar", "48000", str(out)], check=True, capture_output=True, timeout=180)
+    for f in parts:
+        f.unlink(missing_ok=True)
+
+
 def flow_make_vo(fid: str) -> None:
     """التعليق الصوتي كله مرة واحدة (نبرة واحدة سلسة)، ثم نسمعه ونعرف كل جملة بدأت وخلصت متى، وكل مشهد يأخذ طول جملته."""
     d = flow_load(fid)
@@ -25973,7 +26003,12 @@ def flow_make_vo(fid: str) -> None:
     raw = folder / f"vo-raw-{uuid.uuid4().hex[:6]}.wav"
     t0 = time.time()   # ⏱️ وقت كل خطوة بيتسجل (التسجيل والتفريغ) علشان نعرف البطء منين
     flow_update(fid, lambda x: x.update(vo_step="tts"))
-    vo_say("\n".join(x for x in says if x), vo.get("voice") or "", vo.get("lang") or d.get("lang") or "ar-eg-cairo", raw)
+    lang_v = vo.get("lang") or d.get("lang") or "ar-eg-cairo"
+    if d["template"]["id"] in MOTION_TWO_VOICES:   # 🎙️🎙️ حوار بصوتين (البودكاست): كل جملة بصوت متكلمها، A ثم B بالتناوب
+        says = [re.sub(r"(?m)^\s*[AB]\s*[:：]\s*", "", x) for x in says]
+        vo_dialogue(rows, says, vo.get("voice") or "", lang_v, raw)
+    else:
+        vo_say("\n".join(x for x in says if x), vo.get("voice") or "", lang_v, raw)
     t_tts = round(time.time() - t0, 1)
     vdur = probe_duration(raw)
     flow_update(fid, lambda x: x.update(vo_step="stt"))
@@ -27461,6 +27496,9 @@ def flow_export(fid: str, body: FlowExportIn):
     params = {**(d.get("params") or {}), **{k: v for k, v in (body.params or {}).items() if k in schema}}
     params.update({k: v for k, v in (d.get("locked") or {}).items() if k in schema and k not in (body.params or {})})   # 🧾 معطيات العميل
     params = flow_fill_els(d, brand_guard(schema, params, flow_brain(d)))
+    if mid in MOTION_TWO_VOICES:   # علامة المتكلم (A:/B:) للصوت بس، مش للشاشة
+        strip = lambda v: re.sub(r"^\s*[AB]\s*[:：]\s*", "", v) if isinstance(v, str) else v  # noqa: E731
+        params = {k: ([strip(x) for x in v] if isinstance(v, list) else strip(v)) for k, v in params.items()}
     vt = d.get("vo_track") or {}
     vo_path = FLOWS_DIR / Path(fid).name / vt["file"] if vt.get("file") else None
     title = (d.get("scenario") or {}).get("title") or (d.get("idea") or {}).get("title") or d["template"]["name"]
