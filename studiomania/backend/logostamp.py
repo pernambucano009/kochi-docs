@@ -144,3 +144,20 @@ def plain_background(path: Path) -> bool:
         a = np.asarray(im.convert("RGB")).astype(np.float32)
     b = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
     return float(np.sqrt(((b - np.median(b, axis=0)) ** 2).sum(-1)).mean()) < 12.0
+
+
+def edges_opaque(path) -> bool:
+    """الخلفية لسه موجودة؟ (أطراف الصورة معظمها مش شفافة: ورق أو ملمس ماتشالش)"""
+    from PIL import Image
+    try:
+        with Image.open(path) as im:
+            a = im.convert("RGBA").getchannel("A")
+    except OSError:
+        return False
+    w, h = a.size
+    k = max(2, int(min(w, h) * 0.04))
+    px = a.load()
+    pts = [(x, y) for x in range(0, w, 4) for y in (*range(k), *range(h - k, h))] + [(x, y) for y in range(0, h, 4) for x in (*range(k), *range(w - k, w))]
+    solid = sum(1 for x, y in pts if px[x, y] > 200)
+    return solid / max(1, len(pts)) > 0.35
+

@@ -839,8 +839,9 @@ const Gallery = (() => {
     return it.url ? `<span class="gg-lg ok" title="شعارك بأسلوب هذا القالب جاهز"><img src="${esc(it.url)}" alt=""></span>`
       : `<span class="gg-lg miss" title="لم يُصنع شعارك بأسلوب هذا القالب بعد">🏷️</span>`;
   }
+  const NO_STAMP = new Set(["phone", "avatar", "carousel", "editor", "custom", "dental"]);   // دول مابيتختموش بالشعار
   function lgLine(x) {
-    if (!LG.d?.logo) return "";
+    if (!LG.d?.logo || NO_STAMP.has(x.alias || x.id) || x.dtid) return "";
     const it = lgOf(x), busy = LG.d.working && LG.d.step === it?.style;
     if (!it) return `<small class="nh-gal-hint">🏷️ يُختم آخر الفيديو بشعارك الأصلي.</small>`;
     if (it.url) return `<div class="gg-lgrow"><img src="${esc(it.url)}" alt=""><small>🏷️ شعارك بأسلوب هذا القالب جاهز، ويُختم به آخر الفيديو.</small></div>`;

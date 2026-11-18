@@ -22002,6 +22002,8 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
                 (folder / x["final"]).unlink(missing_ok=True)
             x["final"] = name
         typo_update(pid, fin)
+        if not d.get("no_logo"):   # 🏷️ آخر الفيديو بشعار العميل (معاينات المعرض من غير شعار)
+            typo_logo_end(pid, d.get("preset") or ("hairline" if d.get("style") == "hairline" else "typo"))
         typo_update(pid, lambda x: x.update(status="done", step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         tmp_v.unlink(missing_ok=True)
@@ -22113,7 +22115,6 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
             if render:
                 typo_set(pid, status="rendering", step="🎬 يُجهّز")
                 run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
-                typo_logo_end(pid, tid)
             return
         typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
         blocks = typo.studio_plan(words, dur, None, sp["collection"], sp["seed"])
@@ -22125,7 +22126,6 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
         if render:
             typo_set(pid, status="rendering", step="🎬 يُجهّز")
             run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
-            typo_logo_end(pid, tid)
     except Exception as exc:  # noqa: BLE001
         print(f"[tytpl] {pid}: {exc}", flush=True)
         typo_fail(pid, exc)
@@ -22206,7 +22206,7 @@ def tytpl_preview(tid: str) -> None:
         lang = "ar-sa-najdi"
         voice = dub.DIALECTS[lang]["voices"][0]
         pid = typo_new(TypoNewIn(name=f"معاينة {typotpl.SPECS[tid]['name']}", text=""))["id"]
-        typo_update(pid, lambda x: x.update(style=typotpl.STYLE, preset=tid, dialect=lang, status="planning", step="🎙️"))
+        typo_update(pid, lambda x: x.update(style=typotpl.STYLE, preset=tid, dialect=lang, status="planning", step="🎙️", no_logo=True))
         tytpl_build(pid, tid, typotpl.SAMPLE[tid], lang, voice, "fitness")
         t = typo_load(pid)
         if t.get("final"):
@@ -25735,7 +25735,7 @@ def logo_like_ref(style: str) -> Path | None:
     if not style.startswith("x-"):
         return None
     mid = Path(style[2:]).name
-    for f in (FRONTEND_DIR / "gallery" / f"{mid}.jpg", MOTION_DIR / "r" / mid / "poster.jpg"):
+    for f in (FRONTEND_DIR / "gallery" / f"{mid}.jpg", MOTION_DIR / "r" / mid / "poster.jpg", TYTPL_DIR / f"{mid}.jpg"):
         if f.is_file():
             return f
     return None
@@ -25769,6 +25769,14 @@ def logo_styled(bid: str, style: str, make: bool = True) -> Path | None:
                 print(f"[logost] bg {bid}/{style}: {exc}", flush=True)
         firstvid.cutout(raw, out)
         raw.unlink(missing_ok=True)
+        if logostamp.edges_opaque(out):   # 🧼 الخلفية لسه ظاهرة بعد القص: الموديل يشيلها
+            try:
+                nb = out.with_name(f"logost-nobg-{uuid.uuid4().hex[:6]}.png")
+                atlas.download(atlas.run_model("Image", {"model": logostamp.BG_REMOVER, "image": atlas.reference_url(out)}, "إزالة خلفية الشعار", max_seconds=300), nb)
+                firstvid.cutout(nb, out)
+                nb.unlink(missing_ok=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[logost] bg2 {bid}/{style}: {exc}", flush=True)
         return out
     except Exception as exc:  # noqa: BLE001 — القالب بياخد اللوجو الأصلي
         print(f"[logost] {bid}/{style}: {exc}", flush=True)
@@ -25875,7 +25883,7 @@ def logo_styles_get(bid: str):
     if ent and not ent.get("original") and not ent.get("prepped") and bid not in LOGOST_JOBS:   # 🧼 لوجو اترفع قبل التنضيف التلقائي: يتنضّف دلوقتي مرة واحدة
         logo_upload_kick(bid, [src.name])
     elif src and bid not in LOGOST_JOBS:   # 🧼 نسخ اترسمت قبل ما خلفيتها تتشال بالموديل: تتمسح وتترسم تاني (مرة واحدة لكل نسخة)
-        fixed = set((brain_row(bid) or {}).get("logost_fixed") or [])
+        fixed = set((brain_row(bid) or {}).get("logost_fixed2") or [])   # 2: كمان النسخ اللي ليها شفافية بس الورق/الملمس لسه حواليها
         bad = []
         for st in logostamp.ALL:
             f = logostamp.file_for(brain_dir(bid), src, st)
@@ -25883,20 +25891,22 @@ def logo_styles_get(bid: str):
                 try:
                     from PIL import Image as _PImg
                     with _PImg.open(f) as im:
-                        if not firstvid.has_alpha(im):
-                            bad.append(f)
+                        alpha = firstvid.has_alpha(im)
+                    if not alpha or logostamp.edges_opaque(f):
+                        bad.append(f)
                 except OSError:
                     pass
         if bad:
             for f in bad:
                 f.unlink(missing_ok=True)
-            update_brain(bid, lambda d: d.update(logost_fixed=sorted(fixed | {f.name for f in bad})))
+            update_brain(bid, lambda d: d.update(logost_fixed2=sorted(fixed | {f.name for f in bad})))
             logo_styles_kick(bid)
     off = (brain_row(bid) or {}).get("logo_styles_off") or []
     items = []
     names = tpl_names()
     likes = [f"x-{m.name}" for m in sorted((MOTION_DIR / "r").iterdir()) if m.is_dir() and logostamp.style_of(m.name, EL_DIR / "fitness" / "index.json") == f"x-{m.name}"
              and logo_like_ref(f"x-{m.name}")]
+    likes += [f"x-{t}" for t in ("typo", *typotpl.SPECS) if logo_like_ref(f"x-{t}")]   # 🔤 التايبوجرافي: على شكل غلاف القالب
     for st in [*logostamp.ALL, *likes]:   # الـ٨ دايمًا، والباقي (خاص بقالب) بيظهر في صفحة القوالب، وفي صفحة العلامة لو اترسم
         f = logostamp.file_for(brain_dir(bid), src, st) if src else None
         label = logostamp.ALL_LABELS.get(st) or names.get(st[2:]) or st[2:]
