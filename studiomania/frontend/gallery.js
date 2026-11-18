@@ -906,11 +906,11 @@ const Gallery = (() => {
 .gg-ap { position: absolute; top: 10px; inset-inline-start: 10px; z-index: 3; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.35); color: transparent; font-size: 14px; cursor: pointer; display: grid; place-items: center; }
 .gg-ap:hover { background: rgba(0,0,0,.55); color: rgba(255,255,255,.7); }
 .gg-ap.on { background: #E5613E; border-color: #E5613E; color: #fff; }
-.gg-lg { position: absolute; top: 10px; inset-inline-end: 10px; z-index: 3; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.92); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.18); font-size: 15px; }
-.gg-lg img { width: 28px; height: 28px; object-fit: contain; }
+.gg-lg { position: absolute; top: 10px; inset-inline-end: 10px; z-index: 3; width: 34px; height: 34px; border-radius: 10px; background: none; display: grid; place-items: center;  font-size: 15px; }
+.gg-lg img { width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.45)); }
 .gg-lg.miss { opacity: .55; filter: grayscale(1); }
 .gg-lgrow { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-.gg-lgrow img { width: 48px; height: 48px; object-fit: contain; border-radius: 10px; background: #fff; padding: 4px; }
+.gg-lgrow img { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,.25)); }
 .nh-gal-go.apon { color: #E5613E; }
 .nh-gal-aphint { text-align: center; font-size: 13px; color: var(--nh-muted, #6B6B67); margin: 0 0 10px; }` }));
   // Esc بيقفل المعاينة الأول (قبل ما يرجع من الصفحة)
