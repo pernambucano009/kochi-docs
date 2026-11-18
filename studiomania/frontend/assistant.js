@@ -710,7 +710,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     const paint = (extra) => {
       d.innerHTML = `<b>اختر ألوان علامتك</b><div class="as-cstrips">${extra || ""}${o.logo?.length ? strip(o.logo, "من شعارك") : ""}${(o.presets || []).map((p) => strip(p)).join("")}</div>
         <label class="as-drop">🖼️ <span>أو ارفع صورة أو سكرين شوت (موقعك، صفحتك، المنيو…) ونأخذ ألوانها</span><input type="file" hidden accept="image/png,image/jpeg,image/webp"></label>
-        <div class="row"><button type="button" class="as-btn" data-csay>سأقولها بصوتي</button><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
+        <div class="row"><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
       d.querySelector("input[type=file]").onchange = async (e) => {
         const f = e.target.files?.[0]; if (!f) return;
         const fd = new FormData(); fd.append("file", f); d.querySelector(".as-drop span").textContent = "⏳ جارٍ سحب الألوان…";
@@ -730,7 +730,6 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
         d.remove(); changed(); chip(`✓ <span><b>ألوان العلامة</b> ${cols.map((c) => `<i class="as-cdot" style="background:${esc(c)}"></i>`).join("")}</span>`);
         return say("(اخترت ألوان العلامة)");
       }
-      if (e.target.closest("[data-csay]")) { d.remove(); return; }
       if (e.target.closest("[data-later]")) { d.remove(); say("سأختار الألوان لاحقًا"); }
     });
     q(".as-acts").before(d);

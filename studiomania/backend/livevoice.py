@@ -293,8 +293,9 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
                                              ("about", "What makes them different from others. Ask this in a SEPARATE turn, after the first answer; "
                                                        "save both answers together under [about]."))
                                             if qid == "about" and tools else
-                                            (("colors", q + " (call show_input kind=colors in the SAME turn: color strips to pick from, or a logo or "
-                                                         "screenshot to take the colors from. If they pick or upload, the colors are saved; do not ask again)"),)
+                                            (("colors", q + " (call show_input kind=colors in the SAME turn. Say in ONE sentence: they can tell you their colors, or pick "
+                                                         "from the color box on their screen, or put a picture or screenshot there and we take its colors. If they pick or "
+                                                         "upload, the colors are saved; do not ask again. If they say them, save_answer [colors])"),)
                                             if qid == "colors" and tools else ((qid, q),))]
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
     # ⭐ المشترك: بعد الأسئلة، الشعار وآراء العملاء (لو ناقصين) علشان فيديوهاته تتعمل بيهم من الأول
