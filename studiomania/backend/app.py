@@ -11870,6 +11870,35 @@ def brand_colors_text(ans: str) -> str:
     return "، ".join(f"{c} ({names[i]})" for i, c in enumerate(hexes[:5])) or ans[:300]
 
 
+# 🎨 سؤال الألوان: شرايط ألوان يختار منها (أولها ألوان شعاره)، أو صورة/سكرين شوت نسحب منها الألوان
+COLOR_PRESETS = [["#1F4D3A", "#C8F169", "#F3F5F1"], ["#0F2A4A", "#E5613E", "#F7F3EC"], ["#111111", "#D4AF37", "#F5F1E8"], ["#5B2A86", "#F2B5D4", "#FFF7FB"],
+                 ["#0B6E4F", "#F4D35E", "#FFFDF5"], ["#1D3557", "#457B9D", "#F1FAEE"], ["#7A1F2B", "#E9C46A", "#FFF8F0"], ["#264653", "#2A9D8F", "#E9F5F2"],
+                 ["#FF6B35", "#004E89", "#FFFFFF"], ["#3D2B1F", "#C69C6D", "#F8F1E7"]]
+
+
+@app.get("/api/ad-brains/{bid}/color-options")
+def brand_color_options(bid: str):
+    lg = logo_path(bid)
+    logo = firstvid.palette(lg) if lg and lg.is_file() else []
+    return {"logo": logo, "presets": COLOR_PRESETS}
+
+
+@app.post("/api/ad-brains/{bid}/colors-from-image")
+def brand_colors_from_image(bid: str, file: UploadFile = File(...)):
+    """صورة أو سكرين شوت (موقع، صفحة، منيو…) ← أهم ألوانها."""
+    if not brain_row(bid):
+        raise HTTPException(404, "العلامة غير موجودة")
+    tmp = TMP_DIR / f"colors-{uuid.uuid4().hex[:8]}{Path(file.filename or 'x.png').suffix.lower() or '.png'}"
+    tmp.write_bytes(file.file.read()[:15_000_000])
+    try:
+        cols = firstvid.palette(tmp, 4)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "تعذّر قراءة الصورة. جرّب صورة PNG أو JPG") from None
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {"colors": cols}
+
+
 def first_colors_apply(bid: str, path: Path) -> list[str]:
     """ألوان اللوجو ← فرع «الشكل» في العقل (لو العميل ماكتبش ألوانه بنفسه)."""
     cols = firstvid.palette(path)

@@ -36,7 +36,7 @@ const Assistant = (() => {
 .as-box b{font-size:14.5px}.as-box .as-err{margin:0;min-height:0}.as-box .as-err:empty{display:none}.as-box .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .as-box input[type=text]{width:min(64vw,300px);padding:10px 14px;border-radius:999px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.1);color:inherit;font:inherit;outline:0}
 .as-drop{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px 22px;border:1.5px dashed rgba(229,97,62,.7);border-radius:16px;cursor:pointer;font-size:14px}
-.as-drop.over{background:rgba(229,97,62,.12)}@keyframes asUp{from{opacity:0;transform:translateY(12px) scale(.96)}}
+.as-drop.over{background:rgba(229,97,62,.12)}.as-cstrips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:560px}.as-cstrip{display:flex;align-items:center;gap:0;padding:4px;border-radius:12px;background:rgba(255,255,255,.9);border:1.5px solid transparent;cursor:pointer}.as-cstrip:hover{border-color:#E5613E}.as-cstrip i{width:26px;height:26px}.as-cstrip i:first-child{border-radius:8px 0 0 8px}.as-cstrip i:last-of-type{border-radius:0 8px 8px 0}.as-cstrip small{font-size:11px;margin-inline:6px;color:#333}.as-cdot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-inline-start:4px;vertical-align:middle}@keyframes asUp{from{opacity:0;transform:translateY(12px) scale(.96)}}
 /* 🧠 من خريطة العقل: الكرة على اليمين من غير بلير، والعقل باين بيكبر في النص */
 .as-ov.dock{left:auto;right:0;width:min(380px,100vw);pointer-events:none;justify-content:flex-start;padding:96px 18px 24px}
 .as-ov.dock .as-acts{margin-top:auto}
@@ -602,6 +602,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     reviews: { t: "ارفع صور آراء عملائك (تقييمات جوجل أو رسائل واتساب)", accept: "image/png,image/jpeg,image/webp", multi: true, url: "/api/library/reviews", done: "رفعت آراء العملاء" },
     products: { t: "ارفع صور منتجاتك أو أعمالك", accept: "image/png,image/jpeg,image/webp", multi: true, kind: "products", done: "رفعت صور المنتجات" },
     intro: { t: "ارفع فيديو الإنترو", accept: "video/*", video: true, done: "رفعت فيديو الإنترو" },
+    colors: { t: "ألوان علامتك" },
     myvideo: { t: "ارفع فيديو قصيرًا تتحدث فيه (من ١٥ ثانية إلى دقيقة)", accept: "video/*", video: true, url: "/api/assistant/showcase/upload", done: "رفعت فيديو أتحدث فيه" },
   };
   // 🦷 فيديو المثال لعيادات الأسنان (حالة تجريبية، مش مريض حقيقي): بيتعرض، والمايك بيقفل وهو شغال، ولما يخلص سعاد تكمّل
@@ -664,6 +665,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
   function box(kind) {
     if (kind === "dental_case") return dentalBox();
     if (kind === "account") { q(".as-box")?.remove(); return acct(true); }
+    if (kind === "colors") return colorsBox();
     const k = BOX[kind]; q(".as-box")?.remove();
     if (!k || !ov) return;
     const d = document.createElement("div"); d.className = "as-box";
@@ -696,6 +698,42 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
     drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
     drop.ondragleave = () => drop.classList.remove("over");
     drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); up(e.dataTransfer.files); };
+  }
+  // 🎨 ألوان العلامة: شريط ألوان يختار منه (أوله ألوان شعاره)، أو صورة/سكرين شوت نسحب منها الألوان، أو يقولها بصوته
+  async function colorsBox() {
+    q(".as-box")?.remove();
+    if (!ov) return;
+    const d = document.createElement("div"); d.className = "as-box as-colors";
+    const bid = encodeURIComponent(state.brand || "");
+    const o = await api(`/api/ad-brains/${bid}/color-options`).catch(() => ({ logo: [], presets: [] }));
+    const strip = (cs, tag) => `<button type="button" class="as-cstrip" data-cols="${esc(cs.join(" "))}">${cs.map((c) => `<i style="background:${esc(c)}"></i>`).join("")}${tag ? `<small>${esc(tag)}</small>` : ""}</button>`;
+    const paint = (extra) => {
+      d.innerHTML = `<b>اختر ألوان علامتك</b><div class="as-cstrips">${extra || ""}${o.logo?.length ? strip(o.logo, "من شعارك") : ""}${(o.presets || []).map((p) => strip(p)).join("")}</div>
+        <label class="as-drop">🖼️ <span>أو ارفع صورة أو سكرين شوت (موقعك، صفحتك، المنيو…) ونأخذ ألوانها</span><input type="file" hidden accept="image/png,image/jpeg,image/webp"></label>
+        <div class="row"><button type="button" class="as-btn" data-csay>سأقولها بصوتي</button><button type="button" class="as-btn" data-later>لاحقًا</button></div><p class="as-err" data-berr></p>`;
+      d.querySelector("input[type=file]").onchange = async (e) => {
+        const f = e.target.files?.[0]; if (!f) return;
+        const fd = new FormData(); fd.append("file", f); d.querySelector(".as-drop span").textContent = "⏳ جارٍ سحب الألوان…";
+        try {
+          const r = await fetch(`/api/ad-brains/${bid}/colors-from-image`, { method: "POST", body: fd, credentials: "same-origin" });
+          const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || "تعذّر قراءة الصورة");
+          paint(strip(j.colors || [], "من صورتك"));
+        } catch (er) { d.querySelector("[data-berr]").textContent = er.message; }
+      };
+    };
+    paint();
+    d.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-cols]");
+      if (b) {
+        const cols = b.dataset.cols.split(" ").filter(Boolean);
+        await api(`/api/ad-brains/${bid}/quiz`, { method: "POST", ...jsonBody({ qid: "colors", answer: cols.join(" ") }) }).catch(() => {});
+        d.remove(); changed(); chip(`✓ <span><b>ألوان العلامة</b> ${cols.map((c) => `<i class="as-cdot" style="background:${esc(c)}"></i>`).join("")}</span>`);
+        return say("(اخترت ألوان العلامة)");
+      }
+      if (e.target.closest("[data-csay]")) { d.remove(); return; }
+      if (e.target.closest("[data-later]")) { d.remove(); say("سأختار الألوان لاحقًا"); }
+    });
+    q(".as-acts").before(d);
   }
   // 📼 مسجّل المكالمة (عشان نطوّر منطقها): كلامها وكلام العميل (المكتوب من الصوت أو الكتابة)، والأدوات ونتايجها، وأي «كمّلت لوحدها»
   // كتابة بس من غير صوت. بيتبعت كل ١٥ ثانية وفي الآخر، والخادم بيحفظه لو التسجيل مسموح (محادثات الأدمن دايمًا، والعملاء لو اتفعّل)

@@ -32,9 +32,9 @@ function twRender() {
       <b data-no-i18n>${twe(t.name)}</b>
       <small>${t.ready.video ? "🎬" : "○"} ${t.ready.photos}/${t.ready.angles} 📷 ${t.ready.voice ? "🎙️" : "○"}</small></div>`;
   setHTML(el, `${tw.adding ? `<section class="nh-panel nb-card ch-new"><form class="tw-new" data-twnew>
-        <div class="nb-row"><label class="nb-f"><span>اسم الشخص</span><input name="name" required maxlength="80" placeholder="مثلًا: أنا، أو سارة"></label></div>
+        <div class="nb-row"><label class="nb-f"><span>اسم الشخص</span><input type="text" name="name" required maxlength="80" placeholder="مثلًا: أنا، أو سارة"></label></div>
         <label class="tw-consent"><input type="checkbox" name="consent" required> الشخص الذي في التسجيلات أنا، أو وافق على استخدام وجهه وصوته</label>
-        <div class="nb-row"><button class="nb-btn">حفظ</button><button type="button" class="nb-btn danger" data-twnewx>إلغاء</button></div></form></section>` : ""}
+        <div class="nb-row"><button class="nb-btn fs-go">حفظ</button><button type="button" class="nb-btn" data-twnewx>إلغاء</button></div></form></section>` : ""}
     <p class="nb-hint">أفاتار لأي شخص: أنت، أو شخص آخر لديك إذنه. يُنشأ من تسجيلات حقيقية له (وجهه وحركته وملابسه وصوته)، لتصنع به فيديوهات بكلام جديد. يمكنك إنشاء أكثر من أفاتار.</p>
     <div class="as-sh"><h2>الأفاتار <span>(${tw.list.length})</span></h2></div>
     <div class="ch-grid as-grid">${tw.list.map(card).join("")}<button type="button" class="as-new" data-twadd><span>＋</span>أفاتار جديد</button></div>`);

@@ -139,9 +139,10 @@ TOOLS = [
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "show_input", "description": "Show a box on the user's screen to type or upload what you are asking for. "
      "Call it in the SAME turn you ask for it.",
-     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "reviews", "products", "intro", "rival", "dental_case", "none"],
+     "parameters": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["account", "logo", "reviews", "products", "intro", "rival", "colors", "dental_case", "none"],
          "description": "account: Instagram/TikTok link or @handle. logo: their logo image. reviews: screenshots of real customer reviews (Google reviews, WhatsApp or DM messages). products: photos of their products or work. "
                         "intro: a short video that opens their videos. rival: the link of a page they consider a competitor. "
+                        "colors: brand color strips to pick from, or upload a logo or any screenshot (website, page) to take the colors from. "
                         "dental_case: (dentists only) photo slots for ONE case: retractor before and retractor after are the two needed; smile and face photos are optional. "
                         "none: close the box (they said later / they have none)."},
          "template": {"type": "string", "enum": ["a03", "a24"], "description": "dental_case only: the template of the example he saw."}}, "required": ["kind"]}},
@@ -291,7 +292,10 @@ def instructions(dialect: str, agent: str = "", user: str = "محمود", agent_
     left = [x for qid, q in left for x in ((("about", "What they offer (their services / treatments). Ask this ALONE."),
                                              ("about", "What makes them different from others. Ask this in a SEPARATE turn, after the first answer; "
                                                        "save both answers together under [about]."))
-                                            if qid == "about" and tools else ((qid, q),))]
+                                            if qid == "about" and tools else
+                                            (("colors", q + " (call show_input kind=colors in the SAME turn: color strips to pick from, or a logo or "
+                                                         "screenshot to take the colors from. If they pick or upload, the colors are saved; do not ask again)"),)
+                                            if qid == "colors" and tools else ((qid, q),))]
     qs = "\n".join(f"   {i + 1}. " + (f"[{qid}] " if tools else "") + q for i, (qid, q) in enumerate(left)) or "   (all answered already: skip this step)"
     # ⭐ المشترك: بعد الأسئلة، الشعار وآراء العملاء (لو ناقصين) علشان فيديوهاته تتعمل بيهم من الأول
     need = [k for k in ("logo", "reviews") if not have.get(k)] if full and tools and not have.get("dental") else []
