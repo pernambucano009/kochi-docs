@@ -22757,6 +22757,7 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
         return out
     cost = wallet.credits(voice_usd(voice, text))
     wallet.need(cost, "التعليق الصوتي")
+    text = dub.tts_fem_kaf(text, lang)   # 🇸🇦 كاف المخاطَبة تتنطق كاف مش شين
     raw = out.with_suffix(".src")
     if str(voice).startswith("clone:"):   # 🎙️ صوت العميل المستنسخ: نسخة فورية من العينة، بتتمسح بعد الجملة
         _, cbid, nid = (voice.split(":") + ["", ""])[:3]

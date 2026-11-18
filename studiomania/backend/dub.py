@@ -228,6 +228,26 @@ def fix_najdi(text: str) -> str:
     return out
 
 
+_KAF_ROOT = {"ذلك", "كذلك", "لذلك", "هنالك", "ملك", "شبك", "فلك", "بنك", "تلك", "مشترك", "مبارك", "سمك", "سلك", "ديك", "شك", "ضحك", "حك",
+             "مسك", "ترك", "شارك", "تبارك", "بارك", "هلك", "سك", "بك", "لك", "فيك", "عليك", "منك", "عنك", "معك", "عندك"}
+_KAF_END = re.compile(r"(?<![\w])([\u0621-\u064A]{1,})ك(?![\u064B-\u0652\w])")
+
+
+def tts_fem_kaf(text: str, lang: str) -> str:
+    """🗣️ قبل الصوت: لو الكلام لأنثى، كاف المخاطَبة بتاخد كسرة (تمارينكِ). من غيرها صوت ElevenLabs بينطقها شين (تمارينش) بلكنة خليجية.
+    (الأمثلة اتجربت: من غير كسرة «تمارينش، تقدمش»، وبالكسرة «تمارينكي، تقدمكي».)"""
+    if lang not in ("ar-sa-najdi", "ar-sa-hijazi") or not isinstance(text, str) or not _FEM_CUE.search(text):
+        return text
+    def one(m):
+        w = m.group(0)
+        stem = m.group(1)
+        bare = w[1:] if len(w) > 3 and w[0] in "وف" else w
+        if bare in _KAF_ROOT - {"لك", "فيك", "عليك", "منك", "عنك", "معك", "عندك", "بك"} or len(stem) < 1:
+            return w
+        return w + "\u0650"
+    return _KAF_END.sub(one, text)
+
+
 def fix_dialect(obj, lang: str):
     """على كل الكلام جوه رد العقل (نص، قائمة، قاموس): بيتطبق على النجدي بس."""
     if lang != "ar-sa-najdi":
