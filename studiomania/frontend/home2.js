@@ -492,7 +492,7 @@ const NH = (() => {
       real.forEach((e) => (e.style.opacity = ""));
     });
   }
-  function zoomBack() {
+  function zoomBack(instant = false) {
     if (!zoom) return Promise.resolve();
     const z = zoom;
     zoom = null;
@@ -500,6 +500,7 @@ const NH = (() => {
     z.flies.forEach((f) => (f.style.opacity = ""));
     z.real.forEach((e) => (e.style.opacity = 0));
     z.anims.forEach((a) => a.reverse());
+    if (instant) z.anims.forEach((a) => a.finish());   // ورا صفحة مفتوحة فوقه: يرجع على طول من غير ما حد يشوف الحركة
     return z.anims[0].finished.then(() => {
       // نفس المجسّم اللي راجعين منه بيرجع حي في مكانه وبنفس وضعه (من لحظة اللقطة)، والصورة بتدوب فيه بهدوء
       GL?.rewind?.();
@@ -694,7 +695,7 @@ const NH = (() => {
     zoom.cleanup.push(() => { page.hidden = true; pGrid.innerHTML = ""; });
     renderBar();
   }
-  function closePage(all = false) {
+  function closePage(all = false, instant = false) {
     if (busy || !zoom?.page) return Promise.resolve();
     if (pStack.length && !all) { swapPage(pStack[pStack.length - 1].key, true); renderBar(); return Promise.resolve(); }
     // راجع للرئيسية على طول: العنوان الأصلي بيرجع الأول عشان يطير لمكان المربع
@@ -702,7 +703,7 @@ const NH = (() => {
     stopMedia();
     busy = true;
     zooming(true);
-    return zoomBack().then(() => { zooming(false); busy = false; renderBar(); refresh(); });
+    return zoomBack(instant).then(() => { zooming(false); busy = false; renderBar(); refresh(); });
   }
   document.getElementById("nhBack").onclick = () => closePage();
 
@@ -825,7 +826,7 @@ const NH = (() => {
     popping = true;
     try {
       await idle();
-      if (first === "home") { if (stageOpen()) await closeStage(); await idle(); if (zoom?.page) await closePage(true); return; }
+      if (first === "home") { if (stageOpen() && zoom?.page) { await closePage(true, true); await closeStage(); return; } if (stageOpen()) await closeStage(); await idle(); if (zoom?.page) await closePage(true); return; }
       const tile = pageTile(first) || (T[first]?.page && hostTile(first));
       if (tile) {
         if (stageOpen()) { await closeStage(); await idle(); }
@@ -871,6 +872,8 @@ const NH = (() => {
     const c = document.getElementById("nhCrumbs")._list?.[k];
     if (!c) return;
     if (c.lv === "stagekey") return showStep(c.key);
+    // 🏠 من جوه صفحة (المونتاج مثلًا) للرئيسية على طول: الصفحة اللي في النص بترجع ورا الصفحة المفتوحة من غير ما تبان، وبعدين انتقال واحد ناعم
+    if (c.lv === "home" && stageOpen() && zoom?.page) { await closePage(true, true); await closeStage(); return; }
     if (stageOpen()) await closeStage();
     if (c.lv === "home") { if (zoom?.page) await closePage(true); return; }
     if (c.lv === "pagekey" && c.key === pTitle.dataset.key) { MODS[pGrid.dataset.key]?.back?.(); return renderBar(); }
