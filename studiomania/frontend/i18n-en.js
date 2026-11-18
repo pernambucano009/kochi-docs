@@ -16769,4 +16769,7 @@ window.I18N_EN = {
   "يوجد فحص يعمل الآن": "A check is already running",
   "العينة غير موجودة": "Sample not found",
   "فحص الجودة (حكم صاحب المشروع): {0}: {1}": "Quality check (owner verdict): {0}: {1}",
+  "مراجعة المخرج أوقفت فيديو: {0}": "Director review held a video: {0}",
+  "لاحظنا شيئًا في الفيديو قبل نشره: {0}": "We noticed something in the video before posting it: {0}",
+  "نراجع الفيديو النهائي": "Reviewing the final video",
 };

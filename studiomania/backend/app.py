@@ -33885,15 +33885,21 @@ def pilot_slots(s: dict, start: datetime, hours: float = 24) -> list[datetime]:
 PILOT_TPL_WEEK = 5   # فيديوهات القوالب حشو: مش أكتر من ٥ في الأسبوع، والأساس محتوى العميل نفسه (الموبايل/الأفاتار)
 
 
-def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
-    """🎨 قالب الفيديو الجاي: من قوالب مجال العميل (والقوالب اللي كان اختارها)، اللي ماتستخدمش الأسبوع ده والأقدم استخدامًا،
-    وقالب آراء العملاء بس لو عنده آراء حقيقية. None لو اتعمل ٥ فيديوهات قوالب الأسبوع ده."""
+def pilot_tpl_cands(pool: list[str]) -> list[str]:
+    """القوالب اللي تصلح لمجال العميل (والقوالب اللي كان اختارها)."""
     bid = active_client_id()
     field = field_guess(brain_row(bid) or {}) if bid else ""
     cands = list(dict.fromkeys([*fieldpacks.field_reels(field), *[t for t in pool if t.startswith("t-")]]))
     cands = [t for t in cands if tplfit.auto_ok(t, field, chosen=t in pool)]   # 🎯 المتخصص يفضل في تخصصه
     if "t-review" in cands and not review_facts(bid):
         cands.remove("t-review")
+    return cands
+
+
+def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
+    """🎨 قالب الفيديو الجاي: من قوالب مجال العميل (والقوالب اللي كان اختارها)، اللي ماتستخدمش الأسبوع ده والأقدم استخدامًا،
+    وقالب آراء العملاء بس لو عنده آراء حقيقية. None لو اتعمل ٥ فيديوهات قوالب الأسبوع ده."""
+    cands = pilot_tpl_cands(pool)
     if not cands:
         return None
     week = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
@@ -33924,13 +33930,15 @@ def pilot_plan() -> None:
                 continue
             tpl = pool[d["rot"] % len(pool)]
             d["rot"] += 1
-            if tpl == "tpl:auto" or tpl.startswith("t-"):   # 🎨 القالب يختاره البرنامج (حد ٥ في الأسبوع ومن غير تكرار)
+            auto = tpl == "tpl:auto" or tpl.startswith("t-")
+            if auto:   # 🎨 القالب يختاره البرنامج (حد ٥ في الأسبوع ومن غير تكرار)
                 tpl = pilot_auto_tpl(d, pool)
                 if not tpl:
                     continue
             d["jobs"].insert(0, {"id": uuid.uuid4().hex[:8], "at": key, "tpl": tpl, "kind": pilot_kind(tpl), "name": pilot_tpl_name(tpl, s.get("names") or {}),
                                  "status": "run", "phase": "start", "gate": None, "passed": [], "note": "في الطابور", "error": None,
-                                 "fid": None, "project_id": None, "export_id": None, "post_id": None, "tries": 0, "created_at": now()})
+                                 "fid": None, "project_id": None, "export_id": None, "post_id": None, "tries": 0, "created_at": now(),
+                                 **({"auto_tpl": True} if auto else {})})
             have.add(key[:16])
         d["jobs"] = d["jobs"][:60]
     pilot_update(fn)
@@ -34022,6 +34030,110 @@ def pilot_fee() -> int:
     return wallet.credits(PILOT_FEE_USD)
 
 
+# 🎬 مخرج الأوتوبايلوت (كلود): بيختار القالب الأنسب لكل فيديو من قوالب مجال العميل، وبيشوف الفيديو النهائي قبل ما يتجدول.
+# بيتشغّل ويتقفل، والموديلات بتتغير من «فحص الجودة» في لوحة الأدمن. لو وقع: الأوتوبايلوت بيكمل زي ما كان.
+DIRECTOR_RUNNING: set[str] = set()
+
+
+def director_cfg() -> dict:
+    return qa.settings(PLATFORM_DIR)
+
+
+def director_pick(s: dict, j: dict, occ: str) -> dict | None:
+    cfg = director_cfg()
+    if not cfg.get("director_on") or atlas.mock_mode():
+        return None
+    try:
+        pool = [t for t in s.get("templates") or [] if isinstance(t, str)]
+        cands = pilot_tpl_cands(pool)
+        if len(cands) < 2:
+            return None
+        man = {m["id"]: m for m in json.loads((MOTION_DIR / "manifest.json").read_text("utf-8")) if isinstance(m, dict)}
+        d = pilot_load()
+        recent = [x["tpl"] for x in d["jobs"] if x.get("id") != j["id"] and str(x.get("tpl") or "").startswith("t-")][:10]
+        b = brain_row(active_client_id()) or {}
+        mem = mem_load(mem_cid({"client_id": active_client_id()}))
+        ideas = [str((x.get("item") or {}).get("title") or "") for x in mem.get("saved") or []
+                 if x.get("kind") == "idea" and x.get("mine") and not x.get("used_at")][:12]
+        lst = "\n".join(f"- {t}: {(man.get(t) or {}).get('name', '')}. {(man.get(t) or {}).get('use', '')}" for t in cands)
+        raw = ad_media_chat([{"role": "system", "content": "You are the creative director of a brand's short-video channel. Answer JSON only."},
+                             {"role": "user", "content": (f"Brand:\n{rivals.brand_info(b)}\n\nOccasion now: {occ or 'none'}\n"
+                                                          f"Ideas waiting in the brand's folder: {ideas or 'none'}\n"
+                                                          f"Templates used in the last videos (newest first, avoid repeating them): {recent or 'none'}\n\n"
+                                                          f"Pick the ONE template that will make the strongest next video for this brand and its audience now, "
+                                                          f"from this list only:\n{lst}\n"
+                                                          'Answer: {"tpl": "template id", "why": "one short Arabic sentence"}')}],
+                            max_tokens=400, models=[cfg["director_model"], "google/gemini-2.5-pro"])
+        v = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+        t = str(v.get("tpl") or "").strip()
+        if t not in cands:
+            return None
+        return {"tpl": t, "why": str(v.get("why") or "")[:200], "by": cfg["director_model"]}
+    except Exception as exc:  # noqa: BLE001
+        print(f"[director] pick: {str(exc)[:160]}", flush=True)
+        return None
+
+
+def director_review_due(j: dict) -> bool:
+    """True = المراجعة لسه شغالة (أو بدأت دلوقتي). بعد ما تخلص: لو فيه مشكلة، المهمة بتستنى موافقة العميل."""
+    rv = j.get("dir_rev")
+    if rv and rv.get("status") != "working":
+        return False
+    cfg = director_cfg()
+    if not cfg.get("director_on") or atlas.mock_mode() or not j.get("export_id"):
+        return False
+    if j["id"] in DIRECTOR_RUNNING:
+        return True
+    if rv and rv.get("status") == "working" and time.time() - float(rv.get("at") or 0) < 900:
+        return True
+    DIRECTOR_RUNNING.add(j["id"])
+    pilot_job_set(j["id"], dir_rev={"status": "working", "at": time.time()})
+    bid = active_client_id()
+
+    def go():
+        frames, res = [], {"status": "done", "ok": True, "notes": "", "at": time.time()}
+        try:
+            with closing(db()) as conn:
+                row = conn.execute("SELECT filename FROM exports WHERE id = ?", (j["export_id"],)).fetchone()
+            src = EXPORTS_DIR / row["filename"] if row else None
+            if not src or not src.is_file():
+                raise RuntimeError("export missing")
+            dur = media_info(src).duration or 10
+            for k in range(6):
+                f = TMP_DIR / f"dir_{uuid.uuid4().hex[:6]}.jpg"
+                typo_frame(src, dur * (k + 0.5) / 6, f, 540)
+                if f.is_file():
+                    frames.append(f)
+            fl = flow_load(j["fid"]) if j.get("fid") else {}
+            sc = (fl.get("scenario") or {}) if fl else {}
+            script = pilot_say(sc) if sc else ""
+            b = brain_row(bid) or {}
+            parts = [{"type": "text", "text": (
+                "These are 6 frames, in order, from a short vertical social video that is about to be posted automatically for this brand:\n"
+                f"{rivals.brand_info(b)}\nSpoken script: «{script[:1500]}»\n"
+                "Reject it ONLY for real problems a viewer would notice: text cut off at the edges or overlapping, unreadable text, "
+                "empty or black frames, broken or missing images, a wrong brand name, gibberish text, an obviously AI-deformed person or object, "
+                "mixed-gender scenes or immodest clothing, or content that does not match the script at all. "
+                'Answer JSON only: {"ok": true|false, "notes": "short Arabic description of the problem for the customer, empty if ok"}')}]
+            parts += [{"type": "image_url", "image_url": {"url": data_url(f, "image/jpeg")}} for f in frames]
+            v = qa_review(parts, director_cfg()["director_review_model"])
+            res.update(ok=v.get("ok") is not False, notes=v.get("notes") or "", by=v.get("by"))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[director] review {j['id']}: {str(exc)[:160]}", flush=True)
+        finally:
+            for f in frames:
+                f.unlink(missing_ok=True)
+            if res["ok"]:
+                pilot_job_set(j["id"], dir_rev=res)
+            else:
+                issues.record("qa", "/pilot/director-review", f"مراجعة المخرج أوقفت فيديو: {res['notes']}", ref=j["id"], user=bid or "")
+                pilot_job_set(j["id"], dir_rev=res, status="wait", gate="video",
+                              note=f"لاحظنا شيئًا في الفيديو قبل نشره: {res['notes']}"[:300])
+            DIRECTOR_RUNNING.discard(j["id"])
+    threading.Thread(target=go, daemon=True).start()
+    return True
+
+
 def pilot_step(j: dict, s: dict, port: int) -> None:
     """خطوة واحدة للمهمة (بدون ما نستنى عمل تقيل: العمل التقيل يُنشأ في الخلفية ونرجعله اللفة القادمة)."""
     jid, kind, ph = j["id"], j["kind"], j["phase"]
@@ -34041,6 +34153,14 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             raise HTTPException(400, "لا يوجد أفاتار جاهز في «الأفاتار». سجّل فيديو القراءة أو صورة أمامية أولًا")
         pre = j.get("preset") or {}
         occ = pilot_occasion(j.get("at"))
+        if j.get("auto_tpl") and not j.get("dir") and not (pre.get("title") or pre.get("idea")):   # 🎬 المخرج (كلود) بيختار القالب الأنسب
+            pick = director_pick(s, j, occ)
+            if pick and pick["tpl"] != j["tpl"]:
+                put(tpl=pick["tpl"], kind=pilot_kind(pick["tpl"]), name=pilot_tpl_name(pick["tpl"], s.get("names") or {}), dir=pick)
+                j = {**j, "tpl": pick["tpl"], "kind": pilot_kind(pick["tpl"]), "name": pilot_tpl_name(pick["tpl"], s.get("names") or {})}
+                kind = j["kind"]
+            elif pick:
+                put(dir=pick)
         f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=True, season=occ))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
         flow_update(f["id"], lambda x: x.update(pilot=jid))
         if not (pre.get("title") or pre.get("idea")):   # 💡 أغلب الأفكار من عقل العلامة، وفكرة جديدة أحيانًا (المناسبة لو فيه بتتقدّم)
@@ -34066,6 +34186,8 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         return put(phase="final", project_id=run.get("project_id"), export_id=ex, note="الفيديو جاهز")
 
     if ph in ("final", "schedule"):
+        if kind != "carousel" and director_review_due(j):   # 🎬 المخرج بيشوف الفيديو النهائي قبل ما يتجدول
+            return put(note="نراجع الفيديو النهائي")
         if gate("video", "الفيديو جاهز: انظر إليه ووافق لكي يتجدول"):
             return
         plats0 = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
