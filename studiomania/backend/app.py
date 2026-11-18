@@ -25429,7 +25429,7 @@ def flow_new(body: FlowNewIn):
             except (OSError, ValueError):
                 continue
             if old.get("client_id") == me and (old.get("template") or {}).get("id") == tpl.get("id") and not old.get("idea") \
-                    and not old.get("pilot") and old.get("stage") == "idea" and not old.get("busy"):
+                    and not old.get("pilot") and old.get("stage") == ("facts" if tpl.get("id") in FACT_TPLS else "idea") and not old.get("busy"):
                 return flow_to_dict(f.parent.name, old)
     fid = uuid.uuid4().hex[:10]
     d = {"client_id": active_client_id(), "template": tpl, "stage": "idea", "season": body.season.strip()[:200],
@@ -25437,7 +25437,7 @@ def flow_new(body: FlowNewIn):
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
     with FLOW_LOCK:
         flow_save(fid, d)
-    if tpl.get("id") in FACT_TPLS and not body.skip_ideas:   # 🧾 عرض السعر وآراء العملاء: أول خطوة التفاصيل نفسها، مش أفكار عامة
+    if tpl.get("id") in FACT_TPLS and (body.reuse or not body.skip_ideas):   # من الواجهة (reuse) أو أي بداية عادية، مش الأوتوبايلوت   # 🧾 عرض السعر وآراء العملاء: أول خطوة التفاصيل نفسها، مش أفكار عامة
         b0 = brain_row(d["client_id"]) or {}
         br = tplbrief.brief(tpl["id"], field_guess(b0), first_brand_name(b0)) or {}
         pre = review_facts(d["client_id"]) if tpl["id"] == "t-review" else {}
