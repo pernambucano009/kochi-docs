@@ -16849,4 +16849,12 @@ window.I18N_EN = {
   "من صورتك": "From your image",
   "(اخترت ألوان العلامة)": "(I picked the brand colors)",
   "سأختار الألوان لاحقًا": "I will pick the colors later",
+  "نصفين": "Split",
+  "زخرفة عربية": "Arabesque",
+  "جريدة": "Newspaper",
+  "ورق ملاحظات": "Sticky notes",
+  "باستيل ناعم": "Soft pastel",
+  "شبكة سويسرية": "Swiss grid",
+  "ملصق سينما": "Movie poster",
+  "فاتورة": "Receipt",
 };
