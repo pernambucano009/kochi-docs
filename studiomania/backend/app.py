@@ -25552,7 +25552,7 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
 
 
 FACT_TPLS = {"t-price": {"step": "العرض", "title": "تفاصيل العرض"}, "t-review": {"step": "الآراء", "title": "آراء عملائك وتقييمهم"},
-             "t-count": {"step": "العرض", "title": "العرض الذي ينتظره الناس"}, "t-map": {"step": "التوصيل", "title": "فرعك ومناطق التوصيل"}}
+             "t-count": {"step": "العرض", "title": "العرض الذي ينتظره الناس"}, "t-tilt": {"step": "الافتتاح", "title": "تفاصيل الافتتاح"}, "t-map": {"step": "التوصيل", "title": "فرعك ومناطق التوصيل"}}
 
 
 class FlowFactsIn(BaseModel):

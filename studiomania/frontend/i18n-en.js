@@ -16863,4 +16863,13 @@ window.I18N_EN = {
   "ستايلات الصور": "Image styles",
   "العرض الذي ينتظره الناس": "The offer people are waiting for",
   "فرعك ومناطق التوصيل": "Your branch and delivery areas",
+  "الافتتاح": "Opening",
+  "تفاصيل الافتتاح": "Opening details",
+  "سنصنع لك إعلان افتتاح: المدينة من أعلى كأنها مجسّم صغير، والناس يتجمعون عند فرعكم الجديد، ومعه الموعد.": "We will make you an opening ad: the city from above like a small model, people gathering at your new branch, with the date.",
+  "الخبر": "The news",
+  "مثال: افتتاح فرعنا الجديد في العليا": "e.g. Opening our new branch in Olaya",
+  "الموعد والمكان": "Date and place",
+  "مثال: الجمعة الجاية · الساعة ١٠ الصبح": "e.g. Next Friday · 10 AM",
+  "هدية أو عرض الافتتاح": "Opening gift or offer",
+  "مثال: قهوة مجانية لأول ١٠٠ زائر": "e.g. Free coffee for the first 100 visitors",
 };

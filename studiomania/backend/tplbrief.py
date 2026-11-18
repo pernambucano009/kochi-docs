@@ -110,6 +110,14 @@ BRIEFS: dict[str, dict] = {
             _q("img2", "صورته", "image", req=False),
         ],
     },
+    "t-tilt": {
+        "idea": "سنصنع لك إعلان افتتاح: المدينة من أعلى كأنها مجسّم صغير، والناس يتجمعون عند فرعكم الجديد، ومعه الموعد.",
+        "ask": [
+            _q("title", "الخبر", ph="مثال: افتتاح فرعنا الجديد في العليا", max=22),
+            _q("when", "الموعد والمكان", ph="مثال: الجمعة الجاية · الساعة ١٠ الصبح", max=32),
+            _q("gift", "هدية أو عرض الافتتاح", ph="مثال: قهوة مجانية لأول ١٠٠ زائر", req=False, max=40),
+        ],
+    },
     "t-count": {
         "idea": "سنصنع لك عدًّا تنازليًا يشد الانتباه، وعند الصفر يظهر عرضكم.",
         "ask": [
@@ -264,6 +272,9 @@ def apply(tpl: str, facts: dict, currency: str = "") -> tuple[dict, dict]:
         p.update(name1=f.get("name1"), price1=f"{ar_digits(f.get('price1', ''))}{cur}", name2=f.get("name2"), price2=f"{ar_digits(f.get('price2', ''))}{cur}")
         p.update({k: f[k] for k in ("img1", "img2") if f.get(k)})
         say.update(p1=f"{f.get('name1')} بـ {f.get('price1')}{cur}", p2=f"{f.get('name2')} بـ {f.get('price2')}{cur}")
+    elif tpl == "t-tilt":
+        p.update(title=f.get("title"), sub=f.get("when"))
+        say.update(news=f.get("title"), when=f.get("when"), gift=f.get("gift"))
     elif tpl == "t-count":
         p["offer"] = f.get("offer")
         say.update(offer=f.get("offer"), until=f.get("until"))
@@ -346,7 +357,11 @@ def auto_icons(tpl: str, params: dict) -> dict:
 
 
 # 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
-NOUNS_EN = {"dental": ("treatment", "your clinic's treatments", "the treatment"), 
+NOUNS_EN = {
+    "سنصنع لك إعلان افتتاح: المدينة من أعلى كأنها مجسّم صغير، والناس يتجمعون عند فرعكم الجديد، ومعه الموعد.": "We will make you an opening ad: the city from above like a small model, people gathering at your new branch, with the date.",
+    "الخبر": "The news", "مثال: افتتاح فرعنا الجديد في العليا": "e.g. Opening our new branch in Olaya", "الموعد والمكان": "Date and place",
+    "مثال: الجمعة الجاية · الساعة ١٠ الصبح": "e.g. Next Friday · 10 AM", "هدية أو عرض الافتتاح": "Opening gift or offer",
+    "مثال: قهوة مجانية لأول ١٠٠ زائر": "e.g. Free coffee for the first 100 visitors","dental": ("treatment", "your clinic's treatments", "the treatment"), 
     "food": ("dish", "your restaurant's menu", "the dish"), "beauty": ("service", "your salon's services", "the service"),
     "ecom": ("product", "your store", "the product"), "realestate": ("property", "your listings", "the property"),
     "edu": ("course", "your courses", "the course"), "fitness": ("membership", "your gym", "the membership"),
