@@ -22014,10 +22014,10 @@ TYTPL_STOCK_USD = 0.13   # صورة البداية + ١٠ ثواني Seedance Mi
 
 
 def tytpl_voice_b(lang: str, voice_a: str) -> str:
-    """الصوت التاني في الحوار: صوت تاني في نفس اللهجة (نوعه عكس الأول لو ينفع)."""
+    """الصوت التاني في الحوار: صوت تاني في نفس اللهجة ومن نفس النوع (راجلين أو ستين، من غير حوار بين راجل وست)."""
     vs = [v for v in dub.DIALECTS.get(lang, {}).get("voices") or [] if v != voice_a]
     ga = (dub.VOICES.get(voice_a) or {}).get("gender")
-    return next((v for v in vs if (dub.VOICES.get(v) or {}).get("gender") not in (None, ga)), vs[0] if vs else voice_a)
+    return next((v for v in vs if ga and (dub.VOICES.get(v) or {}).get("gender") == ga), vs[0] if vs else voice_a)
 
 
 def tytpl_stock(tid: str, script: str, field: str, folder: Path) -> Path | None:
