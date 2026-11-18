@@ -17117,6 +17117,54 @@ def draw_key(prompt: str, base: Path, target: Path, out: Path, size: str, i: int
     return out
 
 
+import stockgen  # noqa: E402  (🎞️ قواعد اللقطات المتولّدة: الشكل الطبيعي وفلتر الـ slop)
+
+
+def ai_natural(path: Path) -> Path:
+    """🎞️ قرار صاحب المشروع: أي لقطة متولّدة بالذكاء الاصطناعي بتاخد «الشكل الطبيعي» (كونتراست وتشبع أقل، بلور خفيف، حبيبات)
+    عشان مايبانش إنها AI. بيتطبق مكان الملف نفسه، والصوت بيفضل زي ما هو. لو فشل: اللقطة زي ما هي.
+    مابيتطبقش على وش العميل الحقيقي (الأفاتار بيتكلم، الليب سينك، زوايا الكاميرا لتصويره)."""
+    if atlas.mock_mode() or not path or not Path(path).is_file():
+        return path
+    try:
+        h = media_info(path).height or stockgen.BASE_H
+        tmp = Path(path).with_name(f".nat-{uuid.uuid4().hex[:6]}{Path(path).suffix}")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-vf", stockgen.natural_vf(h),
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", str(tmp)],
+                       check=True, capture_output=True, timeout=600)
+        tmp.replace(path)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[natural] {path}: {exc}", flush=True)
+    return path
+
+
+def ai_slop(path: Path) -> tuple[bool, str]:
+    """🔎 فلتر الـ AI slop: موديل رؤية بيشوف ٥ فريمات من اللقطة المتولّدة. يرجع (سليمة؟, السبب). لو الفحص نفسه وقع: سليمة."""
+    if atlas.mock_mode() or not Path(path).is_file():
+        return True, ""
+    frames = []
+    try:
+        dur = media_info(path).duration or 4
+        for k in range(5):
+            f = TMP_DIR / f"slop_{uuid.uuid4().hex[:6]}.jpg"
+            typo_frame(Path(path), dur * (k + 0.5) / 5, f, 512)
+            if f.is_file():
+                frames.append(f)
+        parts = [{"type": "text", "text": stockgen.SLOP_CHECK}] + [{"type": "image_url", "image_url": {"url": data_url(f, "image/jpeg")}} for f in frames]
+        raw = ad_media_chat([{"role": "user", "content": parts}], max_tokens=300, models=["google/gemini-2.5-flash", "google/gemini-2.5-pro"])
+        v = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+        ok, why = bool(v.get("ok")), str(v.get("problem") or "")[:200]
+        if not ok:
+            print(f"[slop] {Path(path).name}: {why}", flush=True)
+        return ok, why
+    except Exception as exc:  # noqa: BLE001
+        print(f"[slop] check skipped: {str(exc)[:120]}", flush=True)
+        return True, ""
+    finally:
+        for f in frames:
+            f.unlink(missing_ok=True)
+
+
 def gen_motion(model_key: str, resolution: str, ratio: str, prompt: str, img_a: Path, img_b: Path, secs: int,
                out: Path, W: int, H: int, what: str = "حركة الموصل") -> Path:
     """حركة بين صورة بداية وصورة نهاية (Seedance)."""
@@ -17131,6 +17179,7 @@ def gen_motion(model_key: str, resolution: str, ratio: str, prompt: str, img_a: 
             "image": atlas.reference_url(img_a), "last_image": atlas.reference_url(img_b),
             "duration": secs, "resolution": resolution, "ratio": ratio, "generate_audio": False}
     atlas.download(atlas.run_model("Video", body, what, max_seconds=1500, interval=6), out)
+    ai_natural(out)
     return out
 
 
@@ -19475,6 +19524,7 @@ def run_tv_once(vid: str) -> None:
                 if prev is not None:
                     body["reference_videos"] = [atlas.upload_media(prev)]
                 atlas.download(atlas.run_model("Video", body, "توليد الفيديو كله", max_seconds=1800, interval=6), folder / name)
+                ai_natural(folder / name)
             prev = folder / name
             parts.append(prev)
         tv_set(vid, step="🎞️ جارٍ تجهيز الفيديو")
@@ -23223,6 +23273,7 @@ def run_scenes_gen(vid: str, only: int | None) -> None:
                         "duration": int(SCENE_SEC), "resolution": d.get("resolution") or "480p", "ratio": ratio,
                         "generate_audio": True, "watermark": False}
                 atlas.download(atlas.run_model("Video", body, f"المشهد {i + 1}", max_seconds=1800, interval=6), folder / name)
+                ai_natural(folder / name)
 
             def fn(x, i=i, name=name):
                 old = (x.setdefault("scene_files", {}).get(str(i)) or {}).get("file")
@@ -23821,6 +23872,7 @@ def run_ad_gen(vid: str, only: str | None) -> None:
                        "reference_images": [atlas.reference_url(p) for p in refs], "duration": j["secs"],
                        "resolution": d.get("resolution") or "480p", "ratio": ratio, "generate_audio": True, "watermark": False}
                 atlas.download(atlas.run_model("Video", req, j["label"], max_seconds=1800, interval=6), folder / name)
+                ai_natural(folder / name)
 
             def fn(x, key=j["key"], name=name):
                 g = x["ad"].setdefault("gens", {})
@@ -27568,6 +27620,7 @@ def gen_video(prompt: str = Form(...), model: str = Form(VDEF), duration: int = 
             body = {"model": vm["model"], "prompt": prompt, "image": atlas.reference_url(start), "duration": secs,
                     "resolution": resolution, "ratio": ratio, "generate_audio": bool(audio), "watermark": False}
             atlas.download(atlas.run_model("Video", body, "مولد الفيديو", max_seconds=1800, interval=6), dest)
+            ai_natural(dest)
         dur = probe_duration(dest)
         export_id = uuid.uuid4().hex[:12]
         filename = f"gen_{export_id}.mp4"
@@ -30528,8 +30581,15 @@ def phone_broll_avatar(b: dict, people: list[Path], bg: Path | None, vertical: b
               + ". Photorealistic, natural phone-camera look, no talking to the camera, no text, no logos, no subtitles.")
     body = {"model": BROLL_MODEL, "prompt": prompt, "reference_images": refs, "duration": BROLL_AI_SEC, "resolution": "720p",
             "ratio": "9:16" if vertical else "16:9", "generate_audio": False, "watermark": False}
-    atlas.download(atlas.run_model("Video", body, "لقطة B-roll بالأفاتار", max_seconds=1500, interval=6), out)
-    return out
+    for attempt in range(2):   # 🔎 لقطة فيها AI slop: تتولد تاني مرة واحدة بلقطة أبسط، وبعدها تتشال
+        atlas.download(atlas.run_model("Video", body, "لقطة B-roll بالأفاتار", max_seconds=1500, interval=6), out)
+        ok, why = ai_slop(out)
+        if ok:
+            ai_natural(out)
+            return out
+        body = {**body, "prompt": stockgen.prompt(f"{b['prompt']} Avoid: {why}. Keep it simpler, from the side or from behind")}
+    out.unlink(missing_ok=True)
+    return None
 
 
 def phone_auto_broll(d: dict, path: Path, shots: list[tuple[float, float]], words: list[dict], starts: list[tuple[float, float]],
@@ -32694,6 +32754,7 @@ def auto_gen_piece(src: Path, dur: float, g: dict, dest: Path, run_id: str, rati
                 if end:
                     body["last_image"] = atlas.upload_media(seedance_ref(end))
         atlas.download(atlas.run_model("Video", body, cand["label"], max_seconds=2400, interval=6), dest)
+        ai_natural(dest)
         wallet.charge(cost, f"قالب مخصص: توليد قطعة ({cand['label']})", run_id)
         return cand["label"]
     finally:
