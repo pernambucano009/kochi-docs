@@ -22161,6 +22161,11 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
         lines = [(w, t) for w, t in lines if t.strip()]
         if not lines:
             raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
+        if not voice:   # 🔇 بدون صوت: الكلام بيظهر على توقيت تقريبي (على قد طول كل كلمة)، والأصوات الرسمية بس
+            words = typotpl.align(" ".join(t for _, t in lines).split(), [])
+            dur = round(words[-1]["e"] + 0.9, 2)
+            typo_update(pid, lambda x: x.update(source=None, words=words, duration=dur, style="hairline" if tid == "hairline" else x.get("style")))
+            return tytpl_finish(pid, tid, sp, words, dur, {"kind": "theme", "color": "#0E0E10"}, None, script, field, render)
         vb = tytpl_voice_b(lang, voice) if tid in typotpl.TWO_VOICES else voice
         parts = []
         for i, (who, text) in enumerate(lines):
@@ -22186,13 +22191,18 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
         words = typotpl.align(" ".join(t for _, t in lines).split(), heard)
         dur = round(max(vdur, words[-1]["e"]) + 0.9, 2)
         bg = {"kind": "theme", "color": "#0E0E10"}
-        if sp["type"] == "stock":
-            typo_set(pid, step="🎞️ جارٍ توليد لقطة الخلفية")
-            clip = tytpl_stock(tid, typotpl.clean_script(script), field, folder)
-            if clip:
-                bg = {"kind": "video", "file": clip.name, "dim": typotpl.DIM}
-        if tid == "hairline":
-            typo_update(pid, lambda x: x.update(source={"kind": "audio", "file": wav.name}, words=words, duration=dur, bg=bg, style="hairline"))
+        return tytpl_finish(pid, tid, sp, words, dur, bg, wav, script, field, render)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[tytpl] {pid}: {exc}", flush=True)
+        typo_fail(pid, exc)
+
+
+def tytpl_finish(pid: str, tid: str, sp: dict, words: list, dur: float, bg: dict, wav: Path | None, script: str, field: str, render: bool) -> None:
+    """بعد الصوت (أو من غيره): الخلفية ← توزيع الكلام على الحركات ← الرسم."""
+    try:
+        src = {"kind": "audio", "file": wav.name} if wav else None
+        if tid in ("hairline", "typo"):   # ✏️ خطوط رفيعة / تايبوجرافي عام: التوزيع بستايله هو
+            typo_update(pid, lambda x: x.update(source=src, words=words, duration=dur, bg=bg, **({"style": "hairline"} if tid == "hairline" else {})))
             typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
             run_typo_plan(pid)
             if typo_load(pid).get("status") != "planned":
@@ -22201,12 +22211,17 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
                 typo_set(pid, status="rendering", step="🎬 يُجهّز")
                 run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
             return
+        if sp["type"] == "stock":
+            typo_set(pid, step="🎞️ جارٍ توليد لقطة الخلفية")
+            clip = tytpl_stock(tid, typotpl.clean_script(script), field, TYPO_PROJ / pid)
+            if clip:
+                bg = {"kind": "video", "file": clip.name, "dim": typotpl.DIM}
         typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
         blocks = typo.studio_plan(words, dur, None, sp["collection"], sp["seed"])
         for i, b in enumerate(blocks):   # الحركات الثابتة للقالب، وفوق اللقطة: كلها بتسيب اللقطة باينة (بالدور على حركات القالب)
             if i < len(sp["kinds"]) or bg["kind"] == "video":
                 b["kind"] = sp["kinds"][i % len(sp["kinds"])]
-        typo_update(pid, lambda x: x.update(source={"kind": "audio", "file": wav.name}, words=words, duration=dur, bg=bg, blocks=blocks,
+        typo_update(pid, lambda x: x.update(source=src, words=words, duration=dur, bg=bg, blocks=blocks,
                                             collection=sp["collection"], status="planned", step=None, error=None))
         if render:
             typo_set(pid, status="rendering", step="🎬 يُجهّز")
@@ -22265,15 +22280,17 @@ def typo_logo_end(pid: str, tid: str) -> None:
 def tytpl_start(fid: str) -> str:
     """من المسار (أو الأوتوبايلوت): السكريبت المختار ← مشروع القالب."""
     d = flow_load(fid)
-    tid = d["template"].get("preset") or d["template"]["id"]
+    tid = d["template"].get("preset") or ("typo" if d["template"]["id"] == "typo" else d["template"]["id"])
     sc = d.get("scenario") or {}
     script = "\n".join(str(b.get("say") or b.get("text") or "").strip() for b in sc.get("beats") or sc.get("scenes") or []).strip() \
         or str(sc.get("text") or sc.get("summary") or "")
     if not script:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
-    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    vo = d.get("vo") or {}
+    lang = vo.get("lang") if vo.get("lang") in dub.DIALECTS else d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     bid = d.get("client_id") or active_client_id()
-    voice = brand_narrator(lang, bid, advance=True)
+    # 🎙️ الصوت اللي اختاره في خطوة الصوت، و«بدون صوت» = كلام على الشاشة بس (الأوتوبايلوت: صوت الراوي)
+    voice = "" if vo and vo.get("on") is False else (vo.get("voice") or brand_narrator(lang, bid, advance=True))
     field = field_guess(brain_row(bid) or {}) if bid else ""
     title = (d.get("idea") or {}).get("title") or d["template"]["name"]
     return tytpl_new(tid, f"🧭 {title}", script, lang, voice, bid, field)
@@ -26406,7 +26423,7 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") == "motion"
         # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
         kd = d["template"].get("kind")
-        d.update(scenario=it, stage="voice" if code else "generate" if kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "carousel" if kd == "carousel" else "cast", **({"vo_track": None} if code else {}))
+        d.update(scenario=it, stage="voice" if code or kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "carousel" if kd == "carousel" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     d = flow_update(fid, fn)
@@ -26969,7 +26986,8 @@ def flow_voice(fid: str, body: FlowVoiceIn):
         if vo["on"]:
             flow_job(fid, "vo", lambda: flow_make_vo(fid))
         return flow_to_dict(fid, flow_load(fid))
-    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage="assets")))
+    nxt = "generate" if d["template"].get("kind") == "typo" else "assets"   # 🔤 التايبوجرافي: الصوت (أو بدون صوت) ← الفيديو
+    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage=nxt)))
 
 
 # 🔊 عينة لكل صوت (جملة قصيرة باللهجة)، بتتعمل مرة واحدة وتتحفظ، فمابتتحسبش غير أول مرة
@@ -27858,7 +27876,7 @@ def flow_generate(fid: str, body: FlowGoIn):
             flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
             run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, flow_els_inline(params), f"🧭 {title}")
         flow_job(fid, "generate", run_motion)
-    elif tpl["kind"] == "typo" and (tpl.get("preset") in typotpl.SPECS or tpl.get("preset") == "hairline"):
+    elif tpl["kind"] == "typo":
         pid = tytpl_start(fid)
         flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": pid, "status": "done"}, stage="done"))
     elif tpl["kind"] == "typo":
