@@ -3438,3 +3438,4 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .mt-fnext:hover { transform: translateY(-1px); }
 :root:root .stage .project-bar .mt-export { background: var(--ink, #1D1B19); color: var(--card, #fff); box-shadow: 0 10px 24px rgba(0, 0, 0, .18); border-color: transparent; }
 :root[data-nh-theme="dark"] .mt-fnext, :root[data-nh-theme="dark"] .stage .project-bar .mt-export { background: #F2EFEA; color: #1D1B19; }
+#carTemplates .car-asset { width: 124px; } #carTemplates .car-asset span { font-size: 12.5px; }

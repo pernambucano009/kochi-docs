@@ -922,8 +922,8 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
           <div class="car-layout">
             <aside class="panel car-list-panel">
               <div class="panel-head"><h2>الكاروسيلات</h2>
-                <span class="row"><button class="btn sm" id="carLibOpen" title="قوالب وشخصيات"><span class="emo">📚</span> المكتبة</button>
-                <button class="btn sm" id="carBrandOpen" title="الهوية البصرية والنماذج"><span class="emo">🎨</span> الهوية</button></span></div>
+                <span class="row"><button class="btn sm" id="carLibOpen" title="قوالب وشخصيات" hidden><span class="emo">📚</span> المكتبة</button>
+                <button class="btn sm" id="carBrandOpen" title="الهوية البصرية والنماذج" hidden><span class="emo">🎨</span> الهوية</button></span></div>
               <form class="row" id="carNewForm"><input type="text" id="carNewName" placeholder="موضوع الكاروسيل"><button class="btn primary sm" type="submit">＋ جديد</button></form>
               <ul class="car-list" id="carList"></ul>
               <p class="empty" id="carListEmpty">لا توجد كاروسيلات بعد. اكتب موضوعًا واضغط جديد.</p>
@@ -955,20 +955,20 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
                   <button class="btn sm" data-q="اختر أقوى فكرة وقولي له، واقترح هوك أقوى لأول سلايد"><span class="emo">🎯</span> أقوى فكرة</button>
                 </div>
                 <div class="car-setup">
-                  <p class="hint car-mix-hint">اختر ما يعجبك من كل شيء واجمعها معًا (قالب + أسلوب + شخصيات + شخصية). كلها اختيارية، وضغطة أخرى على أي شيء تلغيه. دون اختيار يرسم البرنامج بأسلوب العميل.</p>
+                  <p class="hint car-mix-hint">اختر ستايل الكاروسيل. يُرسم بألوان علامتك وشعارها وخطها، وضغطة أخرى على الستايل تلغيه.</p>
                   <div class="car-pick" id="carPickTemplate">
-                    <div class="car-setup-title">🧩 التصميم (قالب) <a href="#" class="lib-link" data-lib="template"><span class="emo">📚</span> المكتبة</a></div>
+                    <div class="car-setup-title">🎨 الستايل</div>
                     <div class="car-assets" id="carTemplates"></div>
                   </div>
-                  <div class="car-pick" id="carPickStyle">
+                  <div class="car-pick" id="carPickStyle" hidden>
                     <div class="car-setup-title">🎨 أسلوب الرسم <a href="#" class="lib-link" data-lib="style"><span class="emo">📚</span> المكتبة</a></div>
                     <div class="car-assets" id="carStyles"></div>
                   </div>
-                  <div class="car-pick" id="carPickChars">
+                  <div class="car-pick" id="carPickChars" hidden>
                     <div class="car-setup-title">🧑‍🎨 الشخصيات (حتى 4) <a href="#" class="lib-link" data-lib="character"><span class="emo">📚</span> المكتبة</a></div>
                     <div class="car-assets" id="carChars"></div>
                   </div>
-                  <div class="car-pick" id="carPickCoach">
+                  <div class="car-pick" id="carPickCoach" hidden>
                     <div class="car-setup-title">🏋️ الشخصية (من مكتبة الشخصيات)</div>
                     <div class="car-assets" id="carCoaches"></div>
                     <span class="hint" id="carCoachNote"></span>

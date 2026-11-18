@@ -8048,10 +8048,20 @@ def get_asset(conn: sqlite3.Connection, aid: str) -> sqlite3.Row:
     return r
 
 
+def car_style_asset(sid: str) -> dict:
+    """🎨 ستايل كاروسيل جاهز (cs-<id>) بنفس شكل عنصر المكتبة: شرائحه المرجعية الثلاثة."""
+    k = cz.style_id(sid)
+    name, prompt = cz.STYLES[k]
+    files = [FRONTEND_DIR / "gallery" / "carstyle" / f"{k}-{i}.jpg" for i in range(3)]
+    return {"id": f"cs-{k}", "kind": "template", "name": name, "notes": f"{prompt}. {cz.STYLE_RULE}", "handle": "", "builtin": True,
+            "images": [{"name": f.name, "url": f"/gallery/carstyle/{f.name}", "path": str(f)} for f in files if f.is_file()]}
+
+
 @app.get("/api/carousel/library")
 def carousel_library():
     with closing(db()) as conn:
-        return [asset_to_dict(r) for r in conn.execute("SELECT * FROM carousel_assets ORDER BY created_at")]
+        own = [asset_to_dict(r) for r in conn.execute("SELECT * FROM carousel_assets ORDER BY created_at")]
+    return [car_style_asset(f"cs-{k}") for k in cz.STYLES] + own
 
 
 def add_asset_files(aid: str, current: list[str], files: list[UploadFile]) -> tuple[list[str], int]:
@@ -8490,7 +8500,11 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
                 return None
             return conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = ?", (aid, kind)).fetchone()
 
-        if r := asset(st.get("template_id"), "template"):
+        if cz.style_id(st.get("template_id")):   # 🎨 ستايل جاهز
+            a = car_style_asset(st["template_id"])
+            ctx["template"] = {"name": a["name"], "notes": a["notes"]}
+            assets["template"] = a
+        elif r := asset(st.get("template_id"), "template"):
             ctx["template"] = {"name": r["name"], "notes": r["notes"]}
             assets["template"] = asset_to_dict(r)
         for aid in st.get("character_ids") or []:
@@ -8596,7 +8610,7 @@ def reference_list(first: list[Path], assets: dict) -> tuple[list[Path], dict]:
         return len(files)
 
     def add_asset(a: dict, limit: int) -> list[int]:
-        return [i for img in a["images"][:max(0, limit)] if (i := add(LIBRARY_DIR / a["id"] / img["name"]))]
+        return [i for img in a["images"][:max(0, limit)] if (i := add(Path(img["path"]) if img.get("path") else LIBRARY_DIR / a["id"] / img["name"]))]
 
     logo = logo_path()
     if logo and (i := add(logo)):

@@ -105,13 +105,16 @@ def style_text(style: dict | None) -> str | None:
             + ". Keep its line work, shapes, proportions, shading and texture, but use ONLY the brand colors below.")
 
 
-def brand_block(brand: dict, kind: str = "characters", style: dict | None = None) -> str:
+def brand_block(brand: dict, kind: str = "characters", style: dict | None = None, tpl: bool = False) -> str:
     b = full_brand(brand)
     lines = [f"Brand: {b['name'] or 'the brand'}. {b['about']}".strip(), f"Audience: {b['audience']}" if b["audience"] else ""]
     if b.get("market"):
         lines.append(f"Market: {b['market']}")
     lines = [x for x in lines if x]
-    lines.append(f"Illustration style (for every character, icon and drawing): {style_text(style) or b['style']}")
+    if tpl and not style:   # 🎨 ستايل/تمبليت مختار: هو اللي بيحدد نوع الصور (صورة، رسم، كلام بس)، مش أسلوب الرسم الافتراضي
+        lines.append("Imagery style: exactly as the design template references show (photo, illustration, 3D or type only).")
+    else:
+        lines.append(f"Illustration style (for every character, icon and drawing): {style_text(style) or b['style']}")
     lines.append(f"Typography: {b['font']}")
     if b.get("colors"):
         lines.append(f"Brand colors (use these as the palette, exact hex values): {b['colors']}")
@@ -337,7 +340,7 @@ def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) 
         "Every panel is a finished slide. All panels share one visual system: same background treatment, "
         "same color palette, same typography, same characters, same logo position.",
         kind_design_rules(ctx, brand),
-        brand_block(brand, style=ctx.get("style")),
+        brand_block(brand, style=ctx.get("style"), tpl=bool(ctx.get("template"))),
         TEXT_RULES,
     ]
     lines += reference_notes(refs)
@@ -359,7 +362,7 @@ def slide_prompt(brand: dict, plan: dict, k: int, ratio: str, refs: dict, ctx: d
     ]
     if refs.get("previous"):
         lines.append("Reference image 2 is the finished previous slide: match its exact style, colors, fonts and character design.")
-    lines += [kind_design_rules(ctx, brand), brand_block(brand, style=ctx.get("style")), TEXT_RULES]
+    lines += [kind_design_rules(ctx, brand), brand_block(brand, style=ctx.get("style"), tpl=bool(ctx.get("template"))), TEXT_RULES]
     lines += reference_notes(refs)
     lines.append(f"Slide {k} text: {slide_text(s)}")
     lines.append(f"Visual: {s.get('visual') or 'supporting visual'}")
@@ -464,3 +467,27 @@ def mock_plan(slides: int, cta: str | None = None) -> str:
     return json.dumps({"title": "الراحة جزء من التمرين", "caption": "الراحة مو رفاهية 💪", "hashtags": ["#لياقة"],
                        "slides": items[: slides - 1] + [{"headline": cta, "body": "", "visual": "call to action"} if cta else items[-1]]},
                       ensure_ascii=False)
+
+# 🎨 ستايلات الكاروسيل الجاهزة (اتعتمدت ١٨ نوفمبر): كل ستايل = ٣ شرائح مرجعية (غلاف، محتوى، دعوة) لعلامة تجريبية
+# في frontend/gallery/carstyle/<id>-<0..2>.jpg + وصف. الرسم بياخد التقسيم والخطوط والإحساس من المرجع، والألوان والشعار من العلامة.
+STYLES = {
+    "editorial": ("مجلة", "editorial magazine layout on warm cream paper, a large elegant Arabic serif-style headline, thin black rules, generous margins, page number in a corner"),
+    "bold": ("كلام عريض", "bold typographic poster: huge heavy Arabic words filling the slide on a flat bright background in the brand accent color, text in the brand main color, no images"),
+    "photo": ("صورة وكلام", "full-bleed realistic photo from the brand's world (objects, places, hands; no faces) with a dark bottom gradient and a white headline over it"),
+    "minimal": ("بسيط", "minimal clean white slide, lots of empty space, one small lime accent shape, small neat dark green Arabic text, one thin line icon"),
+    "notes": ("ملاحظة جوال", "looks like a phone notes app or a social post card: white rounded card with a tiny avatar and name row, simple black Arabic text, on a soft background tinted with the brand color"),
+    "doodle": ("رسم يدوي", "hand-drawn marker doodles on off-white paper: arrows, circles and underlines drawn around handwritten-style Arabic words"),
+    "glass": ("زجاج متدرّج", "soft gradient background from the brand main color to its accent with a frosted glass rounded card in the middle holding the text, subtle glow"),
+    "riso": ("طباعة ريزو", "risograph print look: two inks (the two brand colors) with grainy halftone texture, slight misregistration, bold shapes"),
+    "lux": ("فخم", "premium dark slide: matte black background, thin gold lines and gold accents, refined Arabic typography (gold may be replaced by the brand accent if it is not gold)"),
+    "steps": ("خطوات ومعلومة", "infographic: numbered badge, simple flat icons, a clean card layout with a big number and short text, like an explainer"),
+    "collage": ("قص ولصق", "paper collage: torn paper pieces, tape strips, cut-out photos of the brand's products or tools (no people), stickers, text on torn paper labels"),
+    "clay": ("مجسمات ثلاثية", "soft 3D clay-like icons of the brand's own products or tools floating on a pastel background tinted with the brand accent, rounded friendly Arabic headline"),
+}
+STYLE_RULE = ("The references show an EXAMPLE brand («نادي الحركة», green and lime): never copy its name, its text, its photos or its colors. "
+              "Copy only the design system (layout, typography treatment, decoration, mood) and apply it to this brand's colors and content.")
+
+
+def style_id(sid) -> str | None:
+    s = str(sid or "")
+    return s[3:] if s.startswith("cs-") and s[3:] in STYLES else None

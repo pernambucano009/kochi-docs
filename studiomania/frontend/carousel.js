@@ -180,7 +180,8 @@ function renderSetup() {
   const st = car.cur.settings;
   const picked = new Set(st.character_ids || []);
   const empty = (what) => `<span class="muted">لا يوجد ${what} بعد. أضف من 📚 المكتبة.</span>`;
-  $("carTemplates").innerHTML = car.lib.filter((a) => a.kind === "template").map((a) => assetThumb(a, a.id === st.template_id)).join("") || empty("قوالب");
+  // 🎨 الستايلات الجاهزة بس (المكتبة القديمة اتشالت من هنا)
+  $("carTemplates").innerHTML = car.lib.filter((a) => a.builtin || a.id === st.template_id).filter((a) => a.kind === "template").map((a) => assetThumb(a, a.id === st.template_id)).join("");
   $("carStyles").innerHTML = car.lib.filter((a) => a.kind === "style").map((a) => assetThumb(a, a.id === st.style_id)).join("") || empty("أساليب");
   $("carChars").innerHTML = car.lib.filter((a) => a.kind === "character").map((a) => assetThumb(a, picked.has(a.id))).join("") || empty("شخصيات");
   $("carCoaches").innerHTML = car.coaches.map((c) => coachThumb(c, c.id === st.coach_id)).join("")
