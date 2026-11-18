@@ -773,7 +773,8 @@ const NH = (() => {
     const out = [{ label: "الرئيسية", lv: "home" }];
     // قسم مفتوح فوق صفحة (الإعدادات فوق «باقتي ونقاطي» مثلًا): انت دلوقتي في القسم، فالصفحة اللي تحته مش جزء من المسار
     if (zoom?.page && !(stageOpen() && stageTrail.length)) {
-      const cur = pTitle.dataset.key, par = PAGE_PARENT[cur];
+      // 📍 الصفحة اتفتحت من صفحة تانية (الأفاتار من «ابدأ مشروع جديد» مثلًا): المسار هو اللي مشي فيه، مش مكانها الأصلي
+      const cur = pTitle.dataset.key, par = pStack.length && pStack[pStack.length - 1].tkey !== cur ? pStack[pStack.length - 1].tkey : PAGE_PARENT[cur];
       if (par && T[par]) out.push({ label: T[par].ar, lv: "pagekey", key: par });
       out.push({ label: T[cur]?.ar || "", lv: "pagekey", key: cur });
       const sub = MODS[pGrid.dataset.key]?.sub?.();

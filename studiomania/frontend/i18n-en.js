@@ -6435,7 +6435,7 @@ window.I18N_EN = {
   "اسم الشخص": "Person's name",
   "أفاتار لأي شخص: أنت، أو شخص آخر لديك إذنه. يُنشأ من تسجيلات حقيقية له (وجهه وحركته وملابسه وصوته)، لتصنع به فيديوهات بكلام جديد. يمكنك إنشاء أكثر من أفاتار.": "An avatar of anyone: you, or someone whose permission you have. It's built from real recordings (face, motion, clothes and voice) so you can make videos with new words. You can create more than one.",
   "أفاتار لأي شخص: أنت، أو حد آخر معك إذنه. يُنشأ من تسجيلات حقيقية له (وشّه وحركته ولبسه وصوته)، لكي تعمل به فيديوهات بكلام جديد. يمكنك تعمل أكثر من أفاتار.": "An avatar of anyone: you, or someone whose permission you have. It's built from real recordings (face, motion, clothes and voice) so you can make videos with new words. You can create more than one.",
-  "هذا أنا، أو لدي إذن صريح من الشخص بإنشاء نسخة منه": "This is me, or I have the person's explicit permission to make a copy of them",
+  "الشخص الذي في التسجيلات أنا، أو وافق على استخدام وجهه وصوته": "The person in the recordings is me, or agreed to the use of their face and voice",
   "هذا أنا، أو معي إذن صريح من الشخص إننا نعمل نسخة منه": "This is me, or I have the person's explicit permission to make a copy of them",
   "＋ أفاتار جديد": "＋ New avatar",
   "أنشئ أفاتارًا جديدًا من اليسار، وسنرافقك خطوة خطوة.": "Create a new avatar on the left and we'll guide you step by step.",
