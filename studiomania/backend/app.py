@@ -13189,6 +13189,14 @@ def brain_quiz_answer(bid: str, body: QuizIn):
                     d[to["pick"]] = ans
                     if to["pick"] == "type":
                         d["type_set"] = True
+            elif "dm" in to:   # 💬 «علّق بكلمة»: لا ← مقفول، وإلا الكلمة (بين علامتين لو موجودة، وإلا آخر كلمة) ← في كل منشور
+                if re.match(r"^\s*(لا|لأ|no|مش|مو|ما ابي|ما أبي|لا شكرا)\b", ans, re.I):
+                    d.update(dm_mode="off")
+                else:
+                    m = re.search(r"[«\"'“](.+?)[»\"'”]", ans)
+                    w = (m.group(1) if m else (re.findall(r"[\w\u0600-\u06FF]+", ans) or [""])[-1]).strip()[:30]
+                    if w:
+                        d.update(dm_mode="always", dm_word=w)
             elif "rules" in to:
                 have = [r for r in str(d.get("rules") or "").split("\n") if r.strip()]
                 # سؤال «إيه الممنوع؟»: الإجابة بتتكتب قاعدة واضحة («ممنوع في المحتوى: …») مش كلمة لوحدها

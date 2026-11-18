@@ -94,10 +94,10 @@ VOICE_GENDER = {"marin": "f", "cedar": "m", "coral": "f", "sage": "f", "shimmer"
 # أسئلة العقل اللي الموديل بيسألها بالترتيب (من نفس كويز العقل، عشان كل إجابة تروح خانتها)
 SKIP_Q = {"language", "link", "type"}   # اللهجة معروفة من التسجيل، والحساب بيتطلب الأول، والنوع بيبان من الوصف
 # 💸 المكالمة استعراض (وبتتكلف فلوس): بنسأل بس اللي محتاجينه عشان نحلل ونجيب منافسين ونعمل الفيديو. الباقي العقل بيسأله بعدين
-CALL_Q = ["domain", "about", "audience", "market"]
+CALL_Q = ["domain", "about", "audience", "market", "cta", "dm"]   # 📣 الأساسيات: الدعوة في آخر الفيديو، و«علّق بكلمة»
 # 🧠 المكالمة الكاملة (للمشترك): كل أسئلة العقل اللي ينفع تتسأل بالصوت. المنافسون ليهم محطة لوحدهم، واللينك/اللهجة/النوع في SKIP_Q.
 # المجاني بيفضل على CALL_Q (تكلفة الصوت)، والباقي بيملاه كتابة من اختبار العقل.
-FULL_Q = ["domain", "about", "audience", "pain", "market", "voice", "products", "offer", "proof", "faq", "rules", "cta"]
+FULL_Q = ["domain", "about", "audience", "pain", "market", "voice", "products", "offer", "proof", "faq", "rules", "cta", "dm"]
 
 
 def agent_name(dialect: str, gender: str) -> str:

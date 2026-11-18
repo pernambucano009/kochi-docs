@@ -50,6 +50,10 @@ Q = [
     {"id": "cta", "to": {"field": "cta"},
      "ar": "ماذا تريد من المشاهد أن يفعل بعد أن يرى الفيديو؟", "en": "What should viewers do after watching?",
      "ph_ar": "مثلًا: اطلب الآن، احجز موعدك، حمّل التطبيق", "ph_en": "e.g. order now, book a visit, download the app"},
+    # 💬 «علّق بكلمة»: اللي يعلّق بالكلمة دي يوصله رد تلقائي في الرسائل. الإجابة = الكلمة نفسها، أو «لا»
+    {"id": "dm", "to": {"dm": True},
+     "ar": "هل تريد أن يصل ردّ تلقائي في الرسائل لمن يعلّق بكلمة معيّنة؟ وما هي الكلمة؟", "en": "Should people who comment a certain word get an automatic DM reply? Which word?",
+     "ph_ar": "مثلًا: «حجز»، أو اكتب «لا»", "ph_en": "e.g. «book», or write «no»"},
     {"id": "link", "to": {"field": "link"},
      "ar": "ما رابط موقعك أو صفحتك أو رقم التواصل؟", "en": "What is your website, page link, or contact number?",
      "ph_ar": "https://…", "ph_en": "https://…", "ltr": True},
@@ -83,6 +87,8 @@ def current(q: dict, brain: dict) -> str:
     if "note" in to:
         n = next((x for x in brain.get("notes") or [] if x.get("quiz") == q["id"]), None)
         return str((n or {}).get("body") or "")
+    if "dm" in to:
+        return "لا" if brain.get("dm_mode") == "off" else str(brain.get("dm_word") or "")
     return ""
 
 
