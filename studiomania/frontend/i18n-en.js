@@ -6628,6 +6628,8 @@ window.I18N_EN = {
   "تحليل الحسابات": "Account analysis",
   "تُحسب من نقاطك": "Counted from your points",
   "نقاطك": "Your points",
+  "تعذّر إتمام هذه الخطوة الآن. سجّلنا المشكلة وسنصلحها، فجرّب مرة أخرى بعد قليل.": "This step couldn’t be completed right now. We’ve logged the problem and will fix it, so please try again shortly.",
+  "🗑 حُذفت لقطة التايبوجرافي": "🗑 Typography shot deleted",
   "↩︎ المسار": "↩︎ Back to steps",
   "التالي: النشر ←": "Next: Publish →",
   "صدّر ثم انشر ←": "Export, then publish →",

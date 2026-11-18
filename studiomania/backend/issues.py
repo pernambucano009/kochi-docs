@@ -161,6 +161,49 @@ def scan_json(path: str, body, user: str = "") -> None:
         pass
 
 
+# 🙈 العميل مايشوفش أخطاء تقنية (HTTP 400، أسماء موديلات، request_id، Traceback…): الأصل بيتسجل في صندوق الأخطاء،
+#   وللعميل جملة هادية. بيتطبق على خانات الخطأ بس (error / detail / render_error) في ردود /api/.
+FRIENDLY = "تعذّر إتمام هذه الخطوة الآن. سجّلنا المشكلة وسنصلحها، فجرّب مرة أخرى بعد قليل."
+ERR_KEYS = ("error", "detail", "render_error")
+_TECH = re.compile(r"HTTP ?\d{3}|request_id|Traceback|\{['\"]|\b(?:google|openai|anthropic|deepseek|minimax|kling|bytedance|atlas|gemini|gpt)[-/.]|"
+                   r"Error\b|Exception|errno|ffmpeg|https?://|\b[45]\d\d\b.*(?:bad request|not found|forbidden|unauthorized)|\.py\b", re.I)
+
+
+def technical(s: str) -> bool:
+    if not isinstance(s, str) or not s.strip():
+        return False
+    if _TECH.search(s):
+        return True
+    latin = sum(c.isascii() and c.isalpha() for c in s)
+    return len(s) > 24 and latin > 0.5 * sum(c.isalpha() for c in s)
+
+
+def soften(x, depth: int = 0):
+    """يبدّل رسايل الخطأ التقنية بجملة هادية (في أي عمق). يرجع (القيمة, اتغيّر؟)."""
+    if depth > 8:
+        return x, False
+    changed = False
+    if isinstance(x, dict):
+        out = {}
+        for k, v in x.items():
+            if k in ERR_KEYS and isinstance(v, str) and technical(v):
+                out[k], changed = FRIENDLY, True
+            elif isinstance(v, (dict, list)):
+                out[k], c = soften(v, depth + 1)
+                changed = changed or c
+            else:
+                out[k] = v
+        return out, changed
+    if isinstance(x, list):
+        out = []
+        for v in x:
+            nv, c = soften(v, depth + 1) if isinstance(v, (dict, list)) else (v, False)
+            out.append(nv)
+            changed = changed or c
+        return out, changed
+    return x, False
+
+
 class Middleware:
     """ASGI خام: بيبص على ردود /api/ (من غير ما يلمس الستريم والفيديو) ويسجّل الأخطاء والشغل الفاشل أو المتعطّل."""
 
@@ -175,19 +218,45 @@ class Middleware:
             return await self.app(scope, receive, send)
         hdr = {k.decode().lower(): v.decode("latin-1") for k, v in scope.get("headers") or []}
         user = hdr.get("x-user-email", "")
-        state = {"status": 200, "json": False, "buf": bytearray(), "over": False}
+        state = {"status": 200, "json": False, "buf": bytearray(), "over": False, "start": None}
+        soft = not path.startswith(("/api/platform", "/api/admin", "/api/lab"))   # صفحات الأدمن والمعمل بتشوف الأصل
 
         async def send2(msg):
             if msg["type"] == "http.response.start":
                 state["status"] = msg["status"]
                 ct = next((v.decode() for k, v in msg.get("headers") or [] if k.lower() == b"content-type"), "")
                 state["json"] = "json" in ct
+                if state["json"] and soft:   # الرد بيستنى لحد ما يكمل، عشان رسالة الخطأ تتبدّل قبل ما توصل
+                    state["start"] = msg
+                    return
             elif msg["type"] == "http.response.body" and state["json"] and not state["over"]:
                 state["buf"] += msg.get("body") or b""
-                if len(state["buf"]) > self.MAX:
-                    state["over"], state["buf"] = True, bytearray()
+                if len(state["buf"]) > self.MAX:   # رد كبير: يعدّي زي ما هو
+                    state["over"] = True
+                    if state["start"] is not None:
+                        await send(state["start"])
+                        state["start"] = None
+                        body, state["buf"] = bytes(state["buf"]), bytearray()
+                        return await send({**msg, "body": body})
+                    state["buf"] = bytearray()
                 if not msg.get("more_body"):
                     self.inspect(scope, path, state, user)
+                    if state["start"] is not None:
+                        body = bytes(state["buf"])
+                        try:
+                            new, changed = soften(json.loads(body or b"null"))
+                            if changed:
+                                body = json.dumps(new, ensure_ascii=False).encode()
+                        except ValueError:
+                            pass
+                        start = state["start"]
+                        state["start"] = None
+                        hs = [(k, v) for k, v in start.get("headers") or [] if k.lower() != b"content-length"] + [(b"content-length", str(len(body)).encode())]
+                        await send({**start, "headers": hs})
+                        return await send({"type": "http.response.body", "body": body, "more_body": False})
+                    return await send(msg)
+                if state["start"] is not None:
+                    return
             await send(msg)
         try:
             await self.app(scope, receive, send2)

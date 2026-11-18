@@ -1006,6 +1006,13 @@ $("tlSplit").onclick = $("edSplit").onclick = () => splitAt(mt.t);
 function deleteSelected() {
   const list = allSelected().filter((x) => !kindLocked(x.kind));
   if (!list.length) return;
+  // 🔤 لقطة تايبوجرافي: بتتشال من مشروع التايبوجرافي نفسه (كلامها بيفضل في الصوت، بس من غير حركة)
+  const ty = list.filter((x) => x.kind === "typo").map((x) => x.i);
+  if (ty.length && typeof mtTypoSave === "function" && mtx?.cur?.blocks) {
+    mt.sel = null;
+    mtTypoSave(mtx.cur.blocks.filter((_, i) => !ty.includes(i)), "🗑 حُذفت لقطة التايبوجرافي");
+    if (list.every((x) => x.kind === "typo")) return;
+  }
   pushHistory();
   const d = mt.project.data;
   // الكابشن: بنشيل الكلام ده من الكابشن في المشروع ده بس (التعليق الصوتي نفسه مبيتغيّرش)
@@ -2050,6 +2057,18 @@ const CTX_ACTS = {
   toOver: () => clipToOverlay(),
 };
 $("tlCanvas").addEventListener("contextmenu", (e) => {
+  const tyEl = e.target.closest(".tl-typo[data-ty]");
+  if (tyEl) {   // 🔤 كليك يمين على لقطة تايبوجرافي: بتتحدد هي (مش اللي تحتها)، وقايمة فيها «احذف»
+    e.preventDefault();
+    mt.sel = { kind: "typo", i: Number(tyEl.dataset.ty) };
+    renderTimeline();
+    const m = ctxMenu();
+    m.innerHTML = `<button data-act="del"><span>🗑 احذف</span><kbd>Delete</kbd></button>`;
+    m.hidden = false;
+    m.style.left = `${Math.min(e.clientX, innerWidth - m.offsetWidth - 8)}px`;
+    m.style.top = `${Math.min(e.clientY, innerHeight - m.offsetHeight - 8)}px`;
+    return;
+  }
   const clipEl = e.target.closest(".tl-clip[data-i]"), audEl = e.target.closest(".tl-audio[data-track]");
   const mk = e.target.closest(".tl-mark");
   if (mk) {
@@ -3189,12 +3208,12 @@ function inFlow() { const c = flowCtx(); return c?.fid && mt.project && c.pid ==
 function renderFlowBar() {
   const bar = $("mtFlowBar"), c = inFlow();
   bar.hidden = !c;
-  $("resultNext").hidden = !c;
+  $("resultNext").hidden = true;   // الانتقال للنشر من شريط المسار بس (مش تحت الفيديو)
   if (!c) return;
   const done = mt.project.render_status === "done" && mt.project.export_id;
   bar.innerHTML = `<button type="button" class="btn sm" data-fb="back">↩︎ المسار</button>
     <ol class="mt-fsteps">${FLOW_STEPS.map((t, i) => `<li class="${i < 5 ? "ok" : i === 5 ? "cur" : ""}"><button type="button" data-fb="${i < 5 ? "back" : i === 6 ? "next" : ""}" ${i === 5 ? "disabled" : ""}><i>${i < 5 ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>
-    <button type="button" class="btn primary sm" data-fb="next">${done ? "التالي: النشر ←" : "صدّر ثم انشر ←"}</button>`;
+    <button type="button" class="mt-fnext" data-fb="next">${done ? "التالي: النشر ←" : "صدّر ثم انشر ←"}</button>`;
 }
 function flowNext() {
   const p = mt.project, c = inFlow();

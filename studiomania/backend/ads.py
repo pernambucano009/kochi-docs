@@ -119,10 +119,11 @@ def audio_messages(duration: float) -> list[dict]:
 
 
 def with_media(messages: list[dict], data_url: str, filename: str) -> list[dict]:
-    """يضع الفيديو أو الصوت داخل رسالة المستخدم (يُرسل كملف base64، هذا ما Gemini على Atlas يفهمه كامل)."""
+    """يضع الفيديو أو الصوت داخل رسالة المستخدم (data URL في جزء image_url: ده اللي Gemini على Atlas بيقبله دلوقتي
+    للفيديو والصوت والصور؛ جزء «file» بقى بيرجع 400)."""
     msg = dict(messages[-1])
     msg["content"] = [{"type": "text", "text": msg["content"]},
-                      {"type": "file", "file": {"filename": filename, "file_data": data_url}}]
+                      {"type": "image_url", "image_url": {"url": data_url}}]
     return messages[:-1] + [msg]
 
 

@@ -3432,3 +3432,9 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .mt-fsteps .cur button { background: var(--soft, #F1EEEA); color: var(--ink, #1D1B19); font-weight: 700; }
 .mt-fsteps .cur i { background: var(--accent, #E2572B); color: #fff; }
 :root[data-nh-theme="dark"] .mt-flowbar { background: #242324; border-color: #3A3839; }
+
+/* 🧭 أزرار التنقل في المسار سودا (زي باقي خطوات المسار)؛ البرتقالي للنشر نفسه بس */
+.mt-fnext { flex: none; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--ink, #1D1B19); color: var(--card, #fff); font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+.mt-fnext:hover { transform: translateY(-1px); }
+:root:root .stage .project-bar .mt-export { background: var(--ink, #1D1B19); color: var(--card, #fff); box-shadow: 0 10px 24px rgba(0, 0, 0, .18); border-color: transparent; }
+:root[data-nh-theme="dark"] .mt-fnext, :root[data-nh-theme="dark"] .stage .project-bar .mt-export { background: #F2EFEA; color: #1D1B19; }
