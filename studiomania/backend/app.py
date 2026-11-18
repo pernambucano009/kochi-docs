@@ -22066,7 +22066,7 @@ def tytpl_new(tid: str, name: str, script: str, lang: str, voice: str, client: s
 
 
 def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: str, render: bool = True) -> None:
-    sp = typotpl.SPECS[tid]
+    sp = typotpl.SPECS.get(tid) or {"type": "type", "kinds": []}   # hairline: التوزيع بستايله هو (رسومات على قد الكلام)
     folder = TYPO_PROJ / pid
     try:
         # 🎙️ الصوت: صوت واحد، أو صوتين للحوار (كل سطر بصوت المتكلم بتاعه، وبينهم وقفة قصيرة)
@@ -22104,6 +22104,17 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
             clip = tytpl_stock(tid, typotpl.clean_script(script), field, folder)
             if clip:
                 bg = {"kind": "video", "file": clip.name, "dim": typotpl.DIM}
+        if tid == "hairline":
+            typo_update(pid, lambda x: x.update(source={"kind": "audio", "file": wav.name}, words=words, duration=dur, bg=bg, style="hairline"))
+            typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
+            run_typo_plan(pid)
+            if typo_load(pid).get("status") != "planned":
+                raise RuntimeError(typo_load(pid).get("error") or "توقف التوزيع")
+            if render:
+                typo_set(pid, status="rendering", step="🎬 يُجهّز")
+                run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
+                typo_logo_end(pid, tid)
+            return
         typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
         blocks = typo.studio_plan(words, dur, None, sp["collection"], sp["seed"])
         for i, b in enumerate(blocks):   # الحركات الثابتة للقالب، وفوق اللقطة: كلها بتسيب اللقطة باينة (بالدور على حركات القالب)
@@ -22114,9 +22125,56 @@ def tytpl_build(pid: str, tid: str, script: str, lang: str, voice: str, field: s
         if render:
             typo_set(pid, status="rendering", step="🎬 يُجهّز")
             run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
+            typo_logo_end(pid, tid)
     except Exception as exc:  # noqa: BLE001
         print(f"[tytpl] {pid}: {exc}", flush=True)
         typo_fail(pid, exc)
+
+
+def typo_logo_end(pid: str, tid: str) -> None:
+    """🏷️ آخر الفيديو بشعار العميل (نسخته بستايل القالب لو اترسمت، وإلا الأصلي): آخر فريم بيثبت ويغمق، والشعار بيظهر عليه.
+    الشعار الأصلي على كارت فاتح عشان يبان على الغامق، ونسخة الخطوط الرفيعة بتتقلب أبيض على الأسود."""
+    d = typo_load(pid)
+    bid = d.get("client_id")
+    if not d.get("final") or atlas.mock_mode():
+        return
+    logo = logo_stamp_for(bid, tid)
+    if not logo or not logo.is_file():
+        return
+    folder = TYPO_PROJ / pid
+    src = folder / d["final"]
+    try:
+        from PIL import Image as _PImg, ImageDraw as _PDraw, ImageOps as _POps
+        info = media_info(src)
+        W, H, dur = info.width or 1080, info.height or 1920, info.duration or probe_duration(src)
+        styled = logo.name != (logo_path(bid) or Path()).name
+        card = _PImg.new("RGBA", (W, H), (0, 0, 0, 0))
+        with _PImg.open(logo) as im:
+            lg = im.convert("RGBA")
+        if styled and tid == "hairline":   # خطوط سودا ← بيضا (الشفافية زي ما هي)
+            r, g, b, a = lg.split()
+            lg = _PImg.merge("RGBA", (*_POps.invert(_PImg.merge("RGB", (r, g, b))).split(), a))
+        lg.thumbnail((int(W * 0.46), int(H * 0.22)))
+        x, y = (W - lg.width) // 2, (H - lg.height) // 2
+        if not (styled and tid == "hairline"):
+            pad = int(W * 0.06)
+            _PDraw.Draw(card).rounded_rectangle((x - pad, y - pad, x + lg.width + pad, y + lg.height + pad), radius=int(W * 0.04), fill=(255, 255, 255, 240))
+        card.alpha_composite(lg, (x, y))
+        cf = folder / ".logo_end.png"
+        card.save(cf)
+        out = folder / f"typo-{uuid.uuid4().hex[:4]}.mp4"
+        T = 1.6
+        fl = (f"[0:v]tpad=stop_mode=clone:stop_duration={T},eq=brightness=-0.18:enable='gte(t,{dur:.3f})'[bg];"
+              f"[1:v]format=rgba,fade=in:st={dur:.3f}:d=0.45:alpha=1[lg];[bg][lg]overlay=0:0:enable='gte(t,{dur:.3f})',format=yuv420p[v];"
+              f"[0:a]apad=pad_dur={T}[a]")
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-loop", "1", "-t", f"{dur + T:.3f}", "-i", str(cf),
+                        "-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
+                        "-t", f"{dur + T:.3f}", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=600)
+        cf.unlink(missing_ok=True)
+        src.unlink(missing_ok=True)
+        typo_update(pid, lambda x: x.update(final=out.name))
+    except Exception as exc:  # noqa: BLE001 — من غير الشعار، الفيديو زي ما هو
+        print(f"[typo-logo] {pid}: {exc}", flush=True)
 
 
 def tytpl_start(fid: str) -> str:
@@ -24818,6 +24876,8 @@ def flow_template(tid: str, name: str, cat: str, desc: str) -> dict:
     """نوع القالب: موشن بالكود (t-*) / تايبوجرافي / قالب متولّد (مشاهد، إعلان، صور) / قالب من المعمل."""
     if tid.startswith("t-") and (MOTION_DIR / "r" / Path(tid).name / "reel.html").exists():
         return {"id": tid, "name": name, "cat": cat, "desc": desc, "kind": "motion"}
+    if tid == "hairline":   # ✏️ خطوط رفيعة على الأسود: مسار عادي (فكرة ← نص ← فيديو)، والصوت والرسومات بتتعمل لوحدها
+        return {"id": tid, "name": name or "خطوط رفيعة على الأسود", "cat": cat, "desc": desc, "kind": "typo", "preset": "hairline"}
     if tid in typotpl.SPECS:   # 🔤 قالب تايبوجرافي جاهز: الصوت واللقطة والحركات بتتعمل لوحدها
         sp = typotpl.SPECS[tid]
         return {"id": tid, "name": name or sp["name"], "cat": cat, "desc": desc or sp["desc"], "kind": "typo", "preset": tid}
@@ -25821,6 +25881,7 @@ def logo_styles_get(bid: str):
         tmap = {}
     tmap.update({f"t-{k}": k for k in logostamp.EXTRA if f"t-{k}" not in tmap and (MOTION_DIR / "r" / f"t-{k}" / "reel.html").exists()})
     tmap.update({st[2:]: st for st in likes if st[2:] not in tmap})
+    tmap["hairline"] = "hairline"
     return {"logo": bool(src), "working": LOGOST_JOBS.get(bid) == "working", "items": items, "error": LOGOST_ERR.get(bid, ""), "tpl": tmap,
             "step": "clean" if step == "clean" else step.split(":", 1)[1] if step.startswith("draw:") else ""}
 
@@ -27663,7 +27724,7 @@ def flow_generate(fid: str, body: FlowGoIn):
             flow_update(fid, lambda x: x.update(output={"kind": "motion", "mid": mid, "params": params, "before": before, "status": "working"}))
             run_motion_import(mid, {"name": f"🧭 {title}"[:100], "category": "motion_graphics", "tags": ["مسار القالب"]}, flow_els_inline(params), f"🧭 {title}")
         flow_job(fid, "generate", run_motion)
-    elif tpl["kind"] == "typo" and tpl.get("preset") in typotpl.SPECS:
+    elif tpl["kind"] == "typo" and (tpl.get("preset") in typotpl.SPECS or tpl.get("preset") == "hairline"):
         pid = tytpl_start(fid)
         flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": pid, "status": "done"}, stage="done"))
     elif tpl["kind"] == "typo":

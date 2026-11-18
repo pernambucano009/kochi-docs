@@ -761,14 +761,6 @@ const Gallery = (() => {
     } else if (v.getAttribute("src")) { v.pause(); v.removeAttribute("src"); v.load(); cardEl.classList.remove("playing"); }   // مايفضلش يحمّل في الخلفية
   }
   // ✏️ Hairline: مشروع تايبوجرافي جديد بالستايل ده، والصفحة بتفتح على «سجّل صوتك»
-  async function startHairline() {
-    try {
-      const p = await api("/api/typo", { method: "POST", ...jsonBody({ name: "✏️ Hairline", style: "hairline", ratio: "9:16" }) });
-      storageSet("studiomania.typo", p.id);
-      if (typeof tyx !== "undefined") tyx.cur = null;
-      showStep("12");
-    } catch (err) { toast(err.message, true); }
-  }
   // 🎞️ محرر الفيديو: مشروع مونتاج حر جديد فاضي، ويفتح المحرر عليه على طول
   async function openEditor() {
     try {
@@ -782,7 +774,6 @@ const Gallery = (() => {
   function startTpl(x) {
     if (!x) return;
     if (x.alias) return startTpl(EXTRA.find((e) => e.id === x.alias) || { ...x, id: x.alias });   // نسخة من قالب عام جوه تصنيف تاني (التصوير والأفاتار في الأسنان)
-    if (x.id === "hairline") return startHairline();
     if (x.id === "avatar") return showStep("16");
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");

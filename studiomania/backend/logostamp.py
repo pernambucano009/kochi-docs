@@ -38,10 +38,12 @@ EXTRA = {
     "woodcut": "woodcut relief print: bold black carved strokes with gouge marks and one flat accent color",
     "redcut": "red paper cut-out art: the shape is cut from one sheet of red paper, holes where light passes",
     "onehero": "clean modern 3D render: soft studio light, smooth rounded materials, gentle shadows",
+    "hairline": "minimal hairline line art: only very thin single-weight black strokes, no fills, no shading, like a fine technical pen outline",
 }
 EXTRA_LABELS = {"pixel": "بكسل", "blueprint": "مخطط هندسي", "glass": "زجاج معشّق", "screen": "طباعة حريرية", "deco": "آرت ديكو",
                 "holo": "هولوجرام", "impasto": "زيت سميك", "shadow": "خيال الظل", "ascii": "حروف الشاشة", "dossier": "ملف أرشيف",
-                "woodcut": "حفر خشب", "redcut": "قص ورق", "onehero": "مجسّم"}
+                "woodcut": "حفر خشب", "redcut": "قص ورق", "onehero": "مجسّم",
+                "hairline": "خطوط رفيعة"}
 ALL = {**STYLES, **EXTRA}
 ALL_LABELS = {**LABELS, **EXTRA_LABELS}
 
@@ -68,6 +70,8 @@ def style_of(mid: str, index: Path) -> str | None:
         return None
     if s in STYLES:
         return s
+    if mid in EXTRA:   # قوالب مش t-* ليها ستايل (Hairline)
+        return mid
     x = mid[2:] if mid.startswith("t-") else ""
     if x in EXTRA:
         return x

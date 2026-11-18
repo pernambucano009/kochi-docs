@@ -16810,4 +16810,6 @@ window.I18N_EN = {
   "👂 جارٍ ضبط توقيت الكلمات": "👂 Timing the words",
   "🎞️ جارٍ توليد لقطة الخلفية": "🎞️ Generating the background shot",
   "🧠 جارٍ توزيع الكلام على الحركات": "🧠 Assigning words to moves",
+  "توقف التوزيع": "Planning stopped",
+  "خطوط رفيعة": "Hairline",
 };
