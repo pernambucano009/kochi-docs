@@ -3187,3 +3187,17 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .bm-nradd { display: flex; flex-direction: column; gap: 8px; }
 #nh .bm-nradd select { max-width: 100%; }
 #nh .bm-nrv { display: inline-flex; gap: 2px; }
+
+/* 📤 النشر جوه المسار */
+.flw-pub { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 22px; align-items: start; }
+@media (max-width: 760px) { .flw-pub { grid-template-columns: 1fr; } }
+.flw-out.sm { width: 100%; max-height: 62vh; border-radius: 18px; background: #000; }
+.flw-pubf { display: grid; gap: 16px; }
+.flw-pubf section { display: grid; gap: 8px; }
+.flw-pubf section > b { font-size: 14px; }
+.flw-pubf textarea, .flw-pubf input[type="datetime-local"] { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line, #E6E1DA); background: var(--card, #fff); color: var(--ink, #1D1B19); font: inherit; font-size: 14px; line-height: 1.6; }
+.flw-accs { display: flex; flex-wrap: wrap; gap: 8px; }
+.flw-acc, .flw-chip { padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line, #E6E1DA); background: var(--card, #fff); color: var(--ink, #1D1B19); font: inherit; font-size: 13px; cursor: pointer; }
+.flw-acc.on, .flw-chip.on { border-color: var(--ink, #1D1B19); background: var(--ink, #1D1B19); color: var(--card, #fff); }
+.flw-acc.add { border-style: dashed; color: var(--muted, #8A847C); }
+.flw-btn.orange { background: var(--accent, #E2572B) !important; color: #fff !important; }

@@ -70,6 +70,9 @@ const BrandPage = (() => {
         { f: "outro", t: "الأوترو", type: "video" },
         { f: "narrators", t: "صوت الراوي", type: "narr" },
         { f: "cta", t: "الدعوة لاتخاذ إجراء", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
+        { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
+        { f: "dm_mode", t: "«علّق بكلمة» فتصله رسالة على الخاص", type: "pick", opts: [["always", "في كل منشور"], ["ask", "أختار عند النشر"], ["off", "لا"]] },
+        { f: "dm_word", t: "كلمة التعليق", type: "text", ph: "مثلًا: برنامج" },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "التعليق النصي الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
@@ -159,7 +162,9 @@ const BrandPage = (() => {
     }
   }
   // الشعار على الفيديو شغّال من الأول (أي قيمة غير «0» معناها نعم)، فمايظهرش كأنه خانة فاضية
-  const pickRaw = (b, l) => (l.f === "logo_on" ? (String(b?.logo_on ?? "") === "0" ? "0" : "1") : String(b?.[l.f] || ""));
+  const pickRaw = (b, l) => (l.f === "logo_on" ? (String(b?.logo_on ?? "") === "0" ? "0" : "1")
+    : l.f === "cta_mode" ? (b?.cta_mode === "off" ? "off" : "always")   // 📣 نفس الافتراضي اللي السيرفر بيستخدمه
+    : l.f === "dm_mode" ? (b?.dm_mode || (String(b?.dm_word || "").trim() ? "always" : "ask")) : String(b?.[l.f] || ""));
   const leafValue = (b, l) => {
     if (l.type === "text") return filled(b, l) ? String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim() : "";
     if (l.type === "pick") return l.opts.find(([v]) => v === pickRaw(b, l))?.[1] || "";

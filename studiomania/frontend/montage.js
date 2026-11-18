@@ -3223,9 +3223,7 @@ function flowNext() {
     syncExportTop();
     return toast("صدّر الفيديو أولًا من «صدّر الفيديو» في الأعلى، ثم انتقل إلى النشر");
   }
-  try { localStorage.setItem("studiomania.pubPick", p.export_id); } catch { /* غير مهم */ }
-  flowCtxSet({ ...c, pub: true });
-  showStep("7"); if (typeof pubTab === "function") pubTab("new");
+  Flow.openPublish(c.fid);   // النشر خطوة جوه المسار نفسه (الفيديو ده بس)، مش صفحة النشر
 }
 $("mtFlowBar").addEventListener("click", (e) => {
   const b = e.target.closest("[data-fb]");

@@ -11103,6 +11103,7 @@ BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "them
                 "style", "market", "language", "logo_rule", "modest",
                 # 🧠 عقل العلامة: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
                 "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link",
+                "cta_mode", "dm_mode", "dm_word",   # 📣 أساسيات النشر: الدعوة في آخر كل فيديو، و«علّق بكلمة» (في كل منشور/عند النشر/لا)
                 "niche")   # النيتش: من تحليل حساب السوشيال (وتقدر تكتبه بإيدك)
 BRAND_VIDEOS = ("intro", "outro")
 BRAIN_LOCK = threading.Lock()
@@ -25096,7 +25097,8 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
         raw = fz.mock_scripts(schema, live["scenes"], 2)
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
-                                                 dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "النص")
+                                                 dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"),
+                                                 (hint or "") + flow_cta_hint(brain)), "النص")   # 📣 الدعوة في الآخر لو العقل عايزها
     items = [{**s, "id": uuid.uuid4().hex[:8]} for s in dub.fix_dialect(fz.clean_scripts(raw, schema, live["scenes"]), lang)]   # 🇸🇦 كاف المخاطَبة ماتبقاش شين
     # نفس النص بلهجة تانية مش تكرار: لما اللهجة تتغير، فلتر «اتستخدم قبل كده» مابيشتغلش
     items, rep = (items, []) if relang else flow_fresh_scen(d, items, more)
@@ -30922,6 +30924,80 @@ def flow_to_montage(fid: str):
                      (pid, data["name"], json.dumps(data), now(), now()))
     flow_update(fid, lambda x: x.update(montage={"project_id": pid, "at": now()}))
     return {"project_id": pid}
+
+
+def post_defaults(brain: dict | None) -> dict:
+    """📣 أساسيات النشر من العقل: الدعوة (دايمًا إلا لو اتقفلت) ونصها، و«علّق بكلمة» (في كل منشور / أختار عند النشر / لا)."""
+    b = brain or {}
+    dm_def = dm_defaults_for(b.get("id")) if b.get("id") else {}
+    word = str(b.get("dm_word") or dm_def.get("word") or "").strip()
+    cta = str(b.get("cta") or "").strip() or algo.funnel_cta(b)
+    return {"cta_mode": "off" if b.get("cta_mode") == "off" else "always", "cta": cta,
+            "dm_mode": b.get("dm_mode") if b.get("dm_mode") in ("always", "ask", "off") else ("always" if word else "ask"),
+            "dm_word": word, "dm_message": dm_def.get("message") or "", "dm_reply": dm_def.get("reply") or ""}
+
+
+def flow_cta_hint(brain: dict | None) -> str:
+    """لو الدعوة شغالة: آخر جملة في النص دعوة بنفس معنى دعوة العلامة."""
+    pdf = post_defaults(brain)
+    return f"\nآخر جملة منطوقة في النص دعوة للتصرف بنفس معنى دعوة العلامة: «{pdf['cta']}»." if pdf["cta_mode"] == "always" and pdf["cta"] else ""
+
+
+@app.post("/api/flows/{fid}/publish-pack")
+def flow_publish_pack(fid: str, fresh: bool = False):
+    """📤 خطوة النشر جوه المسار: الفيديو ده بس، وتعليق نصي جاهز (بالدعوة والوسوم)، و«علّق بكلمة» حسب العقل، والحسابات المربوطة."""
+    d = flow_load(fid)
+    ex_id = flow_to_publish(fid)["export_id"]
+    with closing(db()) as conn:
+        row = conn.execute("SELECT * FROM exports WHERE id = ?", (ex_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "الفيديو غير موجود")
+    ex = export_to_dict(row)
+    brain = flow_brain(d) or {}
+    pdf = post_defaults(brain)
+    pack = d.get("pub_pack") or {}
+    if fresh or pack.get("export_id") != ex_id or not pack.get("caption"):
+        sc = d.get("scenario") or {}
+        context = "\n".join(x for x in [f"العنوان: {sc.get('title') or (d.get('idea') or {}).get('title') or ''}",
+                                          "النص: " + " ".join(str(r.get("say") or "") for r in sc.get("scenes") or [])] if x.strip())
+        lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+        if atlas.mock_mode():
+            raw = algo.mock_post_caption(context)
+        else:
+            try:
+                raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), ""), json_mode=True, temperature=0.6), "التعليق النصي")
+            except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError):
+                raw = {"first": sc.get("title") or "", "body": "", "cta": "", "tags": []}
+        raw = raw if isinstance(raw, dict) else {}
+        if pdf["cta_mode"] == "off":
+            raw["cta"] = ""
+        elif pdf["cta"] and not raw.get("cta"):
+            raw["cta"] = pdf["cta"]
+        if pdf["dm_mode"] == "always" and pdf["dm_word"] and pdf["dm_word"] not in str(raw.get("cta") or ""):
+            raw["cta"] = (str(raw.get("cta") or "") + f"\nعلّق بكلمة «{pdf['dm_word']}» وتوصلك رسالة على الخاص").strip()
+        caption = dub.fix_dialect(algo.assemble_caption(raw, brain if pdf["cta_mode"] != "off" else {}, False), lang)
+        pack = {"export_id": ex_id, "caption": caption}
+        flow_update(fid, lambda x: x.update(pub_pack=pack))
+    try:
+        acc = publisher_status()
+    except Exception:  # noqa: BLE001
+        acc = {"account_list": [], "platforms": {}, "service": ""}
+    return {"export": ex, "caption": pack["caption"], "defaults": pdf, "accounts": acc.get("account_list") or [],
+            "platforms": acc.get("platforms") or {}, "service": acc.get("service") or "", "not_for_posts": acc.get("not_for_posts") or [],
+            "posted": d.get("posted")}
+
+
+class FlowPostedIn(BaseModel):
+    post_id: str = ""
+    at: str = ""
+    now: bool = False
+
+
+@app.post("/api/flows/{fid}/posted")
+def flow_posted(fid: str, body: FlowPostedIn):
+    """المنشور اتعمل من خطوة النشر: المسار يعرف إنه خلص (وفي «قيد العمل» بيبان منشور/مجدول)."""
+    flow_update(fid, lambda x: x.update(posted={"post_id": body.post_id[:40], "at": body.at[:40], "now": body.now}, stage="done"))
+    return {"ok": True}
 
 
 @app.post("/api/flows/{fid}/to-publish")

@@ -9,7 +9,7 @@ window.flowBack = () => {
   if (!c?.fid) return false;
   const inMont = step === "6f" && (typeof mt === "undefined" || !mt.project || mt.project.id === c.pid);
   if (!inMont && !(step === "7" && c.pub)) return false;
-  Flow.open(c.fid);
+  if (step === "7") Flow.openPublish(c.fid); else Flow.open(c.fid);
   return true;
 };
 // 🧭 مسار القالب: العميل داس على قالب ← المخ بيمشي معاه خطوة بخطوة
@@ -67,7 +67,7 @@ const Flow = (() => {
   }
   async function start(t) {
     shell();
-    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null });
+    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null, view: null, pub: null, pubAcc: null, pubWhen: null });
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكارًا…</p></div></div>`;
     try {
@@ -79,7 +79,7 @@ const Flow = (() => {
   }
   async function open(fid) {
     shell();
-    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null });
+    Object.assign(S, { d: null, edit: null, own: false, hint: false, chat: null, cast: null, vopts: null, vo: null, view: null, pub: null, pubAcc: null, pubWhen: null });
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span></div></div>`;
     try { S.d = await api(`/api/flows/${fid}`); render(); poll(); } catch (err) { toast(err.message, true); close(); }
@@ -133,7 +133,7 @@ const Flow = (() => {
       <span><b class="num">${k.score}٪</b><small>${esc(k.level)}</small></span></button>`;
   }
   function stepper(d) {
-    const cur = idx(d.stage, d);
+    const cur = S.view === "publish" ? idx("publish", d) : idx(d.stage, d);
     const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d),
       shoot: isPhone(d), review: !!d.footage?.main, montage: isCode(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: isCode(d) && d.output?.status === "done" };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
@@ -568,6 +568,84 @@ const Flow = (() => {
     return `<div class="flw-trend${open.length ? "" : " flw-ok"}"><b>${open.length ? "⚠️ ملاحظات مراجعة النص" : "✓ راجعنا النص: الكلام المنطوق يطابق المكتوب على الشاشة"}</b>
       ${[...open, ...fixed].map((i) => `<small class="${i.fixed ? "muted" : ""}">${i.fixed ? "✓ " : "• "}${esc(i.detail)}</small>`).join("<br>")}</div>`;
   }
+  // ---------------------------------------------------------------- 📤 النشر جوه المسار (الفيديو ده بس)
+  // الفيديو، والحسابات المربوطة (واللي مش مربوط يتربط من هنا)، وتعليق نصي جاهز بالدعوة والوسوم، و«علّق بكلمة» حسب العقل، والموعد.
+  async function openPub(fresh = false) {
+    S.view = "publish";
+    if (fresh) S.pub = { ...(S.pub || {}), recap: true }; else S.pub = null;
+    render();
+    try {
+      const r = await api(`/api/flows/${S.d.id}/publish-pack${fresh ? "?fresh=1" : ""}`, { method: "POST" });
+      S.pub = r;
+      S.pubAcc = S.pubAcc || Object.fromEntries((r.accounts || []).filter((a) => !(r.not_for_posts || []).includes(a.platform)).map((a) => [`${a.platform}@${a.id}`, true]));
+      S.pubDm = r.defaults?.dm_mode === "always";
+      const cap = S.el?.querySelector("#pubCap");
+      if (cap && (fresh || !cap.value)) cap.value = r.caption || "";
+    } catch (err) { S.pub = { error: true }; toast(err.message, true); }
+    render();
+  }
+  async function pubLink(platform) {
+    try {
+      const r = await api("/api/publisher/connect", { method: "POST", ...J({ platform }) });
+      if (r.url) { flowCtxSet({ fid: S.d.id, pub: true }); location.assign(r.url); }
+      else toast("افتح «حساباتك» لإكمال ربط هذه المنصة");
+    } catch (err) { toast(err.message, true); }
+  }
+  function pubWhenDate() {
+    const now = new Date(), w = S.pubWhen || "1h";
+    if (w === "1h") return new Date(now.getTime() + 3600e3);
+    if (w === "t12" || w === "t18") { const t = new Date(now); t.setDate(t.getDate() + 1); t.setHours(w === "t12" ? 12 : 18, 0, 0, 0); return t; }
+    const v = S.el?.querySelector("#pubAt")?.value;
+    return v ? new Date(v) : null;
+  }
+  async function pubSend(now) {
+    const p = S.pub, platforms = Object.entries(S.pubAcc || {}).filter(([, on]) => on).map(([k]) => k);
+    if (!platforms.length) return toast("اختر حسابًا واحدًا على الأقل", true);
+    const when = now ? new Date() : pubWhenDate();
+    if (!when || isNaN(when)) return toast("اختر الموعد", true);
+    const dm = S.pubDm && p.defaults?.dm_word;
+    const body = { export_id: p.export.id, caption: S.el.querySelector("#pubCap")?.value || p.caption, platforms, scheduled_at: when.toISOString(),
+      options: dm ? { dm_on: true, dm_words: [p.defaults.dm_word], dm_message: p.defaults.dm_message, dm_reply: p.defaults.dm_reply } : {} };
+    try {
+      const post = await api("/api/posts", { method: "POST", ...J(body) });
+      await api(`/api/flows/${S.d.id}/posted`, { method: "POST", ...J({ post_id: post.id || "", at: when.toISOString(), now }) });
+      S.pub = { ...p, posted: { at: when.toISOString(), now } };
+      toast(now ? "🚀 يُنشر الآن" : "✅ جُدول المنشور");
+      render();
+    } catch (err) { toast(err.message, true); }
+  }
+  function stPublish(d) {
+    const p = S.pub;
+    if (!p) return `<h2>النشر</h2>${working("يجهّز الفيديو والتعليق النصي…")}`;
+    if (p.error) return `<h2>النشر</h2><div class="flw-empty"><p>تعذّر تجهيز النشر الآن.</p><div class="flw-acts"><button type="button" class="flw-btn pri" data-topub>🔁 أعد المحاولة</button></div></div>`;
+    const fmtW = (iso) => new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" });
+    if (p.posted) return `<h2>${p.posted.now ? "🚀 يُنشر الآن" : "✅ جُدول المنشور"}</h2>
+      <p class="flw-sub">${p.posted.now ? "يُرسل الفيديو الآن إلى حساباتك، وستراه في شريط النشاط حتى يكتمل." : `سيُنشر ${esc(fmtW(p.posted.at))}، وستراه في شريط النشاط قبل موعده.`}</p>
+      <video class="flw-out sm" src="${esc(p.export.url)}" controls playsinline></video>`;
+    const posting = (p.accounts || []).filter((a) => !(p.not_for_posts || []).includes(a.platform));
+    const linked = new Set(posting.map((a) => a.platform));
+    const unlinked = ["instagram", "tiktok", "facebook", "youtube", "snapchat", "x"].filter((k) => p.platforms?.[k] && !linked.has(k));
+    const df = p.defaults || {}, w = S.pubWhen || "1h";
+    const chip = (k, t) => `<button type="button" class="flw-chip${w === k ? " on" : ""}" data-pwhen="${k}">${t}</button>`;
+    return `<h2>النشر</h2>
+      <div class="flw-pub">
+        <video class="flw-out sm" src="${esc(p.export.url)}" controls playsinline></video>
+        <div class="flw-pubf">
+          <section><b>الحسابات</b>
+            <div class="flw-accs">${posting.map((a) => { const k = `${a.platform}@${a.id}`; return `<button type="button" class="flw-acc${S.pubAcc?.[k] ? " on" : ""}" data-pacc="${esc(k)}">${S.pubAcc?.[k] ? "✓ " : ""}${esc(p.platforms?.[a.platform] || a.platform)}${a.username ? ` <small dir="ltr">@${esc(a.username)}</small>` : ""}</button>`; }).join("") || `<small class="muted">لا توجد حسابات مربوطة بعد.</small>`}</div>
+            ${unlinked.length ? `<div class="flw-accs">${unlinked.map((k) => `<button type="button" class="flw-acc add" data-plink="${k}">＋ اربط ${esc(p.platforms[k])}</button>`).join("")}</div>` : ""}</section>
+          <section><b>التعليق النصي</b>
+            <textarea id="pubCap" rows="6" dir="auto">${esc(p.caption || "")}</textarea>
+            <button type="button" class="flw-link" data-pcapnew>✍️ اكتب تعليقًا آخر</button></section>
+          ${df.dm_mode === "ask" && df.dm_word ? `<section><button type="button" class="flw-acc${S.pubDm ? " on" : ""}" data-pdm>${S.pubDm ? "✓ " : ""}من يعلّق بكلمة «${esc(df.dm_word)}» تصله رسالة على الخاص</button></section>`
+            : df.dm_mode === "always" && df.dm_word ? `<small class="muted">💬 من يعلّق بكلمة «${esc(df.dm_word)}» تصله رسالة على الخاص (من إعدادات العقل).</small>` : ""}
+          <section><b>الموعد</b>
+            <div class="flw-accs">${chip("1h", "بعد ساعة")}${chip("t12", "غدًا ١٢ الظهر")}${chip("t18", "غدًا ٦ المغرب")}${chip("pick", "موعد آخر")}</div>
+            ${w === "pick" ? `<input type="datetime-local" id="pubAt">` : ""}</section>
+          <div class="flw-acts end"><button type="button" class="flw-btn big" data-psend="later">🗓️ جدول</button><button type="button" class="flw-btn pri big orange" data-psend="now">🚀 انشر الآن</button></div>
+        </div></div>`;
+  }
+
   function stDone(d) {
     const o = d.output || {};
     const isWork = o.status === "working" || d.busy === "generate";
@@ -724,8 +802,8 @@ const Flow = (() => {
     const d = S.d;
     if (!d || !S.el) return;
     S.el.classList.toggle("flw-lock", !!S.inflight || busy());
-    const st = d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
+    const st = S.view === "publish" ? "publish" : d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
+    const body = { publish: stPublish, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
       shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
@@ -854,7 +932,6 @@ const Flow = (() => {
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
     if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-tomont]")) return codeOut("montage");
-    if (q("[data-topub]")) return codeOut("publish");
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; flowCtxSet({ fid: S.d.id, pid }); close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {
       const pid = S.d.montage?.project_id;
@@ -881,8 +958,16 @@ const Flow = (() => {
       if (ok) campoll();
       return;
     }
-    if ((b = q("[data-go]")) && isCode(S.d) && (b.dataset.go === "montage" || b.dataset.go === "publish")) return codeOut(b.dataset.go);
-    if ((b = q("[data-go]"))) { reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
+    if ((b = q("[data-go]")) && isCode(S.d) && b.dataset.go === "publish") return openPub();
+    if ((b = q("[data-go]")) && isCode(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
+    if ((b = q("[data-go]"))) { S.view = null; reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
+    if (q("[data-topub]")) return openPub();
+    if ((b = q("[data-pwhen]"))) { S.pubWhen = b.dataset.pwhen; return render(); }
+    if ((b = q("[data-pacc]"))) { S.pubAcc = S.pubAcc || {}; S.pubAcc[b.dataset.pacc] = !S.pubAcc[b.dataset.pacc]; return render(); }
+    if ((b = q("[data-plink]"))) return pubLink(b.dataset.plink);
+    if (q("[data-pcapnew]")) return openPub(true);
+    if (q("[data-pdm]")) { S.pubDm = !S.pubDm; return render(); }
+    if ((b = q("[data-psend]"))) return pubSend(b.dataset.psend === "now");
     if ((b = q("[data-rate]"))) {
       return call("/rate", { stage: b.dataset.rate, item: b.dataset.rid, value: +b.dataset.v });
     }
@@ -1044,5 +1129,6 @@ const Flow = (() => {
   async function recent() {
     try { return (await api("/api/flows")).filter((f) => f.stage !== "done").slice(0, 6); } catch { return []; }
   }
-  return { start, open, close, recent };
+  async function openPublish(fid) { await open(fid); if (S.d?.id === fid) openPub(); }
+  return { start, open, close, recent, openPublish };
 })();
