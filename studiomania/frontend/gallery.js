@@ -537,7 +537,7 @@ const Gallery = (() => {
         if (Math.abs(e.deltaY) > 2 && now - C.last > 170) { C.last = now; catGo(Math.round(C.target) + Math.sign(e.deltaY)); }
         return;
       }
-      if (C.cur > 0) return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول يسكرول فيها عادي
+      if (C.cur > 0 && CATS2[C.cur][0] !== "carousel") return;   // صفحة الدبلجة أو المولّد أو القوالب المخصصة مفتوحة: الرول يسكرول فيها عادي
       e.preventDefault(); if (W.drag) return;
       const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
       if (W.mode === "snap" && Math.sign(d) !== Math.sign(W.vel)) W.vel *= .3;   // إذا عكست الاتجاه العجلة تفرمل أولًا
