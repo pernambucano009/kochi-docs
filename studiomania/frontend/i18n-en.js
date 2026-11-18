@@ -16816,4 +16816,10 @@ window.I18N_EN = {
   "الآراء": "Reviews",
   "آراء عملائك وتقييمهم": "Your customer reviews and rating",
   "متابعة": "Continue",
+  "عدد المتكلمين": "Speakers",
+  "شخص واحد يقرأ الحوار كله": "One person reads the whole dialogue",
+  "شخصان: {0} و{1}": "Two people: {0} and {1}",
+  "الصوت المختار بالأعلى هو صوت {0}. اختر صوت {1}:": "The voice chosen above is {0}. Pick the voice for {1}:",
+  "المذيع": "Host",
+  "الضيف": "Guest",
 };

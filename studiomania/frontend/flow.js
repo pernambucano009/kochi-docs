@@ -517,8 +517,20 @@ const Flow = (() => {
         <h3 class="flw-h3">الصوت</h3><div class="flw-voices">${voices.map((x) => `<div class="flw-voice${x.id === v.voice ? " on" : ""}">
           <button type="button" class="flw-vpick" data-nofx data-vvoice="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button>
           ${o.voices[v.lang] && o.fasih && /^ar-/.test(v.lang) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
+      ${on && o.two ? twoVoices(o, v, voices) : ""}
       ${isCode(d) ? failed("vo") : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد →${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل →"}</button></div>`;
+  }
+  // 🎙️🎙️ قوالب الحوار: شخص واحد يقرأ الكل، أو شخصين (الصوت اللي فوق للأول، واختار هنا صوت التاني)
+  function twoVoices(o, v, voices) {
+    const [a, b] = o.two, two = (v.people || 2) === 2;
+    if (!voices.some((x) => x.id === v.voice_b) || v.voice_b === v.voice) v.voice_b = (voices.find((x) => x.id !== v.voice) || voices[0])?.id || "";
+    return `<h3 class="flw-h3">عدد المتكلمين</h3><div class="flw-langs">
+        <button type="button" class="flw-chip${two ? "" : " on"}" data-vpeople="1">شخص واحد يقرأ الحوار كله</button>
+        <button type="button" class="flw-chip${two ? " on" : ""}" data-vpeople="2">شخصان: ${esc(a)} و${esc(b)}</button></div>
+      ${two ? `<p class="flw-sub">الصوت المختار بالأعلى هو صوت ${esc(a)}. اختر صوت ${esc(b)}:</p>
+        <div class="flw-voices">${voices.filter((x) => x.id !== v.voice).map((x) => `<div class="flw-voice${x.id === v.voice_b ? " on" : ""}">
+          <button type="button" class="flw-vpick" data-nofx data-vvoiceb="${esc(x.id)}"><i>${x.gender === "female" ? "👩" : "👨"}</i><b>${esc(x.label)}</b></button></div>`).join("")}</div>` : ""}`;
   }
   async function loadVoice() {
     if (S.vLoading) return;
@@ -1059,6 +1071,8 @@ const Flow = (() => {
     if ((b = q("[data-vspk]"))) { S.vo.speaker = b.dataset.vspk; return render(); }
     if ((b = q("[data-vlang]"))) { S.vo.lang = b.dataset.vlang; S.vo.voice = ""; S.dialOpen = false; return call("/lang", { lang: b.dataset.vlang }); }
     if ((b = q("[data-vvoice]"))) { S.vo.voice = b.dataset.vvoice; return render(); }
+    if ((b = q("[data-vvoiceb]"))) { S.vo.voice_b = b.dataset.vvoiceb; return render(); }
+    if ((b = q("[data-vpeople]"))) { S.vo.people = +b.dataset.vpeople; return render(); }
     if ((b = q("[data-vplay]"))) return playSample(b.dataset.vplay);
     if (q("[data-setvoice]")) { S.audio?.pause(); return call("/voice", S.vo); }
     if ((b = q("[data-tlook]"))) return tset("look", b.dataset.tlook);

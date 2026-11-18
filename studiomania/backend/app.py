@@ -24923,8 +24923,8 @@ def flow_profile(tpl: dict) -> str:
                    "النص فقط (والألوان) هو ما يتغير. اجعل النص بنفس طول الأمثلة تقريبًا.")
         if tid in MOTION_TWO_VOICES:
             a, b = MOTION_TWO_VOICES[tid]
-            out.append(f"هذا القالب حوار بصوتين: {a} (A) و{b} (B). كل جملة يقولها واحد منهما بالتناوب، فاكتب الجمل كأنها حوار قصير بينهما، "
-                       "وابدأ كل سطر بـ «A:» أو «B:».")
+            out.append(f"هذا القالب حوار بين شخصين: {a} (A) و{b} (B). الفكرة نفسها لازم تكون حوارًا بينهما (سؤال وجواب، أو موقف يحكيه واحد "
+                       "ويرد عليه التاني)، مش فكرة عامة تتقال بصوت واحد. والنص: كل جملة يقولها واحد منهما، والسطر يبدأ بـ «A:» أو «B:».")
     elif kind == "carousel":
         out.append("هذا القالب كاروسيل صور على إنستجرام (٥–٨ سلايدات): أول سلايد هوك يشد يقلب، وكل سلايد فكرة واحدة واضحة بكلام قليل، "
                    "وآخر سلايد دعوة. الفكرة يجب تُقسّم لنقط أو خطوات أو مقارنة أو قائمة، غير حكاية فيديو.")
@@ -26062,12 +26062,12 @@ def flow_motion_params(d: dict) -> dict:
     return out
 
 
-MOTION_TWO_VOICES = {"t-audiogram": ("المذيع", "الضيف")}
+MOTION_TWO_VOICES = {"t-audiogram": ("المذيع", "الضيف"), "t-chat": ("العميل", "العلامة")}
 
 
-def vo_dialogue(rows: list[dict], says: list[str], voice_a: str, lang: str, out: Path) -> None:
+def vo_dialogue(rows: list[dict], says: list[str], voice_a: str, lang: str, out: Path, voice_b: str = "") -> None:
     """صوتين: كل جملة (سطر، أو جملة منتهية بعلامة) بصوت متكلمها. «A:»/«B:» في السكريبت بتحدد المتكلم، وإلا بالتناوب."""
-    voice_b = tytpl_voice_b(lang, voice_a)
+    voice_b = voice_b or tytpl_voice_b(lang, voice_a)
     parts, who = [], "B"
     for i, txt in enumerate(says):
         raw_lines = str(((rows[i] if i < len(rows) else {}) or {}).get("say") or "").splitlines()
@@ -26101,9 +26101,12 @@ def flow_make_vo(fid: str) -> None:
     t0 = time.time()   # ⏱️ وقت كل خطوة بيتسجل (التسجيل والتفريغ) علشان نعرف البطء منين
     flow_update(fid, lambda x: x.update(vo_step="tts"))
     lang_v = vo.get("lang") or d.get("lang") or "ar-eg-cairo"
-    if d["template"]["id"] in MOTION_TWO_VOICES:   # 🎙️🎙️ حوار بصوتين (البودكاست): كل جملة بصوت متكلمها، A ثم B بالتناوب
+    if d["template"]["id"] in MOTION_TWO_VOICES:   # 🎙️🎙️ حوار: كل جملة بصوت متكلمها (A ثم B)، أو شخص واحد يقرأ الكل
         says = [re.sub(r"(?m)^\s*[AB]\s*[:：]\s*", "", x) for x in says]
-        vo_dialogue(rows, says, vo.get("voice") or "", lang_v, raw)
+        if (vo.get("people") or 2) == 2:
+            vo_dialogue(rows, says, vo.get("voice") or "", lang_v, raw, vo.get("voice_b") or "")
+        else:
+            vo_say("\n".join(x for x in says if x), vo.get("voice") or "", lang_v, raw)
     else:
         vo_say("\n".join(x for x in says if x), vo.get("voice") or "", lang_v, raw)
     t_tts = round(time.time() - t0, 1)
@@ -26803,14 +26806,19 @@ def flow_voice_options(fid: str):
     voice = vo.get("voice") if vo.get("voice") in dub.DIALECTS[lang]["voices"] or str(vo.get("voice") or "").startswith("clone:") else mine
     if mine.startswith("clone:"):   # 🎙️ صوت العميل المستنسخ يظهر أول اختيار في اللهجة
         voices[lang] = [{"id": mine, "label": "صوتك (مستنسخ)", "gender": "", "pts": wallet.credits(voice_usd(mine, say)), "sample": ""}, *voices[lang]]
+    two = MOTION_TWO_VOICES.get(d["template"]["id"])   # 🎙️🎙️ قالب حوار: شخص واحد يقرأ، أو شخصين بصوتين
     return {"speakers": speakers, "dialects": dialects, "voices": voices, "fasih": bool(fasih.api_key() or atlas.mock_mode()), "balance": wallet.balance(),
-            "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice}}
+            "two": list(two) if two else None,
+            "pick": {"speaker": vo.get("speaker") or "narrator", "lang": lang, "voice": voice, "people": vo.get("people") or (2 if two else 1),
+                     "voice_b": vo.get("voice_b") or (tytpl_voice_b(lang, voice) if two else "")}}
 
 
 class FlowVoiceIn(BaseModel):
     speaker: str = "narrator"
     lang: str = "ar-eg-cairo"
     voice: str = ""
+    voice_b: str = ""   # الصوت التاني في قوالب الحوار
+    people: int = 1
 
 
 def flow_guide(tpl: dict) -> dict | None:
@@ -26858,6 +26866,9 @@ def flow_voice(fid: str, body: FlowVoiceIn):
     voice = body.voice if body.voice in dub.DIALECTS[body.lang]["voices"] or body.voice.startswith(f"clone:{d.get('client_id') or active_client_id()}:") \
         else brand_narrator(body.lang, d.get("client_id"))
     vo = {"speaker": body.speaker, "speaker_name": names[body.speaker], "lang": body.lang, "voice": voice, "on": body.speaker != "none"}
+    if d["template"]["id"] in MOTION_TWO_VOICES:
+        vb = body.voice_b if body.voice_b in dub.DIALECTS[body.lang]["voices"] else tytpl_voice_b(body.lang, voice)
+        vo.update(people=2 if body.people == 2 else 1, voice_b=vb)
     if d["template"].get("kind") == "motion":
         flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, vo_track=None, stage="voice" if vo["on"] else "panel"))
         if vo["on"]:
