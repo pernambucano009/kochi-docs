@@ -16872,4 +16872,8 @@ window.I18N_EN = {
   "مثال: الجمعة الجاية · الساعة ١٠ الصبح": "e.g. Next Friday · 10 AM",
   "هدية أو عرض الافتتاح": "Opening gift or offer",
   "مثال: قهوة مجانية لأول ١٠٠ زائر": "e.g. Free coffee for the first 100 visitors",
+  "المقارنة": "Comparison",
+  "طرفا المقارنة ونقاطها": "The two sides and the points",
+  "تقارنه بماذا؟": "Compared with what?",
+  "مثال: الباقة العادية، أو الطريقة المعتادة": "e.g. the regular plan, or the usual way",
 };

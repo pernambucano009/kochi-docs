@@ -143,6 +143,7 @@ BRIEFS: dict[str, dict] = {
         "idea": "سنصنع لك مقارنة بين {the} والبديل المعتاد، جولة بجولة، بأرقام صادقة.",
         "ask": [
             _q("a", "اسم {the}", ph="مثال: باقتنا الذهبية", max=12),
+            _q("b", "تقارنه بماذا؟", ph="مثال: الباقة العادية، أو الطريقة المعتادة", max=14),
             _q("rows", "نقاط المقارنة (من 3 إلى 5)", "lines", ph="النقطة|درجتكم|درجة البديل من 10، مثال: السعر|8|5", count=[3, 5], pair=True),
         ],
     },
@@ -288,8 +289,8 @@ def apply(tpl: str, facts: dict, currency: str = "") -> tuple[dict, dict]:
         p["items"] = [f"{a}|{en.get(a, a)}" for a in f.get("items") or []]
         say["items"] = f.get("items")
     elif tpl == "t-versus":
-        p.update(a=f.get("a"), rows=f.get("rows"))
-        say.update(a=f.get("a"), rows=f.get("rows"))
+        p.update(a=f.get("a"), b=f.get("b"), rows=f.get("rows"))
+        say.update(a=f.get("a"), b=f.get("b"), rows=f.get("rows"))
     return {k: v for k, v in p.items() if v not in (None, "", [])}, {k: v for k, v in say.items() if v not in (None, "", [])}
 
 
@@ -358,6 +359,7 @@ def auto_icons(tpl: str, params: dict) -> dict:
 
 # 🇬🇧 نفس الفكرة والخانات بالإنجليزي (الواجهة الإنجليزي): {n} / {from} / {the} / {brand} بتتملا بكلمات المجال الإنجليزي
 NOUNS_EN = {
+    "تقارنه بماذا؟": "Compared with what?", "مثال: الباقة العادية، أو الطريقة المعتادة": "e.g. the regular plan, or the usual way",
     "سنصنع لك إعلان افتتاح: المدينة من أعلى كأنها مجسّم صغير، والناس يتجمعون عند فرعكم الجديد، ومعه الموعد.": "We will make you an opening ad: the city from above like a small model, people gathering at your new branch, with the date.",
     "الخبر": "The news", "مثال: افتتاح فرعنا الجديد في العليا": "e.g. Opening our new branch in Olaya", "الموعد والمكان": "Date and place",
     "مثال: الجمعة الجاية · الساعة ١٠ الصبح": "e.g. Next Friday · 10 AM", "هدية أو عرض الافتتاح": "Opening gift or offer",
