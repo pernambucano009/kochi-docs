@@ -25551,7 +25551,8 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     flow_update(fid, lambda x: x.update(lang=lang, script_lang=lang, scenarios=(x.get("scenarios") or []) + items if more else items))
 
 
-FACT_TPLS = {"t-price": {"step": "العرض", "title": "تفاصيل العرض"}, "t-review": {"step": "الآراء", "title": "آراء عملائك وتقييمهم"}}
+FACT_TPLS = {"t-price": {"step": "العرض", "title": "تفاصيل العرض"}, "t-review": {"step": "الآراء", "title": "آراء عملائك وتقييمهم"},
+             "t-count": {"step": "العرض", "title": "العرض الذي ينتظره الناس"}, "t-map": {"step": "التوصيل", "title": "فرعك ومناطق التوصيل"}}
 
 
 class FlowFactsIn(BaseModel):
