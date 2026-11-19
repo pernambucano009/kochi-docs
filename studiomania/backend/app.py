@@ -7688,9 +7688,38 @@ def legacy_logo_path() -> Path | None:
     return path if path and path.exists() else None
 
 
+LOGO_HOLES_DONE: set[str] = set()
+
+
+def logo_holes_once(bid: str) -> None:
+    """🕳️ مرة واحدة لكل علامة: الشعارات اللي اترفعت قبل إصلاح الفتحات (O وR وB) ونسخها المرسومة بتتصلح مكانها."""
+    if bid in LOGO_HOLES_DONE:
+        return
+    LOGO_HOLES_DONE.add(bid)
+    try:
+        if (brain_row(bid) or {}).get("logo_holes1"):
+            return
+        from PIL import Image as _PImg
+        d = brain_dir(bid)
+        files = [d / a["file"] for a in (brain_row(bid) or {}).get("logos") or []] + list(d.glob("logost-*.png"))
+        for f in files:
+            if not f.is_file() or f.suffix.lower() != ".png":
+                continue
+            with _PImg.open(f) as im:
+                if not firstvid.has_alpha(im):
+                    continue
+                fixed = firstvid.fill_holes(im.convert("RGBA"))
+            fixed.save(f, "PNG")
+        update_brain(bid, lambda x: x.update(logo_holes1=True))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[logo-holes] {bid}: {exc}", flush=True)
+
+
 def logo_path(client_id: str | None = None) -> Path | None:
     """شعار العميل المختار (أول شعار في ملفه)، أو شعار عميل معيّن."""
     c = (brain_row(client_id) if client_id else None) or active_client()
+    if c and c.get("id"):
+        logo_holes_once(c["id"])
     for a in (c or {}).get("logos") or []:
         p = brain_dir(c["id"]) / a["file"]
         if p.exists():

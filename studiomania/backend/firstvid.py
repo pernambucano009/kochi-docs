@@ -30,12 +30,43 @@ def has_alpha(img: Image.Image) -> bool:
     return float((_border(a) < 250).mean()) > 0.5
 
 
+def fill_holes(out: Image.Image, bg=None) -> Image.Image:
+    """🕳️ الفتحات اللي جوه الحروف (O وR وB وA…): لون الخلفية المحبوس جوه الحرف مش متوصل بالأطراف، فكان بيفضل (صاحب المشروع ١٩ نوفمبر).
+    أي جزء صغير (أقل من ٣٪ من الصورة) لونه قريب من لون الخلفية ومحاوط بالشعار بيتشال. bg = لون الخلفية (لو مش معروف: الأبيض)."""
+    if cv2 is None:
+        return out
+    a = np.asarray(out.convert("RGBA")).astype(np.float32)
+    rgb, al = a[..., :3], a[..., 3]
+    h, w = al.shape
+    if bg is None:
+        bg = np.array([250.0, 250.0, 250.0])
+    dist = np.sqrt(((rgb - np.asarray(bg, np.float32)) ** 2).sum(-1))
+    near = ((dist < 70) & (al > 200)).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(near, connectivity=4)
+    if n <= 1:
+        return out
+    lim = 0.03 * h * w
+    kill = np.zeros((h, w), bool)
+    for i in range(1, n):
+        x, y, cw, ch, area = stats[i]
+        if area > lim or area < 6 or x == 0 or y == 0 or x + cw >= w or y + ch >= h:
+            continue
+        m = lab == i
+        if float(dist[m].mean()) > 40:   # جوه الحرف بس لون الخلفية فعلًا (مش أبيض مقصود في التصميم)
+            continue
+        kill |= m
+    if not kill.any():
+        return out
+    al2 = np.where(kill, np.clip((dist - 22.0) / 48.0, 0, 1) * 255, al)
+    return Image.fromarray(np.dstack([rgb, al2]).astype(np.uint8), "RGBA")
+
+
 def cutout(src: Path, dst: Path) -> dict:
     """يشيل الخلفية السادة اللي حوالين اللوجو، ويقص الفراغ الزيادة. يرجع {ok, already}."""
     img = Image.open(src)
     img.load()
     if has_alpha(img):
-        out = img.convert("RGBA")
+        out = fill_holes(img.convert("RGBA"))   # الخلفية اتشالت بالموديل: الفتحات البيضا جوه الحروف ساعات بتفضل
         already = True
     else:
         rgb = np.asarray(img.convert("RGB")).astype(np.float32)
@@ -55,6 +86,7 @@ def cutout(src: Path, dst: Path) -> dict:
         alpha = np.where(keep, np.clip((dist - lo) / (hi - lo), 0, 1), 1.0)
         out = Image.fromarray(np.dstack([rgb, alpha * 255]).astype(np.uint8), "RGBA")
         already = False
+        out = fill_holes(out, bg)
     box = out.getchannel("A").point(lambda v: 255 if v > 12 else 0).getbbox()
     if box:
         pad = max(4, int(max(box[2] - box[0], box[3] - box[1]) * 0.04))
