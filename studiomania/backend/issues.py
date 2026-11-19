@@ -53,6 +53,8 @@ def norm_path(p: str) -> str:
 
 # 🩺 السبب والإصلاح المقترح: أشهر الأخطاء ومعناها الحقيقي
 RULES: list[tuple[str, str, str]] = [
+    (r"غير متاحة الآن لسبب من جهتنا", "رصيد مزوّد الذكاء الاصطناعي (Atlas) نفد: المزوّد رفض الطلب لعدم كفاية الرصيد، والعميل رأى جملة هادية",
+     "اشحن رصيد Atlas من لوحتهم (وفعّل الشحن التلقائي عندهم)، ثم أعد المحاولة. الإعدادات ← رصيد المنصات يبيّن الرصيد"),
     (r"free users|paid plan|upgrade|subscription|payment required", "خطة مزوّد الخدمة لا تسمح بهذه الخاصية أو رصيده انتهى",
      "اشحن رصيد المزوّد أو رقِّ خطته (الإعدادات ← رصيد المنصات يبيّن أي مزوّد)، ثم أعد المحاولة"),
     (r"insufficient|credits|balance|رصيد|نقاط|NoCredits", "رصيد العميل أو رصيد المنصة لا يكفي",
@@ -70,7 +72,7 @@ RULES: list[tuple[str, str, str]] = [
 ]
 
 
-BY_STATUS = {402: 0, 504: 2, 429: 3, 404: 8, 500: 9}   # الرقم ← القاعدة (لو الرسالة نفسها مافيهاش حاجة معروفة)
+BY_STATUS = {402: 1, 504: 3, 429: 4, 404: 9, 500: 10}   # الرقم ← القاعدة (لو الرسالة نفسها مافيهاش حاجة معروفة)
 
 
 LANG_FIX = {"no_en": ("جمل تظهر للعميل وليس لها ترجمة إنجليزية في frontend/i18n-en.js، فتظهر بالعربي في وضع الإنجليزي",
@@ -83,8 +85,10 @@ def explain(message: str, raw: str = "", status: int = 0, kind: str = "") -> tup
     if kind == "i18n":
         return LANG_FIX["dialect" if "عامية" in message else "no_en"]
     txt = f"{message}\n{raw}\n{kind}"
+    if re.search(RULES[0][0], txt):   # الرصيد قبل أي حاجة: حتى لو جه من شغل فشل
+        return RULES[0][1], RULES[0][2]
     if status == 500:   # خطأ في الكود: الرسالة نفسها فيها كلام زي «key» أو «JSON» بيوه
-        return RULES[9][1], RULES[9][2]
+        return RULES[10][1], RULES[10][2]
     for pat, cause, fix in RULES:
         if re.search(pat, txt, re.I):
             return cause, fix

@@ -25147,7 +25147,8 @@ def flow_job(fid: str, what: str, fn) -> None:
             flow_update(fid, lambda d: d.update(busy=None, error=msg))
             if issues.technical(msg) or not isinstance(exc, HTTPException):   # 🚨 العميل بيشوف جملة هادية، والأصل لازم يوصل صندوق الأخطاء
                 import traceback  # noqa: PLC0415
-                issues.record("job", f"flow/{what}", msg, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-3500:], 500, ref=fid)
+                issues.record("job", f"flow/{what}", msg, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-3500:],
+                              getattr(exc, "status_code", 500), ref=fid)
     flow_update(fid, lambda d: d.update(busy=what, busy_at=time.time(), error=None))
     threading.Thread(target=run, daemon=True).start()
 
