@@ -1321,6 +1321,7 @@ def billing_state(request: Request):
             "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
             "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
+            "next_plan": (json.loads(kv_get(f"next_plan:{u['workspace']}") or "{}") or {}).get("plan") or None,
             "paypal": payments.paypal_on(), "tap": payments.tap_on(),
             "plans": cfg["plans"], "addons": cfg["addons"], "topups": cfg["topups"], "rules": cfg["rules"], "history": hist,
             "discount": {"pct": w["discount_pct"] or 0, "code": w["discount_code"] or "", "once": bool(w["discount_once"])} if w and w["discount_pct"] else None}
@@ -1407,6 +1408,39 @@ def checkout(body: CheckoutIn, request: Request):
     except payments.PayError as e:   # العميل مايشوفش تفاصيل تقنية: الخطأ نفسه بيروح صندوق الأخطاء
         issues.record("api", "POST /api/billing/checkout", f"الدفع فشل ({body.provider}): {e}", str(e)[:1000], 502, u["workspace"])
         raise HTTPException(502, "تعذّر فتح صفحة الدفع الآن. جرّب طريقة دفع أخرى، أو حاول بعد قليل.")
+
+
+# ⬇️ النزول لباقة أقل: العميل بيكمل باقته اللي دافعها لآخر المدة (بنقاطها)، وفي ميعاد التجديد الخصم بيبقى بسعر الباقة الأقل وبتتحوّل
+class DowngradeIn(BaseModel):
+    plan: str
+
+
+@app.post("/api/billing/downgrade")
+def downgrade(body: DowngradeIn, request: Request):
+    u = customer_user(request)
+    wid = u["workspace"]
+    w = workspace(wid)
+    cfg = billing.config(DATA_DIR)
+    order = [p["key"] for p in cfg["plans"]]
+    p = plan_of(body.plan)
+    if not (w and w["provider"] == "tap" and w["sub_id"] and not w["ends_at"]):
+        raise HTTPException(400, "لا يوجد اشتراك يمكن تغييره")
+    if not p or p.get("once") or p["key"] not in order or w["plan"] not in order or order.index(p["key"]) >= order.index(w["plan"]):
+        raise HTTPException(400, "اختر باقة أقل من باقتك")
+    try:
+        tot = billing.custom_total(cfg, p["key"], int(w["extra_accounts"] or 0), bool(w["autopilot"]))
+    except ValueError:
+        tot = billing.custom_total(cfg, p["key"], 0, False)
+    usd = billing.yearly(cfg, tot["total"]) if w["cycle"] == "year" else tot["total"]
+    kv_set(f"next_plan:{wid}", json.dumps({"plan": p["key"], "usd": usd}))
+    return billing_state(request)
+
+
+@app.delete("/api/billing/downgrade")
+def downgrade_cancel(request: Request):
+    u = customer_user(request)
+    kv_set(f"next_plan:{u['workspace']}", "")
+    return billing_state(request)
 
 
 class DeleteMeIn(BaseModel):
@@ -1608,7 +1642,10 @@ def tap_renewals() -> None:
                 continue
             customer, card, agreement = (r["sub_id"].split("|") + ["", "", ""])[:3]
             usd = float(kv_get(f"tap_amt:{r['id']}") or 0)
-            p = plan_of(r["plan"])
+            nx = json.loads(kv_get(f"next_plan:{r['id']}") or "{}") or {}
+            if nx.get("plan") and plan_of(nx["plan"]) and nx.get("usd"):   # ⬇️ نزول متسجّل: التجديد ده بسعر الباقة الأقل
+                usd = float(nx["usd"])
+            p = plan_of(nx.get("plan") or r["plan"])
             if not (customer and card and usd and p):
                 continue
             try:
@@ -1620,6 +1657,11 @@ def tap_renewals() -> None:
                 print(f"[tap] renew {r['id']}: {exc}", flush=True)
             if ok:
                 kv_set(f"tap_fail:{r['id']}", "0")
+                if nx.get("plan") and p["key"] != r["plan"]:
+                    with closing(db()) as c, c:
+                        c.execute("UPDATE workspaces SET plan=? WHERE id=?", (p["key"], r["id"]))
+                    kv_set(f"tap_amt:{r['id']}", str(usd))
+                    kv_set(f"next_plan:{r['id']}", "")
                 kv_set(f"tap_next:{r['id']}", str(nxt + (TAP_YEAR if r["cycle"] == "year" else MONTH)))
                 renew(r["id"], f"tap-{ch['id']}", usd)
             else:

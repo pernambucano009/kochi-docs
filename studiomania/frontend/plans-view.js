@@ -227,7 +227,8 @@ const PlansView = (() => {
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل إلى السنوي" : "حوّل إلى الشهري") : `${curI < 0 ? "اشترك في" : "ترقية إلى"} ${esc(p.name)}`;
         cta = `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
-      } else if (s === "down") cta = `<button class="soft" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>انتقل إلى ${esc(p.name)}</button>`;   // النزول لباقة أقل مسموح، بس من غير برتقالي
+      } else if (s === "down") cta = d.next_plan === p.key ? `<span class="low">تنتقل إليها عند التجديد</span><button class="soft" data-pvdownx>تراجع</button>`
+        : `<button class="soft" ${d.provider === "tap" && o.downgrade ? "data-pvdown" : "data-pvup"}="${esc(p.key)}" ${providers.length ? "" : "disabled"}>انتقل إلى ${esc(p.name)}</button>`;   // النزول لباقة أقل مسموح، بس من غير برتقالي   // النزول لباقة أقل مسموح، بس من غير برتقالي
       else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "انتهت التجربة" : "أقل من باقتك"}</span>`;
       const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكثر اختيارًا</em>` : "";
@@ -292,6 +293,8 @@ const PlansView = (() => {
         const p = plans.find((x) => x.key === key);
         return sheet("plan", key, S.cyc === "year" ? p.price * ym : moP(p));
       }
+      if (q("[data-pvdown]")) return o.downgrade(q("[data-pvdown]").dataset.pvdown);
+      if (q("[data-pvdownx]")) return o.downgrade("");
       if (q("[data-pvkgo]")) { const v = el.querySelector("[data-pvk]")?.value.trim(); return v ? o.coupon(v) : null; }
       if (q("[data-pvhist]")) { S.hist = !S.hist; return render(); }
       if (q("[data-pvmore]")) { S.tops = !S.tops; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }

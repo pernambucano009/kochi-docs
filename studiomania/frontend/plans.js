@@ -30,6 +30,17 @@ const PlansPage = (() => {
           mount(root);
         } catch (err) { toast(err.message, true); }
       },
+      // ⬇️ النزول لباقة أقل: بيتسجّل ويحصل في ميعاد التجديد (الباقة الحالية ونقاطها لحد آخر المدة). "" = تراجع
+      async downgrade(plan) {
+        if (demo) return toast("هذه معاينة، والتغيير يعمل في النسخة الحقيقية");
+        const name = (d.plans.find((p) => p.key === plan) || {}).name;
+        if (plan && !(await uiConfirm(`تبقى باقتك الحالية ونقاطها حتى نهاية المدة التي دفعتها، ثم تنتقل إلى «${name}» عند التجديد بسعرها. هل تريد ذلك؟`))) return;
+        try {
+          await api("/api/billing/downgrade", plan ? { method: "POST", ...jsonBody({ plan }) } : { method: "DELETE" });
+          toast(plan ? `✓ تنتقل إلى «${name}» عند التجديد` : "✓ ألغيت الانتقال، وتبقى على باقتك");
+          mount(root);
+        } catch (err) { toast(err.message, true); }
+      },
       signup: (plan, cycle) => { location.href = `/signup${plan ? `?plan=${encodeURIComponent(plan)}&cycle=${cycle}` : ""}`; },
       async pay(kind, key, provider, cycle) {
         if (demo) return toast("هذه معاينة، والدفع يعمل في النسخة الحقيقية");
