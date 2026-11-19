@@ -4,20 +4,20 @@
 // PlansView.mount(el, data, { pay(kind, key, provider, cycle), signup(plan), toast(msg, bad) })
 const PlansView = (() => {
   const CSS = `
-:is(#nh, body) .pv { --pv-ink: var(--nh-ink, var(--text, #181718)); --pv-sub: #6B6A66; --pv-muted: var(--nh-muted, var(--muted, #6B6B67)); --pv-acc: var(--nh-accent, var(--accent));
+:is(#nh, body) .pv { --pv-ink: var(--nh-ink, var(--text, #181718)); --pv-sub: #6B6A66; --pv-muted: var(--nh-muted, var(--muted, #6B6B67)); --pv-acc: #E5613E;
   --pv-card: var(--card, #fff); --pv-field: var(--field, #F3F2EF); --pv-field-hi: #EBEAE6; --pv-fill: rgba(20, 20, 22, .045); --pv-line: rgba(24, 23, 24, .08);
   --pv-track: #E3E2DE; --pv-soft: rgba(229, 97, 62, .1); --pv-tip: #181718; --pv-tip-ink: #fff; --pv-tip-sub: rgba(255, 255, 255, .78); --pv-tip-m: #F6B29E;
   --pv-sh: 0 4px 24px rgba(24, 23, 24, .06); --pv-sh-hi: 0 16px 34px -18px rgba(24, 23, 24, .3); --pv-cont: 0 6px 24px rgba(24, 23, 24, .07);
   --pv-ease: cubic-bezier(.65, 0, .35, 1); --pv-pop: cubic-bezier(.2, .8, .2, 1);
   position: relative; min-height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; color: var(--pv-ink); font-family: var(--nh-arabic, "Jost", "Alexandria", sans-serif); }
-:root[data-nh-theme="dark"] :is(#nh, body) .pv { --pv-sub: #A3A29E; --pv-field: #2A292A; --pv-field-hi: #343334; --pv-fill: rgba(255, 255, 255, .05); --pv-line: rgba(255, 255, 255, .08);
+:root[data-nh-theme="dark"] :is(#nh, body) .pv { --pv-acc: #F0754F; --pv-sub: #A3A29E; --pv-field: #2A292A; --pv-field-hi: #343334; --pv-fill: rgba(255, 255, 255, .05); --pv-line: rgba(255, 255, 255, .08);
   --pv-track: #3D3C3D; --pv-soft: rgba(240, 117, 79, .14); --pv-tip: #F1F1F3; --pv-tip-ink: #141416; --pv-tip-sub: rgba(20, 20, 22, .72); --pv-tip-m: #A93A1F;
   --pv-sh: 0 4px 24px rgba(0, 0, 0, .28); --pv-sh-hi: 0 16px 34px -18px rgba(0, 0, 0, .7); --pv-cont: 0 6px 24px rgba(0, 0, 0, .35); }
 :is(#nh, body) .pv :where(button) { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 :is(#nh, body) .pv a { color: inherit; text-decoration: none; }
 :is(#nh, body) .pv .num { font-family: var(--nh-latin, "Jost", sans-serif); font-weight: 300; letter-spacing: .03em; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
 :is(#nh, body) .pv .lat { font-family: var(--nh-latin, "Jost", sans-serif); text-transform: uppercase; direction: ltr; unicode-bidi: isolate; }
-:is(#nh, body) .pv-mid { display: grid; place-content: center; justify-items: center; gap: 40px; padding: 24px 0; }
+:is(#nh, body) .pv-mid { display: grid; place-content: start center; justify-items: center; gap: 16px; padding: 4px 0 12px; }
 :is(#nh, body) .pv-cap { cursor: pointer; display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 18px; border-radius: 99px; background: var(--pv-card); box-shadow: var(--pv-cont);
   font-size: 12.5px; color: var(--pv-ink); transition: scale .32s var(--pv-pop), box-shadow .3s; }
 :is(#nh, body) .pv-cap:hover { scale: 1.04; box-shadow: var(--pv-sh-hi); }
@@ -104,7 +104,7 @@ const PlansView = (() => {
 :is(#nh, body) .pv-cont .tp:hover { background: var(--pv-fill); }
 :is(#nh, body) .pv-cont .tp small { color: var(--pv-muted); font-size: 11.5px; }
 :is(#nh, body) .pv-cont .tp.pick { background: var(--pv-soft); color: var(--pv-acc); }
-:is(#nh, body) .pv-cont .more { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--pv-fill); font-size: 16px; color: var(--pv-sub); transition: rotate .25s var(--pv-ease), background .2s; }
+:is(#nh, body) .pv-cont .more { width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--pv-acc); font-size: 24px; font-weight: 300; line-height: 1; color: #fff; box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--pv-acc) 70%, transparent); transition: rotate .25s var(--pv-ease), background .2s; }
 :is(#nh, body) .pv-cont.open .more { rotate: 45deg; }
 :is(#nh, body) .pv-cont:not(.open) .sep, :is(#nh, body) .pv-cont:not(.open) .tp { display: none; }
 :is(#nh, body) .pv-low { position: relative; flex-direction: column; align-items: center; gap: 8px; }
@@ -117,6 +117,24 @@ const PlansView = (() => {
 :is(#nh, body) .pv-hist .d { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; flex: none; } :is(#nh, body) .pv-hist .d.plus { color: var(--pv-acc); }
 :is(#nh, body) .pv-hist small { color: var(--pv-muted); display: block; font-size: 11px; }
 :is(#nh, body) .pv-cont .how { font-size: 11.5px; color: var(--pv-muted); padding-inline: 6px; }
+/* 💳 اختيار طريقة الدفع */
+:is(#nh, body) .pv-sheet { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(12, 12, 14, .35); backdrop-filter: blur(3px); animation: pv-in .2s ease; }
+:is(#nh, body) .pv-sb { position: relative; width: min(340px, 100%); display: grid; gap: 6px; justify-items: center; padding: 26px 22px 22px; border-radius: 24px; background: var(--pv-card); box-shadow: var(--pv-sh-hi); }
+:is(#nh, body) .pv-sb > b { font-size: 15px; font-weight: 500; }
+:is(#nh, body) .pv-sb .am { font-size: 13px; color: var(--pv-sub); } :is(#nh, body) .pv-sb .am .num { font-size: 20px; color: var(--pv-ink); }
+:is(#nh, body) .pv-sb .x { position: absolute; top: 10px; inset-inline-end: 12px; width: 30px; height: 30px; border-radius: 50%; font-size: 20px; color: var(--pv-muted); background: var(--pv-fill); }
+:is(#nh, body) .pv-ms { width: 100%; display: grid; gap: 10px; margin-top: 12px; }
+:is(#nh, body) .pv-ms .pm { height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 17px; transition: scale .25s var(--pv-pop), filter .2s; }
+:is(#nh, body) .pv-ms .pm:hover { scale: 1.02; filter: brightness(1.05); } :is(#nh, body) .pv-ms .pm:disabled { opacity: .5; cursor: default; }
+:is(#nh, body) .pv-ms .mada { background: #fff; box-shadow: inset 0 0 0 1px #D9D9D9; color: #259BD6; }
+:is(#nh, body) .pv-ms .mada .lat { text-transform: none; font-weight: 700; font-size: 20px; letter-spacing: -.02em; } :is(#nh, body) .pv-ms .mada .md { font-style: normal; color: #84B740; font-weight: 700; font-size: 15px; }
+:is(#nh, body) .pv-ms .apple { background: #000; color: #fff; font-family: -apple-system, "Helvetica Neue", sans-serif; font-weight: 500; font-size: 19px; } :is(#nh, body) .pv-ms .apple svg { translate: 0 -2px; }
+:is(#nh, body) .pv-ms .card { background: #1A1F71; color: #fff; } :is(#nh, body) .pv-ms .card .lat { font-weight: 800; font-style: italic; letter-spacing: .04em; font-size: 19px; }
+:is(#nh, body) .pv-ms .card .mc { display: inline-flex; margin-inline-start: 8px; direction: ltr; } :is(#nh, body) .pv-ms .card .mc i { width: 20px; height: 20px; border-radius: 50%; background: #EB001B; }
+:is(#nh, body) .pv-ms .card .mc i + i { background: #F79E1B; margin-left: -8px; mix-blend-mode: screen; }
+:is(#nh, body) .pv-ms .paypal { background: #FFC439; direction: ltr; font-family: Verdana, sans-serif; font-weight: 700; font-style: italic; font-size: 19px; } :is(#nh, body) .pv-ms .pp1 { color: #003087; } :is(#nh, body) .pv-ms .pp2 { color: #009CDE; }
+:is(#nh, body) .pv-ms .paypal { gap: 0; }
+@keyframes pv-in { from { opacity: 0; } }
 @media (max-width: 1100px) { :is(#nh, body) .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
 /* التابلت: الكروت الأربعة صفّين بدل ما تتقطع */
 @media (min-width: 821px) and (max-width: 1020px) { :is(#nh, body) .pv-cards { flex-wrap: wrap; justify-content: center; max-width: 640px; } :is(#nh, body) .pv-pc { width: calc(50% - 12px); }
@@ -143,6 +161,7 @@ const PlansView = (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const n = (x) => Number(x || 0).toLocaleString("en-US");
   const ORDER = ["trial", "starter", "pro", "agency"];
+  const APPLE = `<svg viewBox="0 0 17 20" width="15" height="18" aria-hidden="true"><path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.6 4.8 2 5.8 1.1 7.4c-1.9 3.2-.5 8 1.3 10.6.9 1.3 1.9 2.7 3.3 2.6 1.3-.1 1.8-.9 3.4-.9 1.6 0 2 .9 3.4.8 1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.9-1.1-3-4.3zM11.5 3c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>`;
   const PLUS = `<svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 
   // اللي بيزيد في الباقة عن اللي قبلها: من plan-items.js، نفس المصدر اللي شاشة الأسعار في صفحة الهبوط بتقرا منه
@@ -154,14 +173,29 @@ const PlansView = (() => {
 
   function mount(el, d, o = {}) {
     ADDONS = d.addons || [];
-    const S = { cyc: "month", open: !!o.open, pick: null, tops: false, top: null, busy: false };   // open: التفاصيل مفتوحة من الأول (صفحة الأسعار العامة)
+    const S = { cyc: "month", open: true, pick: null, tops: false, top: null, busy: false };   // open: التفاصيل مفتوحة من الأول (صفحة الأسعار العامة)
     const plans = ORDER.map((k) => d.plans.find((p) => p.key === k)).filter(Boolean).concat(d.plans.filter((p) => !ORDER.includes(p.key)));
     const guest = !d.me, ym = +(d.rules?.yearly_months || 10);
     const curI = guest ? -2 : plans.findIndex((p) => p.key === d.plan);
     const moP = (p) => S.cyc === "year" ? Math.round(p.price * ym / 12) : p.price;
     const fmtD = (t) => t ? new Date(t * 1000).toLocaleDateString(typeof UI_LOCALE === "function" ? UI_LOCALE() : "ar-EG", { day: "numeric", month: "long" }) : "";
     const renew = d.ends_at ? `تنتهي ${fmtD(d.ends_at)}` : d.renews_at ? `تتجدد ${fmtD(d.renews_at)}` : "";
-    const providers = [d.tap && ["tap", "مدى · بطاقة · Apple Pay"], d.paypal && ["paypal", "PayPal"]].filter(Boolean);
+    const providers = [d.tap && ["tap"], d.paypal && ["paypal"]].filter(Boolean);
+    // 💳 طرق الدفع: كل طريقة زرار لوحده بشكلها المعروف (مدى، Apple Pay، فيزا وماستركارد، PayPal)
+    const METHODS = [d.tap && ["tap", "mada", `<span class="lat">mada</span><i class="md">مدى</i>`],
+      d.tap && ["tap", "apple", `${APPLE}<span>Pay</span>`],
+      d.tap && ["tap", "card", `<span class="lat">VISA</span><span class="mc"><i></i><i></i></span>`],
+      d.paypal && ["paypal", "paypal", `<span class="pp1">Pay</span><span class="pp2">Pal</span>`]].filter(Boolean);
+    function sheet(kind, key, price) {
+      if (!METHODS.length) return o.toast?.("الدفع قيد التجهيز، وسيُتاح قريبًا.");
+      S.sheet = { kind, key, price }; render();
+    }
+    function payBox() {
+      if (!S.sheet) return "";
+      return `<div class="pv-sheet"><div class="pv-sb" role="dialog" aria-label="اختر طريقة الدفع"><button class="x" data-pvx aria-label="إغلاق">×</button>
+        <b>اختر طريقة الدفع</b>${S.sheet.price ? `<span class="am"><span class="num">${sar(S.sheet.price)}</span> ر.س</span>` : ""}
+        <div class="pv-ms">${METHODS.map(([prov, k, inner]) => `<button class="pm ${k}" data-pvm="${prov}" ${S.busy ? "disabled" : ""}>${inner}</button>`).join("")}</div></div></div>`;
+    }
     const sameCycle = () => (d.cycle || "month") === S.cyc;
 
     function state(p, i) {
@@ -192,8 +226,7 @@ const PlansView = (() => {
       else if (s === "cur") cta = `<span class="cur">✓ باقتك${renew ? ` · ${esc(renew)}` : ""}</span>`;
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل إلى السنوي" : "حوّل إلى الشهري") : `${curI < 0 ? "اشترك في" : "ترقية إلى"} ${esc(p.name)}`;
-        cta = S.pick === p.key && providers.length > 1 ? providers.map(([k, t]) => `<button class="go" data-pvpay="${k}" data-plan="${esc(p.key)}" ${S.busy ? "disabled" : ""}>${t}</button>`).join("")
-          : `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
+        cta = `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
       } else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "انتهت التجربة" : "أقل من باقتك"}</span>`;
       const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكثر اختيارًا</em>` : "";
@@ -207,9 +240,7 @@ const PlansView = (() => {
         <div class="pv-cta">${cta}</div></article>`;
     }
     function bottom() {
-      const tops = d.topups.map((t) => S.top === t.key && !guest && providers.length > 1
-        ? providers.map(([k, tx]) => `<button class="tp pick" data-pvtop="${esc(t.key)}" data-prov="${k}">${tx}</button>`).join("")
-        : `<button class="tp" data-pvtop="${esc(t.key)}">+<span class="num">${n(t.credits)}</span> <small><span class="num">${sar(t.price)}</span> ر.س</small></button>`).join("");
+      const tops = d.topups.map((t) => `<button class="tp" data-pvtop="${esc(t.key)}">+<span class="num">${n(t.credits)}</span> <small><span class="num">${sar(t.price)}</span> ر.س</small></button>`).join("");
       if (guest) return `<div class="pv-cont${S.tops ? " open" : ""}"><b class="ttl" style="padding-inline-start:10px">نقاط إضافية</b><span class="sep"></span>${tops}<span class="how">صالحة ${d.rules?.topup_valid_months || 12} شهرًا</span><button class="more" data-pvmore aria-label="نقاط إضافية">+</button></div>`;
       const c = d.me.credits || {}, cur = plans[curI], full = (cur?.credits || 0) + (c.topup_credits || 0);
       const pct = full ? Math.max(0, Math.min(100, Math.round((c.total || 0) / full * 100))) : 0;
@@ -232,63 +263,46 @@ const PlansView = (() => {
     function render() {
       el.innerHTML = `<div class="pv${S.open ? " open" : ""}" data-nofx>
         <div class="pv-mid">
-          <button class="pv-cap" data-pvcap aria-expanded="${S.open}"><span data-pvcapt>${S.open ? "إخفاء" : "التفاصيل"}</span><i aria-hidden="true"></i></button>
           <div class="pv-stack">
-            <div class="pv-row">${plans.map(small).join("")}</div>
-            <div class="pv-wrap" aria-hidden="${!S.open}">
+            <div class="pv-wrap">
               ${plans.some((p) => p.price) ? `<div class="pv-seg"><button data-pvcyc="month" class="${S.cyc === "month" ? "on" : ""}">شهري</button><button data-pvcyc="year" class="${S.cyc === "year" ? "on" : ""}">سنوي <em>${ym < 12 ? (12 - ym === 2 ? "شهران مجانًا" : `${12 - ym} أشهر مجانًا`) : ""}</em></button></div>` : ""}
               <div class="pv-cards">${plans.map(big).join("")}</div>
             </div>
           </div>
         </div>
-        <div class="pv-low">${bottom()}${hist()}</div></div>`;
+        <div class="pv-low">${bottom()}${hist()}</div>${payBox()}</div>`;
     }
     const pv = () => el.querySelector(".pv");
     let shut;
-    const zoom = (on) => { clearTimeout(shut); if (on && !S.open) S.openedAt = Date.now(); S.open = on; if (!on) S.pick = null; pv().classList.toggle("open", on); el.querySelector("[data-pvcap]").setAttribute("aria-expanded", on);
-      el.querySelector("[data-pvcapt]").textContent = on ? "إخفاء" : "التفاصيل";
-      el.querySelector(".pv-wrap").setAttribute("aria-hidden", !on); };
     const pay = async (kind, key, prov) => {
       if (!o.pay) return;
       S.busy = true; render();
-      try { await o.pay(kind, key, prov, S.cyc); } finally { S.busy = false; if (el.isConnected) { render(); if (S.open) pv().classList.add("open"); } }
+      try { await o.pay(kind, key, prov, S.cyc); } finally { S.busy = false; if (el.isConnected) render(); }
     };
     el.addEventListener("click", (e) => {
       const q = (s) => e.target.closest(s);
-      if (q("[data-pvcap]")) return S.open && Date.now() - (S.openedAt || 0) < 700 ? null : zoom(!S.open);   // الضغطة اللي بعد الهوفر على طول ماتقفلهاش
-      if (q("[data-pvopen]")) return zoom(true);
-      if (q("[data-pvcyc]")) { S.cyc = q("[data-pvcyc]").dataset.pvcyc; S.pick = null; render(); return pv().classList.add("open"); }
+      if (q("[data-pvopen]")) return el.querySelector(".pv-cards")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (q("[data-pvx]") || e.target.matches?.(".pv-sheet")) { S.sheet = null; return render(); }
+      if (q("[data-pvm]")) { const b = q("[data-pvm]"), sh = S.sheet; S.sheet = null; return pay(sh.kind, sh.key, b.dataset.pvm); }
+      if (q("[data-pvcyc]")) { S.cyc = q("[data-pvcyc]").dataset.pvcyc; return render(); }
       if (q("[data-pvbuy]")) return o.signup?.(q("[data-pvbuy]").dataset.pvbuy, S.cyc);
       if (q("[data-pvup]")) {
         const key = q("[data-pvup]").dataset.pvup;
-        if (providers.length === 1) return pay("plan", key, providers[0][0]);
-        S.pick = key; render(); return pv().classList.add("open");
+        const p = plans.find((x) => x.key === key);
+        return sheet("plan", key, S.cyc === "year" ? p.price * ym : moP(p));
       }
-      if (q("[data-pvpay]")) { const b = q("[data-pvpay]"); return pay("plan", b.dataset.plan, b.dataset.pvpay); }
       if (q("[data-pvkgo]")) { const v = el.querySelector("[data-pvk]")?.value.trim(); return v ? o.coupon(v) : null; }
-      if (q("[data-pvhist]")) { S.hist = !S.hist; const o2 = S.open; render(); return o2 && pv().classList.add("open"); }
-      if (q("[data-pvmore]")) { S.tops = !S.tops; S.top = null; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
+      if (q("[data-pvhist]")) { S.hist = !S.hist; return render(); }
+      if (q("[data-pvmore]")) { S.tops = !S.tops; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
       const t = q("[data-pvtop]");
       if (t) {
         if (guest) return o.signup?.("", S.cyc);
         if (t.dataset.prov) return pay("topup", t.dataset.pvtop, t.dataset.prov);
         if (!providers.length) return o.toast?.("الدفع قيد التجهيز، وسيُتاح قريبًا.");
-        if (providers.length === 1) return pay("topup", t.dataset.pvtop, providers[0][0]);
-        S.top = t.dataset.pvtop; render(); if (S.open) pv().classList.add("open");
+        return sheet("topup", t.dataset.pvtop, (d.topups.find((x) => x.key === t.dataset.pvtop) || {}).price);
       }
     });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.open && el.isConnected) zoom(false); });
-    // 🖱️ الوقوف على «التفاصيل» يفتحها على طول، والخروج من منطقة الباقات يقفلها بعد لحظة (الضغط شغال كمان، وعلى الجوال بالضغط بس)
-    if (matchMedia("(hover: hover)").matches) {
-      el.addEventListener("mouseover", (e) => {
-        if (e.target.closest?.("[data-pvcap]") && !S.open) zoom(true);
-        if (e.target.closest?.(".pv-mid")) clearTimeout(shut);
-      });
-      el.addEventListener("mouseout", (e) => {
-        if (!S.open || !e.target.closest?.(".pv-mid") || e.relatedTarget?.closest?.(".pv-mid")) return;
-        clearTimeout(shut); shut = setTimeout(() => { if (S.open && !S.busy) zoom(false); }, 700);
-      });
-    }
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.sheet && el.isConnected) { S.sheet = null; render(); } });
     render();
   }
   return { mount };

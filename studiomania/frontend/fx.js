@@ -34,12 +34,17 @@
     fit();
   }
 
+  // 🫥 الزرار اللي من غير جسم (كلام في الهوا زي «سمسم كيت» اللي بيرجّع للرئيسية): مالوش إفكت. الجسم = خلفية أو إطار أو ظل باينين
+  const seen = (c) => { const m = c.match(/[\d.]+/g); return !!m && (m.length < 4 || +m[3] > .02); };
+  const body = (el) => { const cs = getComputedStyle(el);
+    return seen(cs.backgroundColor) || cs.backgroundImage !== "none" || cs.boxShadow !== "none" || ((parseFloat(cs.borderTopWidth) || 0) > 0 && cs.borderTopStyle !== "none" && seen(cs.borderTopColor)); };
   let on = null, box = null;   // الزرار المرفوع دلوقتي، ومكانه قبل ما يطلع
   const off = () => { on?.classList.remove("fx-on"); on = box = null; };
   document.addEventListener("pointerover", (e) => {
     const el = e.target.closest?.(SEL);
     if (!el || el.matches(SKIP) || el.closest(SKIP) || el.disabled) return;
     if (el.offsetWidth < 26 || el.offsetHeight < 22) return;   // أيقونات صغيرة جدًا
+    if (!el.classList.contains("fx") && !body(el)) return;
     if (!el.classList.contains("fx")) { const z = getComputedStyle(el).zIndex; if (z !== "auto" && +z > 2) el.style.zIndex = z; }   // زرار عايم فوق الصفحة (دايرة المساعدة): البروز كان بينزّل ترتيبه لـ٢ فيستخبى ورا المحتوى
     el.classList.add("fx");
     el.classList.toggle("fx-wide", el.offsetWidth > 320);   // صف/كارت عريض: مايتكبرش (٦٪ من عرضه بتطلّعه بره إطاره وتطلّع شريط تمرير)، بيترفع بس
@@ -61,6 +66,6 @@
   addEventListener("blur", off);
   document.addEventListener("focusin", (e) => {
     const el = e.target.closest?.(SEL);
-    if (el && !el.matches(SKIP) && !el.closest(SKIP) && el.offsetWidth >= 26) { el.classList.add("fx"); snake(el); }
+    if (el && !el.matches(SKIP) && !el.closest(SKIP) && el.offsetWidth >= 26 && (el.classList.contains("fx") || body(el))) { el.classList.add("fx"); snake(el); }
   });
 })();

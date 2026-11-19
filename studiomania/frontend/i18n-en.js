@@ -9938,6 +9938,8 @@ window.I18N_EN = {
   "إعادة (Ctrl+Y)": "Redo (Ctrl+Y)",
   "إعادة المحاولة": "Retry",
   "إغلاق": "Close",
+  "اختر طريقة الدفع": "Choose a payment method",
+  "مدى": "mada",
   "إلغاء": "Cancel",
   "إلغاء المنشور": "Cancelling the post",
   "إلغاء هذا المنشور؟": "Cancel this post?",
