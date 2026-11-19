@@ -140,8 +140,11 @@ const PlansView = (() => {
   :is(#nh, body) .pv { grid-template-rows: auto auto; align-content: start; gap: 14px; }
   :is(#nh, body) .pv-mid { gap: 10px; padding: 0 0 4px; }
   :is(#nh, body) .pv-wrap { gap: 14px; }
-  :is(#nh, body) .pv-pc { padding: 20px 22px 18px; gap: 14px; }
-  :is(#nh, body) .pv-pc ul { padding: 12px 0 2px; gap: 8px; }
+  :is(#nh, body) .pv-pc { padding: 16px 20px 14px; gap: 10px; }
+  :is(#nh, body) .pv-pc ul { padding: 10px 0 0; gap: 6px; font-size: 11.5px; }
+  :is(#nh, body) .pv-pc .p .yr { min-height: 0; }
+  :is(#nh, body) .pv-cta > * { height: 32px; }
+  :is(#nh, body) .pv-low { gap: 6px; padding-bottom: 0; }
   :is(#nh, body) .pv-seg { margin-bottom: -4px; }
 }
 @media (max-width: 1100px) { :is(#nh, body) .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
