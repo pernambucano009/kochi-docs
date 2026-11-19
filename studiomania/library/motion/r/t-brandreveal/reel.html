@@ -13,6 +13,8 @@ const PR = M.params({
   img3: { label: "صورة ٣ للبطاقات", kind: "image", role: "product_img3", def: "", group: G2, img: { ratio: "4:5", cut: false } },
   shape: { label: "رمز العلامة", kind: "select", def: "عضمة", options: [["عضمة", "🦴 عضمة"], ["نجمة", "⭐ نجمة"], ["قلب", "❤️ قلب"], ["دايرة", "⚪ دايرة"], ["ورقة", "🍃 ورقة شجر"]], group: G4,
     hint: "الشكل الذي يتساقط ويملأ الشاشة في النهاية (ويظهر في البطاقات إن لم توجد صور). اختر ما يناسب مجالك." },
+  els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G2, max: 8,
+    hint: "صور عناصر من مجال العلامة، رابط في كل سطر: كل بطاقة منشور تأخذ عنصرًا مختلفًا، والمطر في النهاية يتساقط بها بدل الرمز." },
   tag: { label: "الجملة الأخيرة", kind: "text", role: "tagline", def: "رعاية بتحبها كلابك", group: G4, max: 26, hint: "وعد العلامة في سطر (يظهر تحت الاسم في النهاية)." },
   accent: { label: "لون العلامة", kind: "color", role: "accent", def: "#ff4a12", group: GS, hint: "لون واحد قوي: يملأ الشاشة كثيرًا، فيجب أن يكون لون العلامة الأساسي." },
   ink: { label: "اللون الغامق", kind: "color", role: "dark", def: "#161c1e", group: GS, hint: "خلفية الحرف والدليل والبطاقات الغامقة." },
@@ -39,14 +41,29 @@ M.reel({
     const own = (fam, file, weight = "400") => { const f = new FontFace(fam, `url(../../fonts/${file})`, { weight }); document.fonts.add(f); return f.load().catch(() => {}); };
     await Promise.all([own("ALZ", "SM-Lalezar.ttf"), own("ARQ", "TY-ArefRuqaa-700.ttf", "700"), own("AMR", "TY-Amiri-700.ttf", "700"), own("ACH", "SM-Changa.ttf")]);
     const imgs = await Promise.all([PR.img1, PR.img2, PR.img3, PR.logo].map(M.img));
+    const EL = (await M.els(PR.els, 8)).filter(Boolean);
+    // 🎨 الدايرة ورا الشعار بلون يبان عليه الشعار (شعار أخضر على دايرة خضرا كان بيختفي): أبعد لون عن متوسط ألوان الشعار
+    let ring = null;
+    if (imgs[3]) {
+      try {
+        const cv = document.createElement("canvas"); cv.width = cv.height = 48; const cc = cv.getContext("2d"); cc.drawImage(imgs[3], 0, 0, 48, 48);
+        const px = cc.getImageData(0, 0, 48, 48).data; let r0 = 0, g0 = 0, b0 = 0, n0 = 0;
+        for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) { r0 += px[i]; g0 += px[i + 1]; b0 += px[i + 2]; n0++; }
+        if (n0) {
+          const hx = (h) => { const v = parseInt(String(h).replace("#", "").slice(0, 6), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
+          const dist = (h) => { const [a, b, c] = hx(h); return Math.hypot(a - r0 / n0, b - g0 / n0, c - b0 / n0); };
+          ring = [PR.accent, PR.paper, PR.ink].sort((p, q) => dist(q) - dist(p))[0];
+        }
+      } catch (e) { ring = null; }
+    }
     const c = M.canvas(W, H);
     // المطر: كل قطعة ليها مكان وقوع ووقت (ثابتين بالـ seed)
     const r = M.rng(7), rain = [];
     for (let i = 0; i < 150; i++) rain.push({ x: r() * W, t0: T5 + .1 + r() * 1.9, rot: r() * 6.28, spin: (r() - .5) * 4, s: 70 + r() * 70, land: H - 80 - (i / 150) * 1500 - r() * 240 });
-    return { x: c.getContext("2d"), imgs, rain };
+    return { x: c.getContext("2d"), imgs, rain, EL, ring };
   },
   seek(t, C, M) {
-    const { x, imgs, rain } = C, { seg, clamp, springO, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k));
+    const { x, imgs, rain, EL, ring } = C, { seg, clamp, springO, cubicIO, expo } = M, io = (k) => cubicIO(clamp(k));
     const A = PR.accent, K = PR.ink, P = PR.paper;
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1;
     const txt = (s, cx, cy, size, color, fam = "HD", w = "800", maxW = 940) => {
@@ -55,7 +72,7 @@ M.reel({
     };
     const mark = (cx, cy, size, col, bgc) => {   // علامة البراند: الشعار أو أول حرف في دايرة
       const lg = imgs[3];
-      x.fillStyle = col; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill();   // دايرة بلون البراند ورا الشعار علشان يبان على أي خلفية
+      x.fillStyle = lg && ring ? ring : col; x.beginPath(); x.arc(cx, cy, size / 2, 0, Math.PI * 2); x.fill();   // دايرة بلون البراند ورا الشعار علشان يبان على أي خلفية
       if (lg) { const k = Math.min(size * .66 / lg.width, size * .66 / lg.height); x.drawImage(lg, cx - lg.width * k / 2, cy - lg.height * k / 2, lg.width * k, lg.height * k); return; }
       txt([...String(PR.brand).replace(/[ً-ْ]/g, "")][0] || "B", cx, cy + size * .04, size * .62, bgc, "HD", "800", size);
     };
@@ -107,6 +124,8 @@ M.reel({
         if (z > -.2) {
           const im = imgs[i % 3];
           if (im) { x.save(); x.beginPath(); x.roundRect(-cw / 2 + 24 * sc, -ch * .1, cw - 48 * sc, ch * .55, 18 * sc); x.clip(); const k = Math.max((cw - 48 * sc) / im.width, ch * .55 / im.height); x.drawImage(im, -im.width * k / 2, ch * .175 - im.height * k / 2, im.width * k, im.height * k); x.restore(); }
+          else if (EL.length) { const el = EL[i % EL.length], bw = cw - 80 * sc, bh = ch * .5, k = Math.min(bw / el.width, bh / el.height);
+            x.drawImage(el, -el.width * k / 2, ch * .18 - el.height * k / 2, el.width * k, el.height * k); }   // 🧩 كل بطاقة عنصر مختلف من مجال العلامة
           else { x.fillStyle = i % 3 === 0 ? K : A; x.save(); x.translate(0, ch * .18); x.rotate(.3 * i); shape(SHAPE, 220 * sc); x.restore(); }
           txt(words[i % words.length], 0, -ch * .3, 120 * sc, fg, "HD", "800", cw - 50 * sc);
           x.globalAlpha = .8; txt(PR.brand, cw * .28, ch * .43, 30 * sc, fg, "HD", "800", cw * .4); x.globalAlpha = 1;
@@ -135,7 +154,7 @@ M.reel({
         if (i === 0) { x.save(); mark(px + 225, py + 190, 220, A, P); x.restore(); }
         else if (i === 1) txt("Aa", px + 225, py + 190, 200, fg, "HD");
         else if (i === 2) { [A, K, "#d9d9d6"].forEach((cc, j) => { x.fillStyle = cc; x.fillRect(px + 40 + j * 130, py + 90, 110, 160); }); txt(A.toUpperCase(), px + 225, py + 320, 36, K, "TX", "500"); }
-        else if (i === 3) { txt(PR.brand, px + 225, py + 180, 110, fg); }
+        else if (i === 3) { txt(PR.brand, px + 225, py + 180, 110, fg, "HD", "800", 390); }   // الاسم الطويل بيصغر جوه الكارت
         else { x.fillStyle = fg; for (let l = 0; l < 5; l++) { x.globalAlpha = clamp(e * 2) * .5; x.fillRect(px + 40, py + 90 + l * 50, 370 - (l % 2) * 120, 18); } }
         x.globalAlpha = clamp(e * 2); txt(`0${i + 1}`, px + 400, py + 360, 30, fg, "TX", "500");
       }
@@ -147,10 +166,13 @@ M.reel({
       const ne = springO(clamp((t - T5) / .5), 11, .6);
       x.save(); x.translate(540, 900); x.scale(ne, ne); txt(PR.brand, 0, 0, 260, P); x.restore();
       x.fillStyle = P;
-      rain.forEach((d) => {
+      rain.forEach((d, ri) => {
         const s = t - d.t0; if (s <= 0) return;
         const yy = Math.min(d.land, -150 + 2600 * s * s), landed = yy >= d.land;
-        x.save(); x.translate(d.x, yy); x.rotate(d.rot + (landed ? d.spin * Math.sqrt(Math.max(0, (d.land + 150) / 2600)) : d.spin * s)); shape(SHAPE, d.s); x.restore();
+        x.save(); x.translate(d.x, yy); x.rotate(d.rot + (landed ? d.spin * Math.sqrt(Math.max(0, (d.land + 150) / 2600)) : d.spin * s));
+        if (EL.length) { const el = EL[ri % EL.length], k = d.s * 1.3 / Math.max(el.width, el.height); x.drawImage(el, -el.width * k / 2, -el.height * k / 2, el.width * k, el.height * k); }
+        else shape(SHAPE, d.s);
+        x.restore();
       });
       // الاسم بيطلع فوق الكومة في الآخر
       const fin = io(seg(t, 8.0, 8.5));

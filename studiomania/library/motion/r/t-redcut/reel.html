@@ -8,6 +8,7 @@ const PR = M.params({
   title: { label: "العنوان", kind: "text", role: "product", def: "كل سنة وإنتم طيبين", group: G2, max: 22, hint: "التهنئة أو العرض." },
   sub: { label: "تحت العنوان", kind: "text", def: "هدايا العيد وصلت", group: G2, max: 24 },
   brand: { label: "اسم العلامة (يُقص داخل الدائرة)", kind: "text", role: "brand", def: "هدية", group: G2, max: 8, hint: "كلمة قصيرة لتُقص داخل دائرة صغيرة." },
+  logo: { label: "الشعار", kind: "image", role: "logo", def: "", group: G1, img: { ratio: "1:1", cut: true, tip: "شعار العلامة بلا خلفية: يُقص بالورق الأحمر مكان الوردة في البداية، ومفرّغًا داخل الدائرة في النهاية." } },
   els: { label: "عناصر من مكتبة المجال", kind: "lines", def: [], group: G1, hint: "صور عناصر من مكتبة المجال، رابط في كل سطر. تظهر بالتناوب مكان الرسمة الأصلية، وإن تُركت فارغة تظهر الرسمة الأصلية." },
   red: { label: "لون الورق", kind: "color", role: "accent", def: "#d4202a", group: G1, hint: "لون الورق المقصوص كله." },
   ground: { label: "لون الورقة السفلية", kind: "color", def: "#f6efe2", group: G1, hint: "يجب أن تكون فاتحة ليظهر القص." },
@@ -36,10 +37,13 @@ M.reel({
         g.moveTo(x0 + r, y0); if (i % 3) g.arc(x0, y0, r, 0, 7); else { g.arc(x0, y0, r, 0, Math.PI); g.arc(x0, y0 - r * .35, r * .75, Math.PI, 0, true); } }
       g.fill(); return c;
     });
-    return { x, q: L.getContext("2d"), cuts };
+    // 🏷️ شعار العميل مقصوص بالورق الأحمر (مكان الوردة الثابتة)
+    const lg = PR.logo ? await M.img(PR.logo) : null;
+    const lgs = lg ? M.fx.silhouette(lg, PR.red, 600, 600) : null;
+    return { x, q: L.getContext("2d"), cuts, lgs };
   },
   seek(t, C, M) {
-    const { x, q } = C, { seg, clamp, cubicIO, springO, hash, smooth } = M, io = (k) => cubicIO(clamp(k)), RED = PR.red;
+    const { x, q, lgs } = C, { seg, clamp, cubicIO, springO, hash, smooth } = M, io = (k) => cubicIO(clamp(k)), RED = PR.red;
     const back = (k) => { k = clamp(k); const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = PR.ground; x.fillRect(0, 0, W, H);
     for (let i = 0; i < 1600; i++) { x.fillStyle = "rgba(150,120,80,.05)"; x.fillRect(hash(i) * W, hash(i + 1600) * H, 2, 2); }
@@ -59,7 +63,9 @@ M.reel({
       q.beginPath(); q.arc(cx, cy, R0 * .3, 0, TAU); q.fill(); if (hole) cut(() => { q.moveTo(cx + R0 * .22, cy); q.arc(cx, cy, R0 * .22, 0, TAU); });
     };
     const s1 = t < 3.6;
-    if (s1) { const op = io(seg(t, .4, 2.2)), sc = .6 + .4 * back(seg(t, .2, .9)); rose(540, 900, 420 * sc, op, -Math.PI / 2 + (1 - op) * .4 + t * .05, true); }
+    if (s1 && lgs) { const op = io(seg(t, .4, 2.2)), sc = (.6 + .4 * back(seg(t, .2, .9))) * (.55 + .45 * op), S0 = 760 * sc;
+      q.save(); q.translate(540, 900); q.rotate((1 - op) * -.5); q.drawImage(lgs, -S0 / 2, -S0 / 2, S0, S0); q.restore(); }
+    else if (s1) { const op = io(seg(t, .4, 2.2)), sc = .6 + .4 * back(seg(t, .2, .9)); rose(540, 900, 420 * sc, op, -Math.PI / 2 + (1 - op) * .4 + t * .05, true); }
     // ٢) برواز الشباك المسنن والمشهد
     const s2k = io(seg(t, 3.4, 4.2)) * (1 - io(seg(t, 8.0, 8.6)));
     if (s2k > 0) {
@@ -102,8 +108,12 @@ M.reel({
     }
     // ٣) الاسم مقصوص جوه دايرة وردية + العنوان
     if (t > 8.2) { const k = back(seg(t, 8.3, 9.0)); q.save(); q.translate(540, 820); q.scale(k, k); q.translate(-540, -820);
+      if (lgs) {   // الشعار مفرّغ جوه دايرة حمرا مسننة، والاسم تحته
+        q.fillStyle = RED; q.beginPath(); for (let i = 0; i <= 72; i++) { const a = i / 72 * TAU, r = 330 + (i % 2 ? 0 : 16); q[i ? "lineTo" : "moveTo"](540 + Math.cos(a) * r, 820 + Math.sin(a) * r); } q.fill();
+        q.save(); q.globalCompositeOperation = "destination-out"; q.drawImage(lgs, 540 - 230, 820 - 230, 460, 460); q.restore(); q.restore();
+      } else {
       rose(540, 820, 400, 1, -Math.PI / 2 + t * .06, false); q.fillStyle = RED; q.beginPath(); q.arc(540, 820, 230, 0, TAU); q.fill();
-      q.save(); q.globalCompositeOperation = "destination-out"; q.font = `${M.fit(PR.brand, "LZ", 360, 170, 70)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(PR.brand, 540, 836); q.restore(); q.restore(); }
+      q.save(); q.globalCompositeOperation = "destination-out"; q.font = `${M.fit(PR.brand, "LZ", 360, 170, 70)}px LZ`; q.textAlign = "center"; q.textBaseline = "middle"; q.direction = "rtl"; q.fillText(PR.brand, 540, 836); q.restore(); q.restore(); } }
     // نحط الورق الأحمر بضل خفيف (ورقة فوق ورقة)
     x.save(); x.shadowColor = "rgba(80,20,10,.35)"; x.shadowBlur = 10; x.shadowOffsetX = 5; x.shadowOffsetY = 8; x.drawImage(q.canvas, 0, 0); x.restore();
     // كلام
