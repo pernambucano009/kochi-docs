@@ -3,7 +3,18 @@
 #   curl -fsSL https://raw.githubusercontent.com/pernambucano009/kochi-docs/claude/new-program-gvemu5/studiomania/deploy/oracle/zernio.sh | sudo bash
 set -uo pipefail
 docker exec -i simsimkit sh -c 'cd /app/backend && python3 -' <<'PY'
-import json, publisher
+import json, os, sqlite3, pathlib
+# المفتاح ممكن يكون في إعدادات صاحب البرنامج (قاعدة بيانات مساحته) مش في متغيرات السيرفر، زي ما البوابة بتديه للنسخ
+data = pathlib.Path(os.environ.get("STUDIOMANIA_DATA") or "/app/data")
+for db in (data / "studiomania.db",):
+    try:
+        with sqlite3.connect(db) as c0:
+            for k, v in c0.execute("SELECT key, value FROM settings WHERE key LIKE 'key:%'"):
+                os.environ.setdefault(k[4:], v)
+    except sqlite3.Error as e:
+        print("settings db:", e)
+import publisher
+print("key source:", "env/settings" if publisher.api_key() else "MISSING")
 c = publisher._client(30)
 def show(path):
     try:
