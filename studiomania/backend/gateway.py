@@ -3163,7 +3163,16 @@ def admin_batch_page(request: Request):
 
 @app.get("/api/platform/batch")
 def batch_list(request: Request):
+    """الصفحة بتعرض آخر نسخة لكل قالب بس: القالب اللي اتعاد في دفعة بعدها (أو اتشال من قايمة دفعته) بيختفي من الدفعة القديمة،
+    عشان مايبقاش فيه فيديو قديم أو بايظ جنب الجديد."""
     admin(request)
+    reqs = batch_requests()
+    order = {r["id"]: i for i, r in enumerate(reqs)}
+    wanted = {r["id"]: set(r.get("templates") or []) for r in reqs}
+    latest: dict[str, str] = {}   # القالب ← آخر دفعة هو فيها
+    for r in reqs:
+        for t in r.get("templates") or []:
+            latest[t] = r["id"]
     out = []
     for f in sorted(BATCH_DIR.glob("*/run.json"), key=lambda x: x.stat().st_mtime, reverse=True):
         try:
@@ -3174,12 +3183,15 @@ def batch_list(request: Request):
             notes = json.loads((f.parent / "notes.json").read_text("utf-8"))
         except (OSError, ValueError):
             notes = {}
+        rid = run.get("id")
+        if rid in wanted:
+            run["items"] = [it for it in run.get("items") or [] if it["tid"] in wanted[rid] and latest.get(it["tid"]) == rid]
         for it in run.get("items") or []:
             v = f.parent / f"{it['tid']}.mp4"
             it["url"] = f"/api/platform/batch/{run['id']}/{it['tid']}.mp4?v={int(v.stat().st_mtime)}" if v.is_file() else None
             it["note"] = notes.get(it["tid"]) or {}
         out.append(run)
-    return out
+    return sorted(out, key=lambda r: order.get(r.get("id"), -1))
 
 
 @app.get("/api/platform/issues/batch")
