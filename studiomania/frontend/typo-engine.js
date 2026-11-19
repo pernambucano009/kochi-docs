@@ -158,6 +158,7 @@
         this.stage.style.background = "#000";
         this.stage.innerHTML = this[`k_${b.kind}`](b, t, (t - b.t0) / Math.max(0.01, b.t1 - b.t0), th, i) + (this.showAnchors ? this.anchorGuides(t) : "");
         if (this.afterPaint) this.afterPaint(t);
+        this.clipFit();
         return;
       }
       if (b && TypoEngine.STUDIO?.has(b.kind)) {
@@ -205,7 +206,36 @@
 
     // أي سطر كلام طالع برّه الكادر (كلمة طويلة، ميلان، نطة): بيصغر ويدخل جوه بهامش صغير.
     // الحاجات اللي طالعة برّه بالقصد (شرايط، حروف عملاقة بتلف، فراغ 3D) عليها data-free ومش بتتلمس.
+    // ✂️ الكلام اللي بيتقص جوه صندوقه (overflow:hidden وسطر واحد): الخط بيصغر لحد ما يدخل. بيتعمل لكل الحركات (حتى الاحترافية)
+    clipFit() {
+      for (const el of this.stage.querySelectorAll("*")) {
+        const st = el.style;
+        if (!st || st.overflow !== "hidden" || (st.whiteSpace !== "nowrap" && st.whiteSpace !== "pre") || !el.textContent.trim()) continue;
+        if (el.scrollWidth <= el.clientWidth + 1 || !el.clientWidth) continue;
+        const fs = parseFloat(getComputedStyle(el).fontSize) || 0;
+        if (fs) st.fontSize = `${(fs * el.clientWidth / el.scrollWidth * 0.97).toFixed(1)}px`;
+      }
+    }
+
+    // 🔎 فلتر الكلام: كام سطر لسه طالع برّه الكادر أو متقصوص بعد التصليح (السيرفر بيسأله وهو بيرسم، واللي يلاقيه بيروح صندوق الأخطاء)
+    textIssues() {
+      const { w, h } = this.doc, st = this.stage.getBoundingClientRect();
+      if (!st.width) return [];
+      const k = st.width / w, out = [];
+      for (const el of this.stage.querySelectorAll("*")) {
+        const s = el.style;
+        if (!s || (s.whiteSpace !== "nowrap" && s.whiteSpace !== "pre") || !el.textContent.trim() || el.closest("[data-free]")) continue;
+        if (getComputedStyle(el).opacity === "0") continue;
+        if (s.overflow === "hidden" && el.scrollWidth > el.clientWidth + 2) { out.push(["cut", el.textContent.trim().slice(0, 40)]); continue; }
+        const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect();
+        const x0 = (b.left - st.left) / k, x1 = (b.right - st.left) / k;
+        if (b.width > 2 && (x0 < -2 || x1 > w + 2)) out.push(["out", el.textContent.trim().slice(0, 40)]);
+      }
+      return out;
+    }
+
     fitFrame() {
+      this.clipFit();
       const { w, h } = this.doc;
       const st = this.stage.getBoundingClientRect();
       if (!st.width) return;

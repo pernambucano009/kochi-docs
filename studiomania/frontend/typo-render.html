@@ -27,6 +27,7 @@ window.typoReady = (async () => {
     if (fx) fx.renderAt(t);
     return Promise.all([eng.settle ? eng.settle() : null, fx?.settle ? fx.settle() : null]);
   };
+  window.typoCheck = () => eng.textIssues ? eng.textIssues() : [];
   eng.renderAt(0);
   return { w: doc.w, h: doc.h, duration: doc.duration };
 })();

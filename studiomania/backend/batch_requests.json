@@ -25,7 +25,7 @@
   ]
  },
  {
-  "id": "robust-fix",
+  "id": "robust-fix2",
   "user": "463753e66f39f1c3",
   "templates": [
    "ty-slam",
@@ -39,7 +39,7 @@
   ]
  },
  {
-  "id": "robust-stock",
+  "id": "robust-stock2",
   "user": "463753e66f39f1c3",
   "templates": [
    "st-run",

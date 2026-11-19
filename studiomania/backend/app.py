@@ -16869,6 +16869,7 @@ def run_motion_import(mid: str, meta: dict, params: dict | None = None, name: st
         if stamp and stamp.exists():   # 🏷️ قفلة بلوجو العميل بستايل القالب
             job.update(progress=0.99)
             logostamp.stamp(folder / "clip.mp4", stamp, ffmpeg_exe())
+        threading.Thread(target=video_check, args=(folder / "clip.mp4", f"قالب {mid}", f"motion:{mid}:{aid}"), daemon=True).start()
         subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{dur / 2:.3f}", "-i", str(folder / "clip.mp4"),
                         "-frames:v", "1", "-vf", "scale=480:-2", "-q:v", "3", str(folder / "thumb.jpg")], check=True, capture_output=True, timeout=60)
         info = media_info(folder / "clip.mp4")
@@ -17293,6 +17294,46 @@ def ai_natural(path: Path) -> Path:
     except Exception as exc:  # noqa: BLE001
         print(f"[natural] {path}: {exc}", flush=True)
     return path
+
+
+VIDEO_CHECK = (
+    "These are frames from a finished short marketing video (the last frame is the logo outro). Check ONLY for these defects: "
+    "(1) text cut off, clipped inside its box, overlapping other text, or running outside the frame edge; "
+    "(2) a logo or important text that is hard to see because its color is too close to the color behind it; "
+    "(3) a person in immodest clothing (tight leggings, fitted or cropped top, visible cleavage, uncovered hair for women; shirtless men); "
+    "(4) deformed AI-generated people or objects. Ignore style choices. "
+    'Answer JSON only: {"ok": true|false, "problems": [{"frame": 1, "what": "short Arabic description"}]}'
+)
+
+
+def video_check(path: Path, what: str, ref: str = "") -> dict:
+    """🔎 فحص الفيديو النهائي (قرار صاحب المشروع ١٩ نوفمبر: الفلاتر هي اللي تمسك المشاكل قبل العميل): ٨ فريمات لموديل رؤية،
+    كلام مقطوع أو برّه الإطار، شعار أو كلام مش باين على خلفيته، لبس مش محتشم، أشكال مشوّهة. اللي يلاقيه بيروح صندوق الأخطاء."""
+    if atlas.mock_mode() or not Path(path).is_file():
+        return {"ok": True}
+    frames = []
+    try:
+        dur = media_info(path).duration or 6
+        for k in range(8):
+            f = TMP_DIR / f"vchk_{uuid.uuid4().hex[:6]}.jpg"
+            typo_frame(Path(path), min(dur - 0.05, dur * (k + 0.5) / 8 if k < 7 else dur - 0.15), f, 540)
+            if f.is_file():
+                frames.append(f)
+        parts = [{"type": "text", "text": VIDEO_CHECK}] + [{"type": "image_url", "image_url": {"url": data_url(f, "image/jpeg")}} for f in frames]
+        raw = ad_media_chat([{"role": "user", "content": parts}], max_tokens=600, models=[qa.settings(PLATFORM_DIR).get("review_model") or "anthropic/claude-sonnet-5", "google/gemini-2.5-flash"])
+        m = re.search(r"\{.*\}", raw or "", re.S)
+        v = json.loads(m.group(0)) if m else {}
+        if v and not v.get("ok", True) and v.get("problems"):
+            probs = "؛ ".join(f"فريم {p.get('frame')}: {p.get('what')}" for p in v["problems"][:5] if isinstance(p, dict))
+            issues.record("job", "video/check", f"فحص الفيديو النهائي وجد مشكلة ({what})", f"{ref}\n{probs}", 0, ref=ref or str(path))
+            return {"ok": False, "problems": probs}
+        return {"ok": True}
+    except Exception as exc:  # noqa: BLE001  (الفحص نفسه وقع: الفيديو زي ما هو)
+        print(f"[video-check] {path}: {str(exc)[:160]}", flush=True)
+        return {"ok": True}
+    finally:
+        for f in frames:
+            f.unlink(missing_ok=True)
 
 
 def ai_slop(path: Path) -> tuple[bool, str]:
@@ -22139,8 +22180,15 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
                 if inputs:
                     cdp.send("Emulation.setDefaultBackgroundColorOverride", {"color": {"r": 0, "g": 0, "b": 0, "a": 0}})
                 shot = {"format": "png", "optimizeForSpeed": True} if inputs else {"format": "jpeg", "quality": 93, "optimizeForSpeed": True}
+                text_bad: list = []   # 🔎 فلتر الكلام: كل ثانية بنسأل الصفحة فيه كلام طالع برّه الكادر أو متقصوص (بعد التصليح التلقائي)
                 for i in range(n):
                     page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
+                    if i % TYPO_FPS == TYPO_FPS // 2 and len(text_bad) < 6:
+                        try:
+                            for kind_, txt_ in page.evaluate("window.typoCheck ? window.typoCheck() : []") or []:
+                                text_bad.append(f"{i / TYPO_FPS:.1f}ث {('متقصوص' if kind_ == 'cut' else 'برّه الكادر')}: {txt_}")
+                        except Exception:  # noqa: BLE001
+                            pass
                     try:
                         proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", shot)["data"]))
                     except BrokenPipeError:   # FFmpeg وقف: السبب الحقيقي في رسالته، مش «Broken pipe»
@@ -22151,6 +22199,9 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             finally:
                 browser.close()
         proc.stdin.close()
+        if text_bad:
+            typo_update(pid, lambda x: x.update(qa_text=text_bad))
+            issues.record("job", "typo/text-fit", "كلام خارج الإطار أو مقطوع في فيديو تايبوجرافي", f"{d.get('preset') or d.get('style')} · {pid}\n" + "\n".join(text_bad), 0, ref=pid)
         err = proc.stderr.read().decode(errors="ignore")
         if proc.wait(timeout=600) != 0:
             raise RuntimeError(f"FFmpeg: {err.strip()[-300:]}")
@@ -22164,6 +22215,8 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
         typo_update(pid, fin)
         if not d.get("no_logo"):   # 🏷️ آخر الفيديو بشعار العميل (معاينات المعرض من غير شعار)
             typo_logo_end(pid, d.get("preset") or ("hairline" if d.get("style") == "hairline" else "typo"))
+            fin_f = folder / str(typo_load(pid).get("final") or "_")
+            threading.Thread(target=video_check, args=(fin_f, f"تايبوجرافي {d.get('preset') or ''}", f"typo:{pid}"), daemon=True).start()
         typo_update(pid, lambda x: x.update(status="done", step=None, error=None))
     except Exception as exc:  # noqa: BLE001
         tmp_v.unlink(missing_ok=True)
@@ -37826,7 +37879,8 @@ def tbatch_run(body: BatchIn) -> None:
                     raise HTTPException(400, "الفيديو غير موجود بعد الرسم")
                 shutil.copyfile(f, out / f"{tid}.mp4")
                 d = flow_load(fid)
-                it.update(status="done", fid=fid, idea=(d.get("idea") or {}).get("title"), secs=round(time.time() - it["t0"]))
+                chk = video_check(out / f"{tid}.mp4", f"دفعة {tid}", f"batch:{body.id}:{tid}")
+                it.update(status="done", fid=fid, idea=(d.get("idea") or {}).get("title"), secs=round(time.time() - it["t0"]), check=chk.get("problems") or "")
             except Exception as exc:  # noqa: BLE001
                 it.update(status="failed", error=str(getattr(exc, "detail", None) or exc)[:300])
                 print(f"[batch] {tid}: {exc}", flush=True)

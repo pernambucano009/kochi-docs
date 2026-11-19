@@ -41,6 +41,7 @@ async function load() {
   const keep = Object.fromEntries([...g.querySelectorAll("textarea")].map((t) => [t.dataset.k, t.value]));
   g.innerHTML = items.map((x) => `<div class="it">
       ${x.url ? `<video src="${esc(x.url)}" controls playsinline preload="metadata"></video>` : `<div class="ph ${x.status === "failed" ? "err" : ""}">${x.status === "failed" ? esc(x.error || "تعذّر") : "جارٍ الصنع…"}</div>`}
+      ${x.check ? `<small class="err">🔎 الفحص: ${esc(x.check)}</small>` : x.status === "done" ? `<small>🔎 الفحص: سليم</small>` : ""}
       <b>${esc(x.name)}</b><small dir="ltr">${esc(x.tid)}${x.idea ? ` · ${esc(x.idea)}` : ""}</small>
       <div class="vs">${V.map(([k, t]) => `<button data-k="${esc(x.rid)}|${esc(x.tid)}" data-v="${k}" class="${x.note?.verdict === k ? "on" : ""}">${t}</button>`).join("")}</div>
       <textarea data-k="${esc(x.rid)}|${esc(x.tid)}" placeholder="ملاحظاتك على هذا القالب">${esc(keep[`${x.rid}|${x.tid}`] ?? x.note?.text ?? "")}</textarea></div>`).join("");

@@ -3207,7 +3207,7 @@ def batch_feed(request: Request):
         except (OSError, ValueError):
             continue
         out.append({"id": run.get("id"), "done": run.get("done"), "logos": run.get("logos"), "updated": f.stat().st_mtime,
-                    "items": [{k: it.get(k) for k in ("tid", "status", "error", "secs", "idea")} for it in run.get("items") or []]})
+                    "items": [{k: it.get(k) for k in ("tid", "status", "error", "secs", "idea", "check")} for it in run.get("items") or []]})
     return {"release": (os.environ.get("BUILD_SHA") or "")[:7], "now": time.time(), "runs": out, "requests": [r.get("id") for r in batch_requests()]}
 
 
