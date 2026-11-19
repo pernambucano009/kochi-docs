@@ -39,7 +39,9 @@ const Flow = (() => {
   // قالب كود: السكريبت على مشاهد القالب ← الصوت (المشاهد بتاخد طول جملها) ← لوحة التحكم ← التصدير
   const STEPS_CODE = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "المشاهد"], ["generate", "الفيديو"], ["montage", "المونتاج والتصدير"], ["publish", "النشر"]];
   // قالب تايبوجرافي: كلام بس بيتحرك (مفيش نوع بوست ولا أبطال ولا ملفات)
-  const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["generate", "التوليد"]];
+  const STEPS_TYPO = [["idea", "الفكرة"], ["scenario", "النص"], ["voice", "الصوت"], ["panel", "المشاهد"], ["generate", "الفيديو"], ["montage", "المونتاج والتصدير"], ["publish", "النشر"]];
+  const isTypo = (d) => d?.template?.kind === "typo";
+  const isVid = (d) => isCode(d) || isTypo(d);   // قوالب بيترسم فيديوها في المسار نفسه: المونتاج والنشر من المسار
   const isCode = (d) => d?.template?.kind === "motion";
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
   const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
@@ -136,8 +138,8 @@ const Flow = (() => {
   }
   function stepper(d) {
     const cur = S.view === "publish" ? idx("publish", d) : idx(d.stage, d);
-    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: !!d.scenario && !isCode(d),
-      shoot: isPhone(d), review: !!d.footage?.main, montage: isCode(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: isCode(d) && d.output?.status === "done" };
+    const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: isTypo(d) ? !!d.output : !!d.scenario && !isCode(d),
+      shoot: isPhone(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: isVid(d) && d.output?.status === "done" };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -480,6 +482,20 @@ const Flow = (() => {
       <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
   }
 
+  // 🔤 مشاهد التايبوجرافي: الكلام متقسّم على المشاهد، وكل مشهد ليه حركة (تقدر تغيّرها) قبل ما الفيديو يترسم
+  function stTypoScenes(d) {
+    if (d.busy === "typoplan") return `${picked("scenario", false)}${working("يسجّل الصوت، ثم يوزّع الكلام على المشاهد…")}`;
+    const sc = d.typo_scenes || [];
+    if (!sc.length) return `${picked("scenario", false)}${failed("typoplan") || `<div class="flw-empty">لم تجهز المشاهد بعد. <button type="button" class="flw-link" data-retry="typoplan">جهّزها الآن</button></div>`}`;
+    return `${picked("scenario", false)}<h2>المشاهد</h2>
+      <p class="flw-sub">قُسّم الكلام على <b class="num">${sc.length}</b> مشهدًا، ولكل مشهد حركة تناسب طول جملته.${d.typo_swap ? " إذا لم تعجبك حركة مشهد، اضغط «غيّر الحركة»." : ""}</p>
+      ${d.typo_audio ? `<audio class="flw-vo" src="${esc(d.typo_audio)}" controls preload="metadata"></audio>` : ""}
+      <ol class="flw-times">${sc.map((x) => `<li><span dir="auto">${esc(x.text)}</span>${d.typo_swap ? `<button type="button" class="flw-link" data-tyswap="${x.i}" ${d.busy ? "disabled" : ""}>غيّر الحركة</button>` : ""}</li>`).join("")}</ol>
+      ${d.typo_dur ? `<small class="muted">⏱ الفيديو <span class="num">${Number(d.typo_dur).toFixed(1)}</span> ثانية</small>` : ""}
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-tyrender ${d.busy ? "disabled" : ""}>🎬 اصنع الفيديو</button></div>
+      <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
+  }
+
   // ---------------------------------------------------------------- 4) الأبطال
   function stCast(d) {
     const opts = S.castOpts;
@@ -519,7 +535,7 @@ const Flow = (() => {
           ${o.voices[v.lang] && o.fasih && /^ar-/.test(v.lang) ? `<button type="button" class="flw-vplay" data-nofx data-vplay="${esc(x.id)}" title="اسمع عينة">${S.vplay === x.id ? "⏳" : "▶"}</button>` : ""}</div>`).join("")}</div>` : ""}
       ${on && o.two ? twoVoices(o, v, voices) : ""}
       ${isCode(d) ? failed("vo") : ""}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد →${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل →"}</button></div>`;
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-setvoice>${isTypo(d) ? "سجّل الصوت ووزّع الكلام على المشاهد →" : isCode(d) && on ? `🎙️ سجّل التعليق الصوتي واضبط المشاهد →${costTag((voices.find((x) => x.id === v.voice) || voices[0])?.pts, o.balance)}` : "أكمل →"}</button></div>`;
   }
   // 🎙️🎙️ قوالب الحوار: شخص واحد يقرأ الكل، أو شخصين (الصوت اللي فوق للأول، واختار هنا صوت التاني)
   function twoVoices(o, v, voices) {
@@ -578,8 +594,7 @@ const Flow = (() => {
       return `<h2>جاهز للتوليد</h2>${d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
         <div class="flw-sum"><div><small>القالب</small><b>${esc(d.template.name)}</b></div><div><small>الفكرة</small><b>${esc(d.idea?.title || "")}</b></div>
           <div><small>النص</small><b>${esc(d.scenario?.title || "")}</b></div></div>
-        <p class="muted">سيوضع النص في التايبوجرافي، وهناك تختار الشكل والصوت وتصدّر الفيديو.</p>
-        <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-gen ${d.busy ? "disabled" : ""}>🚀 ولّد</button></div>`;
+        <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="panel">↩︎ إلى المشاهد</button></div>`;
     }
     const fmt = FMT[d.format] || FMT.reel;
     return `<h2>جاهز للتوليد</h2>${d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
@@ -685,7 +700,7 @@ const Flow = (() => {
       ${isWork ? working(o.kind === "typo" ? "يسجّل الصوت ويحرّك الكلام ويصنع الفيديو…" : `العقل يبني ${OUT[o.kind] ? `في ${OUT[o.kind]}` : "المنشور"}${pct}`) : ""}
       ${!isWork && o.status === "failed" ? `<div class="flw-empty">
         <p>توقّف صنع الفيديو قبل أن يكتمل. اضغط «أعد المحاولة» ليُكمل من حيث توقّف، فالعناصر التي رُسمت محفوظة ولن تُحتسب مرة أخرى.</p>
-        <div class="flw-acts"><button type="button" class="flw-btn pri big" ${o.kind === "typo" ? "data-gen" : "data-export"}>🔁 أعد المحاولة</button></div></div>` : d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
+        <div class="flw-acts"><button type="button" class="flw-btn pri big" ${o.kind === "typo" ? "data-tyrender" : "data-export"}>🔁 أعد المحاولة</button></div></div>` : d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
       ${o.video_url ? `<video class="flw-out" src="${esc(o.video_url)}" controls playsinline autoplay loop></video>` : ""}
       ${!isWork && o.points > 0 ? `<p class="flw-sub muted">🪙 استُهلك لصناعة هذا الفيديو ${Number(o.points).toLocaleString("en-US")} نقطة (رسم العناصر والإخراج).</p>` : ""}
       ${!isWork && o.video_url && d.qa ? qaBox(d.qa) : ""}
@@ -833,7 +848,7 @@ const Flow = (() => {
     if (!d || !S.el) return;
     S.el.classList.toggle("flw-lock", !!S.inflight || busy());
     const st = S.view === "publish" ? "publish" : d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { publish: stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: stPanel, generate: stGenerate, done: stDone,
+    const body = { publish: stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: isTypo(d) ? stTypoScenes : stPanel, generate: stGenerate, done: stDone,
       shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
@@ -993,8 +1008,8 @@ const Flow = (() => {
       if (ok) campoll();
       return;
     }
-    if ((b = q("[data-go]")) && isCode(S.d) && b.dataset.go === "publish") return openPub();
-    if ((b = q("[data-go]")) && isCode(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
+    if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "publish") return openPub();
+    if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
     if ((b = q("[data-go]"))) { S.view = null; reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
     if (q("[data-topub]")) return openPub();
     if ((b = q("[data-pwhen]"))) { S.pubWhen = b.dataset.pwhen; return render(); }
@@ -1021,6 +1036,9 @@ const Flow = (() => {
     if (q("[data-own]")) { S.own = true; S.edit = null; render(); return S.el.querySelector(".flw-form input")?.focus(); }
     if (q("[data-hint]")) { S.hint = true; render(); return S.el.querySelector("#flwHint")?.focus(); }
     if ((b = q("[data-retry]")) && b.dataset.retry === "vo") return call("/voice", S.vo);
+    if ((b = q("[data-retry]")) && b.dataset.retry === "typoplan") return call("/voice", S.vo || S.d.vo || {});
+    if ((b = q("[data-tyswap]"))) return call("/typo-swap", { i: +b.dataset.tyswap });
+    if (q("[data-tyrender]")) return call("/typo-render", {});
     if (q("[data-dialopen]")) { S.dialOpen = !S.dialOpen; return render(); }
     if ((b = q("[data-slang]"))) { S.dialOpen = false; if (S.vo) { S.vo.lang = b.dataset.slang; S.vo.voice = ""; } return call("/scenarios", { lang: b.dataset.slang, more: false }); }
     if ((b = q("[data-rewrite]"))) { S.dialOpen = false; if (await call("/stage", { stage: "scenario" })) return call("/scenarios", { lang: b.dataset.rewrite, more: false }); return; }

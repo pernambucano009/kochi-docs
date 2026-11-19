@@ -11,9 +11,9 @@ from pathlib import Path
 ALL = "*"
 EL_DIR = Path(__file__).resolve().parent.parent / "frontend" / "gallery" / "el"
 
-_ALL = ("t-chart t-chat t-keynote t-logo t-loop t-particles t-review t-signature t-swiss t-title3d t-wrapped t-beat "
+_ALL = ("t-chart t-chat t-keynote t-logo t-loop t-particles t-review t-swiss t-title3d t-wrapped t-beat "
         "t-newsletter t-flipcards t-brandreveal t-microgame t-spy t-audiogram 017 019 026 038 042 052 061 080 119 121 123 149 226 b-intro b-outro")
-_ALL_ELS = "t-board t-flow t-milestone t-riso t-glass t-sketch t-redcut t-shadow 027"
+_ALL_ELS = "t-board t-flow t-milestone t-riso t-glass t-sketch t-shadow 027"
 _FIELDS_ELS = {
     "t-watercolor": "food", "t-impasto": "food", "t-oneline": "food", "t-woodcut": "food shops", "t-ascii": "food ecom",
     "t-dossier": "food ecom shops", "t-ink": "beauty food", "t-ukiyo": "food", "t-screen": "food ecom", "t-deco": "ecom beauty",
@@ -25,7 +25,7 @@ _SPECIAL = {
     "t-pictogram": "fitness", "t-math": "edu realestate fitness", "055": "edu fitness realestate beauty dental home",
 }
 _NEED = {"t-price": "offer", "t-count": "offer", "t-tilt": "event", "t-versus": "compare", "t-show": "quiz", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
-         "t-lantern": "ramadan", "065": "event", "072": "event"}
+         "t-lantern": "ramadan", "065": "event", "072": "event", "t-redcut": "logo", "t-signature": "thanks"}   # قص ورق أحمر: بيعرض الشعار بس (طلب صاحب المشروع)
 
 FIT: dict[str, dict] = {}
 for _t in _ALL.split():

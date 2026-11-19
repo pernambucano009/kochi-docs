@@ -22187,12 +22187,12 @@ def tytpl_stock(tid: str, script: str, field: str, folder: Path) -> Path | None:
     return None
 
 
-def tytpl_new(tid: str, name: str, script: str, lang: str, voice: str, client: str | None, field: str) -> str:
+def tytpl_new(tid: str, name: str, script: str, lang: str, voice: str, client: str | None, field: str, render: bool = True) -> str:
     """مشروع تايبوجرافي جديد بالقالب، والبناء والرسم في الخلفية. يرجع رقمه."""
     pid = typo_new(TypoNewIn(name=name[:100], text=""))["id"]
     typo_update(pid, lambda x: x.update(style=typotpl.STYLE, script=typotpl.clean_script(script), status="planning", step="🎙️ جارٍ تسجيل الصوت",
                                         preset=tid, dialect=lang, client_id=client or x.get("client_id")))
-    threading.Thread(target=tytpl_build, args=(pid, tid, script, lang, voice, field), daemon=True, name=f"tytpl-{pid}").start()
+    threading.Thread(target=tytpl_build, args=(pid, tid, script, lang, voice, field, render), daemon=True, name=f"tytpl-{pid}").start()
     return pid
 
 
@@ -22321,7 +22321,7 @@ def typo_logo_end(pid: str, tid: str) -> None:
         print(f"[typo-logo] {pid}: {exc}", flush=True)
 
 
-def tytpl_start(fid: str) -> str:
+def tytpl_start(fid: str, render: bool = True) -> str:
     """من المسار (أو الأوتوبايلوت): السكريبت المختار ← مشروع القالب."""
     d = flow_load(fid)
     tid = d["template"].get("preset") or ("typo" if d["template"]["id"] == "typo" else d["template"]["id"])
@@ -22337,7 +22337,7 @@ def tytpl_start(fid: str) -> str:
     voice = "" if vo and vo.get("on") is False else (vo.get("voice") or brand_narrator(lang, bid, advance=True))
     field = field_guess(brain_row(bid) or {}) if bid else ""
     title = (d.get("idea") or {}).get("title") or d["template"]["name"]
-    return tytpl_new(tid, f"🧭 {title}", script, lang, voice, bid, field)
+    return tytpl_new(tid, f"🧭 {title}", script, lang, voice, bid, field, render)
 
 
 # 🖼️ معاينات المعرض: كل قالب بنصه النجدي المثال، بتترسم مرة واحدة في نسخة الأدمن وتتشارك مع كل الحسابات
@@ -25012,6 +25012,19 @@ def flow_to_dict(fid: str, d: dict) -> dict:
                 out["stage"] = "done"
         else:
             out["output"] = {**o, "progress": job.get("progress", 0)}
+    if d.get("typo_pid") and d["template"].get("kind") == "typo":   # 🔤 المشاهد: كل جزء من الكلام والحركة بتاعته
+        try:
+            tp = typo_load(d["typo_pid"])
+            ws = tp.get("words") or []
+            out["typo_scenes"] = [{"i": i, "text": " ".join(w["w"] for w in ws[b["from"]:b["to"] + 1])} for i, b in enumerate(tp.get("blocks") or [])
+                                  if isinstance(b.get("from"), int) and isinstance(b.get("to"), int)]
+            out["typo_swap"] = bool(typo.COLLECTIONS.get(tp.get("collection") or ""))
+            src = (tp.get("source") or {}).get("file")
+            if src and (TYPO_PROJ / d["typo_pid"] / src).is_file():
+                out["typo_audio"] = f"/media/typo/projects/{d['typo_pid']}/{src}"
+            out["typo_dur"] = tp.get("duration")
+        except HTTPException:
+            pass
     if o.get("kind") == "typo" and o.get("id") and o.get("status") != "failed":   # 🔤 التايبوجرافي: الفيديو بيظهر هنا لما يخلص
         try:
             t = typo_load(o["id"])
@@ -27072,8 +27085,64 @@ def flow_voice(fid: str, body: FlowVoiceIn):
         if vo["on"]:
             flow_job(fid, "vo", lambda: flow_make_vo(fid))
         return flow_to_dict(fid, flow_load(fid))
-    nxt = "generate" if d["template"].get("kind") == "typo" else "assets"   # 🔤 التايبوجرافي: الصوت (أو بدون صوت) ← الفيديو
-    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage=nxt)))
+    if d["template"].get("kind") == "typo":   # 🔤 التايبوجرافي: الصوت ← المشاهد (الكلام متوزّع على الحركات) ← الفيديو، زي باقي القوالب
+        flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage="panel", typo_pid=None, output=None))
+        flow_job(fid, "typoplan", lambda: flow_typo_plan(fid))
+        return flow_to_dict(fid, flow_load(fid))
+    return flow_to_dict(fid, flow_update(fid, lambda x: x.update(vo=vo, lang=body.lang, stage="assets")))
+
+
+def flow_typo_plan(fid: str) -> None:
+    """🔤 الصوت بيتسجّل والكلام بيتوزّع على الحركات (من غير رسم)، والعميل بيشوف المشاهد قبل ما الفيديو يترسم."""
+    pid = tytpl_start(fid, render=False)
+    flow_update(fid, lambda x: x.update(typo_pid=pid))
+    t0 = time.time()
+    while time.time() - t0 < 900:
+        t = typo_load(pid)
+        if t.get("status") == "failed":
+            raise HTTPException(400, t.get("error") or "توقف تجهيز المشاهد")
+        if t.get("status") == "planned" and t.get("blocks"):
+            return
+        time.sleep(2)
+    raise HTTPException(400, "تأخر تجهيز المشاهد، جرّب مرة أخرى")
+
+
+class FlowTypoSwapIn(BaseModel):
+    i: int
+
+
+@app.post("/api/flows/{fid}/typo-swap")
+def flow_typo_swap(fid: str, body: FlowTypoSwapIn):
+    """🔁 «غيّر الحركة» لمشهد: حركة تانية من حركات القالب نفسه."""
+    import random
+    d = flow_load(fid)
+    pid = d.get("typo_pid")
+    t = typo_load(pid) if pid else {}
+    col = typo.COLLECTIONS.get(t.get("collection") or "")
+    if not col or not (0 <= body.i < len(t.get("blocks") or [])):
+        raise HTTPException(400, "لا يمكن تغيير حركة هذا المشهد")
+    def fn(x):
+        b = x["blocks"][body.i]
+        opts = [k for k in col["kinds"] if k not in (b.get("kind"), "counter")]
+        if opts:
+            b["kind"] = random.choice(opts)
+    typo_update(pid, fn)
+    return flow_to_dict(fid, flow_load(fid))
+
+
+@app.post("/api/flows/{fid}/typo-render")
+def flow_typo_render(fid: str):
+    """🎬 رسم الفيديو من المشاهد، ويظهر في نفس المربع."""
+    d = flow_load(fid)
+    flow_idle(d)
+    pid = d.get("typo_pid")
+    if not pid or typo_load(pid).get("status") not in ("planned", "done", "failed"):
+        raise HTTPException(400, "المشاهد لم تجهز بعد")
+    typo_set(pid, status="rendering", step="🎬 يُجهّز", error=None)
+    flow_update(fid, lambda x: x.update(stage="generate", output={"kind": "typo", "id": pid, "status": "working"}))
+    base = f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}"
+    threading.Thread(target=run_typo_render, args=(pid, base, "high"), daemon=True).start()
+    return flow_to_dict(fid, flow_load(fid))
 
 
 # 🔊 عينة لكل صوت (جملة قصيرة باللهجة)، بتتعمل مرة واحدة وتتحفظ، فمابتتحسبش غير أول مرة
@@ -27751,7 +27820,8 @@ def flow_stage(fid: str, body: FlowGoIn):
     if body.stage not in fz.STAGES:
         raise HTTPException(400, "خطوة غير معروفة")
     # الرجوع لأي خطوة قبل النتيجة بيفتح صفحة جديدة (المشروع اللي اتعمل بيفضل في قسمه)
-    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(stage=body.stage, **({} if body.stage == "done" else {"output": None}))))
+    keep = lambda d: body.stage == "done" or (body.stage == "generate" and (d.get("template") or {}).get("kind") == "typo")  # noqa: E731  (🔤 الرجوع لخطوة «الفيديو» بيعرض الفيديو اللي اترسم)
+    return flow_to_dict(fid, flow_update(fid, lambda d: d.update(stage=body.stage, **({} if keep(d) else {"output": None}))))
 
 
 def flow_refs(d: dict) -> list[dict]:
