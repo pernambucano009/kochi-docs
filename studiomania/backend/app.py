@@ -35275,7 +35275,10 @@ def pilot_state() -> dict:
 def pilot_linked() -> bool:
     """فيه حساب سوشيال واحد على الأقل مربوط؟ (من غيره خطوة «النشر» في الأوتوبايلوت رمادي ومابتتعلّمش)"""
     try:
-        return bool(publisher.accounts() if publisher.service_name() == "zernio" else True)
+        if publisher.service_name() != "zernio":
+            return True
+        # النسخة المحفوظة ٥ دقايق: لو فاضية (لسه رابط حساب حالًا) نسأل خدمة النشر تاني بدل ما النشر يفضل رمادي
+        return bool(publisher.accounts() or publisher.accounts(refresh=True))
     except Exception:  # noqa: BLE001
         return False
 
