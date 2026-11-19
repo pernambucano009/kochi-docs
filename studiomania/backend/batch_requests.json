@@ -25,54 +25,25 @@
   ]
  },
  {
-  "id": "robust-2b",
+  "id": "robust-fix",
   "user": "463753e66f39f1c3",
   "templates": [
-   "t-board",
-   "t-pixel",
-   "t-blueprint",
-   "t-swiss",
-   "t-launch",
-   "t-glass",
-   "t-crayon",
-   "t-spy",
-   "t-holo",
-   "t-chart",
-   "t-shadow",
-   "t-keynote",
-   "t-ascii",
-   "t-math",
-   "t-loop",
-   "t-flow",
-   "t-dossier",
-   "t-pictogram",
-   "t-microgame",
-   "t-screencast",
-   "t-ytintro",
-   "t-newsletter",
-   "t-notch",
    "ty-slam",
    "ty-drum",
    "ty-duo",
-   "ty-figs",
    "ty-strobe",
-   "ot-social",
-   "ot-call"
+   "t-chart",
+   "t-ytintro",
+   "t-shadow",
+   "t-launch"
   ]
  },
  {
-  "id": "robust-3b",
+  "id": "robust-stock",
   "user": "463753e66f39f1c3",
   "templates": [
-   "st-offer",
-   "st-depth",
-   "st-orbit",
-   "st-bike",
-   "st-food",
-   "st-box",
    "st-run",
-   "st-gold",
-   "st-yoga"
+   "st-food"
   ]
  }
 ]
