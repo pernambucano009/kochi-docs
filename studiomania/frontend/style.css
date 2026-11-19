@@ -3449,3 +3449,84 @@ html[dir="ltr"] :is(.vl-box,.sil-menu,.hp-tease,.hp-box,.flw){direction:ltr}
 .car-sty b { font-weight: 500; font-size: 13.5px; padding-inline: 2px; }
 .car-sty:hover { border-color: var(--line); }
 .car-sty.on { border-color: var(--accent); }
+
+/* ===== 💬 التعليقات والرسائل (التصميم الهادي): من غير كروت، ومن غير سكرول للصفحة. القايمة والمحادثة بس هما اللي بيتحركوا جوا ===== */
+.stage-body:has(> .view[data-view="15"]:not([hidden])) { overflow: hidden; display: flex; flex-direction: column; }
+:root:root:root .view[data-view="15"]:not([hidden]) { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
+:root:root:root .view[data-view="15"] .ib-bar { flex-direction: row; justify-content: flex-start; gap: 16px; margin: 0 0 14px; flex: none; }
+:root:root:root #ibTabs { background: none; padding: 0; gap: 26px; border-radius: 0; }
+:root:root:root #ibTabs button { padding: 6px 0; border-radius: 0; background: none; box-shadow: none; color: var(--label, #8a857f); font-size: 15px; border-bottom: 2px solid transparent; }
+:root:root:root #ibTabs button.on { color: var(--ink, #181718); border-bottom-color: var(--accent, #E5613E); background: none; box-shadow: none; }
+:root:root:root #ibTabs .ib-n { color: var(--accent, #E5613E); font-size: 12px; }
+:root:root:root .ib-layout { flex: 1; min-height: 0; grid-template-columns: 340px minmax(0, 1fr); gap: 0; align-items: stretch; }
+:root:root:root .ib-layout[hidden] { display: none; }
+:root:root:root .ib-list-panel, :root:root:root .ib-thread { background: none; box-shadow: none; border-radius: 0; height: auto; min-height: 0; overflow-y: auto; }
+:root:root:root .ib-list-panel { padding: 0 0 0 14px; border-inline-end: 1px solid var(--line); }
+:root:root:root .ib-list { gap: 0; }
+:root:root:root .ib-list li { padding: 12px 10px; border-radius: 12px; border-bottom: 1px solid var(--line); border-radius: 0; }
+:root:root:root .ib-list li:last-child { border-bottom: 0; }
+:root:root:root .ib-list li:hover { background: var(--field, #F3F2EF); }
+:root:root:root .ib-list li.on { background: none; box-shadow: inset -3px 0 0 var(--accent, #E5613E); }
+html[dir="ltr"]:root:root .ib-list li.on { box-shadow: inset 3px 0 0 var(--accent, #E5613E); }
+:root:root:root .ib-thumb { border-radius: 10px; width: 46px; height: 46px; }
+:root:root:root .ib-more { all: unset; display: block; margin: 10px auto; font-size: 13px; color: var(--label, #8a857f); cursor: pointer; }
+:root:root:root .ib-more:hover { color: var(--accent, #E5613E); }
+:root:root:root .ib-thread { padding: 4px 26px 0; display: flex; flex-direction: column; }
+:root:root:root .ib-thread > .empty { margin: auto; color: var(--label, #8a857f); }
+:root:root:root .ib-post { flex-wrap: wrap; margin-bottom: 10px; }
+:root:root:root .ib-triage { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 10px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 14px; background: none; }
+:root:root:root .ib-go { border: 0; cursor: pointer; font: inherit; font-size: 13.5px; padding: 8px 18px; border-radius: 999px; color: #fff;
+  background: linear-gradient(120deg, var(--glow-a, #F08A4B), var(--glow-b, #E5613E) 55%, var(--glow-c, #D9473A)); box-shadow: 0 8px 20px rgba(229, 97, 62, .28); }
+:root:root:root .ib-go:disabled { opacity: .6; cursor: default; }
+:root:root:root .ib-topt { display: flex; gap: 8px; width: 100%; }
+:root:root:root .ib-topt[hidden] { display: none; }
+:root:root:root .ib-topt input { flex: 1; min-width: 0; font: inherit; font-size: 13px; border: 0; border-radius: 10px; padding: 8px 12px; background: var(--field, #F3F2EF); color: inherit; }
+:root:root:root .ib-comments { gap: 0; padding-bottom: 20px; }
+:root:root:root .ib-comments > .ib-c { padding: 16px 0; border-bottom: 1px solid var(--line); }
+:root:root:root .ib-comments > .ib-c:last-child { border-bottom: 0; }
+:root:root:root .ib-cb > p { background: none; padding: 0; border-radius: 0; margin: 4px 0 0; display: block; }
+:root:root:root .ib-c.mine > .ib-cb > p { background: none; color: inherit; }
+:root:root:root .ib-c.reply { padding-inline-start: 12px; border-inline-start: 2px solid var(--line); }
+:root:root:root .ib-c.reply.mine { border-inline-start-color: var(--accent, #E5613E); }
+:root:root:root .ib-c.reply.mine > .ib-cb > p { color: var(--sub, #6B6A66); }
+:root:root:root .ib-act { display: inline; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--label, #8a857f); cursor: pointer; padding: 0; margin-inline-end: 10px; }
+:root:root:root .ib-act:hover { color: var(--accent, #E5613E); }
+:root:root:root .ib-dm { margin-top: 10px; padding-inline-start: 12px; border-inline-start: 2px solid var(--accent, #E5613E); }
+:root:root:root .ib-dm p { margin: 4px 0 6px; }
+:root:root:root .ib-compose { background: none; border-radius: 0; padding: 10px 0 0; gap: 8px; }
+:root:root:root .ib-compose textarea { background: var(--field, #F3F2EF); border: 0; border-radius: 14px; resize: none; }
+:root:root:root .ib-compose .ib-hint { background: var(--field, #F3F2EF); border: 0; border-radius: 10px; }
+:root:root:root .ib-compose .ib-hint[hidden] { display: none; }
+:root:root:root .ib-compose :is(.ib-sug, .ib-cancel) { border: 0; background: none; font: inherit; font-size: 13px; padding: 6px 4px; cursor: pointer; color: var(--label, #8a857f); box-shadow: none; }
+:root:root:root .ib-compose .ib-sug { color: var(--ink, #181718); }
+:root:root:root .ib-compose .ib-sug:hover, :root:root:root .ib-compose .ib-cancel:hover { color: var(--accent, #E5613E); }
+:root:root:root .ib-send { border: 0; cursor: pointer; font: inherit; font-size: 13.5px; color: #fff; padding: 8px 22px; border-radius: 999px;
+  background: linear-gradient(120deg, var(--glow-a, #F08A4B), var(--glow-b, #E5613E) 55%, var(--glow-c, #D9473A)); box-shadow: 0 8px 20px rgba(229, 97, 62, .28); }
+:root:root:root .ib-send:disabled { opacity: .6; }
+/* الرسايل: المحادثة بتملا المكان، وصندوق الرد ثابت تحت */
+:root:root:root .ib-thread:has(.ib-chat) { overflow: hidden; padding-bottom: 14px; }
+:root:root:root .ib-chathead { flex: none; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+:root:root:root .ib-chat { flex: 1; min-height: 0; max-height: none; overflow-y: auto; padding: 14px 0; }
+:root:root:root .ib-thread:has(.ib-chat) > .ib-compose { flex: none; border-top: 1px solid var(--line); }
+:root:root:root .ib-msg { background: var(--field, #F3F2EF); }
+:root:root:root .ib-msg.mine { background: #FBE3D9; color: #4a2a1e; }
+:root[data-nh-theme="dark"] .ib-msg.mine { background: #4a2a1e; color: #FBE3D9; }
+/* 🤖 الردود التلقائية: صفوف بخطوط رفيعة، من غير كروت */
+:root:root:root .view[data-view="15"] #ibBots:not([hidden]) { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+:root:root #ibBots .nb-wrap { flex: 1; min-height: 0; display: flex; background: none !important; box-shadow: none !important; padding: 0 !important; }
+:root:root #ibBots .bot-grid { flex: 1; min-height: 0; grid-template-columns: 340px minmax(0, 1fr); gap: 0; align-items: stretch; }
+:root:root #ibBots .bot-list { overflow-y: auto; padding: 0; padding-inline-end: 14px; border-radius: 0; border-inline-end: 1px solid var(--line); background: none; box-shadow: none; }
+:root:root #ibBots .bot-form { overflow-y: auto; padding: 0 26px 16px; border-radius: 0; background: none; box-shadow: none; }
+:root:root #ibBots .bot-recipes { display: flex; flex-direction: column; gap: 0; }
+:root:root #ibBots .bot-recipe { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 13px 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; box-shadow: none; translate: none; }
+:root:root #ibBots .bot-recipe:last-child { border-bottom: 0; }
+:root:root #ibBots .bot-recipe:hover, :root:root #ibBots .bot-recipe:focus-visible { background: var(--field, #F3F2EF); translate: none; }
+:root:root #ibBots .bot-recipe b { min-width: 170px; }
+:root:root #ibBots .bot-recipe small { flex: 1; min-width: 200px; }
+:root:root #ibBots .bot-recipe span { flex: none; }
+@media (max-width: 900px) {
+  .stage-body:has(> .view[data-view="15"]:not([hidden])) { overflow: auto; display: block; }
+  :root:root:root .ib-layout, :root:root #ibBots .bot-grid { grid-template-columns: 1fr; }
+  :root:root:root .ib-list-panel, :root:root #ibBots .bot-list { border: 0; padding: 0; max-height: 40vh; }
+  :root:root:root .ib-thread, :root:root #ibBots .bot-form { padding: 14px 0 0; }
+}

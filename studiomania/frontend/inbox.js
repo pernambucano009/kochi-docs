@@ -28,7 +28,6 @@ async function initInbox() {
 async function ibLoad(reset = false) {
   if (ib.loading) return;
   ib.loading = true;
-  $("ibRefresh").disabled = true;
   try {
     const comments = ib.tab === "comments";
     const d = await api(`/api/inbox/${comments ? "comments" : "conversations"}${!reset && ib.next ? `?cursor=${encodeURIComponent(ib.next)}` : ""}`);
@@ -45,7 +44,6 @@ async function ibLoad(reset = false) {
     ibAlert(`⚠️ ${escapeHtml(err.message)}${settings ? "" : /Inbox/.test(err.message) ? ` · <a href="https://zernio.com/dashboard" target="_blank" rel="noopener">لوحة Zernio ↗</a>` : ""}`);
   } finally {
     ib.loading = false;
-    $("ibRefresh").disabled = false;
   }
 }
 
@@ -75,12 +73,13 @@ function ibRenderList() {
 // ---------- الكومنتات ----------
 const ibWaiting = (c) => !c.mine && !(c.replies || []).some((r) => r.mine);
 
-async function ibOpenPost(id) {
+async function ibOpenPost(id, quiet = false) {
   const p = ib.posts.find((x) => x.id === id);
   if (!p) return;
-  ib.sel = id; ib.post = p; ib.comments = []; ib.triage = null;
+  ib.sel = id; ib.post = p;
+  if (!quiet) { ib.comments = []; ib.triage = null; }
   ibRenderList();
-  $("ibThread").innerHTML = `<p class="empty">جارٍ تحميل التعليقات…</p>`;
+  if (!quiet) $("ibThread").innerHTML = `<p class="empty">جارٍ تحميل التعليقات…</p>`;
   try {
     ib.comments = await api(`/api/inbox/comments/${encodeURIComponent(p.id)}?account_id=${encodeURIComponent(p.account_id)}`);
     if (ib.sel === id) ibRenderPost();
@@ -115,11 +114,11 @@ function ibRenderPost() {
       ${p.url ? `<a class="ib-open" href="${escapeHtml(p.url)}" target="_blank" rel="noopener">افتح المنشور ↗</a>` : ""}
       <label class="ib-filter"><input type="checkbox" id="ibOnlyWaiting" ${ib.onlyWaiting ? "checked" : ""}> ما ينتظر ردًا فقط${waiting ? ` (${waiting})` : ""}</label></div>
     ${waiting ? `<div class="ib-triage">
-      <b>🧠 رتّب التعليقات وجهّز ردودًا</b>
-      <div class="row wrap"><input type="text" id="ibKw" placeholder="(اختياري) كلمة الـ CTA، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
-        <input type="text" id="ibDm" placeholder="(اختياري) ماذا تقول الرسالة الخاصة؟ مثلًا: رابط الدليل" value="${escapeHtml(ib.tdm)}">
-        <button type="button" class="btn sm primary" id="ibTriage">رتّب ${waiting} ${waiting === 1 ? "تعليق" : "تعليقات"}</button></div>
-      ${ib.triage ? `<small class="muted">${ibTriageSummary()} · راجع كل رد واضغط «إرسال»، أو عدّله أولًا.</small>` : ""}</div>` : ""}
+      <button type="button" class="ib-go" id="ibTriage">✨ جهّز ردودًا لـ ${waiting === 1 ? "تعليق واحد" : `${waiting} تعليقات`}</button>
+      ${ib.triage ? `<small class="muted">${ibTriageSummary()} · راجع كل رد واضغط «إرسال»، أو عدّله أولًا.</small>`
+        : `<button type="button" class="ib-act" id="ibTOpt">${ib.topt ? "إخفاء الخيارات" : "كلمة الـ CTA والرسالة الخاصة"}</button>`}
+      <div class="ib-topt"${ib.topt && !ib.triage ? "" : " hidden"}><input type="text" id="ibKw" placeholder="كلمة الـ CTA، مثلًا: دليل" value="${escapeHtml(ib.tkw)}">
+        <input type="text" id="ibDm" placeholder="ماذا تقول الرسالة الخاصة؟ مثلًا: رابط الدليل" value="${escapeHtml(ib.tdm)}"></div></div>` : ""}
     <div class="ib-comments">${list.map((c) => ibCommentHTML(c)).join("") || `<p class="empty">${ib.onlyWaiting ? "✅ رددت على كل التعليقات" : "لا توجد تعليقات"}</p>`}</div>`;
 }
 
@@ -145,12 +144,13 @@ async function ibRunTriage(btn) {
 function ibComposer(target, text = "") {
   return `<div class="ib-compose" data-target="${escapeHtml(target)}">
       <textarea rows="2" placeholder="اكتب الرد… أو اضغط «اقترح ردًا»" dir="auto">${escapeHtml(text)}</textarea>
-      <input type="text" class="ib-hint" placeholder="(اختياري) ماذا تريد أن يقول الرد؟ مثلًا: الحجز من الرابط في السيرة">
+      <input type="text" class="ib-hint" hidden placeholder="ماذا تريد أن يقول الرد؟ مثلًا: الحجز من الرابط في السيرة">
       <div class="row">
-        <button type="button" class="btn sm ib-sug" data-sug>اقترح ردًا</button>
+        <button type="button" class="ib-sug" data-sug>اقترح ردًا</button>
+        <button type="button" class="ib-act" data-hint>وجّه الاقتراح</button>
         <span class="spacer"></span>
-        <button type="button" class="btn sm ib-cancel" data-cancel>إلغاء</button>
-        <button type="button" class="btn sm primary ib-send" data-send>إرسال</button>
+        <button type="button" class="ib-cancel" data-cancel>إلغاء</button>
+        <button type="button" class="ib-send" data-send>إرسال</button>
       </div></div>`;
 }
 
@@ -178,13 +178,14 @@ async function ibSuggest(box, payload) {
 }
 
 // ---------- الرسايل ----------
-async function ibOpenConv(id) {
+async function ibOpenConv(id, quiet = false) {
   const c = ib.convs.find((x) => x.id === id);
   if (!c) return;
-  ib.sel = id; ib.messages = [];
+  ib.sel = id;
+  if (!quiet) ib.messages = [];
   c.unread = 0;
   ibRenderList();
-  $("ibThread").innerHTML = `<p class="empty">جارٍ تحميل المحادثة…</p>`;
+  if (!quiet) $("ibThread").innerHTML = `<p class="empty">جارٍ تحميل المحادثة…</p>`;
   try {
     ib.messages = await api(`/api/inbox/conversations/${encodeURIComponent(c.id)}/messages?account_id=${encodeURIComponent(c.account_id)}`);
     if (ib.sel === id) ibRenderConv(c);
@@ -215,13 +216,19 @@ $("ibTabs").addEventListener("click", (e) => {
   $("ibTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
   // 🤖 البوتات: تبويب جوه التعليقات والرسائل (بوت بيرد عليهم لوحده)
   const bots = ib.tab === "bots";
-  $("ibBots").hidden = !bots; $("ibLayout").hidden = bots; $("ibRefresh").hidden = bots; $("ibNote").hidden = bots;
+  $("ibBots").hidden = !bots; $("ibLayout").hidden = bots; $("ibNote").hidden = bots;
   if (bots) { ibAlert(""); $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
   $("ibThread").innerHTML = `<p class="empty">اختر ${ib.tab === "comments" ? "منشور" : "محادثة"} من القائمة.</p>`;
   ibAlert("");
   ibLoad(true);
 });
-$("ibRefresh").onclick = () => { ibAlert(""); ibLoad(true); if (ib.sel) (ib.tab === "comments" ? ibOpenPost : ibOpenConv)(ib.sel); };
+// 🔄 بيتحدّث لوحده كل دقيقة وهو مفتوح (من غير زرار «حدّث»)، وماينطّش لو بيكتب رد
+setInterval(() => {
+  const v = document.querySelector('.view[data-view="15"]');
+  if (!v || v.hidden || document.hidden || ib.tab === "bots" || ib.loading) return;
+  if ([...$("ibThread").querySelectorAll(".ib-compose textarea")].some((t) => t.value.trim()) || $("ibThread").contains(document.activeElement)) return;
+  ibLoad(true).then(() => { if (!ib.sel) return; if (ib.tab === "comments") ibOpenPost(ib.sel, true); else ibOpenConv(ib.sel, true); });
+}, 60000);
 $("ibMore").onclick = () => ibLoad(false);
 $("ibList").addEventListener("click", (e) => {
   const li = e.target.closest("li[data-id]");
@@ -237,6 +244,9 @@ $("ibThread").addEventListener("change", (e) => {
 
 $("ibThread").addEventListener("click", async (e) => {
   if (e.target.closest("#ibTriage")) return ibRunTriage(e.target.closest("#ibTriage"));
+  if (e.target.closest("#ibTOpt")) { ib.tkw = $("ibKw").value.trim(); ib.tdm = $("ibDm").value.trim(); ib.topt = !ib.topt; return ibRenderPost(); }
+  const hb = e.target.closest("[data-hint]");
+  if (hb) { const h = hb.closest(".ib-compose").querySelector(".ib-hint"); h.hidden = !h.hidden; if (!h.hidden) h.focus(); return; }
   const cp = e.target.closest("[data-copy]");
   if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast("✅ نُسخت"); } catch { toast("تعذّر النسخ", true); } return; }
   const rep = e.target.closest("[data-reply]");
