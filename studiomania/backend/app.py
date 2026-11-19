@@ -31834,16 +31834,22 @@ def flow_publish_pack(fid: str, fresh: bool = False):
         else:
             try:
                 raw = az.parse_json(llm(algo.post_caption_messages(context, algo.strategy_text(brain), ""), json_mode=True, temperature=0.6), "الكابشن")
-            except (ValueError, HTTPException, atlas.AtlasError, httpx.HTTPError):
+            except Exception as exc:  # noqa: BLE001 — الكابشن مايوقفش النشر: عنوان بسيط، والسبب لصندوق الأخطاء
+                issues.record("job", "flow/publish-caption", str(exc)[:400], getattr(exc, "status_code", 500), ref=fid)
                 raw = {"first": sc.get("title") or "", "body": "", "cta": "", "tags": []}
         raw = raw if isinstance(raw, dict) else {}
+        raw["tags"] = [str(t) for t in raw.get("tags") or [] if t] if isinstance(raw.get("tags"), list) else []
         if pdf["cta_mode"] == "off":
             raw["cta"] = ""
         elif pdf["cta"] and not raw.get("cta"):
             raw["cta"] = pdf["cta"]
         if pdf["dm_mode"] == "always" and pdf["dm_word"] and pdf["dm_word"] not in str(raw.get("cta") or ""):
             raw["cta"] = (str(raw.get("cta") or "") + f"\nعلّق بكلمة «{pdf['dm_word']}» وتوصلك رسالة على الخاص").strip()
-        caption = dub.fix_dialect(algo.assemble_caption(raw, brain if pdf["cta_mode"] != "off" else {}, False), lang)
+        try:
+            caption = dub.fix_dialect(algo.assemble_caption(raw, brain if pdf["cta_mode"] != "off" else {}, False), lang)
+        except Exception as exc:  # noqa: BLE001
+            issues.record("job", "flow/publish-caption", str(exc)[:400], 500, ref=fid)
+            caption = "\n".join(str(x) for x in (raw.get("first"), raw.get("body"), raw.get("cta")) if x)
         pack = {"export_id": ex_id, "caption": caption}
         flow_update(fid, lambda x: x.update(pub_pack=pack))
     try:

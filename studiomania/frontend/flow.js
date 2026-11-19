@@ -626,7 +626,7 @@ const Flow = (() => {
       S.pubDm = r.defaults?.dm_mode === "always";
       const cap = S.el?.querySelector("#pubCap");
       if (cap && (fresh || !cap.value)) cap.value = r.caption || "";
-    } catch (err) { S.pub = { error: true }; toast(err.message, true); }
+    } catch (err) { S.pub = { error: err.message || true }; }
     render();
   }
   async function pubLink(platform) {
@@ -662,7 +662,7 @@ const Flow = (() => {
   function stPublish(d) {
     const p = S.pub;
     if (!p) return `<h2>النشر</h2>${working("يجهّز الفيديو والكابشن…")}`;
-    if (p.error) return `<h2>النشر</h2><div class="flw-empty"><p>تعذّر تجهيز النشر الآن.</p><div class="flw-acts"><button type="button" class="flw-btn pri" data-topub>🔁 أعد المحاولة</button></div></div>`;
+    if (p.error) return `<h2>النشر</h2><div class="flw-empty"><p>تعذّر تجهيز النشر الآن.</p>${typeof p.error === "string" ? `<small class="muted">${esc(p.error)}</small>` : ""}<div class="flw-acts"><button type="button" class="flw-btn pri" data-topub>🔁 أعد المحاولة</button></div></div>`;
     const fmtW = (iso) => new Date(iso).toLocaleString(UI_LOCALE(), { weekday: "long", hour: "numeric", minute: "2-digit" });
     if (p.posted) return `<h2>${p.posted.now ? "🚀 يُنشر الآن" : "✅ جُدول المنشور"}</h2>
       <p class="flw-sub">${p.posted.now ? "يُرسل الفيديو الآن إلى حساباتك، وستراه في شريط النشاط حتى يكتمل." : `سيُنشر ${esc(fmtW(p.posted.at))}، وستراه في شريط النشاط قبل موعده.`}</p>
