@@ -2526,10 +2526,10 @@ label.dim { opacity: .4; }
 #nh .nh-page:has(.nh-pgrid[data-key="plans"]) .nh-ptitle { visibility: hidden; }
 /* المحتوى (والكروت المستخبية جوّه) أطول من الصفحة، فالتوسيط كان بيزق زرار «تفاصيل الباقات» لفوق برّه المساحة الظاهرة.
    safe: لو أطول من المساحة يبدأ من فوق بدل ما يتقص */
-#nh .bq-wrap .pv-mid { align-content: safe center; }
+#nh .bq-wrap .pv-mid { align-content: start; }   /* الكروت فوق على طول وشريط النقاط تحتها، من غير سكرول */
 body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 #nh .bq-wrap { min-height: 100%; height: 100%; }
-#nh .bq-wrap > .pv { min-height: 100%; }   /* من غير ارتفاع ثابت: لما التفاصيل تتفتح الصفحة تطول، وشريط النقاط يفضل تحت الكروت مش وراها */
+#nh .bq-wrap > .pv { min-height: 0; }
 @media (max-width: 820px) { #nhBar #stagePlans { display: grid !important; } }
 /* الرفعة في الهوفر بتزق الزرار من تحت الماوس لو واقف على طرفه، فبيرتعش (هوفر/مش هوفر). مساحة شفافة حواليه بتمسك الهوفر */
 .nh-tile:hover::after, .nh-cta:hover::after, #nh .nh-pj-card:hover::after { content: ""; position: absolute; inset: -8px; border-radius: inherit; }
@@ -2546,7 +2546,7 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
 /* ✨ كل زرار برتقاني بينوّر: لمعة من فوق، وهالة ناعمة حواليه بتتنفّس بهدوء، ولمعة بتعدّي عليه لما تقف عليه */
 :root { --glow-a: #F48A62; --glow-b: #E5613E; --glow-c: #D44E2C; }
 :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add),
-#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add) {
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add, .pv-act.go, .pv-cta .go, .pv-cont .more, .flw-btn.orange) {
   position: relative; isolation: isolate;
   background: linear-gradient(180deg, var(--glow-a) 0%, var(--glow-b) 55%, var(--glow-c) 100%) !important;
   border-color: transparent !important; color: #fff !important;
@@ -2556,15 +2556,15 @@ body:has(#nhPGrid[data-key="plans"]) #nhCorner { visibility: hidden; }
   transition: transform .2s ease, filter .2s ease;
 }
 :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add)::after,
-#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add)::after {
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add, .pv-act.go, .pv-cta .go, .pv-cont .more, .flw-btn.orange)::after {
   content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .45) 48%, transparent 66%) no-repeat;
   background-size: 220% 100%; background-position: 130% 0; transition: background-position .75s ease;
 }
 :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add):hover:not(:disabled),
-#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add):hover:not(:disabled) { filter: brightness(1.06) saturate(1.05); transform: translateY(-1px); }
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add, .pv-act.go, .pv-cta .go, .pv-cont .more, .flw-btn.orange):hover:not(:disabled) { filter: brightness(1.06) saturate(1.05); transform: translateY(-1px); }
 :root :is(.btn.primary, .nh-cta, .ml-add, .ui-dlg-ok:not(.danger), .cut-tl button.ic.cut, .sfx-item button.add):hover::after,
-#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add):hover::after { background-position: -30% 0; }
+#nh :is(.nb-btn.fs-go, .nh-pj-new, .nh-cr-next, .bm-go, .sc-btn.pri, .ap .ap-acts .ok, .ml-sact .nb-btn.ml-add, .pv-act.go, .pv-cta .go, .pv-cont .more, .flw-btn.orange):hover::after { background-position: -30% 0; }
 :root :is(.btn.primary, .nb-btn.fs-go, .ui-dlg-ok):disabled { animation: none; filter: saturate(.6) opacity(.7); }
 @keyframes btnGlow {
   0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 0 0 1px rgba(229, 97, 62, .28), 0 8px 22px -6px rgba(229, 97, 62, .65), 0 0 18px rgba(240, 117, 79, .26); }
@@ -3241,8 +3241,3 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #twMain .tw-consent { font-size: 12.5px; color: var(--nh-muted); }
 #twMain .tw-consent input { accent-color: var(--nh-accent); margin-top: 3px; }
 
-/* 🟠 كل زرار برتقالي في الموقع بنفس شكل «ابدأ مشروعًا جديدًا»: نفس اللون ونفس النور (الظل البرتقالي المنوّر) */
-:is(#nh, #ibBots, body) :is(.nb-btn.fs-go, .pv-act.go, .pv-cta .go, .pv-cont .more, .btn.primary, .ui-dlg-ok, .flw-btn.orange, .pub-accounts .pa-link:not(.more), .sc-btn.pri, .bm-go, .ml-add, .nh-cr-next, .cal-add):not(:disabled) {
-  background: var(--nh-accent, #C4471F) !important; border-color: var(--nh-accent, #C4471F); box-shadow: 0 12px 34px rgba(229, 97, 62, .5) !important; }
-:is(#nh, #ibBots, body) :is(.nb-btn.fs-go, .pv-act.go, .pv-cta .go, .pv-cont .more, .btn.primary, .ui-dlg-ok, .flw-btn.orange, .pub-accounts .pa-link:not(.more), .sc-btn.pri, .bm-go, .ml-add, .nh-cr-next, .cal-add):not(:disabled):is(:hover, :focus-visible) {
-  box-shadow: 0 18px 42px -8px color-mix(in srgb, var(--nh-accent, #C4471F) 90%, transparent) !important; }

@@ -135,6 +135,15 @@ const PlansView = (() => {
 :is(#nh, body) .pv-ms .paypal { background: #FFC439; direction: ltr; font-family: Verdana, sans-serif; font-weight: 700; font-style: italic; font-size: 19px; } :is(#nh, body) .pv-ms .pp1 { color: #003087; } :is(#nh, body) .pv-ms .pp2 { color: #009CDE; }
 :is(#nh, body) .pv-ms .paypal { gap: 0; }
 @keyframes pv-in { from { opacity: 0; } }
+/* 📏 الصفحة كلها في الشاشة من غير سكرول: كروت أقصر وأقرب لفوق، وشريط النقاط تحتها على طول */
+@media (min-width: 821px) {
+  :is(#nh, body) .pv { grid-template-rows: auto auto; align-content: start; gap: 14px; }
+  :is(#nh, body) .pv-mid { gap: 10px; padding: 0 0 4px; }
+  :is(#nh, body) .pv-wrap { gap: 14px; }
+  :is(#nh, body) .pv-pc { padding: 20px 22px 18px; gap: 14px; }
+  :is(#nh, body) .pv-pc ul { padding: 12px 0 2px; gap: 8px; }
+  :is(#nh, body) .pv-seg { margin-bottom: -4px; }
+}
 @media (max-width: 1100px) { :is(#nh, body) .pv-pc { width: 220px; padding: 26px 22px 22px; } :is(#nh, body) .pv-pl { width: 120px; } }
 /* التابلت: الكروت الأربعة صفّين بدل ما تتقطع */
 @media (min-width: 821px) and (max-width: 1020px) { :is(#nh, body) .pv-cards { flex-wrap: wrap; justify-content: center; max-width: 640px; } :is(#nh, body) .pv-pc { width: calc(50% - 12px); }

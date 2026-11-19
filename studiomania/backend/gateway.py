@@ -3117,11 +3117,34 @@ def batch_requests() -> list[dict]:
         return []
 
 
+def batch_reconcile(wid: str) -> None:
+    """🧮 الدفعات كانت بتضيف رصيد مؤقت (٢٠٬٠٠٠ نقطة) وبترجّعه في الآخر، بس لما السيرفر اتحدّث في نص دفعة الإرجاع ماحصلش
+    (حساب robustfitness وصل ٨٣ ألف نقطة). بعد ما كل الدفعات تخلص: الرصيد بيرجع زي ما كان قبل أول دفعة بالظبط، مرة واحدة."""
+    if kv_get(f"batch_reconciled:{wid}"):
+        return
+    with closing(db()) as c, c:
+        r = c.execute("SELECT MIN(at) AS t FROM ledger WHERE workspace=? AND kind='gift' AND ref LIKE 'batch-%'", (wid,)).fetchone()
+        if not r or not r["t"]:
+            return
+        n = int(c.execute("SELECT COALESCE(SUM(delta), 0) AS d FROM ledger WHERE workspace=? AND at>=?", (wid, r["t"])).fetchone()["d"] or 0)
+        if n > 0:
+            w = c.execute("SELECT plan_credits, topup_credits FROM wallet WHERE workspace=?", (wid,)).fetchone()
+            if w:
+                from_plan = min(n, max(0, w["plan_credits"]))
+                from_top = min(n - from_plan, max(0, w["topup_credits"]))
+                c.execute("UPDATE wallet SET plan_credits=plan_credits-?, topup_credits=topup_credits-?, updated_at=? WHERE workspace=?",
+                          (from_plan, from_top, time.time(), wid))
+                ledger_add(c, wid, -(from_plan + from_top), "adjust", "تصحيح الرصيد بعد دفعة اختبار القوالب (الرصيد المؤقت)", "batch-reconcile")
+                print(f"[batch] reconcile {wid}: -{from_plan + from_top}", flush=True)
+    kv_set(f"batch_reconciled:{wid}", "1")
+
+
 def batch_loop() -> None:
     import hashlib
     time.sleep(60)
     print(f"[batch] loop on, requests={[r.get('id') for r in batch_requests()]} file={BACKEND / 'batch_requests.json'}", flush=True)
     while True:
+        pending = False
         for rq in batch_requests():
             try:
                 run = {}
@@ -3131,6 +3154,7 @@ def batch_loop() -> None:
                     pass
                 if run.get("done") and all(i.get("status") in ("done", "failed") for i in run.get("items") or []) and len(run.get("items") or []) >= len(rq["templates"]):
                     continue
+                pending = True
                 with closing(db()) as c:
                     us = c.execute("SELECT email, workspace FROM users").fetchall()
                 wid = next((u["workspace"] for u in us if hashlib.sha256((u["email"] or "").strip().lower().encode()).hexdigest()[:16] == rq["user"]), None)
@@ -3147,6 +3171,14 @@ def batch_loop() -> None:
                 print(f"[batch] {rq['id']} → {wid}: {r.status_code} {r.text[:200]}", flush=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"[batch] {rq.get('id')}: {exc}", flush=True)
+        if not pending:   # كل الدفعات خلصت: الرصيد المؤقت يرجع لكل حساب اتعمل عليه دفعة
+            try:
+                with closing(db()) as c:
+                    ws = {r["workspace"] for r in c.execute("SELECT DISTINCT workspace FROM ledger WHERE kind='gift' AND ref LIKE 'batch-%'")}
+                for w in ws:
+                    batch_reconcile(w)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[batch] reconcile: {exc}", flush=True)
         time.sleep(180)
 
 
