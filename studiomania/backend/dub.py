@@ -237,8 +237,18 @@ def tts_fem_kaf(text: str, lang: str) -> str:
     """🗣️ قبل الصوت: لو الكلام لأنثى، كاف المخاطَبة بتتكتب للصوت «ـِكّ» (كسرة على الحرف اللي قبلها وشدة على الكاف): تمارينِكّ، تقدّمِكّ، يخلّيكّ.
     من غيرها ElevenLabs بينطقها شين (تمارينش). اتجربت ١٨ نوفمبر وصاحب المشروع سمعها: «تمارينِك» صح.
     الكسرة لوحدها أو مع سكون: لسه شين. والكسرة على الكاف نفسها: «تمارينكي» (غلط). الكلام المكتوب على الشاشة مابيتغيرش."""
-    if lang not in ("ar-sa-najdi", "ar-sa-hijazi") or not isinstance(text, str) or not _FEM_CUE.search(text):
+    if lang not in ("ar-sa-najdi", "ar-sa-hijazi") or not isinstance(text, str):
         return text
+    if not _FEM_CUE.search(text):
+        # 🇸🇦 الكلام لذكر (أو مش باين): النجدي برضو كان بينطق الكاف شين (خيال الظل، مقدمة القناة، ١٩ نوفمبر).
+        #   فتحة على الحرف اللي قبل الكاف (جسمَك، تمارينَك) عشان الصوت يقراها «ـَك». محتاجة سماع للتأكيد.
+        def male(m):
+            w = m.group(0)
+            bare = w[1:] if len(w) > 3 and w[0] in "وف" else w
+            if bare in _KAF_ROOT - {"لك", "فيك", "عليك", "منك", "عنك", "معك", "عندك", "بك"} or w[-2] in "اويى":
+                return w
+            return w[:-1] + "\u064e" + "ك"
+        return _KAF_END.sub(male, text) if lang == "ar-sa-najdi" else text
     def one(m):
         w = m.group(0)
         bare = w[1:] if len(w) > 3 and w[0] in "وف" else w

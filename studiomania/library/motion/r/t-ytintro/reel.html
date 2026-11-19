@@ -29,13 +29,13 @@ const W = 1080, H = 1920, DUR = 12;
 
 M.reel({
   W, H, DUR, bg: PR.c2,
-  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody), M.font("PX", "plex4")]); const [th1, th2, lgI] = await Promise.all([M.img(PR.th1), M.img(PR.th2), M.img(PR.logo)]); const c = M.canvas(W, H); return { x: c.getContext("2d"), th: [th1, th2], lgI }; },
+  async init(M) { await Promise.all([M.font("LZ", PR.fHead), M.font("PB", PR.fBody), M.font("PX", "plex4")]); const [th1, th2, lgI] = await Promise.all([M.img(PR.th1), M.img(PR.th2), M.img(PR.logo)]); const c = M.canvas(W, H); return { x: c.getContext("2d"), th: [th1, th2], lgI, ring: M.contrastFor(lgI, [PR.c1, "#ffffff", "#111111"]) }; },
   seek(t, C, M) {
-    const { x, th, lgI } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.c1, B = PR.c2;
+    const { x, th, lgI, ring } = C, { seg, clamp, cubicIO, springO, expo, hash } = M, io = (k) => cubicIO(clamp(k)), A = PR.c1, B = PR.c2;
     x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = B; x.fillRect(0, 0, W, H);
     const logo = (cx, cy, s, k) => { // لوجو: دايرة + معلقة + بخار
       x.save(); x.translate(cx, cy); x.scale(s, s);
-      x.fillStyle = A; x.beginPath(); x.arc(0, 0, 150 * springO(clamp(k / .6), 12, .5), 0, Math.PI * 2); x.fill();
+      x.fillStyle = lgI ? ring : A; x.beginPath(); x.arc(0, 0, 150 * springO(clamp(k / .6), 12, .5), 0, Math.PI * 2); x.fill();
       if (lgI) { const q = springO(clamp((k - .25) / .6), 12, .5), z = 210 * q / Math.max(lgI.width, lgI.height); x.drawImage(lgI, -lgI.width * z / 2, -lgI.height * z / 2, lgI.width * z, lgI.height * z); x.restore(); return; }   // شعار القناة بدل المعلقة
       const k2 = springO(clamp((k - .25) / .6), 12, .5); x.fillStyle = "#fff"; x.save(); x.rotate(-.5 + (1 - k2) * 2); x.beginPath(); x.ellipse(0, -30, 44 * k2, 58 * k2, 0, 0, Math.PI * 2); x.fill(); x.fillRect(-10 * k2, 20, 20 * k2, 110 * k2); x.restore();
       x.strokeStyle = "#fff"; x.lineWidth = 10; x.lineCap = "round"; for (let i = 0; i < 3; i++) { const k3 = clamp((k - .4 - i * .08) / .4); if (k3 <= 0) continue; x.beginPath(); for (let j = 0; j <= 10 * k3; j++) { const u = j / 10; x.lineTo(60 + i * 26 + Math.sin(u * 6 + t * 4) * 8, -60 - u * 120); } x.stroke(); }

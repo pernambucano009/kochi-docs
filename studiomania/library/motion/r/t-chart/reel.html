@@ -27,7 +27,10 @@ M.meta({
 const W = 1080, H = 1920, DUR = 12, X0 = 120, X1 = 960, Y0 = 1360, Y1 = 520;
 const ar = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
 const en = (s) => String(s ?? "").replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[٫,]/g, ".");
-const D = PR.data.slice(0, 8).map((l) => { const [n, v] = String(l).split("|"); return { n: (n || "").trim(), v: parseFloat(en(v)) || 0 }; }).filter((d) => d.n || d.v);
+const D0 = PR.data.slice(0, 8).map((l) => { const [n, v] = String(l).split("|"); return { n: (n || "").trim(), v: parseFloat(en(v)) || 0 }; }).filter((d) => d.n || d.v);
+// 📈 الرسم بيطلع من تحت لفوق: الأقل (البداية) على الشمال والأعلى على اليمين، وبيترسم بالترتيب ده.
+// لو الأرقام اتكتبت من الأعلى للأقل (أعلى مرحلة الأول)، بتتقلب هي وأساميها مع بعض عشان الكلام يفضل على رقمه الصح
+const D = D0.length > 1 && D0[0].v > D0[D0.length - 1].v && D0.every((d, i) => !i || d.v <= D0[i - 1].v) ? D0.slice().reverse() : D0;
 // الخلفية غامقة ولا فاتحة: الكلام والخطوط بياخدوا اللون اللي يتقري عليها
 const DARK = (() => { const h = String(PR.paper).replace("#", ""), n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16) || 0; return ((n >> 16) * .299 + ((n >> 8) & 255) * .587 + (n & 255) * .114) < 128; })();
 

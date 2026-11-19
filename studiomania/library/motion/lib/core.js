@@ -32,6 +32,20 @@
   M.X = (e, x, y, sx = 1, sy = sx, r = 0) => { e.style.transform = `translate(${x}px,${y}px) rotate(${r}deg) scale(${sx},${sy})`; };
   M.show = (e, on) => { e.style.display = on ? "" : "none"; };
   M.op = (e, a) => { e.style.opacity = a; };
+  // 🎨 لون الدايرة/الكارت اللي ورا الشعار: الأبعد عن متوسط ألوان الشعار (شعار أخضر على دايرة خضرا كان بيختفي). colors = الاختيارات بالترتيب
+  M.contrastFor = (img, colors) => {
+    if (!img) return colors[0];
+    try {
+      const cv = document.createElement("canvas"); cv.width = cv.height = 48; const g = cv.getContext("2d"); g.drawImage(img, 0, 0, 48, 48);
+      const px = g.getImageData(0, 0, 48, 48).data; let r = 0, gg = 0, b = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 128) { r += px[i]; gg += px[i + 1]; b += px[i + 2]; n++; }
+      if (!n) return colors[0];
+      const hx = (h) => { const v = parseInt(String(h).replace("#", "").slice(0, 6), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
+      const d = (h) => { const [a1, b1, c1] = hx(h); return Math.hypot(a1 - r / n, b1 - gg / n, c1 - b / n); };
+      const first = colors[0];
+      return d(first) > 110 ? first : colors.slice().sort((p, q) => d(q) - d(p))[0];   // لو اللون الأصلي باين كفاية بيفضل هو
+    } catch (e) { return colors[0]; }
+  };
   M.canvas = (w, h, css = "", parent) => { const c = M.el("canvas", "", `position:absolute;left:0;top:0;${css}`, null, parent); c.width = w; c.height = h; return c; };
 
   // ---------- params: كل عنصر بيعلن الحاجات اللي بتتعدّل فيه (كلام، ألوان، لوجو...) وقيمها الأصلية.

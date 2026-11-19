@@ -3205,9 +3205,9 @@
     const sz = fitSize(main, `700 {}px ${ff}`, w * 0.6, mn * 0.11);
     const a = eOut(seg(t, b.t0, b.t0 + 0.5));
     const m = sz * 0.95;
-    // العلامة: دايرة بخطوط زي الغروب
-    const mark = `<svg width="${m.toFixed(0)}" height="${m.toFixed(0)}" viewBox="0 0 20 20"><defs><clipPath id="tyEc${bi}"><circle cx="10" cy="10" r="9.5"/></clipPath></defs><g clip-path="url(#tyEc${bi})"><rect width="20" height="20" fill="${acc}"/>
-      ${[11.5, 14, 16.5].map((y) => `<rect x="0" y="${y}" width="20" height="1.1" fill="${solid ? solidC : PAPER}"/>`).join("")}</g></svg>`;
+    // نقطة صغيرة سادة قبل الكلمة (زي البوليت): الدايرة اللي فيها خطوط كانت بتبان كأنها شعار علامة تانية (صاحب المشروع ١٩ نوفمبر)
+    const dm = m * 0.34;
+    const mark = `<span style="display:inline-block;flex:none;width:${dm.toFixed(1)}px;height:${dm.toFixed(1)}px;border-radius:50%;background:${acc}"></span>`;
     let html = `<div style="position:absolute;inset:0;background:${solid ? solidC : PAPER}"></div>
       <div dir="${this.dir(main)}" style="position:absolute;left:0;right:0;top:${(h * 0.47).toFixed(1)}px;transform:translateY(-50%) scale(${lerp(0.92, 1, a).toFixed(3)});display:flex;justify-content:center;align-items:center;gap:${(sz * 0.2).toFixed(1)}px;opacity:${a.toFixed(3)}">
         ${mark}<span style="white-space:nowrap;font:700 ${sz.toFixed(1)}px ${ff};letter-spacing:-0.04em;color:${ecInk}">${esc(main)}</span></div>`;
