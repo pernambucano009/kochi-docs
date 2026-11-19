@@ -203,7 +203,7 @@ const PlansView = (() => {
       if (d.owner) return "owner";
       if (i === curI) return sameCycle() || p.once ? "cur" : "switch";
       if (p.once) return curI < 0 ? "trial" : "low";
-      return i > curI || curI < 0 ? "up" : "low";
+      return i > curI || curI < 0 ? "up" : "down";
     }
     function small(p, i) {
       const s = state(p, i);
@@ -227,7 +227,8 @@ const PlansView = (() => {
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل إلى السنوي" : "حوّل إلى الشهري") : `${curI < 0 ? "اشترك في" : "ترقية إلى"} ${esc(p.name)}`;
         cta = `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
-      } else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
+      } else if (s === "down") cta = `<button class="soft" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>انتقل إلى ${esc(p.name)}</button>`;   // النزول لباقة أقل مسموح، بس من غير برتقالي
+      else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "انتهت التجربة" : "أقل من باقتك"}</span>`;
       const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكثر اختيارًا</em>` : "";
       const prev = plans[i - 1];

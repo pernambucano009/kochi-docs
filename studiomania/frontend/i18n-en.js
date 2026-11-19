@@ -403,6 +403,7 @@ window.I18N_EN = {
   "امرأة هادئة": "Calm woman",
   "{0} حسابات تواصل اجتماعي": "{0} social accounts",
   "ترقية إلى {0}": "Upgrade to {0}",
+  "انتقل إلى {0}": "Switch to {0}",
   "· تتجدد {0}": "· renews {0}",
   "شرح · موصى به لمجال {0}": "Explainer · recommended for {0}",
   "مسودة · اضغط للتشغيل": "Draft · click to play",
