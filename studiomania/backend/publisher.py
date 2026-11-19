@@ -477,6 +477,17 @@ def upload_file(path: Path) -> str:
     return file_url
 
 
+# 🏷️ الاسم اللي بيظهر في الربط والنشر = المنصة + نوع التنزيل اللي بننزل بيه فعلًا (فيديوهاتنا ٩:١٦)
+POST_KIND = {
+    "instagram": "إنستجرام ريلز",
+    "youtube": "يوتيوب شورتس",
+    "tiktok": "تيك توك (فيديو)",
+    "facebook": "فيسبوك (فيديو على الصفحة)",
+    "snapchat": "سناب سبوتلايت",
+    "x": "X (منشور فيديو)",
+}
+
+
 def schedule(
     video: Path, caption: str, platforms: list[str], when_utc: str, title: str, ai_made: bool, publish_now: bool,
     options: dict | None = None,

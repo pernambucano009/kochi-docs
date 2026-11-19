@@ -3914,7 +3914,7 @@ def publisher_status():
             linked.setdefault(a["platform"], {"id": a["id"], "name": a["name"]})
     return {
         "service": service,
-        "platforms": {k: v[1] for k, v in publisher.PLATFORMS.items()},
+        "platforms": {k: publisher.POST_KIND.get(k, v[1]) for k, v in publisher.PLATFORMS.items()},   # 🏷️ بنوع التنزيل: «إنستجرام ريلز»، «يوتيوب شورتس»…
         "accounts": linked,            # أول حساب لكل منصة (القديم)
         "account_list": [a for a in lst if a["visible"]],   # حسابات البراند المفتوح بس (أكتر من حساب على نفس المنصة)
         "credentials": sorted(publisher.CREDENTIALS),   # بتتربط بفورم عندنا (من غير تسجيل دخول)
