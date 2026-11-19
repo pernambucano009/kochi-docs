@@ -16909,4 +16909,6 @@ window.I18N_EN = {
   "بوابة الدفع رفضت الطلب: {0}": "The payment gateway refused the request: {0}",
   "بوابة الدفع لم ترجع رابط الدفع": "The payment gateway returned no payment link",
   "مدى · بطاقة · Apple Pay": "mada · Card · Apple Pay",
+  "تعذّر فتح صفحة الدفع الآن. جرّب طريقة دفع أخرى، أو حاول بعد قليل.": "Could not open the payment page right now. Try another payment method, or try again shortly.",
+  "الدفع فشل ({0}): {1}": "Payment failed ({0}): {1}",
 };

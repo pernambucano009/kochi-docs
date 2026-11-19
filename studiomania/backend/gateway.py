@@ -1404,8 +1404,9 @@ def checkout(body: CheckoutIn, request: Request):
         else:
             raise HTTPException(400, "طريقة دفع غير معروفة")
         return {"url": url}
-    except payments.PayError as e:
-        raise HTTPException(502, str(e))
+    except payments.PayError as e:   # العميل مايشوفش تفاصيل تقنية: الخطأ نفسه بيروح صندوق الأخطاء
+        issues.record("api", "POST /api/billing/checkout", f"الدفع فشل ({body.provider}): {e}", str(e)[:1000], 502, u["workspace"])
+        raise HTTPException(502, "تعذّر فتح صفحة الدفع الآن. جرّب طريقة دفع أخرى، أو حاول بعد قليل.")
 
 
 class DeleteMeIn(BaseModel):
