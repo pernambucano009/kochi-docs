@@ -3184,6 +3184,8 @@ def batch_list(request: Request):
         except (OSError, ValueError):
             notes = {}
         rid = run.get("id")
+        if rid not in wanted:   # دفعة اتلغت أو اتبدلت بنسخة جديدة: مابتظهرش
+            continue
         if rid in wanted:
             run["items"] = [it for it in run.get("items") or [] if it["tid"] in wanted[rid] and latest.get(it["tid"]) == rid]
         for it in run.get("items") or []:
