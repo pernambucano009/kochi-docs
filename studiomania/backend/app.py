@@ -785,6 +785,24 @@ def _dental_resume():
         pass
 
 
+BATCH_STATE: dict = {}
+
+
+class BatchIn(BaseModel):
+    id: str
+    templates: list[str]
+
+
+@app.post("/api/_tenant/batch")
+def tenant_batch(body: BatchIn):
+    """للبوابة بس (البوابة بتبعت السر): يبدأ دفعة اختبار القوالب في الخلفية (tbatch_run تحت). متسجّل هنا قبل ملفات الواجهة عشان POST يوصله."""
+    if BATCH_STATE:
+        return {"ok": False, "busy": BATCH_STATE.get("cur")}
+    BATCH_STATE.update(cur="start")
+    threading.Thread(target=tbatch_run, args=(body,), daemon=True, name=f"batch-{body.id}").start()
+    return {"ok": True}
+
+
 @app.get("/api/_tenant/busy")
 def tenant_busy():
     """للبوابة: فيه عمل يعمل (توليد، رندر، تحليل…) ولا هذه النسخة تُغلق إذا لا يوجد حد يستخدمها؟
@@ -37689,12 +37707,6 @@ app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 # البوابة بتبعت قايمة قوالب، والنسخة دي بتعمل لكل قالب فيديو كامل بالمسار العادي: أول فكرة ← أول نص ← الصوت الافتراضي ← الفيديو.
 # الشعار بستايل القالب بيترسم قبل الفيديو. النقاط بترجع للعميل في الآخر (الدفعة على حساب الإدارة).
 # النتيجة: <PLATFORM>/batch/<id>/run.json + <tid>.mp4 (البوابة بتعرضها في لوحة الفحص).
-BATCH_STATE: dict = {}
-
-
-class BatchIn(BaseModel):
-    id: str
-    templates: list[str]
 
 
 def batch_dir(bid_: str) -> Path:
@@ -37748,7 +37760,7 @@ def batch_video(fid: str) -> Path | None:
     return f if f.is_file() else None
 
 
-def batch_run(body: BatchIn) -> None:
+def tbatch_run(body: BatchIn) -> None:
     out = batch_dir(body.id)
     out.mkdir(parents=True, exist_ok=True)
     print(f"[batch] run {body.id} in {out} ({len(body.templates)} templates)", flush=True)
@@ -37808,11 +37820,3 @@ def batch_run(body: BatchIn) -> None:
         BATCH_STATE.clear()
 
 
-@app.post("/api/_tenant/batch")
-def tenant_batch(body: BatchIn):
-    """للبوابة بس (البوابة بتبعت السر): يبدأ دفعة في الخلفية."""
-    if BATCH_STATE:
-        return {"ok": False, "busy": BATCH_STATE.get("cur")}
-    BATCH_STATE.update(cur="start")
-    threading.Thread(target=batch_run, args=(body,), daemon=True, name=f"batch-{body.id}").start()
-    return {"ok": True}
