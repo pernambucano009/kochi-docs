@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دفعة القوالب</title>
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #141416; --muted: #6b6b70; --acc: #C4471F; --line: rgba(20,20,22,.08); }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0c0c0e; --card: #19181a; --ink: #f1f1f3; --muted: #a6a6ae; --acc: #F0754F; --line: rgba(255,255,255,.08); } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Alexandria", "Readex Pro", system-ui, sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px; }
+  header h1 { margin: 0; font-size: 20px; font-weight: 500; }
+  header a { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .sum { padding: 0 22px 8px; color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding: 12px 22px 40px; }
+  .it { background: var(--card); border-radius: 20px; padding: 12px; display: grid; gap: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.05); }
+  .it video { width: 100%; aspect-ratio: 9 / 16; border-radius: 14px; background: #000; object-fit: contain; }
+  .it .ph { width: 100%; aspect-ratio: 9 / 16; border-radius: 14px; background: var(--line); display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 16px; }
+  .it b { font-size: 14px; font-weight: 500; } .it small { color: var(--muted); font-size: 12px; }
+  .vs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vs button { border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 6px 10px; border-radius: 99px; cursor: pointer; }
+  .vs button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  textarea { width: 100%; min-height: 56px; border-radius: 12px; border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; font-size: 13px; padding: 8px 10px; resize: vertical; }
+  .err { color: #c0392b; }
+</style>
+</head>
+<body>
+<header><h1>دفعة القوالب</h1><a href="/admin/inspect">← لوحة الفحص</a></header>
+<div class="sum" id="sum">جارٍ التحميل…</div>
+<div class="grid" id="grid"></div>
+<script>
+const V = [["main", "قالب أساسي"], ["special", "قالب متخصص"], ["fix", "به عيب"], ["drop", "يُلغى"]];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let runs = [];
+async function load() {
+  try { runs = await (await fetch("/api/platform/batch")).json(); } catch { runs = []; }
+  const items = runs.flatMap((r) => (r.items || []).map((it) => ({ ...it, rid: r.id })));
+  const done = items.filter((x) => x.status === "done").length, bad = items.filter((x) => x.status === "failed").length;
+  document.getElementById("sum").textContent = items.length ? `جاهز ${done} من ${items.length}${bad ? ` · تعذّر ${bad}` : ""}${runs.some((r) => !r.done) ? " · ما زالت تعمل" : ""}` : "لا توجد فيديوهات بعد.";
+  const g = document.getElementById("grid");
+  const keep = Object.fromEntries([...g.querySelectorAll("textarea")].map((t) => [t.dataset.k, t.value]));
+  g.innerHTML = items.map((x) => `<div class="it">
+      ${x.url ? `<video src="${esc(x.url)}" controls playsinline preload="metadata"></video>` : `<div class="ph ${x.status === "failed" ? "err" : ""}">${x.status === "failed" ? esc(x.error || "تعذّر") : "جارٍ الصنع…"}</div>`}
+      <b>${esc(x.name)}</b><small dir="ltr">${esc(x.tid)}${x.idea ? ` · ${esc(x.idea)}` : ""}</small>
+      <div class="vs">${V.map(([k, t]) => `<button data-k="${esc(x.rid)}|${esc(x.tid)}" data-v="${k}" class="${x.note?.verdict === k ? "on" : ""}">${t}</button>`).join("")}</div>
+      <textarea data-k="${esc(x.rid)}|${esc(x.tid)}" placeholder="ملاحظاتك على هذا القالب">${esc(keep[`${x.rid}|${x.tid}`] ?? x.note?.text ?? "")}</textarea></div>`).join("");
+}
+async function save(k, patch) {
+  const [rid, tid] = k.split("|");
+  const it = runs.find((r) => r.id === rid)?.items.find((x) => x.tid === tid);
+  if (!it) return;
+  it.note = { ...(it.note || {}), ...patch };
+  await fetch(`/api/platform/batch/${rid}/${tid}/note`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verdict: it.note.verdict || "", text: it.note.text || "" }) });
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".vs button"); if (!b) return;
+  const on = !b.classList.contains("on");
+  b.parentElement.querySelectorAll("button").forEach((x) => x.classList.remove("on")); if (on) b.classList.add("on");
+  save(b.dataset.k, { verdict: on ? b.dataset.v : "" });
+});
+document.addEventListener("change", (e) => { if (e.target.matches("textarea")) save(e.target.dataset.k, { text: e.target.value }); });
+load();
+setInterval(() => { if (!document.querySelector("video:not([paused])") && runs.some((r) => !r.done)) load(); }, 60000);
+</script>
+</body>
+</html>

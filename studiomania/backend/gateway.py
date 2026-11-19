@@ -3104,6 +3104,111 @@ import review  # noqa: E402
 review.setup(app, DATA_DIR, admin, feed_ok, page)
 
 
+# ---------------------------------------------------------------- 🧪 دفعة اختبار القوالب: فيديو لكل قالب على حساب عميل، ومعرض بالملاحظات
+# الطلب في backend/batch_requests.json (البريد بصمته بس، الريبو عام). كل ٣ دقايق: لو الدفعة لسه ماخلصتش، بتتبعت للنسخة (لو شغالة بترد «مشغولة»)،
+# فلو السيرفر اتحدّث في النص بتكمّل من مكانها. النتيجة: <PLATFORM>/batch/<id>/ (run.json والفيديوهات)، والملاحظات في notes.json.
+BATCH_DIR = PLATFORM / "batch"
+
+
+def batch_requests() -> list[dict]:
+    try:
+        return json.loads((BACKEND / "batch_requests.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def batch_loop() -> None:
+    import hashlib
+    time.sleep(90)
+    while True:
+        for rq in batch_requests():
+            try:
+                run = {}
+                try:
+                    run = json.loads((BATCH_DIR / rq["id"] / "run.json").read_text("utf-8"))
+                except (OSError, ValueError):
+                    pass
+                if run.get("done") and all(i.get("status") in ("done", "failed") for i in run.get("items") or []) and len(run.get("items") or []) >= len(rq["templates"]):
+                    continue
+                with closing(db()) as c:
+                    us = c.execute("SELECT email, workspace FROM users").fetchall()
+                wid = next((u["workspace"] for u in us if hashlib.sha256((u["email"] or "").strip().lower().encode()).hexdigest()[:16] == rq["user"]), None)
+                if not wid:
+                    continue
+                t = _tenants.get(wid)
+                if not t or t.proc.poll() is not None:
+                    t = _spawn(wid)
+                    _tenants[wid] = t
+                t.last = time.time()
+                httpx.post(f"http://127.0.0.1:{t.port}/api/_tenant/batch", json={"id": rq["id"], "templates": rq["templates"]},
+                           headers={"x-gateway-secret": GATEWAY_SECRET}, timeout=20)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[batch] {rq.get('id')}: {exc}", flush=True)
+        time.sleep(180)
+
+
+threading.Thread(target=batch_loop, daemon=True, name="batch-loop").start()
+
+
+@app.get("/admin/batch")
+def admin_batch_page(request: Request):
+    u = current_user(request)
+    if not u or u["role"] != "admin":
+        return RedirectResponse("/login")
+    return page("batch.html")
+
+
+@app.get("/api/platform/batch")
+def batch_list(request: Request):
+    admin(request)
+    out = []
+    for f in sorted(BATCH_DIR.glob("*/run.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            run = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            continue
+        try:
+            notes = json.loads((f.parent / "notes.json").read_text("utf-8"))
+        except (OSError, ValueError):
+            notes = {}
+        for it in run.get("items") or []:
+            v = f.parent / f"{it['tid']}.mp4"
+            it["url"] = f"/api/platform/batch/{run['id']}/{it['tid']}.mp4?v={int(v.stat().st_mtime)}" if v.is_file() else None
+            it["note"] = notes.get(it["tid"]) or {}
+        out.append(run)
+    return out
+
+
+@app.get("/api/platform/batch/{rid}/{name}")
+def batch_file(rid: str, name: str, request: Request):
+    admin(request)
+    f = BATCH_DIR / Path(rid).name / Path(name).name
+    if f.suffix != ".mp4" or not f.is_file():
+        raise HTTPException(404, "غير موجود")
+    return FileResponse(f, media_type="video/mp4")
+
+
+class BatchNoteIn(BaseModel):
+    verdict: str = ""   # main | special | drop | fix
+    text: str = ""
+
+
+@app.post("/api/platform/batch/{rid}/{tid}/note")
+def batch_note(rid: str, tid: str, body: BatchNoteIn, request: Request):
+    admin(request)
+    d = BATCH_DIR / Path(rid).name
+    if not d.is_dir():
+        raise HTTPException(404, "غير موجود")
+    f = d / "notes.json"
+    try:
+        notes = json.loads(f.read_text("utf-8"))
+    except (OSError, ValueError):
+        notes = {}
+    notes[tid] = {"verdict": body.verdict if body.verdict in ("main", "special", "drop", "fix") else "", "text": body.text[:2000], "at": time.time()}
+    f.write_text(json.dumps(notes, ensure_ascii=False, indent=1), "utf-8")
+    return {"ok": True}
+
+
 @app.get("/admin/inspect")
 def admin_inspect_page(request: Request):
     u = current_user(request)

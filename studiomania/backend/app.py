@@ -19,6 +19,7 @@ import math
 import os
 import re
 import shutil
+import sys
 import sqlite3
 import subprocess
 import tempfile
@@ -22021,6 +22022,13 @@ def typo_bg_grade(doc: dict) -> str:
     return out
 
 
+def self_base() -> str:
+    """عنوان النسخة دي نفسها (الرسم من غير طلب): نسخ العملاء بتشتغل على بورت من البوابة (--port)، مش PORT بتاع البوابة."""
+    argv = sys.argv
+    port = argv[argv.index("--port") + 1] if "--port" in argv and argv.index("--port") + 1 < len(argv) else (os.environ.get("PORT") or "8000")
+    return f"http://127.0.0.1:{int(port)}"
+
+
 def run_typo_render(pid: str, base: str, quality: str) -> None:
     folder = TYPO_PROJ / pid
     tmp_v = folder / f".render_{uuid.uuid4().hex[:6]}.mp4"
@@ -22253,7 +22261,7 @@ def tytpl_finish(pid: str, tid: str, sp: dict, words: list, dur: float, bg: dict
                 raise RuntimeError(typo_load(pid).get("error") or "توقف التوزيع")
             if render:
                 typo_set(pid, status="rendering", step="🎬 يُجهّز")
-                run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
+                run_typo_render(pid, self_base(), "high")
             return
         if sp["type"] == "stock":
             typo_set(pid, step="🎞️ جارٍ توليد لقطة الخلفية")
@@ -22269,7 +22277,7 @@ def tytpl_finish(pid: str, tid: str, sp: dict, words: list, dur: float, bg: dict
                                             collection=sp["collection"], status="planned", step=None, error=None))
         if render:
             typo_set(pid, status="rendering", step="🎬 يُجهّز")
-            run_typo_render(pid, f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}", "high")
+            run_typo_render(pid, self_base(), "high")
     except Exception as exc:  # noqa: BLE001
         print(f"[tytpl] {pid}: {exc}", flush=True)
         typo_fail(pid, exc)
@@ -26063,6 +26071,18 @@ def logo_bg_fix(bid: str, files: list[Path]) -> None:
         except Exception as exc:  # noqa: BLE001
             print(f"[logost] bg fix {f.name}: {exc}", flush=True)
 
+def logo_prep(bid: str | None, mid: str) -> None:
+    """🏷️ قبل الفيديو (الأوتوبايلوت والدفعات): نسخة الشعار بستايل القالب تترسم لو مش موجودة، أي ستايل (مش الـ٨ بس)."""
+    try:
+        if not bid or not logo_path(bid) or (brain_row(bid) or {}).get("logo_on") == "0":
+            return
+        style = logostamp.style_of(mid, EL_DIR / "fitness" / "index.json")
+        if style and style not in ((brain_row(bid) or {}).get("logo_styles_off") or []):
+            logo_styled(bid, style, make=True)
+    except Exception as exc:  # noqa: BLE001  (من غير النسخة: الشعار الأصلي)
+        print(f"[logo-prep] {bid} {mid}: {exc}", flush=True)
+
+
 def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
     """اللوجو اللي يتختم بيه فيديو القالب ده: نسخته بستايل القالب (لو مش مقفولة)، وإلا الأصلي. None لو الشعار مقفول أو مش موجود."""
     if not bid or not logo_path(bid) or (brain_row(bid) or {}).get("logo_on") == "0":
@@ -27140,7 +27160,7 @@ def flow_typo_render(fid: str):
         raise HTTPException(400, "المشاهد لم تجهز بعد")
     typo_set(pid, status="rendering", step="🎬 يُجهّز", error=None)
     flow_update(fid, lambda x: x.update(stage="generate", output={"kind": "typo", "id": pid, "status": "working"}))
-    base = f"http://127.0.0.1:{int(os.environ.get('PORT') or 8000)}"
+    base = self_base()
     threading.Thread(target=run_typo_render, args=(pid, base, "high"), daemon=True).start()
     return flow_to_dict(fid, flow_load(fid))
 
@@ -34887,6 +34907,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
 
     # 🔤 قالب تايبوجرافي جاهز: الصوت ← اللقطة ← الحركات ← الرسم
     if ph == "typo":
+        logo_prep(d.get("client_id"), d["template"].get("preset") or d["template"]["id"])
         pid = tytpl_start(fid)
         return put(phase="typodraw", typo=pid, note="جارٍ رسم الفيديو")
     if ph == "typodraw":
@@ -34961,6 +34982,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     if ph == "vo":
         if not (d.get("vo_track") or {}).get("file"):
             return
+        logo_prep(d.get("client_id"), d["template"]["id"])
         try:
             flow_export(fid, FlowExportIn())
         except HTTPException as exc:
@@ -37647,3 +37669,129 @@ def qa_file(rid: str, name: str):
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+
+
+
+# ---------------------------------------------------------------- 🧪 دفعة اختبار القوالب (من الإدارة)
+# البوابة بتبعت قايمة قوالب، والنسخة دي بتعمل لكل قالب فيديو كامل بالمسار العادي: أول فكرة ← أول نص ← الصوت الافتراضي ← الفيديو.
+# الشعار بستايل القالب بيترسم قبل الفيديو. النقاط بترجع للعميل في الآخر (الدفعة على حساب الإدارة).
+# النتيجة: <PLATFORM>/batch/<id>/run.json + <tid>.mp4 (البوابة بتعرضها في لوحة الفحص).
+BATCH_STATE: dict = {}
+
+
+class BatchIn(BaseModel):
+    id: str
+    templates: list[str]
+
+
+def batch_dir(bid_: str) -> Path:
+    return PLATFORM_DIR / "batch" / re.sub(r"[^\w-]", "", bid_)[:40]
+
+
+def batch_wait(fid: str, ok, secs: int = 900) -> dict:
+    t0 = time.time()
+    while time.time() - t0 < secs:
+        d = flow_to_dict(fid, flow_load(fid))
+        if not d.get("busy") and ok(d):
+            return d
+        if not d.get("busy") and d.get("error"):
+            raise HTTPException(400, d["error"])
+        if (d.get("output") or {}).get("status") == "failed":
+            raise HTTPException(400, (d.get("output") or {}).get("error") or "توقف الرسم")
+        time.sleep(3)
+    raise HTTPException(400, "تأخر")
+
+
+def batch_one(tid: str) -> str:
+    """فيديو واحد بالمسار العادي. يرجع رقم المسار."""
+    fid = flow_new(FlowNewIn(template=tid))["id"]
+    d = batch_wait(fid, lambda x: bool(x.get("ideas")), 600)
+    flow_pick_idea(fid, FlowPickIn(id=d["ideas"][0]["id"]))
+    d = batch_wait(fid, lambda x: bool(x.get("scenarios")), 600)
+    flow_pick_scenario(fid, FlowPickIn(id=d["scenarios"][0]["id"]))
+    d = flow_load(fid)
+    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    bid = d.get("client_id")
+    kind = d["template"].get("kind")
+    logo_prep(bid, d["template"].get("preset") or tid)
+    flow_voice(fid, FlowVoiceIn(speaker="narrator", lang=lang, voice=brand_narrator(lang, bid)))
+    if kind == "typo":
+        batch_wait(fid, lambda x: bool(x.get("typo_scenes")), 900)
+        flow_typo_render(fid)
+    else:
+        batch_wait(fid, lambda x: bool((x.get("vo_track") or {}).get("file")) or x.get("stage") == "panel", 900)
+        flow_export(fid, FlowExportIn())
+    batch_wait(fid, lambda x: (x.get("output") or {}).get("status") == "done" and bool((x.get("output") or {}).get("video_url")), 1800)
+    return fid
+
+
+def batch_video(fid: str) -> Path | None:
+    o = flow_to_dict(fid, flow_load(fid)).get("output") or {}
+    if o.get("kind") == "typo":
+        t = typo_load(o["id"])
+        f = TYPO_PROJ / Path(o["id"]).name / str(t.get("final") or "_")
+    else:
+        f = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
+    return f if f.is_file() else None
+
+
+def batch_run(body: BatchIn) -> None:
+    out = batch_dir(body.id)
+    out.mkdir(parents=True, exist_ok=True)
+    run = {"id": body.id, "tenant": os.environ.get("TENANT_ID") or "owner", "at": time.time(), "items": [], "done": False}
+    try:
+        old = json.loads((out / "run.json").read_text("utf-8"))
+        if old.get("items"):
+            run = {**old, "done": False}
+    except (OSError, ValueError):
+        pass
+    names = tpl_names()
+    have = {it["tid"] for it in run["items"] if it.get("status") == "done"}
+    b0 = wallet.balance()
+    if b0 is not None:
+        wallet.gift(20000, "رصيد مؤقت لدفعة اختبار القوالب (من الإدارة)", f"batch-{body.id}")
+    def save():
+        _w = out / f".run.{time.time_ns()}.tmp"
+        _w.write_text(json.dumps(run, ensure_ascii=False, indent=1), "utf-8")
+        _w.replace(out / "run.json")
+    try:
+        for tid in body.templates:
+            if tid in have:
+                continue
+            it = next((x for x in run["items"] if x["tid"] == tid), None)
+            if not it:
+                it = {"tid": tid}
+                run["items"].append(it)
+            it.update(name=names.get(tid) or (typotpl.SPECS.get(tid) or {}).get("name") or tid, status="working", error=None, t0=time.time())
+            BATCH_STATE.update(cur=tid)
+            save()
+            try:
+                fid = batch_one(tid)
+                f = batch_video(fid)
+                if not f:
+                    raise HTTPException(400, "الفيديو غير موجود بعد الرسم")
+                shutil.copyfile(f, out / f"{tid}.mp4")
+                d = flow_load(fid)
+                it.update(status="done", fid=fid, idea=(d.get("idea") or {}).get("title"), secs=round(time.time() - it["t0"]))
+            except Exception as exc:  # noqa: BLE001
+                it.update(status="failed", error=str(getattr(exc, "detail", None) or exc)[:300])
+                print(f"[batch] {tid}: {exc}", flush=True)
+            save()
+    finally:
+        if b0 is not None:   # النقاط ترجع زي ما كانت
+            b1 = wallet.balance() or 0
+            if b1 > b0:
+                wallet.charge(b1 - b0, "إرجاع الرصيد المؤقت لدفعة اختبار القوالب", f"batch-{body.id}-end")
+        run["done"] = True
+        save()
+        BATCH_STATE.clear()
+
+
+@app.post("/api/_tenant/batch")
+def tenant_batch(body: BatchIn):
+    """للبوابة بس (البوابة بتبعت السر): يبدأ دفعة في الخلفية."""
+    if BATCH_STATE:
+        return {"ok": False, "busy": BATCH_STATE.get("cur")}
+    BATCH_STATE.update(cur="start")
+    threading.Thread(target=batch_run, args=(body,), daemon=True, name=f"batch-{body.id}").start()
+    return {"ok": True}
