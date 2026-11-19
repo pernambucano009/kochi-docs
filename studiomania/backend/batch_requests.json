@@ -63,5 +63,20 @@
    "t-microgame",
    "t-newsletter"
   ]
+ },
+ {
+  "id": "robust-3",
+  "user": "463753e66f39f1c3",
+  "templates": [
+   "st-offer",
+   "st-depth",
+   "st-orbit",
+   "st-bike",
+   "st-food",
+   "st-box",
+   "st-run",
+   "st-gold",
+   "st-yoga"
+  ]
  }
 ]
