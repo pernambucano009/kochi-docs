@@ -22423,6 +22423,19 @@ def tytpl_previews_redo():
 
 
 
+def tytpl_previews_missing() -> None:
+    """🖼️ نسخة صاحب البرنامج: أي قالب تايبوجرافي جاهز مالوش معاينة بتترسم لوحدها بعد التشغيل،
+    عشان القوالب دي بتظهر في المعرض بس لما معاينتها تبقى موجودة (كانت بتفشل قبل كده فالقوالب ماظهرتش)."""
+    time.sleep(150)
+    for tid in typotpl.SPECS:
+        if not (TYTPL_DIR / f"{tid}.mp4").is_file():
+            tytpl_preview(tid)
+
+
+if (os.environ.get("TENANT_ROLE") or "admin") == "admin" and not atlas.mock_mode():
+    threading.Thread(target=tytpl_previews_missing, daemon=True, name="tytpl-previews").start()
+
+
 @app.post("/api/typo/{pid}/to-editor")
 def typo_to_editor(pid: str):
     """🎞️ الفيديو في مونتاج الإعلانات (بصوته)."""
