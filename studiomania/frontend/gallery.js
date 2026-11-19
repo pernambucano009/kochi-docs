@@ -299,7 +299,9 @@ const Gallery = (() => {
   function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريبًا</small></span>`;
-    return `<article class="nh-wc${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
+    const g = grpOf(x), first = !k || grpOf(W.list?.[k - 1]?.[0] || {}) !== g;
+    return `<article class="nh-wc g-${g}${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
+      ${first ? `<span class="nh-wc-grp">${esc(grpName(g))}</span>` : ""}
       <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${apMark(x)}${lgMark(x)}</div></article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
@@ -316,6 +318,24 @@ const Gallery = (() => {
   // «موصى به لمجالك» بس للقوالب المختارة للمجال ده فعلًا (مش اللي بتنفع لأي مجال)
   // النظام الجديد: مفيش «موصى به» ولا ترتيب أولوية بالمجال — قوالب التخصص (spec) الأول، وبعدها القوالب العامة، كل مجموعة بترتيبها (pin)
   const ri = (x) => (x.spec ? 0 : 1);
+  // 🗂️ القوالب متقسّمة مجموعات بالترتيب ده (صاحب المشروع ١٩ نوفمبر): التصوير ← التايبوجرافي ← الرسومات ← العروض ← آراء العملاء ← المتخصصة.
+  //   نفس العجلة ونفس السكرول، وأول قالب في كل مجموعة عليه خط بلونها واسمها، والترقيم ماشي من ١ لآخر قالب
+  const GRPS = [["spec", "قوالب تخصصك"], ["shoot", "قوالب التصوير"], ["typo", "قوالب التايبوجرافي"], ["art", "قوالب الرسومات"],
+    ["offers", "قوالب العروض"], ["reviews", "قوالب آراء العملاء"], ["special", "قوالب متخصصة"]];
+  const G_OFFERS = new Set(["t-price", "t-count"]), G_REVIEWS = new Set(["t-review", "t-signature"]);
+  const G_SPECIAL = new Set(["t-tilt", "t-versus", "t-show", "t-map", "t-audiogram", "t-ytintro", "t-launch", "t-notch", "t-screencast", "t-lower", "t-lantern"]);
+  const grpOf = (x) => {
+    const id = x.alias || x.id;
+    if (x.spec) return "spec";
+    if (id === "phone" || id === "avatar") return "shoot";
+    if (id === "hairline" || id === "typo" || /^(ty|st|ot)-/.test(id)) return "typo";
+    if (G_OFFERS.has(id)) return "offers";
+    if (G_REVIEWS.has(id)) return "reviews";
+    if (G_SPECIAL.has(id)) return "special";
+    return "art";
+  };
+  const grpI = (x) => GRPS.findIndex(([k]) => k === grpOf(x));
+  const grpName = (k) => (GRPS.find(([g]) => g === k) || [, ""])[1];
   const recFor = () => false;
   const SPEC_NAME = { dental: "الأسنان" };
   const GF = { q: "", type: "", niche: "" };   // niche هنا = نوع القوالب: "" الكل، أو التخصص (dental)، أو general
@@ -331,7 +351,7 @@ const Gallery = (() => {
     const list = S.items.map((x, i) => [x, i]).filter(([x]) => (!GF.type || x.cat === GF.type)
       && (!q || [x.name, x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(q)))
       && (!GF.niche || (GF.niche === "general" ? !x.spec : x.spec === GF.niche)));
-    list.sort((a, b) => (ri(a[0]) - ri(b[0])) || (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
+    list.sort((a, b) => (grpI(a[0]) - grpI(b[0])) || (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
     return list;
   }
   function ggCard([x, i]) {
@@ -346,7 +366,7 @@ const Gallery = (() => {
     const box = S.root.querySelector(".gg-grid");
     if (!box) return;
     const list = ggList();
-    box.innerHTML = list.length ? list.map(ggCard).join("") : `<div class="nh-empty">لا يوجد قالب بهذا البحث. جرّب كلمة أخرى أو امسح عوامل التصفية.</div>`;
+    box.innerHTML = list.length ? list.map((it, k) => (!k || grpOf(list[k - 1][0]) !== grpOf(it[0]) ? `<h3 class="gg-grp g-${grpOf(it[0])}">${esc(grpName(grpOf(it[0])))}</h3>` : "") + ggCard(it)).join("") : `<div class="nh-empty">لا يوجد قالب بهذا البحث. جرّب كلمة أخرى أو امسح عوامل التصفية.</div>`;
     S.root.querySelector(".gg-count").textContent = `${list.length} قالب`;
   }
   function renderGrid() {
@@ -427,14 +447,14 @@ const Gallery = (() => {
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
     // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
     // قوالب مجال العميل الأول (موصى به)، وبعدها الثابتين (الموبايل ← الأفاتار)، وبعدها المناسب لأي مجال، والباقي
-    list.sort((a, b) => (ri(a[0]) - ri(b[0])) || (recFor(b[0], S.niche.key) - recFor(a[0], S.niche.key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
+    list.sort((a, b) => (grpI(a[0]) - grpI(b[0])) || (recFor(b[0], S.niche.key) - recFor(a[0], S.niche.key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (fits(b[0]) - fits(a[0])) || (!!b[0].sample_url - !!a[0].sample_url));
     W.list = list;
     const box = S.root.querySelector(".nh-gal-grid");
     if (!list.length) { box.innerHTML = `<div class="nh-empty">لا توجد قوالب بعد.</div>`; return; }
     box.innerHTML = `<div class="nh-wh" dir="ltr">
       <div class="nh-wh-wheel"><div class="nh-wh-3d">
         <svg class="nh-wh-l nh-wh-back" aria-hidden="true"></svg>
-        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span class="mk${recFor(x, S.niche.key) ? " rec" : ""}"><i></i></span>`).join("")}</div>
+        <div class="nh-wh-l nh-wh-labs" aria-hidden="true">${list.map(([x]) => `<span class="mk g-${grpOf(x)}${recFor(x, S.niche.key) ? " rec" : ""}"><i></i></span>`).join("")}</div>
         <svg class="nh-wh-l nh-wh-ring" aria-hidden="true"></svg>
         <svg class="nh-wh-l nh-wh-ball" aria-hidden="true"></svg>
         <i class="nh-wh-l nh-wh-ptr" aria-hidden="true"></i>

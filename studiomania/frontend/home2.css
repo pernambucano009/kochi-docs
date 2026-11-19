@@ -3241,3 +3241,20 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #twMain .tw-consent { font-size: 12.5px; color: var(--nh-muted); }
 #twMain .tw-consent input { accent-color: var(--nh-accent); margin-top: 3px; }
 
+
+/* 🗂️ مجموعات القوالب في العجلة والشبكة: لون لكل مجموعة (من ألوان البرنامج)، ورقم القالب بلونها، وخط واسم فوق أول قالب فيها */
+#nh :is(.nh-wc, .mk, .gg-grp) { --g: var(--nh-ink); }
+#nh :is(.nh-wc, .mk, .gg-grp).g-spec { --g: #7C5CFA; }
+#nh :is(.nh-wc, .mk, .gg-grp).g-shoot { --g: #D9473A; }
+#nh :is(.nh-wc, .mk, .gg-grp).g-typo { --g: #2F7CF6; }
+#nh :is(.nh-wc, .mk, .gg-grp).g-art { --g: var(--nh-ink); }
+#nh :is(.nh-wc, .mk, .gg-grp).g-offers { --g: var(--nh-accent); }
+#nh :is(.nh-wc, .mk, .gg-grp).g-reviews { --g: var(--nh-ok, #2f8f6b); }
+#nh :is(.nh-wc, .mk, .gg-grp).g-special { --g: #B7791F; }
+#nh .nh-wc .nh-wc-h i { color: color-mix(in srgb, var(--g) 55%, transparent); }
+#nh .nh-wc.on .nh-wc-h i { color: var(--g); }
+#nh .nh-wc { position: relative; }
+#nh .nh-wc-grp { position: absolute; top: -26px; inset-inline: 0; padding-top: 6px; border-top: 3px solid var(--g); font-size: 12px; font-weight: 600; color: var(--g); white-space: nowrap; opacity: calc(1 - var(--dim, 0)); }
+#nh .nh-wh-labs .mk i { background: var(--g); }
+#nh .gg-grp { grid-column: 1 / -1; margin: 14px 0 0; padding-top: 8px; border-top: 3px solid var(--g); font-size: 14px; font-weight: 600; color: var(--g); }
+#nh .gg-grp:first-child { margin-top: 0; }
