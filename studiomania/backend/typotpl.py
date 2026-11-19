@@ -141,9 +141,21 @@ def align(tokens: list[str], heard: list[dict]) -> list[dict]:
     return out
 
 
-def stock_messages(tid: str, script: str, field_name: str) -> list[dict]:
-    """وصف لقطة على قد السكريبت، من نفس عيلة لقطة القالب، وبقواعد اللقطات المتولّدة."""
+def stock_messages(tid: str, script: str, field_name: str, n: int = 1) -> list[dict]:
+    """وصف لقطة (أو n لقطات مختلفة بالترتيب على الكلام) على قد السكريبت، من نفس عيلة لقطة القالب، وبقواعد اللقطات المتولّدة."""
     img, mot = STOCK.get(tid) or ("", "")
+    if n > 1:
+        return [{"role": "system", "content": "You write prompts for short generated stock clips. Answer JSON only."},
+                {"role": "user", "content": (
+                    f"Business field: {field_name}. Spoken script (Arabic): «{script[:900]}»\n"
+                    f"Reference shot of this template: {img}. Motion: {mot}\n"
+                    f"Write {n} DIFFERENT simple shots, in order, each matching the part of the script said at that moment, all in the same family as the reference "
+                    "(same framing and mood) so they cut together as one video. Vary subject or angle between shots; never repeat a shot. "
+                    "Simple subject only: hands, feet or legs, equipment, food, or ONE person seen from the side or from behind. "
+                    "No faces, no text, no screens, no pouring liquids, no complex body movement, no mixed-gender scenes; if a woman appears she is alone "
+                    "and in loose long modest clothing (no leggings, no tight or fitted clothes) with a hijab covering her hair. Men never shirtless. "
+                    "Empty background, softly blurred.\n"
+                    '{"shots": [{"image": "english image prompt", "motion": "english camera/motion prompt"}, ...]}')}]
     return [{"role": "system", "content": "You write prompts for one short generated stock clip. Answer JSON only."},
             {"role": "user", "content": (
                 f"Business field: {field_name}. Spoken script (Arabic): «{script[:600]}»\n"

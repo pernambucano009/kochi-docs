@@ -22172,7 +22172,7 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
 
 # ---------------------------------------------------------------- 🔤 قوالب التايبوجرافي الجاهزة (typotpl.py): مشروع تايبوجرافي بيتبني ويترسم لوحده
 TYTPL_DIR = providers.state_file(DATA_DIR).parent / "tytpl"   # معاينات المعرض: مشتركة لكل الحسابات
-TYTPL_STOCK_USD = 0.13   # صورة البداية + ١٠ ثواني Seedance Mini 480p
+TYTPL_STOCK_USD = 0.13   # لكل لقطة: صورة البداية + ١٠ ثواني Seedance Mini 480p
 
 
 def tytpl_voice_b(lang: str, voice_a: str) -> str:
@@ -22182,40 +22182,73 @@ def tytpl_voice_b(lang: str, voice_a: str) -> str:
     return next((v for v in vs if ga and (dub.VOICES.get(v) or {}).get("gender") == ga), vs[0] if vs else voice_a)
 
 
-def tytpl_stock(tid: str, script: str, field: str, folder: Path) -> Path | None:
-    """لقطة الخلفية: موضوع على قد السكريبت من نفس عيلة لقطة القالب ← صورة ← حركة ← الشكل الطبيعي ← فلتر الـ slop."""
+def tytpl_stock(tid: str, script: str, field: str, folder: Path, dur: float = 0) -> Path | None:
+    """لقطات الخلفية: لقطة مختلفة لكل ١٠ ثواني من الكلام (لحد ٤، بالترتيب على الكلام، من نفس عيلة لقطة القالب) بدل لقطة واحدة بتتعاد
+    (طلب صاحب المشروع ١٩ نوفمبر). كل لقطة: صورة ← حركة ← الشكل الطبيعي ← فلتر الـ slop (ولو وقعت: لقطة القالب الأصلية). بعدين بتتلزق ورا بعض."""
     if atlas.mock_mode() or not atlas.api_key():
         return None
+    import concurrent.futures as cf
     img0, mot0 = typotpl.STOCK.get(tid) or ("", "")
-    tries = []
+    n = max(1, min(4, math.ceil(max(dur, 1) / typotpl.SECS)))
+    fname = (fieldpacks.FIELDS.get(field) or {}).get("name") or field or "fitness"
+    shots: list[tuple[str, str]] = []
     try:
-        v = flow_llm(typotpl.stock_messages(tid, script, (fieldpacks.FIELDS.get(field) or {}).get("name") or field or "fitness"), "لقطة القالب")
-        if str(v.get("image") or "").strip():
-            tries.append((str(v["image"])[:600], str(v.get("motion") or mot0)[:300]))
+        v = flow_llm(typotpl.stock_messages(tid, script, fname, n), "لقطة القالب")
+        raw = v.get("shots") if n > 1 else [v]
+        shots = [(str(x.get("image") or "")[:600], str(x.get("motion") or mot0)[:300]) for x in raw or [] if isinstance(x, dict) and str(x.get("image") or "").strip()][:n]
     except Exception as exc:  # noqa: BLE001
         print(f"[tytpl] stock prompt: {str(exc)[:120]}", flush=True)
-    tries.append((img0, mot0))
-    wallet.need(wallet.credits(TYTPL_STOCK_USD), "لقطة القالب")
-    for img, mot in tries[:2]:
-        start, out = folder / "stock-start.png", folder / "stock.mp4"
-        try:
-            atlas.download(atlas.run_model("Image", {"model": "krea-2-turbo/text-to-image", "prompt": stockgen.prompt(img), "image_size": "768x1344"},
-                                           "لقطة القالب", max_seconds=300, interval=2), start)
-            body = {"model": TRIAL_MODELS["seedance-mini"]["model"], "image": atlas.reference_url(start), "prompt": mot, "duration": typotpl.SECS,
-                    "resolution": "480p", "ratio": "9:16", "generate_audio": False, "watermark": False}
-            atlas.download(atlas.run_model("Video", body, "لقطة القالب", max_seconds=1800, interval=5), out)
-            wallet.charge(wallet.credits(TYTPL_STOCK_USD), "لقطة القالب", tid)
-            ai_natural(out)
-            ok, why = ai_slop(out)
-            if ok:
-                return out
-            print(f"[tytpl] slop {tid}: {why}", flush=True)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[tytpl] stock {tid}: {str(exc)[:160]}", flush=True)
-        finally:
-            start.unlink(missing_ok=True)
-    (folder / "stock.mp4").unlink(missing_ok=True)
-    return None
+    shots += [(img0, mot0)] * (n - len(shots))
+    wallet.need(wallet.credits(TYTPL_STOCK_USD * n), "لقطة القالب")
+
+    def one(k: int, img: str, mot: str) -> Path | None:
+        for im, mo in ((img, mot), (img0, mot0)) if img != img0 else ((img0, mot0),):
+            start, out = folder / f"stock-start{k}.png", folder / f"stock{k}.mp4"
+            try:
+                atlas.download(atlas.run_model("Image", {"model": "krea-2-turbo/text-to-image", "prompt": stockgen.prompt(im), "image_size": "768x1344"},
+                                               "لقطة القالب", max_seconds=300, interval=2), start)
+                body = {"model": TRIAL_MODELS["seedance-mini"]["model"], "image": atlas.reference_url(start), "prompt": mo, "duration": typotpl.SECS,
+                        "resolution": "480p", "ratio": "9:16", "generate_audio": False, "watermark": False}
+                atlas.download(atlas.run_model("Video", body, "لقطة القالب", max_seconds=1800, interval=5), out)
+                wallet.charge(wallet.credits(TYTPL_STOCK_USD), "لقطة القالب", f"{tid}-{k}")
+                ai_natural(out)
+                ok, why = ai_slop(out)
+                if ok:
+                    return out
+                print(f"[tytpl] slop {tid}#{k}: {why}", flush=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[tytpl] stock {tid}#{k}: {str(exc)[:160]}", flush=True)
+            finally:
+                start.unlink(missing_ok=True)
+            out.unlink(missing_ok=True)
+        return None
+
+    with cf.ThreadPoolExecutor(max_workers=n) as ex:
+        clips = [c for c in ex.map(lambda a: one(*a), [(k, *sh) for k, sh in enumerate(shots)]) if c]
+    final = folder / "stock.mp4"
+    if not clips:
+        return None
+    if len(clips) == 1:
+        clips[0].replace(final)
+        return final
+    try:   # ورا بعض بقطع ناعم (نص ثانية ذوبان)، كلهم على نفس المقاس
+        ins = sum((["-i", str(c)] for c in clips), [])
+        norm = "".join(f"[{i}:v]scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1,fps=30,format=yuv420p[v{i}];" for i in range(len(clips)))
+        durs = [media_info(c).duration or typotpl.SECS for c in clips]
+        chain, last, off = "", "[v0]", 0.0
+        for i in range(1, len(clips)):
+            off += durs[i - 1] - 0.5
+            chain += f"{last}[v{i}]xfade=transition=fade:duration=0.5:offset={off:.3f}[x{i}];"
+            last = f"[x{i}]"
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", *ins, "-filter_complex", norm + chain.rstrip(";"), "-map", last,
+                        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-an", "-movflags", "+faststart", str(final)],
+                       check=True, capture_output=True, timeout=600)
+    except Exception as exc:  # noqa: BLE001  (اللزق وقع: أول لقطة بس)
+        print(f"[tytpl] stock join {tid}: {str(exc)[:160]}", flush=True)
+        clips[0].replace(final)
+    for c in clips:
+        c.unlink(missing_ok=True)
+    return final
 
 
 def tytpl_new(tid: str, name: str, script: str, lang: str, voice: str, client: str | None, field: str, render: bool = True) -> str:
@@ -22288,7 +22321,7 @@ def tytpl_finish(pid: str, tid: str, sp: dict, words: list, dur: float, bg: dict
             return
         if sp["type"] == "stock":
             typo_set(pid, step="🎞️ جارٍ توليد لقطة الخلفية")
-            clip = tytpl_stock(tid, typotpl.clean_script(script), field, TYPO_PROJ / pid)
+            clip = tytpl_stock(tid, typotpl.clean_script(script), field, TYPO_PROJ / pid, dur)
             if clip:
                 bg = {"kind": "video", "file": clip.name, "dim": typotpl.DIM}
         typo_set(pid, step="🧠 جارٍ توزيع الكلام على الحركات")
