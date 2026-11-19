@@ -3240,3 +3240,9 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #twMain .tw-new input[type=text]:focus-visible { outline: none; border-color: var(--nh-line); }
 #twMain .tw-consent { font-size: 12.5px; color: var(--nh-muted); }
 #twMain .tw-consent input { accent-color: var(--nh-accent); margin-top: 3px; }
+
+/* 🟠 كل زرار برتقالي في الموقع بنفس شكل «ابدأ مشروعًا جديدًا»: نفس اللون ونفس النور (الظل البرتقالي المنوّر) */
+:is(#nh, #ibBots, body) :is(.nb-btn.fs-go, .pv-act.go, .pv-cta .go, .pv-cont .more, .btn.primary, .ui-dlg-ok, .flw-btn.orange, .pub-accounts .pa-link:not(.more), .sc-btn.pri, .bm-go, .ml-add, .nh-cr-next, .cal-add):not(:disabled) {
+  background: var(--nh-accent, #C4471F) !important; border-color: var(--nh-accent, #C4471F); box-shadow: 0 12px 34px rgba(229, 97, 62, .5) !important; }
+:is(#nh, #ibBots, body) :is(.nb-btn.fs-go, .pv-act.go, .pv-cta .go, .pv-cont .more, .btn.primary, .ui-dlg-ok, .flw-btn.orange, .pub-accounts .pa-link:not(.more), .sc-btn.pri, .bm-go, .ml-add, .nh-cr-next, .cal-add):not(:disabled):is(:hover, :focus-visible) {
+  box-shadow: 0 18px 42px -8px color-mix(in srgb, var(--nh-accent, #C4471F) 90%, transparent) !important; }
