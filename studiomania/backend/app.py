@@ -22118,7 +22118,8 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
             else:
                 cmd += ["-map", f"{inputs}:v", "-vf", f"{rs}format=yuv420p"]
             if audio_in is not None:
-                cmd += ["-map", f"{audio_in}:a?", "-c:a", "aac", "-b:a", "160k", "-shortest"]
+                # الصوت أقصر من الفيديو (فيه ثانية في الآخر): -shortest كان بيقفل FFmpeg بدري والرسم يقع بـ Broken pipe، فالصوت بيكمّل سكوت لآخر المدة
+                cmd += ["-map", f"{audio_in}:a?", "-af", "apad", "-c:a", "aac", "-b:a", "160k"]
             elif sfx_in is not None:
                 cmd += ["-map", f"{sfx_in}:a", "-c:a", "aac", "-b:a", "160k"]
         # سقف للحجم: الحبيبات بتخلّي الملف يكبر جدًا من غير حد
@@ -22140,7 +22141,11 @@ def run_typo_render(pid: str, base: str, quality: str) -> None:
                 shot = {"format": "png", "optimizeForSpeed": True} if inputs else {"format": "jpeg", "quality": 93, "optimizeForSpeed": True}
                 for i in range(n):
                     page.evaluate(f"renderAt({i / TYPO_FPS:.4f})")
-                    proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", shot)["data"]))
+                    try:
+                        proc.stdin.write(base64.b64decode(cdp.send("Page.captureScreenshot", shot)["data"]))
+                    except BrokenPipeError:   # FFmpeg وقف: السبب الحقيقي في رسالته، مش «Broken pipe»
+                        proc.kill()
+                        raise RuntimeError("FFmpeg: " + proc.stderr.read().decode(errors="ignore")[-600:] + " | " + " ".join(cmd)[-900:]) from None
                     if i % TYPO_FPS == 0:
                         typo_set(pid, step=f"🎬 جارٍ الرسم {i // TYPO_FPS} من {int(dur)} ثانية")
             finally:

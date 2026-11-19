@@ -497,7 +497,9 @@ STYLES = {
     "receipt": ("فاتورة", "the content printed like a long paper receipt or ticket on a solid background: monospaced-style Arabic text, dotted lines, totals, a barcode"),
 }
 STYLE_RULE = ("The references show an EXAMPLE brand («نادي الحركة», green and lime): never copy its name, its text, its photos or its colors. "
-              "Copy only the design system (layout, typography treatment, decoration, mood) and apply it to this brand's colors and content.")
+              "Copy only the design system (layout, typography treatment, decoration, mood) and apply it to this brand's colors and content. "
+              "If people appear: loose long modest clothing; any woman wears a hijab covering her hair, never tight leggings, fitted tops or "
+              "visible cleavage; men never shirtless.")
 
 
 def style_id(sid) -> str | None:

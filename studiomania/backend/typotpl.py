@@ -151,7 +151,7 @@ def stock_messages(tid: str, script: str, field_name: str) -> list[dict]:
                 "Write ONE simple shot that fits what the script says, in the same family as the reference (same kind of framing). "
                 "Simple subject only: hands, feet or legs, equipment, food, or ONE person seen from the side or from behind. "
                 "No faces, no text, no screens, no pouring liquids, no complex body movement, no mixed-gender scenes; if a woman appears she is alone "
-                "and in modest clothing with hijab. Empty background, softly blurred.\n"
+                "and in loose long modest clothing (no leggings, no tight or fitted clothes) with a hijab covering her hair. Men never shirtless. Empty background, softly blurred.\n"
                 'Answer: {"image": "english image prompt", "motion": "english camera/motion prompt"}')}]
 
 

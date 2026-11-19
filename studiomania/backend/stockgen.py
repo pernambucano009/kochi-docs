@@ -14,13 +14,19 @@
 """
 from __future__ import annotations
 
+# 🧕 قاعدة عامة في البرنامج (صاحب المشروع ١٩ نوفمبر): مجتمع عربي، فأي ست في صورة أو فيديو متولّد لبسها واسع ومحتشم وبحجاب،
+# من غير بنطلون ضيق ولا ليجنز ولا توب لازق ولا صدر باين، والرجالة من غير صدر عريان. بتتحط في كل برومت صور/فيديو بناس.
+MODESTY = ("Modesty for an Arab audience: any woman wears loose, long, non-transparent clothing (loose long sleeves, loose long pants or a long abaya-style dress) "
+           "and a hijab fully covering her hair and neck; never tight leggings, yoga pants, fitted or cropped tops, sports bras, visible cleavage or bare skin "
+           "beyond face and hands. Men wear a loose t-shirt and long shorts or pants, never shirtless.")
+
 PROMPT_RULES = (
     "Natural documentary stock footage look. Simple subject: hands, feet or legs, equipment, food, or people seen from the side or from behind. "
     "No close-up faces, no full bodies doing complex movement, no pouring water or liquids, no text, letters, screens, signs or logos in the scene. "
     "Side or back angle, shallow depth of field with a softly blurred background, soft natural light, muted realistic colors, slight film grain. "
     "Not hyper detailed, not 8k, not ultra sharp, not glossy. "
     "No mixed-gender scenes: never women among men, no women jumping or dancing. Prefer no people, or only hands/feet, or one person alone; "
-    "if women appear, only with other women and in modest clothing."
+    "if women appear, only with other women. " + MODESTY
 )
 
 # الفلتر على لقطة 1080×1920. البلور بيتحسب على المقاس: لقطة أصغر = sigma أصغر بنفس النسبة.
@@ -36,7 +42,8 @@ COVERS = ("endcard portalchat blurduo kinstack blurstrobe luxmix medallion quote
 SLOP_CHECK = (
     "These are frames from one AI-generated stock clip. Reject it if ANY frame shows: a deformed face or body, wrong hands or fingers, "
     "fake or garbled text, signs or screens, unnatural water or liquid physics, mannequin-like people, an obviously synthetic glossy look, "
-    "women mixed among men, women jumping or dancing, or immodest clothing. "
+    "women mixed among men, women jumping or dancing, or immodest clothing: a woman in tight or form-fitting clothes (leggings, yoga pants, "
+    "fitted or cropped top, sports bra), visible cleavage, uncovered hair, or a shirtless man. "
     'Answer JSON only: {"ok": true|false, "problem": "short english reason, empty if ok"}'
 )
 
