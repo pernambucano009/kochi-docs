@@ -539,6 +539,38 @@ with closing(db()) as _conn, _conn:
 auth = Auth(DB_PATH, DATA_DIR)
 app = FastAPI(title="StudioMania")
 import issues  # noqa: E402  (🚨 صندوق الأخطاء: أي خطأ أو شغل فشل/وقف بيتسجل لوحده)
+
+
+def issue_diagnose(iid: str, kind: str, path: str, message: str, raw: str, status: int) -> None:
+    """🤖 تشخيص آلي لخطأ جديد: الموديل بيقرا الرسالة والـ Traceback والكود حوالين السطر اللي وقع فيه، ويكتب السبب والإصلاح بالعربي.
+    تشخيص بس: مابيعدّلش كود ولا بيدفع حاجة."""
+    try:
+        ctx = []
+        for fn, ln in re.findall(r'File "[^"]*/backend/(\w+\.py)", line (\d+)', raw)[-2:]:
+            try:
+                lines = (Path(__file__).resolve().parent / fn).read_text("utf-8").splitlines()
+                n = int(ln)
+                ctx.append(f"--- {fn}:{n}\n" + "\n".join(f"{i + 1}: {lines[i]}" for i in range(max(0, n - 15), min(len(lines), n + 6))))
+            except (OSError, ValueError):
+                continue
+        prompt = ("You diagnose an error from a production web app (Python FastAPI backend, vanilla JS frontend) that makes social media videos for businesses. "
+                  "Customer-facing messages are softened; the real cause may be hidden in the raw text. Common causes: an AI provider out of balance, "
+                  "a provider outage or timeout, a malformed AI reply, a code bug.\n"
+                  f"Kind: {kind}\nPath: {path}\nHTTP status: {status}\nMessage: {message}\nRaw/traceback:\n{raw[-3000:]}\n"
+                  + ("Code around the failing lines:\n" + "\n".join(ctx) if ctx else "")
+                  + '\nAnswer JSON only: {"cause": "one or two Arabic sentences: the real cause, specific", '
+                  '"fix": "Arabic: what the owner should do now, and if it is a code bug the exact file:line and the change"}')
+        out = atlas.chat([{"role": "user", "content": prompt}], qa.settings(PLATFORM_DIR).get("review_model") or "anthropic/claude-sonnet-5",
+                         temperature=0.2, max_tokens=700, json_mode=True, timeout=90)
+        m = re.search(r"\{.*\}", out or "", re.S)
+        v = json.loads(m.group(0)) if m else {}
+        if v.get("cause"):
+            issues.set_ai(iid, str(v["cause"]), str(v.get("fix") or ""))
+    except Exception:  # noqa: BLE001  (التشخيص نفسه مايكسرش حاجة)
+        pass
+
+
+issues.ON_NEW = issue_diagnose
 app.add_middleware(issues.Middleware)
 
 

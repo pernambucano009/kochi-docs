@@ -23,7 +23,10 @@ _LOCK = threading.Lock()
 _SEEN: dict[str, float] = {}      # (بصمة + رقم الشغل) ← أول مرة: المتابعة كل ثانيتين ماتعدّش نفس الفشل ١٠٠ مرة
 _WORKING: dict[str, float] = {}   # شغل حالته «شغّال» ← أول مرة شفناه
 STUCK_MIN = float(os.environ.get("ISSUE_STUCK_MIN") or 45)
-SKIP_STATUS = {401}               # «سجّل الدخول» مش خطأ في البرنامج
+SKIP_STATUS = {401}
+# 🤖 التشخيص الآلي: البرنامج بيسجّل دالة هنا (app.py)، وكل خطأ جديد سببه مش معروف أو خطأ كود بيتبعتله في الخلفية
+ON_NEW = None
+AI_DAY: dict[str, int] = {}       # حد يومي عشان خطأ بيتكرر بأشكال كتير مايصرفش رصيد               # «سجّل الدخول» مش خطأ في البرنامج
 
 
 def db_path() -> Path:
@@ -114,6 +117,7 @@ def record(kind: str, path: str, message: str, raw: str = "", status: int = 0, u
                     _SEEN.pop(x, None)
         cause, fix = explain(message, raw, status, kind)
         now = time.time()
+        new = False
         with _LOCK, closing(_db()) as c, c:
             r = c.execute("SELECT users, workspaces FROM issues WHERE id=?", (fp,)).fetchone()
             if r:
@@ -125,10 +129,24 @@ def record(kind: str, path: str, message: str, raw: str = "", status: int = 0, u
                              screen=COALESCE(NULLIF(?, ''), screen) WHERE id=?""",
                           (now, str(raw)[:4000], json.dumps(sorted(us)[:50]), json.dumps(sorted(ws)[:50]), screen, fp))
             else:
+                new = True
                 c.execute("""INSERT INTO issues (id, kind, path, status, message, raw, cause, fix, screen, users, workspaces, first_at, last_at)
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                           (fp, kind, np_, status, str(message)[:1000], str(raw)[:4000], cause, fix, screen,
                            json.dumps([user] if user else []), json.dumps([TENANT]), now, now))
+        day = time.strftime("%Y-%m-%d")
+        if new and ON_NEW and kind != "i18n" and (cause.startswith("غير معروف") or "كود البرنامج" in cause) and AI_DAY.get(day, 0) < 30:
+            AI_DAY[day] = AI_DAY.get(day, 0) + 1
+            threading.Thread(target=ON_NEW, args=(fp, kind, np_, str(message)[:1000], str(raw)[:4000], status), daemon=True).start()
+    except Exception:   # noqa: BLE001
+        pass
+
+
+def set_ai(iid: str, cause: str, fix: str) -> None:
+    """التشخيص الآلي بيحل محل السبب والإصلاح العامّين."""
+    try:
+        with _LOCK, closing(_db()) as c, c:
+            c.execute("UPDATE issues SET cause=?, fix=? WHERE id=?", (("🤖 " + cause)[:800], fix[:1500], iid))
     except Exception:   # noqa: BLE001
         pass
 
