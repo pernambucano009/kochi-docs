@@ -277,11 +277,11 @@ const PilotPage = (() => {
   }
   // 🛫 أنواع المنشورات بالترتيب، ولكل نوع خطواته. الخطوة اللي ليها مفتاح (idea…) تقبل الدايرة الزرقا (توقف لحد موافقتك)
   const TYPES = [
-    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
-    { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["", "النشر"]] },
-    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "photo", n: "صور", soon: true },
-    { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["", "النشر"]] },
+    { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
   ];
   const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
   const typeOn = (t) => (t.id === "tpl" ? S.d.settings.templates.includes("tpl:auto") || tplIds().length > 0 : S.d.settings.templates.includes(t.id));
@@ -301,7 +301,8 @@ const PilotPage = (() => {
       const on = new Set(sb[t.kind] || []);
       const chips = t.steps.map(([k, n]) => {
         if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
-        if (k === "@style") return `<button type="button" class="ap-stp pick" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : "<small>تلقائي</small>"} ▾</button>`;
+        // الستايل: «تلقائي» لما مفيش ستايل متعلّم عليه والقايمة مقفولة. وهي مفتوحة الكلمة بتختفي (هتختار)، ولو قفلتها من غير اختيار بترجع
+        if (k === "@style") return `<button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
       }).join('<i class="ar" aria-hidden="true">←</i>');
       return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b><div class="ap-chain">${chips}</div></div>`;
@@ -347,6 +348,10 @@ const PilotPage = (() => {
     } else if (j.status === "wait" && j.gate === "video") {
       body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : ""}
         <div class="ap-acts">${j.project_id ? `<button type="button" data-edit="${esc(j.project_id)}">عدّل في المونتاج</button>` : ""}<button type="button" class="ok" data-ok="${esc(j.id)}">موافق، جدوِله</button></div>`;
+    } else if (j.status === "wait" && j.gate === "publish") {   // 🔵 موافقة على النشر: الفيديو والكابشن والموعد
+      body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : imgs(j)}
+        ${j.caption ? `<p class="ap-say">${esc(j.caption)}</p>` : ""}
+        <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">يُنشر ${esc(when(j.at))}</span><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، انشره في موعده</button></div>`;
     } else if (j.unposted) {   // مفيش حسابات مربوطة: الفيديو جاهز للمشاهدة من غير جدولة
       body = `${j.video_url ? `<video src="${esc(j.video_url)}" controls playsinline preload="metadata"></video>` : imgs(j)}
         <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">اربط حسابات النشر لكي يُجدول ما بعده</span></div>`;
@@ -456,7 +461,7 @@ const PilotPage = (() => {
         if (d.type === "carousel" && set.has("carousel") && carStyles().length && !(s.car_styles || []).length) S.pop = "style";
         return save({ templates: [...set] });
       }
-      if (d.open) { S.pop = S.pop === d.open ? null : d.open; return drawPop(); }
+      if (d.open) { S.pop = S.pop === d.open ? null : d.open; return drawFlow(); }
       if ("popx" in d) { S.pop = null; return drawPop(); }
       if ("carpage" in d) return showStep("8");
       if (d.tplc) {
@@ -466,7 +471,6 @@ const PilotPage = (() => {
       }
       if (d.styc) {
         const set = new Set(s.car_styles || []);
-        if (set.has(d.styc) && set.size === 1) return toast("اختر ستايلًا واحدًا على الأقل");
         set.has(d.styc) ? set.delete(d.styc) : set.add(d.styc);
         return save({ car_styles: [...set] });
       }

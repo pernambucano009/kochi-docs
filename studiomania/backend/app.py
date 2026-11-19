@@ -34374,7 +34374,7 @@ def scene_take_delete(sid: str, tid: str):
 # لو العميل اختار «أوافق على كل خطوة» المهمة بتقف عند الخطوة دي لحد ما يوافق. قالب الموبايل بيستنى العميل يصوّر.
 PILOT_FILE = DATA_DIR / "pilot.json"
 PILOT_LOCK, PILOT_TICK = threading.Lock(), threading.Lock()
-PILOT_STEPS = ("idea", "script", "montage", "video")
+PILOT_STEPS = ("idea", "script", "montage", "video", "publish")   # publish: يوافق على الكابشن والموعد قبل ما يتجدول
 PILOT_BEST = {1: ["19:00"], 2: ["13:00", "20:00"], 3: ["12:00", "17:00", "21:00"], 4: ["09:00", "13:00", "18:00", "21:30"],
               5: ["09:00", "12:00", "15:00", "18:00", "21:30"], 6: ["08:00", "11:00", "13:30", "16:30", "19:00", "22:00"]}
 PILOT_DEFAULTS = {"on": False, "per_day": 2, "times": [{"t": t, "mine": False} for t in PILOT_BEST[2]], "tz": 180, "templates": [],
@@ -34990,6 +34990,8 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             publisher.resolve_targets(["instagram"] if kind == "carousel" else plats0)
         except publisher.PublishError:
             return put(status="done", phase="done", gate=None, unposted=True, note="جاهز. اربط حسابات النشر لكي يُجدول")
+        if gate("publish", "جاهز للنشر: راجع الكابشن والموعد، ووافق لكي يُجدول"):   # 🔵 موافقة على النشر نفسه
+            return
         if not j.get("fee_paid"):   # الرسم مرة واحدة على البوست، قبل ما يتجدول
             wallet.need(pilot_fee(), "رسم الأوتوبايلوت")
             wallet.charge(pilot_fee(), f"الأوتوبايلوت: تجهيز وجدولة «{j['name']}»", jid)
