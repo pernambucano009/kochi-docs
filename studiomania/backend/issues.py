@@ -204,6 +204,23 @@ def soften(x, depth: int = 0):
     return x, False
 
 
+def _tech_msgs(x, depth: int = 0) -> list[str]:
+    """رسايل الخطأ التقنية اللي soften هيبدّلها."""
+    out: list[str] = []
+    if depth > 8:
+        return out
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k in ERR_KEYS and isinstance(v, str) and technical(v):
+                out.append(v)
+            elif isinstance(v, (dict, list)):
+                out += _tech_msgs(v, depth + 1)
+    elif isinstance(x, list):
+        for v in x[:200]:
+            out += _tech_msgs(v, depth + 1)
+    return out
+
+
 class Middleware:
     """ASGI خام: بيبص على ردود /api/ (من غير ما يلمس الستريم والفيديو) ويسجّل الأخطاء والشغل الفاشل أو المتعطّل."""
 
@@ -244,9 +261,12 @@ class Middleware:
                     if state["start"] is not None:
                         body = bytes(state["buf"])
                         try:
-                            new, changed = soften(json.loads(body or b"null"))
+                            old = json.loads(body or b"null")
+                            new, changed = soften(old)
                             if changed:
                                 body = json.dumps(new, ensure_ascii=False).encode()
+                                for m in _tech_msgs(old)[:3]:   # الأصل اللي اتخبّى عن العميل لازم يوصل الصندوق
+                                    record("api", f"{scope.get('method')} {path}", m[:300], m[:2000], state["status"], user, ref=path)   # المتابعة كل ثانيتين: مرة واحدة
                         except ValueError:
                             pass
                         start = state["start"]
