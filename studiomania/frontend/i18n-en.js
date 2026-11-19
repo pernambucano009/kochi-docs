@@ -9945,6 +9945,8 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "صور عناصر من مجال العلامة، رابط في كل سطر: كل بطاقة منشور تأخذ عنصرًا مختلفًا، والمطر في النهاية يتساقط بها بدل الرمز.": "Element images from the brand's field, one link per line: each post card takes a different element, and the final rain falls with them instead of the symbol.",
+  "شعار العلامة بلا خلفية: يُقص بالورق الأحمر مكان الوردة في البداية، ومفرّغًا داخل الدائرة في النهاية.": "The brand logo without a background: cut in red paper in place of the rose at the start, and hollowed inside the circle at the end.",
   "تأخر": "Timed out",
   "الفيديو غير موجود بعد الرسم": "The video is missing after rendering",
   "إرجاع الرصيد المؤقت لدفعة اختبار القوالب": "Returning the temporary balance of the template test batch",
