@@ -3928,8 +3928,19 @@ class ConnectIn(BaseModel):
     platform: str
 
 
+def public_base(request: Request) -> str:
+    """🌐 عنوان الموقع زي ما العميل شايفه (simsimkit.com): النسخة شغالة ورا البوابة على 127.0.0.1، فـ base_url كان بيرجّع العنوان الداخلي،
+    وروابط الرجوع بعد ربط الحسابات كانت بتفتح «127.0.0.1 refused to connect» (صاحب المشروع ١٩ نوفمبر). البوابة بتبعت العنوان الحقيقي في x-forwarded-host."""
+    host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip() or request.url.scheme
+    if host and not host.startswith(("127.0.0.1", "localhost")):
+        return f"{'http' if proto == 'http' and ':' in host else 'https'}://{host}"   # الدومين الحقيقي دايمًا https (Caddy)
+    pub = (os.environ.get("PUBLIC_URL") or "").rstrip("/")
+    return pub or str(request.base_url).rstrip("/")
+
+
 def pub_back(request: Request) -> str:
-    return str(request.base_url).rstrip("/") + "/#7"
+    return public_base(request) + "/#7"
 
 
 def pub_ready() -> None:
@@ -6293,7 +6304,7 @@ def ads_connect(body: AdsConnectIn, request: Request):
     rivals_client()
     ads_call(adsmgr.ready)
     acc = body.account_id or next((a["id"] for a in ads_social() if a["platform"] == body.platform), "")
-    r = ads_call(adsmgr.connect, body.platform, acc, str(request.base_url).rstrip("/") + "/#adsmgr")
+    r = ads_call(adsmgr.connect, body.platform, acc, public_base(request) + "/#adsmgr")
     return r if r.get("url") else ads_get()
 
 
