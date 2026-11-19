@@ -83,8 +83,25 @@ def file_for(folder: Path, src: Path, style: str) -> Path:
     return folder / f"logost-{style}-{src.stem}.png"
 
 
+def logo_luma(logo: Path) -> float:
+    """متوسط إضاءة الشعار (الأجزاء الظاهرة بس)، من ٠ (غامق) لـ ١ (فاتح)."""
+    from PIL import Image
+    try:
+        with Image.open(logo) as im:
+            im = im.convert("RGBA")
+            im.thumbnail((128, 128))
+            px = [p for p in im.getdata() if p[3] > 128]
+    except OSError:
+        return 0.3
+    if not px:
+        return 0.3
+    return sum(0.2126 * r + 0.7152 * g + 0.0722 * b for r, g, b, _ in px) / len(px) / 255
+
+
 def stamp(clip: Path, logo: Path, ffmpeg: str, secs: float = 2.0) -> bool:
-    """يلزق كارت القفلة في آخر الفيديو (بدّل نفس الملف). يرجع False لو فشل (والفيديو يفضل زي ما هو)."""
+    """🏷️ قفلة الشعار الموحّدة لكل القوالب (قرار صاحب المشروع ١٩ نوفمبر): آخر فريم بيثبت وبيتبلّر جامد ويتفتّح (يمسح كل اللي في الشاشة)،
+    والشعار من غير خلفية بيظهر فوقه. لو الشعار فاتح: الخلفية بتغمق بدل ما تتفتّح، عشان الشعار مايتوهش عليها.
+    بدّل نفس الملف. يرجع False لو فشل (والفيديو يفضل زي ما هو)."""
     tmp_last, out = clip.with_name("stamp-last.png"), clip.with_name("stamp-out.mp4")
     try:
         probe = subprocess.run([ffmpeg, "-hide_banner", "-i", str(clip)], capture_output=True, text=True, timeout=60).stderr
@@ -99,7 +116,9 @@ def stamp(clip: Path, logo: Path, ffmpeg: str, secs: float = 2.0) -> bool:
                        check=True, capture_output=True, timeout=60)
         fade, lw, lh = 0.4, int(w * 0.6), int(h * 0.32)
         off = max(0.0, dur - fade)
-        fc = (f"[1:v]scale={w}:{h},setsar=1,boxblur=24:2,eq=brightness=0.28:saturation=0.5,fps=30,format=yuv420p[bg];"
+        light = logo_luma(logo) > 0.62
+        grade = "eq=brightness=-0.32:saturation=0.45" if light else "eq=brightness=0.28:saturation=0.5"
+        fc = (f"[1:v]scale={w}:{h},setsar=1,boxblur=40:3,{grade},fps=30,format=yuv420p[bg];"
               f"[2:v]scale={lw}:{lh}:force_original_aspect_ratio=decrease,format=rgba,fade=t=in:st=0.3:d=0.5:alpha=1[lg];"
               f"[bg][lg]overlay=x=(W-w)/2:y='(H-h)/2+50*max(0,1-(t-0.3)/0.6)':eval=frame,format=yuv420p,settb=AVTB[end];"
               f"[0:v]fps=30,scale={w}:{h},setsar=1,format=yuv420p,settb=AVTB[main];"

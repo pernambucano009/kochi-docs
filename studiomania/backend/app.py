@@ -22340,8 +22340,8 @@ def tytpl_finish(pid: str, tid: str, sp: dict, words: list, dur: float, bg: dict
 
 
 def typo_logo_end(pid: str, tid: str) -> None:
-    """🏷️ آخر الفيديو بشعار العميل (نسخته بستايل القالب لو اترسمت، وإلا الأصلي): آخر فريم بيثبت ويغمق، والشعار بيظهر عليه.
-    الشعار الأصلي على كارت فاتح عشان يبان على الغامق، ونسخة الخطوط الرفيعة بتتقلب أبيض على الأسود."""
+    """🏷️ آخر فيديو التايبوجرافي بنفس قفلة قوالب الموشن (logostamp.stamp): آخر فريم بيتبلّر ويتفتّح، والشعار من غير خلفية فوقه.
+    نسخة الخطوط الرفيعة بتتقلب أبيض (الخطوط سودا)."""
     d = typo_load(pid)
     bid = d.get("client_id")
     if not d.get("final") or atlas.mock_mode():
@@ -22352,35 +22352,16 @@ def typo_logo_end(pid: str, tid: str) -> None:
     folder = TYPO_PROJ / pid
     src = folder / d["final"]
     try:
-        from PIL import Image as _PImg, ImageDraw as _PDraw, ImageOps as _POps
-        info = media_info(src)
-        W, H, dur = info.width or 1080, info.height or 1920, info.duration or probe_duration(src)
         styled = logo.name != (logo_path(bid) or Path()).name
-        card = _PImg.new("RGBA", (W, H), (0, 0, 0, 0))
-        with _PImg.open(logo) as im:
-            lg = im.convert("RGBA")
         if styled and tid == "hairline":   # خطوط سودا ← بيضا (الشفافية زي ما هي)
-            r, g, b, a = lg.split()
-            lg = _PImg.merge("RGBA", (*_POps.invert(_PImg.merge("RGB", (r, g, b))).split(), a))
-        lg.thumbnail((int(W * 0.46), int(H * 0.22)))
-        x, y = (W - lg.width) // 2, (H - lg.height) // 2
-        if not (styled and tid == "hairline"):
-            pad = int(W * 0.06)
-            _PDraw.Draw(card).rounded_rectangle((x - pad, y - pad, x + lg.width + pad, y + lg.height + pad), radius=int(W * 0.04), fill=(255, 255, 255, 240))
-        card.alpha_composite(lg, (x, y))
-        cf = folder / ".logo_end.png"
-        card.save(cf)
-        out = folder / f"typo-{uuid.uuid4().hex[:4]}.mp4"
-        T = 1.6
-        fl = (f"[0:v]tpad=stop_mode=clone:stop_duration={T},eq=brightness=-0.18:enable='gte(t,{dur:.3f})'[bg];"
-              f"[1:v]format=rgba,fade=in:st={dur:.3f}:d=0.45:alpha=1[lg];[bg][lg]overlay=0:0:enable='gte(t,{dur:.3f})',format=yuv420p[v];"
-              f"[0:a]apad=pad_dur={T}[a]")
-        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-loop", "1", "-t", f"{dur + T:.3f}", "-i", str(cf),
-                        "-filter_complex", fl, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
-                        "-t", f"{dur + T:.3f}", "-movflags", "+faststart", str(out)], check=True, capture_output=True, timeout=600)
-        cf.unlink(missing_ok=True)
-        src.unlink(missing_ok=True)
-        typo_update(pid, lambda x: x.update(final=out.name))
+            from PIL import Image as _PImg, ImageOps as _POps
+            with _PImg.open(logo) as im:
+                r, g, b, a = im.convert("RGBA").split()
+            inv = folder / ".logo_inv.png"
+            _PImg.merge("RGBA", (*_POps.invert(_PImg.merge("RGB", (r, g, b))).split(), a)).save(inv)
+            logo = inv
+        logostamp.stamp(src, logo, ffmpeg_exe())
+        (folder / ".logo_inv.png").unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001 — من غير الشعار، الفيديو زي ما هو
         print(f"[typo-logo] {pid}: {exc}", flush=True)
 
@@ -26158,7 +26139,9 @@ def logo_stamp_for(bid: str | None, mid: str) -> Path | None:
         return None
     style = logostamp.style_of(mid, EL_DIR / "fitness" / "index.json")
     if style and style not in ((brain_row(bid) or {}).get("logo_styles_off") or []):   # الـ٨ بيترسموا لو ناقصين، والباقي لو العميل طلبه بس
-        return logo_styled(bid, style, make=style in logostamp.STYLES) or logo_path(bid)
+        f = logo_styled(bid, style, make=style in logostamp.STYLES)
+        if f and not logostamp.edges_opaque(f):   # 🏷️ الشعار في القفلة دايمًا من غير خلفية (قرار صاحب المشروع)
+            return f
     return logo_path(bid)
 
 
