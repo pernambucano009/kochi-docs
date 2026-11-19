@@ -3179,6 +3179,21 @@ def batch_list(request: Request):
     return out
 
 
+@app.get("/api/platform/issues/batch")
+def batch_feed(request: Request):
+    """🧪 حالة الدفعات لجلسة كلود المتابعة (بمفتاح المتابعة): القالب، والحالة، والخطأ، ونسخة البرنامج."""
+    feed_ok(request)
+    out = []
+    for f in sorted(BATCH_DIR.glob("*/run.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:3]:
+        try:
+            run = json.loads(f.read_text("utf-8"))
+        except (OSError, ValueError):
+            continue
+        out.append({"id": run.get("id"), "done": run.get("done"), "logos": run.get("logos"), "updated": f.stat().st_mtime,
+                    "items": [{k: it.get(k) for k in ("tid", "status", "error", "secs", "idea")} for it in run.get("items") or []]})
+    return {"release": (os.environ.get("BUILD_SHA") or "")[:7], "now": time.time(), "runs": out, "requests": [r.get("id") for r in batch_requests()]}
+
+
 @app.get("/api/platform/batch/{rid}/{name}")
 def batch_file(rid: str, name: str, request: Request):
     admin(request)
