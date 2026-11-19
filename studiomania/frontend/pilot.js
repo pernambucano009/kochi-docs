@@ -83,6 +83,7 @@ const PilotPage = (() => {
 #nh .ap-chain .ar { font-style: normal; color: var(--nh-muted); font-size: 13px; }
 #nh .ap-stp { position: relative; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ap-field); font-size: 12.5px; color: var(--nh-ink); display: inline-flex; align-items: center; gap: 4px; }
 #nh .ap-stp.fixed { color: var(--ap-sub); cursor: default; }
+#nh .ap-stp.off { color: var(--ap-sub); opacity: .45; cursor: not-allowed; }
 #nh .ap-stp.dot::after { content: ""; position: absolute; top: -3px; inset-inline-end: -3px; width: 12px; height: 12px; border-radius: 50%; background: #2F7BF6; box-shadow: 0 0 0 2px var(--ap-card); }
 #nh .ap-stp.pick { background: var(--ap-soft); color: var(--ap-acc-ink, #A93A17); }
 #nh .ap-stp small { font-size: 11px; opacity: .8; }
@@ -303,6 +304,8 @@ const PilotPage = (() => {
         if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
         // الستايل: «تلقائي» لما مفيش ستايل متعلّم عليه والقايمة مقفولة. وهي مفتوحة الكلمة بتختفي (هتختار)، ولو قفلتها من غير اختيار بترجع
         if (k === "@style") return `<button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>`;
+        // 🔗 النشر من غير حسابات مربوطة: رمادي، والضغط عليه بيقول يربط حساب
+        if (k === "publish" && S.d.linked === false) return `<button type="button" class="ap-stp off" data-needlink title="اربط حساب سوشيال ميديا واحدًا على الأقل">${esc(n)}</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
       }).join('<i class="ar" aria-hidden="true">←</i>');
       return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b><div class="ap-chain">${chips}</div></div>`;
@@ -461,6 +464,7 @@ const PilotPage = (() => {
         if (d.type === "carousel" && set.has("carousel") && carStyles().length && !(s.car_styles || []).length) S.pop = "style";
         return save({ templates: [...set] });
       }
+      if (b.hasAttribute("data-needlink")) return toast("لكي تكمل إلى خطوة النشر، اربط حساب سوشيال ميديا واحدًا على الأقل من صفحة «النشر».");
       if (d.open) { S.pop = S.pop === d.open ? null : d.open; return drawFlow(); }
       if ("popx" in d) { S.pop = null; return drawPop(); }
       if ("carpage" in d) return showStep("8");

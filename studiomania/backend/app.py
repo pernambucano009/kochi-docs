@@ -35269,7 +35269,15 @@ def pilot_state() -> dict:
     twins = [{"id": t["id"], "name": t.get("name") or "", "ready": bool(t["ready"]["video"] or t["ready"]["photo"])} for t in twins_list()]
     upcoming = [a.isoformat(timespec="minutes") for a in pilot_slots(s, datetime.now(timezone.utc), 48)][:12]
     return {"settings": s, "jobs": jobs, "custom": custom, "twins": twins, "best": PILOT_BEST, "upcoming": upcoming,
-            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam")), "fee": pilot_fee()}
+            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam")), "fee": pilot_fee(), "linked": pilot_linked()}
+
+
+def pilot_linked() -> bool:
+    """فيه حساب سوشيال واحد على الأقل مربوط؟ (من غيره خطوة «النشر» في الأوتوبايلوت رمادي ومابتتعلّمش)"""
+    try:
+        return bool(publisher.accounts() if publisher.service_name() == "zernio" else True)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 class PilotIn(BaseModel):

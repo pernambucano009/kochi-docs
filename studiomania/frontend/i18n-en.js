@@ -9945,6 +9945,8 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "اربط حساب سوشيال ميديا واحدًا على الأقل": "Link at least one social media account",
+  "لكي تكمل إلى خطوة النشر، اربط حساب سوشيال ميديا واحدًا على الأقل من صفحة «النشر».": "To continue to the publish step, link at least one social media account from the Publish page.",
   "جاهز للنشر: راجع الكابشن والموعد، ووافق لكي يُجدول": "Ready to publish: check the caption and time, then approve to schedule it",
   "يُنشر {0}": "Publishes {0}",
   "موافق، انشره في موعده": "Approve, publish on time",
