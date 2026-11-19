@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "يسجّل الصوت ويحرّك الكلام ويصنع الفيديو…": "Recording the voice, animating the words and making the video…",
   "لا يوجد اشتراك يمكن تغييره": "There is no subscription to change",
   "اختر باقة أقل من باقتك": "Choose a plan lower than yours",
   "فيديو وأنت تقرأ النص": "A video of you reading the script",

@@ -25012,6 +25012,21 @@ def flow_to_dict(fid: str, d: dict) -> dict:
                 out["stage"] = "done"
         else:
             out["output"] = {**o, "progress": job.get("progress", 0)}
+    if o.get("kind") == "typo" and o.get("id") and o.get("status") != "failed":   # 🔤 التايبوجرافي: الفيديو بيظهر هنا لما يخلص
+        try:
+            t = typo_load(o["id"])
+        except HTTPException:
+            t = {}
+        fin = TYPO_PROJ / Path(str(o["id"])).name / str(t.get("final") or "_")
+        if t.get("status") == "failed":
+            out["output"] = {**o, "status": "failed", "error": t.get("error")}
+        elif t.get("final") and fin.is_file() and t.get("status") not in TYPO_BUSY:
+            out["output"] = {**o, "status": "done", "video_url": f"/media/typo/projects/{o['id']}/{t['final']}?v={int(fin.stat().st_mtime)}"}
+            if o.get("status") != "done":
+                flow_update(fid, lambda x: x.update(output={**o, "status": "done"}, stage="done"))
+                out["stage"] = "done"
+        elif o.get("status") == "working":
+            out["output"] = {**o, "step": t.get("step")}
     if (out.get("output") or {}).get("asset"):
         aid = out["output"]["asset"]
         out["output"]["video_url"] = f"/media/assets/{aid}/clip.mp4"
@@ -27949,7 +27964,7 @@ def flow_generate(fid: str, body: FlowGoIn):
         flow_job(fid, "generate", run_motion)
     elif tpl["kind"] == "typo":
         pid = tytpl_start(fid)
-        flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": pid, "status": "done"}, stage="done"))
+        flow_update(fid, lambda x: x.update(output={"kind": "typo", "id": pid, "status": "working"}))
     elif tpl["kind"] == "typo":
         script = " ".join(str(b.get("say") or b.get("text") or "") for b in sc.get("beats") or []).strip() or sc.get("summary", "")
         r = typo_new(TypoNewIn(name=f"🧭 {title}"[:100], text=script))
@@ -31496,6 +31511,12 @@ def flow_to_montage(fid: str):
             if conn.execute("SELECT 1 FROM projects WHERE id = ?", (pid,)).fetchone():
                 return {"project_id": pid}
     o = flow_to_dict(fid, d).get("output") or {}
+    if o.get("kind") == "typo":
+        if o.get("status") != "done":
+            raise HTTPException(400, "الفيديو لم يُرسم بعد")
+        r = typo_to_editor(o["id"])
+        flow_update(fid, lambda x: x.update(montage={"project_id": r["project_id"]}))
+        return r
     src = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
     if o.get("status") != "done" or not src.is_file():
         raise HTTPException(400, "الفيديو لم يُرسم بعد")
@@ -31624,6 +31645,9 @@ def flow_to_publish(fid: str):
             return {"export_id": r["export_id"]}
     o = flow_to_dict(fid, d).get("output") or {}
     src = ASSETS_DIR / Path(str(o.get("asset") or "_")).name / "clip.mp4"
+    if o.get("kind") == "typo":
+        src = TYPO_PROJ / Path(str(o.get("id"))).name / str(typo_load(o["id"]).get("final") or "_")
+        o = {**o, "asset": f"typo-{o.get('id')}"}
     if o.get("status") != "done" or not src.is_file():
         raise HTTPException(400, "الفيديو لم يُرسم بعد")
     if d.get("export_id") and (EXPORTS_DIR / f"pilot_{d['export_id']}.mp4").exists() and d.get("export_src") == o.get("asset"):

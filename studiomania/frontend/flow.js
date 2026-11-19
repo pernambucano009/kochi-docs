@@ -682,15 +682,15 @@ const Flow = (() => {
     const pct = o.progress ? ` ${Math.round(o.progress * 100)}٪` : "";
     const rated = (d.ratings || {})["output:final"];
     return `<h2>${isWork ? "جارٍ التوليد…" : o.status === "failed" ? "توقف التوليد" : "اكتمل! 🎉"}</h2>
-      ${isWork ? working(`العقل يبني ${OUT[o.kind] ? `في ${OUT[o.kind]}` : "المنشور"}${pct}`) : ""}
+      ${isWork ? working(o.kind === "typo" ? "يسجّل الصوت ويحرّك الكلام ويصنع الفيديو…" : `العقل يبني ${OUT[o.kind] ? `في ${OUT[o.kind]}` : "المنشور"}${pct}`) : ""}
       ${!isWork && o.status === "failed" ? `<div class="flw-empty">
         <p>توقّف صنع الفيديو قبل أن يكتمل. اضغط «أعد المحاولة» ليُكمل من حيث توقّف، فالعناصر التي رُسمت محفوظة ولن تُحتسب مرة أخرى.</p>
-        <div class="flw-acts"><button type="button" class="flw-btn pri big" data-export>🔁 أعد المحاولة</button></div></div>` : d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
+        <div class="flw-acts"><button type="button" class="flw-btn pri big" ${o.kind === "typo" ? "data-gen" : "data-export"}>🔁 أعد المحاولة</button></div></div>` : d.error ? `<div class="flw-empty bad">⚠️ ${esc(d.error)}</div>` : ""}
       ${o.video_url ? `<video class="flw-out" src="${esc(o.video_url)}" controls playsinline autoplay loop></video>` : ""}
       ${!isWork && o.points > 0 ? `<p class="flw-sub muted">🪙 استُهلك لصناعة هذا الفيديو ${Number(o.points).toLocaleString("en-US")} نقطة (رسم العناصر والإخراج).</p>` : ""}
       ${!isWork && o.video_url && d.qa ? qaBox(d.qa) : ""}
       ${!isWork && o.kind && o.status !== "failed" ? `<div class="flw-done">
-        ${o.kind !== "motion" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "أُنشئ الكاروسيل بالشرائح والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
+        ${o.kind !== "motion" && o.kind !== "typo" ? `<p>${o.kind === "tvideo" ? "الفيديو جُهّز في قسم القوالب بالسيناريو والتوجيهات الخاصة بك، أكمل هناك (الصوت والستوري بورد والتوليد)." : o.kind === "series" ? `المسلسل أُنشئ بـ ${(o.episodes || []).length} حلقات والنص جاهز في كل حلقة.` : o.kind === "carousel" ? "أُنشئ الكاروسيل بالشرائح والنص." : "الفيديو جُهّز في التايبوجرافي."}</p>
           <button type="button" class="flw-btn pri big" data-openout>افتح في ${OUT[o.kind]} →</button>` : o.video_url ? `<button type="button" class="flw-btn pri big" data-tomont>✂️ افتح في المونتاج وعدّل</button><button type="button" class="flw-btn" data-topub>📤 انشره كما هو</button><a class="flw-btn" href="${esc(o.video_url)}" download>⬇️ نزّل</a>` : ""}
         <div class="flw-final"><b>هل أعجبك الناتج؟</b> ${rateBtns("output", "")}<small class="muted">${rated ? "سُجّل في العقل ✓" : "تقييمك يعلّم العقل ذوقك"}</small></div>
         ${rated === -1 ? `<div class="flw-chatrow"><input id="flwWhy" placeholder="ما الذي لم يعجبك؟ (سيتذكره العقل)"><button type="button" class="flw-btn" data-why-send>سجّل</button></div>` : ""}
