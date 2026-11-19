@@ -35,6 +35,7 @@ const PilotPage = (() => {
 #nh .ap-day .hr { position: absolute; top: 32px; translate: -50% 0; font: 300 10px var(--nh-latin); color: var(--nh-muted); }
 #nh .ap-day .pt { position: absolute; top: 13px; translate: -50% 0; width: 20px; height: 20px; border-radius: 50%; background: var(--nh-accent); box-shadow: 0 0 0 4px var(--ap-card), 0 6px 14px rgba(229, 97, 62, .35); cursor: grab; }
 #nh .ap-day .pt b { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; font: 400 11.5px var(--nh-latin); white-space: nowrap; direction: rtl; unicode-bidi: isolate; }
+#nh .ap-day.rtl .hr, #nh .ap-day.rtl .pt { translate: 50% 0; }
 #nh .ap-day .pt.mine { background: var(--nh-ink); box-shadow: 0 0 0 4px var(--ap-card); }
 #nh .ap-leg { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 11.5px; color: var(--nh-muted); }
 #nh .ap-leg i { display: inline-block; width: 18px; height: 8px; border-radius: 8px; background: var(--ap-soft); margin-inline-end: 6px; vertical-align: middle; }
@@ -240,11 +241,15 @@ const PilotPage = (() => {
     q("[data-on]").classList.toggle("on", !!s.on);
     q("[data-st]").textContent = !s.on ? "مغلق" : !s.templates.length ? "يعمل · اختر نوعًا واحدًا على الأقل" : `يعمل${nx ? ` · القادم ${when(nx)}` : ""}`;
   }
+  // ⏱️ خط اليوم في الوضع العربي من اليمين للشمال (١٢ بالليل على اليمين)، وفي الإنجليزي من الشمال لليمين
+  const dayRtl = () => window.I18N?.lang !== "en";
+  const dayH = (e, r) => Math.max(0, Math.min(23.5, Math.round(((dayRtl() ? r.right - e.clientX : e.clientX - r.left) / r.width) * 48) / 2));
   function drawDay() {
-    const pct = (h) => (h / 24) * 100, s = S.d.settings;
-    q("[data-day]").innerHTML = PEAKS.map(([a, b]) => `<span class="pk" style="left:${pct(a)}%;width:${pct(b - a)}%"></span>`).join("")
-      + [0, 6, 12, 18].map((h) => `<span class="hr" style="left:${pct(h)}%">${String(h).padStart(2, "0")}</span>`).join("")
-      + s.times.map((t, i) => `<span class="pt ${t.mine ? "mine" : ""}" data-pt="${i}" style="left:${pct(hOf(t.t))}%"><b>${fmtH(hOf(t.t))}</b></span>`).join("");
+    const pct = (h) => (h / 24) * 100, s = S.d.settings, side = dayRtl() ? "right" : "left";
+    q("[data-day]").classList.toggle("rtl", dayRtl());
+    q("[data-day]").innerHTML = PEAKS.map(([a, b]) => `<span class="pk" style="${side}:${pct(a)}%;width:${pct(b - a)}%"></span>`).join("")
+      + [0, 6, 12, 18].map((h) => `<span class="hr" style="${side}:${pct(h)}%">${String(h).padStart(2, "0")}</span>`).join("")
+      + s.times.map((t, i) => `<span class="pt ${t.mine ? "mine" : ""}" data-pt="${i}" style="${side}:${pct(hOf(t.t))}%"><b>${fmtH(hOf(t.t))}</b></span>`).join("");
     q("[data-n]").textContent = s.times.length;
     q("[data-fee]").textContent = S.d.fee ? `· كل منشور ${S.d.fee} نقطة للأوتوبايلوت + تكلفة التوليد` : "";
   }
@@ -399,7 +404,7 @@ const PilotPage = (() => {
       const pt = e.target.closest("[data-pt]"), r = day.getBoundingClientRect(), s = S.d.settings;
       if (pt) { S.drag = { i: +pt.dataset.pt, x: e.clientX, moved: false }; pt.setPointerCapture(e.pointerId); return; }
       if (s.times.length >= 6) return toast("6 منشورات في اليوم كحد أقصى");
-      const h = Math.max(0, Math.min(23.5, Math.round(((e.clientX - r.left) / r.width) * 48) / 2));
+      const h = dayH(e, r);
       if (s.times.some((t) => t.t === tOf(h))) return;
       s.times.push({ t: tOf(h), mine: true });
       s.times.sort((a, b) => hOf(a.t) - hOf(b.t));
@@ -409,10 +414,10 @@ const PilotPage = (() => {
       const g = S.drag; if (!g) return;
       if (Math.abs(e.clientX - g.x) > 3) g.moved = true;
       if (!g.moved) return;
-      const r = day.getBoundingClientRect(), h = Math.max(0, Math.min(23.5, Math.round(((e.clientX - r.left) / r.width) * 48) / 2));
+      const r = day.getBoundingClientRect(), h = dayH(e, r);
       S.d.settings.times[g.i] = { t: tOf(h), mine: true };
       const el = day.querySelector(`[data-pt="${g.i}"]`);
-      el.style.left = `${(h / 24) * 100}%`; el.querySelector("b").textContent = fmtH(h); el.classList.add("mine");
+      el.style[dayRtl() ? "right" : "left"] = `${(h / 24) * 100}%`; el.querySelector("b").textContent = fmtH(h); el.classList.add("mine");
     });
     day.addEventListener("pointerup", () => {
       const g = S.drag; if (!g) return;
