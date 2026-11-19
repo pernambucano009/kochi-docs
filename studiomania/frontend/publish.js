@@ -305,10 +305,13 @@ async function paTelegram() {
 }
 // رجع من تسجيل الدخول على المنصة: لو محتاج يختار صفحة/منظمة/مكان/بورد بنعرضله القايمة هنا
 async function connectReturn() {
-  const q = new URLSearchParams(location.search);
+  // بيانات الرجوع ممكن تيجي في ?… أو بعد الـ # (خدمة الربط ساعات بتلزقها بعد «#7?…»)
+  const hq = location.hash.includes("?") ? location.hash.slice(location.hash.indexOf("?") + 1) : "";
+  const q = new URLSearchParams(location.search || "");
+  new URLSearchParams(hq).forEach((v, k) => { if (!q.has(k)) q.set(k, v); });
   if (!q.has("step") && !q.has("connected") && !q.has("error")) return;
   const params = Object.fromEntries(q.entries());
-  history.replaceState(null, "", location.pathname + location.hash);   // الرابط لا يظل فيه بيانات الربط
+  history.replaceState(null, "", location.pathname + location.hash.split("?")[0]);   // الرابط لا يظل فيه بيانات الربط
   if (params.error) return toast(`⚠️ الربط لم يكتمل: ${params.error_message || params.error}`, true);
   if (params.connected) { toast("✅ رُبط الحساب"); return paRefresh(await api("/api/publisher")); }
   let r;
