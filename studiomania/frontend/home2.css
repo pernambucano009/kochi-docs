@@ -3148,10 +3148,40 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 :is(#nh) .pk-ib.on { color: var(--nh-accent); }
 @media (max-width: 760px) { :is(#nh) .ld-r { grid-template-columns: 56px 1fr; } :is(#nh) .ld-r .ld-say, :is(#nh) .ld-r .pk-acts { grid-column: 1 / -1; } }
 /* 🪞 الأفاتار: نفس كروت الشخصيات */
-.tw-art { aspect-ratio: 3 / 4; border-radius: 14px; overflow: hidden; display: grid; place-items: center; }
-.tw-art .tw-ph { font-size: 44px; opacity: .55; }
-#twMain .tw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
-#twMain .tw-step { margin-bottom: 12px; }
+/* الشكل الجديد: كروت بيضا هادية، أرقام برتقالي، خانات صور بخلفية فاتحة من غير إطار متقطع، ومن غير إيموجي */
+#nh .tw-art { aspect-ratio: 4 / 5; border-radius: 20px; overflow: hidden; display: grid; place-items: center; background: var(--nh-fill); }
+#nh .tw-art .tw-ph { width: auto; aspect-ratio: auto; background: none; font-size: 0; color: var(--nh-muted); opacity: .35; }
+#nh .tw-st { display: flex; gap: 10px; justify-content: flex-start; font-size: 12px; color: var(--nh-muted); text-align: start !important; }
+#nh .tw-st > span { display: inline-flex; align-items: center; gap: 5px; } #nh .tw-st > span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--nh-line, rgba(24,23,24,.15)); }
+#nh .tw-st > span.on { color: var(--nh-ink); } #nh .tw-st > span.on::before { background: #2f8f6b; }
+#twMain { max-width: 860px; margin-inline: auto; }
+#twMain .tw-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 16px; }
+#twMain .tw-head h2 { font-size: 22px; font-weight: 500; }
+#twMain .tw-step { margin-bottom: 14px; padding: 18px 22px; }
+#twMain .tw-step summary { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 500; }
+#twMain .tw-step summary b { flex: 1; font-weight: 500; display: flex; align-items: baseline; gap: 8px; }
+#twMain .tw-step i, #twMain .tw-mh i { width: 30px; height: 30px; font-size: 13px; background: color-mix(in srgb, #E5613E 12%, transparent); color: #E5613E; }
+#twMain .tw-step.done i { background: color-mix(in srgb, #2f8f6b 14%, transparent); color: #2f8f6b; }
+#twMain .tw-make .tw-mh i { background: #E5613E; color: #fff; }
+#twMain .tw-chev { width: 7px; height: 7px; border-right: 1.5px solid var(--nh-muted); border-bottom: 1.5px solid var(--nh-muted); rotate: 45deg; transition: rotate .3s; }
+#twMain .tw-step[open] .tw-chev { rotate: 225deg; }
+#twMain .tw-in { display: grid; gap: 12px; padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--nh-line, rgba(24,23,24,.08)); }
+#twMain .tw-in > * { margin: 0; }
+#twMain .tw-step .hint, #twMain .tw-make .hint { font-size: 13px; color: var(--nh-muted); line-height: 1.7; margin: 0; }
+#twMain .tw-tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+#twMain .tw-tips li { position: relative; padding-inline-start: 14px; } #twMain .tw-tips li::before { content: ""; position: absolute; inset-inline-start: 0; top: .75em; width: 5px; height: 5px; border-radius: 50%; background: #E5613E; opacity: .7; }
+#twMain .tw-script { background: var(--nh-fill); border-radius: 16px; padding: 14px 18px; }
+#twMain .tw-angles { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+#twMain .tw-angle { border: 0; background: var(--nh-fill); border-radius: 18px; padding: 10px; gap: 8px; }
+#twMain .tw-angle.on { border: 0; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #2f8f6b 55%, transparent); }
+#twMain .tw-angle .tw-ph { background: var(--nh-bg); color: var(--nh-muted); font-size: 0; opacity: 1; border-radius: 12px; }
+#twMain .tw-angle .tw-ph svg { opacity: .25; }
+#twMain .tw-angle .row { display: flex; gap: 6px; justify-content: center; }
+#twMain .tw-make { padding: 18px 22px; }
+#twMain .tw-mh { margin-bottom: 12px; font-weight: 500; }
+#twMain .tw-form select, #twMain .tw-form textarea, #twMain .tw-in input.input { border-radius: 12px; border: 1px solid var(--nh-line, rgba(24,23,24,.12)); background: var(--card, #fff); color: inherit; font: inherit; padding: 9px 12px; }
+#twMain .tw-clips li { background: var(--nh-fill); border-radius: 16px; }
+#twMain .row.wrap, #twMain .tw-in > .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 #nh .bm-world .bm-branch.bm-seed > b { font-size: calc(12px * max(1, .82 / var(--bm-s, 1))); }
 
 /* 👤 الحساب جوه نافذة العلامات */
