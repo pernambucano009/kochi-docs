@@ -141,7 +141,7 @@ const NH = (() => {
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
   // RTL: أول عمود على اليمين · النشر تحت على اليمين، والأوتوبايلوت فوق على الشمال (نفس الأماكن بالعربي والإنجليزي)
-  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "settings"];
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "inbox"];   // ⚙️ الإعدادات اتنقلت للشريط اللي فوق، ومكانها «التعليقات والرسائل»
   const META = {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
     brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>نسبة فهم العقل <span class="num">${pct}%</span></span>`; },
@@ -156,6 +156,7 @@ const NH = (() => {
       const up = D.posts.filter((p) => p.status === "scheduled").length, bad = D.posts.filter((p) => p.status === "failed").length;
       return `<span>${up ? `${up} منشور مجدول` : "لا توجد منشورات مجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
+    inbox: () => `<span>التعليقات والرسائل والردود التلقائية</span>`,
     // من غير رصيد معروف: مفيش سطر تاني (كان بيكرر نفس الوصف اللي فوقه)
     settings: () => (window.ME && window.ME.role !== "admin" ? `<span>نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة</span>`
       : D.money ? `<span>رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span></span>` : ""),
@@ -221,11 +222,13 @@ const NH = (() => {
     </div>
     <div class="nh-tools" id="nhTools">
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
+      ${KOCHI ? "" : `<button class="nh-chip nh-setb" id="nhSet" title="الإعدادات" aria-label="الإعدادات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3.9a7.5 7.5 0 0 0-2.6-1.5L14.1 2.5h-4.2l-.4 2.5a7.5 7.5 0 0 0-2.6 1.5l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-.9a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4.2l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.3.9 2-3.4z"/></svg></button>`}
       <button class="nh-chip latin nh-langb" id="nhLang" aria-label="English">EN</button>
       <button class="nh-chip" id="nhClient" title="علاماتك وحسابك" aria-label="علاماتك وحسابك"><i id="nhClientAv" aria-hidden="true"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-switch" id="nhTheme" aria-label="تبديل الوضع الفاتح والغامق"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
+  document.getElementById("nhSet")?.addEventListener("click", () => act("settings")());
   // 📱 على الشاشات الضيقة الشريط بيتكسر لسطرين: الزيادة دي بتنزّل محتوى الصفحة (زي أقسام العجلة) تحته بدل ما يركب عليه
   const barX = () => { const r = bar.getBoundingClientRect(); let b = r.bottom; bar.querySelectorAll("*").forEach((e) => { const x = e.getBoundingClientRect(); if (x.height && x.height < 80) b = Math.max(b, x.bottom); }); document.documentElement.style.setProperty("--nh-bar-x", `${Math.max(0, Math.round(b - 66))}px`); };
   if (typeof ResizeObserver !== "undefined") { const ro = new ResizeObserver(barX); ro.observe(bar); bar.querySelectorAll(".nh-tools, .nh-bar-r").forEach((e) => ro.observe(e)); }
@@ -766,7 +769,7 @@ const NH = (() => {
     renderBar();
   };
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
-  const PAGE_PARENT = { pubacc: "publish", pubcal: "publish", pubdone: "publish", pubpost: "publish", inbox: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
+  const PAGE_PARENT = { pubacc: "publish", pubcal: "publish", pubdone: "publish", pubpost: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
     coaches: "brand", twin: "brand", brainlib: "brand", auto: "create", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
   const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
   function crumbs() {

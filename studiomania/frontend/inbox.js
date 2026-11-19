@@ -21,9 +21,125 @@ function ibAlert(msg) {
 
 async function initInbox() {
   ibAlert("");
-  if (ib.tab === "bots") { $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
-  await ibLoad(true);
+  ibStarShow();
 }
+
+// ---------- ✳️ تقسيمة المرسيدس: ٣ أتلات وكل تلت قسم، والإعدادات في النص ----------
+const IB_SECS = ["comments", "messages", "bots"];
+function ibStarShow() {
+  $("ibStar").hidden = false; $("ibWork").hidden = true;
+  ibStarLayout();
+  ibStarLoad();
+}
+// الخطوط التلاتة من النص: واحد لفوق، واتنين للركنين اللي تحت. وكل قسم في المساحة اللي بين خطين
+function ibStarLayout() {
+  const st = $("ibStar"), w = st.clientWidth, h = st.clientHeight;
+  if (!w || !h) return;
+  const cx = w / 2, cy = h * 0.47, k = (h - cy) * 0.4, rtl = document.documentElement.dir !== "ltr";
+  const poly = { a: `${cx},${cy} ${cx},0 ${w},0 ${w},${h}`, b: `${cx},${cy} ${cx},0 0,0 0,${h}`, c: `${cx},${cy} 0,${h} ${w},${h}` };
+  // RTL: أول قسم (التعليقات) على اليمين، والرسائل على الشمال، والردود التلقائية تحت
+  const order = rtl ? ["a", "b", "c"] : ["b", "a", "c"];
+  $("ibY").setAttribute("viewBox", `0 0 ${w} ${h}`);
+  $("ibY").innerHTML = IB_SECS.map((sec, i) => `<polygon data-sec="${sec}" points="${poly[order[i]]}"/>`).join("")
+    + `<path d="M${cx} ${cy}V0M${cx} ${cy}L0 ${h}M${cx} ${cy}L${w} ${h}"/>`;
+  const side = (el, right) => Object.assign(el.style, { top: "28px", height: `${cy - 40}px`, width: `${cx - 90}px`, left: right ? `${cx + 62}px` : "28px", right: "auto", bottom: "auto" });
+  const hw = Math.max(200, k * cx / (h - cy) - 36);
+  st.querySelectorAll(".ib-sec").forEach((el, i) => {
+    const o = order[i];
+    if (o === "c") Object.assign(el.style, { top: `${cy + k}px`, height: `${h - cy - k - 18}px`, width: `${hw * 2}px`, left: `${cx - hw}px`, right: "auto", bottom: "auto" });
+    else side(el, o === "a");
+  });
+  Object.assign($("ibHub").style, { left: `${cx}px`, top: `${cy}px` });
+}
+addEventListener("resize", () => { if (!$("ibStar").hidden) ibStarLayout(); });
+
+async function ibStarLoad() {
+  const sec = (k) => $("ibStar").querySelector(`.ib-sec[data-sec="${k}"]`);
+  const fill = (k, n, sub, rows) => {
+    const el = sec(k);
+    el.querySelector("[data-n]").textContent = n ?? "";
+    el.querySelector("[data-s]").textContent = sub || "";
+    el.querySelector("[data-l]").innerHTML = rows.join("");
+  };
+  const [cm, ms, bt] = await Promise.allSettled([api("/api/inbox/comments"), api("/api/inbox/conversations"), api("/api/bots")]);
+  if (cm.status === "fulfilled") {
+    ib.posts = cm.value.posts || [];
+    const total = ib.posts.reduce((n, x) => n + (x.comments || 0), 0);
+    fill("comments", total || "", ib.posts.length ? `على ${ib.posts.length} منشور` : "لا توجد تعليقات بعد",
+      ib.posts.slice(0, 3).map((x) => `<li data-pick="${escapeHtml(x.id)}"><span>${escapeHtml(x.content || "(بدون كابشن)")}</span><em>${x.comments || 0}</em></li>`));
+  } else fill("comments", "", cm.reason?.message || "", []);
+  if (ms.status === "fulfilled") {
+    ib.convs = ms.value.conversations || [];
+    const unread = ib.convs.reduce((n, c) => n + (c.unread || 0), 0);
+    fill("messages", unread || ib.convs.length || "", unread ? "لم تُقرأ بعد" : ib.convs.length ? "محادثات" : "لا توجد رسائل بعد",
+      ib.convs.slice(0, 3).map((c) => `<li data-pick="${escapeHtml(c.id)}" class="${c.unread ? "unread" : ""}"><b>${escapeHtml(c.name || "—")}</b><span>${escapeHtml(c.last || "")}</span></li>`));
+  } else fill("messages", "", ms.reason?.message || "", []);
+  if (bt.status === "fulfilled" && bt.value.live) {
+    const bots = bt.value.bots || [], on = bots.filter((b) => b.status === "active").length;
+    fill("bots", on || "", bots.length ? (on ? "يعمل الآن" : "كلها متوقفة") : "لا توجد ردود تلقائية بعد",
+      bots.slice(0, 3).map((b) => `<li><span>${escapeHtml(b.name)}</span><em class="${b.status === "active" ? "ok" : ""}">${b.status === "active" ? "يعمل" : "متوقف"}</em></li>`));
+  } else fill("bots", "", bt.status === "fulfilled" ? bt.value.note || "" : bt.reason?.message || "", []);
+}
+
+function ibOpenSec(sec, pick = "") {
+  $("ibStar").hidden = true; $("ibWork").hidden = false; $("ibSet").hidden = true;
+  ibGoTab(sec, true).then(() => { if (pick) (sec === "comments" ? ibOpenPost : ibOpenConv)(pick); });
+}
+$("ibStar").addEventListener("click", (e) => {
+  if (e.target.closest("#ibHub")) return ibSettings();
+  const t = e.target.closest("[data-sec]");
+  if (t) ibOpenSec(t.dataset.sec, e.target.closest("[data-pick]")?.dataset.pick || "");
+});
+// لما الماوس على قسم، التلت بتاعه بينوّر
+$("ibStar").addEventListener("pointerover", (e) => {
+  const t = e.target.closest("[data-sec]")?.dataset.sec || "";
+  $("ibY").querySelectorAll("polygon").forEach((p) => p.classList.toggle("on", p.dataset.sec === t));
+});
+$("ibStar").addEventListener("pointerleave", () => $("ibY").querySelectorAll("polygon").forEach((p) => p.classList.remove("on")));
+$("ibBack").onclick = () => { ibAlert(""); ibStarShow(); };
+
+// ---------- ⚙️ الإعدادات (من النص) ----------
+const ibSetS = { bid: null, mode: "ask", word: "", accounts: [] };
+async function ibSettings() {
+  const box = $("ibSet");
+  box.hidden = false;
+  box.innerHTML = `<div class="ib-set-in"><p class="empty">جارٍ التحميل…</p></div>`;
+  try {
+    const brains = await api("/api/ad-brains");
+    const b = (Array.isArray(brains) ? brains : []).find((x) => x.id === clientx?.active) || (Array.isArray(brains) ? brains[0] : null) || {};
+    const pub = await api("/api/publisher").catch(() => ({}));
+    Object.assign(ibSetS, { bid: b.id, mode: b.dm_mode || (String(b.dm_word || "").trim() ? "always" : "ask"), word: b.dm_word || "", accounts: pub.account_list || [], names: pub.platforms || {} });
+  } catch (err) { box.innerHTML = `<div class="ib-set-in"><p class="empty err">${escapeHtml(err.message)}</p></div>`; return; }
+  ibSetRender();
+}
+function ibSetRender() {
+  const S = ibSetS, pill = (k, t) => `<button type="button" class="ib-pill${S.mode === k ? " on" : ""}" data-dm="${k}">${t}</button>`;
+  $("ibSet").innerHTML = `<div class="ib-set-in">
+      <header><b>الإعدادات</b><button type="button" class="ib-x" data-setx aria-label="إغلاق">✕</button></header>
+      <section><h4>«علّق بكلمة» فتصله رسالة على الخاص</h4>
+        <div class="ib-pills">${pill("always", "في كل منشور")}${pill("ask", "أختار عند النشر")}${pill("off", "لا")}</div>
+        <label class="ib-fl">كلمة التعليق<input type="text" id="ibSetWord" value="${escapeHtml(S.word)}" placeholder="مثلًا: برنامج"></label></section>
+      <section><h4>الحسابات المربوطة</h4>
+        <ul class="ib-accs">${S.accounts.map((a) => `<li><span>${escapeHtml(S.names[a.platform] || a.platform)}</span><small dir="ltr">${escapeHtml(a.username ? "@" + a.username : a.name || "")}</small></li>`).join("") || `<li class="muted">لا توجد حسابات مربوطة بعد.</li>`}</ul>
+        <button type="button" class="ib-act" data-setacc>إدارة الحسابات ←</button></section>
+      <div class="ib-set-go"><button type="button" class="ib-go" data-setsave>احفظ</button></div></div>`;
+}
+$("ibSet").addEventListener("click", async (e) => {
+  const q = (s) => e.target.closest(s);
+  if (q("[data-setx]") || e.target === $("ibSet")) { $("ibSet").hidden = true; return; }
+  if (q("[data-dm]")) { ibSetS.word = $("ibSetWord").value; ibSetS.mode = q("[data-dm]").dataset.dm; return ibSetRender(); }
+  if (q("[data-setacc]")) { $("ibSet").hidden = true; showStep("7"); if (typeof pubTab === "function") pubTab("acc"); return; }
+  if (q("[data-setsave]")) {
+    const btn = q("[data-setsave]");
+    btn.disabled = true;
+    try {
+      await api(`/api/ad-brains/${encodeURIComponent(ibSetS.bid)}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: { dm_mode: ibSetS.mode, dm_word: $("ibSetWord").value.trim() } }) });
+      $("ibSet").hidden = true;
+      toast("✅ حُفظت الإعدادات");
+    } catch (err) { btn.disabled = false; toast(err.message, true); }
+  }
+});
 
 async function ibLoad(reset = false) {
   if (ib.loading) return;
@@ -208,24 +324,29 @@ function ibRenderConv(c) {
 }
 
 // ---------- الأحداث ----------
-$("ibTabs").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-t]");
-  if (!b || b.dataset.t === ib.tab) return;
-  ib.tab = b.dataset.t;
+async function ibGoTab(t, force = false) {
+  if (!force && t === ib.tab) return;
+  ib.tab = t;
   ib.sel = null; ib.next = null;
-  $("ibTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-  // 🤖 البوتات: تبويب جوه التعليقات والرسائل (بوت بيرد عليهم لوحده)
+  $("ibTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.t === t));
+  // 🤖 الردود التلقائية: بوت بيرد على التعليقات والرسائل لوحده
   const bots = ib.tab === "bots";
   $("ibBots").hidden = !bots; $("ibLayout").hidden = bots; $("ibNote").hidden = bots;
-  if (bots) { ibAlert(""); $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
-  $("ibThread").innerHTML = `<p class="empty">اختر ${ib.tab === "comments" ? "منشور" : "محادثة"} من القائمة.</p>`;
   ibAlert("");
-  ibLoad(true);
+  if (bots) { $("ibBots").innerHTML = BotsPage.html(); return BotsPage.mount($("ibBots")); }
+  $("ibThread").innerHTML = `<p class="empty">اختر ${ib.tab === "comments" ? "منشورًا" : "محادثة"} من القائمة.</p>`;
+  await ibLoad(true);
+}
+$("ibTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-t]");
+  if (b) ibGoTab(b.dataset.t);
 });
 // 🔄 بيتحدّث لوحده كل دقيقة وهو مفتوح (من غير زرار «حدّث»)، وماينطّش لو بيكتب رد
 setInterval(() => {
   const v = document.querySelector('.view[data-view="15"]');
-  if (!v || v.hidden || document.hidden || ib.tab === "bots" || ib.loading) return;
+  if (!v || v.hidden || document.hidden || ib.loading) return;
+  if (!$("ibStar").hidden) return ibStarLoad();
+  if (ib.tab === "bots") return;
   if ([...$("ibThread").querySelectorAll(".ib-compose textarea")].some((t) => t.value.trim()) || $("ibThread").contains(document.activeElement)) return;
   ibLoad(true).then(() => { if (!ib.sel) return; if (ib.tab === "comments") ibOpenPost(ib.sel, true); else ibOpenConv(ib.sel, true); });
 }, 60000);

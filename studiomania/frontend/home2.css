@@ -3258,3 +3258,7 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .nh-wh-labs .mk i { background: var(--g); }
 #nh .gg-grp { grid-column: 1 / -1; margin: 14px 0 0; padding-top: 8px; border-top: 3px solid var(--g); font-size: 14px; font-weight: 600; color: var(--g); }
 #nh .gg-grp:first-child { margin-top: 0; }
+/* ⚙️ الإعدادات في الشريط اللي فوق (مكانها في الرئيسية بقى «التعليقات والرسائل») */
+#nhBar .nh-setb { width: 44px; padding: 0; justify-content: center; }
+#nhBar .nh-setb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; transition: rotate .5s ease; }
+#nhBar .nh-setb:hover svg { rotate: 60deg; }
