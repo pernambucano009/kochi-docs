@@ -3119,7 +3119,8 @@ def batch_requests() -> list[dict]:
 
 def batch_loop() -> None:
     import hashlib
-    time.sleep(90)
+    time.sleep(60)
+    print(f"[batch] loop on, requests={[r.get('id') for r in batch_requests()]} file={BACKEND / 'batch_requests.json'}", flush=True)
     while True:
         for rq in batch_requests():
             try:
@@ -3134,14 +3135,16 @@ def batch_loop() -> None:
                     us = c.execute("SELECT email, workspace FROM users").fetchall()
                 wid = next((u["workspace"] for u in us if hashlib.sha256((u["email"] or "").strip().lower().encode()).hexdigest()[:16] == rq["user"]), None)
                 if not wid:
+                    print(f"[batch] {rq['id']}: no user matches", flush=True)
                     continue
                 t = _tenants.get(wid)
                 if not t or t.proc.poll() is not None:
                     t = _spawn(wid)
                     _tenants[wid] = t
                 t.last = time.time()
-                httpx.post(f"http://127.0.0.1:{t.port}/api/_tenant/batch", json={"id": rq["id"], "templates": rq["templates"]},
-                           headers={"x-gateway-secret": GATEWAY_SECRET}, timeout=20)
+                r = httpx.post(f"http://127.0.0.1:{t.port}/api/_tenant/batch", json={"id": rq["id"], "templates": rq["templates"]},
+                               headers={"x-gateway-secret": GATEWAY_SECRET}, timeout=20)
+                print(f"[batch] {rq['id']} → {wid}: {r.status_code} {r.text[:200]}", flush=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"[batch] {rq.get('id')}: {exc}", flush=True)
         time.sleep(180)

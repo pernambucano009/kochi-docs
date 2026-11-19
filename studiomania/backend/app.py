@@ -37751,6 +37751,7 @@ def batch_video(fid: str) -> Path | None:
 def batch_run(body: BatchIn) -> None:
     out = batch_dir(body.id)
     out.mkdir(parents=True, exist_ok=True)
+    print(f"[batch] run {body.id} in {out} ({len(body.templates)} templates)", flush=True)
     run = {"id": body.id, "tenant": os.environ.get("TENANT_ID") or "owner", "at": time.time(), "items": [], "done": False}
     try:
         old = json.loads((out / "run.json").read_text("utf-8"))
@@ -37768,6 +37769,7 @@ def batch_run(body: BatchIn) -> None:
         _w.write_text(json.dumps(run, ensure_ascii=False, indent=1), "utf-8")
         _w.replace(out / "run.json")
     try:
+        save()
         if not run.get("logos"):   # 🏷️ نسخ الشعار بستايل كل القوالب المتخصصة (طلب صاحب المشروع) قبل الفيديوهات
             for mid, f in tplfit.FIT.items():
                 if f.get("need") or f.get("special"):
