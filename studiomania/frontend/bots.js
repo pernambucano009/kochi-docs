@@ -34,7 +34,8 @@ const BotsPage = (() => {
   // ٥ أماكن حوالين النص (خماسي): فوق، واليمين واليسار، وتحت يمين وتحت يسار
   const POS = [[50, 10], [87, 38], [73, 82], [27, 82], [13, 38]];
   // البروز وقت الهوفر بيروح ناحية النص (مش برا الشاشة): [x, y] بالبكسل
-  const LIFT = [[0, 6], [-10, 0], [-8, -8], [8, -8], [10, 0]];
+  // ومعاه نقطة الكبر: كل أيقونة بتكبر ناحية النص (اللي فوق لتحت، اليمين للشمال، اللي تحت يمين لفوق شمال…)
+  const LIFT = [[0, 14, "50% 0%"], [-16, 0, "100% 50%"], [-12, -14, "100% 100%"], [12, -14, "0% 100%"], [16, 0, "0% 50%"]];
   function star() {
     const d = S.d, on = d.bots.filter((b) => b.status === "active").length;
     return `<svg class="bx-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${POS.map(([x, y]) => `<line x1="50" y1="50" x2="${x}" y2="${y}"/>`).join("")}</svg>
@@ -45,16 +46,29 @@ const BotsPage = (() => {
         // 🟢 مفعّل: أيقونة برتقالي ونقطة خضرا · ⚪ مش مفعّل: أيقونة باهتة و«غير مفعّل»
         const n = botsOf(k).filter((b) => b.status === "active").length, pub = k === "comment" && S.pub && S.pub.mode !== "off";
         const live = n || pub, what = pub && !n ? (S.pub.mode === "always" ? "في كل منشور" : "عند النشر") : n > 1 ? `${n} حسابات` : "";
-        return `<button type="button" class="bx-node ${live ? "live" : "off"}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px">
+        return `<button type="button" class="bx-node ${live ? "live" : "off"}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px;--o:${LIFT[i][2]}">
           ${svgIc(R[k].ic)}<b>${R[k].n}</b><small>${d.sk ? "&nbsp;" : live ? `<i class="bx-dot"></i>مفعّل${what ? ` · ${what}` : ""}` : `<i class="bx-dot off"></i>غير مفعّل`}</small></button>`; }).join("")}`;
   }
 
   // ---------- اللوح اللي على الجنب ----------
   function field(k) {
     const [t, type, ph] = FIELD[k];
+    if (k === "post") return postPick();
     if (type === "check") return `<label class="bx-chk"><input type="checkbox" data-bf="${k}" ${S.f[k] ? "checked" : ""}><span>${t}</span></label>`;
     if (type === "area") return `<label class="bx-f"><span>${t}</span><textarea rows="3" data-bf="${k}" placeholder="${esc(ph)}">${esc(val(k))}</textarea></label>`;
     return `<label class="bx-f"><span>${t}</span><input type="${type === "url" ? "url" : "text"}" ${type === "url" ? 'dir="ltr"' : ""} data-bf="${k}" value="${esc(val(k))}" placeholder="${esc(ph)}"></label>`;
+  }
+  // 📌 «على منشور معيّن»: قايمة بمنشورات الحساب المختار (صورته وأول الكابشن)، أو «كل المنشورات»
+  function postPick() {
+    const list = (S.posts || []).filter((p) => p.account_id === S.f.account);
+    const cur = list.find((p) => p.id === S.f.post);
+    const row = (p) => `${p.picture ? `<img src="${esc(p.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : `<i class="bx-pth"></i>`}<b>${esc((p.content || "(بدون كابشن)").slice(0, 70))}</b>`;
+    return `<div class="bx-f bot-accf"><span>على أي منشور؟</span>
+      <button type="button" class="bot-accbtn bx-postbtn" data-bpostopen>${cur ? row(cur) : `<b>كل المنشورات</b>`}<i class="bot-caret">▾</i></button>
+      ${S.postOpen ? `<ul class="bot-accmenu bx-posts">${S.posts == null ? `<li class="bx-note">جارٍ التحميل…</li>` : ""}
+        <li><button type="button" data-bpost="" class="${!S.f.post ? "on" : ""}"><b>كل المنشورات</b></button></li>
+        ${list.map((p) => `<li><button type="button" data-bpost="${esc(p.id)}" class="${p.id === S.f.post ? "on" : ""}">${row(p)}</button></li>`).join("")}
+        ${S.posts && !list.length ? `<li class="bx-note">لا توجد منشورات لهذا الحساب بعد.</li>` : ""}</ul>` : ""}</div>`;
   }
   function accPick(r, accs) {
     const all = S.d.all_accounts?.length ? S.d.all_accounts : accs;
@@ -120,7 +134,13 @@ const BotsPage = (() => {
     w.addEventListener("click", async (e) => {
       const q = (s) => e.target.closest(s);
       if (q("[data-baccopen]")) { S.accOpen = !S.accOpen; return render(); }
-      if (q("[data-bacc]")) { S.f.account = q("[data-bacc]").dataset.bacc; S.accOpen = false; return render(); }
+      if (q("[data-bpostopen]")) {
+        S.postOpen = !S.postOpen; render();
+        if (S.postOpen && S.posts == null) { try { S.posts = (await api("/api/inbox/comments?all=1")).posts || []; } catch { S.posts = []; } render(); }
+        return;
+      }
+      if (q("[data-bpost]")) { S.f.post = q("[data-bpost]").dataset.bpost; S.postOpen = false; return render(); }
+      if (q("[data-bacc]")) { S.f.account = q("[data-bacc]").dataset.bacc; S.f.post = ""; S.accOpen = false; return render(); }
       if (q("[data-brecipe]")) { const k = q("[data-brecipe]").dataset.brecipe; S.open = S.open === k ? "" : k; S.f = {}; S.accOpen = false; return render(); }
       if (q("[data-bclose]")) { S.open = ""; return render(); }
       if (q("[data-dm]")) { if ($("bxWord")) S.pub.word = $("bxWord").value; S.pub.mode = q("[data-dm]").dataset.dm; return render(); }

@@ -1069,7 +1069,21 @@ const Flow = (() => {
     if (q("[data-savedopen]")) { S.savedOpen = !S.savedOpen; render(); if (S.savedOpen) loadSaved(); return; }
     if ((b = q("[data-usesaved]"))) { reset(); S.savedOpen = false; S.saved = null; return call(`/use-saved/${b.dataset.usesaved}`).then(poll); }
     if ((b = q("[data-delsaved]"))) { try { S.saved = await api(`/api/flows/${S.d.id}/saved/${b.dataset.delsaved}`, { method: "DELETE" }); render(); } catch (err) { toast(err.message, true); } return; }
-    if ((b = q("[data-pick-idea]"))) { reset(); return call("/idea", { id: b.dataset.pickIdea }); }
+    if ((b = q("[data-pick-idea]"))) {
+      const id = b.dataset.pickIdea;
+      // 💬 «علّق بكلمة» على «أختار عند النشر»: الكلمة بتتسأل هنا (قبل النص)، علشان تتقال في آخر الفيديو وتتكتب في الكابشن
+      let dm = null;
+      try {
+        const r = await api(`/api/flows/${S.d.id}/dm-word?idea_id=${encodeURIComponent(id)}`);
+        if (r.ask) {
+          const w = await uiPrompt("الرد الآلي «علّق بكلمة» مفعّل. ما الكلمة التي يكتبها المتابع في التعليق لتصله رسالة على الخاص؟ تُقال في آخر الفيديو.", r.word || "",
+            { ok: "استخدمها", cancel: "بدون «علّق بكلمة»", placeholder: "مثلًا: جدول" });
+          dm = (w || "").trim();
+        }
+      } catch { dm = null; }
+      reset();
+      return call("/idea", { id, ...(dm !== null ? { dm_word: dm } : {}) });
+    }
     if ((b = q("[data-pick-scen]"))) { reset(); S.castOpts = null; S.cast = null; return call("/scenario", { id: b.dataset.pickScen }); }
     if ((b = q("[data-chat]"))) { S.chat = S.chat === b.dataset.chat ? null : b.dataset.chat; render(); return S.el.querySelector("[data-chatin]")?.focus(); }
     if ((b = q("[data-send]"))) return send(b.dataset.send);

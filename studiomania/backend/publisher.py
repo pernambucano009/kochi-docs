@@ -696,9 +696,9 @@ def _failed(meta: dict | None) -> list[str]:
     return out
 
 
-def inbox_posts(limit: int = 50, cursor: str | None = None) -> dict:
-    """المنشورات التي عليها تعليقات (من كل الحسابات)، الأحدث أولًا."""
-    params = {"limit": limit, "minComments": 1, "sortBy": "date", "sortOrder": "desc"}
+def inbox_posts(limit: int = 50, cursor: str | None = None, min_comments: int = 1) -> dict:
+    """المنشورات التي عليها تعليقات (من كل الحسابات)، الأحدث أولًا. min_comments=0: كل المنشورات (لاختيار منشور في الرد الآلي)."""
+    params = {"limit": limit, "minComments": min_comments, "sortBy": "date", "sortOrder": "desc"}
     if cursor:
         params["cursor"] = cursor
     with _client() as c:

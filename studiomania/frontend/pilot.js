@@ -283,9 +283,9 @@ const PilotPage = (() => {
   }
   // 🛫 أنواع المنشورات بالترتيب، ولكل نوع خطواته. الخطوة اللي ليها مفتاح (idea…) تقبل الدايرة الزرقا (توقف لحد موافقتك)
   const TYPES = [
-    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
-    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "photo", n: "صور", soon: true },
     { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
   ];
@@ -305,7 +305,7 @@ const PilotPage = (() => {
       + `<button type="button" class="ap-ty new" data-newauto>+ قالب مخصص</button>`;
     const rows = TYPES.filter((t) => !t.soon && typeOn(t)).map((t) => {
       const on = new Set(sb[t.kind] || []);
-      const chips = t.steps.map(([k, n]) => {
+      const chips = t.steps.filter(([k]) => k !== "word" || S.d.dm_mode === "ask").map(([k, n]) => {   // 💬 «كلمة التعليق» بس لما «علّق بكلمة» على «أختار عند النشر»
         if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
         // الستايل: «تلقائي» لما مفيش ستايل متعلّم عليه والقايمة مقفولة. وهي مفتوحة الكلمة بتختفي (هتختار)، ولو قفلتها من غير اختيار بترجع
         if (k === "@style") return `<button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>`;
@@ -347,6 +347,10 @@ const PilotPage = (() => {
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
         <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نصًا"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+    } else if (j.status === "wait" && j.gate === "word") {   // 💬 كلمة «علّق بكلمة» اللي هتتقال في آخر الفيديو
+      body = `<p class="ap-say">الكلمة التي يكتبها المتابع في التعليق لتصله رسالة على الخاص، وتُقال في آخر الفيديو:</p>
+        <div class="ap-acts"><input type="text" class="ap-word" data-wordin="${esc(j.id)}" value="${esc(j.dm_word || "")}" placeholder="مثلًا: جدول">
+        <button type="button" class="ok" data-wordok="${esc(j.id)}">موافق</button><button type="button" data-wordno="${esc(j.id)}">بدون «علّق بكلمة»</button></div>`;
     } else if (j.status === "wait" && j.gate === "montage" && j.kind === "carousel") {
       body = `${imgs(j)}<div class="ap-acts"><button type="button" class="ok" data-ok="${esc(j.id)}">موافق، ارسم الشرائح</button></div>`;
     } else if (j.status === "wait" && j.gate === "video" && j.kind === "carousel") {
@@ -496,6 +500,8 @@ const PilotPage = (() => {
       if ("cap" in d) { S.open = !S.open; return drawQ(); }
       if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اعتُمد، وتكتمل الخطوة التالية");
       if (d.ok) return act(`${d.ok}/ok`, { method: "POST", ...jsonBody({}) }, "✓ اعتُمد");
+      if (d.wordok) { const w = (S.root.querySelector(`[data-wordin="${d.wordok}"]`)?.value || "").trim(); if (!w) return toast("اكتب الكلمة، أو اختر «بدون علّق بكلمة»", true); return act(`${d.wordok}/ok`, { method: "POST", ...jsonBody({ word: w }) }, "✓ اعتُمدت الكلمة"); }
+      if (d.wordno) return act(`${d.wordno}/ok`, { method: "POST", ...jsonBody({ word: "" }) }, "✓ بدون «علّق بكلمة»");
       if (d.stop) return act(`${d.stop}/stop`, null, "أُزيل هذا الموعد");
       if (d.retry) return act(`${d.retry}/retry`, null, "يُعيد المحاولة");
       if (d.del) return act(d.del, { method: "DELETE" });

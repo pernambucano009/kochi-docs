@@ -4903,8 +4903,8 @@ def _inbox_call(fn, *args):
 
 
 @app.get("/api/inbox/comments")
-def inbox_posts(cursor: str | None = None):
-    r = _inbox_call(publisher.inbox_posts, 50, cursor)
+def inbox_posts(cursor: str | None = None, all: bool = False):  # noqa: A002
+    r = _inbox_call(publisher.inbox_posts, 50, cursor, 0 if all else 1)   # all=1: كل المنشورات (اختيار منشور في «علّق بكلمة»)
     r["posts"] = [p for p in r.get("posts") or [] if acct_visible(p.get("account_id"))]   # تعليقات حسابات البراند المفتوح بس
     return r
 
@@ -25602,6 +25602,8 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
         idea_txt += ("\nمهم: الفكرة والهوك أعلاه ربما كُتبا بلهجة أخرى. لا تنسخ الهوك كما هو: أعد كتابته بنفس المعنى والقوة "
                      "بلهجة النص المطلوبة، وكذلك أي جملة تُقال من الهوك التلاتي.")
     avoid = [s.get("title", "") for s in d.get("scenarios") or []]
+    if d["template"].get("kind") != "motion" and (w := flow_dm_word(d, brain)):   # 💬 «علّق بكلمة»: الكلمة بتتقال في آخر السكريبت
+        hint = (hint or "") + flow_dm_line(w)
     if d["template"].get("kind") == "motion":
         return flow_gen_scripts(fid, d, brain, idea_txt, avoid if more else [], hint, more, relang)
     if atlas.mock_mode():
@@ -25793,7 +25795,7 @@ def flow_gen_scripts(fid: str, d: dict, brain, idea_txt: str, avoid: list[str], 
     else:
         raw = flow_llm(fz.motion_script_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), schema, live["scenes"], idea_txt, lang_label,
                                                  dub.GUIDES.get(lang, ""), dub.CHARS_PER_SEC, 2, avoid + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"),
-                                                 (hint or "") + flow_cta_hint(brain)), "النص")   # 📣 الدعوة في الآخر لو العقل عايزها
+                                                 (hint or "") + flow_cta_hint(brain, d)), "النص")   # 📣 الدعوة في الآخر لو العقل عايزها
     items = [{**s, "id": uuid.uuid4().hex[:8]} for s in dub.fix_dialect(fz.clean_scripts(raw, schema, live["scenes"]), lang)]   # 🇸🇦 كاف المخاطَبة ماتبقاش شين
     # نفس النص بلهجة تانية مش تكرار: لما اللهجة تتغير، فلتر «اتستخدم قبل كده» مابيشتغلش
     items, rep = (items, []) if relang else flow_fresh_scen(d, items, more)
@@ -26573,6 +26575,18 @@ def flow_ideas(fid: str, body: FlowGenIn):
 class FlowPickIn(BaseModel):
     id: str = ""          # اختار اقتراح
     item: dict | None = None   # أو نسخة معدّلة / مكتوبة بإيده
+    dm_word: str | None = None   # 💬 «أختار عند النشر»: كلمة التعليق للفيديو ده (فاضية = من غير)
+
+
+@app.get("/api/flows/{fid}/dm-word")
+def flow_dm_word_get(fid: str, idea_id: str = ""):
+    """💬 «أختار عند النشر»: هل نسأل على كلمة التعليق؟ ومعها كلمة مقترحة من الفكرة."""
+    d = flow_load(fid)
+    brain = flow_brain(d)
+    if post_defaults(brain)["dm_mode"] != "ask" or d["template"].get("kind") == "carousel":
+        return {"ask": False}
+    it = next((i for i in d.get("ideas") or [] if i["id"] == idea_id), None) or d.get("idea") or {}
+    return {"ask": True, "word": dm_word_suggest({**d, "idea": it}, brain)}
 
 
 @app.post("/api/flows/{fid}/idea")
@@ -26590,6 +26604,8 @@ def flow_pick_idea(fid: str, body: FlowPickIn):
         kd = d["template"].get("kind")
         code = kd in ("motion", "typo", "phone", "avatar", "carousel")
         d.update(idea=it, stage="scenario" if code else "format", scenarios=[], scenario=None, **({"format": "carousel" if kd == "carousel" else "reel"} if code else {}))
+        if body.dm_word is not None:
+            d["dm_word"] = body.dm_word.strip()[:30]
     d = flow_update(fid, fn)
     mark_idea_used(d, d["idea"], fid)
     if d["template"].get("kind") in ("motion", "typo", "phone", "avatar", "carousel"):
@@ -31828,8 +31844,40 @@ def post_defaults(brain: dict | None) -> dict:
             "dm_word": word, "dm_message": dm_def.get("message") or "", "dm_reply": dm_def.get("reply") or ""}
 
 
-def flow_cta_hint(brain: dict | None) -> str:
-    """لو الدعوة شغالة: آخر جملة في النص دعوة بنفس معنى دعوة العلامة."""
+def flow_dm_word(d: dict | None, brain: dict | None) -> str:
+    """💬 كلمة «علّق بكلمة» للفيديو ده: الثابتة («في كل منشور»)، أو اللي اتختارت للفيديو نفسه («أختار عند النشر»)، وإلا فاضي."""
+    pdf = post_defaults(brain)
+    if pdf["dm_mode"] == "always":
+        return pdf["dm_word"]
+    return str((d or {}).get("dm_word") or "").strip() if pdf["dm_mode"] == "ask" else ""
+
+
+def flow_dm_line(word: str) -> str:
+    return (f"\nآخر جملة منطوقة في النص دعوة قصيرة للتعليق بكلمة «{word}» تحت الفيديو ليصله الرابط أو التفاصيل على الخاص. "
+            "الكلمة تُقال بحروفها بالضبط، والجملة بلهجة النص، وتحل محل أي دعوة أخرى في الآخر.")
+
+
+def dm_word_suggest(d: dict, brain: dict | None) -> str:
+    """كلمة تعليق قصيرة للفيديو ده (كلمة أو كلمتين بتدل على اللي هيوصله على الخاص)."""
+    fallback = (dm_defaults_for((brain or {}).get("id")) if (brain or {}).get("id") else {}).get("word") or "التفاصيل"
+    if atlas.mock_mode():
+        return fallback
+    idea = d.get("idea") or {}
+    try:
+        raw = llm([{"role": "system", "content": "Answer with one Arabic word (or two at most) only, no punctuation, no quotes."},
+                   {"role": "user", "content": (f"فيديو عن: {idea.get('title') or ''} · {idea.get('idea') or ''}\nالنشاط: {(brain or {}).get('domain') or ''}\n"
+                                                "اقترح كلمة قصيرة يكتبها المتابع في التعليق ليصله على الخاص ما وعد به الفيديو (رابط، جدول، دليل، سعر…). "
+                                                "كلمة سهلة الكتابة وتدل على المعنى، مثل: جدول، دليل، سعر، برنامج.")}], temperature=0.4)
+        w = re.sub(r"[^\w\u0600-\u06FF ]", "", str(raw)).strip().split("\n")[0][:20].strip()
+        return w or fallback
+    except HTTPException:
+        return fallback
+
+
+def flow_cta_hint(brain: dict | None, d: dict | None = None) -> str:
+    """لو «علّق بكلمة» شغالة للفيديو ده: آخر جملة دعوة للتعليق بالكلمة. وإلا لو الدعوة شغالة: دعوة بنفس معنى دعوة العلامة."""
+    if (w := flow_dm_word(d, brain)):
+        return flow_dm_line(w)
     pdf = post_defaults(brain)
     return f"\nآخر جملة منطوقة في النص دعوة للتصرف بنفس معنى دعوة العلامة: «{pdf['cta']}»." if pdf["cta_mode"] == "always" and pdf["cta"] else ""
 
@@ -31846,6 +31894,8 @@ def flow_publish_pack(fid: str, fresh: bool = False):
     ex = export_to_dict(row)
     brain = flow_brain(d) or {}
     pdf = post_defaults(brain)
+    if pdf["dm_mode"] == "ask" and (w := flow_dm_word(d, brain)):   # الكلمة اللي اتختارت للفيديو ده: الرد الآلي شغال عليه زي «في كل منشور»
+        pdf = {**pdf, "dm_mode": "always", "dm_word": w}
     pack = d.get("pub_pack") or {}
     if fresh or pack.get("export_id") != ex_id or not pack.get("caption"):
         sc = d.get("scenario") or {}
@@ -34414,7 +34464,7 @@ def scene_take_delete(sid: str, tid: str):
 # لو العميل اختار «أوافق على كل خطوة» المهمة بتقف عند الخطوة دي لحد ما يوافق. قالب الموبايل بيستنى العميل يصوّر.
 PILOT_FILE = DATA_DIR / "pilot.json"
 PILOT_LOCK, PILOT_TICK = threading.Lock(), threading.Lock()
-PILOT_STEPS = ("idea", "script", "montage", "video", "publish")   # publish: يوافق على الكابشن والموعد قبل ما يتجدول
+PILOT_STEPS = ("idea", "word", "script", "montage", "video", "publish")   # word: كلمة «علّق بكلمة» لما تكون «أختار عند النشر»   # publish: يوافق على الكابشن والموعد قبل ما يتجدول
 PILOT_BEST = {1: ["19:00"], 2: ["13:00", "20:00"], 3: ["12:00", "17:00", "21:00"], 4: ["09:00", "13:00", "18:00", "21:30"],
               5: ["09:00", "12:00", "15:00", "18:00", "21:30"], 6: ["08:00", "11:00", "13:30", "16:30", "19:00", "22:00"]}
 PILOT_DEFAULTS = {"on": False, "per_day": 2, "times": [{"t": t, "mine": False} for t in PILOT_BEST[2]], "tz": 180, "templates": [],
@@ -35042,7 +35092,15 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if kind == "carousel":   # 🖼️ الكاروسيل بيتنشر صور على إنستجرام
             post = publish_carousel(j["carousel_id"], CarouselPostIn(caption=caption, scheduled_at=when))
         else:
-            post = create_post(PostIn(export_id=j["export_id"], caption=caption, platforms=plats, scheduled_at=when))
+            opts = PostOptions()
+            if j.get("fid"):   # 💬 «علّق بكلمة»: الرد الآلي شغال على المنشور ده بنفس الكلمة اللي اتقالت في الفيديو
+                fd = flow_load(j["fid"])
+                pdf = post_defaults(flow_brain(fd))
+                if (w := flow_dm_word(fd, flow_brain(fd))) and pdf.get("dm_message"):
+                    opts = PostOptions(dm_on=True, dm_words=[w], dm_message=pdf["dm_message"], dm_reply=pdf.get("dm_reply") or "")
+                    if w not in caption:
+                        caption = f"{caption}\n\nعلّق بكلمة «{w}» وتوصلك رسالة على الخاص".strip()
+            post = create_post(PostIn(export_id=j["export_id"], caption=caption, platforms=plats, scheduled_at=when, options=opts))
         notify("autopilot", "ok", f"🛫 جُدول: {j['name']}", when.isoformat(timespec="minutes"), "7", post["id"])
         return put(status="done", phase="done", gate=None, post_id=post["id"], note="جُدول")
 
@@ -35068,7 +35126,17 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if gate("idea", "اختر فكرة من التلاتة"):
             return
         pick = j.get("pick") if any(i["id"] == j.get("pick") for i in d["ideas"]) else d["ideas"][0]["id"]
+        brain = flow_brain(d)
+        if kind != "carousel" and post_defaults(brain)["dm_mode"] == "ask":   # 💬 قبل النص: كلمة التعليق اللي هتتقال في آخره
+            it = next((i for i in d["ideas"] if i["id"] == pick), {})
+            return put(phase="word", idea_pick=pick, dm_word=dm_word_suggest({**d, "idea": it}, brain), pick=None, note="كلمة التعليق")
         flow_pick_idea(fid, FlowPickIn(id=pick))
+        return put(phase="script", pick=None, note="جارٍ كتابة النص")
+
+    if ph == "word":
+        if gate("word", "كلمة التعليق: وافق عليها أو غيّرها"):
+            return
+        flow_pick_idea(fid, FlowPickIn(id=j.get("idea_pick") or "", dm_word=str(j.get("dm_word") or "")))
         return put(phase="script", pick=None, note="جارٍ كتابة النص")
 
     if ph == "script":
@@ -35309,7 +35377,8 @@ def pilot_state() -> dict:
     twins = [{"id": t["id"], "name": t.get("name") or "", "ready": bool(t["ready"]["video"] or t["ready"]["photo"])} for t in twins_list()]
     upcoming = [a.isoformat(timespec="minutes") for a in pilot_slots(s, datetime.now(timezone.utc), 48)][:12]
     return {"settings": s, "jobs": jobs, "custom": custom, "twins": twins, "best": PILOT_BEST, "upcoming": upcoming,
-            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam")), "fee": pilot_fee(), "linked": pilot_linked()}
+            "waiting": sum(1 for j in d["jobs"] if j.get("status") in ("wait", "cam")), "fee": pilot_fee(), "linked": pilot_linked(),
+            "dm_mode": post_defaults(active_client())["dm_mode"]}
 
 
 def pilot_linked() -> bool:
@@ -35395,6 +35464,7 @@ def pilot_put(body: PilotIn, request: Request):
 
 class PilotOkIn(BaseModel):
     pick: str = ""
+    word: str | None = None   # 💬 كلمة التعليق (لو غيّرها، أو فاضية = من غير «علّق بكلمة»)
 
 
 @app.post("/api/pilot/jobs/{jid}/ok")
@@ -35404,6 +35474,8 @@ def pilot_ok(jid: str, body: PilotOkIn):
         j = next((x for x in d["jobs"] if x["id"] == jid), None)
         if not j or j.get("status") != "wait":
             raise HTTPException(400, "هذه المهمة لا تنتظر موافقة")
+        if j["gate"] == "word" and body.word is not None:
+            j["dm_word"] = body.word.strip()[:30]
         j.update(status="run", passed=[*(j.get("passed") or []), j["gate"]], gate=None, pick=body.pick or None, note="يُكمل", updated_at=now())
     pilot_update(fn)
     return pilot_state()
