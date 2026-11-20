@@ -828,7 +828,7 @@ const Flow = (() => {
     S.avScene = cur;
     const own = (tw?.backgrounds || []).map((b) => `<button type="button" class="flw-scn own${cur.bg === b.id ? " on" : ""}" data-avbg="${esc(b.id)}"><img src="${esc(b.url)}" alt=""><span>${esc(b.name || "مكانك")}</span></button>`).join("");
     return `<section class="flw-scnbox"><h3>الخلفية ووضعية التصوير</h3>
-      <div class="flw-scns">${(S.avScenes || []).map((x) => `<button type="button" class="flw-scn${!cur.bg && cur.id === x.id ? " on" : ""}" data-avscene="${esc(x.id)}"><span>${esc(x.name)}</span></button>`).join("")}${own}
+      <div class="flw-scns">${(S.avScenes || []).map((x) => `<button type="button" class="flw-scn${!cur.bg && cur.id === x.id ? " on" : ""}" data-avscene="${esc(x.id)}">${x.img ? `<img class="sq" src="${esc(x.img)}" alt="">` : ""}<span>${esc(x.name)}</span></button>`).join("")}${own}
         <label class="flw-scn add"><span>＋ مكانك (صورة)</span><input type="file" accept="image/*" data-avbgup hidden></label></div></section>`;
   }
   // 🪞 إنشاء الأفاتار جوه المسار نفسه (من غير ما يخرج لصفحة تانية): اسم وموافقة ← فيديو وهو بيقرا النص، أو صورة أمامية

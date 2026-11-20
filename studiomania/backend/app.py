@@ -1555,6 +1555,11 @@ AVATAR_SCENES = {
     "sofa": ("صالة المنزل · على الأريكة", "sitting relaxed on a sofa in a cozy living room, phone on a tripod in front at eye level (not visible), warm lamp light",
              "talks to the camera in a relaxed friendly way, small gestures, static camera"),
 }
+# 🙂 أفاتارات جاهزة من سمسم كيت (أشخاص مولّدين بالذكاء الاصطناعي، مش ناس حقيقيين): العميل يستخدمها على طول من غير ما يصوّر نفسه.
+# الصورة في frontend/avatars/ready، وأول ما العميل يستخدم واحد بتتعمل له نسخة في أفاتاراته (عشان أماكنه وفيديوهاته تتحفظ عليها)،
+# والصوت صوت جاهز بلهجة المشروع على قد نوع الشخص (رجل/امرأة).
+READY_AVATARS = {"saud": ("سعود", "male"), "reem": ("ريم", "female"), "omar": ("عمر", "male"), "mariam": ("مريم", "female"),
+                 "dr_khaled": ("د. خالد", "male"), "dr_huda": ("د. هدى", "female"), "fahad": ("فهد", "male"), "salma": ("سلمى", "female")}
 AVATAR_STYLES = {"real": "photorealistic portrait photo, natural skin texture, soft studio light",
                  "3d": "polished 3D animated character, Pixar-like, soft global illumination",
                  "cartoon": "flat 2D cartoon character, clean outlines, friendly colors"}
@@ -26981,7 +26986,8 @@ def my_idea_dict(s: dict) -> dict:
     return {"id": s["id"], "title": it.get("title") or "", "text": it.get("idea") or "", "hook": it.get("hook") or "", "url": it.get("url") or "",
             "script": it.get("script") or "", "sources": it.get("sources") or [], "dropped": it.get("dropped") or 0,
             "audio_url": f"/api/my-ideas/{s['id']}/audio" if it.get("audio") else None, "status": s.get("status") or "ready", "error": s.get("error"),
-            "polished": bool(it.get("raw")), "mine": bool(s.get("mine")), "at": s.get("at"), "used_at": s.get("used_at")}
+            "polished": bool(it.get("raw")), "mine": bool(s.get("mine")), "at": s.get("at"), "used_at": s.get("used_at"),
+            "auto": str(s.get("origin") or "").startswith("auto")}
 
 
 def my_ideas_cid() -> str:
@@ -27000,7 +27006,10 @@ def my_idea_title(text: str, url: str) -> str:
 
 @app.get("/api/my-ideas")
 def my_ideas_list():
-    m = mem_load(my_ideas_cid())
+    cid = my_ideas_cid()
+    if active_client_id():
+        brain_ideas_refill(cid, active_client_id())   # 🗓️ أفكار جديدة كل يوم (في الخلفية)
+    m = mem_load(cid)
     return [my_idea_dict(x) for x in reversed(m.get("saved") or []) if x.get("kind") == "idea"]
 
 
@@ -30983,7 +30992,56 @@ def twins_list():
         if not owned(d.get("client_id")) and "chars" not in share_keys():   # 🔒 نسخة براند تاني (إلا لو «الشخصيات» متشاركة)
             continue
         out.append(twin_to_dict(f.parent.name, d))
+    have = {t.get("stock") for t in out if owned(t.get("client_id"))}
+    for rid, (name, gender) in READY_AVATARS.items():   # 🙂 الجاهزة اللي لسه مااستخدمهاش
+        if rid not in have:
+            out.append({"id": f"r-{rid}", "name": name, "stock": rid, "gender": gender, "photos": [{"angle": "front", "url": f"/avatars/ready/{rid}.jpg"}],
+                        "backgrounds": [], "clips": [], "busy": False, "video_url": None, "voice_url": None,
+                        "ready": {"video": False, "photo": True, "voice": False, "photos": 1, "backgrounds": 0}})
     return out
+
+
+def twin_real(tid: str) -> str:
+    """🙂 أفاتار جاهز («r-…»): نسخة منه في أفاتارات العميل (بتتعمل مرة)، وأي أفاتار تاني زي ما هو."""
+    if not str(tid or "").startswith("r-"):
+        return tid
+    rid = tid[2:]
+    if rid not in READY_AVATARS:
+        raise HTTPException(404, "هذا الأفاتار غير موجود")
+    with TWIN_LOCK:
+        for f in TWINS_DIR.glob("*/twin.json"):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if d.get("stock") == rid and owned(d.get("client_id")):
+                return f.parent.name
+        new = uuid.uuid4().hex[:10]
+        twin_dir(new).mkdir(parents=True)
+        shutil.copyfile(FRONTEND_DIR / "avatars" / "ready" / f"{rid}.jpg", twin_dir(new) / "photo_front.jpg")
+        name, gender = READY_AVATARS[rid]
+        twin_save(new, {"name": name, "client_id": active_client_id(), "stock": rid, "gender": gender, "video": None, "voice": None, "clips": [],
+                        "photos": [{"angle": "front", "file": "photo_front.jpg", "at": now()}], "created_at": now()})
+    return new
+
+
+def twin_voice_for(tid: str, lang: str, cid: str | None) -> str:
+    """🎙️ صوت الأفاتار: صوته المستنسخ، وللجاهز صوت جاهز بلهجة المشروع على قد نوعه، وإلا صوت الراوي."""
+    if twin_voice_raw(tid):
+        return f"twin:{tid}"
+    t = twin_load(tid)
+    if t.get("stock"):
+        vs = (dub.DIALECTS.get(lang) or {}).get("voices") or []
+        v = next((x for x in vs if (dub.VOICES.get(x) or {}).get("gender") == t.get("gender")), None)
+        if v:
+            return v
+    return brand_narrator(lang, cid)
+
+
+@app.post("/api/twins/{tid}/use")
+def twin_use(tid: str):
+    """🙂 استخدام أفاتار جاهز: بيرجع النسخة الحقيقية بتاعته."""
+    return twin_to_dict(twin_real(tid), twin_load(twin_real(tid)))
 
 
 class TwinNewIn(BaseModel):
@@ -31116,7 +31174,9 @@ def twin_voice(tid: str, file: UploadFile = File(...)):
         if old:
             (folder / old).unlink(missing_ok=True)
         d["voice"] = {"file": name, "duration": round(dur, 2), "at": now()}
-    return twin_to_dict(tid, twin_update(tid, fn))
+    out = twin_to_dict(tid, twin_update(tid, fn))
+    threading.Thread(target=twin_voice_sample, args=(tid,), daemon=True).start()   # 🎚️ تنضيف العينة من دلوقتي (عشان أول فيديو مايستناش)
+    return out
 
 
 def twin_voice_sample(tid: str) -> Path | None:
@@ -31246,9 +31306,14 @@ def twin_scene_still(tid: str, cid: str, scene: dict) -> Path:
         refs.append(atlas.reference_url(folder / bg["file"]))
         where = "inside exactly the place shown in the second reference photo, phone camera at eye level (not visible)"
     else:
-        where = AVATAR_SCENES.get(scene.get("id") or "office", AVATAR_SCENES["office"])[1]
+        sid = scene.get("id") if scene.get("id") in AVATAR_SCENES else "office"
+        where = AVATAR_SCENES[sid][1].replace(" him ", " the person ").replace(" his ", " their ")
+        look = FRONTEND_DIR / "avatars" / "scenes" / f"{sid}.jpg"   # 🏞️ نفس صورة المكان اللي العميل شافها في الخلفيات
+        if look.is_file():
+            refs.append(atlas.reference_url(look))
+            where += ", in the same place as the second reference photo"
     prompt = ("Photorealistic vertical smartphone photo of the SAME person as the first reference photo (keep the exact face, hair, skin tone, beard if any, "
-              "and the same clothes), " + where + ". He looks into the lens, natural expression, mouth slightly open as if talking, real skin texture, "
+              "and the same clothes), " + where + ". The person looks into the lens, natural expression, mouth slightly open as if talking, real skin texture, "
               "ordinary phone camera look, candid, not retouched. Modest clothing. No text, captions or logos in the image.")
     if atlas.mock_mode():
         shutil.copyfile(face, dest)
@@ -31520,7 +31585,7 @@ class AvatarSayIn(BaseModel):
 @app.get("/api/avatar-scenes")
 def avatar_scenes():
     """🎬 الخلفيات الجاهزة بوضعياتها (للمسار والأوتوبايلوت)."""
-    return [{"id": k, "name": v[0]} for k, v in AVATAR_SCENES.items()]
+    return [{"id": k, "name": v[0], "img": f"/avatars/scenes/{k}.jpg"} for k, v in AVATAR_SCENES.items()]
 
 
 @app.post("/api/flows/{fid}/avatar-say")
@@ -31528,13 +31593,14 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     """🪞 قالب الأفاتار: نص المشروع بصوت ← الأفاتار بيقوله ← الفيديو بيبقى الفيديو الأساسي (وبعده الملاحظات والمونتاج زي التصوير بالجوال)."""
     d = flow_load(fid)
     tid = pilot_twin({"twin": body.twin})
+    tid = twin_real(tid) if tid else tid
     if not tid:
         raise HTTPException(400, "لا يوجد أفاتار جاهز. أنشئ الأفاتار أولًا")
     text = pilot_say(d.get("scenario") or {})
     if not text:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-    voice = f"twin:{tid}" if twin_voice_raw(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
+    voice = twin_voice_for(tid, lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وللجاهز صوت جاهز، وإلا صوت الراوي
     wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
     if not twin_face(tid):
         raise HTTPException(400, "يحتاج الأفاتار إلى صورة أمامية أو فيديو")
@@ -35122,8 +35188,9 @@ def pilot_twin(s: dict) -> str | None:
     ts = twins_list()
     for t in ts:
         if t["id"] == s.get("twin") and (t["ready"]["video"] or t["ready"]["photo"]):
-            return t["id"]
-    return next((t["id"] for t in ts if t["ready"]["video"] or t["ready"]["photo"]), None)
+            return twin_real(t["id"])
+    first = next((t["id"] for t in ts if t["ready"]["video"] or t["ready"]["photo"]), None)
+    return twin_real(first) if first else None
 
 
 def pilot_slots(s: dict, start: datetime, hours: float = 24) -> list[datetime]:
@@ -35676,7 +35743,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if not text:
             raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-        voice = f"twin:{tid}" if twin_voice_raw(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه
+        voice = twin_voice_for(tid, lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه، وللجاهز صوت جاهز
         wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
         cid = uuid.uuid4().hex[:8]
         wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")   # الصوت بيتخصم جوّه vo_say
