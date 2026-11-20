@@ -299,7 +299,25 @@ const Gallery = (() => {
   // 🃏 كارت الكاروسيل = رزمة شرائحه فوق بعض: لما تقف عليه بتتفرد زي الكوتشينة من تحت (الأولى فوق على اليمين)
   function deck(sl) {
     const a = sl.slice(0, 5), n = a.length;
-    return `<span class="car-deck">${a.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" style="--i:${(n - 1) / 2 - i};z-index:${n - i}">`).join("")}</span>`;
+    return `<span class="car-deck">${a.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" style="--i:${(n - 1) / 2 - i};z-index:${n - i}">`).join("")}</span>
+      <button type="button" class="car-eye" data-careye title="اعرض كل الشرائح" aria-label="اعرض كل الشرائح"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>`;
+  }
+  // 👁️ كل شرائح الكاروسيل مفرودة جنب بعض (من غير ما يدخل القالب): بتطلع من الرزمة وتتفرد صف واحد
+  function carSpread(x) {
+    const sl = (x?.slides || []).slice(0, 10);
+    if (!sl.length) return;
+    const n = sl.length, ov = Object.assign(document.createElement("div"), { className: "car-spread" });
+    ov.innerHTML = `<div class="car-spread-row">${sl.map((u, i) => `<figure style="--i:${i - (n - 1) / 2};--d:${i * 45}ms"><img src="${esc(u)}" alt=""><figcaption class="num">${i + 1}</figcaption></figure>`).join("")}</div>
+      <div class="car-spread-bar"><b>${esc(x.name)}</b><button type="button" class="car-spread-go" data-csgo>ابدأ بهذا القالب</button><button type="button" class="car-spread-x" data-csx aria-label="إغلاق">✕</button></div>`;
+    const close = () => { ov.classList.remove("on"); removeEventListener("keydown", key); setTimeout(() => ov.remove(), 300); };
+    const key = (e) => { if (e.key === "Escape") close(); };
+    ov.addEventListener("click", (e) => {
+      if (e.target.closest("[data-csgo]")) { close(); return startTpl(x); }
+      if (e.target.closest("[data-csx]") || !e.target.closest("figure")) close();
+    });
+    addEventListener("keydown", key);
+    (document.getElementById("nh") || document.body).appendChild(ov);
+    requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("on")));
   }
   function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
@@ -603,6 +621,7 @@ const Gallery = (() => {
       const D = W.drag; if (!D) return; const a = D.s[0], b = D.s[D.s.length - 1], dt = (b[0] - a[0]) / 1000;
       const c = e && document.elementFromPoint(e.clientX, e.clientY)?.closest(".nh-wc");
       W.drag = null;
+      if (D.moved < 6 && c && document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-careye]")) return carSpread(S.items[W.list[+c.dataset.wi][1]]);
       if (D.moved < 6 && c) return tap(+c.dataset.wi);
       W.vel = dt > .008 && performance.now() - b[0] < 80 ? Math.max(-VMAX, Math.min(VMAX, (b[1] - a[1]) / dt)) : 0;
       W.fric = 1.7;

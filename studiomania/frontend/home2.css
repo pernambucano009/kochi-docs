@@ -3310,3 +3310,26 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-avways details ol { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.8; max-height: 180px; overflow: auto; }
 .flw-avways .flw-btn { justify-self: start; }
 .flw-avmk .flw-avlines { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.8; max-height: 180px; overflow: auto; }
+/* 👁️ عين على كارت الكاروسيل (تظهر مع الهوفر) ← كل الشرائح مفرودة صف واحد فوق الصفحة */
+#nh .nh-wc-art.car .car-eye { position: absolute; left: 50%; bottom: 14px; z-index: 20; translate: -50% 6px; width: 46px; height: 46px; padding: 0; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: color-mix(in srgb, #1C1B1C 55%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 0 0 7px rgba(255, 255, 255, .22); opacity: 0; transition: opacity .25s, translate .25s, scale .2s; pointer-events: auto; }
+#nh .nh-wc-art.car .car-eye svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#nh .nh-wc:hover .nh-wc-art.car .car-eye { opacity: 1; translate: -50% 0; }
+#nh .nh-wc-art.car .car-eye:hover { scale: 1.1; background: var(--nh-accent); }
+#nh .car-spread { position: fixed; inset: 0; z-index: 9000; display: grid; grid-template-rows: 1fr auto; align-items: center; padding: 32px 24px 24px; gap: 18px;
+  background: color-mix(in srgb, #0c0c0e 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); opacity: 0; transition: opacity .3s; }
+#nh .car-spread.on { opacity: 1; }
+#nh .car-spread-row { display: flex; justify-content: center; gap: 16px; direction: rtl; min-height: 0; height: 100%; align-items: center; }
+#nh .car-spread figure { margin: 0; position: relative; flex: 0 1 auto; height: min(62vh, 560px); aspect-ratio: 4 / 5; max-width: calc((100vw - 48px) / 3.2);
+  transform: translateX(calc(var(--i) * -100% - var(--i) * 16px)) rotate(calc(var(--i) * -4deg)) scale(.92); transition: transform .55s cubic-bezier(.2, .9, .25, 1.1) var(--d); }
+#nh .car-spread.on figure { transform: none; }
+#nh .car-spread figure img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .6); }
+#nh .car-spread figcaption { position: absolute; bottom: -34px; left: 50%; translate: -50% 0; min-width: 26px; height: 26px; border-radius: 99px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .45); }
+#nh .car-spread-bar { display: flex; justify-content: center; align-items: center; gap: 14px; color: #fff; direction: rtl; }
+#nh .car-spread-bar b { font-size: 16px; }
+#nh .car-spread-go { border: 0; border-radius: 99px; padding: 11px 22px; font: 600 13px var(--nh-arabic); color: #fff; cursor: pointer;
+  background: linear-gradient(180deg, var(--glow-a) 0%, var(--glow-b) 55%, var(--glow-c) 100%); }
+#nh .car-spread-x { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35); background: none; color: #fff; font-size: 16px; cursor: pointer; }
+@media (max-width: 720px) { #nh .car-spread-row { overflow-x: auto; justify-content: flex-start; } #nh .car-spread figure { height: 52vh; max-width: none; flex: 0 0 auto; } }

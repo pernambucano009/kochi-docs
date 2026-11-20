@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "اعرض كل الشرائح": "Show all slides",
   "صوت الأفاتار غير موجود. سجّل صوته من خطوة إنشاء الأفاتار": "The avatar's voice is missing. Record it in the avatar creation step",
   "✓ تم": "✓ Done",
   "🎙️ صوت {0}": "🎙️ {0}'s voice",
