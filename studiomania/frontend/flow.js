@@ -45,6 +45,8 @@ const Flow = (() => {
   const isCode = (d) => d?.template?.kind === "motion";
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
   const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"], ["publish", "النشر"]];
+  // 🪄 الأفاتار: من غير «الملاحظات» (دي للي بيصوّر نفسه ويعيد التصوير، إنما فيديو الأفاتار إحنا اللي بنعمله)
+  const STEPS_AVATAR = STEPS_PHONE.filter(([k]) => k !== "review");
   const isPhone = (d) => d?.template?.kind === "phone";
   const isAvatar = (d) => d?.template?.kind === "avatar";
   const isTalk = (d) => isPhone(d) || isAvatar(d);   // التصوير بالجوال والأفاتار: نفس التسلسل لحد النشر   // 🪞 نفس تسلسل التصوير بالجوال، بس الأفاتار هو اللي بيقول النص
@@ -52,7 +54,7 @@ const Flow = (() => {
   const STEPS_CAR = [["style", "الستايل"], ["idea", "الفكرة"], ["scenario", "النص"], ["carousel", "التعديلات"], ["publish", "النشر"]];
   const isCar = (d) => d?.template?.kind === "carousel";
   // 🧾 قوالب المعطيات (عرض السعر، آراء العملاء): أول خطوة تفاصيل العرض أو الآراء نفسها، والأفكار والنص مبنيين عليها
-  const steps0 = (d) => (isCar(d) ? STEPS_CAR : isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) || isAvatar(d) ? STEPS_PHONE : STEPS_AI);
+  const steps0 = (d) => (isCar(d) ? STEPS_CAR : isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isAvatar(d) ? STEPS_AVATAR : isPhone(d) ? STEPS_PHONE : STEPS_AI);
   // 🧾 القالب المخصص: التفاصيل ← الصوت ← … (مفيش فكرة ولا نص: النص بيتكتب من التفاصيل ويتختار لوحده)
   const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d).filter(([k]) => k !== "idea" && k !== "scenario")] : steps0(d));
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
@@ -145,7 +147,7 @@ const Flow = (() => {
   function stepper(d) {
     const cur = S.view === "publish" ? idx("publish", d) : idx(d.stage, d);
     const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: isTypo(d) ? !!d.output : !!d.scenario && !isCode(d),
-      shoot: isPhone(d) || isAvatar(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: (isVid(d) || isCar(d)) && d.output?.status === "done" || isTalk(d) && !!S.mstate?.project?.export_url, style: !!d.car_style, carousel: isCar(d) && !!d.scenario };
+      shoot: isPhone(d) || isAvatar(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : isAvatar(d) ? !!d.footage?.main : !!(d.review || d.montage), publish: (isVid(d) || isCar(d)) && d.output?.status === "done" || isTalk(d) && !!S.mstate?.project?.export_url, style: !!d.car_style, carousel: isCar(d) && !!d.scenario };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -795,9 +797,8 @@ const Flow = (() => {
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
     return `<h2>الفيديو جاهز</h2>
       <div class="flw-avdone"><div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video></div>
-        <div class="flw-avnext"><p>شاهد الفيديو. الخطوة التالية «الملاحظات»: يراجع البرنامج الفيديو والنص، ويقترح تحسينات قبل المونتاج.</p>
-          <button type="button" class="flw-btn orange big" data-phreview ${d.busy ? "disabled" : ""}>التالي: الملاحظات ←</button>
-          <button type="button" class="flw-link" data-automont>الفيديو مناسب، انتقل إلى المونتاج مباشرة ←</button>
+        <div class="flw-avnext"><p>شاهد الفيديو. الخطوة التالية «المونتاج»: يقص البرنامج السكتات، ويغيّر زاوية الكاميرا، ويضيف لقطات الـ B-roll والتايبوجرافي.</p>
+          <button type="button" class="flw-btn orange big" data-automont ${d.busy ? "disabled" : ""}>التالي: المونتاج ←</button>
           <span class="flw-avsep"></span>
           ${who}<button type="button" class="flw-link" data-avsay="${esc(sel)}">↻ أعد توليد الفيديو</button>
           <button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>${failed("avatar")}</div></div>`;

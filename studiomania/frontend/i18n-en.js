@@ -9945,6 +9945,8 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "التالي: المونتاج ←": "Next: Montage ←",
+  "شاهد الفيديو. الخطوة التالية «المونتاج»: يقص البرنامج السكتات، ويغيّر زاوية الكاميرا، ويضيف لقطات الـ B-roll والتايبوجرافي.": "Watch the video. The next step, «Montage», cuts the pauses, changes the camera angle, and adds B-roll shots and typography.",
   "التالي: الملاحظات ←": "Next: Notes ←",
   "الأفاتار يقول النص بوجهك وصوتك.": "The avatar says the script with your face and voice.",
   "النص الذي سيقوله الأفاتار": "The script the avatar will say",
