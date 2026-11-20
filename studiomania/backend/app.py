@@ -25508,6 +25508,35 @@ def brain_ideas_pick(d: dict, n: int = 2) -> list[dict]:
 IDEAS_MIN = 5
 IDEAS_REFILL = 8
 IDEAS_REFILL_EVERY = 6 * 3600
+IDEAS_DAILY = 24 * 3600   # 🗓️ أفكار جديدة كل يوم حتى لو الفولدر مليان (العناوين بتتجدد مع الترند والتعليقات والمنافسين)
+
+# 💬 تعليقات الجمهور الحقيقية: بنستنبط منها الاحتياج بس (لا الكومنت بيتعرض ولا صاحبه بيتذكر). فلتر الكود قبل الموديل
+_PRAISE = re.compile(r"^(ما ?شاء ?الله|تبارك ?الله|الله يعطيك|عاش|جميل|رائع|حلو|👏|🔥|❤️|😍)", re.I)
+_ASK = re.compile(r"[?؟]|\b(كيف|ليش|ليه|ازاي|إزاي|هل|وش|ايش|إيش|متى|امتى|كم|عندي|مشكلة|مشكلتي|ما اقدر|ما أقدر|مش قادر|بيوجع|يوجع|أبي|ابي|عايز|نفسي|ينفع|يصلح)\b")
+
+
+def audience_comments(n: int = 30) -> list[str]:
+    """تعليقات حقيقية على منشورات العلامة فيها سؤال أو مشكلة (من غير مجاملات ولا منشن ولا روابط ولا ردود العلامة نفسها)."""
+    out: list[str] = []
+    try:
+        posts = publisher.inbox_posts(20, None, 1).get("posts") or []
+    except Exception:  # noqa: BLE001
+        return out
+    for p in posts[:8]:
+        if not acct_visible(p.get("account_id")):
+            continue
+        try:
+            cs = publisher.inbox_comments(p["id"], p["account_id"])
+        except Exception:  # noqa: BLE001
+            continue
+        for c in cs:
+            t = re.sub(r"@\w+|https?://\S+", "", str(c.get("text") or "")).strip()
+            if c.get("mine") or len(t.split()) < 4 or _PRAISE.match(t) or not _ASK.search(t):
+                continue
+            out.append(t[:220])
+            if len(out) >= n:
+                return out
+    return out
 IDEAS_REFILLING: set[str] = set()
 
 
@@ -25531,7 +25560,8 @@ def brain_ideas_refill(cid: str, bid: str, force: bool = False) -> None:
         return
     mem = mem_load(cid)
     left = [x for x in mem.get("saved") or [] if x.get("kind") == "idea" and x.get("mine") and not x.get("used_at")]
-    if not force and (len(left) >= IDEAS_MIN or time.time() - float(mem.get("refill_at") or 0) < IDEAS_REFILL_EVERY):
+    since = time.time() - float(mem.get("refill_at") or 0)
+    if not force and since < IDEAS_DAILY and (len(left) >= IDEAS_MIN or since < IDEAS_REFILL_EVERY):
         return
     IDEAS_REFILLING.add(cid)
 
@@ -25540,10 +25570,11 @@ def brain_ideas_refill(cid: str, bid: str, force: bool = False) -> None:
             b = brain_row(bid) or {}
             wins = rival_winners(b.get("competitors") or {})
             trs = [t for t in (b.get("trends") or {}).get("items") or [] if t.get("title")][:8]
-            if not wins and not trs:
-                if b.get("competitors") or b.get("market"):
-                    start_trends(bid)   # مفيش ترندات لسه: تتجاب، والمرة الجاية تتستخدم
-                return
+            coms = audience_comments()
+            if not trs and (b.get("competitors") or b.get("market")):
+                start_trends(bid)   # مفيش ترندات لسه: تتجاب، والمرة الجاية تتستخدم
+            fp = fieldpacks.FIELDS.get(field_guess(b) or "") or {}
+            angles = [str(a) for a in (fp.get("angles") or [])][:12]
             lang = cz.full_brand(b).get("language") or "عربي"
             old = [str((x.get("item") or {}).get("title") or "") for x in mem.get("saved") or [] if x.get("kind") == "idea"]
             old += [str(u.get("title") or "") for u in mem.get("used") or [] if u.get("kind") == "idea"]
@@ -25561,8 +25592,13 @@ Competitor posts that clearly outperformed (views far above that account's usual
 Trends in this market now:
 {tl or "(none)"}
 
-Create {IDEAS_REFILL} short-video ideas for THIS brand. Each one takes the reason a winning post or trend worked (topic, question, format, emotion) and applies it to the brand's own offer and audience. Never copy a post. Mix sources. Skip anything similar to: {old[-60:]}
-Return JSON: {{"ideas": [{{"title": "...", "hook": "first spoken line", "idea": "2 sentences: what the video shows and says", "src": ["W0", "T1"]}}]}}"""}]
+Real questions and problems the brand's own audience wrote in comments (use only the NEED behind each one; never quote it, never mention a commenter or "a follower asked"):
+{chr(10).join(f"[C{i}] {c}" for i, c in enumerate(coms)) or "(none)"}
+
+Content angles that work in this field (use different ones): {angles or "(any)"}
+
+Create {IDEAS_REFILL} short-video ideas for THIS brand. Each one takes the reason a winning post, trend or audience question matters (topic, question, format, emotion) and applies it to the brand's own offer and audience. Never copy a post. Mix sources, and if there are few sources, use the field angles so every idea is a different topic and a different angle. Skip anything similar to: {old[-60:]}
+Return JSON: {{"ideas": [{{"title": "...", "hook": "first spoken line", "idea": "2 sentences: what the video shows and says", "src": ["W0", "T1", "C2"]}}]}}"""}]
             raw = rivals_llm(msgs, "أفكار من المنافسين والترند")
             items = []
             for it in (raw.get("ideas") or [])[:IDEAS_REFILL]:
@@ -25575,6 +25611,8 @@ Return JSON: {{"ideas": [{{"title": "...", "hook": "first spoken line", "idea": 
                         src.append({"kind": "rival", "handle": wins[int(m[2])]["handle"], "url": wins[int(m[2])].get("url") or "", "views": wins[int(m[2])]["views"]})
                     elif m and m[1] == "T" and int(m[2]) < len(trs):
                         src.append({"kind": "trend", "title": trs[int(m[2])]["title"]})
+                    elif re.fullmatch(r"C\d+", str(k).strip().upper()):
+                        src.append({"kind": "audience"})   # سؤال من الجمهور (من غير نص الكومنت)
                 items.append({"id": uuid.uuid4().hex[:10], "kind": "idea", "mine": True, "at": now(), "status": "ready", "origin": "auto:rivals",
                               "item": {"title": str(it["title"])[:120], "idea": str(it.get("idea") or "")[:600], "hook": str(it.get("hook") or "")[:300],
                                        "url": "", "audio": "", "sources": src[:3]}})
@@ -26877,6 +26915,7 @@ def flow_save_later(fid: str, body: FlowSaveIn):
 def flow_saved(fid: str):
     """مكتبة «لبعدين» الخاصة بالعميل: الأفكار تنفع في أي قالب، والسيناريو في نفس القالب فقط."""
     d = flow_load(fid)
+    brain_ideas_refill(SHARED_LIB if "ideas" in share_keys() else mem_cid(d), d.get("client_id") or active_client_id())   # 🗓️ أفكار جديدة كل يوم (في الخلفية)
     return [{**saved_to_dict(s), "now": bool(s.get("now")), "here": s["kind"] in ("idea", "trend") or (s.get("template") or {}).get("id") == d["template"].get("id")}
             for s in reversed(saved_of(d))]
 

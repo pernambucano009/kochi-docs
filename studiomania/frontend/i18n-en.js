@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "جديدة": "New",
   "‹ رجوع": "‹ Back",
   "＋ أنشئ أفاتار": "＋ Create an avatar",
   "لا يوجد أفاتار بعد. أنشئه مرة واحدة من صورة أو فيديو، ثم يقول أي نص بوجهك وصوتك.": "No avatar yet. Create it once from a photo or a video, then it says any script with your face and voice.",

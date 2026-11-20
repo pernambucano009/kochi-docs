@@ -3348,3 +3348,4 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-scn.on { border-color: var(--ink, #1C1B1C); box-shadow: 0 0 0 1px var(--ink, #1C1B1C) inset; font-weight: 600; }
 .flw-scn img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
 .flw-scn.add { border-style: dashed; color: var(--nh-muted, #6B6B67); }
+.flw-new { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: rgba(229, 97, 62, .12); color: var(--nh-accent, #E5613E); }

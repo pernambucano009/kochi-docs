@@ -305,10 +305,12 @@ const Flow = (() => {
   }
   // 💡 أفكارك من «فولدر الأفكار» (مكتبة محتويات البراند): بتظهر هنا لو حابب تستخدم واحدة
   function mineRow(d) {
-    const list = S.trendsFor === d.id ? S.mine || [] : [];
+    // 🗓️ الأفكار اللي لسه ما اتستخدمتش الأول، والأحدث فوق (فيه أفكار جديدة كل يوم من الترند والمنافسين وأسئلة الجمهور)
+    const ts = (x) => Date.parse(x.at || "") || 0, day = Date.now() - 86400000;
+    const list = (S.trendsFor === d.id ? S.mine || [] : []).slice().sort((a, b) => (!!a.used_at - !!b.used_at) || ts(b) - ts(a));
     if (!list.length) return "";
     return `<div class="flw-trend flw-mine"><b>💡 أفكارك في مجلد الأفكار (${list.length}). هل تستخدم واحدة منها؟</b>
-      <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
+      <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ts(x) > day ? "<em class=\"flw-new\">جديدة</em> " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
   const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
