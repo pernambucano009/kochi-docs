@@ -8161,7 +8161,7 @@ def car_style_asset(sid: str) -> dict:
     name, prompt = cz.STYLES[k]
     files = [FRONTEND_DIR / "gallery" / "carstyle" / f"{k}-{i}.jpg" for i in range(3)]
     return {"id": f"cs-{k}", "kind": "template", "name": name, "notes": f"{prompt}. {cz.STYLE_RULE}", "handle": "", "builtin": True,
-            "images": [{"name": f.name, "url": f"/gallery/carstyle/{f.name}", "path": str(f)} for f in files if f.is_file()]}
+            "images": [{"name": f.name, "url": f"/gallery/carstyle/{f.name}?v=2", "path": str(f)} for f in files if f.is_file()]}
 
 
 @app.get("/api/carousel/library")
@@ -34810,6 +34810,11 @@ def pilot_auto_tpl(d: dict, pool: list[str]) -> str | None:
     return min(fresh, key=lambda t: (last.get(t, ""), random.random()))
 
 
+def pilot_field() -> str:
+    bid = active_client_id()
+    return field_guess(brain_row(bid) or {}) if bid else ""
+
+
 def pilot_plan() -> None:
     """مهمة جديدة لكل موعد قادم في الـ ٢٤ ساعة ليس له مهمة، والقالب يتلف على القوالب المختارة بالدور."""
     def fn(d):
@@ -34825,6 +34830,10 @@ def pilot_plan() -> None:
             if key[:16] in have:
                 continue
             tpl = pool[d["rot"] % len(pool)]
+            # 🌱 التنمية البشرية: الكاروسيل هو الأساس، ٢ من كل ٣ منشورات كاروسيل والتالت فيديو (لو الاتنين متعلّم عليهم)
+            others = [t for t in pool if t != "carousel"]
+            if "carousel" in pool and others and pilot_field() == "selfdev":
+                tpl = "carousel" if d["rot"] % 3 != 2 else others[(d["rot"] // 3) % len(others)]
             d["rot"] += 1
             auto = tpl == "tpl:auto" or tpl.startswith("t-") or tpl in typotpl.SPECS
             if auto:   # 🎨 القالب يختاره البرنامج (حد ٥ في الأسبوع ومن غير تكرار)
