@@ -3340,3 +3340,11 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-avnext p { margin: 0; line-height: 1.8; color: var(--nh-muted, #6B6B67); }
 .flw-avsep { width: 100%; height: 1px; background: var(--nh-line, rgba(24, 23, 24, .1)); margin: 6px 0; }
 @media (max-width: 720px) { .flw-avdone { grid-template-columns: 1fr; } }
+/* 🎬 الخلفية والوضعية في خطوة فيديو الأفاتار */
+.flw-scnbox { display: grid; gap: 10px; margin-block: 8px; }
+.flw-scnbox h3 { margin: 0; font-size: 15px; }
+.flw-scns { display: flex; flex-wrap: wrap; gap: 8px; }
+.flw-scn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px; border: 1px solid var(--nh-line, rgba(24, 23, 24, .12)); background: var(--nh-card, #fff); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.flw-scn.on { border-color: var(--ink, #1C1B1C); box-shadow: 0 0 0 1px var(--ink, #1C1B1C) inset; font-weight: 600; }
+.flw-scn img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.flw-scn.add { border-style: dashed; color: var(--nh-muted, #6B6B67); }

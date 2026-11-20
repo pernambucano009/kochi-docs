@@ -3759,3 +3759,4 @@ html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
 .bx-lock { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 0 auto 10px; padding: 10px 16px; border-radius: 14px; font-size: 13px;
   background: color-mix(in srgb, var(--nh-accent, #E5613E) 10%, transparent); color: var(--nh-ink, #1C1B1C); max-width: 680px; }
 .bx-lock-go { border: 0; border-radius: 99px; padding: 7px 16px; font: 600 12.5px inherit; color: #fff; cursor: pointer; background: linear-gradient(180deg, var(--glow-a, #F48A62) 0%, var(--glow-b, #E5613E) 55%, var(--glow-c, #D44E2C) 100%); }
+.ap-scn { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0 2px; }

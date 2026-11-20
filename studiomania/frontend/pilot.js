@@ -283,12 +283,13 @@ const PilotPage = (() => {
   }
   // 🛫 أنواع المنشورات بالترتيب، ولكل نوع خطواته. الخطوة اللي ليها مفتاح (idea…) تقبل الدايرة الزرقا (توقف لحد موافقتك)
   const TYPES = [
-    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
-    { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["script", "النص"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["@scene", "الخلفية والوضعية"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "photo", n: "صور", soon: true },
     { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
   ];
+  let SCN = null;   // 🎬 خلفيات الأفاتار الجاهزة (من السيرفر)
   const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
   const typeOn = (t) => (t.id === "tpl" ? S.d.settings.templates.includes("tpl:auto") || tplIds().length > 0 : S.d.settings.templates.includes(t.id));
   const carStyles = () => (S.lib || []).filter((a) => a.kind === "style" || a.kind === "template");
@@ -309,6 +310,8 @@ const PilotPage = (() => {
         if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
         // الستايل: «تلقائي» لما مفيش ستايل متعلّم عليه والقايمة مقفولة. وهي مفتوحة الكلمة بتختفي (هتختار)، ولو قفلتها من غير اختيار بترجع
         if (k === "@style") return `<button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>`;
+        // 🎬 خلفيات الأفاتار: اللي يتعلّم عليه الأوتوبايلوت يتناوب بينه، ومن غير اختيار بيتناوب على كلها
+        if (k === "@scene") return `<button type="button" class="ap-stp pick${S.pop === "scene" ? " on" : ""}" data-open="scene">${esc(n)} ${(s.av_scenes || []).length ? `<b class="num">${s.av_scenes.length}</b>` : S.pop === "scene" ? "" : "<small>تلقائي</small>"} ${S.pop === "scene" ? "▴" : "▾"}</button>`;
         // 🔗 النشر من غير حسابات مربوطة: رمادي، والضغط عليه بيقول يربط حساب
         if (k === "publish" && S.d.linked === false) return `<button type="button" class="ap-stp off" data-needlink title="اربط حساب سوشيال ميديا واحدًا على الأقل">${esc(n)}</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
@@ -329,6 +332,11 @@ const PilotPage = (() => {
         <div class="ap-grid">${codeTpls().map((x) => `<button type="button" class="ap-card ${on.has(x.id) ? "on" : ""}" data-tplc="${esc(x.id)}">
           <video src="${esc(x.sample_url || "")}" poster="${esc(x.cover_url || "")}" muted loop playsinline preload="none"></video><span class="ck">✓</span><b>${esc(x.name)}</b></button>`).join("") || `<span class="ap-none">لا توجد قوالب</span>`}</div>`;
       box.querySelectorAll("video").forEach((v) => { const c = v.closest(".ap-card"); c.onmouseenter = () => v.play().catch(() => {}); c.onmouseleave = () => v.pause(); });
+    } else if (S.pop === "scene") {
+      if (!SCN) { SCN = []; api("/api/avatar-scenes").then((d) => { SCN = d || []; if (S.pop === "scene") drawPop(); }).catch(() => {}); }
+      const on = new Set(s.av_scenes || []);
+      box.innerHTML = `<div class="ap-ph"><b>خلفيات الأفاتار</b><small>علّم على الأماكن التي تناسبك، والأوتوبايلوت يتناوب بينها. دون اختيار يتناوب على كلها</small><button type="button" data-popx>تم</button></div>
+        <div class="ap-scn">${SCN.map((x) => `<button type="button" class="ap-stp ${on.has(x.id) ? "dot" : ""}" data-scenec="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>`;
     } else {
       const on = new Set(s.car_styles || []), lib = carStyles();
       box.innerHTML = `<div class="ap-ph"><b>ستايلات الكاروسيل</b><small>${lib.length ? "علّم على ستايل واحد أو أكثر، والأوتوبايلوت يتناوب بينها" : "لا توجد ستايلات بعد: أضفها من صفحة الكاروسيل، وحتى ذلك يصمّم بستايل علامتك"}</small><button type="button" data-popx>تم</button></div>
@@ -481,6 +489,11 @@ const PilotPage = (() => {
         const set = new Set(s.templates), x = codeTpls().find((t) => t.id === d.tplc);
         set.has(d.tplc) ? set.delete(d.tplc) : set.add(d.tplc);
         return save({ templates: [...set], names: x ? { [x.id]: x.name } : {} });
+      }
+      if (d.scenec) {
+        const set = new Set(s.av_scenes || []);
+        set.has(d.scenec) ? set.delete(d.scenec) : set.add(d.scenec);
+        return save({ av_scenes: [...set] });
       }
       if (d.styc) {
         const set = new Set(s.car_styles || []);

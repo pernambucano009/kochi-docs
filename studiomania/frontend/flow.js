@@ -788,10 +788,10 @@ const Flow = (() => {
     if (d.busy === "avatar") return `<h2>الفيديو</h2>${working("الأفاتار يتكلم الآن… يستغرق بضع دقائق")}`;
     if (S.twins === null) return `<h2>الفيديو</h2>${working("جارٍ جلب الأفاتار…")}`;
     if (!twins.length || S.avMake) return `<h2>الفيديو</h2>${avMaker(twins.length > 0)}`;
-    // قبل الفيديو: النص + زرار واحد يولّده
-    if (!mn) return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك.</p>
-      ${beats ? `<details class="flw-shotlist" open><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
-      ${who}${failed("avatar")}
+    // قبل الفيديو: النص، والخلفية والوضعية، وزرار واحد يولّده
+    if (!mn) return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك، في المكان والوضعية التي تختارها.</p>
+      ${beats ? `<details class="flw-shotlist"><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
+      ${who}${scenePick(d, twins.find((t) => t.id === sel))}${failed("avatar")}
       <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
         <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار</button></div>`;
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
@@ -802,6 +802,16 @@ const Flow = (() => {
           <span class="flw-avsep"></span>
           ${who}<button type="button" class="flw-link" data-avsay="${esc(sel)}">↻ أعد توليد الفيديو</button>
           <button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>${failed("avatar")}</div></div>`;
+  }
+  // 🎬 الخلفية والوضعية: أماكن جاهزة (كل مكان بحركته)، أو مكان العميل اللي رفعه للأفاتار ده
+  function scenePick(d, tw) {
+    if (S.avScenes === undefined) { S.avScenes = null; api("/api/avatar-scenes").then((x) => { S.avScenes = x || []; render(); }).catch(() => { S.avScenes = []; render(); }); }
+    const cur = S.avScene || d.av_scene || { id: "office", bg: "" };
+    S.avScene = cur;
+    const own = (tw?.backgrounds || []).map((b) => `<button type="button" class="flw-scn own${cur.bg === b.id ? " on" : ""}" data-avbg="${esc(b.id)}"><img src="${esc(b.url)}" alt=""><span>${esc(b.name || "مكانك")}</span></button>`).join("");
+    return `<section class="flw-scnbox"><h3>الخلفية والوضعية</h3>
+      <div class="flw-scns">${(S.avScenes || []).map((x) => `<button type="button" class="flw-scn${!cur.bg && cur.id === x.id ? " on" : ""}" data-avscene="${esc(x.id)}"><span>${esc(x.name)}</span></button>`).join("")}${own}
+        <label class="flw-scn add"><span>＋ مكانك (صورة)</span><input type="file" accept="image/*" data-avbgup hidden></label></div></section>`;
   }
   // 🪞 إنشاء الأفاتار جوه المسار نفسه (من غير ما يخرج لصفحة تانية): اسم وموافقة ← فيديو وهو بيقرا النص، أو صورة أمامية
   function avMaker(canBack) {
@@ -1109,7 +1119,9 @@ const Flow = (() => {
       try { const t = await api("/api/twins", { method: "POST", ...J({ name: A.name.trim(), consent: true }) }); S.avNew = { ...A, tid: t.id }; } catch (err) { toast(err.message, true); }
       return render();
     }
-    if ((b = q("[data-avsay]"))) return call("/avatar-say", { twin: b.dataset.avsay || "" }).then(poll);
+    if ((b = q("[data-avscene]"))) { S.avScene = { id: b.dataset.avscene, bg: "" }; return render(); }
+    if ((b = q("[data-avbg]"))) { S.avScene = { id: S.avScene?.id || "office", bg: b.dataset.avbg }; return render(); }
+    if ((b = q("[data-avsay]"))) return call("/avatar-say", { twin: b.dataset.avsay || "", scene: S.avScene?.id || "office", bg: S.avScene?.bg || "" }).then(poll);
     if (q("[data-phreview]")) return call("/review", {}).then(poll);
     if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
     if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
@@ -1282,6 +1294,19 @@ const Flow = (() => {
     if (e.target.matches?.("[data-avvid]") && e.target.files?.[0]) return avUpload("video", e.target.files[0]);
     if (e.target.matches?.("[data-avpic]") && e.target.files?.[0]) return avUpload("photo", e.target.files[0]);
     if (e.target.matches?.("[data-avvoice]") && e.target.files?.[0]) return avUpload("voice", e.target.files[0]);
+    if (e.target.matches?.("[data-avbgup]") && e.target.files?.[0]) {   // 🏠 مكان العميل: بيتحفظ مع الأفاتار ويتختار على طول
+      const tw = (S.twins || []).find((t) => t.id === (S.avTwin || (S.twins || []).find((x) => x.ready?.video || x.ready?.photo)?.id));
+      if (!tw) return;
+      const f = new FormData(); f.append("name", "مكاني"); f.append("file", e.target.files[0]); e.target.value = "";
+      try {
+        const t = await api(`/api/twins/${tw.id}/background`, { method: "POST", body: f });
+        const nb = (t.backgrounds || []).slice(-1)[0];
+        S.twins = (S.twins || []).map((x) => (x.id === t.id ? t : x));
+        if (nb) S.avScene = { id: S.avScene?.id || "office", bg: nb.id };
+        render();
+      } catch (err) { toast(err.message, true); }
+      return;
+    }
     if (e.target.matches?.("[data-avtwin]")) { S.avTwin = e.target.value; return render(); }
     if (e.target.matches?.("[data-casttwin]")) return call("/phone-cast", { twin: e.target.value, bg: "" });
     if (e.target.id === "flwFiles") upload(e.target.files);

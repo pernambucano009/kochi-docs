@@ -1534,6 +1534,27 @@ def coach_sheet_del(coach_id: str, file: str):
 # ويعمل فيديو والشخصية بتقوله: البق والوش والإيد ماشيين مع الصوت، والصورة (الوش واللبس والخلفية) زي ما هي.
 AVATAR_MODELS = {"pro": {"model": "kwaivgi/kling-v2.6-pro/avatar", "label": "جودة عالية", "per_sec": 0.095},
                  "std": {"model": "kwaivgi/kling-v2.6-std/avatar", "label": "جودة عادية (أرخص)", "per_sec": 0.048}}
+# 🎬 خلفيات الأفاتار الجاهزة: كل خلفية بوضعيتها (الصورة الأولى) وحركتها وهو بيتكلم (Kling Avatar Pro)
+AVATAR_SCENES = {
+    "office": ("مكتب · الجوال على حامل", "sitting at a desk in a bright small office, the phone on a tripod in front of him at eye level (the phone and tripod are NOT visible), "
+               "a shelf and a plant behind, soft window light",
+               "talks calmly to the camera with natural hand gestures, slight head movement, static camera on a tripod"),
+    "car": ("سيارة متوقفة · سيلفي", "selfie taken by his own outstretched arm in the driver seat of a PARKED car in daylight, the arm comes in from the bottom edge "
+            "and no phone is visible, headrest and side window behind, seatbelt off",
+            "sits in the parked car holding the phone and talks to the camera, small head movements, the phone moves slightly in the hand"),
+    "market": ("سوبر ماركت · سيلفي أثناء المشي", "selfie while walking slowly in a supermarket aisle, arm extended holding the phone (not visible), shelves with groceries behind",
+               "walks slowly through the aisle holding the phone in selfie position and talks to the camera, natural hand-held camera movement"),
+    "gym": ("النادي الرياضي · بين التمارين", "standing in a gym between sets, racks and dumbbells behind, phone on a stand at chest height (not visible), a towel on the shoulder",
+            "talks to the camera between sets, slightly out of breath, natural gestures, static camera"),
+    "clinic": ("عيادة · على الكرسي", "sitting in a clean modern clinic or consultation room on a chair, desk beside, phone on a tripod at eye level (not visible)",
+               "talks to the camera with a calm professional tone and small gestures, static camera"),
+    "kitchen": ("مطبخ المنزل", "standing in a bright home kitchen with the counter in front, phone propped at eye level (not visible)",
+                "talks to the camera while leaning slightly on the counter, natural gestures, static camera"),
+    "street": ("شارع · سيلفي أثناء المشي", "selfie while walking on a sunny sidewalk, arm extended holding the phone (not visible), shops and trees behind",
+               "walks along the sidewalk holding the phone in selfie position and talks to the camera, natural hand-held movement"),
+    "sofa": ("صالة المنزل · على الأريكة", "sitting relaxed on a sofa in a cozy living room, phone on a tripod in front at eye level (not visible), warm lamp light",
+             "talks to the camera in a relaxed friendly way, small gestures, static camera"),
+}
 AVATAR_STYLES = {"real": "photorealistic portrait photo, natural skin texture, soft studio light",
                  "3d": "polished 3D animated character, Pixar-like, soft global illumination",
                  "cartoon": "flat 2D cartoon character, clean outlines, friendly colors"}
@@ -30850,7 +30871,8 @@ def index():
 # ---------------------------------------------------------------- 🪞 «نسختي»: أفاتار من تسجيلات الشخص الحقيقية
 TWIN_LOCK = threading.Lock()
 TWIN_COST = {"video:veed": dub.LIPSYNC["veed"]["per_sec"], "video:sync": dub.LIPSYNC["sync"]["per_sec"],
-             "photo:std": AVATAR_MODELS["std"]["per_sec"], "photo:pro": AVATAR_MODELS["pro"]["per_sec"]}
+             "photo:std": AVATAR_MODELS["std"]["per_sec"], "photo:pro": AVATAR_MODELS["pro"]["per_sec"],
+             "scene:pro": AVATAR_MODELS["pro"]["per_sec"]}   # 🎬 الأفاتار في خلفية ووضعية: صورة المشهد + Kling Avatar Pro
 
 
 def twin_dir(tid: str) -> Path:
@@ -31090,6 +31112,45 @@ def twin_clip_set(tid: str, cid: str, **kw) -> None:
 
 
 @wallet.covering   # بتخصم بنفسها
+def twin_face(tid: str) -> Path | None:
+    """🙂 صورة وش الأفاتار: الصورة الأمامية، وإلا كادر من فيديو القراية (بيتقطع مرة ويتحفظ)."""
+    d, folder = twin_load(tid), twin_dir(tid)
+    p = next((x for x in d.get("photos") or [] if x["angle"] in ("front", "smile")), None)
+    if p and (folder / p["file"]).is_file():
+        return folder / p["file"]
+    vf = (d.get("video") or {}).get("file")
+    if not vf or not (folder / vf).is_file():
+        return None
+    out = folder / "face_from_video.jpg"
+    if not out.is_file():
+        subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-ss", "3", "-i", str(folder / vf), "-frames:v", "1", "-q:v", "2", str(out)],
+                       capture_output=True, timeout=120)
+    return out if out.is_file() else None
+
+
+def twin_scene_still(tid: str, cid: str, scene: dict) -> Path:
+    """🖼️ أول كادر: نفس الشخص في الخلفية والوضعية المختارة (خلفية جاهزة، أو مكان العميل اللي رفعه)."""
+    folder, face = twin_dir(tid), twin_face(tid)
+    if not face:
+        raise RuntimeError("يحتاج الأفاتار إلى صورة أو فيديو للوجه")
+    dest = folder / f"scene_{cid}.png"
+    refs = [atlas.reference_url(face)]
+    bg = next((b for b in twin_load(tid).get("backgrounds") or [] if b["id"] == scene.get("bg")), None) if scene.get("bg") else None
+    if bg:
+        refs.append(atlas.reference_url(folder / bg["file"]))
+        where = "inside exactly the place shown in the second reference photo, phone camera at eye level (not visible)"
+    else:
+        where = AVATAR_SCENES.get(scene.get("id") or "office", AVATAR_SCENES["office"])[1]
+    prompt = ("Photorealistic vertical smartphone photo of the SAME person as the first reference photo (keep the exact face, hair, skin tone, beard if any, "
+              "and the same clothes), " + where + ". He looks into the lens, natural expression, mouth slightly open as if talking, real skin texture, "
+              "ordinary phone camera look, candid, not retouched. Modest clothing.")
+    if atlas.mock_mode():
+        shutil.copyfile(face, dest)
+    else:
+        atlas.download(atlas.generate_image("nano2", prompt, "1080x1920", "medium", refs), dest)
+    return dest
+
+
 def run_twin_clip(tid: str, cid: str) -> None:
     """النص الجديد بصوته ← فيديو به هو: يا إما على فيديو القراية الخاص به (ليب سينك)، يا إما من صورته القدامية."""
     folder = twin_dir(tid)
@@ -31120,6 +31181,21 @@ def run_twin_clip(tid: str, cid: str) -> None:
                     body["sync_mode"] = "cut_off"
                 atlas.download(atlas.run_model("Video", body, "الليب سينك", max_seconds=3600, interval=6), dest)
             base.unlink(missing_ok=True)
+        elif c["method"] == "scene":   # 🎬 الأفاتار في خلفية ووضعية ← Kling Avatar Pro بحركة الخلفية دي
+            twin_clip_set(tid, cid, status="working", step="جارٍ تجهيز المكان والوضعية")
+            still = twin_scene_still(tid, cid, c.get("scene") or {})
+            twin_clip_set(tid, cid, step="الأفاتار يتكلم في المكان (يستغرق بضع دقائق)")
+            sc = c.get("scene") or {}
+            motion = "talks naturally to the camera" if sc.get("bg") else AVATAR_SCENES.get(sc.get("id") or "office", AVATAR_SCENES["office"])[2]
+            if atlas.mock_mode():
+                subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-loop", "1", "-i", str(still), "-i", str(audio),
+                                "-vf", "scale=720:-2,format=yuv420p", "-c:v", "libx264", "-shortest", str(dest)], check=True, capture_output=True, timeout=300)
+            else:
+                m = AVATAR_MODELS["pro"]
+                body = {"model": m["model"], "image": atlas.reference_url(still), "audio": atlas.upload_media(audio),
+                        "prompt": f"The person {motion}. Lips perfectly synced to the audio, natural blinking and breathing, energetic but natural delivery. "
+                                  "Keep the face, hair, outfit and place exactly as in the photo."}
+                atlas.download(atlas.run_model("Video", body, "الأفاتار", max_seconds=2400, interval=6), dest)
         else:
             photo = next((p for p in d.get("photos") or [] if p["angle"] == "front"), None) or next(p for p in d["photos"] if p["angle"] == "smile")
             twin_clip_set(tid, cid, status="working", step="🎬 صورتك تتكلم (يستغرق بضع دقائق)")
@@ -31328,6 +31404,14 @@ def flow_phone_cast(fid: str, body: PhoneCastIn):
 
 class AvatarSayIn(BaseModel):
     twin: str = ""      # الأفاتار اللي هيتكلم (فاضي = أول واحد جاهز)
+    scene: str = "office"   # 🎬 خلفية جاهزة (AVATAR_SCENES)
+    bg: str = ""        # أو مكان العميل اللي رفعه للأفاتار ده
+
+
+@app.get("/api/avatar-scenes")
+def avatar_scenes():
+    """🎬 الخلفيات الجاهزة بوضعياتها (للمسار والأوتوبايلوت)."""
+    return [{"id": k, "name": v[0]} for k, v in AVATAR_SCENES.items()]
 
 
 @app.post("/api/flows/{fid}/avatar-say")
@@ -31343,14 +31427,17 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
     wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
-    flow_update(fid, lambda x: x.update(phone_cast={"twin": tid, "bg": ""}))
+    if not twin_face(tid):
+        raise HTTPException(400, "يحتاج الأفاتار إلى صورة أمامية أو فيديو")
+    scene = {"id": body.scene if body.scene in AVATAR_SCENES else "office", "bg": body.bg or ""}
+    if scene["bg"] and scene["bg"] not in [b["id"] for b in twin_load(tid).get("backgrounds") or []]:
+        raise HTTPException(400, "هذا المكان غير موجود في الأفاتار")
+    flow_update(fid, lambda x: x.update(phone_cast={"twin": tid, "bg": scene["bg"]}, av_scene=scene))
 
     def run():
         cid = uuid.uuid4().hex[:8]
         wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
-        t = twin_load(tid)
-        method = "video" if twin.ready(t)["video"] else "photo"
-        item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,
+        item = {"id": cid, "method": "scene", "quality": "pro", "text": text[:2000], "audio": wav.name, "scene": scene,
                 "status": "queued", "step": "في الطابور", "file": None, "error": None, "created_at": now(), "flow": fid}
         twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
         run_twin_clip(tid, cid)
@@ -35480,14 +35567,14 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if not text:
             raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-        voice = dub.DIALECTS[lang]["voices"][0]
-        cost = wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01)
-        wallet.need(cost, "صوت الأفاتار")
+        voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه
+        wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
         cid = uuid.uuid4().hex[:8]
         wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")   # الصوت بيتخصم جوّه vo_say
-        t = twin_load(tid)
-        method = "video" if twin.ready(t)["video"] else "photo"
-        item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,
+        # 🎬 الأوتوبايلوت: الخلفية والوضعية من اختيار العميل في الإعدادات، وإلا بالدور على الخلفيات (عشان الفيديوهات ماتبقاش شبه بعض)
+        pool = [k for k in (s.get("av_scenes") or []) if k in AVATAR_SCENES] or list(AVATAR_SCENES)
+        scene = {"id": pool[int(hashlib.md5(jid.encode()).hexdigest(), 16) % len(pool)], "bg": ""}
+        item = {"id": cid, "method": "scene", "quality": "pro", "text": text[:2000], "audio": wav.name, "scene": scene,
                 "status": "queued", "step": "في الطابور", "file": None, "error": None, "created_at": now(), "pilot": jid}
         twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
         threading.Thread(target=run_twin_clip, args=(tid, cid), daemon=True).start()
@@ -35601,6 +35688,7 @@ class PilotIn(BaseModel):
     names: dict | None = None   # أسماء قوالب الكود (للعرض)
     steps_by: dict | None = None   # 🔵 الموافقات لكل نوع: {"phone": ["idea", ...], "motion": [...], "carousel": [...], "avatar": [...]}
     car_styles: list[str] | None = None   # 🎨 ستايلات الكاروسيل (واحد على الأقل لو فيه): بيتناوب بينها
+    av_scenes: list[str] | None = None    # 🎬 خلفيات الأفاتار اللي الأوتوبايلوت يتناوب بينها (فاضي = كلهم)
 
 
 def pilot_port(request: Request) -> int:
@@ -35643,6 +35731,8 @@ def pilot_put(body: PilotIn, request: Request):
             s["mode"] = "approve" if any(s["steps_by"].values()) else "auto"   # مفيش ولا دايرة زرقا = كله تلقائي
         if body.car_styles is not None:
             s["car_styles"] = [str(x)[:40] for x in dict.fromkeys(body.car_styles)][:20]
+        if body.av_scenes is not None:
+            s["av_scenes"] = [x for x in dict.fromkeys(body.av_scenes) if x in AVATAR_SCENES]
         if body.platforms is not None:
             s["platforms"] = [p for p in dict.fromkeys(body.platforms) if publisher.valid_target(p)][:20]
         if body.twin is not None:
