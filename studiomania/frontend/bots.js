@@ -46,7 +46,7 @@ const BotsPage = (() => {
         // 🟢 مفعّل: أيقونة برتقالي ونقطة خضرا · ⚪ مش مفعّل: أيقونة باهتة و«غير مفعّل»
         const n = botsOf(k).filter((b) => b.status === "active").length, pub = k === "comment" && S.pub && S.pub.mode !== "off";
         const live = n || pub, what = pub && !n ? (S.pub.mode === "always" ? "في كل منشور" : "عند النشر") : n > 1 ? `${n} حسابات` : "";
-        return `<button type="button" class="bx-node ${live ? "live" : "off"}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px;--o:${LIFT[i][2]}">
+        return `<button type="button" class="bx-node ${live ? "live" : "off"}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;${POS[i][1] > 70 ? "top:auto;bottom:28px;translate:-50% 0" : `top:${POS[i][1]}%`};--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px;--o:${LIFT[i][2]}">
           ${svgIc(R[k].ic)}<b>${R[k].n}</b><small>${d.sk ? "&nbsp;" : live ? `<i class="bx-dot"></i>مفعّل${what ? ` · ${what}` : ""}` : `<i class="bx-dot off"></i>غير مفعّل`}</small></button>`; }).join("")}`;
   }
 

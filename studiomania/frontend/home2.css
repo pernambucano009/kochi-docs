@@ -3279,3 +3279,4 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nhBar .nh-goback.off > * { opacity: .35; }
 #nhBar .nh-crumbs .nh-cb-empty { color: var(--nh-muted); opacity: .6; font-size: 13px; }
 #nh .ap-word { flex: 1; min-width: 140px; font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 9px 12px; background: var(--nh-fill, #F3F2EF); color: inherit; }
+#nh .bx { min-height: 560px; }   /* صفحة الردود الآلية من «النشر»: ارتفاع ثابت */
