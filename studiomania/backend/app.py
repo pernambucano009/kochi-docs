@@ -22482,27 +22482,41 @@ def tytpl_start(fid: str, render: bool = True) -> str:
 TYTPL_PREV_RUNNING: set[str] = set()
 
 
-def tytpl_preview(tid: str) -> None:
-    if tid in TYTPL_PREV_RUNNING:
+def tytpl_dir(field: str = "") -> Path:
+    """مكان المعاينة: العامة في TYTPL_DIR، ونسخة المجال في TYTPL_DIR/f/<المجال>."""
+    return TYTPL_DIR / "f" / field if field else TYTPL_DIR
+
+
+def tytpl_missing() -> list[tuple[str, str]]:
+    """(القالب، المجال) لكل معاينة ناقصة: العامة، ونسخ المجالات اللي ليها نص في SAMPLE_F."""
+    out = [(tid, "") for tid in typotpl.SPECS]
+    out += [(tid, fld) for fld, txt in typotpl.SAMPLE_F.items() for tid in txt if tid in typotpl.SPECS]
+    return [(tid, fld) for tid, fld in out if not (tytpl_dir(fld) / f"{tid}.mp4").is_file()]
+
+
+def tytpl_preview(tid: str, field: str = "") -> None:
+    key = f"{field}/{tid}"
+    if key in TYTPL_PREV_RUNNING or (field and tid not in typotpl.SAMPLE_F.get(field, {})):
         return
-    TYTPL_PREV_RUNNING.add(tid)
+    TYTPL_PREV_RUNNING.add(key)
     try:
-        lang = "ar-sa-najdi"
+        lang = "ar-eg-cairo" if field else "ar-sa-najdi"
         voice = dub.DIALECTS[lang]["voices"][0]
         pid = typo_new(TypoNewIn(name=f"معاينة {typotpl.SPECS[tid]['name']}", text=""))["id"]
         typo_update(pid, lambda x: x.update(style=typotpl.STYLE, preset=tid, dialect=lang, status="planning", step="🎙️", no_logo=True))
-        tytpl_build(pid, tid, typotpl.SAMPLE[tid], lang, voice, "fitness")
+        tytpl_build(pid, tid, typotpl.SAMPLE_F[field][tid] if field else typotpl.SAMPLE[tid], lang, voice, field or "fitness")
         t = typo_load(pid)
         if t.get("final"):
-            TYTPL_DIR.mkdir(parents=True, exist_ok=True)
+            d = tytpl_dir(field)
+            d.mkdir(parents=True, exist_ok=True)
             src = TYPO_PROJ / pid / t["final"]
-            shutil.copy(src, TYTPL_DIR / f"{tid}.mp4")
-            typo_frame(src, min(2.5, (t.get("duration") or 4) * 0.4), TYTPL_DIR / f"{tid}.jpg", 720)
+            shutil.copy(src, d / f"{tid}.mp4")
+            typo_frame(src, min(2.5, (t.get("duration") or 4) * 0.4), d / f"{tid}.jpg", 720)
         shutil.rmtree(TYPO_PROJ / pid, ignore_errors=True)
     except Exception as exc:  # noqa: BLE001
-        print(f"[tytpl] preview {tid}: {exc}", flush=True)
+        print(f"[tytpl] preview {key}: {exc}", flush=True)
     finally:
-        TYTPL_PREV_RUNNING.discard(tid)
+        TYTPL_PREV_RUNNING.discard(key)
 
 
 @app.on_event("startup")
@@ -22512,9 +22526,8 @@ def _tytpl_previews():
         return
     def go():
         time.sleep(300)
-        for tid in typotpl.SPECS:
-            if not (TYTPL_DIR / f"{tid}.mp4").is_file():
-                tytpl_preview(tid)
+        for tid, fld in tytpl_missing():
+            tytpl_preview(tid, fld)
     threading.Thread(target=go, daemon=True, name="tytpl-previews").start()
 
 
@@ -22525,17 +22538,21 @@ def tytpl_list():
     field = field_guess(brain_row(bid) or {}) if bid else ""
     out = []
     for tid, sp in typotpl.SPECS.items():
-        f = TYTPL_DIR / f"{tid}.mp4"
+        fd = tytpl_dir(field) / f"{tid}.mp4" if field else None   # نسخة مجال العميل لو اترسمت، وإلا العامة
+        own = bool(fd and fd.is_file())
+        f = fd if own else TYTPL_DIR / f"{tid}.mp4"
         if f.is_file() and typotpl.fits(tid, field):
             v = int(f.stat().st_mtime)
-            out.append({"id": tid, "name": sp["name"], "desc": sp["desc"], "sample_url": f"/api/tytpl/{tid}.mp4?v={v}", "cover_url": f"/api/tytpl/{tid}.jpg?v={v}"})
+            q = f"?f={field}&v={v}" if own else f"?v={v}"
+            out.append({"id": tid, "name": sp["name"], "desc": sp["desc"], "sample_url": f"/api/tytpl/{tid}.mp4{q}", "cover_url": f"/api/tytpl/{tid}.jpg{q}"})
     return out
 
 
 @app.get("/api/tytpl/{name}")
-def tytpl_file(name: str):
+def tytpl_file(name: str, f: str = ""):
     tid, _, ext = name.rpartition(".")
-    f = TYTPL_DIR / f"{tid}.{ext}"
+    fld = f if f in typotpl.SAMPLE_F else ""
+    f = tytpl_dir(fld) / f"{tid}.{ext}"
     if tid not in typotpl.SPECS or ext not in ("mp4", "jpg") or not f.is_file():
         raise HTTPException(404, "الملف غير موجود")
     return FileResponse(f, media_type="video/mp4" if ext == "mp4" else "image/jpeg")
@@ -22548,6 +22565,9 @@ def tytpl_previews_redo():
     def go():
         for tid in typotpl.SPECS:
             tytpl_preview(tid)
+        for fld, txt in typotpl.SAMPLE_F.items():
+            for tid in txt:
+                tytpl_preview(tid, fld)
     threading.Thread(target=go, daemon=True).start()
     return {"ok": True, "n": len(typotpl.SPECS)}
 
@@ -22557,9 +22577,8 @@ def tytpl_previews_missing() -> None:
     """🖼️ نسخة صاحب البرنامج: أي قالب تايبوجرافي جاهز مالوش معاينة بتترسم لوحدها بعد التشغيل،
     عشان القوالب دي بتظهر في المعرض بس لما معاينتها تبقى موجودة (كانت بتفشل قبل كده فالقوالب ماظهرتش)."""
     time.sleep(150)
-    for tid in typotpl.SPECS:
-        if not (TYTPL_DIR / f"{tid}.mp4").is_file():
-            tytpl_preview(tid)
+    for tid, fld in tytpl_missing():
+        tytpl_preview(tid, fld)
 
 
 if (os.environ.get("TENANT_ROLE") or "admin") == "admin" and not atlas.mock_mode():
