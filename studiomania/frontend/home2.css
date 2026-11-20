@@ -3253,7 +3253,6 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh :is(.nh-wc, .mk, .gg-grp).g-special { --g: #B7791F; }
 #nh .nh-wc .nh-wc-h i { color: color-mix(in srgb, var(--g) 55%, transparent); }
 #nh .nh-wc.on .nh-wc-h i { color: var(--g); }
-#nh .nh-wc { position: relative; }
 #nh .nh-wc-grp { position: absolute; top: -26px; inset-inline: 0; padding-top: 6px; border-top: 3px solid var(--g); font-size: 12px; font-weight: 600; color: var(--g); white-space: nowrap; opacity: calc(1 - var(--dim, 0)); }
 #nh .nh-wh-labs .mk i { background: var(--g); }
 #nh .gg-grp { grid-column: 1 / -1; margin: 14px 0 0; padding-top: 8px; border-top: 3px solid var(--g); font-size: 14px; font-weight: 600; color: var(--g); }
