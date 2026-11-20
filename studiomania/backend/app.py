@@ -31072,7 +31072,33 @@ def twin_voice(tid: str, file: UploadFile = File(...)):
 
 
 def twin_voice_sample(tid: str) -> Path | None:
-    """🎙️ عينة صوت الأفاتار للاستنساخ: تسجيل الصوت لو موجود، وإلا صوت فيديو القراية نفسه (بيتقطع مرة ويتحفظ)."""
+    """🎙️ عينة صوت الأفاتار للاستنساخ (صافية): تسجيل الصوت لو موجود، وإلا صوت فيديو القراية نفسه."""
+    raw = twin_voice_raw(tid)
+    return twin_voice_clean(raw) if raw else None
+
+
+def twin_voice_clean(src: Path) -> Path:
+    """🎚️ قبل الاستنساخ: الكلام لوحده من غير موسيقى أو أغاني أو دوشة ورا (فصل الصوت من ElevenLabs، بيتعمل مرة ويتحفظ).
+    لو الفصل فشل بنستخدم العينة زي ما هي."""
+    out = src.with_name(src.stem + "_clean.mp3")
+    if out.is_file():
+        return out
+    if atlas.mock_mode():
+        return src
+    try:
+        stems = voicelab.eleven_stems(src, src.parent / f"_stems_{src.stem}")
+        voc = stems.get("vocals")
+        if voc and voc.is_file():
+            subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(voc), "-af", "highpass=f=70,loudnorm=I=-18",
+                            "-ac", "1", "-b:a", "160k", str(out)], check=True, capture_output=True, timeout=300)
+        shutil.rmtree(src.parent / f"_stems_{src.stem}", ignore_errors=True)
+        return out if out.is_file() else src
+    except Exception as exc:  # noqa: BLE001
+        print(f"[twin] voice clean: {str(exc)[:160]}", flush=True)
+        return src
+
+
+def twin_voice_raw(tid: str) -> Path | None:
     try:
         t = twin_load(tid)
     except HTTPException:
@@ -31460,7 +31486,7 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     if not text:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-    voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
+    voice = f"twin:{tid}" if twin_voice_raw(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
     wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
     if not twin_face(tid):
         raise HTTPException(400, "يحتاج الأفاتار إلى صورة أمامية أو فيديو")
@@ -35602,7 +35628,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if not text:
             raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-        voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه
+        voice = f"twin:{tid}" if twin_voice_raw(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه
         wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
         cid = uuid.uuid4().hex[:8]
         wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")   # الصوت بيتخصم جوّه vo_say
