@@ -25825,8 +25825,20 @@ def flow_facts(fid: str, body: FlowFactsIn):
     if errs:
         raise HTTPException(400, " · ".join(errs))
     flow_set_facts(fid, tpl, facts)
-    flow_update(fid, lambda x: x.update(stage="idea", ideas=[], error=None))
-    flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, tplbrief.prompt_text(tplbrief.apply(tpl, facts)[1])))
+    # 🧾 القالب المخصص (العرض، الآراء…): مفيش فكرة ولا نص يختارهم. النص بيتكتب من التفاصيل اللي كتبها ويتختار لوحده، وبعدين الصوت على طول
+    say = tplbrief.prompt_text(tplbrief.apply(tpl, facts)[1])
+
+    def run():
+        it = {"id": uuid.uuid4().hex[:8], "title": d["template"].get("name") or "", "hook": "", "own": True,
+              "idea": "الفيديو يقول تفاصيل هذا العرض كما كتبها العميل بالضبط، بلا فكرة جديدة:\n" + say}
+        flow_update(fid, lambda x: x.update(idea=it, ideas=[], scenarios=[], scenario=None, format="reel"))
+        flow_gen_scenarios(fid, "النص يقول التفاصيل المكتوبة فقط وبالأرقام نفسها، بجمل قصيرة تمشي مع ظهور الكلام في القالب.")
+        sc = flow_load(fid).get("scenarios") or []
+        if not sc:
+            raise HTTPException(400, "لم يُكتب النص، جرّب مرة أخرى")
+        flow_pick_scenario(fid, FlowPickIn(id=sc[0]["id"]))
+    flow_update(fid, lambda x: x.update(stage="facts", error=None))
+    flow_job(fid, "scenarios", run)
     return flow_to_dict(fid, flow_load(fid))
 
 

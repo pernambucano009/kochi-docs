@@ -1154,7 +1154,8 @@ body:has(#nhPage.nh-full:not([hidden])) #nhCorner { display: none; }   /* الع
 .flw-hr { display: flex; align-items: center; gap: 10px; }
 .flw-meter { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 999px; }
 .flw-meter:hover { background: var(--soft); }
-.flw-meter svg { width: 36px; height: 36px; transform: rotate(-90deg); }
+.flw-meter { position: relative; }
+.flw-meter > svg:not(.fx-snake) { width: 36px; height: 36px; transform: rotate(-90deg); }   /* السنيك (fx-snake) بياخد مقاس الزرار كله، مش مقاس الدايرة */
 .flw-meter circle { fill: none; stroke-width: 3.5; }
 .flw-meter .bg { stroke: var(--soft); }
 .flw-meter .fg { stroke: var(--acc); stroke-linecap: round; transition: stroke-dasharray .6s; }

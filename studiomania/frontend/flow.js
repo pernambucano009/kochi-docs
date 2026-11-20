@@ -48,7 +48,8 @@ const Flow = (() => {
   const isPhone = (d) => d?.template?.kind === "phone";
   // 🧾 قوالب المعطيات (عرض السعر، آراء العملاء): أول خطوة تفاصيل العرض أو الآراء نفسها، والأفكار والنص مبنيين عليها
   const steps0 = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
-  const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d)] : steps0(d));
+  // 🧾 القالب المخصص: التفاصيل ← الصوت ← … (مفيش فكرة ولا نص: النص بيتكتب من التفاصيل ويتختار لوحده)
+  const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d).filter(([k]) => k !== "idea" && k !== "scenario")] : steps0(d));
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
@@ -317,7 +318,7 @@ const Flow = (() => {
     };
     return `<h2>${esc(b.title || "التفاصيل")}</h2><p class="flw-sub">${esc(b.idea || "")}</p>
       <div class="flw-facts">${(b.ask || []).map(fld).join("")}</div>
-      <div class="flw-acts"><button type="button" class="flw-btn pri big" data-factsgo ${busy() ? "disabled" : ""}>متابعة</button></div>${failed("facts")}`;
+      <div class="flw-acts"><button type="button" class="flw-btn pri big" data-factsgo ${busy() ? "disabled" : ""}>متابعة</button></div>${busy() ? working("يكتب النص من التفاصيل، ثم ننتقل إلى الصوت…") : ""}${failed("facts")}`;
   }
 
   function stIdea(d) {
@@ -479,7 +480,7 @@ const Flow = (() => {
       <ol class="flw-times">${rows}</ol>${vt ? `<small class="muted">⏱ الفيديو <span class="num">${vt.total.toFixed(1)}</span> ثانية</small>` : ""}
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-export ${d.busy ? "disabled" : ""}>🎬 اصنع الفيديو</button></div>
       <p class="flw-sub">بعد صنعه يفتح في المونتاج: تشاهده وتعدّل فيه (العناصر، والموسيقى، والتعليق الصوتي أو صوتك أنت)، ثم تصدّره.</p>
-      <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button><button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button></div>`;
+      <div class="flw-more"><button type="button" class="flw-link" data-go="voice">↩︎ غيّر الصوت</button>${d.brief ? `<button type="button" class="flw-link" data-go="facts">↩︎ غيّر التفاصيل</button>` : `<button type="button" class="flw-link" data-go="scenario">↩︎ غيّر النص</button>`}</div>`;
   }
 
   // 🔤 مشاهد التايبوجرافي: الكلام متقسّم على المشاهد، وكل مشهد ليه حركة (تقدر تغيّرها) قبل ما الفيديو يترسم
