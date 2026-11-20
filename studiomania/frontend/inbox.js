@@ -13,6 +13,7 @@ const ibAv = (pic, name) => {
     : `<i class="ib-av">${ch}</i>`;
 };
 
+$("inboxAlert").addEventListener("click", (e) => { if (e.target.closest("[data-linkacc]")) { e.preventDefault(); showStep("7"); if (typeof pubTab === "function") pubTab("acc"); } });
 function ibAlert(msg) {
   const a = $("inboxAlert");
   a.hidden = !msg;
@@ -61,7 +62,10 @@ async function ibStarLoad() {
     el.querySelector("[data-s]").textContent = sub || "";
     el.querySelector("[data-l]").innerHTML = rows.join("");
   };
-  const [cm, ms, bt] = await Promise.allSettled([api("/api/inbox/comments"), api("/api/inbox/conversations"), api("/api/bots")]);
+  const [cm, ms, bt, pub] = await Promise.allSettled([api("/api/inbox/comments"), api("/api/inbox/conversations"), api("/api/bots"), api("/api/publisher")]);
+  // 🔗 مفيش ولا حساب مربوط: تنبيه فوق، وبعده الأقسام فاضية
+  const linked = pub.status === "fulfilled" ? (pub.value.account_list || []).length : 1;
+  ibAlert(linked ? "" : `يجب ربط حساب سوشيال ميديا واحد على الأقل لتفعيل التعليقات والرسائل. <a href="#" data-linkacc>اربط حسابًا ←</a>`);
   if (cm.status === "fulfilled") {
     ib.posts = cm.value.posts || [];
     const total = ib.posts.reduce((n, x) => n + (x.comments || 0), 0);

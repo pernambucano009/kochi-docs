@@ -306,5 +306,5 @@ setInterval(() => { if (!document.hidden) loadMoney(); }, 60000);
 
 // راس الصفحات: الرصيد بيفتح تفاصيله، والكالندر بيفتح المواعيد في صفحة النشر بالأسبوع
 $("stageMoney").onclick = () => $("moneyBtn").click();
-$("stageCal").onclick = () => showStep("cal");
+if ($("stageCal")) $("stageCal").onclick = () => showStep("cal");
 $("stagePlans").onclick = (e) => (typeof NH !== "undefined" && NH ? NH.openPlans(e.currentTarget) : (location.href = "/billing"));

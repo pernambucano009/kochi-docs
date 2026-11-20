@@ -69,6 +69,8 @@ const NH = (() => {
       : { en: "Publish", ar: "النشر", icon: "send", page: "publish", desc: "انشر وجدول، والتعليقات والرسائل، وإعلاناتك ووصفة الاستهداف، وحملات واتساب." },
     // 📤 جوه «النشر»: كل اللي بيوصّل المحتوى للناس (الإعلانات والاستهداف والواتساب اتنقلوا هنا من العقل)
     pubacc: { en: "Your accounts", ar: "حساباتك", icon: "send", go: "7", tab: "acc", desc: "ربط حسابات السوشيال ميديا وفصلها." },
+    // 🗓️ المواعيد من الرئيسية على طول (من غير «النشر» قبلها في التسلسل)
+    calendar: { en: "Calendar", ar: "المواعيد", icon: "send", go: "cal", desc: "المنشورات المجدولة وموعد كل منها." },
     pubcal: { en: "Schedule", ar: "المواعيد", icon: "send", go: "7", tab: "cal", desc: "المنشورات المجدولة وموعد كل منها." },
     pubdone: { en: "Published", ar: "ما نُشر", icon: "send", go: "7", tab: "done", desc: "كل ما نُشر على حساباتك." },
     pubpost: { en: "New post", ar: "منشور جديد", icon: "send", go: "7", tab: "new", desc: "الحسابات المربوطة، والفيديوهات الجاهزة، والجدولة وما نُشر." },
@@ -114,7 +116,7 @@ const NH = (() => {
   };
   const GLKEY = { create: "app", brand: "brand", assets: "assets", dubhub: "voices", settings: "settings", progress: "progress", publish: "publish", reel: "reel", raw: "film",
     series: "series", carousel: "carousel", ad: "publish", typo: "create", dub: "voices", edit: "film", coaches: "characters", twin: "characters", voice: "voices", music: "music", pilot: "autopilot", pubpost: "publish",
-    inbox: "inbox", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox", leads: "audience" };
+    inbox: "inbox", calendar: "calendar", adsmgr: "adsmgr", audience: "audience", wacamp: "wacamp", bots: "inbox", leads: "audience" };
   // 📤 أيقونات أقسام النشر (خط بسيط): نفس الأيقونة في مربعات صفحة النشر وفي عنوان صفحة كل قسم لما تدخله
   const PUB_IC = { pubcal: "M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4", pubdone: "M5 12l4 4L19 6", pubacc: "M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1 M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1", pubpost: "M4 12l16-8-6 16-3-7z M11 13l9-9", inbox: "M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5", adsmgr: "M4 10v4h3l6 4V6L7 10z M16 9a4 4 0 0 1 0 6 M18.5 6.5a7.5 7.5 0 0 1 0 11",
     audience: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
@@ -141,7 +143,7 @@ const NH = (() => {
 
   // ---------- الرئيسية (نسخة أ): المجسّم في النص، والأقسام مكتوبة على الجنبين، و«ابدأ مشروع جديد» تحت المجسّم ----------
   // RTL: أول عمود على اليمين · النشر تحت على اليمين، والأوتوبايلوت فوق على الشمال (نفس الأماكن بالعربي والإنجليزي)
-  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "inbox"];   // ⚙️ الإعدادات اتنقلت للشريط اللي فوق، ومكانها «التعليقات والرسائل»
+  const SIDE_R = KOCHI ? ["brand", "assets"] : ["brand", "publish", "inbox"], SIDE_L = KOCHI ? ["progress", "publish", "settings"] : ["pilot", "calendar", "settings"];   // ٦ أقسام: ٣ يمين و٣ شمال، على نفس الخطوط
   const META = {
     // نفس رقم «العقل فاهمك قد إيه» اللي في العقل (مش رقم تاني)
     brand: () => { const pct = D.brand?.knowledge?.score ?? brainPct(D.brand); return `<span class="nh-mbar"><i style="width:${pct}%"></i></span><span>نسبة فهم العقل <span class="num">${pct}%</span></span>`; },
@@ -157,6 +159,7 @@ const NH = (() => {
       return `<span>${up ? `${up} منشور مجدول` : "لا توجد منشورات مجدولة"}${bad ? ` · <em>${bad} فشل</em>` : ""}</span>`;
     },
     inbox: () => `<span>التعليقات والرسائل والردود التلقائية</span>`,
+    calendar: () => { const up = D.posts.filter((p) => p.status === "scheduled").length; return `<span>${up ? `${up} منشور مجدول` : "لا توجد منشورات مجدولة"}</span>`; },
     // من غير رصيد معروف: مفيش سطر تاني (كان بيكرر نفس الوصف اللي فوقه)
     settings: () => (window.ME && window.ME.role !== "admin" ? `<span>نقاطك · <span class="num" data-credits>${window.ME.credits.total.toLocaleString("en-US")}</span> نقطة</span>`
       : D.money ? `<span>رصيد Atlas · <span class="num">$${D.money.balance.toFixed(2)}</span></span>` : ""),
@@ -222,13 +225,11 @@ const NH = (() => {
     </div>
     <div class="nh-tools" id="nhTools">
       <button class="nh-chip nh-bell" id="nhBell" title="الإشعارات" aria-label="الإشعارات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg><b class="bell-n" hidden></b></button>
-      ${KOCHI ? "" : `<button class="nh-chip nh-setb" id="nhSet" title="الإعدادات" aria-label="الإعدادات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3.9a7.5 7.5 0 0 0-2.6-1.5L14.1 2.5h-4.2l-.4 2.5a7.5 7.5 0 0 0-2.6 1.5l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-.9a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4.2l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.3.9 2-3.4z"/></svg></button>`}
       <button class="nh-chip latin nh-langb" id="nhLang" aria-label="English">EN</button>
       <button class="nh-chip" id="nhClient" title="علاماتك وحسابك" aria-label="علاماتك وحسابك"><i id="nhClientAv" aria-hidden="true"></i><span id="nhClientName" data-no-i18n></span></button>
       <button class="nh-switch" id="nhTheme" aria-label="تبديل الوضع الفاتح والغامق"><span class="track"><span class="knob"></span></span><span id="nhMode">غامق</span></button>
     </div>`;
   document.body.appendChild(bar);
-  document.getElementById("nhSet")?.addEventListener("click", () => act("settings")());
   // 📱 على الشاشات الضيقة الشريط بيتكسر لسطرين: الزيادة دي بتنزّل محتوى الصفحة (زي أقسام العجلة) تحته بدل ما يركب عليه
   const barX = () => { const r = bar.getBoundingClientRect(); let b = r.bottom; bar.querySelectorAll("*").forEach((e) => { const x = e.getBoundingClientRect(); if (x.height && x.height < 80) b = Math.max(b, x.bottom); }); document.documentElement.style.setProperty("--nh-bar-x", `${Math.max(0, Math.round(b - 66))}px`); };
   if (typeof ResizeObserver !== "undefined") { const ro = new ResizeObserver(barX); ro.observe(bar); bar.querySelectorAll(".nh-tools, .nh-bar-r").forEach((e) => ro.observe(e)); }
@@ -236,7 +237,8 @@ const NH = (() => {
   addEventListener("load", barX);
   setTimeout(barX, 600);
   // الرصيد والردود والمواعيد (كانوا في راس الصفحات) بقوا في الشريط، وبيبانوا بره الرئيسية بس
-  ["stageMoney", "stagePlans", "stageInbox", "stageCal"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
+  ["stageInbox", "stageCal"].forEach((id) => document.getElementById(id)?.remove());   // 💬🗓️ بقوا أقسام في الرئيسية
+  ["stageMoney", "stagePlans"].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add("nh-xtra"); document.getElementById("nhTools").prepend(el); } });
   // عنوان الصفحة المفتوحة: في نفس الركن اللي المربع كان فيه في الرئيسية (الإعدادات تحت شمال ← عنوانها تحت شمال)
   const corner = document.createElement("div");
   corner.id = "nhCorner";
@@ -530,7 +532,7 @@ const NH = (() => {
   const zooming = (on) => document.body.classList.toggle("nh-zooming", on);
 
   // صفحة جوه الرئيسية (اعمل جديد / الأصول / شغّال عليه): الأيقونة والاسم بيطيروا لحد ما يبقوا عنوان الصفحة
-  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=13" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=13" alt="" loading="lazy">`; }
+  function glImg(key) { return `<img class="ic-l" src="/icons3d/${key}.webp?v=14" alt="" loading="lazy"><img class="ic-d" src="/icons3d/${key}_d.webp?v=14" alt="" loading="lazy">`; }
   const panel = (c, r, inner, attrs = "") => `<div class="nh-tile nh-panel" ${attrs} style="grid-column:span ${c};grid-row:span ${r}">${inner}</div>`;
   const PAGES = {
     // كل نوع كارت فيه أيقونته الزجاج الـ 3D (فاتحة وغامقة)، واسمه، وسطر بيشرح هيعمل إيه
@@ -771,7 +773,7 @@ const NH = (() => {
   // 📍 التسلسل بيقول انت فين (القسم ← الصفحة)، مش كل اللي فتحته قبل كده. «رجوع» هو اللي بيمشي على التاريخ
   const PAGE_PARENT = { pubacc: "publish", pubcal: "publish", pubdone: "publish", pubpost: "publish", adsmgr: "publish", audience: "publish", leads: "publish", wacamp: "publish", bots: "publish",
     coaches: "brand", twin: "brand", brainlib: "brand", auto: "create", rivals: "brand", plan: "brand", viral: "brand", comics: "brand", voice: "brand", music: "brand" };
-  const STAGE_PARENT = { cal: "7", "6s": "9", "6a": "10" };
+  const STAGE_PARENT = { "6s": "9", "6a": "10" };   // 🗓️ المواعيد بقت قسم في الرئيسية: تسلسلها «المواعيد» بس
   function crumbs() {
     const out = [{ label: "الرئيسية", lv: "home" }];
     // قسم مفتوح فوق صفحة (الإعدادات فوق «باقتي ونقاطي» مثلًا): انت دلوقتي في القسم، فالصفحة اللي تحته مش جزء من المسار
@@ -803,7 +805,7 @@ const NH = (() => {
     nav.hidden = false;
     nav.innerHTML = deep ? list.map((c, k) => !k ? "" : k === list.length - 1 ? `<b class="nh-cb" aria-current="page">${esc(c.label)}</b>`
       : `<button type="button" class="nh-cb" data-crumb="${k}">${esc(c.label)}</button><i aria-hidden="true">‹</i>`).join("")
-      : `<span class="nh-cb nh-cb-empty" aria-hidden="true"></span>`;   // الشعار هو «الرئيسية»: التسلسل بيبدأ من الصفحة اللي انت فيها
+      : `<span class="nh-cb nh-cb-empty" aria-hidden="true">الصفحة الرئيسية</span>`;   // في الرئيسية: مكتوب بالرمادي (مش شغال)   // الشعار هو «الرئيسية»: التسلسل بيبدأ من الصفحة اللي انت فيها
     nav._list = list;
     syncHash();
   }

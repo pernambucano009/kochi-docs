@@ -3262,3 +3262,14 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nhBar .nh-setb { width: 44px; padding: 0; justify-content: center; }
 #nhBar .nh-setb svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; transition: rotate .5s ease; }
 #nhBar .nh-setb:hover svg { rotate: 60deg; }
+/* ٦ أقسام: ٣ صفوف متساوية في العمودين، فكل قسم على نفس خط اللي قصاده والمسافات واحدة */
+@media (min-width: 821px) {
+  #nh .nh-col { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); align-content: stretch; align-items: center; justify-content: stretch; }
+  #nh .nh-col-r { justify-items: start; }
+  #nh .nh-col-l { justify-items: end; }
+  [dir="ltr"] #nh .nh-col-r { justify-items: end; }
+  [dir="ltr"] #nh .nh-col-l { justify-items: start; }
+}
+/* في الرئيسية: «رجوع» و«الصفحة الرئيسية» مكتوبين بالرمادي الخفيف (مش شغالين)، بدل مربعين فاضيين */
+#nhBar .nh-goback.off > * { opacity: .35; }
+#nhBar .nh-crumbs .nh-cb-empty { color: var(--nh-muted); opacity: .6; font-size: 13px; }
