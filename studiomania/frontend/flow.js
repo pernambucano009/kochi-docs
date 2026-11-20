@@ -793,12 +793,12 @@ const Flow = (() => {
       ${beats ? `<details class="flw-shotlist" open><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
       ${who}${failed("avatar")}
       <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
-        <button type="button" class="flw-btn orange big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار</button></div>`;
+        <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار</button></div>`;
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
     return `<h2>الفيديو جاهز</h2>
       <div class="flw-avdone"><div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video></div>
         <div class="flw-avnext"><p>شاهد الفيديو. الخطوة التالية «المونتاج»: يقص البرنامج السكتات، ويغيّر زاوية الكاميرا، ويضيف لقطات الـ B-roll والتايبوجرافي.</p>
-          <button type="button" class="flw-btn orange big" data-automont ${d.busy ? "disabled" : ""}>التالي: المونتاج ←</button>
+          <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>التالي: المونتاج ←</button>
           <span class="flw-avsep"></span>
           ${who}<button type="button" class="flw-link" data-avsay="${esc(sel)}">↻ أعد توليد الفيديو</button>
           <button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>${failed("avatar")}</div></div>`;
