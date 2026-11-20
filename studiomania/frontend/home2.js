@@ -254,6 +254,7 @@ const NH = (() => {
   function updateCorner(mode) {
     if (mode === undefined) mode = stageOpen() ? "stage" : zoom?.page ? "page" : null;
     if (mode === "stage" && $("stage").classList.contains("mt-mode")) mode = null;
+    if (mode === "page") mode = null;   // جوه الصفحات: مفيش عنوان ولا أيقونة زجاج ولا «اشرح لي» (المحتوى على طول، والشرح عند المساعدة تحت)
     corner.hidden = !mode;
     document.body.classList.toggle("nh-cb", !!mode && (mode === "stage" ? cornerStage : cornerPage)[0] === "b");
     document.body.classList.toggle("nh-cl", !!mode && (mode === "stage" ? cornerStage : cornerPage)[1] === "l");

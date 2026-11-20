@@ -55,92 +55,92 @@ function twRender() {
   const el = tw.el;
   if (!el || !el.isConnected) return;
   if (tw.list === null) { el.innerHTML = `<div class="nh-empty">جارٍ التحميل…</div>`; return; }
+  // 📐 الصفحة كلها في الشاشة من غير سكرول: الدواير فوق، والخلفيات صف (أو صفين على الموبايل) تحت
   const W = Math.max(300, el.clientWidth || 900), small = W < 620;
-  const making = !!tw.make;
-  const H = making ? (small ? 430 : 470) : (small ? 400 : 460);
-  const cx = W / 2, cy = making ? (small ? 118 : 132) : H / 2 - 6, R = small ? 62 : 84, r = small ? 30 : 40;
+  const key = `${innerWidth}x${innerHeight}`;
+  if (tw.fitKey !== key) { tw.fitKey = key; tw.fitAdj = 0; }
+  const avail = Math.max(small ? 520 : 480, innerHeight - el.getBoundingClientRect().top - 18 - tw.fitAdj);
   const cur = tw.list.find((t) => t.id === tw.cur);
+  const nPl = tw.scenes.length + (cur?.backgrounds || []).length + (cur ? 1 : 0), rows = small ? 2 : 1, per = Math.ceil(nPl / rows);
+  const ps = Math.max(48, Math.min(small ? 70 : 100, (W - (per - 1) * (small ? 8 : 12)) / per));
+  const plH = rows * (ps + (small ? 30 : 34)) + (rows - 1) * 8 + 34;
+  const H = Math.max(300, avail - plH - 8);
+  const making = !!tw.make;
+  const top0 = small ? 44 : 0, mY = top0 + (H - top0) / 2 - 14;   // على الموبايل الدواير تحت كلمة «الأفاتار»
+  const cx = W / 2, cy = making ? top0 + (H - top0) * 0.27 : mY;
+  const R = Math.round(Math.min(small ? 52 : 84, H * 0.18)), r = Math.round(Math.min(small ? 26 : 40, H * 0.085));
   let stage = "";
-  // المدار: كل الشخصيات ما عدا المختار، و«＋» في الآخر
   const ring = tw.list.filter((t) => t.id !== (making ? tw.make.tid : tw.cur));
-  const n = ring.length + 1, rx = Math.min(W / 2 - r - 14, small ? 160 : 330), ry = H / 2 - r - 22;
-  ring.forEach((t, i) => {
-    const a = -Math.PI / 2 + ((i + 1) * 2 * Math.PI) / (n + 0);
-    stage += twCircle(t, cx + Math.cos(a) * rx, H / 2 - 6 + Math.sin(a) * ry, r, making ? " dim" : "");
+  // المدار: «＋» فوق في النص بالظبط، والباقيين متوزعين على الجنبين، وفراغ تحت (مكان اسم المختار وأوامره)
+  const gap = (38 * Math.PI) / 180, rx = Math.min(W / 2 - r - (small ? 4 : 12), small ? 170 : 340), ry = (H - top0) / 2 - r - 26;
+  const lc = Math.ceil(ring.length / 2), rc = ring.length - lc, half = Math.PI - gap;
+  const angs = [...Array(lc)].map((_, j) => Math.PI / 2 + gap + (half * j) / lc).concat([1.5 * Math.PI], [...Array(rc)].map((_, j) => 2.5 * Math.PI - gap - (half * (rc - 1 - j)) / rc));
+  const order = [...ring.slice(0, lc), null, ...ring.slice(lc)];
+  order.forEach((t, i) => {
+    const x = cx + Math.cos(angs[i]) * rx, y = mY + Math.sin(angs[i]) * ry;
+    if (t) stage += twCircle(t, x, y, r, making ? " dim" : "");
+    else if (!making) stage += `<button type="button" class="ob-face add" style="left:${x - r}px;top:${y - r}px;width:${2 * r}px;height:${2 * r}px" data-twnew title="أفاتار جديد"><i>${TW_I.plus}</i><span class="ob-nm">أفاتار جديد</span></button>`;
   });
   if (!making) {
-    const a = -Math.PI / 2;
-    stage += `<button type="button" class="ob-face add" style="left:${cx + Math.cos(a) * rx - r}px;top:${H / 2 - 6 + Math.sin(a) * ry - r}px;width:${2 * r}px;height:${2 * r}px" data-twnew title="أفاتار جديد"><i>${TW_I.plus}</i><span class="ob-nm">أفاتار جديد</span></button>`;
-    stage += cur ? twCircle(cur, cx, cy, R, " main") : "";
-  } else stage += twMakerStage(cx, cy, R, small);
-  el.innerHTML = `<header class="ob-h"><b>الشخصيات</b><span class="muted">اختر الشخصية التي تظهر في فيديوهاتك، أو أنشئ أفاتارك من ٣ صور وتسجيل صوتي.</span></header>
-    <div class="ob-stage${making ? " making" : ""}" style="height:${H}px">${stage}</div>
-    <div class="ob-info">${making ? twMakerInfo() : twInfo(cur)}</div>
-    <header class="ob-h"><b>الخلفيات وأوضاع التصوير</b><span class="muted">الأماكن الجاهزة متاحة لكل أفاتار، ويمكنك إضافة مكانك الخاص للأفاتار المختار.</span></header>
-    ${twPlaces(cur)}`;
-}
-
-function twInfo(t) {
-  if (!t) return `<p class="muted">اختر شخصية من المدار، أو اضغط «＋» لإنشاء أفاتارك.</p>`;
-  if (t.stock) return `<b class="ob-name">${twe(t.name)}</b><p class="muted">أفاتار جاهز من سمسم كيت، يتكلم بصوت جاهز بلهجة مشروعك. اختره في خطوة الفيديو بقالب الأفاتار أو في الأوتوبايلوت.</p>`;
-  const r = t.ready || {};
-  const voice = r.voice ? "بصوته المستنسخ" : r.video ? "بصوته من فيديو القراءة" : "بصوت الراوي (لم يُسجَّل صوته بعد)";
-  return `<b class="ob-name">${twe(t.name)}</b><p class="muted">يظهر في قالب الأفاتار والأوتوبايلوت، ${voice}.</p>
-    ${t.voice_url ? `<audio src="${twe(t.voice_url)}" controls preload="none"></audio>` : ""}
-    <div class="ob-links"><button type="button" data-twedit="${twe(t.id)}">الصور والصوت</button><button type="button" class="del" data-twdel="${twe(t.id)}">حذف الأفاتار</button></div>`;
+    if (cur) stage += twCircle(cur, cx, cy, R, " main");
+    if (cur && !cur.stock) stage += `<div class="ob-links ob-under" style="top:${cy + R + 40}px"><button type="button" data-twedit="${twe(cur.id)}">الصور والصوت</button><button type="button" class="del" data-twdel="${twe(cur.id)}">حذف</button></div>`;
+  } else stage += twMakerStage(cx, cy, R, small, H);
+  const own = tw.list.filter((t) => !t.stock).length, stock = tw.list.filter((t) => t.stock).length;
+  el.innerHTML = `<div class="ob-stage${making ? " making" : ""}" style="height:${H}px">
+      <div class="ob-tag"><b>الأفاتار</b><span class="num">${own + stock}</span></div>${stage}</div>
+    <div class="ob-pl"><div class="ob-tag in"><b>الخلفيات ووضعيات التصوير</b><span class="num">${nPl - (cur ? 1 : 0)}</span></div>
+      ${twPlaces(cur, ps, per)}</div>`;
+  // لو لسه فيه سكرول (فراغات الصفحة حوالين المحتوى): نصغّر الدواير على قده مرة واحدة
+  const g = el.closest(".nh-pgrid"), over = g ? g.scrollHeight - g.clientHeight : 0;
+  if (over > 0 && tw.fitAdj < 400) { tw.fitAdj += over + 2; twRender(); }
 }
 
 // ✨ إنشاء أفاتار: الاسم والموافقة، وبعدين ٣ دواير صور ومربع صوت طالعين من الأفاتار
-function twMakerStage(cx, cy, R, small) {
+function twMakerStage(cx, cy, R, small, H) {
   const A = tw.make, t = twMakeTwin();
   const have = { front: !!(t?.photos || []).find((p) => p.angle === "front"), r45: !!(t?.photos || []).find((p) => p.angle === "r45"), l45: !!(t?.photos || []).find((p) => p.angle === "l45"), voice: !!t?.ready?.voice };
   const done = TW_SLOTS.filter(([k]) => have[k]).length, busy = Object.values(tw.up).some(Boolean);
   const face = twFace(t);
   let out = `<div class="ob-face main new${face ? "" : " empty"}" style="left:${cx - R}px;top:${cy - R}px;width:${2 * R}px;height:${2 * R}px">
       ${face ? `<img src="${twe(face)}" alt="">` : `<i>${TW_I.plus}</i>`}<span class="ob-nm">${twe(A.name || "أفاتار جديد")}</span></div>`;
-  if (A.tid) {
-    out += `<div class="ob-ring${busy ? " spin" : ""}${done === 4 ? " full" : ""}" style="left:${cx - R - 9}px;top:${cy - R - 9}px;width:${2 * R + 18}px;height:${2 * R + 18}px;--p:${busy ? 18 : (done / 4) * 100}%"></div>`;
-    const rad = small ? Math.min(150, cx - 44) : 190, s = small ? 62 : 76;
-    let wires = "";
-    TW_SLOTS.forEach(([k, label, shape], i) => {
-      const a = (Math.PI * (160 - i * 46.6)) / 180, x = cx + Math.cos(a) * rad, y = cy + 40 + Math.sin(a) * rad * 0.95;
-      wires += `<path d="M${cx} ${cy + R * 0.6} Q ${(cx + x) / 2} ${y + 30} ${x} ${y - s / 2}"/>`;
-      const img = k !== "voice" && (t?.photos || []).find((p) => p.angle === k)?.url;
-      const cls = `ob-slot ${shape}${have[k] ? " filled" : ""}${tw.up[k] ? " busy" : ""}${k === "voice" && tw.rec ? " rec" : ""}`;
-      const inner = img ? `<img src="${twe(img)}" alt="">` : have[k] ? `<i>${TW_I.ok}</i>` : `<i>${k === "voice" ? TW_I.mic : TW_I.cam}</i>`;
-      const style = `left:${x - s / 2}px;top:${y - s / 2}px;width:${s}px;height:${s}px;--d:${i * 70}ms`;
-      if (k === "voice") {
-        out += `<div class="${cls}" style="${style}">${inner}<span class="ob-nm">${tw.rec ? `<b class="num" data-twrect>0:00</b>` : label}</span>
-          <span class="ob-vacts"><button type="button" data-twrec>${tw.rec ? "أوقف" : "سجّل"}</button><label>ارفع<input type="file" accept="audio/*,video/*" data-twup="voice" hidden></label></span></div>`;
-      } else out += `<label class="${cls}" style="${style}">${inner}<span class="ob-nm">${label}</span><input type="file" accept="image/*" data-twup="photo" data-angle="${k}" hidden></label>`;
-    });
-    out = `<svg class="ob-wires" aria-hidden="true">${wires}</svg>` + out;
+  if (!A.tid) {
+    return out + `<div class="ob-form" style="top:${cy + R + 44}px"><input class="av-in" data-twname placeholder="اسم الشخص" value="${twe(A.name || "")}" maxlength="80">
+      <label class="av-chk"><input type="checkbox" data-twok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
+      <div class="ob-links"><button type="button" data-twback>رجوع</button><button type="button" class="nb-btn fs-go" data-twcreate>متابعة</button></div></div>`;
   }
+  out += `<div class="ob-ring${busy ? " spin" : ""}${done === 4 ? " full" : ""}" style="left:${cx - R - 9}px;top:${cy - R - 9}px;width:${2 * R + 18}px;height:${2 * R + 18}px;--p:${busy ? 18 : (done / 4) * 100}%"></div>`;
+  const s = small ? 60 : Math.min(76, Math.round(H * 0.15));
+  const rad = Math.max(110, Math.min(small ? 150 : 200, cx - s / 2 - 34, (H - cy - 40 - s / 2 - 78) / 0.9));
+  let wires = "";
+  TW_SLOTS.forEach(([k, label, shape], i) => {
+    const a = (Math.PI * (160 - i * 46.6)) / 180, x = cx + Math.cos(a) * rad, y = cy + 40 + Math.sin(a) * rad * 0.95;
+    wires += `<path d="M${cx} ${cy + R * 0.6} Q ${(cx + x) / 2} ${y + 30} ${x} ${y - s / 2}"/>`;
+    const img = k !== "voice" && (t?.photos || []).find((p) => p.angle === k)?.url;
+    const cls = `ob-slot ${shape}${have[k] ? " filled" : ""}${tw.up[k] ? " busy" : ""}${k === "voice" && tw.rec ? " rec" : ""}`;
+    const inner = img ? `<img src="${twe(img)}" alt="">` : have[k] ? `<i>${TW_I.ok}</i>` : `<i>${k === "voice" ? TW_I.mic : TW_I.cam}</i>`;
+    const style = `left:${x - s / 2}px;top:${y - s / 2}px;width:${s}px;height:${s}px;--d:${i * 70}ms`;
+    if (k === "voice") {
+      out += `<div class="${cls}" style="${style}">${inner}<span class="ob-nm">${tw.rec ? `<b class="num" data-twrect>0:00</b>` : label}</span>
+        <span class="ob-vacts"><button type="button" data-twrec>${tw.rec ? "أوقف" : "سجّل"}</button><label>ارفع<input type="file" accept="audio/*,video/*" data-twup="voice" hidden></label>${(tw.kit?.voice_script || []).length ? `<button type="button" data-twscript>النص</button>` : ""}</span></div>`;
+    } else out += `<label class="${cls}" style="${style}">${inner}<span class="ob-nm">${label}</span><input type="file" accept="image/*" data-twup="photo" data-angle="${k}" hidden></label>`;
+  });
+  out = `<svg class="ob-wires" aria-hidden="true">${wires}</svg>` + out;
+  const ready = !!t?.ready?.photo;
+  out += `<div class="ob-links ob-bottom"><button type="button" data-twback>رجوع</button>${ready ? `<button type="button" class="nb-btn fs-go" data-twdone>تم</button>` : ""}</div>`;
+  if (tw.script) out += `<div class="ob-script"><button type="button" class="x" data-twscript aria-label="إغلاق">✕</button><ol class="av-lines">${tw.kit.voice_script.map((l) => `<li dir="auto">${twe(l)}</li>`).join("")}</ol></div>`;
   return out;
 }
 
-function twMakerInfo() {
-  const A = tw.make, t = twMakeTwin();
-  if (!A.tid) return `<div class="ob-form"><input class="av-in" data-twname placeholder="اسم الشخص" value="${twe(A.name || "")}" maxlength="80">
-      <label class="av-chk"><input type="checkbox" data-twok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
-      <div class="ob-links"><button type="button" data-twback>رجوع</button><button type="button" class="nb-btn fs-go" data-twcreate>متابعة</button></div></div>`;
-  const ready = !!t?.ready?.photo, all = ready && t?.ready?.voice && (t.photos || []).length >= 3;
-  const lines = (tw.kit?.voice_script || []).map((l) => `<li dir="auto">${twe(l)}</li>`).join("");
-  return `<p class="muted">${all ? "اكتمل الأفاتار." : "اضغط على كل دائرة لرفع صورة واضحة بإضاءة جيدة، وعلى المربع لتسجيل صوتك في مكان هادئ (نصف دقيقة على الأقل)."}</p>
-    ${lines && !t?.ready?.voice ? `<details><summary>النص الذي تقرؤه للتسجيل</summary><ol class="av-lines">${lines}</ol></details>` : ""}
-    <div class="ob-links"><button type="button" data-twback>رجوع</button>${ready ? `<button type="button" class="nb-btn fs-go" data-twdone>تم</button>` : ""}</div>`;
-}
-
-// 🏞️ الخلفيات وأوضاع التصوير: مربعات (الجاهزة، وأماكن الأفاتار المختار، و«＋»)
-function twPlaces(t) {
+// 🏞️ الخلفيات ووضعيات التصوير: مربعات في صف واحد (الجاهزة، وأماكن الأفاتار المختار، و«＋»)
+function twPlaces(t, ps, per) {
   const ready = tw.scenes.map((s) => {
     const [place, pose] = String(s.name || "").split(" · ");
-    return `<figure class="ob-place">${s.img ? `<img src="${twe(s.img)}" alt="" loading="lazy">` : ""}<figcaption><b>${twe(place)}</b>${pose ? `<small>${twe(pose)}</small>` : ""}</figcaption></figure>`;
+    return `<figure class="ob-place">${s.img ? `<img src="${twe(s.img)}" alt="">` : ""}<figcaption><b>${twe(place)}</b>${pose ? `<small>${twe(pose)}</small>` : ""}</figcaption></figure>`;
   }).join("");
   const own = (t?.backgrounds || []).map((b) => `<figure class="ob-place own"><img src="${twe(b.url)}" alt=""><figcaption><b>${twe(b.name || "مكاني")}</b><small>${twe(t.name)}</small></figcaption>
       <button type="button" data-twbgdel="${twe(b.id)}" aria-label="حذف">✕</button></figure>`).join("");
-  const add = t ? `<label class="ob-place add${tw.placeBusy ? " busy" : ""}"><i>${TW_I.plus}</i><figcaption><b>مكانك</b><small>صورة للمكان فارغًا</small></figcaption><input type="file" accept="image/*" data-twup="background" hidden></label>` : "";
-  return `<div class="ob-places">${ready}${own}${add}</div>`;
+  const add = t ? `<label class="ob-place add${tw.placeBusy ? " busy" : ""}"><i>${TW_I.plus}</i><figcaption><b>مكانك</b></figcaption><input type="file" accept="image/*" data-twup="background" hidden></label>` : "";
+  return `<div class="ob-places" style="--ps:${ps}px;grid-template-columns:repeat(${per}, var(--ps))">${ready}${own}${add}</div>`;
 }
 
 async function twEnsure(id) {
@@ -192,9 +192,10 @@ async function twClick(e) {
   if ((b = q("[data-twpick]"))) { if (tw.make) return; tw.cur = b.dataset.twpick; return twRender(); }
   if (q("[data-twnew]")) { tw.make = {}; tw.up = {}; return twRender(); }
   if ((b = q("[data-twedit]"))) { const t = tw.list.find((x) => x.id === b.dataset.twedit); tw.make = { tid: t.id, name: t.name }; tw.up = {}; return twRender(); }
-  if (q("[data-twback]")) { if (tw.rec) return; tw.make = null; return twRender(); }
+  if (q("[data-twback]")) { if (tw.rec) return; tw.make = null; tw.script = false; return twRender(); }
   if (q("[data-twdone]")) { tw.cur = tw.make?.tid || tw.cur; tw.make = null; toast("الأفاتار جاهز"); return twInit(); }
   if (q("[data-twrec]")) return twRecord();
+  if (q("[data-twscript]")) { tw.script = !tw.script; return twRender(); }
   if (q("[data-twcreate]")) {
     const A = tw.make || {};
     if (!(A.name || "").trim()) return toast("اكتب اسم الشخص", true);

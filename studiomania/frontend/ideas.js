@@ -4,31 +4,27 @@
 // «✨ نقّح» بيرتّب الكلام، و«📝 نسّقها نصًا» بيكتبها كلام يتقال ومعاه سندات حقيقية لو موجودة.
 const IdeasPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
-  const S = { el: null, list: [], timer: null, rec: null, clip: null, edit: null, busy: {}, open: null, adding: false };
+  const S = { el: null, list: [], timer: null, rec: null, clip: null, edit: null, busy: {}, open: null, adding: false, page: 0, fitAdj: 0 };
   const html = () => `<div class="nb-wrap tb" id="idWrap"><div class="nh-empty">جارٍ التحميل…</div></div>`;
   const ago = (t) => { try { return new Date(t).toLocaleDateString("ar-EG-u-nu-latn", { day: "numeric", month: "short" }); } catch { return ""; } };
   const isNew = (x) => !x.used_at && x.auto && Date.now() - new Date(x.at).getTime() < 2 * 864e5;
 
   // 🫧 ترتيب الفقاعات: الغير مستخدمة من النص لبرة (حلزوني)، والمستخدمة صغيرة ومستخبية ورا على الأطراف
-  function pack(W, small) {
-    const fresh = S.list.filter((x) => !x.used_at), used = S.list.filter((x) => x.used_at).slice(0, 40);
+  // 🫧 ترتيب الفقاعات: الغير مستخدمة من النص لبرة (حلزوني)، والمستخدمة صغيرة ومستخبية ورا على الأطراف. f = حجم الفقاعات
+  function pack(items, W, small, f) {
     const rOf = (x) => {
-      if (x.used_at) return small ? 22 : 28;
+      if (x.used_at) return Math.round((small ? 20 : 26) * f);
       const n = (x.title || "").length;
-      return Math.round((small ? 42 : 56) + Math.min(n, 60) / 60 * (small ? 12 : 18));
+      return Math.round(((small ? 40 : 54) + (Math.min(n, 60) / 60) * (small ? 12 : 18)) * f);
     };
-    const placed = [], cx = W / 2, sx = small ? 1.05 : 1.7;
+    const placed = [], cx = W / 2, sx = small ? 1.05 : 1.8;
     const fits = (x, y, r, used) => {
       if (x - r < 8 || x + r > W - 8) return false;
-      return placed.every((p) => {
-        const d = Math.hypot(p.x - x, p.y - y);
-        return d >= (used && !p.used ? (p.r + r) * 0.62 : p.r + r + 6);
-      });
+      return placed.every((p) => Math.hypot(p.x - x, p.y - y) >= (used && !p.used ? (p.r + r) * 0.62 : p.r + r + 5));
     };
     let tMax = 0;
-    for (const x of [...fresh, ...used]) {
+    for (const x of items) {
       const r = rOf(x), u = !!x.used_at;
-      // المستخدمة بتبدأ من طرف السحابة (ورا الأفكار الجديدة، مش في النص)
       for (let t = u ? tMax * 0.8 : 0; t < 2400; t += 0.12) {
         const px = cx + Math.cos(t) * t * 5 * sx, py = Math.sin(t) * t * 5;
         if (fits(px, py, r, u)) { placed.push({ x: px, y: py, r, used: u, it: x }); if (!u) tMax = Math.max(tMax, t); break; }
@@ -37,43 +33,57 @@ const IdeasPage = (() => {
     return placed;
   }
 
+  // 🔢 فوق على اليمين: «الأفكار» وقدامها المستخدمة (أسود) / الموجودة (برتقالي)
   function counter() {
-    const used = S.list.filter((x) => x.used_at).length, tot = S.list.length, fresh = S.list.filter(isNew).length;
-    return `<section class="tb-top">
-      <div class="tb-count"><span class="u"><b class="num">${used}</b><small>استُخدمت</small></span><i>/</i><span class="t"><b class="num">${tot}</b><small>فكرة لديك</small></span></div>
-      <p class="muted">تُضاف أفكار جديدة كل يوم من أفضل منشورات منافسيك، والترند، وأسئلة جمهورك${fresh ? `، ومنها <b class="tb-fresh">${fresh} جديدة</b>` : ""}. وأضف أفكارك أنت من «＋».</p></section>`;
+    const used = S.list.filter((x) => x.used_at).length, tot = S.list.length;
+    return `<div class="tb-tag"><b>الأفكار</b><span class="tb-count num"><i class="u">${used}</i><i class="sl">/</i><i class="t">${tot}</i></span>
+      <small class="muted">تتجدد كل يوم</small></div>`;
   }
 
-  function stage() {
+  // 📐 السحابة على قد الشاشة (من غير سكرول): الفقاعات بتصغر لحد حد معيّن، وبعده الزيادة بتتقلّب بفقاعة «+عدد»
+  function stage(H) {
     const W = Math.max(300, S.el.clientWidth || 900), small = W < 620;
-    const pl = pack(W, small);
-    const top = Math.min(0, ...pl.map((p) => p.y - p.r)) - (small ? 34 : 44), bot = Math.max(0, ...pl.map((p) => p.y + p.r));
-    const puff = small ? 22 : 34, oy = -top;
-    const cloudH = bot - top + puff + 14;
-    // السحابة: دايرة أكبر شوية ورا كل فكرة (اتحادهم بيعمل شكل سحابة)
+    const trailH = small ? 120 : 130, topPad = small ? 64 : 10, cloudMax = H - trailH - topPad;
+    const fresh = S.list.filter((x) => !x.used_at), used = S.list.filter((x) => x.used_at).slice(0, 30);
+    const all = [...fresh, ...used];
+    let f = 1, n = all.length, pl = [], more = 0;
+    for (let k = 0; k < 40; k++) {
+      const start = n < all.length ? (S.page * n) % all.length : 0;
+      const items = n < all.length ? [...all, ...all].slice(start, start + n) : all;
+      pl = pack(items, W, small, f);
+      const t0 = Math.min(0, ...pl.map((p) => p.y - p.r)), b0 = Math.max(0, ...pl.map((p) => p.y + p.r));
+      more = all.length - n;
+      if (b0 - t0 + (small ? 40 : 60) <= cloudMax) break;
+      if (f > 0.66) f -= 0.06; else n = Math.max(4, n - 2);
+    }
+    const top = Math.min(0, ...pl.map((p) => p.y - p.r)), bot = Math.max(0, ...pl.map((p) => p.y + p.r));
+    const puff = Math.round((small ? 20 : 32) * f), oy = topPad + (cloudMax - (bot - top)) / 2 - top;
     const fr = pl.filter((p) => !p.used);
     const bx0 = Math.min(...fr.map((p) => p.x - p.r)), bx1 = Math.max(...fr.map((p) => p.x + p.r)), by0 = Math.min(...fr.map((p) => p.y - p.r)) + oy, by1 = Math.max(...fr.map((p) => p.y + p.r)) + oy;
     const core = fr.length ? `<i style="left:${bx0 + (bx1 - bx0) * 0.08}px;top:${by0 + (by1 - by0) * 0.08}px;width:${(bx1 - bx0) * 0.84}px;height:${(by1 - by0) * 0.84}px"></i>` : "";
     const puffs = core + fr.map((p) => `<i style="left:${p.x - p.r - puff}px;top:${p.y + oy - p.r - puff}px;width:${2 * (p.r + puff)}px;height:${2 * (p.r + puff)}px"></i>`).join("")
-      || `<i style="left:${W / 2 - 120}px;top:20px;width:240px;height:160px"></i>`;
+      || `<i style="left:${W / 2 - 120}px;top:${topPad + cloudMax / 2 - 80}px;width:240px;height:160px"></i>`;
+    const fs = Math.max(11, Math.round(13 * Math.sqrt(f)));
     const bubs = pl.map((p, i) => {
       const x = p.it, on = S.open === x.id, busy = x.status === "transcribing";
       const cls = `tb-bub${p.used ? " used" : ""}${isNew(x) ? " new" : ""}${on ? " on" : ""}${busy ? " busy" : ""}`;
       const title = x.title || (busy ? "جارٍ تحويل الصوت إلى نص…" : "فكرة");
-      return `<button type="button" class="${cls}" data-iopen="${esc(x.id)}" title="${esc(title)}" style="left:${p.x - p.r}px;top:${p.y + oy - p.r}px;width:${2 * p.r}px;height:${2 * p.r}px;--fl:${(i % 7) * -0.9}s">
+      return `<button type="button" class="${cls}" data-iopen="${esc(x.id)}" title="${esc(title)}" style="left:${p.x - p.r}px;top:${p.y + oy - p.r}px;width:${2 * p.r}px;height:${2 * p.r}px;font-size:${fs}px;--fl:${(i % 7) * -0.9}s">
         ${p.used ? `<span class="tk">✓</span>` : `${isNew(x) ? `<em>جديدة</em>` : ""}<span>${esc(title)}</span>`}</button>`;
     }).join("");
-    // الراس وسلسلة الفقاعات الصغيرة لحد السحابة، وأكبرهم «＋»
+    const mr = small ? 24 : 30;
+    const moreB = more > 0 ? `<button type="button" class="tb-more" data-imore style="left:${Math.max(8, bx0 - mr * 0.6)}px;top:${by1 - 2 * mr}px;width:${2 * mr}px;height:${2 * mr}px" title="أفكار أخرى"><b class="num">+${more}</b></button>` : "";
     // من تحت لفوق: الراس ← فقاعة صغيرة ← أكبر ← «＋» لازقة في السحابة
-    const pr = small ? 25 : 30, px = fr.length ? Math.min(W - pr - 50, bx1 - pr * 0.6) : W / 2 + 60, py = fr.length ? by1 + puff + pr * 0.3 : cloudH + pr - 4;
-    const hr = small ? 26 : 32, hx = Math.min(W - hr - 6, px + (small ? 46 : 70)), hy = py + pr + (small ? 74 : 92);
-    const trail = [[px + (hx - px) * 0.66, py + pr + (hy - hr - py - pr) * 0.62, 7], [px + (hx - px) * 0.33, py + pr + (hy - hr - py - pr) * 0.22, 11]]
+    const pr = small ? 25 : 30, cloudBot = fr.length ? by1 + puff : topPad + cloudMax / 2 + 80;
+    const px = fr.length ? Math.min(W - pr - 50, bx1 - pr * 0.6) : W / 2 + 60, py = Math.min(cloudBot + pr * 0.3, H - trailH + pr);
+    const hr = small ? 24 : 30, hx = Math.min(W - hr - 6, px + (small ? 46 : 70)), hy = H - hr - 4;
+    const trail = [[px + (hx - px) * 0.66, py + pr + (hy - hr - py - pr) * 0.62, 6], [px + (hx - px) * 0.33, py + pr + (hy - hr - py - pr) * 0.22, 10]]
       .map(([x, y, r]) => `<i class="tb-dot" style="left:${x - r}px;top:${y - r}px;width:${2 * r}px;height:${2 * r}px"></i>`).join("");
-    const H = hy + hr + 26;
     return `<div class="tb-stage" style="height:${H}px">
-      <div class="tb-cloud" style="height:${cloudH}px">${puffs}</div>${bubs}${trail}
+      <div class="tb-cloud">${puffs}</div>${bubs}${moreB}${trail}
       <button type="button" class="tb-plus${S.adding ? " on" : ""}" data-iaddopen title="فكرة جديدة" style="left:${px - pr}px;top:${py - pr}px;width:${2 * pr}px;height:${2 * pr}px">＋<small>فكرة جديدة</small></button>
       <i class="tb-head" style="left:${hx - hr}px;top:${hy - hr}px;width:${2 * hr}px;height:${2 * hr}px"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></i>
+      ${counter()}${S.list.length ? "" : `<p class="muted tb-empty" style="top:${topPad + cloudMax / 2 - 10}px">لا توجد أفكار بعد. اضغط «＋» لإضافة أول فكرة.</p>`}
     </div>`;
   }
 
@@ -122,11 +132,15 @@ const IdeasPage = (() => {
   function render() {
     const w = S.el;
     if (!w || !w.isConnected) return;
+    const key = `${innerWidth}x${innerHeight}`;
+    if (S.fitKey !== key) { S.fitKey = key; S.fitAdj = 0; }
+    const H = Math.max(420, innerHeight - w.getBoundingClientRect().top - 18 - S.fitAdj);
     const cur = S.list.find((x) => x.id === S.open);
-    w.innerHTML = `${counter()}${S.list.length ? stage() : `<div class="tb-empty">${stage()}<p class="muted">لا توجد أفكار بعد. اضغط «＋» لإضافة أول فكرة.</p></div>`}
-      ${S.adding ? addPanel() : cur ? openPanel(cur) : ""}`;
+    const panel = S.adding ? addPanel() : cur ? openPanel(cur) : "";
+    w.innerHTML = `${stage(H)}${panel ? `<div class="tb-veil" data-iveil></div>${panel}` : ""}`;
+    const g = w.closest(".nh-pgrid"), over = g ? g.scrollHeight - g.clientHeight : 0;
+    if (over > 0 && S.fitAdj < 300) { S.fitAdj += over + 2; render(); }
   }
-  const reveal = () => requestAnimationFrame(() => S.el?.querySelector("#tbPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   async function load() { S.list = await api("/api/my-ideas"); }
   function poll() {
     clearTimeout(S.timer);
@@ -159,8 +173,10 @@ const IdeasPage = (() => {
       const q = (s) => e.target.closest(s);
       let b;
       try {
-        if ((b = q("[data-iopen]"))) { S.adding = false; S.edit = null; S.open = S.open === b.dataset.iopen ? null : b.dataset.iopen; render(); return reveal(); }
-        if (q("[data-iaddopen]")) { keepDraft(); S.adding = !S.adding; S.open = null; render(); restoreDraft(); if (S.adding) { reveal(); S.el.querySelector('[data-inew="text"]')?.focus({ preventScroll: true }); } return; }
+        if ((b = q("[data-iopen]"))) { S.adding = false; S.edit = null; S.open = S.open === b.dataset.iopen ? null : b.dataset.iopen; return render(); }
+        if (q("[data-imore]")) { S.page += 1; return render(); }
+        if (q("[data-iveil]")) { if (S.rec) return; keepDraft(); S.open = null; S.adding = false; S.edit = null; return render(); }
+        if (q("[data-iaddopen]")) { keepDraft(); S.adding = !S.adding; S.open = null; render(); restoreDraft(); if (S.adding) S.el.querySelector('[data-inew="text"]')?.focus({ preventScroll: true }); return; }
         if (q("[data-iaddclose]")) { if (S.rec) return; S.adding = false; return render(); }
         if (q("[data-iclose]")) { S.open = null; return render(); }
         if (q("[data-irec]")) return recToggle();
