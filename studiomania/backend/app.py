@@ -23404,7 +23404,7 @@ def tpl_sample_cost(d: dict) -> float:
 
 def voice_usd(voice: str, text: str) -> float:
     """تكلفة التعليق الصوتي الحقيقية: فصيح بالدقيقة، وElevenLabs بالألف حرف."""
-    v = dub.VOICES.get(voice) or ({"per_1k": 0.30} if str(voice).startswith("clone:") else {})
+    v = dub.VOICES.get(voice) or ({"per_1k": 0.30} if str(voice).startswith(("clone:", "twin:")) else {})
     n = len(text or "")
     per_1k = v.get("per_1k", 0.1)
     return n / 1000 * per_1k + (n / dub.CHARS_PER_SEC) / 60 * v.get("per_min", 0)
@@ -23422,12 +23422,17 @@ def vo_say(text: str, voice: str, lang: str, out: Path) -> Path:
     wallet.need(cost, "التعليق الصوتي")
     text = dub.tts_fem_kaf(text, lang)   # 🇸🇦 كاف المخاطَبة تتنطق كاف مش شين
     raw = out.with_suffix(".src")
-    if str(voice).startswith("clone:"):   # 🎙️ صوت العميل المستنسخ: نسخة فورية من العينة، بتتمسح بعد الجملة
-        _, cbid, nid = (voice.split(":") + ["", ""])[:3]
-        n = next((x for x in (brain_row(cbid) or {}).get("narrators") or [] if x.get("id") == nid), None)
-        sample = brain_dir(cbid) / str((n or {}).get("file") or "")
-        if not n or not sample.is_file():
-            raise HTTPException(400, "عينة الصوت المستنسخ غير موجودة. أضفها من «صوت الراوي» في عقل العلامة")
+    if str(voice).startswith(("clone:", "twin:")):   # 🎙️ صوت مستنسخ (الراوي، أو صوت الأفاتار نفسه): نسخة فورية من العينة، بتتمسح بعد الجملة
+        if voice.startswith("twin:"):
+            sample, cbid = twin_voice_sample(voice[5:]), "twin"
+            if not sample:
+                raise HTTPException(400, "صوت الأفاتار غير موجود. سجّل صوته من خطوة إنشاء الأفاتار")
+        else:
+            _, cbid, nid = (voice.split(":") + ["", ""])[:3]
+            n = next((x for x in (brain_row(cbid) or {}).get("narrators") or [] if x.get("id") == nid), None)
+            sample = brain_dir(cbid) / str((n or {}).get("file") or "")
+            if not n or not sample.is_file():
+                raise HTTPException(400, "عينة الصوت المستنسخ غير موجودة. أضفها من «صوت الراوي» في عقل العلامة")
         vid = voicelab.eleven_clone(sample, f"brand-{cbid}")
         try:
             voicelab.eleven_say(text, vid, raw)
@@ -31028,6 +31033,28 @@ def twin_voice(tid: str, file: UploadFile = File(...)):
     return twin_to_dict(tid, twin_update(tid, fn))
 
 
+def twin_voice_sample(tid: str) -> Path | None:
+    """🎙️ عينة صوت الأفاتار للاستنساخ: تسجيل الصوت لو موجود، وإلا صوت فيديو القراية نفسه (بيتقطع مرة ويتحفظ)."""
+    try:
+        t = twin_load(tid)
+    except HTTPException:
+        return None
+    folder = twin_dir(tid)
+    if (v := (t.get("voice") or {}).get("file")) and (folder / v).is_file():
+        return folder / v
+    vf = (t.get("video") or {}).get("file")
+    if not vf or not (folder / vf).is_file():
+        return None
+    out = folder / "voice_from_video.m4a"
+    if not out.is_file():
+        r = subprocess.run([ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(folder / vf), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "128k", str(out)],
+                           capture_output=True, timeout=300)
+        if r.returncode != 0 or not out.is_file():
+            out.unlink(missing_ok=True)
+            return None
+    return out
+
+
 def twin_base_video(src: Path, dur: float, dest: Path) -> None:
     """فيديو القراية على قدر الصوت الجديد: إذا أقصر يُعاد رايح قادم (بدون قفلة باينة)، ومن غير صوته."""
     ff = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
@@ -31304,7 +31331,7 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     if not text:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-    voice = brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الراوي بتاع العلامة (صوته المستنسخ لو موجود)
+    voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
     wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
     flow_update(fid, lambda x: x.update(phone_cast={"twin": tid, "bg": ""}))
 

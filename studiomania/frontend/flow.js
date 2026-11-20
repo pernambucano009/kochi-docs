@@ -803,6 +803,16 @@ const Flow = (() => {
       <input class="flw-in" data-avname placeholder="اسم الشخص" value="${esc(A.name || "")}" maxlength="80">
       <label class="flw-chk"><input type="checkbox" data-avok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
       <div class="flw-acts">${back}<button type="button" class="flw-btn pri" data-avcreate>متابعة</button></div></section>`;
+    if (A.step === "voice") {   // 🎙️ صوت الأفاتار: من فيديو القراية تلقائيًا، أو تسجيل لوحده (لازم لو اتعمل من صورة)
+      const vl = (S.avKit?.voice_script || []).map((l) => `<li dir="auto">${esc(l)}</li>`).join("");
+      return `<section class="flw-avmk"><h3>🎙️ صوت ${esc(A.name || "الأفاتار")}</h3>
+        <p class="muted">${A.from === "video" ? "✓ سيُستنسخ صوته من الفيديو الذي رفعته. إن كان صوت الفيديو غير واضح، سجّل الصوت وحده في مكان هادئ." : "اقرأ هذا النص بصوتك الطبيعي في مكان هادئ (نصف دقيقة على الأقل)، لكي يتكلم الأفاتار بصوتك."}</p>
+        ${vl ? `<details ${A.from === "video" ? "" : "open"}><summary>النص الذي تقرؤه</summary><ol class="flw-avlines">${vl}</ol></details>` : ""}
+        <div class="flw-acts"><button type="button" class="flw-btn ${A.from === "video" ? "" : "pri"}" data-avrec>${S.avRec ? "⏹ أوقف التسجيل وارفعه" : "🎙️ سجّل الآن"}</button>
+          <label class="flw-btn">⬆ ارفع تسجيلًا<input type="file" accept="audio/*,video/*" data-avvoice hidden></label>
+          ${A.from === "video" ? `<button type="button" class="flw-btn pri" data-avdone>✓ تم</button>` : ""}</div>
+        ${S.avRec ? `<p class="muted">🔴 جارٍ التسجيل…</p>` : ""}</section>`;
+    }
     const lines = (S.avKit?.video_script || []).map((l) => `<li dir="auto">${esc(l)}</li>`).join("");
     return `<section class="flw-avmk"><h3>🪞 ${esc(A.name || "الأفاتار")}: اختر طريقة واحدة</h3>
       <div class="flw-avways">
@@ -818,13 +828,28 @@ const Flow = (() => {
     const f = new FormData();
     if (kind === "photo") f.append("angle", "front");
     f.append("file", file);
-    S.avNew = { ...A, busy: kind === "photo" ? "جارٍ رفع الصورة…" : "جارٍ رفع الفيديو وتجهيزه…" }; render();
+    S.avNew = { ...A, busy: kind === "photo" ? "جارٍ رفع الصورة…" : kind === "voice" ? "جارٍ رفع الصوت…" : "جارٍ رفع الفيديو وتجهيزه…" }; render();
     try {
       await api(`/api/twins/${A.tid}/${kind}`, { method: "POST", body: f });
-      S.avTwin = A.tid; S.avNew = null; S.avMake = false; S.twins = undefined;
-      toast("✓ الأفاتار جاهز");
+      if (kind === "voice") avDone(A.tid);
+      else S.avNew = { ...A, busy: null, step: "voice", from: kind };
     } catch (err) { S.avNew = { ...A, busy: null }; toast(err.message, true); }
     render();
+  }
+  function avDone(tid) { S.avTwin = tid; S.avNew = null; S.avMake = false; S.twins = undefined; toast("✓ الأفاتار جاهز"); }
+  async function avRecord() {
+    if (S.avRec) { S.avRec.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream), parts = [];
+      rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        S.avRec = null;
+        avUpload("voice", new File(parts, "voice.webm", { type: rec.mimeType || "audio/webm" }));
+      };
+      rec.start(); S.avRec = rec; render();
+    } catch { toast("تعذّر الوصول إلى الميكروفون. ارفع تسجيلًا بدلًا من ذلك", true); }
   }
   // 🪞 مين في الفيديو وصوّر فين: عشان لقطات الـ B-roll اللي فيها الشخص تطلع بنفس الوش ونفس المكان
   function castBox(d) {
@@ -1063,6 +1088,8 @@ const Flow = (() => {
     }
     if ((b = q("[data-libpick]"))) { const role = S.lib?.role || "main"; S.lib = null; return call("/footage/pick", { gen_id: b.dataset.libpick, role }); }
     if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
+    if (q("[data-avrec]")) return avRecord();
+    if (q("[data-avdone]")) { avDone(S.avNew?.tid); return render(); }
     if (q("[data-avnew]")) { S.avMake = true; S.avNew = null; return render(); }
     if (q("[data-avback]")) { S.avMake = false; S.avNew = null; return render(); }
     if (q("[data-avcreate]")) {
@@ -1244,6 +1271,7 @@ const Flow = (() => {
     if (e.target.matches?.("[data-avok]")) { S.avNew = { ...(S.avNew || {}), ok: e.target.checked }; return; }
     if (e.target.matches?.("[data-avvid]") && e.target.files?.[0]) return avUpload("video", e.target.files[0]);
     if (e.target.matches?.("[data-avpic]") && e.target.files?.[0]) return avUpload("photo", e.target.files[0]);
+    if (e.target.matches?.("[data-avvoice]") && e.target.files?.[0]) return avUpload("voice", e.target.files[0]);
     if (e.target.matches?.("[data-avtwin]")) { S.avTwin = e.target.value; return render(); }
     if (e.target.matches?.("[data-casttwin]")) return call("/phone-cast", { twin: e.target.value, bg: "" });
     if (e.target.id === "flwFiles") upload(e.target.files);
