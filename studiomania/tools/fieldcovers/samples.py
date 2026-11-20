@@ -89,3 +89,8 @@ S = {
 # 🏋️ اللياقة: مثال على كل قالب (fitness.py)
 from fitness import F as _FIT  # noqa: E402
 S["fitness"].update(_FIT)
+
+# 🌱 التنمية البشرية وتطوير الذات: مثال على كل قالب ينفع للمجال (selfdev.py)
+from selfdev import F as _SD  # noqa: E402
+S["selfdev"] = {}
+S["selfdev"].update(_SD)

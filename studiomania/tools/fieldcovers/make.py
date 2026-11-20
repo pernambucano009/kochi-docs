@@ -1,7 +1,7 @@
 """يعمل غلاف (1080×1350) وفيديو معاينة لكل قالب من قوالب كل مجال، بكلام وصور من المجال نفسه.
     python3 tools/fieldcovers/make.py [field[/tpl] ...]
 الناتج: frontend/gallery/f/<field>/<tpl>.jpg و.mp4 + frontend/gallery/f/index.json (المتاح لكل مجال)."""
-import base64, io, json, subprocess, sys, tempfile
+import base64, io, json, re, subprocess, sys, tempfile
 from pathlib import Path
 
 import imageio_ffmpeg
@@ -39,6 +39,7 @@ def render(b, field: str, tpl: str, params: dict, arts: dict):
         f = (HERE / "elements" / field / "krea2t" / ("" if st == "base" else st) / f"{nm}.png") if nm else None   # base: = العناصر العادية (الستايل بيتعمل بالكود)
         return "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode() if f and f.exists() else v
     pr = {k: (arts[v] if k.startswith(("img", "p", "th", "cover", "bg")) and isinstance(v, str) and v in arts else
+              el(v) if isinstance(v, str) and re.fullmatch(r"[a-z0-9]+:[a-z0-9_]+", v) else   # صورة واحدة من مكتبة المجال («base:book»)
               [el(i) for i in v] if isinstance(v, list) and any(isinstance(i, str) and ":" in i and not i.startswith("data:") and "|" not in i for i in v) else v)
           for k, v in params.items()}
     pg = b.new_page(viewport={"width": 1080, "height": 1920})
