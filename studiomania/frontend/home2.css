@@ -3268,7 +3268,11 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
   /* محور واحد لكل عمود: سنتر كل الأيقونات على خط واحد في نص العمود. والعمودين بنفس العرض على طرفي الشاشة،
      فالمسافة من حافة الشاشة اليمين لمحور اليمين = المسافة من حافة الشمال لمحور الشمال */
   #nh .nh-col-r, #nh .nh-col-l, [dir="ltr"] #nh .nh-col-r, [dir="ltr"] #nh .nh-col-l { justify-items: center; }
-  #nh .nh-col .nh-side { width: 220px; max-width: 100%; margin: 0; box-sizing: border-box; align-items: center; text-align: center; }
+  #nh .nh-col .nh-side { width: 200px; max-width: 100%; margin: 0; box-sizing: border-box; align-items: center; text-align: center; }
+  /* براح للعين: العمودين أضيق وأقرب لحافة الصفحة (المحور على ١١٠px من الحافة بدل ~٢٠٠)، والأقسام التلاتة متوزعة على طول العمود كله */
+  #nh .nh-home { padding-inline: 10px; }
+  #nh .nh-bento { grid-template-columns: 200px minmax(0, 1fr) 200px; }
+  #nh .nh-col { grid-template-rows: repeat(3, auto); align-content: space-between; padding-block: 6px 10px; }
   #nh .nh-col .nh-side .nh-sname { max-width: 100%; }
 }
 /* في الرئيسية: «رجوع» و«الصفحة الرئيسية» مكتوبين بالرمادي الخفيف (مش شغالين)، بدل مربعين فاضيين */
