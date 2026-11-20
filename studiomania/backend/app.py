@@ -37803,7 +37803,7 @@ def qa_tts(out: Path, cfg: dict) -> list[dict]:
 
 def qa_ideas(out: Path, cfg: dict) -> list[dict]:
     items = []
-    for fk in fieldpacks.FIELD_ORDER:
+    for fk in fieldpacks.ALL_FIELDS:
         f, code = fieldpacks.FIELDS.get(fk) or {}, qa.IDEA_DIALECT.get(fk, "ar-msa")
         lab = dub.DIALECTS.get(code, {}).get("label", code)
         it = {"id": f"ideas-{fk}", "kind": "ideas", "label": f"{f.get('name', fk)} · {lab}"}

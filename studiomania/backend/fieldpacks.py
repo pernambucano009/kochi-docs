@@ -322,13 +322,14 @@ FIELDS["dental"] = {**FIELDS["beauty"],
     "about_ph": "مثلًا: عيادة أسنان في جدة، نقدم فينير وتبييض وزراعة، وما يميزنا تصميم الابتسامة الرقمي ومواعيد مسائية",
     "rules": "لا نعد بنتائج طبية مضمونة\nلا ننشر صور حالات دون موافقة مكتوبة من المريض\nلا نجمّل صورة «قبل» ولا نعدّل الأسنان بالذكاء الاصطناعي",
 }
-FIELD_ORDER = ["food", "dental", "beauty", "ecom", "realestate", "edu", "selfdev", "fitness", "home", "shops"]
+# ✅ المجالات المتاحة للتسجيل: اللي خلصناها بس (صاحب المشروع ٢٠ نوفمبر). الباقي بياناته موجودة ومستخبي لحد ما يخلص.
+FIELD_ORDER = ["fitness", "selfdev", "dental"]
+ALL_FIELDS = ["food", "dental", "beauty", "ecom", "realestate", "edu", "selfdev", "fitness", "home", "shops"]
 
 
 def options() -> dict:
     """القوائم التي تظهر في التسجيل وفي أسئلة أول استخدام."""
-    return {"fields": [{"id": k, "name": FIELDS[k]["name"], "hint": FIELDS[k]["hint"], "goal": FIELDS[k]["goal"]} for k in FIELD_ORDER]
-            + [{"id": "other", "name": "مجال آخر", "hint": "", "goal": "sales"}],
+    return {"fields": [{"id": k, "name": FIELDS[k]["name"], "hint": FIELDS[k]["hint"], "goal": FIELDS[k]["goal"]} for k in FIELD_ORDER],
             "goals": [{"id": a, "name": b} for a, b, _ in GOALS]}
 
 
@@ -344,7 +345,7 @@ def onboard_dict(country: str, dial: str, field: str = "", goal: str = "", brand
         return None
     dial = dial if dial in names else reg[2]
     return {"country": reg[1] if reg and reg[0] != "XX" else "", "dialect": dial, "dialect_label": names[dial],
-            "field": field if field in FIELDS or field == "other" else "", "goal": goal if goal in GOAL_BY else "", "brand": brand.strip()[:80]}
+            "field": field if field in FIELD_ORDER else "", "goal": goal if goal in GOAL_BY else "", "brand": brand.strip()[:80]}
 
 
 DIALECT_PHRASE = {"ar-sa-najdi": "باللهجة النجدية", "ar-sa-hijazi": "باللهجة الحجازية", "ar-gulf": "باللهجة الخليجية", "ar-ae": "باللهجة الإماراتية",

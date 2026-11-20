@@ -524,15 +524,10 @@ const LP_STEPS = [
   ['الفيديو يُنشر في موعده', 'The video posts on time', 'القالب يصنع الفيديو بالصوت والترجمة، والأوتوبايلوت ينشره على حساباتك.', 'The template makes the video with voice and captions, and the autopilot posts it.']
 ];
 // أمثلة لكل مجال: قوالب المجال (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)، بكلام وصور من المجال نفسه (gallery/f/<المجال>)
-const LP_FIELDS = [
-  ['مطاعم وكافيهات', 'Restaurants & cafés', [['t-price', 'كشف السعر', 'Price reveal'], ['t-chat', 'قصة محادثة', 'Chat story'], ['t-map', 'خريطة متحركة', 'Animated map']], 'food'],
-  ['عيادات وتجميل', 'Clinics & beauty', [['t-review', 'رأي عميل', 'Customer review'], ['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-flipcards', 'بطاقات تتقلب', 'Flip cards']], 'beauty'],
-  ['متاجر إلكترونية', 'Online stores', [['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-count', 'عد تنازلي', 'Countdown']], 'ecom'],
-  ['عقارات', 'Real estate', [['t-map', 'خريطة متحركة', 'Animated map'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-chart', 'رسم بياني', 'Chart']], 'realestate'],
-  ['تعليم وكوتشينج', 'Education', [['t-board', 'سبورة', 'Whiteboard'], ['t-flow', 'خطوات', 'Steps'], ['t-show', 'برنامج مسابقات', 'Quiz show']], 'edu'],
+const LP_FIELDS = [   // المجالات المتاحة بس (اللي خلصناها)
   ['رياضة ولياقة', 'Fitness', [['t-pictogram', 'بطاقات بيكتوجرام', 'Pictogram cards'], ['t-count', 'عد تنازلي', 'Countdown'], ['t-review', 'رأي عميل', 'Customer review']], 'fitness'],
-  ['خدمات منزلية', 'Home services', [['t-flow', 'خطوات الخدمة', 'Service steps'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-map', 'خريطة متحركة', 'Animated map']], 'home'],
-  ['محلات وتجزئة', 'Local shops', [['t-count', 'عد تنازلي', 'Countdown'], ['t-price', 'كشف السعر', 'Price reveal'], ['t-shopfloat', 'متجر بمنتجات طائرة', 'Floating store']], 'shops']
+  ['تنمية بشرية وتطوير ذات', 'Self-development', [['t-swiss', 'ملصق سويسري', 'Swiss poster'], ['t-board', 'سبورة', 'Whiteboard'], ['t-review', 'رأي عميل', 'Customer review']], 'selfdev'],
+  ['عيادات أسنان', 'Dental clinics', [['t-review', 'رأي عميل', 'Customer review'], ['t-flow', 'خطوات العلاج', 'Treatment steps'], ['t-flipcards', 'بطاقات تتقلب', 'Flip cards']], 'dental']
 ];
 
 class Component {

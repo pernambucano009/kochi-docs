@@ -378,22 +378,17 @@
     },
   };
   // أمثلة لكل مجال: قوالب المجال الرخيصة (نفس قوالب «اصنع أول فيديو» وخطة الشهر في البرنامج)
-  const FIELDS = [
-    ["food", "مطاعم وكافيهات", "Restaurants & cafés", ["t-price", "t-chat", "t-map"]],
-    ["beauty", "عيادات وتجميل", "Clinics & beauty", ["t-review", "t-flow", "t-flipcards"]],
-    ["ecom", "متاجر إلكترونية", "Online stores", ["t-shopfloat", "t-price", "t-count"]],
-    ["realestate", "عقارات", "Real estate", ["t-map", "t-price", "t-chart"]],
-    ["edu", "تعليم وكوتشينج", "Education & coaching", ["t-board", "t-flow", "t-show"]],
+  const FIELDS = [   // المجالات المتاحة بس (اللي خلصناها)
     ["fitness", "رياضة ولياقة", "Sports & fitness", ["t-pictogram", "t-count", "t-review"]],
-    ["home", "خدمات منزلية ومقاولات", "Home services", ["t-flow", "t-price", "t-map"]],
-    ["shops", "محلات وتجزئة محلية", "Local shops", ["t-count", "t-price", "t-shopfloat"]],
+    ["selfdev", "تنمية بشرية وتطوير ذات", "Self-development", ["t-swiss", "t-board", "t-review"]],
+    ["dental", "عيادات أسنان", "Dental clinics", ["t-review", "t-flow", "t-flipcards"]],
   ];
   const TPL = { "t-price": ["كشف السعر", "Price reveal", "السعر القديم يُشطب والجديد يظهر بعدّاد وزر اطلب."], "t-chat": ["قصة محادثة", "Chat story", "محادثة بين العميل والمتجر تنتهي بتأكيد الطلب."],
     "t-map": ["خريطة متحركة", "Animated map", "دبابيس على الأحياء وطريق التوصيل يُرسم."], "t-review": ["رأي عميل", "Customer review", "اقتباس يظهر كلمة كلمة ونجوم تضيء."],
     "t-flow": ["خطوات الخدمة", "Service steps", "بطاقات الخطوات تظهر والخطوط بينها تُرسم."], "t-flipcards": ["بطاقات تتقلب", "Flip cards", "ثلاث رسائل، كل واحدة في بطاقة تتقلب."],
     "t-shopfloat": ["متجر بمنتجات طائرة", "Floating store", "بطاقات منتج بالسعر وزر «أضف إلى السلة»."], "t-count": ["عد تنازلي", "Countdown", "رقم يقلب حتى الصفر ثم يظهر العرض."],
     "t-chart": ["رسم بياني", "Chart", "أرقام تتحرك وتحكي القصة."], "t-board": ["سبورة", "Whiteboard", "شرح يُرسم أمامك على سبورة."],
-    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."],
+    "t-show": ["برنامج مسابقات", "Quiz show", "سؤال وثلاث إجابات والجائزة في الآخر."], "t-swiss": ["ملصق سويسري", "Swiss poster", "كلام عريض على شبكة سويسرية يتحرك على الإيقاع."], "t-pictogram": ["بطاقات بيكتوجرام", "Pictogram cards", "رسومات هندسية تتحرك على الإيقاع."],
     "t-versus": ["مقارنة", "Versus", "مقارنة بندًا ببند والفائز واضح."] };
   const ICONS = ["M12 4a4 4 0 0 1 4 4 4 4 0 0 1 2 7.5A4 4 0 0 1 12 20a4 4 0 0 1-6-4.5A4 4 0 0 1 8 8a4 4 0 0 1 4-4z M12 4v16", "M4 5h7v7H4z M13 5h7v7h-7z M4 14h7v5H4z M13 14h7v5h-7z",
     "M12 3v4 M12 17v4 M3 12h4 M17 12h4 M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z", "M4 6h9 M8.5 4v2 M6 6c0 4 3 7 6 8 M11 6c0 3-3 7-7 8 M13 20l4-9 4 9 M14.5 17h5",
