@@ -1555,7 +1555,6 @@ AVATAR_SCENES = {
     "sofa": ("صالة المنزل · على الأريكة", "sitting relaxed on a sofa in a cozy living room, phone on a tripod in front at eye level (not visible), warm lamp light",
              "talks to the camera in a relaxed friendly way, small gestures, static camera"),
 }
-AVATAR_MAX_SEC, AVATAR_MAX_WORDS = 30, 75   # ⏱️ أقصى طول لفيديو الأفاتار (بيتحاسب بالثانية على الموديل)
 AVATAR_STYLES = {"real": "photorealistic portrait photo, natural skin texture, soft studio light",
                  "3d": "polished 3D animated character, Pixar-like, soft global illumination",
                  "cartoon": "flat 2D cartoon character, clean outlines, friendly colors"}
@@ -25356,9 +25355,8 @@ def flow_profile(tpl: dict) -> str:
         out.append("هذا القالب فيديو يصوّره صاحب العلامة نفسه بالجوال وهو يتكلم للكاميرا (Talking head)، ومعه لقطات قصيرة يصورها (B-roll). "
                    "النص = الجمل الذي سيقولها بصوته بالترتيب، بلغة طبيعية سهلة تُقال، والهوك أول جملة، وكل beat فيه say (ما سيُقال) "
                    "و visual (سيظهر ماذا: وشه، أو لقطة B-roll يصورها). لا يوجد شخصيات متولّدة ولا مشاهد خيالية.")
-        if kind == "avatar":   # ⏱️ فيديو الأفاتار بيتحاسب بالثانية: الفكرة والنص على ٣٠ ثانية بالكتير
-            out.append(f"مهم جدًا: النص المنطوق كله لا يزيد عن {AVATAR_MAX_SEC} ثانية (حوالي {AVATAR_MAX_WORDS} كلمة بالكتير، والأفضل ٢٠–٢٥ ثانية). "
-                       "فكرة واحدة مركّزة: هوك، ومعلومة واحدة، ودعوة قصيرة. الشخص يتكلم من مكان واحد، فلا يوجد B-roll يصوّره.")
+        if kind == "avatar":
+            out.append("الشخص (الأفاتار) يتكلم من مكان واحد طوال الفيديو، فلا يوجد B-roll يصوّره.")
     elif kind == "typo":
         out.append("هذا القالب نص فقط يتحرك على الإيقاع (بدون صور ولا شخصيات ولا مشاهد): الكلمات نفسها هي البطل. "
                    "الفكرة يجب تصبح جملة/رسالة قوية تُقال بصوت: سؤال وإجابته، قائمة سريعة، اعتراف، مقارنة بالكلام، أو جملة تُبنى كلمة كلمة.")
@@ -31167,8 +31165,8 @@ def run_twin_clip(tid: str, cid: str) -> None:
         c = next(x for x in d["clips"] if x["id"] == cid)
         audio = folder / c["audio"]
         dur = probe_duration(audio)
-        if dur > 120:
-            raise RuntimeError("الصوت أطول من دقيقتين. قسّمه على أكثر من فيديو")
+        if dur > 300:   # حد الموديل نفسه (العميل بيختار الطول، وبيشوف التكلفة قبل ما يضغط)
+            raise RuntimeError("الصوت أطول من ٥ دقائق. قسّمه على أكثر من فيديو")
         key = f"{c['method']}:{c['quality']}"
         cost = wallet.credits(TWIN_COST[key] * dur)
         wallet.need(cost, "فيديو بالأفاتار")
@@ -31432,8 +31430,6 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     text = pilot_say(d.get("scenario") or {})
     if not text:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
-    if len(text.split()) > AVATAR_MAX_WORDS + 10:
-        raise HTTPException(400, f"النص أطول من {AVATAR_MAX_SEC} ثانية. اختصره من خطوة النص ثم ولّد الفيديو")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
     voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه (مستنسخ من تسجيله)، وإلا صوت الراوي
     wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
@@ -35576,8 +35572,6 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         text = pilot_say(d.get("scenario") or {})
         if not text:
             raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
-        if len(text.split()) > AVATAR_MAX_WORDS + 10:
-            raise HTTPException(400, f"النص أطول من {AVATAR_MAX_SEC} ثانية، فلم يُولَّد فيديو الأفاتار")
         lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
         voice = f"twin:{tid}" if twin_voice_sample(tid) else brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الأفاتار نفسه
         wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")

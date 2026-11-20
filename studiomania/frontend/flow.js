@@ -794,7 +794,7 @@ const Flow = (() => {
       ${who}${scenePick(d, twins.find((t) => t.id === sel))}${failed("avatar")}
       <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
         <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار${d.av_cost ? costTag(d.av_cost, window.ME?.credits?.total) : ""}</button></div>
-      ${d.av_sec > 30 ? `<p class="flw-empty bad">النص نحو <span class="num">${d.av_sec}</span> ثانية، والحد الأقصى لفيديو الأفاتار ٣٠ ثانية. اختصره من خطوة النص.</p>` : ""}`;
+      ${d.av_sec ? `<p class="flw-sub muted">مدة الفيديو نحو <span class="num">${d.av_sec}</span> ثانية حسب النص، وتكلفته نحو <span class="num">${Number(d.av_cost || 0).toLocaleString("en-US")}</span> نقطة. لتقليل التكلفة اختصر النص.</p>` : ""}`;
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
     return `<h2>الفيديو جاهز</h2>
       <div class="flw-avdone"><div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video></div>
