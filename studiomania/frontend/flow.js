@@ -289,8 +289,15 @@ const Flow = (() => {
   function trendRow(d) {
     if (S.trendsFor !== d.id) {
       S.trendsFor = d.id; S.trends = null;
-      api(`/api/flows/${d.id}/saved`).then((x) => { S.trends = x.filter((i) => i.kind === "trend"); S.mine = x.filter((i) => i.kind === "idea" && i.mine); render(); }).catch(() => { S.trends = []; S.mine = []; });
+      api(`/api/flows/${d.id}/saved`).then((x) => { S.trends = x.filter((i) => i.kind === "trend"); S.mine = x.filter((i) => i.kind === "idea" && i.mine); S.ideaNow = x.find((i) => i.kind === "idea" && i.now); render(); }).catch(() => { S.trends = []; S.mine = []; });
       return "";
+    }
+    // 💡 «استخدم الفكرة» من فولدر الأفكار: الفكرة بتتختار لوحدها أول ما تفتح القالب
+    const inow = S.ideaNow;
+    if (inow && !d.busy && S.ideaAuto !== inow.id) {
+      S.ideaAuto = inow.id;
+      setTimeout(() => call(`/use-saved/${inow.id}`).then(() => { S.trendsFor = null; S.ideaNow = null; poll(); }), 0);
+      return `<div class="flw-trend on"><b>جارٍ استخدام فكرتك «${esc(inow.title)}»…</b></div>`;
     }
     const list = S.trends || [], now = list.find((x) => x.now);
     if (now && !d.busy && S.trendAuto !== now.id) {

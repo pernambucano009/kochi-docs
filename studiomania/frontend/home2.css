@@ -3410,8 +3410,9 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .ob-links button:hover { color: var(--nh-ink); }
 #nh .ob-links .del:hover { color: #C2412D; }
 #nh .ob-links .nb-btn.fs-go { height: auto; padding: 9px 24px; border-radius: 99px; background: var(--nh-ink) !important; color: var(--nh-bg) !important; font-weight: 600; }
-#nh .ob-places { display: grid; gap: 8px 12px; justify-content: center; }
-#nh .ob-place { position: relative; margin: 0; display: grid; gap: 6px; align-content: start; cursor: default; }
+#nh .ob-places { display: grid; gap: 14px 18px; justify-content: center; padding-block: 10px 6px; }
+#nh .ob-place { position: relative; margin: 0; display: grid; gap: 6px; align-content: start; cursor: default; transform: translateY(var(--ty, 0)) rotate(var(--rot, 0)); transition: transform .35s cubic-bezier(.2, .9, .25, 1.2); }
+#nh .ob-place:hover { transform: translateY(calc(var(--ty, 0px) - 4px)) rotate(0deg) scale(1.05); z-index: 2; }
 #nh .ob-place img, #nh .ob-place.add i { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 22%; box-shadow: 0 12px 26px -16px rgba(0, 0, 0, .5); background: var(--nh-fill); }
 #nh .ob-place figcaption { display: grid; gap: 0; text-align: center; overflow: hidden; }
 #nh .ob-place figcaption > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3473,7 +3474,9 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .tb-ph small { grid-row: 2; }
 #nh .tb-x { grid-row: 1 / 3; grid-column: 2; color: var(--nh-muted); font-size: 14px; }
 #nh .tb-panel audio { width: 100%; height: 36px; }
-#nh .tb-hint { margin: 0; font-size: 12.5px; }
+#nh .tb-from { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+#nh .tb-from span { padding: 3px 10px; border-radius: 99px; background: var(--nh-fill); }
+#nh .tb-acts .nb-btn.tb-use { height: auto; padding: 9px 22px; border-radius: 99px; background: var(--nh-ink) !important; color: var(--nh-bg) !important; font-weight: 600; }
 #nh .tb-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; }
 #nh .tb-acts > button, #nh .tb-acts > label { color: var(--nh-muted); cursor: pointer; }
 #nh .tb-acts > button:hover:not(:disabled), #nh .tb-acts > label:hover { color: var(--nh-ink); }

@@ -26959,6 +26959,9 @@ def flow_use_saved(fid: str, sid: str):
         flow_job(fid, "ideas", lambda: flow_gen_ideas(fid, trends.hint(s["item"])))
         return flow_to_dict(fid, flow_load(fid))
     if s["kind"] == "idea":
+        if s.get("now"):   # «استخدم الفكرة» من فولدر الأفكار: اتطبّقت خلاص
+            for c in {mem_cid(d), *([SHARED_LIB] if "ideas" in share_keys() else [])}:
+                mem_update(c, lambda m: [x.pop("now", None) for x in m.get("saved") or [] if x["id"] == sid])
         it = {**s["item"], "id": uuid.uuid4().hex[:8]}
         flow_update(fid, lambda x: x.update(ideas=[it, *(x.get("ideas") or [])]))
         return flow_pick_idea(fid, FlowPickIn(id=it["id"]))
@@ -26987,7 +26990,25 @@ def my_idea_dict(s: dict) -> dict:
             "script": it.get("script") or "", "sources": it.get("sources") or [], "dropped": it.get("dropped") or 0,
             "audio_url": f"/api/my-ideas/{s['id']}/audio" if it.get("audio") else None, "status": s.get("status") or "ready", "error": s.get("error"),
             "polished": bool(it.get("raw")), "mine": bool(s.get("mine")), "at": s.get("at"), "used_at": s.get("used_at"),
-            "auto": str(s.get("origin") or "").startswith("auto")}
+            "auto": str(s.get("origin") or "").startswith("auto"), "kind": s.get("kind") or "idea", "from": my_idea_from(s)}
+
+
+def my_idea_from(s: dict) -> list[str]:
+    """🧭 الفكرة جت منين (بيظهر للعميل): منافس، ترند، أسئلة جمهوره، أفكار مجاله، مشروع، أو فكرته هو."""
+    if s.get("kind") == "trend":
+        return ["ترند في السوق الآن"]
+    o, out = str(s.get("origin") or ""), []
+    for x in (s.get("item") or {}).get("sources") or []:
+        k = x.get("kind") if isinstance(x, dict) else None
+        if k == "rival" and x.get("handle"):
+            out.append(f"منشور ناجح لمنافسك @{x['handle']}")
+        elif k == "trend" and x.get("title"):
+            out.append(f"ترند «{x['title']}»")
+        elif k == "audience":
+            out.append("أسئلة جمهورك")
+    if not out:
+        out = (["أفكار تنجح في مجالك"] if o.startswith(("field:", "auto")) else ["من مشروع سابق"] if not s.get("mine") else ["فكرتك"])
+    return list(dict.fromkeys(out))[:3]
 
 
 def my_ideas_cid() -> str:
@@ -27010,7 +27031,24 @@ def my_ideas_list():
     if active_client_id():
         brain_ideas_refill(cid, active_client_id())   # 🗓️ أفكار جديدة كل يوم (في الخلفية)
     m = mem_load(cid)
-    return [my_idea_dict(x) for x in reversed(m.get("saved") or []) if x.get("kind") == "idea"]
+    return [my_idea_dict(x) for x in reversed(m.get("saved") or []) if x.get("kind") in ("idea", "trend")]   # 📈 الترندات المحفوظة كمان
+
+
+@app.post("/api/my-ideas/{iid}/use")
+def my_idea_use(iid: str):
+    """▶️ «استخدم الفكرة»: بتتعلّم «دلوقتي»، وأول مشروع جديد بيبدأ بيها (الترند: الأفكار بتتبني عليه)."""
+    cid, found = my_ideas_cid(), []
+    def fn(m):
+        for x in m.get("saved") or []:
+            if x.get("kind") in ("idea", "trend"):
+                x.pop("now", None)
+            if x["id"] == iid:
+                x["now"] = True
+                found.append(x)
+    mem_update(cid, fn)
+    if not found:
+        raise HTTPException(404, "هذه الفكرة غير موجودة")
+    return {"ok": True}
 
 
 def set_my_idea(cid: str, iid: str, **kw) -> None:

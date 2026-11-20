@@ -69,7 +69,7 @@ const IdeasPage = (() => {
       const cls = `tb-bub${p.used ? " used" : ""}${isNew(x) ? " new" : ""}${on ? " on" : ""}${busy ? " busy" : ""}`;
       const title = x.title || (busy ? "جارٍ تحويل الصوت إلى نص…" : "فكرة");
       return `<button type="button" class="${cls}" data-iopen="${esc(x.id)}" title="${esc(title)}" style="left:${p.x - p.r}px;top:${p.y + oy - p.r}px;width:${2 * p.r}px;height:${2 * p.r}px;font-size:${fs}px;--fl:${(i % 7) * -0.9}s">
-        ${p.used ? `<span class="tk">✓</span>` : `${isNew(x) ? `<em>جديدة</em>` : ""}<span>${esc(title)}</span>`}</button>`;
+        ${p.used ? `<span class="tk">✓</span>` : `${x.kind === "trend" ? `<em>ترند</em>` : isNew(x) ? `<em>جديدة</em>` : ""}<span>${esc(title)}</span>`}</button>`;
     }).join("");
     const mr = small ? 24 : 30;
     const moreB = more > 0 ? `<button type="button" class="tb-more" data-imore style="left:${Math.max(8, bx0 - mr * 0.6)}px;top:${by1 - 2 * mr}px;width:${2 * mr}px;height:${2 * mr}px" title="أفكار أخرى"><b class="num">+${more}</b></button>` : "";
@@ -120,12 +120,13 @@ const IdeasPage = (() => {
       ${x.audio_url ? `<audio src="${esc(x.audio_url)}" controls preload="metadata"></audio>` : ""}
       ${x.url ? `<a class="id-link" href="${esc(x.url)}" target="_blank" rel="noopener" dir="ltr">${esc(x.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a>` : ""}
       ${x.error ? `<p class="fs-err">${esc(x.error)}</p>` : ""}
-      <p class="muted tb-hint">تظهر هذه الفكرة عند اختيار الفكرة في أي مشروع جديد.</p>
+      ${(x.from || []).length ? `<p class="tb-from"><small class="muted">مصدرها</small> ${x.from.map((f) => `<span>${esc(f)}</span>`).join("")}</p>` : ""}
       <div class="tb-acts">
-        <button type="button" class="pri" data-ipolish ${busy || pol ? "disabled" : ""} title="يرتّب الذكاء الاصطناعي النص ويضبطه (يُخصم من الرصيد)">${pol === true ? "جارٍ التنقيح…" : "نقّح"}</button>
+        <button type="button" class="nb-btn tb-use" data-iuse ${busy ? "disabled" : ""}>${x.kind === "trend" ? "ابنِ فكرة على هذا الترند" : "استخدم الفكرة"}</button>
+        ${x.kind === "trend" ? "" : `<button type="button" class="pri" data-ipolish ${busy || pol ? "disabled" : ""} title="يرتّب الذكاء الاصطناعي النص ويضبطه (يُخصم من الرصيد)">${pol === true ? "جارٍ التنقيح…" : "نقّح"}</button>
         <button type="button" data-iscript ${busy || pol ? "disabled" : ""} title="يكتبها نصًا يُقال، ويضع مصادر حقيقية في مكانها إن وُجدت (يُخصم من الرصيد)">${pol === "script" ? "جارٍ التنسيق…" : x.script ? "نسّق مرة أخرى" : "نسّقها نصًا"}</button>
         ${x.polished ? `<button type="button" data-irevert>أعدها كما كتبتها</button>` : ""}
-        <button type="button" data-iedit ${busy ? "disabled" : ""}>عدّل</button>
+        <button type="button" data-iedit ${busy ? "disabled" : ""}>عدّل</button>`}
         <button type="button" class="del" data-idel>احذف</button></div></section>`;
   }
 
@@ -193,6 +194,12 @@ const IdeasPage = (() => {
         }
         const c = e.target.closest("[data-iid]"), id = c?.dataset.iid;
         if (!id) return;
+        if (q("[data-iuse]")) {
+          await api(`/api/my-ideas/${id}/use`, { method: "POST" });
+          toast("اختر القالب، وسيبدأ المشروع بهذه الفكرة");
+          S.open = null;
+          return window.NHNav?.("create");
+        }
         if (q("[data-iedit]")) { S.edit = id; return render(); }
         if (q("[data-icancel]")) { S.edit = null; return render(); }
         if (q("[data-isave]")) {

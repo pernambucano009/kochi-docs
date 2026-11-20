@@ -133,13 +133,16 @@ function twMakerStage(cx, cy, R, small, H) {
 
 // 🏞️ الخلفيات ووضعيات التصوير: مربعات في صف واحد (الجاهزة، وأماكن الأفاتار المختار، و«＋»)
 function twPlaces(t, ps, per) {
+  // 🃏 مبعثرة شوية زي كروت متحطوطة جنب بعض (ميلة ونزلة خفيفة ثابتة لكل كارت)، من غير ما تركب على بعض
+  const tilt = (i) => `style="--rot:${(((i * 37) % 9) - 4) * 1.6}deg;--ty:${(((i * 53) % 7) - 3) * 4}px"`;
+  let ci = 0;
   const ready = tw.scenes.map((s) => {
     const [place, pose] = String(s.name || "").split(" · ");
-    return `<figure class="ob-place">${s.img ? `<img src="${twe(s.img)}" alt="">` : ""}<figcaption><b>${twe(place)}</b>${pose ? `<small>${twe(pose)}</small>` : ""}</figcaption></figure>`;
+    return `<figure class="ob-place" ${tilt(ci++)}>${s.img ? `<img src="${twe(s.img)}" alt="">` : ""}<figcaption><b>${twe(place)}</b>${pose ? `<small>${twe(pose)}</small>` : ""}</figcaption></figure>`;
   }).join("");
-  const own = (t?.backgrounds || []).map((b) => `<figure class="ob-place own"><img src="${twe(b.url)}" alt=""><figcaption><b>${twe(b.name || "مكاني")}</b><small>${twe(t.name)}</small></figcaption>
+  const own = (t?.backgrounds || []).map((b) => `<figure class="ob-place own" ${tilt(ci++)}><img src="${twe(b.url)}" alt=""><figcaption><b>${twe(b.name || "مكاني")}</b><small>${twe(t.name)}</small></figcaption>
       <button type="button" data-twbgdel="${twe(b.id)}" aria-label="حذف">✕</button></figure>`).join("");
-  const add = t ? `<label class="ob-place add${tw.placeBusy ? " busy" : ""}"><i>${TW_I.plus}</i><figcaption><b>مكانك</b></figcaption><input type="file" accept="image/*" data-twup="background" hidden></label>` : "";
+  const add = t ? `<label class="ob-place add${tw.placeBusy ? " busy" : ""}" ${tilt(ci++)}><i>${TW_I.plus}</i><figcaption><b>مكانك</b></figcaption><input type="file" accept="image/*" data-twup="background" hidden></label>` : "";
   return `<div class="ob-places" style="--ps:${ps}px;grid-template-columns:repeat(${per}, var(--ps))">${ready}${own}${add}</div>`;
 }
 
