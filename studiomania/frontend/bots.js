@@ -32,7 +32,9 @@ const BotsPage = (() => {
 
   // ---------- النجمة ----------
   // ٥ أماكن حوالين النص (خماسي): فوق، واليمين واليسار، وتحت يمين وتحت يسار
-  const POS = [[50, 9], [88, 38], [74, 86], [26, 86], [12, 38]];
+  const POS = [[50, 10], [87, 38], [73, 82], [27, 82], [13, 38]];
+  // البروز وقت الهوفر بيروح ناحية النص (مش برا الشاشة): [x, y] بالبكسل
+  const LIFT = [[0, 6], [-10, 0], [-8, -8], [8, -8], [10, 0]];
   function star() {
     const d = S.d, on = d.bots.filter((b) => b.status === "active").length;
     const pd = S.pub;
@@ -43,7 +45,7 @@ const BotsPage = (() => {
         <button type="button" class="bx-pub" data-bxpub><span>«علّق بكلمة» في منشوراتك</span><b>${pubTxt}</b></button>
       </div>
       ${ORDER.map((k, i) => { const n = botsOf(k).filter((b) => b.status === "active").length;
-        return `<button type="button" class="bx-node${n ? " live" : ""}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%">
+        return `<button type="button" class="bx-node${n ? " live" : ""}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px">
           ${svgIc(R[k].ic)}<b>${R[k].n}</b><small>${n ? `<i class="bx-dot"></i>يعمل${n > 1 ? ` · ${n}` : ""}` : R[k].s}</small></button>`; }).join("")}`;
   }
 
