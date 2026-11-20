@@ -787,13 +787,13 @@ const Flow = (() => {
     const who = twins.length > 1 ? `<label class="flw-csel"><select data-avtwin>${twins.map((t) => `<option value="${esc(t.id)}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : "";
     if (d.busy === "avatar") return `<h2>الفيديو</h2>${working("الأفاتار يتكلم الآن… يستغرق بضع دقائق")}`;
     if (S.twins === null) return `<h2>الفيديو</h2>${working("جارٍ جلب الأفاتار…")}`;
-    if (!twins.length || S.avMake) return `<h2>الفيديو</h2>${avMaker(twins.length > 0)}`;
-    // قبل الفيديو: النص، والخلفية والوضعية، وزرار واحد يولّده
+    if (S.avMake) return `<h2>الفيديو</h2>${avMaker(true)}`;   // إنشاء أفاتار جوه المسار، وفيه «رجوع» دايمًا
+    // قبل الفيديو: ١) الأفاتار (اختيار أو إنشاء) ← ٢) الخلفية ووضعية التصوير ← زرار واحد يولّد
     if (!mn) return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك، في المكان والوضعية التي تختارها.</p>
       ${beats ? `<details class="flw-shotlist"><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
-      ${who}${scenePick(d, twins.find((t) => t.id === sel))}${failed("avatar")}
-      <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
-        <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار${d.av_cost ? costTag(d.av_cost, window.ME?.credits?.total) : ""}</button></div>
+      ${avPick(twins, sel)}${twins.length ? scenePick(d, twins.find((t) => t.id === sel)) : ""}${failed("avatar")}
+      <div class="flw-acts end">
+        <button type="button" class="flw-btn pri big" data-avsay="${esc(sel || "")}" ${d.busy || !twins.length ? "disabled" : ""}>ولّد الفيديو بالأفاتار${d.av_cost ? costTag(d.av_cost, window.ME?.credits?.total) : ""}</button></div>
       ${d.av_sec ? `<p class="flw-sub muted">مدة الفيديو نحو <span class="num">${d.av_sec}</span> ثانية حسب النص، وتكلفته نحو <span class="num">${Number(d.av_cost || 0).toLocaleString("en-US")}</span> نقطة. لتقليل التكلفة اختصر النص.</p>` : ""}`;
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
     return `<h2>الفيديو جاهز</h2>
@@ -803,6 +803,14 @@ const Flow = (() => {
           <span class="flw-avsep"></span>
           ${who}<button type="button" class="flw-link" data-avsay="${esc(sel)}">↻ أعد توليد الفيديو</button>
           <button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>${failed("avatar")}</div></div>`;
+  }
+  // 🙂 أول اختيار: الأفاتار (من الموجودين، أو أنشئ واحد جديد)
+  function avPick(twins, sel) {
+    const thumb = (t) => (t.photos || []).find((p) => ["front", "smile"].includes(p.angle))?.url || (t.photos || [])[0]?.url || "";
+    return `<section class="flw-scnbox"><h3>الأفاتار</h3>
+      ${twins.length ? `<div class="flw-scns">${twins.map((t) => `<button type="button" class="flw-scn${t.id === sel ? " on" : ""}" data-avpick="${esc(t.id)}">${thumb(t) ? `<img src="${esc(thumb(t))}" alt="">` : ""}<span>${esc(t.name)}</span></button>`).join("")}
+        <button type="button" class="flw-scn add" data-avnew><span>＋ أنشئ أفاتار</span></button></div>`
+      : `<p class="muted">لا يوجد أفاتار بعد. أنشئه مرة واحدة من صورة أو فيديو، ثم يقول أي نص بوجهك وصوتك.</p><div class="flw-acts"><button type="button" class="flw-btn pri" data-avnew>＋ أنشئ أفاتار</button></div>`}</section>`;
   }
   // 🎬 الخلفية والوضعية: أماكن جاهزة (كل مكان بحركته)، أو مكان العميل اللي رفعه للأفاتار ده
   function scenePick(d, tw) {
@@ -818,7 +826,7 @@ const Flow = (() => {
   function avMaker(canBack) {
     const A = S.avNew || {};
     if (A.tid && !S.avKit) { S.avKit = {}; api("/api/twin-kit").then((k) => { S.avKit = k; render(); }).catch(() => {}); }
-    const back = canBack ? `<button type="button" class="flw-link" data-avback>‹ الأفاتار الموجود</button>` : "";
+    const back = `<button type="button" class="flw-link" data-avback>‹ رجوع</button>`;
     if (A.busy) return `<section class="flw-avmk">${working(A.busy)}</section>`;
     if (!A.tid) return `<section class="flw-avmk"><h3>أنشئ الأفاتار هنا</h3><p class="muted">مرة واحدة فقط، ثم يقول الأفاتار أي نص بوجهك.</p>
       <input class="flw-in" data-avname placeholder="اسم الشخص" value="${esc(A.name || "")}" maxlength="80">
@@ -1111,6 +1119,7 @@ const Flow = (() => {
     if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
     if (q("[data-avrec]")) return avRecord();
     if (q("[data-avdone]")) { avDone(S.avNew?.tid); return render(); }
+    if ((b = q("[data-avpick]"))) { S.avTwin = b.dataset.avpick; return render(); }
     if (q("[data-avnew]")) { S.avMake = true; S.avNew = null; return render(); }
     if (q("[data-avback]")) { S.avMake = false; S.avNew = null; return render(); }
     if (q("[data-avcreate]")) {
