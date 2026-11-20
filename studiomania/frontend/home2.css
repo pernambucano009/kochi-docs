@@ -3300,3 +3300,12 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 /* 🃏 الكروت المتفرّدة: بتطلع فوق مربع الشرح (مش تحته)، والترتيب فوق/تحت ثابت بالرقم (الأكبر فوق) */
 #nh .nh-wh-cards { overflow-x: visible; overflow-y: clip; z-index: 3; }
 #nh .nh-wh-track { transform-style: flat; }
+/* 🪞 إنشاء الأفاتار جوه المسار */
+.flw-avmk { display: grid; gap: 12px; padding: 16px; border-radius: 16px; background: var(--nh-fill, #F3F2EF); }
+.flw-avmk h3 { margin: 0; font-size: 15px; }
+.flw-avmk .flw-in { font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 10px 12px; background: var(--nh-card, #fff); color: inherit; }
+.flw-avmk .flw-chk { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.flw-avways { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.flw-avways > div { display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: 14px; background: var(--nh-card, #fff); }
+.flw-avways details ol { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.8; max-height: 180px; overflow: auto; }
+.flw-avways .flw-btn { justify-self: start; }

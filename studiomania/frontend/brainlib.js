@@ -265,7 +265,7 @@ const BrainLibPage = (() => {
         ...A.twins.flatMap((t) => [...(t.photos || []).map((p) => tile(`<img src="${esc(p.url)}" alt="" loading="lazy">`, `${t.name} · أفاتار`)),
           ...(t.backgrounds || []).map((b) => tile(`<img src="${esc(b.url)}" alt="" loading="lazy">`, b.name || "مكان تصوير"))])];
       S.body.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub"><span>تُضاف الشخصيات والأفاتار هنا تلقائيًا</span></div>
-          <div class="pk-acts">${pkIb("users", "افتح الشخصيات", 'data-blnav="coaches"')}${pkIb("eye", "افتح الأفاتار", 'data-blnav="twin"')}</div></div>
+          <div class="pk-acts">${pkIb("users", "افتح الشخصيات", 'data-blnav="coaches"')}</div></div>
         <div class="bl-tiles">${items.join("") || `<div class="pk-empty">لا توجد شخصيات أو أفاتار بعد.</div>`}</div></div>`;
       return;
     }

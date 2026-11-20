@@ -44,9 +44,10 @@ const Flow = (() => {
   const isVid = (d) => isCode(d) || isTypo(d);   // قوالب بيترسم فيديوها في المسار نفسه: المونتاج والنشر من المسار
   const isCode = (d) => d?.template?.kind === "motion";
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
-  const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
+  const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"], ["publish", "النشر"]];
   const isPhone = (d) => d?.template?.kind === "phone";
-  const isAvatar = (d) => d?.template?.kind === "avatar";   // 🪞 نفس تسلسل التصوير بالجوال، بس الأفاتار هو اللي بيقول النص
+  const isAvatar = (d) => d?.template?.kind === "avatar";
+  const isTalk = (d) => isPhone(d) || isAvatar(d);   // التصوير بالجوال والأفاتار: نفس التسلسل لحد النشر   // 🪞 نفس تسلسل التصوير بالجوال، بس الأفاتار هو اللي بيقول النص
   // 🖼️ الكاروسيل: الستايل اللي اختاره ← الفكرة ← النص (موزّع على الشرائح) ← التعديلات (الألوان والرسم) ← النشر
   const STEPS_CAR = [["style", "الستايل"], ["idea", "الفكرة"], ["scenario", "النص"], ["carousel", "التعديلات"], ["publish", "النشر"]];
   const isCar = (d) => d?.template?.kind === "carousel";
@@ -144,7 +145,7 @@ const Flow = (() => {
   function stepper(d) {
     const cur = S.view === "publish" ? idx("publish", d) : idx(d.stage, d);
     const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: isTypo(d) ? !!d.output : !!d.scenario && !isCode(d),
-      shoot: isPhone(d) || isAvatar(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: (isVid(d) || isCar(d)) && d.output?.status === "done", style: !!d.car_style, carousel: isCar(d) && !!d.scenario };
+      shoot: isPhone(d) || isAvatar(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: (isVid(d) || isCar(d)) && d.output?.status === "done" || isTalk(d) && !!S.mstate?.project?.export_url, style: !!d.car_style, carousel: isCar(d) && !!d.scenario };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -782,15 +783,48 @@ const Flow = (() => {
     const twins = (S.twins || []).filter((t) => t.ready?.video || t.ready?.photo);
     const sel = S.avTwin && twins.some((t) => t.id === S.avTwin) ? S.avTwin : twins[0]?.id;
     const pick = S.twins === null ? working("جارٍ جلب الأفاتار…")
-      : !twins.length ? `<p class="muted">لا يوجد أفاتار جاهز بعد. أنشئه مرة واحدة (فيديو قصير وصور من عدة اتجاهات)، ثم ارجع هنا.</p><div class="flw-acts"><button type="button" class="flw-btn pri" data-gotwin>🪞 أنشئ الأفاتار</button></div>`
+      : !twins.length || S.avMake ? avMaker(twins.length > 0)
       : `${twins.length > 1 ? `<label class="flw-csel"><select data-avtwin>${twins.map((t) => `<option value="${esc(t.id)}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : ""}
-        <div class="flw-acts"><button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>🪞 ${mn ? "أعد توليد الفيديو بالأفاتار" : "ولّد الفيديو بالأفاتار"}</button></div>`;
+        <div class="flw-acts"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button><button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>🪞 ${mn ? "أعد توليد الفيديو بالأفاتار" : "ولّد الفيديو بالأفاتار"}</button></div>`;
     return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك، ثم يراجع البرنامج الفيديو ويصنع المونتاج.</p>
       ${beats ? `<details class="flw-shotlist" open><summary>📝 النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
       ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video><small class="muted">${secs(mn.duration)}</small></div>` : ""}
       ${d.busy === "avatar" ? working("الأفاتار يتكلم الآن… يستغرق بضع دقائق") : `${pick}${failed("avatar")}`}
       ${mn && !d.busy ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ إلى المونتاج مباشرة</button>
         <button type="button" class="flw-btn pri big" data-phreview>🔎 راجع الفيديو واقترح التحسينات</button></div>` : ""}`;
+  }
+  // 🪞 إنشاء الأفاتار جوه المسار نفسه (من غير ما يخرج لصفحة تانية): اسم وموافقة ← فيديو وهو بيقرا النص، أو صورة أمامية
+  function avMaker(canBack) {
+    const A = S.avNew || {};
+    if (A.tid && !S.avKit) { S.avKit = {}; api("/api/twin-kit").then((k) => { S.avKit = k; render(); }).catch(() => {}); }
+    const back = canBack ? `<button type="button" class="flw-link" data-avback>‹ الأفاتار الموجود</button>` : "";
+    if (A.busy) return `<section class="flw-avmk">${working(A.busy)}</section>`;
+    if (!A.tid) return `<section class="flw-avmk"><h3>🪞 أنشئ الأفاتار هنا</h3><p class="muted">مرة واحدة فقط، ثم يقول الأفاتار أي نص بوجهك.</p>
+      <input class="flw-in" data-avname placeholder="اسم الشخص" value="${esc(A.name || "")}" maxlength="80">
+      <label class="flw-chk"><input type="checkbox" data-avok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
+      <div class="flw-acts">${back}<button type="button" class="flw-btn pri" data-avcreate>متابعة</button></div></section>`;
+    const lines = (S.avKit?.video_script || []).map((l) => `<li dir="auto">${esc(l)}</li>`).join("");
+    return `<section class="flw-avmk"><h3>🪞 ${esc(A.name || "الأفاتار")}: اختر طريقة واحدة</h3>
+      <div class="flw-avways">
+        <div><b>🎬 فيديو وأنت تقرأ هذا النص</b><small class="muted">دقيقة تقريبًا، أمام الكاميرا، والضوء أمامك. أفضل نتيجة.</small>
+          ${lines ? `<details><summary>النص الذي تقرؤه</summary><ol>${lines}</ol></details>` : ""}
+          <label class="flw-btn pri">⬆ ارفع الفيديو<input type="file" accept="video/*" data-avvid hidden></label></div>
+        <div><b>📷 أو صورة أمامية واضحة</b><small class="muted">أسرع، لكن الحركة أقل طبيعية.</small>
+          <label class="flw-btn">⬆ ارفع الصورة<input type="file" accept="image/*" data-avpic hidden></label></div>
+      </div>${back ? `<div class="flw-acts">${back}</div>` : ""}</section>`;
+  }
+  async function avUpload(kind, file) {
+    const A = S.avNew || {};
+    const f = new FormData();
+    if (kind === "photo") f.append("angle", "front");
+    f.append("file", file);
+    S.avNew = { ...A, busy: kind === "photo" ? "جارٍ رفع الصورة…" : "جارٍ رفع الفيديو وتجهيزه…" }; render();
+    try {
+      await api(`/api/twins/${A.tid}/${kind}`, { method: "POST", body: f });
+      S.avTwin = A.tid; S.avNew = null; S.avMake = false; S.twins = undefined;
+      toast("✓ الأفاتار جاهز");
+    } catch (err) { S.avNew = { ...A, busy: null }; toast(err.message, true); }
+    render();
   }
   // 🪞 مين في الفيديو وصوّر فين: عشان لقطات الـ B-roll اللي فيها الشخص تطلع بنفس الوش ونفس المكان
   function castBox(d) {
@@ -807,6 +841,7 @@ const Flow = (() => {
     const bgs = tw?.backgrounds || [];
     const auto = `<p class="muted">🪄 الـ B-roll تلقائي: اللقطات التي يجب أن تظهر فيها تُنشأ بالأفاتار${tw ? " في المكان نفسه" : ""}، والباقي من فيديوهات ستوك حقيقية. وفي المونتاج يمكنك إزالة أي لقطة أو استبدالها بفيديو من جهازك.</p>`;
     if (S.twins === null) return `<section><h3>🪞 من في الفيديو؟</h3>${working("جارٍ جلب الأفاتار…")}</section>`;
+    if (S.avMake) return avMaker(true);
     if (!twins.length) return `<section><h3>🪞 من في الفيديو؟</h3><p class="muted">إذا أنشأت أفاتار في «🪞 الأفاتار» (فيديو وصور من عدة اتجاهات)، يستطيع البرنامج صنع لقطات B-roll به، وبدونه سيستخدم فيديوهات ستوك فقط.</p>
       <button type="button" class="flw-link" data-gotwin>🪞 أنشئ أفاتار</button>${auto}</section>`;
     return `<section><h3>🪞 من في الفيديو؟</h3>
@@ -850,7 +885,8 @@ const Flow = (() => {
         ${mo.plain ? `<button type="button" class="flw-link" data-automont>↩︎ استعد المونتاج التلقائي</button>` : `<button type="button" class="flw-link" data-plain>✕ بدون مونتاج</button>`}
         <button type="button" class="flw-btn" data-myedit>✏️ سأصنع المونتاج بنفسي</button>
         ${done ? `<a class="flw-btn" href="${esc(pj.export_url)}" download>⬇ نزّل</a>` : ""}
-        <button type="button" class="flw-btn pri big" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر نسخة أخرى" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button></div>
+        <button type="button" class="flw-btn ${done ? "" : "pri big"}" data-render ${rendering || tyBusy ? "disabled" : ""}>${done ? "🔁 صدّر نسخة أخرى" : "✓ موافق، صدّر الفيديو"}<small class="flw-cost">بدون نقاط</small></button>
+        ${done ? `<button type="button" class="flw-btn pri big" data-go="publish">📤 إلى النشر</button>` : ""}</div>
       ${rp.broll && !mo.plain ? `<p class="muted">✏️ إن أردت صنع المونتاج بنفسك: لقطات الـ B-roll طبقات فوق الفيديو، يمكنك إزالة أي منها أو استبدالها بفيديو أو صورة من جهازك.</p>` : ""}
       ${tyBusy ? `<p class="muted">التصدير ينتظر انتهاء التايبوجرافي ليظهر النص فوق الفيديو.</p>` : ""}
       ${mo.plain ? "" : camBench(d)}`;
@@ -1027,11 +1063,20 @@ const Flow = (() => {
     }
     if ((b = q("[data-libpick]"))) { const role = S.lib?.role || "main"; S.lib = null; return call("/footage/pick", { gen_id: b.dataset.libpick, role }); }
     if ((b = q("[data-fdel]"))) return call(`/footage/${b.dataset.fdel}`, null, "DELETE");
+    if (q("[data-avnew]")) { S.avMake = true; S.avNew = null; return render(); }
+    if (q("[data-avback]")) { S.avMake = false; S.avNew = null; return render(); }
+    if (q("[data-avcreate]")) {
+      const A = S.avNew || {};
+      if (!(A.name || "").trim()) return toast("اكتب اسم الشخص", true);
+      if (!A.ok) return toast("يجب أن تؤكد أن هذا أنت، أو أن لديك إذنًا صريحًا من الشخص", true);
+      try { const t = await api("/api/twins", { method: "POST", ...J({ name: A.name.trim(), consent: true }) }); S.avNew = { ...A, tid: t.id }; } catch (err) { toast(err.message, true); }
+      return render();
+    }
     if ((b = q("[data-avsay]"))) return call("/avatar-say", { twin: b.dataset.avsay || "" }).then(poll);
     if (q("[data-phreview]")) return call("/review", {}).then(poll);
     if (q("[data-reshoot]")) return call("/stage", { stage: "shoot" });
     if ((b = q("[data-castbg]"))) return call("/phone-cast", { twin: S.d.phone_cast?.twin || "", bg: b.dataset.castbg });
-    if (q("[data-gotwin]")) { S.twins = undefined; close(); return showStep("16"); }
+    if (q("[data-gotwin]")) { S.avMake = true; S.avNew = null; return render(); }
     if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto", effects: S.fxMode || "auto" }).then(poll); }
     if ((b = q("[data-fxdel]"))) { try { S.mstate = await api(`/api/flows/${S.d.id}/effects/remove`, { method: "POST", ...J({ index: +b.dataset.fxdel }) }); render(); toast("✓ حُذف الإفكت، وسيختفي في التصدير القادم"); } catch (err) { toast(err.message, true); } return; }
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
@@ -1064,7 +1109,7 @@ const Flow = (() => {
       return;
     }
     if ((b = q("[data-go]")) && isCar(S.d) && b.dataset.go === "publish") { S.view = "publish"; return render(); }   // 🖼️ نشر الكاروسيل: خطوة عرض بس
-    if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "publish") return openPub();
+    if ((b = q("[data-go]")) && (isVid(S.d) || isTalk(S.d)) && b.dataset.go === "publish") return openPub();
     if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
     if ((b = q("[data-carkeep]"))) { S.carKeep = b.dataset.carkeep === "1"; return render(); }
     if (q("[data-carmake]")) return call("/car-make", { keep_colors: !!(S.carKeep ?? S.d.car_keep ?? false) });
@@ -1196,6 +1241,9 @@ const Flow = (() => {
   async function onChange(e) {
     if (e.target.matches?.("[data-comics]")) { S.comics = e.target.value; return; }
     if (e.target.matches?.("[data-fxmode]")) { S.fxMode = e.target.value; return; }
+    if (e.target.matches?.("[data-avok]")) { S.avNew = { ...(S.avNew || {}), ok: e.target.checked }; return; }
+    if (e.target.matches?.("[data-avvid]") && e.target.files?.[0]) return avUpload("video", e.target.files[0]);
+    if (e.target.matches?.("[data-avpic]") && e.target.files?.[0]) return avUpload("photo", e.target.files[0]);
     if (e.target.matches?.("[data-avtwin]")) { S.avTwin = e.target.value; return render(); }
     if (e.target.matches?.("[data-casttwin]")) return call("/phone-cast", { twin: e.target.value, bg: "" });
     if (e.target.id === "flwFiles") upload(e.target.files);
@@ -1220,7 +1268,8 @@ const Flow = (() => {
     const n = e.target.dataset?.aname;
     if (n !== undefined) call(`/assets/${encodeURIComponent(n)}`, { name: e.target.value }, "PATCH");
   }
-  function onInput() { /* الكتابة توقف إعادة الرسم أثناء البولنج (انظر poll) */ }
+  function onInput(e) {
+    if (e?.target?.matches?.("[data-avname]")) S.avNew = { ...(S.avNew || {}), name: e.target.value }; /* الكتابة توقف إعادة الرسم أثناء البولنج (انظر poll) */ }
   async function upload(files) {
     if (!files?.length) return;
     const fd = new FormData();

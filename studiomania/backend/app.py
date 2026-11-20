@@ -25671,7 +25671,23 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
             except HTTPException:
                 fixed = {}
         items = algo.apply_scenario_fixes(items, fixed)
+    if d["template"].get("kind") != "motion" and (w := flow_dm_word(d, brain)):
+        items = [flow_force_dm(x, w) for x in items]
     flow_update(fid, lambda x: x.update(scenarios=(x.get("scenarios") or []) + items if more else items))
+
+
+def flow_force_dm(sc: dict, word: str) -> dict:
+    """💬 الكلمة اللي العميل اختارها لازم تتقال بحروفها في الآخر: لو الموديل كتب دعوة تانية (زي دعوة العلامة) بتتبدل بيها."""
+    rows = sc.get("beats") or sc.get("scenes") or []
+    if not rows or any(word in str(r.get("say") or "") for r in rows if isinstance(r, dict)):
+        return sc
+    last = rows[-1] if isinstance(rows[-1], dict) else None
+    if last is None:
+        return sc
+    line = f"علّق بكلمة «{word}» ويوصلك كل شيء على الخاص."
+    say = str(last.get("say") or "").strip()
+    last["say"] = line if not say or re.search(r"علّق|علق|اكتب|كومنت|تعليق|تواصل|احجز|راسل", say) else f"{say} {line}"
+    return sc
 
 
 class FlowHookIn(BaseModel):
@@ -31288,8 +31304,8 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
     if not text:
         raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
     lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
-    voice = dub.DIALECTS[lang]["voices"][0]
-    wallet.need(wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01), "صوت الأفاتار")
+    voice = brand_narrator(lang, d.get("client_id"))   # 🎙️ صوت الراوي بتاع العلامة (صوته المستنسخ لو موجود)
+    wallet.need(wallet.credits(voice_usd(voice, text)), "صوت الأفاتار")
     flow_update(fid, lambda x: x.update(phone_cast={"twin": tid, "bg": ""}))
 
     def run():
