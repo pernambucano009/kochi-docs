@@ -33,14 +33,24 @@ function ibAlert(msg) {
 
 // ⚙️ الترس: سنّاته مرسومة بخط واحد، والسنيك البرتقالي بيلف على السنّات نفسها (مش دايرة)
 (function gear() {
-  const n = 8, R = 44, r = 34, cx = 50, cy = 50, step = (Math.PI * 2) / n, tw = step * 0.26, bw = step * 0.36;
-  const pt = (rad, a) => `${(cx + rad * Math.cos(a)).toFixed(2)} ${(cy + rad * Math.sin(a)).toFixed(2)}`;
-  let d = "";
+  // سنّات بزوايا مدوّرة: كل ركن في السنّة بيتقفل بمنحنى (Q) بدل زاوية حادة، والقوس بين السنّات نقط متقاربة
+  const n = 8, R = 44, r = 33, cx = 50, cy = 50, step = (Math.PI * 2) / n, tw = step * 0.2, bw = step * 0.3, rad = 4.2;
+  const P = (rr, a) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
+  const pts = [];   // [x, y, يتدوّر؟]
   for (let i = 0; i < n; i++) {
     const a = i * step - Math.PI / 2;
-    d += `${i ? "L" : "M"}${pt(r, a - bw)} L${pt(R, a - tw)} L${pt(R, a + tw)} L${pt(r, a + bw)} `;
-    d += `A${r} ${r} 0 0 1 ${pt(r, a + step - bw)} `;
+    pts.push([...P(r, a - bw), 1], [...P(R, a - tw), 1], [...P(R, a + tw), 1], [...P(r, a + bw), 1]);
+    for (let k = 1; k < 4; k++) pts.push([...P(r, a + bw + ((step - 2 * bw) * k) / 4), 0]);
   }
+  const f = (v) => v.toFixed(2), m = pts.length;
+  const toward = (p, q, d) => { const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, t = Math.min(d, L / 2) / L; return [p[0] + dx * t, p[1] + dy * t]; };
+  let d = "";
+  pts.forEach((p, i) => {
+    const prev = pts[(i - 1 + m) % m], next = pts[(i + 1) % m];
+    if (!p[2]) { d += `${i ? "L" : "M"}${f(p[0])} ${f(p[1])} `; return; }
+    const a = toward(p, prev, rad), b = toward(p, next, rad);
+    d += `${i ? "L" : "M"}${f(a[0])} ${f(a[1])} Q${f(p[0])} ${f(p[1])} ${f(b[0])} ${f(b[1])} `;
+  });
   $("ibGear").querySelectorAll("[data-gear]").forEach((p) => p.setAttribute("d", d + "Z"));
 })();
 
@@ -48,6 +58,8 @@ async function initInbox() {
   ibAlert("");
   $("ibDuo").hidden = false; $("ibBotSet").hidden = true;
   window.NHBar?.();
+  // ⚡ آخر بيانات اتشافت بتظهر على طول، والجديد بيتجاب في الخلفية
+  if (ib.seen) { ib.conv = null; ibRenderConvs(); ibRenderComments(); half("messages").querySelector("[data-n]").textContent = ib.nM; half("comments").querySelector("[data-n]").textContent = ib.nC; }
   await ibLoadAll();
 }
 
@@ -56,27 +68,27 @@ async function ibLoadAll(quiet = false) {
   if (ib.loading) return;
   ib.loading = true;
   try {
-    const [cm, ms, pub] = await Promise.allSettled([api("/api/inbox/comments"), api("/api/inbox/conversations"), api("/api/publisher")]);
+    const [cm, ms, pub] = await Promise.allSettled([api("/api/inbox/comments"), api("/api/inbox/conversations"), api("/api/publisher?fresh=0")]);
     const linked = pub.status === "fulfilled" ? (pub.value.account_list || []).length : 1;
     ibAlert(linked ? "" : `يجب ربط حساب سوشيال ميديا واحد على الأقل لتفعيل التعليقات والرسائل. <a href="#" data-linkacc>اربط حسابًا ←</a>`);
     // الرسائل
     if (ms.status === "fulfilled") {
       ib.convs = ms.value.conversations || [];
-      half("messages").querySelector("[data-n]").textContent = ib.convs.length;
+      half("messages").querySelector("[data-n]").textContent = ib.nM = ib.convs.length;
       if (!ib.conv) ibRenderConvs();
       else if (!quiet) ibOpenConv(ib.conv.id);
     } else ibErr("messages", ms.reason);
     // التعليقات: تعليقات آخر المنشورات (لحد ٨ منشورات) في قايمة واحدة، الأحدث فوق
     if (cm.status === "fulfilled") {
       ib.posts = cm.value.posts || [];
-      half("comments").querySelector("[data-n]").textContent = ib.posts.reduce((n, p) => n + (p.comments || 0), 0);
+      half("comments").querySelector("[data-n]").textContent = ib.nC = ib.posts.reduce((n, p) => n + (p.comments || 0), 0);
       const withC = ib.posts.filter((p) => p.comments > 0).slice(0, 8);
       const lists = await Promise.allSettled(withC.map((p) => api(`/api/inbox/comments/${encodeURIComponent(p.id)}?account_id=${encodeURIComponent(p.account_id)}`)));
       const all = [];
       lists.forEach((r, i) => { if (r.status === "fulfilled") (r.value || []).filter((c) => !c.mine).forEach((c) => all.push({ ...c, post: withC[i] })); });
       all.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
       // اللي فاتح صندوق رد عليه بيفضل فاتح
-      ib.comments = all;
+      ib.comments = all; ib.seen = true;
       if (!$("ibDuo").querySelector('[data-half="comments"] .ib-compose textarea')?.value.trim()) ibRenderComments();
     } else ibErr("comments", cm.reason);
   } finally { ib.loading = false; }

@@ -3897,12 +3897,12 @@ def acct_tag(lst: list[dict]) -> list[dict]:
 
 
 @app.get("/api/publisher")
-def publisher_status():
+def publisher_status(fresh: bool = True):
     service = publisher.service_name()
     lst, error = [], None
     if service == "zernio":
         try:
-            lst = publisher.account_list(refresh=True)
+            lst = publisher.account_list(refresh=fresh)   # fresh=0: من الكاش (صفحة التعليقات بتفتح أسرع)
         except (publisher.PublishError, httpx.HTTPError) as exc:
             error = f"تعذّر الوصول إلى خدمة النشر: {exc}"
     elif service == "mock":
@@ -4651,7 +4651,7 @@ def bots_get():
     except publisher.PublishError as e:
         raise HTTPException(400, str(e))
     try:   # 🔗 كل الحسابات المربوطة (حتى اللي مابيدعمش الرد الآلي، بتظهر رمادي في القايمة)
-        every = [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in publisher.account_list(True)]
+        every = [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in publisher.account_list()]
     except Exception:  # noqa: BLE001
         every = []
     return {"live": True, "bots": bots, "accounts": [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in accs],

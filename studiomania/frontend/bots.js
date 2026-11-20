@@ -37,16 +37,16 @@ const BotsPage = (() => {
   const LIFT = [[0, 6], [-10, 0], [-8, -8], [8, -8], [10, 0]];
   function star() {
     const d = S.d, on = d.bots.filter((b) => b.status === "active").length;
-    const pd = S.pub;
-    const pubTxt = !pd ? "" : pd.mode === "always" ? `في كل منشور · «${esc(pd.word)}»` : pd.mode === "ask" ? "أختار عند النشر" : "متوقف";
     return `<svg class="bx-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${POS.map(([x, y]) => `<line x1="50" y1="50" x2="${x}" y2="${y}"/>`).join("")}</svg>
       <div class="bx-hub">
-        <b class="bx-num num">${on}</b><span class="bx-sub">${on === 1 ? "رد آلي يعمل الآن" : "ردود آلية تعمل الآن"}</span>
-        <button type="button" class="bx-pub" data-bxpub><span>«علّق بكلمة» في منشوراتك</span><b>${pubTxt}</b></button>
+        <b class="bx-num num">${d.sk ? "&nbsp;" : on}</b><span class="bx-sub">${on === 1 ? "رد آلي يعمل الآن" : "ردود آلية تعمل الآن"}</span>
       </div>
-      ${ORDER.map((k, i) => { const n = botsOf(k).filter((b) => b.status === "active").length;
-        return `<button type="button" class="bx-node${n ? " live" : ""}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px">
-          ${svgIc(R[k].ic)}<b>${R[k].n}</b><small>${n ? `<i class="bx-dot"></i>يعمل${n > 1 ? ` · ${n}` : ""}` : R[k].s}</small></button>`; }).join("")}`;
+      ${ORDER.map((k, i) => {
+        // 🟢 مفعّل: أيقونة برتقالي ونقطة خضرا · ⚪ مش مفعّل: أيقونة باهتة و«غير مفعّل»
+        const n = botsOf(k).filter((b) => b.status === "active").length, pub = k === "comment" && S.pub && S.pub.mode !== "off";
+        const live = n || pub, what = pub && !n ? (S.pub.mode === "always" ? "في كل منشور" : "عند النشر") : n > 1 ? `${n} حسابات` : "";
+        return `<button type="button" class="bx-node ${live ? "live" : "off"}${S.open === k ? " open" : ""}" data-brecipe="${k}" style="left:${POS[i][0]}%;top:${POS[i][1]}%;--mx:${LIFT[i][0]}px;--my:${LIFT[i][1]}px">
+          ${svgIc(R[k].ic)}<b>${R[k].n}</b><small>${d.sk ? "&nbsp;" : live ? `<i class="bx-dot"></i>مفعّل${what ? ` · ${what}` : ""}` : `<i class="bx-dot off"></i>غير مفعّل`}</small></button>`; }).join("")}`;
   }
 
   // ---------- اللوح اللي على الجنب ----------
@@ -67,7 +67,6 @@ const BotsPage = (() => {
       ${accs.length ? "" : `<small class="bx-err">هذا النوع يعمل على ${r.platforms.map((p) => PL[p]).join(" أو ")} فقط، ولا يوجد حساب منها مربوط.</small>`}</div>`;
   }
   function sheet() {
-    if (S.open === "_pub") return pubSheet();
     const k = S.open, r = S.d.recipes[k];
     if (!r) return "";
     const accs = S.d.accounts.filter((a) => r.platforms.includes(a.platform));
@@ -75,6 +74,8 @@ const BotsPage = (() => {
     const mine = botsOf(k);
     return `<aside class="bx-sheet"><header>${svgIc(R[k].ic, "lg")}<div><b>${R[k].n}</b><small>${esc(r.desc)}</small></div>
         <button type="button" class="bx-x" data-bclose aria-label="إغلاق">✕</button></header>
+      ${k === "comment" && S.pub ? pubBlock() : ""}
+      ${k === "comment" ? `<h4 class="bx-h">على كل منشوراتك (أو منشور بعينه)</h4>` : ""}
       ${mine.length ? `<section class="bx-mine">${mine.map((b) => `<div class="bx-row">${plIc(b.platform)}<span><b>${esc(b.account || b.name)}</b>
           <small>بدأ ${b.started} · انتهى ${b.completed}${b.exited ? ` · حُوّل ${b.exited}` : ""}</small></span>
           <button type="button" class="bx-tg${b.status === "active" ? " on" : ""}" data-btog="${esc(b.id)}" data-on="${b.status === "active" ? 0 : 1}" aria-label="${b.status === "active" ? "أوقف" : "شغّل"}"><i></i></button>
@@ -85,14 +86,14 @@ const BotsPage = (() => {
         ${k === "assistant" || S.f.ai ? `<p class="bx-note">يرد من عقل العلامة، ويُخصم كل رد بنقطة تقريبًا. وإن طلب العميل شخصًا أو سأل عن شيء غير موجود، تُحوَّل المحادثة إلى الرسائل.</p>` : ""}
         <button type="button" class="bx-go" data-bgo ${S.busy || !accs.length || !S.f.account ? "disabled" : ""}>${S.busy ? "جارٍ التشغيل…" : "شغّل"}</button></section></aside>`;
   }
-  function pubSheet() {
+  // «علّق بكلمة» في الفيديوهات اللي البرنامج بيعملها وينشرها: الكلمة بتتقال في آخر الفيديو وتتكتب في الكابشن، والرد بيتفعّل على المنشور
+  function pubBlock() {
     const p = S.pub, pill = (k, t) => `<button type="button" class="ib-pill${p.mode === k ? " on" : ""}" data-dm="${k}">${t}</button>`;
-    return `<aside class="bx-sheet"><header>${svgIc(R.comment.ic, "lg")}<div><b>«علّق بكلمة» في منشوراتك</b><small>من يعلّق بالكلمة تحت المنشور تصله رسالة على الخاص.</small></div>
-        <button type="button" class="bx-x" data-bclose aria-label="إغلاق">✕</button></header>
-      <section class="bx-new"><div class="ib-pills">${pill("always", "في كل منشور")}${pill("ask", "أختار عند النشر")}${pill("off", "لا")}</div>
+    return `<section class="bx-new bx-pubset"><h4 class="bx-h">في الفيديوهات التي ينشرها البرنامج</h4>
+        <div class="ib-pills">${pill("always", "في كل منشور")}${pill("ask", "أختار عند النشر")}${pill("off", "لا")}</div>
         ${p.mode === "always" ? `<label class="bx-f"><span>كلمة التعليق في كل منشور</span><input type="text" id="bxWord" value="${esc(p.word)}" placeholder="مثلًا: برنامج"></label>`
           : p.mode === "ask" ? `<p class="bx-note">تكتب الكلمة عند صنع كل فيديو.</p>` : ""}
-        <button type="button" class="bx-go" data-bxsave>احفظ</button></section></aside>`;
+        <button type="button" class="bx-go" data-bxsave>احفظ</button></section>`;
   }
 
   function render() {
@@ -121,7 +122,6 @@ const BotsPage = (() => {
       if (q("[data-baccopen]")) { S.accOpen = !S.accOpen; return render(); }
       if (q("[data-bacc]")) { S.f.account = q("[data-bacc]").dataset.bacc; S.accOpen = false; return render(); }
       if (q("[data-brecipe]")) { const k = q("[data-brecipe]").dataset.brecipe; S.open = S.open === k ? "" : k; S.f = {}; S.accOpen = false; return render(); }
-      if (q("[data-bxpub]")) { S.open = S.open === "_pub" ? "" : "_pub"; return render(); }
       if (q("[data-bclose]")) { S.open = ""; return render(); }
       if (q("[data-dm]")) { if ($("bxWord")) S.pub.word = $("bxWord").value; S.pub.mode = q("[data-dm]").dataset.dm; return render(); }
       if (q("[data-bxsave]")) {
@@ -130,7 +130,7 @@ const BotsPage = (() => {
         return run(async () => {
           // الكلمة الثابتة بتتحفظ مع «في كل منشور» بس (في «أختار عند النشر» بتتكتب مع كل فيديو)
           await api(`/api/ad-brains/${encodeURIComponent(S.pub.bid)}`, { method: "PATCH", ...jsonBody({ fields: S.pub.mode === "always" ? { dm_mode: "always", dm_word: word } : { dm_mode: S.pub.mode } }) });
-          S.pub.word = word; S.open = "";
+          S.pub.word = word;
           toast("✅ حُفظت الإعدادات");
         });
       }
@@ -152,7 +152,10 @@ const BotsPage = (() => {
     if (!w) return;
     S.el = w; S.open = "";
     bind(w);
-    try { [S.d] = await Promise.all([api("/api/bots"), loadPub()]); render(); } catch (err) { w.innerHTML = `<div class="bx-loading">${esc(err.message)}</div>`; }
+    // ⚡ بيفتح على طول: آخر بيانات اتشافت، أو الأنواع الخمسة من غير حالة لحد ما البيانات توصل (في الخلفية)
+    if (!S.d) S.d = { live: true, bots: [], accounts: [], all_accounts: [], recipes: {}, defaults: {}, sk: true };
+    render();
+    try { [S.d] = await Promise.all([api("/api/bots"), loadPub()]); if (S.el === w) render(); } catch (err) { if (S.d.sk) w.innerHTML = `<div class="bx-loading">${esc(err.message)}</div>`; else toast(err.message, true); }
   }
   return { html, mount, close: () => {} };
 })();

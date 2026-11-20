@@ -191,7 +191,7 @@ def _req(method: str, path: str, what: str, params: dict | None = None, body: di
 
 
 def bot_accounts() -> list[dict]:
-    return [a for a in publisher.account_list(True) if a["platform"] in PLATFORMS]
+    return [a for a in publisher.account_list() if a["platform"] in PLATFORMS]   # من الكاش (٥ دقايق): الصفحة بتفتح أسرع
 
 
 def list_bots() -> list[dict]:
