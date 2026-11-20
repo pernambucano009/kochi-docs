@@ -34,6 +34,8 @@ def score(im):
 
 
 def render(b, field: str, tpl: str, params: dict, arts: dict):
+    cover_t = params.get("_cover_t")   # وقت الغلاف بالثانية (لو أحسن فريم بالحساب طلع فاضي)
+    params = {k: v for k, v in params.items() if not k.startswith("_")}
     def el(v):   # «ستايل:اسم» = عنصر من مكتبة المجال (elements/<field>/krea2t/<style>/<name>.png)، و«base:اسم» = العنصر العادي
         st, _, nm = v.partition(":") if isinstance(v, str) else ("", "", "")
         f = (HERE / "elements" / field / "krea2t" / ("" if st == "base" else st) / f"{nm}.png") if nm else None   # base: = العناصر العادية (الستايل بيتعمل بالكود)
@@ -64,7 +66,7 @@ def render(b, field: str, tpl: str, params: dict, arts: dict):
                 pg.evaluate(f"() => seek({i / FPS})")
                 shot = pg.screenshot(type="jpeg", quality=88)
                 proc.stdin.write(shot)
-                if i in picks:   # الغلاف: أحسن فريم (نفس قص الكارت ٤:٥ من النص)
+                if (i == int(cover_t * FPS)) if cover_t else (i in picks):   # الغلاف: أحسن فريم (نفس قص الكارت ٤:٥ من النص)
                     im = Image.open(io.BytesIO(shot)).convert("RGB")
                     cw = min(W, H * 4 / 5); ch = cw * 5 / 4
                     c = im.crop(tuple(int(v) for v in ((W - cw) / 2, (H - ch) / 2, (W + cw) / 2, (H + ch) / 2))).resize((1080, 1350), Image.LANCZOS)
