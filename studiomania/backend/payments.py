@@ -36,7 +36,8 @@ def _pp_cred() -> tuple[str, str]:
 
 
 def paypal_on() -> bool:
-    return all(_pp_cred())
+    # ⏸️ PayPal موقوف بطلب صاحب البرنامج (الدفع بـ Tap بس). للتشغيل تاني: PAYPAL_ENABLED=1 مع المفاتيح الصح
+    return os.environ.get("PAYPAL_ENABLED") == "1" and all(_pp_cred())
 
 
 LIVE, SANDBOX = "https://api-m.paypal.com", "https://api-m.sandbox.paypal.com"

@@ -793,7 +793,8 @@ const Flow = (() => {
       ${beats ? `<details class="flw-shotlist"><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
       ${who}${scenePick(d, twins.find((t) => t.id === sel))}${failed("avatar")}
       <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
-        <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار</button></div>`;
+        <button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار${d.av_cost ? costTag(d.av_cost, window.ME?.credits?.total) : ""}</button></div>
+      ${d.av_sec > 30 ? `<p class="flw-empty bad">النص نحو <span class="num">${d.av_sec}</span> ثانية، والحد الأقصى لفيديو الأفاتار ٣٠ ثانية. اختصره من خطوة النص.</p>` : ""}`;
     // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
     return `<h2>الفيديو جاهز</h2>
       <div class="flw-avdone"><div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video></div>
@@ -809,7 +810,7 @@ const Flow = (() => {
     const cur = S.avScene || d.av_scene || { id: "office", bg: "" };
     S.avScene = cur;
     const own = (tw?.backgrounds || []).map((b) => `<button type="button" class="flw-scn own${cur.bg === b.id ? " on" : ""}" data-avbg="${esc(b.id)}"><img src="${esc(b.url)}" alt=""><span>${esc(b.name || "مكانك")}</span></button>`).join("");
-    return `<section class="flw-scnbox"><h3>الخلفية والوضعية</h3>
+    return `<section class="flw-scnbox"><h3>الخلفية ووضعية التصوير</h3>
       <div class="flw-scns">${(S.avScenes || []).map((x) => `<button type="button" class="flw-scn${!cur.bg && cur.id === x.id ? " on" : ""}" data-avscene="${esc(x.id)}"><span>${esc(x.name)}</span></button>`).join("")}${own}
         <label class="flw-scn add"><span>＋ مكانك (صورة)</span><input type="file" accept="image/*" data-avbgup hidden></label></div></section>`;
   }
