@@ -47,6 +47,7 @@ function ibAlert(msg) {
 async function initInbox() {
   ibAlert("");
   $("ibDuo").hidden = false; $("ibBotSet").hidden = true;
+  window.NHBar?.();
   await ibLoadAll();
 }
 
@@ -213,47 +214,21 @@ $("ibDuo").addEventListener("click", async (e) => {
   }
 });
 
-// ---------- 🤖 إعدادات الرد الآلي ----------
-const ibSetS = { bid: null, mode: "ask", word: "" };
-async function ibBotSettings() {
+// ---------- 🤖 إعدادات الرد الآلي (صفحة جوه التعليقات والرسائل) ----------
+function ibBotSettings() {
   $("ibDuo").hidden = true; $("ibBotSet").hidden = false; ibAlert("");
-  $("ibDmSet").innerHTML = `<p class="empty">جارٍ التحميل…</p>`;
   $("ibBots").innerHTML = BotsPage.html();
   BotsPage.mount($("ibBots"));
-  try {
-    const brains = await api("/api/ad-brains"), list = Array.isArray(brains) ? brains : [];
-    const b = list.find((x) => x.id === clientx?.active) || list[0] || {};
-    Object.assign(ibSetS, { bid: b.id, mode: b.dm_mode || (String(b.dm_word || "").trim() ? "always" : "ask"), word: b.dm_word || "" });
-    ibDmRender();
-  } catch (err) { $("ibDmSet").innerHTML = `<p class="empty">${escapeHtml(err.message)}</p>`; }
+  window.NHBar?.();
 }
-function ibDmRender() {
-  const S = ibSetS, pill = (k, t) => `<button type="button" class="ib-pill${S.mode === k ? " on" : ""}" data-dm="${k}">${t}</button>`;
-  $("ibDmSet").innerHTML = `<h4>«علّق بكلمة» في المنشورات التي ينشرها البرنامج</h4>
-    <p class="muted">من يعلّق بالكلمة تحت المنشور تصله رسالة على الخاص.</p>
-    <div class="ib-dmrow"><div class="ib-pills">${pill("always", "في كل منشور")}${pill("ask", "أختار عند النشر")}${pill("off", "لا")}</div>
-      <button type="button" class="ib-go" data-setsave>احفظ</button></div>
-    ${S.mode === "always" ? `<label class="ib-fl ib-dmword">كلمة التعليق في كل منشور<input type="text" id="ibSetWord" value="${escapeHtml(S.word)}" placeholder="مثلًا: برنامج"></label>`
-      : S.mode === "ask" ? `<p class="muted ib-dmnote">تكتب الكلمة عند صنع كل فيديو.</p>` : ""}`;
-}
-$("ibDmSet").addEventListener("click", async (e) => {
-  const q = (s) => e.target.closest(s);
-  if (q("[data-dm]")) { if ($("ibSetWord")) ibSetS.word = $("ibSetWord").value; ibSetS.mode = q("[data-dm]").dataset.dm; return ibDmRender(); }
-  const btn = q("[data-setsave]");
-  if (!btn) return;
-  const word = ($("ibSetWord")?.value ?? ibSetS.word).trim();
-  if (ibSetS.mode === "always" && !word) { $("ibSetWord")?.focus(); return toast("اكتب كلمة التعليق التي ستُقال في كل منشور", true); }
-  btn.disabled = true;
-  try {
-    // الكلمة الثابتة بتتحفظ مع «في كل منشور» بس (في «أختار عند النشر» بتتكتب مع كل فيديو)
-    await api(`/api/ad-brains/${encodeURIComponent(ibSetS.bid)}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: ibSetS.mode === "always" ? { dm_mode: "always", dm_word: word } : { dm_mode: ibSetS.mode } }) });
-    ibSetS.word = word;
-    toast("✅ حُفظت الإعدادات");
-  } catch (err) { toast(err.message, true); }
-  btn.disabled = false;
-});
-$("ibBack").onclick = () => initInbox();
+// «رجوع» اللي فوق: من الإعدادات للتعليقات والرسائل (مش للرئيسية)، والتسلسل فيه «إعدادات الرد الآلي»
+window.stageSubBack = () => {
+  const v = document.querySelector('.view[data-view="15"]');
+  if (!v || v.hidden || $("ibBotSet").hidden) return false;
+  initInbox();
+  return true;
+};
+window.stageSubLabel = (cur) => (cur === "15" && !$("ibBotSet").hidden ? "إعدادات الرد الآلي" : "");
 
 // 🔄 بيتحدّث لوحده كل دقيقة وهو مفتوح، وماينطّش لو بيكتب رد
 setInterval(() => {

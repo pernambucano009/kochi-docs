@@ -3669,3 +3669,68 @@ html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
 .bot-accmenu small { font-size: 11.5px; color: var(--label, #8a857f); }
 .ib-dmset .ib-dmword { max-width: 320px; margin-top: 12px; }
 .ib-dmset .ib-dmnote { margin: 10px 0 0; font-size: 13px; }
+
+/* ===== 🤖 الرد الآلي: ٥ أنواع حوالين النص (خماسي بخطوط رفيعة)، والتفاصيل في لوح على الجنب ===== */
+.bx { position: relative; flex: 1; min-height: 520px; display: flex; gap: 0; }
+.bx-loading { margin: auto; color: var(--label, #8a857f); }
+.bx-star { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.bx-lines { position: absolute; inset: 7% 9%; width: 82%; height: 86%; overflow: visible; }
+.bx-lines line { stroke: var(--ink, #181718); stroke-opacity: .13; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.bx-hub { position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 18px 26px; background: var(--page-bg, #F7F7F5); text-align: center; }
+.bx-num { font-size: 88px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, var(--glow-a, #F48A62) 0%, var(--glow-b, #E5613E) 55%, var(--glow-c, #D44E2C) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bx-sub { font-size: 14px; color: var(--label, #8a857f); }
+.bx-pub { margin-top: 16px; border: 0; background: none; cursor: pointer; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--label, #8a857f); font-size: 12px; }
+.bx-pub b { font-size: 14px; font-weight: 500; color: var(--ink, #181718); }
+.bx-pub:hover b { color: var(--accent, #E5613E); }
+.bx-star > .bx-node { position: absolute; z-index: 2; }
+.bx-node { translate: -50% -50%; border: 0; background: var(--page-bg, #F7F7F5); padding: 12px 18px; cursor: pointer; font: inherit; color: var(--ink, #181718);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; border-radius: 18px; }
+.bx-node b { font-size: 17px; font-weight: 500; white-space: nowrap; }
+.bx-node small { font-size: 12.5px; color: var(--label, #8a857f); display: inline-flex; align-items: center; gap: 6px; }
+.bx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok, #2F8F6B); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok, #2F8F6B) 18%, transparent); }
+.bx-ic { width: 56px; height: 56px; overflow: visible; transition: scale .35s cubic-bezier(.2, .8, .2, 1.2); }
+.bx-ic .b { fill: none; stroke: var(--ink, #181718); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.bx-ic .s { fill: none; stroke: var(--accent, #E5613E); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 14 86; opacity: 0; transition: opacity .25s; }
+.bx-node:hover .bx-ic, .bx-node:focus-visible .bx-ic, .bx-node.open .bx-ic { scale: 1.15; }
+.bx-node:hover .bx-ic .s, .bx-node:focus-visible .bx-ic .s, .bx-node.open .bx-ic .s { opacity: 1; animation: ib-snake 1.8s linear infinite; }
+.bx-node.live .bx-ic .b { stroke: var(--accent, #E5613E); }
+.bx-node.open b { color: var(--accent, #E5613E); }
+/* اللوح */
+.bx-sheet { flex: none; width: 380px; border-inline-start: 1px solid var(--line); padding: 4px 24px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; animation: ib-in .25s ease; }
+.bx-sheet header { display: flex; align-items: flex-start; gap: 14px; }
+.bx-sheet header > div { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.bx-sheet header b { font-size: 20px; font-weight: 500; }
+.bx-sheet header small { font-size: 13px; color: var(--label, #8a857f); line-height: 1.6; }
+.bx-ic.lg { width: 40px; height: 40px; flex: none; }
+.bx-ic.lg .s { display: none; }
+.bx-x { border: 0; background: none; cursor: pointer; font-size: 15px; color: var(--label, #8a857f); padding: 4px; }
+.bx-mine { display: flex; flex-direction: column; }
+.bx-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.bx-row > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bx-row b { font-size: 14px; font-weight: 500; }
+.bx-row small { font-size: 12px; color: var(--label, #8a857f); }
+.bx-row .ib-plat { width: 30px; height: 30px; } .bx-row .ib-plat svg { width: 22px; height: 22px; }
+.bx-tg { position: relative; width: 42px; height: 24px; flex: none; border: 0; border-radius: 99px; background: var(--field, #E9E8E4); cursor: pointer; transition: background .2s; }
+.bx-tg i { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .2); transition: inset-inline-start .2s; }
+.bx-tg.on { background: var(--accent, #E5613E); }
+.bx-tg.on i { inset-inline-start: 21px; }
+.bx-new { display: flex; flex-direction: column; gap: 12px; }
+.bx-new h4 { margin: 0; font-size: 14px; font-weight: 500; }
+.bx-f { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--label, #8a857f); }
+.bx-f input, .bx-f textarea { font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 10px 12px; background: var(--field, #F3F2EF); color: var(--ink, #181718); resize: none; }
+.bx-chk { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
+.bx-note { margin: 0; font-size: 12.5px; color: var(--label, #8a857f); line-height: 1.6; }
+.bx-err { color: var(--danger, #c0392b); font-size: 12.5px; margin: 0; }
+.bx-go { align-self: flex-start; border: 0; cursor: pointer; font: inherit; font-size: 14px; color: #fff; padding: 10px 30px; border-radius: 999px;
+  background: linear-gradient(120deg, var(--glow-a, #F48A62), var(--glow-b, #E5613E) 55%, var(--glow-c, #D44E2C)); box-shadow: 0 8px 20px rgba(229, 97, 62, .28); }
+.bx-go:disabled { opacity: .55; cursor: default; }
+.bx .ib-pills { margin: 0; }
+@media (max-width: 900px) {
+  .bx { flex-direction: column; min-height: 0; }
+  .bx-star { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bx-lines { display: none; }
+  .bx-hub, .bx-star > .bx-node { position: static; translate: none; }
+  .bx-hub { grid-column: 1 / -1; }
+  .bx-sheet { width: auto; border: 0; border-top: 1px solid var(--line); padding: 16px 0 0; }
+}

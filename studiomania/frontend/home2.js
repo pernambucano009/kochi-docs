@@ -789,6 +789,8 @@ const NH = (() => {
       const cur = stageTrail[stageTrail.length - 1], par = STAGE_PARENT[cur];
       if (par && STEP_INFO[par]) out.push({ label: STEP_INFO[par].title, lv: "stagekey", key: par });
       out.push({ label: STEP_INFO[cur]?.title || "", lv: "stagekey", key: cur });
+      const sub = window.stageSubLabel?.(cur);
+      if (sub) out.push({ label: sub, lv: "sub" });
     }
     return out;
   }
@@ -860,6 +862,7 @@ const NH = (() => {
   function goBack() {
     if (busy) return;
     if (window.flowBack?.()) return;   // 🧭 صفحة فاتحة من جوه المسار (المونتاج/النشر): الرجوع للمسار
+    if (stageOpen() && window.stageSubBack?.()) return renderBar();   // صفحة جوه القسم (إعدادات الرد الآلي جوه التعليقات والرسائل): الرجوع للقسم
     if (stageOpen()) {
       if (stageTrail.length > 1) return showStep(stageTrail[stageTrail.length - 2]);
       return closeStage();
@@ -877,7 +880,7 @@ const NH = (() => {
     if (busy) return;
     const c = document.getElementById("nhCrumbs")._list?.[k];
     if (!c) return;
-    if (c.lv === "stagekey") return showStep(c.key);
+    if (c.lv === "stagekey") { if (stageTrail[stageTrail.length - 1] === c.key && window.stageSubBack?.()) return renderBar(); return showStep(c.key); }
     // 🏠 من جوه صفحة (المونتاج مثلًا) للرئيسية على طول: الصفحة اللي في النص بترجع ورا الصفحة المفتوحة من غير ما تبان، وبعدين انتقال واحد ناعم
     if (c.lv === "home" && stageOpen() && zoom?.page) { await closePage(true, true); await closeStage(); return; }
     if (stageOpen()) await closeStage();
