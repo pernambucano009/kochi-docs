@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "استنساخ صوت الأفاتار فشل، واستُخدم صوت الراوي: {0}": "Cloning the avatar voice failed, so the narrator voice was used: {0}",
   "ترقية فورية، ونقاط الباقة الجديدة كاملة من اليوم": "Instant upgrade, with the new plan's full points from today",
   "بوت الردود الآلية": "Auto-reply bot",
   "🔒 بوت الردود الآلية متاح في باقة «محترف» و«وكالات»، أو أضفه إلى باقتك": "🔒 The auto-reply bot is included in Pro and Agency, or add it to your plan",
