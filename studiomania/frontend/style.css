@@ -3630,11 +3630,11 @@ html[dir="ltr"]:root:root .ib-list li.on { box-shadow: inset 3px 0 0 var(--accen
 /* ⚙️ الترس: بيكبر لما تقف عليه، وسنيك برتقالي بيلف على السنّات */
 .ib-gear { align-self: center; justify-self: center; border: 0; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; font: inherit; font-size: 12.5px; color: var(--label, #8a857f); }
 .ib-gear svg { width: 124px; height: 124px; overflow: visible; transition: scale .35s cubic-bezier(.2, .8, .2, 1.2); }
-.ib-gear .g-body { fill: none; stroke: var(--label, #8a857f); stroke-width: 4; stroke-linejoin: round; opacity: .45; }
-.ib-gear .g-hole { fill: none; stroke: var(--label, #8a857f); stroke-width: 4; opacity: .45; }
+.ib-gear .g-body { fill: none; stroke: var(--label, #8a857f); stroke-width: 7.5; stroke-linejoin: round; opacity: .3; }
+.ib-gear .g-hole { fill: none; stroke: var(--label, #8a857f); stroke-width: 7.5; opacity: .3; }
 .ib-gear .g-snake { fill: none; stroke: var(--accent, #E5613E); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16 84; stroke-dashoffset: 0; opacity: 0; transition: opacity .25s; }
 .ib-gear:hover svg, .ib-gear:focus-visible svg { scale: 1.12; }
-.ib-gear:hover .g-body, .ib-gear:hover .g-hole { opacity: .7; }
+.ib-gear:hover .g-body, .ib-gear:hover .g-hole { opacity: .55; }
 .ib-gear:hover .g-snake, .ib-gear:focus-visible .g-snake { opacity: 1; animation: ib-snake 1.6s linear infinite; }
 .ib-gear:hover { color: var(--ink, #181718); }
 @keyframes ib-snake { to { stroke-dashoffset: -100; } }
@@ -3748,3 +3748,10 @@ html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
 .bx-postbtn b, .bx-posts b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bx-posts { max-height: 300px; overflow-y: auto; }
 .bx-posts .bx-note { padding: 8px; }
+
+/* خط بالطول بيفصل الرسائل عن التعليقات على محور الترس، ومقطوع حوالين الترس من فوق ومن تحت */
+.ib-duo > .ib-gear { align-self: stretch; justify-content: center; padding: 0; }
+.ib-duo > .ib-gear::before, .ib-duo > .ib-gear::after { content: ""; flex: 1; width: 1px; background: var(--line, rgba(24, 23, 24, .1)); }
+.ib-duo > .ib-gear::before { margin-bottom: 22px; }
+.ib-duo > .ib-gear::after { margin-top: 22px; }
+@media (max-width: 900px) { .ib-duo > .ib-gear::before, .ib-duo > .ib-gear::after { display: none; } }

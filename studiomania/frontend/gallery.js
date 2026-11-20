@@ -302,7 +302,7 @@ const Gallery = (() => {
     const g = grpOf(x), first = !k || grpOf(W.list?.[k - 1]?.[0] || {}) !== g;
     return `<article class="nh-wc g-${g}${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
       ${first ? `<span class="nh-wc-grp">${esc(grpName(g))}</span>` : ""}
-      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${apMark(x)}${lgMark(x)}</div></article>`;
+      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${x.car && (x.slides || []).length > 1 ? `<span class="car-fan" aria-hidden="true">${x.slides.slice(0, 4).map((u, i, a) => `<img src="${esc(u)}" alt="" loading="lazy" style="--i:${i - (a.length - 1) / 2}">`).join("")}</span>` : ""}${apMark(x)}${lgMark(x)}</div></article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
   function labLines(name) {
@@ -812,7 +812,7 @@ const Gallery = (() => {
     if (x.id === "avatar") return showStep("16");
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
-    if (x.car) { storageSet("studiomania.carSty", x.id); return showStep("8"); }   // 🖼️ ستايل كاروسيل: صفحة الكاروسيل والستايل مختار
+    if (x.car) return Flow.start({ id: "carousel", name: x.name, cat: "كاروسيل", desc: x.desc || "", car_style: x.id });   // 🖼️ ستايل كاروسيل: مسار الكاروسيل بالستايل اللي اختاره (مابيتسألش عليه تاني)
     if (x.id === "editor") return openEditor();
     if (x.dtid) return window.Dental?.pick({ id: x.dtid, name: x.name, desc: x.desc, kind: x.dkind });
     if (x.id === "dental") return window.Dental?.open();

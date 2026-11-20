@@ -8528,6 +8528,8 @@ def patch_carousel(cid: str, body: CarouselPatch):
                 st["character_ids"] = [str(x) for x in (body.settings["character_ids"] or [])][:4]
             if "style_id" in body.settings:
                 st["style_id"] = body.settings["style_id"] or None
+            if "keep_colors" in body.settings:
+                st["keep_colors"] = bool(body.settings["keep_colors"])
             if "cta" in body.settings and isinstance(body.settings["cta"], dict):
                 c = body.settings["cta"]
                 st["cta"] = {k: str(c.get(k) or "")[:300] for k in ("type", "keyword", "reward", "text")}
@@ -8609,7 +8611,7 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
 
         if cz.style_id(st.get("template_id")):   # 🎨 ستايل جاهز
             a = car_style_asset(st["template_id"])
-            ctx["template"] = {"name": a["name"], "notes": a["notes"]}
+            ctx["template"] = {"name": a["name"], "notes": a["notes"], "keep": bool(st.get("keep_colors"))}   # 🎨 ألوان الستايل نفسه أو ألوان العلامة
             assets["template"] = a
         elif r := asset(st.get("template_id"), "template"):
             ctx["template"] = {"name": r["name"], "notes": r["notes"]}
@@ -25214,6 +25216,20 @@ def flow_to_dict(fid: str, d: dict) -> dict:
                 out["stage"] = "done"
         elif o.get("status") == "working":
             out["output"] = {**o, "step": t.get("step")}
+    if d.get("car_style"):   # 🖼️ الستايل اللي اختاره من المعرض (صوره بتظهر في أول خطوة)
+        try:
+            out["car_style"] = car_style_asset(d["car_style"])
+        except Exception:  # noqa: BLE001
+            pass
+    if o.get("kind") == "carousel" and o.get("id"):   # 🖼️ شرائح الكاروسيل وهي بتترسم
+        try:
+            c = get_carousel(o["id"])
+            sl = [{"url": x.get("url"), "status": x.get("status")} for x in c["slides"]]
+            ok = bool(sl) and all(x["status"] == "done" for x in sl)
+            out["output"] = {**o, "slides": sl, "overview": (c.get("overview") or {}).get("url"), "busy": bool(c["busy"]),
+                             "status": "done" if ok else "failed" if any(x["status"] == "failed" for x in sl) else "working"}
+        except HTTPException:
+            pass
     if (out.get("output") or {}).get("asset"):
         aid = out["output"]["asset"]
         out["output"]["video_url"] = f"/media/assets/{aid}/clip.mp4"
@@ -25665,6 +25681,7 @@ class FlowNewIn(BaseModel):
     desc: str = ""
     season: str = ""
     skip_ideas: bool = False   # الفكرة جاهزة (من خطة الشهر): من غير ما المخ يقترح أفكار
+    car_style: str = ""        # 🖼️ ستايل الكاروسيل اللي اختاره من المعرض (cs-…): أول خطوة بتعرضه، ومابيتسألش تاني
     reuse: bool = False        # من الواجهة: لو فيه مشروع لنفس القالب لسه ماتختارتش فكرته، يفتحه بدل مشروع جديد (كانت المشاريع بتتكرر في «قيد العمل»)
 
 
@@ -25689,6 +25706,8 @@ def flow_new(body: FlowNewIn):
     d = {"client_id": active_client_id(), "template": tpl, "stage": "idea", "season": body.season.strip()[:200],
          "ideas": [], "idea": None, "idea_chat": [], "format": None, "episodes": "auto", "scenarios": [], "scenario": None, "scen_chat": [],
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
+    if tpl.get("kind") == "carousel" and cz.style_id(body.car_style):   # 🖼️ الكاروسيل: الستايل ← الفكرة ← النص ← التعديلات ← النشر
+        d.update(car_style=body.car_style, stage="style")
     with FLOW_LOCK:
         flow_save(fid, d)
     if tpl.get("id") in FACT_TPLS and (body.reuse or not body.skip_ideas):   # من الواجهة (reuse) أو أي بداية عادية، مش الأوتوبايلوت   # 🧾 عرض السعر وآراء العملاء: أول خطوة التفاصيل نفسها، مش أفكار عامة
@@ -28187,6 +28206,48 @@ def flow_draw_missing(fid: str, mid: str, params: dict) -> dict:
         except Exception as exc:  # noqa: BLE001
             print(f"[draw] {mid}/{slot}: {exc}", flush=True)   # الرسمة فشلت: القالب بيكمل من غير صورة (من غير منتج غلط)
     return params
+
+
+class FlowCarIn(BaseModel):
+    keep_colors: bool = True   # ألوان الستايل زي ما هي، أو false = تتصبغ بألوان العلامة
+
+
+@app.post("/api/flows/{fid}/car-make")
+def flow_car_make(fid: str, body: FlowCarIn):
+    """🖼️ خطوة «التعديلات»: الكاروسيل بيترسم بالستايل اللي اختاره ونص الشرائح اللي اختاره (بألوان الستايل أو ألوان علامته)."""
+    d = flow_load(fid)
+    flow_idle(d)
+    sc = d.get("scenario") or {}
+    if not sc:
+        raise HTTPException(400, "اختر نص الشرائح أولًا")
+    n = max(2, min(10, len(sc.get("slides") or []) or 6))
+    if not atlas.mock_mode():
+        wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + 1), "كاروسيل")
+    title = (d.get("idea") or {}).get("title") or "كاروسيل"
+    car = create_carousel(CarouselIn(name=f"🧭 {title}"[:80]))
+    cid = car["id"]
+    sett = {"slides": n, "keep_colors": body.keep_colors}
+    if d.get("car_style"):
+        sett["template_id"] = d["car_style"]
+    patch_carousel(cid, CarouselPatch(settings=sett))
+    flow_update(fid, lambda x: x.update(output={"kind": "carousel", "id": cid, "status": "working"}, car_keep=body.keep_colors))
+    brief = flow_brief({**d, "_id": fid})
+
+    def run():
+        carousel_chat(cid, ChatIn(message="أنشئ هذا الكاروسيل بالضبط، بنفس الشرائح والنص:\n" + brief))
+        carousel_plan(cid)
+        carousel_overview(cid)
+        for _ in range(240):   # الشكل العام بيترسم في الخلفية: نستنى لحد ما يخلص وبعدين الشرائح
+            c = get_carousel(cid)
+            if not c["busy"] and c["overview"]["status"] in ("done", "failed"):
+                break
+            time.sleep(3)
+        if get_carousel(cid)["overview"]["status"] != "done":
+            raise HTTPException(400, get_carousel(cid)["overview"].get("error") or "توقف رسم الشكل العام")
+        carousel_approve(cid)
+        carousel_slides(cid)
+    flow_job(fid, "carousel", run)
+    return flow_to_dict(fid, flow_load(fid))
 
 
 @app.post("/api/flows/{fid}/generate")

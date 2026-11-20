@@ -305,8 +305,11 @@ def kind_design_rules(ctx: dict, brand: dict | None = None) -> str:
             "text hierarchy and positions, shapes and decorative motifs, spacing and logo position, on every slide. "
             "If a reference is a mockup photo of slides on a phone or table, ignore the phone, perspective, shadows "
             "and background: take only the flat slide designs and adapt them to the vertical slide size. "
-            "RECOLOR everything to the brand palette below (do not keep the template's own colors unless the "
-            "template notes say so). Only the text and content visuals change between slides."
+            + ("KEEP the template's own colors exactly as in the references (ignore the brand colors listed below); only the logo is the brand's. "
+               if t.get("keep") else
+               "RECOLOR everything to the brand palette below (do not keep the template's own colors unless the "
+               "template notes say so). ")
+            + "Only the text and content visuals change between slides."
             + (f" Template notes: {t['notes']}" if t.get("notes") else ""))
     c = ctx.get("coach")
     if c:

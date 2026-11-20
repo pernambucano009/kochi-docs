@@ -46,8 +46,11 @@ const Flow = (() => {
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
   const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"]];
   const isPhone = (d) => d?.template?.kind === "phone";
+  // 🖼️ الكاروسيل: الستايل اللي اختاره ← الفكرة ← النص (موزّع على الشرائح) ← التعديلات (الألوان والرسم) ← النشر
+  const STEPS_CAR = [["style", "الستايل"], ["idea", "الفكرة"], ["scenario", "النص"], ["carousel", "التعديلات"], ["publish", "النشر"]];
+  const isCar = (d) => d?.template?.kind === "carousel";
   // 🧾 قوالب المعطيات (عرض السعر، آراء العملاء): أول خطوة تفاصيل العرض أو الآراء نفسها، والأفكار والنص مبنيين عليها
-  const steps0 = (d) => (isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
+  const steps0 = (d) => (isCar(d) ? STEPS_CAR : isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isPhone(d) ? STEPS_PHONE : STEPS_AI);
   // 🧾 القالب المخصص: التفاصيل ← الصوت ← … (مفيش فكرة ولا نص: النص بيتكتب من التفاصيل ويتختار لوحده)
   const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d).filter(([k]) => k !== "idea" && k !== "scenario")] : steps0(d));
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
@@ -76,7 +79,7 @@ const Flow = (() => {
     S.el.hidden = false;
     S.el.innerHTML = `<div class="flw-box"><div class="flw-load"><span class="flw-spin"></span><p>العقل يقرأ العلامة والقالب ويُجهّز أفكارًا…</p></div></div>`;
     try {
-      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true, reuse: true }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
+      S.d = await api("/api/flows", { method: "POST", ...J({ template: t.id, name: t.name || "", cat: t.cat || "", desc: t.desc || "", skip_ideas: true, reuse: !t.car_style, car_style: t.car_style || "" }) });   // الأفكار بتبدأ بضغطة (بتتحسب بالنقاط)
       try { localStorage.setItem("studiomania.flow", S.d.id); } catch { /* غير مهم */ }
       if (typeof NH !== "undefined") NH?.refresh?.();
       render(); poll();
@@ -140,7 +143,7 @@ const Flow = (() => {
   function stepper(d) {
     const cur = S.view === "publish" ? idx("publish", d) : idx(d.stage, d);
     const ready = { idea: true, format: !!d.idea, scenario: !!d.format, cast: !!d.scenario, voice: !!d.scenario, assets: !!d.scenario, panel: !!d.scenario, generate: isTypo(d) ? !!d.output : !!d.scenario && !isCode(d),
-      shoot: isPhone(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: isVid(d) && d.output?.status === "done" };
+      shoot: isPhone(d), review: !!d.footage?.main, montage: isVid(d) ? d.output?.status === "done" : !!(d.review || d.montage), publish: (isVid(d) || isCar(d)) && d.output?.status === "done", style: !!d.car_style, carousel: isCar(d) && !!d.scenario };
     return `<ol class="flw-steps">${steps(d).map(([k, t], i) => `<li class="${i < cur ? "past" : i === cur ? "now" : ""}">
       <button type="button" ${ready[k] && i !== cur && !busy() ? `data-go="${k}"` : "disabled"}><i class="num">${i < cur ? "✓" : i + 1}</i><span>${t}</span></button></li>`).join("")}</ol>`;
   }
@@ -306,6 +309,33 @@ const Flow = (() => {
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
   const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
   const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
+  // 🖼️ أول خطوة: شرائح الستايل اللي اختاره بس (مش ستايلات تانية)
+  function stStyle(d) {
+    const st = d.car_style || {}, im = (st.images || []).map((x) => x.url);
+    return `<h2>${esc(st.name || "الستايل")}</h2><p class="flw-sub">هذا هو الستايل الذي اخترته. اكتب الموضوع أو اختر فكرة، ونكتب الشرائح عليه.</p>
+      <div class="flw-carfan">${im.map((u, i) => `<img src="${esc(u)}" alt="" style="--i:${i - (im.length - 1) / 2}">`).join("")}</div>
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="idea">الفكرة ←</button></div>`;
+  }
+  // 🎨 التعديلات: الألوان (ألوان الستايل أو ألوان علامتك) ← رسم الشرائح ← تعديل في محرر الكاروسيل
+  function stCar(d) {
+    const o = d.output?.kind === "carousel" ? d.output : null, keep = S.carKeep ?? d.car_keep ?? false;
+    const pill = (v, t) => `<button type="button" class="flw-chip${keep === v ? " on" : ""}" data-carkeep="${v ? 1 : 0}">${t}</button>`;
+    const pick = `<div class="flw-acts">${pill(false, "🎨 بألوان علامتك")}${pill(true, "🖼️ بألوان الستايل كما هي")}</div>`;
+    if (!o) return `<h2>التعديلات</h2><p class="flw-sub">اختر ألوان الكاروسيل، ثم نرسم الشرائح بالستايل الذي اخترته وبالنص الذي اخترته.</p>${pick}
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-carmake ${busy() ? "disabled" : ""}>🎨 ارسم الكاروسيل</button></div>${failed("carousel")}`;
+    const sl = o.slides || [], done = sl.filter((x) => x.status === "done").length;
+    return `<h2>التعديلات</h2>${o.status !== "done" ? working(sl.length ? `جارٍ رسم الشرائح ${done}/${sl.length}` : "نكتب الشرائح ونرسم الشكل العام…") : ""}
+      <div class="flw-carslides">${sl.map((x) => x.url ? `<img src="${esc(x.url)}" alt="" loading="lazy">` : `<span class="flw-carph"></span>`).join("")}</div>
+      ${o.status === "done" ? `<div class="flw-acts"><button type="button" class="flw-btn" data-caredit="${esc(o.id)}">✏️ عدّل شريحة أو لونًا أو شكلًا</button>
+        <button type="button" class="flw-btn" data-carredo>${keep ? "🎨 أعد الرسم بألوان علامتك" : "🖼️ أعد الرسم بألوان الستايل"}</button>
+        <button type="button" class="flw-btn pri" data-go="publish">النشر ←</button></div>` : o.status === "failed" ? `<div class="flw-acts"><button type="button" class="flw-btn pri" data-carmake>🔁 أعد الرسم</button></div>` : ""}${failed("carousel")}`;
+  }
+  function stCarPub(d) {
+    const o = d.output?.kind === "carousel" ? d.output : null;
+    if (!o || o.status !== "done") return `<h2>النشر</h2><p class="flw-sub">ارسم الكاروسيل أولًا من «التعديلات».</p>`;
+    return `<h2>النشر</h2><div class="flw-carslides">${(o.slides || []).map((x) => `<img src="${esc(x.url)}" alt="" loading="lazy">`).join("")}</div>
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-carpub="${esc(o.id)}">📤 انشره أو جدوله</button></div>`;
+  }
   function stFacts(d) {
     const b = d.brief || {}, v = d.facts || d.facts_prefill || {};
     const fld = (q) => {
@@ -849,7 +879,7 @@ const Flow = (() => {
     if (!d || !S.el) return;
     S.el.classList.toggle("flw-lock", !!S.inflight || busy());
     const st = S.view === "publish" ? "publish" : d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
-    const body = { publish: stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: isTypo(d) ? stTypoScenes : stPanel, generate: stGenerate, done: stDone,
+    const body = { style: stStyle, carousel: stCar, publish: isCar(d) ? stCarPub : stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: isTypo(d) ? stTypoScenes : stPanel, generate: stGenerate, done: stDone,
       shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
@@ -1009,8 +1039,15 @@ const Flow = (() => {
       if (ok) campoll();
       return;
     }
+    if ((b = q("[data-go]")) && isCar(S.d) && b.dataset.go === "publish") { S.view = "publish"; return render(); }   // 🖼️ نشر الكاروسيل: خطوة عرض بس
     if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "publish") return openPub();
     if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
+    if ((b = q("[data-carkeep]"))) { S.carKeep = b.dataset.carkeep === "1"; return render(); }
+    if (q("[data-carmake]")) return call("/car-make", { keep_colors: !!(S.carKeep ?? S.d.car_keep ?? false) });
+    if (q("[data-carredo]")) { S.carKeep = !(S.carKeep ?? S.d.car_keep ?? false); return call("/car-make", { keep_colors: S.carKeep }); }
+    if ((b = q("[data-caredit]")) || (b = q("[data-carpub]"))) {   // محرر الكاروسيل (والنشر منه): نفس الكاروسيل اللي اترسم هنا
+      const id = b.dataset.caredit || b.dataset.carpub; close(); storageSet(CAR_KEY, id); showStep("8"); openCarousel(id); return;
+    }
     if ((b = q("[data-go]"))) { S.view = null; reset(); S.chat = null; S.fmt = null; S.eps = null; return call("/stage", { stage: b.dataset.go }); }
     if (q("[data-topub]")) return openPub();
     if ((b = q("[data-pwhen]"))) { S.pubWhen = b.dataset.pwhen; return render(); }
