@@ -13,7 +13,7 @@ import re
 NOUNS = {
     "food": ("طبق", "قائمة مطعمكم", "الطبق"), "beauty": ("خدمة", "خدمات صالونكم", "الخدمة"), "dental": ("علاج", "علاجات عيادتكم", "العلاج"),
     "ecom": ("منتج", "متجركم", "المنتج"), "realestate": ("عقار", "عقاراتكم", "العقار"),
-    "edu": ("دورة", "دوراتكم", "الدورة"), "fitness": ("اشتراك", "ناديكم", "الاشتراك"),
+    "edu": ("دورة", "دوراتكم", "الدورة"), "selfdev": ("جلسة", "جلساتكم ودوراتكم", "الجلسة"), "fitness": ("اشتراك", "ناديكم", "الاشتراك"),
     "home": ("خدمة", "خدماتكم", "الخدمة"), "shops": ("منتج", "محلكم", "المنتج"),
 }
 DEFAULT_NOUN = ("منتج", "منتجاتكم", "المنتج")
@@ -386,7 +386,7 @@ NOUNS_EN = {
     "مثال: قهوة مجانية لأول ١٠٠ زائر": "e.g. Free coffee for the first 100 visitors","dental": ("treatment", "your clinic's treatments", "the treatment"), 
     "food": ("dish", "your restaurant's menu", "the dish"), "beauty": ("service", "your salon's services", "the service"),
     "ecom": ("product", "your store", "the product"), "realestate": ("property", "your listings", "the property"),
-    "edu": ("course", "your courses", "the course"), "fitness": ("membership", "your gym", "the membership"),
+    "edu": ("course", "your courses", "the course"), "selfdev": ("session", "your sessions and courses", "the session"), "fitness": ("membership", "your gym", "the membership"),
     "home": ("service", "your services", "the service"), "shops": ("product", "your shop", "the product"),
 }
 EN = {

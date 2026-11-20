@@ -45,7 +45,7 @@ SAY = {
 }
 # المجال ← اللهجة اللي بنكتب بيها أفكاره (أكتر عملاء المجال)
 IDEA_DIALECT = {"food": "ar-sa-najdi", "dental": "ar-sa-najdi", "beauty": "ar-sa-hijazi", "ecom": "ar-gulf", "realestate": "ar-ae",
-                "edu": "ar-eg-cairo", "fitness": "ar-sa-najdi", "home": "ar-kw", "shops": "ar-eg-cairo"}
+                "edu": "ar-eg-cairo", "selfdev": "ar-eg-cairo", "fitness": "ar-sa-najdi", "home": "ar-kw", "shops": "ar-eg-cairo"}
 ELEMENTS = {"fitness": ["a pair of blue running shoes", "a glass of water with lemon slices", "a kettlebell next to a folded towel",
                         "a hand holding a jump rope", "a plate of grilled chicken with rice and salad"]}
 STOCK = ["hands tying the laces of running shoes on a gym floor", "a woman seen from behind stretching on a yoga mat at home",
