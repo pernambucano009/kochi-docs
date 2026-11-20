@@ -8155,18 +8155,24 @@ def get_asset(conn: sqlite3.Connection, aid: str) -> sqlite3.Row:
     return r
 
 
-def car_style_asset(sid: str) -> dict:
+def car_style_asset(sid: str, draw: bool = False) -> dict:
     """🎨 ستايل كاروسيل جاهز (cs-<id>) بنفس شكل عنصر المكتبة: شرائحه المرجعية الثلاثة."""
     k = cz.style_id(sid)
     name, prompt = cz.STYLES[k]
-    # 🗂️ كل مجال بيشوف شرايح الستايل بكلام وصور من مجاله (gallery/carstyle/f/<المجال>/)، ولو مجاله مالوش نسخة: العامة
+    # 🗂️ كل مجال بيشوف شرايح الستايل بكلام وصور من مجاله بس (gallery/carstyle/f/<المجال>/). شرايح carstyle/ نفسها بتاعة اللياقة.
+    #   مجال مالوش نسخة: مفيش شرايح تظهر (عشان مايشوفش مجال تاني)، والرسم بس (draw) بياخد الشكل من الشرايح العامة
     try:
         field = field_guess(brain_row(active_client_id()) or {}) if active_client_id() else ""
     except Exception:  # noqa: BLE001
         field = ""
     base = FRONTEND_DIR / "gallery" / "carstyle"
     fdir = base / "f" / re.sub(r"[^a-z0-9_-]", "", field) if field else None
-    files = [fdir / f"{k}-{i}.jpg" for i in range(3)] if fdir and (fdir / f"{k}-0.jpg").is_file() else [base / f"{k}-{i}.jpg" for i in range(3)]
+    if fdir and (fdir / f"{k}-0.jpg").is_file():
+        files = [fdir / f"{k}-{i}.jpg" for i in range(3)]
+    elif field == "fitness" or draw:
+        files = [base / f"{k}-{i}.jpg" for i in range(3)]
+    else:
+        files = []
     return {"id": f"cs-{k}", "kind": "template", "name": name, "notes": f"{prompt}. {cz.STYLE_RULE}", "handle": "", "builtin": True,
             "images": [{"name": f.name, "url": "/" + f.relative_to(FRONTEND_DIR).as_posix() + "?v=2", "path": str(f)} for f in files if f.is_file()]}
 
@@ -8617,7 +8623,7 @@ def carousel_context(data: dict) -> tuple[dict, dict]:
             return conn.execute("SELECT * FROM carousel_assets WHERE id = ? AND kind = ?", (aid, kind)).fetchone()
 
         if cz.style_id(st.get("template_id")):   # 🎨 ستايل جاهز
-            a = car_style_asset(st["template_id"])
+            a = car_style_asset(st["template_id"], draw=True)
             ctx["template"] = {"name": a["name"], "notes": a["notes"], "keep": bool(st.get("keep_colors"))}   # 🎨 ألوان الستايل نفسه أو ألوان العلامة
             assets["template"] = a
         elif r := asset(st.get("template_id"), "template"):

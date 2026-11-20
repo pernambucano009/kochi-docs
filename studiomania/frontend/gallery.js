@@ -174,7 +174,7 @@ const Gallery = (() => {
     const [cats, niche, tyt, clib] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null), api("/api/tytpl").catch(() => []),
       api("/api/carousel/library").catch(() => [])]);
     // 🖼️ الكاروسيل: تصنيف لوحده في العجلة الصغيرة، والعجلة الكبيرة بتلف على ستايلاته
-    S.carItems = (clib || []).filter((a) => a.builtin).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
+    S.carItems = (clib || []).filter((a) => a.builtin && (a.images || []).length).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
       slides: a.images.map((im) => im.url), desc: "كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
     S.carItems.forEach((x) => { FIT[x.id] = "*"; });
     S.niche = niche?.key ? niche : { key: "", name: "", art_off: !!niche?.art_off };
