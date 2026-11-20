@@ -177,7 +177,7 @@ const Gallery = (() => {
     S.carItems = (clib || []).filter((a) => a.builtin).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
       slides: a.images.map((im) => im.url), desc: "كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
     S.carItems.forEach((x) => { FIT[x.id] = "*"; });
-    S.niche = niche?.key ? niche : { key: "", name: "" };
+    S.niche = niche?.key ? niche : { key: "", name: "", art_off: !!niche?.art_off };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
     // المعرض قوالب كود بس: بتترسم زي الغلاف بالظبط ومن غير توليد. قوالب التوليد بالذكاء الاصطناعي (sk-* واللي من المعمل)
     // اتشالت من هنا لأن نتيجتها مش مضمونة ومش شبه الغلاف، ومكانها بعدين في «مولد الفيديو» لو احتجناها
@@ -348,7 +348,7 @@ const Gallery = (() => {
   }
   function ggList() {
     const key = S.niche.key, q = GF.q.trim().toLowerCase();
-    const list = S.items.map((x, i) => [x, i]).filter(([x]) => (!GF.type || x.cat === GF.type)
+    const list = S.items.map((x, i) => [x, i]).filter(([x]) => !(S.niche?.art_off && grpOf(x) === "art") && (!GF.type || x.cat === GF.type)
       && (!q || [x.name, x.desc, x.description, catName(x.cat)].some((t) => String(t || "").toLowerCase().includes(q)))
       && (!GF.niche || (GF.niche === "general" ? !x.spec : x.spec === GF.niche)));
     list.sort((a, b) => (grpI(a[0]) - grpI(b[0])) || (recFor(b[0], key) - recFor(a[0], key)) || ((a[0].pin || 99) - (b[0].pin || 99)) || (!!b[0].sample_url - !!a[0].sample_url));
@@ -443,7 +443,7 @@ const Gallery = (() => {
   }
   function render() {
     if (S.view === "grid") return renderGrid();
-    const list = S.items.map((x, i) => [x, i]);
+    const list = S.items.map((x, i) => [x, i]).filter(([x]) => !(S.niche?.art_off && grpOf(x) === "art"));   // 🎨 قال إن الرسومات مش مناسبة لصفحته
     // أول ٣ ثابتين (الموبايل ← الأفاتار ← القالب المخصص)، وبعدهم اللي ليه فيديو الأول
     // وبعدهم المناسب لمجال العميل (لو العقل عارفه)، وبعدهم الباقي
     // قوالب مجال العميل الأول (موصى به)، وبعدها الثابتين (الموبايل ← الأفاتار)، وبعدها المناسب لأي مجال، والباقي

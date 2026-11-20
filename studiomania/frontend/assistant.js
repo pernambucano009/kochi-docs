@@ -293,7 +293,7 @@ body.as-docked .hp-fab,body.as-docked .hp-tease,body.as-docked #nhPTitle,body.as
       return r;
     }
     if (name === "save_preference") {
-      const r = await api("/api/assistant/preference", { method: "POST", ...jsonBody({ topic: args.topic || "", text: args.text || "" }) }).catch(() => ({ ok: false }));
+      const r = await api("/api/assistant/preference", { method: "POST", ...jsonBody({ topic: args.topic || "", text: args.text || "", ...(typeof args.ok === "boolean" ? { ok: args.ok } : {}) }) }).catch(() => ({ ok: false }));
       if (r.ok) { changed(); chip(`✓ <span><b>حُفظ رأيك</b><br>${esc(String(args.text || "").slice(0, 90))}</span>`); }
       return r;
     }

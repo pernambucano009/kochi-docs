@@ -169,8 +169,10 @@ TOOLS = [
          "what": {"type": "string", "description": "Their field in their own words, in Arabic (always fill it)."}}, "required": ["field", "what"]}},
     {"type": "function", "name": "save_preference", "description": "Save what the user said about a tour stop (e.g. keep these video types or try "
      "others, they like filming themselves or not, they want autopilot or not) into their brand profile.",
-     "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot", "presenter"]},
-                                                     "text": {"type": "string", "description": "Their answer, clearly, in Arabic."}}, "required": ["topic", "text"]}},
+     "parameters": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["analysis", "types", "rivals", "phone", "avatar", "process", "autopilot", "presenter", "art"]},
+                                                     "text": {"type": "string", "description": "Their answer, clearly, in Arabic."},
+                                                     "ok": {"type": "boolean", "description": "Topic art only: true if illustrated/animated graphic templates suit their page, false if not."}},
+                    "required": ["topic", "text"]}},
     {"type": "function", "name": "get_showcase", "description": "Check whether the showcase reel is ready (and how far it got).",
      "parameters": {"type": "object", "properties": {}}},
     {"type": "function", "name": "play_showcase", "description": "Show the ready showcase reel on the user's screen and start playing it.",

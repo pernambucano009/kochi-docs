@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "قوالب الرسومات تناسب صفحتي": "Graphic templates suit my page",
   "كلمة التعليق: وافق عليها أو غيّرها": "Comment word: approve it or change it",
   "كل المنشورات": "All posts",
   "على أي منشور؟": "On which post?",

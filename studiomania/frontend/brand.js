@@ -69,6 +69,7 @@ const BrandPage = (() => {
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
         { f: "narrators", t: "صوت الراوي", type: "narr" },
+        { f: "art_ok", t: "قوالب الرسومات تناسب صفحتي", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
         { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
         { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
         { f: "dm_mode", t: "«علّق بكلمة» فتصله رسالة على الخاص", type: "pick", opts: [["always", "في كل منشور"], ["ask", "أختار عند النشر"], ["off", "لا"]] },

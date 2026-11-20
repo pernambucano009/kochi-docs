@@ -11247,7 +11247,7 @@ BRAIN_FIELDS = ("type", "domain", "about", "audience", "rules", "palette", "them
                 "style", "market", "language", "logo_rule", "modest",
                 # 🧠 عقل العلامة: الستايلات (أول واحد هو الديفولت) والتسليم (اللوجو، الإنترو والأوترو، الـ CTA، الكابشن الثابت واللينك)
                 "styles", "logo_on", "intro_on", "outro_on", "cta", "caption", "link",
-                "cta_mode", "dm_mode", "dm_word",   # 📣 أساسيات النشر: الدعوة في آخر كل فيديو، و«علّق بكلمة» (في كل منشور/عند النشر/لا)
+                "cta_mode", "dm_mode", "dm_word", "art_ok",   # art_ok: «قوالب الرسومات» تناسب صفحته؟ (1/0، فاضي = ماتسألش)   # 📣 أساسيات النشر: الدعوة في آخر كل فيديو، و«علّق بكلمة» (في كل منشور/عند النشر/لا)
                 "niche")   # النيتش: من تحليل حساب السوشيال (وتقدر تكتبه بإيدك)
 BRAND_VIDEOS = ("intro", "outro")
 BRAIN_LOCK = threading.Lock()
@@ -19001,7 +19001,7 @@ def tpl_niche():
     have = sorted(x.stem for x in media.glob("*.jpg")) if media and media.is_dir() else []   # كل قالب ليه نسخة من المجال، مش الموصى بيها بس
     out.update(field=field, field_name=(fieldpacks.FIELDS.get(field) or {}).get("name", ""), reels=reels,
                field_media=[r for r in reels if r in have] + [r for r in have if r not in reels and tplfit.fits(r, field)],
-               unfit=tplfit.unfit(field or field_guess(c)))   # 🎯 قوالب متخصصة لمجالات تانية: مابتظهرش للعميل ده
+               unfit=tplfit.unfit(field or field_guess(c)), art_off=str(c.get("art_ok") or "") == "0")   # 🎨 قال إن الرسومات مش مناسبة: مجموعتها مابتظهرش   # 🎯 قوالب متخصصة لمجالات تانية: مابتظهرش للعميل ده
     # 🩺 تخصص العميل: كل تخصص ليه قوالبه (فوق القوالب العامة). دلوقتي: الأسنان
     out["spec"] = "dental" if dental_brain_on(active_client_id()) else ""
     return out
@@ -34775,6 +34775,8 @@ def pilot_tpl_cands(pool: list[str]) -> list[str]:
     cands += [t for t in typotpl.SPECS if typotpl.fits(t, field) and t not in cands]   # 🔤 قوالب التايبوجرافي الجاهزة (تنويع)
     if "t-review" in cands and not review_facts(bid):
         cands.remove("t-review")
+    if not tplfit.art_allowed(brain_row(bid) if bid else None, field):   # 🎨 الرسومات مش مناسبة لصفحته (أو لسه ماتسألش في مجال التنمية البشرية)
+        cands = [t for t in cands if not tplfit.is_art(t)] or cands
     return cands
 
 
@@ -36894,7 +36896,10 @@ def tour_card(bid: str, b: dict, kind: str) -> dict:
         media = [r for r in reels if field and (FRONTEND_DIR / "gallery" / "f" / Path(field).name / f"{r}.jpg").exists()]
         return {"ok": True, "kind": kind, "data": {"reels": reels, "field": field, "field_media": media, "brand": first_brand_name(b), "logo": bool(logo_path(bid))},
                 "facts": "Ready templates for their field. They pick one on the screen and press the make button; they type the real details "
-                         "(prices, names) and we make their first video with their brand name and logo, free. The screen tells you what they picked."}
+                         "(prices, names) and we make their first video with their brand name and logo, free. The screen tells you what they picked."
+                         + (" FIRST, one question (this field mostly uses typography: words moving on screen, alone or over calm footage): do illustrated / "
+                            "animated graphic videos suit their page, or do they prefer typography only? Save the answer with save_preference topic art "
+                            "and ok true or false." if field == "selfdev" and not str(b.get("art_ok") or "") else "")}
     if kind == "firstvideo":
         j = b.get("first_job") or {}
         if j.get("status") != "done":
@@ -37132,6 +37137,7 @@ def assistant_field(body: AssistFieldIn):
 class AssistPrefIn(BaseModel):
     topic: str
     text: str
+    ok: bool | None = None   # topic art: قوالب الرسومات مناسبة لصفحته؟
 
 
 @app.post("/api/assistant/preference")
@@ -37141,10 +37147,12 @@ def assistant_preference(body: AssistPrefIn):
     text = body.text.strip()[:600]
     if not bid or not text:
         return {"ok": False}
+    if body.topic == "art" and body.ok is not None:   # 🎨 قوالب الرسومات: تظهر وتتختار تلقائيًا ولا لأ
+        update_brain(bid, lambda d: d.update(art_ok="1" if body.ok else "0"))
     if body.topic == "presenter":   # اتحل: مايتسألش تاني
         update_brain(bid, lambda d: d.setdefault("assistant", {}).update(presenter_ok=True))
     titles = {"presenter": "من يظهر في الفيديوهات", "types": "أنواع الفيديوهات المفضلة", "phone": "التصوير بنفسه", "avatar": "الأفاتار", "rivals": "رأيه في المنافسين",
-              "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم"}
+              "analysis": "رأيه في تحليل حسابه", "autopilot": "النشر التلقائي", "process": "مستوى التحكم", "art": "قوالب الرسومات"}
     if body.topic in ("phone", "avatar"):   # سؤال التصوير اتجاوب: المحطة خلصت
         update_brain(bid, lambda d: d.setdefault("assistant", {}).setdefault("tour", []).append("filming")
                      if "filming" not in (d.get("assistant") or {}).get("tour", []) else None)

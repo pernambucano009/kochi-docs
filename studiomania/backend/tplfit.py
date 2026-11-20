@@ -27,6 +27,21 @@ _SPECIAL = {
 _NEED = {"t-price": "offer", "t-count": "offer", "t-tilt": "event", "t-versus": "compare", "t-show": "quiz", "t-ytintro": "youtube", "t-launch": "app", "t-notch": "app", "t-screencast": "app", "t-lower": "person",
          "t-lantern": "ramadan", "065": "event", "072": "event", "t-signature": "thanks"}   # قص ورق أحمر: بيعرض الشعار بس (طلب صاحب المشروع)
 
+# 🎨 «قوالب الرسومات» (نفس تقسيمة المعرض): قوالب الموشن غير العروض وآراء العملاء والمتخصصة
+NOT_ART = {"t-price", "t-count", "t-review", "t-signature", "t-tilt", "t-versus", "t-show", "t-map", "t-audiogram", "t-ytintro", "t-launch",
+           "t-notch", "t-screencast", "t-lower", "t-lantern"}
+
+
+def is_art(tid: str) -> bool:
+    return str(tid).startswith("t-") and tid not in NOT_ART
+
+
+def art_allowed(brain: dict | None, field: str) -> bool:
+    """العميل قال إن قوالب الرسومات مش مناسبة لصفحته («0»)، أو مجاله تنمية بشرية ولسه ماوافقش: مابتتختارش تلقائيًا ومابتظهرش."""
+    ok = str((brain or {}).get("art_ok") or "")
+    return ok == "1" or (ok != "0" and field != "selfdev")
+
+
 FIT: dict[str, dict] = {}
 for _t in _ALL.split():
     FIT[_t] = {"fields": ALL, "els": False}
