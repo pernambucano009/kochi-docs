@@ -3265,10 +3265,11 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 /* ٦ أقسام: ٣ صفوف متساوية في العمودين، فكل قسم على نفس خط اللي قصاده والمسافات واحدة */
 @media (min-width: 821px) {
   #nh .nh-col { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); align-content: stretch; align-items: center; justify-content: stretch; }
-  #nh .nh-col-r { justify-items: start; }
-  #nh .nh-col-l { justify-items: end; }
-  [dir="ltr"] #nh .nh-col-r { justify-items: end; }
-  [dir="ltr"] #nh .nh-col-l { justify-items: start; }
+  /* محور واحد لكل عمود: سنتر كل الأيقونات على خط واحد في نص العمود. والعمودين بنفس العرض على طرفي الشاشة،
+     فالمسافة من حافة الشاشة اليمين لمحور اليمين = المسافة من حافة الشمال لمحور الشمال */
+  #nh .nh-col-r, #nh .nh-col-l, [dir="ltr"] #nh .nh-col-r, [dir="ltr"] #nh .nh-col-l { justify-items: center; }
+  #nh .nh-col .nh-side { width: 220px; max-width: 100%; margin: 0; box-sizing: border-box; align-items: center; text-align: center; }
+  #nh .nh-col .nh-side .nh-sname { max-width: 100%; }
 }
 /* في الرئيسية: «رجوع» و«الصفحة الرئيسية» مكتوبين بالرمادي الخفيف (مش شغالين)، بدل مربعين فاضيين */
 #nhBar .nh-goback.off > * { opacity: .35; }
