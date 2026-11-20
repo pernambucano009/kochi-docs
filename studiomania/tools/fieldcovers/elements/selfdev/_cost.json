@@ -1,0 +1,306 @@
+[
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "book",
+  "secs": 5.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "open_book",
+  "secs": 8.9,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "notebook",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "lightbulb",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "plant",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "mountain",
+  "secs": 8.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "coffee",
+  "secs": 5.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "alarm_clock",
+  "secs": 4.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "compass",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "stairs",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "key",
+  "secs": 8.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "hourglass",
+  "secs": 8.4,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "puzzle",
+  "secs": 7.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "sunrise",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "checklist",
+  "secs": 8.6,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "walking",
+  "secs": 8.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "meditate",
+  "secs": 4.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "",
+  "name": "reading",
+  "secs": 7.9,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "book",
+  "secs": 8.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "lightbulb",
+  "secs": 9.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "plant",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "mountain",
+  "secs": 9.2,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "coffee",
+  "secs": 5.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "alarm_clock",
+  "secs": 9.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "walking",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "reading",
+  "secs": 8.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "sunrise",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "riso",
+  "name": "notebook",
+  "secs": 8.5,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "book",
+  "secs": 8.7,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "lightbulb",
+  "secs": 5.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "plant",
+  "secs": 9.0,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "mountain",
+  "secs": 9.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "coffee",
+  "secs": 9.6,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "alarm_clock",
+  "secs": 9.2,
+  "cost": null,
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "walking",
+  "secs": 9.3,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "reading",
+  "secs": 5.1,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "sunrise",
+  "secs": 5.2,
+  "cost": "0.009227",
+  "base": 0.008
+ },
+ {
+  "model": "krea2t",
+  "style": "sketch",
+  "name": "notebook",
+  "secs": 8.5,
+  "cost": "0.009227",
+  "base": 0.008
+ }
+]

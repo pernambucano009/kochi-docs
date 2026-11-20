@@ -6,6 +6,7 @@
 الناتج: tools/fieldcovers/elements/<field>/<model>/<name>.png (من غير خلفية) و_cost.json (السعر الفعلي لكل صورة).
 المفتاح من المتغيرات بس (والبروكسي بيحطه)، مابيتحفظش في أي ملف."""
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -18,7 +19,7 @@ sys.path.insert(0, str(HERE.parent.parent / "backend"))
 import atlas  # noqa: E402
 import firstvid  # noqa: E402
 
-FIELD = "fitness"
+FIELD = os.environ.get("FC_FIELD", "fitness")   # FC_FIELD=selfdev ← مكتبة مجال تاني
 OUT = HERE / "elements" / FIELD
 
 # الموديلات الرخيصة اللي بنجربها (السعر الأساسي من كتالوج المزوّد، بالدولار للصورة)
@@ -121,6 +122,29 @@ ITEMS = {
     "check": "a bold green 3D check mark",
     "target": "a red and white target with a dart in the center",
 }
+# 🌱 تنمية بشرية وتطوير ذات (FC_FIELD=selfdev): رموز وأدوات بسيطة، والناس من غير وشوش ولبس محتشم
+SELFDEV_ITEMS = {
+    "book": "a closed hardcover book with a plain cover and a ribbon bookmark",
+    "open_book": "an open book with blank pages",
+    "notebook": "a spiral notebook with a pen lying on it",
+    "lightbulb": "a glowing light bulb",
+    "plant": "a small green plant sprout growing in a simple pot",
+    "mountain": "a small mountain peak with a little flag on the top",
+    "coffee": "a ceramic coffee mug with light steam",
+    "alarm_clock": "a round classic alarm clock",
+    "compass": "a brass compass",
+    "stairs": "a short staircase of five steps going up",
+    "key": "an old golden key",
+    "hourglass": "an hourglass with sand",
+    "puzzle": "two puzzle pieces fitting together",
+    "sunrise": "a half sun rising with rays",
+    "checklist": "a clipboard with a checklist and check marks",
+    "walking": PERSON.replace("athletic figure", "figure").replace("sports clothes", "casual clothes") + "walking forward with confident steps",
+    "meditate": PERSON.replace("athletic figure", "figure").replace("sports clothes", "casual clothes") + "sitting cross-legged calmly, hands on knees",
+    "reading": PERSON.replace("athletic figure", "figure").replace("sports clothes", "casual clothes") + "sitting and reading a book",
+}
+if FIELD == "selfdev":
+    ITEMS = SELFDEV_ITEMS
 TRIAL = ["dumbbell", "ems_suit", "water_bottle", "squat", "stopwatch"]
 
 
