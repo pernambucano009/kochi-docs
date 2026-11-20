@@ -3755,3 +3755,7 @@ html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
 .ib-duo > .ib-gear::before { margin-bottom: 22px; }
 .ib-duo > .ib-gear::after { margin-top: 22px; }
 @media (max-width: 900px) { .ib-duo > .ib-gear::before, .ib-duo > .ib-gear::after { display: none; } }
+/* 🔒 بوت الردود في «بداية» من غير الإضافة */
+.bx-lock { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 0 auto 10px; padding: 10px 16px; border-radius: 14px; font-size: 13px;
+  background: color-mix(in srgb, var(--nh-accent, #E5613E) 10%, transparent); color: var(--nh-ink, #1C1B1C); max-width: 680px; }
+.bx-lock-go { border: 0; border-radius: 99px; padding: 7px 16px; font: 600 12.5px inherit; color: #fff; cursor: pointer; background: linear-gradient(180deg, var(--glow-a, #F48A62) 0%, var(--glow-b, #E5613E) 55%, var(--glow-c, #D44E2C) 100%); }

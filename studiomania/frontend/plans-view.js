@@ -90,6 +90,13 @@ const PlansView = (() => {
 :is(#nh, body) .pv-cta .go { background: var(--pv-acc); color: #fff; box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--pv-acc) 55%, transparent); }
 :is(#nh, body) .pv-cta .go:hover { scale: 1.04; }
 :is(#nh, body) .pv-cta .soft { background: var(--pv-field); } :is(#nh, body) .pv-cta .soft:hover { background: var(--pv-field-hi); }
+/* الباقة اللي فوقك على طول برتقالي، الأعلى منها أسود، واللي تحتك برتقالي فاتح */
+:is(#nh, body) .pv-cta .dark, :is(#nh, body) .pv-act.dark { background: var(--pv-ink); color: var(--pv-card); } :is(#nh, body) .pv-cta .dark:hover, :is(#nh, body) .pv-act.dark:hover { scale: 1.04; }
+:is(#nh, body) .pv-cta .lite, :is(#nh, body) .pv-act.lite { background: var(--pv-soft); color: var(--pv-acc); } :is(#nh, body) .pv-cta .lite:hover, :is(#nh, body) .pv-act.lite:hover { scale: 1.04; }
+/* 🧩 سطر «إضافة ميزات» تحت سطر النقاط */
+:is(#nh, body) .pv-feat .ttl { white-space: nowrap; }
+:is(#nh, body) .pv-feat .tp.pick { box-shadow: 0 0 0 2px var(--pv-acc) inset; }
+:is(#nh, body) .pv-sb .nt { font-size: 12px; color: var(--pv-muted); text-align: center; line-height: 1.6; }
 :is(#nh, body) .pv-cta .cur { color: var(--pv-acc); background: var(--pv-soft); }
 :is(#nh, body) .pv-cta .low { color: var(--pv-muted); }
 :is(#nh, body) .pv-cta button:disabled { opacity: .45; cursor: default; scale: none; }
@@ -206,6 +213,7 @@ const PlansView = (() => {
       if (!S.sheet) return "";
       return `<div class="pv-sheet"><div class="pv-sb" role="dialog" aria-label="اختر طريقة الدفع"><button class="x" data-pvx aria-label="إغلاق">×</button>
         <b>اختر طريقة الدفع</b>${S.sheet.price ? `<span class="am"><span class="num">${sar(S.sheet.price)}</span> ر.س</span>` : ""}
+        ${S.sheet.kind === "feat" ? `<span class="nt">اشتراكك ${(d.cycle || "month") === "year" ? "السنوي" : "الشهري"} بعد الإضافة. يبدأ من اليوم، وتعود نقاط باقتك كاملة.</span>` : ""}
         <div class="pv-ms">${METHODS.map(([prov, k, inner]) => `<button class="pm ${k}" data-pvm="${prov}" ${S.busy ? "disabled" : ""}>${inner}</button>`).join("")}</div></div></div>`;
     }
     const sameCycle = () => (d.cycle || "month") === S.cyc;
@@ -221,9 +229,9 @@ const PlansView = (() => {
       const s = state(p, i);
       const act = s === "buy" ? `<button class="pv-act ${p.popular ? "go" : "soft"}" data-pvbuy="${esc(p.key)}">${p.price ? "اشترك" : "ابدأ مجانًا"}</button>`
         : s === "cur" ? `<span class="pv-act cur">✓ باقتك</span>`
-        : s === "up" || s === "switch" ? `<button class="pv-act go" data-pvopen>${s === "switch" ? "حوّل" : curI < 0 ? "اشترك" : "ترقية"}</button>`
+        : s === "up" || s === "switch" ? `<button class="pv-act ${s === "switch" || i === nextUp() || curI < 0 ? "go" : "dark"}" data-pvopen>${s === "switch" ? "حوّل" : curI < 0 ? "اشترك" : "ترقية"}</button>`
         : s === "owner" ? "" : `<span class="pv-act low">${p.once ? "انتهت" : "أقل من باقتك"}</span>`;
-      const tipM = s === "cur" ? renew : s === "up" ? "ترقية فورية، والفرق يُحسب بالأيام" : "";
+      const tipM = s === "cur" ? renew : s === "up" ? "ترقية فورية، ونقاط الباقة الجديدة كاملة من اليوم" : "";
       return `<div class="pv-pl${s === "cur" ? " mine" : ""}${s === "low" ? " dim" : ""}">
         ${guest && p.popular ? `<span class="pv-hot">الأكثر اختيارًا</span>` : ""}
         <b class="nm">${esc(p.name)}</b>
@@ -231,6 +239,8 @@ const PlansView = (() => {
         ${act}
         <span class="pv-tip"><b>${esc(p.name)}</b><span>${credLine(p)}<br>${adds(p, plans[i - 1]).map(esc).join("<br>")}</span>${tipM ? `<span class="m">${esc(tipM)}</span>` : ""}</span></div>`;
     }
+    // أول باقة أعلى من باقتك (هي اللي زرارها برتقالي)
+    const nextUp = () => plans.findIndex((x, j) => j > curI && !x.once);
     function big(p, i) {
       const s = state(p, i), yr = S.cyc === "year" && p.price;
       let cta;
@@ -238,9 +248,9 @@ const PlansView = (() => {
       else if (s === "cur") cta = `<span class="cur">✓ باقتك${renew ? ` · ${esc(renew)}` : ""}</span>`;
       else if (s === "up" || s === "switch") {
         const label = s === "switch" ? (S.cyc === "year" ? "حوّل إلى السنوي" : "حوّل إلى الشهري") : `${curI < 0 ? "اشترك في" : "ترقية إلى"} ${esc(p.name)}`;
-        cta = `<button class="go" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
+        cta = `<button class="${s === "switch" || i === nextUp() || curI < 0 ? "go" : "dark"}" data-pvup="${esc(p.key)}" ${providers.length ? "" : "disabled"}>${label}</button>`;
       } else if (s === "down") cta = d.next_plan === p.key ? `<span class="low">تنتقل إليها عند التجديد</span><button class="soft" data-pvdownx>تراجع</button>`
-        : `<button class="soft" ${d.provider === "tap" && o.downgrade ? "data-pvdown" : "data-pvup"}="${esc(p.key)}" ${providers.length ? "" : "disabled"}>انتقل إلى ${esc(p.name)}</button>`;   // النزول لباقة أقل مسموح، بس من غير برتقالي   // النزول لباقة أقل مسموح، بس من غير برتقالي
+        : `<button class="lite" ${d.provider === "tap" && o.downgrade ? "data-pvdown" : "data-pvup"}="${esc(p.key)}" ${providers.length ? "" : "disabled"}>انتقل إلى ${esc(p.name)}</button>`;   // النزول لباقة أقل مسموح، بس من غير برتقالي   // النزول لباقة أقل مسموح، بس من غير برتقالي
       else if (s === "owner") cta = `<span class="low">حساب صاحب البرنامج</span>`;
       else cta = `<span class="low">${p.once ? "انتهت التجربة" : "أقل من باقتك"}</span>`;
       const tag = s === "cur" ? `<em class="me">باقتك</em>` : p.popular ? `<em>الأكثر اختيارًا</em>` : "";
@@ -260,6 +270,27 @@ const PlansView = (() => {
       const pct = full ? Math.max(0, Math.min(100, Math.round((c.total || 0) / full * 100))) : 0;
       return `<div class="pv-cont${S.tops ? " open" : ""}"><svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="trk"/><circle cx="20" cy="20" r="16" class="val" style="stroke-dasharray:${pct} 100.5"/></svg>
         <b class="ttl" title="نقاط الباقة ${n(c.plan_credits)} · نقاط إضافية ${n(c.topup_credits)}"><span class="num">${n(c.total)}</span> نقطة</b><span class="sep"></span>${tops}<button class="more" data-pvmore aria-label="أضف نقاطًا">+</button></div>`;
+    }
+    // 🧩 إضافة ميزات: الإضافات اللي مش في باقتك (أوتوبايلوت، بوت الردود، حساب سوشيال زيادة)، كل واحدة بسعرها الشهري
+    const curP = () => plans[curI];
+    function feats() {
+      const p = curP();
+      if (guest || d.owner || !p || p.once || !p.price) return [];
+      return ADDONS.filter((a) => a.key === "account" || ((!a.for || a.for.includes(p.key)) && !p[a.key] && !d[a.key]));
+    }
+    function featTotal(key) {   // الاشتراك الشهري بعد الإضافة (هو اللي هيتدفع دلوقتي ويتجدد بيه)
+      const p = curP(), A = Object.fromEntries(ADDONS.map((a) => [a.key, a]));
+      const acc = (d.extra_accounts || 0) + (key === "account" ? 1 : 0);
+      const ap = !p.autopilot && (d.autopilot || key === "autopilot"), bt = !p.bots && (d.bots || key === "bots");
+      const mo = p.price + acc * (A.account?.price || 0) + (ap ? A.autopilot?.price || 0 : 0) + (bt ? A.bots?.price || 0 : 0);
+      return (d.cycle || "month") === "year" ? mo * ym : mo;
+    }
+    function featRow() {
+      const f = feats();
+      if (!f.length) return "";
+      const want = (() => { try { return sessionStorage.getItem("pv.feat") || ""; } catch { return ""; } })();
+      return `<div class="pv-cont pv-feat open"><b class="ttl" style="padding-inline-start:10px">إضافة ميزات</b><span class="sep"></span>
+        ${f.map((a) => `<button class="tp${want === a.key ? " pick" : ""}" data-pvfeat="${esc(a.key)}">+ ${esc(a.key === "account" ? "حساب سوشيال" : a.name)} <small><span class="num">${sar(a.price)}</span> ر.س / شهر</small></button>`).join("")}</div>`;
     }
     // 🎟️ كود الخصم: يكتبه هنا في أي وقت (نقاط هدية أو خصم ٪ على الاشتراك والشحن)، والخصم الشغّال بيبان
     function coupon() {
@@ -284,7 +315,7 @@ const PlansView = (() => {
             </div>
           </div>
         </div>
-        <div class="pv-low">${bottom()}${hist()}</div>${payBox()}</div>`;
+        <div class="pv-low">${bottom()}${featRow()}${hist()}</div>${payBox()}</div>`;
     }
     const pv = () => el.querySelector(".pv");
     let shut;
@@ -310,6 +341,11 @@ const PlansView = (() => {
       if (q("[data-pvkgo]")) { const v = el.querySelector("[data-pvk]")?.value.trim(); return v ? o.coupon(v) : null; }
       if (q("[data-pvhist]")) { S.hist = !S.hist; return render(); }
       if (q("[data-pvmore]")) { S.tops = !S.tops; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
+      if (q("[data-pvfeat]")) {
+        if (!providers.length) return o.toast?.("الدفع قيد التجهيز، وسيُتاح قريبًا.");
+        const k = q("[data-pvfeat]").dataset.pvfeat;
+        return sheet("feat", k, featTotal(k));
+      }
       const t = q("[data-pvtop]");
       if (t) {
         if (guest) return o.signup?.("", S.cyc);

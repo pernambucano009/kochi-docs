@@ -22,12 +22,12 @@ DEFAULTS = {
         {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0,
          "autopilot": False, "once": True,
          "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة فقط"},
-        {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False},
-        {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "popular": True},
+        {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False, "bots": False},
+        {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "bots": True, "popular": True},
         # 🏆 أعلى باقة: النقطة فيها أرخص بحوالي ٧٠٪ من «محترف» (٣٠ ألف نقطة)، وتكفي ٩٠ بوست في الشهر بالأوتوبايلوت
         # (٣ في اليوم، فيديوهات أو كاروسيل) من غير ما العميل يحتاج يشحن. والنقط الزيادة ليها بالضعف (نص السعر).
         # أسوأ حالة (كل النقط اتصرفت على توليد + ١٠ حسابات بأغلى سعر Zernio) لسه مكسب: plan_margin.
-        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True,
+        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True, "bots": True,
          "max_accounts": 25, "topup_bonus": 2,
          "features": ["النقطة أرخص بحوالي ٧٠٪ من «محترف»",
                       "تكفي ٩٠ منشورًا شهريًا بالأوتوبايلوت",
@@ -39,6 +39,8 @@ DEFAULTS = {
     "addons": [
         {"key": "account", "name": "حساب سوشيال زيادة", "name_en": "Extra social account", "price": 10, "unit": "للحساب في الشهر"},
         {"key": "autopilot", "name": "أوتوبايلوت", "name_en": "Autopilot", "price": 15, "unit": "في الشهر", "for": ["starter"]},
+        # 🤖 بوت الردود الآلية على التعليقات والرسائل (التعليقات والرسائل نفسها في كل الباقات، البوت من «محترف»)
+        {"key": "bots", "name": "بوت الردود الآلية", "name_en": "Auto-reply bot", "price": 15, "unit": "في الشهر", "for": ["starter"]},
     ],
     # نقط زيادة لما نقط الباقة تخلص: أغلى من النقطة العادية (السنت)
     "topups": [
@@ -66,6 +68,13 @@ def config(data_dir: Path) -> dict:
                     cfg[k] = over[k]
         except ValueError:
             pass
+    # 🤖 ميزات اتضافت بعد ما الأدمن حفظ إعداداته: بتتكمّل من الافتراضي (بوت الردود في «محترف» و«وكالات»، وإضافة لـ«بداية»)
+    have = {a.get("key") for a in cfg["addons"]}
+    cfg["addons"] += [copy.deepcopy(a) for a in DEFAULTS["addons"] if a["key"] not in have]
+    dflt = {p["key"]: p for p in DEFAULTS["plans"]}
+    for p in cfg["plans"]:
+        if "bots" not in p:
+            p["bots"] = bool(dflt.get(p["key"], {}).get("bots"))
     return cfg
 
 
@@ -100,8 +109,8 @@ def yearly(cfg: dict, monthly: float) -> float:
     return round(monthly * int(cfg["rules"].get("yearly_months", 10)), 2)
 
 
-def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool = False) -> dict:
-    """باقة على مقاسك: باقة أساسية + حسابات زيادة + أوتوبايلوت."""
+def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool = False, bots: bool = False) -> dict:
+    """باقة على مقاسك: باقة أساسية + حسابات زيادة + أوتوبايلوت + بوت الردود الآلية."""
     p = next((x for x in cfg["plans"] if x["key"] == plan and not x.get("once")), None)
     if not p:
         raise ValueError("هذه الباقة غير موجودة")
@@ -114,4 +123,8 @@ def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool 
     if autopilot and not ap and plan in add["autopilot"].get("for", []):
         total += add["autopilot"]["price"]
         ap = True
-    return {"plan": plan, "accounts": p["accounts"] + extra_accounts, "autopilot": ap, "credits": p["credits"], "total": total}
+    bt = bool(p.get("bots"))
+    if bots and not bt and "bots" in add and plan in add["bots"].get("for", []):
+        total += add["bots"]["price"]
+        bt = True
+    return {"plan": plan, "accounts": p["accounts"] + extra_accounts, "autopilot": ap, "bots": bt, "credits": p["credits"], "total": total}

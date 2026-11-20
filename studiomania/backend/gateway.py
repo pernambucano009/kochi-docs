@@ -101,7 +101,7 @@ with closing(db()) as _c, _c:
     """)
     _cols = {r[1] for r in _c.execute("PRAGMA table_info(workspaces)")}
     for _col, _typ in (("provider", "TEXT"), ("sub_id", "TEXT"), ("customer", "TEXT"), ("ends_at", "REAL"), ("sub_started", "REAL"),
-                       ("cycle", "TEXT"), ("refill_at", "REAL"), ("discount_pct", "INTEGER"), ("discount_code", "TEXT"), ("discount_once", "INTEGER")):
+                       ("cycle", "TEXT"), ("refill_at", "REAL"), ("discount_pct", "INTEGER"), ("discount_code", "TEXT"), ("discount_once", "INTEGER"), ("bots", "INTEGER")):
         if _col not in _cols:
             _c.execute(f"ALTER TABLE workspaces ADD COLUMN {_col} {_typ}")
     if "apple_sub" not in {r[1] for r in _c.execute("PRAGMA table_info(users)")}:   # 🍎 الدخول بـ Apple من الآيفون
@@ -1178,18 +1178,18 @@ def paid_once(c: sqlite3.Connection, ref: str, wid: str, provider: str, kind: st
 
 
 def apply_subscription(wid: str, plan: str, extra: int, autopilot: bool, provider: str, sub_id: str, customer: str | None, ref: str,
-                       amount: float, cycle: str = "month") -> None:
+                       amount: float, cycle: str = "month", bots: bool = False) -> None:
     p = plan_of(plan)
     w = workspace(wid)
     if not p or not w:
         return
     old = (w["provider"], w["sub_id"])
     with closing(db()) as c, c:
-        if not paid_once(c, ref, wid, provider, "subscription", amount, f"{plan} +{extra} {'ap' if autopilot else ''}"):
+        if not paid_once(c, ref, wid, provider, "subscription", amount, f"{plan} +{extra} {'ap' if autopilot else ''} {'bots' if bots else ''}"):
             return
-        c.execute("""UPDATE workspaces SET plan=?, extra_accounts=?, autopilot=?, provider=?, sub_id=?, customer=COALESCE(?, customer),
+        c.execute("""UPDATE workspaces SET plan=?, extra_accounts=?, autopilot=?, bots=?, provider=?, sub_id=?, customer=COALESCE(?, customer),
                      ends_at=NULL, sub_started=?, cycle=?, refill_at=? WHERE id=?""",
-                  (plan, extra, int(autopilot), provider, sub_id, customer, time.time(), "year" if cycle == "year" else "month", time.time(), wid))
+                  (plan, extra, int(autopilot), int(bots), provider, sub_id, customer, time.time(), "year" if cycle == "year" else "month", time.time(), wid))
         c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
         c.execute("UPDATE wallet SET plan_credits=?, updated_at=? WHERE workspace=?", (p["credits"], time.time(), wid))
         ledger_add(c, wid, p["credits"], "plan", f"باقة {p['name']}", ref)
@@ -1250,7 +1250,7 @@ def end_subscription(wid: str, at: float | None = None) -> None:
         if at and at > time.time():
             c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (at, wid))
             return
-        c.execute("UPDATE workspaces SET plan='none', extra_accounts=0, autopilot=0, sub_id=NULL, ends_at=NULL WHERE id=?", (wid,))
+        c.execute("UPDATE workspaces SET plan='none', extra_accounts=0, autopilot=0, bots=0, sub_id=NULL, ends_at=NULL WHERE id=?", (wid,))
         c.execute("UPDATE wallet SET plan_credits=0, updated_at=? WHERE workspace=?", (time.time(), wid))
         ledger_add(c, wid, 0, "cancel", "الاشتراك خلص")
 
@@ -1318,7 +1318,7 @@ def billing_state(request: Request):
                                           (u["workspace"],))]
     cfg = billing.config(DATA_DIR)
     return {"me": me_dict(u), "owner": u["workspace"] == OWNER, "plan": w["plan"] if w else "owner",
-            "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]),
+            "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]), "bots": bool(w and w["bots"]),
             "cycle": (w["cycle"] if w and w["cycle"] else "month"), "renews_at": renews_at(w),
             "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None,
             "next_plan": (json.loads(kv_get(f"next_plan:{u['workspace']}") or "{}") or {}).get("plan") or None,
@@ -1348,6 +1348,7 @@ class CheckoutIn(BaseModel):
     plan: str = ""
     accounts: int = 0         # حسابات زيادة
     autopilot: bool = False
+    bots: bool = False        # 🤖 بوت الردود الآلية (إضافة لباقة «بداية»)
     topup: str = ""
     cycle: str = "month"      # month | year
 
@@ -1378,7 +1379,7 @@ def checkout(body: CheckoutIn, request: Request):
                 raise HTTPException(400, "طريقة دفع غير معروفة")
             return {"url": url}
         try:
-            tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot)
+            tot = billing.custom_total(cfg, body.plan, body.accounts, body.autopilot, body.bots)
         except ValueError as e:
             raise HTTPException(400, str(e))
         full = tot["total"]
@@ -1387,18 +1388,20 @@ def checkout(body: CheckoutIn, request: Request):
         p = plan_of(body.plan)
         extra = tot["accounts"] - p["accounts"]
         ap_paid = tot["autopilot"] and not p.get("autopilot")
+        bt_paid = tot["bots"] and not p.get("bots")
+        flags = int(ap_paid) | (2 if bt_paid else 0)   # الإضافات في خانة واحدة: ١ أوتوبايلوت، ٢ بوت الردود
         yr = body.cycle == "year"
         px = (lambda v: billing.yearly(cfg, v)) if yr else (lambda v: v)
         if body.provider == "paypal":
-            key = f"{p['key']}:{extra}:{int(ap_paid)}:{tot['total']}{':y' if yr else ''}{f':first{first}' if first else ''}"
-            pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' yearly' if yr else ''}",
+            key = f"{p['key']}:{extra}:{flags}:{tot['total']}{':y' if yr else ''}{f':first{first}' if first else ''}"
+            pid = payments.paypal_plan((kv_get, kv_set), key, f"SimsimKit {p['name_en']} +{extra} accounts{' +autopilot' if ap_paid else ''}{' +bot' if bt_paid else ''}{' yearly' if yr else ''}",
                                        px(tot["total"]), "YEAR" if yr else "MONTH", first=px(first) if first else None)
-            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{int(ap_paid)}{'|y' if yr else ''}", real_email(u),
+            url = payments.paypal_subscribe(pid, f"{wid}|{p['key']}|{extra}|{flags}{'|y' if yr else ''}", real_email(u),
                                             ret=f"{back}/api/billing/paypal/sub", cancel=f"{back}/billing")
         elif body.provider == "tap":   # 💳 أول دفعة بتحفظ الكارت، والتجديد بيتخصم منه لوحده (tap_renewals)
             usd = px(first if first else tot["total"])
             _, url = payments.tap_charge(usd, f"SimsimKit {p['name_en']}{' yearly' if yr else ''}",
-                                         {"wid": wid, "kind": "plan", "plan": p["key"], "extra": extra, "ap": int(ap_paid), "cycle": "year" if yr else "month",
+                                         {"wid": wid, "kind": "plan", "plan": p["key"], "extra": extra, "ap": flags, "cycle": "year" if yr else "month",
                                           "usd": usd, "renew_usd": px(tot["total"])},
                                          real_email(u), u["name"] if "name" in u.keys() else "", f"{back}/api/billing/tap/back", f"{back}/api/billing/tap/webhook",
                                          save_card=True)
@@ -1428,7 +1431,7 @@ def downgrade(body: DowngradeIn, request: Request):
     if not p or p.get("once") or p["key"] not in order or w["plan"] not in order or order.index(p["key"]) >= order.index(w["plan"]):
         raise HTTPException(400, "اختر باقة أقل من باقتك")
     try:
-        tot = billing.custom_total(cfg, p["key"], int(w["extra_accounts"] or 0), bool(w["autopilot"]))
+        tot = billing.custom_total(cfg, p["key"], int(w["extra_accounts"] or 0), bool(w["autopilot"]), bool(w["bots"]))
     except ValueError:
         tot = billing.custom_total(cfg, p["key"], 0, False)
     usd = billing.yearly(cfg, tot["total"]) if w["cycle"] == "year" else tot["total"]
@@ -1546,9 +1549,10 @@ def paypal_sub_back(request: Request, subscription_id: str = ""):
     wid, plan, extra, ap = parts[:4]
     yr = len(parts) == 5 and parts[4] == "y"
     cfg = billing.config(DATA_DIR)
-    tot = billing.custom_total(cfg, plan, int(extra), ap == "1")
-    apply_subscription(wid, plan, int(extra), ap == "1", "paypal", subscription_id, None, f"pp-sub-{subscription_id}",
-                       billing.yearly(cfg, tot["total"]) if yr else tot["total"], "year" if yr else "month")
+    fl = int(ap) if ap.isdigit() else 0
+    tot = billing.custom_total(cfg, plan, int(extra), bool(fl & 1), bool(fl & 2))
+    apply_subscription(wid, plan, int(extra), bool(fl & 1), "paypal", subscription_id, None, f"pp-sub-{subscription_id}",
+                       billing.yearly(cfg, tot["total"]) if yr else tot["total"], "year" if yr else "month", bool(fl & 2))
     return RedirectResponse("/billing?ok=plan")
 
 
@@ -1588,9 +1592,10 @@ def tap_apply(ch: dict) -> str:
         return "topup" if t and add_topup(wid, m["key"], "tap", f"tap-{ch['id']}", max(usd, t["price"])) else ""
     if m.get("kind") == "plan":
         yr = m.get("cycle") == "year"
-        apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), m.get("ap") == "1", "tap",
+        fl = int(m.get("ap") or 0) if str(m.get("ap") or "0").isdigit() else 0
+        apply_subscription(wid, m.get("plan", ""), int(m.get("extra") or 0), bool(fl & 1), "tap",
                            f"{ch.get('customer') or ''}|{ch.get('card') or ''}|{ch.get('agreement') or ''}", ch.get("customer"), f"tap-{ch['id']}",
-                           usd, "year" if yr else "month")
+                           usd, "year" if yr else "month", bool(fl & 2))
         if not kv_get(f"tap_due:{ch['id']}"):
             kv_set(f"tap_due:{ch['id']}", "1")
             kv_set(f"tap_next:{wid}", str(time.time() + (TAP_YEAR if yr else MONTH)))

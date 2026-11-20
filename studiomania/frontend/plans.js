@@ -45,8 +45,12 @@ const PlansPage = (() => {
       async pay(kind, key, provider, cycle) {
         if (demo) return toast("هذه معاينة، والدفع يعمل في النسخة الحقيقية");
         try {
-          const r = await api("/api/billing/checkout", { method: "POST", ...jsonBody({ provider, kind, plan: kind === "plan" ? key : "", topup: kind === "topup" ? key : "",
-            accounts: d.extra_accounts || 0, autopilot: !!d.autopilot, cycle }) });
+          // 🧩 إضافة ميزة = نفس باقتك + الإضافات اللي معاك + الجديدة
+          const feat = kind === "feat" ? key : "";
+          const r = await api("/api/billing/checkout", { method: "POST", ...jsonBody({ provider, kind: feat ? "plan" : kind, plan: feat ? d.plan : kind === "plan" ? key : "", topup: kind === "topup" ? key : "",
+            accounts: (d.extra_accounts || 0) + (feat === "account" ? 1 : 0), autopilot: !!d.autopilot || feat === "autopilot", bots: !!d.bots || feat === "bots",
+            cycle: feat ? d.cycle || "month" : cycle }) });
+          try { sessionStorage.removeItem("pv.feat"); } catch { /* */ }
           if (!r.url) throw new Error("لم تُفتح صفحة الدفع، جرّب مرة أخرى");
           location.href = r.url;
         } catch (err) { toast(err.message, true); }

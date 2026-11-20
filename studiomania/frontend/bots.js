@@ -114,7 +114,9 @@ const BotsPage = (() => {
     const d = S.d;
     if (!d.live) { S.el.innerHTML = `<div class="bx-loading">${esc(d.note)}</div>`; return; }
     S.el.classList.toggle("has-sheet", !!S.open);
-    S.el.innerHTML = `<div class="bx-star">${star()}</div>${S.open ? sheet() : ""}`;
+    // 🔒 «بداية» من غير الإضافة: الإعدادات بتتشاف، والتشغيل محتاج «محترف» أو إضافة البوت
+    const lock = d.locked ? `<div class="bx-lock">🔒 بوت الردود الآلية متاح في باقة «محترف» و«وكالات»، أو أضفه إلى باقتك<button type="button" class="bx-lock-go" data-bxplans>إضافة ميزات</button></div>` : "";
+    S.el.innerHTML = `${lock}<div class="bx-star">${star()}</div>${S.open ? sheet() : ""}`;
   }
   async function run(fn) {
     S.busy = true; render();
@@ -133,6 +135,7 @@ const BotsPage = (() => {
     w.addEventListener("change", (e) => { const k = e.target.dataset?.bf; if (k) { S.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; if (k === "ai") render(); } });
     w.addEventListener("click", async (e) => {
       const q = (s) => e.target.closest(s);
+      if (q("[data-bxplans]")) { sessionStorage.setItem("pv.feat", "bots"); return typeof NH !== "undefined" && NH ? NH.openPlans(document.getElementById("stagePlans")) : (location.href = "/billing"); }
       if (q("[data-baccopen]")) { S.accOpen = !S.accOpen; return render(); }
       if (q("[data-bpostopen]")) {
         S.postOpen = !S.postOpen; render();

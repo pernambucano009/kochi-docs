@@ -48,6 +48,21 @@ def balance() -> int | None:
     return (r["plan_credits"] + r["topup_credits"]) if r else 0
 
 
+def has_feature(key: str) -> bool:
+    """🔓 ميزة في باقة العميل (زي «bots»): الباقة نفسها فيها الميزة، أو العميل اشتراها إضافة. صاحب البرنامج عنده كل حاجة."""
+    if free():
+        return True
+    try:
+        with closing(_db()) as c:
+            r = c.execute("SELECT * FROM workspaces WHERE id=?", (TENANT,)).fetchone()
+    except sqlite3.Error:
+        return True   # قاعدة البيانات وقعت: مانقفلش على العميل
+    if not r:
+        return False
+    plan = next((p for p in billing.DEFAULTS["plans"] if p["key"] == r["plan"]), {})
+    return bool(plan.get(key)) or bool(key in r.keys() and r[key])
+
+
 def credits(usd: float) -> int:
     return max(1, billing.credits_for(usd)) if usd > 0 else 0
 

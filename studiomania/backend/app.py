@@ -4655,7 +4655,7 @@ def bots_get():
     except Exception:  # noqa: BLE001
         every = []
     return {"live": True, "bots": bots, "accounts": [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in accs],
-            "all_accounts": every, "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS}
+            "all_accounts": every, "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS, "locked": not wallet.has_feature("bots")}
 
 
 class BotIn(BaseModel):
@@ -4665,8 +4665,13 @@ class BotIn(BaseModel):
     opts: dict = {}
 
 
+BOTS_LOCKED = "بوت الردود الآلية متاح في باقة «محترف» و«وكالات»، أو أضفه إلى باقتك من «باقتي ونقاطي» ← إضافة ميزات"
+
+
 @app.post("/api/bots")
 def bots_create(body: BotIn):
+    if not wallet.has_feature("bots"):   # 🔒 التعليقات والرسائل في كل الباقات، البوت من «محترف» أو إضافة
+        raise HTTPException(402, BOTS_LOCKED)
     if body.recipe not in botflows.RECIPES:
         raise HTTPException(400, "هذه الوصفة غير موجودة")
     acc = next((a for a in botflows.bot_accounts() if a["id"] == body.account), None)
@@ -4690,6 +4695,8 @@ class BotStateIn(BaseModel):
 
 @app.post("/api/bots/{wid}/state")
 def bots_state(wid: str, body: BotStateIn):
+    if body.on and not wallet.has_feature("bots"):
+        raise HTTPException(402, BOTS_LOCKED)
     if wid not in {b["id"] for b in botflows.list_bots()}:
         raise HTTPException(404, "هذا البوت غير موجود")
     try:
@@ -28637,9 +28644,9 @@ def pricing_info():
 
 
 @app.get("/api/pricing/custom")
-def pricing_custom(plan: str, accounts: int = 0, autopilot: bool = False):
+def pricing_custom(plan: str, accounts: int = 0, autopilot: bool = False, bots: bool = False):
     try:
-        return billing.custom_total(billing.config(DATA_DIR), plan, accounts, autopilot)
+        return billing.custom_total(billing.config(DATA_DIR), plan, accounts, autopilot, bots)
     except ValueError as e:
         raise HTTPException(400, str(e))
 

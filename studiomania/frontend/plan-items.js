@@ -4,10 +4,12 @@ const PlanItems = (() => {
   const T = {
     ar: { base: ["كل الأدوات والقوالب", "عقل العلامة"], acc1: (n) => (n === 2 ? "حسابان للنشر على التواصل الاجتماعي" : `${n} حسابات للنشر على التواصل الاجتماعي`),
       sched: "جدولة ونشر", inbox: "التعليقات والرسائل", accN: (n, m) => `${n} حسابات تواصل اجتماعي${m ? ` (حتى ${m})` : ""}`,
-      pilot: "الأوتوبايلوت: يصنع وينشر تلقائيًا", addon: (p) => `الأوتوبايلوت إضافة بـ ${p} ر.س شهريًا`, nopub: "دون نشر" },
+      pilot: "الأوتوبايلوت: يصنع وينشر تلقائيًا", addon: (p) => `الأوتوبايلوت إضافة بـ ${p} ر.س شهريًا`, nopub: "دون نشر",
+      bots: "بوت الردود الآلية على التعليقات والرسائل", botsAdd: (p) => `بوت الردود الآلية إضافة بـ ${p} ر.س شهريًا` },
     en: { base: ["All tools and templates", "Brand brain"], acc1: (n) => `${n} social accounts for publishing`,
       sched: "Scheduling and publishing", inbox: "Comments and messages", accN: (n, m) => `${n} social accounts${m ? ` (up to ${m})` : ""}`,
-      pilot: "Autopilot: makes and posts on its own", addon: (p) => `Autopilot add-on, ${p} SAR a month`, nopub: "No publishing" },
+      pilot: "Autopilot: makes and posts on its own", addon: (p) => `Autopilot add-on, ${p} SAR a month`, nopub: "No publishing",
+      bots: "Auto-reply bot for comments and messages", botsAdd: (p) => `Auto-reply bot add-on, ${p} SAR a month` },
   };
   const sar = (v) => Math.round(v * 3.76);
   // p: الباقة، prev: اللي قبلها، addons: إضافات /api/pricing، lang: "ar" أو "en"
@@ -19,6 +21,9 @@ const PlanItems = (() => {
     if (p.autopilot && !(prev && prev.autopilot)) out.push(t.pilot);
     const ap = !p.autopilot && (addons || []).find((a) => a.key === "autopilot" && (a.for || []).includes(p.key));
     if (ap) out.push(t.addon(sar(ap.price)));
+    if (p.bots && !(prev && prev.bots)) out.push(t.bots);
+    const bt = !p.bots && (addons || []).find((a) => a.key === "bots" && (a.for || []).includes(p.key));
+    if (bt) out.push(t.botsAdd(sar(bt.price)));
     if (!p.accounts) out.push(t.nopub);
     return out.concat((lang === "en" ? p.features_en : p.features) || []);
   }
