@@ -77,9 +77,9 @@ const BrandPage = (() => {
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
-      // 🧑‍🎤 الشخصيات والأفاتار: دراع لوحده من المخ، فيه بندين: الشخصيات لوحدها والأفاتار لوحده
-      { k: "chars", t: "الشخصيات والأفاتار", en: "Characters", leaves: [
-        { f: "pg", i: "coaches", page: "coaches", t: "🧑‍🎤 الشخصيات", type: "page" },
+      // 🙂 الأفاتار: دراع لوحده من المخ (إنشاء، ووش، وصوت مستنسخ، وأماكن تصوير)
+      { k: "chars", t: "الأفاتار", en: "Avatar", leaves: [
+        { f: "pg", i: "twin", page: "twin", t: "🙂 الأفاتار", type: "page" },
       ] },
       // 📚 مكتبة محتويات البراند: صور، فيديوهات، تعليقات صوتية، موسيقى (كل واحد فولدرات جوه فولدرات)، والكوميكس. صفحة واحدة بتابات
       { k: "content", t: "مكتبة المحتويات", en: "Content Library", leaves: [
@@ -937,7 +937,6 @@ const BrandPage = (() => {
   }
   function openCard(n) {
     if (n?.kind === "plan") { window.RV_FOCUS = "plan-only"; return window.NHNav?.("plan"); }
-    if (n?.l?.type === "page" && n.l.page === "twin") return showStep("16");   // قسم تلقائيًا (غير صفحة داخل العقل)
     if (n?.l?.type === "page") { window.RV_FOCUS = n.l.page === "rivals" ? n.l.i : null; window.BL_TAB = n.l.page === "brainlib" ? String(n.l.i).split(":")[1] : null; return window.NHNav?.(n.l.page); }   // الشخصيات / التعليق / الموسيقى: صفحتها تفتح داخل العقل («رجوع» يرجّعك هنا)
     const card = S.el.querySelector(".bm-card");
     // 🧭 لحد ما العقل يفهمك ٣٠٪: «أكمل العقل» هو الشاشة الأساسية (كارت كبير في النص)، والخريطة خلفه

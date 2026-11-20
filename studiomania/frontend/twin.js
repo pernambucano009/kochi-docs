@@ -1,267 +1,155 @@
-// 🪞 «الأفاتار»: نسخة من أي شخص (انت أو حد معاك إذنه) من تسجيلات حقيقية ليه.
-// ١) فيديو وهو بيقرا سكريبت إحنا مدينهوله (بنركّب عليه أي كلام جديد بعدين) ٢) صور من كذا اتجاه ٣) صوته لوحده ٤) فيديوهات جديدة بيه.
-const tw = { list: [], cur: null, kit: null, timer: null, rec: null };
+// 🙂 «الأفاتار» في عقل العلامة: كل الأفاتارات (نفس اللي بتظهر في قالب الأفاتار والأوتوبايلوت)، وإنشاء واحد جديد،
+// ووشه، وصوته المستنسخ، وأماكن التصوير الخاصة بيه. من غير كروت: قايمة على جنب، والتفاصيل جنبها.
+const tw = { list: null, cur: null, kit: null, scenes: [], make: null, rec: null, busy: "" };
 const twe = (v) => escapeHtml(v == null ? "" : String(v));
 const TW = (p = "") => `/api/twins${p}`;
-const twSec = (s) => `${Math.floor((s || 0) / 60)}:${String(Math.round((s || 0) % 60)).padStart(2, "0")}`;
 
-// 🪞 صفحة «الأفاتار» بالشكل الجديد (زي «الشخصيات»): كروت لكل أفاتار، وجوه كل واحد خطواته
 const AvatarPage = {
-  html: () => `<div class="nb-wrap" id="twMain"><div class="nh-empty">جارٍ التحميل…</div></div>`,
-  mount(root) { const el = root.querySelector("#twMain"); if (!el) return; twBind(el); twInit(); },
-  back() { if (!tw.cur) return false; tw.cur = null; twRender(); return true; },
-  close() { clearTimeout(tw.timer); if (tw.rec) tw.rec.mr.stop(); },
+  html: () => `<div class="nb-wrap av-wrap" id="twMain"><div class="nh-empty">جارٍ التحميل…</div></div>`,
+  mount(root) {
+    const el = root.querySelector("#twMain");
+    if (!el) return;
+    tw.el = el;
+    el.addEventListener("click", twClick);
+    el.addEventListener("change", twChange);
+    el.addEventListener("input", (e) => { if (e.target.matches("[data-twname]")) tw.make = { ...(tw.make || {}), name: e.target.value }; });
+    twInit();
+  },
+  back() { if (tw.make) { tw.make = null; twRender(); return true; } return false; },
+  close() { if (tw.rec) try { tw.rec.stop(); } catch { /* */ } },
 };
 
 async function twInit() {
   try {
-    [tw.list, tw.kit] = await Promise.all([api(TW()), tw.kit ? tw.kit : api(`/api/twin-kit?lang=${window.I18N?.lang === "en" ? "en" : "ar"}`)]);
-  } catch (err) { return toast(err.message, true); }
-  if (tw.cur) tw.cur = tw.list.find((x) => x.id === tw.cur.id) || null;
+    const [list, kit, scenes] = await Promise.all([api(TW()), tw.kit || api(`/api/twin-kit?lang=${window.I18N?.lang === "en" ? "en" : "ar"}`), tw.scenes.length ? tw.scenes : api("/api/avatar-scenes")]);
+    tw.list = list; tw.kit = kit; tw.scenes = scenes || [];
+  } catch (err) { tw.list = tw.list || []; toast(err.message, true); }
+  if (!tw.cur || !tw.list.some((t) => t.id === tw.cur)) tw.cur = tw.list[0]?.id || null;
   twRender();
-  twPoll();
 }
 
-const TW_SIL = `<svg viewBox="0 0 48 48" width="56" height="56" aria-hidden="true"><circle cx="24" cy="17" r="8" fill="currentColor"/><path d="M8 44c1.5-9 8-14 16-14s14.5 5 16 14z" fill="currentColor"/></svg>`;
+const twFace = (t) => (t.photos || []).find((p) => ["front", "smile"].includes(p.angle))?.url || (t.photos || [])[0]?.url || "";
+function twState(t) {
+  const r = t.ready || {};
+  return { face: r.photo || r.video, voice: r.voice ? "own" : r.video ? "video" : "" };
+}
 
 function twRender() {
-  const el = $("twMain");
-  if (!el) return;
-  if (tw.cur) { setHTML(el, twBody(tw.cur)); return; }
-  const card = (t, i) => `<div class="ch-card as-card" data-twopen="${t.id}" tabindex="0" role="button">
-      <div class="as-art tw-art">
-        ${(t.photos || [])[0]?.url ? `<img src="${twe(t.photos[0].url)}" alt="" loading="lazy">` : `<span class="tw-ph">${TW_SIL}</span>`}</div>
-      <b data-no-i18n>${twe(t.name)}</b>
-      <small class="tw-st"><span class="${t.ready.video ? "on" : ""}">فيديو</span><span class="${t.ready.photos ? "on" : ""}">صور <span class="num">${t.ready.photos}/${t.ready.angles}</span></span><span class="${t.ready.voice ? "on" : ""}">صوت</span></small></div>`;
-  setHTML(el, `${tw.adding ? `<section class="nh-panel nb-card ch-new"><form class="tw-new" data-twnew>
-        <div class="nb-row"><label class="nb-f"><span>اسم الشخص</span><input type="text" name="name" required maxlength="80" placeholder="مثلًا: أنا، أو سارة"></label></div>
-        <label class="tw-consent"><input type="checkbox" name="consent" required> الشخص الذي في التسجيلات أنا، أو وافق على استخدام وجهه وصوته</label>
-        <div class="nb-row"><button class="nb-btn fs-go">حفظ</button><button type="button" class="nb-btn" data-twnewx>إلغاء</button></div></form></section>` : ""}
-    <p class="nb-hint">أفاتار لأي شخص: أنت، أو شخص آخر لديك إذنه. يُنشأ من تسجيلات حقيقية له (وجهه وحركته وملابسه وصوته)، لتصنع به فيديوهات بكلام جديد. يمكنك إنشاء أكثر من أفاتار.</p>
-    <div class="as-sh"><h2>الأفاتار <span>(${tw.list.length})</span></h2></div>
-    <div class="ch-grid as-grid">${tw.list.map(card).join("")}<button type="button" class="as-new" data-twadd><span>＋</span>أفاتار جديد</button></div>`);
-  if (tw.adding) el.querySelector("[data-twnew] input[name=name]")?.focus();
+  const el = tw.el;
+  if (!el || !el.isConnected) return;
+  if (tw.list === null) { el.innerHTML = `<div class="nh-empty">جارٍ التحميل…</div>`; return; }
+  const side = `<aside class="av-side"><h2>الأفاتار</h2>
+    ${tw.list.map((t) => `<button type="button" class="av-row${t.id === tw.cur && !tw.make ? " on" : ""}" data-twpick="${twe(t.id)}">
+      <i class="av-face">${twFace(t) ? `<img src="${twe(twFace(t))}" alt="">` : twe((t.name || "؟").slice(0, 1))}</i><span>${twe(t.name)}</span></button>`).join("")}
+    <button type="button" class="av-row add${tw.make ? " on" : ""}" data-twnew><i class="av-face">＋</i><span>أفاتار جديد</span></button></aside>`;
+  el.innerHTML = `<div class="av">${side}<section class="av-main">${tw.make ? twMaker() : twDetail(tw.list.find((t) => t.id === tw.cur))}</section></div>`;
 }
 
-function twTips(k) { return `<ul class="tw-tips">${(tw.kit?.tips?.[k] || []).map((x) => `<li>${twe(x)}</li>`).join("")}</ul>`; }
-
-function twBody(t) {
-  const k = tw.kit || {}, r = t.ready;
-  const step = (n, done, title, body) => `<details class="nh-panel nb-card tw-step${done ? " done" : ""}" ${done ? "" : "open"}><summary><i class="num">${done ? "✓" : n}</i><b>${title}</b><span class="tw-chev" aria-hidden="true"></span></summary><div class="tw-in">${body}</div></details>`;
-  const video = step(1, r.video, "فيديو وأنت تقرأ النص", `
-    <p class="hint">هذا أهم تسجيل: نركّب عليه أي نص جديد لاحقًا، فيكون الوجه والحركة والملابس والمكان لك أنت بالضبط.</p>${twTips("video")}
-    <div class="tw-script" dir="auto">${(k.video_script || []).map((l) => `<p class="${/^\(/.test(l) ? "muted" : ""}">${twe(l)}</p>`).join("")}</div>
-    <div class="row wrap"><button type="button" class="nb-btn fs-go" data-twcam="video">سجّل بالكاميرا (يتحرك النص أمامك)</button>
-      <label class="nb-btn">ارفع فيديو<input type="file" accept="video/*" data-twup="video" hidden></label></div>
-    ${t.video_url ? `<video class="tw-vid" src="${t.video_url}" controls playsinline preload="metadata"></video><small class="muted">⏱ ${twSec(t.video.duration)} · ${t.video.w}×${t.video.h}</small>` : ""}`);
-  const have = Object.fromEntries((t.photos || []).map((p) => [p.angle, p]));
-  const photos = step(2, r.photos >= 3 && r.photo, `صور من عدة اتجاهات <small class="muted num">${r.photos}/${r.angles}</small>`, `
-    <p class="hint">الصورة الأمامية إلزامية (نصنع منها فيديو إن لم يوجد فيديو قراءة)، والباقي يجعل النسخة أدق.</p>${twTips("photos")}
-    <div class="tw-angles">${(k.angles || []).map((a) => `<div class="tw-angle${have[a.id] ? " on" : ""}">
-      ${have[a.id] ? `<img src="${have[a.id].url}" alt=""><button type="button" class="tw-x" data-twdelph="${a.id}" title="أزلها">✕</button>` : `<span class="tw-ph">${TW_SIL}</span>`}
-      <b>${twe(a.label)}</b><span class="row"><button type="button" class="nb-btn sm" data-twcam="photo:${a.id}">صوّر</button>
-      <label class="nb-btn sm">ارفع<input type="file" accept="image/*" data-twup="photo:${a.id}" hidden></label></span></div>`).join("")}</div>`);
-  const voice = step(3, r.voice, "صوتك وحده", `
-    <p class="hint">تسجيل نظيف لصوتك في مكان هادئ. يُحفظ لاستنساخ صوتك (قريبًا)، ويمكنك استخدامه مرجعًا.</p>${twTips("voice")}
-    <div class="tw-script" dir="auto">${(k.voice_script || []).map((l) => `<p>${twe(l)}</p>`).join("")}</div>
-    <div class="row wrap"><button type="button" class="nb-btn fs-go" data-twmic="voice">${tw.rec?.kind === "voice" ? "أوقف واحفظ" : "سجّل"}</button>
-      <label class="nb-btn">ارفع تسجيلًا<input type="file" accept="audio/*" data-twup="voice" hidden></label>
-      ${tw.rec?.kind === "voice" ? `<b class="tw-live num" data-twt>0:00</b>` : ""}</div>
-    ${t.voice_url ? `<audio src="${t.voice_url}" controls preload="metadata"></audio><small class="muted">⏱ ${twSec(t.voice.duration)}</small>` : ""}`);
-  const places = step(4, r.backgrounds > 0, `أماكن التصوير <small class="muted num">${r.backgrounds || 0}</small>`, `
-    <p class="hint">صوّر المكان الذي تصوّر فيه فيديوهاتك وهو فارغ. عندما تصوّر فيديو وتختار «صوّرت هنا»، تظهر اللقطات المساندة التي يصنعها البرنامج لك في المكان نفسه.</p>${twTips("backgrounds")}
-    <div class="tw-angles">${(t.backgrounds || []).map((b) => `<div class="tw-angle on"><img src="${b.url}" alt=""><button type="button" class="tw-x" data-twdelbg="${twe(b.id)}" title="أزلها">✕</button><b>${twe(b.name)}</b></div>`).join("")}</div>
-    <div class="row wrap"><input class="input" data-twbgname placeholder="اسم المكان (المكتب، المطبخ…)" maxlength="60">
-      <label class="nb-btn fs-go">صوّر أو ارفع صورة المكان<input type="file" accept="image/*" capture="environment" data-twup="background" hidden></label></div>`);
-  const c = t.cost || {}, sec = (key) => `≈ ${Math.max(1, Math.round((c[key] || 0) * 3 / 0.01))} نقطة/ث`;
-  const make = `<div class="nh-panel nb-card tw-step tw-make"><div class="tw-mh"><i class="num">5</i><b>أنشئ فيديو بالأفاتار</b></div>
-    <p class="hint">قل النص الجديد بصوتك (سجّله هنا أو ارفعه)، ويركّبه البرنامج على شفتيك في فيديو القراءة، أو يجعل صورتك تتكلم. استنساخ الصوت (تكتب النص فيُقال بصوتك) سيُضاف عندما نصل خدمة الاستنساخ.</p>
-    <form class="tw-form" data-twmake>
-      <label>الشكل <select name="method"><option value="video" ${r.video ? "" : "disabled"}>فيديو القراءة الخاص بك (الأدق)</option><option value="photo" ${r.photo ? "" : "disabled"} ${!r.video && r.photo ? "selected" : ""}>من صورتك الأمامية</option></select></label>
-      <label>الجودة <select name="quality" data-twq>
-        <optgroup label="فيديو القراءة"><option value="veed">عادي · ${sec("video:veed")}</option><option value="sync">احترافي · ${sec("video:sync")}</option></optgroup>
-        <optgroup label="الصورة"><option value="std">عادي · ${sec("photo:std")}</option><option value="pro">عالي · ${sec("photo:pro")}</option></optgroup></select></label>
-      <label class="wide">ماذا ستقول؟ (اختياري، للتذكير) <textarea name="text" rows="2" dir="auto" placeholder="اكتب النص لتقرأه وأنت تسجّل"></textarea></label>
-      <div class="row wrap wide"><button type="button" class="nb-btn" data-twmic="say">${tw.rec?.kind === "say" ? "أوقف" : "سجّل النص"}</button>
-        <label class="nb-btn">ارفع صوتًا<input type="file" accept="audio/*,video/*" data-twsay hidden></label>
-        ${tw.rec?.kind === "say" ? `<b class="tw-live num" data-twt>0:00</b>` : tw.say ? `<audio src="${tw.say.url}" controls></audio><small class="muted">${twe(tw.say.name)}</small>` : ""}</div>
-      <button class="nb-btn fs-go wide" ${tw.say && (r.video || r.photo) ? "" : "disabled"}>أنشئ الفيديو</button></form>
-    <ul class="tw-clips">${[...(t.clips || [])].reverse().map((x) => `<li class="${x.status}">
-      ${x.url ? `<video src="${x.url}" controls playsinline preload="metadata"></video>` : `<span class="tw-ph">${x.status === "failed" ? "⚠️" : "⏳"}</span>`}
-      <div><b dir="auto">${twe(x.text || (x.method === "video" ? "على فيديو القراءة" : "من الصورة"))}</b>
-        <small class="${x.status === "failed" ? "err" : "muted"}">${x.status === "done" ? `✓ جاهز · ${twSec(x.duration)}${x.credits ? ` · ${x.credits} نقطة` : ""}` : twe(x.error || x.step || "")}</small>
-        <span class="row">${x.status === "done" ? `<button type="button" class="nb-btn sm fs-go" data-twtypo="${x.id}">نص متحرك فوقه (تايبوجرافي)</button><a class="nb-btn sm" href="${x.url}" download>تنزيل</a>` : ""}
-          <button type="button" class="nb-btn sm" data-twdelc="${x.id}">حذف</button></span></div></li>`).join("")}</ul></div>`;
-  return `<div class="tw-head"><h2 data-no-i18n>${twe(t.name)}</h2><span class="nb-row"><button type="button" class="nb-btn sm danger" data-twdel>احذف الأفاتار</button><button type="button" class="nb-btn sm" data-twlist>إغلاق</button></span></div>${video}${photos}${places}${voice}${make}`;
+function twDetail(t) {
+  if (!t) return `<div class="av-empty"><p>لا يوجد أفاتار بعد. أنشئه مرة واحدة من صورة أو فيديو، ثم يقول أي نص بوجهك وصوتك في قالب الأفاتار والأوتوبايلوت.</p>
+    <button type="button" class="nb-btn fs-go" data-twnew>＋ أنشئ أفاتار</button></div>`;
+  const st = twState(t), places = t.backgrounds || [];
+  const voiceTxt = st.voice === "own" ? "صوته مستنسخ من تسجيل خاص" : st.voice === "video" ? "صوته مستنسخ من فيديو القراءة" : "لا يوجد تسجيل صوت بعد، فيستخدم صوت الراوي";
+  return `<header class="av-head"><i class="av-face big">${twFace(t) ? `<img src="${twe(twFace(t))}" alt="">` : ""}</i>
+      <div><h3>${twe(t.name)}</h3><p class="muted">يظهر في «تصوير الفيديو بالأفاتار» وفي الأوتوبايلوت.</p></div>
+      <button type="button" class="av-del" data-twdel="${twe(t.id)}">حذف الأفاتار</button></header>
+    <div class="av-block"><h4>الوجه</h4>
+      <p class="muted">${t.ready?.video ? "من فيديو القراءة" : t.ready?.photo ? "من صورة أمامية" : "لا يوجد وجه بعد"}</p>
+      <div class="av-acts"><label class="nb-btn">تغيير الصورة<input type="file" accept="image/*" data-twup="photo" hidden></label>
+        <label class="nb-btn">رفع فيديو قراءة<input type="file" accept="video/*" data-twup="video" hidden></label></div></div>
+    <div class="av-block"><h4>الصوت</h4><p class="muted">${voiceTxt}</p>
+      ${t.voice_url ? `<audio src="${twe(t.voice_url)}" controls preload="none"></audio>` : ""}
+      <div class="av-acts"><button type="button" class="nb-btn" data-twrec>${tw.rec ? "⏹ أوقف التسجيل وارفعه" : "🎙️ سجّل صوته الآن"}</button>
+        <label class="nb-btn">ارفع تسجيلًا<input type="file" accept="audio/*,video/*" data-twup="voice" hidden></label></div>
+      ${tw.rec ? `<p class="muted">🔴 جارٍ التسجيل… اقرأ النص بصوتك الطبيعي (نصف دقيقة على الأقل)</p>` : ""}
+      ${(tw.kit?.voice_script || []).length ? `<details><summary>النص الذي تقرؤه للتسجيل</summary><ol class="av-lines">${tw.kit.voice_script.map((l) => `<li dir="auto">${twe(l)}</li>`).join("")}</ol></details>` : ""}</div>
+    <div class="av-block"><h4>أماكن التصوير</h4>
+      <p class="muted">الأماكن الجاهزة متاحة لكل أفاتار: ${tw.scenes.map((s) => twe(s.name)).join(" · ")}. وأماكنك الخاصة:</p>
+      <div class="av-places">${places.map((b) => `<figure><img src="${twe(b.url)}" alt=""><figcaption>${twe(b.name || "مكاني")}</figcaption><button type="button" data-twbgdel="${twe(b.id)}" aria-label="حذف">✕</button></figure>`).join("")}
+        <label class="av-addplace">＋ مكان<input type="file" accept="image/*" data-twup="background" hidden></label></div></div>
+    ${tw.busy ? `<p class="muted">⏳ ${twe(tw.busy)}</p>` : ""}`;
 }
 
-function twPoll() {
-  clearTimeout(tw.timer);
-  if (!tw.cur?.busy || !$("twMain")?.isConnected) return;
-  tw.timer = setTimeout(async () => {
-    try { tw.cur = await api(TW(`/${tw.cur.id}`)); if (!tw.cur.busy) tw.list = await api(TW()); morphing(twRender); } catch { /* الخادم يعيد التشغيل */ }
-    twPoll();
-  }, 4000);
+function twMaker() {
+  const A = tw.make || {};
+  if (!A.tid) return `<div class="av-block"><h4>أفاتار جديد</h4><p class="muted">مرة واحدة فقط، ثم يقول الأفاتار أي نص بوجهك وصوتك.</p>
+      <input class="av-in" data-twname placeholder="اسم الشخص" value="${twe(A.name || "")}" maxlength="80">
+      <label class="av-chk"><input type="checkbox" data-twok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
+      <div class="av-acts"><button type="button" class="nb-btn" data-twback>‹ رجوع</button><button type="button" class="nb-btn fs-go" data-twcreate>متابعة</button></div></div>`;
+  if (A.step === "voice") return `<div class="av-block"><h4>صوت ${twe(A.name)}</h4>
+      <p class="muted">${A.from === "video" ? "✓ سيُستنسخ صوته من الفيديو. إن كان صوت الفيديو غير واضح، سجّل الصوت وحده في مكان هادئ." : "اقرأ النص بصوتك الطبيعي في مكان هادئ (نصف دقيقة على الأقل)، لكي يتكلم الأفاتار بصوتك."}</p>
+      ${(tw.kit?.voice_script || []).length ? `<details ${A.from === "video" ? "" : "open"}><summary>النص الذي تقرؤه</summary><ol class="av-lines">${tw.kit.voice_script.map((l) => `<li dir="auto">${twe(l)}</li>`).join("")}</ol></details>` : ""}
+      <div class="av-acts"><button type="button" class="nb-btn" data-twrec>${tw.rec ? "⏹ أوقف التسجيل وارفعه" : "🎙️ سجّل الآن"}</button>
+        <label class="nb-btn">ارفع تسجيلًا<input type="file" accept="audio/*,video/*" data-twup="voice" hidden></label>
+        <button type="button" class="nb-btn fs-go" data-twdone>${A.from === "video" ? "✓ تم" : "تخطَّ الآن"}</button></div>
+      ${tw.busy ? `<p class="muted">⏳ ${twe(tw.busy)}</p>` : ""}</div>`;
+  const lines = (tw.kit?.video_script || []).map((l) => `<li dir="auto">${twe(l)}</li>`).join("");
+  return `<div class="av-block"><h4>${twe(A.name)}: اختر طريقة واحدة</h4>
+      <div class="av-ways"><div><b>🎬 فيديو وأنت تقرأ هذا النص</b><small class="muted">دقيقة تقريبًا، أمام الكاميرا، والضوء أمامك. أفضل نتيجة.</small>
+          ${lines ? `<details><summary>النص الذي تقرؤه</summary><ol class="av-lines">${lines}</ol></details>` : ""}
+          <label class="nb-btn fs-go">⬆ ارفع الفيديو<input type="file" accept="video/*" data-twup="video" hidden></label></div>
+        <div><b>📷 أو صورة أمامية واضحة</b><small class="muted">أسرع، لكن الحركة أقل طبيعية.</small>
+          <label class="nb-btn">⬆ ارفع الصورة<input type="file" accept="image/*" data-twup="photo" hidden></label></div></div>
+      <div class="av-acts"><button type="button" class="nb-btn" data-twback>‹ رجوع</button></div>
+      ${tw.busy ? `<p class="muted">⏳ ${twe(tw.busy)}</p>` : ""}</div>`;
 }
 
-async function twSend(path, form, what) {
-  toast(`⏳ جارٍ رفع ${what}…`);
-  tw.cur = await api(TW(`/${tw.cur.id}${path}`), { method: "POST", body: form });
-  tw.list = await api(TW());
+async function twUpload(kind, file) {
+  const tid = tw.make?.tid || tw.cur;
+  if (!tid) return;
+  const f = new FormData();
+  if (kind === "photo") f.append("angle", "front");
+  if (kind === "background") f.append("name", "مكاني");
+  f.append("file", file);
+  tw.busy = { photo: "جارٍ رفع الصورة…", video: "جارٍ رفع الفيديو وتجهيزه…", voice: "جارٍ رفع الصوت…", background: "جارٍ رفع المكان…" }[kind];
   twRender();
-  twPoll();
-  toast(`✓ حُفظ ${what}`);
-}
-function twFile(blob, name) { return new File([blob], name, { type: blob.type }); }
-
-// 🎙️ تسجيل صوت (الصوت لوحده، أو الكلام الجديد)
-async function twMic(kind) {
-  if (tw.rec) {
-    const r = tw.rec;
-    if (r.kind !== kind) return;
-    r.mr.stop();
-    return;
-  }
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } }); }
-  catch { return toast("المتصفح لا يسمح بالميكروفون. اسمح به من جانب شريط العنوان", true); }
-  const parts = [], mr = new MediaRecorder(stream), t0 = Date.now();
-  mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
-  mr.onstop = async () => {
-    stream.getTracks().forEach((x) => x.stop());
-    clearInterval(tw.rec?.tick);
-    tw.rec = null;
-    const blob = new Blob(parts, { type: mr.mimeType || "audio/webm" });
-    if (Date.now() - t0 < 1500) { twRender(); return toast("التسجيل قصير جدًا", true); }
-    const file = twFile(blob, `rec-${Date.now()}.webm`);
-    if (kind === "voice") { const f = new FormData(); f.append("file", file); try { await twSend("/voice", f, "التسجيل"); } catch (err) { twRender(); toast(err.message, true); } }
-    else { tw.say = { file, url: URL.createObjectURL(blob), name: "🎙️ تسجيل جديد" }; twRender(); }
-  };
-  mr.start(1000);
-  tw.rec = { kind, mr, tick: setInterval(() => { const el = document.querySelector("[data-twt]"); if (el) el.textContent = twSec((Date.now() - t0) / 1000); }, 500) };
-  twRender();
-}
-
-// 📹 الكاميرا: فيديو القراية (والسكريبت بيتحرك فوق الصورة زي التليبرومبتر) أو صورة لاتجاه
-async function twCam(mode) {
-  let stream;
-  const isVideo = mode === "video";
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: "user" }, audio: isVideo });
-  } catch { return toast("المتصفح لا يسمح بالكاميرا. اسمح بها من جانب شريط العنوان", true); }
-  const angle = isVideo ? null : mode.split(":")[1];
-  const label = angle ? (tw.kit.angles.find((a) => a.id === angle)?.label || "") : "";
-  const ov = Object.assign(document.createElement("div"), { className: "tw-cam" });
-  ov.innerHTML = `<div class="tw-cam-box"><video autoplay muted playsinline></video>
-    ${isVideo ? `<div class="tw-prompter" dir="auto"><div>${tw.kit.video_script.map((l) => `<p>${twe(l)}</p>`).join("")}</div></div>` : `<div class="tw-cam-label">${twe(label)}</div>`}
-    <div class="tw-cam-bar">${isVideo ? `<label class="muted">سرعة النص <input type="range" min="10" max="80" value="32" data-sp></label><b class="num" data-tm>0:00</b>
-      <button type="button" class="nb-btn fs-go" data-go>⏺ ابدأ</button>` : `<button type="button" class="nb-btn fs-go" data-snap>📸 صوّر</button>`}
-      <button type="button" class="nb-btn" data-x>إلغاء</button></div></div>`;
-  document.body.appendChild(ov);
-  const vid = ov.querySelector("video");
-  vid.srcObject = stream;
-  let mr = null, raf = 0, tick = 0;
-  const close = () => { cancelAnimationFrame(raf); clearInterval(tick); stream.getTracks().forEach((x) => x.stop()); ov.remove(); };
-  ov.querySelector("[data-x]").onclick = () => { if (mr && mr.state !== "inactive") { mr.onstop = null; mr.stop(); } close(); };
-  if (!isVideo) {
-    ov.querySelector("[data-snap]").onclick = () => {
-      const c = document.createElement("canvas");
-      c.width = vid.videoWidth; c.height = vid.videoHeight;
-      c.getContext("2d").drawImage(vid, 0, 0);
-      c.toBlob(async (b) => { close(); const f = new FormData(); f.append("angle", angle); f.append("file", twFile(b, `${angle}.jpg`)); try { await twSend("/photo", f, "الصورة"); } catch (err) { toast(err.message, true); } }, "image/jpeg", 0.92);
-    };
-    return;
-  }
-  const pr = ov.querySelector(".tw-prompter > div"), go = ov.querySelector("[data-go]");
-  go.onclick = () => {
-    if (mr) { mr.stop(); return; }
-    const parts = [], t0 = Date.now();
-    mr = new MediaRecorder(stream);
-    mr.ondataavailable = (e) => e.data.size && parts.push(e.data);
-    mr.onstop = async () => {
-      const blob = new Blob(parts, { type: mr.mimeType || "video/webm" });
-      close();
-      if (Date.now() - t0 < 5000) return toast("التسجيل قصير جدًا", true);
-      const f = new FormData(); f.append("file", twFile(blob, `read-${Date.now()}.webm`));
-      try { await twSend("/video", f, "الفيديو"); } catch (err) { toast(err.message, true); }
-    };
-    mr.start(1000);
-    go.textContent = "⏹ أوقف واحفظ";
-    let y = 0, last = performance.now();
-    const step = (now) => { y += (now - last) / 1000 * Number(ov.querySelector("[data-sp]").value); last = now; pr.style.transform = `translateY(${-y}px)`; raf = requestAnimationFrame(step); };
-    raf = requestAnimationFrame(step);
-    tick = setInterval(() => { ov.querySelector("[data-tm]").textContent = twSec((Date.now() - t0) / 1000); }, 500);
-  };
+    await api(TW(`/${tid}/${kind}`), { method: "POST", body: f });
+    if (tw.make && (kind === "photo" || kind === "video")) tw.make = { ...tw.make, step: "voice", from: kind };
+    else if (tw.make && kind === "voice") { tw.cur = tw.make.tid; tw.make = null; toast("✓ الأفاتار جاهز"); }
+    tw.busy = "";
+    await twInit();
+  } catch (err) { tw.busy = ""; twRender(); toast(err.message, true); }
 }
 
-function twBind(el) {
-  if (el.dataset.bound) return;
-  el.dataset.bound = "1";
-  el.addEventListener("click", async (e) => {
-    const t = e.target, v = tw.cur;
-    if (t.closest("[data-twadd]")) { tw.adding = true; return twRender(); }
-    if (t.closest("[data-twnewx]")) { tw.adding = false; return twRender(); }
-    if (t.closest("[data-twlist]")) { tw.cur = null; clearTimeout(tw.timer); return twRender(); }
-    const op = t.closest("[data-twopen]");
-    if (op) { tw.cur = tw.list.find((x) => x.id === op.dataset.twopen); tw.say = null; twRender(); return twPoll(); }
-    const cam = t.closest("[data-twcam]");
-    if (cam) return twCam(cam.dataset.twcam);
-    const mic = t.closest("[data-twmic]");
-    if (mic) return twMic(mic.dataset.twmic);
-    try {
-      if (t.closest("[data-twdel]")) {
-        if (!(await uiConfirm(`أتحذف نسخة «${v.name}» بكل تسجيلاتها وفيديوهاتها؟`))) return;
-        await api(TW(`/${v.id}`), { method: "DELETE" }); tw.cur = null; return twInit();
-      }
-      const dp = t.closest("[data-twdelph]");
-      if (dp) { tw.cur = await api(TW(`/${v.id}/photo/${dp.dataset.twdelph}`), { method: "DELETE" }); return twRender(); }
-      const db = t.closest("[data-twdelbg]");
-      if (db) { tw.cur = await api(TW(`/${v.id}/background/${db.dataset.twdelbg}`), { method: "DELETE" }); return twRender(); }
-      const dc = t.closest("[data-twdelc]");
-      if (dc) { if (!(await uiConfirm("هل تحذف هذا الفيديو؟"))) return; tw.cur = await api(TW(`/${v.id}/clips/${dc.dataset.twdelc}`), { method: "DELETE" }); return twRender(); }
-      const ty = t.closest("[data-twtypo]");
-      if (ty) {
-        const p = await api(TW(`/${v.id}/clips/${ty.dataset.twtypo}/typo`), { method: "POST" });
-        toast("🔤 أُرسل إلى التايبوجرافي، ويُكتب النص بتوقيته");
-        storageSet("studiomania.typo", p.id);
-        if (typeof tyx !== "undefined") tyx.cur = null;
-        return showStep("12");
-      }
-    } catch (err) { toast(err.message, true); }
-  });
-  el.addEventListener("change", async (e) => {
-    const t = e.target;
-    if (t.matches("[data-twsay]") && t.files[0]) { const file = t.files[0]; tw.say = { file, url: URL.createObjectURL(file), name: file.name }; t.value = ""; return twRender(); }
-    if (t.matches("[data-twq]")) return;
-    if (!t.matches("[data-twup]") || !t.files[0]) return;
-    const [kind, angle] = t.dataset.twup.split(":"), f = new FormData();
-    f.append("file", t.files[0]);
-    if (angle) f.append("angle", angle);
-    if (kind === "background") f.append("name", el.querySelector("[data-twbgname]")?.value || "");
-    t.value = "";
-    try { await twSend(kind === "photo" ? "/photo" : `/${kind}`, f, kind === "video" ? "الفيديو" : kind === "photo" || kind === "background" ? "الصورة" : "التسجيل"); } catch (err) { toast(err.message, true); }
-  });
-  el.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    try {
-      if (form.matches("[data-twnew]")) {
-        const t = await api(TW(), { method: "POST", ...jsonBody({ name: form.elements.name.value, consent: form.elements.consent.checked }) });
-        tw.cur = t; tw.adding = false; tw.list = await api(TW()); return twRender();
-      }
-      if (form.matches("[data-twmake]")) {
-        if (!tw.say) return toast("سجّل النص أو ارفعه أولًا", true);
-        const method = form.elements.method.value;
-        let quality = form.elements.quality.value;
-        if (method === "video" && !["veed", "sync"].includes(quality)) quality = "veed";
-        if (method === "photo" && !["std", "pro"].includes(quality)) quality = "pro";
-        const f = new FormData();
-        f.append("method", method); f.append("quality", quality); f.append("text", form.elements.text.value); f.append("audio", tw.say.file);
-        tw.cur = await api(TW(`/${tw.cur.id}/clips`), { method: "POST", body: f });
-        tw.say = null;
-        twRender(); twPoll();
-        toast("⏳ يُنشأ الفيديو، وسيظهر في الأسفل عند انتهائه");
-      }
-    } catch (err) { toast(err.message, true); }
-  });
+async function twRecord() {
+  if (tw.rec) { tw.rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream), parts = [];
+    rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach((t) => t.stop()); tw.rec = null; twUpload("voice", new File(parts, "voice.webm", { type: rec.mimeType || "audio/webm" })); };
+    rec.start(); tw.rec = rec; twRender();
+  } catch { toast("تعذّر الوصول إلى الميكروفون. ارفع تسجيلًا بدلًا من ذلك", true); }
+}
+
+async function twClick(e) {
+  const q = (s) => e.target.closest(s);
+  let b;
+  if ((b = q("[data-twpick]"))) { tw.make = null; tw.cur = b.dataset.twpick; return twRender(); }
+  if (q("[data-twnew]")) { tw.make = {}; return twRender(); }
+  if (q("[data-twback]")) { tw.make = null; return twRender(); }
+  if (q("[data-twdone]")) { tw.cur = tw.make?.tid || tw.cur; tw.make = null; toast("✓ الأفاتار جاهز"); return twInit(); }
+  if (q("[data-twrec]")) return twRecord();
+  if (q("[data-twcreate]")) {
+    const A = tw.make || {};
+    if (!(A.name || "").trim()) return toast("اكتب اسم الشخص", true);
+    if (!A.ok) return toast("يجب أن تؤكد أن هذا أنت، أو أن لديك إذنًا صريحًا من الشخص", true);
+    try { const t = await api(TW(), { method: "POST", ...jsonBody({ name: A.name.trim(), consent: true }) }); tw.make = { ...A, tid: t.id }; } catch (err) { toast(err.message, true); }
+    return twRender();
+  }
+  if ((b = q("[data-twdel]"))) {
+    if (!(await uiConfirm("حذف هذا الأفاتار نهائيًا؟ لن يظهر في قالب الأفاتار ولا في الأوتوبايلوت."))) return;
+    try { await api(TW(`/${b.dataset.twdel}`), { method: "DELETE" }); tw.cur = null; await twInit(); } catch (err) { toast(err.message, true); }
+    return;
+  }
+  if ((b = q("[data-twbgdel]"))) {
+    try { await api(TW(`/${tw.cur}/background/${b.dataset.twbgdel}`), { method: "DELETE" }); await twInit(); } catch (err) { toast(err.message, true); }
+  }
+}
+
+function twChange(e) {
+  if (e.target.matches("[data-twok]")) { tw.make = { ...(tw.make || {}), ok: e.target.checked }; return; }
+  const k = e.target.dataset?.twup, f = e.target.files?.[0];
+  if (k && f) { e.target.value = ""; twUpload(k, f); }
 }

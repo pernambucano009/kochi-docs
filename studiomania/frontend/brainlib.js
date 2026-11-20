@@ -6,7 +6,7 @@ const BrainLibPage = (() => {
   const esc = (s) => escapeHtml(String(s ?? ""));
   // من البروتوتايب: أول ما تدخل بتشوف الفولدرات بس (المحور)، وكل فولدر بيفتح لوحده، والتسلسل فوق: مكتبة المحتويات › الصور
   const S = { el: null, body: null, tab: null, mod: null, lib: null, root: null, cur: null, q: "", hits: null, open: null, timer: null, share: null, menu: false, searchOn: false, counts: {}, play: null };
-  const TABS = [["ideas", "الأفكار"], ["images", "الصور"], ["videos", "الفيديوهات"], ["voice", "التعليقات الصوتية"], ["music", "الموسيقى"], ["comics", "الكوميكس"], ["chars", "الشخصيات والأفاتار"], ["exports", "الفيديوهات الجاهزة"]];
+  const TABS = [["ideas", "الأفكار"], ["images", "الصور"], ["videos", "الفيديوهات"], ["voice", "التعليقات الصوتية"], ["music", "الموسيقى"], ["comics", "الكوميكس"], ["chars", "الأفاتار"], ["exports", "الفيديوهات الجاهزة"]];
   const FIC = {
     ideas: "M9 18h6 M10 21h4 M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z",
     images: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
@@ -186,7 +186,7 @@ const BrainLibPage = (() => {
         if (q("[data-blmenu]")) { S.menu = !S.menu; return render(); }
         if (q("[data-blsharet]")) { S.menu = false; return toggleShare(); }
         if (S.menu && !q(".pk-menu")) { S.menu = false; render(); }
-        if ((b = q("[data-blnav]"))) return b.dataset.blnav === "twin" ? showStep("16") : window.NHNav?.(b.dataset.blnav);
+        if ((b = q("[data-blnav]"))) return window.NHNav?.(b.dataset.blnav);
         if (!TAB[S.tab]) return;
         if ((b = q("[data-blcname]"))) {
           const c = folder(b.dataset.blcname), name = await uiPrompt("اكتب اسم الحالة، مثلًا: عدسات — أحمد", c?.name && !c.case?.needs_name ? c.name : "");
@@ -260,13 +260,12 @@ const BrainLibPage = (() => {
     const A = await api("/api/content/account");
     if (S.tab !== tab) return;
     const tile = (img, cap, extra = "") => `<figure class="bl-tile bl-acc">${img}<figcaption>${esc(cap)}</figcaption>${extra}</figure>`;
-    if (tab === "chars") {
-      const items = [...A.characters.map((c) => tile(`<img src="${esc(c.image_url)}" alt="" loading="lazy">`, c.name)),
-        ...A.twins.flatMap((t) => [...(t.photos || []).map((p) => tile(`<img src="${esc(p.url)}" alt="" loading="lazy">`, `${t.name} · أفاتار`)),
-          ...(t.backgrounds || []).map((b) => tile(`<img src="${esc(b.url)}" alt="" loading="lazy">`, b.name || "مكان تصوير"))])];
-      S.body.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub"><span>تُضاف الشخصيات والأفاتار هنا تلقائيًا</span></div>
-          <div class="pk-acts">${pkIb("users", "افتح الشخصيات", 'data-blnav="coaches"')}</div></div>
-        <div class="bl-tiles">${items.join("") || `<div class="pk-empty">لا توجد شخصيات أو أفاتار بعد.</div>`}</div></div>`;
+    if (tab === "chars") {   // 🙂 الأفاتارات بس (الإدارة نفسها في صفحة «الأفاتار»)
+      const items = A.twins.flatMap((t) => [...(t.photos || []).slice(0, 1).map((p) => tile(`<img src="${esc(p.url)}" alt="" loading="lazy">`, t.name)),
+        ...(t.backgrounds || []).map((b) => tile(`<img src="${esc(b.url)}" alt="" loading="lazy">`, `${t.name} · ${b.name || "مكان تصوير"}`))]);
+      S.body.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub"><span>الأفاتارات وأماكن تصويرها</span></div>
+          <div class="pk-acts">${pkIb("users", "افتح الأفاتار", 'data-blnav="twin"')}</div></div>
+        <div class="bl-tiles">${items.join("") || `<div class="pk-empty">لا يوجد أفاتار بعد.</div>`}</div></div>`;
       return;
     }
     S.body.innerHTML = `<div class="pk"><div class="pk-top"><div class="pk-sub"><span><b class="num">${A.exports.length}</b> فيديو صُدّر من هذا الحساب</span></div></div>
