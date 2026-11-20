@@ -3297,3 +3297,6 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-carslides img, .flw-carslides .flw-carph { flex: none; width: 180px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 12px; background: var(--nh-fill, #F3F2EF); }
 .flw-carslides .flw-carph { animation: flw-pulse 1.4s ease-in-out infinite; }
 @keyframes flw-pulse { 50% { opacity: .5; } }
+/* 🃏 الكروت المتفرّدة: بتطلع فوق مربع الشرح (مش تحته)، والترتيب فوق/تحت ثابت بالرقم (الأكبر فوق) */
+#nh .nh-wh-cards { overflow-x: visible; overflow-y: clip; z-index: 3; }
+#nh .nh-wh-track { transform-style: flat; }

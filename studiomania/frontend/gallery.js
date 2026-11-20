@@ -522,7 +522,7 @@ const Gallery = (() => {
     el.querySelector(".nh-wh-panel").style.left = mobile ? "" : Math.round(cx + R * .8 + 150) + "px";
     // عمودين كروت كبيرة متزحزحين نص كارت (قالبين في الشاشة)، وكل كارت في مكانه على أسطوانة بتلف. الموبايل عمود واحد
     const cols = mobile ? 1 : 2, colW = cards.clientWidth / cols, cellH = (mobile ? 54 : 72) + colW * 5 / 4;
-    W.G = { R, cx, cy, rs, cols, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
+    W.G = { R, cx, cy, rs, cols, colW, cellH, gh: cards.clientHeight, labs: [...el.querySelectorAll(".nh-wh-labs span")], cards: [...el.querySelectorAll(".nh-wc")],
       arc: el.querySelector(".arc"), ticks: el.querySelector(".ticks"), knurl: el.querySelector(".knurl"), sph: el.querySelector("#nhWhSph"),
       d3: el.querySelector(".nh-wh-3d"), track: el.querySelector(".nh-wh-track"), wheelW: w, wheelTop: wheel.offsetTop,
       cats: [...el.querySelectorAll(".nh-wh-cats .nh-wh-cat")], rg1: el.querySelector(".rg1"), rg2: el.querySelector(".rg2") };
@@ -536,7 +536,7 @@ const Gallery = (() => {
     W.G.cats.forEach((x) => { x._w = x.offsetWidth; x._h = x.offsetHeight; });
     W.G.cards.forEach((c, i) => {
       const col = cols === 1 ? 0 : i % 2, row = cols === 1 ? i : Math.floor(i / 2);
-      Object.assign(c.style, { top: (row * cellH + (col ? cellH / 2 : 0)) + "px", left: col || cols === 1 ? "0" : "50%", width: 100 / cols + "%", transform: "" });
+      Object.assign(c.style, { top: (row * cellH + (col ? cellH / 2 : 0)) + "px", left: col || cols === 1 ? "0" : "50%", width: 100 / cols + "%", transform: "", zIndex: String(i + 1) });
       c._hx = c._hy = 0;
     });
   }
@@ -675,7 +675,9 @@ const Gallery = (() => {
     for (let j = Math.max(0, Math.floor(pos) - 4); j <= Math.min(N - 1, Math.ceil(pos) + 4); j++) {
       const c = G.cards[j], d = (yOne(j) - yc) / G.cellH, ad = Math.abs(d), H = W.hov && W.hov.c === c ? W.hov : null;
       c._hx += ((H ? H.x : 0) - c._hx) * kh; c._hy += ((H ? H.y : 0) - c._hy) * kh;
-      c.style.transform = `translateZ(${(-ad * 70).toFixed(1)}px) rotateX(${(-d * 18 - c._hy * 12).toFixed(2)}deg) rotateY(${(c._hx * 14).toFixed(2)}deg) scale(${(1 - Math.min(.12, ad * .07)).toFixed(3)})`;
+      // 🃏 كل كارت بعمقه لوحده (perspective جوه الكارت بنقطة اختفاء نص العمود)، فالترتيب فوق/تحت بيمشي بالرقم: الأكبر دايمًا فوق
+      const px = G.cols === 1 ? 0 : (j % 2 ? -1 : 1) * G.colW / 2, py = yOne(j) - yc;
+      c.style.transform = `translate(${(-px).toFixed(1)}px,${(-py).toFixed(1)}px) perspective(1100px) translate(${px.toFixed(1)}px,${py.toFixed(1)}px) translateZ(${(-ad * 70).toFixed(1)}px) rotateX(${(-d * 18 - c._hy * 12).toFixed(2)}deg) rotateY(${(c._hx * 14).toFixed(2)}deg) scale(${(1 - Math.min(.12, ad * .07)).toFixed(3)})`;
       c.style.setProperty("--dim", Math.min(.5, Math.max(0, ad - .3) * .45).toFixed(3));
       c.style.setProperty("--gx", (50 + c._hx * 90).toFixed(1) + "%"); c.style.setProperty("--gy", (50 + c._hy * 90).toFixed(1) + "%");
       c.style.setProperty("--gl", Math.min(1, Math.hypot(c._hx, c._hy) * 3).toFixed(3));
