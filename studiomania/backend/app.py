@@ -8155,16 +8155,22 @@ def get_asset(conn: sqlite3.Connection, aid: str) -> sqlite3.Row:
     return r
 
 
-def car_style_asset(sid: str, draw: bool = False) -> dict:
+def car_field() -> str:
+    try:
+        bid = active_client_id()
+        return field_guess(brain_row(bid) or {}) if bid else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def car_style_asset(sid: str, draw: bool = False, field: str | None = None) -> dict:
     """🎨 ستايل كاروسيل جاهز (cs-<id>) بنفس شكل عنصر المكتبة: شرائحه المرجعية الثلاثة."""
     k = cz.style_id(sid)
     name, prompt = cz.STYLES[k]
     # 🗂️ كل مجال بيشوف شرايح الستايل بكلام وصور من مجاله بس (gallery/carstyle/f/<المجال>/). شرايح carstyle/ نفسها بتاعة اللياقة.
     #   مجال مالوش نسخة: مفيش شرايح تظهر (عشان مايشوفش مجال تاني)، والرسم بس (draw) بياخد الشكل من الشرايح العامة
-    try:
-        field = field_guess(brain_row(active_client_id()) or {}) if active_client_id() else ""
-    except Exception:  # noqa: BLE001
-        field = ""
+    if field is None:
+        field = car_field()
     base = FRONTEND_DIR / "gallery" / "carstyle"
     fdir = base / "f" / re.sub(r"[^a-z0-9_-]", "", field) if field else None
     if fdir and (fdir / f"{k}-0.jpg").is_file():
@@ -8181,7 +8187,8 @@ def car_style_asset(sid: str, draw: bool = False) -> dict:
 def carousel_library():
     with closing(db()) as conn:
         own = [asset_to_dict(r) for r in conn.execute("SELECT * FROM carousel_assets ORDER BY created_at")]
-    return [car_style_asset(f"cs-{k}") for k in cz.STYLES] + own
+    field = car_field()   # ⚡ مرة واحدة للـ ٢٤ ستايل (كانت بتتحسب لكل ستايل، فالمعرض كان بيتأخر)
+    return [car_style_asset(f"cs-{k}", field=field) for k in cz.STYLES] + own
 
 
 def add_asset_files(aid: str, current: list[str], files: list[UploadFile]) -> tuple[list[str], int]:
