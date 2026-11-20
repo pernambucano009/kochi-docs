@@ -296,13 +296,18 @@ const Gallery = (() => {
         <button type="button" class="nh-ct-card new" data-ctnew><i>＋</i><b>قالب مخصص جديد</b><small>رتّب خطواتك بنفسك</small></button></div></div>`;
   }
   function catGo(i) { C.target = Math.max(0, Math.min(CATS2.length - 1, i)); }
+  // 🃏 كارت الكاروسيل = رزمة شرائحه فوق بعض: لما تقف عليه بتتفرد زي الكوتشينة من تحت (الأولى فوق على اليمين)
+  function deck(sl) {
+    const a = sl.slice(0, 5), n = a.length;
+    return `<span class="car-deck">${a.map((u, i) => `<img src="${esc(u)}" alt="" loading="lazy" style="--i:${(n - 1) / 2 - i};z-index:${n - i}">`).join("")}</span>`;
+  }
   function card(x, k) {
     const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريبًا</small></span>`;
     const g = grpOf(x), first = !k || grpOf(W.list?.[k - 1]?.[0] || {}) !== g;
     return `<article class="nh-wc g-${g}${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
       ${first ? `<span class="nh-wc-grp">${esc(grpName(g))}</span>` : ""}
-      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div><div class="nh-wc-art">${vid}${x.car && (x.slides || []).length > 1 ? `<span class="car-fan" aria-hidden="true">${x.slides.slice(0, 4).map((u, i, a) => `<img src="${esc(u)}" alt="" loading="lazy" style="--i:${i - (a.length - 1) / 2}">`).join("")}</span>` : ""}${apMark(x)}${lgMark(x)}</div></article>`;
+      <div class="nh-wc-h"><b>${esc(x.name)}</b>${recFor(x, S.niche.key) ? `<em class="nh-wc-rec">موصى به</em>` : ""}<i>${k + 1}</i></div>${x.car && (x.slides || []).length > 1 ? `<div class="nh-wc-art car">${deck(x.slides)}${apMark(x)}${lgMark(x)}</div>` : `<div class="nh-wc-art">${vid}${apMark(x)}${lgMark(x)}</div>`}</article>`;
   }
   // اسم أكتر من كلمة بيتكتب على سطرين (متقسّم بالنص على قد الكلمات)
   function labLines(name) {
@@ -809,7 +814,6 @@ const Gallery = (() => {
   function startTpl(x) {
     if (!x) return;
     if (x.alias) return startTpl(EXTRA.find((e) => e.id === x.alias) || { ...x, id: x.alias });   // نسخة من قالب عام جوه تصنيف تاني (التصوير والأفاتار في الأسنان)
-    if (x.id === "avatar") return showStep("16");
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
     if (x.car) return Flow.start({ id: "carousel", name: x.name, cat: "كاروسيل", desc: x.desc || "", car_style: x.id });   // 🖼️ ستايل كاروسيل: مسار الكاروسيل بالستايل اللي اختاره (مابيتسألش عليه تاني)

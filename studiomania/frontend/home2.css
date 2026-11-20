@@ -3280,12 +3280,15 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nhBar .nh-crumbs .nh-cb-empty { color: var(--nh-muted); opacity: .6; font-size: 13px; }
 #nh .ap-word { flex: 1; min-width: 140px; font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 9px 12px; background: var(--nh-fill, #F3F2EF); color: inherit; }
 #nh .bx { min-height: 560px; }   /* صفحة الردود الآلية من «النشر»: ارتفاع ثابت */
-/* 🖼️ كارت ستايل الكاروسيل: لما تقف عليه الشرائح بتتفرد جوه الكارت (بدل الفيديو) */
-#nh .nh-wc-art .car-fan { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .3s ease; background: color-mix(in srgb, #1C1B1C 88%, transparent); }
-#nh .nh-wc-art .car-fan img { position: absolute; left: 50%; top: 50%; width: 52%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
-  translate: -50% -50%; transform: rotate(0) translateX(0); transition: transform .45s cubic-bezier(.2, .8, .2, 1.1); }
-#nh .nh-wc:hover .nh-wc-art .car-fan { opacity: 1; }
-#nh .nh-wc:hover .nh-wc-art .car-fan img { transform: translateX(calc(var(--i) * 34%)) rotate(calc(var(--i) * 7deg)); }
+/* 🃏 كارت ستايل الكاروسيل: الكارت نفسه رزمة شرائح (مقاس الكاروسيل الحقيقي ٤:٥)، ولما تقف عليه بتتفرد زي الكوتشينة ممسوكة من تحت */
+#nh .nh-wc-art.car { overflow: visible; background: transparent; box-shadow: none; }
+#nh .nh-wc-art.car::before, #nh .nh-wc-art.car::after { border-radius: inherit; }
+#nh .nh-wc-art.car .car-deck { position: absolute; inset: 0; }
+#nh .nh-wc-art.car .car-deck img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; filter: saturate(.85);
+  box-shadow: 0 18px 36px -18px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .08) inset; transform-origin: 50% 135%;
+  transform: rotate(calc(var(--i) * 1.6deg)); transition: transform .55s cubic-bezier(.2, .9, .25, 1.15), filter .4s; }
+#nh .nh-wc.on .nh-wc-art.car .car-deck img { filter: none; transform: rotate(calc(var(--i) * 1.6deg)); }
+#nh .nh-wc:hover .nh-wc-art.car .car-deck img { filter: none; transform: rotate(calc(var(--i) * 11deg)); }
 /* 🖼️ مسار الكاروسيل: شرائح الستايل متفرّدة، والشرائح المرسومة صف واحد */
 .flw-carfan { position: relative; height: 340px; margin: 18px 0; }
 .flw-carfan img { position: absolute; left: 50%; top: 50%; width: 220px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 14px; box-shadow: 0 18px 40px rgba(24, 23, 24, .25);

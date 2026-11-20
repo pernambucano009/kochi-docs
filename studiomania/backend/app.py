@@ -26774,7 +26774,7 @@ def flow_pick_scenario(fid: str, body: FlowPickIn):
         code = d["template"].get("kind") == "motion"
         # التايبوجرافي كلام بس: مفيش أبطال ولا ملفات، من السكريبت للتوليد على طول
         kd = d["template"].get("kind")
-        d.update(scenario=it, stage="voice" if code or kd == "typo" else "shoot" if kd == "phone" else "say" if kd == "avatar" else "carousel" if kd == "carousel" else "cast", **({"vo_track": None} if code else {}))
+        d.update(scenario=it, stage="voice" if code or kd == "typo" else "shoot" if kd in ("phone", "avatar") else "carousel" if kd == "carousel" else "cast", **({"vo_track": None} if code else {}))
         if code:
             d["params"] = flow_motion_params(d)
     d = flow_update(fid, fn)
@@ -31271,6 +31271,45 @@ def flow_phone_cast(fid: str, body: PhoneCastIn):
         if body.bg and body.bg not in [b["id"] for b in t.get("backgrounds") or []]:
             raise HTTPException(400, "هذا المكان ليس في النسخة")
     return flow_to_dict(fid, flow_update(fid, lambda d: d.update(phone_cast={"twin": body.twin, "bg": body.bg if body.twin else ""})))
+
+
+class AvatarSayIn(BaseModel):
+    twin: str = ""      # الأفاتار اللي هيتكلم (فاضي = أول واحد جاهز)
+
+
+@app.post("/api/flows/{fid}/avatar-say")
+def flow_avatar_say(fid: str, body: AvatarSayIn):
+    """🪞 قالب الأفاتار: نص المشروع بصوت ← الأفاتار بيقوله ← الفيديو بيبقى الفيديو الأساسي (وبعده الملاحظات والمونتاج زي التصوير بالجوال)."""
+    d = flow_load(fid)
+    tid = pilot_twin({"twin": body.twin})
+    if not tid:
+        raise HTTPException(400, "لا يوجد أفاتار جاهز. أنشئ الأفاتار أولًا")
+    text = pilot_say(d.get("scenario") or {})
+    if not text:
+        raise HTTPException(400, "لا يحتوي النص على كلام يُقال")
+    lang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
+    voice = dub.DIALECTS[lang]["voices"][0]
+    wallet.need(wallet.credits(dub.estimate([text], voice, len(text) / dub.CHARS_PER_SEC, None) or 0.01), "صوت الأفاتار")
+    flow_update(fid, lambda x: x.update(phone_cast={"twin": tid, "bg": ""}))
+
+    def run():
+        cid = uuid.uuid4().hex[:8]
+        wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
+        t = twin_load(tid)
+        method = "video" if twin.ready(t)["video"] else "photo"
+        item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,
+                "status": "queued", "step": "في الطابور", "file": None, "error": None, "created_at": now(), "flow": fid}
+        twin_update(tid, lambda x: x.setdefault("clips", []).append(item))
+        run_twin_clip(tid, cid)
+        c = next((x for x in twin_load(tid).get("clips") or [] if x["id"] == cid), None)
+        if not c or c.get("status") != "done" or not c.get("file"):
+            raise HTTPException(400, (c or {}).get("error") or "توقف فيديو الأفاتار")
+        dest = GENERATED_DIR / f"upload_{uuid.uuid4().hex[:8]}.mp4"
+        shutil.copyfile(twin_dir(tid) / c["file"], dest)
+        gid = phone_gen(dest, f"🪞 {((flow_load(fid).get('idea') or {}).get('title') or 'الأفاتار')[:80]}")
+        phone_set_footage(fid, phone_item(gid), "main")
+    flow_job(fid, "avatar", run)
+    return flow_to_dict(fid, flow_load(fid))
 
 
 @app.post("/api/flows/{fid}/footage/pick")
