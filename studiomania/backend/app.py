@@ -31134,6 +31134,32 @@ def twin_face(tid: str) -> Path | None:
     return out if out.is_file() else None
 
 
+AVATAR_HANDHELD = {"car", "market", "street"}   # الأماكن اللي الجوال فيها في الإيد (اهتزاز خفيف)
+
+
+def avatar_natural(src: Path, handheld: bool) -> None:
+    """🎛️ فلتر الطبيعية (اتختار في مختبر الأفاتار): كونتراست وتشبع أقل سنة، حدّة أقل، حبيبات كاميرا جوال، فينييت خفيف،
+    واهتزاز يد خفيف لو الجوال في الإيد، وصوت مايك جوال. بيتطبّق على الفيديو مكانه، ولو فشل الفيديو بيفضل زي ما هو."""
+    try:
+        info = media_info(src)
+        w, h = (info.width or 720) // 2 * 2, (info.height or 1280) // 2 * 2
+        shake = ("crop=iw*0.96:ih*0.96:(iw*0.02)+(iw*0.012)*sin(t*1.7)+(iw*0.006)*sin(t*4.3):(ih*0.02)+(ih*0.01)*cos(t*1.3)+(ih*0.005)*sin(t*3.7),"
+                 if handheld else "crop=iw*0.98:ih*0.98,")
+        vf = (f"eq=contrast=0.94:saturation=0.9:gamma=1.03,unsharp=5:5:-0.35:5:5:0,noise=alls=7:allf=t,{shake}"
+              f"scale={w}:{h},vignette=PI/7,format=yuv420p")
+        af = "highpass=f=120,lowpass=f=9000,acompressor=threshold=-18dB:ratio=3,aecho=0.8:0.6:18:0.12,volume=1.1"
+        tmp = src.with_name(src.stem + "_nat.mp4")
+        cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", vf]
+        cmd += (["-af", af, "-c:a", "aac", "-b:a", "160k"] if info.has_audio else [])
+        r = subprocess.run(cmd + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", str(tmp)], capture_output=True, timeout=900)
+        if r.returncode == 0 and tmp.is_file() and tmp.stat().st_size > 10000:
+            tmp.replace(src)
+        else:
+            tmp.unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[avatar] natural filter: {str(exc)[:160]}", flush=True)
+
+
 def twin_scene_still(tid: str, cid: str, scene: dict) -> Path:
     """🖼️ أول كادر: نفس الشخص في الخلفية والوضعية المختارة (خلفية جاهزة، أو مكان العميل اللي رفعه)."""
     folder, face = twin_dir(tid), twin_face(tid)
@@ -31214,6 +31240,9 @@ def run_twin_clip(tid: str, cid: str) -> None:
                         "prompt": "The person speaks naturally to the camera, lips perfectly synced to the audio, natural blinking, subtle head movement. "
                                   "Keep the face, hair, outfit and background exactly as in the photo."}
                 atlas.download(atlas.run_model("Video", body, "الأفاتار", max_seconds=2400, interval=6), dest)
+        if c["method"] in ("scene", "photo"):   # 🎛️ الأفاتار يطلع كأنه متصوّر بجوال حقيقي
+            sc = c.get("scene") or {}
+            avatar_natural(dest, c["method"] == "scene" and not sc.get("bg") and sc.get("id") in AVATAR_HANDHELD)
         spent = 0 if atlas.mock_mode() else wallet.charge(cost, f"الأفاتار: فيديو {round(dur)} ثانية", cid)
         twin_clip_set(tid, cid, status="done", step=None, file=dest.name, duration=round(probe_duration(dest), 2), credits=spent, error=None)
     except wallet.NoCredits as exc:
