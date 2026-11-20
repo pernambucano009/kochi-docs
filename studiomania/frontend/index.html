@@ -897,33 +897,27 @@ html.nh-boot.nh-boot-out::after { opacity: 0; }
         <!-- 💬 صندوق الردود: الكومنتات والرسايل من الحسابات المربوطة في Zernio -->
         <main class="view" data-view="15" hidden>
           <div class="alert warn" id="inboxAlert" hidden></div>
-          <!-- ✳️ تقسيمة المرسيدس: الشاشة ٣ أتلات (التعليقات، والرسائل، والردود التلقائية)، والإعدادات في النص -->
-          <div class="ib-star" id="ibStar">
-            <svg class="ib-y" id="ibY" aria-hidden="true"></svg>
-            <button type="button" class="ib-sec" data-sec="comments"><span class="ib-sk">التعليقات</span><b class="num" data-n></b><small data-s></small><ul data-l></ul></button>
-            <button type="button" class="ib-sec" data-sec="messages"><span class="ib-sk">الرسائل</span><b class="num" data-n></b><small data-s></small><ul data-l></ul></button>
-            <button type="button" class="ib-sec" data-sec="bots"><span class="ib-sk">الردود التلقائية</span><b class="num" data-n></b><small data-s></small><ul data-l></ul></button>
-            <button type="button" class="ib-hub" id="ibHub" aria-label="الإعدادات"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3.9a7.5 7.5 0 0 0-2.6-1.5L14.1 2.5h-4.2l-.4 2.5a7.5 7.5 0 0 0-2.6 1.5l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-.9a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4.2l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.3.9 2-3.4z"/></svg><span>الإعدادات</span></button>
+          <!-- 💬 نصّين: الرسائل يمين والتعليقات شمال، وبينهم ترس «إعدادات الرد الآلي». الرد بيتبعت من هنا (مش من المنصة) -->
+          <div class="ib-duo" id="ibDuo">
+            <section class="ib-half" data-half="messages">
+              <header class="ib-hh"><span class="ib-hk">الرسائل</span><b class="ib-big num" data-n>0</b></header>
+              <div class="ib-hbody" data-body><p class="empty">جارٍ التحميل…</p></div>
+            </section>
+            <button type="button" class="ib-gear" id="ibGear" aria-label="إعدادات الرد الآلي">
+              <svg viewBox="0 0 100 100" aria-hidden="true"><path class="g-body" data-gear/><circle class="g-hole" cx="50" cy="50" r="13"/><path class="g-snake" data-gear pathLength="100"/></svg>
+              <span>إعدادات الرد الآلي</span>
+            </button>
+            <section class="ib-half" data-half="comments">
+              <header class="ib-hh"><span class="ib-hk">التعليقات</span><b class="ib-big num" data-n>0</b></header>
+              <div class="ib-hbody" data-body><p class="empty">جارٍ التحميل…</p></div>
+            </section>
           </div>
-          <div class="ib-work" id="ibWork" hidden>
-            <div class="ib-bar">
-              <button type="button" class="ib-back" id="ibBack" aria-label="الأقسام الثلاثة"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12V3 M12 12l-8 6 M12 12l8 6"/></svg></button>
-              <div class="cal-views" id="ibTabs" role="tablist">
-                <button type="button" data-t="comments" class="on">التعليقات <b class="ib-n" id="ibNC"></b></button>
-                <button type="button" data-t="messages">الرسائل <b class="ib-n" id="ibNM"></b></button>
-                <button type="button" data-t="bots">الردود التلقائية</button>
-              </div>
-              <span class="muted ib-note" id="ibNote"></span>
-            </div>
-            <div class="ib-bots" id="ibBots" hidden></div>
-            <div class="ib-layout" id="ibLayout">
-              <section class="ib-list-panel"><ul class="ib-list" id="ibList"></ul>
-                <button class="ib-more" type="button" id="ibMore" hidden>حمّل المزيد</button>
-                <p class="empty" id="ibEmpty" hidden></p></section>
-              <section class="ib-thread" id="ibThread"><p class="empty">اختر منشورًا أو محادثة من القائمة.</p></section>
-            </div>
+          <!-- 🤖 إعدادات الرد الآلي -->
+          <div class="ib-botset" id="ibBotSet" hidden>
+            <header class="ib-bsh"><button type="button" class="ib-back" id="ibBack" aria-label="رجوع إلى التعليقات والرسائل"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button><b>إعدادات الرد الآلي</b></header>
+            <section class="ib-dmset" id="ibDmSet"></section>
+            <div class="ib-bots" id="ibBots"></div>
           </div>
-          <div class="ib-set" id="ibSet" hidden></div>
         </main>
 
         <!-- الإعدادات -->

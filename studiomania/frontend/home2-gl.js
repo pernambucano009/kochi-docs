@@ -407,10 +407,10 @@ window.NHGL = (stage, getClient) => {
   });
   const RIM = () => 1;   // حافة منوّرة رفيعة مثل حافة الجيليفيش
   // الأيقونات اللي ليها صورة زجاج جاهزة (icons3d/<key>.png على الأبيض، و<key>_d.png للغامق) بتتعرض هي نفسها بالظبط
-  const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "autopilot"], loader = new THREE.TextureLoader(), imgPlanes = [];
+  const IMGS = ["create", "settings", "app", "brand", "assets", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "autopilot", "inbox", "calendar"], loader = new THREE.TextureLoader(), imgPlanes = [];
   // الصور بتتحمّل مرة واحدة وتترفع على كارت الشاشة قبل ما تتعرض (عشان مفيش رعشة ولا مربع فاضي)
   const texCache = {};
-  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=13`;
+  const texUrl = (key, d) => `/icons3d/${key}${d ? "_d" : ""}.webp?v=14`;
   function loadTex(url, cb) {
     const c = texCache[url] || (texCache[url] = { t: null, cbs: [] });
     if (c.t) return cb && cb(c.t);
@@ -494,7 +494,7 @@ window.NHGL = (stage, getClient) => {
     warm();
   }
   // نبني الأيقونات الباقية في الخلفية، واحدة كل شوية، عشان أول مرة تتعرض متعلّقش
-  const KEYS = ["app", "create", "brand", "assets", "settings", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds"];
+  const KEYS = ["app", "create", "brand", "assets", "settings", "progress", "publish", "reel", "film", "series", "carousel", "characters", "voices", "music", "backgrounds", "inbox", "calendar", "autopilot"];
   let warming = false;
   function warm() {
     if (warming) return;

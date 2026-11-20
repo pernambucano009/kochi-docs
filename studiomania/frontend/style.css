@@ -3591,3 +3591,67 @@ html[dir="ltr"]:root:root .ib-list li.on { box-shadow: inset 3px 0 0 var(--accen
   .ib-sec[data-sec="bots"] { align-items: stretch; text-align: start; }
   .ib-hub { position: static; translate: none; align-self: flex-start; flex-direction: row; gap: 8px; }
 }
+
+/* ===== 💬 نصّين: الرسائل يمين، والتعليقات شمال، والترس في النص ===== */
+.ib-duo { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr); align-items: stretch; }
+.ib-duo[hidden], .ib-botset[hidden] { display: none; }
+.ib-half { min-height: 0; display: flex; flex-direction: column; }
+.ib-hh { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 4px 4px 14px; border-bottom: 1px solid var(--line); }
+.ib-hk { font-size: 26px; font-weight: 500; color: var(--ink, #181718); }
+.ib-big { font-size: 64px; line-height: 1; font-weight: 300; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, var(--glow-a, #F48A62) 0%, var(--glow-b, #E5613E) 55%, var(--glow-c, #D44E2C) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ib-hbody { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.ib-hbody > .empty { margin: auto; color: var(--label, #8a857f); }
+.ib-rows { list-style: none; margin: 0; padding: 0; }
+.ib-row { border-bottom: 1px solid var(--line); cursor: pointer; }
+.ib-row:hover { background: var(--field, #F3F2EF); }
+.ib-row.open { background: none; cursor: default; }
+.ib-rmain { display: flex; align-items: center; gap: 12px; padding: 14px 8px; }
+.ib-rtext { flex: 1; min-width: 0; }
+.ib-rtop { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ib-rtop b { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-rtop small { color: var(--label, #8a857f); font-size: 12px; flex: none; }
+.ib-rtext > p { margin: 3px 0 0; font-size: 14px; color: var(--sub, #6B6A66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-row.open .ib-rtext > p { white-space: pre-wrap; color: var(--ink, #181718); }
+.ib-rtext > p.ib-mine { color: var(--accent, #E5613E); font-size: 13px; }
+.ib-row.unread .ib-rtext > p { color: var(--ink, #181718); font-weight: 500; }
+.ib-plat { flex: none; width: 40px; height: 40px; display: grid; place-items: center; font-style: normal; color: var(--ink, #181718); }
+.ib-plat svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ib-plat svg .f { fill: currentColor; stroke: none; }
+.ib-post-ic { flex: none; position: relative; width: 40px; height: 52px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; background: var(--field, #F3F2EF); color: var(--label, #8a857f); font-style: normal; }
+.ib-post-ic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.ib-post-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.ib-row .ib-compose { padding: 0 8px 14px; }
+.ib-half .ib-chathead { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.ib-half .ib-chathead .ib-act { margin-inline-end: 6px; }
+.ib-half .ib-chat { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 14px 4px; }
+.ib-half .ib-chat + .ib-compose { flex: none; border-top: 1px solid var(--line); padding: 10px 4px 0; }
+.ib-half:has(.ib-chat) .ib-hbody { overflow: hidden; }
+/* ⚙️ الترس: بيكبر لما تقف عليه، وسنيك برتقالي بيلف على السنّات */
+.ib-gear { align-self: center; justify-self: center; border: 0; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; font: inherit; font-size: 12.5px; color: var(--label, #8a857f); }
+.ib-gear svg { width: 84px; height: 84px; overflow: visible; transition: scale .35s cubic-bezier(.2, .8, .2, 1.2); }
+.ib-gear .g-body { fill: none; stroke: var(--ink, #181718); stroke-width: 2.2; stroke-linejoin: round; opacity: .75; }
+.ib-gear .g-hole { fill: none; stroke: var(--ink, #181718); stroke-width: 2.2; opacity: .75; }
+.ib-gear .g-snake { fill: none; stroke: var(--accent, #E5613E); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16 84; stroke-dashoffset: 0; opacity: 0; transition: opacity .25s; }
+.ib-gear:hover svg, .ib-gear:focus-visible svg { scale: 1.18; }
+.ib-gear:hover .g-snake, .ib-gear:focus-visible .g-snake { opacity: 1; animation: ib-snake 1.6s linear infinite; }
+.ib-gear:hover { color: var(--ink, #181718); }
+@keyframes ib-snake { to { stroke-dashoffset: -100; } }
+/* 🤖 إعدادات الرد الآلي */
+.ib-botset { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.ib-bsh { flex: none; display: flex; align-items: center; gap: 10px; }
+.ib-bsh b { font-size: 22px; font-weight: 500; }
+html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
+.ib-dmset { flex: none; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.ib-dmset h4 { margin: 0 0 4px; font-size: 15px; font-weight: 500; }
+.ib-dmset > p { margin: 0 0 12px; font-size: 13px; }
+.ib-dmrow { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 14px 26px; }
+.ib-dmrow .ib-pills { margin: 0 0 8px; }
+.ib-dmrow .ib-fl { min-width: 220px; }
+:root:root:root .view[data-view="15"] .ib-botset #ibBots { flex: 1; min-height: 0; overflow: hidden; display: flex; }
+@media (max-width: 900px) {
+  .ib-duo { display: flex; flex-direction: column; gap: 24px; }
+  .ib-hbody { max-height: 60vh; }
+  .ib-gear { order: 3; flex-direction: row; }
+  .ib-gear svg { width: 48px; height: 48px; }
+}
