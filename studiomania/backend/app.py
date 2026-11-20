@@ -27090,7 +27090,15 @@ def my_ideas_polish(iid: str):
         raise HTTPException(404, "هذه الفكرة غير موجودة")
     it = s["item"]
     raw = it.get("raw") or {k: it.get(k) or "" for k in ("title", "idea", "hook")}
-    src = f"{raw.get('idea') or ''}\n{('رابط مرجعي: ' + it['url']) if it.get('url') else ''}".strip()
+    seen = it.get("link_text") or ""
+    if it.get("url") and not seen and not atlas.mock_mode():   # 🔗 فيديو مرجعي: نقرا كلامه (أو عنوانه ووصفه) بدل اللينك لوحده
+        seen = rivals.link_text(it["url"])
+        if seen:
+            set_my_idea(cid, iid, item={**it, "link_text": seen[:3000]})
+    src = (f"{raw.get('idea') or ''}\n" + (f"ما يقال في الفيديو المرجعي ({it['url']}):\n{seen[:3000]}" if seen else
+                                         (f"رابط مرجعي: {it['url']}" if it.get("url") else ""))).strip()
+    if it.get("url") and not seen and not (raw.get("idea") or "").strip():
+        raise HTTPException(400, "تعذّرت قراءة الفيديو من هذا الرابط. اكتب في سطر واحد عن ماذا يتكلم الفيديو، ثم نقّح")
     if not src:
         raise HTTPException(400, "الفكرة ما زالت فارغة")
     if atlas.mock_mode():
@@ -27100,7 +27108,8 @@ def my_ideas_polish(iid: str):
         msgs = [{"role": "system", "content": "You are a short-form video content strategist. Rewrite the user's raw idea notes into one clear, "
                                               "well-organized video idea, in the same language and dialect the user wrote in. Keep every point they made; "
                                               "do not invent facts, products, prices or names. Return JSON only."},
-                {"role": "user", "content": f"Brand context:\n{growth_brand()[:3000]}\n\nRaw idea notes:\n{src[:4000]}\n\n"
+                {"role": "user", "content": f"Brand context:\n{growth_brand()[:3000]}\n\nRaw idea notes (if a reference video's speech is included, "
+                                            f"take its topic and angle and adapt it to this brand, never copy it):\n{src[:6000]}\n\n"
                                             'Return JSON: {"title": "short title (max 8 words)", "idea": "the idea in 1-2 short sentences: the angle and topic only, not a script '
                                             '(keep the ending/CTA if mentioned)", "hook": "one opening line for the first 2 seconds"}'}]
         out = az.parse_json(series_chat(msgs), "تنقيح الفكرة")

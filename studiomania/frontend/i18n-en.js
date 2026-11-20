@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "تعذّرت قراءة الفيديو من هذا الرابط. اكتب في سطر واحد عن ماذا يتكلم الفيديو، ثم نقّح": "Could not read the video from this link. Write one line about what the video says, then polish",
   "جديدة": "New",
   "‹ رجوع": "‹ Back",
   "＋ أنشئ أفاتار": "＋ Create an avatar",

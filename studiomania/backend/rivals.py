@@ -177,6 +177,28 @@ def transcript(platform: str, url: str) -> str:
     return " ".join(t.split()[:120])
 
 
+def link_text(url: str) -> str:
+    """🔗 محتوى فيديو من لينك (تيك توك، إنستجرام، يوتيوب وشورتس): الكلام المنطوق، ولو مفيش: العنوان والوصف."""
+    u = url.lower()
+    try:
+        if "tiktok.com" in u:
+            return transcript("tiktok", url)
+        if "instagram.com" in u:
+            return transcript("instagram", url)
+        if "youtube.com" in u or "youtu.be" in u:
+            d = _get("/v1/youtube/video/transcript", {"url": url}, 45)
+            t = d.get("transcript_only_text") or " ".join(str(x.get("text") or "") for x in d.get("transcript") or [] if isinstance(x, dict))
+            if not str(t).strip():
+                v = _get("/v1/youtube/video", {"url": url}, 30)
+                t = f"{v.get('title') or ''}. {v.get('description') or ''}"
+            return " ".join(str(t).split()[:400])
+    except RivalsError:
+        return ""
+    except Exception:  # noqa: BLE001
+        return ""
+    return ""
+
+
 # ---------- الموافقة: البرنامج بيقترح، وانت بتوافق أو ترفض. المعتمدين بس هم اللي بيدخلوا في التحليل والوصفة
 def is_ok(i: dict) -> bool:
     st = i.get("state")
