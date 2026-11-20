@@ -782,16 +782,25 @@ const Flow = (() => {
     }
     const twins = (S.twins || []).filter((t) => t.ready?.video || t.ready?.photo);
     const sel = S.avTwin && twins.some((t) => t.id === S.avTwin) ? S.avTwin : twins[0]?.id;
-    const pick = S.twins === null ? working("جارٍ جلب الأفاتار…")
-      : !twins.length || S.avMake ? avMaker(twins.length > 0)
-      : `${twins.length > 1 ? `<label class="flw-csel"><select data-avtwin>${twins.map((t) => `<option value="${esc(t.id)}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : ""}
-        <div class="flw-acts"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button><button type="button" class="flw-btn pri big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>🪞 ${mn ? "أعد توليد الفيديو بالأفاتار" : "ولّد الفيديو بالأفاتار"}</button></div>`;
-    return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك، ثم يراجع البرنامج الفيديو ويصنع المونتاج.</p>
-      ${beats ? `<details class="flw-shotlist" open><summary>📝 النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
-      ${mn ? `<div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video><small class="muted">${secs(mn.duration)}</small></div>` : ""}
-      ${d.busy === "avatar" ? working("الأفاتار يتكلم الآن… يستغرق بضع دقائق") : `${pick}${failed("avatar")}`}
-      ${mn && !d.busy ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ إلى المونتاج مباشرة</button>
-        <button type="button" class="flw-btn pri big" data-phreview>🔎 راجع الفيديو واقترح التحسينات</button></div>` : ""}`;
+    const who = twins.length > 1 ? `<label class="flw-csel"><select data-avtwin>${twins.map((t) => `<option value="${esc(t.id)}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : "";
+    if (d.busy === "avatar") return `<h2>الفيديو</h2>${working("الأفاتار يتكلم الآن… يستغرق بضع دقائق")}`;
+    if (S.twins === null) return `<h2>الفيديو</h2>${working("جارٍ جلب الأفاتار…")}`;
+    if (!twins.length || S.avMake) return `<h2>الفيديو</h2>${avMaker(twins.length > 0)}`;
+    // قبل الفيديو: النص + زرار واحد يولّده
+    if (!mn) return `<h2>الفيديو</h2><p class="flw-sub">الأفاتار يقول النص بوجهك وصوتك.</p>
+      ${beats ? `<details class="flw-shotlist" open><summary>النص الذي سيقوله الأفاتار</summary><ol>${beats}</ol></details>` : ""}
+      ${who}${failed("avatar")}
+      <div class="flw-acts end"><button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>
+        <button type="button" class="flw-btn orange big" data-avsay="${esc(sel)}" ${d.busy ? "disabled" : ""}>ولّد الفيديو بالأفاتار</button></div>`;
+    // بعد الفيديو: الفيديو وجنبه الخطوة الجاية (الملاحظات)، والإعادة اختيار جانبي
+    return `<h2>الفيديو جاهز</h2>
+      <div class="flw-avdone"><div class="flw-main-v"><video src="${esc(mn.url)}" controls playsinline preload="metadata"></video></div>
+        <div class="flw-avnext"><p>شاهد الفيديو. الخطوة التالية «الملاحظات»: يراجع البرنامج الفيديو والنص، ويقترح تحسينات قبل المونتاج.</p>
+          <button type="button" class="flw-btn orange big" data-phreview ${d.busy ? "disabled" : ""}>التالي: الملاحظات ←</button>
+          <button type="button" class="flw-link" data-automont>الفيديو مناسب، انتقل إلى المونتاج مباشرة ←</button>
+          <span class="flw-avsep"></span>
+          ${who}<button type="button" class="flw-link" data-avsay="${esc(sel)}">↻ أعد توليد الفيديو</button>
+          <button type="button" class="flw-link" data-avnew>＋ أفاتار جديد</button>${failed("avatar")}</div></div>`;
   }
   // 🪞 إنشاء الأفاتار جوه المسار نفسه (من غير ما يخرج لصفحة تانية): اسم وموافقة ← فيديو وهو بيقرا النص، أو صورة أمامية
   function avMaker(canBack) {
@@ -799,7 +808,7 @@ const Flow = (() => {
     if (A.tid && !S.avKit) { S.avKit = {}; api("/api/twin-kit").then((k) => { S.avKit = k; render(); }).catch(() => {}); }
     const back = canBack ? `<button type="button" class="flw-link" data-avback>‹ الأفاتار الموجود</button>` : "";
     if (A.busy) return `<section class="flw-avmk">${working(A.busy)}</section>`;
-    if (!A.tid) return `<section class="flw-avmk"><h3>🪞 أنشئ الأفاتار هنا</h3><p class="muted">مرة واحدة فقط، ثم يقول الأفاتار أي نص بوجهك.</p>
+    if (!A.tid) return `<section class="flw-avmk"><h3>أنشئ الأفاتار هنا</h3><p class="muted">مرة واحدة فقط، ثم يقول الأفاتار أي نص بوجهك.</p>
       <input class="flw-in" data-avname placeholder="اسم الشخص" value="${esc(A.name || "")}" maxlength="80">
       <label class="flw-chk"><input type="checkbox" data-avok ${A.ok ? "checked" : ""}> أؤكد أن هذا أنا، أو أن لديّ إذنًا صريحًا من الشخص</label>
       <div class="flw-acts">${back}<button type="button" class="flw-btn pri" data-avcreate>متابعة</button></div></section>`;
@@ -814,7 +823,7 @@ const Flow = (() => {
         ${S.avRec ? `<p class="muted">🔴 جارٍ التسجيل…</p>` : ""}</section>`;
     }
     const lines = (S.avKit?.video_script || []).map((l) => `<li dir="auto">${esc(l)}</li>`).join("");
-    return `<section class="flw-avmk"><h3>🪞 ${esc(A.name || "الأفاتار")}: اختر طريقة واحدة</h3>
+    return `<section class="flw-avmk"><h3>${esc(A.name || "الأفاتار")}: اختر طريقة واحدة</h3>
       <div class="flw-avways">
         <div><b>🎬 فيديو وأنت تقرأ هذا النص</b><small class="muted">دقيقة تقريبًا، أمام الكاميرا، والضوء أمامك. أفضل نتيجة.</small>
           ${lines ? `<details><summary>النص الذي تقرؤه</summary><ol>${lines}</ol></details>` : ""}
@@ -865,11 +874,11 @@ const Flow = (() => {
     const tw = twins.find((t) => t.id === cast?.twin);
     const bgs = tw?.backgrounds || [];
     const auto = `<p class="muted">🪄 الـ B-roll تلقائي: اللقطات التي يجب أن تظهر فيها تُنشأ بالأفاتار${tw ? " في المكان نفسه" : ""}، والباقي من فيديوهات ستوك حقيقية. وفي المونتاج يمكنك إزالة أي لقطة أو استبدالها بفيديو من جهازك.</p>`;
-    if (S.twins === null) return `<section><h3>🪞 من في الفيديو؟</h3>${working("جارٍ جلب الأفاتار…")}</section>`;
+    if (S.twins === null) return `<section><h3>من في الفيديو؟</h3>${working("جارٍ جلب الأفاتار…")}</section>`;
     if (S.avMake) return avMaker(true);
-    if (!twins.length) return `<section><h3>🪞 من في الفيديو؟</h3><p class="muted">إذا أنشأت أفاتار في «🪞 الأفاتار» (فيديو وصور من عدة اتجاهات)، يستطيع البرنامج صنع لقطات B-roll به، وبدونه سيستخدم فيديوهات ستوك فقط.</p>
-      <button type="button" class="flw-link" data-gotwin>🪞 أنشئ أفاتار</button>${auto}</section>`;
-    return `<section><h3>🪞 من في الفيديو؟</h3>
+    if (!twins.length) return `<section><h3>من في الفيديو؟</h3><p class="muted">إذا أنشأت أفاتار في «الأفاتار» (فيديو وصور من عدة اتجاهات)، يستطيع البرنامج صنع لقطات B-roll به، وبدونه سيستخدم فيديوهات ستوك فقط.</p>
+      <button type="button" class="flw-link" data-gotwin>أنشئ أفاتار</button>${auto}</section>`;
+    return `<section><h3>من في الفيديو؟</h3>
       <label class="flw-csel"><select data-casttwin><option value="">بدون أفاتار (ستوك فقط)</option>
         ${twins.map((t) => `<option value="${esc(t.id)}" ${cast?.twin === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>
       ${tw ? `<h4>🏠 أين صوّرت؟</h4><div class="flw-bgs">
@@ -932,7 +941,7 @@ const Flow = (() => {
         <label>الزاوية <select data-camangle>${Object.entries(cm.angles).map(([k, t]) => `<option value="${k}" ${(S.camAngle || "side") === k ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
         <label title="صور الشخص من عدة اتجاهات تمنع النموذج من تخمين شكله من الزاوية الجديدة">📷 صور الشخص <select data-camtwin><option value="">بدون صور</option>
           ${(S.camTwins || []).filter((t) => t.ready?.photos).map((t) => `<option value="${esc(t.id)}" ${S.camTwin === t.id || (!S.camTwin && S.camTwin !== "" && t === S.camTwins.find((x) => x.ready?.photos)) ? "selected" : ""}>${esc(t.name)} (${t.ready.photos} صورة)</option>`).join("")}</select></label></div>
-      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 إذا أنشأت أفاتار في «🪞 الأفاتار» وصوّرت صورك من عدة اتجاهات، يمكنك إرسالها مع اللقطة ليظهر الوجه أدق من الزاوية الجديدة.</p>`}
+      ${(S.camTwins || []).some((t) => t.ready?.photos) ? "" : `<p class="muted">💡 إذا أنشأت أفاتار في «الأفاتار» وصوّرت صورك من عدة اتجاهات، يمكنك إرسالها مع اللقطة ليظهر الوجه أدق من الزاوية الجديدة.</p>`}
       <div class="flw-camm">${cm.models.map((m) => `<label><input type="checkbox" data-cammodel value="${esc(m.model)}" ${!S.camSel || S.camSel.includes(m.model) ? "checked" : ""}>
         ${esc(m.label)} <small class="muted">${m.kind === "ref" ? "مرجع فيديو" : "تعديل فيديو"} · ${m.per_sec ? `$${(m.per_sec * sec * (m.kind === "ref" ? 2 : 1)).toFixed(2)} للتجربة` : "السعر غير معروف"}</small></label>`).join("")}</div>
       <div class="flw-acts"><button type="button" class="flw-btn pri" data-camgo ${cm.models.length ? "" : "disabled"}>جرّب على النماذج المختارة</button>
