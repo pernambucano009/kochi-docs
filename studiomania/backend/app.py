@@ -31175,7 +31175,7 @@ def twin_scene_still(tid: str, cid: str, scene: dict) -> Path:
         where = AVATAR_SCENES.get(scene.get("id") or "office", AVATAR_SCENES["office"])[1]
     prompt = ("Photorealistic vertical smartphone photo of the SAME person as the first reference photo (keep the exact face, hair, skin tone, beard if any, "
               "and the same clothes), " + where + ". He looks into the lens, natural expression, mouth slightly open as if talking, real skin texture, "
-              "ordinary phone camera look, candid, not retouched. Modest clothing.")
+              "ordinary phone camera look, candid, not retouched. Modest clothing. No text, captions or logos in the image.")
     if atlas.mock_mode():
         shutil.copyfile(face, dest)
     else:
@@ -31226,7 +31226,7 @@ def run_twin_clip(tid: str, cid: str) -> None:
                 m = AVATAR_MODELS["pro"]
                 body = {"model": m["model"], "image": atlas.reference_url(still), "audio": atlas.upload_media(audio),
                         "prompt": f"The person {motion}. Lips perfectly synced to the audio, natural blinking and breathing, energetic but natural delivery. "
-                                  "Keep the face, hair, outfit and place exactly as in the photo."}
+                                  "Keep the face, hair, outfit and place exactly as in the photo. No text, captions, subtitles or logos anywhere on screen."}
                 atlas.download(atlas.run_model("Video", body, "الأفاتار", max_seconds=2400, interval=6), dest)
         else:
             photo = next((p for p in d.get("photos") or [] if p["angle"] == "front"), None) or next(p for p in d["photos"] if p["angle"] == "smile")
