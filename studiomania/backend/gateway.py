@@ -1902,7 +1902,7 @@ def _cat(note: str) -> str:
 
 @app.get("/api/platform/customers")
 def admin_customers(request: Request, days: int = 30):
-    admin(request)
+    admin_or_feed(request)
     since = time.time() - max(1, min(days, 3650)) * 86400
     with closing(db()) as c:
         rows = [dict(r) for r in c.execute("""SELECT w.id AS workspace, w.name AS brand, w.plan, w.created_at, w.discount_pct, w.discount_code,
@@ -1942,7 +1942,7 @@ def admin_customers(request: Request, days: int = 30):
 @app.get("/api/platform/customers/{wid}")
 def admin_customer(wid: str, request: Request, days: int = 30):
     """تفاصيل عميل: صرف نقاطه في أنهي قسم (والتكلفة علينا)، وآخر حركات نقاطه."""
-    admin(request)
+    admin_or_feed(request)
     if not workspace(wid):
         raise HTTPException(404, "هذا العميل غير موجود")
     since = time.time() - max(1, min(days, 3650)) * 86400
@@ -3044,6 +3044,29 @@ def admin_or_feed(request: Request) -> None:
 def finance_feed_costs(request: Request, month: str = ""):
     """💰 نفس صرف الشهر، تحت مسار صندوق الأخطاء (مفتاح المتابعة بيتحط لوحده على المسار ده في بيئة جلسات Claude)."""
     return admin_costs(request, month)
+
+
+# 🔎 جلسة Claude تقرا حالة العملاء (الباقة والرصيد وسجل النقاط) بمفتاح المتابعة، قراءة بس ومن غير إيميلات أو أرقام أو أسماء
+_PRIVATE = ("email", "phone", "name")
+
+
+@app.get("/api/platform/issues/fin/customers")
+def finance_feed_customers(request: Request, days: int = 30):
+    feed_ok(request)
+    r = admin_customers(request, days)
+    rows = r.get("items", []) if isinstance(r, dict) else r
+    for x in rows if isinstance(rows, list) else []:
+        for k in _PRIVATE:
+            x.pop(k, None)
+    return r
+
+
+@app.get("/api/platform/issues/fin/customers/{wid}")
+def finance_feed_customer(wid: str, request: Request, days: int = 30):
+    feed_ok(request)
+    w = workspace(wid)
+    return {**admin_customer(wid, request, days), "plan": w["plan"] if w else None, "wallet": wallet(wid) if w else None,
+            "provider": w["provider"] if w else None, "ends_at": w["ends_at"] if w else None}
 
 
 @app.get("/api/platform/issues/fin/providers")
