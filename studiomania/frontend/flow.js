@@ -306,11 +306,18 @@ const Flow = (() => {
   // 💡 أفكارك من «فولدر الأفكار» (مكتبة محتويات البراند): بتظهر هنا لو حابب تستخدم واحدة
   function mineRow(d) {
     // 🗓️ الأفكار اللي لسه ما اتستخدمتش الأول، والأحدث فوق (فيه أفكار جديدة كل يوم من الترند والمنافسين وأسئلة الجمهور)
+    // 🔀 كل يوم تشكيلة مختلفة: أحدث فكرتين + ٣ من باقي الأفكار بترتيب بيتغير كل يوم (عشان المنصة تحس إنها حية)
     const ts = (x) => Date.parse(x.at || "") || 0, day = Date.now() - 86400000;
-    const list = (S.trendsFor === d.id ? S.mine || [] : []).slice().sort((a, b) => (!!a.used_at - !!b.used_at) || ts(b) - ts(a));
-    if (!list.length) return "";
-    return `<div class="flw-trend flw-mine"><b>💡 أفكارك في مجلد الأفكار (${list.length}). هل تستخدم واحدة منها؟</b>
-      <div class="flw-acts">${list.slice(0, 6).map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ts(x) > day ? "<em class=\"flw-new\">جديدة</em> " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
+    const all = S.trendsFor === d.id ? S.mine || [] : [];
+    if (!all.length) return "";
+    const unused = all.filter((x) => !x.used_at), pool = unused.length >= 5 ? unused : all;
+    let seed = Math.floor(Date.now() / 86400000) + (d.id || "").length;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    const fresh = pool.filter((x) => ts(x) > day).sort((a, b) => ts(b) - ts(a)).slice(0, 2);
+    const rest = pool.filter((x) => !fresh.includes(x)).map((x) => [rnd(), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+    const list = [...fresh, ...rest].slice(0, 5);
+    return `<div class="flw-trend flw-mine"><b>💡 أفكارك في مجلد الأفكار (${all.length}). هل تستخدم واحدة منها؟</b>
+      <div class="flw-acts">${list.map((x) => `<button type="button" class="flw-btn" data-usesaved="${esc(x.id)}" title="${esc([x.text, x.url].filter(Boolean).join("\n"))}" ${d.busy ? "disabled" : ""}>${x.used_at ? "✓ " : ts(x) > day ? "<em class=\"flw-new\">جديدة</em> " : ""}«${esc(x.title)}»</button>`).join("")}</div></div>`;
   }
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
   const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
