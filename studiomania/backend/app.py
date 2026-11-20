@@ -4650,8 +4650,12 @@ def bots_get():
         accs, bots = botflows.bot_accounts(), botflows.list_bots()
     except publisher.PublishError as e:
         raise HTTPException(400, str(e))
+    try:   # 🔗 كل الحسابات المربوطة (حتى اللي مابيدعمش الرد الآلي، بتظهر رمادي في القايمة)
+        every = [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in publisher.account_list(True)]
+    except Exception:  # noqa: BLE001
+        every = []
     return {"live": True, "bots": bots, "accounts": [{k: a.get(k) for k in ("id", "platform", "name", "username")} for a in accs],
-            "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS}
+            "all_accounts": every, "recipes": botflows.RECIPES, "defaults": botflows.DEFAULTS}
 
 
 class BotIn(BaseModel):

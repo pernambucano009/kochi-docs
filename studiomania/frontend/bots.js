@@ -24,6 +24,19 @@ const BotsPage = (() => {
     if (type === "area") return `<label class="pk-f">${t}<textarea rows="3" data-bf="${k}" placeholder="${esc(ph)}">${esc(val(k))}</textarea></label>`;
     return `<label class="pk-f">${t}<input type="${type === "url" ? "url" : "text"}" ${type === "url" ? 'dir="ltr"' : ""} data-bf="${k}" value="${esc(val(k))}" placeholder="${esc(ph)}"></label>`;
   }
+  // 🔗 «على حساب»: قايمة بكل الحسابات المربوطة بأيقونة منصتها. اللي النوع ده مابيشتغلش عليه بيبان رمادي ومايتختارش
+  const plIc = (p) => (typeof ibPlat === "function" ? ibPlat(p) : "");
+  const accName = (a) => esc(a.username ? "@" + a.username : a.name || "");
+  function accPick(r, accs) {
+    const all = S.d.all_accounts?.length ? S.d.all_accounts : accs;
+    if (!all.length) return `<p class="pk-err">لا يوجد حساب مربوط. اربط حسابًا من «حساباتك» أولًا.</p>`;
+    const cur = accs.find((a) => a.id === S.f.account);
+    return `<div class="pk-f bot-accf"><span>على حساب</span>
+      <button type="button" class="bot-accbtn" data-baccopen aria-expanded="${S.accOpen ? "true" : "false"}">${cur ? `${plIc(cur.platform)}<b>${accName(cur)}</b>` : `<b class="muted">اختر حسابًا</b>`}<i class="bot-caret">▾</i></button>
+      ${S.accOpen ? `<ul class="bot-accmenu">${all.map((a) => { const ok = r.platforms.includes(a.platform);
+        return `<li><button type="button" ${ok ? `data-bacc="${esc(a.id)}"` : "disabled"} class="${a.id === S.f.account ? "on" : ""}">${plIc(a.platform)}<b>${accName(a)}</b>${ok ? "" : `<small>لا يدعم هذا النوع</small>`}</button></li>`; }).join("")}</ul>` : ""}
+      ${accs.length ? "" : `<small class="pk-err">هذا النوع يعمل على ${r.platforms.map((p) => PL[p]).join(" أو ")} فقط، ولا يوجد حساب منها مربوط.</small>`}</div>`;
+  }
   function formHTML() {
     const R = S.d.recipes, r = R[S.recipe];
     if (!r) return `<b class="pk-h3">بوت جديد</b><p class="pk-note">اختر نوع البوت:</p><div class="bot-recipes">${Object.entries(R).map(([k, x]) =>
@@ -31,12 +44,11 @@ const BotsPage = (() => {
     const accs = S.d.accounts.filter((a) => r.platforms.includes(a.platform));
     if (!S.f.account || !accs.some((a) => a.id === S.f.account)) S.f.account = accs[0]?.id || "";
     return `<div class="bot-formhead"><b class="pk-h3">${esc(r.t)}</b>${pkIb("close", "عودة إلى الأنواع", "data-bback", "sm")}</div><p class="pk-note">${esc(r.desc)}</p>
-      ${accs.length ? `<label class="pk-f">على حساب<select data-bf="account">${accs.map((a) => `<option value="${esc(a.id)}" ${a.id === S.f.account ? "selected" : ""}>${PL[a.platform]} · ${esc(a.name || a.username)}</option>`).join("")}</select></label>`
-        : `<p class="pk-err">لا يوجد حساب ${r.platforms.map((p) => PL[p]).join(" أو ")} مربوط. اربطه من صفحة النشر أولًا.</p>`}
+      ${accPick(r, accs)}
       <label class="pk-f">اسم البوت<input type="text" data-bf="name" value="${esc(S.f.name ?? r.t)}"></label>
       ${r.fields.map(field).join("")}
       ${S.recipe === "assistant" || S.f.ai ? `<p class="pk-note">يقرأ الرد الذكي من عقل العلامة (الهوية والمعرفة والقواعد)، ويُخصم كل رد بنقطة تقريبًا. إن طلب العميل أحدًا من الفريق أو سأل عن شيء غير موجود في العقل، تُحوَّل المحادثة إلى صندوق الرسائل.</p>` : ""}
-      <div class="pk-dacts"><button class="nb-btn fs-go" data-bgo ${S.busy || !accs.length ? "disabled" : ""}>${S.busy ? "جارٍ التشغيل…" : "🤖 شغّل البوت"}</button></div>`;
+      <div class="pk-dacts"><button class="nb-btn fs-go" data-bgo ${S.busy || !accs.length || !S.f.account ? "disabled" : ""}>${S.busy ? "جارٍ التشغيل…" : "🤖 شغّل البوت"}</button></div>`;
   }
   function render() {
     const d = S.d;
@@ -59,6 +71,8 @@ const BotsPage = (() => {
     w.addEventListener("change", (e) => { const k = e.target.dataset?.bf; if (k) { S.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; if (k === "ai" || k === "account") render(); } });
     w.addEventListener("click", async (e) => {
       const q = (s) => e.target.closest(s);
+      if (q("[data-baccopen]")) { S.accOpen = !S.accOpen; return render(); }
+      if (q("[data-bacc]")) { S.f.account = q("[data-bacc]").dataset.bacc; S.accOpen = false; return render(); }
       if (q("[data-brecipe]")) { S.recipe = q("[data-brecipe]").dataset.brecipe; S.f = {}; return render(); }
       if (q("[data-bback]")) { S.recipe = ""; return render(); }
       if (q("[data-btog]")) { const b = q("[data-btog]"); return run(async () => { S.d = await api(`/api/bots/${encodeURIComponent(b.dataset.btog)}/state`, { method: "POST", ...jsonBody({ on: b.dataset.on === "1" }) }); }); }

@@ -3655,3 +3655,15 @@ html:not([dir="ltr"]) .ib-bsh .ib-back svg { scale: -1 1; }
   .ib-gear { order: 3; flex-direction: row; }
   .ib-gear svg { width: 48px; height: 48px; }
 }
+/* 🔗 «على حساب» في الردود الآلية: قايمة الحسابات المربوطة بأيقوناتها */
+.bot-accf { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.bot-accbtn { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 12px; padding: 6px 12px; background: var(--field, #F3F2EF); color: var(--ink, #181718); font: inherit; cursor: pointer; text-align: start; }
+.bot-accbtn b, .bot-accmenu b { font-weight: 500; font-size: 14px; flex: 1; }
+.bot-accbtn .ib-plat, .bot-accmenu .ib-plat { width: 30px; height: 30px; }
+.bot-accbtn .ib-plat svg, .bot-accmenu .ib-plat svg { width: 22px; height: 22px; }
+.bot-caret { font-style: normal; color: var(--label, #8a857f); }
+.bot-accmenu { position: absolute; z-index: 10; top: 100%; inset-inline: 0; margin: 6px 0 0; padding: 6px; list-style: none; background: var(--page-bg, #F7F7F5); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 30px rgba(24, 23, 24, .12); }
+.bot-accmenu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 6px 8px; border-radius: 10px; font: inherit; color: inherit; cursor: pointer; text-align: start; }
+.bot-accmenu button:hover:not(:disabled), .bot-accmenu button.on { background: var(--field, #F3F2EF); }
+.bot-accmenu button:disabled { opacity: .4; cursor: default; }
+.bot-accmenu small { font-size: 11.5px; color: var(--label, #8a857f); }
