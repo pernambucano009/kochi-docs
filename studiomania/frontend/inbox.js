@@ -232,18 +232,23 @@ function ibDmRender() {
   $("ibDmSet").innerHTML = `<h4>«علّق بكلمة» في المنشورات التي ينشرها البرنامج</h4>
     <p class="muted">من يعلّق بالكلمة تحت المنشور تصله رسالة على الخاص.</p>
     <div class="ib-dmrow"><div class="ib-pills">${pill("always", "في كل منشور")}${pill("ask", "أختار عند النشر")}${pill("off", "لا")}</div>
-      <label class="ib-fl">كلمة التعليق<input type="text" id="ibSetWord" value="${escapeHtml(S.word)}" placeholder="مثلًا: برنامج"></label>
-      <button type="button" class="ib-go" data-setsave>احفظ</button></div>`;
+      <button type="button" class="ib-go" data-setsave>احفظ</button></div>
+    ${S.mode === "always" ? `<label class="ib-fl ib-dmword">كلمة التعليق في كل منشور<input type="text" id="ibSetWord" value="${escapeHtml(S.word)}" placeholder="مثلًا: برنامج"></label>`
+      : S.mode === "ask" ? `<p class="muted ib-dmnote">تكتب الكلمة عند صنع كل فيديو.</p>` : ""}`;
 }
 $("ibDmSet").addEventListener("click", async (e) => {
   const q = (s) => e.target.closest(s);
-  if (q("[data-dm]")) { ibSetS.word = $("ibSetWord").value; ibSetS.mode = q("[data-dm]").dataset.dm; return ibDmRender(); }
+  if (q("[data-dm]")) { if ($("ibSetWord")) ibSetS.word = $("ibSetWord").value; ibSetS.mode = q("[data-dm]").dataset.dm; return ibDmRender(); }
   const btn = q("[data-setsave]");
   if (!btn) return;
+  const word = ($("ibSetWord")?.value ?? ibSetS.word).trim();
+  if (ibSetS.mode === "always" && !word) { $("ibSetWord")?.focus(); return toast("اكتب كلمة التعليق التي ستُقال في كل منشور", true); }
   btn.disabled = true;
   try {
+    // الكلمة الثابتة بتتحفظ مع «في كل منشور» بس (في «أختار عند النشر» بتتكتب مع كل فيديو)
     await api(`/api/ad-brains/${encodeURIComponent(ibSetS.bid)}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fields: { dm_mode: ibSetS.mode, dm_word: $("ibSetWord").value.trim() } }) });
+      body: JSON.stringify({ fields: ibSetS.mode === "always" ? { dm_mode: "always", dm_word: word } : { dm_mode: ibSetS.mode } }) });
+    ibSetS.word = word;
     toast("✅ حُفظت الإعدادات");
   } catch (err) { toast(err.message, true); }
   btn.disabled = false;
