@@ -53,6 +53,10 @@ for _t, _f in _SPECIAL.items():
     FIT[_t] = {"fields": _f.split(), "els": False, "special": True}
 for _t, _n in _NEED.items():
     FIT[_t] = {"fields": ALL, "els": False, "need": _n}
+# 🚫 قوالب صاحب المشروع قال إنها ماتصلحش لمجال معين (ملاحظاته في معرض المراجعة)
+NOT_FOR = {
+    "selfdev": {"t-brandreveal", "t-microgame", "t-logo", "t-notch", "t-glass", "t-spy", "t-lantern"},
+}
 # 🛵 الخريطة: للي عندهم منتجات وتوصيل بس (مطاعم، متاجر إلكترونية، محلات)، ومابتتختارش لوحدها
 FIT["t-map"] = {"fields": ["food", "ecom", "shops"], "els": False, "special": True, "need": "delivery"}
 
@@ -63,6 +67,8 @@ def has_els(field: str) -> bool:
 
 def fits(tpl: str, field: str) -> bool:
     """القالب يصلح لعميل المجال ده؟ (مجال مش معروف، أو قالب مش في الخريطة: يصلح)"""
+    if tpl in NOT_FOR.get(field, ()):
+        return False
     f = FIT.get(tpl)
     if not f or not field:
         return True

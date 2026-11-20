@@ -22504,7 +22504,7 @@ def tytpl_preview(tid: str, field: str = "") -> None:
         return
     TYTPL_PREV_RUNNING.add(key)
     try:
-        lang = "ar-eg-cairo" if field else "ar-sa-najdi"
+        lang = typotpl.SAMPLE_F_LANG if field else "ar-sa-najdi"
         voice = dub.DIALECTS[lang]["voices"][0]
         pid = typo_new(TypoNewIn(name=f"معاينة {typotpl.SPECS[tid]['name']}", text=""))["id"]
         typo_update(pid, lambda x: x.update(style=typotpl.STYLE, preset=tid, dialect=lang, status="planning", step="🎙️", no_logo=True))
