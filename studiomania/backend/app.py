@@ -25691,6 +25691,9 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
 def flow_force_dm(sc: dict, word: str) -> dict:
     """💬 الكلمة اللي العميل اختارها لازم تتقال بحروفها في الآخر: لو الموديل كتب دعوة تانية (زي دعوة العلامة) بتتبدل بيها."""
     rows = sc.get("beats") or sc.get("scenes") or []
+    while len(rows) > 1 and isinstance(rows[-1], dict) and str(rows[-1].get("say") or "").strip(" .«»\"'!،") == word \
+            and any(word in str(r.get("say") or "") for r in rows[:-1] if isinstance(r, dict)):
+        rows.pop()   # سطر لوحده فيه الكلمة بس (والكلمة اتقالت في الجملة اللي قبله): زيادة
     if not rows or any(word in str(r.get("say") or "") for r in rows if isinstance(r, dict)):
         return sc
     last = rows[-1] if isinstance(rows[-1], dict) else None
@@ -31344,7 +31347,13 @@ def flow_avatar_say(fid: str, body: AvatarSayIn):
 
     def run():
         cid = uuid.uuid4().hex[:8]
-        wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
+        try:
+            wav = vo_say(text, voice, lang, twin_dir(tid) / f"say_{cid}.wav")
+        except (HTTPException, RuntimeError, voicelab.LabError) as exc:   # 🎙️ الاستنساخ وقع (زي اشتراك المزود): الفيديو يكمل بصوت الراوي، والسبب يتسجّل للأدمن
+            if not voice.startswith("twin:"):
+                raise
+            issues.record("job", "flow/avatar-voice", f"استنساخ صوت الأفاتار فشل، واستُخدم صوت الراوي: {getattr(exc, 'detail', exc)}"[:300], "", 500, ref=fid)
+            wav = vo_say(text, brand_narrator(lang, d.get("client_id")), lang, twin_dir(tid) / f"say_{cid}.wav")
         t = twin_load(tid)
         method = "video" if twin.ready(t)["video"] else "photo"
         item = {"id": cid, "method": method, "quality": "veed" if method == "video" else "pro", "text": text[:2000], "audio": wav.name,
