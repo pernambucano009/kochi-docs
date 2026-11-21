@@ -82,8 +82,10 @@ const PilotPage = (() => {
 #nh .ap-rn { flex: none; width: 110px; font-size: 13px; font-weight: 600; }
 #nh .ap-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #nh .ap-chain .ar { font-style: normal; color: var(--nh-muted); font-size: 13px; }
-#nh .ap-flowrow:has(.ap-shape) { flex-wrap: wrap; }
-#nh .ap-shape { padding-inline-end: 12px; border-inline-end: 1px solid var(--nh-line, rgba(24,23,24,.12)); }
+#nh .ap-pk { display: inline-flex; align-items: center; gap: 4px; }
+#nh .ap-dtg { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #2F7BF6; background: transparent; padding: 0; cursor: pointer; flex: none; }
+#nh .ap-dtg.on { background: #2F7BF6; }
+#nh .ap-stp.sel { background: var(--nh-ink); color: var(--ap-card); }
 #nh .ap-stp { position: relative; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ap-field); font-size: 12.5px; color: var(--nh-ink); display: inline-flex; align-items: center; gap: 4px; }
 #nh .ap-stp.fixed { color: var(--ap-sub); cursor: default; }
 #nh .ap-stp.off { color: var(--ap-sub); opacity: .45; cursor: not-allowed; }
@@ -288,7 +290,7 @@ const PilotPage = (() => {
     { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["@scene", "الخلفية ووضعية التصوير"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
-    { id: "carousel", n: "الصور والكاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "carousel", n: "الصور والكاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@shape", "هيكل المنشور"], ["script", "النص"], ["@style", "الستايل"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
   ];
   let SCN = null;   // 🎬 خلفيات الأفاتار الجاهزة (من السيرفر)
   const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
@@ -310,19 +312,20 @@ const PilotPage = (() => {
       const chips = t.steps.filter(([k]) => k !== "word" || S.d.dm_mode === "ask").map(([k, n]) => {   // 💬 «كلمة التعليق» بس لما «علّق بكلمة» على «أختار عند النشر»
         if (k === "@tpl") return `<span class="ap-stp fixed" title="يختار البرنامج القالب المناسب من قوالب مجالك، دون تكرار، وحتى ٥ فيديوهات قوالب في الأسبوع">${esc(n)} <small>يختاره البرنامج</small></span>`;
         // الستايل: «تلقائي» لما مفيش ستايل متعلّم عليه والقايمة مقفولة. وهي مفتوحة الكلمة بتختفي (هتختار)، ولو قفلتها من غير اختيار بترجع
-        if (k === "@style") return `<button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>`;
+        // 🎛️ الستايل وهيكل المنشور: الضغط على الاسم بيفتح الاختيارات (تلقائي أو اختيارك)، والدايرة الصغيرة جنبه = الدايرة الزرقا (توقف لحد موافقتك). حاجتين منفصلين
+        const ask = (step) => `<button type="button" class="ap-dtg${on.has(step) ? " on" : ""}" data-dot="${t.kind}:${step}" aria-label="${on.has(step) ? "يتوقف لموافقتك" : "دون موافقتك"}" title="الدايرة الزرقاء: يتوقف لموافقتك"></button>`;
+        if (k === "@style") return `<span class="ap-pk"><button type="button" class="ap-stp pick${S.pop === "style" ? " on" : ""}" data-open="style">${esc(n)} ${(s.car_styles || []).length ? `<b class="num">${s.car_styles.length}</b>` : S.pop === "style" ? "" : "<small>تلقائي</small>"} ${S.pop === "style" ? "▴" : "▾"}</button>${ask("style")}</span>`;
+        if (k === "@shape") {
+          const cn = +s.car_n || 0, v = cn === 1 ? "صورة واحدة" : cn > 1 ? `كاروسيل ${cn.toLocaleString("ar-EG")}` : "تلقائي";
+          return `<span class="ap-pk"><button type="button" class="ap-stp pick${S.pop === "shape" ? " on" : ""}" data-open="shape">${esc(n)} <small>${v}</small> ${S.pop === "shape" ? "▴" : "▾"}</button>${ask("shape")}</span>`;
+        }
         // 🎬 خلفيات الأفاتار: اللي يتعلّم عليه الأوتوبايلوت يتناوب بينه، ومن غير اختيار بيتناوب على كلها
         if (k === "@scene") return `<button type="button" class="ap-stp pick${S.pop === "scene" ? " on" : ""}" data-open="scene">${esc(n)} ${(s.av_scenes || []).length ? `<b class="num">${s.av_scenes.length}</b>` : S.pop === "scene" ? "" : "<small>تلقائي</small>"} ${S.pop === "scene" ? "▴" : "▾"}</button>`;
         // 🔗 النشر من غير حسابات مربوطة: رمادي، والضغط عليه بيقول يربط حساب
         if (k === "publish" && S.d.linked === false) return `<button type="button" class="ap-stp off" data-needlink title="اربط حساب سوشيال ميديا واحدًا على الأقل">${esc(n)}</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
       }).join('<i class="ar" aria-hidden="true">←</i>');
-      // 🖼️ الصور والكاروسيل: صورة واحدة أو كاروسيل بعدد شرائحه (اختيار واحد)
-      const cn = +s.car_n || 5, shape = t.kind === "carousel" ? `<div class="ap-chain ap-shape">
-        <button type="button" class="ap-stp ${cn === 1 ? "dot" : ""}" data-carn="1">صورة واحدة</button>
-        <button type="button" class="ap-stp ${cn > 1 ? "dot" : ""}" data-carn="${cn > 1 ? cn : 5}">كاروسيل${cn > 1 ? ` <small>${cn.toLocaleString("ar-EG")} شرائح</small>` : ""}</button>
-        ${cn > 1 ? [3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="ap-stp ${k === cn ? "dot" : ""}" data-carn="${k}">${k.toLocaleString("ar-EG")}</button>`).join("") : ""}</div>` : "";
-      return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b>${shape}<div class="ap-chain">${chips}</div></div>`;
+      return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b><div class="ap-chain">${chips}</div></div>`;
     });
     q("[data-rows]").innerHTML = rows.join("") || `<small class="ap-none">اختر نوعًا واحدًا على الأقل</small>`;
     drawPop();
@@ -338,6 +341,11 @@ const PilotPage = (() => {
         <div class="ap-grid">${codeTpls().map((x) => `<button type="button" class="ap-card ${on.has(x.id) ? "on" : ""}" data-tplc="${esc(x.id)}">
           <video src="${esc(x.sample_url || "")}" poster="${esc(x.cover_url || "")}" muted loop playsinline preload="none"></video><span class="ck">✓</span><b>${esc(x.name)}</b></button>`).join("") || `<span class="ap-none">لا توجد قوالب</span>`}</div>`;
       box.querySelectorAll("video").forEach((v) => { const c = v.closest(".ap-card"); c.onmouseenter = () => v.play().catch(() => {}); c.onmouseleave = () => v.pause(); });
+    } else if (S.pop === "shape") {   // 🖼️ هيكل المنشور: تلقائي (على حسب المحتوى) أو اختيارك
+      const cn = +s.car_n || 0;
+      box.innerHTML = `<div class="ap-ph"><b>هيكل المنشور</b><small>تلقائي: يختار البرنامج صورة واحدة أو كاروسيل على حسب المحتوى</small><button type="button" data-popx>تم</button></div>
+        <div class="ap-scn"><button type="button" class="ap-stp ${cn === 0 ? "sel" : ""}" data-carn="0">تلقائي</button><button type="button" class="ap-stp ${cn === 1 ? "sel" : ""}" data-carn="1">صورة واحدة</button>
+        ${[3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="ap-stp ${cn === k ? "sel" : ""}" data-carn="${k}">كاروسيل ${k.toLocaleString("ar-EG")} شرائح</button>`).join("")}</div>`;
     } else if (S.pop === "scene") {
       if (!SCN) { SCN = []; api("/api/avatar-scenes").then((d) => { SCN = d || []; if (S.pop === "scene") drawPop(); }).catch(() => {}); }
       const on = new Set(s.av_scenes || []);
@@ -361,6 +369,12 @@ const PilotPage = (() => {
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
         <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نصًا"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+    } else if (j.status === "wait" && j.gate === "shape") {   // 🖼️ هيكل هذا المنشور
+      body = `<div class="ap-scn">${[["1", "صورة واحدة"], ...[3, 4, 5, 6, 7, 8].map((k) => [String(k), `كاروسيل ${k.toLocaleString("ar-EG")} شرائح`])].map(([v, t]) => `<button type="button" class="ap-stp" data-pick="${esc(j.id)}" data-id="${v}">${t}</button>`).join("")}</div>
+        <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">البرنامج يختار</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+    } else if (j.status === "wait" && j.gate === "style") {   // 🎨 ستايل هذا المنشور
+      body = `<div class="ap-grid">${carStyles().map((a) => `<button type="button" class="ap-card" data-pick="${esc(j.id)}" data-id="${esc(a.id)}">${a.images?.[0] ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
+        <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">البرنامج يختار</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "wait" && j.gate === "word") {   // 💬 كلمة «علّق بكلمة» اللي هتتقال في آخر الفيديو
       body = `<p class="ap-say">الكلمة التي يكتبها المتابع في التعليق لتصله رسالة على الخاص، وتُقال في آخر الفيديو:</p>
         <div class="ap-acts"><input type="text" class="ap-word" data-wordin="${esc(j.id)}" value="${esc(j.dm_word || "")}" placeholder="مثلًا: جدول">
@@ -501,7 +515,7 @@ const PilotPage = (() => {
         set.has(d.scenec) ? set.delete(d.scenec) : set.add(d.scenec);
         return save({ av_scenes: [...set] });
       }
-      if (d.carn) return save({ car_n: +d.carn });
+      if (d.carn != null) return save({ car_n: +d.carn });
       if (d.styc) {
         const set = new Set(s.car_styles || []);
         set.has(d.styc) ? set.delete(d.styc) : set.add(d.styc);

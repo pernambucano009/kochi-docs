@@ -168,7 +168,7 @@ def scenarios_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], id
         shape = ('كل سيناريو = منشور صورة واحدة (شريحة واحدة بالضبط): {"title": "...", "summary": "سطر", "slides": [{"n": 1, "heading": "عنوان قوي قصير", '
                  '"text": "سطر واحد قصير", "visual": "ما يُرى"}], "caption": "الكابشن، وفيه الدعوة"}')
     elif fmt == "carousel":
-        cnt = f"{episodes} سلايدات بالضبط" if str(episodes).isdigit() else "من ٥ لـ ٨ سلايدات"
+        cnt = f"{episodes} سلايدات بالضبط" if str(episodes).isdigit() else "اختر أنت الأنسب للمحتوى: سلايد واحد فقط (منشور صورة واحدة بعنوان قوي وسطر) أو من ٣ لـ ٨ سلايدات"
         shape = (f'كل سيناريو = سلايدات ({cnt}): {{"title": "...", "summary": "سطر", "slides": [{{"n": 1, "heading": "عنوان السلايد", "text": "النص", "visual": "ما يُرى"}}], "caption": "تعليق نصي المنشور"}}')
     elif fmt == "series":
         cnt = f"عدد الحلقات: {episodes} بالضبط" if str(episodes).isdigit() else "أنت الذي تحدد عدد الحلقات المناسب للحكاية (من ٢ لـ ٦)"

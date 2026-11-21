@@ -35171,7 +35171,7 @@ def scene_take_delete(sid: str, tid: str):
 # لو العميل اختار «أوافق على كل خطوة» المهمة بتقف عند الخطوة دي لحد ما يوافق. قالب الموبايل بيستنى العميل يصوّر.
 PILOT_FILE = DATA_DIR / "pilot.json"
 PILOT_LOCK, PILOT_TICK = threading.Lock(), threading.Lock()
-PILOT_STEPS = ("idea", "word", "script", "montage", "video", "publish")   # word: كلمة «علّق بكلمة» لما تكون «أختار عند النشر»   # publish: يوافق على الكابشن والموعد قبل ما يتجدول
+PILOT_STEPS = ("idea", "word", "shape", "style", "script", "montage", "video", "publish")   # word: كلمة «علّق بكلمة» لما تكون «أختار عند النشر»   # publish: يوافق على الكابشن والموعد قبل ما يتجدول
 PILOT_BEST = {1: ["19:00"], 2: ["13:00", "20:00"], 3: ["12:00", "17:00", "21:00"], 4: ["09:00", "13:00", "18:00", "21:30"],
               5: ["09:00", "12:00", "15:00", "18:00", "21:30"], 6: ["08:00", "11:00", "13:30", "16:30", "19:00", "22:00"]}
 PILOT_DEFAULTS = {"on": False, "per_day": 2, "times": [{"t": t, "mine": False} for t in PILOT_BEST[2]], "tz": 180, "templates": [],
@@ -35444,9 +35444,9 @@ def pilot_tpl_name(tpl: str, names: dict) -> str:
 
 
 def pilot_car_n(s: dict) -> int:
-    """🖼️ الصور والكاروسيل في الأوتوبايلوت: صورة واحدة (1) أو كاروسيل بعدد شرائحه."""
+    """🖼️ هيكل المنشور في الأوتوبايلوت: 0 تلقائي (على حسب المحتوى)، 1 صورة واحدة، أو كاروسيل بعدد شرائحه."""
     try:
-        return max(1, min(10, int(s.get("car_n") or 5)))
+        return max(0, min(10, int(s.get("car_n") or 0)))   # 0 = تلقائي: البرنامج يختار على حسب المحتوى
     except (TypeError, ValueError):
         return 5
 
@@ -35772,7 +35772,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             elif pick:
                 put(dir=pick)
         f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=True, season=occ))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
-        flow_update(f["id"], lambda x: x.update(pilot=jid, **({"car_n": pilot_car_n(s)} if kind == "carousel" else {})))   # 🖼️ صورة واحدة أو كاروسيل
+        flow_update(f["id"], lambda x: x.update(pilot=jid, **({"car_n": pilot_car_n(s)} if kind == "carousel" and pilot_car_n(s) else {})))   # 🖼️ هيكل المنشور الثابت (لو مش تلقائي)
         if not (pre.get("title") or pre.get("idea")):   # 💡 أغلب الأفكار من عقل العلامة، وفكرة جديدة أحيانًا (المناسبة لو فيه بتتقدّم)
             fid0 = f["id"]
             flow_job(fid0, "ideas", lambda: flow_gen_ideas(fid0, brain_first=not occ))
@@ -35804,7 +35804,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         try:   # مفيش حسابات نشر مربوطة (تجربة قبل الربط): الفيديو جاهز ومحفوظ، ومايتعملش منشور هيفشل ولا يتخصم رسم الجدولة
             if not plats0:
                 raise publisher.PublishError("no accounts")
-            publisher.resolve_targets(["instagram"] if kind == "carousel" and pilot_car_n(s) > 1 else plats0)
+            publisher.resolve_targets(["instagram"] if kind == "carousel" and len(get_carousel(j["carousel_id"])["slides"]) > 1 else plats0)
         except publisher.PublishError:
             return put(status="done", phase="done", gate=None, unposted=True, note="جاهز. اربط حسابات النشر لكي يُجدول")
         if gate("publish", "جاهز للنشر: راجع الكابشن والموعد، ووافق لكي يُجدول"):   # 🔵 موافقة على النشر نفسه
@@ -35858,7 +35858,20 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         if kind != "carousel" and post_defaults(brain)["dm_mode"] == "ask":   # 💬 قبل النص: كلمة التعليق اللي هتتقال في آخره
             it = next((i for i in d["ideas"] if i["id"] == pick), {})
             return put(phase="word", idea_pick=pick, dm_word=dm_word_suggest({**d, "idea": it}, brain), pick=None, note="كلمة التعليق")
+        if kind == "carousel":   # 🖼️ هيكل المنشور (صورة واحدة أو كاروسيل) قبل النص
+            return put(phase="shape", idea_pick=pick, pick=None, note="هيكل المنشور")
         flow_pick_idea(fid, FlowPickIn(id=pick))
+        return put(phase="script", pick=None, note="جارٍ كتابة النص")
+
+    if ph == "shape":
+        if gate("shape", "اختر هيكل المنشور: صورة واحدة أو كاروسيل"):
+            return
+        try:
+            n = max(0, min(10, int(j.get("pick") or 0))) or pilot_car_n(s)
+        except (TypeError, ValueError):
+            n = pilot_car_n(s)
+        flow_update(fid, lambda x: x.update(car_n=n) if n else x.pop("car_n", None))
+        flow_pick_idea(fid, FlowPickIn(id=j.get("idea_pick") or ""))
         return put(phase="script", pick=None, note="جارٍ كتابة النص")
 
     if ph == "word":
@@ -35894,16 +35907,20 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     # 🖼️ الكاروسيل: نص السلايدات ← الشكل العام (مراجعة «المونتاج») ← السلايدات
     if ph == "car":
         sc = d.get("scenario") or {}
-        n = 1 if d.get("car_n") == 1 else max(2, min(10, len(sc.get("slides") or []) or 6))
+        n = 1 if d.get("car_n") == 1 or len(sc.get("slides") or []) == 1 else max(2, min(10, len(sc.get("slides") or []) or 6))   # تلقائي: النص نفسه بيحدد
+        if gate("style", "اختر الستايل"):   # 🔵 الستايل بموافقتك
+            return
         if not atlas.mock_mode():
             wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + (1 if n > 1 else 0)), "صورة" if n == 1 else "كاروسيل")
         car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
         cid = car["id"]
         sty = [x for x in s.get("car_styles") or [] if x]
+        lib = {a["id"]: a for a in carousel_library()}
+        if j.get("pick") in lib:   # 🔵 اختاره هو وقت الموافقة
+            sty = [j["pick"]]
         if sty:   # 🎨 ستايلات العميل: كل كاروسيل بالدور (لو واحد بس: هو كل مرة)
-            pick = sty[int(s.get("car_i") or 0) % len(sty)]
+            pick = sty[0] if len(sty) == 1 else sty[int(s.get("car_i") or 0) % len(sty)]
             pilot_update(lambda d: d["settings"].update(car_i=int(d["settings"].get("car_i") or 0) + 1))
-            lib = {a["id"]: a for a in carousel_library()}
             key = "template_id" if (lib.get(pick) or {}).get("kind") == "template" else "style_id"
             patch_carousel(cid, CarouselPatch(settings={"slides": n, key: pick}))
         else:
@@ -36134,7 +36151,7 @@ class PilotIn(BaseModel):
     names: dict | None = None   # أسماء قوالب الكود (للعرض)
     steps_by: dict | None = None   # 🔵 الموافقات لكل نوع: {"phone": ["idea", ...], "motion": [...], "carousel": [...], "avatar": [...]}
     car_styles: list[str] | None = None   # 🎨 ستايلات الكاروسيل (واحد على الأقل لو فيه): بيتناوب بينها
-    car_n: int | None = None              # 🖼️ صورة واحدة (1) أو كاروسيل بعدد الشرائح
+    car_n: int | None = None              # 🖼️ هيكل المنشور: 0 تلقائي، 1 صورة واحدة، أو عدد شرائح الكاروسيل
     av_scenes: list[str] | None = None    # 🎬 خلفيات الأفاتار اللي الأوتوبايلوت يتناوب بينها (فاضي = كلهم)
 
 
