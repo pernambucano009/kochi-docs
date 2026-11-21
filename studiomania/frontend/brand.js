@@ -782,7 +782,9 @@ const BrandPage = (() => {
     if (n.kind === "quiz") return quizHTML(b);
     if (n.kind === "trends") return trendsHTML(b);
     if (n.kind === "branch") {
-      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(n.br.t)}</b></div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. تحدّث مع المساعدة (الدائرة البرتقالية فوق العقل)، وستظهر المعرفة هنا.</p>` : ""}
+      // 📚 الفروع اللي ليها صفحة (مكتبة المحتويات، الأفاتار، منافسوك): العنوان نفسه زرار بيدخل الصفحة، والكارت بيوري المحتويات زي ما هو
+      const pg = { content: "brainlib", chars: "twin", pulse: "rivals" }[n.br.k];
+      return `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span>${pg ? `<button type="button" class="bm-chgo" data-brpage="${pg}">${esc(n.br.t)} <i aria-hidden="true">‹</i></button>` : `<b>${esc(n.br.t)}</b>`}</div>${n.br.k === "knowledge" && !n.br.leaves.length ? `<p class="bm-note">ما زالت فارغة. تحدّث مع المساعدة (الدائرة البرتقالية فوق العقل)، وستظهر المعرفة هنا.</p>` : ""}
         <ul class="bm-list">${n.br.leaves.map((l) => `<li><button data-go="${esc(`${n.br.k}:${l.f}:${l.i ?? ""}`)}"><span class="bm-dot ${l.type === "action" || l.type === "rule-new" ? "add" : filled(b, l) ? "full" : "empty"}"></span><b>${esc(l.type === "rule" ? l.t : l.t)}</b></button></li>`).join("")}</ul>`;
     }
     const l = n.l, head = `<div class="bm-ch"><span class="latin en-k">${n.br.en}</span><b>${esc(l.type === "rule" ? "قاعدة" : l.t)}</b></div>`;
@@ -1221,12 +1223,13 @@ const BrandPage = (() => {
         if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
         if (n.kind === "quiz") S.qi = null;
         // 📚 الفرع اللي كل نقطه صفحة واحدة (مكتبة المحتويات، الأفاتار): الفرع نفسه زرار بيدخل الصفحة على طول
-        if (n.kind === "branch" && ["content", "chars", "pulse"].includes(n.br?.k)) { openCard(null); window.BL_TAB = null; window.RV_FOCUS = null; return window.NHNav?.({ content: "brainlib", chars: "twin", pulse: "rivals" }[n.br.k]); }
         if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
         return openCard(n);
       }
       if (t.closest("[data-close]")) return openCard(null);
+      const brp = t.closest("[data-brpage]");
+      if (brp) { openCard(null); window.BL_TAB = null; window.RV_FOCUS = null; return window.NHNav?.(brp.dataset.brpage); }
       if (t.closest("[data-ibrec]")) return toggleRec();
       if (t.closest("[data-bstart]")) return brandStart();
       if (t.closest("[data-qnext]")) return quizStep(1);

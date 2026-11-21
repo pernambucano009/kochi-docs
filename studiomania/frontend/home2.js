@@ -313,6 +313,17 @@ const NH = (() => {
     fit();
   }
 
+  // 💬 الفقاعة السودا (شرح القسم) مابتطلعش برّه الشاشة أبدًا: لو هتتقص من جنب، بتتزق جوّه
+  document.addEventListener("pointerover", (e) => {
+    const tip = e.target.closest?.(".nh-tile, .nh-cont-ic, .nh-cta")?.querySelector(":scope > .nh-tip");
+    if (!tip) return;
+    tip.style.marginInline = "0";
+    requestAnimationFrame(() => {
+      const r = tip.getBoundingClientRect(), pad = 10;
+      const dx = r.right > innerWidth - pad ? innerWidth - pad - r.right : r.left < pad ? pad - r.left : 0;
+      if (dx) tip.style.marginLeft = `${Math.round(dx)}px`;
+    });
+  });
   // ---------- المسرح ----------
   renderTiles();
   const GL = window.NHGL ? window.NHGL(document.getElementById("nhStage"), () => clientx?.cur) : null;
