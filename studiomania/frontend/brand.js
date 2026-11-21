@@ -23,7 +23,8 @@ const BrandPage = (() => {
     identity: "M12 4a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M4.5 20c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5",
     look: "M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.6-1-2.7 0-1 .8-1.6 1.8-1.6h2.3a3 3 0 0 0 2.9-3C20.5 6.8 16.7 3.5 12 3.5z M7.8 11a1.2 1.2 0 1 1 0 .1z M10.5 7.4a1.2 1.2 0 1 1 0 .1z M15 7.6a1.2 1.2 0 1 1 0 .1z",
     rules: "M9 6.5h10.5 M9 12h10.5 M9 17.5h10.5 M4.5 6.5l1 1 2-2 M4.5 12l1 1 2-2 M4.5 17.5l1 1 2-2",
-    delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    delivery: "M4.5 6.5h11v11h-11z M15.5 10l4-2.5v9l-4-2.5",
+    publish: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
     improve: "M4 19h16 M6 15l4-4 3 3 5-6 M15 8h3v3",
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
@@ -64,16 +65,19 @@ const BrandPage = (() => {
         ...rulesOf(b).map((r, i) => ({ f: "rule", i, t: r, type: "rule" })),
         { f: "rule+", t: "قاعدة جديدة", type: "rule-new" },
       ] },
-      { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
+      // 🎬 صناعة الفيديو: اللي بيأثر على الفيديو نفسه وهو بيتعمل (الشعار، الإنترو والأوترو، الصوت، الرسومات)
+      { k: "delivery", t: "صناعة الفيديو", en: "Production", leaves: [
         { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
         { f: "intro", t: "الإنترو", type: "video" },
         { f: "outro", t: "الأوترو", type: "video" },
         { f: "narrators", t: "صوت الراوي", type: "narr" },
         { f: "art_ok", t: "قوالب الرسومات تناسب صفحتي", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
-        { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: حمّل التطبيق الآن" },
+      ] },
+      // 📣 النشر: آخر جملة في الفيديو والكابشن. «علّق بكلمة» مكانه إعدادات الردود (نفس الإعداد، بيفتحه من هنا عشان مايبقاش في مكانين)
+      { k: "publish", t: "النشر", en: "Publishing", leaves: [
+        { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: احجز جلسة استشارة" },
         { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
-        { f: "dm_mode", t: "«علّق بكلمة» فتصله رسالة على الخاص", type: "pick", opts: [["always", "في كل منشور"], ["ask", "أختار عند النشر"], ["off", "لا"]] },
-        { f: "dm_word", t: "كلمة التعليق", type: "text", ph: "مثلًا: برنامج" },
+        { f: "pg", i: "bots", page: "bots", t: `💬 «علّق بكلمة»: ${b?.dm_mode === "off" ? "لا" : b?.dm_mode === "always" || (!b?.dm_mode && String(b?.dm_word || "").trim()) ? `في كل منشور «${String(b?.dm_word || "").trim()}»` : "أختار عند النشر"}`, type: "page" },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
@@ -116,7 +120,7 @@ const BrandPage = (() => {
     });
   }
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
-    typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
+    typography: "look", palette: "look", cta: "publish", link: "publish", caption: "publish" };
   const FIELD_T = { niche: "النيتش", about: "عن العلامة", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
     palette: "الألوان", cta: "الـ CTA", link: "الرابط", caption: "الكابشن الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
@@ -144,14 +148,14 @@ const BrandPage = (() => {
   // 🌱 العقل بيتبني قدام العميل: الفرع مايطلعش غير لما يبقى فيه معلومة منه هو (مش اللي البرنامج ملاه لوحده وقت التسجيل).
   // قبلها بيبقى نقطة صغيرة جنب العقل تدوس عليها وتملاها بإيدك. والثابت (المنافسون، الترند، خطة المحتوى، الخوارزميات، المكتبة،
   // الشخصيات) بييجي في الآخر: لما العقل يفهمه (٦٠٪) أو المساعدة تخلّص كلامها معاه، والمنافسون أول ما يتلاقوا
-  const SEED = new Set(["identity", "look", "rules", "delivery", "knowledge", "improve"]);
+  const SEED = new Set(["identity", "look", "rules", "delivery", "publish", "knowledge", "improve"]);
   const lateOn = (b) => (b?.knowledge?.score || 0) >= 60 || !!b?.assistant_done;
   function branchOn(b, br) {
     if (!b) return false;
     const pre = b.prefilled || {}, own = (f) => String(b[f] ?? "").trim() !== String(pre[f] ?? "").trim();
     if (br.leaves.some((l) => l.type === "pending")) return true;
     switch (br.k) {
-      case "identity": case "look": case "delivery":
+      case "identity": case "look": case "delivery": case "publish":
         return br.leaves.some((l) => !["pick", "action", "page", "rule-new", "pending"].includes(l.type) && l.f !== "@name" && filled(b, l) && (l.type !== "text" || own(l.f)));
       case "rules": return rulesOf(b).length > 0 && own("rules");
       case "knowledge": return (b.notes || []).some((x) => x.source !== "field");
