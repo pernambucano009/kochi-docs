@@ -5655,6 +5655,43 @@ def batch_auto() -> None:
     threading.Thread(target=work, daemon=True).start()
 
 
+BATCH_WEEK = 7 * 86400
+
+
+def batch_weekly() -> None:
+    """📊 كل أسبوع: آخر فيديوهات حساب العلامة تتجاب وتتحلل لوحدها، وإشعار بالأسبوع ده مقارنة باللي قبله، والنتيجة بتدخل في الأفكار.
+    الحساب: اللي اتحلل قبل كده، وإلا حساب العلامة اللي اتضاف للعقل."""
+    bid = active_client_id()
+    b = brain_row(bid) if bid else None
+    if not b or atlas.mock_mode() or not rivals.live():
+        return
+    bt, so = b.get("batch") or {}, b.get("social") or {}
+    handle, plat = bt.get("handle") or so.get("handle"), bt.get("platform") or so.get("platform") or "tiktok"
+    if not handle:
+        return
+    if not bt.get("week_at"):   # أول مرة: الأسبوع بيبدأ من دلوقتي
+        update_brain(bid, lambda d: d.setdefault("batch", {}).update(week_at=time.time()))
+        return
+    if time.time() - float(bt["week_at"]) < BATCH_WEEK:
+        return
+    update_brain(bid, lambda d: d.setdefault("batch", {}).update(week_at=time.time()))   # قبل الشغل عشان مايتكررش
+
+    def work():
+        try:
+            batch_pull(bid, handle, plat)
+            batch_run(bid)
+            nb = (brain_row(bid) or {}).get("batch") or {}
+            calc = algo.batch_rows(nb.get("posts") or [], nb.get("metrics") or {})
+            prev = (nb.get("history") or [None])[-1]
+            best, pbest = float(calc.get("best") or 0), float((prev or {}).get("best") or 0)
+            trend = (f"أفضل فيديو هذا الأسبوع {best:.1f}× مقابل {pbest:.1f}× الأسبوع الماضي. " if prev else "") + (algo.VERDICTS.get(calc["verdict"]) or "")
+            hyp = ((nb.get("analysis") or {}).get("hypothesis") or "").strip()
+            notify("batch", "ok", "📊 تقرير الأسبوع: فيديوهاتك", (trend + (f" {hyp}" if hyp else ""))[:400], "brand", bid)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[batch-weekly] {bid}: {str(getattr(exc, 'detail', None) or exc)[:200]}", flush=True)
+    threading.Thread(target=work, daemon=True).start()
+
+
 class TriageIn(BaseModel):
     post: str = ""
     platform: str = ""
@@ -7029,6 +7066,10 @@ def scheduler_loop() -> None:
             pass
         try:
             offers_remind()
+        except Exception:  # noqa: BLE001
+            pass
+        try:   # 📊 تقرير الأسبوع: آخر فيديوهاتك تتحلل لوحدها كل أسبوع (من غير زرار)
+            batch_weekly()
         except Exception:  # noqa: BLE001
             pass
         time.sleep(20)
@@ -31623,7 +31664,8 @@ class AvatarSayIn(BaseModel):
 @app.get("/api/avatar-scenes")
 def avatar_scenes():
     """🎬 الخلفيات الجاهزة بوضعياتها (للمسار والأوتوبايلوت)."""
-    return [{"id": k, "name": v[0], "img": f"/avatars/scenes/{k}.jpg"} for k, v in AVATAR_SCENES.items()]
+    pose = lambda k: (FRONTEND_DIR / "avatars" / "scenes" / f"pose_{k}.jpg").is_file()   # noqa: E731  الصورة فيها الوضعية نفسها (شخص بيصوّر نفسه)
+    return [{"id": k, "name": v[0], "img": f"/avatars/scenes/{'pose_' if pose(k) else ''}{k}.jpg"} for k, v in AVATAR_SCENES.items()]
 
 
 @app.post("/api/flows/{fid}/avatar-say")

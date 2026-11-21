@@ -96,7 +96,6 @@ const BrandPage = (() => {
         ...(b?.rivals || []).map((r) => ({ f: "pg", i: `rv${r.id}`, page: "rivals", t: `@${r.handle}`, type: "page" })),
         ...((b?.rivals || []).length && !b?.rivals_pending ? [] : [{ f: "pg", i: "rv:rivals", page: "rivals", t: b?.rivals_pending ? `🆕 ${b.rivals_pending} بانتظار موافقتك` : "🏆 منافسوك", type: "page" }]),
         { f: "pg", i: "rv:works", page: "rivals", t: "🧠 ما ينجح لديهم", type: "page" },
-        { f: "pg", i: "rv:batch", page: "rivals", t: "📊 حلّل آخر ١٠ فيديوهات لك", type: "page" },
       ] },
       // 📡 قواعد الخوارزميات: القواعد الأساسية اللي كل الأدوات بتمشي عليها (تتعدّل وتتقفل وترجع للأصل)
       { k: "algo", t: "قواعد الخوارزميات", en: "Algorithm Rules", leaves: Object.entries(ALGO_G).map(([g, t]) => ({ f: "ag", i: g, t, type: "algo" })) },
@@ -769,6 +768,11 @@ const BrandPage = (() => {
     move();
   }
 
+  // 🎨 أمثلة من «قوالب الرسومات» قبل ما يقرر تناسب صفحته ولا لأ (تشتغل لما تقف عليها أو تدوس)
+  const ART_SAMPLES = ["sk-anime", "sk-clay", "sk-papercut", "sk-chalk", "sk-felt", "sk-toy", "sk-popup", "sk-lowpoly", "sk-hd2d", "sk-scifitoon"];
+  function artSamples() {
+    return `<p class="bm-note">أمثلة من قوالب الرسومات:</p><div class="bm-arts">${ART_SAMPLES.map((k) => `<video src="/gallery/${k}.mp4" poster="/gallery/${k}.jpg" muted loop playsinline preload="none" data-artv></video>`).join("")}</div>`;
+  }
   function cardHTML(n) {
     const b = cur();
     if (n.kind === "center") {
@@ -801,7 +805,7 @@ const BrandPage = (() => {
           <div class="bm-acts"><button class="bm-pill" data-audadd>＋ جمهور</button>${A.length ? `<button class="bm-go" data-audsave>احفظ</button>` : ""}<button class="bm-pill" data-audx ${b?.audiences_busy ? "disabled" : ""}>✨ استخلصها من الوصف</button></div>`;
       }
       case "rule-new": return head + `<p class="bm-note">أي شيء يجب مراعاته في كل عمل للعلامة: النص والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: بدون موسيقى · واضغط Enter");
-      case "pick": return head + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${pickRaw(b, l) === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
+      case "pick": return head + (l.f === "art_ok" ? artSamples() : "") + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${pickRaw(b, l) === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
         const hs = hexes(b?.palette);
         return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · اضغط لإزالته"></button>`).join("")}
@@ -1141,6 +1145,9 @@ const BrandPage = (() => {
     hover(n?.kind === "branch" ? n.id : n?.kind === "leaf" ? n.br.k : null, n?.kind === "leaf" ? n.id : null);
   }
   function bind(w) {
+    // 🎨 أمثلة الرسومات: تشتغل لما تقف عليها، وتقف لما تسيبها (وعلى الموبايل الضغطة بتشغّل/توقف)
+    w.addEventListener("pointerover", (e) => { const v = e.target.closest?.("[data-artv]"); if (v && v.paused) v.play().catch(() => {}); });
+    w.addEventListener("pointerout", (e) => { const v = e.target.closest?.("[data-artv]"); if (v && e.pointerType === "mouse") v.pause(); });
     // مسك وسحب أي نقطة أو فرع أو المخ نفسه
     w.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
@@ -1212,6 +1219,8 @@ const BrandPage = (() => {
         // 🎙️ دايرة «؟» هي المساعد نفسه: بيسأل أسئلة العقل وبيطلب الرفع (الشعار والصور) بالصوت أو بالكتابة
         if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
         if (n.kind === "quiz") S.qi = null;
+        // 📚 الفرع اللي كل نقطه صفحة واحدة (مكتبة المحتويات، الأفاتار): الفرع نفسه زرار بيدخل الصفحة على طول
+        if (n.kind === "branch" && ["content", "chars"].includes(n.br?.k)) { openCard(null); window.BL_TAB = null; return window.NHNav?.(n.br.k === "content" ? "brainlib" : "twin"); }
         if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
         return openCard(n);

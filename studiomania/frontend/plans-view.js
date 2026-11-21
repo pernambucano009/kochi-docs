@@ -285,12 +285,18 @@ const PlansView = (() => {
       const mo = p.price + acc * (A.account?.price || 0) + (ap ? A.autopilot?.price || 0 : 0) + (bt ? A.bots?.price || 0 : 0);
       return (d.cycle || "month") === "year" ? mo * ym : mo;
     }
+    // 💾 مساحة تخزين إضافية (بالنقاط، وبتفضل مع الحساب): بتتشري من هنا كمان
+    if (!guest && S.store === undefined && typeof api === "function") {
+      S.store = null;
+      api("/api/storage").then((x) => { S.store = x?.pack ? x : null; if (S.store) render(); }).catch(() => {});
+    }
+    const storeB = () => (S.store?.pack ? `<button class="tp" data-pvstore>+ مساحة <span class="num">${S.store.pack.gb}</span> جيجابايت <small><span class="num">${n(S.store.pack.points)}</span> نقطة · مرة واحدة</small></button>` : "");
     function featRow() {
       const f = feats();
-      if (!f.length) return "";
+      if (!f.length && !S.store?.pack) return "";
       const want = (() => { try { return sessionStorage.getItem("pv.feat") || ""; } catch { return ""; } })();
       return `<div class="pv-cont pv-feat open"><b class="ttl" style="padding-inline-start:10px">إضافة ميزات</b><span class="sep"></span>
-        ${f.map((a) => `<button class="tp${want === a.key ? " pick" : ""}" data-pvfeat="${esc(a.key)}">+ ${esc(a.key === "account" ? "حساب سوشيال" : a.name)} <small><span class="num">${sar(a.price)}</span> ر.س / شهر</small></button>`).join("")}</div>`;
+        ${f.map((a) => `<button class="tp${want === a.key ? " pick" : ""}" data-pvfeat="${esc(a.key)}">+ ${esc(a.key === "account" ? "حساب سوشيال" : a.name)} <small><span class="num">${sar(a.price)}</span> ر.س / شهر</small></button>`).join("")}${storeB()}</div>`;
     }
     // 🎟️ كود الخصم: يكتبه هنا في أي وقت (نقاط هدية أو خصم ٪ على الاشتراك والشحن)، والخصم الشغّال بيبان
     function coupon() {
@@ -341,6 +347,13 @@ const PlansView = (() => {
       if (q("[data-pvkgo]")) { const v = el.querySelector("[data-pvk]")?.value.trim(); return v ? o.coupon(v) : null; }
       if (q("[data-pvhist]")) { S.hist = !S.hist; return render(); }
       if (q("[data-pvmore]")) { S.tops = !S.tops; return el.querySelector(".pv-cont").classList.toggle("open", S.tops); }
+      if (q("[data-pvstore]")) {
+        const pk = S.store.pack;
+        return (async () => {
+          if (typeof uiConfirm === "function" && !(await uiConfirm(`تشتري ${pk.gb} جيجابايت مساحة إضافية مقابل ${n(pk.points)} نقطة؟ تبقى مع حسابك.`))) return;
+          try { await api("/api/storage/buy", { method: "POST" }); o.toast?.("أُضيفت المساحة إلى حسابك"); S.store = undefined; render(); } catch (err) { o.toast?.(err.message, true); }
+        })();
+      }
       if (q("[data-pvfeat]")) {
         if (!providers.length) return o.toast?.("الدفع قيد التجهيز، وسيُتاح قريبًا.");
         const k = q("[data-pvfeat]").dataset.pvfeat;

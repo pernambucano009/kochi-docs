@@ -2254,6 +2254,10 @@ label.dim { opacity: .4; }
 #nh .nh-tip .nh-mbar { display: none; }
 #nh .nh-tile:hover > .nh-tip, #nh .nh-tile:focus-visible > .nh-tip { opacity: 1; translate: -50% 0; }
 #nh .nh-cta > .nh-tip { top: calc(100% + 10px); }
+/* الفقاعة في أقسام الجنبين بتتسند على طرف المربع اللي ناحية الشاشة، عشان ماتتقصش عند حافة الشاشة */
+#nh .nh-col-r .nh-tip { left: auto; right: 0; translate: 0 4px; }
+#nh .nh-col-l .nh-tip { left: 0; translate: 0 4px; }
+#nh .nh-col-r .nh-tile:is(:hover, :focus-visible) > .nh-tip, #nh .nh-col-l .nh-tile:is(:hover, :focus-visible) > .nh-tip { translate: 0 0; }
 #nh .nh-cont-wrap, #nh .nh-cta-wrap { position: relative; z-index: 6; }
 /* فقاعة «شغّال عليه» بتطلع جنب الزرار، مش فوقه، عشان ماتستخباش ورا «ابدأ مشروع جديد» ولا تتقص من فوق */
 #nh .nh-cont-ic > .nh-tip { top: auto; bottom: 0; left: calc(100% + 14px); translate: 6px 0; z-index: 60; }
@@ -3352,47 +3356,60 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 .flw-scn img.sq { border-radius: 7px; }
 .flw-scn.add { border-style: dashed; color: var(--nh-muted, #6B6B67); }
 .flw-new { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: rgba(229, 97, 62, .12); color: var(--nh-accent, #E5613E); }
-/* 🙂 صفحة «الأفاتار» في العقل (تصميم «المدار»): الشخصيات دواير حوالين المختار، والخلفيات وأوضاع التصوير مربعات تحت */
-#nh .ob { display: grid; gap: 8px; padding-block: 0; max-width: none; }
-#nh .ob-tag { position: absolute; top: 0; inset-inline-start: 0; display: flex; align-items: baseline; gap: 10px; z-index: 3; }
+/* 🫧 كانفاس الفقاعات الطايرة (floatcanvas.js): نقط زي كانفاس العقل، والعناصر تتمسك وتتحرّك، وزوم بالرول */
+#nh .fc { position: relative; overflow: hidden; touch-action: none; user-select: none; cursor: grab; max-width: none; margin: 0; border-radius: 0;
+  background-color: transparent; background-image: radial-gradient(circle, color-mix(in srgb, var(--nh-ink) 18%, transparent) 1px, transparent 1.4px); background-size: 22px 22px; }
+#nh .fc { width: 100%; }
+#nh .fc.fc-panning { cursor: grabbing; }
+#nh .fc-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+#nh .fc-n { position: absolute; translate: -50% -50%; z-index: 2; cursor: grab; }
+#nh .fc-n.fc-held { z-index: 7; cursor: grabbing; }
+#nh .fc-n.fc-held .fc-f { animation-play-state: paused; scale: 1.04; }
+#nh .fc-f { position: relative; display: grid; justify-items: center; animation: fcFloat 6.5s ease-in-out infinite; animation-delay: var(--fd, 0s); transition: scale .2s; }
+@keyframes fcFloat { 0%, 100% { translate: 0 0; } 30% { translate: 2px -5px; } 65% { translate: -2px 3px; } }
+@media (prefers-reduced-motion: reduce) { #nh .fc-f { animation: none; } }
+
+/* 🙂 صفحة «الأفاتار»: الشخصيات دواير، والخلفيات ووضعيات التصوير مربعات مبعثرة */
+#nh .ob-tag { position: absolute; top: 10px; inset-inline-start: 6px; display: flex; align-items: baseline; gap: 10px; z-index: 5; pointer-events: none; }
+
 #nh .ob-tag b { font-size: 20px; font-weight: 600; }
 #nh .ob-tag .num { font-size: 44px; line-height: 1; font-weight: 600; color: var(--nh-accent); letter-spacing: -.02em; }
-#nh .ob-tag.in { position: static; margin-bottom: 10px; }
-#nh .ob-tag.in b { font-size: 16px; }
-#nh .ob-tag.in .num { font-size: 30px; }
-#nh .ob-under, #nh .ob-bottom { position: absolute; inset-inline: 0; z-index: 3; }
-#nh .ob-bottom { bottom: 6px; }
-#nh .ob-form { position: absolute; inset-inline: 0; display: grid; gap: 10px; justify-items: center; z-index: 3; }
-#nh .ob-script { position: absolute; z-index: 8; inset-inline: 50% auto; translate: 50% 0; top: 8%; width: min(460px, 92%); max-height: 70%; overflow: auto; padding: 20px 22px; border-radius: 26px; background: var(--nh-bg); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .45); }
-[dir="ltr"] #nh .ob-script { translate: -50% 0; }
-#nh .ob-script .x { position: absolute; top: 12px; inset-inline-end: 14px; color: var(--nh-muted); }
-#nh .ob-script .av-lines { max-height: none; }
-#nh .ob-stage { position: relative; transition: height .45s cubic-bezier(.2, .9, .25, 1); }
-#nh .ob-stage svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-#nh .ob-wires { position: absolute; inset: 0; width: 100% !important; height: 100% !important; pointer-events: none; }
-#nh .ob-wires path { fill: none; stroke: var(--nh-line); stroke-width: 1.4; stroke-dasharray: 4 5; animation: obDraw .6s ease both; }
-@keyframes obDraw { from { opacity: 0; } }
-#nh .ob-face { position: absolute; border-radius: 50%; padding: 0; overflow: visible; background: var(--nh-fill); display: grid; place-items: center; color: var(--nh-muted);
-  box-shadow: 0 14px 30px -16px rgba(0, 0, 0, .45); transition: left .55s cubic-bezier(.2, .9, .25, 1.08), top .55s cubic-bezier(.2, .9, .25, 1.08), width .55s, height .55s, opacity .35s, transform .25s; }
-#nh .ob-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-#nh .ob-face:hover { transform: scale(1.06); }
-#nh .ob-face.main:hover { transform: none; }
-#nh .ob-face .ob-nm, #nh .ob-slot .ob-nm { position: absolute; top: calc(100% + 6px); inset-inline: -30px; text-align: center; font-size: 12px; color: var(--nh-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#nh .ob-face.main .ob-nm { font-size: 15px; font-weight: 600; top: calc(100% + 10px); }
-#nh .ob-face em { position: absolute; top: -4px; inset-inline-end: -6px; font-style: normal; font-size: 10px; line-height: 1; padding: 4px 7px; border-radius: 99px; background: var(--nh-ink); color: var(--nh-bg); }
-#nh .ob-face.add { background: transparent; border: 1.5px dashed var(--nh-line); box-shadow: none; color: var(--nh-accent); }
+#nh .ob-lab { position: absolute; translate: -50% -100%; display: flex; align-items: baseline; gap: 10px; white-space: nowrap; pointer-events: none; }
+#nh .ob-lab b { font-size: 18px; font-weight: 600; }
+#nh .ob-lab .num { font-size: 32px; line-height: 1; font-weight: 600; color: var(--nh-accent); }
+#nh .ob-c { position: relative; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--nh-fill); color: var(--nh-muted); box-shadow: 0 18px 36px -18px rgba(0, 0, 0, .5); transition: box-shadow .25s; }
+#nh .ob-c img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+#nh .ob-c svg, #nh .ob-slot svg, #nh .ob-addsq svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#nh .ob-face.add .ob-c { background: transparent; border: 1.5px dashed var(--nh-line); box-shadow: none; color: var(--nh-accent); }
+#nh .ob-face.on .ob-c { box-shadow: 0 0 0 3px var(--nh-bg), 0 0 0 5px var(--nh-accent), 0 22px 44px -18px rgba(0, 0, 0, .55); }
+#nh .ob-nm { margin-top: 8px; font-size: 13.5px; font-weight: 500; white-space: nowrap; color: var(--nh-ink); }
 #nh .ob-face.add .ob-nm { color: var(--nh-muted); }
-#nh .ob-face.dim { opacity: .07; pointer-events: none; transform: scale(.8); }
-#nh .ob-face.main { box-shadow: 0 24px 50px -22px rgba(0, 0, 0, .55); }
-#nh .ob-face.new.empty { background: transparent; border: 1.5px dashed var(--nh-line); box-shadow: none; color: var(--nh-accent); }
+#nh .ob-face em { position: absolute; top: -2px; inset-inline-end: -4px; font-style: normal; font-size: 10.5px; line-height: 1; padding: 4px 8px; border-radius: 99px; background: var(--nh-ink); color: var(--nh-bg); }
+#nh .ob-x { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--nh-ink) !important; color: var(--nh-bg) !important; opacity: 0; transition: opacity .2s; z-index: 3; }
+#nh .fc-n:hover .ob-x, #nh .ob-face.on .ob-x { opacity: 1; }
+@media (hover: none) { #nh .ob-x { opacity: .85; } }
+#nh .ob-place .ob-sq { position: relative; border-radius: 22%; overflow: hidden; background: var(--nh-fill); rotate: var(--rot, 0deg); box-shadow: 0 16px 30px -18px rgba(0, 0, 0, .55); transition: rotate .3s; }
+#nh .ob-place:hover .ob-sq { rotate: 0deg; }
+#nh .ob-place .ob-sq img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+#nh .ob-place .ob-x { top: 8px; left: 8px; }
+#nh .ob-cap { display: grid; text-align: center; margin-top: 8px; max-width: 150px; }
+#nh .ob-cap b { font-size: 13px; font-weight: 600; }
+#nh .ob-cap small { font-size: 11.5px; color: var(--nh-muted); line-height: 1.4; }
+#nh .ob-addsq { position: absolute; inset: 0; display: grid; place-items: center; color: var(--nh-accent); border: 1.5px dashed var(--nh-line); border-radius: inherit; cursor: pointer; background: var(--nh-bg); }
+#nh .ob-addsq.busy { border-style: solid; border-color: var(--nh-accent); animation: obPulse 1s ease-in-out infinite; }
+#nh .ob-slots { position: absolute; z-index: 6; width: 0; height: 0; }
+#nh .ob-slots[hidden] { display: none; }
+#nh .ob-wires { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+#nh .ob-wires path { fill: none; stroke: var(--nh-accent); stroke-opacity: .55; stroke-width: 1.4; stroke-dasharray: 4 5; animation: obDraw .6s ease both; }
+@keyframes obDraw { from { opacity: 0; } }
 #nh .ob-ring { position: absolute; border-radius: 50%; pointer-events: none; background: conic-gradient(var(--nh-accent) var(--p, 0%), transparent 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); transition: --p .5s; }
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px)); }
 #nh .ob-ring.spin { animation: obSpin 1s linear infinite; }
 #nh .ob-ring.full { animation: obDone .9s ease; }
 @keyframes obSpin { to { transform: rotate(360deg); } }
 @keyframes obDone { 50% { transform: scale(1.06); } }
 #nh .ob-slot { position: absolute; display: grid; place-items: center; background: var(--nh-bg); color: var(--nh-muted); border: 1.5px dashed var(--nh-line); cursor: pointer;
-  animation: obPop .5s cubic-bezier(.2, .9, .25, 1.25) both; animation-delay: var(--d, 0ms); transition: border-color .25s; }
+  box-shadow: 0 12px 26px -16px rgba(0, 0, 0, .45); animation: obPop .5s cubic-bezier(.2, .9, .25, 1.25) both; animation-delay: var(--d, 0ms); transition: border-color .25s; }
 #nh .ob-slot.round { border-radius: 50%; }
 #nh .ob-slot.sq { border-radius: 22%; }
 #nh .ob-slot:hover { border-color: var(--nh-accent); color: var(--nh-accent); }
@@ -3400,37 +3417,21 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .ob-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 #nh .ob-slot.busy { border-style: solid; border-color: var(--nh-accent); animation: obPulse 1s ease-in-out infinite; }
 #nh .ob-slot.rec { border: 2px solid #D9442B; color: #D9442B; animation: obPulse 1s ease-in-out infinite; }
-#nh .ob-slot .ob-nm { inset-inline: -24px; color: var(--nh-muted); }
-#nh .ob-vacts { position: absolute; top: calc(100% + 26px); inset-inline: -40px; display: flex; justify-content: center; gap: 12px; font-size: 12px; }
+#nh .ob-slot .ob-nm { position: absolute; top: calc(100% + 4px); margin: 0; font-size: 12px; color: var(--nh-muted); }
+#nh .ob-vacts { position: absolute; top: calc(100% + 24px); display: flex; justify-content: center; gap: 12px; font-size: 12.5px; white-space: nowrap; }
 #nh .ob-vacts button, #nh .ob-vacts label { color: var(--nh-accent); font-weight: 600; cursor: pointer; }
 @keyframes obPop { from { opacity: 0; transform: scale(.3); } }
-@keyframes obPulse { 50% { box-shadow: 0 0 0 6px var(--nh-fill-hi, rgba(229, 97, 62, .14)); } }
-#nh .ob-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px; font-size: 13px; }
-#nh .ob-links button { color: var(--nh-muted); }
-#nh .ob-links button:hover { color: var(--nh-ink); }
-#nh .ob-links .del:hover { color: #C2412D; }
-#nh .ob-links .nb-btn.fs-go { height: auto; padding: 9px 24px; border-radius: 99px; background: var(--nh-ink) !important; color: var(--nh-bg) !important; font-weight: 600; }
-#nh .ob-places { display: grid; gap: 14px 18px; justify-content: center; padding-block: 10px 6px; }
-#nh .ob-place { position: relative; margin: 0; display: grid; gap: 6px; align-content: start; cursor: default; transform: translateY(var(--ty, 0)) rotate(var(--rot, 0)); transition: transform .35s cubic-bezier(.2, .9, .25, 1.2); }
-#nh .ob-place:hover { transform: translateY(calc(var(--ty, 0px) - 4px)) rotate(0deg) scale(1.05); z-index: 2; }
-#nh .ob-place img, #nh .ob-place.add i { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 22%; box-shadow: 0 12px 26px -16px rgba(0, 0, 0, .5); background: var(--nh-fill); }
-#nh .ob-place figcaption { display: grid; gap: 0; text-align: center; overflow: hidden; }
-#nh .ob-place figcaption > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#nh .ob-place figcaption b { font-size: 12.5px; font-weight: 600; }
-#nh .ob-place figcaption small { font-size: 11px; color: var(--nh-muted); line-height: 1.4; }
-#nh .ob-place > button { position: absolute; top: 6px; inset-inline-end: 6px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 0, 0, .55) !important; color: #fff !important; font-size: 11px; }
-#nh .ob-place.add { cursor: pointer; }
-#nh .ob-place.add i { display: grid; place-items: center; background: transparent; border: 1.5px dashed var(--nh-line); box-shadow: none; color: var(--nh-accent); box-sizing: border-box; }
-#nh .ob-place.add svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
-#nh .ob-place.add:hover i { border-color: var(--nh-accent); }
-#nh .ob-place.add.busy i { border-style: solid; border-color: var(--nh-accent); animation: obPulse 1s ease-in-out infinite; }
-#nh .av-in { font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 10px 14px; background: var(--nh-fill); color: inherit; width: min(320px, 100%); text-align: center; }
+@keyframes obPulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--nh-accent) 18%, transparent); } }
+#nh .ob-form { position: absolute; z-index: 8; left: 50%; bottom: 24px; translate: -50% 0; display: grid; gap: 10px; justify-items: center; padding: 18px 22px; border-radius: 26px; background: var(--nh-bg); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .45); width: min(420px, calc(100% - 24px)); cursor: default; }
+#nh .ob-form .nb-btn.fs-go { height: auto; padding: 9px 24px; border-radius: 99px; background: var(--nh-ink) !important; color: var(--nh-bg) !important; font-weight: 600; }
+#nh .ob-script { position: absolute; z-index: 9; left: 50%; top: 10%; translate: -50% 0; width: min(460px, 92%); max-height: 75%; overflow: auto; padding: 20px 22px; border-radius: 26px; background: var(--nh-bg); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .45); cursor: default; }
+#nh .ob-script .x { position: absolute; top: 12px; inset-inline-end: 14px; color: var(--nh-muted); }
+#nh .av-in { font: inherit; font-size: 14px; border: 0; border-radius: 12px; padding: 10px 14px; background: var(--nh-fill); color: inherit; width: 100%; text-align: center; }
 #nh .av-chk { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-#nh .av-lines { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.8; max-height: 200px; overflow: auto; text-align: start; }
-@media (max-width: 620px) { #nh .ob-places { gap: 6px 8px; } #nh .ob-place figcaption small { display: none; } #nh .ob-tag b { font-size: 17px; } #nh .ob-tag .num { font-size: 34px; } }
+#nh .av-lines { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.8; text-align: start; }
+@media (max-width: 620px) { #nh .ob-tag b { font-size: 17px; } #nh .ob-tag .num { font-size: 34px; } }
 /* 💡 فولدر الأفكار (تصميم «فقاعة التفكير»): عدّاد فوق، وسحابة أفكار، وسلسلة فقاعات طالعة من الراس، و«＋» */
-#nh .tb { position: relative; display: block; padding: 0; max-width: none; }
-#nh .tb-tag { position: absolute; top: 0; inset-inline-start: 0; z-index: 3; display: grid; grid-template-columns: auto auto; align-items: baseline; column-gap: 12px; }
+#nh .tb-tag { position: absolute; top: 10px; inset-inline-start: 6px; z-index: 5; pointer-events: none; display: grid; grid-template-columns: auto auto; align-items: baseline; column-gap: 12px; }
 #nh .tb-tag b { font-size: 20px; font-weight: 600; }
 #nh .tb-tag small { grid-column: 1 / -1; font-size: 12px; }
 #nh .tb-count { display: flex; align-items: baseline; gap: 4px; direction: ltr; font-size: 44px; line-height: 1; font-weight: 600; letter-spacing: -.02em; }
@@ -3439,21 +3440,24 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .tb-count .sl { color: var(--nh-muted); font-weight: 200; }
 #nh .tb-count .t { color: var(--nh-accent); }
 #nh .tb-more { position: absolute; z-index: 2; border-radius: 50%; display: grid; place-items: center; background: var(--nh-ink); color: var(--nh-bg); font-size: 13px; box-shadow: 0 10px 22px -12px rgba(0, 0, 0, .5); }
-#nh .tb-empty { position: absolute; inset-inline: 0; margin: 0; text-align: center; z-index: 2; }
+#nh .tb-empty { position: absolute; left: 0; top: 0; translate: -50% -50%; margin: 0; white-space: nowrap; z-index: 2; }
+
 #nh .tb-veil { position: absolute; inset: 0; z-index: 9; background: color-mix(in srgb, var(--nh-bg) 55%, transparent); backdrop-filter: blur(3px); }
 @media (max-width: 620px) { #nh .tb-tag b { font-size: 17px; } #nh .tb-count { font-size: 34px; } }
 #nh .tb-stage { position: relative; overflow: clip; }
-#nh .tb-cloud { position: absolute; inset: 0; pointer-events: none; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .08)); }
+#nh .tb-cloud { position: absolute; left: 0; top: 0; pointer-events: none; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .08)); }
 #nh .tb-cloud i { position: absolute; border-radius: 50%; background: color-mix(in srgb, var(--nh-ink) 5%, var(--nh-bg)); }
-#nh .tb-bub { position: absolute; border-radius: 50%; display: grid; place-items: center; text-align: center; padding: 14px; font-size: 13px; line-height: 1.45; color: var(--nh-ink);
-  background: var(--nh-bg); box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .45); z-index: 2; animation: tbFloat 6s ease-in-out infinite; animation-delay: var(--fl, 0s);
+#nh .tb-bub { position: relative; border-radius: 50%; display: grid; place-items: center; text-align: center; padding: 14px; font-size: 13px; line-height: 1.45; color: var(--nh-ink);
+  background: var(--nh-bg); box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .45); 
   transition: transform .35s cubic-bezier(.2, .9, .25, 1.2), background .25s, color .25s, opacity .25s; }
 #nh .tb-bub span { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 #nh .tb-bub:hover { transform: scale(1.06); z-index: 4; }
 #nh .tb-bub.new { background: color-mix(in srgb, var(--nh-accent) 16%, var(--nh-bg)); }
 #nh .tb-bub { align-content: center; gap: 2px; }
 #nh .tb-bub em { font-style: normal; font-size: 10.5px; color: var(--nh-accent); font-weight: 600; }
-#nh .tb-bub.used { z-index: 1; opacity: .6; font-size: 0; background: var(--nh-bg); color: var(--nh-muted); box-shadow: 0 8px 16px -12px rgba(0, 0, 0, .4); }
+#nh .tb-n.back { z-index: 1; }
+#nh .tb-n:has(.tb-bub.on) { z-index: 6; }
+#nh .tb-bub.used { opacity: .6; font-size: 0; background: var(--nh-bg); color: var(--nh-muted); box-shadow: 0 8px 16px -12px rgba(0, 0, 0, .4); }
 #nh .tb-bub.used .tk { font-size: 13px; }
 #nh .tb-bub.used:hover { opacity: 1; z-index: 5; transform: scale(1.25); }
 #nh .tb-bub.on { z-index: 6; background: var(--nh-ink); color: var(--nh-bg); opacity: 1; transform: scale(1.12); }
@@ -3487,3 +3491,7 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .tb-acts .sp { flex: 1; }
 #nh .tb-acts .nb-btn.fs-go { color: #fff; }
 @media (prefers-reduced-motion: reduce) { #nh .tb-bub { animation: none; } }
+
+/* 🎨 أمثلة «قوالب الرسومات» في كارت العقل */
+#nh .bm-arts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 4px 0 10px; }
+#nh .bm-arts video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: var(--nh-fill); cursor: pointer; }
