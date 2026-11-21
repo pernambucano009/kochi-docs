@@ -9945,6 +9945,7 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "＋ صور من العلامة": "＋ Brand photos",
   "صناعة الفيديو": "Video production",
   "في كل منشور «{0}»": "On every post «{0}»",
   "مثلًا: احجز جلسة استشارة": "e.g. Book a consultation",

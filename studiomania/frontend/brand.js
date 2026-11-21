@@ -23,8 +23,7 @@ const BrandPage = (() => {
     identity: "M12 4a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M4.5 20c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5",
     look: "M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.6-1-2.7 0-1 .8-1.6 1.8-1.6h2.3a3 3 0 0 0 2.9-3C20.5 6.8 16.7 3.5 12 3.5z M7.8 11a1.2 1.2 0 1 1 0 .1z M10.5 7.4a1.2 1.2 0 1 1 0 .1z M15 7.6a1.2 1.2 0 1 1 0 .1z",
     rules: "M9 6.5h10.5 M9 12h10.5 M9 17.5h10.5 M4.5 6.5l1 1 2-2 M4.5 12l1 1 2-2 M4.5 17.5l1 1 2-2",
-    delivery: "M4.5 6.5h11v11h-11z M15.5 10l4-2.5v9l-4-2.5",
-    publish: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
+    delivery: "M20.5 3.5 10 14 M20.5 3.5 14 20.5l-4-6.5-6.5-4z",
     improve: "M4 19h16 M6 15l4-4 3 3 5-6 M15 8h3v3",
     knowledge: "M4 5.5c2.7-1 5.3-1 8 .8 2.7-1.8 5.3-1.8 8-.8v13c-2.7-1-5.3-1-8 .8-2.7-1.8-5.3-1.8-8-.8z M12 6.3v13.3",
     assets: "M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M3.5 15.5l4.5-4.5 4 4 3-3 5 5 M15.5 8.5a1.3 1.3 0 1 1 0 .1z",
@@ -53,28 +52,23 @@ const BrandPage = (() => {
         { f: "audiences", t: "الجماهير المستهدفة", type: "auds" },
         { f: "market", t: "السوق", type: "text", ph: "مثلًا: السعودية والخليج" },
         { f: "language", t: "اللغة واللهجة", type: "text", ph: "مثلًا: اللهجة السعودية البيضاء" },
+        { f: "narrators", t: "صوت الراوي", type: "narr" },
       ] },
       { k: "look", t: "الشكل", en: "Look", leaves: [
-        { f: "logos", t: "الشعار", type: "imgs" },
+        { f: "logos", t: "الشعار", type: "imgs" },   // ومعاه «الشعار على الفيديو» نعم/لا
         { f: "palette", t: "الألوان", type: "palette" },
         { f: "typography", t: "الخطوط", type: "text", ph: "مثلًا: Cairo للعناوين و IBM Plex للنص" },
-        { f: "derived", t: "ما استنبطه البرنامج", type: "multi", fields: [["theme", "الثيم"], ["logo_rule", "مكان الشعار"], ["logo_description", "وصف الشعار"], ["ui_style", "شكل الواجهة"]] },
-        { f: "analyze", t: "استنبط الهوية من الصور", type: "action" },
+        { f: "intro", t: "الإنترو", type: "video" },
+        { f: "outro", t: "الأوترو", type: "video" },
+        { f: "art_ok", t: "قوالب الرسومات تناسب صفحتي", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
+        { f: "derived", t: "ما استنبطه البرنامج", type: "multi", fields: [["theme", "الثيم"], ["logo_rule", "مكان الشعار"], ["logo_description", "وصف الشعار"], ["ui_style", "شكل الواجهة"]] },   // ومعاه رفع الصور وزرار الاستنباط
       ] },
       { k: "rules", t: "القواعد", en: "Rules", leaves: [
         ...rulesOf(b).map((r, i) => ({ f: "rule", i, t: r, type: "rule" })),
         { f: "rule+", t: "قاعدة جديدة", type: "rule-new" },
       ] },
-      // 🎬 صناعة الفيديو: اللي بيأثر على الفيديو نفسه وهو بيتعمل (الشعار، الإنترو والأوترو، الصوت، الرسومات)
-      { k: "delivery", t: "صناعة الفيديو", en: "Production", leaves: [
-        { f: "logo_on", t: "الشعار على الفيديو", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
-        { f: "intro", t: "الإنترو", type: "video" },
-        { f: "outro", t: "الأوترو", type: "video" },
-        { f: "narrators", t: "صوت الراوي", type: "narr" },
-        { f: "art_ok", t: "قوالب الرسومات تناسب صفحتي", type: "pick", opts: [["1", "نعم"], ["0", "لا"]] },
-      ] },
-      // 📣 النشر: آخر جملة في الفيديو والكابشن. «علّق بكلمة» مكانه إعدادات الردود (نفس الإعداد، بيفتحه من هنا عشان مايبقاش في مكانين)
-      { k: "publish", t: "النشر", en: "Publishing", leaves: [
+      // 📣 التسليم: آخر جملة في الفيديو والكابشن والرابط. «علّق بكلمة» نفس إعداد صفحة الردود (بيفتحها، مش نسخة تانية)
+      { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
         { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: احجز جلسة استشارة" },
         { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
         { f: "pg", i: "bots", page: "bots", t: `💬 «علّق بكلمة»: ${b?.dm_mode === "off" ? "لا" : b?.dm_mode === "always" || (!b?.dm_mode && String(b?.dm_word || "").trim()) ? `في كل منشور «${String(b?.dm_word || "").trim()}»` : "أختار عند النشر"}`, type: "page" },
@@ -120,7 +114,7 @@ const BrandPage = (() => {
     });
   }
   const FIELD_BR = { niche: "identity", about: "identity", audience: "identity", market: "identity", language: "identity", domain: "identity",
-    typography: "look", palette: "look", cta: "publish", link: "publish", caption: "publish" };
+    typography: "look", palette: "look", cta: "delivery", link: "delivery", caption: "delivery" };
   const FIELD_T = { niche: "النيتش", about: "عن العلامة", audience: "الجمهور", market: "السوق", language: "اللغة واللهجة", domain: "المجال", typography: "الخطوط",
     palette: "الألوان", cta: "الـ CTA", link: "الرابط", caption: "الكابشن الافتراضي" };
   const pendBranch = (p) => (p.kind === "field" ? FIELD_BR[p.field] || "identity" : p.kind === "rule" ? "rules" : p.kind === "image" ? "look" : "knowledge");
@@ -148,14 +142,14 @@ const BrandPage = (() => {
   // 🌱 العقل بيتبني قدام العميل: الفرع مايطلعش غير لما يبقى فيه معلومة منه هو (مش اللي البرنامج ملاه لوحده وقت التسجيل).
   // قبلها بيبقى نقطة صغيرة جنب العقل تدوس عليها وتملاها بإيدك. والثابت (المنافسون، الترند، خطة المحتوى، الخوارزميات، المكتبة،
   // الشخصيات) بييجي في الآخر: لما العقل يفهمه (٦٠٪) أو المساعدة تخلّص كلامها معاه، والمنافسون أول ما يتلاقوا
-  const SEED = new Set(["identity", "look", "rules", "delivery", "publish", "knowledge", "improve"]);
+  const SEED = new Set(["identity", "look", "rules", "delivery", "knowledge", "improve"]);
   const lateOn = (b) => (b?.knowledge?.score || 0) >= 60 || !!b?.assistant_done;
   function branchOn(b, br) {
     if (!b) return false;
     const pre = b.prefilled || {}, own = (f) => String(b[f] ?? "").trim() !== String(pre[f] ?? "").trim();
     if (br.leaves.some((l) => l.type === "pending")) return true;
     switch (br.k) {
-      case "identity": case "look": case "delivery": case "publish":
+      case "identity": case "look": case "delivery":
         return br.leaves.some((l) => !["pick", "action", "page", "rule-new", "pending"].includes(l.type) && l.f !== "@name" && filled(b, l) && (l.type !== "text" || own(l.f)));
       case "rules": return rulesOf(b).length > 0 && own("rules");
       case "knowledge": return (b.notes || []).some((x) => x.source !== "field");
@@ -390,7 +384,7 @@ const BrandPage = (() => {
         <i>${p.kind === "question" ? "؟" : ""}</i><span class="bm-tip"><b>${esc(l.t)}</b><small>${esc(String(sub || "").slice(0, 60))}</small><small class="miss">بانتظار موافقتك</small></span></button>`;
     }
     // المعلومات الثابتة (قواعد الخوارزميات، القواعد، المعرفة) لونها لوحدها
-    const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : l.type === "page" ? "go" : ["algo", "rule", "note"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
+    const cls = (l.type === "action" ? "act" : l.type === "rule-new" ? "add" : l.type === "page" ? "go" : ["algo", "rule", "note", "todo"].includes(l.type) ? "full info" : n.on ? "full" : "empty") + (l.sugg ? " sugg" : "");
     // 🏷️ اللي اتكتب في النقطة باين جنبها على طول (أول كام كلمة…)، من غير ما تفتحها
     const lab = l.type === "page" ? l.t.replace(/^\S+\s/, "") : l.type === "rule" ? l.t : l.type === "note" ? l.note.title || "" : n.on ? val : "";
     const side = (S.byId?.[n.from]?.x ?? 0) + 0 > n.x ? "l" : "r";
@@ -819,6 +813,7 @@ const BrandPage = (() => {
         const xs = b?.[l.f] || [];
         return head + `<div class="bm-imgs">${xs.map((x) => `<figure data-file="${esc(x.file)}"><img src="${esc(x.url)}" alt="" loading="lazy" title="${esc(x.description || x.name)}"><button data-adel title="احذف">✕</button></figure>`).join("")}
           <label class="bm-up">+<small>ارفع</small><input type="file" accept="image/*" multiple data-up="${l.f}" hidden></label></div>
+          ${l.f === "logos" ? `<div class="bm-sub"><small>الشعار على الفيديو</small><div class="bm-pills">${[["1", "نعم"], ["0", "لا"]].map(([v, t]) => `<button class="bm-pill${(String(b?.logo_on ?? "") === "0" ? "0" : "1") === v ? " on" : ""}" data-pick="logo_on" data-v="${v}">${t}</button>`).join("")}</div></div>` : ""}
           <p class="bm-note">${l.f === "logos" ? "الشعار بنسخه (فاتح، غامق، أيقونة). يزيل البرنامج خلفيته ويحسّن جودته تلقائيًا بعد الرفع." : "صور حقيقية من العلامة. يصفها البرنامج ويستخدمها كما هي بدلًا من الاختراع."} يمكنك سحب الصور وإفلاتها هنا.</p>` + (l.f === "logos" && xs.length ? lstHTML(b) : "");
       }
       case "video": {
@@ -828,7 +823,9 @@ const BrandPage = (() => {
           <button class="bm-link bad" data-vdel="${l.f}">أزل الفيديو</button>` : `<label class="bm-up wide">+<small>ارفع فيديو</small><input type="file" accept="video/*" data-vup="${l.f}" hidden></label>`)
           + makerHTML(b, l.f);
       }
-      case "multi": return head + `<p class="bm-note">يُكتب تلقائيًا من الشعار والصور، ويمكنك تعديله.</p>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
+      case "multi": return head + `<p class="bm-note">يُكتب تلقائيًا من الشعار والصور، ويمكنك تعديله.</p>
+        <div class="bm-acts"><label class="bm-pill">＋ صور من العلامة<input type="file" accept="image/*" multiple data-up="screens" hidden></label>
+          <button class="bm-go" data-analyze ${b?.status === "working" ? "disabled" : ""}>${b?.status === "working" ? "جارٍ الاستنباط…" : "استنبط من الصور"}</button></div>` + l.fields.map(([k, t]) => `<div class="bm-sub"><small>${t}</small>${editable(k, b?.[k], "…", /logo_description|ui_style|style/.test(k))}</div>`).join("") + suggBox(b, l);
       case "todo": {
         const x = l.todo;
         return head + (x.why ? `<div class="bm-sub"><small>له</small><p class="bm-now">${esc(x.why)}</p></div>` : "") + (x.how ? `<div class="bm-sub"><small>كيف تُصلَح</small><p class="bm-now">${esc(x.how)}</p></div>` : "")
