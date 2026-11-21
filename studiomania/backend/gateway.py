@@ -2611,6 +2611,41 @@ def admin_customer_plan(wid: str, body: AdminPlanIn, request: Request):
     return {"ok": True, "plan": p["key"], "ends_at": ends}
 
 
+# ⏳ مدّ مدة الباقة اللي الأدمن فعّلها (من غير ما النقاط ترجع كاملة)، ولو كتب نقاط: رصيده يبقى العدد ده بالظبط للفترة الجاية
+class AdminExtendIn(BaseModel):
+    days: int = 7
+    points: int | None = None
+
+
+@app.post("/api/platform/customers/{wid}/extend")
+def admin_customer_extend(wid: str, body: AdminExtendIn, request: Request):
+    admin(request)
+    w = workspace(wid)
+    if not w or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    if w["sub_id"]:
+        raise HTTPException(400, "هذا العميل مشترك باشتراك مدفوع يعمل الآن")
+    days = int(body.days)
+    if not 1 <= days <= 365:
+        raise HTTPException(400, "المدة من يوم إلى ٣٦٥ يومًا")
+    if w["plan"] in ("trial", None, ""):
+        raise HTTPException(400, "فعّل باقة أولًا")
+    ends = max(float(w["ends_at"] or 0), time.time()) + days * 86400
+    with closing(db()) as c, c:
+        c.execute("UPDATE workspaces SET ends_at=? WHERE id=?", (ends, wid))
+        if body.points is not None:
+            n = int(body.points)
+            if not 0 <= n <= 1_000_000:
+                raise HTTPException(400, "اكتب عدد نقاط صحيحًا")
+            c.execute("INSERT OR IGNORE INTO wallet (workspace, plan_credits, topup_credits, updated_at) VALUES (?, 0, 0, ?)", (wid, time.time()))
+            r = c.execute("SELECT plan_credits + topup_credits AS t FROM wallet WHERE workspace=?", (wid,)).fetchone()
+            c.execute("UPDATE wallet SET plan_credits=?, topup_credits=0, updated_at=? WHERE workspace=?", (n, time.time(), wid))
+            if n - int(r["t"] or 0):
+                ledger_add(c, wid, n - int(r["t"] or 0), "plan", f"رصيد فترة التجربة ({days} يوم)")
+    _PAID.pop(wid, None)
+    return {"ok": True, "ends_at": ends}
+
+
 # 🎟️ الكوبونات: الأدمن بيعمل كود، والعميل بيكتبه وهو بيسجّل (أو من «باقتي ونقاطي»): نقاط هدية، أو خصم ٪ على الاشتراك والشحن
 class CouponIn(BaseModel):
     code: str
