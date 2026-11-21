@@ -3252,6 +3252,8 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 /* 🗂️ مجموعات القوالب في العجلة والشبكة: لون لكل مجموعة (من ألوان البرنامج)، ورقم القالب بلونها، وخط واسم فوق أول قالب فيها */
 #nh :is(.nh-wc, .mk, .gg-grp) { --g: var(--nh-ink); }
 #nh :is(.nh-wc, .mk, .gg-grp).g-spec { --g: #7C5CFA; }
+#nh :is(.nh-wc, .mk, .gg-grp).g-dphoto { --g: #E5484D; }
+#nh :is(.nh-wc, .mk, .gg-grp).g-car { --g: #2F9E5B; }
 #nh :is(.nh-wc, .mk, .gg-grp).g-shoot { --g: #D9473A; }
 #nh :is(.nh-wc, .mk, .gg-grp).g-typo { --g: #2F7CF6; }
 #nh :is(.nh-wc, .mk, .gg-grp).g-art { --g: var(--nh-ink); }

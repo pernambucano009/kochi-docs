@@ -347,12 +347,15 @@ const Gallery = (() => {
   const ri = (x) => (x.spec ? 0 : 1);
   // 🗂️ القوالب متقسّمة مجموعات بالترتيب ده (صاحب المشروع ١٩ نوفمبر): التصوير ← التايبوجرافي ← الرسومات ← العروض ← آراء العملاء ← المتخصصة.
   //   نفس العجلة ونفس السكرول، وأول قالب في كل مجموعة عليه خط بلونها واسمها، والترقيم ماشي من ١ لآخر قالب
-  const GRPS = [["spec", "قوالب تخصصك"], ["shoot", "قوالب التصوير"], ["typo", "قوالب التايبوجرافي"], ["art", "قوالب الرسومات"],
+  // 🖼️ في «الصور والكاروسيل»: قوالب صور الأسنان (خط أحمر) الأول، وبعدها ستايلات الكاروسيل (خط أخضر)، والترقيم ماشي
+  const GRPS = [["dphoto", "قوالب صور الأسنان"], ["car", "قوالب الكاروسيل"], ["spec", "قوالب تخصصك"], ["shoot", "قوالب التصوير"], ["typo", "قوالب التايبوجرافي"], ["art", "قوالب الرسومات"],
     ["offers", "قوالب العروض"], ["reviews", "قوالب آراء العملاء"], ["special", "قوالب متخصصة"]];
   const G_OFFERS = new Set(["t-price", "t-count"]), G_REVIEWS = new Set(["t-review", "t-signature"]);
   const G_SPECIAL = new Set(["t-tilt", "t-versus", "t-show", "t-map", "t-audiogram", "t-ytintro", "t-launch", "t-notch", "t-screencast", "t-lower", "t-lantern"]);
   const grpOf = (x) => {
     const id = x.alias || x.id;
+    if (x.car) return "car";
+    if (x.dkind === "photo") return "dphoto";
     if (x.spec) return "spec";
     if (id === "phone" || id === "avatar") return "shoot";
     if (id === "hairline" || id === "typo" || /^(ty|st|ot)-/.test(id)) return "typo";

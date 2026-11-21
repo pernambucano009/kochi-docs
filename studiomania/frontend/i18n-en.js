@@ -9945,6 +9945,8 @@ window.I18N_EN = {
   "✓ ألغيت الانتقال، وتبقى على باقتك": "✓ Switch cancelled; you stay on your plan",
   "تنتقل إليها عند التجديد": "You move to it at renewal",
   "تراجع": "Undo",
+  "قوالب صور الأسنان": "Dental photo templates",
+  "قوالب الكاروسيل": "Carousel templates",
   "تُنشر الصورة بمقاس 1080×1350 على الحسابات التي اخترتها.": "The image is published at 1080×1350 to the accounts you chose.",
   "📤 يرسل الصورة...": "📤 Sending the image...",
   "عنوان وسطر في شريحة واحدة": "A headline and one line on a single slide",
