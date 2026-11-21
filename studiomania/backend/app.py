@@ -8406,7 +8406,10 @@ def car_style_asset(sid: str, draw: bool = False, field: str | None = None) -> d
     else:
         files = []
     return {"id": f"cs-{k}", "kind": "template", "name": name, "notes": f"{prompt}. {cz.STYLE_RULE}", "handle": "", "builtin": True,
-            "images": [{"name": f.name, "url": "/" + f.relative_to(FRONTEND_DIR).as_posix() + "?v=2", "path": str(f)} for f in files if f.is_file()]}
+            "images": [{"name": f.name, "url": "/" + f.relative_to(FRONTEND_DIR).as_posix() + "?v=2", "path": str(f),
+                        # 🪶 نسخة صغيرة للعرض بس (المعرض كان بيحمّل كل الشرايح بمقاسها الكامل)، والرسم بياخد الأصلية
+                        "thumb": "/" + (f.parent / "th" / f.name).relative_to(FRONTEND_DIR).as_posix() + "?v=2" if (f.parent / "th" / f.name).is_file() else None}
+                       for f in files if f.is_file()]}
 
 
 @app.get("/api/carousel/library")

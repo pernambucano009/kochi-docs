@@ -332,7 +332,7 @@ const Flow = (() => {
   // 🖼️ أول خطوة «الشكل»: الستايل اللي اختاره، وصورة واحدة أو كاروسيل بعدد شرائحه
   const carOne = (d) => d?.car_n === 1;
   function stStyle(d) {
-    const st = d.car_style || {}, im = (st.images || []).map((x) => x.url), n = d.car_n || 5, one = n === 1;
+    const st = d.car_style || {}, im = (st.images || []).map((x) => x.thumb || x.url), n = d.car_n || 5, one = n === 1;
     const cnt = [3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="flw-carn${n === k ? " on" : ""}" data-carn="${k}">${k.toLocaleString("ar-EG")}</button>`).join("");
     return `<h2>${esc(st.name || "الستايل")}</h2>
       <div class="flw-carfan">${im.map((u, i) => `<img src="${esc(u)}" alt="" style="--i:${i - (im.length - 1) / 2}">`).join("")}</div>

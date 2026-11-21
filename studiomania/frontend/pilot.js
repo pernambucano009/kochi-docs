@@ -355,7 +355,7 @@ const PilotPage = (() => {
       const on = new Set(s.car_styles || []), lib = carStyles();
       box.innerHTML = `<div class="ap-ph"><b>ستايلات الصور والكاروسيل</b><small>${lib.length ? "علّم على ستايل واحد أو أكثر، والأوتوبايلوت يتناوب بينها" : "لا توجد ستايلات بعد: أضفها من صفحة الكاروسيل، وحتى ذلك يصمّم بستايل علامتك"}</small><button type="button" data-popx>تم</button></div>
         <div class="ap-grid">${lib.map((a) => `<button type="button" class="ap-card ${on.has(a.id) ? "on" : ""}" data-styc="${esc(a.id)}">
-          ${a.images?.[0] ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<span class="ck">✓</span><b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
+          ${a.images?.[0] ? `<img src="${esc(a.images[0].thumb || a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<span class="ck">✓</span><b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
         ${lib.length ? "" : `<div class="ap-acts" style="justify-content:center"><button type="button" data-carpage>افتح صفحة الكاروسيل</button></div>`}`;
     }
   }
@@ -372,7 +372,7 @@ const PilotPage = (() => {
     } else if (j.status === "wait" && (j.gate === "shape" || j.gate === "style")) {   // 🔵 البرنامج اختار: موافق، أو جرّب غيره
       const p = String(j.prop || ""), st = carStyles().find((a) => a.id === p);
       const what = j.gate === "shape" ? (p === "1" ? "صورة واحدة" : `كاروسيل ${(+p || 5).toLocaleString("ar-EG")} شرائح`) : (st?.name || "ستايل");
-      body = `<div class="ap-prop">${j.gate === "style" && st?.images?.length ? `<div class="ap-imgs">${st.images.map((im) => `<img src="${esc(im.url)}" alt="" loading="lazy">`).join("")}</div>` : ""}
+      body = `<div class="ap-prop">${j.gate === "style" && st?.images?.length ? `<div class="ap-imgs">${st.images.map((im) => `<img src="${esc(im.thumb || im.url)}" alt="" loading="lazy">`).join("")}</div>` : ""}
         <p class="ap-say">${j.gate === "shape" ? "هيكل المنشور الذي اخترناه" : "الستايل الذي اخترناه"}: <b>${esc(what)}</b></p></div>
         <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">موافق</button><button type="button" data-other="${esc(j.id)}">جرّب غيره</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "wait" && j.gate === "word") {   // 💬 كلمة «علّق بكلمة» اللي هتتقال في آخر الفيديو

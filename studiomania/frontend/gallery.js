@@ -174,8 +174,8 @@ const Gallery = (() => {
     const [cats, niche, tyt, clib] = await Promise.all([api("/api/style-cats").catch(() => []), api("/api/tpl-niche").catch(() => null), api("/api/tytpl").catch(() => []),
       api("/api/carousel/library").catch(() => [])]);
     // 🖼️ الكاروسيل: تصنيف لوحده في العجلة الصغيرة، والعجلة الكبيرة بتلف على ستايلاته
-    S.carItems = (clib || []).filter((a) => a.builtin && (a.images || []).length).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
-      slides: a.images.map((im) => im.url), desc: "صورة واحدة أو كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
+    S.carItems = (clib || []).filter((a) => a.builtin && (a.images || []).length).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.thumb || a.images[0]?.url,
+      slides: a.images.map((im) => im.thumb || im.url), desc: "صورة واحدة أو كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
     S.carItems.forEach((x) => { FIT[x.id] = "*"; });
     S.niche = niche?.key ? niche : { key: "", name: "", art_off: !!niche?.art_off };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
@@ -323,8 +323,15 @@ const Gallery = (() => {
     (document.getElementById("nh") || document.body).appendChild(ov);
     requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("on")));
   }
+  // 🪶 غلاف الفيديو بيتحمّل لما الكارت يقرّب من الشاشة بس (كان المعرض بيحمّل أغلفة الـ ٦٠+ قالب مرة واحدة)
+  function lazyArt(root) {
+    const vs = [...(root?.querySelectorAll("video[data-poster]") || [])];
+    if (!("IntersectionObserver" in window)) return vs.forEach((v) => { v.poster = v.dataset.poster; });
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.poster = e.target.dataset.poster; io.unobserve(e.target); } }), { rootMargin: "900px" });
+    vs.forEach((v) => io.observe(v));
+  }
   function card(x, k) {
-    const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
+    const vid = x.sample_url ? `<video muted loop playsinline preload="none" ${x.cover_url ? `data-poster="${esc(x.cover_url)}"` : ""} data-src="${esc(x.sample_url)}"></video>`
       : x.cover_url ? `<img src="${esc(x.cover_url)}" alt="" loading="lazy">` : `<span class="nh-gal-ph"><i>${x.icon || "✦"}</i><small>فيديو العرض قادم قريبًا</small></span>`;
     const g = grpOf(x), first = !k || grpOf(W.list?.[k - 1]?.[0] || {}) !== g;
     return `<article class="nh-wc g-${g}${x.sample_url || x.cover_url ? "" : " soon"}" tabindex="0" data-wi="${k}" aria-label="${esc(x.name)}">
@@ -506,6 +513,7 @@ const Gallery = (() => {
         <button type="button" class="nh-wh-snd" aria-pressed="${sndOn}" title="صوت العجلة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>${sndOn ? "الصوت يعمل" : "شغّل الصوت"}</span></button></aside>
     </div>`;
     Object.assign(W, { pos: 0, vel: 0, target: 0, mode: "snap", shown: -1, cell: 0, drag: null, el: box.querySelector(".nh-wh") });
+    lazyArt(W.el);
     const want = CATS2.findIndex(([k]) => k === window.GAL_CAT);   // إذا الصفحة فُتحت على قسم بعينه (مثلًا الدبلجة)
     window.GAL_CAT = null;
     Object.assign(C, { pos: Math.max(0, want), target: Math.max(0, want), vel: 0, cur: -1 });
