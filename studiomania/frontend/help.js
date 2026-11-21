@@ -75,7 +75,7 @@ const Help = (() => {
   const ICON_CALL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>`;
   const ICON_ATT = `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>`;
   const pageKey = () => (document.getElementById("nhPage")?.hidden !== false ? "home" : document.getElementById("nhPGrid")?.dataset.key || "home");
-  const pageName = (k) => S.names[k]?.name || "هذه الصفحة";
+  const pageName = (k) => (k === "brainlib" && window.BL_NAME) || S.names[k]?.name || "هذه الصفحة";   // جوه مكتبة المحتويات: اسم الفولدر المفتوح (الأفكار، الصور…)
   const nm = () => S.name || "سعاد";
   function msgHTML(m) {
     const me = m.role === "user";
@@ -263,7 +263,7 @@ const Help = (() => {
     job.addEventListener("click", (e) => { if (e.target.closest("[data-hpjob]")) { seenJob(); toggle(true); } });
     document.body.append(fab, box, t, job);
     let last = "";
-    setInterval(() => { const br = onBrain(); if (br !== !!S.brain) { S.brain = br; if (br && typeof Assistant !== "undefined") Assistant.info?.().then((x) => { S.ainfo = x; tease(); }); ropeGo(); } const k = pageKey() + (br ? "|b" : "") + (document.body.classList.contains("as-docked") || document.querySelector(".as-ov") ? "|c" : ""); if (k !== last) { if (br && last && typeof Assistant !== "undefined") Assistant.info?.().then((x) => { S.ainfo = x; tease(); }); last = k; if (S.closed && S.closed !== pageKey()) S.closed = null; tease(); draw(); } }, 700);
+    setInterval(() => { const br = onBrain(); if (br !== !!S.brain) { S.brain = br; if (br && typeof Assistant !== "undefined") Assistant.info?.().then((x) => { S.ainfo = x; tease(); }); ropeGo(); } const k = pageKey() + (window.BL_NAME || "") + (br ? "|b" : "") + (document.body.classList.contains("as-docked") || document.querySelector(".as-ov") ? "|c" : ""); if (k !== last) { if (br && last && typeof Assistant !== "undefined") Assistant.info?.().then((x) => { S.ainfo = x; tease(); }); last = k; if (S.closed && S.closed !== pageKey()) S.closed = null; tease(); draw(); } }, 700);
     // في العقل: الدايرة بتفتح المكالمة. بعد ما الأسئلة تخلص: المشترك مكالمة مساعدة («محتاج مني حاجة؟»)، والمجاني الشات (من غير تكلفة مكالمة)
     const callOrChat = () => (S.ainfo?.help && !S.ainfo?.full ? toggle(true) : Assistant.open(fab));
     fab.addEventListener("click", () => { if (!S.open && S.brain && typeof Assistant !== "undefined") { document.querySelector(".hp-tease").hidden = true; return callOrChat(); } toggle(); });   // في العقل: الدايرة بتفتح المكالمة

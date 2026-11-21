@@ -56,7 +56,7 @@ const BrainLibPage = (() => {
   // 🗂 المحور: الفولدرات الثمانية بعدد اللي جواها
   async function hub() {
     closeSub();
-    S.tab = null; window.NHBar?.();
+    S.tab = null; window.BL_NAME = null; window.NHBar?.();
     const draw = () => { if (S.tab) return; S.body.innerHTML = `<div class="bl-hub"><p class="pk-note">كل ما يخص علامتك في مكان واحد، وكل ملف يمكنك الإشارة إليه («@») في القالب المخصص.</p>
       <div class="bl-folds">${TABS.map(([k, t]) => `<button type="button" class="bl-fd" data-bltab="${k}"><span class="bl-fi">${fic(k)}</span><b>${esc(t)}</b><small>${S.counts[k] != null ? `${S.counts[k]} ${UNIT[k]}` : "…"}</small></button>`).join("")}</div></div>`; };
     draw();
@@ -293,6 +293,7 @@ const BrainLibPage = (() => {
     if (!TABS.some(([k]) => k === tab)) return hub();
     if (tab !== S.tab) { S.cur = null; S.open = null; S.hits = null; S.q = ""; S.searchOn = false; S.menu = false; }
     S.tab = tab;
+    window.BL_NAME = (TABS.find(([k]) => k === tab) || [])[1] || null;   // اسم الفولدر المفتوح (لـ«اشرح لي» عند المساعدة)
     window.NHBar?.();
     try { S.share = S.share || await api("/api/library/share"); } catch { /* المكتبة تعمل بدونها */ }
     try {
@@ -306,7 +307,7 @@ const BrainLibPage = (() => {
   async function mount(root) {
     const w = root.querySelector("#blWrap");
     if (!w) return;
-    S.el = w; S.body = w.querySelector("#blBody"); S.share = null; S.tab = null;
+    S.el = w; S.body = w.querySelector("#blBody"); S.share = null; S.tab = null; window.BL_NAME = null;
     bind(w);
     const tab = window.BL_TAB, toCases = window.BL_CASES;
     window.BL_TAB = null; window.BL_CASES = null;
