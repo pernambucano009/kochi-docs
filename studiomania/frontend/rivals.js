@@ -47,7 +47,7 @@ const RivalsPage = (() => {
           ${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "جارٍ العمل…")}</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         <div class="pk-acts"><label class="rv-mode" data-tip="${d.algo_mode ? "القواعد خطوات إلزامية في صناعة كل فيديو" : "القواعد نصائح فقط"}"><input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}>وضع الخوارزمية</label>
           ${pkIb("search", `اقترح منافسين آخرين${ct("rivals_discover")}`, `data-rvfind ${busy ? "disabled" : ""}`)}${d.approved ? pkIb("refresh", `حدّث الأرقام${ct("rivals_refresh")}`, `data-rvall ${busy ? "disabled" : ""}`) : ""}
-          ${pkIb("trend", "حلّل آخر ١٠ فيديوهات لك", 'data-rvdw="batch"')}${pkIb("plus", "أضف منافسًا بنفسك", 'data-rvdw="add"', "blk")}</div></div>
+          ${pkIb("plus", "أضف منافسًا بنفسك", 'data-rvdw="add"', "blk")}</div></div>
       ${pend.length ? `<div class="rv-sec"><span class="pk-lbl">مقترحون${where ? ` حسب: <span data-no-i18n>${esc(where)}</span>` : ""}</span><span class="pk-acts"><button class="pk-chip" data-rvokall>وافق على الكل</button><button class="pk-chip" data-rvnoall>ارفض الكل</button></span></div>
         <div class="rv-rows">${hd}${pend.map(row).join("")}</div>` : ""}
       ${oks.length ? `<div class="rv-sec"><span class="pk-lbl">منافسوك المعتمدون</span></div><div class="rv-rows">${pend.length ? "" : hd}${oks.map(row).join("")}</div>` : ""}

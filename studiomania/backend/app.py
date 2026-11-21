@@ -3414,6 +3414,69 @@ def kochi_cleanup():
     return {**left, "kept": kept, "freed_mb": round(max(0, shutil.disk_usage(DATA_DIR).free - before) / 2**20, 1)}
 
 
+class FreshIn(BaseModel):
+    parts: list[str] = []
+
+
+FRESH_PARTS = ("videos", "posts", "notes", "ideas", "avatars", "brain")
+
+
+@app.post("/api/account/fresh")
+def account_fresh(body: FreshIn):
+    """🧹 تنظيف الحساب قبل تسليمه (أو للبدء من جديد): اللي العميل اختاره بس بيتمسح. الباقة والنقاط والحسابات المربوطة بتفضل زي ما هي.
+    videos: المشاريع والفيديوهات (الخام والجاهزة وتجارب المختبر والتايبو والأرشيف) · posts: المنشورات والمجدول · notes: الإشعارات
+    ideas: فولدر الأفكار والمحفوظات · avatars: أفاتاراتك (الجاهزة من سمسم كيت بترجع زي ما هي) · brain: عقل العلامة من الأول."""
+    parts = [x for x in dict.fromkeys(body.parts) if x in FRESH_PARTS]
+    if not parts:
+        raise HTTPException(400, "اختر ما تريد تنظيفه")
+    if "videos" in parts and RENDER_ACTIVE:
+        raise HTTPException(400, "يوجد تصدير يعمل الآن، انتظر حتى ينتهي")
+    done = {}
+    if "videos" in parts:
+        n = 0
+        for sec in WIPE_SECTIONS:
+            try:
+                r = wipe_storage(sec)
+                n += int((r or {}).get("deleted") or 0)
+            except HTTPException:
+                pass
+        for f in list(FLOWS_DIR.glob("*/flow.json")):
+            shutil.rmtree(f.parent, ignore_errors=True)
+            n += 1
+        for d in (GENERATED_DIR, CLIPS_DIR, TMP_DIR):
+            for x in list(d.glob("*")):
+                shutil.rmtree(x, ignore_errors=True) if x.is_dir() else x.unlink(missing_ok=True)
+        done["videos"] = n
+    if "posts" in parts:
+        with closing(db()) as conn, conn:
+            done["posts"] = conn.execute("DELETE FROM posts").rowcount
+    if "notes" in parts:
+        with closing(db()) as conn, conn:
+            done["notes"] = conn.execute("DELETE FROM notifications").rowcount
+    if "ideas" in parts:
+        n = 0
+        for f in list(IDEA_MEM_DIR.glob("*")):
+            shutil.rmtree(f, ignore_errors=True) if f.is_dir() else f.unlink(missing_ok=True)
+            n += 1
+        done["ideas"] = n
+    if "avatars" in parts:
+        n = 0
+        with TWIN_LOCK:
+            for f in list(TWINS_DIR.glob("*/twin.json")):
+                shutil.rmtree(f.parent, ignore_errors=True)
+                n += 1
+        done["avatars"] = n
+    if "brain" in parts:   # العقل نفسه بيفضل (نفس الرقم، عشان كل حاجة مربوطة بيه)، بس فاضي، والاسم بيرجع افتراضي لحد ما العميل يكتبه
+        with closing(db()) as conn, conn:
+            ids = [r["id"] for r in conn.execute("SELECT id FROM ad_brains").fetchall()]
+            for bid in ids:
+                fresh = {"type": "app", **{k: "" for k in BRAIN_FIELDS if k != "type"}, "screens": [], "logos": [], "products": [], "status": "idle"}
+                conn.execute("UPDATE ad_brains SET data = ?, name = ? WHERE id = ?", (json.dumps(fresh, ensure_ascii=False), "عميل جديد", bid))
+        done["brain"] = len(ids)
+    print(f"[fresh] {parts} → {done}", flush=True)
+    return {"ok": True, "done": done}
+
+
 @app.post("/api/storage/clean")
 def clean_storage():
     """يحذف الملفات المؤقتة فقط (صور التايم لاين وبقايا التصدير)، وهي تُنشأ مرة أخرى تلقائيًا عندما تحتاجها."""

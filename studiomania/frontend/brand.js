@@ -1221,7 +1221,7 @@ const BrandPage = (() => {
         if (n.kind === "quiz" && typeof Assistant !== "undefined") { openCard(null); return Assistant.open(node).then((ok) => { if (!ok) { S.qi = null; openCard(n); } }); }
         if (n.kind === "quiz") S.qi = null;
         // 📚 الفرع اللي كل نقطه صفحة واحدة (مكتبة المحتويات، الأفاتار): الفرع نفسه زرار بيدخل الصفحة على طول
-        if (n.kind === "branch" && ["content", "chars"].includes(n.br?.k)) { openCard(null); window.BL_TAB = null; return window.NHNav?.(n.br.k === "content" ? "brainlib" : "twin"); }
+        if (n.kind === "branch" && ["content", "chars", "pulse"].includes(n.br?.k)) { openCard(null); window.BL_TAB = null; window.RV_FOCUS = null; return window.NHNav?.({ content: "brainlib", chars: "twin", pulse: "rivals" }[n.br.k]); }
         if (n.kind === "add" && !S.open) S.addTab = S.addTab || "file";
         if (n.kind === "leaf" && n.l.type === "action") return openCard(n);
         return openCard(n);

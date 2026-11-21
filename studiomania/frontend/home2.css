@@ -3495,3 +3495,6 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 /* 🎨 أمثلة «قوالب الرسومات» في كارت العقل */
 #nh .bm-arts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 4px 0 10px; }
 #nh .bm-arts video { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; background: var(--nh-fill); cursor: pointer; }
+/* 🧹 «ابدأ الحساب من جديد» في الإعدادات */
+.fresh-box { margin-top: 18px; padding: 14px 16px; border-radius: 16px; border: 1px dashed rgba(194, 65, 45, .45); display: grid; gap: 8px; justify-items: start; }
+.fresh-box .chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; margin-inline-end: 14px; }

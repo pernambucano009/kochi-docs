@@ -414,6 +414,19 @@ $("storageInfo").addEventListener("click", async (e) => {
   }
   loadStorage();
 });
+// 🧹 ابدأ الحساب من جديد: اللي متعلّم عليه بس بيتمسح (الباقة والنقاط والحسابات المربوطة بتفضل)
+$("freshGo").onclick = async () => {
+  const parts = [...document.querySelectorAll("[data-fresh]:checked")].map((x) => x.dataset.fresh);
+  if (!parts.length) return toast("اختر ما تريد تنظيفه", true);
+  const names = [...document.querySelectorAll("[data-fresh]:checked")].map((x) => x.parentElement.textContent.trim()).join("، ");
+  if (!(await uiConfirm(`سيُحذف نهائيًا: ${names}.\n\nتبقى الباقة والنقاط والحسابات المربوطة. لا يمكن التراجع عن هذا الحذف.`))) return;
+  $("freshGo").disabled = true;
+  try {
+    await api("/api/account/fresh", { method: "POST", ...jsonBody({ parts }) });
+    toast("نُظّف الحساب");
+    setTimeout(() => location.reload(), 900);
+  } catch (err) { toast(err.message, true); $("freshGo").disabled = false; }
+};
 $("cleanTmp").onclick = async () => {
   try {
     const r = await api("/api/storage/clean", { method: "POST" });
