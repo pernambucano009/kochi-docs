@@ -480,6 +480,20 @@ def mock_plan(slides: int, cta: str | None = None) -> str:
 # 🎨 ستايلات الكاروسيل الجاهزة (اتعتمدت ١٨ نوفمبر): كل ستايل = ٣ شرائح مرجعية (غلاف، محتوى، دعوة) لعلامة تجريبية
 # في frontend/gallery/carstyle/<id>-<0..2>.jpg + وصف. الرسم بياخد التقسيم والخطوط والإحساس من المرجع، والألوان والشعار من العلامة.
 STYLES = {
+    # 🚫👤 ١٢ ستايل من غير ناس خالص (٢١ نوفمبر): كل الشرايح أشياء ورسم وكلام بس، وبيظهروا الأول في كل المجالات
+    "flatlay": ("تصوير من فوق", "top-down flat-lay photo of neatly arranged objects from the brand's world on a solid colored surface, text set in a clean empty area, no people, no hands"),
+    "iso": ("مجسم أيزومتري", "isometric 3D illustration of a small scene of the brand's objects on a floating tile, soft shadows, clean flat colors, no people"),
+    "blueprint": ("مخطط هندسي", "technical blueprint: deep blue grid paper, white thin construction lines, measured line drawings of objects, labels and arrows, no people"),
+    "pixel": ("بكسل", "retro 8-bit pixel art: pixelated objects and icons, chunky pixel frame, limited game palette, game-like score or level badge, no people"),
+    "papercut": ("ورق مقصوص", "layered paper-cut art: several stacked cut paper layers with soft drop shadows forming hills, waves and object shapes, no people"),
+    "chart": ("رسم بياني", "data infographic: one big clear bar or line chart with a highlighted value, thin axes, a big percentage, clean and modern, no people"),
+    "duotone": ("لونين", "duotone photo of one object from the brand's world mapped to two bold brand colors, strong contrast, big headline, no people"),
+    "comic": ("قصة مصورة", "comic strip page: bold black panel borders, halftone dots, action lines and onomatopoeia shapes, objects drawn as heroes (no people), Arabic text in speech-box captions"),
+    "lineart": ("خط واحد", "minimal one-continuous-line drawing of an object in a single color on a plain light background, lots of white space, no people"),
+    "mosaic": ("فسيفساء", "colorful ceramic mosaic tiles forming an object shape and a frame, grout lines, crafted texture, no people"),
+    "stamp": ("طوابع بريد", "vintage postage stamps with perforated edges, postmarks and a postcard texture, each stamp showing an object from the brand's world, no people"),
+    "retro": ("ريترو سبعينات", "1970s retro poster: warm sunburst rays, thick rounded stripes and curves, grainy print texture, groovy rounded Arabic headline, no people"),
+    # 👤 الستايلات اللي فيها ناس بعدهم
     "editorial": ("مجلة", "editorial magazine layout on warm cream paper, a large elegant Arabic serif-style headline, thin black rules, generous margins, page number in a corner"),
     "bold": ("كلام عريض", "bold typographic poster: huge heavy Arabic words filling the slide on a flat bright background in the brand accent color, text in the brand main color, no images"),
     "photo": ("صورة وكلام", "full-bleed realistic photo from the brand's world (objects, places, hands; no faces) with a dark bottom gradient and a white headline over it"),
@@ -504,19 +518,6 @@ STYLES = {
     "poster": ("ملصق سينما", "dramatic movie poster: cinematic lighting on an object from the brand's world (no faces), big title at the bottom, small credits line"),
     "watercolor": ("ألوان مائية", "soft watercolor illustration washes in the brand colors on textured paper, hand-lettered-style Arabic headline"),
     "receipt": ("فاتورة", "the content printed like a long paper receipt or ticket on a solid background: monospaced-style Arabic text, dotted lines, totals, a barcode"),
-    # 🚫👤 ١٢ ستايل من غير ناس خالص (٢١ نوفمبر): كل الشرايح أشياء ورسم وكلام بس
-    "flatlay": ("تصوير من فوق", "top-down flat-lay photo of neatly arranged objects from the brand's world on a solid colored surface, text set in a clean empty area, no people, no hands"),
-    "iso": ("مجسم أيزومتري", "isometric 3D illustration of a small scene of the brand's objects on a floating tile, soft shadows, clean flat colors, no people"),
-    "blueprint": ("مخطط هندسي", "technical blueprint: deep blue grid paper, white thin construction lines, measured line drawings of objects, labels and arrows, no people"),
-    "pixel": ("بكسل", "retro 8-bit pixel art: pixelated objects and icons, chunky pixel frame, limited game palette, game-like score or level badge, no people"),
-    "papercut": ("ورق مقصوص", "layered paper-cut art: several stacked cut paper layers with soft drop shadows forming hills, waves and object shapes, no people"),
-    "chart": ("رسم بياني", "data infographic: one big clear bar or line chart with a highlighted value, thin axes, a big percentage, clean and modern, no people"),
-    "duotone": ("لونين", "duotone photo of one object from the brand's world mapped to two bold brand colors, strong contrast, big headline, no people"),
-    "comic": ("قصة مصورة", "comic strip page: bold black panel borders, halftone dots, action lines and onomatopoeia shapes, objects drawn as heroes (no people), Arabic text in speech-box captions"),
-    "lineart": ("خط واحد", "minimal one-continuous-line drawing of an object in a single color on a plain light background, lots of white space, no people"),
-    "mosaic": ("فسيفساء", "colorful ceramic mosaic tiles forming an object shape and a frame, grout lines, crafted texture, no people"),
-    "stamp": ("طوابع بريد", "vintage postage stamps with perforated edges, postmarks and a postcard texture, each stamp showing an object from the brand's world, no people"),
-    "retro": ("ريترو سبعينات", "1970s retro poster: warm sunburst rays, thick rounded stripes and curves, grainy print texture, groovy rounded Arabic headline, no people"),
 }
 STYLE_RULE = ("The references show an EXAMPLE brand («نادي الحركة», green and lime): never copy its name, its text, its photos or its colors. "
               "Copy only the design system (layout, typography treatment, decoration, mood) and apply it to this brand's colors and content. "
