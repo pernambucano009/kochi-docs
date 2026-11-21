@@ -63,6 +63,27 @@ def has_feature(key: str) -> bool:
     return bool(plan.get(key)) or bool(key in r.keys() and r[key])
 
 
+def brands_limit() -> int | None:
+    """🏷️ كام علامة مسموح للعميل: اللي في باقته + العلامات الزيادة اللي اشتراها. None = مفيش حد (صاحب البرنامج، أو القاعدة وقعت)."""
+    if free():
+        return None
+    try:
+        with closing(_db()) as c:
+            r = c.execute("SELECT * FROM workspaces WHERE id=?", (TENANT,)).fetchone()
+    except sqlite3.Error:
+        return None
+    if not r:
+        return 1
+    plans = {p["key"]: p for p in billing.DEFAULTS["plans"]}
+    try:
+        plans.update({p["key"]: {**plans.get(p["key"], {}), **p} for p in billing.config(__import__("pathlib").Path(PDB).parent)["plans"]})
+    except Exception:  # noqa: BLE001
+        pass
+    base = int((plans.get(r["plan"]) or {}).get("brands") or 1)
+    extra = int((r["extra_brands"] if "extra_brands" in r.keys() else 0) or 0)
+    return base + extra
+
+
 def credits(usd: float) -> int:
     return max(1, billing.credits_for(usd)) if usd > 0 else 0
 

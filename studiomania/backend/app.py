@@ -3958,6 +3958,20 @@ def acct_visible(account_id: str | None) -> bool:
     return not cur or acct_brand_of(account_id) == cur
 
 
+def inbox_merged() -> bool:
+    """📥 العميل اختار يشوف رسايل وتعليقات كل علاماته في صندوق واحد (بدل كل علامة لوحدها)."""
+    try:
+        return auth.get_setting("inbox_merge") == "1"
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def inbox_brand(account_id: str | None) -> str:
+    """اسم العلامة اللي الحساب ده بتاعها (بيظهر جنب الرسالة لما الصندوق مدموج)."""
+    bid = acct_brand_of(account_id)
+    return str((brain_row(bid) or {}).get("name") or "") if bid else ""
+
+
 def acct_tag(lst: list[dict]) -> list[dict]:
     """الحسابات بالبراند بتاعها، والجديد منها (أول مرة يظهر) يتسجّل على البراند المفتوح."""
     m = acct_brands()
@@ -5001,7 +5015,10 @@ def _inbox_call(fn, *args):
 @app.get("/api/inbox/comments")
 def inbox_posts(cursor: str | None = None, all: bool = False):  # noqa: A002
     r = _inbox_call(publisher.inbox_posts, 50, cursor, 0 if all else 1)   # all=1: كل المنشورات (اختيار منشور في «علّق بكلمة»)
-    r["posts"] = [p for p in r.get("posts") or [] if acct_visible(p.get("account_id"))]   # تعليقات حسابات البراند المفتوح بس
+    if inbox_merged():   # 📥 صندوق واحد لكل العلامات، وجنب كل منشور اسم علامته
+        r["posts"] = [{**p, "brand": inbox_brand(p.get("account_id"))} for p in r.get("posts") or []]
+    else:
+        r["posts"] = [p for p in r.get("posts") or [] if acct_visible(p.get("account_id"))]   # تعليقات حسابات البراند المفتوح بس
     return r
 
 
@@ -5029,8 +5046,28 @@ def inbox_conversations(cursor: str | None = None):
     r = _inbox_call(publisher.inbox_conversations, 50, cursor)
     key = next((k for k in ("conversations", "items", "data") if isinstance(r.get(k), list)), None)
     if key:   # رسائل حسابات البراند المفتوح بس
-        r[key] = [c for c in r[key] if acct_visible(c.get("account_id") or c.get("accountId"))]
+        if inbox_merged():
+            r[key] = [{**c, "brand": inbox_brand(c.get("account_id") or c.get("accountId"))} for c in r[key]]
+        else:
+            r[key] = [c for c in r[key] if acct_visible(c.get("account_id") or c.get("accountId"))]
     return r
+
+
+class InboxMergeIn(BaseModel):
+    on: bool
+
+
+@app.get("/api/inbox/merge")
+def inbox_merge_get():
+    with closing(db()) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM ad_brains").fetchone()[0]
+    return {"on": inbox_merged(), "brands": n}
+
+
+@app.put("/api/inbox/merge")
+def inbox_merge_set(body: InboxMergeIn):
+    auth.set_setting("inbox_merge", "1" if body.on else "0")
+    return inbox_merge_get()
 
 
 @app.get("/api/inbox/conversations/{conv_id}/messages")
@@ -12928,6 +12965,12 @@ PLACEHOLDER_NAMES = {"", "عميلي", "عميل جديد", "علامة جديد
 
 @app.post("/api/ad-brains")
 def create_brain(body: BrainIn):
+    lim = wallet.brands_limit()   # 🏷️ عدد العلامات من الباقة (+ اللي اشتراه زيادة). اللي عنده أكتر من قبل كده بيفضلوا، بس مايزودش
+    if lim is not None:
+        with closing(db()) as conn:
+            have = conn.execute("SELECT COUNT(*) FROM ad_brains").fetchone()[0]
+        if have >= lim:
+            raise HTTPException(402, f"عدد العلامات في باقتك: {lim}. أضف علامة من «باقتي ونقاطي» ← «إضافة ميزات».")
     bid = uuid.uuid4().hex[:12]
     data = {"type": "app", **{k: str(body.fields.get(k) or "") for k in BRAIN_FIELDS if k != "type"},
             "screens": [], "logos": [], "products": [], "status": "idle"}

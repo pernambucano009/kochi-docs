@@ -49,6 +49,7 @@ const PlansPage = (() => {
           const feat = kind === "feat" ? key : "";
           const r = await api("/api/billing/checkout", { method: "POST", ...jsonBody({ provider, kind: feat ? "plan" : kind, plan: feat ? d.plan : kind === "plan" ? key : "", topup: kind === "topup" ? key : "",
             accounts: (d.extra_accounts || 0) + (feat === "account" ? 1 : 0), autopilot: !!d.autopilot || feat === "autopilot", bots: !!d.bots || feat === "bots",
+            brands: (d.extra_brands || 0) + (feat === "brand" ? 1 : 0),
             cycle: feat ? d.cycle || "month" : cycle }) });
           try { sessionStorage.removeItem("pv.feat"); } catch { /* */ }
           if (!r.url) throw new Error("لم تُفتح صفحة الدفع، جرّب مرة أخرى");

@@ -85,10 +85,29 @@ const FloatCanvas = (() => {
       if (!d || e.pointerId !== d.pid) return;
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
       if (!d.moved) { d.moved = true; vp.setPointerCapture(e.pointerId); d.el.classList.add("fc-held"); }
-      const [wx, wy] = toWorld(e.clientX, e.clientY), x = Math.round(wx + d.ox), y = Math.round(wy + d.oy);
-      setPos(d.el, x, y);
-      opt.onMove?.(d.id, x, y);
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      d.tx = wx + d.ox; d.ty = wy + d.oy;
+      spring(d);
     });
+    // 🪀 السحب فيه حياة: العنصر بيلحق الماوس بنعومة (مش لازق فيه)، وبيميل ويتمطّ شوية على قد سرعته، ولما تسيبه بيهدى ويرجع مستقيم
+    function spring(d) {
+      if (d.raf) return;
+      const f = d.el.querySelector(".fc-f") || d.el;
+      if (d.x == null) { d.x = +d.el.dataset.x; d.y = +d.el.dataset.y; }
+      const step = () => {
+        const vx = d.tx - d.x, vy = d.ty - d.y;
+        d.x += vx * 0.22; d.y += vy * 0.22;
+        const x = Math.round(d.x), y = Math.round(d.y);
+        setPos(d.el, x, y);
+        opt.onMove?.(d.id, x, y);
+        const sp = Math.min(1, Math.hypot(vx, vy) / 120);
+        f.style.rotate = `${Math.max(-14, Math.min(14, vx * 0.12))}deg`;
+        f.style.scale = `${1.06 + sp * 0.06} ${1.06 - sp * 0.04}`;
+        if (Math.hypot(vx, vy) > 0.4 || C.drag === d) d.raf = requestAnimationFrame(step);
+        else { d.raf = null; f.style.rotate = ""; f.style.scale = ""; setPos(d.el, Math.round(d.tx), Math.round(d.ty)); }
+      };
+      d.raf = requestAnimationFrame(step);
+    }
     const up = (e) => {
       C.pts.delete(e.pointerId);
       if (C.pts.size < 2) C.pinch = null;
@@ -96,7 +115,7 @@ const FloatCanvas = (() => {
       const d = C.drag;
       if (d && e.pointerId === d.pid) {
         C.drag = null;
-        if (d.moved) { C.noClick = true; d.el.classList.remove("fc-held"); C.pos[d.id] = [+d.el.dataset.x, +d.el.dataset.y]; save(opt.key, C.pos); }
+        if (d.moved) { C.noClick = true; d.el.classList.remove("fc-held"); C.pos[d.id] = [Math.round(d.tx), Math.round(d.ty)]; save(opt.key, C.pos); }
       }
       if (C.noClick) setTimeout(() => (C.noClick = false), 0);
     };

@@ -276,13 +276,14 @@ const PlansView = (() => {
     function feats() {
       const p = curP();
       if (guest || d.owner || !p || p.once || !p.price) return [];
-      return ADDONS.filter((a) => a.key === "account" || ((!a.for || a.for.includes(p.key)) && !p[a.key] && !d[a.key]));
+      return ADDONS.filter((a) => a.key === "account" || a.key === "brand" || ((!a.for || a.for.includes(p.key)) && !p[a.key] && !d[a.key]));
     }
     function featTotal(key) {   // الاشتراك الشهري بعد الإضافة (هو اللي هيتدفع دلوقتي ويتجدد بيه)
       const p = curP(), A = Object.fromEntries(ADDONS.map((a) => [a.key, a]));
       const acc = (d.extra_accounts || 0) + (key === "account" ? 1 : 0);
       const ap = !p.autopilot && (d.autopilot || key === "autopilot"), bt = !p.bots && (d.bots || key === "bots");
-      const mo = p.price + acc * (A.account?.price || 0) + (ap ? A.autopilot?.price || 0 : 0) + (bt ? A.bots?.price || 0 : 0);
+      const eb = (d.extra_brands || 0) + (key === "brand" ? 1 : 0);
+      const mo = p.price + acc * (A.account?.price || 0) + (ap ? A.autopilot?.price || 0 : 0) + (bt ? A.bots?.price || 0 : 0) + eb * (A.brand?.price || 0);
       return (d.cycle || "month") === "year" ? mo * ym : mo;
     }
     // 💾 مساحة تخزين إضافية (بالنقاط، وبتفضل مع الحساب): بتتشري من هنا كمان
@@ -296,7 +297,7 @@ const PlansView = (() => {
       if (!f.length && !S.store?.pack) return "";
       const want = (() => { try { return sessionStorage.getItem("pv.feat") || ""; } catch { return ""; } })();
       return `<div class="pv-cont pv-feat open"><b class="ttl" style="padding-inline-start:10px">إضافة ميزات</b><span class="sep"></span>
-        ${f.map((a) => `<button class="tp${want === a.key ? " pick" : ""}" data-pvfeat="${esc(a.key)}">+ ${esc(a.key === "account" ? "حساب سوشيال" : a.name)} <small><span class="num">${sar(a.price)}</span> ر.س / شهر</small></button>`).join("")}${storeB()}</div>`;
+        ${f.map((a) => `<button class="tp${want === a.key ? " pick" : ""}" data-pvfeat="${esc(a.key)}">+ ${esc(a.key === "account" ? "حساب سوشيال" : a.key === "brand" ? "علامة" : a.name)} <small><span class="num">${sar(a.price)}</span> ر.س / شهر</small></button>`).join("")}${storeB()}</div>`;
     }
     // 🎟️ كود الخصم: يكتبه هنا في أي وقت (نقاط هدية أو خصم ٪ على الاشتراك والشحن)، والخصم الشغّال بيبان
     function coupon() {

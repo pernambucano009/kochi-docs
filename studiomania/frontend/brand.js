@@ -359,7 +359,7 @@ const BrandPage = (() => {
       const tr = S.trFor === b?.id ? S.tr : null, nw = tr?.new || 0;
       return `<button class="bm-n bm-trends${nw ? " has" : ""}${tr?.status === "working" ? " busy" : ""}" data-n="trends" title="الترند الرائج الآن في سوقك (حدّثه بضغطة)">
         <span class="bm-trbox">${svg(IC.trends, 18)}<b>الترند</b>${nw ? `<em class="num">${nw}</em>` : ""}</span>
-        <small>${tr?.status === "working" ? "جارٍ البحث…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
+        <small class="bm-trsub"${tr?.market ? ` title="${esc(tr.market)}"` : ""}>${tr?.status === "working" ? "جارٍ البحث…" : tr ? `${(tr.items || []).length} ترند${tr.market ? ` · ${esc(tr.market)}` : ""}` : ""}</small></button>`;
     }
     if (n.kind === "plan") {
       if (b && S.plFor !== b.id && S.plLoading !== b.id) loadPlan(b);
@@ -1387,6 +1387,8 @@ const BrandPage = (() => {
         try {
           const b = await api("/api/ad-brains", { method: "POST", ...jsonBody({ name: v, fields: {} }) });
           S.brains.push(b); S.id = b.id; await api("/api/clients/active", { method: "PUT", ...jsonBody({ id: b.id }) }).catch(() => {});
+          // 📥 أول علامة تانية: رسايل وتعليقات كل العلامات في صندوق واحد ولا كل علامة لوحدها؟ (تتغيّر بعدين من الإعدادات)
+          if (S.brains.length === 2) { const one = await uiConfirm("هل تريد رسائل وتعليقات كل علاماتك في صندوق واحد؟ (يظهر بجانب كل رسالة اسم علامتها). أو اختر «إلغاء» لتبقى كل علامة منفصلة."); api("/api/inbox/merge", { method: "PUT", ...jsonBody({ on: !!one }) }).catch(() => {}); }
           openCard(null); layout(); loadClients(); if (S.byId?.quiz) openCard(S.byId.quiz);
         } catch (err) { toast(err.message, true); }
         return;

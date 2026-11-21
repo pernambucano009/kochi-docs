@@ -5,11 +5,13 @@ const PlanItems = (() => {
     ar: { base: ["كل الأدوات والقوالب", "عقل العلامة"], acc1: (n) => (n === 2 ? "حسابان للنشر على التواصل الاجتماعي" : `${n} حسابات للنشر على التواصل الاجتماعي`),
       sched: "جدولة ونشر", inbox: "التعليقات والرسائل", accN: (n, m) => `${n} حسابات تواصل اجتماعي${m ? ` (حتى ${m})` : ""}`,
       pilot: "الأوتوبايلوت: يصنع وينشر تلقائيًا", addon: (p) => `الأوتوبايلوت إضافة بـ ${p} ر.س شهريًا`, nopub: "دون نشر",
-      bots: "بوت الردود الآلية على التعليقات والرسائل", botsAdd: (p) => `بوت الردود الآلية إضافة بـ ${p} ر.س شهريًا` },
+      bots: "بوت الردود الآلية على التعليقات والرسائل", botsAdd: (p) => `بوت الردود الآلية إضافة بـ ${p} ر.س شهريًا`,
+      brands: (n) => (n === 1 ? "علامة واحدة" : n === 2 ? "علامتان" : `${n} علامات`) },
     en: { base: ["All tools and templates", "Brand brain"], acc1: (n) => `${n} social accounts for publishing`,
       sched: "Scheduling and publishing", inbox: "Comments and messages", accN: (n, m) => `${n} social accounts${m ? ` (up to ${m})` : ""}`,
       pilot: "Autopilot: makes and posts on its own", addon: (p) => `Autopilot add-on, ${p} SAR a month`, nopub: "No publishing",
-      bots: "Auto-reply bot for comments and messages", botsAdd: (p) => `Auto-reply bot add-on, ${p} SAR a month` },
+      bots: "Auto-reply bot for comments and messages", botsAdd: (p) => `Auto-reply bot add-on, ${p} SAR a month`,
+      brands: (n) => (n === 1 ? "One brand" : `${n} brands`) },
   };
   const sar = (v) => Math.round(v * 3.76);
   // p: الباقة، prev: اللي قبلها، addons: إضافات /api/pricing، lang: "ar" أو "en"
@@ -18,6 +20,7 @@ const PlanItems = (() => {
     if (!prev) out.push(...t.base);
     if (p.accounts && !(prev && prev.accounts)) out.push(t.acc1(p.accounts), t.sched, t.inbox);
     else if (prev && p.accounts > prev.accounts) out.push(t.accN(p.accounts, p.max_accounts));
+    if (p.brands && (!prev || p.brands > (prev.brands || 1))) out.push(t.brands(p.brands));   // 🏷️ عدد العلامات
     if (p.autopilot && !(prev && prev.autopilot)) out.push(t.pilot);
     const ap = !p.autopilot && (addons || []).find((a) => a.key === "autopilot" && (a.for || []).includes(p.key));
     if (ap) out.push(t.addon(sar(ap.price)));

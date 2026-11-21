@@ -414,6 +414,9 @@ $("storageInfo").addEventListener("click", async (e) => {
   }
   loadStorage();
 });
+// 📥 صندوق واحد لكل العلامات ولا كل علامة لوحدها (بيظهر بس لو عنده أكتر من علامة)
+api("/api/inbox/merge").then((m) => { if (m.brands > 1) { $("mergeBox").hidden = false; $("mergeOn").checked = !!m.on; } }).catch(() => {});
+$("mergeOn").onchange = (e) => api("/api/inbox/merge", { method: "PUT", ...jsonBody({ on: e.target.checked }) }).then(() => toast("حُفظ")).catch((err) => toast(err.message, true));
 // 🧹 ابدأ الحساب من جديد: اللي متعلّم عليه بس بيتمسح (الباقة والنقاط والحسابات المربوطة بتفضل)
 $("freshGo").onclick = async () => {
   const parts = [...document.querySelectorAll("[data-fresh]:checked")].map((x) => x.dataset.fresh);

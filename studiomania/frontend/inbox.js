@@ -106,7 +106,7 @@ function ibRenderComments() {
         <div class="ib-rtext"><div class="ib-rtop"><b>${escapeHtml(c.name || c.username || "—")}</b><small>${c.created_at ? ntfAgo(c.created_at) : ""}</small>${ibWaiting(c) ? `<span class="ib-wait">ينتظر الرد</span>` : ""}</div>
           <p dir="auto">${escapeHtml(c.text)}</p>
           ${(c.replies || []).filter((r) => r.mine).map((r) => `<p class="ib-mine" dir="auto">↩ ${escapeHtml(r.text)}</p>`).join("")}</div>
-        ${ibPlat(c.post?.platform)}${ibPostIc(c.post)}</div>
+        ${c.post?.brand ? `<span class="ib-brand">${escapeHtml(c.post.brand)}</span>` : ""}${ibPlat(c.post?.platform)}${ibPostIc(c.post)}</div>
       ${ib.open === `c:${c.id}` ? ibComposer(`c:${c.id}`) : ""}</li>`).join("")}</ul>`
     : `<p class="empty">لا توجد تعليقات بعد.</p>`;
 }
@@ -118,7 +118,7 @@ function ibRenderConvs() {
       <div class="ib-rmain">${ibAv(c.picture, c.name)}
         <div class="ib-rtext"><div class="ib-rtop"><b>${escapeHtml(c.name || "—")}</b><small>${c.updated_at ? ntfAgo(c.updated_at) : ""}</small>${c.unread ? `<span class="ib-unread">${c.unread}</span>` : ""}${c.request ? `<span class="ib-wait">طلب رسالة</span>` : ""}</div>
           <p dir="auto">${escapeHtml(c.last || "")}</p></div>
-        ${ibPlat(c.platform)}</div></li>`).join("")}</ul>`
+        ${c.brand ? `<span class="ib-brand">${escapeHtml(c.brand)}</span>` : ""}${ibPlat(c.platform)}</div></li>`).join("")}</ul>`
     : `<p class="empty">لا توجد رسائل بعد.</p>`;
 }
 async function ibOpenConv(id) {

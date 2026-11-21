@@ -19,15 +19,15 @@ PAY_FEE = (0.03, 0.30)  # عمولة سترايب / باي بال التقريب
 
 DEFAULTS = {
     "plans": [
-        {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0,
+        {"key": "trial", "name": "تجربة مجانية", "name_en": "Free trial", "price": 0, "credits": 300, "accounts": 0, "brands": 1,
          "autopilot": False, "once": True,
          "note": "٣٠٠ نقطة مرة واحدة؛ ربط الحسابات والنشر في الباقات المدفوعة فقط"},
-        {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "autopilot": False, "bots": False},
-        {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "autopilot": True, "bots": True, "popular": True},
+        {"key": "starter", "name": "بداية", "name_en": "Starter", "price": 29, "credits": 1000, "accounts": 2, "brands": 1, "autopilot": False, "bots": False},
+        {"key": "pro", "name": "محترف", "name_en": "Pro", "price": 79, "credits": 3500, "accounts": 4, "brands": 3, "autopilot": True, "bots": True, "popular": True},
         # 🏆 أعلى باقة: النقطة فيها أرخص بحوالي ٧٠٪ من «محترف» (٣٠ ألف نقطة)، وتكفي ٩٠ بوست في الشهر بالأوتوبايلوت
         # (٣ في اليوم، فيديوهات أو كاروسيل) من غير ما العميل يحتاج يشحن. والنقط الزيادة ليها بالضعف (نص السعر).
         # أسوأ حالة (كل النقط اتصرفت على توليد + ١٠ حسابات بأغلى سعر Zernio) لسه مكسب: plan_margin.
-        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "autopilot": True, "bots": True,
+        {"key": "agency", "name": "وكالات", "name_en": "Agency", "price": 199, "credits": 30000, "accounts": 10, "brands": 10, "autopilot": True, "bots": True,
          "max_accounts": 25, "topup_bonus": 2,
          "features": ["النقطة أرخص بحوالي ٧٠٪ من «محترف»",
                       "تكفي ٩٠ منشورًا شهريًا بالأوتوبايلوت",
@@ -41,6 +41,8 @@ DEFAULTS = {
         {"key": "autopilot", "name": "أوتوبايلوت", "name_en": "Autopilot", "price": 15, "unit": "في الشهر", "for": ["starter"]},
         # 🤖 بوت الردود الآلية على التعليقات والرسائل (التعليقات والرسائل نفسها في كل الباقات، البوت من «محترف»)
         {"key": "bots", "name": "بوت الردود الآلية", "name_en": "Auto-reply bot", "price": 15, "unit": "في الشهر", "for": ["starter"]},
+        # 🏷️ علامة زيادة (عقل ومشاريع وأفكار لوحدها) فوق عدد العلامات اللي في الباقة: ٢٠ ر.س في الشهر (الأسعار هنا بالدولار × ٣٫٧٦)
+        {"key": "brand", "name": "علامة زيادة", "name_en": "Extra brand", "price": 5.32, "unit": "للعلامة في الشهر"},
     ],
     # نقط زيادة لما نقط الباقة تخلص: أغلى من النقطة العادية (السنت)
     "topups": [
@@ -75,6 +77,8 @@ def config(data_dir: Path) -> dict:
     for p in cfg["plans"]:
         if "bots" not in p:
             p["bots"] = bool(dflt.get(p["key"], {}).get("bots"))
+        if "brands" not in p:
+            p["brands"] = int(dflt.get(p["key"], {}).get("brands") or 1)
     return cfg
 
 
@@ -109,8 +113,8 @@ def yearly(cfg: dict, monthly: float) -> float:
     return round(monthly * int(cfg["rules"].get("yearly_months", 10)), 2)
 
 
-def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool = False, bots: bool = False) -> dict:
-    """باقة على مقاسك: باقة أساسية + حسابات زيادة + أوتوبايلوت + بوت الردود الآلية."""
+def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool = False, bots: bool = False, extra_brands: int = 0) -> dict:
+    """باقة على مقاسك: باقة أساسية + حسابات زيادة + أوتوبايلوت + بوت الردود الآلية + علامات زيادة."""
     p = next((x for x in cfg["plans"] if x["key"] == plan and not x.get("once")), None)
     if not p:
         raise ValueError("هذه الباقة غير موجودة")
@@ -127,4 +131,7 @@ def custom_total(cfg: dict, plan: str, extra_accounts: int = 0, autopilot: bool 
     if bots and not bt and "bots" in add and plan in add["bots"].get("for", []):
         total += add["bots"]["price"]
         bt = True
-    return {"plan": plan, "accounts": p["accounts"] + extra_accounts, "autopilot": ap, "bots": bt, "credits": p["credits"], "total": total}
+    extra_brands = max(0, min(50, int(extra_brands or 0))) if "brand" in add else 0
+    total = round(total + extra_brands * (add["brand"]["price"] if extra_brands else 0), 2)
+    return {"plan": plan, "accounts": p["accounts"] + extra_accounts, "autopilot": ap, "bots": bt, "credits": p["credits"], "total": total,
+            "brands": int(p.get("brands") or 1) + extra_brands, "extra_brands": extra_brands}
