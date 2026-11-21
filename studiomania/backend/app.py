@@ -32473,7 +32473,7 @@ def post_defaults(brain: dict | None) -> dict:
     word = str(b.get("dm_word") or dm_def.get("word") or "").strip()
     cta = str(b.get("cta") or "").strip() or algo.funnel_cta(b)
     return {"cta_mode": "off" if b.get("cta_mode") == "off" else "always", "cta": cta,
-            "dm_mode": b.get("dm_mode") if b.get("dm_mode") in ("always", "ask", "off") else ("always" if word else "ask"),
+            "dm_mode": b.get("dm_mode") if b.get("dm_mode") in ("always", "ask", "off") else ("always" if word else "off"),   # 🎬 «آخر الفيديو» اختيار واحد: من غير إعداد ← الـ CTA
             "dm_word": word, "dm_message": dm_def.get("message") or "", "dm_reply": dm_def.get("reply") or ""}
 
 
@@ -32549,8 +32549,8 @@ def flow_publish_pack(fid: str, fresh: bool = False):
             raw["cta"] = ""
         elif pdf["cta"] and not raw.get("cta"):
             raw["cta"] = pdf["cta"]
-        if pdf["dm_mode"] == "always" and pdf["dm_word"] and pdf["dm_word"] not in str(raw.get("cta") or ""):
-            raw["cta"] = (str(raw.get("cta") or "") + f"\nعلّق بكلمة «{pdf['dm_word']}» وتوصلك رسالة على الخاص").strip()
+        if pdf["dm_mode"] == "always" and pdf["dm_word"]:   # 🎬 «علّق بكلمة» هي الدعوة الوحيدة (زي آخر جملة في الفيديو)
+            raw["cta"] = f"علّق بكلمة «{pdf['dm_word']}» وتوصلك رسالة على الخاص"
         try:
             caption = dub.fix_dialect(algo.assemble_caption(raw, brain if pdf["cta_mode"] != "off" else {}, False), lang)
         except Exception as exc:  # noqa: BLE001

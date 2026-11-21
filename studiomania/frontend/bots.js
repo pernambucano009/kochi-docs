@@ -127,7 +127,7 @@ const BotsPage = (() => {
     try {
       const brains = await api("/api/ad-brains"), list = Array.isArray(brains) ? brains : [];
       const b = list.find((x) => x.id === clientx?.active) || list[0] || {};
-      S.pub = { bid: b.id, mode: b.dm_mode || (String(b.dm_word || "").trim() ? "always" : "ask"), word: b.dm_word || "" };
+      S.pub = { bid: b.id, mode: b.dm_mode || (String(b.dm_word || "").trim() ? "always" : "off"), word: b.dm_word || "" };
     } catch { S.pub = null; }
   }
   function bind(w) {

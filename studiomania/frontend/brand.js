@@ -70,8 +70,8 @@ const BrandPage = (() => {
       // 📣 التسليم: آخر جملة في الفيديو والكابشن والرابط. «علّق بكلمة» نفس إعداد صفحة الردود (بيفتحها، مش نسخة تانية)
       { k: "delivery", t: "التسليم", en: "Delivery", leaves: [
         { f: "cta", t: "الـ CTA", type: "text", ph: "مثلًا: احجز جلسة استشارة" },
-        { f: "cta_mode", t: "الدعوة في آخر كل فيديو", type: "pick", opts: [["always", "دائمًا"], ["off", "لا"]] },
-        { f: "pg", i: "bots", page: "bots", t: `💬 «علّق بكلمة»: ${b?.dm_mode === "off" ? "لا" : b?.dm_mode === "always" || (!b?.dm_mode && String(b?.dm_word || "").trim()) ? `في كل منشور «${String(b?.dm_word || "").trim()}»` : "أختار عند النشر"}`, type: "page" },
+        // 🎬 آخر الفيديو: اختيار واحد (الاتنين مايتجمعوش في آخر جملة): دعوة الـ CTA، أو «علّق بكلمة» فتوصله رسالة على الخاص، أو من غير دعوة
+        { f: "end_mode", t: "آخر الفيديو", type: "pick", opts: [["cta", "دعوة الـ CTA"], ["dm", "«علّق بكلمة» فتصله رسالة"], ["off", "بدون دعوة"]] },
         { f: "link", t: "الرابط", type: "text", ph: "https://…", ltr: true },
         { f: "caption", t: "الكابشن الافتراضي", type: "text", ph: "{caption}\n\n{cta} 👇\n{link}\n#وسم", hint: "{caption} تعليق الفيديو النصي · {cta} الدعوة · {link} الرابط. توضع تلقائيًا وقت النشر." },
       ] },
@@ -161,7 +161,10 @@ const BrandPage = (() => {
   // الشعار على الفيديو شغّال من الأول (أي قيمة غير «0» معناها نعم)، فمايظهرش كأنه خانة فاضية
   const pickRaw = (b, l) => (l.f === "logo_on" ? (String(b?.logo_on ?? "") === "0" ? "0" : "1")
     : l.f === "cta_mode" ? (b?.cta_mode === "off" ? "off" : "always")   // 📣 نفس الافتراضي اللي السيرفر بيستخدمه
-    : l.f === "dm_mode" ? (b?.dm_mode || (String(b?.dm_word || "").trim() ? "always" : "ask")) : String(b?.[l.f] || ""));
+    : l.f === "dm_mode" ? (b?.dm_mode || (String(b?.dm_word || "").trim() ? "always" : "off"))
+    : l.f === "end_mode" ? endMode(b) : String(b?.[l.f] || ""));
+  // آخر الفيديو من الإعدادات المحفوظة (نفس اللي السيرفر بيقرا: «علّق بكلمة» شغالة ← هي آخر جملة، وإلا الـ CTA لو الدعوة مش مقفولة)
+  const endMode = (b) => { const dm = b?.dm_mode || (String(b?.dm_word || "").trim() ? "always" : "off"); return dm !== "off" ? "dm" : b?.cta_mode === "off" ? "off" : "cta"; };
   const leafValue = (b, l) => {
     if (l.type === "text") return filled(b, l) ? String(l.f === "@name" ? b?.name : b?.[l.f] || "").trim() : "";
     if (l.type === "pick") return l.opts.find(([v]) => v === pickRaw(b, l))?.[1] || "";
@@ -768,6 +771,15 @@ const BrandPage = (() => {
 
   // 🎨 أمثلة من «قوالب الرسومات» قبل ما يقرر تناسب صفحته ولا لأ (تشتغل لما تقف عليها أو تدوس)
   const ART_SAMPLES = ["sk-anime", "sk-clay", "sk-papercut", "sk-chalk", "sk-felt", "sk-toy", "sk-popup", "sk-lowpoly", "sk-hd2d", "sk-scifitoon"];
+  function endHTML(b, l) {
+    const v = endMode(b), word = String(b?.dm_word || "").trim();
+    const note = v === "dm" ? (b?.dm_mode === "always" && word ? `آخر جملة: «علّق بكلمة «${esc(word)}»»، ومن يعلّق تصله رسالة على الخاص تلقائيًا. وفي الكابشن نفس الدعوة.`
+      : "تختار كلمة التعليق مع كل فيديو، أو تثبّتها لكل المنشورات من إعدادات الردود.")
+      : v === "cta" ? (String(b?.cta || "").trim() ? `آخر جملة دعوة بمعنى «${esc(b.cta)}» بلهجة الفيديو، ونفس الدعوة في الكابشن.` : "اكتب الـ CTA في الخانة التي فوق، لتكون آخر جملة في كل فيديو.")
+      : "ينتهي الفيديو بالكلام نفسه، من غير دعوة في آخره ولا في الكابشن.";
+    return `<div class="bm-pills">${l.opts.map(([o, t]) => `<button class="bm-pill${v === o ? " on" : ""}" data-pick="end_mode" data-v="${o}">${t}</button>`).join("")}</div>
+      <p class="bm-note">${note}</p>${v === "dm" ? `<button class="bm-link" data-brpage="bots">كلمة التعليق والرسالة ←</button>` : ""}`;
+  }
   function artSamples() {
     return `<p class="bm-note">أمثلة من قوالب الرسومات:</p><div class="bm-arts">${ART_SAMPLES.map((k) => `<video src="/gallery/${k}.mp4" poster="/gallery/${k}.jpg" muted loop playsinline preload="none" data-artv></video>`).join("")}</div>`;
   }
@@ -805,7 +817,8 @@ const BrandPage = (() => {
           <div class="bm-acts"><button class="bm-pill" data-audadd>＋ جمهور</button>${A.length ? `<button class="bm-go" data-audsave>احفظ</button>` : ""}<button class="bm-pill" data-audx ${b?.audiences_busy ? "disabled" : ""}>✨ استخلصها من الوصف</button></div>`;
       }
       case "rule-new": return head + `<p class="bm-note">أي شيء يجب مراعاته في كل عمل للعلامة: النص والصور والفيديو والصوت.</p>` + editable("rule:new", "", "مثلًا: بدون موسيقى · واضغط Enter");
-      case "pick": return head + (l.f === "art_ok" ? artSamples() : "") + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${pickRaw(b, l) === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
+      case "pick": if (l.f === "end_mode") return head + endHTML(b, l);
+        return head + (l.f === "art_ok" ? artSamples() : "") + `<div class="bm-pills">${l.opts.map(([v, t]) => `<button class="bm-pill${pickRaw(b, l) === v ? " on" : ""}" data-pick="${l.f}" data-v="${v}">${t}</button>`).join("")}</div>`;
       case "palette": {
         const hs = hexes(b?.palette);
         return head + `<div class="bm-sw">${hs.map((h) => `<button style="background:${h}" data-hdel="${h}" title="${h} · اضغط لإزالته"></button>`).join("")}
@@ -1322,6 +1335,10 @@ const BrandPage = (() => {
       const ndel = t.closest("[data-ndel]");
       if (ndel) { if ((await uiConfirm("أتحذف هذه المعلومة؟ لن يعرفها العقل بعد الآن ولن يستخدمها في أي كتابة جديدة. (ما أُنشئ سابقًا لن يتغير)"))) { openCard(null); save(() => bAPI(`/notes/${ndel.dataset.ndel}`, { method: "DELETE" })); } return; }
       const pick = t.closest("[data-pick]");
+      if (pick && pick.dataset.pick === "end_mode") {   // 🎬 اختيار واحد بيظبط الاتنين مع بعض
+        const v = pick.dataset.v, word = String(cur()?.dm_word || "").trim();
+        return patch(v === "dm" ? { cta_mode: "always", dm_mode: word ? "always" : "ask" } : v === "cta" ? { cta_mode: "always", dm_mode: "off" } : { cta_mode: "off", dm_mode: "off" });
+      }
       if (pick) return patch({ [pick.dataset.pick]: pick.dataset.v });
       const mk = t.closest("[data-mk]");
       if (mk) { const m = S.mk[`${cur()?.id}:${mk.dataset.mk}`]; if (m) { m.opts[mk.dataset.mkk] = mk.dataset.v; refreshCard(); } return; }
