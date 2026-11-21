@@ -3516,3 +3516,6 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .nh-col { position: relative; }
 #nh .nh-col:hover, #nh .nh-col:focus-within { z-index: 40; }
 #nh .nh-col .nh-tile:hover, #nh .nh-col .nh-tile:focus-visible { position: relative; z-index: 6; }
+/* 💬 «التعليقات والرسائل» تحت على اليمين: الشرح بيطلع جنبها ناحية النص، مش تحتها (كان بيستخبى تحت دايرة سعاد) */
+#nh .nh-col .nh-tile[data-id="inbox"] > .nh-tip { top: 50%; right: calc(100% + 12px); left: auto; translate: 6px -50%; }
+#nh .nh-col .nh-tile[data-id="inbox"]:is(:hover, :focus-visible) > .nh-tip { translate: 0 -50%; }
