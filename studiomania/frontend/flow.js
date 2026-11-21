@@ -51,14 +51,14 @@ const Flow = (() => {
   const isAvatar = (d) => d?.template?.kind === "avatar";
   const isTalk = (d) => isPhone(d) || isAvatar(d);   // التصوير بالجوال والأفاتار: نفس التسلسل لحد النشر   // 🪞 نفس تسلسل التصوير بالجوال، بس الأفاتار هو اللي بيقول النص
   // 🖼️ الكاروسيل: الستايل اللي اختاره ← الفكرة ← النص (موزّع على الشرائح) ← التعديلات (الألوان والرسم) ← النشر
-  const STEPS_CAR = [["style", "الستايل"], ["idea", "الفكرة"], ["scenario", "النص"], ["carousel", "التعديلات"], ["publish", "النشر"]];
+  const STEPS_CAR = [["style", "الشكل"], ["idea", "الفكرة"], ["scenario", "النص"], ["carousel", "التعديلات"], ["publish", "النشر"]];
   const isCar = (d) => d?.template?.kind === "carousel";
   // 🧾 قوالب المعطيات (عرض السعر، آراء العملاء): أول خطوة تفاصيل العرض أو الآراء نفسها، والأفكار والنص مبنيين عليها
   const steps0 = (d) => (isCar(d) ? STEPS_CAR : isCode(d) ? STEPS_CODE : d?.template?.kind === "typo" ? STEPS_TYPO : isAvatar(d) ? STEPS_AVATAR : isPhone(d) ? STEPS_PHONE : STEPS_AI);
   // 🧾 القالب المخصص: التفاصيل ← الصوت ← … (مفيش فكرة ولا نص: النص بيتكتب من التفاصيل ويتختار لوحده)
   const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d).filter(([k]) => k !== "idea" && k !== "scenario")] : steps0(d));
-  const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
-  const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
+  const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "الصور والكاروسيل", "صورة واحدة أو صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
+  const OUT = { tvideo: "قسم القوالب", carousel: "الصور والكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
   const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st === "review" ? "shoot" : st)));
 
   // ---------------------------------------------------------------- فتح وقفل
@@ -329,11 +329,18 @@ const Flow = (() => {
   // 💳 تكلفة كتابة العقل (الأفكار / السيناريو) قبل الضغط، للعميل بس (صاحب البرنامج مابيتخصمش منه)
   const writeCost = (d, k) => (window.ME?.credits && d.costs?.[k] ? costTag(d.costs[k], window.ME.credits.total) : "");
   const costNote = (d) => (window.ME?.credits && d.costs ? `<p class="flw-sub muted">💳 كل اقتراح أفكار يُحسب بنحو ${d.costs.ideas} نقطة، وكل كتابة سيناريو بنحو ${d.costs.scenarios} نقطة. كتابتك أنت مجانية.</p>` : "");
-  // 🖼️ أول خطوة: شرائح الستايل اللي اختاره بس (مش ستايلات تانية)
+  // 🖼️ أول خطوة «الشكل»: الستايل اللي اختاره، وصورة واحدة أو كاروسيل بعدد شرائحه
+  const carOne = (d) => d?.car_n === 1;
   function stStyle(d) {
-    const st = d.car_style || {}, im = (st.images || []).map((x) => x.url);
-    return `<h2>${esc(st.name || "الستايل")}</h2><p class="flw-sub">هذا هو الستايل الذي اخترته. اكتب الموضوع أو اختر فكرة، ونكتب الشرائح عليه.</p>
+    const st = d.car_style || {}, im = (st.images || []).map((x) => x.url), n = d.car_n || 5, one = n === 1;
+    const cnt = [3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="flw-carn${n === k ? " on" : ""}" data-carn="${k}">${k.toLocaleString("ar-EG")}</button>`).join("");
+    return `<h2>${esc(st.name || "الستايل")}</h2>
       <div class="flw-carfan">${im.map((u, i) => `<img src="${esc(u)}" alt="" style="--i:${i - (im.length - 1) / 2}">`).join("")}</div>
+      <div class="flw-shape">
+        <button type="button" class="flw-shp${one ? " on" : ""}" data-carn="1"><span class="flw-shp-ic one"><i></i></span><b>صورة واحدة</b><small>عنوان وسطر في شريحة واحدة</small></button>
+        <div class="flw-shp${one ? "" : " on"}" role="group"><button type="button" class="flw-shp-hit" data-carn="${one ? 5 : n}"><span class="flw-shp-ic"><i></i><i></i><i></i></span><b>كاروسيل</b><small>عدة شرائح تُقلَّب</small></button>
+          <div class="flw-carns">${cnt}</div></div>
+      </div>
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-go="idea">الفكرة ←</button></div>`;
   }
   // 🎨 التعديلات: الألوان (ألوان الستايل أو ألوان علامتك) ← رسم الشرائح ← تعديل في محرر الكاروسيل
@@ -341,18 +348,18 @@ const Flow = (() => {
     const o = d.output?.kind === "carousel" ? d.output : null, keep = S.carKeep ?? d.car_keep ?? false;
     const pill = (v, t) => `<button type="button" class="flw-chip${keep === v ? " on" : ""}" data-carkeep="${v ? 1 : 0}">${t}</button>`;
     const pick = `<div class="flw-acts">${pill(false, "🎨 بألوان علامتك")}${pill(true, "🖼️ بألوان الستايل كما هي")}</div>`;
-    if (!o) return `<h2>التعديلات</h2><p class="flw-sub">اختر ألوان الكاروسيل، ثم نرسم الشرائح بالستايل الذي اخترته وبالنص الذي اخترته.</p>${pick}
-      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-carmake ${busy() ? "disabled" : ""}>🎨 ارسم الكاروسيل</button></div>${failed("carousel")}`;
+    if (!o) return `<h2>التعديلات</h2><p class="flw-sub">${carOne(d) ? "اختر الألوان، ثم نرسم الصورة بالستايل الذي اخترته وبالنص الذي اخترته." : "اختر ألوان الكاروسيل، ثم نرسم الشرائح بالستايل الذي اخترته وبالنص الذي اخترته."}</p>${pick}
+      <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-carmake ${busy() ? "disabled" : ""}>${carOne(d) ? "🎨 ارسم الصورة" : "🎨 ارسم الكاروسيل"}</button></div>${failed("carousel")}`;
     const sl = o.slides || [], done = sl.filter((x) => x.status === "done").length;
-    return `<h2>التعديلات</h2>${o.status !== "done" ? working(sl.length ? `جارٍ رسم الشرائح ${done}/${sl.length}` : "نكتب الشرائح ونرسم الشكل العام…") : ""}
+    return `<h2>التعديلات</h2>${o.status !== "done" ? working(carOne(d) ? "نكتب النص ونرسم الصورة…" : sl.length ? `جارٍ رسم الشرائح ${done}/${sl.length}` : "نكتب الشرائح ونرسم الشكل العام…") : ""}
       <div class="flw-carslides">${sl.map((x) => x.url ? `<img src="${esc(x.url)}" alt="" loading="lazy">` : `<span class="flw-carph"></span>`).join("")}</div>
-      ${o.status === "done" ? `<div class="flw-acts"><button type="button" class="flw-btn" data-caredit="${esc(o.id)}">✏️ عدّل شريحة أو لونًا أو شكلًا</button>
+      ${o.status === "done" ? `<div class="flw-acts"><button type="button" class="flw-btn" data-caredit="${esc(o.id)}">${carOne(d) ? "✏️ عدّل الصورة" : "✏️ عدّل شريحة أو لونًا أو شكلًا"}</button>
         <button type="button" class="flw-btn" data-carredo>${keep ? "🎨 أعد الرسم بألوان علامتك" : "🖼️ أعد الرسم بألوان الستايل"}</button>
         <button type="button" class="flw-btn pri" data-go="publish">النشر ←</button></div>` : o.status === "failed" ? `<div class="flw-acts"><button type="button" class="flw-btn pri" data-carmake>🔁 أعد الرسم</button></div>` : ""}${failed("carousel")}`;
   }
   function stCarPub(d) {
     const o = d.output?.kind === "carousel" ? d.output : null;
-    if (!o || o.status !== "done") return `<h2>النشر</h2><p class="flw-sub">ارسم الكاروسيل أولًا من «التعديلات».</p>`;
+    if (!o || o.status !== "done") return `<h2>النشر</h2><p class="flw-sub">${carOne(d) ? "ارسم الصورة أولًا من «التعديلات»." : "ارسم الكاروسيل أولًا من «التعديلات»."}</p>`;
     return `<h2>النشر</h2><div class="flw-carslides">${(o.slides || []).map((x) => `<img src="${esc(x.url)}" alt="" loading="lazy">`).join("")}</div>
       <div class="flw-acts end"><button type="button" class="flw-btn pri big" data-carpub="${esc(o.id)}">📤 انشره أو جدوله</button></div>`;
   }
@@ -1198,6 +1205,7 @@ const Flow = (() => {
     if ((b = q("[data-go]")) && isCar(S.d) && b.dataset.go === "publish") { S.view = "publish"; return render(); }   // 🖼️ نشر الكاروسيل: خطوة عرض بس
     if ((b = q("[data-go]")) && (isVid(S.d) || isTalk(S.d)) && b.dataset.go === "publish") return openPub();
     if ((b = q("[data-go]")) && isVid(S.d) && b.dataset.go === "montage") { S.view = null; return codeOut("montage"); }
+    if ((b = q("[data-carn]"))) { const n = +b.dataset.carn; if (n !== S.d.car_n) call("/car-shape", { n }, "PUT"); return; }   // 🖼️ صورة واحدة أو كاروسيل بعدد شرائحه
     if ((b = q("[data-carkeep]"))) { S.carKeep = b.dataset.carkeep === "1"; return render(); }
     if (q("[data-carmake]")) return call("/car-make", { keep_colors: !!(S.carKeep ?? S.d.car_keep ?? false) });
     if (q("[data-carredo]")) { S.carKeep = !(S.carKeep ?? S.d.car_keep ?? false); return call("/car-make", { keep_colors: S.carKeep }); }

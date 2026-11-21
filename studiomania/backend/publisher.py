@@ -555,9 +555,10 @@ def schedule(
 def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_now: bool, options: dict | None = None,
                       targets: list[str] | None = None) -> str:
     """كاروسيل صور على إنستجرام (حتى 10 صور). إنستجرام لا يقبل موسيقى على الكاروسيل من الـ API."""
-    ig = [t for t in (targets or []) if split_target(t)[0] == "instagram"] or ["instagram"]
+    one = len(images) == 1   # 🖼️ صورة واحدة: منشور صورة على كل الحسابات اللي اختارها، مش إنستجرام بس
+    ig = (targets if one else [t for t in (targets or []) if split_target(t)[0] == "instagram"]) or ["instagram"]
     ig_targets = resolve_targets(ig)
-    if not 2 <= len(images) <= 10:
+    if not 1 <= len(images) <= 10:
         raise PublishError("يجب أن يتكون الكاروسيل من 2 إلى 10 صور")
     opts = options or {}
     urls = [upload_file(p) for p in images]
@@ -570,9 +571,9 @@ def schedule_carousel(images: list[Path], caption: str, when_utc: str, publish_n
         if opts.get("ig_collab"):
             data["collaborators"] = tags[:3]
     entries = []
-    for _, acc in ig_targets:
-        entry = {"platform": "instagram", "accountId": acc}
-        if data:
+    for plat, acc in ig_targets:
+        entry = {"platform": PLATFORMS.get(plat, (plat,))[0], "accountId": acc}
+        if data and plat == "instagram":
             entry["platformSpecificData"] = data
         entries.append(entry)
     body = {"content": caption, "platforms": entries, "mediaItems": [{"type": "image", "url": u} for u in urls]}

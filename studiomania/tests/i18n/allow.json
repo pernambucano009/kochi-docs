@@ -221,6 +221,9 @@
   "هذه غير مجرد أداة جديدة",
   "شركة جزم حطت سوستة",
   "Compare the account's profile name with the user's name and clinic/brand name. ONLY if it is clearly a different person or business (not their name, not their clinic, not a nickname of it), ask once kindly in their dialect «متأكد إن ده حسابك؟», and if they say yes continue normally. If it matches or you are unsure, say nothing about it.",
-  "جمل حشو بتعلن عن اللي هتعمله ({0} مرة): ممنوعة"
+  "جمل حشو بتعلن عن اللي هتعمله ({0} مرة): ممنوعة",
+  "كل سيناريو = منشور صورة واحدة (شريحة واحدة بالضبط): {\"title\": \"...\", \"summary\": \"سطر\", \"slides\": [{\"n\": 1, \"heading\": \"عنوان قوي قصير\",",
+  "\"text\": \"سطر واحد قصير\", \"visual\": \"ما يُرى\"}], \"caption\": \"الكابشن، وفيه الدعوة\"}",
+  "كل سيناريو = سلايدات ({0}): {\"title\": \"...\", \"summary\": \"سطر\", \"slides\": [{\"n\": 1, \"heading\": \"عنوان السلايد\", \"text\": \"النص\", \"visual\": \"ما يُرى\"}], \"caption\": \"تعليق نصي المنشور\"}"
  ]
 }

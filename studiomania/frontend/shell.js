@@ -14,7 +14,7 @@ const STEP_INFO = {
   4: { num: "", title: "مكتبة الشخصيات", en: "Characters" },
   3: { num: "", title: "مكتبة التعليق الصوتي", en: "Voices" },
   5: { num: "", title: "مكتبة الموسيقى", en: "Music" },
-  8: { num: "", title: "صناعة الكاروسيل", en: "Carousel" },
+  8: { num: "", title: "الصور والكاروسيل", en: "Images & Carousel" },
   9: { num: "", title: "المسلسلات", en: "Series" },
   10: { num: "", title: "الإعلانات", en: "Ads" },
   11: { num: "", title: "معمل التفكيك", en: "Lab" },

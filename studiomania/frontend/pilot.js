@@ -82,6 +82,8 @@ const PilotPage = (() => {
 #nh .ap-rn { flex: none; width: 110px; font-size: 13px; font-weight: 600; }
 #nh .ap-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #nh .ap-chain .ar { font-style: normal; color: var(--nh-muted); font-size: 13px; }
+#nh .ap-flowrow:has(.ap-shape) { flex-wrap: wrap; }
+#nh .ap-shape { padding-inline-end: 12px; border-inline-end: 1px solid var(--nh-line, rgba(24,23,24,.12)); }
 #nh .ap-stp { position: relative; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--ap-field); font-size: 12.5px; color: var(--nh-ink); display: inline-flex; align-items: center; gap: 4px; }
 #nh .ap-stp.fixed { color: var(--ap-sub); cursor: default; }
 #nh .ap-stp.off { color: var(--ap-sub); opacity: .45; cursor: not-allowed; }
@@ -260,7 +262,7 @@ const PilotPage = (() => {
       { id: "phone", n: "تصوير بالجوال", k: "قالب", tag: ["cam", "📱 يحتاج إلى أن تصوّر بنفسك"] },
       { id: "avatar", n: "تصوير الفيديو بالأفاتار", k: twin ? `بأفاتار ${twin.name}` : "قالب", tag: twin ? null : ["", "يحتاج إلى أفاتار جاهز"], off: !twin },
       ...d.custom.map((c) => ({ id: c.id, n: c.name, k: "قالب مخصص" })),
-      { id: "carousel", n: "كاروسيل", k: "قالب", tag: ["", "🖼️ صور على إنستجرام"] },
+      { id: "carousel", n: "الصور والكاروسيل", k: "قالب", tag: ["", "🖼️ صورة واحدة أو كاروسيل"] },
       ...d.settings.templates.filter((t) => t.startsWith("t-")).map((t) => ({ id: t, n: names[t] || codeTpls().find((x) => x.id === t)?.name || t, k: "قالب" })),
     ];
   }
@@ -286,8 +288,7 @@ const PilotPage = (() => {
     { id: "phone", n: "تصوير بالجوال", kind: "phone", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "التصوير"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "avatar", n: "الأفاتار", kind: "avatar", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["@scene", "الخلفية ووضعية التصوير"], ["", "فيديو الأفاتار"], ["montage", "المونتاج"], ["video", "التصدير"], ["publish", "النشر"]] },
     { id: "tpl", n: "قوالب الفيديو", kind: "motion", steps: [["idea", "الفكرة"], ["word", "كلمة التعليق"], ["script", "النص"], ["", "صوت الراوي"], ["@tpl", "القالب"], ["video", "التصدير"], ["publish", "النشر"]] },
-    { id: "photo", n: "صور", soon: true },
-    { id: "carousel", n: "كاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
+    { id: "carousel", n: "الصور والكاروسيل", kind: "carousel", steps: [["idea", "الفكرة"], ["@style", "الستايل"], ["script", "النص"], ["montage", "التصميم"], ["video", "التصدير"], ["publish", "النشر"]] },
   ];
   let SCN = null;   // 🎬 خلفيات الأفاتار الجاهزة (من السيرفر)
   const tplIds = () => S.d.settings.templates.filter((t) => t.startsWith("t-"));
@@ -316,7 +317,12 @@ const PilotPage = (() => {
         if (k === "publish" && S.d.linked === false) return `<button type="button" class="ap-stp off" data-needlink title="اربط حساب سوشيال ميديا واحدًا على الأقل">${esc(n)}</button>`;
         return k ? `<button type="button" class="ap-stp ${on.has(k) ? "dot" : ""}" data-dot="${t.kind}:${k}">${esc(n)}</button>` : `<span class="ap-stp fixed">${esc(n)}</span>`;
       }).join('<i class="ar" aria-hidden="true">←</i>');
-      return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b><div class="ap-chain">${chips}</div></div>`;
+      // 🖼️ الصور والكاروسيل: صورة واحدة أو كاروسيل بعدد شرائحه (اختيار واحد)
+      const cn = +s.car_n || 5, shape = t.kind === "carousel" ? `<div class="ap-chain ap-shape">
+        <button type="button" class="ap-stp ${cn === 1 ? "dot" : ""}" data-carn="1">صورة واحدة</button>
+        <button type="button" class="ap-stp ${cn > 1 ? "dot" : ""}" data-carn="${cn > 1 ? cn : 5}">كاروسيل${cn > 1 ? ` <small>${cn.toLocaleString("ar-EG")} شرائح</small>` : ""}</button>
+        ${cn > 1 ? [3, 4, 5, 6, 7, 8].map((k) => `<button type="button" class="ap-stp ${k === cn ? "dot" : ""}" data-carn="${k}">${k.toLocaleString("ar-EG")}</button>`).join("") : ""}</div>` : "";
+      return `<div class="ap-flowrow"><b class="ap-rn">${esc(t.n)}</b>${shape}<div class="ap-chain">${chips}</div></div>`;
     });
     q("[data-rows]").innerHTML = rows.join("") || `<small class="ap-none">اختر نوعًا واحدًا على الأقل</small>`;
     drawPop();
@@ -339,7 +345,7 @@ const PilotPage = (() => {
         <div class="ap-scn">${SCN.map((x) => `<button type="button" class="ap-stp ${on.has(x.id) ? "dot" : ""}" data-scenec="${esc(x.id)}">${esc(x.name)}</button>`).join("")}</div>`;
     } else {
       const on = new Set(s.car_styles || []), lib = carStyles();
-      box.innerHTML = `<div class="ap-ph"><b>ستايلات الكاروسيل</b><small>${lib.length ? "علّم على ستايل واحد أو أكثر، والأوتوبايلوت يتناوب بينها" : "لا توجد ستايلات بعد: أضفها من صفحة الكاروسيل، وحتى ذلك يصمّم بستايل علامتك"}</small><button type="button" data-popx>تم</button></div>
+      box.innerHTML = `<div class="ap-ph"><b>ستايلات الصور والكاروسيل</b><small>${lib.length ? "علّم على ستايل واحد أو أكثر، والأوتوبايلوت يتناوب بينها" : "لا توجد ستايلات بعد: أضفها من صفحة الكاروسيل، وحتى ذلك يصمّم بستايل علامتك"}</small><button type="button" data-popx>تم</button></div>
         <div class="ap-grid">${lib.map((a) => `<button type="button" class="ap-card ${on.has(a.id) ? "on" : ""}" data-styc="${esc(a.id)}">
           ${a.images?.[0] ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<span class="ck">✓</span><b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
         ${lib.length ? "" : `<div class="ap-acts" style="justify-content:center"><button type="button" data-carpage>افتح صفحة الكاروسيل</button></div>`}`;
@@ -495,6 +501,7 @@ const PilotPage = (() => {
         set.has(d.scenec) ? set.delete(d.scenec) : set.add(d.scenec);
         return save({ av_scenes: [...set] });
       }
+      if (d.carn) return save({ car_n: +d.carn });
       if (d.styc) {
         const set = new Set(s.car_styles || []);
         set.has(d.styc) ? set.delete(d.styc) : set.add(d.styc);

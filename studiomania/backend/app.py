@@ -8711,7 +8711,7 @@ def patch_carousel(cid: str, body: CarouselPatch):
         if body.settings is not None:
             st = data["settings"]
             if "slides" in body.settings:
-                st["slides"] = max(2, min(10, int(body.settings["slides"] or 6)))
+                st["slides"] = max(1, min(10, int(body.settings["slides"] or 6)))   # 1 = صورة واحدة
             if "ratio" in body.settings and body.settings["ratio"] in cz.SIZES:
                 st["ratio"] = body.settings["ratio"]
             if "coach_id" in body.settings:
@@ -9053,6 +9053,20 @@ def carousel_overview(cid: str):
     return get_carousel(cid)
 
 
+def car_single_done(cid: str) -> bool:
+    """🖼️ صورة واحدة: الشكل العام هو الصورة نفسها (بنفس المقاس)، فبتبقى الشريحة على طول من غير رسم تاني."""
+    with closing(db()) as conn:
+        _, data = load_carousel(conn, cid)
+    if len(data.get("slides") or []) != 1 or data["overview"].get("status") != "done":
+        return False
+    f = data["overview"]["file"]
+    def put(d):
+        add_version(d, "1", f)
+        d["slides"][0] = {"status": "done", "file": f, "error": None}
+    update_carousel(cid, put)
+    return True
+
+
 @app.post("/api/carousels/{cid}/approve")
 def carousel_approve(cid: str):
     with closing(db()) as conn:
@@ -9167,14 +9181,16 @@ class CarouselPostIn(BaseModel):
     caption: str = ""
     scheduled_at: datetime
     options: PostOptions = PostOptions()
+    platforms: list[str] = []   # 🖼️ للصورة الواحدة: الحسابات اللي تتنشر عليها (الكاروسيل إنستجرام بس)
 
 
 @app.post("/api/carousels/{cid}/publish")
 def publish_carousel(cid: str, body: CarouselPostIn):
     """كاروسيل صور على إنستجرام عن طريق Zernio (فوري أو مجدول)، مع تاج المدرب على سلايد."""
     _, _, images = ready_slides(cid)
-    if not 2 <= len(images) <= 10:
+    if not 1 <= len(images) <= 10:
         raise HTTPException(400, "يقبل إنستغرام الكاروسيل من 2 إلى 10 صور")
+    plats = [p for p in dict.fromkeys(body.platforms) if publisher.valid_target(p)][:20] if len(images) == 1 else []
     when = body.scheduled_at
     if when.tzinfo is None:
         raise HTTPException(400, "يجب أن يتضمن الموعد المنطقة الزمنية")
@@ -9186,7 +9202,7 @@ def publish_carousel(cid: str, body: CarouselPostIn):
         conn.execute(
             "INSERT INTO posts (id, export_id, carousel_id, caption, platforms, scheduled_at, status, options, created_at, updated_at) "
             "VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?)",
-            (post_id, cid, body.caption.strip(), json.dumps(["instagram"]), when, status, options, now(), now()),
+            (post_id, cid, body.caption.strip(), json.dumps(plats or ["instagram"]), when, status, options, now(), now()),
         )
     after_save(post_id, when, None)
     with closing(db()) as conn:
@@ -25913,7 +25929,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
         raw = fz.mock_scenarios(d["format"], 2, d.get("episodes"))
     else:
         raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
-                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2,
+                                             d["format"], flow_eps(d), [c["name"] for c in d.get("cast") or []], 2,
                                              (avoid if more else []) + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint),
                        "السيناريوهات")
     slang = d.get("lang") if d.get("lang") in dub.DIALECTS else flow_lang_guess(d)
@@ -25921,7 +25937,7 @@ def flow_gen_scenarios(fid: str, hint: str = "", more: bool = False, relang: boo
     items, rep = flow_fresh_scen(d, items, more)
     if rep and not items and not atlas.mock_mode():   # كلهم شبه حاجات اتستخدمت: مرة كمان بعناوينهم في «تجنّب»
         raw = flow_llm(fz.scenarios_messages(flow_brand(brain, idea_txt), fz.prefs_text(brain), flow_tpl(d), flow_assets_list(d), idea_txt,
-                                             d["format"], d.get("episodes") or "auto", [c["name"] for c in d.get("cast") or []], 2,
+                                             d["format"], flow_eps(d), [c["name"] for c in d.get("cast") or []], 2,
                                              avoid + [x.get("title", "") for x in rep] + ideamem.avoid_titles(mem_load(mem_cid(d)), "scenario"), hint), "السيناريوهات")
         items, rep2 = flow_fresh_scen(d, [{**s, "id": uuid.uuid4().hex[:8]} for s in (raw.get("scenarios") or [])[:4] if isinstance(s, dict)], more)
         rep += rep2
@@ -26013,7 +26029,7 @@ def flow_new(body: FlowNewIn):
          "ideas": [], "idea": None, "idea_chat": [], "format": None, "episodes": "auto", "scenarios": [], "scenario": None, "scen_chat": [],
          "cast": [], "assets": [], "prompt": "", "output": None, "ratings": {}, "busy": None, "error": None, "created_at": now()}
     if tpl.get("kind") == "carousel" and cz.style_id(body.car_style):   # 🖼️ الكاروسيل: الستايل ← الفكرة ← النص ← التعديلات ← النشر
-        d.update(car_style=body.car_style, stage="style")
+        d.update(car_style=body.car_style, stage="style", car_n=5)   # 🖼️ الشكل: كاروسيل ٥ شرائح، أو يختار صورة واحدة
     with FLOW_LOCK:
         flow_save(fid, d)
     if tpl.get("id") in FACT_TPLS and (body.reuse or not body.skip_ideas):   # من الواجهة (reuse) أو أي بداية عادية، مش الأوتوبايلوت   # 🧾 عرض السعر وآراء العملاء: أول خطوة التفاصيل نفسها، مش أفكار عامة
@@ -28566,6 +28582,25 @@ def flow_draw_missing(fid: str, mid: str, params: dict) -> dict:
     return params
 
 
+def flow_eps(d: dict):
+    """عدد الحلقات للمسلسل، أو عدد الشرائح للصور والكاروسيل (1 = صورة واحدة)."""
+    if d.get("format") == "carousel" and d.get("car_n"):
+        return str(int(d["car_n"]))
+    return d.get("episodes") or "auto"
+
+
+class FlowShapeIn(BaseModel):
+    n: int = 5   # 1 = صورة واحدة، وأكتر = كاروسيل بعدد الشرائح ده
+
+
+@app.put("/api/flows/{fid}/car-shape")
+def flow_car_shape(fid: str, body: FlowShapeIn):
+    """🖼️ خطوة «الشكل»: صورة واحدة أو كاروسيل بعدد شرائحه (قبل الفكرة والنص)."""
+    n = max(1, min(10, int(body.n)))
+    d = flow_update(fid, lambda x: x.update(car_n=n))
+    return flow_to_dict(fid, d)
+
+
 class FlowCarIn(BaseModel):
     keep_colors: bool = True   # ألوان الستايل زي ما هي، أو false = تتصبغ بألوان العلامة
 
@@ -28578,10 +28613,10 @@ def flow_car_make(fid: str, body: FlowCarIn):
     sc = d.get("scenario") or {}
     if not sc:
         raise HTTPException(400, "اختر نص الشرائح أولًا")
-    n = max(2, min(10, len(sc.get("slides") or []) or 6))
+    n = 1 if d.get("car_n") == 1 else max(2, min(10, len(sc.get("slides") or []) or 6))
     if not atlas.mock_mode():
-        wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + 1), "كاروسيل")
-    title = (d.get("idea") or {}).get("title") or "كاروسيل"
+        wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + (1 if n > 1 else 0)), "صورة" if n == 1 else "كاروسيل")
+    title = (d.get("idea") or {}).get("title") or ("صورة" if n == 1 else "كاروسيل")
     car = create_carousel(CarouselIn(name=f"🧭 {title}"[:80]))
     cid = car["id"]
     sett = {"slides": n, "keep_colors": body.keep_colors}
@@ -28603,7 +28638,8 @@ def flow_car_make(fid: str, body: FlowCarIn):
         if get_carousel(cid)["overview"]["status"] != "done":
             raise HTTPException(400, get_carousel(cid)["overview"].get("error") or "توقف رسم الشكل العام")
         carousel_approve(cid)
-        carousel_slides(cid)
+        if not car_single_done(cid):
+            carousel_slides(cid)
     flow_job(fid, "carousel", run)
     return flow_to_dict(fid, flow_load(fid))
 
@@ -35398,13 +35434,21 @@ def pilot_tpl_name(tpl: str, names: dict) -> str:
     if tpl == "avatar":
         return "تصوير الفيديو بالأفاتار"
     if tpl == "carousel":
-        return "كاروسيل"
+        return "الصور والكاروسيل"
     if tpl.startswith("auto:"):
         try:
             return auto_load(tpl[5:], active_client_id()).get("name") or "قالب مخصص"
         except HTTPException:
             return "قالب مخصص (حُذف)"
     return names.get(tpl) or tpl_names().get(tpl) or tpl   # أسماء قوالب الكود زي ما هي في معرض القوالب (الواجهة بتبعتها)
+
+
+def pilot_car_n(s: dict) -> int:
+    """🖼️ الصور والكاروسيل في الأوتوبايلوت: صورة واحدة (1) أو كاروسيل بعدد شرائحه."""
+    try:
+        return max(1, min(10, int(s.get("car_n") or 5)))
+    except (TypeError, ValueError):
+        return 5
 
 
 def pilot_twin(s: dict) -> str | None:
@@ -35728,7 +35772,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
             elif pick:
                 put(dir=pick)
         f = flow_new(FlowNewIn(template=j["tpl"], name=j["name"] if j["name"] != j["tpl"] else "", skip_ideas=True, season=occ))   # 🗓️ مناسبة في بلده النهارده أو قريب ← الفكرة عنها أول حاجة
-        flow_update(f["id"], lambda x: x.update(pilot=jid))
+        flow_update(f["id"], lambda x: x.update(pilot=jid, **({"car_n": pilot_car_n(s)} if kind == "carousel" else {})))   # 🖼️ صورة واحدة أو كاروسيل
         if not (pre.get("title") or pre.get("idea")):   # 💡 أغلب الأفكار من عقل العلامة، وفكرة جديدة أحيانًا (المناسبة لو فيه بتتقدّم)
             fid0 = f["id"]
             flow_job(fid0, "ideas", lambda: flow_gen_ideas(fid0, brain_first=not occ))
@@ -35760,7 +35804,7 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         try:   # مفيش حسابات نشر مربوطة (تجربة قبل الربط): الفيديو جاهز ومحفوظ، ومايتعملش منشور هيفشل ولا يتخصم رسم الجدولة
             if not plats0:
                 raise publisher.PublishError("no accounts")
-            publisher.resolve_targets(["instagram"] if kind == "carousel" else plats0)
+            publisher.resolve_targets(["instagram"] if kind == "carousel" and pilot_car_n(s) > 1 else plats0)
         except publisher.PublishError:
             return put(status="done", phase="done", gate=None, unposted=True, note="جاهز. اربط حسابات النشر لكي يُجدول")
         if gate("publish", "جاهز للنشر: راجع الكابشن والموعد، ووافق لكي يُجدول"):   # 🔵 موافقة على النشر نفسه
@@ -35772,8 +35816,9 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         when = max(datetime.fromisoformat(j["at"]), datetime.now(timezone.utc) + timedelta(minutes=3))
         plats = s.get("platforms") or [k for k in (publisher.accounts() if publisher.service_name() == "zernio" else {"instagram": 1})]
         caption = j.get("caption") or (pilot_caption(flow_load(j["fid"])) if j.get("fid") else j["name"])
-        if kind == "carousel":   # 🖼️ الكاروسيل بيتنشر صور على إنستجرام
-            post = publish_carousel(j["carousel_id"], CarouselPostIn(caption=caption, scheduled_at=when))
+        if kind == "carousel":   # 🖼️ الكاروسيل بيتنشر صور على إنستجرام، والصورة الواحدة على كل الحسابات
+            one = len(get_carousel(j["carousel_id"])["slides"]) == 1
+            post = publish_carousel(j["carousel_id"], CarouselPostIn(caption=caption, scheduled_at=when, platforms=plats if one else []))
         else:
             opts = PostOptions()
             if j.get("fid"):   # 💬 «علّق بكلمة»: الرد الآلي شغال على المنشور ده بنفس الكلمة اللي اتقالت في الفيديو
@@ -35849,9 +35894,9 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     # 🖼️ الكاروسيل: نص السلايدات ← الشكل العام (مراجعة «المونتاج») ← السلايدات
     if ph == "car":
         sc = d.get("scenario") or {}
-        n = max(2, min(10, len(sc.get("slides") or []) or 6))
+        n = 1 if d.get("car_n") == 1 else max(2, min(10, len(sc.get("slides") or []) or 6))
         if not atlas.mock_mode():
-            wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + 1), "كاروسيل")
+            wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + (1 if n > 1 else 0)), "صورة" if n == 1 else "كاروسيل")
         car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
         cid = car["id"]
         sty = [x for x in s.get("car_styles") or [] if x]
@@ -35887,10 +35932,11 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
                 raise HTTPException(400, c["overview"].get("error") or "توقف رسم الشكل العام")
             if c["overview"]["status"] != "done":
                 return
-            if gate("montage", "شكل الكاروسيل جاهز: انظر إليه ووافق لكي يرسم السلايدات"):
+            if len(c["slides"]) > 1 and gate("montage", "شكل الكاروسيل جاهز: انظر إليه ووافق لكي يرسم السلايدات"):
                 return
             carousel_approve(j["carousel_id"])
-            carousel_slides(j["carousel_id"])
+            if not car_single_done(j["carousel_id"]):
+                carousel_slides(j["carousel_id"])
             return put(phase="car_slides", note="جارٍ رسم الشرائح")
         bad = [s for s in c["slides"] if s.get("status") == "failed"]
         if bad:
@@ -36088,6 +36134,7 @@ class PilotIn(BaseModel):
     names: dict | None = None   # أسماء قوالب الكود (للعرض)
     steps_by: dict | None = None   # 🔵 الموافقات لكل نوع: {"phone": ["idea", ...], "motion": [...], "carousel": [...], "avatar": [...]}
     car_styles: list[str] | None = None   # 🎨 ستايلات الكاروسيل (واحد على الأقل لو فيه): بيتناوب بينها
+    car_n: int | None = None              # 🖼️ صورة واحدة (1) أو كاروسيل بعدد الشرائح
     av_scenes: list[str] | None = None    # 🎬 خلفيات الأفاتار اللي الأوتوبايلوت يتناوب بينها (فاضي = كلهم)
 
 
@@ -36131,6 +36178,8 @@ def pilot_put(body: PilotIn, request: Request):
             s["mode"] = "approve" if any(s["steps_by"].values()) else "auto"   # مفيش ولا دايرة زرقا = كله تلقائي
         if body.car_styles is not None:
             s["car_styles"] = [str(x)[:40] for x in dict.fromkeys(body.car_styles)][:20]
+        if body.car_n is not None:
+            s["car_n"] = pilot_car_n({"car_n": body.car_n})
         if body.av_scenes is not None:
             s["av_scenes"] = [x for x in dict.fromkeys(body.av_scenes) if x in AVATAR_SCENES]
         if body.platforms is not None:

@@ -10,7 +10,7 @@ const Gallery = (() => {
     // 🪞 رقم ٢: نفس الكلام للكاميرا بس الأفاتار هو اللي بيقوله · 🧩 رقم ٣: القالب المخصص (خطواتك انت)
     { id: "avatar", name: "تصوير الفيديو بالأفاتار", icon: "🪞", sample_url: "/gallery/avatar.mp4?v=4", cover_url: "/gallery/avatar.jpg?v=3", cat: "ugc", pin: 2,
     desc: "فكرة التصوير بالجوال نفسها لكن دون أن تصوّر: الأفاتار (من «الأفاتار»: أنت أو أي شخص لديك إذنه) يقول النص بوجهه وحركته." },
-    { id: "carousel", name: "كاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
+    { id: "carousel", name: "الصور والكاروسيل", icon: "🖼️", cover_url: "/gallery/carousel.jpg", cat: "social", pin: 4,
     desc: "صور متتالية على إنستجرام: شريحة هوك تشدّ، وكل شريحة فكرة واحدة، وآخر شريحة دعوة. بأسلوب العلامة وألوانها." },
     // 🎞️ محرر الفيديو: مونتاج حر فاضي، ترفع فيديوهاتك وتعمل مونتاج بنفسك من غير قالب
     { id: "editor", name: "محرر الفيديو", icon: "🎞️", cover_url: "/gallery/editor.jpg?v=2", cat: "other", pin: 5,
@@ -167,7 +167,7 @@ const Gallery = (() => {
   };
   const fits = (x) => !S.niche.key || FIT[x.id] === "*" || (FIT[x.id] || "").split(" ").includes(S.niche.key);
   // تصنيفات القوالب اللي مش جاية من السيرفر
-  const MORE_CATS = [{ id: "carousel", ar: "كاروسيل" }, { id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "الأسنان: فيديوهات" }, { id: "dentalimg", ar: "الأسنان: صور" }, { id: "other", ar: "قوالبي" }];
+  const MORE_CATS = [{ id: "carousel", ar: "الصور والكاروسيل" }, { id: "art", ar: "رسم وطباعة" }, { id: "explain", ar: "شرح" }, { id: "social", ar: "إعلانات التواصل الاجتماعي" }, { id: "cartoon2d", ar: "كرتون 2D" }, { id: "retro", ar: "ألعاب وريترو" }, { id: "dental", ar: "الأسنان: فيديوهات" }, { id: "other", ar: "قوالبي" }];
   const CAT_EN = { cartoon2d: "2D Cartoon", anim3d: "3D Animation", paper: "Paper", clay: "Clay", collage: "Collage", motion: "Motion", ugc: "UGC", cinematic: "Cinematic", product: "Product", art: "Art & Print", explain: "Explainer", social: "Social Ads", retro: "Retro Games", other: "My Templates" };
 
   async function load() {
@@ -175,7 +175,7 @@ const Gallery = (() => {
       api("/api/carousel/library").catch(() => [])]);
     // 🖼️ الكاروسيل: تصنيف لوحده في العجلة الصغيرة، والعجلة الكبيرة بتلف على ستايلاته
     S.carItems = (clib || []).filter((a) => a.builtin && (a.images || []).length).map((a) => ({ id: a.id, car: true, name: a.name, cat: "carousel", icon: "🖼️", cover_url: a.images[0]?.url,
-      slides: a.images.map((im) => im.url), desc: "كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
+      slides: a.images.map((im) => im.url), desc: "صورة واحدة أو كاروسيل بهذا الستايل، بألوان علامتك وشعارها وخطها. اكتب الموضوع ويكتب البرنامج الشرائح ويرسمها." }));
     S.carItems.forEach((x) => { FIT[x.id] = "*"; });
     S.niche = niche?.key ? niche : { key: "", name: "", art_off: !!niche?.art_off };
     S.cats = [...cats, ...MORE_CATS.filter((m) => !cats.some((c) => c.id === m.id))];
@@ -201,7 +201,11 @@ const Gallery = (() => {
       lead.forEach((x) => { FIT[x.id] = "beauty"; });
       add.forEach((x) => { if (x.dkind === "video") x.pin = 1 + (dt.video || []).findIndex((t) => t.id === x.dtid) / 100; });   // ترتيب القوالب زي ما هو في القايمة
       [...lead, ...add].forEach((x) => { x.spec = "dental"; });
-      S.items = [...lead, ...add, ...S.items.filter((x) => x.id !== "dental")];
+      // 🖼️ قوالب صور الحالات (قبل وبعد) في «الصور والكاروسيل» أولًا، بعيدًا عن قوالب الفيديو
+      const photo = add.filter((x) => x.dkind === "photo");
+      photo.forEach((x) => { x.cat = "carousel"; });
+      S.carItems = [...photo, ...(S.carItems || [])];
+      S.items = [...lead, ...add.filter((x) => x.dkind !== "photo"), ...S.items.filter((x) => x.id !== "dental")];
     }   // القالب المخصص والإديتور بقوا اختيارات في العجلة الداخلية
     // 🎯 قوالب مجال العميل (من أسئلة البداية): غلافها ومعاينتها بكلام وصور من مجاله نفسه، وهي الموصى بيها الأول
     // 🎯 القوالب المتخصصة لمجالات تانية مابتظهرش أصلًا (دكتور الأسنان مالوش كوباية قهوة بتتنطط)
@@ -232,7 +236,7 @@ const Gallery = (() => {
   // 🎡 العجلة الصغيرة جوه الكورة: الأقسام الكبيرة. «المشاريع الأساسية» (القوالب) هي الأساس وعليها دايرة برتقاني.
   // عجلة الفأرة فوق الكورة بيلفّها، واللي تقف عليه بيظهر على اليمين: القوالب، أو صفحة الدبلجة، أو المولّدات.
   // 🧩 القوالب أول اختيارين في العجلة الداخلية: الجاهزة (العجلة الكبيرة) والمخصصة (قوالب العميل بخطواته)
-  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["carousel", "كاروسيل", "ستايلات الصور"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "محرر الفيديو", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الاصطناعي"], ["scene", "استوديو المشهد", "مسودة 3D → فيديو حقيقي"],
+  const CATS2 = [["projects", "قوالب جاهزة", "القوالب"], ["carousel", "الصور والكاروسيل", "صورة واحدة أو عدة شرائح"], ["custom", "قوالب مخصصة", "بخطواتك أنت"], ["editor", "محرر الفيديو", "مونتاج حر بدون قالب"], ["dub", "الدبلجة والترجمة", "أي فيديو بلغة أو لهجة أخرى"], ["video", "توليد فيديو", "بالذكاء الاصطناعي"], ["scene", "استوديو المشهد", "مسودة 3D → فيديو حقيقي"],
     ["image", "توليد صور", "بالذكاء الاصطناعي"], ["voice", "توليد صوت", "بالذكاء الاصطناعي"]];
   const C = { pos: 0, vel: 0, target: 0, cur: 0, last: 0, setT: 0 };
   const catsHTML = (cls) => `<div class="${cls}">${CATS2.map(([k, t, sub], i) => `<button type="button" class="nh-wh-cat${i < 3 ? " main" : ""}" data-cat2="${i}"><b>${t}</b><small>${sub}</small></button>`).join("")}</div>`;
@@ -837,7 +841,7 @@ const Gallery = (() => {
     if (x.alias) return startTpl(EXTRA.find((e) => e.id === x.alias) || { ...x, id: x.alias });   // نسخة من قالب عام جوه تصنيف تاني (التصوير والأفاتار في الأسنان)
     if (x.id === "custom") return window.NHNav?.("auto");
     if (x.id === "carousel") return showStep("8");
-    if (x.car) return Flow.start({ id: "carousel", name: x.name, cat: "كاروسيل", desc: x.desc || "", car_style: x.id });   // 🖼️ ستايل كاروسيل: مسار الكاروسيل بالستايل اللي اختاره (مابيتسألش عليه تاني)
+    if (x.car) return Flow.start({ id: "carousel", name: x.name, cat: "الصور والكاروسيل", desc: x.desc || "", car_style: x.id });   // 🖼️ ستايل كاروسيل: مسار الكاروسيل بالستايل اللي اختاره (مابيتسألش عليه تاني)
     if (x.id === "editor") return openEditor();
     if (x.dtid) return window.Dental?.pick({ id: x.dtid, name: x.name, desc: x.desc, kind: x.dkind });
     if (x.id === "dental") return window.Dental?.open();

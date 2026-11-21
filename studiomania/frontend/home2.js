@@ -80,7 +80,7 @@ const NH = (() => {
     reel: { en: "Reel", ar: "شورت / ريل من قالب", icon: "phone", go: "14", desc: "اختر أسلوبًا، واكتب فكرتك، ويُكمل القالب: نص ← صوت ← مشاهد." },
     raw: { en: "From Footage", ar: "فيديو من تصويرك", icon: "cut", go: "0", desc: "المشروع ← التقطيع ← التوليد ← المونتاج ← النشر." },
     series: { en: "Series", ar: "مسلسل من حلقات", icon: "clapper", go: "9", desc: "حلقات متتالية بنفس الشخصيات والعالم." },
-    carousel: { en: "Carousel", ar: "كاروسيل", icon: "slides", go: "8", desc: "فكرة ← نص ← تصميم ← سلايدات." },
+    carousel: { en: "Images & Carousel", ar: "الصور والكاروسيل", icon: "slides", go: "8", desc: "صورة واحدة أو كاروسيل: فكرة ← نص ← تصميم." },
     ad: { en: "Ad", ar: "إعلان", icon: "megaphone", go: "10", desc: "إعلان من مرجع أو من الصفر على علامة العميل." },
     typo: { en: "Typography", ar: "تايبوجرافي", icon: "type", go: "12", desc: "نص متحرك من صوت أو نص." },
     dub: { en: "Dubbing", ar: "دبلجة فيديو", icon: "globe", go: "13", desc: "نفس الفيديو بلهجة أخرى." },

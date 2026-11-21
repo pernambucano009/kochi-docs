@@ -3519,3 +3519,21 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 /* 💬 «التعليقات والرسائل» تحت على اليمين: الشرح بيطلع جنبها ناحية النص، مش تحتها (كان بيستخبى تحت دايرة سعاد) */
 #nh .nh-col .nh-tile[data-id="inbox"] > .nh-tip { top: 50%; right: calc(100% + 12px); left: auto; translate: 6px -50%; }
 #nh .nh-col .nh-tile[data-id="inbox"]:is(:hover, :focus-visible) > .nh-tip { translate: 0 -50%; }
+
+/* 🖼️ خطوة «الشكل» في الصور والكاروسيل: صورة واحدة أو كاروسيل بعدد شرائحه */
+.flw-carfan:has(+ .flw-shape) { height: 250px; margin: 6px 0 10px; }
+.flw-carfan:has(+ .flw-shape) img { width: 170px; }
+.flw-shape { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 6px; }
+.flw-shp { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px; border-radius: 20px; background: var(--card); border: 2px solid transparent;
+  box-shadow: 0 2px 12px rgba(24, 23, 24, .07); font: inherit; color: inherit; cursor: pointer; text-align: center; }
+.flw-shp.on { border-color: var(--ink); }
+.flw-shp b { font-size: 15px; } .flw-shp small { font-size: 12px; color: var(--muted); }
+.flw-shp-hit { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+.flw-shp-ic { display: flex; height: 46px; align-items: center; }
+.flw-shp-ic i { width: 30px; height: 38px; border-radius: 6px; background: var(--ink); opacity: .85; margin-inline-start: -16px; box-shadow: -3px 3px 8px rgba(0, 0, 0, .18); }
+.flw-shp-ic i:first-child { margin-inline-start: 0; }
+.flw-shp-ic i:nth-child(2) { opacity: .55; } .flw-shp-ic i:nth-child(3) { opacity: .3; }
+.flw-shp-ic.one i { opacity: .85; }
+.flw-carns { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.flw-carn { min-width: 32px; height: 32px; border-radius: 999px; border: 1px solid rgba(24, 23, 24, .15); background: none; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+.flw-carn.on { background: #FF6A13; border-color: transparent; color: #fff; font-weight: 700; }

@@ -164,8 +164,12 @@ def ideas_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], n: int
 
 
 def scenarios_messages(brand: str, prefs: str, tpl: dict, assets: list[dict], idea: str, fmt: str, episodes, cast: list[str], n: int, avoid: list[str], hint: str) -> list[dict]:
-    if fmt == "carousel":
-        shape = ('كل سيناريو = سلايدات (من ٥ لـ ٨): {"title": "...", "summary": "سطر", "slides": [{"n": 1, "heading": "عنوان السلايد", "text": "النص", "visual": "ما يُرى"}], "caption": "تعليق نصي المنشور"}')
+    if fmt == "carousel" and str(episodes) == "1":   # 🖼️ صورة واحدة: شريحة واحدة بعنوان قوي وسطر، والدعوة في الكابشن
+        shape = ('كل سيناريو = منشور صورة واحدة (شريحة واحدة بالضبط): {"title": "...", "summary": "سطر", "slides": [{"n": 1, "heading": "عنوان قوي قصير", '
+                 '"text": "سطر واحد قصير", "visual": "ما يُرى"}], "caption": "الكابشن، وفيه الدعوة"}')
+    elif fmt == "carousel":
+        cnt = f"{episodes} سلايدات بالضبط" if str(episodes).isdigit() else "من ٥ لـ ٨ سلايدات"
+        shape = (f'كل سيناريو = سلايدات ({cnt}): {{"title": "...", "summary": "سطر", "slides": [{{"n": 1, "heading": "عنوان السلايد", "text": "النص", "visual": "ما يُرى"}}], "caption": "تعليق نصي المنشور"}}')
     elif fmt == "series":
         cnt = f"عدد الحلقات: {episodes} بالضبط" if str(episodes).isdigit() else "أنت الذي تحدد عدد الحلقات المناسب للحكاية (من ٢ لـ ٦)"
         shape = (f'{cnt}. كل سيناريو = مسلسل: {{"title": "...", "summary": "الحكاية في سطرين", "episodes": [{{"n": 1, "title": "عنوان الحلقة", "beats": ["ما يحدث"], "voice": ["جمل التعليق الصوتي"]}}], "caption": "..."}}')

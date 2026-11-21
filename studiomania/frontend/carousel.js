@@ -825,11 +825,16 @@ async function renderPublish() {
   const c = car.cur;
   if (car.sec !== "publish") return;
   document.querySelectorAll("#carPubModes [data-mode]").forEach((b) => b.classList.toggle("active", b.dataset.mode === car.pubMode));
+  const one = (c.slides || []).length === 1;   // 🖼️ صورة واحدة: منشور صورة على الحسابات اللي يختارها، من غير كاروسيل ولا ريل
+  if (one) car.pubMode = "carousel";
+  $("carPubModes").hidden = one;
+  $("carPubOne").hidden = !one;
   const reel = car.pubMode === "reel";
   $("carPubReel").hidden = !reel;
   $("carPubSlideWrap").hidden = reel;
   $("carPubHint").textContent = reel
     ? "سيصنع البرنامج فيديو من السلايدات بالموسيقى، ويُحفظ أيضًا في الفيديوهات الجاهزة. يكون الوسم في الريل على الفيديو كله."
+    : one ? "تُنشر الصورة بمقاس 1080×1350 على الحسابات التي اخترتها."
     : "يُنشر الكاروسيل صورًا بمقاس 1080×1350 على إنستجرام. تيك توك لا يقبل كاروسيل الصور من هنا، استخدم الريل.";
   // أول ما تفتح النشر للكاروسيل ده: الكابشن من النص، والتاج حساب الشخصية
   if (car.pubFor !== c.id) {
@@ -881,9 +886,12 @@ async function publishCarousel(now) {
         body: JSON.stringify({ export_id: exp.id, caption, platforms, scheduled_at: when.toISOString(), options: { ig_tags: options.ig_tags, ig_collab: options.ig_collab } }) });
       $("carPubDone").innerHTML = `<video src="${exp.url}" controls preload="metadata"></video>`;
     } else {
-      $("carPubState").textContent = "📤 يرسل الكاروسيل...";
+      const one = (c.slides || []).length === 1;
+      const platforms = one ? [...document.querySelectorAll("#carPubOne [data-onep]:checked")].map((x) => x.dataset.onep) : [];
+      if (one && !platforms.length) return toast("اختر منصة واحدة على الأقل", true);
+      $("carPubState").textContent = one ? "📤 يرسل الصورة..." : "📤 يرسل الكاروسيل...";
       post = await api(`/api/carousels/${c.id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption, scheduled_at: when.toISOString(), options }) });
+        body: JSON.stringify({ caption, scheduled_at: when.toISOString(), options, platforms }) });
       $("carPubDone").innerHTML = "";
     }
     $("carPubState").textContent = "";

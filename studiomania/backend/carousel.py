@@ -208,10 +208,11 @@ def cta_rule(ctx: dict, brand: dict | None = None) -> str:
 
 
 def plan_messages(brand: dict, chat: list[dict], slides: int, ctx: dict) -> list[dict]:
-    ask = f"""اكتب الكاروسيل النهائي من النقاش الذي فات، في {slides} سلايدات بالضبط.
+    one = slides == 1   # 🖼️ صورة واحدة: سلايد واحد، والدعوة في الكابشن
+    ask = f"""{"اكتب منشور الصورة الواحدة النهائي من النقاش الذي فات: سلايد واحد فقط فيه عنوان قوي قصير وسطر واحد قصير، والدعوة تكون في الكابشن." if one else f"اكتب الكاروسيل النهائي من النقاش الذي فات، في {slides} سلايدات بالضبط."}
 {dialect_rules(brand)}
 {kind_writing_rules(ctx)}
-{cta_rule(ctx, brand)}
+{"" if one else cta_rule(ctx, brand)}
 استعد JSON فقط، بدون أي نص قبله أو بعده، هذا بالشكل:
 {PLAN_SCHEMA}"""
     return [{"role": "system", "content": chat_system(brand)}, *chat[-20:], {"role": "user", "content": ask}]
@@ -336,6 +337,11 @@ def kind_design_rules(ctx: dict, brand: dict | None = None) -> str:
 def overview_prompt(brand: dict, plan: dict, ratio: str, refs: dict, ctx: dict) -> str:
     n = len(plan["slides"])
     cols, rows = overview_grid(n)
+    if n == 1:   # 🖼️ صورة واحدة: المنشور نفسه، مش شبكة
+        s = plan["slides"][0]
+        return "\n".join([f"Design ONE finished single-image social-media post, a full-bleed {ratio} vertical image, high resolution.",
+                           kind_design_rules(ctx, brand), brand_block(brand, style=ctx.get("style"), tpl=bool(ctx.get("template"))), TEXT_RULES,
+                           *reference_notes(refs), f"Text: {slide_text(s)}. Visual: {s.get('visual') or 'supporting visual'}", EYES_RULE])
     lines = [
         f"Design a complete, cohesive social-media carousel of {n} slides, shown together on ONE sheet as a grid of "
         f"{cols} columns x {rows} rows of {ratio} vertical panels with thin light gaps between them. "
