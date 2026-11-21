@@ -369,12 +369,12 @@ const PilotPage = (() => {
     if (j.status === "wait" && (j.gate === "idea" || j.gate === "script")) {
       body = `<div class="ap-opts">${(j.options || []).map((o) => `<button type="button" class="ap-opt" data-pick="${esc(j.id)}" data-id="${esc(o.id)}"><b>${esc(o.title)}</b><small>${esc(o.text)}</small></button>`).join("")}</div>
         <div class="ap-acts"><span style="font-size:11.5px;color:var(--nh-muted);align-self:center">${j.gate === "idea" ? "اختر فكرة" : "اختر نصًا"}</span><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
-    } else if (j.status === "wait" && j.gate === "shape") {   // 🖼️ هيكل هذا المنشور
-      body = `<div class="ap-scn">${[["1", "صورة واحدة"], ...[3, 4, 5, 6, 7, 8].map((k) => [String(k), `كاروسيل ${k.toLocaleString("ar-EG")} شرائح`])].map(([v, t]) => `<button type="button" class="ap-stp" data-pick="${esc(j.id)}" data-id="${v}">${t}</button>`).join("")}</div>
-        <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">البرنامج يختار</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
-    } else if (j.status === "wait" && j.gate === "style") {   // 🎨 ستايل هذا المنشور
-      body = `<div class="ap-grid">${carStyles().map((a) => `<button type="button" class="ap-card" data-pick="${esc(j.id)}" data-id="${esc(a.id)}">${a.images?.[0] ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<i></i>"}<b>${esc(a.name || "ستايل")}</b></button>`).join("")}</div>
-        <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">البرنامج يختار</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
+    } else if (j.status === "wait" && (j.gate === "shape" || j.gate === "style")) {   // 🔵 البرنامج اختار: موافق، أو جرّب غيره
+      const p = String(j.prop || ""), st = carStyles().find((a) => a.id === p);
+      const what = j.gate === "shape" ? (p === "1" ? "صورة واحدة" : `كاروسيل ${(+p || 5).toLocaleString("ar-EG")} شرائح`) : (st?.name || "ستايل");
+      body = `<div class="ap-prop">${j.gate === "style" && st?.images?.length ? `<div class="ap-imgs">${st.images.map((im) => `<img src="${esc(im.url)}" alt="" loading="lazy">`).join("")}</div>` : ""}
+        <p class="ap-say">${j.gate === "shape" ? "هيكل المنشور الذي اخترناه" : "الستايل الذي اخترناه"}: <b>${esc(what)}</b></p></div>
+        <div class="ap-acts"><button type="button" class="ok" data-pick="${esc(j.id)}" data-id="">موافق</button><button type="button" data-other="${esc(j.id)}">جرّب غيره</button><button type="button" data-stop="${esc(j.id)}">أزل هذا الموعد</button></div>`;
     } else if (j.status === "wait" && j.gate === "word") {   // 💬 كلمة «علّق بكلمة» اللي هتتقال في آخر الفيديو
       body = `<p class="ap-say">الكلمة التي يكتبها المتابع في التعليق لتصله رسالة على الخاص، وتُقال في آخر الفيديو:</p>
         <div class="ap-acts"><input type="text" class="ap-word" data-wordin="${esc(j.id)}" value="${esc(j.dm_word || "")}" placeholder="مثلًا: جدول">
@@ -532,6 +532,7 @@ const PilotPage = (() => {
       if ("openplan" in d) return openPlan();
       if (d.step) { const st = new Set(s.steps); st.has(d.step) ? st.delete(d.step) : st.add(d.step); return save({ steps: STEP_N.map(([k]) => k).filter((k) => st.has(k)) }); }
       if ("cap" in d) { S.open = !S.open; return drawQ(); }
+      if (d.other) return act(`${d.other}/other`, { method: "POST" });
       if (d.pick) return act(`${d.pick}/ok`, { method: "POST", ...jsonBody({ pick: d.id }) }, "✓ اعتُمد، وتكتمل الخطوة التالية");
       if (d.ok) return act(`${d.ok}/ok`, { method: "POST", ...jsonBody({}) }, "✓ اعتُمد");
       if (d.wordok) { const w = (S.root.querySelector(`[data-wordin="${d.wordok}"]`)?.value || "").trim(); if (!w) return toast("اكتب الكلمة، أو اختر «بدون علّق بكلمة»", true); return act(`${d.wordok}/ok`, { method: "POST", ...jsonBody({ word: w }) }, "✓ اعتُمدت الكلمة"); }

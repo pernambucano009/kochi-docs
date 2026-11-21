@@ -35451,6 +35451,33 @@ def pilot_car_n(s: dict) -> int:
         return 5
 
 
+def pilot_pick_shape(d: dict, idea_id: str | None) -> int:
+    """🖼️ هيكل المنشور التلقائي: صورة واحدة أو كاروسيل بعدد شرائحه، على حسب الفكرة."""
+    if atlas.mock_mode():
+        return 5
+    it = next((i for i in d.get("ideas") or [] if i.get("id") == idea_id), {}) or {}
+    try:
+        raw = llm([{"role": "user", "content": "فكرة منشور على السوشيال ميديا:\n" + json.dumps({k: it.get(k) for k in ("title", "idea", "hook")}, ensure_ascii=False)
+                    + '\nهل الأنسب لها صورة واحدة (معلومة أو جملة قوية واحدة) أم كاروسيل (خطوات أو قائمة أو شرح)؟ وكم شريحة (٣ إلى ٨)؟ أعد JSON فقط: {"slides": 1} للصورة الواحدة أو {"slides": n}'}],
+                  json_mode=True, temperature=0.2)
+        n = int(json.loads(raw).get("slides") or 5)
+    except Exception:  # noqa: BLE001
+        n = 5
+    return 1 if n <= 1 else max(3, min(8, n))
+
+
+def pilot_pick_style(s: dict, skip: list[str] | None = None) -> str:
+    """🎨 الستايل اللي البرنامج اختاره: بالدور على ستايلات العميل، أو على كل الستايلات لو مااختارش (غير اللي اترفضوا)."""
+    lib = [a["id"] for a in carousel_library() if a.get("kind") in ("style", "template")]
+    pool = [x for x in s.get("car_styles") or [] if x in lib] or lib
+    pool = [x for x in pool if x not in (skip or [])] or pool
+    if not pool:
+        return ""
+    i = int(s.get("car_i") or 0)
+    pilot_update(lambda d: d["settings"].update(car_i=i + 1))
+    return pool[i % len(pool)]
+
+
 def pilot_twin(s: dict) -> str | None:
     """النسخة التي ستتكلم: ما اخترها، وإلا أول نسخة جاهزة."""
     ts = twins_list()
@@ -35863,16 +35890,16 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
         flow_pick_idea(fid, FlowPickIn(id=pick))
         return put(phase="script", pick=None, note="جارٍ كتابة النص")
 
-    if ph == "shape":
-        if gate("shape", "اختر هيكل المنشور: صورة واحدة أو كاروسيل"):
+    if ph == "shape":   # 🖼️ البرنامج بيختار الهيكل (الثابت من الإعدادات، أو على حسب الفكرة)، والدايرة الزرقا = يستنى موافقتك على اختياره
+        if not j.get("prop"):
+            j["prop"] = str(pilot_car_n(s) or pilot_pick_shape(d, j.get("idea_pick")))
+            put(prop=j["prop"])
+        if gate("shape", "هيكل المنشور: وافق أو جرّب غيره"):
             return
-        try:
-            n = max(0, min(10, int(j.get("pick") or 0))) or pilot_car_n(s)
-        except (TypeError, ValueError):
-            n = pilot_car_n(s)
-        flow_update(fid, lambda x: x.update(car_n=n) if n else x.pop("car_n", None))
+        n = max(1, min(10, int(j["prop"])))
+        flow_update(fid, lambda x: x.update(car_n=n))
         flow_pick_idea(fid, FlowPickIn(id=j.get("idea_pick") or ""))
-        return put(phase="script", pick=None, note="جارٍ كتابة النص")
+        return put(phase="script", pick=None, prop=None, note="جارٍ كتابة النص")
 
     if ph == "word":
         if gate("word", "كلمة التعليق: وافق عليها أو غيّرها"):
@@ -35908,25 +35935,24 @@ def pilot_step(j: dict, s: dict, port: int) -> None:
     if ph == "car":
         sc = d.get("scenario") or {}
         n = 1 if d.get("car_n") == 1 or len(sc.get("slides") or []) == 1 else max(2, min(10, len(sc.get("slides") or []) or 6))   # تلقائي: النص نفسه بيحدد
-        if gate("style", "اختر الستايل"):   # 🔵 الستايل بموافقتك
+        if not j.get("prop"):   # 🎨 البرنامج بيختار الستايل (بالدور على ستايلاتك، أو من كلها)، والدايرة الزرقا = يستنى موافقتك
+            j["prop"] = pilot_pick_style(s)
+            put(prop=j["prop"])
+        if gate("style", "الستايل: وافق أو جرّب غيره"):
             return
         if not atlas.mock_mode():
             wallet.need(wallet.credits(wallet.est(chars=12000)) + carousel_img_credits() * (n + (1 if n > 1 else 0)), "صورة" if n == 1 else "كاروسيل")
         car = create_carousel(CarouselIn(name=f"🛫 {(d.get('idea') or {}).get('title') or j['name']}"[:80]))
         cid = car["id"]
-        sty = [x for x in s.get("car_styles") or [] if x]
         lib = {a["id"]: a for a in carousel_library()}
-        if j.get("pick") in lib:   # 🔵 اختاره هو وقت الموافقة
-            sty = [j["pick"]]
-        if sty:   # 🎨 ستايلات العميل: كل كاروسيل بالدور (لو واحد بس: هو كل مرة)
-            pick = sty[0] if len(sty) == 1 else sty[int(s.get("car_i") or 0) % len(sty)]
-            pilot_update(lambda d: d["settings"].update(car_i=int(d["settings"].get("car_i") or 0) + 1))
+        if j.get("prop") in lib:
+            pick = j["prop"]
             key = "template_id" if (lib.get(pick) or {}).get("kind") == "template" else "style_id"
             patch_carousel(cid, CarouselPatch(settings={"slides": n, key: pick}))
         else:
             patch_carousel(cid, CarouselPatch(settings={"slides": n}))
         brief = flow_brief({**d, "_id": fid})
-        put(phase="car_plan", carousel_id=cid, note="جارٍ كتابة الشرائح")
+        put(phase="car_plan", carousel_id=cid, prop=None, note="جارٍ كتابة الشرائح")
 
         def write():   # الكتابة بتاخد دقيقة: في الخلفية عشان لفة المجدول ماتقفش
             try:
@@ -36230,6 +36256,22 @@ def pilot_ok(jid: str, body: PilotOkIn):
             j["dm_word"] = body.word.strip()[:30]
         j.update(status="run", passed=[*(j.get("passed") or []), j["gate"]], gate=None, pick=body.pick or None, note="يُكمل", updated_at=now())
     pilot_update(fn)
+    return pilot_state()
+
+
+@app.post("/api/pilot/jobs/{jid}/other")
+def pilot_other(jid: str):
+    """🔵 «جرّب غيره»: البرنامج بيختار حاجة تانية (هيكل أو ستايل) ويفضل مستني موافقتك."""
+    d0 = pilot_load()
+    j = next((x for x in d0["jobs"] if x["id"] == jid), None)
+    if not j or j.get("status") != "wait" or j.get("gate") not in ("shape", "style"):
+        raise HTTPException(400, "هذه المهمة لا تنتظر موافقة على اختيار")
+    tried = [*(j.get("tried") or []), str(j.get("prop") or "")]
+    if j["gate"] == "shape":
+        nxt = next((x for x in ("1", "5", "3", "7", "4", "6", "8") if x not in tried), "5")
+    else:
+        nxt = pilot_pick_style(d0["settings"], tried) or str(j.get("prop") or "")
+    pilot_job_set(jid, prop=nxt, tried=tried[-12:])
     return pilot_state()
 
 
