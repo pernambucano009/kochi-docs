@@ -767,6 +767,10 @@ async function openCust(w) {
       <button class="btn" id="emGo">احفظ</button><span class="mute" id="emMsg"></span></div>
     <div class="row" style="margin-top:8px"><span class="mute">تفعيل باقة من غير دفع:</span><select id="plKey"><option value="starter">بداية</option><option value="pro" selected>محترف</option><option value="agency">وكالات</option></select>
       <input id="plDays" type="number" min="1" max="365" value="7" style="width:80px"><span class="mute">يوم</span><button class="btn" id="plGo">فعّل</button><span class="mute" id="plMsg"></span></div>
+    <h4>🧹 ابدأ الحساب من جديد (قبل تسليمه)</h4>
+    <div class="row" style="flex-wrap:wrap;gap:6px 14px">${[["videos", "المشاريع والفيديوهات"], ["posts", "المنشورات والمجدول"], ["notes", "الإشعارات"], ["ideas", "الأفكار المحفوظة"], ["avatars", "الأفاتارات التي أنشأها"], ["brain", "عقل العلامة"], ["ledger", "سطور اختبار القوالب من سجل النقاط"]]
+      .map(([k, t]) => `<label><input type="checkbox" data-fr="${k}" ${k === "brain" ? "" : "checked"}> ${t}</label>`).join("")}</div>
+    <div class="row" style="margin-top:6px"><button class="btn" id="frGo">نظّف الحساب</button><span class="mute" id="frMsg">الباقة والنقاط والحسابات المربوطة تبقى كما هي.</span></div>
     <div class="row" style="margin-top:8px"><button class="btn" id="delGo" style="color:#D9473A">🗑️ احذف العميل نهائيًا</button><span class="mute" id="delMsg"></span></div>
     <h4>أنفقنا عليه في (منذ أول يوم)</h4>
     <table><thead><tr><th>القسم</th><th>الدولار</th><th>منه أثناء التجربة</th><th>منه ترويج</th></tr></thead><tbody>${(d.spend_cat || []).map((x) => `<tr><td>${esc(x.cat)}</td><td>${money(x.usd)}</td><td>${money(x.trial)}</td><td>${money(x.promo)}</td></tr>`).join("") || `<tr><td colspan="4" class="mute">لم يُسجَّل إنفاق بعد</td></tr>`}</tbody></table>
@@ -775,6 +779,15 @@ async function openCust(w) {
     <h4>آخر حركات النقاط</h4>
     <table><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>النقاط</th></tr></thead><tbody>${(d.moves || []).map((m) => `<tr><td class="mute">${when(m.at)}</td><td>${KIND[m.kind] || esc(m.kind)}</td><td>${esc(m.note || "")}</td><td class="${m.delta > 0 ? "ok" : ""}" dir="ltr">${m.delta > 0 ? "+" : ""}${num(m.delta)}</td></tr>`).join("")}</tbody></table>
     ${(d.payments || []).length ? `<h4>المدفوعات</h4><table><tbody>${d.payments.map((p) => `<tr><td class="mute">${when(p.at)}</td><td>${esc(p.kind)}</td><td>${esc(p.note || "")}</td><td>${money(p.amount)}</td></tr>`).join("")}</tbody></table>` : ""}`;
+  $("frGo").onclick = async () => {
+    const parts = [...box.querySelectorAll("[data-fr]:checked")].map((x) => x.dataset.fr);
+    if (!parts.length) return;
+    const names = [...box.querySelectorAll("[data-fr]:checked")].map((x) => x.parentElement.textContent.trim()).join("، ");
+    if (!confirm(`سيُحذف نهائيًا من حساب ${r?.email || ""}:\n${names}\n\nالباقة والنقاط والحسابات المربوطة تبقى. لا يمكن التراجع.`)) return;
+    $("frMsg").textContent = "جارٍ التنظيف…";
+    try { const x = await api(`/api/platform/customers/${w}/fresh`, { method: "POST", body: JSON.stringify({ parts }) }); $("frMsg").textContent = "✓ نُظّف: " + Object.entries(x.done || {}).map(([k, v]) => `${k} ${v}`).join(" · "); }
+    catch (e) { $("frMsg").textContent = e.message; }
+  };
   $("delGo").onclick = async () => {
     const em = prompt(`حذف الحساب ده نهائيًا بكل ملفاته ورصيده (مايترجعش).\nللتأكيد اكتب إيميل العميل:\n${r?.email || ""}`);
     if (!em) return;

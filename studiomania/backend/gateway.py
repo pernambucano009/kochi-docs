@@ -1314,8 +1314,8 @@ def billing_state(request: Request):
         raise HTTPException(401, "يجب تسجيل الدخول")
     w = workspace(u["workspace"])
     with closing(db()) as c:
-        hist = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? ORDER BY at DESC LIMIT 30",
-                                          (u["workspace"],))]
+        hist = [dict(r) for r in c.execute("SELECT delta, kind, note, at FROM ledger WHERE workspace=? AND COALESCE(note, '') NOT LIKE '%دفعة اختبار القوالب%' "
+                                          "ORDER BY at DESC LIMIT 30", (u["workspace"],))]   # 🧪 حركات نقاط اختبار القوالب (من الإدارة) مابتظهرش للعميل
     cfg = billing.config(DATA_DIR)
     return {"me": me_dict(u), "owner": u["workspace"] == OWNER, "plan": w["plan"] if w else "owner",
             "extra_accounts": (w["extra_accounts"] if w else 0), "autopilot": bool(w and w["autopilot"]), "bots": bool(w and w["bots"]),
@@ -2480,6 +2480,35 @@ def admin_create_customer(body: AdminCustomerIn, request: Request):
 
 class AdminDeleteIn(BaseModel):
     confirm: str = ""   # لازم إيميل العميل نفسه (تأكيد إن ده الحساب المقصود)
+
+
+class AdminFreshIn(BaseModel):
+    parts: list[str] = []
+
+
+@app.post("/api/platform/customers/{wid}/fresh")
+async def admin_fresh_customer(wid: str, body: AdminFreshIn, request: Request):
+    """🧹 الأدمن يبدأ حساب عميل من جديد (قبل تسليمه): اللي اتعلّم عليه بس بيتمسح جوه نسخته، والباقة والنقاط والحسابات المربوطة بتفضل.
+    «ledger»: سطور رصيد دفعات اختبار القوالب بتتشال من سجل نقاطه (مش رصيده)."""
+    admin(request)
+    if not workspace(wid) or wid == OWNER:
+        raise HTTPException(404, "هذا العميل غير موجود")
+    done = {}
+    if "ledger" in body.parts:
+        with closing(db()) as c, c:
+            done["ledger"] = c.execute("DELETE FROM ledger WHERE workspace=? AND note LIKE '%دفعة اختبار القوالب%'", (wid,)).rowcount
+    parts = [p for p in body.parts if p != "ledger"]
+    if parts:
+        t = await ensure(wid)
+        try:
+            r = await _http.post(f"http://127.0.0.1:{t.port}/api/account/fresh", json={"parts": parts},
+                                 headers={"x-gateway-secret": GATEWAY_SECRET, "content-type": "application/json"}, timeout=300)
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, f"نسخة العميل لم ترد: {exc}") from exc
+        if r.status_code >= 400:
+            raise HTTPException(r.status_code, (r.json() or {}).get("detail") or "تعذّر التنظيف")
+        done.update((r.json() or {}).get("done") or {})
+    return {"ok": True, "done": done}
 
 
 @app.post("/api/platform/customers/{wid}/delete")

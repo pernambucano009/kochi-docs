@@ -3422,10 +3422,12 @@ FRESH_PARTS = ("videos", "posts", "notes", "ideas", "avatars", "brain")
 
 
 @app.post("/api/account/fresh")
-def account_fresh(body: FreshIn):
+def account_fresh(body: FreshIn, request: Request):
     """🧹 تنظيف الحساب قبل تسليمه (أو للبدء من جديد): اللي العميل اختاره بس بيتمسح. الباقة والنقاط والحسابات المربوطة بتفضل زي ما هي.
     videos: المشاريع والفيديوهات (الخام والجاهزة وتجارب المختبر والتايبو والأرشيف) · posts: المنشورات والمجدول · notes: الإشعارات
     ideas: فولدر الأفكار والمحفوظات · avatars: أفاتاراتك (الجاهزة من سمسم كيت بترجع زي ما هي) · brain: عقل العلامة من الأول."""
+    if request.headers.get("x-user-email") and TENANT_ROLE == "customer":   # 🔒 من الأدمن بس (صفحة العملاء)، مش من حساب العميل نفسه
+        raise HTTPException(403, "هذا الإجراء من الإدارة فقط")
     parts = [x for x in dict.fromkeys(body.parts) if x in FRESH_PARTS]
     if not parts:
         raise HTTPException(400, "اختر ما تريد تنظيفه")
