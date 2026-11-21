@@ -44,9 +44,9 @@ const Flow = (() => {
   const isVid = (d) => isCode(d) || isTypo(d);   // قوالب بيترسم فيديوها في المسار نفسه: المونتاج والنشر من المسار
   const isCode = (d) => d?.template?.kind === "motion";
   // 📱 تصوير بالموبايل: الفكرة والسكريبت اختياريين (تقدر تتخطاهم لو عندك الفيديو)، وبعدين الفيديو ← الملاحظات ← المونتاج الأوتوماتيك
-  const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["review", "الملاحظات"], ["montage", "المونتاج"], ["publish", "النشر"]];
-  // 🪄 الأفاتار: من غير «الملاحظات» (دي للي بيصوّر نفسه ويعيد التصوير، إنما فيديو الأفاتار إحنا اللي بنعمله)
-  const STEPS_AVATAR = STEPS_PHONE.filter(([k]) => k !== "review");
+  // «الملاحظات» مش خطوة لوحدها: بتظهر جوه خطوة الفيديو لو طلبتها (راجع الفيديو واقترح تحسينات)
+  const STEPS_PHONE = [["idea", "الفكرة"], ["scenario", "النص"], ["shoot", "الفيديو"], ["montage", "المونتاج"], ["publish", "النشر"]];
+  const STEPS_AVATAR = STEPS_PHONE;
   const isPhone = (d) => d?.template?.kind === "phone";
   const isAvatar = (d) => d?.template?.kind === "avatar";
   const isTalk = (d) => isPhone(d) || isAvatar(d);   // التصوير بالجوال والأفاتار: نفس التسلسل لحد النشر   // 🪞 نفس تسلسل التصوير بالجوال، بس الأفاتار هو اللي بيقول النص
@@ -59,7 +59,7 @@ const Flow = (() => {
   const steps = (d) => (d?.brief ? [["facts", d.brief.step || "التفاصيل"], ...steps0(d).filter(([k]) => k !== "idea" && k !== "scenario")] : steps0(d));
   const FMT = { reel: ["🎬", "ريل", "فيديو قصير رأسي"], carousel: ["🗂️", "كاروسيل", "صور متتالية تُقلَّب"], series: ["📺", "مسلسل", "عدة حلقات بالأبطال أنفسهم"] };
   const OUT = { tvideo: "قسم القوالب", carousel: "الكاروسيل", series: "المسلسلات", typo: "التايبوجرافي", motion: "الموشن" };
-  const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st)));
+  const idx = (st, d = S.d) => Math.max(0, steps(d).findIndex(([k]) => k === (st === "done" ? "generate" : st === "review" ? "shoot" : st)));
 
   // ---------------------------------------------------------------- فتح وقفل
   function shell() {
@@ -787,8 +787,20 @@ const Flow = (() => {
           ${(f.broll || []).length ? `<div class="flw-broll">${f.broll.map((x) => `<figure><video src="${esc(x.url)}#t=0.5" muted preload="metadata"></video><button type="button" data-fdel="${esc(x.gen_id)}" title="أزلها">✕</button></figure>`).join("")}</div>` : ""}</section>
         ${castBox(d)}</div>
       ${d.busy === "upload" ? working("جارٍ الرفع…") : failed("shoot")}
-      ${mn ? `<div class="flw-acts end"><button type="button" class="flw-link" data-automont>⏭ إلى المونتاج مباشرة</button>
-        <button type="button" class="flw-btn pri big" data-phreview ${d.busy ? "disabled" : ""}>🔎 راجع الفيديو واقترح التحسينات</button></div>` : ""}`;
+      ${mn && (d.review || d.busy === "review") ? reviewBox(d) : ""}
+      ${mn ? `<div class="flw-acts end">${d.review || d.busy === "review" ? "" : `<button type="button" class="flw-link" data-phreview ${d.busy ? "disabled" : ""}>راجع الفيديو واقترح تحسينات</button>`}
+        <button type="button" class="flw-btn pri big" data-automont ${d.busy ? "disabled" : ""}>التالي: المونتاج ←</button></div>` : ""}`;
+  }
+  // 🔎 ملاحظات الفيديو (لو طلبها): جوه خطوة الفيديو نفسها، مش خطوة لوحدها
+  function reviewBox(d) {
+    const r = d.review;
+    if (d.busy === "review" || !r) return d.busy === "review" ? working("البرنامج يشاهد الفيديو ويستمع إلى النص ويقارنه بقواعد الخوارزميات…") : failed("review");
+    const note = (n) => `<li class="${n.level}"><div><b>${n.level === "must" ? "🔴" : "🟡"} ${esc(n.title)}</b>${n.t != null ? `<button type="button" class="flw-chip num" data-seek="${n.t}">⏱ ${secs(n.t)}</button>` : ""}</div>
+      ${n.why ? `<p>${esc(n.why)}</p>` : ""}${n.fix ? `<p class="flw-fix">✅ ${esc(n.fix)}</p>` : ""}</li>`;
+    return `<section class="flw-revbox"><h3>ملاحظات على الفيديو</h3>
+      <div class="flw-rev"><div class="flw-score">${r.score != null ? `<b class="num">${r.score}</b><small>من 100</small>` : ""}</div><div><p>${esc(r.summary || "")}</p></div></div>
+      <ul class="flw-notes">${(r.notes || []).map(note).join("") || `<li class="nice"><b>لا توجد ملاحظات مهمة</b></li>`}</ul>
+      <p class="flw-sub muted">إن أردت تنفيذها، صوّر مرة أخرى واضغط «بدّله». وإن كان كافيًا، أكمل إلى المونتاج.</p></section>`;
   }
   // 🪞 قالب الأفاتار: النص اللي اتكتب ← الأفاتار بيقوله بوشك وصوتك ← الملاحظات والمونتاج
   function stAvatar(d) {
@@ -1009,7 +1021,7 @@ const Flow = (() => {
     S.el.classList.toggle("flw-lock", !!S.inflight || busy());
     const st = S.view === "publish" ? "publish" : d.stage === "generate" && (d.output || d.busy === "generate") ? "done" : d.stage;
     const body = { style: stStyle, carousel: stCar, publish: isCar(d) ? stCarPub : stPublish, facts: stFacts, idea: stIdea, format: stFormat, scenario: isCode(d) ? stScript : stScenario, cast: stCast, voice: stVoice, assets: stAssets, panel: isTypo(d) ? stTypoScenes : stPanel, generate: stGenerate, done: stDone,
-      shoot: stShoot, review: stReview, montage: stMontage }[st] || stIdea;
+      shoot: stShoot, review: stShoot, montage: stMontage }[st] || stIdea;
     if (S.stage && S.stage !== st) S.chat = null;   // النقاش يُغلق عندما تنتقل خطوة
     if (st === "montage" && d.montage && S.mfor !== d.montage.at) { S.mfor = d.montage.at; S.mstate = null; setTimeout(mpoll, 0); }
     if (!d.busy) S.busyFrom = null;
@@ -1155,7 +1167,7 @@ const Flow = (() => {
     if (q("[data-automont]")) { S.mstate = null; return call("/auto-montage", { plain: false, comics: S.comics || "auto", effects: S.fxMode || "auto" }).then(poll); }
     if ((b = q("[data-fxdel]"))) { try { S.mstate = await api(`/api/flows/${S.d.id}/effects/remove`, { method: "POST", ...J({ index: +b.dataset.fxdel }) }); render(); toast("✓ حُذف الإفكت، وسيختفي في التصدير القادم"); } catch (err) { toast(err.message, true); } return; }
     if (q("[data-plain]")) { if (!(await uiConfirm("هل تزيل المونتاج التلقائي وتُخرج الفيديو كما هو؟"))) return; S.mstate = null; return call("/auto-montage", { plain: true }).then(poll); }
-    if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
+    if ((b = q("[data-seek]"))) { const v = S.el.querySelector(".flw-rv, .flw-main-v video"); if (v) { v.currentTime = +b.dataset.seek; v.play().catch(() => {}); } return; }
     if (q("[data-tomont]")) return codeOut("montage");
     if (q("[data-myedit]")) { const pid = S.d.montage?.project_id; if (!pid) return; flowCtxSet({ fid: S.d.id, pid }); close(); storageSet(projectKey("free"), pid); return showStep("6f"); }
     if (q("[data-render]")) {

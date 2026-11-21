@@ -3512,3 +3512,7 @@ html[lang="en"] :is(.flw-steps, .ap-steps, #flowNav, .car-steps, .fs-stepper, .f
 #nh .bm-chgo { font: inherit; font-size: 20px; font-weight: 500; line-height: 1.35; color: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 0; border-bottom: 1.5px solid var(--nh-accent); }
 #nh .bm-chgo i { font-style: normal; color: var(--nh-accent); }
 #nh .bm-chgo:hover { color: var(--nh-accent); }
+/* 💬 العمود اللي عليه الماوس بيطلع فوق المسرح اللي في النص، عشان فقاعة الشرح ماتستخباش وراه */
+#nh .nh-col { position: relative; }
+#nh .nh-col:hover, #nh .nh-col:focus-within { z-index: 40; }
+#nh .nh-col .nh-tile:hover, #nh .nh-col .nh-tile:focus-visible { position: relative; z-index: 6; }
