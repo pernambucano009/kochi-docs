@@ -610,6 +610,7 @@ const BrandPage = (() => {
         <button class="bm-pill" data-trdel="${esc(x.id)}" title="احذفه من القائمة">✕</button></div></li>`;
     return head + `<p class="bm-note">الرائج الآن في ${esc(tr.market || "سوقك")} ومجالك. حدّثه بزر «ابحث الآن»، ويبقى الترند هنا حتى تحذفه.${tr.live ? "" : " (وضع تجريبي: ترندات تجريبية حتى يُضبط مفتاح مصدر البيانات)"}</p>
       <div class="bm-acts"><button class="bm-pill" data-trref ${tr.status === "working" ? "disabled" : ""}>${tr.status === "working" ? "⏳ جارٍ البحث…" : `🔄 ابحث الآن${ct("trends")}`}</button>
+        <label class="bm-pill bm-auto"><input type="checkbox" data-trauto ${tr.auto ? "checked" : ""}> تحديث تلقائي <small>(نحو ${(tr.auto_day || 0).toLocaleString("ar-EG")} نقطة يوميًا)</small></label>
         ${ago != null ? `<small class="bm-note">آخر تحديث منذ ${ago < 1 ? "أقل من ساعة" : `${ago} ساعة`}</small>` : ""}</div>
       ${tr.error ? `<p class="bm-note bad">⚠️ ${esc(tr.error)}</p>` : ""}
       ${(tr.items || []).length ? `<ul class="bm-trs">${tr.items.map(row).join("")}</ul>` : `<p class="bm-note">لا توجد ترندات بعد.${tr.market ? "" : " اكتب «السوق» و«المجال» في الهوية ليبدأ البحث."}</p>`}`;
@@ -1257,6 +1258,10 @@ const BrandPage = (() => {
       }
       const trd = t.closest("[data-trdel]");
       if (trd) { if (!(await uiConfirm("أتحذف هذا الترند من القائمة؟"))) return; try { S.tr = await bAPI(`/trends/${trd.dataset.trdel}`, { method: "DELETE" }); redrawNode("trends"); refreshCard(); } catch (err) { toast(err.message, true); } return; }
+      if (t.matches?.("[data-trauto]")) {   // 🔁 التحديث التلقائي للترندات (تشغيل/إيقاف)
+        try { const x = await api("/api/auto-on", { method: "PUT", ...jsonBody({ what: "trends", on: t.checked, bid: S.id }) }); if (S.tr) S.tr.auto = x.on; toast(x.on ? "✓ التحديث التلقائي للترندات مفعّل" : "أُوقف التحديث التلقائي للترندات"); S.trFor = null; loadTrends(cur()); }
+        catch (err) { toast(err.message, true); t.checked = !t.checked; } return;
+      }
       if (t.closest("[data-trref]")) { try { S.tr = await bAPI("/trends/refresh", { method: "POST" }); redrawNode("trends"); refreshCard(); S.trFor = null; loadTrends(cur()); } catch (err) { toast(err.message, true); } return; }
       const aro = t.closest("[data-aron]");
       if (aro) { const [fid, i] = aro.dataset.aron.split(":"), rows = arRows(fid); rows[+i].on = aro.checked; return algoSave(fid, rows); }

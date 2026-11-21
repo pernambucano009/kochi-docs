@@ -46,12 +46,13 @@ const RivalsPage = (() => {
           ${d.found_at || d.updated_at ? `<span>آخر تحديث ${ago(d.found_at || d.updated_at)}</span>` : ""}${d.live ? "" : `<span>وضع تجريبي: حسابات تجريبية</span>`}
           ${busy ? `<span class="pk-busy">⏳ ${esc(d.step || "جارٍ العمل…")}</span>` : d.error ? `<span class="pk-err">⚠️ ${esc(d.error)}</span>` : ""}</div>
         <div class="pk-acts"><label class="rv-mode" data-tip="${d.algo_mode ? "القواعد خطوات إلزامية في صناعة كل فيديو" : "القواعد نصائح فقط"}"><input type="checkbox" data-rvmode ${d.algo_mode ? "checked" : ""}>وضع الخوارزمية</label>
+          <label class="rv-mode" data-tip="يجلب اقتراحات ويحدّث الأرقام والوصفة كل أسبوع وحده"><input type="checkbox" data-rvauto ${d.auto ? "checked" : ""}>تحديث تلقائي <small>(نحو ${(d.auto_day || 0).toLocaleString("ar-EG")} نقطة يوميًا)</small></label>
           ${pkIb("search", `اقترح منافسين آخرين${ct("rivals_discover")}`, `data-rvfind ${busy ? "disabled" : ""}`)}${d.approved ? pkIb("refresh", `حدّث الأرقام${ct("rivals_refresh")}`, `data-rvall ${busy ? "disabled" : ""}`) : ""}
           ${pkIb("plus", "أضف منافسًا بنفسك", 'data-rvdw="add"', "blk")}</div></div>
       ${pend.length ? `<div class="rv-sec"><span class="pk-lbl">مقترحون${where ? ` حسب: <span data-no-i18n>${esc(where)}</span>` : ""}</span><span class="pk-acts"><button class="pk-chip" data-rvokall>وافق على الكل</button><button class="pk-chip" data-rvnoall>ارفض الكل</button></span></div>
         <div class="rv-rows">${hd}${pend.map(row).join("")}</div>` : ""}
       ${oks.length ? `<div class="rv-sec"><span class="pk-lbl">منافسوك المعتمدون</span></div><div class="rv-rows">${pend.length ? "" : hd}${oks.map(row).join("")}</div>` : ""}
-      ${d.items.length ? "" : `<div class="pk-empty">${busy ? "جارٍ البحث عن منافسين في مجالك…" : d.brain.domain ? "لا توجد اقتراحات بعد. اضغط «اقترح منافسين آخرين»." : "اكتب «المجال» في فرع الهوية، وسيجلب البرنامج المنافسين تلقائيًا."}</div>`}
+      ${d.items.length ? "" : `<div class="pk-empty">${busy ? "جارٍ البحث عن منافسين في مجالك…" : d.brain.domain ? "لا توجد اقتراحات بعد. اضغط «اقترح منافسين آخرين»." : "اكتب «المجال» في فرع الهوية، ثم اضغط «اقترح منافسين آخرين»."}</div>`}
       ${d.approved ? digest(d.digest) : ""}`;
   }
   function addDw() {
@@ -280,6 +281,10 @@ const RivalsPage = (() => {
       if (e.target.matches("[data-rvmode]")) {
         api("/api/algo/mode", { method: "POST", ...jsonBody({ on: e.target.checked }) })
           .then((x) => { S.d.algo_mode = x.on; render(); toast(x.on ? "✓ وضع الخوارزمية مفعّل" : "أُوقف وضع الخوارزمية"); }).catch((err) => toast(err.message, true));
+      }
+      if (e.target.matches("[data-rvauto]")) {   // 🔁 التحديث التلقائي للمنافسين (تشغيل/إيقاف)
+        api("/api/auto-on", { method: "PUT", ...jsonBody({ what: "rivals", on: e.target.checked }) })
+          .then((x) => { S.d.auto = x.on; render(); toast(x.on ? "✓ التحديث التلقائي للمنافسين مفعّل" : "أُوقف التحديث التلقائي للمنافسين"); }).catch((err) => toast(err.message, true));
       }
       if (e.target.matches("[data-btm]")) {
         const row = S.el.querySelectorAll(`[data-btm="${CSS.escape(e.target.dataset.btm)}"]`), val = (k) => { const x = [...row].find((i) => i.dataset.k === k)?.value; return x === "" || x == null ? null : +x; };

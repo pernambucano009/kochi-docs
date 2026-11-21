@@ -5398,6 +5398,51 @@ def brain_plan(bid: str):
     return plan_out(bid)
 
 
+# 🔁 التحديث التلقائي (الترندات والمنافسين): مقفول افتراضيًا، والعميل بيشغّله بزرار مكتوب عليه تكلفته في اليوم
+AUTO_KINDS = ("trends", "rivals")
+
+
+def auto_on(b: dict | None, what: str) -> bool:
+    return auto_paid() or bool(((b or {}).get("auto") or {}).get(what))
+
+
+def auto_day(what: str) -> int:
+    """💳 تقدير النقاط في اليوم لو التحديث التلقائي شغال (الترندات مرتين في اليوم، والمنافسين مرة في الأسبوع)."""
+    k = auto_costs()
+    if what == "trends":
+        return int(k["trends"] * (86400 / trends.EVERY))
+    return int(math.ceil((k["rivals_refresh"] + k["rivals_discover"] + k["rivals_brief"]) / (rivals.STALE / 86400)))
+
+
+class AutoIn(BaseModel):
+    what: str
+    on: bool
+    bid: str = ""   # العلامة (من صفحة العقل)، وإلا العلامة المفتوحة
+
+
+@app.put("/api/auto-on")
+def auto_set(body: AutoIn):
+    if body.what not in AUTO_KINDS:
+        raise HTTPException(400, "اختيار غير معروف")
+    bid = body.bid if body.bid and brain_row(body.bid) else rivals_client()
+    update_brain(bid, lambda d: d.setdefault("auto", {}).update({body.what: bool(body.on)}))
+    if body.on:
+        auto_tick()
+    return {"on": body.on, "day": auto_day(body.what)}
+
+
+def auto_tick() -> None:
+    """🔁 من المجدول: لو التحديث التلقائي شغال للعلامة، الترندات والمنافسين بيتحدّثوا في معادهم حتى لو الصفحة مقفولة."""
+    bid = active_client_id()
+    b = brain_row(bid) if bid else None
+    if not b:
+        return
+    if auto_on(b, "trends") and (b.get("market") or b.get("domain")) and time.time() - float((b.get("trends") or {}).get("checked_at") or 0) > trends.EVERY:
+        start_trends(bid)
+    if auto_on(b, "rivals"):
+        rivals_auto(bid)
+
+
 @app.get("/api/auto-costs")
 def auto_costs():
     """💳 تكلفة الأزرار اللي كانت بتشتغل لوحدها، علشان تتكتب على الزرار قبل الضغط."""
@@ -6104,7 +6149,8 @@ def rivals_out(bid: str) -> dict:
             "items": items, "approved": sum(1 for i in items if i["state"] == "approved"), "pending": sum(1 for i in items if i["state"] == "pending"),
             "digest": c.get("digest") or {}, "trending": c.get("trending") or [], "status": c.get("status") or "", "step": c.get("step"),
             "error": c.get("error"), "updated_at": c.get("updated_at"), "found_at": c.get("found_at"), "excluded": len(c.get("excluded") or []),
-            "audience": aud, "brief_due": bool(ok) and rivals.sig(ok) != aud.get("sig"), "audiences": b.get("audiences") or []}
+            "audience": aud, "brief_due": bool(ok) and rivals.sig(ok) != aud.get("sig"), "audiences": b.get("audiences") or [],
+            "auto": auto_on(b, "rivals"), "auto_day": auto_day("rivals")}
 
 
 def rivals_client() -> str:
@@ -6253,7 +6299,7 @@ def rivals_get():
     c = rivals_state(bid)
     if c.get("status") == "working" and bid not in RIVALS_BUSY:   # السيرفر اتعمله ريستارت والشغل وقف
         rivals_set(bid, status="failed", step=None, error="توقف العمل، وسيُستكمل تلقائيًا في المرة القادمة")
-    elif auto_paid():
+    elif auto_on(brain_row(bid), "rivals"):
         rivals_auto(bid)
     return rivals_out(bid)
 
@@ -7172,6 +7218,10 @@ def scheduler_loop() -> None:
             pass
         try:   # 📊 تقرير الأسبوع: آخر فيديوهاتك تتحلل لوحدها كل أسبوع (من غير زرار)
             batch_weekly()
+        except Exception:  # noqa: BLE001
+            pass
+        try:   # 🔁 الترندات والمنافسين لو العميل شغّل التحديث التلقائي
+            auto_tick()
         except Exception:  # noqa: BLE001
             pass
         time.sleep(20)
@@ -34797,7 +34847,8 @@ def trends_out(bid: str) -> dict:
     t = trends_state(bid)
     items = t.get("items") or []
     return {"items": items, "new": sum(1 for x in items if not x.get("seen")), "status": "working" if bid in TRENDS_BUSY else t.get("status") or "idle",
-            "error": t.get("error"), "checked_at": t.get("checked_at"), "live": rivals.live(), "market": (brain_row(bid) or {}).get("market") or ""}
+            "error": t.get("error"), "checked_at": t.get("checked_at"), "live": rivals.live(), "market": (brain_row(bid) or {}).get("market") or "",
+            "auto": auto_on(brain_row(bid), "trends"), "auto_day": auto_day("trends")}
 
 
 def run_trends(bid: str) -> None:
@@ -34846,7 +34897,7 @@ def brain_trends(bid: str):
     if b is None:
         raise HTTPException(404, "هذا العميل غير موجود")
     t = b.get("trends") or {}
-    if auto_paid() and (b.get("market") or b.get("domain")) and time.time() - float(t.get("checked_at") or 0) > trends.EVERY:
+    if auto_on(b, "trends") and (b.get("market") or b.get("domain")) and time.time() - float(t.get("checked_at") or 0) > trends.EVERY:
         start_trends(bid)
     return trends_out(bid)
 
