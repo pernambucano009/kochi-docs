@@ -39,6 +39,33 @@ KIND = ("hi", "mid", "lo", "edge")
 _D_OK = re.compile(r"^[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]{2,1200}$")
 
 
+# 🧭 معنى كل رسمة جاهزة (للموديل وهو بيختار رسمة على قد معنى الجملة، مش على كلمة فيها)
+FIG_MEANS = {"laptop": "laptop / computer / office work", "phone": "smartphone / app", "keyboard": "keyboard / typing / writing",
+             "terminal": "code terminal / programming", "padlock": "padlock / security / privacy", "vault": "safe vault / money / savings",
+             "plot": "rising chart / growth / results / numbers", "cabinet": "filing cabinet / storage", "router": "wifi router / internet",
+             "dish": "satellite dish / broadcast / ads / reach", "query": "question mark / a question", "drawer": "file drawer / documents",
+             "basket": "shopping basket / buying", "plug": "power plug / energy / charging", "hub": "connected nodes / team / community",
+             "relay": "relay / passing on", "settle": "neatly arranged blocks / organizing", "format": "document format", "rebuild": "rebuilding blocks",
+             "stack": "stacked layers / server stack", "loupe": "magnifying glass / searching / details", "lockers": "lockers / storage units",
+             "rail": "clothes rail / fashion", "sieve": "sieve / filtering", "elevator": "elevator / steps / levels", "terrain": "terrain / landscape",
+             "riffle": "shuffled cards", "exploded": "exploded layers / design", "phosphor": "glowing screen", "slow": "hourglass / time / patience",
+             "turntable": "record turntable / music", "branches": "branching paths / choices", "patch": "patch / fixing"}
+
+
+def plan_messages(sentences: list[str]) -> list[dict]:
+    """رسمة لكل جملة على قد معناها: رسمة جاهزة لو مطابقة فعلًا، وإلا شيء ملموس واحد يترسم يعبّر عن الجملة."""
+    figs = "\n".join(f"- {k}: {v}" for k, v in FIG_MEANS.items())
+    lines = "\n".join(f"[{i}] {t}" for i, t in enumerate(sentences))
+    return [{"role": "system", "content": "You pick one simple line-art object to illustrate each spoken sentence of a short video. Return JSON only."},
+            {"role": "user", "content": (
+                "For each sentence, choose ONE concrete object that a viewer instantly connects with what the sentence MEANS (its main idea, "
+                "not a random word in it). Use a ready drawing only if it truly matches the meaning; otherwise name a concrete, drawable object "
+                "in 1-3 English words (e.g. 'dumbbell', 'coffee cup', 'calendar', 'toothbrush', 'house key'). No people, no faces, no text, "
+                "no abstract shapes. Avoid repeating the same object in neighbouring sentences.\n\n"
+                f"Ready drawings:\n{figs}\n\nSentences:\n{lines}\n\n"
+                'Return {"items": [{"i": 0, "fig": "ready drawing key or empty", "draw": "object to draw if no ready drawing, else empty"}]}')}]
+
+
 def pick_fig(text: str) -> str:
     t = " " + norm(text)
     return next((f for rx, f in _WORDS if rx.search(t)), "")

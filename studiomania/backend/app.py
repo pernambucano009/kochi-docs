@@ -21350,14 +21350,50 @@ def hair_drawing(word: str, context: str) -> str | None:
     return sl
 
 
+def hair_plan(blocks: list[dict]) -> dict[int, dict]:
+    """🧭 الموديل بيقرا كل الجمل مرة واحدة ويختار لكل جملة رسمة على قد معناها (جاهزة أو شيء ملموس يترسم). لو وقع: {} والقديم بيشتغل."""
+    todo = [(i, " ".join(w["w"] for w in b.get("words") or []) or str(b.get("text") or "")) for i, b in enumerate(blocks)
+            if b.get("kind") == "hairfig" and not b.get("fig") and not b.get("draw")]
+    if not todo or atlas.mock_mode() or not atlas.api_key():
+        return {}
+    try:
+        raw = ad_json(series_chat(hairdraw.plan_messages([t for _, t in todo])), "اختيار رسومات الخطوط الرفيعة")
+    except (HTTPException, RuntimeError, ValueError):
+        return {}
+    out = {}
+    for it in raw.get("items") or []:
+        try:
+            k = int(it.get("i"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= k < len(todo):
+            fig = str(it.get("fig") or "").strip()
+            out[todo[k][0]] = {"fig": fig if fig in hairdraw.FIGS else "", "draw": re.sub(r"[^\w\s-]", "", str(it.get("draw") or "")).strip()[:40]}
+    return out
+
+
 def hair_assign(pid: str, blocks: list[dict]) -> None:
-    """✏️ كل hairfig: رسمة جاهزة على قدر النص، وإذا لا يوجد، رسمة جديدة لأهم كلمة (من المكتبة أو تُرسم)."""
+    """✏️ كل hairfig: رسمة على قد معنى الجملة (الموديل بيختار جاهزة أو بيسمّي شيء يترسم)، ولو الموديل وقع: مطابقة كلمات زي الأول."""
     new = 0
-    for b in blocks:
+    plan = hair_plan(blocks)
+    for bi, b in enumerate(blocks):
         if b.get("kind") != "hairfig" or b.get("fig") or b.get("draw"):
             continue
         ws = [w["w"] for w in b.get("words") or []] or str(b.get("text") or "").split()
         text = " ".join(ws)
+        pl = plan.get(bi)
+        if pl and pl["fig"]:
+            b["fig"] = pl["fig"]
+            continue
+        if pl and pl["draw"]:
+            had = (HAIRDRAW_DIR / f"{hairdraw.slug(pl['draw'])}.json").exists()
+            if had or new < HAIRDRAW_NEW_MAX:
+                typo_set(pid, step=f"✏️ جارٍ رسم «{pl['draw']}» بخط رفيع")
+                sl = hair_drawing(pl["draw"], text)
+                new += 0 if had else 1
+                if sl:
+                    b["draw"] = sl
+                    continue
         fig = hairdraw.pick_fig(text)
         if fig:
             b["fig"] = fig
